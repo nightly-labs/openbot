@@ -1,4 +1,5 @@
 import type { QueueDelivery } from "@openbot/contracts/ipc";
+import { awaitingReplyEnded } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { type Accessor, createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { agentAwaitingReplies } from "../../../awaiting-replies";
@@ -33,7 +34,7 @@ export function createQueueStore(deps: QueueStoreDeps) {
       agents: deps.props.agents,
       self: deps.props.agent,
       waits: deps.props.agentWaits,
-    }).filter((row) => !(hidden.has(row.id) && (row.state === "replied" || row.state === "failed")));
+    }).filter((row) => !(hidden.has(row.id) && awaitingReplyEnded(row.state)));
   });
   const [renderedQueueDeliveries, setRenderedQueueDeliveries] = createSignal<QueueDelivery[]>([]);
   const queuePanelVisible = createMemo(() => renderedQueueDeliveries().length > 0);

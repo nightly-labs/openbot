@@ -1,3 +1,23 @@
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import {
+  fillWorkflowFileExport,
+  parseWorkflowFolderAction,
+  WORKFLOW_MEDIA_CATALOG_MAX,
+  type WorkflowFileHostExport,
+  type WorkflowFileSaveResult,
+  type WorkflowMediaCatalog,
+  type WorkflowMediaCredits,
+  type WorkflowMediaProviders,
+} from "@openbot/contracts/ipc";
+import {
+  WORKFLOW_FOLDERS_CAPABILITY,
+  WORKFLOW_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflow-folders-v1";
+import {
+  WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
@@ -11,6 +31,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
@@ -19,17 +43,32 @@ import {
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import {
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_PORTABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import {
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
+import {
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_SUNRA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
+import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
 import {
+  decodeRemoteCreditMediaCredits,
   decodeRemoteHiggsfieldCredits,
   decodeRemoteHiggsfieldProviders,
   decodeRemoteMediaServiceAccounts,
   decodeRemoteMediaServiceCredits,
   decodeRemoteWorkflowDetail,
+  decodeRemoteWorkflowFileExport,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
@@ -44,6 +83,7 @@ import {
   decodeRemoteWorkflowSaveResult,
   decodeRemoteWorkflowSecret,
   decodeRemoteWorkflowStep,
+  decodeRemoteWorkflowStepSettings,
   decodeRemoteWorkflowSummary,
   decodeRemoteWorkflowVersionGraph,
   decodeRemoteWorkflowVersions,
@@ -51,13 +91,16 @@ import {
   workflowMediaProvidersOf,
 } from "@openbot/team-client/workflow-decoding";
 import type { Effect } from "effect";
+import { app, type BrowserWindow, dialog, type SaveDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { WorkflowsHandle } from "../../backend/workflows/workflows";
 import type { WorkflowGitHubDirectory } from "../github-rest";
 import type { HostEventsService } from "../host-events-service";
-import { acceptEmpty, type ResponseDecoder } from "../remote-host-decoding";
+import { acceptEmpty, decodeWorkflowFoldersSnapshotFromHost, type ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
 import type { RemoteWorkflowError } from "../remote-service-effects";
+import type { WorkflowFileExporter } from "../workflow-file-export";
+import type { WorkflowFoldersService } from "../workflow-folders-service";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import {
@@ -67,6 +110,7 @@ import {
   parseRetryWorkflowStep,
   parseRunWorkflowStep,
   parseSaveWorkflowGraph,
+  parseSetWorkflowPaused,
   parseStartWorkflowRun,
   parseWorkflowDraftId,
   parseWorkflowGitHubLastEvent,
@@ -90,7 +134,13 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_SUNRA_CAPABILITY
       | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY
       | typeof WORKFLOWS_MEDIA_CATALOG_CAPABILITY
-      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
+      | typeof WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY
+      | typeof WORKFLOWS_CREDIT_MEDIA_CAPABILITY
+      | typeof WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY
+      | typeof WORKFLOWS_STEP_SETTINGS_CAPABILITY
+      | typeof WORKFLOWS_PAUSE_CAPABILITY
+      | typeof WORKFLOWS_PORTABLE_CAPABILITY
+      | typeof WORKFLOW_FOLDERS_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -98,20 +148,29 @@ interface WorkflowRemoteServers {
     decoder: ResponseDecoder<T>,
     init?: RemoteRequestInit,
   ): Effect.Effect<T, RemoteWorkflowError>;
+  downloadAttachment(attachmentId: string, serverId: string): Effect.Effect<{ bytes: Uint8Array }, RemoteWorkflowError>;
 }
 
 interface WorkflowIpcDependencies {
   workflows: WorkflowsHandle;
   events: Pick<HostEventsService, "rotateWorkflowSecret">;
   github: WorkflowGitHubDirectory;
+  workflowFolders: Pick<WorkflowFoldersService, "read" | "change">;
   remoteServers: WorkflowRemoteServers;
+  workflowFiles: WorkflowFileExporter;
+  getMainWindow: () => BrowserWindow | null;
+  translate: AppTranslate;
 }
 
 export function workflowIpcHandlers({
   workflows,
   events,
   github,
+  workflowFolders,
   remoteServers,
+  workflowFiles,
+  getMainWindow,
+  translate,
 }: WorkflowIpcDependencies): Pick<IpcGroupHandlers, "workflows"> {
   function remote<T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: unknown): Promise<T> {
     if (!remoteServers.supportsCapability(serverId, WORKFLOWS_CAPABILITY))
@@ -122,6 +181,33 @@ export function workflowIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, WORKFLOWS_GITHUB_CAPABILITY))
       throw new Error(sourceText("error.workflow.serverTooOld"));
     return remote(serverId, path, decoder, body);
+  }
+  function remoteFolders(serverId: string, path: string, body: unknown) {
+    if (!remoteServers.supportsCapability(serverId, WORKFLOW_FOLDERS_CAPABILITY))
+      throw new Error(sourceText("error.team.workflowFoldersUnsupported"));
+    return remote(serverId, path, decodeWorkflowFoldersSnapshotFromHost, body);
+  }
+  async function chooseExportPath(name: string): Promise<string | null> {
+    const mainWindow = getMainWindow();
+    const options: SaveDialogOptions = {
+      title: translate("dialog.saveWorkflow"),
+      defaultPath: join(app.getPath("downloads"), name),
+      filters: [{ name: translate("dialog.filter.workflow"), extensions: ["json"] }],
+      showsTagField: false,
+    };
+    const result = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
+    return result.canceled || !result.filePath ? null : result.filePath;
+  }
+  async function saveExport(
+    source: WorkflowFileHostExport,
+    bytes: (fileId: string) => Promise<Uint8Array | null>,
+  ): Promise<WorkflowFileSaveResult> {
+    const filled = await fillWorkflowFileExport(source, bytes);
+    if (!filled.ok) return { saved: false, problem: filled.problem };
+    const path = await chooseExportPath(filled.name);
+    if (!path) return { saved: false, problem: null };
+    await writeFile(path, filled.text, "utf8");
+    return { saved: true, problem: null };
   }
   return {
     workflows: {
@@ -136,11 +222,44 @@ export function workflowIpcHandlers({
       }),
       create: scopedHandler(parseCreateWorkflow, {
         local: (input) => runCauseEffect(workflows.create(input)),
-        remote: (input, serverId) => remote(serverId, WORKFLOWS_ROUTES.create, decodeRemoteWorkflowDetail, input),
+        remote: ({ paused, ...input }, serverId) =>
+          remote(serverId, WORKFLOWS_ROUTES.create, decodeRemoteWorkflowDetail, {
+            ...input,
+            ...(paused && remoteServers.supportsCapability(serverId, WORKFLOWS_PAUSE_CAPABILITY) ? { paused } : {}),
+          }),
       }),
       rename: scopedHandler(parseRenameWorkflow, {
         local: (input) => runCauseEffect(workflows.rename(input)),
         remote: (input, serverId) => remote(serverId, WORKFLOWS_ROUTES.rename, decodeRemoteWorkflowSummary, input),
+      }),
+      setPaused: scopedHandler(parseSetWorkflowPaused, {
+        local: (input) => runCauseEffect(workflows.setPaused(input)),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_PAUSE_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          return remote(serverId, WORKFLOWS_PAUSE_ROUTES.pause, decodeRemoteWorkflowSummary, input);
+        },
+      }),
+      exportFile: scopedHandler(parseWorkflowId, {
+        local: async (workflowId) => {
+          const detail = await runCauseEffect(workflows.get(workflowId));
+          return saveExport(await runCauseEffect(workflowFiles.source(detail)), (fileId) =>
+            runCauseEffect(workflowFiles.bytes(fileId)),
+          );
+        },
+        remote: async (workflowId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_PORTABLE_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          const source = await remote(serverId, WORKFLOWS_PORTABLE_ROUTES.export, decodeRemoteWorkflowFileExport, {
+            workflowId,
+          });
+          return saveExport(source, (fileId) =>
+            runCauseEffect(remoteServers.downloadAttachment(fileId, serverId)).then(
+              (file) => file.bytes,
+              () => null,
+            ),
+          );
+        },
       }),
       delete: scopedHandler(parseWorkflowId, {
         local: (id) => runCauseEffect(workflows.remove(id)),
@@ -198,6 +317,14 @@ export function workflowIpcHandlers({
         local: (id) => runCauseEffect(workflows.run(id)),
         remote: (runId, serverId) => remote(serverId, WORKFLOWS_ROUTES.run, decodeRemoteWorkflowRunDetail, { runId }),
       }),
+      stepSettings: scopedHandler(parseWorkflowStepId, {
+        local: (stepId) => runCauseEffect(workflows.stepSettings(stepId)),
+        remote: (stepId, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, WORKFLOWS_STEP_SETTINGS_CAPABILITY))
+            throw new Error(sourceText("error.workflow.serverTooOld"));
+          return remote(serverId, WORKFLOWS_STEP_SETTINGS_ROUTES.read, decodeRemoteWorkflowStepSettings, { stepId });
+        },
+      }),
       rotateWebhookSecret: scopedHandler(parseWorkflowTrigger, {
         local: (input) => runCauseEffect(events.rotateWorkflowSecret(input)),
         remote: (input, serverId) =>
@@ -233,64 +360,106 @@ export function workflowIpcHandlers({
       }),
       mediaProviders: scopedQueryHandler({
         local: () => workflows.mediaProviders(),
-        remote: async (serverId) => {
-          if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
-            const accounts = await remote(
-              serverId,
-              WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
-              decodeRemoteMediaServiceAccounts,
-              {},
-            );
-            return workflowMediaProvidersOf(accounts);
-          }
-          const [sunra, higgsfield] = await Promise.all([
-            remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
-              ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
-              : { sunra: false },
-            remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
-              ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
-              : { higgsfield: false },
-          ]);
-          return { ...sunra, ...higgsfield, accounts: null };
-        },
+        remote: async (serverId) => ({
+          ...(await serviceProviders(serverId)),
+          ...(creditMedia(serverId) ? { openbot: true } : {}),
+        }),
       }),
       mediaCredits: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCredits()),
         remote: async (serverId) => {
-          if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
-            const accounts = await remote(
-              serverId,
-              WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
-              decodeRemoteMediaServiceCredits,
-              {},
-            );
-            return workflowMediaCreditsOf(accounts);
-          }
-          const [sunra, higgsfield] = await Promise.all([
-            remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
-              ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
-              : { sunra: null },
-            remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
-              ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
-              : { higgsfield: null },
+          const [services, credit] = await Promise.all([
+            serviceCredits(serverId),
+            creditMedia(serverId)
+              ? remote(serverId, WORKFLOWS_CREDIT_MEDIA_ROUTES.credits, decodeRemoteCreditMediaCredits, {})
+              : {},
           ]);
-          return { ...sunra, ...higgsfield, accounts: null };
+          return { ...services, ...credit };
         },
       }),
       mediaCatalog: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCatalog()),
-        remote: (serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
-            : Promise.resolve({ models: [] }),
+        remote: async (serverId) => {
+          const [credit, services] = await Promise.all([
+            creditMedia(serverId)
+              ? remote(serverId, WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
+              : { models: [] },
+            serviceCatalog(serverId),
+          ]);
+          return { models: [...credit.models, ...services.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX) };
+        },
       }),
       mediaPrice: scopedHandler(parseWorkflowMediaPrice, {
         local: (input) => runCauseEffect(workflows.mediaPrice(input)),
         remote: (input, serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
-            : Promise.resolve({ credits: null }),
+          remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
+            ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+            : remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.price, decodeRemoteWorkflowMediaPrice, input)
+              : Promise.resolve({ credits: null }),
+      }),
+      folders: scopedQueryHandler({
+        local: () => runCauseEffect(workflowFolders.read()),
+        remote: (serverId) => remoteFolders(serverId, WORKFLOW_FOLDERS_ROUTES.read, {}),
+      }),
+      folderAction: scopedHandler(parseWorkflowFolderAction, {
+        local: (action) => runCauseEffect(workflowFolders.change(action)),
+        remote: (action, serverId) => remoteFolders(serverId, WORKFLOW_FOLDERS_ROUTES.actions, action),
       }),
     },
   };
+
+  function creditMedia(serverId: string) {
+    return remoteServers.supportsCapability(serverId, WORKFLOWS_CREDIT_MEDIA_CAPABILITY);
+  }
+
+  async function serviceProviders(serverId: string): Promise<WorkflowMediaProviders> {
+    if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+      const accounts = await remote(
+        serverId,
+        WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
+        decodeRemoteMediaServiceAccounts,
+        {},
+      );
+      return workflowMediaProvidersOf(accounts);
+    }
+    const [sunra, higgsfield] = await Promise.all([
+      remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
+        ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+        : { sunra: false },
+      remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
+        ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
+        : { higgsfield: false },
+    ]);
+    return { ...sunra, ...higgsfield, accounts: null };
+  }
+
+  async function serviceCredits(serverId: string): Promise<WorkflowMediaCredits> {
+    if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY)) {
+      const accounts = await remote(
+        serverId,
+        WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
+        decodeRemoteMediaServiceCredits,
+        {},
+      );
+      return workflowMediaCreditsOf(accounts);
+    }
+    const [sunra, higgsfield] = await Promise.all([
+      remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
+        ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+        : { sunra: null },
+      remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
+        ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
+        : { higgsfield: null },
+    ]);
+    return { ...sunra, ...higgsfield, accounts: null };
+  }
+
+  function serviceCatalog(serverId: string): Promise<WorkflowMediaCatalog> {
+    if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY))
+      return remote(serverId, WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {});
+    if (remoteServers.supportsCapability(serverId, WORKFLOWS_MEDIA_CATALOG_CAPABILITY))
+      return remote(serverId, WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {});
+    return Promise.resolve({ models: [] });
+  }
 }

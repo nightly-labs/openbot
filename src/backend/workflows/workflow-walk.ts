@@ -11,6 +11,7 @@ import {
   type WorkflowMediaProvider,
   type WorkflowMediaSpecs,
   type WorkflowNode,
+  type WorkflowStepSource,
   workflowLoopEdges,
 } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
@@ -107,6 +108,7 @@ export function nextActions(
   const kinds = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const reasons = { before, loops, latest };
   const due = new Set<string>();
+  const thisRound = new Set<string>();
   const actions: WalkAction[] = [];
   for (const nodeId of graphOrder(graph.nodes, forward, scope)) {
     const current = latest.get(nodeId);
@@ -122,8 +124,10 @@ export function nextActions(
       const source = latest.get(edge.from);
       return source !== undefined && edgeActive(edge, source) && newer(edge);
     });
-    if (current && !nextPass && !ahead.some(newer)) continue;
+    const inputChanges = ahead.some((edge) => newer(edge) || thisRound.has(edge.from));
+    if (current && !nextPass && !inputChanges) continue;
     due.add(nodeId);
+    if (!current || inputChanges) thisRound.add(nodeId);
     if (ahead.some((edge) => due.has(edge.from) || isWaiting(latest.get(edge.from)))) continue;
     const outside = (before.get(nodeId) ?? []).length > edges.length;
     const answered = edges.some((edge) => {
@@ -169,6 +173,7 @@ function textEdges(
 export interface MediaInput {
   from: string;
   attachmentId: string;
+  file?: true;
 }
 
 export function mediaInputs(
@@ -177,9 +182,11 @@ export function mediaInputs(
   latest: ReadonlyMap<string, StoredWorkflowStep>,
 ): MediaInput[] {
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
-  return graph.edges.flatMap((edge) =>
-    edge.to === nodeId && edge.type === "image" ? edgeFile(nodes.get(edge.from), latest) : [],
-  );
+  return graph.edges.flatMap((edge) => {
+    if (edge.to !== nodeId || (edge.type !== "image" && edge.type !== "file")) return [];
+    const files = edgeFile(nodes.get(edge.from), latest);
+    return edge.type === "file" ? files.map((input) => ({ ...input, file: true as const })) : files;
+  });
 }
 
 export function agentFileInputs(
@@ -192,6 +199,41 @@ export function agentFileInputs(
   return [...new Set(files.map((file) => file.attachmentId))];
 }
 
+export interface StepRecord {
+  settings: WorkflowFields;
+  sources: WorkflowStepSource[];
+}
+
+export function stepRecord(
+  graph: WorkflowGraph,
+  node: WorkflowNode,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): StepRecord {
+  const nodes = new Map(graph.nodes.map((item) => [item.id, item]));
+  const sources = graph.edges.flatMap((edge) => {
+    if (edge.to !== node.id) return [];
+    const source = latest.get(edge.from);
+    const stepId = source && edgeActive(edge, source) ? source.id : null;
+    const attachmentId = edgeFile(nodes.get(edge.from), latest)[0]?.attachmentId ?? null;
+    return stepId === null && attachmentId === null ? [] : [{ from: edge.from, type: edge.type, stepId, attachmentId }];
+  });
+  return { settings: runtimeFields(node), sources };
+}
+
+export function usedMediaSettings(
+  kind: WorkflowMediaKind,
+  model: WorkflowMediaModel,
+  specs: WorkflowMediaSpecs,
+): WorkflowFields {
+  return {
+    model: model.id,
+    ...(specs.size ? {} : { aspect: specs.aspect }),
+    ...(kind === "image" && model.transparent ? { background: specs.transparent ? "transparent" : "solid" } : {}),
+    ...(specs.resolution ? { resolution: specs.resolution } : {}),
+    ...(kind === "video" ? { duration: specs.duration } : {}),
+  };
+}
+
 function edgeFile(node: WorkflowNode | undefined, latest: ReadonlyMap<string, StoredWorkflowStep>): MediaInput[] {
   if (node?.kind === "asset") {
     const attachmentId = fieldText(node, "fileId");
@@ -202,7 +244,8 @@ function edgeFile(node: WorkflowNode | undefined, latest: ReadonlyMap<string, St
   return source?.status === "done" && source.output ? [{ from: node.id, attachmentId: source.output }] : [];
 }
 
-export type MediaImageRole = "first" | "last" | "reference";
+export type MediaImageRole = "first" | "last" | "reference" | "file";
+export type MediaPictureRole = Exclude<MediaImageRole, "file">;
 
 export function mediaImages(
   fields: WorkflowFields,
@@ -213,6 +256,7 @@ export function mediaImages(
   const first = frame("firstFrame");
   const last = frame("lastFrame");
   return inputs.flatMap((input) => {
+    if (input.file) return kind === "video" ? [{ role: "file" as const, attachmentId: input.attachmentId }] : [];
     const roles: MediaImageRole[] = [];
     if (input.from === first) roles.push("first");
     if (input.from === last) roles.push("last");
@@ -257,6 +301,17 @@ function edgeInputs(join: boolean, edges: readonly WorkflowEdge[], reasons: Reas
     const reason = missingAnswer(source, reasons, new Set());
     return reason ? [reason] : [];
   });
+}
+
+export function endedWithoutAnswer(
+  graph: WorkflowGraph,
+  nodeId: string,
+  latest: ReadonlyMap<string, StoredWorkflowStep>,
+): boolean {
+  const source = latest.get(nodeId);
+  if (!source) return false;
+  const reasons = { before: incoming(graph.edges), loops: workflowLoopEdges(graph.nodes, graph.edges), latest };
+  return missingAnswer(source, reasons, new Set()) !== null;
 }
 
 function missingAnswer(source: StoredWorkflowStep, reasons: Reasons, seen: Set<string>): string | null {
@@ -386,7 +441,7 @@ export function modelStepPrompt(system: string, prompt: string, input: string): 
 const TRANSPARENT_ASK = {
   codex: "Give it a transparent background: a cut-out PNG with clear pixels around the subject.",
   grok: "Put the subject on one flat, solid background colour, with no shadow, floor, gradient or texture, and keep a margin around the subject. Use pure green #00FF00, or pure magenta #FF00FF when the subject is green. Do not use that colour in the subject.",
-} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra" | "higgsfield">, string>;
+} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra" | "higgsfield" | "openbot">, string>;
 
 export function mediaStepPrompt(
   fields: WorkflowFields,
@@ -396,7 +451,7 @@ export function mediaStepPrompt(
   provider: WorkflowMediaProvider,
 ): string {
   const ask =
-    provider === "sunra" || provider === "higgsfield"
+    provider === "sunra" || provider === "higgsfield" || provider === "openbot"
       ? ""
       : kind === "video"
         ? `Make one video of ${specs.duration} seconds at ${specs.resolution ?? "720p"}, aspect ratio ${specs.aspect}.`

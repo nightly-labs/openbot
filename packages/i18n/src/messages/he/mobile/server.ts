@@ -216,8 +216,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "אזל",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · מסתיים ב-{date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · הנתונים נשמרים עד {date}",
   "mobile.server.hosted.state.payment": "ממתין לתשלום",
   "mobile.server.hosted.state.setup": "בהגדרה",
+  "mobile.server.hosted.state.restoring": "משחזר נתונים",
   "mobile.server.hosted.state.starting": "מתחיל",
   "mobile.server.hosted.state.running": "פועל",
   "mobile.server.hosted.state.stopped": "נעצר",
@@ -340,6 +342,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "ממתין. המארח מריץ כמה תורות שהזיכרון שלו מאפשר.",
   "mobile.server.threads.hold.agentBusy": "ממתין לסיום עבודה אחרת של הסוכן הזה.",
   "mobile.server.threads.hold.oneTurn": "ממתין. הספק של הסוכן הזה מריץ תור אחד בכל פעם.",
+  "mobile.server.threads.hold.signIn": "ממתין. הספק של הסוכן הזה דורש התחברות.",
   "mobile.server.threads.offline": "יש להתחבר לשרת הזה כדי לראות את השרשורים שלו.",
   "mobile.server.threads.loading": "טוען שרשורים…",
   "mobile.server.threads.loadFailed": "לא ניתן לטעון את השרשורים של חלק מהסוכנים.",
@@ -446,6 +449,7 @@ export const messages = {
   "mobile.server.route.timezone": "אזור זמן",
   "mobile.server.route.personality": "אישיות הסוכן",
   "mobile.server.route.agents": "סוכנים",
+  "mobile.server.route.voiceModel": "זיהוי דיבור",
   "mobile.server.settings.storage": "אחסון",
   "mobile.server.route.storage": "אחסון",
   "mobile.server.route.storageFiles": "כל הקבצים",
@@ -571,6 +575,18 @@ export const messages = {
   "mobile.server.settings.timezoneSaveFailed": "לא ניתן לשמור את אזור הזמן. אפשר לנסות שוב.",
   "mobile.server.settings.timezoneUnavailable": "יש להתחבר לשרת הזה כבעלים או כמנהל כדי לשנות את אזור הזמן שלו.",
   "mobile.server.settings.timezoneUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את אזור הזמן שלו.",
+  "mobile.server.settings.voiceModelDescription":
+    "הסוכנים בשרת הזה משתמשים במודל הזה כדי לתמלל את הקול של סרטונים שאין להם כתוביות.",
+  "mobile.server.settings.voiceModelLoading": "טוען את זיהוי הדיבור…",
+  "mobile.server.settings.voiceModelLoadFailed": "לא ניתן לטעון את מודל זיהוי הדיבור של השרת.",
+  "mobile.server.settings.voiceModelSaveFailed": "לא ניתן לשנות את מודל זיהוי הדיבור. יש לנסות שוב.",
+  "mobile.server.settings.voiceModelUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את זיהוי הדיבור שלו.",
+  "mobile.server.settings.voiceModelReady": "מוכן",
+  "mobile.server.settings.voiceModelDownloading": "מוריד: {percent}",
+  "mobile.server.settings.voiceModelSize": "הורדה של {size}",
+  "mobile.server.settings.voiceModelDownload": "הורדה",
+  "mobile.server.settings.voiceModelCancel": "עצירת ההורדה",
+  "mobile.server.settings.voiceModelRemove": "הסרה",
   "mobile.server.settings.keySection": "מפתח השרת",
   "mobile.server.settings.keyChanged": "השינוי האחרון",
   "mobile.server.settings.keyChange": "החלפת מפתח",
@@ -648,6 +664,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "הוספת סוכנים",
   "mobile.server.browserProfiles.agentsHint":
     "נגיעה נותנת לסוכן את הפרופיל הזה, או מחזירה אותו לפרופיל המשותף. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
+  "mobile.server.browserProfiles.movedNote":
+    "ההתחברויות לאתרים נשארות בפרופיל הישן. סוכן שהועבר צריך להתחבר שוב לאתרים האלה.",
   "mobile.server.browserProfiles.clear": "ניקוי נתונים",
   "mobile.server.browserProfiles.clearTitle": "לנקות את הנתונים של {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1160,7 +1178,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkNumber": "קישור מספר",
   "mobile.server.connectors.whatsapp.ownNumberNote": "הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לפנות ל-OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "האנשים שאישרת יכולים לפנות ל-OpenBot. אנשים אחרים מקבלים קוד למסור לך.",
+    "הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לפנות ל-OpenBot. אנשים אחרים מקבלים קוד למסור לך.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp הסיר את השרת הזה ממכשירים מקושרים. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1401,10 +1419,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "לא ניתן לשנות את המודלים. אפשר לנסות שוב.",
   "mobile.server.providers.promptCache": "מטמון פרומפט",
   "mobile.server.providers.promptCacheHint":
-    "כמה זמן Claude שומר את ההקשר של סוכן במטמון בין תורות. שינוי נכנס לתוקף כש-Claude מתחיל שוב.",
-  "mobile.server.providers.promptCacheDefault": "ברירת המחדל של Claude Code",
+    "כמה זמן Claude ו-Pi שומרים את ההקשר של סוכן במטמון בין תורות. שינוי חל כשהספק מתחיל מחדש.",
+  "mobile.server.providers.promptCacheDefault": "ברירת המחדל של הספק",
   "mobile.server.providers.promptCacheHour": "שעה",
   "mobile.server.providers.promptCacheLoadFailed": "לא ניתן לטעון את זמן מטמון הפרומפט של השרת הזה.",
+  "mobile.server.providers.cacheExpiryCompaction": "לכווץ לפני שהמטמון פג",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "כשצ׳אט עם הקשר של 200K טוקנים או יותר לא פעיל עם מטמון של שעה, הסוכן מכווץ את ההקשר לפני שהמטמון פג. כך ההודעה הבאה לא קוראת שוב את כל ההקשר בלי מטמון.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "לא ניתן לטעון את הגדרת הכיווץ של השרת הזה.",
   "mobile.server.providers.compactWindow": "כיווץ צ׳אטים ב־",
   "mobile.server.providers.compactWindowHint":
     "Claude Code מסכם את התורות הישנים של צ׳אט כשהצ׳אט מגיע לגודל הזה. נמוך יותר שומר על תורות מהירים וזולים. גבוה יותר שומר יותר פרטים. מודל עם חלון קטן יותר מכווץ במגבלה שלו.",
@@ -1458,6 +1480,8 @@ export const messages = {
   "mobile.server.providers.codexKeyInUse":
     "ChatGPT משתמש במפתח הזה, ולא בתוכנית ChatGPT שלך. OpenAI מחייבת כל בקשה במפתח. השימוש בתוכנית לא מוצג.",
   "mobile.server.providers.codexKeyAlternative": "או להתחבר עם מפתח OpenAI API. OpenAI מחייבת כל בקשה במפתח.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse משתמש במפתח הזה, לא בהתחברות שלך. כדי להשתמש בהתחברות, יש להסיר את המפתח.",
   "mobile.server.providers.sectionUse": "שימוש",
   "mobile.server.providers.unused": "אף סוכן לא משתמש בו",
   "mobile.server.providers.usedByCount": {
@@ -1678,6 +1702,8 @@ export const messages = {
   "mobile.server.mcp.testFailed": "שרת ה-MCP לא ענה.",
   "mobile.server.mcp.connected": { one: "מחובר · כלי אחד", two: "מחובר · שני כלים", other: "מחובר · {count} כלים" },
   "mobile.server.mcp.signInOnComputer": "שרת ה-MCP הזה דורש התחברות. יש להתחבר מ-OpenBot במחשב ואז לבדוק שוב.",
+  "mobile.server.mcp.signIn": "התחברות",
+  "mobile.server.mcp.signInHere": "שרת MCP זה מבקש ממך להתחבר. הקש על התחברות ואז בדוק שוב.",
   "mobile.server.mcp.signedInDescription": "{server} מחובר לשרת ה-MCP הזה.",
   "mobile.server.mcp.signOut": "התנתקות",
   "mobile.server.mcp.saveFailed": "לא ניתן לשמור את השינוי. אפשר לנסות שוב.",
@@ -1725,6 +1751,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 שעות",
   "mobile.server.planLimits.window.hours": { one: "שעה", two: "שעתיים", other: "{count} שעות" },
   "mobile.server.planLimits.window.minutes": "{minutes} דק׳",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "עדכונים",
   "mobile.server.settings.updateAvailable": "עדכון זמין",
   "mobile.server.route.updates": "עדכונים",
@@ -2063,4 +2090,41 @@ export const messages = {
   "mobile.server.transfer.copyAgents": "סוכנים להעתקה",
   "mobile.server.transfer.copyNext": "סוכנים מועתקים משתמשים בכללי האישור של {server}.",
   "mobile.server.transfer.copyNoServer": "יש להתחבר לשרת אחר כבעלים או כמנהל כדי להעתיק אליו סוכנים.",
+  "mobile.server.route.ownerTransfer": "העברת בעלות",
+  "mobile.server.ownerTransfer.unavailable": "יש להתחבר לשרת הזה כבעלים כדי להעביר בעלות.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot מארח את השרת הזה, ולכן אי אפשר להחליף את הבעלים שלו.",
+  "mobile.server.ownerTransfer.lede":
+    "הבעלים החדשים יקבלו אימייל ויצטרכו לאשר בזמן שהם מחוברים עם האימייל הזה. אחר כך הגישה שלך לשרת הזה תוסר.",
+  "mobile.server.ownerTransfer.email": "האימייל של הבעלים החדשים",
+  "mobile.server.ownerTransfer.send": "שליחה",
+  "mobile.server.ownerTransfer.sending": "בשליחה…",
+  "mobile.server.ownerTransfer.stays":
+    "סוכנים, צ'אטים, שגרות, התחברויות לספקים, מפתחות שמורים, פרטי כניסה בכספת, התחברויות בדפדפן ואפליקציות מחוברות נשארים בשרת. הבעלים החדשים יוכלו להשתמש בהם.",
+  "mobile.server.ownerTransfer.expiry": "הבקשה פגה אחרי 7 ימים.",
+  "mobile.server.ownerTransfer.confirmTitle": "להפוך את {email} לבעלים?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "כש־{email} יאשר, הוא יהפוך לבעלים של {server} והגישה שלך תוסר. הנתונים נשארים בשרת. הבקשה פגה אחרי 7 ימים.",
+  "mobile.server.ownerTransfer.confirm": "העברה",
+  "mobile.server.ownerTransfer.sendFailed": "הבקשה לא נשלחה.",
+  "mobile.server.ownerTransfer.loadFailed": "לא ניתן לקרוא את ההעברה הממתינה.",
+  "mobile.server.ownerTransfer.pending": "ממתין לבעלים החדשים",
+  "mobile.server.ownerTransfer.expires": "פג ב־{date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} צריך לאשר בזמן שהוא מחובר עם האימייל הזה. עד אז הבעלות נשארת שלך.",
+  "mobile.server.ownerTransfer.cancel": "ביטול העברה",
+  "mobile.server.ownerTransfer.cancelTitle": "לבטל את ההעברה?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} לא יוכל לאשר אותה יותר.",
+  "mobile.server.ownerTransfer.keep": "השארה",
+  "mobile.server.ownerTransfer.cancelFailed": "ההעברה לא בוטלה.",
+  "mobile.server.ownerTransfer.incomingTitle": "להפוך לבעלים של {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} רוצה להפוך אותך לבעלים של {server}. תהיה לך שליטה מלאה בשרת, והסוכנים, הצ'אטים, השגרות וההתחברויות השמורות נשארים בו. הגישה של {name} תוסר. כל מי שעדיין יכול להתחבר למחשב שמריץ את השרת יכול להשתמש בחשבון OpenBot שלך. כדאי להחליף את הסיסמאות ואת מפתחות ה-SSH שלו.",
+  "mobile.server.ownerTransfer.accept": "אישור",
+  "mobile.server.ownerTransfer.decline": "דחייה",
+  "mobile.server.ownerTransfer.accepted": "עכשיו הבעלות על {server} שלך.",
+  "mobile.server.ownerTransfer.acceptFailed": "לא ניתן לאשר את ההעברה",
+  "mobile.server.ownerTransfer.declineFailed": "לא ניתן לדחות את ההעברה",
+  "mobile.server.ownerTransfer.tryAgain": "אפשר לנסות שוב מאוחר יותר.",
+  "mobile.server.providers.updateAll": "עדכון הכול",
+  "mobile.server.providers.updateAllFailed": "חלק מהעדכונים לא התחילו. נסו שוב.",
 } as const satisfies PartialTranslation<typeof source>;

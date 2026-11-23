@@ -9,6 +9,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { Effect, Option, Schema } from "effect";
 import { writeFileAtomically } from "../atomic-json-file";
+import { isMissingFileError } from "../file-errors";
 import { isPathInside } from "../path-containment";
 
 export class AgentInstructionsFileRefused extends Schema.TaggedError<AgentInstructionsFileRefused>()(
@@ -131,6 +132,19 @@ const cliReadsFile = Effect.fn("WorkspaceInstructions.cliReads")(function* (
     if (Option.isSome(path) && path.value === file.path) return true;
   }
   return false;
+});
+
+const entryMissing = (path: string) =>
+  fileIo("read", () => lstat(path)).pipe(
+    Effect.as(false),
+    Effect.catch((failure) => Effect.succeed(isMissingFileError(failure.cause))),
+  );
+
+export const missingInstructionFileNames = Effect.fn("WorkspaceInstructions.missing")(function* (workspace: string) {
+  const missing: AgentInstructionFileName[] = [];
+  for (const fileName of AGENT_INSTRUCTION_FILE_NAMES)
+    if (yield* entryMissing(join(workspace, fileName))) missing.push(fileName);
+  return missing;
 });
 
 export const promptInstructionsFile = Effect.fn("WorkspaceInstructions.prompt")(function* (

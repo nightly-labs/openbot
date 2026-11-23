@@ -1,3 +1,4 @@
+import type { MobilePlatformLogoVariant } from "@openbot/brand";
 import {
   type ApprovalAutomationPreference,
   agentAutoApprovalEnabled,
@@ -10,6 +11,7 @@ import {
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import type { AppTextKey } from "@openbot/i18n";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import type { MobileInstallRequest } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from "../../action-sounds";
@@ -23,6 +25,7 @@ import {
 } from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
+import { readRestoreLastWorkspace, writeRestoreLastWorkspace } from "../../restore-workspace-preference";
 import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -118,10 +121,13 @@ const Settings = createSimpleContext({
     let notificationFocusNonce = 0;
     const [appSettingRowRequest, setAppSettingRowRequest] = createSignal<AppSettingRowRequest | null>(null);
     let appSettingRowNonce = 0;
+    const [mobileInstallRequest, setMobileInstallRequest] = createSignal<MobileInstallRequest | null>(null);
+    let mobileInstallNonce = 0;
     createEffect(appSettingsOpen, (open) => {
       if (open) return;
       setNotificationFocusRequest(null);
       setAppSettingRowRequest(null);
+      setMobileInstallRequest(null);
     });
     const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
       serverId: string;
@@ -133,6 +139,7 @@ const Settings = createSimpleContext({
         ...DEFAULT_GENERAL_SETTINGS,
         taskSound: readTaskSound(),
         sendShortcut: readSendShortcutMode(),
+        restoreLastWorkspace: readRestoreLastWorkspace(),
         showAgentSteps: readShowAgentSteps(),
         compactMessageActions: readCompactMessageActions(),
         soundFeedback: isActionSoundEnabled(),
@@ -247,6 +254,9 @@ const Settings = createSimpleContext({
       }
       if (previous.showAgentSteps !== value.showAgentSteps) {
         setShowAgentSteps(value.showAgentSteps);
+      }
+      if (previous.restoreLastWorkspace !== value.restoreLastWorkspace) {
+        writeRestoreLastWorkspace(value.restoreLastWorkspace);
       }
       if (previous.compactMessageActions !== value.compactMessageActions) {
         setCompactMessageActions(value.compactMessageActions);
@@ -447,6 +457,15 @@ const Settings = createSimpleContext({
     function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
       setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
       openAppSettings(trigger, "hosted-servers");
+    }
+
+    function openMobileInstall(platform: MobilePlatformLogoVariant, trigger?: HTMLElement | null): void {
+      setMobileInstallRequest({ platform, nonce: ++mobileInstallNonce });
+      openAppSettings(trigger, "mobile-connect");
+    }
+
+    function clearMobileInstallRequest(): void {
+      setMobileInstallRequest(null);
     }
 
     onSettled(() => {
@@ -680,6 +699,9 @@ const Settings = createSimpleContext({
       openAppSettingRow,
       hostedServerDeleteRequest,
       openHostedServerDelete,
+      mobileInstallRequest,
+      openMobileInstall,
+      clearMobileInstallRequest,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,

@@ -3,7 +3,11 @@ import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { isDynamicRecord, type DynamicRecord as RpcRecord } from "@openbot/contracts/runtime-values";
 
-let sessionFile = join(process.env.FAKE_DIR ?? process.cwd(), `pi-${process.pid}.jsonl`);
+const sessionArgument = process.argv.indexOf("--session");
+let sessionFile =
+  sessionArgument >= 0
+    ? String(process.argv[sessionArgument + 1])
+    : join(process.env.FAKE_DIR ?? process.cwd(), `pi-${process.pid}.jsonl`);
 
 function log(entry: RpcRecord): void {
   const path = process.env.FAKE_LOG;
@@ -50,7 +54,7 @@ function exit(reason: string): void {
   process.exit(0);
 }
 
-log({ event: "start" });
+log({ event: "start", sessionFile });
 process.on("SIGTERM", () => exit("SIGTERM"));
 createInterface({ input: process.stdin })
   .on("line", (line) => {

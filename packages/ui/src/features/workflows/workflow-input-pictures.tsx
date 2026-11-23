@@ -6,14 +6,14 @@ import { resultValue, useBoard, type WfnBoard } from "./workflow-board";
 
 export type InputRole = "reference" | "first" | "last" | "both";
 
-const ROLE_TEXT = {
+export const ROLE_TEXT = {
   reference: "workflow.video.role.reference",
   first: "workflow.video.role.first",
   last: "workflow.video.role.last",
   both: "workflow.video.role.both",
 } as const satisfies Record<InputRole, AppTextKey>;
 
-const ROLE_BADGE = {
+export const ROLE_BADGE = {
   first: "workflow.video.badge.first",
   last: "workflow.video.badge.last",
   both: "workflow.video.badge.both",

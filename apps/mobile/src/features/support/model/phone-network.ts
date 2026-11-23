@@ -42,7 +42,15 @@ function ipv6(address: string): readonly number[] | null {
   return all.every((group) => Number.isInteger(group) && group >= 0 && group <= 0xffff) ? all : null;
 }
 
+export type PhoneVpnState = "off" | "on" | "proxy" | "unknown";
+
+function isProxyTunnel(entry: InterfaceAddress): boolean {
+  const v4 = ipv4(entry.address);
+  return v4 !== null && v4[0] === 198 && (v4[1] === 18 || v4[1] === 19);
+}
+
 function vpnName(entry: InterfaceAddress) {
+  if (isProxyTunnel(entry)) return "probably a proxy app such as Clash (tunnel 198.18.x.x)";
   const v6 = ipv6(entry.address);
   if (v6) {
     const [first = 0, second = 0, third = 0, , fifth = 0, sixth = 0] = v6;
@@ -85,6 +93,13 @@ function vpnText(reading: PhoneNetworkReading): string {
   }
   if (addresses.some((entry) => entry.vpn === false)) return "no VPN found";
   return "VPN: not known";
+}
+
+export function phoneVpnState(reading: PhoneNetworkReading): PhoneVpnState {
+  const addresses = reading.addresses ?? [];
+  if (addresses.some(isProxyTunnel)) return "proxy";
+  if (reading.connection === "vpn" || addresses.some((entry) => entry.vpn === true)) return "on";
+  return addresses.some((entry) => entry.vpn === false) ? "off" : "unknown";
 }
 
 export function phoneNetworkText(reading: PhoneNetworkReading): string {

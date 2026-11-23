@@ -5,10 +5,35 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { BILLING_PLAN_IDS, type BillingPlanId } from "@openbot/contracts/billing";
+import {
+  CUSTOM_SERVER_PAID_STATUSES,
+  type CustomServerPlan,
+  parseCustomServerPlan,
+} from "@openbot/contracts/custom-server-plans";
 import { HOSTED_PLAN_SIZE, HOSTED_SERVER_SIZE_NAMES } from "@openbot/contracts/hosted-servers";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
+import {
+  ARCHIVE_REGION,
+  abortUpload,
+  archiveScript,
+  B2_BUCKET,
+  type B2Key,
+  completeUpload,
+  deleteArchive,
+  newArchiveKey,
+  PART_BYTES,
+  partCount,
+  partUrls,
+  SERVER_BYTES,
+  shellWord,
+  startUpload,
+  uploadedParts,
+  wrapArchiveKey,
+  wrapKeySecret,
+} from "./pool-archive";
+import { hostingCopy, MACHINE_HOSTING, prepareScript, upgradeScript } from "./pool-machine";
 
 const logger = createOpenBotLogger("leaseweb-pool");
 const AUTH_API = resolve(import.meta.dirname, "../../apps/auth-api");
@@ -49,7 +74,6 @@ const AUTH_API_URL = {
   test: "https://openbot-auth-api-test.internal9671.workers.dev",
 };
 const SANDBOX_MOVE = "/root/openbot-move";
-const MACHINE_HOSTING = "/root/openbot-hosting";
 const MACHINE_ARCHIVE = "/root/openbot-move.tar";
 const EXPORT_WAIT_MS = 3 * 60 * 60_000;
 const RESTORE_WAIT_MS = 30 * 60_000;
@@ -70,6 +94,15 @@ const POOL_FIRST_START_SQL = `(operator_host IS NOT NULL AND observed_state = 's
 const TOKEN_HASH_PATTERN = /^[A-Za-z0-9_-]{43}$/u;
 const OFFER_WAIT_MS = 2 * 60_000;
 const ROOT = resolve(HOSTING, "../..");
+const DAY_MS = 24 * 60 * 60_000;
+const ARCHIVE_KEPT_MS = 14 * DAY_MS;
+const POOL_UNPAID_ARCHIVE_AFTER_MS = 3 * DAY_MS;
+const OPEN_STATUSES_SQL = "('active', 'trialing', 'past_due', 'unpaid', 'paused')";
+const ENDED_SUBSCRIPTION_STATUSES = new Set(["canceled", "incomplete_expired"]);
+const SUBSCRIPTION_PATTERN = /^sub_[A-Za-z0-9]{1,250}$/u;
+const OBJECT_KEY_PATTERN = /^[a-z]{2}\/[A-Za-z0-9:_-]{1,128}\/\d{13}\.tar\.age$/u;
+const ARCHIVE_VALUE_PATTERN = /^[A-Za-z0-9._-]{1,512}$/u;
+const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 
 function literal(value: string | number, pattern?: RegExp): string {
   if (typeof value === "number") {
@@ -88,21 +121,20 @@ const wranglerErrorSchema = z.object({
   error: z.object({ text: z.string(), notes: z.array(z.object({ text: z.string() })).default([]) }),
 });
 
-function d1Statement(sql: string, testDatabase: boolean) {
+type D1Target = "production" | "test" | "local";
+
+const D1_TARGET_ARGS: Record<D1Target, string[]> = {
+  production: ["openbot-auth", "--remote"],
+  test: ["openbot-auth-test", "--env", "test", "--remote"],
+  local: ["openbot-auth", "--local"],
+};
+
+function d1Statement(sql: string, database: D1Target) {
   let output: string;
   try {
     output = execFileSync(
       "bunx",
-      [
-        "wrangler",
-        "d1",
-        "execute",
-        testDatabase ? "openbot-auth-test" : "openbot-auth",
-        ...(testDatabase ? ["--env", "test"] : []),
-        "--remote",
-        "--json",
-        `--command=${sql}`,
-      ],
+      ["wrangler", "d1", "execute", ...D1_TARGET_ARGS[database], "--json", `--command=${sql}`],
       { cwd: AUTH_API, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
     );
   } catch (error) {
@@ -122,6 +154,22 @@ const workRowSchema = z.object({
   operator_host: z.string().regex(HOST_ID_PATTERN),
 });
 type WorkRow = z.infer<typeof workRowSchema>;
+const archiveRowSchema = workRowSchema.extend({
+  plan: z.string(),
+  email: z.string().nullable(),
+  plan_ended_at: z.number().int(),
+  subscription: z.string().regex(SUBSCRIPTION_PATTERN).nullable(),
+});
+type ArchiveRow = z.infer<typeof archiveRowSchema>;
+const storedArchiveSchema = z.object({
+  object_key: z.string().regex(OBJECT_KEY_PATTERN),
+  version_id: z.string().regex(ARCHIVE_VALUE_PATTERN),
+  server_id: z.string().regex(SERVER_ID_PATTERN),
+});
+const subscriptionSchema = z.object({
+  status: z.string(),
+  cancellation_details: z.object({ reason: z.string().nullable() }).nullish(),
+});
 
 const moveRowSchema = z.object({
   plan: z.string(),
@@ -219,6 +267,95 @@ interface CustomOptions {
   owner: string;
   customer: string;
   name: string;
+  plan: CustomServerPlan | null;
+}
+
+const PLAN_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ._+-]{0,58}[A-Za-z0-9.+]?$/u;
+const PRICE_PATTERN = /^\d{1,6}(?:\.\d{2})?$/u;
+const CUSTOM_PLAN_OPTIONS = ["price", "currency", "interval", "vcpu", "memory", "storage"] as const;
+const CUSTOM_CHECKOUT_OPEN_MS = 35 * 60 * 1000;
+const PAID_STATUSES_SQL = `(${CUSTOM_SERVER_PAID_STATUSES.map((status) => `'${status}'`).join(", ")})`;
+
+function customPlanOption(option: (name: string) => string | undefined, support: boolean): CustomServerPlan | null {
+  const name = option("plan");
+  if (name === undefined) {
+    if (support || CUSTOM_PLAN_OPTIONS.some((planOption) => option(planOption) !== undefined)) {
+      throw new Error("Give --plan=<name> with the plan options, or remove them.");
+    }
+    return null;
+  }
+  const price = option("price") ?? "";
+  if (!PLAN_NAME_PATTERN.test(name) || !PRICE_PATTERN.test(price)) {
+    throw new Error(
+      "Give --plan=<name> (letters, digits, spaces, '.', '_', '+' or '-') and --price=<amount>, for example --price=499 or --price=499.50.",
+    );
+  }
+  const plan = parseCustomServerPlan({
+    name,
+    amount: Math.round(Number(price) * 100),
+    currency: option("currency") ?? "eur",
+    interval: option("interval") ?? "month",
+    vcpu: Number(option("vcpu")),
+    memoryGb: Number(option("memory")),
+    storageGb: Number(option("storage")),
+    personalizedSupport: support,
+  });
+  if (!plan) {
+    throw new Error(
+      "Give --vcpu=<n> --memory=<GB> --storage=<GB> as whole numbers, --currency=eur|usd|pln|brl, --interval=month|year, and a price from 1.00 to 100000.00.",
+    );
+  }
+  return plan;
+}
+
+type CustomPlanChange = { kind: "show" } | { kind: "remove" } | { kind: "set"; plan: CustomServerPlan };
+
+const customPlanRowSchema = z.object({
+  name: z.string(),
+  hosted: z.number(),
+  plan_name: z.string().nullable(),
+  amount: z.number().nullable(),
+  currency: z.string().nullable(),
+  billing_interval: z.string().nullable(),
+  vcpu: z.number().nullable(),
+  memory_gb: z.number().nullable(),
+  storage_gb: z.number().nullable(),
+  personalized_support: z.number().nullable(),
+  subscription_status: z.string().nullable(),
+  checkout_session_id: z.string().nullable(),
+  updated_at: z.number().nullable(),
+});
+
+const hostIdRowSchema = z.object({ host_id: z.string() });
+
+function customPlanChangeableSql(now: number) {
+  return `(custom_server_offers.subscription_status IS NULL OR custom_server_offers.subscription_status NOT IN ${PAID_STATUSES_SQL})
+    AND NOT (custom_server_offers.checkout_session_id IS NOT NULL
+      AND custom_server_offers.updated_at > ${literal(now - CUSTOM_CHECKOUT_OPEN_MS)})`;
+}
+
+function customPlanOfRow(row: z.infer<typeof customPlanRowSchema>): CustomServerPlan | null {
+  if (row.plan_name === null) return null;
+  return parseCustomServerPlan({
+    name: row.plan_name,
+    amount: row.amount,
+    currency: row.currency,
+    interval: row.billing_interval,
+    vcpu: row.vcpu,
+    memoryGb: row.memory_gb,
+    storageGb: row.storage_gb,
+    personalizedSupport: row.personalized_support === 1,
+  });
+}
+
+function describeCustomPlan(plan: CustomServerPlan) {
+  return `${plan.name}: ${(plan.amount / 100).toFixed(2)} ${plan.currency.toUpperCase()} each ${plan.interval}, ${plan.vcpu} vCPU, ${plan.memoryGb} GB memory, ${plan.storageGb} GB storage${plan.personalizedSupport ? ", personalized support" : ""}`;
+}
+
+function customPlanChange(args: string[], option: (name: string) => string | undefined): CustomPlanChange {
+  if (args.includes("--remove")) return { kind: "remove" };
+  const plan = customPlanOption(option, args.includes("--support"));
+  return plan ? { kind: "set", plan } : { kind: "show" };
 }
 
 const SANDBOX_SSH = `ssh -i "$d/key" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes \\
@@ -284,7 +421,12 @@ function referenceLabel(reference: string) {
     .join(" ");
 }
 
+const alertCode = (value: string) => `\`${value.replaceAll("`", "'")}\``;
 const gigabytes = (bytes: number) => `${(bytes / 1e9).toFixed(1)} GB`;
+const elapsedText = (milliseconds: number) => {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000));
+  return seconds < 120 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+};
 
 function packBytes(pack: { value: number; unit: string } | null | undefined) {
   const scale = { GB: 1e9, TB: 1e12 }[pack?.unit ?? ""];
@@ -339,6 +481,7 @@ function toVps(body: unknown, key: string): Vps {
 
 class Pool {
   readonly #apply: boolean;
+  readonly #database: D1Target;
   readonly #testDatabase: boolean;
   readonly #keys: { name: string; key: string }[];
   readonly #found = new Map<string, Vps>();
@@ -347,30 +490,33 @@ class Pool {
   #operatorKeysBase64: string | undefined;
   readonly #boatKey: string | undefined;
   readonly #claimsToken: string | undefined;
+  readonly #environment: NodeJS.ProcessEnv;
 
   constructor(
     apply: boolean,
-    testDatabase: boolean,
+    database: D1Target,
     environment: NodeJS.ProcessEnv,
     operatorKeysFile: string | undefined = undefined,
   ) {
     this.#apply = apply;
-    this.#testDatabase = testDatabase;
+    this.#database = database;
+    this.#testDatabase = database === "test";
     this.#operatorKeysFile = operatorKeysFile;
     this.#operatorKeysHost = environment.OPERATOR_KEYS_HOST || undefined;
     this.#boatKey = environment.BOAT_API_KEY || undefined;
     this.#claimsToken = environment.SERVER_CLAIMS_ADMIN_TOKEN || undefined;
+    this.#environment = environment;
     this.#keys = Object.entries(environment).flatMap(([name, key]) =>
       /^LEASEWEB_API_KEY_[A-Z]+$/u.test(name) && key ? [{ name, key }] : [],
     );
   }
 
   #rows<Row>(sql: string, schema: z.ZodType<Row>): Row[] {
-    return z.array(schema).parse(d1Statement(sql, this.#testDatabase).results);
+    return z.array(schema).parse(d1Statement(sql, this.#database).results);
   }
 
   #write(sql: string): number {
-    const { changes } = d1Statement(sql, this.#testDatabase).meta;
+    const { changes } = d1Statement(sql, this.#database).meta;
     if (changes === undefined) throw new Error("Wrangler gave no D1 write result.");
     return changes;
   }
@@ -418,7 +564,9 @@ class Pool {
   #work() {
     const query = (where: string) =>
       this.#rows(
-        `SELECT server_id, operator_host FROM hosted_servers WHERE operator_host IS NOT NULL AND ${where}`,
+        `SELECT server_id, operator_host FROM hosted_servers WHERE operator_host IS NOT NULL AND ${where}
+           AND NOT EXISTS(SELECT 1 FROM hosted_server_archives a WHERE a.server_id = hosted_servers.server_id
+             AND a.deleted_at IS NULL AND a.restored_at IS NULL)`,
         workRowSchema,
       );
     return {
@@ -429,7 +577,33 @@ class Pool {
         `desired_state = 'running' AND observed_state NOT IN ('running', 'deleted') AND NOT COALESCE(${POOL_FIRST_START_SQL}, 0)`,
       ),
       reinstall: query("desired_state = 'deleted' AND observed_state = 'deleted'"),
+      archive: this.#rows(
+        `SELECT h.server_id, h.operator_host, h.plan, h.plan_ended_at,
+           (SELECT u.email FROM users u WHERE u.id = h.owner_user_id) AS email,
+           (SELECT s.stripe_subscription_id FROM billing_subscriptions s WHERE s.server_id = h.server_id
+            ORDER BY COALESCE(s.current_period_end, 0) DESC, s.updated_at DESC LIMIT 1) AS subscription
+         FROM hosted_servers h
+         WHERE h.operator_host IS NOT NULL AND h.desired_state = 'stopped' AND h.observed_error = 'plan_ended'
+           AND h.plan_ended_at IS NOT NULL AND NOT COALESCE(${POOL_FIRST_START_SQL}, 0)
+           AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = h.server_id
+             AND s.status IN ${OPEN_STATUSES_SQL})
+           AND NOT EXISTS(SELECT 1 FROM hosted_server_archives a WHERE a.server_id = h.server_id
+             AND a.deleted_at IS NULL)
+         ORDER BY h.plan_ended_at`,
+        archiveRowSchema,
+      ),
     };
+  }
+
+  #dueArchives() {
+    return this.#rows(
+      `SELECT a.object_key, a.version_id, a.server_id FROM hosted_server_archives a
+       LEFT JOIN hosted_servers h ON h.server_id = a.server_id
+       WHERE a.deleted_at IS NULL AND ((a.delete_after <= ${literal(Date.now())} AND h.desired_state != 'running')
+         OR a.restored_at IS NOT NULL OR h.server_id IS NULL OR h.desired_state = 'deleted')
+       ORDER BY a.delete_after`,
+      storedArchiveSchema,
+    );
   }
 
   #readySql() {
@@ -498,7 +672,9 @@ class Pool {
     for (const [action, rows] of Object.entries(work)) {
       for (const row of rows) logger.info(`sync would ${action} ${row.operator_host} (server ${row.server_id}).`);
     }
-    if (Object.values(work).every((rows) => rows.length === 0)) logger.info("sync has no work.");
+    const due = this.#dueArchives();
+    for (const row of due) logger.info(`sync would delete the archive of server ${row.server_id} in B2.`);
+    if (Object.values(work).every((rows) => rows.length === 0) && due.length === 0) logger.info("sync has no work.");
   }
 
   async add(ids: string[]) {
@@ -556,7 +732,7 @@ class Pool {
   async sync() {
     const work = this.#work();
     let failed = 0;
-    const each = async (row: WorkRow, task: (row: WorkRow) => Promise<void>) => {
+    const each = async <Row extends WorkRow>(row: Row, task: (row: Row) => Promise<void>) => {
       try {
         await task(row);
       } catch (error) {
@@ -567,6 +743,15 @@ class Pool {
     for (const row of work.stop) await each(row, (item) => this.#runService(item, "stopped"));
     for (const row of work.start) await each(row, (item) => this.#runService(item, "running"));
     for (const row of work.reinstall) await each(row, (item) => this.#reinstall(item));
+    for (const row of work.archive) await each(row, (item) => this.#archive(item));
+    for (const row of this.#dueArchives()) {
+      try {
+        await this.#deleteStoredArchive(row);
+      } catch (error) {
+        failed += 1;
+        logger.error(`The archive of server ${row.server_id} is not deleted.`, toLogValue(error));
+      }
+    }
     try {
       await this.#nameMachines();
     } catch (error) {
@@ -619,7 +804,12 @@ class Pool {
     const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
     logger.info(`${state === "stopped" ? "Stop" : "Start"} OpenBot on VPS ${machine.id} (server ${row.server_id}).`);
     if (!this.#apply) return;
-    this.#remote(machine, `systemctl ${state === "stopped" ? "disable" : "enable"} --now openbot.service`);
+    this.#remote(
+      machine,
+      state === "stopped"
+        ? "systemctl disable --now openbot.service"
+        : "rm -f /run/openbot-pre-stop && systemctl enable --now openbot.service",
+    );
     const changes = this.#write(
       `UPDATE hosted_servers SET observed_state = '${state}', updated_at = ${literal(Date.now())}
        WHERE server_id = ${literal(row.server_id, SERVER_ID_PATTERN)}
@@ -653,6 +843,163 @@ class Pool {
       changes === 1
         ? `VPS ${machine.id} is free. Run prepare to offer it for a new server.`
         : `The row of server ${row.server_id} changed.`,
+    );
+  }
+
+  #archiveKeys(): { b2: B2Key; wrapSecret: Buffer } {
+    const id = this.#environment.B2_KEY_ID_EU;
+    const secret = this.#environment.B2_APPLICATION_KEY_EU;
+    if (!id || !secret) throw new Error("B2_KEY_ID_EU and B2_APPLICATION_KEY_EU are not in the environment.");
+    return { b2: { id, secret }, wrapSecret: wrapKeySecret(this.#environment.HOSTED_ARCHIVE_KEY_SECRET) };
+  }
+
+  async #subscriptionEnd(subscription: string): Promise<"open" | "cancelled" | "payment_failed"> {
+    const key = this.#environment.STRIPE_SECRET_KEY;
+    if (!key) throw new Error("STRIPE_SECRET_KEY is not in the environment.");
+    const response = await fetch(`https://api.stripe.com/v1/subscriptions/${subscription}`, {
+      headers: { authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`Stripe answered ${response.status} for subscription ${subscription}.`);
+    const body = subscriptionSchema.parse(await response.json());
+    if (!ENDED_SUBSCRIPTION_STATUSES.has(body.status)) return "open";
+    return body.cancellation_details?.reason === "payment_failed" ? "payment_failed" : "cancelled";
+  }
+
+  async #archive(row: ArchiveRow) {
+    if (!row.subscription) {
+      logger.warn(`Server ${row.server_id} has no Stripe subscription. It is not archived. Examine it by hand.`);
+      return;
+    }
+    const end = await this.#subscriptionEnd(row.subscription);
+    if (end === "open") {
+      logger.info(`The plan of server ${row.server_id} is open in Stripe. It is not archived.`);
+      return;
+    }
+    const archiveAt = row.plan_ended_at + POOL_UNPAID_ARCHIVE_AFTER_MS;
+    if (end === "payment_failed" && Date.now() < archiveAt) {
+      logger.info(
+        `The last payment of server ${row.server_id} failed. Its archive starts after ${new Date(archiveAt).toISOString()}.`,
+      );
+      return;
+    }
+    const machine = await this.#vps(row.operator_host.replace("leaseweb:", ""));
+    logger.info(`Archive server ${row.server_id} from VPS ${machine.id} in B2, then reinstall the VPS.`);
+    if (!this.#apply) return;
+    const { b2, wrapSecret } = this.#archiveKeys();
+    const host = literal(row.operator_host, HOST_ID_PATTERN);
+    const server = literal(row.server_id, SERVER_ID_PATTERN);
+    this.#remote(machine, "bash -s", {
+      input: `${hostingCopy()}
+command -v age >/dev/null || DEBIAN_FRONTEND=noninteractive apt-get install -y -q age >/dev/null
+`,
+    });
+    const started = Date.now();
+    const serverBytes = Number(this.#remote(machine, SERVER_BYTES, { capture: true }).trim());
+    if (!Number.isSafeInteger(serverBytes) || serverBytes <= 0)
+      throw new Error(`VPS ${machine.id} has no server data.`);
+    const objectKey = `${ARCHIVE_REGION}/${row.server_id}/${Date.now()}.tar.age`;
+    const archiveKey = newArchiveKey();
+    const uploadId = await startUpload(b2, objectKey);
+    let versionId = "";
+    let archivedBytes = 0;
+    let kept = false;
+    try {
+      const output = this.#remote(
+        machine,
+        `bash -c ${shellWord(archiveScript(MACHINE_HOSTING))} archive ${archiveKey.recipient} ${PART_BYTES}`,
+        { input: `${partUrls(b2, objectKey, uploadId, partCount(serverBytes))}\n`, capture: true },
+      );
+      const upload = uploadedParts(output);
+      if (upload.parts.length === 0 || upload.sha256 === "" || upload.parts.some((part) => part.etag !== part.md5)) {
+        throw new Error(`B2 did not get each part of server ${row.server_id} as the machine sent it.`);
+      }
+      const head = await completeUpload(b2, objectKey, uploadId, upload.parts);
+      versionId = head.versionId;
+      if (head.status !== 200 || head.size !== upload.bytes || !ARCHIVE_VALUE_PATTERN.test(versionId)) {
+        throw new Error(`B2 has ${head.size} of ${upload.bytes} bytes of the archive of server ${row.server_id}.`);
+      }
+      const wrapped = wrapArchiveKey(wrapSecret, archiveKey.identity, row.server_id, objectKey);
+      const stored = this.#write(
+        `INSERT INTO hosted_server_archives(object_key, server_id, region, bucket, version_id, size_bytes, sha256,
+           wrapped_key, plan_ended_at, delete_after, created_at)
+         SELECT ${literal(objectKey, OBJECT_KEY_PATTERN)}, server_id, '${ARCHIVE_REGION}', '${B2_BUCKET}',
+           ${literal(versionId, ARCHIVE_VALUE_PATTERN)}, ${literal(upload.bytes)}, ${literal(upload.sha256, SHA256_PATTERN)},
+           ${literal(wrapped, ARCHIVE_VALUE_PATTERN)}, plan_ended_at, plan_ended_at + ${literal(ARCHIVE_KEPT_MS)},
+           ${literal(Date.now())}
+         FROM hosted_servers WHERE server_id = ${server} AND operator_host = ${host} AND desired_state = 'stopped'
+           AND plan_ended_at = ${literal(row.plan_ended_at)}`,
+      );
+      if (stored !== 1) {
+        logger.warn(`Server ${row.server_id} changed during its archive. It stays on VPS ${machine.id}.`);
+        return;
+      }
+      kept = true;
+      archivedBytes = upload.bytes;
+    } finally {
+      if (versionId === "") await abortUpload(b2, objectKey, uploadId);
+      else if (!kept) await deleteArchive(b2, objectKey, versionId).catch(() => undefined);
+    }
+    const released = this.#write(
+      `UPDATE hosted_servers SET operator_host = NULL, updated_at = ${literal(Date.now())}
+       WHERE server_id = ${server} AND operator_host = ${host} AND desired_state = 'stopped'`,
+    );
+    if (released !== 1) {
+      logger.warn(`Server ${row.server_id} was renewed after its archive. It stays on VPS ${machine.id}.`);
+      await this.#deleteStoredArchive({ object_key: objectKey, version_id: versionId, server_id: row.server_id });
+      return;
+    }
+    this.#write(`UPDATE operator_hosts SET assign_token_hash = NULL, seen_at = NULL WHERE host_id = ${host}`);
+    try {
+      await this.#setReference(machine, POOL_REFERENCE);
+      await this.#erase(machine);
+    } catch (error) {
+      throw new Error(
+        `Server ${row.server_id} is in B2, but VPS ${machine.id} still has its data. Run prepare --reinstall for it.`,
+        { cause: error },
+      );
+    }
+    logger.info(`VPS ${machine.id} is free. Run prepare to offer it for a new server.`);
+    await this.#alert(
+      [
+        `📦 **Archived** · ${row.plan} server · ${row.email === null ? "unknown account" : alertCode(row.email)}`,
+        `${row.server_id.slice(0, 8)} · ${gigabytes(archivedBytes)} in B2`,
+        `VPS ${machine.id} free`,
+        end === "payment_failed" ? "payment failed" : "cancelled",
+        elapsedText(Date.now() - started),
+      ].join(" · "),
+    );
+  }
+
+  async #alert(text: string) {
+    if (!this.#apply || this.#testDatabase) return;
+    const url = URL.parse(this.#environment.HOSTED_POOL_ALERT_WEBHOOK_URL?.trim() ?? "");
+    if (url?.protocol !== "https:") {
+      logger.warn("HOSTED_POOL_ALERT_WEBHOOK_URL is not an HTTPS URL. The Discord alert is not sent.");
+      return;
+    }
+    const sent = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: text, allowed_mentions: { parse: [] } }),
+      signal: AbortSignal.timeout(10_000),
+    }).then(
+      (response) => response.ok,
+      () => false,
+    );
+    if (!sent) logger.warn("The Discord alert was not sent.");
+  }
+
+  async #deleteStoredArchive(row: z.infer<typeof storedArchiveSchema>) {
+    logger.info(`Delete the archive of server ${row.server_id} in B2.`);
+    if (!this.#apply) return;
+    const { b2 } = this.#archiveKeys();
+    const answer = await deleteArchive(b2, row.object_key, row.version_id);
+    if (!answer.deleted)
+      throw new Error(`B2 answered ${answer.status} and keeps the archive of server ${row.server_id}.`);
+    this.#write(
+      `UPDATE hosted_server_archives SET deleted_at = ${literal(Date.now())}, wrapped_key = NULL
+       WHERE object_key = ${literal(row.object_key, OBJECT_KEY_PATTERN)} AND deleted_at IS NULL`,
     );
   }
 
@@ -858,39 +1205,19 @@ class Pool {
     return z.object({ password: z.string().min(1) }).parse(await response.json()).password;
   }
 
-  #hostingCopy() {
-    const archive = execFileSync("tar", ["-czf", "-", "--exclude=*.ts", "-C", resolve(HOSTING, ".."), "hosting"], {
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    return `set -euo pipefail
-rm -rf ${MACHINE_HOSTING}
-install -d -m 0700 ${MACHINE_HOSTING}
-base64 -d <<'OPENBOT_HOSTING' | tar -xz --no-same-owner --strip-components=1 -C ${MACHINE_HOSTING}
-${archive.toString("base64")}
-OPENBOT_HOSTING
-`;
-  }
-
   async #prepareMachine(machine: Vps, release: Release) {
     const keys = this.#operatorKeys();
     const password = this.#machineState(machine) === null ? await this.#rootPassword(machine) : undefined;
     if (password !== undefined)
       logger.info(`VPS ${machine.id} has no key of this computer. Sign in one time with the root password.`);
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
-    const script = `${this.#hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh prepare lsw-${machine.id} 1000 1000 '${release.url}' ${release.sha256} '${authApi}'
-bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
-`;
-    this.#remote(machine, "bash -s", { input: script, password });
+    this.#remote(machine, "bash -s", { input: prepareScript(machine.id, release, authApi, keys), password });
     await this.#restartMachine(machine);
   }
 
   #upgradeMachine(machine: Vps, release: Release) {
     const authApi = this.#testDatabase ? AUTH_API_URL.test : AUTH_API_URL.production;
-    const script = `${this.#hostingCopy()}
-bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha256} '${authApi}'
-`;
-    this.#remote(machine, "bash -s", { input: script });
+    this.#remote(machine, "bash -s", { input: upgradeScript(release, authApi) });
   }
 
   async #restartMachine(machine: Vps) {
@@ -943,7 +1270,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     );
     if (changes !== 1) throw new Error(`VPS ${machine.id} is not a free machine of the pool any more.`);
     try {
-      this.#remote(machine, "bash -s", { input: this.#hostingCopy() });
+      this.#remote(machine, "bash -s", { input: hostingCopy() });
       this.#remote(machine, `bash ${MACHINE_HOSTING}/move-from-boat.sh offer leaseweb:${machine.id}`, {
         input: `${token}\n`,
       });
@@ -1224,6 +1551,12 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
           : `VPS ${id} would get the reference ${label} <owner>, the hostname lsw-${id}, OpenBot with a claim for the owner, the bootstrap, and a restart.`,
       );
       if (resumed) this.#showCustomState(machine, owner);
+      if (options.plan) {
+        const { plan } = options;
+        logger.info(`The server would get the plan ${describeCustomPlan(plan)}.`);
+      } else {
+        logger.info("The server would get no plan: the owner uses it without a paywall. Add --plan=<name> to set one.");
+      }
       logger.info("Nothing changed. Run again with --apply.");
       return;
     }
@@ -1267,7 +1600,7 @@ bash ${MACHINE_HOSTING}/move-from-boat.sh upgrade '${release.url}' ${release.sha
     const hostname = `lsw-${id}`;
     const claim = install ? await this.#serverClaim(owner) : "";
     const authApi = this.#testDatabase ? ` --auth-api-url '${AUTH_API_URL.test}'` : "";
-    const script = `${this.#hostingCopy()}
+    const script = `${hostingCopy()}
 hostnamectl set-hostname ${hostname}
 ${
   install
@@ -1300,9 +1633,113 @@ bash ${MACHINE_HOSTING}/leaseweb-bootstrap.sh '${keys}'
     const after = await this.#waitOnline(machine);
     if (after.account !== owner) throw new Error(`OpenBot on VPS ${id} is not signed in to the owner.`);
     const remoteHost = this.#checkOwner(owner, after.hosts);
+    if (options.plan) this.#setCustomOffer(remoteHost, options.plan);
     logger.info(
       `VPS ${id} is ${label}: OpenBot ${after.version}, online, server ${remoteHost} of the owner. Address ${machine.address}.`,
     );
+  }
+
+  customPlan(host: string, change: CustomPlanChange) {
+    const hostId = literal(host, REMOTE_HOST_PATTERN);
+    const [row] = this.#rows(
+      `SELECT h.name, EXISTS(SELECT 1 FROM hosted_servers s WHERE s.server_id = h.host_id) AS hosted,
+         o.plan_name, o.amount, o.currency, o.billing_interval, o.vcpu, o.memory_gb, o.storage_gb,
+         o.personalized_support, o.subscription_status, o.checkout_session_id, o.updated_at
+         FROM remote_hosts h LEFT JOIN custom_server_offers o ON o.host_id = h.host_id
+        WHERE h.host_id = ${hostId}`,
+      customPlanRowSchema,
+    );
+    if (!row) throw new Error(`D1 has no OpenBot server ${host}.`);
+    if (row.hosted === 1)
+      throw new Error(`Server ${host} is a hosted server. Its plan is a hosted plan, not a custom plan.`);
+    const current = customPlanOfRow(row);
+    const paid = isOneOf(CUSTOM_SERVER_PAID_STATUSES, row.subscription_status ?? "");
+    logger.info(
+      current
+        ? `Server ${host} (${row.name}) has the plan ${describeCustomPlan(current)}. Subscription: ${row.subscription_status ?? "none"}.`
+        : `Server ${host} (${row.name}) has no plan: the owner uses it without a paywall.`,
+    );
+    if (change.kind === "show") return;
+    if (paid) throw new Error(`Server ${host} pays for its plan already. Change the subscription in Stripe, not here.`);
+    const now = Date.now();
+    if (row.checkout_session_id !== null && row.updated_at !== null && row.updated_at > now - CUSTOM_CHECKOUT_OPEN_MS) {
+      throw new Error(
+        `The owner of server ${host} opened the checkout less than 35 minutes ago and can still pay the plan. Run the command again later.`,
+      );
+    }
+    if (change.kind === "remove" && !current) {
+      logger.info("Nothing to remove.");
+      return;
+    }
+    if (!this.#apply) {
+      logger.info(
+        change.kind === "remove"
+          ? `The plan would be removed, and the owner would use the server without a paywall.`
+          : `The server would get the plan ${describeCustomPlan(change.plan)}.`,
+      );
+      logger.info("Nothing changed. Run again with --apply.");
+      return;
+    }
+    if (change.kind === "set") {
+      this.#setCustomOffer(host, change.plan);
+      return;
+    }
+    const removed = this.#rows(
+      `DELETE FROM custom_server_offers WHERE host_id = ${hostId} AND ${customPlanChangeableSql(now)} RETURNING host_id`,
+      hostIdRowSchema,
+    ).length;
+    if (removed !== 1) throw new Error(`The plan of server ${host} changed at the same time. Run the command again.`);
+    logger.info(`Server ${host} has no plan now. The owner uses it without a paywall.`);
+    this.#announceServersChanged(host);
+  }
+
+  #announceServersChanged(host: string) {
+    const now = literal(Date.now());
+    const members = this.#rows(
+      `INSERT INTO remote_auth_events(event_id, payload, created_at, attempts, next_attempt_at)
+       SELECT lower(hex(randomblob(16))), json_object('type', 'account-servers-changed', 'userId', user_id), ${now}, 0, ${now}
+         FROM remote_memberships WHERE host_id = ${literal(host, REMOTE_HOST_PATTERN)} AND status = 'active'
+       RETURNING event_id`,
+      z.object({ event_id: z.string() }),
+    ).length;
+    logger.info(`The apps of ${members} member(s) get the change within one minute.`);
+  }
+
+  #setCustomOffer(host: string, plan: CustomServerPlan) {
+    const now = Date.now();
+    const values = [
+      literal(host, REMOTE_HOST_PATTERN),
+      literal(plan.name, PLAN_NAME_PATTERN),
+      literal(plan.amount),
+      literal(plan.currency, /^[a-z]{3}$/u),
+      literal(plan.interval, /^(?:month|year)$/u),
+      literal(plan.vcpu),
+      literal(plan.memoryGb),
+      literal(plan.storageGb),
+      literal(plan.personalizedSupport ? 1 : 0),
+      literal(now),
+      literal(now),
+    ].join(", ");
+    const changes = this.#rows(
+      `INSERT INTO custom_server_offers(host_id, plan_name, amount, currency, billing_interval, vcpu, memory_gb, storage_gb, personalized_support, created_at, updated_at)
+       VALUES (${values})
+       ON CONFLICT(host_id) DO UPDATE SET plan_name = excluded.plan_name, amount = excluded.amount,
+         currency = excluded.currency, billing_interval = excluded.billing_interval, vcpu = excluded.vcpu,
+         memory_gb = excluded.memory_gb, storage_gb = excluded.storage_gb,
+         personalized_support = excluded.personalized_support, checkout_session_id = NULL, updated_at = excluded.updated_at
+       WHERE ${customPlanChangeableSql(now)}
+       RETURNING host_id`,
+      hostIdRowSchema,
+    ).length;
+    if (changes !== 1) {
+      throw new Error(
+        `Server ${host} pays for its plan already, or its owner opened the checkout less than 35 minutes ago. Change a paid subscription in Stripe, not here.`,
+      );
+    }
+    logger.info(
+      `Server ${host} has the plan ${describeCustomPlan(plan)}. The owner pays it when they open the server.`,
+    );
+    this.#announceServersChanged(host);
   }
 
   #showCustomState(machine: Vps, owner: string) {
@@ -1483,7 +1920,7 @@ exit "$status"`;
       state = this.#machineState(machine);
     } else {
       this.#remote(machine, "bash -s", {
-        input: `${this.#hostingCopy()}\nbash ${MACHINE_HOSTING}/move-from-boat.sh withdraw\n`,
+        input: `${hostingCopy()}\nbash ${MACHINE_HOSTING}/move-from-boat.sh withdraw\n`,
       });
     }
     if (state?.user !== "user" || state.data || state.enabled === "enabled") {
@@ -1762,13 +2199,18 @@ systemd-run --quiet --collect --unit=openbot-move-export bash ${SANDBOX_MOVE}/ru
 }
 
 const USAGE =
-  "Usage: leaseweb-pool.ts status | boat | free | traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>] | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... [--keys=<file>] [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> [--keys=<file>] [--apply] [--env=test]";
+  "Usage: leaseweb-pool.ts status | boat | free | traffic [--from=<YYYY-MM-DD>] [--to=<YYYY-MM-DD>] | add <VPS ID>... | remove <VPS ID>... | sync | prepare <VPS ID>... [--keys=<file>] [--reinstall] | move <server ID> <VPS ID | auto> [--keys=<file>] [--units=<unit>,...] [--docker] [--folders=<folder>,...] | custom <VPS ID> --owner=<email> --customer=<word> --name=<server name> [--plan=<name> --price=<amount> --vcpu=<n> --memory=<GB> --storage=<GB> [--currency=eur] [--interval=month] [--support]] [--keys=<file>] [--apply] [--env=test] | custom-plan <server ID> [--plan=<name> --price=<amount> --vcpu=<n> --memory=<GB> --storage=<GB> [--currency=eur] [--interval=month] [--support] | --remove] [--apply] [--env=test|local]";
 
 async function main(args: string[]) {
   const [command, ...operands] = args.filter((arg) => !arg.startsWith("--"));
   const option = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
   const keys = option("keys");
-  const pool = new Pool(args.includes("--apply"), args.includes("--env=test"), process.env, keys);
+  const environment = option("env");
+  if (environment !== undefined && environment !== "test" && environment !== "local") throw new Error(USAGE);
+  if (environment === "local" && command !== "custom-plan") {
+    throw new Error("--env=local is only for custom-plan: the other commands change Leaseweb machines.");
+  }
+  const pool = new Pool(args.includes("--apply"), environment ?? "production", process.env, keys);
   if (command === "status") pool.status();
   else if (command === "boat") pool.boat();
   else if (command === "free") await pool.free();
@@ -1793,7 +2235,10 @@ async function main(args: string[]) {
       owner: option("owner") ?? "",
       customer: option("customer") ?? "",
       name: option("name") ?? "",
+      plan: customPlanOption(option, args.includes("--support")),
     });
+  else if (command === "custom-plan" && operands.length === 1 && operands[0])
+    pool.customPlan(operands[0], customPlanChange(args, option));
   else throw new Error(USAGE);
 }
 

@@ -11,7 +11,14 @@ export const Route = createFileRoute("/v2/hosting/pool/assignment")({
         runApiResponse(
           Effect.gen(function* () {
             const body = yield* readJsonObject(request);
-            return json(yield* requestHostedServerService().poolAssignment(body.hostId, body.token));
+            return json(
+              yield* requestHostedServerService().poolAssignment(
+                body.hostId,
+                body.token,
+                body.restoreVersion,
+                body.restored,
+              ),
+            );
           }),
           hostedServerErrorResponse,
         ),

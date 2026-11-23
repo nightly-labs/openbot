@@ -3,6 +3,7 @@ import {
   type BillingPlanId,
   type BillingServerPlan,
   billingListPrices,
+  storageTierGb,
 } from "@openbot/contracts/billing";
 import {
   HOSTED_PLAN_SIZE,
@@ -32,7 +33,7 @@ function prices(plan: BillingPlanId) {
 export const MOCK_HOSTED_SERVER_CATALOG: HostedServerCatalog = {
   plans: BILLING_PLANS.map((plan) => ({
     id: plan.id,
-    diskGb: plan.storageGb,
+    diskGb: storageTierGb(plan.id, 0),
     memberLimit: plan.memberLimit,
     relativeSpeed: plan.relativeSpeed,
     prices: prices(plan.id),
@@ -71,6 +72,7 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
       error: "plan_ended",
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
+      dataKeptUntil: Date.now() + 12 * 24 * 60 * 60_000,
     },
   ];
   if (billingPlans) {
@@ -173,6 +175,7 @@ export function createMockHostedServers(billingPlans?: BillingServerPlan[]): Hos
           ? { state: "waking", error: null }
           : {},
       ),
+    openCustomCheckout: async () => ({ opened: true }),
     delete: async ({ serverId, confirmName }) => {
       const server = servers.find((entry) => entry.serverId === serverId);
       if (!server) throw new Error("The hosted server does not exist.");

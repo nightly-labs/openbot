@@ -1,14 +1,19 @@
 import {
-  type AgentAccessLevel,
-  canAdministerServer,
-  graphAgentIds,
   WORKFLOW_GROUP_FIELDS,
+  WORKFLOW_MEDIA_CATALOG_V1_ASPECTS,
+  WORKFLOW_STEP_NAME_FIELD,
   type WorkflowDetail,
   type WorkflowGraph,
+  type WorkflowMediaCatalog,
   type WorkflowRunDetail,
   type WorkflowRunPage,
   type WorkflowStep,
+  workflowNeedsAdmin,
 } from "@openbot/contracts/ipc";
+import {
+  WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
@@ -22,6 +27,10 @@ import {
   WORKFLOWS_MEDIA_CATALOG_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import {
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
+import {
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
@@ -29,6 +38,18 @@ import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import {
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_PORTABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import {
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import {
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKFLOWS_SUNRA_ROUTES,
@@ -40,10 +61,6 @@ import {
   WORKFLOWS_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { RoutineInputError } from "@openbot/team-client/routine-schedule";
-import type { Effect } from "effect";
-import { runCauseEffect } from "../../backend/effect-boundary";
-import { WorkflowStoreError } from "../../backend/workflows/workflow-store";
 import {
   parseCreateWorkflow,
   parseDecideWorkflowStep,
@@ -51,6 +68,7 @@ import {
   parseRetryWorkflowStep,
   parseRunWorkflowStep,
   parseSaveWorkflowGraph,
+  parseSetWorkflowPaused,
   parseStartWorkflowRun,
   parseWorkflowGitHubLastEvent,
   parseWorkflowGitHubRepository,
@@ -61,10 +79,10 @@ import {
 } from "../ipc/workflow-inputs";
 import type { TeamApiAgents, TeamApiWorkflows } from "./dependencies";
 import { HttpError } from "./http-error";
-import { isPeerHiddenProvider } from "./provider-visibility";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireAgentLevel, stringField, WEBRTC_FRAME_BODY_BUDGET } from "./request-helpers";
 import { runEventsEffect } from "./route-events";
+import { runWorkflowEffect as run, workflowMissing, workflowVisibility } from "./workflow-visibility";
 
 const WORKFLOW_PATHS = new Set<string>(Object.values(WORKFLOWS_ROUTES));
 const WORKFLOW_GITHUB_PATHS = new Set<string>(Object.values(WORKFLOWS_GITHUB_ROUTES));
@@ -72,10 +90,26 @@ const WORKFLOW_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_ROUTE
 const WORKFLOW_SUNRA_PATHS = new Set<string>(Object.values(WORKFLOWS_SUNRA_ROUTES));
 const WORKFLOW_HIGGSFIELD_PATHS = new Set<string>(Object.values(WORKFLOWS_HIGGSFIELD_ROUTES));
 const WORKFLOW_MEDIA_CATALOG_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_CATALOG_ROUTES));
+const WORKFLOW_MEDIA_CATALOG_V2_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_CATALOG_V2_ROUTES));
 const WORKFLOW_MEDIA_ACCOUNT_PATHS = new Set<string>(Object.values(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES));
+const WORKFLOW_CREDIT_MEDIA_PATHS = new Set<string>(Object.values(WORKFLOWS_CREDIT_MEDIA_ROUTES));
+const WORKFLOW_STEP_SETTINGS_PATHS = new Set<string>(Object.values(WORKFLOWS_STEP_SETTINGS_ROUTES));
+const WORKFLOW_PAUSE_PATHS = new Set<string>(Object.values(WORKFLOWS_PAUSE_ROUTES));
+const WORKFLOW_PORTABLE_PATHS = new Set<string>(Object.values(WORKFLOWS_PORTABLE_ROUTES));
 
-function workflowMissing(): never {
-  throw new HttpError(404, sourceText("error.workflow.missing"));
+function serviceCatalog(catalog: WorkflowMediaCatalog): WorkflowMediaCatalog {
+  return { models: catalog.models.filter((model) => model.provider !== "openbot") };
+}
+
+function catalogV1(catalog: WorkflowMediaCatalog): WorkflowMediaCatalog {
+  return {
+    models: serviceCatalog(catalog).models.flatMap(
+      ({ options: _options, inputs: _inputs, modes: _modes, ...model }) => {
+        const aspects = model.aspects.filter((aspect) => WORKFLOW_MEDIA_CATALOG_V1_ASPECTS.includes(aspect));
+        return aspects.length > 0 ? [{ ...model, aspects }] : [];
+      },
+    ),
+  };
 }
 
 function parse<A>(decode: (value: unknown) => A, body: unknown): A {
@@ -83,16 +117,6 @@ function parse<A>(decode: (value: unknown) => A, body: unknown): A {
     return decode(body);
   } catch (error) {
     throw new HttpError(400, error instanceof Error ? error.message : "Invalid workflow request.");
-  }
-}
-
-async function run<A>(operation: Effect.Effect<A, { readonly cause: unknown }>): Promise<A> {
-  try {
-    return await runCauseEffect(operation);
-  } catch (error) {
-    if (error instanceof WorkflowStoreError) throw new HttpError(error.code === "missing" ? 404 : 400, error.message);
-    if (error instanceof RoutineInputError) throw new HttpError(400, error.message);
-    throw error;
   }
 }
 
@@ -105,16 +129,17 @@ function placeOutputs(graph: WorkflowGraph): Map<string, string> {
   return places;
 }
 
-const GROUP_FIELD_KEYS: ReadonlySet<string> = new Set(Object.values(WORKFLOW_GROUP_FIELDS));
+const DISPLAY_FIELD_KEYS: ReadonlySet<string> = new Set([
+  ...Object.values(WORKFLOW_GROUP_FIELDS),
+  WORKFLOW_STEP_NAME_FIELD,
+]);
 
 function adminNodes(graph: WorkflowGraph): Map<string, string> {
   const nodes = new Map<string, string>();
   for (const node of graph.nodes) {
-    const kind = node.kind === "trigger" ? node.fields.trigger : node.kind === "output" ? node.fields.target : null;
-    if (kind !== "github" && kind !== "discord" && kind !== "telegram" && kind !== "slack" && kind !== "chat-channel")
-      continue;
+    if (!workflowNeedsAdmin(node)) continue;
     const fields = Object.keys(node.fields)
-      .filter((key) => !GROUP_FIELD_KEYS.has(key))
+      .filter((key) => !DISPLAY_FIELD_KEYS.has(key))
       .sort()
       .map((key) => [key, node.fields[key] ?? null]);
     nodes.set(node.id, JSON.stringify([node.kind, fields]));
@@ -153,17 +178,35 @@ export async function routeWorkflows(
   agents: Pick<TeamApiAgents, "listAgents">,
   hiddenAgentIds: ReadonlySet<string>,
 ): Promise<RouteOutcome> {
-  const { method, url, capabilities, member, request, json, protocol } = context;
+  const { method, url, capabilities, member, request, json } = context;
   const path = url.pathname;
   const githubPath = WORKFLOW_GITHUB_PATHS.has(path);
   const mediaPath = WORKFLOW_MEDIA_PATHS.has(path);
   const sunraPath = WORKFLOW_SUNRA_PATHS.has(path);
   const higgsfieldPath = WORKFLOW_HIGGSFIELD_PATHS.has(path);
   const catalogPath = WORKFLOW_MEDIA_CATALOG_PATHS.has(path);
+  const catalogV2Path = WORKFLOW_MEDIA_CATALOG_V2_PATHS.has(path);
   const accountPath = WORKFLOW_MEDIA_ACCOUNT_PATHS.has(path);
+  const creditPath = WORKFLOW_CREDIT_MEDIA_PATHS.has(path);
+  const settingsPath = WORKFLOW_STEP_SETTINGS_PATHS.has(path);
+  const pausePath = WORKFLOW_PAUSE_PATHS.has(path);
+  const portablePath = WORKFLOW_PORTABLE_PATHS.has(path);
   if (
     method !== "POST" ||
-    !(githubPath || mediaPath || sunraPath || higgsfieldPath || catalogPath || accountPath || WORKFLOW_PATHS.has(path))
+    !(
+      githubPath ||
+      mediaPath ||
+      sunraPath ||
+      higgsfieldPath ||
+      catalogPath ||
+      catalogV2Path ||
+      accountPath ||
+      creditPath ||
+      settingsPath ||
+      pausePath ||
+      portablePath ||
+      WORKFLOW_PATHS.has(path)
+    )
   )
     return "unmatched";
   if (!workflows || !capabilities.has(WORKFLOWS_CAPABILITY))
@@ -179,21 +222,26 @@ export async function routeWorkflows(
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (catalogPath && !capabilities.has(WORKFLOWS_MEDIA_CATALOG_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (catalogV2Path && !capabilities.has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (creditPath && !capabilities.has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   if (accountPath && !capabilities.has(WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY))
     throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (settingsPath && !capabilities.has(WORKFLOWS_STEP_SETTINGS_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  if (pausePath && !capabilities.has(WORKFLOWS_PAUSE_CAPABILITY))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
+  const files = workflows.files;
+  if (portablePath && (!files || !capabilities.has(WORKFLOWS_PORTABLE_CAPABILITY)))
+    throw new HttpError(400, sourceText("error.workflow.serverTooOld"));
   const body = await readJson(request);
-  const admin = canAdministerServer(member.role);
-  const listed = () => new Set(agents.listAgents().map((agent) => agent.id));
-
-  const visibleAgents = (agentIds: readonly string[], known: ReadonlySet<string>) =>
-    agentIds.every((agentId) => !hiddenAgentIds.has(agentId) && (admin || known.has(agentId)));
-  const visibleGraph = (graph: WorkflowGraph, known: ReadonlySet<string>) =>
-    visibleAgents(graphAgentIds(graph), known) &&
-    graph.nodes.every((node) => !isPeerHiddenProvider(node.fields.provider, protocol));
-  const requireUsable = (graph: WorkflowGraph, level: Exclude<AgentAccessLevel, "none">) => {
-    if (!visibleGraph(graph, listed())) workflowMissing();
-    for (const agentId of graphAgentIds(graph)) requireAgentLevel(context, agentId, level);
-  };
+  const { admin, listed, visibleAgents, visibleGraph, requireUsable, visibleDetail, usableDetail } = workflowVisibility(
+    context,
+    workflows,
+    agents,
+    hiddenAgentIds,
+  );
   const requireChange = (before: WorkflowGraph, after: WorkflowGraph) => {
     requireUsable(before, "manage");
     requireUsable(after, "manage");
@@ -201,16 +249,6 @@ export async function routeWorkflows(
     for (const [nodeId, place] of placeOutputs(after)) if (old.get(nodeId) !== place) requireAdmin(member);
     const oldAdmin = adminNodes(before);
     for (const [nodeId, settings] of adminNodes(after)) if (oldAdmin.get(nodeId) !== settings) requireAdmin(member);
-  };
-  const visibleDetail = async (workflowId: string) => {
-    const detail = await run(workflows.get(workflowId));
-    if (!visibleGraph(detail.graph, listed())) workflowMissing();
-    return detail;
-  };
-  const usableDetail = async (workflowId: string, level: Exclude<AgentAccessLevel, "none">) => {
-    const detail = await visibleDetail(workflowId);
-    requireUsable(detail.graph, level);
-    return detail;
   };
   const usableRunOf = async (ref: { runId: string } | { stepId: string }) => {
     const missing = () =>
@@ -376,8 +414,30 @@ export async function routeWorkflows(
     return json(200, { accounts: workflows.mediaProviders().accounts ?? [] });
   if (path === WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits)
     return json(200, { accounts: (await run(workflows.mediaCredits())).accounts ?? [] });
-  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog()));
-  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price)
+  if (path === WORKFLOWS_PAUSE_ROUTES.pause) {
+    const input = parse(parseSetWorkflowPaused, body);
+    await usableDetail(input.workflowId, "manage");
+    return json(200, await run(workflows.setPaused(input)));
+  }
+  if (path === WORKFLOWS_PORTABLE_ROUTES.export && files) {
+    const detail = await usableDetail(stringField(body, "workflowId"), "manage");
+    return json(200, fitted(await run(files.source(detail))));
+  }
+  if (path === WORKFLOWS_STEP_SETTINGS_ROUTES.read) {
+    const stepId = stringField(body, "stepId");
+    const scope = await run(workflows.workflowOf({ stepId }));
+    if (scope === null) throw new HttpError(404, sourceText("error.workflow.stepMissing"));
+    await visibleDetail(scope.workflowId);
+    if (!visibleAgents(scope.agentIds, listed())) throw new HttpError(404, sourceText("error.workflow.stepMissing"));
+    return json(200, fitted(await run(workflows.stepSettings(stepId))));
+  }
+  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog) return json(200, catalogV1(await run(workflows.mediaCatalog())));
+  if (path === WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.catalog)
+    return json(200, serviceCatalog(await run(workflows.mediaCatalog())));
+  if (path === WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog) return json(200, await run(workflows.mediaCatalog("openbot")));
+  if (path === WORKFLOWS_CREDIT_MEDIA_ROUTES.credits)
+    return json(200, { openbot: (await run(workflows.mediaCredits("openbot"))).openbot ?? null });
+  if (path === WORKFLOWS_MEDIA_CATALOG_ROUTES.price || path === WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price)
     return json(200, await run(workflows.mediaPrice(parse(parseWorkflowMediaPrice, body))));
   if (!github) return "unmatched";
   switch (path) {

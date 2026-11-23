@@ -10,7 +10,9 @@ socket of the workspace's host in transit. `POST /v1/telegram/updates/<bot ID>` 
 the callback query ID, a `/start <code>` link code, and the chat type, the entity types and whether the
 message replies, is in a thread, or renames or leaves the chat (to know whether it can address
 OpenBot, never the text), and passes the body to the `ingress` socket of
-the chat's host in the same way. `POST /v1/github/events` checks the OpenBot GitHub App's signature,
+the chat's host in the same way. When the account service answers that no host has the chat, a
+direct message, a mention or a command gets one notice from Signal that the chat is not linked, at
+most once a day for each chat (`status.messaging.telegramNotLinked`). `POST /v1/github/events` checks the OpenBot GitHub App's signature,
 reads only the installation ID and the repository ID, and passes the body to the `ingress` socket of
 every host whose GitHub route names the repository. Do not log these bodies, and do not read more of them. The one store
 is `src/ingress-queue.ts`: for a hosted server that sleeps, and for the `/start` update of a Telegram

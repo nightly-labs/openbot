@@ -1,6 +1,6 @@
 export const PRIVACY_POLICY_ROUTE = "/privacy-policy";
 
-export const PRIVACY_POLICY_UPDATED_AT = "2026-11-06";
+export const PRIVACY_POLICY_UPDATED_AT = "2026-11-20";
 
 export const PRIVACY_POLICY_META = {
   title: "OpenBot Privacy Policy",

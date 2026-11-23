@@ -25,12 +25,16 @@ export const messages = {
     "ホストが OpenBot に画面の収録を許可していません。ホストで画面収録を許可してから、再試行してください。",
   "error.remote.windowsSessionDisconnected":
     "ホストの Windows セッションが切断されているため、共有する画面がありません。ホストの画面で Windows にサインインしてから、再試行してください。",
+  "error.remote.windowsCaptureDenied":
+    "ホストの Windows が OpenBot による画面の記録を許可していません。ホストの画面で Windows のロックを解除し、管理者の確認画面をすべて閉じてから、再試行してください。解決しない場合は、ホストを再起動してください。",
   "error.remote.macScreenLocked":
     "Mac がロックされているため、画面を共有できません。Mac の画面でロックを解除してから、再試行してください。",
   "error.remote.streamTooSlowLowerQuality":
     "ホストへの接続が遅すぎて画面を表示できません。再試行してください。次の接続では画質を下げます。",
   "error.remote.streamTooSlow":
     "ホストへの接続が遅すぎて画面を表示できません。より速いネットワークを使ってから、再試行してください。",
+  "error.remote.noPictureSwitchEncoder":
+    "ホストから画面が送られてきませんでした。再試行してください。次の接続では、より多くのコンピューターで動作するビデオ設定を使います。",
   "error.remote.teamSessionExpired": "チームのセッションの期限が切れました。",
   "error.remote.finishTestBeforeSwitch":
     "ディスプレイを切り替える前に、リモートデスクトップのテストを終了してください。",
@@ -216,6 +220,11 @@ export const messages = {
   "error.remote.formUnavailable": "このフォームは利用できなくなりました。",
   "error.remote.hostedServerRemoval": "ホスト型サーバーを削除するには「お支払い」を使用してください。",
   "error.remote.hostRemoved": "所有者がこのサーバーをアカウントから削除しました。",
+  "error.remote.ownerTransferSelf":
+    "このサーバーはすでにあなたのものです。新しい所有者のメールアドレスを入力してください。",
+  "error.remote.ownerTransferHosted": "OpenBot がホストするサーバーは所有者を変更できません。",
+  "error.remote.ownerTransferInvalid":
+    "この所有権の移行は利用できなくなりました。所有者にもう一度送るよう依頼してください。",
   "error.remote.channelsUnsupported": "チャンネルを使うには、このデスクトップサーバーを更新してください。",
   "error.remote.channelDeleteUnsupported": "チャンネルを削除するには、このデスクトップサーバーを更新してください。",
   "error.remote.historyRefreshFailed": "メッセージは送信されましたが、チャット履歴を更新できませんでした。",

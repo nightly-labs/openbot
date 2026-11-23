@@ -211,8 +211,10 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.hosted.soldOut": "Sold out",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · Ends on {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · Data kept until {date}",
   "mobile.server.hosted.state.payment": "Waiting for payment",
   "mobile.server.hosted.state.setup": "Setting up",
+  "mobile.server.hosted.state.restoring": "Restoring data",
   "mobile.server.hosted.state.starting": "Starting",
   "mobile.server.hosted.state.running": "Running",
   "mobile.server.hosted.state.stopped": "Stopped",
@@ -323,6 +325,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.threads.hold.serverBusy": "Waiting. The host runs as many turns as its memory allows.",
   "mobile.server.threads.hold.agentBusy": "Waiting for other work of this agent to finish.",
   "mobile.server.threads.hold.oneTurn": "Waiting. The provider of this agent runs one turn at a time.",
+  "mobile.server.threads.hold.signIn": "Waiting. The provider of this agent needs sign-in.",
   "mobile.server.threads.offline": "Connect to this server to see its threads.",
   "mobile.server.threads.loading": "Loading threads…",
   "mobile.server.threads.loadFailed": "Could not load the threads of some agents.",
@@ -427,6 +430,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.route.timezone": "Timezone",
   "mobile.server.route.personality": "Agent personality",
   "mobile.server.route.agents": "Agents",
+  "mobile.server.route.voiceModel": "Speech recognition",
   "mobile.server.settings.storage": "Storage",
   "mobile.server.route.storage": "Storage",
   "mobile.server.route.storageFiles": "All files",
@@ -549,6 +553,19 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.timezoneSaveFailed": "Could not save the timezone. Try again.",
   "mobile.server.settings.timezoneUnavailable": "Connect to this server as an owner or admin to change its timezone.",
   "mobile.server.settings.timezoneUnsupported": "Update OpenBot on this server to change its timezone here.",
+  "mobile.server.settings.voiceModelDescription":
+    "Agents on this server use this model to transcribe the sound of videos that have no captions.",
+  "mobile.server.settings.voiceModelLoading": "Loading speech recognition…",
+  "mobile.server.settings.voiceModelLoadFailed": "Could not load the speech recognition model of the server.",
+  "mobile.server.settings.voiceModelSaveFailed": "Could not change the speech recognition model. Try again.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Update OpenBot on this server to change its speech recognition here.",
+  "mobile.server.settings.voiceModelReady": "Ready",
+  "mobile.server.settings.voiceModelDownloading": "Downloading: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} download",
+  "mobile.server.settings.voiceModelDownload": "Download",
+  "mobile.server.settings.voiceModelCancel": "Stop download",
+  "mobile.server.settings.voiceModelRemove": "Remove",
   "mobile.server.settings.keySection": "Server key",
   "mobile.server.settings.keyChanged": "Last change",
   "mobile.server.settings.keyChange": "Change key",
@@ -627,6 +644,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.browserProfiles.addAgents": "Add agents",
   "mobile.server.browserProfiles.agentsHint":
     "A tap gives the agent this profile, or moves it back to the shared profile. A change closes the agent's open tabs.",
+  "mobile.server.browserProfiles.movedNote":
+    "Site sign-ins stay in the old profile. A moved agent must sign in to these sites again.",
   "mobile.server.browserProfiles.clear": "Clear data",
   "mobile.server.browserProfiles.clearTitle": "Clear the data of {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1125,7 +1144,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Your “Message yourself” chat and the people you allow reach OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "The people you allow reach OpenBot. Other people get a code to give you.",
+    "Your “Message yourself” chat and the people you allow reach OpenBot. Other people get a code to give you.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp removed this server from the linked devices. Link the number again.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1372,10 +1391,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.modelsFailed": "Could not change the models. Try again.",
   "mobile.server.providers.promptCache": "Prompt cache",
   "mobile.server.providers.promptCacheHint":
-    "How long Claude keeps the context of an agent in the cache between turns. A change applies when Claude starts again.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code default",
+    "How long Claude and Pi keep the context of an agent in the cache between turns. A change applies when the provider starts again.",
+  "mobile.server.providers.promptCacheDefault": "Provider default",
   "mobile.server.providers.promptCacheHour": "1 hour",
   "mobile.server.providers.promptCacheLoadFailed": "Could not load the prompt cache time of this server.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compact before the cache expires",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "When a chat with 200K or more tokens of context is idle with a 1 hour cache, the agent compacts the context before the cache expires. Then the next message does not read the full context again with no cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Could not load the compaction setting of this server.",
   "mobile.server.providers.compactWindow": "Compact chats at",
   "mobile.server.providers.compactWindowHint":
     "Claude Code sums up the older turns of a chat when the chat reaches this size. Lower keeps turns fast and cheap. Higher keeps more detail. A model with a smaller window compacts at its own limit.",
@@ -1430,6 +1453,7 @@ export const messages = defineMessages("mobile.server", {
     "ChatGPT uses this key, not your ChatGPT plan. OpenAI bills each request to the key. The plan's usage is not shown.",
   "mobile.server.providers.codexKeyAlternative":
     "Or log in with an OpenAI API key. OpenAI bills each request to the key.",
+  "mobile.server.providers.museKeyInUse": "Muse uses this key, not your sign-in. To use your sign-in, remove the key.",
   "mobile.server.providers.sectionUse": "Use",
   "mobile.server.providers.unused": "No agent uses it",
   "mobile.server.providers.usedByCount": { one: "1 agent uses it", other: "{count} agents use it" },
@@ -1658,6 +1682,8 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.mcp.connected": { one: "Connected · {count} tool", other: "Connected · {count} tools" },
   "mobile.server.mcp.signInOnComputer":
     "This MCP server asks you to sign in. Sign in from OpenBot on a computer, then test again.",
+  "mobile.server.mcp.signIn": "Sign in",
+  "mobile.server.mcp.signInHere": "This MCP server asks you to sign in. Tap Sign in, then test again.",
   "mobile.server.mcp.signedInDescription": "{server} is signed in to this MCP server.",
   "mobile.server.mcp.signOut": "Sign out",
   "mobile.server.mcp.saveFailed": "Could not save the change. Try again.",
@@ -1706,6 +1732,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.planLimits.window.fiveHour": "5-hour",
   "mobile.server.planLimits.window.hours": { one: "{count}-hour", other: "{count}-hour" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Updates",
   "mobile.server.settings.updateAvailable": "Update available",
   "mobile.server.route.updates": "Updates",
@@ -2032,4 +2059,41 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.transfer.copyAgents": "Agents to copy",
   "mobile.server.transfer.copyNext": "Copied agents use the approval rules of {server}.",
   "mobile.server.transfer.copyNoServer": "Connect to another server as an owner or admin to copy agents to it.",
+  "mobile.server.route.ownerTransfer": "Transfer ownership",
+  "mobile.server.ownerTransfer.unavailable": "Connect to this server as its owner to transfer ownership.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot hosts this server, so its owner cannot change.",
+  "mobile.server.ownerTransfer.lede":
+    "The new owner gets an email and must accept while signed in with that email. Then you are removed from this server.",
+  "mobile.server.ownerTransfer.email": "Email of the new owner",
+  "mobile.server.ownerTransfer.send": "Send",
+  "mobile.server.ownerTransfer.sending": "Sending…",
+  "mobile.server.ownerTransfer.stays":
+    "Agents, chats, routines, provider sign-ins, saved keys, Vault logins, browser sign-ins, and connected apps stay on the server. The new owner can use them.",
+  "mobile.server.ownerTransfer.expiry": "The request expires after 7 days.",
+  "mobile.server.ownerTransfer.confirmTitle": "Make {email} the owner?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "When {email} accepts, they become the owner of {server} and you lose access to it. The data stays on the server. The request expires after 7 days.",
+  "mobile.server.ownerTransfer.confirm": "Transfer",
+  "mobile.server.ownerTransfer.sendFailed": "The request was not sent.",
+  "mobile.server.ownerTransfer.loadFailed": "Could not read the pending transfer.",
+  "mobile.server.ownerTransfer.pending": "Waiting for the new owner",
+  "mobile.server.ownerTransfer.expires": "Expires {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} must accept while signed in with this email. Until then, you stay the owner.",
+  "mobile.server.ownerTransfer.cancel": "Cancel transfer",
+  "mobile.server.ownerTransfer.cancelTitle": "Cancel the transfer?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} can no longer accept it.",
+  "mobile.server.ownerTransfer.keep": "Keep",
+  "mobile.server.ownerTransfer.cancelFailed": "The transfer was not cancelled.",
+  "mobile.server.ownerTransfer.incomingTitle": "Become the owner of {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} wants to make you the owner of {server}. You get full control of the server, and its agents, chats, routines, and saved sign-ins stay on it. {name} loses access. Anyone who can still sign in to the computer that runs the server can use your OpenBot account. Change its passwords and SSH keys.",
+  "mobile.server.ownerTransfer.accept": "Accept",
+  "mobile.server.ownerTransfer.decline": "Decline",
+  "mobile.server.ownerTransfer.accepted": "You are now the owner of {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Could not accept the transfer",
+  "mobile.server.ownerTransfer.declineFailed": "Could not decline the transfer",
+  "mobile.server.ownerTransfer.tryAgain": "Try again later.",
+  "mobile.server.providers.updateAll": "Update all",
+  "mobile.server.providers.updateAllFailed": "Some updates did not start. Try again.",
 });

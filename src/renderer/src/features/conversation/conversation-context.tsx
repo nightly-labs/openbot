@@ -24,6 +24,7 @@ import {
   toAgentMessages,
 } from "../../app-message-projection";
 import { createStoredMessage, updateStored } from "../../app-stored-values";
+import { rendererPerfCount } from "../../perf-count";
 import { usePlatform } from "../../platform";
 import { createScopeGuard } from "../../scope-lifetime";
 import { createSimpleContext } from "../../simple-context";
@@ -556,6 +557,7 @@ const Conversation = createSimpleContext({
     }
 
     function applyDeltaNow(event: ConversationDeltaEvent) {
+      rendererPerfCount("conversation.applyDelta");
       if (event.revision <= (conversations[event.agentId]?.revision ?? -1)) return;
       const pendingSnapshot = pendingConversationSnapshots.get(event.agentId);
       if (pendingSnapshot) {
@@ -581,6 +583,7 @@ const Conversation = createSimpleContext({
             (thinkingItemIndex >= 0 ? thinking?.items?.[thinkingItemIndex] : "") ??
             "") + event.delta;
         rawAgentMessageBodies.set(messageKey, rawBody);
+        rendererPerfCount("conversation.cleanTextChars", rawBody.length);
         if (existing) {
           updateStored(existing, {
             ...existing,
@@ -764,7 +767,7 @@ const Conversation = createSimpleContext({
         const tail = merge === "latest" && page.pageInfo.hasOlder && !trimmed;
         const keepsWindow = tail && conversation.windowMode === "around";
         const apart = tail && !keepsWindow && !currentMessages.some((message) => mappedIds.has(message.id));
-        const kept = currentMessages.filter((message) => !pageItemIds.has(message.id));
+        const kept = currentMessages.filter((message) => mappedIds.has(message.id) || !pageItemIds.has(message.id));
         conversation.messages = keepsWindow
           ? windowedSnapshotMessages(currentMessages, pageMessages, { mode: "around", capped: true }).filter(
               (message) => mappedIds.has(message.id) || !pageItemIds.has(message.id),

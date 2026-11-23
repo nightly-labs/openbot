@@ -1,12 +1,11 @@
-import type { BrowserControlSession, BrowserTab, BrowserTabProfile } from "@openbot/contracts/ipc";
+import type { BrowserControlSession, BrowserTab, BrowserTabAgent, BrowserTabLabel } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import type { AgentProfile } from "@openbot/ui/data";
 import type { JSX } from "@solidjs/web";
 import type { BrowserViewRuntime } from "./BrowserLiveView";
 import type { BrowserHistoryEntry } from "./browser-suggestions";
 import type { BrowserShortcutPlatform } from "./browser-view-shortcuts";
 
-export type BrowserTabLabel = BrowserTabProfile & { proxy?: string | undefined };
+export type { BrowserTabLabel } from "@openbot/contracts/ipc";
 
 export interface BrowserTeachBarProps {
   agentName: string;
@@ -24,8 +23,8 @@ export interface BrowserFullViewProps {
   history: readonly BrowserHistoryEntry[];
   canReopen: boolean;
   controlForTab: (tab: BrowserTab) => BrowserControlSession | undefined;
-  controllerForTab: (tab: BrowserTab) => AgentProfile | undefined;
-  ownerForTab: (tab: BrowserTab) => AgentProfile | undefined;
+  controllerForTab: (tab: BrowserTab) => BrowserTabAgent | undefined;
+  ownerForTab: (tab: BrowserTab) => BrowserTabAgent | undefined;
   profileForTab?: ((tab: BrowserTab) => BrowserTabLabel | undefined) | undefined;
   onActivateTab: (tabId: string) => void;
   onCloseTabs: (tabIds: readonly string[]) => void;
@@ -43,8 +42,11 @@ export interface BrowserFullViewProps {
   liveViewClipboard: boolean;
   canCloseTabs?: boolean;
   canEnterPip?: boolean;
+  canOpenWindow?: boolean;
+  detached?: boolean;
   onBack: () => void;
   onEnterPip: () => void;
+  onOpenWindow?: (() => void) | undefined;
   onSignInLocally?: ((tabId: string) => void) | undefined;
   macWindowControls?: boolean;
   shortcuts?: BrowserShortcutPlatform | undefined;

@@ -1,5 +1,6 @@
 import {
   type AgentBackupModelSettings,
+  type AgentBuiltinMemorySettings,
   type AgentFastModel,
   type AgentFastModeSettings,
   type AgentHostSettings,
@@ -12,10 +13,12 @@ import {
   agentAutomationAllowed,
   agentComputerUseEnabled,
   agentFastModeSettings,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   agentSpeed,
   type UpdateAgentBackupModelsInput,
+  type UpdateAgentBuiltinMemoryInput,
   type UpdateAgentFastModeInput,
   type UpdateAgentHostSettingsInput,
   type UpdateAgentNewChatInput,
@@ -50,6 +53,10 @@ export interface AgentHostSettingsService {
   updateNewChat(input: UpdateAgentNewChatInput): Effect.Effect<AgentNewChatSettings, AgentHostSettingsFailure>;
   readPlanCard(agentId: string): AgentPlanCardSettings;
   updatePlanCard(input: UpdateAgentPlanCardInput): Effect.Effect<AgentPlanCardSettings, AgentHostSettingsFailure>;
+  readBuiltinMemory(agentId: string): AgentBuiltinMemorySettings;
+  updateBuiltinMemory(
+    input: UpdateAgentBuiltinMemoryInput,
+  ): Effect.Effect<AgentBuiltinMemorySettings, AgentHostSettingsFailure>;
   readFastMode(agentId: string): AgentFastModeSettings;
   updateFastMode(input: UpdateAgentFastModeInput): Effect.Effect<AgentFastModeSettings, AgentHostSettingsFailure>;
   listFastModels(): AgentFastModel[];
@@ -143,6 +150,18 @@ export function createAgentHostSettings({
     const agent = yield* agents.updateAgent({ agentId, quickAcknowledgement }).pipe(toAgentHostSettingsFailure);
     return planCard(agent);
   });
+  const builtinMemory = (agent: AgentSummary): AgentBuiltinMemorySettings => ({ memory: agentMemoryEnabled(agent) });
+  const updateBuiltinMemory = Effect.fn("AgentHostSettings.updateBuiltinMemory")(function* ({
+    agentId,
+    memory,
+  }: UpdateAgentBuiltinMemoryInput) {
+    yield* Effect.try({
+      try: () => requireAgent(agentId),
+      catch: (cause) => new AgentHostSettingsFailure({ cause }),
+    });
+    const agent = yield* agents.updateAgent({ agentId, memory }).pipe(toAgentHostSettingsFailure);
+    return builtinMemory(agent);
+  });
   const fastMode = (agent: AgentSummary): AgentFastModeSettings => ({ fastMode: agent.fastMode ?? null });
   const writeFastMode = Effect.fn("AgentHostSettings.writeFastMode")(function* (
     agentId: string,
@@ -182,6 +201,8 @@ export function createAgentHostSettings({
     updateNewChat: (input) => updateNewChat(input).pipe(Effect.uninterruptible),
     readPlanCard: (agentId) => planCard(requireAgent(agentId)),
     updatePlanCard: (input) => updatePlanCard(input).pipe(Effect.uninterruptible),
+    readBuiltinMemory: (agentId) => builtinMemory(requireAgent(agentId)),
+    updateBuiltinMemory: (input) => updateBuiltinMemory(input).pipe(Effect.uninterruptible),
     readFastMode: (agentId) => fastMode(requireAgent(agentId)),
     updateFastMode: (input) => updateFastMode(input).pipe(Effect.uninterruptible),
     listFastModels: () =>

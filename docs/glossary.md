@@ -37,6 +37,12 @@ table, IPC channel or product string, or when a term in the code disagrees with 
   new conversation and asks its teammates. A **messaging thread** is one external conversation (a Slack thread) that one agent
   answers in its own execution thread (`projection_messaging_threads`, `MessagingLink`). A Slack
   channel is a `platformChannelId`, never a **channel**.
+- **OpenBot credits**: prepaid points that an account buys with Stripe Checkout for its own balance
+  or for a server, and that an owner moves between the two (`@openbot/contracts/credits`,
+  `CreditsState`, `CreditServerWallet`, `credits.*` IPC, `v1/me/credits`, D1 `credit_purchases` and
+  `credit_ledger`, Stripe lookup keys `openbot_credits_<n>`). They are not the Stripe customer
+  credit of invite links (`billing-referral.ts`), the usage credits of `usage-credits-v1`, or the media credits of a provider
+  (`mediaCredits`).
 - **server**: a joined team server (`ServerSummary`, `servers:*`), the local Team API host
   (`HostStatus`, `host:*`, `src/main/team-api-server.ts`), the account API (`apps/auth-api`,
   `auth:*`), or an MCP server (`createSdkMcpServer`).

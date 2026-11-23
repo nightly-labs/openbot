@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Browserpop-up sluiten",
   "browser.pip.reattachFailed": "OpenBot kon de browser niet terugzetten.",
   "browser.pip.closeFailed": "OpenBot kon de browserpop-up niet sluiten.",
+  "browser.window.open": "Browser openen in nieuw venster",
+  "browser.window.openFailed": "OpenBot kon het browservenster niet openen.",
   "browser.popupBlocked.title": "Pop-up geblokkeerd",
   "browser.popupBlocked.dismiss": "Pop-upmelding sluiten",
   "browser.liveView.label": "Live weergave van de pagina op de server",

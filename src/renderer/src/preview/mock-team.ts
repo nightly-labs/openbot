@@ -25,6 +25,7 @@ import type {
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
 import { DEFAULT_REMOTE_CONTROL_POLICY } from "@openbot/contracts/ipc";
+import type { OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { sourceText } from "@openbot/i18n/source";
 import {
   STORY_DIRECT_SNAPSHOTS,
@@ -49,7 +50,10 @@ export interface MockTeamOptions {
   invites?: TeamInviteSummary[];
   sessions?: TeamSessionSummary[];
   remoteDesktopSessions?: RemoteDesktopSession[];
+  ownerTransfers?: Record<string, OwnerTransfer>;
 }
+
+const OWNER_TRANSFER_LIFETIME_MS = 7 * 24 * 60 * 60_000;
 
 export function createMockTeam(
   options: MockTeamOptions,
@@ -65,6 +69,7 @@ export function createMockTeam(
   let teamMembers = clone(options.teamMembers ?? STORY_TEAM_MEMBERS);
   let invites = clone(options.invites ?? STORY_INVITES);
   let sessions = clone(options.sessions ?? STORY_SESSIONS);
+  const ownerTransfers = new Map(Object.entries(clone(options.ownerTransfers ?? {})));
   let remoteControlPolicy: RemoteControlPolicy = { ...DEFAULT_REMOTE_CONTROL_POLICY };
   let remoteDesktopSessions = clone(options.remoteDesktopSessions ?? [STORY_REMOTE_DESKTOP_SESSION]);
   let directMessageCounter = 10;
@@ -250,6 +255,27 @@ export function createMockTeam(
       permanent: input.permanent ?? false,
       useCount: 0,
     }),
+    getOwnerTransfer: async (serverId) => clone(ownerTransfers.get(serverId) ?? null),
+    startOwnerTransfer: async (email, serverId) => {
+      const server = servers.find((candidate) => candidate.id === serverId);
+      if (!server) throw new Error("Server not found");
+      const createdAt = Date.now();
+      const transfer: OwnerTransfer = {
+        transferId: `transfer-${crypto.randomUUID()}`,
+        hostId: serverId,
+        hostName: server.name,
+        fromEmail: "person@example.com",
+        fromName: "Norbert",
+        toEmail: email.trim().toLowerCase(),
+        createdAt,
+        expiresAt: createdAt + OWNER_TRANSFER_LIFETIME_MS,
+      };
+      ownerTransfers.set(serverId, transfer);
+      return clone(transfer);
+    },
+    cancelOwnerTransfer: async (serverId) => {
+      ownerTransfers.delete(serverId);
+    },
     setTyping: async (_input: SetTeamTypingInput) => undefined,
     onPresence: (listener, serverId) => {
       const receive = (snapshot: TeamPresenceSnapshot) => {

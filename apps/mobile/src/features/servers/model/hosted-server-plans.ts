@@ -34,6 +34,7 @@ export function hostedSetupSettled(status: HostedSetupStatus): boolean {
 }
 
 export function hostedServerInSetup(server: HostedServerSummary, listed: boolean): boolean {
+  if (server.restoring && listed) return false;
   switch (server.state) {
     case "awaiting_payment":
     case "creating":

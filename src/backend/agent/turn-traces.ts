@@ -12,16 +12,22 @@ import {
 } from "@openbot/contracts/ipc";
 import { redactText } from "@openbot/logging";
 
+export interface ToolOutcome {
+  tool: string | null;
+  result: string | null;
+}
+
 interface RunningTrace {
   startedAt: string;
   steps: Map<string, ConversationTraceStep>;
+  outcomes: Map<string, ToolOutcome>;
 }
 
 export class TurnTraces {
   readonly #turns = new Map<string, RunningTrace>();
 
   begin(turnId: string, startedAt: string): void {
-    this.#turns.set(turnId, { startedAt, steps: new Map() });
+    this.#turns.set(turnId, { startedAt, steps: new Map(), outcomes: new Map() });
   }
 
   observe(
@@ -35,6 +41,8 @@ export class TurnTraces {
       command?: string | null;
       recipientAgentIds?: string[] | null;
       error?: string | null;
+      tool?: string | null;
+      result?: string | null;
     },
   ): void {
     const trace = this.#turns.get(turnId);
@@ -57,6 +65,17 @@ export class TurnTraces {
     if (kind === "tool" && step.error === undefined && event.error) step.error = event.error;
     if (event.completed && step.endedAt === null) step.endedAt = now;
     if (event.completed && event.failed) step.failed = true;
+    if (step.kind === "tool" && (event.tool || event.result)) {
+      const outcome = trace.outcomes.get(itemId);
+      trace.outcomes.set(itemId, {
+        tool: outcome?.tool ?? event.tool ?? null,
+        result: event.result ?? outcome?.result ?? null,
+      });
+    }
+  }
+
+  toolOutcomes(turnId: string): ReadonlyMap<string, ToolOutcome> {
+    return this.#turns.get(turnId)?.outcomes ?? new Map();
   }
 
   take(turnId: string, endedAt: string): ConversationTurnTrace | null {

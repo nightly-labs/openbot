@@ -14,6 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_USAGE_LIMIT_ROUTES, type AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { AGENT_WAITS_ROUTES, decodeAgentWaitsResponse } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { PROVIDER_MODEL_SOURCE_ROUTES } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { Deferred, Effect, Result } from "effect";
 import { decodeAgentSummaries, decodeQueueSnapshot, decodeRemoteAgentUsageLimits } from "./remote-agent-decoding";
@@ -38,20 +39,25 @@ export interface RemoteEventRefreshOptions {
   request: RemoteRequestFn;
   hasServer: (serverId: string) => boolean;
   emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
+  onReceivedRuntimeSnapshot?: (serverId: string, snapshot: AgentRuntimeSnapshot) => void;
   onMemberChatColors?: (serverId: string) => void;
   hasUsageLimits?: (serverId: string) => boolean;
   hasModelSources?: (serverId: string) => boolean;
+  hasAgentWaits?: (serverId: string) => boolean;
 }
 
 export class RemoteEventRefresh {
   readonly #request: RemoteRequestFn;
   readonly #hasServer: (serverId: string) => boolean;
   readonly #emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
+  readonly #onReceivedRuntimeSnapshot: (serverId: string, snapshot: AgentRuntimeSnapshot) => void;
   readonly #onMemberChatColors: (serverId: string) => void;
   readonly #hasUsageLimits: (serverId: string) => boolean;
   readonly #hasModelSources: (serverId: string) => boolean;
+  readonly #hasAgentWaits: (serverId: string) => boolean;
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
+  readonly #waitReads = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
   readonly #rosterLoads = new Map<string, Deferred.Deferred<void, RemoteWorkflowError>>();
   readonly #browserHolds = new Map<string, ReadonlySet<string>>();
@@ -72,9 +78,11 @@ export class RemoteEventRefresh {
     this.#request = options.request;
     this.#hasServer = options.hasServer;
     this.#emit = options.emit;
+    this.#onReceivedRuntimeSnapshot = options.onReceivedRuntimeSnapshot ?? (() => undefined);
     this.#onMemberChatColors = options.onMemberChatColors ?? (() => undefined);
     this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
     this.#hasModelSources = options.hasModelSources ?? (() => false);
+    this.#hasAgentWaits = options.hasAgentWaits ?? (() => false);
   }
 
   readonly forward = Effect.fn("RemoteEvents.forward")(function* (
@@ -84,6 +92,7 @@ export class RemoteEventRefresh {
     bufferedLive = false,
   ) {
     this.#advance(serverId);
+    if (event.type === "runtime-snapshot") this.#onReceivedRuntimeSnapshot(serverId, event.snapshot);
     if (event.type === "agents-changed") this.#rosterLoads.delete(serverId);
     if (event.type === "conversation-invalidated") {
       yield* this.#refreshConversationPage(serverId, event.agentId, event.revision);
@@ -118,6 +127,9 @@ export class RemoteEventRefresh {
       );
       if (bufferedLive) this.#emit(serverId, remoteEvent, true);
       else this.#emit(serverId, remoteEvent);
+    }
+    if ((event.type === "turn-started" || event.type === "turn-completed") && this.#hasAgentWaits(serverId)) {
+      yield* this.#refreshWaits(serverId, event.agentId);
     }
   }).bind(this);
 
@@ -350,6 +362,9 @@ export class RemoteEventRefresh {
     for (const key of this.#queues.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#queues.delete(key);
     }
+    for (const key of this.#waitReads.keys()) {
+      if (key.startsWith(`${serverId}\0`)) this.#waitReads.delete(key);
+    }
   }
 
   clear(): void {
@@ -367,6 +382,7 @@ export class RemoteEventRefresh {
     this.#generations.clear();
     this.#conversations.clear();
     this.#queues.clear();
+    this.#waitReads.clear();
   }
 
   readonly #refreshConversationPage = Effect.fn("RemoteEvents.refreshConversationPage")(function* (
@@ -412,40 +428,63 @@ export class RemoteEventRefresh {
     );
   });
 
-  readonly #refreshQueue = Effect.fn("RemoteEvents.refreshQueue")(function* (
+  readonly #refreshAgentRead = Effect.fn("RemoteEvents.refreshAgentRead")(function* (
     this: RemoteEventRefresh,
+    reads: Map<string, QueueRefresh>,
     serverId: string,
     agentId: string,
+    read: Effect.Effect<AgentEvent, RemoteWorkflowError>,
   ) {
     const key = `${serverId}\0${agentId}`;
-    const pending = this.#queues.get(key);
+    const pending = reads.get(key);
     if (pending) {
       pending.dirty = true;
       return;
     }
     const request = { dirty: false };
-    this.#queues.set(key, request);
+    reads.set(key, request);
     yield* Effect.gen({ self: this }, function* () {
       do {
         request.dirty = false;
-        const result = yield* this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
-          Effect.result,
-        );
+        const result = yield* read.pipe(Effect.result);
         if (Result.isFailure(result)) {
           if (request.dirty) continue;
           return;
         }
         if (!this.#hasServer(serverId)) return;
-        this.#emit(serverId, { type: "queue-changed", snapshot: result.success });
+        this.#emit(serverId, result.success);
       } while (request.dirty);
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          if (this.#queues.get(key) === request) this.#queues.delete(key);
+          if (reads.get(key) === request) reads.delete(key);
         }),
       ),
     );
   });
+
+  #refreshQueue(serverId: string, agentId: string) {
+    return this.#refreshAgentRead(
+      this.#queues,
+      serverId,
+      agentId,
+      this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
+        Effect.map((snapshot): AgentEvent => ({ type: "queue-changed", snapshot })),
+      ),
+    );
+  }
+
+  #refreshWaits(serverId: string, agentId: string) {
+    return this.#refreshAgentRead(
+      this.#waitReads,
+      serverId,
+      agentId,
+      this.#request(serverId, AGENT_WAITS_ROUTES.list, decodeAgentWaitsResponse, {
+        method: "POST",
+        body: { agentId },
+      }).pipe(Effect.map((snapshot): AgentEvent => ({ type: "waits-changed", snapshot }))),
+    );
+  }
 
   readonly #conversationPageEffect = Effect.fn("RemoteEvents.conversationPage")(
     (serverId: string, agentId: string, limit: number) =>

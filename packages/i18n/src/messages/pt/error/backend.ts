@@ -96,6 +96,8 @@ export const messages = {
     "Os membros deste canal ainda não têm uma conversa para compactar. Compacte depois que um membro responder no canal.",
   "error.backend.channelCompactNotSupported":
     "Nenhum membro deste canal pode compactar sob demanda. Os membros que suportam isso compactam o contexto automaticamente quando ele está quase cheio.",
+  "error.backend.channelCompactProviderUnavailable":
+    "O provedor dos membros do canal não está funcionando agora. Atualize os provedores e compacte o canal de novo.",
   "error.backend.channelArchived": "Restaure este canal antes de enviar mensagens ou alterar tarefas.",
   "error.backend.channelArchiveRunning": "Pare o trabalho em andamento neste canal e depois exclua-o.",
   "error.backend.channelReferenceUnavailable": "A mensagem do canal usada como referência está indisponível.",
@@ -134,6 +136,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "A execução parou com um erro, mas nenhum motivo foi informado. Abra a execução para ver o que o agente fez.",
   "error.backend.turnNotStarted": "O provedor não iniciou este turno.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} não confirmou a tempo que iniciou esta mensagem. O OpenBot não a envia de novo, para que o trabalho não seja executado duas vezes. O OpenBot espera até 5 minutos para o agente começar.",
+  "error.backend.turnStartAbandoned": "O agente não iniciou esta mensagem em 5 minutos. Envie a mensagem de novo.",
   "error.backend.routineResultConnectionOff":
     "Esta conexão de mensagens está desativada ou foi removida. Escolha outro lugar.",
   "error.backend.routineResultNoDelivery": "Esta execução não tem uma resposta para enviar de novo.",
@@ -237,7 +242,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Esta espera não está aberta. O agente a fechou ou alguém a cancelou.",
   "error.backend.agentWaitNoRequest": "Uma espera precisa de uma mensagem para continuar. Este turno não tem mensagem.",
   "error.backend.agentWaitOwnChatOnly":
-    "Abra uma espera apenas no seu próprio chat. Uma tarefa de canal ou de mensagens não pode esperar.",
+    "Abra uma espera no seu próprio chat ou em uma thread lateral. Uma conversa de canal ou de mensagens não pode esperar.",
   "error.backend.agentWaitNoteRequired": "Escreva uma nota curta que diga para que serve a espera.",
   "error.backend.agentWaitRoutineGone": "Este agente não tem nenhuma rotina com este id.",
   "error.backend.agentWaitNoRoutine":
@@ -255,8 +260,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "O OpenBot mantém até {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Já existe um servidor MCP chamado {name}.",
   "error.backend.mcpServerInvalid": "O OpenBot não pode salvar esta configuração de servidor MCP.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Os nomes de cabeçalho não podem ter espaços nem símbolos como : ( ) /. Use um nome como Authorization e coloque a chave ou o token em Valor.",
   "error.backend.mcpServerNoAnswer": "O servidor não respondeu em {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "O servidor não aceitou esse login.",
+  "error.backend.mcpSignInGrantRefused":
+    "O servidor não aceitou o login. Entre novamente. Se o problema continuar, verifique se sua conta está no mesmo site ou região que este app.",
   "error.backend.mcpSignInAccountRefused":
     "O servidor recusou a conta com que você entrou. Verifique se essa conta pode usar o serviço. Para usar outra conta, saia e entre de novo.",
   "error.backend.mcpSignInClientRefused":
@@ -280,6 +289,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Este servidor pede login. Entre nele pelo OpenBot no computador anfitrião.",
   "error.backend.mcpSignInNeedsHttps":
     "Este servidor pede login, e o OpenBot só faz login por https. Altere a URL para {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Este servidor só faz login em {url}. Altere a URL para este endereço e depois entre de novo.",
   "error.backend.mcpSignInCancelled": "O login foi cancelado.",
   "error.backend.mcpSignInTimedOut": "O login não foi concluído no navegador.",
   "error.backend.mcpSignInRefused": "A página de login recusou o acesso. Entre novamente.",
@@ -299,6 +310,8 @@ export const messages = {
     "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede que você entre. Abra {name} na Loja, Apps, e escolha Entrar.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede uma chave. Abra {name} na Loja, Apps, escolha Editar e digite a chave correta em Cabeçalhos.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} não conseguiu iniciar o servidor MCP {name}. Abra {name} na Loja, Apps, e escolha Testar conexão para ver a causa.",
   "error.backend.mcpServerFailedInProvider":
@@ -309,6 +322,8 @@ export const messages = {
     "{provider} não conseguiu iniciar o servidor MCP {name}, porque o servidor não está disponível agora. Aguarde alguns minutos e depois inicie um novo chat para tentar de novo.",
   "error.backend.mcpServerUnreachableInProvider":
     "{provider} não conseguiu acessar o servidor MCP {name}. Abra {name} na Loja, Apps, e confira se o endereço está correto e se o servidor está em execução. Depois inicie um novo chat para tentar de novo.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} não conseguiu obter as ferramentas do GitHub, porque o GitHub não respondeu. Abra o GitHub na Loja, Apps, e conecte-o de novo se ele pedir. Depois inicie um novo chat para tentar de novo.",
   "error.backend.mcpAppReconnect":
     "{name} no ChatGPT pede que você entre de novo. Reconecte {name} no ChatGPT e peça de novo ao agente.",
   "error.backend.mcpServerSignInPage":
@@ -353,6 +368,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "A pasta não existe ou já foi excluída.",
   "error.backend.libraryFolderOtherAgent": "Um arquivo só pode ir para uma pasta do seu agente.",
   "error.backend.libraryFolderMoveInvalid": "Esta pasta não pode ser movida para lá.",
+  "error.backend.workflowFolderLimit": "Um servidor pode ter até {limit} pastas de fluxos de trabalho.",
+  "error.backend.workflowFolderPlacementLimit": "Há fluxos de trabalho demais nas pastas.",
   "error.backend.sectionNameDuplicate": "Os nomes das seções devem ser exclusivos.",
   "error.backend.directMessageRequired": "Escreva uma mensagem primeiro.",
   "error.backend.directMessageTooLong": "Uma mensagem direta pode ter até {limit} caracteres.",
@@ -384,6 +401,7 @@ export const messages = {
     "Só o app do OpenBot para celular pode enviar este relato, porque ele adiciona a versão e o registro de suporte do celular. Abra este chat no celular. Se você vir esta mensagem lá, atualize o app do celular.",
   "error.backend.takeoverInactive": "Este controle manual do navegador não está mais ativo.",
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
+  "error.backend.apiKeyListFailed": "O OpenBot não conseguiu ler as chaves de API salvas.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",
   "error.backend.apiKeySaving": "A chave de API já está sendo salva.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -472,6 +490,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Dê um título curto à tarefa.",
   "error.backend.taskToolInvalid":
     "Dê à tarefa um título de no máximo 120 caracteres e uma instrução que diga o que fazer.",
+  "error.backend.taskControlInvalid":
+    "Informe o taskId de uma tarefa que você iniciou. Uma mensagem também precisa de texto.",
   "error.backend.taskOwnChatOnly":
     "Inicie uma tarefa só a partir do seu próprio chat. Um canal, uma conversa de mensagens ou outra tarefa não pode iniciar uma.",
   "error.backend.taskUnfinishedLimit":
@@ -479,5 +499,7 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Este agente tem {count} tarefas abertas. Feche uma tarefa e depois inicie ou abra outra.",
   "error.backend.taskRemoteUnsupported": "As tarefas só estão disponíveis para agentes neste computador.",
+  "error.backend.taskMessageFailed":
+    "O OpenBot não conseguiu enviar a mensagem para a tarefa. Tente novamente mais tarde.",
   "error.backend.taskStartFailed": "O OpenBot não conseguiu iniciar a tarefa. Faça o trabalho neste turno.",
 } as const satisfies PartialTranslation<typeof source>;

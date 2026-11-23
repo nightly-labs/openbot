@@ -23,6 +23,8 @@ import {
   agentEventRequestThread,
   agentNotificationLevel,
   notificationForAgentEvent,
+  notificationForSignInWait,
+  type ProviderSignInWaitNotice,
   teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
@@ -38,6 +40,7 @@ import {
   sealPushNotification,
 } from "@openbot/team-client/push-notification-seal";
 import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
+import type { ProviderSignInWait, ProviderSignInWaits } from "../backend/agent/provider-sign-in-waits";
 import { isNoUpdateAnswer } from "../backend/agent/routine-quiet-runs";
 import type { AgentService } from "../backend/agent-service";
 import type { PushNotificationStore, PushTarget, StoredPushRegistration } from "./push-notification-store";
@@ -61,8 +64,11 @@ type PushNotificationAgents = Pick<
 > &
   Pick<AgentService, "readTask">;
 
+type PushNotice = AgentEvent | ProviderSignInWaitNotice;
+
 interface PushNotificationOptions {
   agents: PushNotificationAgents;
+  signInWaits?: Pick<ProviderSignInWaits, "on" | "off">;
   store: Pick<PushNotificationStore, "list" | "replace">;
   send(request: NotificationRelayRequest): Effect.Effect<"sent" | "gone", PushNotificationSendFailure>;
   hiddenAgentIds(protocol: number, capabilities: ReadonlySet<string>, memberId: string): ReadonlySet<string>;
@@ -73,7 +79,7 @@ interface PushNotificationOptions {
     server: ServerNotificationLevel | null;
     agents: ReadonlyMap<string, ServerNotificationLevel>;
   };
-  atHostComputer(memberId: string, event: AgentEvent): boolean;
+  atHostComputer(memberId: string, event: AgentEvent | null): boolean;
   liveActivityShows(
     sessionId: string,
     subject: PushNotificationSubject,
@@ -99,7 +105,7 @@ export interface PushNotificationSubject {
 }
 
 interface HeldEvent {
-  event: AgentEvent;
+  event: PushNotice;
   at: number;
 }
 
@@ -121,6 +127,10 @@ export class PushNotificationService {
   readonly #listener = (event: AgentEvent) => {
     this.#releaseAnswered(event);
     Effect.runFork(this.#deliver(event).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
+  };
+  readonly #signInListener = (wait: ProviderSignInWait) => {
+    const notice: ProviderSignInWaitNotice = { type: "provider-sign-in-wait", ...wait };
+    Effect.runFork(this.#deliver(notice).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
   };
   #scope = Scope.makeUnsafe();
   #listening = false;
@@ -214,7 +224,10 @@ export class PushNotificationService {
 
   readonly dispose = Effect.fn("PushNotifications.dispose")(function* (this: PushNotificationService) {
     this.#running = false;
-    if (this.#listening) this.#options.agents.off("event", this.#listener);
+    if (this.#listening) {
+      this.#options.agents.off("event", this.#listener);
+      this.#options.signInWaits?.off("signInWait", this.#signInListener);
+    }
     this.#listening = false;
     for (const registration of this.#registrations.values()) this.#dropHeld(registration);
     this.#registrations.clear();
@@ -241,9 +254,10 @@ export class PushNotificationService {
 
   #deliver = Effect.fn("PushNotifications.deliver")(function* (
     this: PushNotificationService,
-    received: AgentEvent,
+    received: PushNotice,
     only?: Registration,
   ) {
+    if (received.type === "provider-sign-in-wait") return yield* this.#deliverSignInWait(received, only);
     if (teammateTurnCompleted(received)) return;
     const thread = received.type === "thread-turn-completed" ? received : null;
     const event = thread ? thread.turn : received;
@@ -252,7 +266,6 @@ export class PushNotificationService {
     const now = this.#now();
     const desktopNotifies = !thread || thread.routine;
     const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
-      const { value, memberId, protocol, sessionId } = registration.stored;
       if (
         thread &&
         !thread.routine &&
@@ -260,24 +273,12 @@ export class PushNotificationService {
           registration.stored.threadReplies === false)
       )
         return false;
-      if (!value.away && registration.connected) {
-        if (!only) this.#hold(registration, received, now);
-        return false;
-      }
-      if (value.mutedUntil !== null && value.mutedUntil * 1_000 > now) return false;
-      if (!this.#options.memberActive(memberId)) {
-        this.remove(sessionId);
-        return false;
-      }
-      if (this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(subject.agentId))
-        return false;
-      const used = desktopNotifies
-        ? this.#lastUseElsewhere(memberId, sessionId)
-        : this.#options.lastUseElsewhere(memberId, sessionId);
-      return !(
-        (used !== null && now - used < this.#awayAfterMs) ||
-        this.#options.atHostComputer(memberId, desktopNotifies ? event : received)
-      );
+      return this.#reaches(registration, received, subject.agentId, {
+        desktopNotifies,
+        hostEvent: desktopNotifies ? event : received,
+        now,
+        only,
+      });
     });
     if (!targets.length) return;
     const agents = this.#options.agents.listAgents();
@@ -335,6 +336,73 @@ export class PushNotificationService {
     }
   });
 
+  #deliverSignInWait = Effect.fn("PushNotifications.deliverSignInWait")(function* (
+    this: PushNotificationService,
+    notice: ProviderSignInWaitNotice,
+    only?: Registration,
+  ) {
+    const now = this.#now();
+    const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) =>
+      this.#reaches(registration, notice, notice.agentId, { desktopNotifies: false, hostEvent: null, now, only }),
+    );
+    if (!targets.length) return;
+    const agents = this.#options.agents.listAgents();
+    const userHidden = agents.some((agent) => agent.id === notice.agentId && agent.hiddenAt !== undefined);
+    for (const registration of targets) {
+      const { stored } = registration;
+      const { value, memberId } = stored;
+      if (stored.platform !== "android" && stored.value.token === null) continue;
+      const chosen = this.#options.memberLevels?.(memberId);
+      const level = agentNotificationLevel(
+        chosen?.server ?? value.level,
+        chosen?.agents ?? null,
+        notice.agentId,
+        userHidden,
+      );
+      const translate = translateFor(resolveLocale("system", value.locale));
+      const content = notificationForSignInWait(notice, agents, translate, level);
+      if (!content) continue;
+      const sealedContent: PushNotificationContent = {
+        serverId: value.serverId,
+        agentId: content.agentId,
+        threadId: content.threadId,
+        kind: "sign-in",
+        title: content.title,
+        body: content.body,
+      };
+      yield* this.#send(registration, sealedContent, content.body).pipe(
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      );
+    }
+  });
+
+  #reaches(
+    registration: Registration,
+    received: PushNotice,
+    agentId: string,
+    delivery: { desktopNotifies: boolean; hostEvent: AgentEvent | null; now: number; only: Registration | undefined },
+  ): boolean {
+    const { value, memberId, protocol, sessionId } = registration.stored;
+    const { now } = delivery;
+    if (!value.away && registration.connected) {
+      if (!delivery.only) this.#hold(registration, received, now);
+      return false;
+    }
+    if (value.mutedUntil !== null && value.mutedUntil * 1_000 > now) return false;
+    if (!this.#options.memberActive(memberId)) {
+      this.remove(sessionId);
+      return false;
+    }
+    if (this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(agentId)) return false;
+    const used = delivery.desktopNotifies
+      ? this.#lastUseElsewhere(memberId, sessionId)
+      : this.#options.lastUseElsewhere(memberId, sessionId);
+    return !(
+      (used !== null && now - used < this.#awayAfterMs) ||
+      this.#options.atHostComputer(memberId, delivery.hostEvent)
+    );
+  }
+
   #answer = Effect.fn("PushNotifications.answer")(function* (
     this: PushNotificationService,
     event: AgentTurnCompletedEvent,
@@ -389,7 +457,7 @@ export class PushNotificationService {
     }
   });
 
-  #hold(registration: Registration, event: AgentEvent, now: number): void {
+  #hold(registration: Registration, event: PushNotice, now: number): void {
     const held = registration.held.filter((item) => now - item.at < HELD_EVENT_MS);
     held.push({ event, at: now });
     registration.held = held.slice(-HELD_EVENT_LIMIT);
@@ -469,6 +537,7 @@ export class PushNotificationService {
   #listen(): void {
     if (this.#listening) return;
     this.#options.agents.on("event", this.#listener);
+    this.#options.signInWaits?.on("signInWait", this.#signInListener);
     this.#listening = true;
   }
 }
@@ -492,12 +561,13 @@ function relayRequest(
 }
 
 function heldEventUnseen(
-  event: AgentEvent,
+  event: PushNotice,
   snapshot: ReturnType<PushNotificationAgents["getRuntimeSnapshot"]>,
   reads: ReturnType<PushNotificationAgents["listConversationReads"]>,
   agents: readonly AgentSummary[],
 ): boolean | null {
   if (event.type === "error" || event.type === "thread-turn-completed") return null;
+  if (event.type === "provider-sign-in-wait") return true;
   if (event.type !== "turn-completed") return true;
   if (event.status !== "completed") {
     return snapshot.failedTurns.some((failed) => failed.agentId === event.agentId && failed.turnId === event.turnId);
@@ -506,7 +576,7 @@ function heldEventUnseen(
   return (reads[event.agentId]?.unreadCount ?? 0) > 0;
 }
 
-function heldRequest(event: AgentEvent): { agentId: string; requestId: string | number } | null {
+function heldRequest(event: PushNotice): { agentId: string; requestId: string | number } | null {
   switch (event.type) {
     case "prompt":
       return { agentId: event.agentId, requestId: event.requestId };

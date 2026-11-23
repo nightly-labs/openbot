@@ -44,6 +44,7 @@ export interface McpConfigErrors {
   name?: string;
   command?: string;
   url?: string;
+  headers?: string;
 }
 
 export interface SaveMcpServerInput {
@@ -136,7 +137,15 @@ export function mcpConfigErrors(config: McpServerConfig): McpConfigErrors {
     return errors;
   }
   if (!isHttpUrl(config.url)) errors.url = "Enter an http or https address.";
+  if (config.headers.some(({ key }) => !isMcpHeaderName(key)))
+    errors.headers =
+      "Header names cannot contain spaces or symbols such as : ( ) /. Use a name such as Authorization, and put the key or token in Value.";
   return errors;
+}
+
+export function isMcpHeaderName(key: string): boolean {
+  const name = key.trim();
+  return !name || /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(name);
 }
 
 export function mcpConfigIsValid(config: McpServerConfig): boolean {

@@ -9,11 +9,15 @@ import {
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
   type WorkflowMediaAspect,
+  type WorkflowMediaInput,
   type WorkflowMediaKind,
+  type WorkflowMediaMode,
+  type WorkflowMediaOption,
   type WorkflowMediaPrice,
   type WorkflowMediaPriceRequest,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
+  type WorkflowStepSettings,
   type WorkflowTriggerType,
 } from "@openbot/contracts/ipc";
 import { providerOffersModels } from "../../components/provider-model-options";
@@ -25,6 +29,7 @@ export interface WorkflowFeatures {
   outputs: readonly WorkflowOutputTarget[];
   uploads: boolean;
   presence: boolean;
+  format: number;
 }
 
 export const WORKFLOW_FEATURES_V1: WorkflowFeatures = {
@@ -33,6 +38,7 @@ export const WORKFLOW_FEATURES_V1: WorkflowFeatures = {
   outputs: ["notify", "channel"],
   uploads: false,
   presence: false,
+  format: 1,
 };
 
 export interface WorkflowPlace {
@@ -79,8 +85,13 @@ export interface WorkflowImageModel {
   voices?: boolean;
   aspects?: readonly WorkflowMediaAspect[];
   durations?: readonly number[];
+  defaultDuration?: number;
+  frameCount?: number;
   resolutions?: readonly string[];
   transparent?: boolean;
+  options?: readonly WorkflowMediaOption[];
+  inputs?: readonly WorkflowMediaInput[];
+  modes?: readonly WorkflowMediaMode[];
   accounts?: readonly ProviderAccountStatus[];
 }
 
@@ -95,12 +106,16 @@ export interface WorkflowCatalogs {
   channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
   mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
+  creditBalance?: number | null | undefined;
   mediaSize?: boolean | undefined;
   agentFiles?: boolean | undefined;
+  answers?: boolean | undefined;
+  stepSettings?: ((stepId: string) => Promise<WorkflowStepSettings>) | undefined;
   files: readonly StoredFileRow[];
   media?: ((attachmentId: string, kind: WorkflowMediaKind) => string | null | undefined) | undefined;
   mediaPreview?: ((attachmentId: string) => string | null | undefined) | undefined;
   upload?: ((file: File) => Promise<StoredFileRow>) | undefined;
+  download?: ((attachmentId: string) => Promise<void>) | undefined;
   self?: string | undefined;
 }
 

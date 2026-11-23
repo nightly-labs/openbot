@@ -7,6 +7,7 @@ import type {
   DraftAttachment,
   InstalledSkill,
   QueueDelivery,
+  ResponseStyle,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { isAgentTaskActive } from "@openbot/team-client/agent-tasks";
@@ -15,11 +16,16 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import type {
   AgentMessage,
   AgentProfile,
+  ChatActionMarkerModel,
   ComposerBrowserTab,
   ComposerMcpServer,
   ComposerThread,
 } from "@openbot/ui/data";
-import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
+import {
+  AgentActivityIndicator,
+  type AgentActivityLabel,
+  nextAgentActivityLabel,
+} from "@openbot/ui/features/conversation/AgentActivity";
 import {
   type AgentStep,
   AgentStepsDisclosure,
@@ -72,11 +78,23 @@ import {
   MessageSelectionActions,
   type QuoteShortcutModifier,
 } from "@openbot/ui/features/conversation/SelectionActions";
+import { SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import type { SendShortcut } from "@openbot/ui/features/conversation/send-shortcut";
 import { ComposerVoiceControls, type VoicePhase } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { children, createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show, untrack } from "solid-js";
+import {
+  children,
+  createEffect,
+  createMemo,
+  createSignal,
+  createStore,
+  For,
+  onCleanup,
+  onSettled,
+  Show,
+  untrack,
+} from "solid-js";
 import { createComposerRowsResize } from "../createComposerRowsResize";
 import { type AgentThreadBranchSource, BranchDivider } from "./BranchDivider";
 import { MAIN_THREAD_ID } from "./thread-types";
@@ -87,10 +105,24 @@ const HOLD_TEXT = {
   "server-busy": "conversation.threads.hold.serverBusy",
   "agent-busy": "conversation.threads.hold.agentBusy",
   "one-turn": "conversation.threads.hold.oneTurn",
+  "sign-in": "conversation.threads.hold.signIn",
 } as const satisfies Record<Exclude<AgentTaskHold, "task-limit">, AppTextKey>;
 
 const STICK_DISTANCE = 48;
+
+const MARKER_ROW_KINDS: ReadonlySet<ChatActionMarkerModel["kind"]> = new Set([
+  "skill-lifecycle",
+  "instructions-change",
+  "plan-continuation",
+  "model-switch",
+  "channel-change",
+  "vault-change",
+  "context-reset",
+  "sign-in-failure",
+  "routine-run",
+]);
 const NEAR_SCROLL_VIEWS = 2;
+const OLDER_PRELOAD_VIEWS = 1;
 
 function shownInThread(message: AgentMessage): boolean {
   if (message.kind === "thinking" || message.kind === "memory-changes") return false;
@@ -209,6 +241,7 @@ export interface AgentThreadViewProps {
   copiedMessageId?: string | null | undefined;
   compactMessageActions?: boolean | undefined;
   bubbleStyle?: ChatBubbleStyle | undefined;
+  responseStyle?: ResponseStyle | undefined;
   onBranch?: ((messageId: string) => void) | undefined;
   onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
@@ -225,6 +258,13 @@ export interface AgentThreadViewProps {
   awaiting?: readonly AwaitingReplyItem[] | undefined;
   onOpenWaitingAgent?: ((agentId: string) => void) | undefined;
   selectionActions?: AgentThreadSelectionActions | undefined;
+  failureText?: ((error: string) => string) | undefined;
+  subagents?: AgentThreadSubagents | undefined;
+}
+
+export interface AgentThreadSubagents {
+  selectedId: string | null;
+  onOpen: (subagentId: string) => void;
 }
 
 export interface AgentThreadSelectionActions {
@@ -244,12 +284,37 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     setQuoteRequest((current) => ({ id: (current?.id ?? 0) + 1, messageId, text: limitedQuoteText(text) }));
   const otherThreads = createMemo(() => props.threads?.filter((thread) => thread.id !== props.task?.id));
   let scroller: HTMLElement | undefined;
+  let messageList: HTMLDivElement | undefined;
   let atEnd = true;
-  let olderAnchor: { firstId: string | undefined; row: Element; top: number } | undefined;
+  let olderAnchor: { firstId: string | undefined; content: HTMLElement; top: number } | undefined;
+  let autoLoadedFirstId: string | undefined | null = null;
+  function firstVisibleRow(element: HTMLElement): HTMLElement | undefined {
+    const viewTop = element.getBoundingClientRect().top;
+    const rows = element.querySelectorAll<HTMLElement>(".virtual-chat-row");
+    for (const row of rows) if (row.getBoundingClientRect().bottom > viewTop) return row;
+    return rows[0];
+  }
+  function contentTop(content: HTMLElement, element: HTMLElement): number {
+    return content.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
+  }
   function loadOlder(older: AgentThreadOlderMessages): void {
-    const row = scroller?.querySelector(".virtual-chat-row");
-    if (row) olderAnchor = { firstId: props.messages[0]?.id, row, top: row.getBoundingClientRect().top };
+    const row = scroller && firstVisibleRow(scroller);
+    const content = row?.lastElementChild instanceof HTMLElement ? row.lastElementChild : row;
+    if (scroller && content)
+      olderAnchor = { firstId: props.messages[0]?.id, content, top: contentTop(content, scroller) };
     older.onLoad();
+  }
+  function loadOlderNearTop(element: HTMLElement): void {
+    const older = untrack(() => props.olderMessages);
+    if (!older || older.loading) return;
+    if (element.scrollTop > element.clientHeight * OLDER_PRELOAD_VIEWS) {
+      autoLoadedFirstId = null;
+      return;
+    }
+    const firstId = untrack(() => props.messages[0]?.id);
+    if (firstId === autoLoadedFirstId) return;
+    autoLoadedFirstId = firstId;
+    loadOlder(older);
   }
   createEffect(
     () => props.olderMessages?.loading === true,
@@ -269,7 +334,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     newer.onLoad();
   }
   let shownTaskId = untrack(() => props.task?.id);
-  const activityLabel = nextAgentActivityLabel();
+  const rotatingActivityLabel = nextAgentActivityLabel();
+  const plainActivity = () => props.responseStyle === "natural";
+  const activityLabel = (): AgentActivityLabel => (plainActivity() ? "Thinking it through…" : rotatingActivityLabel);
   const fades = createScrollFades();
   createEffect(
     () => props.task?.id,
@@ -277,12 +344,14 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       if (taskId === shownTaskId) return;
       shownTaskId = taskId;
       atEnd = true;
+      olderAnchor = undefined;
+      autoLoadedFirstId = null;
       if (scroller) scroller.scrollTop = scroller.scrollHeight;
     },
   );
   onSettled(() => {
     const element = scroller;
-    const list = element?.firstElementChild;
+    const list = messageList;
     if (!element || !list) return fades.stop;
     let lastTop = element.scrollTop;
     let lastHeight = element.scrollHeight;
@@ -292,18 +361,19 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       else if (scrollTop < lastTop && scrollHeight >= lastHeight) atEnd = false;
       lastTop = scrollTop;
       lastHeight = scrollHeight;
+      loadOlderNearTop(element);
     };
     const follow = new ResizeObserver(() => {
       const anchor = olderAnchor;
       if (anchor && untrack(() => props.messages[0]?.id) !== anchor.firstId) {
         olderAnchor = undefined;
-        element.scrollTop += anchor.row.getBoundingClientRect().top - anchor.top;
-        return;
-      }
-      if (atEnd) element.scrollTop = element.scrollHeight;
+        if (anchor.content.isConnected) element.scrollTop += contentTop(anchor.content, element) - anchor.top;
+      } else if (atEnd) element.scrollTop = element.scrollHeight;
+      loadOlderNearTop(element);
     });
     follow.observe(list);
     if (atEnd) element.scrollTop = element.scrollHeight;
+    loadOlderNearTop(element);
     element.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       follow.disconnect();
@@ -432,7 +502,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   };
   const changeMarker = (message: AgentMessage) => {
     const marker = message.actionMarker;
-    return marker?.kind === "skill-lifecycle" || marker?.kind === "instructions-change" ? marker : undefined;
+    return marker && MARKER_ROW_KINDS.has(marker.kind) ? marker : undefined;
   };
   const sharedFileOpener = (agentId: string | undefined) => {
     const open = props.onOpenFile;
@@ -547,6 +617,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   const shownRow = (message: AgentMessage) =>
     shownInThread(message) || (message.kind === "thinking" && props.stepsAbove?.(message.id) !== undefined);
   const shownRows = createMemo(() => props.messages.filter(shownRow));
+  const turnOutputShown = (turnId: string | null) =>
+    turnId !== null &&
+    shownRows().some(
+      (message) => message.turnId === turnId && message.author === "agent" && message.kind !== "thinking",
+    );
   const holdsSenderRun = (message: AgentMessage) =>
     message.kind !== "thinking" &&
     message.kind !== "plan" &&
@@ -593,6 +668,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     }
     return ids;
   });
+  const [runOpeners, setRunOpeners] = createStore<Record<string, "agent" | "user">>({});
   const branchDividerId = createMemo(() => {
     const source = props.branchSource;
     if (!source) return undefined;
@@ -611,7 +687,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const reason = error?.trim() ?? "";
     if (!reason) return { body: t("conversation.threads.view.failedBody"), details: null };
     const fallback = t("agent.error.continueFailed");
-    const body = errorMessage(reason, fallback);
+    const body = errorMessage(props.failureText?.(reason) ?? reason, fallback);
     return { body, details: body === fallback ? reason : null };
   };
   const running = () =>
@@ -697,7 +773,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         <Show when={props.newerMessages}>
           {(newer) => <ScrollToLatestButton onClick={() => loadLatest(newer())} />}
         </Show>
-        <div class="virtual-chat-list virtual-chat-list-static" ref={fades.watch}>
+        <div
+          class="virtual-chat-list virtual-chat-list-static"
+          ref={(element: HTMLDivElement) => {
+            messageList = element;
+            fades.watch(element);
+          }}
+        >
           <Show when={props.olderMessages}>
             {(older) => (
               <div class="conversation-history-status">
@@ -719,8 +801,10 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             </p>
           </Show>
           <For each={shownRows()} keyed={(message) => message.id}>
-            {(message) => {
+            {(message, index) => {
               const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
+              const subagentGroup = () =>
+                props.subagents && message().kind === "subagents" ? message().subagents : undefined;
               const stepsInRow = () =>
                 props.traceAbove !== undefined &&
                 !props.stepsOpenByDefault &&
@@ -729,6 +813,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 !agentMessageMarker(message()) &&
                 !changeMarker(message()) &&
                 !card() &&
+                !subagentGroup() &&
                 author(message()).kind === "agent";
               const stepsDisclosure = () => (
                 <Show when={props.stepsAbove?.(message().id)}>
@@ -743,10 +828,34 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                   )}
                 </Show>
               );
+              const opensRun = createMemo((): "agent" | "user" | undefined => {
+                const current = message();
+                if (card() || !continuesRunIds().has(current.id)) return undefined;
+                if (!stepsInRow() && props.stepsAbove?.(current.id)) return undefined;
+                return author(current).kind === "agent" ? "agent" : "user";
+              });
+              createEffect(
+                () => ({ id: message().id, kind: opensRun() }),
+                ({ id, kind }) => {
+                  if (!kind) return;
+                  setRunOpeners((draft) => {
+                    draft[id] = kind;
+                  });
+                  return () =>
+                    setRunOpeners((draft) => {
+                      delete draft[id];
+                    });
+                },
+              );
+              const nextOpensRun = () => {
+                const next = shownRows()[index() + 1];
+                return next ? runOpeners[next.id] : undefined;
+              };
               return (
                 <div
                   class="virtual-chat-row"
                   data-grouped={!card() && continuesRunIds().has(message().id) ? "sender" : undefined}
+                  data-next-grouped={nextOpensRun()}
                 >
                   <Show when={timeMarkers().get(message().id)}>
                     {(label) => (
@@ -793,8 +902,24 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       </article>
                     )}
                   </Show>
+                  <Show when={subagentGroup()}>
+                    {(subagents) => (
+                      <article data-chat-search-message={message().id}>
+                        <SubagentGroup
+                          subagents={subagents()}
+                          selectedId={props.subagents?.selectedId}
+                          onOpen={(subagentId) => props.subagents?.onOpen(subagentId)}
+                        />
+                      </article>
+                    )}
+                  </Show>
                   <Show
-                    when={message().kind !== "thinking" && !agentMessageMarker(message()) && !changeMarker(message())}
+                    when={
+                      message().kind !== "thinking" &&
+                      !subagentGroup() &&
+                      !agentMessageMarker(message()) &&
+                      !changeMarker(message())
+                    }
                   >
                     <Show
                       when={card()}
@@ -826,6 +951,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           actionTime={props.compactMessageActions === false}
                           actionsBeside={stepsInRow() || author(message()).kind === "you"}
                           menu={messageMenu(message())}
+                          textAtOnce={plainActivity()}
                           data-chat-search-message={message().id}
                         />
                       }
@@ -843,10 +969,12 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
-                  label={activityLabel}
+                  label={activityLabel()}
                   detail={task().progress}
                   steps={props.activeSteps}
                   stepsOpenByDefault={props.stepsOpenByDefault}
+                  plain={plainActivity()}
+                  outputShown={turnOutputShown(task().activeTurnId)}
                 />
               </div>
             )}
@@ -856,7 +984,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
               <div class="virtual-chat-row virtual-chat-row-activity">
                 <AgentActivityIndicator
                   agent={props.agent}
-                  label={activityLabel}
+                  label={rotatingActivityLabel}
                   detail={t("chat.activity.backgroundWork")}
                   since={since()}
                 />

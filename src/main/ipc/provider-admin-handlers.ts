@@ -39,6 +39,11 @@ import {
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import {
+  decodeLiveVoiceAccount,
+  LIVE_VOICE_ACCOUNT_CAPABILITY,
+  LIVE_VOICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/live-voice-account-v1";
+import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-code-v1";
@@ -68,6 +73,7 @@ import {
   PROVIDER_HOST_SIGN_IN_ERROR_LIMIT,
   PROVIDER_HOST_SIGN_IN_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import { providerSignInRelay } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import {
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_SIGN_OUT_ROUTES,
@@ -89,11 +95,6 @@ import {
 import { PROVIDERS_V4_CAPABILITY, PROVIDERS_V4_ROUTES } from "@openbot/contracts/team-protocol/providers-v4";
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
-import {
-  SIGN_IN_RELAY_CAPABILITY,
-  SIGN_IN_RELAY_PROVIDERS,
-  SIGN_IN_RELAY_ROUTES,
-} from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Cause, Effect, Exit, Fiber } from "effect";
 import { normalizePastedCode } from "../../backend/agent/cli-code-login";
@@ -129,6 +130,7 @@ import {
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  parseSetLiveVoiceAccountInput,
   parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
@@ -297,12 +299,10 @@ export function providerAdminIpcHandlers({
       local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
       remote: run,
     });
-  function requireRelay(serverId: string, provider: AgentProviderId): void {
-    if (
-      !remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY) ||
-      !SIGN_IN_RELAY_PROVIDERS.some((candidate) => candidate === provider)
-    )
-      throw new Error(sourceText("error.team.providersUnsupported"));
+  function requireRelay(serverId: string, provider: AgentProviderId): string {
+    const match = providerSignInRelay(provider, (capability) => remoteServers.supportsCapability(serverId, capability));
+    if (!match) throw new Error(sourceText("error.team.providersUnsupported"));
+    return match.relay.start;
   }
   async function startRelay(serverId: string, provider: AgentProviderId, path: string, body: unknown): Promise<void> {
     const key = relayKey(serverId, provider);
@@ -406,11 +406,23 @@ export function providerAdminIpcHandlers({
                 })
                 .pipe(Effect.orElseSucceed(() => null))
             : Effect.succeed(null);
+          const liveVoice = remoteServers.supportsCapability(serverId, LIVE_VOICE_ACCOUNT_CAPABILITY)
+            ? remoteServers
+                .request(serverId, LIVE_VOICE_ACCOUNT_ROUTES.settings, decodeLiveVoiceAccount, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(
+                  Effect.map((accountId) => ({ accountId })),
+                  Effect.orElseSucceed(() => null),
+                )
+            : Effect.succeed(null);
           return runCauseEffect(
-            Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
-              Effect.map(([accounts, extra, pooled]) => {
+            Effect.all([list, models, pools, liveVoice], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled, voice]) => {
                 const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
-                return pooled ? { ...withModels, pools: pooled } : withModels;
+                const withPools = pooled ? { ...withModels, pools: pooled } : withModels;
+                return voice ? { ...withPools, liveVoiceAccount: voice.accountId } : withPools;
               }),
             ),
           );
@@ -485,6 +497,19 @@ export function providerAdminIpcHandlers({
           );
         },
       }),
+      setLiveVoiceAccount: scopedHandler(parseSetLiveVoiceAccountInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, LIVE_VOICE_ACCOUNT_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, LIVE_VOICE_ACCOUNT_ROUTES.update, acceptEmpty, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
       hostDefaultProvider: scopedQueryHandler({
         local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
         remote: (serverId) => hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.settings, {}),
@@ -530,8 +555,7 @@ export function providerAdminIpcHandlers({
         },
       }),
       startRelaySignIn: relaySignIn(parseProviderId, (provider, serverId) => {
-        requireRelay(serverId, provider);
-        return startRelay(serverId, provider, SIGN_IN_RELAY_ROUTES.providerStart, { provider });
+        return startRelay(serverId, provider, requireRelay(serverId, provider), { provider });
       }),
       startAccountRelaySignIn: relaySignIn(parseConnectProviderAccountInput, ({ provider, accountId }, serverId) => {
         const accountRelay = providerAccountRelay((capability) =>

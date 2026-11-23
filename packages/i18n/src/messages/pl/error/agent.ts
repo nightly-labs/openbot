@@ -53,6 +53,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Wybrany model agenta jest niedostępny.",
   "error.agent.modelProviderNotConnected":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie jest połączony.",
+  "error.agent.modelProviderSignInRequired":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} wymaga zalogowania. Zaloguj się do {provider} i spróbuj ponownie.",
+  "error.agent.modelProviderNotInstalled":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} nie jest zainstalowany.",
+  "error.agent.modelProviderOutdated":
+    "Wybrany model agenta „{model}” jest niedostępny: {provider} wymaga aktualizacji.",
   "error.agent.modelListEmpty":
     "Wybrany model agenta „{model}” jest niedostępny: {provider} nie zwrócił żadnych modeli. Ostatni błąd: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -126,6 +132,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "Nie udało się całkowicie usunąć danych agenta. Spróbuj ponownie usunąć agenta.",
   "error.agent.deleteFolderInUse":
     "Praca innego agenta nadal używa folderu tego agenta. Usuń agenta ponownie, gdy ta praca się zakończy, lub po ponownym uruchomieniu OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Inny program nadal używa folderu tego agenta, na przykład program uruchomiony przez agenta. Zamknij ten program lub uruchom ponownie komputer, na którym działa ten agent, a potem usuń agenta ponownie.",
   "error.agent.deleteWhenFolderFree":
     "Praca innego agenta nadal używa folderu tego agenta. OpenBot usunie tego agenta, gdy ta praca się zakończy.",
   "error.agent.duplicationBusy": "Ten agent jest już duplikowany.",
@@ -150,6 +158,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Zachowanie wiadomości podczas pracy agenta można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.backupModelsLocalOnly": "Modele zapasowe można ustawić tylko na komputerze, na którym działa agent.",
+  "error.agent.backupModelsAtLimit":
+    "Żaden model zapasowy nie może teraz przejąć pracy: każdy osiągnął limit użycia lub niedawno zawiódł. Modele jednego konta mogą mieć wspólny limit. Aby kontynuować teraz, dodaj model zapasowy od innego dostawcy lub z innego konta albo poczekaj na odnowienie limitu.",
   "error.agent.taskLimitLocalOnly": "Limit zadań można ustawić tylko na komputerze, na którym działa agent.",
   "error.agent.localScriptsOff": "Ten agent nie zezwala na lokalne skrypty.",
   "error.agent.localScriptsRateLimited":

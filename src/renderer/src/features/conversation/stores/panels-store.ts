@@ -1,3 +1,4 @@
+import { isOpenableAttachmentName } from "@openbot/contracts/attachment-files";
 import {
   type AttachmentSummary,
   type BrowserBounds,
@@ -16,6 +17,7 @@ import { createEffect, createMemo, createSignal, onCleanup, type Store, type Sto
 import { createScopeGuard } from "../../../scope-lifetime";
 import { createAttachmentDownloads } from "../attachment-downloads";
 import { attachmentFilePreview } from "../attachment-preview";
+import { BROWSER_PIP_STORAGE_KEY, BROWSER_WINDOW_STORAGE_KEY, storeBounds } from "../browser-bounds-storage";
 import { releaseFilePreviewPage } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
 import type {
@@ -43,7 +45,7 @@ export interface RoutineSettingsRequest {
   nonce: number;
 }
 
-interface SidePanelFile {
+export interface SidePanelFile {
   key: string;
   name: string;
   folder: boolean;
@@ -91,6 +93,9 @@ export interface PanelsStoreDeps {
   settingsModel: () => import("@openbot/contracts/ipc").AgentModelId;
   settingsReasoning: () => import("@openbot/contracts/ipc").AgentReasoningEffort;
   setBrowserPipBounds: (bounds: BrowserBounds | null) => void;
+  browserWindowOpen: () => boolean;
+  setBrowserWindowOpen: (open: boolean) => void;
+  setBrowserWindowBounds: (bounds: BrowserBounds | null) => void;
   sidebarFilePreview: () => SidebarFilePreview | null;
   setSidebarFilePreview: (preview: SidebarFilePreview | null) => void;
   setComposerError: (error: string | null, targetOverride?: ConversationTarget) => void;
@@ -209,7 +214,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     deps.sidebarFilePreview()?.ownerAgentId === conversationOwnerId(deps.props);
 
   function setActiveRightPanel(mode: RightPanelMode, agentId = conversationOwnerId(deps.props)) {
+    if (mode === "browser-expanded" && deps.browserWindowOpen()) {
+      void conversationRuntime(deps.props).browser.focusWindow();
+      return;
+    }
+    showRightPanel(mode, agentId);
+  }
+
+  function showRightPanel(mode: RightPanelMode, agentId = conversationOwnerId(deps.props)) {
     if (!agentId) return;
+    if (mode === "browser-pip") deps.setBrowserWindowOpen(false);
     if (mode !== "file-preview") deps.invalidateFilePreviewGeneration();
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
@@ -284,16 +298,29 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
 
   function saveBrowserPipBounds(bounds: BrowserBounds) {
     deps.setBrowserPipBounds(bounds);
-    window.localStorage.setItem(
-      "openbot:browser-pip-native-bounds",
-      [bounds.x, bounds.y, bounds.width, bounds.height].join(","),
-    );
+    storeBounds(BROWSER_PIP_STORAGE_KEY, bounds);
+  }
+
+  function saveBrowserWindowBounds(bounds: BrowserBounds) {
+    deps.setBrowserWindowBounds(bounds);
+    storeBounds(BROWSER_WINDOW_STORAGE_KEY, bounds);
+  }
+
+  function openBrowserWindow() {
+    if (isBrowserScreenMode(activeRightPanel())) showRightPanel("none");
+    deps.setRightPanels(withoutBrowserScreens);
+    deps.setBrowserWindowOpen(true);
+  }
+
+  function reattachBrowserWindow() {
+    deps.setBrowserWindowOpen(false);
+    showRightPanel("browser-expanded");
   }
 
   function hideBrowserPanel() {
     setActiveRightPanel("none");
     if (deps.props.browserEnabled !== false)
-      void conversationRuntime(deps.props).browser.setVisible({ visible: false });
+      void conversationRuntime(deps.props).browser.setVisible({ visible: false, target: "main" });
   }
 
   async function previewAttachment(attachment: AttachmentSummary, place: FileTabPlace = "tab") {
@@ -334,6 +361,18 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   const attachmentDownloads = attachmentFiles.downloads;
 
   function attachmentAction(attachment: AttachmentSummary, action: FileAction) {
+    if (action === "open" && previewsInsteadOfReveal(attachment)) {
+      void previewAttachment(attachment);
+      return;
+    }
+    attachmentFileAction(attachment, action);
+  }
+
+  function previewsInsteadOfReveal(attachment: AttachmentSummary) {
+    return canPreviewAttachment(attachment) && !isOpenableAttachmentName(attachment.name);
+  }
+
+  function attachmentFileAction(attachment: AttachmentSummary, action: FileAction) {
     if (action === "open" && deps.props.runtime && canPreviewAttachment(attachment)) {
       void previewAttachment(attachment);
       return;
@@ -651,7 +690,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (!file) return;
     const source = file.source;
     if (source.kind === "attachment") {
-      attachmentAction(source.attachment, action);
+      attachmentFileAction(source.attachment, action);
       return;
     }
     if (source.kind === "workspace-folder") return;
@@ -713,6 +752,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openRoutineRunMessage,
     showBrowserPip,
     saveBrowserPipBounds,
+    saveBrowserWindowBounds,
+    openBrowserWindow,
+    reattachBrowserWindow,
     hideBrowserPanel,
     previewAttachment,
     attachmentAction,
@@ -735,7 +777,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
   };
 }
 
-function filePreviewKey(source: SidebarFilePreview["source"]): string {
+export function filePreviewKey(source: SidebarFilePreview["source"]): string {
   if (source.kind === "attachment") return `attachment\u0000${source.attachment.id}`;
   if (source.kind === "shared") return `shared\u0000${source.path}`;
   return `${source.kind}\u0000${source.agentId}\u0000${source.path}`;
@@ -779,4 +821,16 @@ function samePreview(next: FilePreview, shown: FilePreview): boolean {
     if (next.bytes[index] !== shown.bytes[index]) return false;
   }
   return true;
+}
+
+function isBrowserScreenMode(mode: RightPanelMode): boolean {
+  return mode === "browser-expanded" || mode === "browser-pip";
+}
+
+function withoutBrowserScreens(current: Record<string, RightPanelMode>): Record<string, RightPanelMode> {
+  const entries = Object.entries(current);
+  if (!entries.some(([, mode]) => isBrowserScreenMode(mode))) return current;
+  return Object.fromEntries(
+    entries.map(([agentId, mode]): [string, RightPanelMode] => [agentId, isBrowserScreenMode(mode) ? "none" : mode]),
+  );
 }

@@ -8,6 +8,7 @@ import {
   type BillingPlanId,
   isOpenBillingStatus,
   memberLimitForPlan,
+  storageTierGb,
   storageTierOf,
 } from "@openbot/contracts/billing";
 import {
@@ -26,7 +27,6 @@ import {
   type HostedServerState,
   type HostedServerStatus,
   type HostedServerSummary,
-  hostedServerStorageGb,
   parseHostedServerName,
 } from "@openbot/contracts/hosted-servers";
 import { parseLicenseOrder } from "@openbot/contracts/license";
@@ -59,6 +59,13 @@ import {
   verifyBoatWebhookSignature,
 } from "./boat-client";
 import { constantTimeEqual, deriveSecret, hmacSha256, randomToken, sha256 } from "./crypto";
+import {
+  archiveRestore,
+  type HostedArchiveKeys,
+  type HostedArchiveRestore,
+  hostedArchiveKeys,
+  type StoredArchive,
+} from "./hosted-archive-restore";
 import { createHostedPoolAlert, type HostedPoolAlert } from "./hosted-pool-alert";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
@@ -78,9 +85,13 @@ const SETUP_RETRY_AFTER_MS = 10 * 60_000;
 const CREATE_LOST_AFTER_MS = 10 * 60_000;
 const POOL_PRODUCT_OF_PLAN: Record<BillingPlanId, string> = { starter: "VPS01", standard: "VPS02", pro: "VPS03" };
 const POOL_HOST_PATTERN = /^leaseweb:\d{1,20}$/u;
+const SERVER_ID_PATTERN = /^[0-9a-f-]{36}$/u;
 export const POOL_SEEN_WITHIN_MS = 150_000;
 const POOL_SEEN_WRITE_AFTER_MS = 60_000;
 const POOL_START_LOST_AFTER_MS = 4 * 60_000;
+const POOL_RESTORE_LOST_AFTER_MS = 3 * 60 * 60_000;
+const POOL_RESTORE_REPORT_KEPT_MS = 2 * 60 * 60_000;
+export const POOL_RESTORE_VERSION = 1;
 const LOW_POOL_FREE = 1;
 const POOL_CANDIDATES = 3;
 const POOL_FIRST_START_SQL = `(operator_host IS NOT NULL AND observed_state = 'starting' AND last_wake_reason = 'create'
@@ -104,6 +115,11 @@ const NEXT_RUN_MAX_AHEAD_MS = 400 * 24 * 60 * 60_000;
 const CLAIM_OPEN_SQL = `(hosted_servers.auth_session_id IS NULL OR NOT EXISTS(
   SELECT 1 FROM auth_sessions WHERE auth_sessions.id = hosted_servers.auth_session_id AND auth_sessions.revoked_at IS NULL))`;
 const OPEN_STATUSES_SQL = "('active', 'trialing', 'past_due', 'unpaid', 'paused')";
+const HAS_POOL_DATA_SQL = `(operator_host IS NOT NULL OR EXISTS(SELECT 1 FROM hosted_server_archives a
+  WHERE a.server_id = hosted_servers.server_id AND a.deleted_at IS NULL))`;
+const ARCHIVED_SQL = `EXISTS(SELECT 1 FROM hosted_server_archives a
+  WHERE a.server_id = hosted_servers.server_id AND a.deleted_at IS NULL AND a.restored_at IS NULL)`;
+const POOL_RESTORE_SQL = `(operator_host IS NOT NULL AND observed_state = 'starting' AND ${ARCHIVED_SQL})`;
 
 export type HostedServerBindings = Pick<
   WorkerBindings,
@@ -116,6 +132,9 @@ export type HostedServerBindings = Pick<
   | "BOAT_WEBHOOK_SECRET"
   | "REMOTE_TICKET_PRIVATE_JWK"
   | "HOSTED_POOL_ALERT_WEBHOOK_URL"
+  | "HOSTED_ARCHIVE_KEY_SECRET"
+  | "B2_WORKER_KEY_ID_EU"
+  | "B2_WORKER_APPLICATION_KEY_EU"
 >;
 
 export class HostedServerServiceError extends Schema.TaggedError<HostedServerServiceError>()(
@@ -182,12 +201,14 @@ interface HostedServerRow {
   deletion_scheduled_at: number | null;
   deletion_subscription_id: string | null;
   storage_tier: number;
+  plan_ended_at: number | null;
+  archived: number;
 }
 
 const ROW_COLUMNS = `server_id, owner_user_id, name, provider_sandbox_id, provider_template, operator_host, retired_sandbox_id, size, pending_size, plan, billing_interval, currency,
   checkout_session_id, idempotency_key, desired_state, observed_state, observed_error, provider_event_at, auth_session_id,
   last_active_at, lease_until, next_run_at, last_wake_reason, start_requested_at, created_at, updated_at, deletion_scheduled_at,
-  deletion_subscription_id, storage_tier`;
+  deletion_subscription_id, storage_tier, plan_ended_at, ${ARCHIVED_SQL} AS archived`;
 
 export type HostedServerBilling = Pick<
   BillingService,
@@ -219,7 +240,10 @@ export interface CheckoutReturn {
   promotionCode?: string;
 }
 
-export type HostedPoolAssignment = { state: "waiting" } | { state: "assigned"; serverId: string; claim: string };
+export type HostedPoolAssignment =
+  | { state: "waiting" }
+  | { state: "assigned"; serverId: string; claim: string; restore?: HostedArchiveRestore }
+  | { state: "restored" };
 
 export interface HostedServerTickResult {
   restarted: number;
@@ -263,6 +287,7 @@ export class HostedServerService {
   readonly #billing: HostedServerBilling | null;
   readonly #analytics: AccountAnalytics;
   readonly #poolAlert: HostedPoolAlert | null;
+  readonly #archiveKeys: HostedArchiveKeys | null;
 
   constructor(bindings: HostedServerBindings, options: HostedServerServiceOptions = {}) {
     const database = bindings.DB;
@@ -291,6 +316,7 @@ export class HostedServerService {
       bindings.HOSTED_POOL_ALERT_WEBHOOK_URL,
       options.fetch ?? ((input, init) => fetch(input, init)),
     );
+    this.#archiveKeys = hostedArchiveKeys(bindings);
     this.#layer = Layer.succeed(HostedServerDependencies, {
       database,
       boat: this.#boat,
@@ -724,7 +750,7 @@ export class HostedServerService {
         dependencies.database
           .prepare(
             `UPDATE hosted_servers SET desired_state = 'deleted', updated_at = ?
-         WHERE server_id = ? AND desired_state = 'stopped' AND operator_host IS NOT NULL AND plan_ended_at = ?
+         WHERE server_id = ? AND desired_state = 'stopped' AND ${HAS_POOL_DATA_SQL} AND plan_ended_at = ?
          AND lifecycle_token = ? AND lifecycle_lease_until > ?
          AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
            AND s.status IN ${OPEN_STATUSES_SQL})`,
@@ -864,6 +890,7 @@ export class HostedServerService {
         state: row.observed_state,
         error: row.observed_error,
         sleeping: row.desired_state === "idle",
+        ...(isRestoring(row) ? { state: "starting" as const, restoring: true } : {}),
       };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -974,7 +1001,8 @@ export class HostedServerService {
           .first<HostedServerRow>(),
       );
       if (!row) return "not_hosted";
-      if (row.desired_state === "stopped" || row.observed_state === "awaiting_payment") return "ended";
+      if (row.desired_state === "stopped" || (row.observed_state === "awaiting_payment" && !row.archived))
+        return "ended";
       return row.desired_state === "idle" ? "sleeping" : "starting";
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -1141,6 +1169,8 @@ export class HostedServerService {
       this: HostedServerService,
       hostId: unknown,
       token: unknown,
+      restoreVersion: unknown = undefined,
+      restored: unknown = undefined,
     ): Effect.fn.Return<HostedPoolAssignment, HostedFailure, HostedServerDependencies> {
       const dependencies = yield* HostedServerDependencies;
       if (!isString(hostId) || !POOL_HOST_PATTERN.test(hostId)) return yield* invalidPoolToken();
@@ -1167,24 +1197,109 @@ export class HostedServerService {
             .run(),
         );
       }
+      if (restored !== undefined) return yield* this.#reportRestored(hostId, restored);
       const row = yield* hostedCall(() =>
         dependencies.database
           .prepare(
-            `SELECT server_id, claim_token_hash FROM hosted_servers
-         WHERE operator_host = ? AND desired_state = 'running' AND claim_expires_at > ? AND ${POOL_FIRST_START_SQL}`,
+            `SELECT ${ROW_COLUMNS}, claim_token_hash FROM hosted_servers
+         WHERE operator_host = ? AND desired_state = 'running' AND claim_expires_at > ?
+           AND (${POOL_FIRST_START_SQL} OR ${POOL_RESTORE_SQL})`,
           )
           .bind(hostId, now)
-          .first<{ server_id: string; claim_token_hash: string | null }>(),
+          .first<HostedServerRow & { claim_token_hash: string | null }>(),
       );
       const secret = yield* this.#claimKey();
       if (!row?.claim_token_hash || !secret) return { state: "waiting" };
       const claim = yield* hostedPoolClaim(secret, row.server_id, hostId).pipe(Effect.mapError(hostedFailure));
       const claimHash = yield* sha256(claim).pipe(Effect.mapError(hostedFailure));
       if (claimHash !== row.claim_token_hash) return { state: "waiting" };
-      return { state: "assigned", serverId: row.server_id, claim };
+      if (!row.archived) return { state: "assigned", serverId: row.server_id, claim };
+      if (restoreVersion !== POOL_RESTORE_VERSION) {
+        yield* this.#releaseRestore(row, "its openbot-pool-wait cannot restore an archive · prepare it again");
+        return { state: "waiting" };
+      }
+      const restore = yield* this.#restoreOf(row.server_id, now);
+      return restore ? { state: "assigned", serverId: row.server_id, claim, restore } : { state: "waiting" };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
+
+  readonly #restoreOf = Effect.fn("HostedServerService.restoreOf")(function* (
+    this: HostedServerService,
+    serverId: string,
+    now: number,
+  ): Effect.fn.Return<HostedArchiveRestore | null, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    const archive = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `SELECT server_id, object_key, region, bucket, version_id, size_bytes, sha256, wrapped_key
+         FROM hosted_server_archives WHERE server_id = ? AND deleted_at IS NULL AND restored_at IS NULL
+         ORDER BY created_at DESC LIMIT 1`,
+        )
+        .bind(serverId)
+        .first<StoredArchive>(),
+    );
+    if (!archive) return null;
+    return yield* archiveRestore(this.#archiveKeys, archive, now).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          console.warn("Hosted server archive restore is not available.", { serverId, reason: error.reason });
+          return null;
+        }),
+      ),
+    );
+  });
+
+  readonly #reportRestored = Effect.fn("HostedServerService.reportRestored")(function* (
+    this: HostedServerService,
+    hostId: string,
+    serverId: unknown,
+  ): Effect.fn.Return<HostedPoolAssignment, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    if (!isString(serverId) || !SERVER_ID_PATTERN.test(serverId)) return yield* invalidPoolToken();
+    const row = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `SELECT ${ROW_COLUMNS} FROM hosted_servers
+         WHERE server_id = ? AND operator_host = ? AND desired_state != 'deleted'`,
+        )
+        .bind(serverId, hostId)
+        .first<HostedServerRow>(),
+    );
+    if (!row) return yield* invalidPoolToken();
+    if (!row.archived) return { state: "restored" };
+    const now = dependencies.now();
+    const [, restored] = yield* hostedCall(() =>
+      dependencies.database.batch([
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_server_archives SET restored_at = ?
+           WHERE server_id = ? AND deleted_at IS NULL AND restored_at IS NULL AND EXISTS(
+             SELECT 1 FROM hosted_servers h WHERE h.server_id = ? AND h.operator_host = ? AND h.observed_state = 'starting'
+               AND h.desired_state = 'running')`,
+          )
+          .bind(now, serverId, serverId, hostId),
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET observed_state = 'running', provider_event_at = ?, updated_at = ?
+           WHERE server_id = ? AND operator_host = ? AND observed_state = 'starting' AND desired_state = 'running'
+             AND NOT ${ARCHIVED_SQL}`,
+          )
+          .bind(now, now, serverId, hostId),
+      ]),
+    );
+    if (restored?.meta.changes !== 1) return yield* invalidPoolToken();
+    console.info("Hosted server restored from its archive.", { serverId });
+    yield* this.#alertPool(
+      [
+        `♻️ **Restored** · ${row.plan} server · ${row.server_id.slice(0, 8)} · machine ${hostId}`,
+        ...(row.start_requested_at === null ? [] : [elapsedText(now - row.start_requested_at)]),
+      ].join(" · "),
+    );
+    yield* this.#recordReady(row, now);
+    return { state: "restored" };
+  });
 
   readonly handleWebhook = Effect.fn("HostedServerService.handleWebhook")(
     function* (
@@ -1298,11 +1413,11 @@ export class HostedServerService {
         const planChanged = yield* hostedCall(() =>
           dependencies.database
             .prepare(
-              `SELECT ${ROW_COLUMNS} FROM hosted_servers h
-           WHERE h.desired_state != 'deleted' AND h.updated_at <= ?
-             AND (h.observed_state = 'awaiting_payment' OR h.desired_state = 'stopped') = EXISTS(
+              `SELECT ${ROW_COLUMNS} FROM hosted_servers
+           WHERE desired_state != 'deleted' AND updated_at <= ?
+             AND (observed_state = 'awaiting_payment' OR desired_state = 'stopped') = EXISTS(
                SELECT 1 FROM billing_subscriptions s
-               WHERE s.server_id = h.server_id AND s.user_id = h.owner_user_id
+               WHERE s.server_id = hosted_servers.server_id AND s.user_id = hosted_servers.owner_user_id
                  AND (s.status IN ('active', 'trialing') OR (s.status = 'past_due' AND s.current_period_end > ?))
              )
            LIMIT ?`,
@@ -1322,6 +1437,7 @@ export class HostedServerService {
             .prepare(
               `SELECT ${ROW_COLUMNS} FROM hosted_servers
            WHERE observed_state = 'awaiting_payment' AND desired_state = 'running' AND updated_at <= ?
+             AND NOT ${ARCHIVED_SQL}
              AND NOT EXISTS(
                SELECT 1 FROM billing_subscriptions s
                WHERE s.server_id = hosted_servers.server_id AND s.status IN ${OPEN_STATUSES_SQL}
@@ -1335,6 +1451,19 @@ export class HostedServerService {
           Effect.gen({ self: this }, function* () {
             if (yield* this.#removeUnpaid(row, now)) result.abandoned += 1;
           }),
+        );
+        yield* hostedCall(() =>
+          dependencies.database
+            .prepare(
+              `UPDATE hosted_servers SET desired_state = 'stopped', observed_state = 'stopped',
+               observed_error = 'plan_ended', start_requested_at = NULL, updated_at = ?
+             WHERE observed_state = 'awaiting_payment' AND desired_state = 'running' AND operator_host IS NULL
+               AND updated_at <= ? AND ${ARCHIVED_SQL}
+               AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s
+                 WHERE s.server_id = hosted_servers.server_id AND s.status IN ${OPEN_STATUSES_SQL})`,
+            )
+            .bind(now, now - STUCK_AFTER_MS)
+            .run(),
         );
         const failedSetups = yield* hostedCall(() =>
           dependencies.database
@@ -1375,6 +1504,29 @@ export class HostedServerService {
         Effect.gen({ self: this }, function* () {
           if (yield* this.#leavePoolMachine(row)) result.provisioned += 1;
         }),
+      );
+      const lostRestores = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `SELECT ${ROW_COLUMNS} FROM hosted_servers
+         WHERE desired_state != 'deleted' AND start_requested_at <= ? AND ${POOL_RESTORE_SQL} LIMIT ?`,
+          )
+          .bind(now - POOL_RESTORE_LOST_AFTER_MS, TICK_BATCH_SIZE)
+          .all<HostedServerRow>(),
+      );
+      yield* run(lostRestores.results, (row) =>
+        this.#releaseRestore(row, "no restore report in 3 h · it can have customer data · install it again"),
+      );
+      yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE operator_hosts SET assign_token_hash = NULL WHERE assign_token_hash IS NOT NULL AND EXISTS(
+             SELECT 1 FROM hosted_servers h WHERE h.operator_host = operator_hosts.host_id AND h.observed_state != 'starting'
+               AND EXISTS(SELECT 1 FROM hosted_server_archives a WHERE a.server_id = h.server_id
+                 AND a.restored_at IS NOT NULL AND a.restored_at <= ?))`,
+          )
+          .bind(now - POOL_RESTORE_REPORT_KEPT_MS)
+          .run(),
       );
       const unused = yield* hostedCall(() =>
         dependencies.database
@@ -1490,8 +1642,8 @@ export class HostedServerService {
       const expired = yield* hostedCall(() =>
         dependencies.database
           .prepare(
-            `SELECT ${ROW_COLUMNS}, plan_ended_at FROM hosted_servers
-         WHERE operator_host IS NOT NULL AND desired_state = 'stopped' AND plan_ended_at <= ?
+            `SELECT ${ROW_COLUMNS} FROM hosted_servers
+         WHERE ${HAS_POOL_DATA_SQL} AND desired_state = 'stopped' AND plan_ended_at <= ?
            AND EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id)
            AND NOT EXISTS(SELECT 1 FROM billing_subscriptions s WHERE s.server_id = hosted_servers.server_id
              AND s.status IN ${OPEN_STATUSES_SQL})
@@ -1747,6 +1899,23 @@ export class HostedServerService {
     const dependencies = yield* HostedServerDependencies;
     if (row.operator_host) return;
     const secret = yield* this.#claimKey();
+    if (row.archived) {
+      const assigned = secret
+        ? yield* this.#assignRestore(row, secret).pipe(
+            Effect.catch((error) =>
+              Effect.sync(() => {
+                console.warn("Hosted server restore assignment failed.", {
+                  serverId: row.server_id,
+                  error: safeErrorCode(error),
+                });
+                return "the pool query failed";
+              }),
+            ),
+          )
+        : "the Worker has no claim key";
+      if (assigned !== true) yield* this.#waitForRestore(row, assigned);
+      return;
+    }
     if (pool && secret) {
       const assigned = yield* this.#assignPoolMachine(row, secret).pipe(
         Effect.catch((error) =>
@@ -1921,6 +2090,112 @@ export class HostedServerService {
       return true;
     }
     return `no ready ${POOL_PRODUCT_OF_PLAN[row.plan]} in ${locations.join(", ")}`;
+  });
+
+  readonly #assignRestore = Effect.fn("HostedServerService.assignRestore")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+    secret: string,
+  ): Effect.fn.Return<true | string, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    if (!this.#archiveKeys) return "the Worker has no archive keys";
+    const now = dependencies.now();
+    if (!(yield* this.#restoreOf(row.server_id, now))) return "its archive cannot be opened";
+    const seenAfter = now - POOL_SEEN_WITHIN_MS;
+    const locations = poolLocations(row.currency);
+    const candidates = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `SELECT o.host_id, o.location FROM operator_hosts o
+         WHERE o.removed_at IS NULL AND o.product = ? AND o.assign_token_hash IS NOT NULL AND o.seen_at > ?
+           AND o.location IN (${locations.map(() => "?").join(", ")})
+           AND NOT EXISTS(SELECT 1 FROM hosted_servers h WHERE h.operator_host = o.host_id)
+         ORDER BY (o.location = ?) DESC, o.added_at, o.host_id LIMIT ?`,
+        )
+        .bind(POOL_PRODUCT_OF_PLAN[row.plan], seenAfter, ...locations, locations[0], POOL_CANDIDATES)
+        .all<{ host_id: string; location: string }>(),
+    );
+    for (const { host_id: hostId, location } of candidates.results) {
+      const claim = yield* hostedPoolClaim(secret, row.server_id, hostId).pipe(Effect.mapError(hostedFailure));
+      const claimHash = yield* sha256(claim).pipe(Effect.mapError(hostedFailure));
+      const assigned = yield* hostedCall(() =>
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET operator_host = ?, observed_state = 'starting', observed_error = NULL,
+             last_wake_reason = 'restart', start_requested_at = ?, claim_token_hash = ?, claim_expires_at = ?,
+             claim_redeemed_at = NULL, checkout_session_id = NULL, provider_event_at = ?, last_active_at = ?, updated_at = ?
+           WHERE server_id = ? AND observed_state = 'awaiting_payment' AND desired_state = 'running'
+             AND operator_host IS NULL AND provider_sandbox_id IS NULL AND ${ARCHIVED_SQL}
+             AND EXISTS(SELECT 1 FROM operator_hosts o WHERE o.host_id = ? AND o.removed_at IS NULL
+               AND o.assign_token_hash IS NOT NULL AND o.seen_at > ?)
+             AND NOT EXISTS(SELECT 1 FROM hosted_servers h WHERE h.operator_host = ?)`,
+          )
+          .bind(hostId, now, claimHash, now + CLAIM_TTL_MS, now, now, now, row.server_id, hostId, seenAfter, hostId)
+          .run(),
+      );
+      if (assigned.meta.changes !== 1) continue;
+      console.info("Hosted server restore assigned.", { serverId: row.server_id, hostId });
+      yield* this.#alertLowPool(POOL_PRODUCT_OF_PLAN[row.plan], location, seenAfter);
+      return true;
+    }
+    return `no ready ${POOL_PRODUCT_OF_PLAN[row.plan]} in ${locations.join(", ")}`;
+  });
+
+  readonly #waitForRestore = Effect.fn("HostedServerService.waitForRestore")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+    reason: string,
+  ): Effect.fn.Return<void, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    const first = yield* hostedCall(() =>
+      dependencies.database
+        .prepare(
+          `UPDATE hosted_servers SET start_requested_at = ?
+         WHERE server_id = ? AND start_requested_at IS NULL AND observed_state = 'awaiting_payment'
+           AND operator_host IS NULL`,
+        )
+        .bind(dependencies.now(), row.server_id)
+        .run(),
+    );
+    if (first.meta.changes !== 1) return;
+    yield* this.#alertPool(
+      `🛠️ **Restore waits** · ${row.plan} server · ${row.currency} · ${row.server_id.slice(0, 8)} · ${reason}`,
+    );
+  });
+
+  readonly #releaseRestore = Effect.fn("HostedServerService.releaseRestore")(function* (
+    this: HostedServerService,
+    row: HostedServerRow,
+    reason: string,
+  ): Effect.fn.Return<boolean, HostedFailure, HostedServerDependencies> {
+    const dependencies = yield* HostedServerDependencies;
+    const hostId = row.operator_host;
+    if (!hostId) return false;
+    const now = dependencies.now();
+    const [left] = yield* hostedCall(() =>
+      dependencies.database.batch([
+        dependencies.database
+          .prepare(
+            `UPDATE hosted_servers SET operator_host = NULL,
+             observed_state = CASE WHEN desired_state = 'running' THEN 'awaiting_payment' ELSE 'stopped' END,
+             claim_token_hash = NULL, start_requested_at = NULL, updated_at = ?
+           WHERE server_id = ? AND operator_host = ? AND desired_state != 'deleted' AND ${POOL_RESTORE_SQL}`,
+          )
+          .bind(now, row.server_id, hostId),
+        dependencies.database
+          .prepare(
+            `UPDATE operator_hosts SET assign_token_hash = NULL WHERE host_id = ?
+             AND NOT EXISTS(SELECT 1 FROM hosted_servers h WHERE h.operator_host = ?)`,
+          )
+          .bind(hostId, hostId),
+      ]),
+    );
+    if (left?.meta.changes !== 1) return false;
+    console.warn("Hosted server left its restore machine.", { serverId: row.server_id });
+    yield* this.#alertPool(
+      `🛠️ **Pool restore lost** · ${row.plan} server · ${row.server_id.slice(0, 8)} · machine ${hostId} · ${reason}`,
+    );
+    return true;
   });
 
   #alertBoatStart(row: HostedServerRow, reason: string): Effect.Effect<void, never, HostedServerDependencies> {
@@ -2654,7 +2929,9 @@ export class HostedServerService {
     const dependencies = yield* HostedServerDependencies;
     if (row.observed_state === "creating" && !row.provider_sandbox_id) return;
     const sandboxId =
-      row.provider_sandbox_id ?? (row.operator_host ? row.retired_sandbox_id : yield* this.#findLostSandbox(row));
+      row.provider_sandbox_id ??
+      row.retired_sandbox_id ??
+      (row.operator_host ? null : yield* this.#findLostSandbox(row));
     if (sandboxId) {
       const boat = dependencies.boat;
       if (!boat)
@@ -2793,10 +3070,10 @@ export class HostedServerService {
     const row = yield* hostedCall(() =>
       dependencies.database
         .prepare(
-          `SELECT ${ROW_COLUMNS} FROM hosted_servers h
-         WHERE h.server_id = ? AND h.desired_state != 'deleted' AND (h.owner_user_id = ? OR EXISTS(
+          `SELECT ${ROW_COLUMNS} FROM hosted_servers
+         WHERE server_id = ? AND desired_state != 'deleted' AND (owner_user_id = ? OR EXISTS(
            SELECT 1 FROM remote_memberships m
-           WHERE m.host_id = h.server_id AND m.user_id = ? AND m.status = 'active'${roles}
+           WHERE m.host_id = hosted_servers.server_id AND m.user_id = ? AND m.status = 'active'${roles}
          ))`,
         )
         .bind(serverId, user.id, user.id)
@@ -2822,7 +3099,27 @@ export class HostedServerService {
   });
 }
 
+function elapsedText(milliseconds: number): string {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000));
+  return seconds < 120 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+}
+
+function isRestoring(row: HostedServerRow): boolean {
+  return (
+    row.archived === 1 &&
+    row.desired_state === "running" &&
+    (row.observed_state === "awaiting_payment" || row.observed_state === "starting")
+  );
+}
+
+function dataKeptUntil(row: HostedServerRow): number | null {
+  if (row.desired_state !== "stopped" || row.observed_error !== "plan_ended" || row.plan_ended_at === null) return null;
+  return row.operator_host !== null || row.archived === 1 ? row.plan_ended_at + OPERATOR_HOST_DATA_KEPT_MS : null;
+}
+
 function summary(row: HostedServerRow): HostedServerSummary {
+  const restoring = isRestoring(row);
+  const keptUntil = dataKeptUntil(row);
   return {
     serverId: row.server_id,
     deletionScheduledAt: row.deletion_scheduled_at,
@@ -2831,16 +3128,13 @@ function summary(row: HostedServerRow): HostedServerSummary {
     plan: row.plan,
     interval: row.billing_interval,
     currency: row.currency,
-    state: row.observed_state,
+    state: restoring ? "starting" : row.observed_state,
     error: row.observed_error,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
-    storageGb: hostedServerStorageGb(
-      row.plan,
-      row.operator_host !== null,
-      row.provider_template === null ? null : (row.pending_size ?? row.size),
-      storageTierOf(row.storage_tier),
-    ),
+    storageGb: storageTierGb(row.plan, storageTierOf(row.storage_tier)),
+    ...(restoring ? { restoring: true } : {}),
+    ...(keptUntil === null ? {} : { dataKeptUntil: keptUntil }),
   };
 }
 

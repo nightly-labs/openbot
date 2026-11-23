@@ -52,10 +52,7 @@ export class ExternalLinkOpener {
     const { preference, platform, onFallback } = this.#dependencies;
     const target = preference.get().target;
     const page = webPage(url);
-    const openDefault = () =>
-      platform === "linux" && page
-        ? startProgram("xdg-open", [page], true, XDG_OPEN_ENV)
-        : this.#dependencies.openDefault(url);
+    const openDefault = () => (platform === "linux" && page ? openWithXdg(page) : this.#dependencies.openDefault(url));
     if (target.kind === "app" && page) {
       const launched = yield* Effect.result(launchApp(platform, target.path, page));
       if (Result.isSuccess(launched)) return;
@@ -97,6 +94,10 @@ function programOf(command: string): string {
 const LINUX_START_FAILURE_WAIT_MS = 3_000;
 
 const XDG_OPEN_ENV = { MM_NOTTTY: "1" };
+
+export function openWithXdg(target: string): Promise<void> {
+  return startProgram("xdg-open", [target], true, XDG_OPEN_ENV);
+}
 
 function startProgram(
   program: string,

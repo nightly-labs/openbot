@@ -3,13 +3,14 @@ import { Alert, AlertDescription, Button, Copy, ExternalLink, Text } from "@open
 import { createSignal, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 import { createConnectRun, type McpConnectBaseProps, McpConnectShell } from "./McpConnectShell";
-import { McpSignInPage, McpSignInPageNote, type McpSignInPageSource } from "./McpSignInPage";
+import { McpSignInAddressForm, McpSignInPage, McpSignInPageNote, type McpSignInPageSource } from "./McpSignInPage";
 
 export interface McpSignInDialogProps extends McpConnectBaseProps {
   hostName?: string | undefined;
   page?: McpSignInPageSource | undefined;
   onCancelSignIn?: (() => void) | undefined;
   onCopySignInLink?: (() => Promise<void>) | undefined;
+  onPasteSignInAddress?: ((address: string) => Promise<void>) | undefined;
 }
 
 export function McpSignInDialog(props: McpSignInDialogProps) {
@@ -43,16 +44,22 @@ export function McpSignInDialog(props: McpSignInDialogProps) {
       }
     >
       <Show when={page()}>{(source) => <McpSignInPage page={source()} />}</Show>
-      <Show when={copyLink()}>{(copy) => <McpSignInLinkCopy onCopy={copy()} />}</Show>
+      <Show when={copyLink()}>
+        {(copy) => <McpSignInLinkCopy onCopy={copy()} onPaste={props.onPasteSignInAddress} />}
+      </Show>
       <Show when={props.hostName}>{(host) => <McpSignInPageNote hostName={host()} />}</Show>
     </McpConnectShell>
   );
 }
 
-function McpSignInLinkCopy(props: { onCopy: () => Promise<void> }) {
+function McpSignInLinkCopy(props: {
+  onCopy: () => Promise<void>;
+  onPaste?: ((address: string) => Promise<void>) | undefined;
+}) {
   const { t, errorMessage } = useText();
   const [copied, setCopied] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [pasteError, setPasteError] = createSignal<string | null>(null);
   const copy = async () => {
     setError(null);
     try {
@@ -79,6 +86,16 @@ function McpSignInLinkCopy(props: { onCopy: () => Promise<void> }) {
           <Alert tone="danger" report={false} role="alert">
             <AlertDescription>{message()}</AlertDescription>
           </Alert>
+        )}
+      </Show>
+      <Show when={props.onPaste}>
+        {(paste) => (
+          <McpSignInAddressForm
+            description={t("mcp.signIn.pasteHint")}
+            error={pasteError()}
+            onError={setPasteError}
+            onPaste={paste()}
+          />
         )}
       </Show>
     </>

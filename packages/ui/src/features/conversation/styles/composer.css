@@ -26,6 +26,27 @@
   animation-delay: var(--openbot-duration-overlay);
 }
 
+:root[data-openbot-ambient-motion-paused]
+  :is(
+    .agent-row-thinking-dots i,
+    .agent-activity-shine,
+    .agent-activity-shine-text,
+    .image-generation-glow,
+    .media-generation-label[data-shine],
+    .computer-control-dot,
+    .trace-row[data-running] .trace-span-name,
+    .trace-bar[data-running],
+    .task-list-item[data-state="active"] .task-list-item-text,
+    .awaiting-replies-item[data-state="active"] .awaiting-replies-state-label,
+    [data-wait-state="resuming"] .open-waits-row-state
+  ) {
+  animation-play-state: paused;
+}
+
+:root[data-openbot-ambient-motion-paused] .task-list-title[data-showing="task"] .task-list-title-task-text {
+  animation-play-state: running, paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .agent-row-thinking-dots i,
   .team-typing-dots i,

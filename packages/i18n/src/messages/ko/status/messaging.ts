@@ -36,9 +36,11 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot이 Slack 설치를 받았어요. 이 탭을 닫아도 돼요.",
   "status.messaging.signInUnknown": "OpenBot이 시작한 Slack 설치가 아니에요. OpenBot에서 다시 시작해 주세요.",
   "status.messaging.telegramNoAgent":
-    "아직 여기서 답변할 수 있는 에이전트가 없어요. OpenBot에서 Telegram Orchestrator를 추가하세요.",
+    "아직 여기서 답변할 수 있는 에이전트가 없어요. OpenBot에서 마켓플레이스 > 앱 > Telegram을 열고 에이전트 추가를 클릭하세요.",
   "status.messaging.telegramLinked":
     "OpenBot이 이 채팅에 연결되었어요. {bot}을(를) 멘션하거나 OpenBot의 메시지에 답장해서 에이전트에게 요청하세요.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot이 이 채팅에 연결되어 있지 않아요. 연결하려면 OpenBot 앱을 열고 마켓플레이스 → 앱 → Telegram에서 '그룹에 추가' 또는 '1:1 채팅 열기'를 선택하세요.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Telegram에서 답변하고 팀에 요청해요",
   "status.messaging.whatsappNoAgent":

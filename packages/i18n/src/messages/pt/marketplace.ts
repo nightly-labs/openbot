@@ -648,6 +648,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Instale {name} no computador que executa estes agentes: o app precisa de login pelo navegador.",
   "marketplace.error.appInvalid": "Não é possível adicionar {name}: {reason}",
+  "marketplace.error.appNotConnected": "Não foi possível conectar {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Selecione um servidor local para desinstalar um plugin.",
   "marketplace.error.uninstallPartial": "Não foi possível remover todas as partes de {name}. {failures}",
   "marketplace.error.actionFailed": "Não foi possível concluir a ação na loja. Tente novamente.",

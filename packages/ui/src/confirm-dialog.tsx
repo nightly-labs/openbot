@@ -28,6 +28,7 @@ export interface ConfirmDialogProps {
   initialFocus?: "confirm" | "cancel" | "field";
   confirmRef?: (element: HTMLButtonElement) => void;
   restoreFocusTarget?: HTMLElement | null | undefined;
+  class?: string | undefined;
 }
 
 export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
@@ -67,7 +68,7 @@ export function ConfirmDialog(props: ConfirmDialogProps): JSX.Element {
       <AlertDialog.Portal>
         <AlertDialog.Overlay class="ui-confirm-dialog-overlay">
           <AlertDialog.Content
-            class="ui-confirm-dialog"
+            class={props.class ? `ui-confirm-dialog ${props.class}` : "ui-confirm-dialog"}
             data-tone={tone()}
             onOpenAutoFocus={(event) => {
               event.preventDefault();

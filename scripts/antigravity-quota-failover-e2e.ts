@@ -40,7 +40,7 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -77,7 +77,11 @@ function handle(message) {
         ? "\u26A0 Agent execution terminated due to error: Post https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent: read tcp 192.0.2.5:5555->198.51.100.1:443: read: connection reset by peer"
         : model === "gemini-gone"
           ? "\u26A0 Unknown model ID: " + model
-          : "\u26A0 Model " + model + " is unavailable for this account";
+          : model === "gemini-gone-c"
+            ? "\u26A0 Agent execution error: request failed with code 410 Gone"
+            : model === "gemini-gone-d"
+              ? "\u26A0 The model " + model + " has been retired"
+              : "\u26A0 Model " + model + " is unavailable for this account";
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + failure } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
@@ -133,6 +137,7 @@ const report: { cases: CaseReport[]; passed: boolean; error?: string } = { cases
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -330,6 +335,8 @@ try {
     ["dropped connection before work", "gemini-net", "NET-NOW"],
     ["unknown model before work", "gemini-gone", "GONE-NOW"],
     ["unavailable model before work", "gemini-gone-b", "GONE-NOW"],
+    ["410 Gone model before work", "gemini-gone-c", "GONE-NOW"],
+    ["retired model before work", "gemini-gone-d", "GONE-NOW"],
   ] as const) {
     const moved = await runCase(name, model, true, text);
     assert.deepEqual(

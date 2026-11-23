@@ -1,4 +1,5 @@
 import type { AgentModelOption } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Fiber } from "effect";
 import type { AgentClient, AgentProvider } from "../agent-client";
@@ -46,6 +47,8 @@ export class WarmGenerations {
     model: AgentModelOption,
     prompt: string,
     observe?: GenerationObserver,
+    images: readonly string[] = [],
+    outputSchema: DynamicRecord | null = null,
   ) {
     const owner = this.#options.ownerFor(provider);
     let warm = this.#warm.get(provider);
@@ -56,7 +59,7 @@ export class WarmGenerations {
     if (!owner || warm?.busy) {
       const client = this.#options.createClient(provider);
       return yield* this.#options.profileClients.run(client, (cancelled) =>
-        generateTextWithoutTools(client, model, prompt, cancelled, observe),
+        generateTextWithoutTools(client, model, prompt, cancelled, observe, "text", images, outputSchema),
       );
     }
     const started = warm !== undefined;
@@ -73,9 +76,9 @@ export class WarmGenerations {
         if (current.timer) clearTimeout(current.timer);
         current.timer = null;
         current.busy = true;
-        const turn = yield* restore(this.#turn(provider, current, model, prompt, started, observe)).pipe(
-          Effect.ensuring(Effect.sync(() => (current.busy = false))),
-        );
+        const turn = yield* restore(
+          this.#turn(provider, current, model, prompt, started, observe, images, outputSchema),
+        ).pipe(Effect.ensuring(Effect.sync(() => (current.busy = false))));
         if (current.client.releaseThread) yield* current.client.releaseThread(turn.threadId).pipe(Effect.ignore);
         if (current.stale || !current.client.running || this.#warm.get(provider) !== current)
           yield* this.#drop(provider, current);
@@ -92,6 +95,8 @@ export class WarmGenerations {
     prompt: string,
     started: boolean,
     observe: GenerationObserver | undefined,
+    images: readonly string[],
+    outputSchema: DynamicRecord | null,
   ) {
     return this.#options.profileClients
       .run(entry.client, (cancelled) =>
@@ -113,6 +118,9 @@ export class WarmGenerations {
                   : startToolless(entry.client),
               ),
           observe,
+          "text",
+          images,
+          outputSchema,
         ),
       )
       .pipe(Effect.onError(() => this.#drop(provider, entry)));

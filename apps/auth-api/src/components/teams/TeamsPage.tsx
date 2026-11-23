@@ -325,6 +325,7 @@ function CustomTimeline(props: { text: TeamsPageText["custom"] }) {
 
 function splitLead(item: string) {
   const space = item.indexOf(" ");
+  if (space < 0) return { lead: "", rest: item };
   return { lead: item.slice(0, space), rest: item.slice(space + 1) };
 }
 
@@ -451,7 +452,8 @@ function ClosingSection(props: { text: TeamsPageText["closing"] }) {
                 style={{ "--teams-word": index() }}
               >
                 {word.word}
-              </span>{" "}
+              </span>
+              {word.spaceAfter ? " " : ""}
             </>
           )}
         </For>

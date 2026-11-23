@@ -48,6 +48,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "فشل إعداد الوكيل وتعذّرت إزالة الوكيل غير المكتمل.",
   "error.agent.modelUnavailable": "نموذج الوكيل المحدد غير متاح.",
   "error.agent.modelProviderNotConnected": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير متصل.",
+  "error.agent.modelProviderSignInRequired":
+    "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تسجيل الدخول. سجّل الدخول إلى {provider} ثم حاول مرة أخرى.",
+  "error.agent.modelProviderNotInstalled": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} غير مثبّت.",
+  "error.agent.modelProviderOutdated": "نموذج الوكيل المحدد «{model}» غير متاح: {provider} يحتاج إلى تحديث.",
   "error.agent.modelListEmpty":
     "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج. آخر خطأ: {detail}",
   "error.agent.modelListEmptyNoError": "نموذج الوكيل المحدد «{model}» غير متاح: لم يُدرج {provider} أي نماذج.",
@@ -114,6 +118,8 @@ export const messages = {
   "error.agent.deleteIncomplete": "تعذّرت إزالة بيانات الوكيل بالكامل. أعد محاولة حذف الوكيل.",
   "error.agent.deleteFolderInUse":
     "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. احذف هذا الوكيل مرة أخرى عند انتهاء ذلك العمل، أو بعد إعادة تشغيل OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "لا يزال برنامج آخر يستخدم مجلد هذا الوكيل، مثل برنامج بدأه الوكيل. أغلق ذلك البرنامج أو أعد تشغيل الكمبيوتر الذي يعمل عليه هذا الوكيل، ثم احذف الوكيل مرة أخرى.",
   "error.agent.deleteWhenFolderFree":
     "لا يزال عمل وكيل آخر يستخدم مجلد هذا الوكيل. يحذف OpenBot هذا الوكيل عند انتهاء ذلك العمل.",
   "error.agent.duplicationBusy": "يجري تكرار هذا الوكيل بالفعل.",
@@ -137,6 +143,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "لا يمكن تحديد ما تفعله الرسائل أثناء عمل الوكيل إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.backupModelsLocalOnly": "لا يمكن تعيين النماذج الاحتياطية إلا على الحاسوب الذي يشغّل الوكيل.",
+  "error.agent.backupModelsAtLimit":
+    "لا يمكن لأي نموذج احتياطي أن يتولى العمل الآن: كل نموذج بلغ حد الاستخدام أو فشل قبل قليل. قد تتشارك نماذج الحساب الواحد حدًا واحدًا. للمتابعة الآن، أضف نموذجًا احتياطيًا من مزوّد آخر أو حساب آخر، أو انتظر إعادة تعيين الحد.",
   "error.agent.taskLimitLocalOnly": "لا يمكن تعيين حد المهام إلا على الحاسوب الذي يشغّل الوكيل.",
   "error.agent.localScriptsOff": "لا يسمح هذا الوكيل بالسكربتات المحلية.",
   "error.agent.localScriptsRateLimited":

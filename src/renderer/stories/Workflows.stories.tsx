@@ -1,3 +1,4 @@
+import type { AgentStepActivity, WorkflowStepSettings } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -11,6 +12,7 @@ import { PromptNode } from "@openbot/ui/features/workflows/WorkflowPromptNode";
 import { TextNode } from "@openbot/ui/features/workflows/WorkflowTextNode";
 import { TriggerNode } from "@openbot/ui/features/workflows/WorkflowTriggerNode";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
+import { createSignal, onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { NodeGallery } from "./workflow-node-gallery";
 import { createStoryPresence } from "./workflow-presence-story";
@@ -18,6 +20,7 @@ import {
   AGENT_RESULT,
   competitorWatch,
   githubTriage,
+  higgsfieldVideo,
   LLM_RESULT,
   newCompetitorAlert,
   STORY_CATALOGS,
@@ -58,6 +61,8 @@ const meta = {
 } satisfies Meta;
 
 export default meta;
+
+const secondsAgo = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
 type Story = StoryObj<typeof meta>;
 
 export const Example: Story = {
@@ -83,6 +88,16 @@ export const InApp: Story = {
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
 };
 
+export const InAppOpening: Story = {
+  name: "In app, opening",
+  render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} opening />,
+};
+
+export const HiggsfieldVideo: Story = {
+  name: "Higgsfield video",
+  render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
+};
+
 export const ExampleAfterRun: Story = {
   name: "Example after run",
   render: () => <WorkflowStory workflows={[competitorWatch("done")]} features={STORY_ALL_FEATURES} />,
@@ -101,6 +116,17 @@ export const BranchAndApproval: Story = {
 export const GitHubRuns: Story = {
   name: "GitHub runs",
   render: () => <WorkflowStory workflows={[githubTriage()]} features={STORY_ALL_FEATURES} />,
+};
+
+export const FieldNames: Story = {
+  name: "Field names",
+  render: () => (
+    <WorkflowStory
+      workflows={[githubTriage()]}
+      features={STORY_ALL_FEATURES}
+      catalogs={{ ...STORY_CATALOGS, answers: true }}
+    />
+  ),
 };
 
 export const EmptyCanvas: Story = {
@@ -223,6 +249,49 @@ export const Agent: Story = {
   ),
 };
 
+const LIVE_STEPS: readonly { detail: string; activity: AgentStepActivity }[] = [
+  { detail: "Searched the web: “Northwind Atlas launch”", activity: "searching" },
+  { detail: "Reading northwind.com/changelog", activity: "reading" },
+  { detail: "Reading northwind.com/pricing", activity: "reading" },
+  { detail: "Opening news.ycombinator.com", activity: "browsing" },
+  { detail: "Searched the web: “Northwind Slack connector”", activity: "searching" },
+  { detail: "Reading northwind.com/blog/atlas", activity: "reading" },
+  { detail: "Reviewing the results", activity: "reviewing" },
+];
+
+function RunningAgentGallery() {
+  const [step, setStep] = createSignal(0);
+  const timer = setInterval(() => setStep((value) => (value + 1) % LIVE_STEPS.length), 1800);
+  onCleanup(() => clearInterval(timer));
+  return (
+    <NodeGallery
+      selected="research"
+      status={{ research: "running" }}
+      fields={{ research: { stepName: "Research competitors" }, summary: { stepName: "Summary for #market" } }}
+      edges={[{ id: "research>summary", from: "research", to: "summary", type: "text" }]}
+      progress={(id) => {
+        const current = LIVE_STEPS[step()];
+        if (id !== "research" || !current) return undefined;
+        return {
+          agentId: AGENT,
+          detail: current.detail,
+          previous: LIVE_STEPS[step() - 1]?.detail,
+          activity: current.activity,
+          done: step(),
+        };
+      }}
+    >
+      <AgentNode id="research" agentId={AGENT} task={TASK} />
+      <LlmNode id="summary" prompt="Summarize the research in 3 lines for the market team" />
+    </NodeGallery>
+  );
+}
+
+export const AgentRunning: Story = {
+  name: "Agent, running with step names",
+  render: () => <RunningAgentGallery />,
+};
+
 export const Llm: Story = {
   name: "LLM",
   render: () => (
@@ -304,6 +373,29 @@ export const VideoCustomLength: Story = {
   ),
 };
 
+const STORY_CLIP = new URL("../../../packages/ui/src/assets/plush/fishing.webm", import.meta.url).href;
+
+export const VideoWithClip: Story = {
+  name: "Video, with a clip",
+  render: () => (
+    <NodeGallery
+      selected="clip"
+      catalogs={{
+        ...STORY_CATALOGS,
+        imageModels: [RANGE_VIDEO_MODEL, ...STORY_CATALOGS.imageModels],
+        media: (value, kind) => (kind === "video" && value === "plush-clip" ? STORY_CLIP : undefined),
+      }}
+      fields={{
+        empty: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 6 },
+        clip: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 6 },
+      }}
+    >
+      <ImageNode id="empty" prompt="A plush toy fishing from a small wooden pier at sunset" />
+      <ImageNode id="clip" image="plush-clip" prompt="A plush toy fishing from a small wooden pier at sunset" />
+    </NodeGallery>
+  ),
+};
+
 export const ImageManyResults: Story = {
   name: "Image, many results",
   render: () => (
@@ -318,6 +410,200 @@ export const ImageManyResults: Story = {
       }}
     >
       <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+export const ImageBatchFailedTake: Story = {
+  name: "Image, batch with a failed take",
+  render: () => (
+    <NodeGallery
+      selected="filled"
+      results={{
+        filled: [
+          ...Array.from({ length: 11 }, (_, index) => ({
+            id: `image-result-${index + 1}`,
+            at: todayAt(9, index * 4),
+            value: STORY_IMAGES[index % STORY_IMAGES.length]?.name ?? "",
+          })),
+          { id: "image-result-failed", at: todayAt(9, 50), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+      pending={{
+        filled: [
+          { id: "image-take-first", at: secondsAgo(25) },
+          { id: "image-take-second", at: secondsAgo(25) },
+        ],
+      }}
+    >
+      <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+const CREDITS_IMAGE_MODEL: WorkflowCatalogs["imageModels"][number] = {
+  id: "openbot-story-image",
+  provider: "openbot",
+  name: "Story Image",
+  maker: "Northwind Labs",
+  credits: true,
+  kinds: ["image"],
+  voices: false,
+  subscription: "OpenBot",
+  aspects: ["1:1", "16:9"],
+};
+
+const TOO_FEW_CREDITS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: [CREDITS_IMAGE_MODEL, ...STORY_CATALOGS.imageModels],
+  creditBalance: 4,
+};
+
+const ENOUGH_CREDITS: WorkflowCatalogs = { ...TOO_FEW_CREDITS, creditBalance: 1250 };
+
+export const ImagePaidWithCredits: Story = {
+  name: "Image, paid with credits",
+  render: () => (
+    <NodeGallery
+      selected="batch"
+      catalogs={ENOUGH_CREDITS}
+      fields={{ single: { model: CREDITS_IMAGE_MODEL.id }, batch: { model: CREDITS_IMAGE_MODEL.id, batch: 4 } }}
+      results={{
+        batch: [
+          { id: "paid-result-1", at: todayAt(9, 0), value: STORY_IMAGES[0]?.name ?? "" },
+          { id: "paid-result-failed", at: todayAt(9, 4), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+    >
+      <ImageNode id="single" prompt="Hero image for the Atlas comparison page, one product window" />
+      <ImageNode id="batch" prompt="Four cover options for the Atlas launch post" />
+    </NodeGallery>
+  ),
+};
+
+export const ImageBatchTooFewCredits: Story = {
+  name: "Image, batch with too few credits",
+  render: () => (
+    <NodeGallery
+      selected="filled"
+      catalogs={TOO_FEW_CREDITS}
+      fields={{ filled: { model: CREDITS_IMAGE_MODEL.id, batch: 4 } }}
+      results={{
+        filled: [
+          { id: "credits-result-1", at: todayAt(9, 0), value: STORY_IMAGES[0]?.name ?? "" },
+          { id: "credits-result-failed", at: todayAt(9, 4), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+    >
+      <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+const BRIEF = "Atlas launched on 22 Oct at €12 a seat, with a Slack connector";
+const REFERENCE = "story-reference-picture";
+const LONG_BRIEF = [
+  "Atlas launched on 22 Oct at €12 a seat, with a Slack connector and a shared inbox for small teams.",
+  "The launch post names three rivals: Relay, Northwind and Harbor. Relay costs €9 a seat but has no connectors.",
+  "Northwind sells only yearly plans. Harbor has a free plan for 3 seats and a Slack connector since September.",
+  "Early users on the forum ask for a Linear connector, an API and a way to export a workspace.",
+].join("\n\n");
+const LONG_PROMPT = [
+  "Read the research notes and write a short brief for the market team.",
+  "1. Start with one line that says what launched, when, and at what price.",
+  "2. Compare the price per seat with each rival that the notes name. Give the numbers, not adjectives.",
+  "3. List the connectors that each product has. Say which connector only Atlas has.",
+  "4. Name the requests from early users that we can answer in our next post.",
+  "5. End with one risk for our product and one action that we can take this week.",
+  "Keep it under 120 words. Use the names of the products as the notes write them. Do not guess numbers that are not in the notes.",
+].join("\n");
+
+const SAVED_SETTINGS: Record<string, WorkflowStepSettings> = {
+  "llm-saved": {
+    settings: {
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      effort: "high",
+      prompt: "Summarize the research in 3 lines for the market team",
+      system: "You write for busy readers. Use short sentences and no adjectives.",
+    },
+    sources: [{ from: "brief", type: "text", stepId: "brief-result", attachmentId: null }],
+  },
+  "llm-long": {
+    settings: {
+      provider: "codex",
+      model: "gpt-5.6-luna",
+      effort: "high",
+      prompt: LONG_PROMPT,
+      system:
+        "You write for busy readers on a market team. Use short sentences, plain words and no adjectives. Put numbers before opinions. When the notes do not answer a question, say so.",
+    },
+    sources: [{ from: "brief", type: "text", stepId: "brief-long", attachmentId: null }],
+  },
+  "image-saved": {
+    settings: {
+      media: "image",
+      model: "gpt-image",
+      account: "a0123456789abcdef",
+      prompt: "Hero image for the Atlas comparison page, one product window",
+      aspect: "16:9",
+      background: "solid",
+      options: JSON.stringify({ quality: "high" }),
+    },
+    sources: [{ from: "reference", type: "image", stepId: null, attachmentId: REFERENCE }],
+  },
+};
+
+const SAVED_CATALOGS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: STORY_CATALOGS.imageModels.map((model) =>
+    model.id === "gpt-image"
+      ? { ...model, options: [{ name: "quality", kind: "choice", values: ["standard", "high"], default: "standard" }] }
+      : model,
+  ),
+  mediaPreview: (attachmentId) => (attachmentId === REFERENCE ? STORY_IMAGES[1]?.previewUrl : undefined),
+  stepSettings: async (stepId) => SAVED_SETTINGS[stepId] ?? { settings: null, sources: null },
+};
+
+export const ResultSettings: Story = {
+  name: "Result settings",
+  render: () => (
+    <NodeGallery
+      selected="summary"
+      catalogs={SAVED_CATALOGS}
+      edges={[{ id: "brief-summary", from: "brief", to: "summary", type: "text" }]}
+      results={{
+        brief: [{ id: "brief-result", at: todayAt(9, 10), value: BRIEF }],
+        summary: [
+          { id: "llm-old", at: todayAt(8, 2), value: LLM_RESULT },
+          { id: "llm-saved", at: todayAt(9, 14), value: LLM_RESULT },
+        ],
+        hero: [{ id: "image-saved", at: todayAt(9, 20), value: STORY_IMAGES[0]?.name ?? "" }],
+      }}
+      fields={{ summary: { provider: "codex", model: "gpt-6-luna", effort: "low" } }}
+    >
+      <PromptNode id="brief" text={BRIEF} />
+      <LlmNode id="summary" prompt="Summarize the research in 3 lines" />
+      <ImageNode id="hero" prompt="Hero image for the Atlas comparison page" />
+    </NodeGallery>
+  ),
+};
+
+export const ResultSettingsLongPrompt: Story = {
+  name: "Result settings, long prompt",
+  render: () => (
+    <NodeGallery
+      selected="summary"
+      catalogs={SAVED_CATALOGS}
+      edges={[{ id: "brief-summary", from: "brief", to: "summary", type: "text" }]}
+      results={{
+        brief: [{ id: "brief-long", at: todayAt(9, 10), value: LONG_BRIEF }],
+        summary: [{ id: "llm-long", at: todayAt(9, 14), value: LLM_RESULT }],
+      }}
+      fields={{ summary: { provider: "codex", model: "gpt-6-luna", effort: "low" } }}
+    >
+      <PromptNode id="brief" text={LONG_BRIEF} />
+      <LlmNode id="summary" prompt={LONG_PROMPT} />
     </NodeGallery>
   ),
 };

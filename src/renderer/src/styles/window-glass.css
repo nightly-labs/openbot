@@ -82,7 +82,8 @@
     .server-onboarding-screen,
     .sidebar-agent-drag-preview,
     .sidebar-person-drag-preview,
-    .sidebar-section-drag-preview
+    .sidebar-section-drag-preview,
+    .crm-drawer
   ) {
   --openbot-bg-canvas: var(--window-solid-canvas);
   --openbot-bg-sidebar: var(--window-solid-sidebar);
@@ -100,6 +101,17 @@
   --openbot-queue-surface: var(--openbot-bg-surface);
   --background: var(--openbot-bg-canvas);
   --surface: var(--openbot-bg-surface);
+}
+
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-top] .crm-sheet thead :is(th, td),
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-bottom] .crm-sheet tfoot td,
+:root[data-openbot-window-glass]
+  .app-window
+  .crm-sheet-scroll[data-fade-left]
+  .crm-sheet
+  :is(.crm-sheet-index, :is(th, td):nth-child(2)),
+:root[data-openbot-window-glass] .app-window .crm-sheet-scroll[data-fade-right] .crm-sheet .crm-sheet-action {
+  --crm-sheet-bg: var(--window-solid-canvas);
 }
 
 :root[data-openbot-window-glass] .app-window :is(.agent-row-agent-status, .ui-bubble-reactions) {
@@ -131,8 +143,7 @@
     .app-window
     > .app-frame-edge
     .side-panel-maximized
-    > :is(.settings-panel, .browser-panel),
-  :root[data-openbot-window-glass] .app-frame-edge .diagram-view-body {
+    > :is(.settings-panel, .browser-panel) {
     background: var(--window-glass-card);
   }
 }
@@ -178,12 +189,8 @@
 
 :root[data-openbot-window-glass]
   .app-window
-  :is(.schedule-pane, .agent-usage, .tasks-page, .diagram-view, .settings-page-content .agent-files-view) {
+  :is(.schedule-pane, .agent-usage, .tasks-page, .workflows-notice, .settings-page-content .agent-files-view) {
   background: transparent;
-}
-
-:root[data-openbot-window-glass] .app-window .diagram-board-viewport {
-  background-color: transparent;
 }
 
 :root[data-openbot-window-glass] .app-window .tasks-page-composer.composer-wrap {
@@ -213,14 +220,6 @@
 
 :root[data-openbot-window-glass] .app-window .composer-stack {
   clip-path: inset(0 0 var(--composer-stack-overlap) 0);
-}
-
-:root[data-openbot-window-glass] .app-window .diagram-board-viewport {
-  --openbot-bg-surface: var(--window-solid-surface);
-  --openbot-bg-surface-raised: var(--window-solid-surface-raised);
-  --openbot-bg-control: var(--window-solid-control);
-  --openbot-bg-control-hover: var(--window-solid-control-hover);
-  --openbot-bg-control-active: var(--window-solid-control-active);
 }
 
 :root[data-openbot-window-glass] .app-window .wfn-stage {
@@ -289,8 +288,8 @@
   > .ui-bubble-content {
   --message-solid-surface: color-mix(
     in srgb,
-    var(--openbot-text-primary) var(--message-surface-lift),
-    var(--message-chat-color)
+    color-mix(in srgb, var(--openbot-text-primary) var(--message-surface-lift), var(--message-chat-color)) 45%,
+    transparent
   );
   --openbot-bg-canvas: var(--message-solid-surface);
   --openbot-bg-sidebar: var(--message-solid-surface);
@@ -299,5 +298,21 @@
   --openbot-bg-control: var(--message-solid-surface);
   --openbot-bg-control-hover: var(--message-solid-surface);
   --openbot-bg-control-active: var(--message-solid-surface);
-  background: var(--message-chat-color);
+  background: color-mix(in srgb, var(--message-chat-color) var(--message-glass-solid-opacity, 55%), transparent);
+}
+
+:root[data-openbot-window-glass][data-openbot-color-scheme="light"]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid
+  > .ui-bubble-content {
+  --message-glass-solid-opacity: 80%;
+}
+
+:root[data-openbot-window-glass]
+  .app-window
+  .message-entry-user
+  .ui-bubble.message-bubble-colored.message-bubble-solid.message-bubble-solid-dark-text
+  > .ui-bubble-content {
+  --message-glass-solid-opacity: 90%;
 }

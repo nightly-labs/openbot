@@ -195,6 +195,9 @@ export class WorkflowMediaCatalogCache {
         duration: request.duration,
         ...(request.resolution === null ? {} : { resolution: request.resolution }),
         background: request.transparent ? "transparent" : "solid",
+        ...(request.options?.length
+          ? { options: JSON.stringify(Object.fromEntries(request.options.map(({ name, value }) => [name, value]))) }
+          : {}),
       },
       request.kind,
       model,
@@ -208,6 +211,7 @@ export class WorkflowMediaCatalogCache {
       specs.duration,
       specs.resolution,
       specs.transparent,
+      specs.options,
     ]);
     const kept = this.#prices.get(key);
     if (kept && this.#now() - kept.at < kept.ttl) return { credits: kept.credits } satisfies WorkflowMediaPrice;

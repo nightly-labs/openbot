@@ -7,6 +7,7 @@ import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "
 import type {
   AgentEvent,
   AgentImportPreview,
+  AgentRuntimeSnapshot,
   AttachmentDownloadProgress,
   AttachmentImportProgress,
   AvatarImageInput,
@@ -66,7 +67,7 @@ import {
   type RemoteDesktopTestInput,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
 import { AGENT_COLORS_CAPABILITY, AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/agent-import-v1";
 import {
@@ -79,6 +80,7 @@ import {
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { AGENT_WAITS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_PROXIES_ROUTES } from "@openbot/contracts/team-protocol/browser-proxies-v1";
@@ -207,6 +209,7 @@ interface RemoteServerEvents {
   directoryInvalidated: [];
   changed: [servers: ServerSummary[]];
   agent: [serverId: string, event: AgentEvent, bufferedLive?: boolean];
+  receivedRuntimeSnapshot: [serverId: string, snapshot: AgentRuntimeSnapshot];
   presence: [serverId: string, snapshot: TeamPresenceSnapshot];
   directMessage: [serverId: string, event: DirectMessageRealtimeEvent];
   directTyping: [serverId: string, event: DirectTypingRealtimeEvent];
@@ -405,11 +408,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#refresh = new RemoteEventRefresh({
       request: (serverId, path, decoder, init) => this.#client.request(serverId, path, decoder, init),
       hasServer: (serverId) => this.#store.has(serverId),
+      onReceivedRuntimeSnapshot: (serverId, snapshot) => this.emit("receivedRuntimeSnapshot", serverId, snapshot),
       onMemberChatColors: (serverId) => {
         if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
       },
       hasUsageLimits: (serverId) => this.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
       hasModelSources: (serverId) => this.supportsCapability(serverId, PROVIDER_MODEL_SOURCE_CAPABILITY),
+      hasAgentWaits: (serverId) => this.supportsCapability(serverId, AGENT_WAITS_CAPABILITY),
       emit: (serverId, event, bufferedLive) => {
         if (event.type === "agent-notification-levels-changed")
           this.#rememberLevels(serverId, { server: event.server, agents: event.agents });
@@ -996,7 +1001,21 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
             cause: new Error(sourceText("error.remote.inviteIdentityMismatch")),
           });
         }
-        const accepted = yield* transport.acceptInvite(invite.token);
+        const accepted = yield* transport
+          .acceptInvite(invite.token)
+          .pipe(Effect.catchIf(isOwnServerInvitation, () => Effect.succeed({ hostId: invite.serverId })));
+        const serverOnThisComputer =
+          accepted.hostId === this.#getLocalHostId()
+            ? LOCAL_SERVER_ID
+            : this.#thisComputerServers.has(accepted.hostId)
+              ? accepted.hostId
+              : null;
+        if (serverOnThisComputer) {
+          this.#store.setActiveServerId(serverOnThisComputer);
+          yield* this.#store.persist();
+          this.#emitChanged();
+          return yield* remoteDecode(() => requiredServerSummary(this.list(), serverOnThisComputer));
+        }
         if (accepted.hostId !== invite.serverId)
           return yield* new RemoteWorkflowError({
             cause: new Error(sourceText("error.remote.inviteAcceptedOtherHost")),
@@ -2294,6 +2313,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           channelIsolation: true,
           channelPicture: true,
           channelBrowser: true,
+          providerManyAccounts: true,
         }),
       );
       if (!response.ok) {
@@ -2388,6 +2408,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId = this.#store.activeServerId,
       preview = false,
       size?: number,
+      queued = preview,
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const progress = size === undefined ? undefined : this.#attachmentProgress(server.id, attachmentId, size);
@@ -2418,6 +2439,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
             }).pipe((download) => (stoppable ? this.#stoppable(server.id, attachmentId, download) : download)),
           ),
         preview,
+        queued,
       );
       return yield* stoppable ? this.#stoppable(server.id, attachmentId, load) : load;
     },
@@ -2532,11 +2554,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       workspacePath: string,
       serverId = this.#store.activeServerId,
       maxBytes?: number,
+      exactPath = false,
     ): Effect.fn.Return<{ bytes: Uint8Array; name: string }, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(TEAM_API_ROUTES.workspaceFiles, server.apiUrl);
       url.searchParams.set("botId", agentId);
       url.searchParams.set("path", workspacePath);
+      if (exactPath) url.searchParams.set(WORKSPACE_FILE_EXACT_PATH_QUERY, "1");
       const response = yield* this.#client.fetch(server, url);
       return {
         bytes: yield* remoteCall(() => fileResponseBytes(response, maxBytes)),
@@ -2716,6 +2740,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 function sameAppearance(left: ServerAppearance | null | undefined, right: ServerAppearance | null): boolean {
   if (!left || !right) return (left ?? null) === right;
   return left.shape === right.shape && left.color === right.color;
+}
+
+function isOwnServerInvitation(error: RemoteWorkflowError): boolean {
+  const { cause } = error;
+  return typeof cause === "object" && cause !== null && "code" in cause && cause.code === "owner_membership_protected";
 }
 
 function requiredServerSummary(servers: ServerSummary[], serverId: string): ServerSummary {
