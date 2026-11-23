@@ -257,7 +257,9 @@ function antigravityLastPromptLog(
   const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
   for (const log of antigravityRecentLogs(argv, since)) {
     const at = log.lastIndexOf(prompt);
-    if (at >= 0) return log.slice(at);
+    if (at < 0) continue;
+    const otherPrompt = log.indexOf(GEMINI_PROMPT_LOG, at + prompt.length);
+    return log.slice(at, otherPrompt < 0 ? undefined : otherPrompt);
   }
   return null;
 }

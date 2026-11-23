@@ -320,6 +320,8 @@ try {
     [
       `I1123 10:00:00.000000 server.go:10] Sending user message to conversation ${prompt?.sessionId ?? ""}`,
       "E1123 10:00:01.000000 executor.go:20] agent executor error: Error 502, Message: Bad Gateway, Status: 502 Bad Gateway, Details: []",
+      "I1123 10:00:02.000000 server.go:10] Sending user message to conversation other-session",
+      "E1123 10:00:03.000000 executor.go:20] agent executor error: Error 429, Message: Resource exhausted, Status: 429 Too Many Requests, Details: []",
       "",
     ].join("\n"),
   );
@@ -333,7 +335,7 @@ try {
   assert.equal(
     loggedEnd.value.error,
     sourceText("error.provider.antigravityServiceFailure", { detail: "Bad Gateway" }),
-    "The turn shows the error from the agy log, not a generic stall.",
+    "The turn shows its own error from the agy log, not a generic stall or the error of another session.",
   );
 
   const firstLog = join(root, "antigravity-first.jsonl");
