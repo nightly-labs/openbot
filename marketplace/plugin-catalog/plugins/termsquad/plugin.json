@@ -5,7 +5,7 @@
   "description": "TermSquad lets agents start and prompt remote coding agents, read their output, run squads, and manage scheduled tasks on always-on computers. Each user signs in through the browser and chooses which computers, workspaces, and permissions to grant.",
   "category": "coding",
   "creatorName": "TermSquad",
-  "iconUrl": "https://app.termsquad.com/favicon.png",
+  "iconUrl": "https://termsquad.com/brand/termsquad-icon.png",
   "version": "1.0.0",
   "prompts": [
     { "id": "prompt-computers", "text": "List my TermSquad computers and their workspaces." },
@@ -17,7 +17,7 @@
       "id": "app-termsquad-mcp",
       "name": "TermSquad",
       "description": "Remote agent sessions, squads, scheduled tasks, and workspace access, over TermSquad's MCP server with browser sign-in.",
-      "iconUrl": "https://app.termsquad.com/favicon.png",
+      "iconUrl": "https://termsquad.com/brand/termsquad-icon.png",
       "server": {
         "name": "termsquad",
         "transport": "http",
