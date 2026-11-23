@@ -138,6 +138,7 @@ import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "./message-pins-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "./mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
@@ -820,6 +821,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [TEAM_USAGE_READ_FAILED_CAPABILITY, V10],
   [WORKFLOWS_PAUSE_CAPABILITY, V10],
   [WORKFLOWS_PORTABLE_CAPABILITY, V10],
+  [MODEL_VISIBILITY_KEPT_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

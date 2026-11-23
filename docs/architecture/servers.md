@@ -1066,7 +1066,7 @@ Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered i
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
 except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`, `storage-user-files-v1`,
 `storage-channel-v1`, `library-folders-v1`, `agent-fast-mode-v1`, `agent-speed-v1`,
-`model-steering-v1`, `provider-model-source-v1` and `usage-credits-v1`. The
+`model-steering-v1`, `model-visibility-kept-v1`, `provider-model-source-v1` and `usage-credits-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |
@@ -1132,6 +1132,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `provider-environment-v1` | Read and set the environment variables that each process of the host's Claude, Codex and Gemini starts with. Protocol 9 only | `hostAdmin` |
 | `provider-account-models-v1` | Read the models that each account after the first of the host's providers serves and the provider's own sign-in does not, for the model picker of that account. Protocol 9 only | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
+| `model-visibility-kept-v1` | Every member reads the models that an admin turned off and that the model list keeps because an agent uses them. A client shows each one only in a model choice that holds it. Protocol 10 only | none: the model list reads it |
 | `model-steering-v1` | Every member reads which models of a provider that reports steering for each agent (a custom ACP agent) take a message into the running turn. A model that is not listed does not steer: the client shows "Send now" for it, and the host queues the message. Protocol 9 only | `hostAdmin` |
 | `provider-model-source-v1` | Every member reads, for each provider of the host whose own settings give its models from another source, which source that is: a model provider by its name, such as Ollama, or a model list file. No path, address or key. Today only Codex reports one. The model picker shows it on that provider's tab. Protocol 9 only | `agent` (merged into the status) |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
@@ -1383,6 +1384,12 @@ new release shows after an admin edits the list too. The default below puts a mo
 or under Older models; an admin cannot move a model between them. `shown: null` on the update route
 resets a provider, and the settings route's `changed` tells the Models section to offer the reset. A
 choice for a model that the provider does not list now stays in the file.
+
+A model that an admin turned off stays in the model list while an agent of the server uses it, as its
+model, its next or return model, or a backup model. `model-visibility-v1` gives no sign of this, so a
+released client shows it in every picker. The host marks it `kept`, and `model-visibility-kept-v1`
+lists it: the picker then shows it only where it is the value, such as the picker of the agent that
+uses it (#12582).
 
 The main list uses the models.dev copy in OpenCode's cache. When a provider lists 12 models or fewer,
 it folds only a model that the list has a newer model of the same family for, such as `claude-opus-5`

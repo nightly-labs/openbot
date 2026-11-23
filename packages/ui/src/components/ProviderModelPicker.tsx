@@ -235,8 +235,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   let shownProvider = untrack(activeProvider);
 
   function railModelOptions(rail: RailId): ClientAgentModelOption[] {
-    if (rail === CUSTOM_RAIL) return props.modelOptions.filter((option) => isCustomModel(option, customIds()));
-    return props.modelOptions.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
+    const options = props.modelOptions.filter(
+      (option) => option.listing !== "kept" || (option.provider === props.provider && option.id === props.value),
+    );
+    if (rail === CUSTOM_RAIL) return options.filter((option) => isCustomModel(option, customIds()));
+    return options.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
   }
 
   const agentCount = () => {

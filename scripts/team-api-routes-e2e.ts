@@ -349,6 +349,14 @@ import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import {
+  MODEL_VISIBILITY_CAPABILITY,
+  MODEL_VISIBILITY_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
   PASSWORD_MANAGERS_ROUTES,
@@ -567,6 +575,7 @@ import {
 import { LibraryFoldersService, type LibraryFoldersSources } from "../src/main/library-folders-service";
 import { MachineAlertMonitor, MachineAlertPreferenceStore } from "../src/main/machine-alerts";
 import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preference-store";
+import { ModelReleaseCatalog, ModelVisibility } from "../src/main/model-visibility";
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
 import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
 import { ProviderAccountsHost } from "../src/main/provider-accounts-host";
@@ -2668,6 +2677,14 @@ try {
     skills: chatSkills,
     admin: {
       skills: githubSkillsAdmin,
+      modelVisibility: new ModelVisibility({
+        path: join(root, "model-visibility.json"),
+        catalog: new ModelReleaseCatalog({ XDG_CACHE_HOME: join(root, "cache") }, root),
+        listModels: () => FAST_MODE_MODELS,
+        listAgents: () => agents,
+        customEndpoints: () => [],
+        modelsChanged: () => {},
+      }),
       customAgents: {
         list: () => Effect.succeed(customAgentList),
         save: (input) =>
@@ -6110,6 +6127,71 @@ try {
       steering.status === 200 &&
         isDeepStrictEqual(steering.body, { models: [{ provider: "acp", id: "steering-agent/default" }] }),
       summary(steering),
+    );
+  }
+
+  {
+    const visibilityCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MODEL_VISIBILITY_CAPABILITY];
+    const keptCapabilities = [...visibilityCapabilities, MODEL_VISIBILITY_KEPT_CAPABILITY];
+    const ada = agents.find((item) => item.id === "agent-ada");
+    assert.ok(ada, "agent-ada is missing.");
+    const backups = ada.backupModels;
+    ada.backupModels = { automatic: true, order: [{ provider: "codex", model: "gpt-standard" }] };
+    const hide = await call("POST", MODEL_VISIBILITY_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "codex", shown: [] },
+      capabilities: visibilityCapabilities,
+    });
+    const unsupported = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: visibilityCapabilities,
+    });
+    const kept = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    const listing = await call("POST", MODEL_VISIBILITY_ROUTES.listing, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    const released = await call("GET", TEAM_API_ROUTES.agents.models, {
+      token: bobToken,
+      capabilities: keptCapabilities,
+    });
+    const ids = list(released.body).map((model) => field(model, "id"));
+    check(
+      "a turned-off model that an agent uses stays in the model list, and only model-visibility-kept-v1 marks it",
+      hide.status === 200 &&
+        errorIs(unsupported, 400, sourceText("error.team.modelVisibilityUnsupported")) &&
+        kept.status === 200 &&
+        isDeepStrictEqual(kept.body, { models: [{ provider: "codex", id: "gpt-standard" }] }) &&
+        listing.status === 200 &&
+        list(field(listing.body, "models")).every((entry) => field(entry, "id") !== "gpt-standard") &&
+        released.status === 200 &&
+        ids.includes("gpt-standard") &&
+        !ids.includes("gpt-fast") &&
+        list(released.body).every((model) => field(model, "listing") === undefined),
+      [summary(hide), summary(unsupported), summary(kept), summary(listing), summary(released)],
+    );
+    const reset = await call("POST", MODEL_VISIBILITY_ROUTES.update, {
+      token: adaToken,
+      json: { provider: "codex", shown: null },
+      capabilities: visibilityCapabilities,
+    });
+    if (backups) ada.backupModels = backups;
+    else delete ada.backupModels;
+    const none = await call("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: keptCapabilities,
+    });
+    check(
+      "after a reset no model is kept",
+      reset.status === 200 && none.status === 200 && isDeepStrictEqual(none.body, { models: [] }),
+      [summary(reset), summary(none)],
     );
   }
 

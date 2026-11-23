@@ -101,6 +101,7 @@ import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
 import { MESSAGE_DELETE_CODECS } from "./message-delete-v1";
 import { MESSAGE_PINS_CODECS } from "./message-pins-v1";
 import { MODEL_STEERING_CODECS } from "./model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_CODECS } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
@@ -220,6 +221,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...MODEL_STEERING_CODECS,
   ...PROVIDER_MODEL_SOURCE_CODECS,
   ...MODEL_VISIBILITY_CODECS,
+  ...MODEL_VISIBILITY_KEPT_CODECS,
   ...SERVER_AUDIT_CODECS,
   ...PROVIDER_DEFAULT_CODECS,
   ...DISCORD_ACCESS_CODECS,
