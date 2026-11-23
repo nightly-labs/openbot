@@ -251,8 +251,10 @@ sign-in, or the Codex account of the agent, and answers `{ sessionId, sdp }` wit
 Audio goes between the client and OpenAI, never through the host. The member must be able to chat with
 the agent, because each spoken request goes to the agent as the member's message. The start needs an
 open event connection of the same logical session, or it answers 409. A missing Codex sign-in, a
-timeout or a refused call also answers 409 with a sentence for the member. Any other failure answers
-500, and its reason stays in the host log; the phone shows `error.voice.live.hostFailed` for it.
+timeout or a refused call also answers 409 with a sentence for the member. Any other Codex failure
+answers 409 with `error.voice.live.startFailed`: the next step and at most 160 characters of the
+redacted reason. The host log keeps the longer redacted reason. A phone that gets 500 from an older
+host shows `error.voice.live.hostFailed`.
 
 Each member has at most one session; a new start ends the earlier one of that member, and the local
 user's session stays. The host sends the `live-voice` event (transcript parts and the end) only to the
