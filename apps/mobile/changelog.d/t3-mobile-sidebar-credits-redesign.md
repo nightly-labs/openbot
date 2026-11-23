@@ -7,3 +7,5 @@
 - When you move credits, stars fly from one wallet to the other, and the receiving wallet reacts to each one.
 - After a move, the changed balances on the Credits screen turn pink and count to their new values.
 - On the Credits screen, the last 3 activity entries show under Recent activity. See all activity opens the full history, with the credits used and the moves of the last 7 days.
+- In the server drawer, the button next to the server name opens Server settings. To add or join a server, open the server list and tap the last row.
+- In the server drawer, tap your name to open Settings. The gear next to the server name opens Server settings.

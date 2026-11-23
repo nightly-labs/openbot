@@ -39,7 +39,6 @@ export function DrawerCredits({ serverId, open, onNavigate }: DrawerCreditsProps
       : t("mobile.server.drawer.credits.labelPersonal", { personal });
   return (
     <View className="ml-3">
-      <View accessibilityElementsHidden className="h-px bg-grouped-border" />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}

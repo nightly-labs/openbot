@@ -6,6 +6,7 @@ import CalendarClock from "lucide-react-native/icons/calendar-clock";
 import ChartArea from "lucide-react-native/icons/chart-area";
 import Check from "lucide-react-native/icons/check";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 import GalleryVerticalEnd from "lucide-react-native/icons/gallery-vertical-end";
 import ListChecks from "lucide-react-native/icons/list-checks";
 import Monitor from "lucide-react-native/icons/monitor";
@@ -13,7 +14,6 @@ import Pin from "lucide-react-native/icons/pin";
 import PinOff from "lucide-react-native/icons/pin-off";
 import Plus from "lucide-react-native/icons/plus";
 import Settings from "lucide-react-native/icons/settings";
-import Settings2 from "lucide-react-native/icons/settings-2";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import Store from "lucide-react-native/icons/store";
 import UsersRound from "lucide-react-native/icons/users-round";
@@ -69,10 +69,11 @@ import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-fea
 import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
+import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
 import { typeScale } from "@/shared/lib/type-scale";
 import { DrawerCredits } from "./drawer-credits";
 import { DrawerHeaderBlur } from "./drawer-header-blur";
-import { ServerAvatar } from "./server-avatar";
+import { SERVER_AVATAR_CORNER_RATIO, ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
 import { SERVER_ROW_HEIGHT, SortableServerList } from "./sortable-server-list";
 import { useDrawerMemberCount, useDrawerServerValues } from "./use-drawer-server-values";
@@ -88,6 +89,7 @@ const DRAWER_ROW_HEIGHT = 46;
 const CLOSED_LIST = { height: 0, overflow: "hidden" } as const;
 const UNPINNED_OPACITY = 0.5;
 const UNAVAILABLE_OPACITY = 0.45;
+const PROFILE_ROW_OVERHANG = 12;
 
 interface ServerDrawerContentProps {
   activeServerId: string;
@@ -166,6 +168,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const displayName = mobileUserName(session.user);
   const avatarUrl = session.user.avatarUrl ? new URL(session.user.avatarUrl, session.apiUrl).toString() : null;
   const mutedColor = String(muted);
+  const controlColor = useCSSVariable("--openbot-bg-control");
   const [editing, setEditing] = useState(false);
   const [editingTools, setEditingTools] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -459,20 +462,16 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
               >
                 <Check color={mutedColor} size={18} strokeWidth={2} />
               </ServerDrawerIconButton>
-            ) : (
+            ) : activeServer ? (
               <ServerDrawerIconButton
-                accessibilityLabel={showsPlans ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
+                accessibilityLabel={t("mobile.server.drawer.serverSettings")}
                 color={mutedColor}
-                systemName="plus"
-                onPress={() =>
-                  onNavigate(
-                    showsPlans ? { pathname: "/hosted-server", params: { entryPoint: "drawer" } } : "/add-server",
-                  )
-                }
+                systemName="gearshape"
+                onPress={() => onNavigate({ pathname: "/server-settings", params: { serverId: activeServer.id } })}
               >
-                <Plus color={mutedColor} size={18} strokeWidth={2} />
+                <Settings color={mutedColor} size={18} strokeWidth={1.8} />
               </ServerDrawerIconButton>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -508,7 +507,32 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
               <Typography.Paragraph className="px-3 pt-3 text-text-secondary" style={typeScale.caption}>
                 {t("mobile.server.drawer.orderHint")}
               </Typography.Paragraph>
-            ) : null}
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                className="flex-row items-center gap-3 rounded-2xl px-3"
+                style={({ pressed }) => ({ height: SERVER_ROW_HEIGHT - 4, opacity: pressed ? 0.58 : 1 })}
+                onPress={() =>
+                  onNavigate(
+                    showsPlans ? { pathname: "/hosted-server", params: { entryPoint: "drawer" } } : "/add-server",
+                  )
+                }
+              >
+                <View
+                  className="items-center justify-center bg-control"
+                  style={{
+                    width: SERVER_AVATAR_SIZE,
+                    height: SERVER_AVATAR_SIZE,
+                    borderRadius: SERVER_AVATAR_SIZE * SERVER_AVATAR_CORNER_RATIO,
+                  }}
+                >
+                  <Plus color={mutedColor} size={20} strokeWidth={2} />
+                </View>
+                <Typography.Paragraph className="font-medium" numberOfLines={1} style={typeScale.rowTitle}>
+                  {showsPlans ? t("mobile.server.drawer.add") : t("mobile.server.drawer.join")}
+                </Typography.Paragraph>
+              </Pressable>
+            )}
             {activeServer ? <DrawerDivider /> : null}
           </ServerListCollapse>
 
@@ -528,38 +552,36 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
 
       <View className="mr-6 pt-2">
         <DrawerCredits serverId={activeServer?.id ?? null} open={open} onNavigate={onNavigate} />
-        <View className="flex-row items-center gap-2">
-          <View className="min-h-14 min-w-0 flex-1 flex-row items-center gap-2.5 py-2 pl-3">
-            <ProfileAvatar neutral name={displayName} imageUrl={avatarUrl} size={36} />
-            <View className="min-w-0 flex-1">
-              <Typography.Paragraph className="font-semibold" numberOfLines={1} style={typeScale.preview}>
-                {displayName}
-              </Typography.Paragraph>
-              <Typography.Paragraph
-                className="text-text-secondary"
-                numberOfLines={1}
-                selectable
-                style={typeScale.small}
-              >
-                {session.user.email}
-              </Typography.Paragraph>
-            </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${displayName}, ${session.user.email}`}
+          accessibilityHint={t("mobile.server.drawer.settings")}
+          className="min-h-14 flex-row items-center gap-2.5 rounded-2xl py-2 pl-3"
+          style={({ pressed }) => ({
+            marginRight: -PROFILE_ROW_OVERHANG,
+            paddingRight: PROFILE_ROW_OVERHANG,
+            backgroundColor: pressed ? String(controlColor) : undefined,
+          })}
+          onPress={() => {
+            void haptics.impact("soft");
+            onNavigate("/settings");
+          }}
+        >
+          <ProfileAvatar neutral name={displayName} imageUrl={avatarUrl} size={36} />
+          <View className="min-w-0 flex-1">
+            <Typography.Paragraph className="font-semibold" numberOfLines={1} style={typeScale.preview}>
+              {displayName}
+            </Typography.Paragraph>
+            <Typography.Paragraph className="text-text-secondary" numberOfLines={1} style={typeScale.small}>
+              {session.user.email}
+            </Typography.Paragraph>
           </View>
-          <ServerDrawerIconButton
-            accessibilityLabel={t("mobile.server.drawer.settings")}
-            color={mutedColor}
-            systemName="gearshape"
-            onPress={() => onNavigate("/settings")}
-          >
-            <Settings color={mutedColor} size={18} strokeWidth={1.8} />
-          </ServerDrawerIconButton>
-        </View>
+          <ChevronRight color={mutedColor} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
+        </Pressable>
       </View>
     </>
   );
 });
-
-type DrawerRoute = DrawerToolId | "settings";
 
 interface DrawerTool {
   icon: LucideIcon;
@@ -608,7 +630,7 @@ function DrawerServerTools({
     serverRowState(current, serverId, (checks) => checks.canUseWorkflows(serverId)),
   );
   const routes = useMemo(
-    (): Record<DrawerRoute, Href> => ({
+    (): Record<DrawerToolId, Href> => ({
       tasks: { pathname: "/server-tasks", params: { serverId } },
       routines: { pathname: "/server-routines", params: { serverId } },
       workflows: { pathname: "/server-workflows", params: { serverId } },
@@ -618,7 +640,6 @@ function DrawerServerTools({
       providers: { pathname: "/server-settings/providers", params: { serverId } },
       remoteDesktop: { pathname: "/remote-desktop/[serverId]", params: { serverId } },
       members: { pathname: "/server-settings/members", params: { serverId } },
-      settings: { pathname: "/server-settings", params: { serverId } },
     }),
     [serverId],
   );
@@ -735,17 +756,6 @@ function DrawerServerTools({
           );
         })
       )}
-      <DrawerDivider />
-      <DrawerToolRow
-        toolId={null}
-        icon={Settings2}
-        label={t("mobile.server.drawer.serverSettings")}
-        href={routes.settings}
-        width={rowWidth}
-        disabled={editing}
-        onAction={editing ? undefined : onToolAction}
-        onNavigate={onNavigate}
-      />
     </View>
   );
 }
