@@ -285,8 +285,7 @@ export class ConversationRuntime {
         if (current !== cached || untrimmable.has(cached)) return false;
         if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
           return false;
-        if (kind === "agent" && !cached.snapshot.activeTurnId && cached.snapshot.messages.some(hasActiveDelivery))
-          return false;
+        if (!cached.snapshot.activeTurnId && cached.snapshot.messages.some(hasActiveDelivery)) return false;
         return isCommitted(cached);
       });
       if (!oldest) return;
