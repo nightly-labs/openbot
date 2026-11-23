@@ -32,6 +32,7 @@ export type WhatsAppPort = Pick<
   | "setWhatsAppOwnNumber"
   | "setWhatsAppWorkingMessage"
   | "setWhatsAppStatusReactions"
+  | "setWhatsAppSenderReadOnly"
 >;
 
 export const whatsappPort = (): WhatsAppPort => window.openbot.messaging;
@@ -53,6 +54,7 @@ export type HostWhatsAppApi = Pick<
   | "hostSetWhatsAppOwnNumber"
   | "hostSetWhatsAppWorkingMessage"
   | "hostSetWhatsAppStatusReactions"
+  | "hostSetWhatsAppSenderReadOnly"
 >;
 
 export function hostWhatsAppPort(
@@ -80,6 +82,7 @@ export function hostWhatsAppPort(
     setWhatsAppOwnNumber: (input) => call((api, id) => api.hostSetWhatsAppOwnNumber(input, id)),
     setWhatsAppWorkingMessage: (input) => call((api, id) => api.hostSetWhatsAppWorkingMessage(input, id)),
     setWhatsAppStatusReactions: (input) => call((api, id) => api.hostSetWhatsAppStatusReactions(input, id)),
+    setWhatsAppSenderReadOnly: (input) => call((api, id) => api.hostSetWhatsAppSenderReadOnly(input, id)),
   };
 }
 
@@ -226,6 +229,8 @@ export function createWhatsAppConnector(
         loadGroups: async (workspaceId) => (await port().listWhatsAppGroups({ workspaceId })).groups,
         onAddSender: (workspaceId, sender) => run(() => port().addWhatsAppSender({ workspaceId, sender })),
         onRemoveSender: (workspaceId, senderId) => run(() => port().removeWhatsAppSender({ workspaceId, senderId })),
+        onSetSenderReadOnly: (workspaceId, senderId, readOnly) =>
+          run(() => port().setWhatsAppSenderReadOnly({ workspaceId, senderId, readOnly })),
         onAnswerRequest: (workspaceId, code, approve) =>
           run(() => port().answerWhatsAppRequest({ workspaceId, code, approve })),
       },

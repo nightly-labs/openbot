@@ -991,6 +991,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "1 つの番号で許可できる連絡先とグループは最大 {count} 件です。",
   "mobile.server.connectors.whatsapp.senderGroup": "グループ",
   "mobile.server.connectors.whatsapp.removeSender": "削除",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · 読み取り専用",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "読み取り専用にする",
+  "mobile.server.connectors.whatsapp.allowWork": "仕事を頼めるようにする",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "読み取り専用: エージェントはこのチャットを読めますが、OpenBot がここに書き込むことはありません。",
   "mobile.server.connectors.whatsapp.addContact": "連絡先を追加",
   "mobile.server.connectors.whatsapp.addGroup": "グループを追加",
   "mobile.server.connectors.whatsapp.contactTitle": "連絡先を追加",

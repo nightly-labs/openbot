@@ -1015,6 +1015,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Un numero può autorizzare al massimo {count} contatti e gruppi.",
   "mobile.server.connectors.whatsapp.senderGroup": "Gruppo",
   "mobile.server.connectors.whatsapp.removeSender": "Rimuovi",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Sola lettura",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Imposta sola lettura",
+  "mobile.server.connectors.whatsapp.allowWork": "Consenti di dare compiti",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Sola lettura: gli agenti possono leggere questa chat e OpenBot non vi scrive mai.",
   "mobile.server.connectors.whatsapp.addContact": "Aggiungi contatto",
   "mobile.server.connectors.whatsapp.addGroup": "Aggiungi gruppo",
   "mobile.server.connectors.whatsapp.contactTitle": "Aggiungi un contatto",

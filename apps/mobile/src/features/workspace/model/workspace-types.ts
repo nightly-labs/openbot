@@ -146,6 +146,7 @@ import type {
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppSenderReadOnlyInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SetWorkflowPausedInput,
@@ -538,6 +539,7 @@ export interface MobileWorkspaceContextValue {
   setWhatsAppOwnNumber: (input: SetWhatsAppOwnNumberInput, serverId: string) => Promise<void>;
   setWhatsAppWorkingMessage: (input: SetWhatsAppWorkingMessageInput, serverId: string) => Promise<void>;
   setWhatsAppStatusReactions: (input: SetWhatsAppStatusReactionsInput, serverId: string) => Promise<void>;
+  setWhatsAppSenderReadOnly: (input: SetWhatsAppSenderReadOnlyInput, serverId: string) => Promise<void>;
   serverUpdateAccess: (serverId: string) => ServerUpdateAccess | null;
   canReadServerRelease: (serverId: string) => boolean;
   loadServerUpdate: (serverId: string, access: ServerUpdateAccess) => Promise<HostUpdateStatus>;

@@ -143,6 +143,7 @@ export interface WhatsAppSessionOptions {
   pairing?: boolean;
   fetchVersion?: () => Promise<WAVersion | null>;
   now?: () => number;
+  readOnly?: (jid: string) => boolean;
 }
 
 type UpsertListener = (event: { messages: WAMessage[]; type: string }) => void;
@@ -156,6 +157,7 @@ export class WhatsAppSession {
   #pairing: boolean;
   readonly #fetchVersion: () => Promise<WAVersion | null>;
   readonly #now: () => number;
+  readonly #readOnly: (jid: string) => boolean;
   readonly #stateListeners = new Set<(state: WhatsAppSessionState) => void>();
   readonly #upsertListeners = new Set<UpsertListener>();
   readonly #unread: Array<{ messages: WAMessage[]; type: string }> = [];
@@ -192,6 +194,7 @@ export class WhatsAppSession {
     this.#pairing = options.pairing ?? false;
     this.#fetchVersion = options.fetchVersion ?? webVersion;
     this.#now = options.now ?? Date.now;
+    this.#readOnly = options.readOnly ?? (() => false);
   }
 
   get state(): WhatsAppSessionState {
@@ -536,6 +539,7 @@ export class WhatsAppSession {
       const address = this.#postChat(content) ?? (await this.#address(socket, jid));
       const gap = CHAT_PACING_MS * (1 + Math.random() / 2) - (this.#now() - (this.#lastSend.get(jid) ?? 0));
       if (gap > 0) await new Promise((resume) => setTimeout(resume, gap));
+      if (this.#readOnly(jid)) throw new Error("place_read_only");
       messageId ??= generateMessageIDV2(socket.user?.id);
       this.#remember(messageId);
       const ack = this.#ackOf(messageId);

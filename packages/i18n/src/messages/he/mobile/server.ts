@@ -1270,6 +1270,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "מספר יכול לאשר עד {count} אנשי קשר וקבוצות.",
   "mobile.server.connectors.whatsapp.senderGroup": "קבוצה",
   "mobile.server.connectors.whatsapp.removeSender": "הסרה",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · קריאה בלבד",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "הגדר לקריאה בלבד",
+  "mobile.server.connectors.whatsapp.allowWork": "אפשר לתת משימות",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "קריאה בלבד: סוכנים יכולים לקרוא את הצ'אט הזה, ו-OpenBot אף פעם לא כותב בו.",
   "mobile.server.connectors.whatsapp.addContact": "הוספת איש קשר",
   "mobile.server.connectors.whatsapp.addGroup": "הוספת קבוצה",
   "mobile.server.connectors.whatsapp.contactTitle": "הוספת איש קשר",

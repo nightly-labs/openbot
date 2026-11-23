@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Boom } from "@hapi/boom";
 import type { MessagingConnection, WhatsAppLinkState } from "@openbot/contracts/ipc";
+import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
   newStoreKey,
@@ -1409,6 +1410,91 @@ try {
       },
     );
 
+    await step(
+      "read only: a read-only group or contact is saved, starts no work, and OpenBot sends nothing to it",
+      async () => {
+        const id = connectionId(agents);
+        const reader = "48600100800";
+        const readerJid = `${reader}@s.whatsapp.net`;
+        await runCauseEffect(messaging.addWhatsAppSender(OWNER, { id: reader, kind: "contact", name: "Reader" }));
+        await runCauseEffect(messaging.setWhatsAppSenderReadOnly(OWNER, GROUP, true));
+        await runCauseEffect(messaging.setWhatsAppSenderReadOnly(OWNER, reader, true));
+        const modes = () =>
+          new Map(
+            (messaging.whatsappOverview().accounts[0]?.allowedSenders ?? []).map((sender) => [
+              sender.id,
+              sender.readOnly,
+            ]),
+          );
+        assert.equal(modes().get(GROUP), true, "The group is not read only.");
+        assert.equal(modes().get(reader), true, "The contact is not read only.");
+        const from = phone.sent.length;
+        const mention = message({
+          chat: GROUP,
+          participant: `${FRIEND}@s.whatsapp.net`,
+          text: "@48600100200 we chose the blue logo",
+          mentions: [OWNER_JID],
+          pushName: "Ewa",
+        });
+        const direct = message({ chat: readerJid, text: "the client approved the blue logo", pushName: "Reader" });
+        phone.current().receive([mention, direct]);
+        const marker = message({ chat: OWNER_JID, fromMe: true, text: "marker read only" });
+        phone.current().receive([marker]);
+        await until(() => phone.reactedTo(marker.key.id), "the marker");
+        await until(
+          () => agents.messaging.history.recent(id, GROUP, null, 200).some((entry) => entry.id === mention.key.id),
+          "the saved mention",
+        );
+        await until(
+          () => agents.messaging.history.recent(id, readerJid, null, 200).some((entry) => entry.id === direct.key.id),
+          "the saved direct message",
+        );
+        assert.equal(
+          received(agents, GROUP, mention.key.id ?? ""),
+          false,
+          "A mention in a read-only group started work.",
+        );
+        assert.equal(received(agents, readerJid, direct.key.id ?? ""), false, "A read-only contact started work.");
+        const notes = join(root, "read-only-notes.txt");
+        writeFileSync(notes, "notes");
+        const tool = (name: string, args: { place?: string; text?: string; files?: string[] }) =>
+          runCauseEffect(
+            agents.messaging.outboundTool(
+              "agent-whatsapp-e2e",
+              { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
+              name,
+              { connection: id, ...args },
+              (paths) => Effect.succeed(paths.map(() => ({ name: "notes.txt", path: notes, mimeType: "text/plain" }))),
+            ),
+          );
+        const groupPost = await tool("messaging_post", { place: GROUP, text: "Noted." });
+        const contactPost = await tool("messaging_post", { place: `+${reader}`, text: "Noted." });
+        const filePost = await tool("messaging_post", { place: GROUP, files: ["notes.txt"] });
+        for (const refused of [groupPost, contactPost, filePost]) {
+          assert.equal(refused.success, false, "A post to a read-only chat was accepted.");
+          assert.match(refused.contentItems[0]?.text ?? "", /read only/u);
+        }
+        const listed = JSON.parse((await tool("messaging_list_places", {})).contentItems[0]?.text ?? "{}");
+        assert.ok(
+          isDynamicRecord(listed) &&
+            Array.isArray(listed.places) &&
+            listed.places.some((place) => isDynamicRecord(place) && place.id === GROUP && place.readOnly === true),
+          "The group is not marked read only in the places.",
+        );
+        const history = await readHistory(agents, { place: GROUP, query: "blue logo" });
+        assert.deepEqual(
+          history.messages.map((entry) => entry.text),
+          ["@48600100200 we chose the blue logo"],
+        );
+        const elsewhere = phone.sent.slice(from).filter((sent) => sent.jid !== OWNER_JID);
+        assert.deepEqual(elsewhere, [], "OpenBot sent something to a read-only chat.");
+        await runCauseEffect(messaging.setWhatsAppSenderReadOnly(OWNER, GROUP, false));
+        await runCauseEffect(messaging.removeWhatsAppSender(OWNER, reader));
+        assert.equal(modes().get(GROUP), false, "The group does not give work again.");
+        return { saved: 2, sent: elsewhere.length };
+      },
+    );
+
     await step("LID authors: a LID chat with a phone form, and a LID group member, map to their numbers", async () => {
       const input = parseWhatsAppSenderInput({
         workspaceId: OWNER,
@@ -1543,7 +1629,12 @@ try {
           me: { number: OWNER, lid: `${OWNER_LID}@lid` },
           openedAt: Date.now(),
           now: Date.now(),
-          rules: { ownNumber: true, contacts: new Map<string, string>(), groups: new Set<string>() },
+          rules: {
+            ownNumber: true,
+            contacts: new Map<string, string>(),
+            groups: new Set<string>(),
+            readOnly: new Set<string>(),
+          },
           chats,
           isOwnPost: () => false,
           threadOf: () => null,

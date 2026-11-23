@@ -1288,6 +1288,7 @@ const openbotApi: OpenBotDesktopApi = {
     setWhatsAppOwnNumber: decodeVoid,
     setWhatsAppWorkingMessage: decodeVoid,
     setWhatsAppStatusReactions: decodeVoid,
+    setWhatsAppSenderReadOnly: decodeVoid,
     hostOverview: decodeTelegramOverviewReply,
     hostConnect: decodeVoid,
     hostDisconnect: decodeVoid,
@@ -1312,6 +1313,7 @@ const openbotApi: OpenBotDesktopApi = {
     hostSetWhatsAppOwnNumber: decodeVoid,
     hostSetWhatsAppWorkingMessage: decodeVoid,
     hostSetWhatsAppStatusReactions: decodeVoid,
+    hostSetWhatsAppSenderReadOnly: decodeVoid,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
