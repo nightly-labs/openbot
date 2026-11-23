@@ -14,6 +14,7 @@ export const CREDIT_HOLD_START_GRACE_MS = 10 * 60 * 1_000;
 export const CREDIT_HOLD_FIRST_CHECK_MS = 15 * 60 * 1_000;
 const CREDIT_HOLD_MAX_CHECK_GAP_MS = 60 * 60 * 1_000;
 export const CREDIT_HOLD_LIMIT_MS = 24 * 60 * 60 * 1_000;
+export const CREDIT_HOLD_SUBMIT_LEASE_MS = 3 * 60 * 1_000;
 const SWEEP_BATCH = 50;
 
 export type CreditWallet = { userId: string } | { serverId: string };
@@ -52,6 +53,18 @@ export interface CreditHold {
   charged: number | null;
   providerJobId: string | null;
   upstream: string | null;
+}
+
+export interface CreditSubmitTarget {
+  upstream: string;
+  model: string;
+  params: string;
+}
+
+interface SubmitTargetRow {
+  upstream: string;
+  upstream_model: string;
+  upstream_params: string;
 }
 
 export interface CreditSweepResult {
@@ -269,7 +282,8 @@ export class CreditSpending {
     const started = yield* billingCall(() =>
       this.#database
         .prepare(
-          `UPDATE credit_holds SET provider_job_id = ?2, upstream = ?3 WHERE job_id = ?1 AND provider_job_id IS NULL
+          `UPDATE credit_holds SET provider_job_id = ?2, upstream = ?3, submit_lease_until = NULL
+            WHERE job_id = ?1 AND provider_job_id IS NULL
            ${TRACKED_HOLD_SQL}`,
         )
         .bind(jobId, providerJobId, upstream)
@@ -281,16 +295,38 @@ export class CreditSpending {
     return yield* this.find(jobId);
   }).bind(this);
 
-  readonly submitting = Effect.fn("CreditSpending.submitting")(function* (
+  readonly claimSubmit = Effect.fn("CreditSpending.claimSubmit")(function* (
+    this: CreditSpending,
+    jobId: string,
+    target: CreditSubmitTarget,
+  ): Effect.fn.Return<CreditSubmitTarget | null, Failure> {
+    const now = this.#now();
+    const claimed = yield* billingCall(() =>
+      this.#database
+        .prepare(
+          `UPDATE credit_holds
+              SET submitted_at = COALESCE(submitted_at, ?2), submit_lease_until = ?3,
+                  upstream = COALESCE(upstream, ?4), upstream_model = COALESCE(upstream_model, ?5),
+                  upstream_params = COALESCE(upstream_params, ?6)
+            WHERE job_id = ?1 AND status = 'held' AND provider_job_id IS NULL
+              AND (submit_lease_until IS NULL OR submit_lease_until <= ?2)
+           RETURNING upstream, upstream_model, upstream_params`,
+        )
+        .bind(jobId, now, now + CREDIT_HOLD_SUBMIT_LEASE_MS, target.upstream, target.model, target.params)
+        .first<SubmitTargetRow>(),
+    );
+    if (!claimed) return null;
+    return { upstream: claimed.upstream, model: claimed.upstream_model, params: claimed.upstream_params };
+  }).bind(this);
+
+  readonly endSubmit = Effect.fn("CreditSpending.endSubmit")(function* (
     this: CreditSpending,
     jobId: string,
   ): Effect.fn.Return<void, Failure> {
     yield* billingCall(() =>
       this.#database
-        .prepare(
-          "UPDATE credit_holds SET submitted_at = COALESCE(submitted_at, ?2) WHERE job_id = ?1 AND status = 'held'",
-        )
-        .bind(jobId, this.#now())
+        .prepare("UPDATE credit_holds SET submit_lease_until = NULL WHERE job_id = ?1 AND status = 'held'")
+        .bind(jobId)
         .run(),
     );
   }).bind(this);

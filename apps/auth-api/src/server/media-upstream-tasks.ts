@@ -175,6 +175,16 @@ export class TasksMediaUpstream implements MediaUpstream {
     );
   }
 
+  #task(providerJobId: string) {
+    return this.#call(`/v1/tasks/${encodeURIComponent(providerJobId)}`, {}).pipe(
+      Effect.mapError((error) =>
+        error.status === 400
+          ? new MediaUpstreamError({ status: 404, code: error.code, retryAfterSeconds: null })
+          : error,
+      ),
+    );
+  }
+
   #upload(input: MediaGenerationInput, index: number): Effect.Effect<string, MediaUpstreamError> {
     const form = new FormData();
     form.set("file", new Blob([new Uint8Array(input.bytes)], { type: input.mimeType }), fileName(input, index));
@@ -211,7 +221,7 @@ export class TasksMediaUpstream implements MediaUpstream {
     this: TasksMediaUpstream,
     providerJobId: string,
   ): Effect.fn.Return<MediaUpstreamJob, MediaUpstreamError> {
-    const { body } = yield* this.#call(`/v1/tasks/${encodeURIComponent(providerJobId)}`, {});
+    const { body } = yield* this.#task(providerJobId);
     const job = readTask(body);
     if (!job) return yield* invalidResponse();
     return job;
@@ -221,7 +231,7 @@ export class TasksMediaUpstream implements MediaUpstream {
     this: TasksMediaUpstream,
     providerJobId: string,
   ): Effect.fn.Return<MediaUpstreamArtifact[], MediaUpstreamError> {
-    const { body } = yield* this.#call(`/v1/tasks/${encodeURIComponent(providerJobId)}`, {});
+    const { body } = yield* this.#task(providerJobId);
     const artifacts = readArtifacts(body);
     if (!artifacts) return yield* invalidResponse();
     return artifacts;

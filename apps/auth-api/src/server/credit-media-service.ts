@@ -47,6 +47,7 @@ import {
   type CreditJobCheck,
   type CreditJobChecker,
   CreditSpending,
+  type CreditSubmitTarget,
   type CreditWallet,
 } from "./credit-spending";
 import {
@@ -184,12 +185,16 @@ function outputsOf(artifacts: readonly MediaUpstreamArtifact[]): CreditMediaOutp
   }));
 }
 
-function generationOf(stored: StoredModel, submission: CreditMediaSubmission): MediaGeneration {
+function generationOf(
+  stored: StoredModel,
+  target: CreditSubmitTarget,
+  submission: CreditMediaSubmission,
+): MediaGeneration {
   const { request, inputs } = submission;
   return {
     kind: stored.model.kind,
-    model: stored.upstreamId,
-    params: stored.upstreamParams,
+    model: target.model,
+    params: upstreamParams(target.params),
     prompt: request.prompt,
     aspect: request.aspect ?? stored.model.defaultAspect,
     resolution: request.resolution ?? stored.model.defaultResolution,
@@ -420,7 +425,7 @@ export class CreditMediaService {
     const stored = (yield* this.#models(request.model))[0];
     if (!stored)
       return yield* new BillingError(404, "media_model_unavailable", sourceText("error.billing.mediaModelUnavailable"));
-    const upstream = yield* this.#upstreamOrFail(stored.upstream);
+    yield* this.#upstreamOrFail(stored.upstream);
     if (creditMediaRequestProblem(stored.model, request) || inputsProblem(stored.model, submission.inputs))
       return yield* invalidRequest();
     const credits = creditMediaCost(stored.model, request);
@@ -435,8 +440,18 @@ export class CreditMediaService {
     });
     if (hold.status === "released") return this.#releasedView(hold);
     if (hold.status === "charged" || hold.providerJobId) return yield* this.#job(payer, hold.jobId, trace);
-    yield* this.#spending.submitting(hold.jobId);
-    const submitted = yield* Effect.result(upstream.submit(hold.jobId, generationOf(stored, submission)));
+    const target = yield* this.#spending.claimSubmit(hold.jobId, {
+      upstream: stored.upstream,
+      model: stored.upstreamId,
+      params: JSON.stringify(stored.upstreamParams),
+    });
+    if (!target) return yield* this.#job(payer, hold.jobId, trace);
+    const upstream = this.#upstreams.get(target.upstream);
+    if (!upstream) {
+      yield* this.#spending.endSubmit(hold.jobId);
+      return yield* unavailable();
+    }
+    const submitted = yield* Effect.result(upstream.submit(hold.jobId, generationOf(stored, target, submission)));
     if (Result.isFailure(submitted)) {
       const error = submitted.failure;
       logUpstream("submit", error, trace);
@@ -448,6 +463,7 @@ export class CreditMediaService {
         yield* this.#settle(hold, { outcome: "refused" });
         return yield* error.status === 429 ? busy() : unavailable();
       }
+      yield* this.#spending.endSubmit(hold.jobId);
       return yield* busy();
     }
     const job = submitted.success;
@@ -457,7 +473,7 @@ export class CreditMediaService {
       count: request.count,
       audio: request.audio,
     };
-    const started = (yield* this.#spending.start(hold.jobId, job.id, details, stored.upstream)) ?? hold;
+    const started = (yield* this.#spending.start(hold.jobId, job.id, details, target.upstream)) ?? hold;
     return this.#view(started, job.status, job.pollAfterSeconds, []);
   }).bind(this);
 

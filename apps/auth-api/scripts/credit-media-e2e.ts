@@ -815,6 +815,8 @@ function fakeTasksUpstream() {
   const polls: string[] = [];
   let submitStatus = 200;
   let sequence = 0;
+  let submitGate: Promise<void> | null = null;
+  let submitArrived: (() => void) | null = null;
   const fetch = async (input: string, init?: RequestInit) => {
     const url = new URL(input);
     const headers = new Headers(init?.headers);
@@ -840,6 +842,8 @@ function fakeTasksUpstream() {
     if (generate && init?.method === "POST") {
       const body = JSON.parse(String(init.body));
       submits.push({ kind: generate[1] ?? "", body: isDynamicRecord(body) ? body : {} });
+      submitArrived?.();
+      if (submitGate) await submitGate;
       if (submitStatus !== 200)
         return Response.json({ error: { code: submitStatus, type: "upstream_said_no" } }, { status: submitStatus });
       sequence += 1;
@@ -849,7 +853,17 @@ function fakeTasksUpstream() {
     }
     const task = url.pathname.match(/^\/v1\/tasks\/([^/]+)$/);
     const stored = task ? tasks.get(decodeURIComponent(task[1] ?? "")) : undefined;
-    if (!task || !stored) return Response.json({ error: { code: 404, type: "not_found" } }, { status: 404 });
+    if (!task || !stored)
+      return Response.json(
+        {
+          error: {
+            code: "invalid_request_error",
+            message: "Task not found or has expired.",
+            type: "invalid_request_error",
+          },
+        },
+        { status: 400 },
+      );
     const id = decodeURIComponent(task[1] ?? "");
     polls.push(id);
     const files = stored.kind === "image" ? { images: [{ url: stored.urls }] } : { videos: [{ url: stored.urls }] };
@@ -884,6 +898,24 @@ function fakeTasksUpstream() {
     setStatus,
     setSubmitStatus: (status: number) => {
       submitStatus = status;
+    },
+    forget: (id: string) => tasks.delete(id),
+    holdSubmits: () => {
+      let release = () => {};
+      submitGate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const arrived = new Promise<void>((resolve) => {
+        submitArrived = resolve;
+      });
+      return {
+        arrived,
+        release: () => {
+          submitGate = null;
+          submitArrived = null;
+          release();
+        },
+      };
     },
     lastTaskId: () => `task_${sequence}`,
   };
@@ -1115,6 +1147,68 @@ async function tasksUpstreamFlow() {
       settled.status === "completed" &&
       logs.some((line) => line.includes("media: upstream not configured")),
     { missing, routerSweep, stillHeld, swept, settled },
+  );
+
+  const forgotten = await run(both.submit(owner, OWNER, submission("image-one")));
+  tasks.forget(tasks.lastTaskId());
+  const forgottenJob = await run(both.job(owner, forgotten.jobId));
+  const sweptForgotten = await run(both.submit(studio, null, submission("image-one")));
+  tasks.forget(tasks.lastTaskId());
+  clock += CREDIT_HOLD_FIRST_CHECK_MS;
+  await run(both.sweep());
+  const sweptForgottenJob = await run(both.job(studio, sweptForgotten.jobId));
+  check(
+    "a task that the new upstream no longer knows (400 Task not found) fails and frees its hold, on a poll and in the sweep",
+    forgottenJob.status === "failed" &&
+      forgottenJob.credits === 0 &&
+      sweptForgottenJob.status === "failed" &&
+      sweptForgottenJob.credits === 0,
+    { forgottenJob, sweptForgottenJob },
+  );
+
+  const sameJob = submission("image-one");
+  const submitsBefore = tasks.submits.length;
+  const gate = tasks.holdSubmits();
+  const firstSubmit = run(both.submit(owner, OWNER, sameJob));
+  await gate.arrived;
+  const secondSubmit = await run(both.submit(owner, OWNER, sameJob));
+  gate.release();
+  const firstDone = await firstSubmit;
+  const sameTask = tasks.lastTaskId();
+  tasks.complete(sameTask, ["png"]);
+  const sameDone = await run(both.job(owner, sameJob.request.jobId));
+  check(
+    "a second submit of a job whose first submit is still running sends nothing, waits as queued, and then follows the one task",
+    secondSubmit.status === "queued" &&
+      firstDone.status === "queued" &&
+      tasks.submits.length === submitsBefore + 1 &&
+      sameDone.status === "completed" &&
+      sameDone.credits === firstDone.credits,
+    { secondSubmit, firstDone, submits: tasks.submits.length - submitsBefore, sameDone },
+  );
+
+  switchModel("image-one", ROUTER_MEDIA_UPSTREAM, "up-image-1");
+  const lostReply = submission("image-one");
+  router.setSubmitStatus(502);
+  const lostFirst = await failure(both.submit(owner, OWNER, lostReply));
+  router.setSubmitStatus(200);
+  switchModel("image-one", TASKS_MEDIA_UPSTREAM, "tasks-image-1");
+  const tasksBeforeRetry = tasks.submits.length;
+  const retried = await run(both.submit(owner, OWNER, lostReply));
+  const retrySubmit = router.submits.at(-1);
+  router.complete(router.lastJobId(), 1);
+  const retriedDone = await run(both.job(owner, lostReply.request.jobId));
+  check(
+    "a retry after a lost submit reply goes to the upstream and model that got the first request, even after a D1 switch",
+    lostFirst.code === "media_busy" &&
+      retried.status === "queued" &&
+      holdUpstream(lostReply.request.jobId) === "router" &&
+      tasks.submits.length === tasksBeforeRetry &&
+      retrySubmit?.idempotencyKey === lostReply.request.jobId &&
+      retrySubmit.body.model === "up-image-1" &&
+      router.submits.filter((entry) => entry.idempotencyKey === lostReply.request.jobId).length === 2 &&
+      retriedDone.status === "completed",
+    { lostFirst, retried, retrySubmit, retriedDone },
   );
 
   check(
