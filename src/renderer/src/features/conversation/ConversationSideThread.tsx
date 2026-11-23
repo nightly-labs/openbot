@@ -143,6 +143,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     const conversation = panel()?.closest<HTMLElement>(".conversation-panel");
     if (!conversation) return;
     const takeDrop = (event: DragEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(SIDE_DROP_TARGETS)) return;
       const rect = panel()?.getBoundingClientRect();
       if (!rect || event.clientX < rect.left || event.clientX > rect.right) return;
       if (event.clientY < rect.top || event.clientY > rect.bottom) return;
@@ -322,10 +323,13 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
   );
 }
 
+const SIDE_DROP_TARGETS = "#side-thread-panel, .attachment-drop-overlay, .agent-folders-chat-drop";
+
 function droppedFiles(transfer: DataTransfer | null): File[] {
   if (!transfer) return [];
-  return Array.from(transfer.items).flatMap((item) => {
-    if (item.kind !== "file" || item.webkitGetAsEntry()?.isDirectory === true) return [];
+  const items = Array.from(transfer.items).filter((item) => item.kind === "file");
+  if (items.some((item) => item.webkitGetAsEntry()?.isDirectory === true)) return [];
+  return items.flatMap((item) => {
     const file = item.getAsFile();
     return file ? [file] : [];
   });
