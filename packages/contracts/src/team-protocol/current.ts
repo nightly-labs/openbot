@@ -13,6 +13,7 @@ import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "./agent-builtin-memory-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "./agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
+import { AGENT_ERROR_LINK_CAPABILITY } from "./agent-error-link-v1";
 import { AGENT_FAST_MODE_CAPABILITY } from "./agent-fast-mode-v1";
 import { AGENT_FOLDERS_CAPABILITY } from "./agent-folders-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "./agent-hidden-v1";
@@ -307,6 +308,7 @@ export {
   AGENT_COLORS_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
+  AGENT_ERROR_LINK_CAPABILITY,
   AGENT_FAST_MODE_CAPABILITY,
   AGENT_FOLDERS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -838,6 +840,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WHATSAPP_READ_ONLY_CAPABILITY, V10],
   [VOICE_TRANSCRIPTION_CAPABILITY, V10],
   [CLIENT_BROWSER_CAPABILITY, V10],
+  [AGENT_ERROR_LINK_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

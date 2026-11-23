@@ -84,6 +84,7 @@ import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex
 import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
+  AGENT_ERROR_LINK_CAPABILITY,
   AGENT_HIDDEN_WORK_CAPABILITY,
   AGENT_HOST_SETTINGS_CAPABILITY,
   AGENT_IMPORT_CAPABILITY,
@@ -1645,6 +1646,7 @@ export class TeamApiServer {
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
         queueHold: capabilities.has(QUEUE_HOLD_CAPABILITY),
         queueHoldSignIn: capabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
+        errorLink: capabilities.has(AGENT_ERROR_LINK_CAPABILITY),
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -3099,6 +3101,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   SKILL_LEARNING_CAPABILITY,
   QUEUE_HOLD_CAPABILITY,
   QUEUE_HOLD_SIGN_IN_CAPABILITY,
+  AGENT_ERROR_LINK_CAPABILITY,
 ];
 
 function eventEncodingKey(capabilities: ReadonlySet<string>, options: { preserveSemanticTags?: boolean }): string {

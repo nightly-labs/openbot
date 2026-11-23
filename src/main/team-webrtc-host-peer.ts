@@ -11,6 +11,7 @@ import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protoco
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "@openbot/contracts/team-protocol/capability-limits";
 import {
+  AGENT_ERROR_LINK_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
@@ -934,6 +935,7 @@ export class TeamWebRtcHostPeer {
                 agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
                 queueHold: this.#peerCapabilities.has(QUEUE_HOLD_CAPABILITY),
                 queueHoldSignIn: this.#peerCapabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
+                errorLink: this.#peerCapabilities.has(AGENT_ERROR_LINK_CAPABILITY),
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
