@@ -5,6 +5,7 @@ export const messages = {
   "error.attachment.notFound": "הקובץ המצורף לא נמצא.",
   "error.attachment.fileTooLarge": "קובץ חורג ממגבלת 100 MB.",
   "error.attachment.namedFileTooLarge": "{name} חורג ממגבלת 100 MB.",
+  "error.attachment.emptyFile": "הקובץ {name} ריק או ש-OpenBot לא יכול לקרוא אותו. שמור את הקובץ שוב ואז צרף אותו שוב.",
   "error.attachment.totalTooLarge": "הקבצים המצורפים חורגים ממגבלת הסך הכול של 250 MB.",
   "error.attachment.unavailable": "הקובץ הזה כבר אינו זמין.",
   "error.attachment.noApp": "אף אפליקציה במחשב הזה לא פתחה את הקובץ. הורידו אותו ואז פתחו אותו ממנהל הקבצים.",

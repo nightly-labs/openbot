@@ -5,6 +5,8 @@ export const messages = {
   "error.attachment.notFound": "Ek bulunamadı.",
   "error.attachment.fileTooLarge": "Bir dosya 100 MB sınırını aşıyor.",
   "error.attachment.namedFileTooLarge": "{name} 100 MB sınırını aşıyor.",
+  "error.attachment.emptyFile":
+    "{name} boş veya OpenBot onu okuyamıyor. Dosyayı yeniden kaydedin, sonra yeniden ekleyin.",
   "error.attachment.totalTooLarge": "Ekler 250 MB toplam sınırını aşıyor.",
   "error.attachment.unavailable": "Bu dosya artık kullanılamıyor.",
   "error.attachment.noApp":
