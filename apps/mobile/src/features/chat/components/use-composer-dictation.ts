@@ -16,6 +16,7 @@ export interface ComposerDictation {
   presence: SharedValue<number>;
   start: () => boolean;
   finish: () => void;
+  finishDraft: () => Promise<string>;
 }
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -38,8 +39,15 @@ export function useComposerDictation({
   useEffect(() => {
     draftRef.current = draft;
   });
+  const dictatedRef = useRef(draft);
   const presence = useSharedValue(0);
-  const dictation = useVoiceDictation({ enabled, onDraft });
+  const dictation = useVoiceDictation({
+    enabled,
+    onDraft: (text) => {
+      dictatedRef.current = text;
+      onDraft(text);
+    },
+  });
   const { start: listen, finish: stop, phase } = dictation;
 
   const moveTo = useCallback(
@@ -55,6 +63,7 @@ export function useComposerDictation({
 
   const start = useCallback(() => {
     if (activeRef.current || !listen(draftRef.current)) return false;
+    dictatedRef.current = draftRef.current;
     moveTo(true);
     return true;
   }, [listen, moveTo]);
@@ -63,6 +72,12 @@ export function useComposerDictation({
     if (!activeRef.current) return;
     moveTo(false);
     void stop();
+  }, [moveTo, stop]);
+
+  const finishDraft = useCallback(async () => {
+    if (activeRef.current) moveTo(false);
+    await stop();
+    return dictatedRef.current;
   }, [moveTo, stop]);
 
   const previousPhase = useRef(phase);
@@ -92,8 +107,18 @@ export function useComposerDictation({
 
   const { available, level } = dictation;
   return useMemo(
-    () => ({ available, active, busy: active || phase === "stopping", phase, level, presence, start, finish }),
-    [available, active, phase, level, presence, start, finish],
+    () => ({
+      available,
+      active,
+      busy: active || phase === "stopping",
+      phase,
+      level,
+      presence,
+      start,
+      finish,
+      finishDraft,
+    }),
+    [available, active, phase, level, presence, start, finish, finishDraft],
   );
 }
 
