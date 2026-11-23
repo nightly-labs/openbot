@@ -1101,7 +1101,9 @@ it. So the ACP client counts a steer as read only when the agent writes, thinks 
 after the steer was accepted. A steer that the turn did not read, or that was still in flight when
 the prompt ended, is listed in `unreadSteers` of `turn/completed` (not after a stop). The turn end
 puts those deliveries back in the queue with `restoreUnsteered`, so they run in the next turn and
-the sender gets no "blocked" note (#15062). `scripts/opencode-late-steer-e2e.ts` checks both orders
+the sender gets no "blocked" note (#15062). A channel steer sends a channel message id, not a
+delivery id, so this does not cover it. OpenCode can still give its kept copy to a later prompt, as
+it does after a manual resend; over ACP, OpenBot cannot take that copy back. `scripts/opencode-late-steer-e2e.ts` checks both orders
 of the race and that a read steer does not run again. Antigravity and Devin steer with
 a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 and later,
 `steerByPromptCapability` for a Devin CLI that reports `cognition.ai/midTurnPrompts`, because Devin

@@ -4109,6 +4109,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         },
       });
     }
+    const unreadSteers = turn.stopped ? [] : [...turn.unreadSteers.keys()];
+    const steersToQueue = unreadSteers.length > 0 ? { unreadSteers } : {};
     const append = thread.keepsHistory ? this.options.history?.append : undefined;
     if (append) {
       const persisted = yield* Effect.exit(
@@ -4124,20 +4126,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.emit("diagnostic", this.#redact(`ACP history persistence failed: ${String(persisted.cause)}`));
         this.emit("notification", {
           method: "turn/completed",
-          params: { threadId: thread.id, turn: { id: turn.id, status: "failed" } },
+          params: { threadId: thread.id, turn: { id: turn.id, status: "failed", ...steersToQueue } },
         });
         thread.activeTurn = null;
         if (this.#threads.get(thread.id) === thread) yield* this.#threads.markIdle(thread);
         return;
       }
     }
-    const unreadSteers = turn.stopped ? [] : [...turn.unreadSteers.keys()];
     this.emit("notification", {
       method: "turn/completed",
-      params: {
-        threadId: thread.id,
-        turn: { id: turn.id, status, ...(unreadSteers.length > 0 ? { unreadSteers } : {}) },
-      },
+      params: { threadId: thread.id, turn: { id: turn.id, status, ...steersToQueue } },
     });
     thread.activeTurn = null;
     if (this.#threads.get(thread.id) !== thread) return;

@@ -2957,12 +2957,13 @@ export class TurnLifecycle {
             Effect.sync(() => this.#hooks.emitError("delivery_turn_association_failed", failure.cause, agentId)),
           ),
         );
+    const restored = new Set(
+      deliveryIds.filter((deliveryId) => this.#mailbox.getDelivery(deliveryId)?.delivery.status === "queued"),
+    );
+    if (restored.size === 0) return;
     const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
-    for (const message of snapshot.messages)
-      if (deliveryIds.includes(message.id)) {
-        delete message.steered;
-        this.#mailboxSync.syncDeliveryMessage(snapshot, message.id);
-      }
+    for (let index = snapshot.messages.length - 1; index >= 0; index -= 1)
+      if (restored.has(snapshot.messages[index]?.id ?? "")) snapshot.messages.splice(index, 1);
     this.#mailboxSync.syncMailboxMessages(snapshot);
     this.#mailboxSync.emitQueue(agentId);
   });
