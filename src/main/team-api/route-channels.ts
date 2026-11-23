@@ -13,6 +13,7 @@ import {
   isReleasedRoutineSchedule,
   parseChannelCommand,
   parseChannelRead,
+  settingLinkEvent,
 } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import {
@@ -24,6 +25,7 @@ import {
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_WAITS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { ChannelService } from "../../backend/channel-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -99,6 +101,7 @@ export async function routeChannels(
     requireVisibleChannel(channels, input.channelId, channelHiddenAgentIds);
     const seenSubtasks = capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY);
     const taskWaits = capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY) && input.beforeSequence === undefined;
+    const settingLinks = capabilities.has(SETTING_LINK_MARKERS_CAPABILITY);
     const newest = channels.store.pageWithoutExtent(input.channelId, input.beforeSequence, 100);
     const tasks =
       seenSubtasks && input.beforeSequence === undefined
@@ -120,7 +123,9 @@ export async function routeChannels(
         tasks,
         olderCursor,
         channel: peerChannel(newest.channel),
-        messages: messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)),
+        messages: messages.filter(
+          (item) => !hiddenAuthor(item, hiddenAgentIds) && (settingLinks || settingLinkEvent(item.message) === null),
+        ),
       };
       let extent: { olderCount: number; oldestAt?: string } | undefined;
       const sized = <Page extends typeof base>(value: Page) => {

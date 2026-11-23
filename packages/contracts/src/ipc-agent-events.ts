@@ -79,6 +79,7 @@ export type AgentEvent =
   | { type: "vault-changed" }
   | { type: "browser-profiles-changed" }
   | { type: "library-folders-changed" }
+  | { type: "workflow-folders-changed" }
   | { type: "usage-credits-changed" }
   | { type: "agent-session-settings-changed"; agentId: string }
   | { type: "message-pins-changed"; agentId: string }
@@ -223,6 +224,7 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
     case "vault-changed":
     case "browser-profiles-changed":
     case "library-folders-changed":
+    case "workflow-folders-changed":
     case "usage-credits-changed":
       return true;
     case "channel-memories-changed":

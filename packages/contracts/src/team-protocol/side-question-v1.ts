@@ -3,6 +3,7 @@ import { isDynamicRecord } from "../runtime-values";
 import { adminRoute, fields, identifier, list, type OptionalRouteCodec, string } from "./admin-wire";
 
 export const SIDE_QUESTION_CAPABILITY = "side-question-v1";
+export const SIDE_QUESTION_THREADS_CAPABILITY = "side-question-threads-v1";
 
 export const SIDE_QUESTION_ROUTES = {
   ask: "/v1/side-questions/ask",
@@ -16,14 +17,17 @@ export const SIDE_QUESTION_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new
   [
     SIDE_QUESTION_ROUTES.ask,
     adminRoute(
-      fields({
-        agentId: identifier,
-        question: string(SIDE_QUESTION_TEXT_LIMIT),
-        earlier: list(
-          fields({ question: string(SIDE_QUESTION_TEXT_LIMIT), answer: string(EARLIER_ANSWER_LIMIT) }),
-          EARLIER_TURNS_LIMIT,
-        ),
-      }),
+      fields(
+        {
+          agentId: identifier,
+          question: string(SIDE_QUESTION_TEXT_LIMIT),
+          earlier: list(
+            fields({ question: string(SIDE_QUESTION_TEXT_LIMIT), answer: string(EARLIER_ANSWER_LIMIT) }),
+            EARLIER_TURNS_LIMIT,
+          ),
+        },
+        { taskId: identifier },
+      ),
       fields({ answer: string(SIDE_QUESTION_TEXT_LIMIT) }),
     ),
   ],

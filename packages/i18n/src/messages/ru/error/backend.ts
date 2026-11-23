@@ -90,6 +90,8 @@ export const messages = {
     "У участников этого канала ещё нет разговора для сжатия. Сожмите его после того, как участник ответит в канале.",
   "error.backend.channelCompactNotSupported":
     "Ни один участник этого канала не может сжимать по запросу. Участники, которые это поддерживают, сжимают контекст автоматически, когда он почти заполнен.",
+  "error.backend.channelCompactProviderUnavailable":
+    "Провайдер участников канала сейчас не работает. Обновите провайдеров, затем снова сожмите канал.",
   "error.backend.channelArchived": "Восстановите этот канал, прежде чем отправлять сообщения или менять задачи.",
   "error.backend.channelArchiveRunning": "Остановите текущую работу в этом канале, затем удалите его.",
   "error.backend.channelReferenceUnavailable": "Сообщение канала, на которое сделана ссылка, недоступно.",
@@ -228,7 +230,7 @@ export const messages = {
   "error.backend.agentWaitGone": "Это ожидание не открыто. Агент закрыл его, или кто-то его отменил.",
   "error.backend.agentWaitNoRequest": "Для продолжения ожиданию нужно сообщение. В этом ходе нет сообщения.",
   "error.backend.agentWaitOwnChatOnly":
-    "Открывайте ожидание только в своём чате. Задача канала или мессенджера не может ждать.",
+    "Открывайте ожидание в своём чате или в боковой ветке. Разговор канала или мессенджера не может ждать.",
   "error.backend.agentWaitNoteRequired": "Кратко укажите, для чего это ожидание.",
   "error.backend.agentWaitRoutineGone": "У этого агента нет регулярной задачи с таким id.",
   "error.backend.agentWaitNoRoutine":
@@ -246,8 +248,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot хранит не более {limit} серверов MCP.",
   "error.backend.mcpServerNameTaken": "Сервер MCP с именем {name} уже существует.",
   "error.backend.mcpServerInvalid": "OpenBot не может сохранить эту конфигурацию сервера MCP.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Имена заголовков не могут содержать пробелы и символы вроде : ( ) /. Используйте имя вроде Authorization, а ключ или токен укажите в поле «Значение».",
   "error.backend.mcpServerNoAnswer": "Сервер не ответил за {seconds} с.",
   "error.backend.mcpSignInNotAccepted": "Сервер не принял этот вход.",
+  "error.backend.mcpSignInGrantRefused":
+    "Сервер не принял вход. Войдите снова. Если проблема повторится, убедитесь, что ваш аккаунт находится на том же сайте или в том же регионе, что и это приложение.",
   "error.backend.mcpSignInAccountRefused":
     "Сервер отклонил аккаунт, с которым вы вошли. Проверьте, что у этого аккаунта есть доступ к сервису. Чтобы использовать другой аккаунт, выйдите и войдите снова.",
   "error.backend.mcpSignInClientRefused":
@@ -270,6 +276,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Этот сервер просит войти. Войдите в него в OpenBot на компьютере-хосте.",
   "error.backend.mcpSignInNeedsHttps":
     "Этот сервер просит войти, а OpenBot входит только по https. Измените URL на {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Этот сервер выполняет вход только по адресу {url}. Измените URL на этот адрес, затем войдите снова.",
   "error.backend.mcpSignInCancelled": "Вход отменён.",
   "error.backend.mcpSignInTimedOut": "Вход в браузере не был завершён.",
   "error.backend.mcpSignInRefused": "Страница входа отказала в доступе. Войдите снова.",
@@ -289,6 +297,8 @@ export const messages = {
     "Его инструмент {tool} использует формат входных данных, который этот провайдер не может прочитать. Агенты других провайдеров по-прежнему получают сервер.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} не может использовать MCP-сервер {name}: сервер требует входа. Откройте {name} в разделе Каталог, Приложения и выберите «Войти».",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} не может использовать MCP-сервер {name}: сервер требует ключ. Откройте {name} в разделе Каталог, Приложения, выберите «Изменить» и введите правильный ключ в разделе «Заголовки».",
   "error.backend.mcpServerFailedForProvider":
     "{provider} не может запустить MCP-сервер {name}. Откройте {name} в разделе Каталог, Приложения и выберите «Проверить подключение», чтобы увидеть причину.",
   "error.backend.mcpServerFailedInProvider":
@@ -336,6 +346,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "Папка не существует или уже удалена.",
   "error.backend.libraryFolderOtherAgent": "Файл можно поместить только в папку его агента.",
   "error.backend.libraryFolderMoveInvalid": "Эту папку нельзя туда переместить.",
+  "error.backend.workflowFolderLimit": "На сервере может быть не более {limit} папок рабочих процессов.",
+  "error.backend.workflowFolderPlacementLimit": "В папках слишком много рабочих процессов.",
   "error.backend.sectionNameDuplicate": "Названия разделов должны быть уникальными.",
   "error.backend.directMessageRequired": "Сначала напишите сообщение.",
   "error.backend.directMessageTooLong": "Личное сообщение может содержать не более {limit} символов.",
@@ -371,6 +383,7 @@ export const messages = {
     "Этот отчёт может отправить только приложение OpenBot на телефоне: оно добавляет версию и журнал поддержки телефона. Откройте этот чат на телефоне. Если вы видите это сообщение там, обновите приложение на телефоне.",
   "error.backend.takeoverInactive": "Этот перехват браузера больше не активен.",
   "error.backend.authSubmitting": "Отправка аутентификации уже выполняется.",
+  "error.backend.apiKeyListFailed": "OpenBot не удалось прочитать сохранённые ключи API.",
   "error.backend.apiKeySaveFailed": "OpenBot не удалось сохранить ключ API. Повторите попытку.",
   "error.backend.apiKeySaving": "Ключ API уже сохраняется.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -455,6 +468,7 @@ export const messages = {
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",
   "error.backend.taskToolInvalid": "Дайте задаче название не длиннее 120 символов и описание того, что нужно сделать.",
+  "error.backend.taskControlInvalid": "Укажите taskId задачи, которую вы запустили. Сообщению также нужен текст.",
   "error.backend.taskOwnChatOnly":
     "Задачу можно начать только из своего чата. Канал, диалог в мессенджере или другая задача не может её начать.",
   "error.backend.taskUnfinishedLimit":
@@ -462,5 +476,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "У этого агента открыто задач: {count}. Закройте задачу, затем начните или откройте другую.",
   "error.backend.taskRemoteUnsupported": "Задачи доступны только для агентов на этом компьютере.",
+  "error.backend.taskMessageFailed": "OpenBot не удалось отправить сообщение задаче. Повторите попытку позже.",
   "error.backend.taskStartFailed": "OpenBot не удалось запустить задачу. Выполните работу в этом ходе.",
 } as const satisfies PartialTranslation<typeof source>;

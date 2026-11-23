@@ -270,6 +270,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Ожидание. Хост выполняет столько ходов, сколько позволяет его память.",
   "mobile.server.threads.hold.agentBusy": "Ожидание завершения другой работы этого агента.",
   "mobile.server.threads.hold.oneTurn": "Ожидание. Провайдер этого агента выполняет один ход за раз.",
+  "mobile.server.threads.hold.signIn": "Ожидание. Нужно войти в провайдер этого агента.",
   "mobile.server.threads.offline": "Подключитесь к этому серверу, чтобы увидеть его ветки.",
   "mobile.server.threads.loading": "Загрузка веток…",
   "mobile.server.threads.loadFailed": "Не удалось загрузить ветки некоторых агентов.",
@@ -382,6 +383,7 @@ export const messages = {
   "mobile.server.route.timezone": "Часовой пояс",
   "mobile.server.route.personality": "Личность агента",
   "mobile.server.route.agents": "Агенты",
+  "mobile.server.route.voiceModel": "Распознавание речи",
   "mobile.server.settings.storage": "Хранилище",
   "mobile.server.route.storage": "Хранилище",
   "mobile.server.route.storageFiles": "Все файлы",
@@ -516,6 +518,19 @@ export const messages = {
     "Подключитесь к этому серверу как владелец или администратор, чтобы изменить его часовой пояс.",
   "mobile.server.settings.timezoneUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его часовой пояс.",
+  "mobile.server.settings.voiceModelDescription":
+    "Агенты на этом сервере используют эту модель, чтобы расшифровывать звук видео без субтитров.",
+  "mobile.server.settings.voiceModelLoading": "Загрузка распознавания речи…",
+  "mobile.server.settings.voiceModelLoadFailed": "Не удалось загрузить модель распознавания речи сервера.",
+  "mobile.server.settings.voiceModelSaveFailed": "Не удалось изменить модель распознавания речи. Попробуйте ещё раз.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь распознавание речи.",
+  "mobile.server.settings.voiceModelReady": "Готово",
+  "mobile.server.settings.voiceModelDownloading": "Загрузка: {percent}",
+  "mobile.server.settings.voiceModelSize": "Загрузка {size}",
+  "mobile.server.settings.voiceModelDownload": "Скачать",
+  "mobile.server.settings.voiceModelCancel": "Остановить",
+  "mobile.server.settings.voiceModelRemove": "Удалить",
   "mobile.server.settings.keySection": "Ключ сервера",
   "mobile.server.settings.keyChanged": "Последнее изменение",
   "mobile.server.settings.keyChange": "Сменить ключ",
@@ -613,6 +628,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Добавить агентов",
   "mobile.server.browserProfiles.agentsHint":
     "Нажатие назначает агенту этот профиль или возвращает его в общий профиль. Изменение закрывает открытые вкладки агента.",
+  "mobile.server.browserProfiles.movedNote":
+    "Входы на сайты остаются в старом профиле. Перемещённому агенту нужно снова войти на эти сайты.",
   "mobile.server.browserProfiles.clear": "Очистить данные",
   "mobile.server.browserProfiles.clearTitle": "Очистить данные профиля {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -998,7 +1015,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
+    "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1242,10 +1259,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Не удалось изменить модели. Попробуйте ещё раз.",
   "mobile.server.providers.promptCache": "Кеш промптов",
   "mobile.server.providers.promptCacheHint":
-    "Сколько Claude хранит контекст агента в кеше между ходами. Изменение применяется при следующем запуске Claude.",
-  "mobile.server.providers.promptCacheDefault": "По умолчанию Claude Code",
+    "Как долго Claude и Pi хранят контекст агента в кэше между ходами. Изменение применяется при следующем запуске провайдера.",
+  "mobile.server.providers.promptCacheDefault": "По умолчанию у провайдера",
   "mobile.server.providers.promptCacheHour": "1 час",
   "mobile.server.providers.promptCacheLoadFailed": "Не удалось загрузить время кеша промптов этого сервера.",
+  "mobile.server.providers.cacheExpiryCompaction": "Сжимать до истечения кэша",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Когда чат с контекстом от 200K токенов простаивает с кэшем на 1 час, агент сжимает контекст до истечения кэша. Тогда следующее сообщение не читает весь контекст заново без кэша.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Не удалось загрузить настройку сжатия этого сервера.",
   "mobile.server.providers.compactWindow": "Сжимать чаты при",
   "mobile.server.providers.compactWindowHint":
     "Claude Code кратко излагает старые ходы чата, когда чат достигает этого размера. Меньше — ходы быстрее и дешевле. Больше — сохраняется больше деталей. Модель с меньшим окном сжимает на своём пределе.",
@@ -1300,6 +1321,8 @@ export const messages = {
     "ChatGPT использует этот ключ, а не ваш план ChatGPT. OpenAI списывает оплату за каждый запрос с ключа. Расход по плану не показывается.",
   "mobile.server.providers.codexKeyAlternative":
     "Или войдите с API-ключом OpenAI. OpenAI списывает оплату за каждый запрос с ключа.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse использует этот ключ, а не ваш вход. Чтобы использовать вход, удалите ключ.",
   "mobile.server.providers.sectionUse": "Использование",
   "mobile.server.providers.unused": "Не используется агентами",
   "mobile.server.providers.usedByCount": {
@@ -1438,6 +1461,7 @@ export const messages = {
     other: "{count} ч",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} мин",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Обновления",
   "mobile.server.settings.updateAvailable": "Доступно обновление",
   "mobile.server.route.updates": "Обновления",
@@ -1875,4 +1899,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Не удалось принять передачу",
   "mobile.server.ownerTransfer.declineFailed": "Не удалось отклонить передачу",
   "mobile.server.ownerTransfer.tryAgain": "Попробуйте позже.",
+  "mobile.server.providers.updateAll": "Обновить все",
+  "mobile.server.providers.updateAllFailed": "Некоторые обновления не запустились. Попробуйте ещё раз.",
 } as const satisfies PartialTranslation<typeof source>;

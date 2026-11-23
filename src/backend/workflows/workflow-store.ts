@@ -6,6 +6,7 @@ import {
   nodeAgentId,
   type RoutineSchedule,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
+  WORKFLOW_FORMAT,
   WORKFLOW_MAX_VERSIONS,
   WORKFLOW_RUN_STATUSES,
   WORKFLOW_VERSION_KINDS,
@@ -19,7 +20,9 @@ import {
   type WorkflowTriggerState,
   type WorkflowVersion,
   type WorkflowVersionKind,
+  workflowGraphFormat,
   workflowGraphProblem,
+  workflowUnknownFields,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isOneOf } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -121,23 +124,31 @@ export class WorkflowStore {
       this.#database.connection.prepare(`${SUMMARY_SELECT} WHERE w.workflow_id = ?`).get(workflowId),
     );
     if (!row) return null;
+    const graph = this.#graph(workflowId, requiredStringColumn(row, "strokes_json"));
     return {
       summary: toSummary(row),
-      graph: this.#graph(workflowId, requiredStringColumn(row, "strokes_json")),
+      graph,
       revision: requiredNumberColumn(row, "graph_revision"),
       triggers: this.#triggers(workflowId),
+      format: workflowGraphFormat(graph),
+      hostFormat: WORKFLOW_FORMAT,
     };
   }
 
-  create(input: { title: string; graph?: WorkflowGraph }, now = new Date()): WorkflowDetail {
+  create(
+    input: { title: string; graph?: WorkflowGraph; paused?: true },
+    now = new Date(),
+    values: "new" | "saved" = "new",
+  ): WorkflowDetail {
     const graph = input.graph ?? { nodes: [], edges: [], strokes: [] };
     assertRunnable(graph);
+    if (values === "new") assertKnownValues(graph, () => this.#savedNodes(graph.nodes));
     const workflowId = this.#createId();
     return this.#transaction(() => {
       const at = now.toISOString();
       this.#database.connection
-        .prepare("INSERT INTO workflows (workflow_id, title, created_at, updated_at) VALUES (?, ?, ?, ?)")
-        .run(workflowId, input.title.trim(), at, at);
+        .prepare("INSERT INTO workflows (workflow_id, title, paused, created_at, updated_at) VALUES (?, ?, ?, ?, ?)")
+        .run(workflowId, input.title.trim(), input.paused ? 1 : 0, at, at);
       this.#writeGraph(workflowId, graph, now);
       return this.#requireDetail(workflowId);
     });
@@ -147,6 +158,14 @@ export class WorkflowStore {
     const result = this.#database.connection
       .prepare("UPDATE workflows SET title = ?, updated_at = ? WHERE workflow_id = ?")
       .run(title.trim(), now.toISOString(), workflowId);
+    if (Number(result.changes) === 0) throw missing();
+    return this.#requireDetail(workflowId).summary;
+  }
+
+  setPaused(workflowId: string, paused: boolean, now = new Date()): WorkflowSummary {
+    const result = this.#database.connection
+      .prepare("UPDATE workflows SET paused = ?, updated_at = ? WHERE workflow_id = ?")
+      .run(paused ? 1 : 0, now.toISOString(), workflowId);
     if (Number(result.changes) === 0) throw missing();
     return this.#requireDetail(workflowId).summary;
   }
@@ -169,6 +188,7 @@ export class WorkflowStore {
     return this.#transaction(() => {
       const revision = this.#revision(workflowId);
       if (revision !== baseRevision) return { ok: false, conflict: this.#requireDetail(workflowId) };
+      assertKnownValues(graph, () => this.#requireDetail(workflowId).graph.nodes);
       this.#writeGraph(workflowId, graph, now);
       const next = this.#bumpRevision(workflowId, now);
       const last = this.#lastVersionAt(workflowId);
@@ -273,6 +293,16 @@ export class WorkflowStore {
     );
     if (newest && requiredNumberColumn(newest, "graph_revision") === revision) return;
     this.#addVersion(workflowId, revision, "run", graph, now);
+  }
+
+  #savedNodes(nodes: readonly WorkflowNode[]): WorkflowNode[] {
+    const ids = [...new Set(nodes.map((node) => node.id))];
+    if (ids.length === 0) return [];
+    return databaseRows(
+      this.#database.connection
+        .prepare(`SELECT * FROM workflow_nodes WHERE node_id IN (${ids.map(() => "?").join(", ")})`)
+        .all(...ids),
+    ).map(toNode);
   }
 
   #graph(workflowId: string, strokesJson: string): WorkflowGraph {
@@ -453,7 +483,7 @@ export class WorkflowStore {
 }
 
 const SUMMARY_SELECT = `
-  SELECT w.workflow_id, w.title, w.graph_revision, w.strokes_json, w.updated_at,
+  SELECT w.workflow_id, w.title, w.graph_revision, w.strokes_json, w.updated_at, w.paused,
     (SELECT COUNT(*) FROM workflow_nodes AS n
       WHERE n.workflow_id = w.workflow_id AND n.kind NOT IN ('text', 'note', 'shape')) AS steps,
     (SELECT r.status FROM workflow_runs AS r WHERE r.workflow_id = w.workflow_id
@@ -465,6 +495,19 @@ const SUMMARY_SELECT = `
 function assertRunnable(graph: WorkflowGraph): void {
   const problem = workflowGraphProblem(graph);
   if (problem) throw new WorkflowStoreError({ code: "refused", message: sourceText(PROBLEM_TEXT[problem]) });
+}
+
+function assertKnownValues(graph: WorkflowGraph, saved: () => readonly WorkflowNode[]): void {
+  const unknown = graph.nodes.flatMap((node) =>
+    workflowUnknownFields(node.kind, node.fields).map(({ name }) => ({ node, name })),
+  );
+  if (unknown.length === 0) return;
+  const before = saved();
+  const changed = unknown.some(
+    ({ node, name }) =>
+      !before.some((old) => old.id === node.id && old.kind === node.kind && old.fields[name] === node.fields[name]),
+  );
+  if (changed) throw new WorkflowStoreError({ code: "refused", message: sourceText("error.workflow.unknownValue") });
 }
 
 function missing(): WorkflowStoreError {
@@ -553,6 +596,7 @@ function toSummary(row: DynamicRecord): WorkflowSummary {
     steps: requiredNumberColumn(row, "steps"),
     updatedAt: requiredStringColumn(row, "updated_at"),
     lastRun: isOneOf(WORKFLOW_RUN_STATUSES, status) && at !== null ? { status, at } : null,
+    ...(requiredNumberColumn(row, "paused") === 1 ? { paused: true } : {}),
   };
 }
 

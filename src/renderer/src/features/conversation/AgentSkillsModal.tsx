@@ -1,3 +1,9 @@
+import {
+  type AgentProviderRef,
+  agentProviderDescriptor,
+  isKnownAgentProvider,
+  MANAGED_SKILL_FOLDERS,
+} from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { FilePreview, InstalledSkill, MarketplaceSkillDetail } from "@openbot/contracts/ipc";
 import { assignedSkillCount, isFolderSkill, isSkillEnabled, userAssignedSkills } from "@openbot/contracts/ipc";
@@ -32,6 +38,7 @@ interface AgentSkillsModalProps {
   selectionRequest?: { skillId: string } | null | undefined;
   agentId: string;
   agentName: string;
+  agentProvider: AgentProviderRef;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCountChange: (count: number) => void;
@@ -186,17 +193,19 @@ export function AgentSkillsModal(props: AgentSkillsModalProps) {
   }
 
   function detailCall(skill: InstalledSkill): (() => Promise<SkillDetail>) | null {
+    const readHostFile = props.previewWorkspaceFile;
+    const listing = listingCall(skill);
+    if (readHostFile && (!isFolderSkill(skill) || skill.location))
+      return () => hostSkillDetail(skill, props.agentProvider, readHostFile, listing);
+    return listing;
+  }
+
+  function listingCall(skill: InstalledSkill): (() => Promise<SkillDetail>) | null {
     const catalogPort = catalogCalls();
-    const local = skill.skillId.startsWith("local-skill-");
-    const readHostFile = localLibrary() ? undefined : props.previewWorkspaceFile;
-    if (readHostFile && (!isFolderSkill(skill) || skill.location)) {
-      const listing = catalogPort && !local && !isFolderSkill(skill) ? () => catalogPort.get(skill.skillId) : null;
-      return () => hostSkillDetail(skill, readHostFile, listing);
-    }
-    if (isFolderSkill(skill) || !catalogPort || (!localLibrary() && local)) return null;
-    return local
-      ? () => skillsPort().skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion })
-      : () => catalogPort.get(skill.skillId);
+    if (!catalogPort || isFolderSkill(skill)) return null;
+    if (!skill.skillId.startsWith("local-skill-")) return () => catalogPort.get(skill.skillId);
+    if (!localLibrary()) return null;
+    return () => skillsPort().skills.localGet({ skillId: skill.skillId, revision: skill.installedVersion });
   }
 
   async function openDetail(skill: InstalledSkill): Promise<void> {
@@ -703,21 +712,29 @@ function SkillMoreMenu(props: {
   );
 }
 
-function hostSkillPaths(skill: InstalledSkill): string[] {
+function hostSkillPaths(skill: InstalledSkill, provider: AgentProviderRef): string[] {
   if (isFolderSkill(skill)) return [`${skill.location}/SKILL.md`];
   if (!isSkillEnabled(skill)) return [`.openbot/skills-disabled/${skill.slug}/SKILL.md`];
-  return [".agents/skills", ".claude/skills"].map((folder) => `${folder}/${skill.slug}/SKILL.md`);
+  return installedSkillFolders(provider).map((folder) => `${folder}/${skill.slug}/SKILL.md`);
+}
+
+function installedSkillFolders(provider: AgentProviderRef): string[] {
+  if (!isKnownAgentProvider(provider)) return [...MANAGED_SKILL_FOLDERS];
+  const reads = agentProviderDescriptor(provider).skillFolders;
+  const rank = (folder: string) => (reads.includes(folder) ? reads.indexOf(folder) : reads.length);
+  return MANAGED_SKILL_FOLDERS.toSorted((left, right) => rank(left) - rank(right));
 }
 
 async function hostSkillDetail(
   skill: InstalledSkill,
+  provider: AgentProviderRef,
   readHostFile: (path: string) => Promise<FilePreview>,
   listing: (() => Promise<SkillDetail>) | null,
 ): Promise<SkillDetail> {
   const pendingEntry = listing?.().catch(() => null) ?? Promise.resolve(null);
   let file: FilePreview | null = null;
   let failure: unknown;
-  for (const path of hostSkillPaths(skill)) {
+  for (const path of hostSkillPaths(skill, provider)) {
     try {
       file = await readHostFile(path);
       break;

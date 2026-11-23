@@ -228,6 +228,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "In attesa. L'host esegue tanti turni quanti ne consente la sua memoria.",
   "mobile.server.threads.hold.agentBusy": "In attesa che finisca altro lavoro di questo agente.",
   "mobile.server.threads.hold.oneTurn": "In attesa. Il provider di questo agente esegue un turno alla volta.",
+  "mobile.server.threads.hold.signIn": "In attesa. Il provider di questo agente richiede l’accesso.",
   "mobile.server.threads.offline": "Connettiti a questo server per vedere i suoi thread.",
   "mobile.server.threads.loading": "Caricamento dei thread…",
   "mobile.server.threads.loadFailed": "Impossibile caricare i thread di alcuni agenti.",
@@ -334,6 +335,7 @@ export const messages = {
   "mobile.server.route.timezone": "Fuso orario",
   "mobile.server.route.personality": "Personalità dell’agente",
   "mobile.server.route.agents": "Agenti",
+  "mobile.server.route.voiceModel": "Riconoscimento vocale",
   "mobile.server.settings.storage": "Archiviazione",
   "mobile.server.route.storage": "Archiviazione",
   "mobile.server.route.storageFiles": "Tutti i file",
@@ -459,6 +461,19 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Connettiti a questo server come proprietario o admin per cambiarne il fuso orario.",
   "mobile.server.settings.timezoneUnsupported": "Aggiorna OpenBot su questo server per cambiarne qui il fuso orario.",
+  "mobile.server.settings.voiceModelDescription":
+    "Gli agenti su questo server usano questo modello per trascrivere l’audio dei video senza sottotitoli.",
+  "mobile.server.settings.voiceModelLoading": "Caricamento del riconoscimento vocale…",
+  "mobile.server.settings.voiceModelLoadFailed": "Impossibile caricare il modello di riconoscimento vocale del server.",
+  "mobile.server.settings.voiceModelSaveFailed": "Impossibile cambiare il modello di riconoscimento vocale. Riprova.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Aggiorna OpenBot su questo server per cambiarne qui il riconoscimento vocale.",
+  "mobile.server.settings.voiceModelReady": "Pronto",
+  "mobile.server.settings.voiceModelDownloading": "Download: {percent}",
+  "mobile.server.settings.voiceModelSize": "Download di {size}",
+  "mobile.server.settings.voiceModelDownload": "Scarica",
+  "mobile.server.settings.voiceModelCancel": "Ferma download",
+  "mobile.server.settings.voiceModelRemove": "Rimuovi",
   "mobile.server.settings.keySection": "Chiave del server",
   "mobile.server.settings.keyChanged": "Ultima modifica",
   "mobile.server.settings.keyChange": "Cambia chiave",
@@ -542,6 +557,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Aggiungi agenti",
   "mobile.server.browserProfiles.agentsHint":
     "Un tocco dà questo profilo all'agente o lo riporta al profilo condiviso. Una modifica chiude le schede aperte dell'agente.",
+  "mobile.server.browserProfiles.movedNote":
+    "Gli accessi ai siti restano nel profilo precedente. Un agente spostato deve accedere di nuovo a questi siti.",
   "mobile.server.browserProfiles.clear": "Cancella dati",
   "mobile.server.browserProfiles.clearTitle": "Cancellare i dati di {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -896,7 +913,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "La tua chat «Messaggio a te stesso» e le persone che autorizzi raggiungono OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "Le persone che autorizzi raggiungono OpenBot. Le altre ricevono un codice da darti.",
+    "La tua chat «Messaggio a te stesso» e le persone che autorizzi raggiungono OpenBot. Le altre ricevono un codice da darti.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp ha rimosso questo server dai dispositivi collegati. Collega di nuovo il numero.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1137,11 +1154,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Impossibile modificare i modelli. Riprova.",
   "mobile.server.providers.promptCache": "Cache dei prompt",
   "mobile.server.providers.promptCacheHint":
-    "Per quanto tempo Claude tiene in cache il contesto di un agente tra i turni. La modifica vale al prossimo avvio di Claude.",
-  "mobile.server.providers.promptCacheDefault": "Predefinito di Claude Code",
+    "Per quanto tempo Claude e Pi tengono il contesto di un agente nella cache tra un turno e l’altro. La modifica si applica al prossimo avvio del provider.",
+  "mobile.server.providers.promptCacheDefault": "Predefinito del provider",
   "mobile.server.providers.promptCacheHour": "1 ora",
   "mobile.server.providers.promptCacheLoadFailed":
     "Impossibile caricare la durata della cache dei prompt di questo server.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compatta prima della scadenza della cache",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Quando una chat con 200K o più token di contesto è inattiva con una cache di 1 ora, l’agente compatta il contesto prima della scadenza della cache. Così il messaggio successivo non rilegge tutto il contesto senza cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Impossibile caricare l’impostazione di compattazione di questo server.",
   "mobile.server.providers.compactWindow": "Compatta le chat a",
   "mobile.server.providers.compactWindowHint":
     "Claude Code riassume i turni più vecchi di una chat quando la chat raggiunge questa dimensione. Più basso mantiene i turni rapidi ed economici. Più alto conserva più dettagli. Un modello con una finestra più piccola compatta al proprio limite.",
@@ -1197,6 +1219,8 @@ export const messages = {
     "ChatGPT usa questa chiave, non il tuo piano ChatGPT. OpenAI addebita ogni richiesta alla chiave. L'utilizzo del piano non viene mostrato.",
   "mobile.server.providers.codexKeyAlternative":
     "Oppure accedi con una chiave API di OpenAI. OpenAI addebita ogni richiesta alla chiave.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse usa questa chiave, non il tuo accesso. Per usare il tuo accesso, rimuovi la chiave.",
   "mobile.server.providers.sectionUse": "Utilizzo",
   "mobile.server.providers.unused": "Nessun agente lo usa",
   "mobile.server.providers.usedByCount": { one: "1 agente lo usa", other: "{count} agenti lo usano" },
@@ -1315,6 +1339,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 ore",
   "mobile.server.planLimits.window.hours": { one: "{count} ora", other: "{count} ore" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Aggiornamenti",
   "mobile.server.settings.updateAvailable": "Aggiornamento disponibile",
   "mobile.server.route.updates": "Aggiornamenti",
@@ -1686,4 +1711,6 @@ export const messages = {
   "mobile.server.ownerTransfer.acceptFailed": "Impossibile accettare il trasferimento",
   "mobile.server.ownerTransfer.declineFailed": "Impossibile rifiutare il trasferimento",
   "mobile.server.ownerTransfer.tryAgain": "Riprova più tardi.",
+  "mobile.server.providers.updateAll": "Aggiorna tutti",
+  "mobile.server.providers.updateAllFailed": "Alcuni aggiornamenti non sono partiti. Riprova.",
 } as const satisfies PartialTranslation<typeof source>;

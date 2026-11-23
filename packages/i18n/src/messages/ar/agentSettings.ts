@@ -285,6 +285,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "السماح للوكيل ببدء دردشة جديدة عندما تطول دردشته. يحفظ ملاحظات أولًا.",
   "agentSettings.quickAcknowledgement.title": "عرض الخطة قبل المهام الطويلة",
   "agentSettings.quickAcknowledgement.description": "قبل مهمة طويلة، يعرض الوكيل خطته.",
+  "agentSettings.builtinMemory.title": "ذاكرة OpenBot",
+  "agentSettings.builtinMemory.description":
+    "يحفظ الوكيل ذكرياته ويقرؤها. أوقفها لاستخدام تطبيق ذاكرة فقط، مثل Mem0. تبقى الذكريات المحفوظة.",
   "agentSettings.browserProfile.label": "ملف تعريف المتصفح",
   "agentSettings.browserProfile.shared": "مشترك",
   "agentSettings.browserProfile.agent": "هذا الوكيل فقط",
@@ -294,6 +297,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "يحتفظ كل ملف تعريف بعمليات تسجيل الدخول وملفات تعريف الارتباط الخاصة به. يؤدي التغيير إلى إغلاق علامات التبويب المفتوحة لدى الوكيل.",
   "agentSettings.browserProfile.manage": "إدارة",
+  "agentSettings.browserProfile.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل الدخول إلى هذه المواقع مرة أخرى.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "تعمل عملية {provider} كاملةً في بيئة معزولة، لذا تفشل الكتابة خارجها. متاح على macOS فقط.",
 } as const satisfies PartialTranslation<typeof source>;

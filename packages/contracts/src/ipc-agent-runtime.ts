@@ -134,6 +134,9 @@ function isRuntimePathList(value: unknown): value is string[] {
   );
 }
 
+const AGENT_CONTEXT_COMPACTION_REASONS = ["cacheExpiry"] as const;
+export type AgentContextCompactionReason = (typeof AGENT_CONTEXT_COMPACTION_REASONS)[number];
+
 export const AGENT_CONTEXT_CATEGORIES = [
   "systemPrompt",
   "memoryFiles",
@@ -169,6 +172,7 @@ export interface AgentContextState {
     beforeTokens?: number;
     afterTokens?: number;
     expectedMs?: number;
+    reason?: AgentContextCompactionReason;
   } | null;
 }
 
@@ -208,7 +212,8 @@ function isAgentContextState(value: unknown): value is AgentContextState {
         isOneOf(["running", "completed", "failed"] as const, compaction.status) &&
         (compaction.beforeTokens === undefined || isContextCount(compaction.beforeTokens)) &&
         (compaction.afterTokens === undefined || isContextCount(compaction.afterTokens)) &&
-        (compaction.expectedMs === undefined || isContextCount(compaction.expectedMs))))
+        (compaction.expectedMs === undefined || isContextCount(compaction.expectedMs)) &&
+        (compaction.reason === undefined || isOneOf(AGENT_CONTEXT_COMPACTION_REASONS, compaction.reason))))
   );
 }
 
@@ -325,7 +330,9 @@ export function isAgentRuntimeSnapshot(value: unknown): value is AgentRuntimeSna
   );
 }
 
-function isRuntimePrompt(value: unknown): value is AgentRuntimeSnapshot["pendingPrompts"][number] {
+export type AgentRuntimePrompt = AgentRuntimeSnapshot["pendingPrompts"][number];
+
+export function isRuntimePrompt(value: unknown): value is AgentRuntimePrompt {
   return (
     isDynamicRecord(value) &&
     isRequestId(value.requestId) &&

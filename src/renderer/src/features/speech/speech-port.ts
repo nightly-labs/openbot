@@ -6,6 +6,7 @@ export interface SpeechPort {
     | "getSpeechSettings"
     | "setSpeechSettings"
     | "getSpeechModelStatus"
+    | "getModelStatuses"
     | "downloadSpeechModel"
     | "onSpeechModelStatus"
     | "speak"

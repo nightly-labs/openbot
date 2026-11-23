@@ -81,20 +81,36 @@ export function backupModelOptions(
   source: BackupModelSource,
   exclude: readonly AgentModelChoice[],
 ): BackupModelOption[] {
-  return source.modelOptions.flatMap((model) => {
+  const option = (choice: AgentModelChoice) =>
+    exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [backupModelOption(choice, source)];
+  const shared = source.modelOptions.flatMap((model) => {
     const modelProvider = model.provider;
     if (!isKnownAgentProvider(modelProvider)) return [];
     const provider = source.providers?.find((status) => status.id === modelProvider);
     const accountIds = provider?.accounts?.map((account) => account.id) ?? [DEFAULT_PROVIDER_ACCOUNT_ID];
-    return accountIds.flatMap((accountId) => {
-      const choice: AgentModelChoice = {
+    return accountIds.flatMap((accountId) =>
+      option({
         provider: modelProvider,
         model: model.id,
         ...(accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: accountId }),
-      };
-      return exclude.some((other) => sameAgentModelChoice(other, choice)) ? [] : [backupModelOption(choice, source)];
-    });
+      }),
+    );
   });
+  const own = (source.providers ?? []).flatMap((provider) => {
+    const providerId = provider.id;
+    if (!isKnownAgentProvider(providerId)) return [];
+    return (provider.accounts ?? []).flatMap((account) =>
+      account.id === DEFAULT_PROVIDER_ACCOUNT_ID
+        ? []
+        : (account.models ?? [])
+            .filter(
+              (model) =>
+                !source.modelOptions.some((listed) => listed.provider === providerId && listed.id === model.id),
+            )
+            .flatMap((model) => option({ provider: providerId, model: model.id, providerAccountId: account.id })),
+    );
+  });
+  return [...shared, ...own];
 }
 
 function useOptionLabel() {

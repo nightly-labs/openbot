@@ -350,6 +350,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "لا نماذج متاحة لهذا المزوّد.",
   "mobile.agent.runtime.searchModels": "البحث في النماذج",
   "mobile.agent.runtime.noMatches": "لا نماذج تطابق بحثك.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "لا توجد نماذج تطابق بحثك. يمكن أن تخفي إعدادات الخصوصية والمزوّدين والحواجز الوقائية في openrouter.ai بعض النماذج من هذه القائمة.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "لا يعمل هذا المزوّد مع «مساحة العمل فقط» على Windows وLinux. لاستخدامه، غيّر «الأذونات» أولًا.",
   "mobile.agent.runtime.usageLimit": "تم بلوغ حد الاستخدام",
@@ -431,9 +433,14 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "إدارة ملفات التعريف",
   "mobile.agent.browserProfile.footer":
     "يحتفظ كل ملف تعريف بتسجيلات الدخول وملفات تعريف الارتباط الخاصة به. يؤدي التغيير إلى إغلاق علامات التبويب المفتوحة للوكيل.",
+  "mobile.agent.browserProfile.movedNote":
+    "تبقى عمليات تسجيل الدخول إلى المواقع في ملف التعريف القديم. يجب أن يسجّل الوكيل الدخول إلى هذه المواقع مرة أخرى.",
   "mobile.agent.browserProfile.saveFailed": "تعذّر على OpenBot تغيير ملف تعريف المتصفح للوكيل.",
   "mobile.agent.planCard.label": "عرض الخطة قبل المهام الطويلة",
   "mobile.agent.planCard.footer": "قبل مهمة طويلة، يعرض الوكيل خطته. يبدأ بعد 10 ث، أو عندما تضغط «بدء».",
+  "mobile.agent.builtinMemory.label": "ذاكرة OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "يحفظ الوكيل ذكرياته ويقرؤها. أوقفها لاستخدام تطبيق ذاكرة فقط، مثل Mem0. تبقى الذكريات المحفوظة.",
   "mobile.agent.workspace.title": "مجلد مساحة العمل",
   "mobile.agent.workspace.footer": "مجلد هذا الوكيل على حاسوب المضيف.",
   "mobile.agent.advanced.behavior": "السلوك",
@@ -527,6 +534,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "لا يستطيع هذا المضيف نشر الوكلاء من جهاز بعيد.",
   "mobile.agent.usage.tokensWithoutCacheReads": "الرموز دون قراءات ذاكرة التخزين المؤقت",
   "mobile.agent.usage.estimatedCost": "التكلفة المقدّرة",
+  "mobile.agent.usage.noCostEstimate": "لا يوجد تقدير للتكلفة",
   "mobile.agent.usage.daily": "الاستخدام اليومي",
   "mobile.agent.usage.tokens": "الرموز",
   "mobile.agent.usage.cost": "التكلفة",
@@ -673,7 +681,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "لا دردشة مفتوحة",
   "mobile.agent.home.noChatOpenBody": "اختر دردشة من القائمة.",
   "mobile.agent.home.chatListWidth": "عرض قائمة الدردشات",
-  "mobile.agent.home.serverTitle": "{name}، فتح الخوادم",
   "mobile.agent.home.waiting": "في انتظار الاتصال",
   "mobile.agent.home.waitingBody": "ستُحمّل قائمة الوكلاء بعد اتصال هذا الخادم.",
   "mobile.agent.home.noAgents": "لا وكلاء على هذا الخادم",

@@ -13,7 +13,9 @@ export interface RouteWake {
 
 export type RouteWaker = (route: IngressRoute, wake: boolean) => Effect.Effect<RouteWake | null>;
 
-type OfflineOutcome = "queued" | "hosted" | "unavailable";
+type OfflineOutcome = "queued" | "hosted" | "unavailable" | "unlinked";
+
+const FAILED_LOOKUP: RouteWake = { hostId: null, state: "not_hosted" };
 
 export interface IngressQueueLimits {
   ttlMilliseconds: number;
@@ -114,6 +116,7 @@ export class IngressQueue {
     const order = ++this.#order;
     if (!this.#waker) return "unavailable";
     const wake = yield* this.#check(route, routeKey, wakes);
+    if (wake.hostId === null && wake !== FAILED_LOOKUP) return "unlinked";
     if (!wakes) return wake.state === "sleeping" || wake.state === "starting" ? "hosted" : "unavailable";
     if (wake.state !== "starting" || !wake.hostId) return "unavailable";
     return yield* this.#add(order, wake.hostId, route, routeKey, message, telegramCallback);
@@ -245,7 +248,7 @@ export class IngressQueue {
     this.#pending.set(routeKey, { answer: result, wake });
     const waker = this.#waker;
     const asked = waker ? yield* waker(route, wake) : null;
-    const answer: RouteWake = asked ?? { hostId: null, state: "not_hosted" };
+    const answer: RouteWake = asked ?? FAILED_LOOKUP;
     if (asked) {
       this.#routes.delete(routeKey);
       dropOldest(this.#routes, MAXIMUM_ROUTES);

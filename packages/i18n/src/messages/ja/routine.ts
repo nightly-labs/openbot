@@ -317,7 +317,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "渡す",
   "routine.webhook.giveSecretFailed": "署名シークレットを {name} に渡せませんでした。",
   "routine.webhook.secretGiven": "{name} が新しい署名シークレットを受け取りました。",
-  "routine.webhook.statusFailed": "ホストがリレーに接続しているか確認できませんでした。",
   "routine.settings.instruction": "指示",
   "routine.settings.instructionPlaceholderAgent": "このエージェントが行うことを説明してください。",
   "routine.settings.instructionPlaceholderChannel": "このチャンネルが行うことを説明してください。",

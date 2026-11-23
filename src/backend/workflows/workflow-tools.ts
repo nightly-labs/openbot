@@ -3,6 +3,7 @@ import {
   isGitHubRepositoryName,
   isRoutineSchedule,
   isWorkflowGraph,
+  lastJsonObject,
   WORKFLOW_BRANCHES,
   WORKFLOW_DISCORD_EVENTS,
   WORKFLOW_GITHUB_EVENTS,
@@ -12,7 +13,9 @@ import {
   WORKFLOW_PORT_TYPES,
   WORKFLOW_PORTS,
   WORKFLOW_SLACK_EVENTS,
+  WORKFLOW_STEP_NAME_FIELD,
   WORKFLOW_TELEGRAM_EVENTS,
+  type WorkflowAnswerProblem,
   type WorkflowEdge,
   type WorkflowGraph,
   type WorkflowNode,
@@ -21,11 +24,14 @@ import {
   type WorkflowRunDetail,
   type WorkflowStep,
   type WorkflowStepSettings,
-  workflowCatalogProvider,
+  workflowAnswerProblems,
+  workflowAnswerProblemText,
+  workflowCatalogSource,
   workflowGitHubTriggerRepositoryFields,
   workflowGraphProblemAt,
   workflowListField,
   workflowMediaKind,
+  workflowUnknownFields,
 } from "@openbot/contracts/ipc";
 
 import { isOneOf } from "@openbot/contracts/runtime-values";
@@ -35,6 +41,7 @@ import { z } from "zod";
 import { openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import { ToolOperationFailed, toolStep } from "../agent/tool-operation";
 import { githubTriggerRepositories } from "./github-matching";
+import { WORKFLOW_ANSWER_TOOL } from "./workflow-answers";
 import { nodeTimezone, runtimeFields } from "./workflow-graph";
 import { WorkflowStoreError } from "./workflow-store";
 import type { WorkflowsHandle } from "./workflows";
@@ -52,6 +59,7 @@ export type WorkflowTools = Pick<
   | "runs"
   | "run"
   | "stepSettings"
+  | "giveAnswer"
 >;
 
 const identifier = z.string().min(1).max(INPUT_LIMITS.identifier);
@@ -139,6 +147,53 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
   },
 ] as const;
 
+const answerToolSchema = z
+  .object({
+    answer: z
+      .union([z.object({}).catchall(z.unknown()), z.string().max(INPUT_LIMITS.workflowStepInput)])
+      .describe("the answer fields of the step as one JSON object"),
+  })
+  .strict();
+
+export const WORKFLOW_ANSWER_TOOL_DEFINITION = {
+  name: WORKFLOW_ANSWER_TOOL,
+  description:
+    "Only in a workflow step that asks for answer fields: give them as one JSON object. OpenBot checks them at once and tells you what to correct; then call it again. The last answer that fits is the result of the step.",
+  shape: answerToolSchema.shape,
+} as const;
+
+export const handleWorkflowAnswerTool = Effect.fn("WorkflowTools.answer")(function* (
+  args: unknown,
+  workflows: Pick<WorkflowTools, "giveAnswer"> | null,
+  deliveryIds: readonly string[],
+) {
+  const input = yield* toolStep(() => answerToolSchema.parse(args ?? {}));
+  if (!workflows) return yield* new ToolOperationFailed({ cause: new Error("Workflows are unavailable.") });
+  const value = typeof input.answer === "string" ? (lastJsonObject(input.answer) ?? input.answer) : input.answer;
+  const result = yield* workflows
+    .giveAnswer(deliveryIds, value)
+    .pipe(Effect.mapError((failure) => new ToolOperationFailed({ cause: failure.cause })));
+  switch (result.kind) {
+    case "saved":
+      return openBotToolResult({
+        status: "saved",
+        note: "OpenBot keeps this answer as the result of the step. Finish your turn.",
+      });
+    case "problems":
+      return openBotToolFailure(result.text);
+    case "free":
+      return openBotToolFailure("This workflow step asks for no answer fields. Give your answer as text.");
+    case "several":
+      return openBotToolFailure(
+        "This turn has more than one workflow step. End your reply with one JSON object with the answer fields.",
+      );
+    case "none":
+      return openBotToolFailure(
+        "Use this tool only in a workflow step that asks for answer fields. Give your answer as usual.",
+      );
+  }
+});
+
 export const WORKFLOW_TOOL_NAMES: ReadonlySet<string> = new Set(WORKFLOW_TOOL_DEFINITIONS.map((tool) => tool.name));
 
 export const WORKFLOW_CHANGE_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -185,8 +240,14 @@ function refuse(message: string): never {
   throw new WorkflowEditRefused(message);
 }
 
+function stepNameOf(node: WorkflowNode): string {
+  const name = node.fields[WORKFLOW_STEP_NAME_FIELD];
+  return typeof name === "string" ? name.trim() : "";
+}
+
 function readFields(node: WorkflowNode) {
-  const fields = runtimeFields(node);
+  const name = stepNameOf(node);
+  const fields = name ? { ...runtimeFields(node), [WORKFLOW_STEP_NAME_FIELD]: name } : runtimeFields(node);
   if (node.kind !== "trigger" || node.fields.trigger !== "github") return fields;
   const repositories = githubTriggerRepositories(node).join("\n");
   delete fields.repositories;
@@ -356,6 +417,14 @@ function checkTriggerEvent(node: WorkflowNode, op: number): void {
   refuse(`Op ${op}: the ${trigger} trigger ${given}. Set event to one of: ${events.join(", ")}.`);
 }
 
+function checkKnownValues(node: WorkflowNode, op: number, names: ReadonlySet<string>): void {
+  const unknown = workflowUnknownFields(node.kind, node.fields).find((field) => names.has(field.name));
+  if (!unknown) return;
+  refuse(
+    `Op ${op}: ${unknown.name} "${String(node.fields[unknown.name])}" is unknown. Set ${unknown.name} to one of: ${unknown.values.join(", ")}.`,
+  );
+}
+
 function checkAgentStepModel(kind: WorkflowNodeKind, patch: WorkflowOp["fields"], op: number): void {
   if (kind !== "agent") return;
   const given = STEP_MODEL_FIELDS.filter((name) => {
@@ -404,7 +473,7 @@ function checkMedia(node: WorkflowNode, op: number): void {
   if (media !== undefined && !isOneOf(MEDIA_KINDS, media))
     refuse(`Op ${op}: media "${String(media)}" is unknown. Set media to one of: ${MEDIA_KINDS.join(", ")}.`);
   if (model === undefined || model === "") return;
-  if (typeof model === "string" && workflowCatalogProvider(model)) return;
+  if (typeof model === "string" && workflowCatalogSource(model)) return;
   const kind = workflowMediaKind(node.fields);
   const known = WORKFLOW_MEDIA_MODELS.filter((item) => item.kinds.includes(kind)).map((item) => item.id);
   if (typeof model === "string" && known.includes(model)) return;
@@ -445,6 +514,12 @@ function applyWorkflowOps(
   const placed: { id: string; withFrom: boolean }[] = [];
   const pinned = new Set<string>();
   const eventChanges = new Map<string, number>();
+  const valueChanges = new Map<string, { op: number; names: ReadonlySet<string> }>();
+  const noteValues = (id: string, op: number, patch: WorkflowOp["fields"]) => {
+    if (!patch) return;
+    const before = valueChanges.get(id)?.names ?? [];
+    valueChanges.set(id, { op, names: new Set([...before, ...Object.keys(patch)]) });
+  };
 
   ops.forEach((op, index) => {
     const n = index + 1;
@@ -461,6 +536,7 @@ function applyWorkflowOps(
         const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled, scheduleTimezone);
         checkMedia(node, n);
         if (changesTriggerEvent(op.fields)) eventChanges.set(id, n);
+        noteValues(id, n, op.fields);
         const upstream = op.from === undefined ? undefined : resolve(op.from, n);
         node.at = op.at
           ? { x: clampCoordinate(op.at.x), y: clampCoordinate(op.at.y) }
@@ -483,6 +559,7 @@ function applyWorkflowOps(
         if (op.fields && ("media" in op.fields || "model" in op.fields)) checkMedia(next, n);
         replace(next);
         if (changesTriggerEvent(op.fields)) eventChanges.set(node.id, n);
+        noteValues(node.id, n, op.fields);
         return;
       }
       case "move": {
@@ -520,6 +597,8 @@ function applyWorkflowOps(
   for (const node of nodes) {
     const op = eventChanges.get(node.id);
     if (op !== undefined) checkTriggerEvent(node, op);
+    const changed = valueChanges.get(node.id);
+    if (changed !== undefined) checkKnownValues(node, changed.op, changed.names);
   }
   const empty = graph.nodes.every((node) => ANNOTATION_KINDS.has(node.kind));
   if (tidy || empty) {
@@ -609,11 +688,28 @@ function graphProblem(graph: WorkflowGraph): string | null {
   return `Edge ${found.edge.from} -> ${found.edge.to}: ${PROBLEM_TEXT[found.problem] ?? found.problem}.`;
 }
 
+function newAnswerProblems(
+  before: WorkflowGraph,
+  applied: { graph: WorkflowGraph; ids: Record<string, string> },
+): { refusal: string | null; notes: string[] } {
+  const known = new Set(workflowAnswerProblems(before).map((problem) => JSON.stringify(problem)));
+  const found = workflowAnswerProblems(applied.graph).filter((problem) => !known.has(JSON.stringify(problem)));
+  const named = (problem: WorkflowAnswerProblem) => {
+    const ref = Object.entries(applied.ids).find(([, id]) => id === problem.nodeId)?.[0];
+    return `Node ${ref ?? problem.nodeId}: ${workflowAnswerProblemText(problem)}`;
+  };
+  const refused = found.find((problem) => problem.code !== "template");
+  return {
+    refusal: refused ? named(refused) : null,
+    notes: found.filter((problem) => problem.code === "template").map(named),
+  };
+}
+
 function stepLabel(node: WorkflowNode | undefined) {
   if (!node) return {};
   const field = LABEL_FIELD[node.kind];
   const value = field === undefined ? undefined : node.fields[field];
-  const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+  const text = (stepNameOf(node) || (typeof value === "string" ? value : "")).replace(/\s+/g, " ").trim();
   return text
     ? { kind: node.kind, label: text.length > LABEL_CHARS ? `${text.slice(0, LABEL_CHARS)}…` : text }
     : { kind: node.kind };
@@ -642,6 +738,7 @@ function compactStep(step: WorkflowStep, nodes: ReadonlyMap<string, WorkflowNode
     nodeId: step.nodeId,
     ...stepLabel(nodes.get(step.nodeId)),
     status: step.status,
+    ...(step.waiting ? { waitsInAgentQueue: true } : {}),
     ...(step.branch ? { branch: step.branch } : {}),
     ...(step.error ? { error: step.error } : {}),
     ...(step.output ? { output: cut(step.output) } : {}),
@@ -681,13 +778,14 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
     let detail = yield* workflows.get(workflowId);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const applied = yield* toolStep(() => applyWorkflowOps(detail.graph, ops, agentIds, tidy, scheduleTimezone));
-      const problem = graphProblem(applied.graph);
+      const answers = newAnswerProblems(detail.graph, applied);
+      const problem = graphProblem(applied.graph) ?? answers.refusal;
       if (problem) return yield* toolStep(() => refuse(problem));
       const result = yield* workflows.saveGraph(
         { workflowId, baseRevision: detail.revision, graph: applied.graph },
         callerId,
       );
-      if (result.ok) return { revision: result.revision, ids: applied.ids };
+      if (result.ok) return { revision: result.revision, ids: applied.ids, notes: answers.notes };
       detail = result.conflict;
     }
     return yield* toolStep(() => refuse("The workflow changed during the edit. Read it and try again."));
@@ -728,16 +826,17 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
       const workflowId = input.workflowId;
       if (workflowId === undefined) {
         if (input.title === undefined) return openBotToolFailure("A new workflow needs a title.");
-        const applied = yield* toolStep(() =>
-          applyWorkflowOps({ nodes: [], edges: [], strokes: [] }, ops, agentIds, tidy, scheduleTimezone),
-        );
-        const problem = graphProblem(applied.graph);
+        const empty: WorkflowGraph = { nodes: [], edges: [], strokes: [] };
+        const applied = yield* toolStep(() => applyWorkflowOps(empty, ops, agentIds, tidy, scheduleTimezone));
+        const answers = newAnswerProblems(empty, applied);
+        const problem = graphProblem(applied.graph) ?? answers.refusal;
         if (problem) return openBotToolFailure(problem);
         const created = yield* workflows.create({ title: input.title, graph: applied.graph }, callerId);
         return openBotToolResult({
           workflowId: created.summary.id,
           revision: created.revision,
           ...(Object.keys(applied.ids).length > 0 ? { ids: applied.ids } : {}),
+          ...(answers.notes.length > 0 ? { notes: answers.notes } : {}),
         });
       }
       const saved = ops.length > 0 || tidy ? yield* save(workflowId, ops, tidy) : null;
@@ -747,6 +846,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
         workflowId,
         revision: saved.revision,
         ...(Object.keys(saved.ids).length > 0 ? { ids: saved.ids } : {}),
+        ...(saved.notes.length > 0 ? { notes: saved.notes } : {}),
       });
     }
     if (tool === "delete_workflow") {

@@ -6,6 +6,7 @@ import {
   agentNotificationLevelMap,
   type BrowserDisplayState,
   type ChannelSummary,
+  type ChatWindowTarget,
   type ClientAgentSummary,
   decodeChannelSummaries,
   type HiddenAgentsSnapshot,
@@ -73,6 +74,7 @@ type NotifyLevel = (
 export interface RendererForwarderDependencies {
   getMainWindow: () => BrowserWindow | null;
   getChatWindows: () => BrowserWindow[];
+  chatWindowTarget: (window: BrowserWindow) => ChatWindowTarget | null;
   getAgentService: () => Pick<AgentService, "listAgents" | "listHiddenAgents"> | null;
   getHostService: () => HostService | null;
   getHostAnalytics: () => HostAnalytics | null;
@@ -102,6 +104,7 @@ const CHANNEL_READ_GAP_MS = 250;
 export function createRendererForwarders({
   getMainWindow,
   getChatWindows,
+  chatWindowTarget,
   getAgentService,
   getHostService,
   getHostAnalytics,
@@ -123,12 +126,23 @@ export function createRendererForwarders({
     return window.isFocused() || getChatWindows().some((chatWindow) => chatWindow.isFocused());
   }
 
+  function windowShowsConversation(window: BrowserWindow, serverId: string, agentId: string | null): boolean {
+    if (agentId === null) return true;
+    const chat = chatWindowTarget(window);
+    return chat === null || (chat.serverId === serverId && chat.agentId === agentId);
+  }
+
   function forwardAgentEvent(serverId: string, event: AgentEvent, bufferedLive = false): void {
     if (serverId === LOCAL_SERVER_ID) getHostAnalytics()?.handleAgentEvent(event);
     const window = getMainWindow();
     if (!window || window.isDestroyed()) return;
     const scoped = bufferedLive ? { serverId, event, bufferedLive } : { serverId, event };
-    for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.agent.scopedEvent, scoped);
+    const agentId = conversationAgentId(event);
+    for (const target of appWindows()) {
+      if (windowShowsConversation(target, serverId, agentId)) {
+        sendToRenderer(target, IPC_ENDPOINTS.agent.scopedEvent, scoped);
+      }
+    }
     if (event.type === "browser-changed" && serverId !== LOCAL_SERVER_ID) {
       forwardBrowserDisplayState(serverId, { tabs: event.tabs, activeTabId: event.activeTabId });
     }
@@ -225,12 +239,15 @@ export function createRendererForwarders({
     if (level() !== "all" || newChannelReplies(previous, next).length === 0) return;
     const agentLookup = notificationAgents(serverId);
     const agents = agentLookup instanceof Promise ? await agentLookup : agentLookup;
+    const levelLookup = agentNotificationLevels(serverId);
+    const agentLevels = levelLookup instanceof Promise ? await levelLookup : levelLookup;
     const current = level();
     if (!current) return;
     const replies = channelReplyNotifications(previous, next, {
       agents,
       translate: getTranslate(),
       level: current,
+      agentLevels,
       redact: notificationPreviewEnabled() ? redactText : null,
     });
     for (const reply of replies) {
@@ -696,4 +713,18 @@ export function createRendererForwarders({
     forwardInstanceTransferUploadProgress,
     forwardOwnerTransfersChanged,
   };
+}
+
+function conversationAgentId(event: AgentEvent): string | null {
+  switch (event.type) {
+    case "conversation-delta":
+    case "turn-progress":
+      return event.agentId;
+    case "conversation":
+      return event.snapshot.agentId;
+    case "conversation-page":
+      return event.page.agentId;
+    default:
+      return null;
+  }
 }

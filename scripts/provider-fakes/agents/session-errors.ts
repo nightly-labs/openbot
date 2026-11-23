@@ -19,7 +19,23 @@ const LOAD_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => AcpErr
     data: { sessionId: "another-session" },
   }),
   internal: () => ({ code: -32603, message: "Internal error", data: { details: "database is locked" } }),
+  "invalid-id": (sessionId) => ({
+    code: -32603,
+    message: "Internal error",
+    data: { details: invalidSessionIdentifier(sessionId) },
+  }),
+  "invalid-id-other": () => ({
+    code: -32603,
+    message: "Internal error",
+    data: { details: invalidSessionIdentifier("another-session") },
+  }),
+  "unknown-id": (sessionId) => ({ code: -32602, message: `Session not found: ${sessionId}` }),
+  "unknown-id-other": () => ({ code: -32602, message: "Session not found: another-session" }),
 };
+
+function invalidSessionIdentifier(sessionId: string): string {
+  return `Invalid session identifier "${sessionId}".\n  Searched for sessions in /workspace/.chats.\n  Use --list-sessions to see available sessions.`;
+}
 
 const mode = process.env.FAKE_LOAD_ERROR ?? "";
 let sessions = 0;

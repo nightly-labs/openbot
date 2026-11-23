@@ -126,20 +126,31 @@ const stroke = fields({
 });
 const graph = fields({ nodes: list(node, 200), edges: list(edge, 400), strokes: list(stroke, 500) });
 const runStatus = token;
-const summary = fields({
-  id: identifier,
-  title,
-  steps: count,
-  updatedAt: timestamp,
-  lastRun: nullable(fields({ status: runStatus, at: timestamp })),
-});
+const paused: AdminDecoder = (value) => {
+  if (value !== true) throw new Error("Invalid workflow paused flag.");
+  return value;
+};
+export const workflowSummaryCodec = fields(
+  {
+    id: identifier,
+    title,
+    steps: count,
+    updatedAt: timestamp,
+    lastRun: nullable(fields({ status: runStatus, at: timestamp })),
+  },
+  { paused },
+);
+const summary = workflowSummaryCodec;
 const trigger = fields({
   nodeId: identifier,
   type: token,
   nextDueAt: nullable(timestamp),
   webhookUrl: nullable(string(2_048)),
 });
-const detail = fields({ summary, graph, revision: count, triggers: list(trigger, 200) });
+const detail = fields(
+  { summary, graph, revision: count, triggers: list(trigger, 200) },
+  { format: count, hostFormat: count },
+);
 const saveResult: AdminDecoder = (value) => {
   if (isDynamicRecord(value) && value.ok === true) return fields({ ok: boolean, revision: count })(value);
   if (isDynamicRecord(value) && value.ok === false) return fields({ ok: boolean, conflict: detail })(value);
@@ -157,20 +168,23 @@ const run = fields({
   startedAt: timestamp,
   endedAt: nullable(timestamp),
 });
-const step = fields({
-  id: identifier,
-  workflowId: identifier,
-  runId: nullable(identifier),
-  nodeId: identifier,
-  attempt: ordinal(Number.MAX_SAFE_INTEGER),
-  agentId: nullable(identifier),
-  status: token,
-  output: nullable(stepText),
-  branch: nullable(oneOf("yes", "no")),
-  error: nullable(stepText),
-  startedAt: nullable(timestamp),
-  endedAt: nullable(timestamp),
-});
+const step = fields(
+  {
+    id: identifier,
+    workflowId: identifier,
+    runId: nullable(identifier),
+    nodeId: identifier,
+    attempt: ordinal(Number.MAX_SAFE_INTEGER),
+    agentId: nullable(identifier),
+    status: token,
+    output: nullable(stepText),
+    branch: nullable(oneOf("yes", "no")),
+    error: nullable(stepText),
+    startedAt: nullable(timestamp),
+    endedAt: nullable(timestamp),
+  },
+  { waiting: boolean },
+);
 const runDetail = fields({ run, steps: list(step, WORKFLOW_RUN_STEP_LIMIT) });
 const runPage = fields({
   runs: list(runDetail, 50),
@@ -186,7 +200,7 @@ const secret: AdminDecoder = (value) => {
 export const WORKFLOWS_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [WORKFLOWS_ROUTES.list, adminRoute(empty, fields({ workflows: list(summary, 10_000) }))],
   [WORKFLOWS_ROUTES.get, adminRoute(workflowRef, detail)],
-  [WORKFLOWS_ROUTES.create, adminRoute(fields({ title }, { graph }), detail)],
+  [WORKFLOWS_ROUTES.create, adminRoute(fields({ title }, { graph, paused }), detail)],
   [WORKFLOWS_ROUTES.rename, adminRoute(fields({ workflowId: identifier, title }), summary)],
   [WORKFLOWS_ROUTES.delete, adminRoute(workflowRef, empty)],
   [WORKFLOWS_ROUTES.saveGraph, adminRoute(fields({ workflowId: identifier, baseRevision: count, graph }), saveResult)],

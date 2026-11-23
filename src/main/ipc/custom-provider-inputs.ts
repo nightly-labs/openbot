@@ -60,10 +60,10 @@ function parseModels(providerId: string, value: unknown): CustomProviderModel[] 
   for (const entry of value) {
     if (!isObject(entry)) throw new Error("Every model needs an ID and a name.");
     const id = requireString(entry.id, "Model ID", INPUT_LIMITS.identifier);
-    if (!isAgentModel(composedCustomModelId(providerId, id)))
-      throw new Error(sourceText("error.provider.modelIdCharacter"));
-    if (seen.has(id)) throw new Error(sourceText("error.provider.modelIdDuplicate"));
-    seen.add(id);
+    const listed = composedCustomModelId(providerId, id);
+    if (!isAgentModel(listed)) throw new Error(sourceText("error.provider.modelIdCharacter"));
+    if (seen.has(listed)) throw new Error(sourceText("error.provider.modelIdDuplicate"));
+    seen.add(listed);
     const name = requireString(entry.name, "Model name", INPUT_LIMITS.modelName);
     const model: CustomProviderModel = { id, name };
     if (entry.contextWindow !== undefined) {

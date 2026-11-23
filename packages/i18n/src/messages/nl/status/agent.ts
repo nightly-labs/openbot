@@ -151,7 +151,6 @@ export const messages = {
   "status.agent.vaultField.country": "Landcode",
   "status.agent.vaultField.phone": "Telefoon",
   "status.agent.vaultField.email": "E-mailadres",
-  "status.agent.finishCheckContinues": "Het verzoek is nog niet klaar. De agent gaat verder ({current} van {limit}).",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
   "status.agent.planStopped": "De agent is gestopt met open stappen in het plan. Stuur een bericht om verder te gaan.",

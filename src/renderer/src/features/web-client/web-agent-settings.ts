@@ -11,14 +11,18 @@ import { AGENT_MEMORIES_CAPABILITY } from "@openbot/contracts/team-protocol/agen
 import { runTeamEffect } from "@openbot/team-client";
 import {
   addAgentFolder,
+  addChannelFolder,
   browseAgentFolders,
+  browseChannelFolders,
   excludeAgentFolder,
   getHostAgentMemoryLimit,
   getRoutineResultDestination,
   includeAgentFolder,
   listRoutineResultOptions,
   readAgentFolders,
+  readChannelFolders,
   removeAgentFolder,
+  removeChannelFolder,
   setRoutineResultDestination,
 } from "@openbot/team-client/team-admin-requests";
 import {
@@ -29,6 +33,7 @@ import {
   type TeamApiRequest,
 } from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
+import type { ChannelFoldersApi } from "../channels/channel-folders-port";
 import type { AgentFoldersApi, AgentInstructionsApi } from "../conversation/agent-folders-port";
 import type { AgentMemoriesApi } from "../conversation/memories-port";
 import type { RoutineResultsCalls } from "../conversation/routines-port";
@@ -81,6 +86,15 @@ export function webAgentFoldersApi(request: () => TeamApiRequest): AgentFoldersA
     addAgentExclusion: (input) => run(excludeAgentFolder(request(), input)),
     removeAgentExclusion: (input) => run(includeAgentFolder(request(), input)),
     browseAgentFolders: (input) => run(browseAgentFolders(request(), input)),
+  };
+}
+
+export function webChannelFoldersApi(request: () => TeamApiRequest): ChannelFoldersApi {
+  return {
+    listChannelFolders: (channelId) => run(readChannelFolders(request(), channelId)),
+    addChannelFolder: (input) => run(addChannelFolder(request(), input)),
+    removeChannelFolder: (input) => run(removeChannelFolder(request(), input)),
+    browseChannelFolders: (input) => run(browseChannelFolders(request(), input)),
   };
 }
 

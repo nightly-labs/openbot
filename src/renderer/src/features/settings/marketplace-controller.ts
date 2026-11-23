@@ -1040,6 +1040,7 @@ export function createMarketplaceController(
   const [hostTabbed, setHostTabbed] = createSignal<{ url: string; tabId: string } | null>(null);
   let stopSignIn: (() => void) | undefined;
   let copySignIn: (() => Promise<void>) | undefined;
+  let pasteSignIn: ((address: string) => Promise<void>) | undefined;
 
   async function signInPluginApp(config: McpServerConfig) {
     const serverId = props.pluginServerId;
@@ -1051,8 +1052,11 @@ export function createMarketplaceController(
     const stop = () => void mcp.cancelMcpSignIn({ url: config.url }, serverId).catch(() => undefined);
     const copyLink = calls().copySignInLink;
     const copy = copyLink ? () => copyLink(config.url, serverId) : undefined;
+    const pasteAddress = calls().signInRelay?.paste;
+    const paste = pasteAddress ? (address: string) => pasteAddress(config.url, address, serverId) : undefined;
     stopSignIn = stop;
     copySignIn = copy;
+    pasteSignIn = paste;
     if (relay) void followSignInRelay(relay, config.url, serverId, () => waiting);
     if (relay?.hostTab && props.pluginHostView)
       void followSignInHostTab(relay.hostTab, config.url, serverId, () => waiting);
@@ -1060,6 +1064,7 @@ export function createMarketplaceController(
       waiting = false;
       if (stopSignIn === stop) stopSignIn = undefined;
       if (copy && copySignIn === copy) copySignIn = undefined;
+      if (paste && pasteSignIn === paste) pasteSignIn = undefined;
     });
   }
 
@@ -1125,6 +1130,11 @@ export function createMarketplaceController(
   async function copySignInLink(): Promise<void> {
     if (!copySignIn) throw new Error(t("error.mcp.relayEnded"));
     await copySignIn();
+  }
+
+  async function pasteSignInAddress(address: string): Promise<void> {
+    if (!pasteSignIn) throw new Error(t("error.mcp.relayEnded"));
+    await pasteSignIn(address);
   }
 
   function cancelSignIn(): void {
@@ -1276,6 +1286,17 @@ export function createMarketplaceController(
         ? app.server.id === id
         : app.kind === "plugin" && app.plugin.apps.some((entry) => heldApps(entry).some((row) => row.id === id));
     return apps().find(holds)?.id ?? null;
+  }
+
+  function signInPluginServer(id: string): void {
+    for (const app of apps()) {
+      if (app.kind !== "plugin") continue;
+      const entry = app.plugin.apps.find((candidate) => heldApps(candidate).some((row) => row.id === id));
+      if (entry) {
+        void reconnectPluginApp(app.plugin, entry.id, id);
+        return;
+      }
+    }
   }
 
   createEffect(
@@ -1796,7 +1817,9 @@ export function createMarketplaceController(
     pasteSignInRelay,
     cancelSignIn,
     copySignInLink: () => (calls().copySignInLink ? copySignInLink : undefined),
+    pasteSignInAddress: () => (calls().signInRelay ? pasteSignInAddress : undefined),
     openPluginUrl,
     mcpServerApp,
+    signInPluginServer,
   };
 }

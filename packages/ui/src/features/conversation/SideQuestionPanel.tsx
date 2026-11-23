@@ -170,7 +170,6 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
           ref={draftRows.form}
           class="composer side-question-composer"
           data-compact="true"
-          data-small=""
           onSubmit={(event) => {
             event.preventDefault();
             ask();

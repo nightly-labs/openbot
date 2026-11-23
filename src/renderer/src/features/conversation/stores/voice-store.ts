@@ -12,6 +12,7 @@ import { composerDraftKey } from "../conversation-keys";
 import { conversationRuntime } from "../conversation-runtime";
 import type { ComposerDraft, ConversationProps, ConversationTarget, VoiceLiveTranscript } from "../conversation-types";
 import { voiceCaptureError, voiceTranscriptionError } from "../voice-status";
+import { conversationOwnerId } from "./composer-store";
 
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_000;
 const STREAM_INTERVAL_MS = 250;
@@ -46,6 +47,7 @@ interface VoiceSubmitHooks {
 
 type VoiceStoreProps = Pick<ConversationProps, "runtime"> & {
   agent: Pick<NonNullable<ConversationProps["agent"]>, "id"> | undefined;
+  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id"> | undefined;
   server: Pick<NonNullable<ConversationProps["server"]>, "id"> | undefined;
 };
 
@@ -98,6 +100,7 @@ export interface VoiceStoreDeps {
 
 interface VoiceThreadHooks {
   openDraftKey: () => string | undefined;
+  besideDraftKey?: () => string | undefined;
   appendTranscript: (key: string, text: string) => void;
   send: (key: string) => Promise<void>;
   reportError: (message: string) => void;
@@ -110,7 +113,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   let stoppedAtLimit = false;
 
   async function startVoiceRecording(threadKey?: string): Promise<void> {
-    const agentId = deps.props.agent?.id;
+    const agentId = conversationOwnerId(deps.props);
     const serverId = deps.props.server?.id ?? "local";
     if (!agentId || deps.voicePhase() !== "idle") return;
     deps.setVoiceThreadKey(threadKey);
@@ -120,7 +123,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     const destination = { ...target, threadKey };
     const fail = (message: string) =>
       threadKey === undefined ? deps.setConversationError(target, message) : deps.thread?.reportError(message);
-    const stillOpen = () => deps.viewIsMounted() && deps.thread?.openDraftKey() === threadKey;
+    const stillOpen = () =>
+      deps.viewIsMounted() &&
+      (deps.thread?.openDraftKey() === threadKey ||
+        (threadKey !== undefined && deps.thread?.besideDraftKey?.() === threadKey));
     if (threadKey === undefined) {
       deps.setVoiceLimitReached?.(target, false);
       deps.clearConversationError(target);
@@ -129,7 +135,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
     resources.voiceSubmitRequest = undefined;
     const generation = ++resources.voiceRequestGeneration;
     deps.setVoicePhase("preparing");
-    deps.setVoiceModelProgress(0);
+    deps.setVoiceModelProgress(null);
     let stream: MediaStream | undefined;
     let cloud: VoiceCloudStream | undefined;
     try {
@@ -276,7 +282,8 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
   }
 
   const removeVoiceModelListener = conversationRuntime(deps.props).voice.onModelStatus((status) => {
-    if (deps.voicePhase() !== "preparing" || status.modelId !== preparingModelId) return;
+    if (deps.voicePhase() !== "preparing" || status.modelId !== preparingModelId || status.phase !== "downloading")
+      return;
     deps.setVoiceModelProgress(status.progress);
   });
   onCleanup(removeVoiceModelListener);
@@ -446,7 +453,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       deps.clearConversationError(recordingTarget);
       const draft = submitRequest?.draft ?? deps.drafts()[composerDraftKey(recordingTarget)] ?? EMPTY_DRAFT;
       const transcribedDraft = { ...draft, text: appendVoiceTranscript(draft.text, result.text) };
-      const spokenReply = !deps.props.runtime;
+      const spokenReply = !deps.props.runtime && !deps.props.channel;
       if (submitRequest) {
         const target = { agentId: submitRequest.agentId, serverId: submitRequest.serverId };
         if (spokenReply) noteDictatedMessage(target, result.text);
@@ -472,7 +479,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
         const key = composerDraftKey(recordingTarget);
         deps.setDrafts((current) => ({ ...current, [key]: transcribedDraft }));
         if (atLimit) deps.setVoiceLimitReached?.(recordingTarget, true);
-        if (deps.props.agent?.id === targetAgentId && (deps.props.server?.id ?? "local") === targetServerId) {
+        if (
+          conversationOwnerId(deps.props) === targetAgentId &&
+          (deps.props.server?.id ?? "local") === targetServerId
+        ) {
           deps.setComposerFocusRequest((current) => current + 1);
         }
       }

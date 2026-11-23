@@ -1,5 +1,82 @@
 [
   {
+    "version": "0.76.0",
+    "date": "2026-11-21",
+    "notices": [
+      "Update each joined server to this version too. On a server, tasks that run at the same time, the live voice account, the OpenBot memory switch, workflow folders, typed workflow answers and more than 10 accounts of one provider work only when the server has this version.",
+      "After this update, an older version of OpenBot cannot open your data."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "An agent can split unrelated work into tasks that run at the same time. Each result comes back to the main chat, and the agent combines the results for you.",
+          "See all open threads of an agent in the new Threads tab of the side panel. The tab shows the number of threads that wait for you.",
+          "Change your keyboard shortcuts in the new Keyboard tab of Settings. New shortcuts start a thread and go to the next and previous thread.",
+          "Workflows open in tabs, and workflow steps can give typed answers. Write {{name}} to put an answer in a later step.",
+          "Upload an MP4 or WebM video as the window backdrop in Settings > Appearance.",
+          "Choose the ChatGPT account that GPT live voice uses in Settings > Voice."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "A provider keeps up to 20 accounts. Before, the limit was 10.",
+          "Dictation records for up to 10 minutes. Before, it stopped at 2 minutes.",
+          "A thread loads older messages when you scroll near the top. You do not need to click a button."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A scheduled routine no longer turns itself off in silence when a run has nothing to report.",
+          "A long chat keeps all its messages, in the correct order, while a reply streams in.",
+          "A linked WhatsApp number no longer stops receiving messages while it still shows \"Connected\".",
+          "On Windows, OpenCode agents run commands again. Before, they often failed with \"opencode-pty request timed out\".",
+          "An agent that you muted no longer sends you a notification when it replies in a channel."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "0.75.0",
+    "date": "2026-11-20",
+    "notices": [
+      "Update each joined server to this version too. On a server, workflow step settings, Run from this step, owner transfer, the Update all button and many fixes for agents work only when the server has this version.",
+      "After this update, an older version of OpenBot cannot open your data."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Talk to an agent with push to talk. Hold the talk button or the talk key while you speak. OpenBot sends what you said when you let go. Change the key in Settings > Voice.",
+          "Start a workflow again from one step. In the step menu, select Run from this step. The steps before it keep their answers and do not run again.",
+          "See the settings and inputs that made the result of a workflow step. Select Settings on the step, then Use these settings to run it again in the same way.",
+          "Give your server to another OpenBot account. In Server Settings > Members, enter the email of the new owner. The server changes hands when they accept.",
+          "Update all providers at once. Settings > Providers shows Update all when one or more providers have an update."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "OpenBot updates the provider CLIs that it downloaded each hour, when a new version is available. The update waits until the agents are idle.",
+          "Each thread of an agent can use the browser tabs that the main chat or another thread of that agent opened.",
+          "The Routines tab is gone from the sidebar. Routines still run. Manage them in the agent settings, on the Schedule page and in Server Settings > Routines."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Restart for a downloaded update now waits until the agents are idle, with Cancel restart. Before, OpenBot closed at once and stopped the agent's task.",
+          "An agent no longer stays \"working\" with its messages waiting after a restart or a usage limit. The stopped turn shows as interrupted, and the waiting messages start.",
+          "A busy server with many agents and joined devices no longer runs out of memory, and no longer freezes when it selects the next turn.",
+          "A message that you send after a pause no longer stays \"Not sent\" with \"Connect Claude to continue.\" when Claude is signed in.",
+          "Agent browser tabs that no one uses stop using the processor after 2 minutes."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.74.0",
     "date": "2026-11-19",
     "notices": [

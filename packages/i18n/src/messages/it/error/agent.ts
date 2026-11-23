@@ -56,6 +56,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Il modello dell'agente selezionato non è disponibile.",
   "error.agent.modelProviderNotConnected":
     "Il modello dell'agente selezionato «{model}» non è disponibile: {provider} non è connesso.",
+  "error.agent.modelProviderSignInRequired":
+    "Il modello dell'agente selezionato «{model}» non è disponibile: {provider} richiede l'accesso. Accedi a {provider} e riprova.",
+  "error.agent.modelProviderNotInstalled":
+    "Il modello dell'agente selezionato «{model}» non è disponibile: {provider} non è installato.",
+  "error.agent.modelProviderOutdated":
+    "Il modello dell'agente selezionato «{model}» non è disponibile: {provider} deve essere aggiornato.",
   "error.agent.modelListEmpty":
     "Il modello dell'agente selezionato «{model}» non è disponibile: {provider} non ha elencato modelli. Ultimo errore: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -161,6 +167,8 @@ export const messages = {
     "Cosa fanno i messaggi mentre l'agente lavora si può impostare solo sul computer che lo esegue.",
   "error.agent.backupModelsLocalOnly":
     "I modelli di riserva si possono impostare solo sul computer che esegue l'agente.",
+  "error.agent.backupModelsAtLimit":
+    "Nessun modello di riserva può subentrare ora: ognuno ha raggiunto il limite di utilizzo o ha avuto un errore poco fa. I modelli di un account possono condividere un limite. Per continuare, aggiungi un modello di riserva di un altro provider o di un altro account, oppure attendi il ripristino.",
   "error.agent.taskLimitLocalOnly": "Il limite di attività si può impostare solo sul computer che esegue l'agente.",
   "error.agent.localScriptsOff": "Questo agente non consente gli script locali.",
   "error.agent.localScriptsRateLimited":

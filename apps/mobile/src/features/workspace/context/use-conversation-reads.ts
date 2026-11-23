@@ -46,10 +46,14 @@ export function useConversationReads({
   const applyConversationReads = useCallback(
     (reads: Record<string, MobileConversationRead>) => {
       liveState.update("unreadAgentIds", (current) => mergeRemoteUnreadIds(current, reads));
-      liveState.update("unreadCounts", (current) => ({
-        ...current,
-        ...Object.fromEntries(Object.entries(reads).map(([agentId, read]) => [agentId, read.unreadCount])),
-      }));
+      liveState.update("unreadCounts", (current) =>
+        Object.entries(reads).every(([agentId, read]) => current[agentId] === read.unreadCount)
+          ? current
+          : {
+              ...current,
+              ...Object.fromEntries(Object.entries(reads).map(([agentId, read]) => [agentId, read.unreadCount])),
+            },
+      );
       liveState.update("firstUnreadMessageIds", (current) =>
         Object.entries(reads).every(([agentId, read]) => current[agentId] === read.firstUnreadMessageId)
           ? current

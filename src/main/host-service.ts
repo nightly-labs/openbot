@@ -155,6 +155,7 @@ interface HostServiceOptions {
   instanceTransfer?: ForwardedApiOptions["instanceTransfer"];
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
+  workflowFolders?: ForwardedApiOptions["workflowFolders"];
   crm?: ForwardedApiOptions["crm"];
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
   routineRunPlaces?: ForwardedApiOptions["routineRunPlaces"];
@@ -241,7 +242,8 @@ interface HostServiceOptions {
     request: NotificationRelayRequest,
   ) => Effect.Effect<"sent" | "gone", RemoteWorkflowError>;
   pushNotificationStore?: PushNotificationStore;
-  hostComputerInUse?: (event: AgentEvent) => boolean;
+  hostComputerInUse?: (event: AgentEvent | null) => boolean;
+  signInWaits?: ConstructorParameters<typeof PushNotificationService>[0]["signInWaits"];
   awayAfterMs?: number;
   verifyRemoteSessionTicket?: (ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>;
   endRemoteSession?: (sessionId: string) => Effect.Effect<void, RemoteWorkflowError>;
@@ -317,6 +319,7 @@ export class HostService extends EventEmitter<HostEvents> {
   #unreachedSignalUrl: string | null = null;
   #boundAccountId: string | null | undefined = undefined;
   #legacyCredentialRemoved = false;
+  #adoptedReaderKey: string | null = null;
   readonly #remoteControlStreams = new Map<string, string>();
 
   constructor(options: HostServiceOptions) {
@@ -416,6 +419,7 @@ export class HostService extends EventEmitter<HostEvents> {
       sendPushNotification && pushNotificationStore
         ? new PushNotificationService({
             agents: options.agents,
+            ...(options.signInWaits === undefined ? {} : { signInWaits: options.signInWaits }),
             store: pushNotificationStore,
             send: (request) => {
               const hostId = options.store.getIdentity()?.serverId;
@@ -488,6 +492,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.instanceTransfer === undefined ? {} : { instanceTransfer: options.instanceTransfer }),
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
+      ...(options.workflowFolders === undefined ? {} : { workflowFolders: options.workflowFolders }),
       ...(options.crm === undefined ? {} : { crm: options.crm }),
       ...(options.hiddenAgents === undefined ? {} : { hiddenAgents: options.hiddenAgents }),
       ...(options.routineRunPlaces === undefined ? {} : { routineRunPlaces: options.routineRunPlaces }),
@@ -601,6 +606,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...this.#status,
       remoteDesktopReady: capabilities.ready,
       remoteDesktopScreenRecordingDenied: this.#remoteScreen.screenRecordingDenied(),
+      remoteDesktopNeedsX11Session: this.#remoteScreen.needsX11Session(),
       remoteDesktopUnattended: capabilities.unattended,
       remoteDesktopActiveSessions: capabilities.activeSessions,
       remoteDesktopMaxSessions: capabilities.maxSessions,
@@ -1978,6 +1984,7 @@ export class HostService extends EventEmitter<HostEvents> {
     try {
       user = this.#options.getSignedInUser();
     } catch {
+      this.#adoptedReaderKey = null;
       return { id: SIGNED_OUT_CHANNEL_MEMBER_ID, name: "You" };
     }
     return { id: this.#currentAgentReaderId(), name: user.name ?? "You" };
@@ -2038,14 +2045,22 @@ export class HostService extends EventEmitter<HostEvents> {
   #currentAgentReaderId(): string {
     const accountReaderId = `local-user:${this.#options.getSignedInUser().id}`;
     const memberId = this.#findCurrentMemberId();
+    this.#adoptReadsOnce(accountReaderId, memberId);
+    return memberId ?? accountReaderId;
+  }
+
+  #adoptReadsOnce(accountReaderId: string, memberId: string | null): void {
+    const readerKey = `${accountReaderId}\n${memberId ?? ""}`;
+    if (this.#adoptedReaderKey === readerKey) return;
+    this.#adoptedReaderKey = null;
     if (!memberId) {
       this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, accountReaderId);
-      return accountReaderId;
+    } else {
+      this.#options.agents.adoptConversationReads(accountReaderId, memberId);
+      this.#options.channels?.store.adoptReads(accountReaderId, memberId);
+      this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, memberId);
     }
-    this.#options.agents.adoptConversationReads(accountReaderId, memberId);
-    this.#options.channels?.store.adoptReads(accountReaderId, memberId);
-    this.#options.channels?.store.adoptReads(SIGNED_OUT_CHANNEL_MEMBER_ID, memberId);
-    return memberId;
+    this.#adoptedReaderKey = readerKey;
   }
 
   #findCurrentMemberId(): string | null {
@@ -2083,6 +2098,7 @@ function initialHostStatus(identity: TeamIdentity | null, unattended: boolean): 
     apiOnline: false,
     remoteDesktopReady: false,
     remoteDesktopScreenRecordingDenied: false,
+    remoteDesktopNeedsX11Session: false,
     remoteDesktopUnattended: unattended,
     remoteDesktopActiveSessions: 0,
     remoteDesktopMaxSessions: 4,

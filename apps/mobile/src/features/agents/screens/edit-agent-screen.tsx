@@ -45,6 +45,7 @@ import {
 import { AgentDeleteSection } from "@/features/agents/components/agent-delete-section";
 import { AgentFolderBrowser, AgentFolders, AgentFoldersRow } from "@/features/agents/components/agent-folders";
 import {
+  AgentBuiltinMemoryField,
   AgentBusyMessageField,
   AgentHostPermissionFields,
   AgentNewChatAllowedField,
@@ -159,6 +160,7 @@ function AgentForm({
     canManageAgentTaskLimit,
     canManageAgentNewChat,
     canManageAgentPlanCard,
+    canManageAgentBuiltinMemory,
     canManageBrowserProfiles,
     canManageAgentFolders,
     canSetAgentNotificationLevel,
@@ -179,7 +181,8 @@ function AgentForm({
     canManageAgentHostSettings(agent.serverId) ||
     canManageAgentTaskLimit(agent.serverId) ||
     canManageAgentNewChat(agent.serverId) ||
-    canManageAgentPlanCard(agent.serverId);
+    canManageAgentPlanCard(agent.serverId) ||
+    canManageAgentBuiltinMemory(agent.serverId);
   const showWorkspace = Boolean(agent.workspacePath) || canManageBrowserProfiles(agent.serverId);
   const showNewChat = canStartNewChat(agent.serverId) && accessLevel !== "view";
   const showChatActions = showNewChat || showDeleteHistory;
@@ -456,6 +459,7 @@ function AgentForm({
               <AgentTaskLimitField agent={agent} server={host} available={available} />
               <AgentNewChatAllowedField agent={agent} server={host} available={available} />
               <AgentPlanCardField agent={agent} server={host} available={available} />
+              <AgentBuiltinMemoryField agent={agent} server={host} available={available} />
             </SettingsSection>
           ) : null}
           {showWorkspace ? (

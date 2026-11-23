@@ -7,6 +7,8 @@ export const messages = {
   "error.attachment.namedFileTooLarge": "{name} は 100 MB の上限を超えています。",
   "error.attachment.totalTooLarge": "添付ファイルの合計が 250 MB の上限を超えています。",
   "error.attachment.unavailable": "このファイルはもう利用できません。",
+  "error.attachment.noApp":
+    "このコンピューターのアプリでこのファイルを開けませんでした。ダウンロードしてから、ファイルマネージャーで開いてください。",
   "error.attachment.tooMany": "選択できるファイルは {limit} 個までです。",
   "error.attachment.mediaUnsupported":
     "このサーバーは MP3 または MOV の添付ファイルに対応していません。ホストの OpenBot をアップデートしてから、もう一度お試しください。",

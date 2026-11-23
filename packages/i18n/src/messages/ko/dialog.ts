@@ -4,6 +4,7 @@ import type { messages as source } from "../en/dialog";
 export const messages = {
   "dialog.chooseSiteDirectory": "정적 사이트 폴더 선택",
   "dialog.chooseAgentFolder": "{agent}의 폴더 선택",
+  "dialog.chooseChannelFolder": "{channel}의 폴더 선택",
   "dialog.chooseAgentExclusion": "{agent}이(가) 변경하면 안 되는 폴더 선택",
   "dialog.chooseSkill": "스킬 폴더 또는 ZIP 선택",
   "dialog.filter.skillPackages": "스킬 패키지",
@@ -19,6 +20,8 @@ export const messages = {
   "dialog.saveTransfer": "전송 파일 저장",
   "dialog.chooseTransfer": "전송 파일 선택",
   "dialog.filter.transfer": "OpenBot 전송 파일",
+  "dialog.saveWorkflow": "워크플로 파일 저장",
+  "dialog.filter.workflow": "OpenBot 워크플로 파일",
   "dialog.chooseExternalLinkApp": "브라우저 선택",
   "dialog.filter.applications": "응용 프로그램",
 } as const satisfies PartialTranslation<typeof source>;

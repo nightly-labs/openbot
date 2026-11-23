@@ -92,6 +92,8 @@ export const messages = {
     "De leden van dit kanaal hebben nog geen gesprek om te comprimeren. Comprimeer het nadat een lid in het kanaal heeft geantwoord.",
   "error.backend.channelCompactNotSupported":
     "Geen lid van dit kanaal kan op verzoek comprimeren. Leden die het ondersteunen, comprimeren hun context automatisch als die bijna vol is.",
+  "error.backend.channelCompactProviderUnavailable":
+    "De aanbieder van de kanaalleden werkt nu niet. Vernieuw de aanbieders en comprimeer het kanaal daarna opnieuw.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
   "error.backend.channelArchiveRunning": "Stop het lopende werk in dit kanaal en verwijder het daarna.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
@@ -235,7 +237,7 @@ export const messages = {
   "error.backend.agentWaitNoRequest":
     "Een wachtpunt heeft een bericht nodig om verder te gaan. Deze beurt heeft geen bericht.",
   "error.backend.agentWaitOwnChatOnly":
-    "Open een wachtpunt alleen in je eigen chat. Een kanaal- of berichtentaak kan niet wachten.",
+    "Open een wachtpunt in je eigen chat of in een zijthread. Een kanaal- of berichtengesprek kan niet wachten.",
   "error.backend.agentWaitNoteRequired": "Geef een korte notitie die zegt waarvoor het wachtpunt is.",
   "error.backend.agentWaitRoutineGone": "Deze agent heeft geen routine met deze id.",
   "error.backend.agentWaitNoRoutine":
@@ -253,8 +255,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
   "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",
   "error.backend.mcpServerInvalid": "OpenBot kan deze MCP-serverconfiguratie niet opslaan.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Headernamen mogen geen spaties of tekens zoals : ( ) / bevatten. Gebruik een naam zoals Authorization en zet de sleutel of het token bij Waarde.",
   "error.backend.mcpServerNoAnswer": "De server reageerde niet binnen {seconds} seconden.",
   "error.backend.mcpSignInNotAccepted": "De server heeft die inlog niet geaccepteerd.",
+  "error.backend.mcpSignInGrantRefused":
+    "De server heeft de aanmelding niet geaccepteerd. Meld je opnieuw aan. Als het probleem blijft, controleer dan of je account op dezelfde site of in dezelfde regio staat als deze app.",
   "error.backend.mcpSignInAccountRefused":
     "De server heeft het account geweigerd waarmee je bent ingelogd. Controleer of dit account de dienst mag gebruiken. Log uit en log opnieuw in om een ander account te gebruiken.",
   "error.backend.mcpSignInClientRefused":
@@ -278,6 +284,8 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "Deze server vraagt om in te loggen. Log in via OpenBot op de hostcomputer.",
   "error.backend.mcpSignInNeedsHttps":
     "Deze server vraagt om in te loggen, en OpenBot logt alleen in via https. Wijzig de URL in {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "Deze server meldt alleen aan op {url}. Wijzig de URL in dit adres en meld je daarna opnieuw aan.",
   "error.backend.mcpSignInCancelled": "Het inloggen is geannuleerd.",
   "error.backend.mcpSignInTimedOut": "Het inloggen is niet afgerond in de browser.",
   "error.backend.mcpSignInRefused": "De inlogpagina weigerde de toegang. Log opnieuw in.",
@@ -297,6 +305,8 @@ export const messages = {
     "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open {name} in Marktplaats, Apps, en kies Inloggen.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om een sleutel vraagt. Open {name} in Marktplaats, Apps, kies Bewerken en vul bij Headers de juiste sleutel in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} kon de MCP-server {name} niet starten. Open {name} in Marktplaats, Apps, en kies Verbinding testen om de oorzaak te zien.",
   "error.backend.mcpServerFailedInProvider":
@@ -345,6 +355,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "De map bestaat niet of is al verwijderd.",
   "error.backend.libraryFolderOtherAgent": "Een bestand kan alleen naar een map van zijn agent.",
   "error.backend.libraryFolderMoveInvalid": "Deze map kan daar niet naartoe worden verplaatst.",
+  "error.backend.workflowFolderLimit": "Een server kan maximaal {limit} workflowmappen hebben.",
+  "error.backend.workflowFolderPlacementLimit": "Er staan te veel workflows in mappen.",
   "error.backend.sectionNameDuplicate": "Namen van secties moeten uniek zijn.",
   "error.backend.directMessageRequired": "Schrijf eerst een bericht.",
   "error.backend.directMessageTooLong": "Een direct bericht kan maximaal {limit} tekens hebben.",
@@ -380,6 +392,7 @@ export const messages = {
     "Alleen de OpenBot-app op de telefoon kan dit rapport sturen, omdat die de versie en het ondersteuningslog van de telefoon toevoegt. Open deze chat op de telefoon. Zie je dit bericht daar, werk dan de telefoon-app bij.",
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
+  "error.backend.apiKeyListFailed": "OpenBot kon de opgeslagen API-sleutels niet lezen.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
   "error.backend.apiKeySaving": "De API-sleutel wordt al opgeslagen.",
   "error.backend.apiKeyAnswerUnreadable":
@@ -470,6 +483,8 @@ export const messages = {
   "error.backend.taskTitleRequired": "Geef de taak een korte titel.",
   "error.backend.taskToolInvalid":
     "Geef de taak een titel van maximaal 120 tekens en een korte opdracht die zegt wat er moet gebeuren.",
+  "error.backend.taskControlInvalid":
+    "Geef de taskId van een taak die je hebt gestart. Een bericht heeft ook tekst nodig.",
   "error.backend.taskOwnChatOnly":
     "Start een taak alleen vanuit je eigen chat. Een kanaal, een berichtengesprek of een andere taak kan er geen starten.",
   "error.backend.taskUnfinishedLimit":
@@ -477,5 +492,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "Deze agent heeft {count} open taken. Sluit een taak en start of open dan een andere.",
   "error.backend.taskRemoteUnsupported": "Taken zijn alleen beschikbaar voor agents op deze computer.",
+  "error.backend.taskMessageFailed": "OpenBot kon het bericht niet naar de taak sturen. Probeer het later opnieuw.",
   "error.backend.taskStartFailed": "OpenBot kon de taak niet starten. Doe het werk in plaats daarvan in deze beurt.",
 } as const satisfies PartialTranslation<typeof source>;

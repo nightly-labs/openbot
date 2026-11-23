@@ -119,7 +119,6 @@ export const messages = {
   "status.agent.mcpSignInRequested":
     "MCP 서버 {name}에 로그인이 필요해요. 마켓플레이스, 앱, {name}에서 로그인해 주세요.",
   "status.agent.uiBlockClosedByMessage": "새 메시지로 종료되었어요",
-  "status.agent.finishCheckContinues": "요청이 아직 끝나지 않았어요. 에이전트가 계속해요 ({current}/{limit}).",
   "status.agent.nextStepContinues": "에이전트가 다음 단계 전에 멈췄어요. 계속해요 ({current}/{limit}).",
   "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
   "status.agent.planStopped": "계획에 남은 단계가 있는데 에이전트가 멈췄어요. 계속하려면 메시지를 보내세요.",

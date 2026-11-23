@@ -84,19 +84,35 @@ function serializeNode(node: Node): string {
   return node.tagName === "DIV" || node.tagName === "P" ? `${content}\n` : content;
 }
 
+let editCommandRunning = false;
+
+export function isEditCommandRunning(): boolean {
+  return editCommandRunning;
+}
+
+function runEditCommand(command: string, value?: string): boolean {
+  const outerCommandRunning = editCommandRunning;
+  editCommandRunning = true;
+  try {
+    return document.execCommand(command, false, value);
+  } finally {
+    editCommandRunning = outerCommandRunning;
+  }
+}
+
 function insertTextThroughBrowser(editor: HTMLDivElement, text: string): boolean {
   if (typeof document.execCommand !== "function") return false;
   const selection = window.getSelection();
   const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
   if (!range || !editor.contains(range.commonAncestorContainer)) return false;
-  if (!text) return document.execCommand("delete", false);
-  if (!text.includes("\n")) return document.execCommand("insertText", false, text);
+  if (!text) return runEditCommand("delete");
+  if (!text.includes("\n")) return runEditCommand("insertText", text);
   const escaped = document.createElement("div");
   escaped.textContent = text;
   const atEnd = editorTextOffset(editor, range.endContainer, range.endOffset) === editorText(editor).length;
   if (atEnd && editor.lastChild instanceof HTMLBRElement) range.setEndAfter(editor.lastChild);
   const trailingLine = atEnd && text.endsWith("\n") ? "<br>" : "";
-  return document.execCommand("insertHTML", false, escaped.innerHTML + trailingLine);
+  return runEditCommand("insertHTML", escaped.innerHTML + trailingLine);
 }
 
 export function insertPlainText(editor: HTMLDivElement, text: string): void {
@@ -152,7 +168,7 @@ function replaceListRange(
 
   selection.removeAllRanges();
   selection.addRange(target);
-  if (typeof document.execCommand === "function" && document.execCommand("insertHTML", false, content.innerHTML)) {
+  if (typeof document.execCommand === "function" && runEditCommand("insertHTML", content.innerHTML)) {
     return true;
   }
 
