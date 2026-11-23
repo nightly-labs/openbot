@@ -1495,6 +1495,7 @@ export class TurnLifecycle {
           return;
         }
         this.#compaction.threadIdle(agentId, threadId, source);
+        yield* this.#requeueUnreadSteers(agentId, threadId, turnId, getArray(turn, "unreadSteers").filter(isString));
         yield* this.#completeTurn(agentId, threadId, turnId, status).pipe(
           Effect.catchCause((cause) =>
             reportOriginalFailure(cause, (failure) =>
@@ -2938,6 +2939,33 @@ export class TurnLifecycle {
       ),
     );
   }, Effect.uninterruptible);
+
+  readonly #requeueUnreadSteers = Effect.fn("TurnLifecycle.requeueUnreadSteers")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    reported: readonly string[],
+  ) {
+    const deliveryIds = reported.filter((deliveryId) => this.#mailbox.steeredIntoOtherWork(deliveryId));
+    if (deliveryIds.length === 0) return;
+    for (const deliveryId of deliveryIds)
+      yield* this.#mailbox
+        .restoreUnsteered(deliveryId, turnId)
+        .pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => this.#hooks.emitError("delivery_turn_association_failed", failure.cause, agentId)),
+          ),
+        );
+    const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
+    for (const message of snapshot.messages)
+      if (deliveryIds.includes(message.id)) {
+        delete message.steered;
+        this.#mailboxSync.syncDeliveryMessage(snapshot, message.id);
+      }
+    this.#mailboxSync.syncMailboxMessages(snapshot);
+    this.#mailboxSync.emitQueue(agentId);
+  });
 
   #answerFailedRequest(agentId: string, deliveryId: string, temporary: boolean): Effect.Effect<void> {
     return this.#mailbox

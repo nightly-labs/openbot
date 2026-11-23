@@ -346,9 +346,11 @@ export class QueueControls {
         ),
       );
     yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
+    const joinedTurn = this.#mailbox.getDelivery(input.deliveryId)?.delivery.status === "running";
     yield* queueStep(() => {
       const current = liveSnapshot();
       if (
+        joinedTurn &&
         this.#conversation.isExecutionThread(current.threadId) &&
         !current.messages.some((message) => message.id === input.deliveryId)
       ) {
