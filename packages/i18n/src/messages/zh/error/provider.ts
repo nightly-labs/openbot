@@ -353,6 +353,7 @@ export const messages = {
     "Hermes 在处理这条消息时连接断开，因此不知道工作是否已完成。重新发送消息前，请先检查智能体做了什么。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
+  "error.provider.copilotAnswerIncomplete": "模型在完成回答前停止了。请重新发送消息，或为此 Agent 选择其他模型。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.claudeContextFull":
     "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",

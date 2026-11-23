@@ -402,6 +402,8 @@ export const messages = {
     "Hermes heeft tijdens dit bericht de verbinding verloren en weet dus niet of het werk klaar is. Controleer wat de agent heeft gedaan voordat je het bericht opnieuw stuurt.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot kon dit model niet gebruiken: het model accepteerde de denkinstelling niet. Selecteer een ander model voor deze agent en verstuur je bericht opnieuw.",
+  "error.provider.copilotAnswerIncomplete":
+    "Het model stopte voordat het antwoord klaar was. Verstuur je bericht opnieuw of selecteer een ander model voor deze agent.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
   "error.provider.claudeContextFull":
     "Deze chat is te lang geworden voor Claude. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",

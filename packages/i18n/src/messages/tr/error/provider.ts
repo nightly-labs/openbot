@@ -405,6 +405,8 @@ export const messages = {
     "Hermes bu mesaj sırasında bağlantısını kaybetti, bu yüzden işin bitip bitmediğini bilmiyor. Mesajı yeniden göndermeden önce ajanın ne yaptığını kontrol edin.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot bu modeli kullanamadı: model, düşünme ayarını kabul etmedi. Bu ajan için başka bir model seçin, sonra mesajınızı yeniden gönderin.",
+  "error.provider.copilotAnswerIncomplete":
+    "Model, yanıtını tamamlamadan durdu. Mesajınızı yeniden gönderin veya bu ajan için başka bir model seçin.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
   "error.provider.claudeContextFull":
     "Bu sohbet Claude için çok uzun hale geldi. OpenBot sohbet geçmişiyle yeni bir Claude Code oturumu başlattı. Tekrar deneyin.",

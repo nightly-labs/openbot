@@ -388,6 +388,8 @@ export const messages = defineMessages("error.provider", {
     "Hermes lost its connection during this message, so it does not know if the work finished. Check what the agent did before you send the message again.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot could not use this model: the model did not accept its thinking setting. Select a different model for this agent, then send your message again.",
+  "error.provider.copilotAnswerIncomplete":
+    "The model stopped before its answer was complete. Send your message again, or select a different model for this agent.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",
   "error.provider.claudeContextFull":
     "This chat became too long for Claude. OpenBot started a new Claude Code session with the chat history. Try again.",
