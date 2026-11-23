@@ -96,6 +96,7 @@ export interface AcpFlavor {
   configSetUnsaved?(error: RequestError): boolean;
   closeKeepsSession?: true;
   probeCloseDelayMs?: number;
+  sessionFiles?(argv: readonly string[], sessionId: string): readonly string[];
   effortCategories?: readonly string[];
   promptMediaBase64Bytes?: number;
   sessionProcesses?: true;

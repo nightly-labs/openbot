@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, rm, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   type ClientSideConnection,
@@ -545,6 +545,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #backgroundReplays = new Map<string, SessionUpdate[]>();
   readonly #openingTurns = new Map<string, number>();
   #privateSession: { connection: ClientSideConnection; sessionId: string } | null = null;
+  readonly #discardedSessions = new Set<string>();
   #privateAnswer: string[] | null = null;
   readonly #privatePromptLock = Semaphore.makeUnsafe(1);
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
@@ -589,6 +590,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
       deletesSessions: () => this.#deletesSessions,
+      discarded: (sessionId) => this.#discardedSessions.add(sessionId),
       effortCategories: options.flavor.effortCategories,
       stillStarting: options.flavor.stillStarting,
     });
@@ -793,6 +795,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     yield* this.#deleteThrowawaySessions();
+    const leftovers = this.#leftoverSessionFiles();
     yield* this.#transport
       .stop(
         Effect.gen({ self: this }, function* () {
@@ -819,7 +822,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }),
       )
       .pipe(Effect.ensuring(Scope.close(this.#scope, Exit.void)));
+    yield* Effect.forEach(
+      leftovers,
+      (path) => Effect.tryPromise(() => rm(path, { recursive: true, force: true })).pipe(Effect.ignore),
+      { concurrency: "unbounded", discard: true },
+    );
   }, Effect.uninterruptible);
+
+  #leftoverSessionFiles(): readonly string[] {
+    const sessionFiles = this.#flavor.sessionFiles;
+    if (!sessionFiles || this.#deletesSessions) return [];
+    const ids = new Set(this.#discardedSessions);
+    this.#discardedSessions.clear();
+    for (const id of this.#threads.ids()) if (this.#threads.get(id)?.throwaway) ids.add(id);
+    if (this.#privateSession) ids.add(this.#privateSession.sessionId);
+    const keptProbe = this.#configuration.takeKeptProbe();
+    if (keptProbe) ids.add(keptProbe);
+    return [...ids].flatMap((id) => sessionFiles(this.options.argv, id));
+  }
 
   readonly #deleteThrowawaySessions = Effect.fn("AcpAgentClient.deleteThrowawaySessions")(function* (
     this: AcpAgentClient,

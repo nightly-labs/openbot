@@ -353,8 +353,23 @@ function googleRefusedMcpTools(log: string, folder: string): string[] {
   return tools;
 }
 
+const ANTIGRAVITY_SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+function antigravitySessionFiles(argv: readonly string[], sessionId: string): string[] {
+  const home = flagValue(argv, GEMINI_DIR_FLAG);
+  const appData = flagValue(argv, APP_DATA_DIR_FLAG);
+  if (!home || !appData || !ANTIGRAVITY_SESSION_ID.test(sessionId)) return [];
+  const root = join(home, appData);
+  return [
+    ...[".db", ".db-shm", ".db-wal", ".meta"].map((suffix) => join(root, "conversations", `${sessionId}${suffix}`)),
+    join(root, "brain", sessionId),
+    join(root, "annotations", `${sessionId}.pbtxt`),
+  ];
+}
+
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   ownMcpServerNames: antigravityOwnMcpServerNames,
+  sessionFiles: antigravitySessionFiles,
   relayStdioMcpServers: "unconfined",
   mcpToolCallLimitMs: 180_000,
   mcpListLimit: { ms: 5_000, since: "1.5.11" },
