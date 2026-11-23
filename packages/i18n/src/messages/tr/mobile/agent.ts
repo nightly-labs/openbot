@@ -576,6 +576,7 @@ export const messages = {
   },
   "mobile.agent.list.unreadGroup.title": "Okunmamış",
   "mobile.agent.list.unreadGroup.label": { one: "Okunmamış, {count} sohbet", other: "Okunmamış, {count} sohbet" },
+  "mobile.agent.list.unreadGroup.turnOff": "Okunmamış grubunu kapat",
   "mobile.agent.list.waiting.action.question": "Yanıtla",
   "mobile.agent.list.waiting.action.approval": "İncele",
   "mobile.agent.list.waiting.action.takeover": "Devral",

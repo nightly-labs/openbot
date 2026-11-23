@@ -561,6 +561,7 @@ export const messages = {
   },
   "mobile.agent.list.unreadGroup.title": "Non lette",
   "mobile.agent.list.unreadGroup.label": { one: "Non lette, {count} chat", other: "Non lette, {count} chat" },
+  "mobile.agent.list.unreadGroup.turnOff": "Disattiva il gruppo Non lette",
   "mobile.agent.list.waiting.action.question": "Rispondi",
   "mobile.agent.list.waiting.action.approval": "Controlla",
   "mobile.agent.list.waiting.action.takeover": "Intervieni",

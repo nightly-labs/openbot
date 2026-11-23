@@ -561,6 +561,7 @@ export const messages = {
   "mobile.agent.list.waiting.label": { other: "対応が必要なエージェント {count} 件" },
   "mobile.agent.list.unreadGroup.title": "未読",
   "mobile.agent.list.unreadGroup.label": { other: "未読のチャット {count} 件" },
+  "mobile.agent.list.unreadGroup.turnOff": "未読グループをオフにする",
   "mobile.agent.list.waiting.action.question": "回答",
   "mobile.agent.list.waiting.action.approval": "確認",
   "mobile.agent.list.waiting.action.takeover": "操作する",

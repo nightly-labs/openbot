@@ -428,7 +428,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const activeServerOnline = showsOnline(activeServer);
   const canMarkAllRead = hasUnread && !markingAllRead && activeServerOnline;
-  const markAllChatsRead = () => {
+  const markAllChatsRead = useCallback(() => {
     if (!canMarkAllRead) return;
     void haptics.impact("soft");
     setMarkingAllRead(true);
@@ -442,7 +442,16 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         ),
       )
       .finally(() => setMarkingAllRead(false));
-  };
+  }, [canMarkAllRead, markAllRead]);
+  const pressChatAction = useCallback(
+    (event: string) => {
+      if (event === "mark-all-read") markAllChatsRead();
+      if (event === "unread-group-off") changeChatOrder("manual");
+      const order = MOBILE_CHAT_ORDERS.find((candidate) => event === `sort:${candidate}`);
+      if (order) changeChatOrder(order);
+    },
+    [markAllChatsRead],
+  );
   const unpinnedAgents = useMemo(() => {
     const pinned = new Set(pinnedAgentIds);
     return activeAgents.filter((agent) => !pinned.has(agent.id));
@@ -450,6 +459,33 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const sidebar = sidebarByServer[activeServer.id];
   const waitingAgentIds = useWaitingAgentIds();
   const chatOrder = useChatOrderPreference((state) => state.order);
+  const sortAction = useMemo<MenuAction>(
+    () => ({
+      id: "sort",
+      title: t("mobile.agent.home.sort.title"),
+      subactions: MOBILE_CHAT_ORDERS.map(
+        (order): MenuAction => ({
+          id: `sort:${order}`,
+          title: t(CHAT_ORDER_LABEL[order]),
+          state: order === chatOrder ? "on" : "off",
+        }),
+      ),
+    }),
+    [chatOrder, t],
+  );
+  const unreadHeaderActions = useMemo<MenuAction[]>(
+    () => [
+      {
+        id: "mark-all-read",
+        title: t("mobile.agent.home.markAllRead"),
+        image: "envelope.open",
+        attributes: { disabled: !canMarkAllRead },
+      },
+      { id: "unread-group-off", title: t("mobile.agent.list.unreadGroup.turnOff"), image: "eye.slash" },
+      { ...sortAction, image: "arrow.up.arrow.down" },
+    ],
+    [canMarkAllRead, sortAction, t],
+  );
   const unreadChatIds = useMemo(
     () =>
       chatOrder === "manual" || chatOrder === "recent"
@@ -634,7 +670,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         </AgentListRowReveal>
       ) : item.kind === "unread" ? (
         <AgentListRowReveal index={index + rowOffset} reveal={listReveal}>
-          <AgentUnreadGroupHeader count={item.count} />
+          <AgentUnreadGroupHeader count={item.count} actions={unreadHeaderActions} onAction={pressChatAction} />
         </AgentListRowReveal>
       ) : item.kind === "section" ? (
         <CollapsingRow collapsed={collapsedRowIds.has(item.id)}>
@@ -680,8 +716,10 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       collapsedSectionIds,
       folderUnread,
       listReveal,
+      pressChatAction,
       rowOffset,
       toggleSection,
+      unreadHeaderActions,
       visibleSectionIds,
     ],
   );
@@ -752,17 +790,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     const chatActions: MenuAction[] = [
       ...(hasSelectedServer
         ? [
-            {
-              id: "sort",
-              title: t("mobile.agent.home.sort.title"),
-              subactions: MOBILE_CHAT_ORDERS.map(
-                (order): MenuAction => ({
-                  id: `sort:${order}`,
-                  title: t(CHAT_ORDER_LABEL[order]),
-                  state: order === chatOrder ? "on" : "off",
-                }),
-              ),
-            } satisfies MenuAction,
+            sortAction,
             {
               id: "mark-all-read",
               title: t("mobile.agent.home.markAllRead"),
@@ -793,7 +821,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     canMarkAllRead,
     channels.supported,
     sidebar?.layout,
-    chatOrder,
+    sortAction,
     t,
   ]);
 
@@ -803,9 +831,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     if (event === "add-channel") router.push({ pathname: "/add-channel", params: { serverId: activeServer.id } });
     if (event === "hidden-chats") router.push("/hidden-chats");
     if (event === "deleted-chats") router.push({ pathname: "/deleted-chats", params: { serverId: activeServer.id } });
-    if (event === "mark-all-read") markAllChatsRead();
-    const order = MOBILE_CHAT_ORDERS.find((candidate) => event === `sort:${candidate}`);
-    if (order) changeChatOrder(order);
+    pressChatAction(event);
   };
   const openServersButton = (
     <HeaderIconButton accessibilityLabel={t("mobile.agent.home.openServers")} glass={buttonGlass} onPress={openDrawer}>

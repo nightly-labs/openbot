@@ -563,6 +563,7 @@ export const messages = {
     two: "לא נקראו, שני צ'אטים",
     other: "לא נקראו, {count} צ'אטים",
   },
+  "mobile.agent.list.unreadGroup.turnOff": "כיבוי הקבוצה לא נקראו",
   "mobile.agent.list.waiting.action.question": "מענה",
   "mobile.agent.list.waiting.action.approval": "בדיקה",
   "mobile.agent.list.waiting.action.takeover": "השתלטות",

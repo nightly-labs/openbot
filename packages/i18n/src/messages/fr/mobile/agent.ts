@@ -574,6 +574,7 @@ export const messages = {
     one: "Non lues, {count} discussion",
     other: "Non lues, {count} discussions",
   },
+  "mobile.agent.list.unreadGroup.turnOff": "Désactiver le groupe Non lues",
   "mobile.agent.list.waiting.action.question": "Répondre",
   "mobile.agent.list.waiting.action.approval": "Examiner",
   "mobile.agent.list.waiting.action.takeover": "Prendre la main",

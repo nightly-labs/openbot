@@ -563,6 +563,7 @@ export const messages = {
   },
   "mobile.agent.list.unreadGroup.title": "Ongelezen",
   "mobile.agent.list.unreadGroup.label": { one: "Ongelezen, {count} chat", other: "Ongelezen, {count} chats" },
+  "mobile.agent.list.unreadGroup.turnOff": "Groep Ongelezen uitzetten",
   "mobile.agent.list.waiting.action.question": "Beantwoorden",
   "mobile.agent.list.waiting.action.approval": "Bekijken",
   "mobile.agent.list.waiting.action.takeover": "Overnemen",

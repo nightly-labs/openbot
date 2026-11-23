@@ -551,6 +551,7 @@ export const messages = {
   "mobile.agent.list.waiting.label": { other: "확인 필요, 에이전트 {count}개" },
   "mobile.agent.list.unreadGroup.title": "읽지 않음",
   "mobile.agent.list.unreadGroup.label": { other: "읽지 않음, 채팅 {count}개" },
+  "mobile.agent.list.unreadGroup.turnOff": "읽지 않음 그룹 끄기",
   "mobile.agent.list.waiting.action.question": "답변",
   "mobile.agent.list.waiting.action.approval": "검토",
   "mobile.agent.list.waiting.action.takeover": "직접 제어",

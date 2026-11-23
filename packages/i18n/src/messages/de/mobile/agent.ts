@@ -568,6 +568,7 @@ export const messages = {
   "mobile.agent.list.waiting.label": { one: "Braucht dich, {count} Agent", other: "Braucht dich, {count} Agenten" },
   "mobile.agent.list.unreadGroup.title": "Ungelesen",
   "mobile.agent.list.unreadGroup.label": { one: "Ungelesen, {count} Chat", other: "Ungelesen, {count} Chats" },
+  "mobile.agent.list.unreadGroup.turnOff": "Gruppe „Ungelesen“ ausschalten",
   "mobile.agent.list.waiting.action.question": "Antworten",
   "mobile.agent.list.waiting.action.approval": "Prüfen",
   "mobile.agent.list.waiting.action.takeover": "Übernehmen",

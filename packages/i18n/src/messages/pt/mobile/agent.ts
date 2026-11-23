@@ -570,6 +570,7 @@ export const messages = {
   },
   "mobile.agent.list.unreadGroup.title": "Não lidas",
   "mobile.agent.list.unreadGroup.label": { one: "Não lidas, {count} conversa", other: "Não lidas, {count} conversas" },
+  "mobile.agent.list.unreadGroup.turnOff": "Desativar o grupo Não lidas",
   "mobile.agent.list.waiting.action.question": "Responder",
   "mobile.agent.list.waiting.action.approval": "Revisar",
   "mobile.agent.list.waiting.action.takeover": "Assumir",

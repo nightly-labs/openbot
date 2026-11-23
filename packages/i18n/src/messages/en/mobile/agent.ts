@@ -548,6 +548,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.list.waiting.label": { one: "Needs you, {count} agent", other: "Needs you, {count} agents" },
   "mobile.agent.list.unreadGroup.title": "Unread",
   "mobile.agent.list.unreadGroup.label": { one: "Unread, {count} chat", other: "Unread, {count} chats" },
+  "mobile.agent.list.unreadGroup.turnOff": "Turn off Unread group",
   "mobile.agent.list.waiting.action.question": "Answer",
   "mobile.agent.list.waiting.action.approval": "Review",
   "mobile.agent.list.waiting.action.takeover": "Take over",

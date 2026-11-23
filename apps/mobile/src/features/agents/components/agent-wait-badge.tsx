@@ -5,9 +5,13 @@ import type { LucideIcon } from "lucide-react-native";
 import MessageCircleQuestionMark from "lucide-react-native/icons/message-circle-question-mark";
 import MousePointer2 from "lucide-react-native/icons/mouse-pointer-2";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
-import { View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { useRef, useState } from "react";
+import { Pressable, View } from "react-native";
+import { useCSSVariable, useUniwind } from "uniwind";
 import type { MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
+import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { haptics } from "@/shared/lib/haptics";
+import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
@@ -115,14 +119,44 @@ export function AgentWaitingGroupHeader({ count }: { count: number }) {
   );
 }
 
-export function AgentUnreadGroupHeader({ count }: { count: number }) {
+function headerAccessibilityActions(actions: readonly MenuAction[]): { name: string; label: string }[] {
+  return actions.flatMap((action) =>
+    action.subactions
+      ? action.subactions
+          .filter((subaction) => subaction.state !== "on" && !subaction.attributes?.disabled)
+          .map((subaction) => ({ name: subaction.id ?? subaction.title, label: `${action.title}, ${subaction.title}` }))
+      : action.attributes?.disabled
+        ? []
+        : [{ name: action.id ?? action.title, label: action.title }],
+  );
+}
+
+export function AgentUnreadGroupHeader({
+  count,
+  actions,
+  onAction,
+}: {
+  count: number;
+  actions: MenuAction[];
+  onAction: (id: string) => void;
+}) {
   const { t, format } = useText();
-  return (
-    <View
-      accessible
+  const { theme } = useUniwind();
+  const menu = useRef<MenuComponentRef | null>(null);
+  const [width, setWidth] = useState<number>();
+  const header = (
+    <Pressable
       accessibilityRole="header"
       accessibilityLabel={t("mobile.agent.list.unreadGroup.label", { count })}
+      accessibilityActions={headerAccessibilityActions(actions)}
+      onAccessibilityAction={(event) => onAction(event.nativeEvent.actionName)}
       className="flex-row items-center gap-1.5 px-5 pt-5 pb-1.5"
+      style={{ width }}
+      delayLongPress={longPressDelay}
+      onLongPress={() => {
+        void haptics.longPress();
+        if (isAndroid) menu.current?.show();
+      }}
     >
       <Typography.Paragraph className="font-medium text-muted" style={typeScale.caption}>
         {t("mobile.agent.list.unreadGroup.title")}
@@ -132,6 +166,24 @@ export function AgentUnreadGroupHeader({ count }: { count: number }) {
           {format.number(count)}
         </Typography.Paragraph>
       </View>
+    </Pressable>
+  );
+  return (
+    <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+      {width === undefined ? (
+        header
+      ) : (
+        <MenuView
+          {...(isAndroid
+            ? { ref: menu, colorScheme: theme === "dark" ? ("dark" as const) : ("light" as const) }
+            : null)}
+          shouldOpenOnLongPress
+          actions={actions}
+          onPressAction={(event) => onAction(event.nativeEvent.event)}
+        >
+          {header}
+        </MenuView>
+      )}
     </View>
   );
 }

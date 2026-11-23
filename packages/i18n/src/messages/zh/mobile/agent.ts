@@ -531,6 +531,7 @@ export const messages = {
   "mobile.agent.list.waiting.label": { one: "需要你，{count} 个助手", other: "需要你，{count} 个助手" },
   "mobile.agent.list.unreadGroup.title": "未读",
   "mobile.agent.list.unreadGroup.label": { one: "未读，{count} 个聊天", other: "未读，{count} 个聊天" },
+  "mobile.agent.list.unreadGroup.turnOff": "关闭未读分组",
   "mobile.agent.list.waiting.action.question": "回答",
   "mobile.agent.list.waiting.action.approval": "审阅",
   "mobile.agent.list.waiting.action.takeover": "接管",

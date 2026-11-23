@@ -616,6 +616,7 @@ export const messages = {
     many: "Непрочитанные: {count} чатов",
     other: "Непрочитанные: {count} чата",
   },
+  "mobile.agent.list.unreadGroup.turnOff": "Отключить группу «Непрочитанные»",
   "mobile.agent.list.waiting.action.question": "Ответить",
   "mobile.agent.list.waiting.action.approval": "Проверить",
   "mobile.agent.list.waiting.action.takeover": "Взять управление",

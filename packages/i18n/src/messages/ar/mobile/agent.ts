@@ -627,6 +627,7 @@ export const messages = {
     many: "غير مقروءة، {count} دردشة",
     other: "غير مقروءة، {count} دردشة",
   },
+  "mobile.agent.list.unreadGroup.turnOff": "إيقاف مجموعة غير مقروءة",
   "mobile.agent.list.waiting.action.question": "إجابة",
   "mobile.agent.list.waiting.action.approval": "مراجعة",
   "mobile.agent.list.waiting.action.takeover": "تولّي التحكم",
