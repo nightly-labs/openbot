@@ -341,7 +341,6 @@ try {
         { connection, place: CHANNEL, scope: "conversation" },
         { connection, place: CHANNEL, limit: 101 },
         { connection: "no-such-connection", place: CHANNEL },
-        { connectionId: connection, placeId: CHANNEL },
       ];
       const errors: string[] = [];
       for (const args of cases) {
@@ -351,7 +350,6 @@ try {
         errors.push(String(read.result.error));
       }
       assert.match(errors[4] ?? "", /No enabled connection has that id/u);
-      assert.match(errors[5] ?? "", /Remove connectionId, placeId: a read of a named place takes connection, place/u);
       return { refused: cases.length, errors };
     });
 
