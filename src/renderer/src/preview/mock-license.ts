@@ -11,7 +11,6 @@ import { sourceText } from "@openbot/i18n/source";
 
 const DAY = 24 * 60 * 60_000;
 
-/** The owner and the members of the preview servers. */
 export function previewLicenseUsers(): LicenseUser[] {
   return [
     { name: "Ana Kowalska", email: "ana@example.com", servers: ["Office server", "Lab"], owner: true },
@@ -21,10 +20,6 @@ export function previewLicenseUsers(): LicenseUser[] {
   ];
 }
 
-/**
- * The preview account has no license unless `initial` gives one. Checkout acts as Stripe would after
- * payment: it makes an active license. Users, plan and renewal change it as the account server does.
- */
 export function createMockLicense(initial: Partial<LicenseState> = {}): LicenseDesktopApi {
   const users = previewLicenseUsers();
   const state: LicenseState = {
@@ -51,7 +46,6 @@ export function createMockLicense(initial: Partial<LicenseState> = {}): LicenseD
         currency: request.currency,
         amount: licenseMonthlyAmount(plan, request.users, request.currency),
         ...plan,
-        // During a promotion the license is free until the trial end, and its first period starts then.
         status: state.trialEnd === undefined ? "active" : "trialing",
         currentPeriodEnd: state.trialEnd ?? Date.now() + (plan.interval === "year" ? 365 : 30) * DAY,
         cancelAtPeriodEnd: false,

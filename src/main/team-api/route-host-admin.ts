@@ -10,10 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * The server name and logo of this computer, changed from a joined server. The change runs as the
- * local one does, with the account signed in here. Frozen by `host-admin-v1`.
- */
 export async function routeHostAdmin(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -29,13 +25,11 @@ export async function routeHostAdmin(
     await runCauseEffect(identity.updateIdentity(input));
     return json(200, {});
   } catch (error) {
-    // A signed-out host or a failed upload is a sentence for the admin, not a host fault.
     if (error instanceof Error) throw new HttpError(409, error.message);
     throw error;
   }
 }
 
-/** The base64 logo becomes the bytes the local parser checks, so both paths accept the same images. */
 function parsedIdentity(body: DynamicRecord): UpdateHostIdentityInput {
   try {
     const logo = body.logo;

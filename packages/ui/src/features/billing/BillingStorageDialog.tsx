@@ -4,7 +4,6 @@ import { useText } from "../../text";
 import type { BillingStore } from "./billing-store";
 import { StorageTierDialog } from "./StorageTierDialog";
 
-/** "Add storage" in Billing: the storage tier choice of one plan, bought through the Billing store. */
 export function BillingStorageDialog(props: {
   plan: BillingServerPlan;
   serverName: string;

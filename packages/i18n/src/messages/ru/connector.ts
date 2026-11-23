@@ -66,7 +66,6 @@ export const messages = {
   "connector.github.disconnectEffectTools": "Все агенты потеряют инструменты GitHub, gh и git.",
   "connector.github.disconnectEffectRevoke": "Затем откроется GitHub, где можно отозвать доступ OpenBot.",
   "connector.github.disconnectEffectKept": "Чаты, файлы и память агентов останутся на этом компьютере.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Каждый агент на сервере {host} может работать с вашими репозиториями, задачами и пул-реквестами GitHub, а также с gh и git.",
   "connector.github.connectedSummaryHost": {
@@ -388,7 +387,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать.",
   "connector.whatsapp.dedicatedNote":
-    "OpenBot получает сообщения от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
+    "OpenBot получает сообщения из вашего чата «Сообщение себе» и от людей, которым вы разрешили писать. Остальные получают код, который нужно передать вам.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp удалил этот компьютер из связанных устройств. Привяжите номер заново.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "connector.whatsapp.helpError":
@@ -654,9 +653,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Агенты не могут входить с общими учётными данными, пока вы не войдёте снова.",
   "connector.protonPass.reconnect": "Переподключить",
-  "connector.protonPass.planTitle": "Proton Pass требует платный план",
+  "connector.protonPass.planTitle": "Для Proton Pass нужен план с Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI работает только с платным планом Proton. Смените план и подключитесь снова.",
+    "Для Proton Pass CLI нужен план Proton, который включает Pass Plus. Другие платные планы, например Mail Plus, его не включают. Смените план и подключитесь снова.",
   "connector.protonPass.vaultTitle": "Общее хранилище",
   "connector.protonPass.vaultDescription":
     "Агенты могут входить с учётными данными из этого хранилища. Переместите в него учётные данные, чтобы поделиться ими.",

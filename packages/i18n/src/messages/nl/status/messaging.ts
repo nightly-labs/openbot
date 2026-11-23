@@ -12,6 +12,7 @@ export const messages = {
   "status.messaging.stopped": "Gestopt.",
   "status.messaging.stop": "Stop",
   "status.messaging.approvalTitle": "OpenBot vraagt om goedkeuring om door te gaan.",
+  "status.messaging.approvalTitleTeammate": "Teamgenoot {agent} vraagt om goedkeuring om door te gaan.",
   "status.messaging.approvalCommand": "Een opdracht uitvoeren",
   "status.messaging.approvalFileChange": "Bestanden wijzigen",
   "status.messaging.approvalPermissions": "Meer machtigingen krijgen",
@@ -34,9 +35,11 @@ export const messages = {
   "status.messaging.signInReceived": "OpenBot heeft de Slack-installatie ontvangen. Je kunt dit tabblad sluiten.",
   "status.messaging.signInUnknown": "OpenBot heeft deze Slack-installatie niet gestart. Start hem opnieuw in OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Er kan hier nog geen agent antwoorden. Voeg de Telegram-orchestrator toe in OpenBot.",
+    "Er kan hier nog geen agent antwoorden. Open in OpenBot Marktplaats > Apps > Telegram en klik op Agent toevoegen.",
   "status.messaging.telegramLinked":
     "OpenBot is verbonden met deze chat. Noem {bot} of reageer op een bericht van OpenBot om de agents iets te vragen.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot is niet verbonden met deze chat. Open de OpenBot-app, ga naar Marktplaats → Apps → Telegram en kies 'Toevoegen aan een groep' of 'Open een directe chat' om te verbinden.",
   "status.messaging.telegramOrchestratorName": "Telegram-orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Antwoordt in Telegram en vraagt het team",
   "status.messaging.whatsappNoAgent":

@@ -18,20 +18,11 @@ import {
 } from "./agent-network-scene";
 import { useLandingText } from "./LandingText";
 
-/** The grown network chooses from this many avatars. The three named agents come after them. */
 const GROWN_AVATARS = 24;
-/**
- * The scene starts when this share of the stage is on screen, so the first agents are in view.
- * A stage that is higher than the window counts against the window height.
- */
 const START_SHARE = 0.7;
 const SHARE_STEPS = Array.from({ length: 11 }, (_, index) => index / 10);
 const MARKS = LANDING_PROVIDERS.map((entry) => entry.provider);
 
-/**
- * Draws an SVG element into a square canvas, so the scene can draw it many times a frame.
- * `crop` trims the empty margin around the drawing: an avatar fills its node.
- */
 async function rasterize(svg: SVGSVGElement, size: number, crop = false): Promise<HTMLCanvasElement> {
   svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   svg.setAttribute("width", String(size));
@@ -55,7 +46,6 @@ async function rasterize(svg: SVGSVGElement, size: number, crop = false): Promis
   }
 }
 
-/** The smallest square around the drawn pixels of `canvas`. */
 function trimmed(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D): HTMLCanvasElement {
   const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
   let left = canvas.width;
@@ -92,10 +82,6 @@ function trimmed(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D): 
   return square;
 }
 
-/**
- * A copy of a provider mark with its colour written on it: the page colours the
- * marks from CSS, which an image does not read. Gemini's gradient goes with it.
- */
 function standaloneMark(mark: SVGSVGElement): SVGSVGElement {
   const copy = mark.cloneNode(true);
   if (!(copy instanceof SVGSVGElement)) throw new Error("A provider mark did not clone as SVG.");
@@ -113,14 +99,6 @@ function standaloneMark(mark: SVGSVGElement): SVGSVGElement {
   return copy;
 }
 
-/**
- * "Your agents talk to each other": Ada, Linus and Grace pass the Safari task
- * through OpenBot, then the network grows until it fills the frame. When it is
- * complete, a click on an agent grows a new network from that agent. At any time,
- * a click on the hub sends a signal, in one of the styles at random, through the
- * network. The picture is decorative; the heading and the sentence carry the message.
- * It also hides easter eggs (see `agent-network-eggs.ts`), which reduced motion turns off.
- */
 export function AgentNetworkSection() {
   const [playing, setPlaying] = createSignal(false);
   let stageRef: HTMLDivElement | undefined;
@@ -140,8 +118,6 @@ export function AgentNetworkSection() {
     }));
     const [first, second, third] = named;
     const [firstMessage, secondMessage, thirdMessage] = text().picture.team.messages;
-    // With no canvas, or in Safari before 16, which cannot draw rounded rectangles,
-    // the section shows its heading with no network.
     if (
       !stage ||
       !canvas ||
@@ -159,7 +135,6 @@ export function AgentNetworkSection() {
     }
 
     const reduced = prefersReducedMotion();
-    // A new network at each visit. The scene builds only in the browser, so the page markup does not change.
     const newSeed = () => Math.floor(Math.random() * 2 ** 32);
     const seed = newSeed();
     let network = buildAgentNetwork({
@@ -207,7 +182,6 @@ export function AgentNetworkSection() {
       if (!view.width) return;
       const t = now();
       if (signals.some((signal) => signal.end <= t)) signals = signals.filter((signal) => signal.end > t);
-      // A roll turns the canvas, so the scene cannot clear the corners: clear the whole canvas first.
       context.setTransform(1, 0, 0, 1, 0, 0);
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -218,7 +192,6 @@ export function AgentNetworkSection() {
     };
     const tick = (stamp: number) => {
       frame = 0;
-      // A long gap (a hidden tab, a slow frame) does not jump the story forward.
       time += last ? Math.min(0.05, (stamp - last) / 1000) : 0;
       last = stamp;
       eggs.tick();
@@ -238,15 +211,11 @@ export function AgentNetworkSection() {
       view.height = box.height;
       view.narrow = box.width < 640;
       view.top = headingRef ? headingRef.getBoundingClientRect().bottom - box.top : 0;
-      // The network behind the heading fades out, so the heading stays readable.
       stage.style.setProperty("--landing-network-top", `${Math.round(view.top)}px`);
       canvas.width = Math.round(box.width * ratio);
       canvas.height = Math.round(box.height * ratio);
       draw();
     };
-    // True where the mask of `.landing-network-canvas` shows at least half of the network:
-    // between the middles of the fades under the heading and at the bottom, and inside the middle
-    // of the fade of the ellipse (72% × 78% at 50% 55%, solid to 60%).
     const unmasked = (x: number, y: number) =>
       y >= view.top + 48 &&
       y <= view.height - 60 &&
@@ -263,7 +232,6 @@ export function AgentNetworkSection() {
       signal: startSignal,
       eggs: text().network.eggs,
     });
-    // When the network is complete, a click on a visible agent grows a new network from it.
     const agentAt = (event: MouseEvent) => {
       if (now() < network.end) return -1;
       const box = canvas.getBoundingClientRect();
@@ -271,7 +239,6 @@ export function AgentNetworkSection() {
       const y = event.clientY - box.top;
       return unmasked(x, y) ? agentNetworkNodeAt(network, view, now(), x, y) : -1;
     };
-    // Reduced motion has no signal.
     const onHub = (event: MouseEvent) => {
       if (reduced) return false;
       const box = canvas.getBoundingClientRect();
@@ -334,7 +301,6 @@ export function AgentNetworkSection() {
     document.addEventListener("visibilitychange", play);
     if (reduced) setPlaying(true);
 
-    // A failed image keeps its node as a coloured circle; the rest of the scene still draws.
     const marks = Array.from(marksRef?.querySelectorAll("svg") ?? []);
     void Promise.all(marks.map((mark) => rasterize(standaloneMark(mark), 64)))
       .then((images) => {
@@ -343,7 +309,6 @@ export function AgentNetworkSection() {
         draw();
       })
       .catch(() => {});
-    // The avatar engine is too large for the first load of the home page, as in the features section.
     void import("@openbot/ui/bloub-avatar")
       .then(({ AVATAR_HUE_CHOICES, avatarHeadColor, createStaticAvatarSvg }) => {
         if (disposed) return;
@@ -404,7 +369,6 @@ export function AgentNetworkSection() {
           </h2>
           <p class="landing-network-description">{text().network.description}</p>
         </header>
-        {/* The provider marks that the scene draws on each badge, with their page colours. */}
         <div ref={marksRef} class="landing-network-marks" aria-hidden="true">
           <For each={MARKS}>{(provider) => <ProviderLogo provider={provider} />}</For>
         </div>

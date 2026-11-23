@@ -42,7 +42,6 @@ describe("company sign-in migration", () => {
   it("accepts the writes of the Worker that runs before the deploy", () => {
     const database = before();
     database.exec(migration("0047_company_sign_in.sql"));
-    // The deployed Worker knows no company sign-in table. Its sign-in, revoke and server writes stay valid.
     database.exec(`
       INSERT INTO users(id, identity_key, email, name, avatar_url, created_at, updated_at)
         VALUES ('new', 'email:new@example.com', 'new@example.com', NULL, NULL, 10, 10);

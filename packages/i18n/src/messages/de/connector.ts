@@ -65,7 +65,6 @@ export const messages = {
   "connector.github.disconnectEffectRevoke":
     "Danach öffnet sich GitHub. Dort kannst du den Zugriff von OpenBot widerrufen.",
   "connector.github.disconnectEffectKept": "Chats, Dateien und Agentenspeicher bleiben auf diesem Computer erhalten.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Alle Agenten auf {host} können deine GitHub-Repositories, Issues und Pull Requests sowie gh und git verwenden.",
   "connector.github.connectedSummaryHost": {
@@ -366,7 +365,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
+    "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp hat diesen Computer aus den verknüpften Geräten entfernt. Verknüpfe die Nummer erneut.",
   "connector.whatsapp.helpLoggedOutHost":
@@ -641,9 +640,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agents können sich erst wieder mit Ihren geteilten Zugangsdaten anmelden, wenn Sie sich erneut anmelden.",
   "connector.protonPass.reconnect": "Neu verbinden",
-  "connector.protonPass.planTitle": "Proton Pass braucht einen bezahlten Plan",
+  "connector.protonPass.planTitle": "Proton Pass braucht einen Plan mit Pass Plus",
   "connector.protonPass.planDescription":
-    "Die Proton Pass CLI funktioniert nur mit einem bezahlten Proton-Plan. Ändern Sie Ihren Plan und verbinden Sie dann erneut.",
+    "Die Proton Pass CLI braucht einen Proton-Plan, der Pass Plus enthält. Andere bezahlte Pläne wie Mail Plus enthalten sie nicht. Ändern Sie Ihren Plan und verbinden Sie dann erneut.",
   "connector.protonPass.vaultTitle": "Geteilter Tresor",
   "connector.protonPass.vaultDescription":
     "Agents können sich mit den Zugangsdaten in diesem Tresor anmelden. Verschieben Sie Zugangsdaten hinein, um sie zu teilen.",

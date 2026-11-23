@@ -696,6 +696,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "ثبّت {name} على الحاسوب الذي يشغّل هؤلاء الوكلاء: يحتاج تطبيقه إلى تسجيل الدخول في المتصفح.",
   "marketplace.error.appInvalid": "لا يمكن إضافة {name}: {reason}",
+  "marketplace.error.appNotConnected": "تعذّر توصيل {name}: {reason}",
   "marketplace.error.uninstallNoServer": "اختر خادمًا محليًا لإلغاء تثبيت إضافة.",
   "marketplace.error.uninstallPartial": "تعذّرت إزالة بعض أجزاء {name}. {failures}",
   "marketplace.error.actionFailed": "تعذّر إكمال إجراء المتجر. أعد المحاولة.",

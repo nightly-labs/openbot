@@ -56,7 +56,6 @@ export const messages = {
   "connector.github.disconnectEffectTools": "Todos os agentes perdem as ferramentas do GitHub, gh e git.",
   "connector.github.disconnectEffectRevoke": "Em seguida, o GitHub abre para você revogar o OpenBot.",
   "connector.github.disconnectEffectKept": "Os chats, arquivos e a memória dos agentes continuam neste computador.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Todos os agentes em {host} podem usar seus repositórios, issues e pull requests do GitHub, além de gh e git.",
   "connector.github.connectedSummaryHost": {
@@ -355,7 +354,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Seu chat “Mensagem para você mesmo” e as pessoas que você permitir falam com o OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "As pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
+    "Seu chat “Mensagem para você mesmo” e as pessoas que você permitir falam com o OpenBot. Outras pessoas recebem um código para passar a você.",
   "connector.whatsapp.helpLoggedOut":
     "O WhatsApp removeu este computador dos dispositivos conectados. Vincule o número novamente.",
   "connector.whatsapp.helpLoggedOutHost":
@@ -626,9 +625,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Os agentes não podem entrar com seus logins compartilhados até você entrar de novo.",
   "connector.protonPass.reconnect": "Reconectar",
-  "connector.protonPass.planTitle": "O Proton Pass precisa de um plano pago",
+  "connector.protonPass.planTitle": "O Proton Pass precisa de um plano com Pass Plus",
   "connector.protonPass.planDescription":
-    "A CLI do Proton Pass só funciona com um plano pago do Proton. Mude seu plano e conecte de novo.",
+    "A CLI do Proton Pass precisa de um plano do Proton que inclua o Pass Plus. Outros planos pagos, como o Mail Plus, não a incluem. Mude seu plano e conecte de novo.",
   "connector.protonPass.vaultTitle": "Cofre compartilhado",
   "connector.protonPass.vaultDescription":
     "Os agentes podem entrar com os logins deste cofre. Mova um login para ele para compartilhá-lo.",

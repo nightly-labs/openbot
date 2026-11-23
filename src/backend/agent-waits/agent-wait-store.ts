@@ -1,9 +1,3 @@
-/**
- * The open waits of every agent. Rows are written directly, not through `database.dispatch`: a wait
- * holds a copy of the user's request, and the event log is never deleted from. A closed or cancelled
- * wait is deleted. It owns no events: the runtime says when something changed.
- */
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { AgentWait } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
@@ -17,10 +11,8 @@ import {
 } from "../database/database-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 
-/** A refusal the agent reads: the text is already a sentence for it. */
 export class AgentWaitError extends Error {}
 
-/** The agent already has the most open waits it may have. */
 export class AgentWaitLimitError extends AgentWaitError {}
 
 export interface AgentWaitStoreOptions {
@@ -65,7 +57,6 @@ export class AgentWaitStore {
     return row ? toWait(row) : null;
   }
 
-  /** One statement, so two tool calls at once cannot both pass the limit. */
   open(input: OpenAgentWaitInput): AgentWait {
     const waitId = this.#createId();
     const inserted = this.#database.connection
@@ -99,7 +90,6 @@ export class AgentWaitStore {
     return row ? requiredNumberColumn(row, "waits") : 0;
   }
 
-  /** The number of open waits of each agent that has one. */
   countByAgent(): Map<string, number> {
     const rows = databaseRows(
       this.#database.connection.prepare("SELECT agent_id, COUNT(*) AS waits FROM agent_waits GROUP BY agent_id").all(),
@@ -107,7 +97,6 @@ export class AgentWaitStore {
     return new Map(rows.map((row) => [requiredStringColumn(row, "agent_id"), requiredNumberColumn(row, "waits")]));
   }
 
-  /** Closes or cancels a wait. False when it was not open. */
   delete(agentId: string, waitId: string): boolean {
     return (
       this.#database.connection
@@ -116,7 +105,6 @@ export class AgentWaitStore {
     );
   }
 
-  /** The waits a run of this routine wakes, when no event names one wait. */
   forRoutineRun(agentId: string, routineId: string): AgentWait[] {
     return databaseRows(
       this.#database.connection
@@ -138,7 +126,6 @@ export class AgentWaitStore {
       .run(this.#now().toISOString(), deliveryId, agentId, ...waitIds);
   }
 
-  /** The open waits that this delivery woke. A wait cancelled since then is not in the list. */
   wokenBy(deliveryId: string): AgentWait[] {
     return databaseRows(
       this.#database.connection

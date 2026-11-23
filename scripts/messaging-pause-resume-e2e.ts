@@ -1,9 +1,3 @@
-// Checks pause and resume of a Slack workspace and a Discord server: pause stops the transport, the
-// relay answers 200 for a paused workspace and passes nothing on, the other workspace keeps running,
-// the pause stays after a restart, and resume identifies again and starts a new transport. Runs the
-// real agent and messaging services on a temporary profile with fake platform drivers:
-// `bun scripts/messaging-pause-resume-e2e.ts`.
-// Writes .openbot-build/messaging-pause-resume-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -35,7 +29,6 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const SLACK = "T-pause-e2e";
 const DISCORD = "guild-pause-e2e";
-// A fake value. The report must never contain it.
 const BOT_TOKEN = "fake-bot-token-for-pause-e2e";
 
 interface Step {
@@ -66,10 +59,10 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
   }
 }
 
-/** No step needs the browser or a platform API call: a call to one of them is a failure. */
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -88,7 +81,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** The relay as Signal drives it: the service sets one handler, and each event goes through it. */
 function fakeIngress(): { ingress: MessagingIngress; handler: () => IngressHandler | null } {
   let current: IngressHandler | null = null;
   return {
@@ -109,13 +101,11 @@ function fakeIngress(): { ingress: MessagingIngress; handler: () => IngressHandl
   };
 }
 
-/** What each platform's fake driver saw. */
 interface DriverLog {
   identified: number;
   started: number;
   stopped: number;
   delivered: number;
-  /** The transports that are started and not stopped. */
   live: number;
 }
 
@@ -178,7 +168,6 @@ function fakeDriver(platform: MessagingPlatform, log: DriverLog): MessagingDrive
   };
 }
 
-/** The tokens of each connection, in memory. */
 function memoryCredentials(): MessagingCredentials {
   const values = new Map<string, Record<string, string>>();
   return {
@@ -194,7 +183,6 @@ function memoryCredentials(): MessagingCredentials {
   };
 }
 
-// The credential store outlives one boot, as the keychain does.
 const credentials = memoryCredentials();
 
 interface Booted {
@@ -210,7 +198,6 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
   const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
   const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(store.initialize());
   await runCauseEffect(mailbox.initialize());
   const agents = new AgentService({ store, mailbox, browser, sidebarLayout: sidebar });
@@ -224,6 +211,7 @@ async function boot<T>(use: (services: Booted) => Promise<T>): Promise<T> {
     agents: {
       listAgents: () => agents.listAgents(),
       respondToApproval: (input) => agents.respondToApproval(input),
+      approvalExecutionThreadId: (requestId) => agents.approvalExecutionThreadId(requestId),
       onEvent: () => () => {},
       createAgentProfile: (input) => agents.createAgentProfile(input),
       createMemory: (input) => agents.createMemory(input),
@@ -256,7 +244,6 @@ function connection(messaging: MessagingService, platform: "slack" | "discord"):
   return found;
 }
 
-/** One Slack Events API request, as Signal passes it on after it checked the signature. */
 function slackEvent(): IngressDelivery {
   return {
     platform: "slack",
@@ -272,7 +259,6 @@ async function relay(services: Booted, workspaceId: string): Promise<IngressAnsw
   return runCauseEffect(handler(workspaceId, slackEvent()));
 }
 
-/** The request that the Slack and Discord IPC handlers decode, then `setEnabled`. */
 async function setEnabled(
   messaging: MessagingService,
   platform: "slack" | "discord",
@@ -290,7 +276,6 @@ function summary(services: Booted) {
 }
 
 try {
-  // The connections exist before the first boot, as after the OAuth callback of each platform.
   await boot(async ({ agents }) => {
     for (const [platform, workspaceId] of [
       ["slack", SLACK],
@@ -338,7 +323,6 @@ try {
 
     await step("paused: the relay answers 200 and passes no event on", async () => {
       const answer = await relay(services, SLACK);
-      // 200 so that Slack does not send the event again.
       assert.equal(answer.status, 200);
       assert.equal(answer.body, undefined, "A paused workspace answered with the transport's body.");
       assert.equal(logs.slack.delivered, 1, "A paused workspace passed an event on.");

@@ -1,10 +1,3 @@
-// The OpenCode Go quota, read from the endpoint the OpenCode console serves for the Go API key.
-//
-// OpenCode's ACP process does not report a quota, so this is a direct HTTPS request with the key the
-// CLI uses: the key the user pasted into OpenBot, else the CLI's own key. The route is
-// `packages/console/app/src/routes/zen/go/v1/usage.ts` in anomalyco/opencode; it answers
-// `{ usage: { rolling, weekly, monthly } }`, each with an integer `percent` and an ISO `resetsAt`.
-
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -23,32 +16,24 @@ import {
 const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
 
 const OPENCODE_GO_USAGE_TIMEOUT_MS = 10_000;
-/** The Go plan's rolling window. The response carries the reset time but not the length. */
 const ROLLING_WINDOW_MINS = 300;
 const WEEKLY_WINDOW_MINS = 10_080;
 const MONTHLY_WINDOW_MINS = 43_200;
 
 const NO_USAGE: AccountRateLimitsReadResult = { rateLimits: null, rateLimitsByLimitId: null };
 
-/**
- * No key, a key the console rejects, and a key with no Go subscription all read as no usage, so the
- * dock hides the row instead of showing an error for the free catalog.
- */
 class OpenCodeUsageFailed extends Schema.TaggedError<OpenCodeUsageFailed>()("OpenCodeUsageFailed", {
   cause: Schema.Defect(),
 }) {}
 
 const OPENCODE_CONSOLE_URL = "https://opencode.ai/console";
-/** OpenCode keeps its database in WAL mode; a read waits this long for a writer, not more. */
 const OPENCODE_DB_BUSY_TIMEOUT_MS = 100;
 
-/** The file of OpenCode's database, or null when OpenCode keeps it in memory (`OPENCODE_DB=:memory:`). */
 export function openCodeDatabasePath(env: NodeJS.ProcessEnv, home?: string): string | null {
   const databaseFile = env.OPENCODE_DB || "opencode.db";
   return databaseFile === ":memory:" ? null : resolve(openCodeDataDirectory(env, home), databaseFile);
 }
 
-/** Runs `read` on OpenCode's database, opened read-only. It throws when the open or `read` fails. */
 export function readOpenCodeDatabase<A>(databasePath: string, read: (database: DatabaseSync) => A): A {
   const database = new DatabaseSync(databasePath, { readOnly: true });
   try {
@@ -59,20 +44,14 @@ export function readOpenCodeDatabase<A>(databasePath: string, read: (database: D
   }
 }
 
-/** An API key in OpenCode's `auth.json` (OpenCode 1.x), the file `OPENCODE_AUTH_CONTENT` replaces. */
 const AuthFileKey = Schema.Struct({ type: Schema.Literal("api"), key: Schema.String });
 const AuthFile = Schema.Struct({ "opencode-go": Schema.optionalKey(Schema.Unknown) });
-/** A key in the `credential` table of OpenCode 2's database. `server` names a self-hosted console. */
 const StoredKey = Schema.Struct({
   type: Schema.Literal("key"),
   key: Schema.String,
   metadata: Schema.optionalKey(Schema.NullOr(Schema.Struct({ server: Schema.optionalKey(Schema.Unknown) }))),
 });
 
-/**
- * The OpenCode Go quota for the key the CLI uses. The CLI sends a saved key over every other key
- * (`opencode-config.ts`), so with one this reads that key only.
- */
 export const readOpenCodeGoUsage = Effect.fn("OpenCode.readGoUsage")(function* (apiKey: string | null) {
   const keys = apiKey ? [apiKey] : yield* readOwnKeys();
   for (const key of keys) {
@@ -82,13 +61,6 @@ export const readOpenCodeGoUsage = Effect.fn("OpenCode.readGoUsage")(function* (
   return NO_USAGE;
 });
 
-/**
- * The keys of the user's own OpenCode set-up, in the order the CLI uses them: the OpenCode Console
- * connection in OpenCode 2's database, then the Go key. The Go key is the `opencode-go` key in
- * `auth.json`, which OpenCode applies after `OPENCODE_API_KEY`, or that variable when `auth.json` has
- * none. A rejected Console key moves the read to the Go key. `OPENCODE_AUTH_CONTENT` replaces the
- * local sign-in, the Console connection included.
- */
 const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
   const env = process.env;
   const dataDirectory = openCodeDataDirectory(env);
@@ -108,12 +80,6 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
 const AuthFileEntries = Schema.Record(Schema.String, Schema.Unknown);
 const AuthFileEntry = Schema.Struct({ type: Schema.String });
 
-/**
- * Whether OpenCode has its own key for a model provider: an active `credential` row in OpenCode 2's
- * database, or an entry in `auth.json` (OpenCode 1.x) or in `OPENCODE_AUTH_CONTENT`, which replaces
- * both. A key in an environment variable or in a config file is not found. It reads only when a turn
- * fails, so it reads synchronously.
- */
 export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(function* (
   provider: string,
   env: NodeJS.ProcessEnv,
@@ -148,6 +114,29 @@ export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(funct
   }).pipe(Effect.orElseSucceed(() => false));
 });
 
+const RefusedTurn = Schema.Struct({
+  error: Schema.Struct({ type: Schema.Literal("provider.auth"), status: Schema.Finite }),
+});
+
+export const readOpenCodeRefusalStatus = Effect.fn("OpenCode.readRefusalStatus")(function* (
+  sessionId: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (!databasePath) return null;
+  const row = yield* Effect.try({
+    try: () =>
+      readOpenCodeDatabase(databasePath, (database) =>
+        database
+          .prepare("SELECT data FROM session_message WHERE session_id = ? ORDER BY seq DESC LIMIT 1")
+          .get(sessionId),
+      ),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => undefined));
+  const refused = Schema.decodeUnknownOption(Schema.fromJsonString(RefusedTurn))(row?.data);
+  return Option.isSome(refused) ? refused.value.error.status : null;
+});
+
 function authFileGoKey(text: string): string | undefined {
   const file = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(text);
   if (Option.isNone(file)) return undefined;
@@ -155,11 +144,6 @@ function authFileGoKey(text: string): string | undefined {
   return Option.isSome(entry) ? entry.value.key : undefined;
 }
 
-/**
- * The active OpenCode Console key, or none. The row is chosen before it is decoded, so an OAuth or
- * self-hosted connection cannot fall through to another stored account. A NULL `active` predates the
- * flag. No database, a locked one, or an older schema gives no key.
- */
 const readConsoleKey = Effect.fn("OpenCode.readConsoleKey")(function* (databasePath: string) {
   return yield* Effect.try({
     try: () => {
@@ -185,7 +169,6 @@ const readConsoleKey = Effect.fn("OpenCode.readConsoleKey")(function* (databaseP
   }).pipe(Effect.orElseSucceed(() => undefined));
 });
 
-/** The quota for one key, or null when the console rejects the key. */
 const readGoUsage = Effect.fn("OpenCode.readGoUsageWithKey")(function* (apiKey: string) {
   return yield* Effect.acquireUseRelease(
     Effect.sync(() => new AbortController()),
@@ -216,11 +199,6 @@ const readGoUsage = Effect.fn("OpenCode.readGoUsageWithKey")(function* (apiKey: 
 
 const UsageWindow = Schema.Struct({ percent: Schema.Finite, resetsAt: Schema.NullOr(Schema.String) });
 
-/**
- * The second window of the reading is the weekly or the monthly one, whichever is closer to its
- * limit, since that is the one that stops a turn first. When both are spent, the one that resets
- * later, since turns stay stopped until then. The other one goes to `tertiary` for the usage list.
- */
 function openCodeGoRateLimits(value: unknown): AccountRateLimitsReadResult {
   const usage = getRecord(value, "usage");
   const rolling = usageWindow(getRecord(usage, "rolling"), ROLLING_WINDOW_MINS);

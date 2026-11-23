@@ -9,6 +9,9 @@ export const messages = {
   "webClient.loadingLine.prompts": "プロンプトのもつれをほどいています…",
   "webClient.loadingLine.sleepy": "寝ている子にやさしくお願いしています…",
   "webClient.loadingLine.almost": "もうすぐです。たぶん。",
+  "webClient.slowLoad.title": "OpenBot の読み込みにいつもより時間がかかっています",
+  "webClient.slowLoad.body": "インターネット接続を確認してから、ページを再読み込みしてください。",
+  "webClient.slowLoad.reload": "再読み込み",
   "webClient.login.failed": "サインインに失敗しました。",
   "webClient.login.requestFailed": "アカウントのリクエストに失敗しました。",
   "webClient.login.sessionFailed": "このセッションを確認できませんでした。",
@@ -17,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "サインインの応答が無効です。",
   "webClient.pane.navigation": "ワークスペースのナビゲーション",
   "webClient.pane.chat": "チャット",
-  "webClient.pane.routines": "ルーティン",
   "webClient.pane.workspace": "ワークスペース",
   "webClient.phoneApp.title": "OpenBot アプリを使う",
   "webClient.phoneApp.description":
@@ -35,7 +37,8 @@ export const messages = {
     "ホスト型サーバーを作成すると、このブラウザーからエージェントとチャットできます。コンピューターで OpenBot を実行するか、招待でサーバーに参加することもできます。",
   "webClient.connect.stepInstall": "コンピューターに OpenBot をインストールして開きます。",
   "webClient.connect.stepSignIn": "メールアドレスでサインインします。",
-  "webClient.connect.stepRemote": "リモートアクセスをオンにします。",
+  "webClient.connect.stepRemote":
+    "OpenBot で「サーバーの設定」>「メンバー」を開き、「このサーバーを公開」をオンにします。",
   "webClient.notice.download": "OpenBot をダウンロード",
   "webClient.notice.createServer": "ホスト型サーバーを作成",
   "webClient.notice.join": "招待で参加",

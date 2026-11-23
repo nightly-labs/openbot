@@ -29,40 +29,15 @@ interface ReceiptRow {
   result_json: string;
 }
 
-/**
- * A SQL function that turns each run of whitespace into one space. Search uses it so that a query
- * with a space finds a message that a line break splits.
- */
 export const COLLAPSE_WHITESPACE_FUNCTION = "openbot_collapse_whitespace";
 
-/**
- * A SQL function that lowercases text with the full Unicode rules. SQLite `LOWER` changes only
- * ASCII letters, so "État" would not match the query "état".
- */
 export const LOWERCASE_FUNCTION = "openbot_lowercase";
 
 export interface DatabaseCoreOptions {
   userDataPath: string;
-  /**
-   * Runs `PRAGMA quick_check(20)` on the file at the path in another process and gives its lines, or
-   * null when it could not run there. Used after a stop that did not close the file: the check reads
-   * every page, and on a large file it would stop the calling thread for minutes. Without it, or when
-   * it gives null, the check runs on the calling thread as before.
-   */
   checkIntegrity?: ((databasePath: string) => Effect.Effect<readonly unknown[] | null>) | undefined;
 }
 
-/**
- * The SQLite handle and the append-events, project, write-receipt primitive every other database
- * controller is built on.
- *
- * Owns the open connection, the file on disk and its migration, the orchestration event log and
- * its command receipts, and the transaction ownership rule: only the caller that finds no open
- * transaction opens and closes one, so a projector may nest another dispatch inside its own.
- * Controllers hold this object and read `connection` at each use — a cached handle survives
- * `initialize` and then silently addresses a closed database after `close`. The class knows
- * nothing about projections and never imports the facade.
- */
 export class DatabaseCore {
   readonly path: string;
   readonly #legacyBackupRoot: string;
@@ -78,7 +53,6 @@ export class DatabaseCore {
   initialize = Effect.fn("DatabaseCore.initialize")(function* (this: DatabaseCore) {
     if (this.#db) return;
     yield* storedIO(() => mkdir(dirname(this.path), { recursive: true, mode: 0o700 }));
-    // Read before the open: the first statement makes a new write-ahead log.
     const closedCleanly = yield* storedSync(() => !existsSync(`${this.path}-wal`));
     const db = yield* storedSync(() => new DatabaseSync(this.path));
     const configured = yield* Effect.result(
@@ -95,7 +69,6 @@ export class DatabaseCore {
             typeof value === "string" ? value.toLocaleLowerCase() : value,
           );
         });
-        // A migration checks the file on this thread after it runs, so a check before it would read it twice.
         const checkIntegrity = this.#checkIntegrity;
         const problems =
           closedCleanly || !checkIntegrity || (yield* storedSync(() => openBotDatabaseNeedsMigration(db)))
@@ -104,7 +77,6 @@ export class DatabaseCore {
         if (problems) yield* storedSync(() => assertQuickCheckResult(problems));
         yield* storedSync(() => {
           this.#db = db;
-          // A file that passed the check here does not need it again, unless a migration runs.
           this.#migrate(closedCleanly || problems !== null);
         });
         yield* storedIO(() => chmod(this.path, 0o600));
@@ -115,8 +87,6 @@ export class DatabaseCore {
         db.close();
         this.#db = null;
       });
-      // The close removed the write-ahead log. An empty one makes the next start run the check again,
-      // so a database that failed it does not open at the next start.
       yield* storedSync(() => appendFileSync(`${this.path}-wal`, "", { mode: 0o600 })).pipe(Effect.ignore);
       return yield* configured.failure;
     }
@@ -133,7 +103,6 @@ export class DatabaseCore {
     return this.#db;
   }
 
-  /** A prepared statement of the open connection, kept as `cachedStatement` says. */
   statement(sql: string): StatementSync {
     return cachedStatement(this.connection, sql);
   }
@@ -167,9 +136,6 @@ export class DatabaseCore {
         sequences.push(Number(result.lastInsertRowid));
       }
       const result = project(db, sequences);
-      // A receipt is deleted with its command's events. A command that keeps no event, such as the
-      // memory transaction wrapper or a channel delete that removes its own event, gets no receipt,
-      // because nothing would delete it.
       const keepsEvent = this.statement("SELECT 1 FROM orchestration_events WHERE command_id = ? LIMIT 1").get(
         commandId,
       );
@@ -239,11 +205,6 @@ function decodeReceiptRow(value: unknown): ReceiptRow | null {
   };
 }
 
-/**
- * Deletes the receipts of commands whose events were just dropped. Each receipt is deleted by key,
- * because a sweep for every orphan scans the whole receipts table, which grows without limit. The
- * `NOT EXISTS` guard keeps a receipt whose command still has an event.
- */
 export function deleteReceiptsOf(db: DatabaseSync, commandIds: readonly string[]): void {
   if (commandIds.length === 0) return;
   const deleteReceipt = cachedStatement(
@@ -270,10 +231,6 @@ export function deleteAggregateHistory(db: DatabaseSync, aggregateType: string, 
   );
 }
 
-/**
- * Deletes the attachments of every message of a thread. Their owner is `<thread>:<message>`, and a range
- * from `<thread>:` up to `<thread>;` (the next character) reads the owner index; `LIKE` cannot (#2241).
- */
 export function deleteThreadAttachments(db: DatabaseSync, threadId: string): void {
   db.prepare(
     "DELETE FROM projection_attachments WHERE owner_kind = 'thread-message' AND owner_id >= ? AND owner_id < ?",

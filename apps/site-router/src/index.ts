@@ -14,7 +14,6 @@ interface SiteBucket {
 interface SiteRouterEnv {
   SITES: SiteBucket;
   SITE_SERVE_ENABLED?: string;
-  /** Origin of the account service, such as `https://openbot.run`. The report route and error pages use it. */
   ACCOUNT_ORIGIN?: string;
 }
 
@@ -103,7 +102,6 @@ export const routeRequest = Effect.fn("SiteRouter.routeRequest")(
         headers: secureHeaders({ Location: report.toString(), "Cache-Control": "no-store" }),
       });
     }
-    // Read both keys at once. The block marker still wins, also when the route read fails.
     const [blockMarker, routeRead] = yield* Effect.all(
       [storage.get(hostedSiteBlockKey(hostname)), Effect.result(storage.get(hostedSiteRouteKey(hostname)))],
       { concurrency: 2 },
@@ -123,7 +121,6 @@ export const routeRequest = Effect.fn("SiteRouter.routeRequest")(
     if (path === null) return errorResponse(request, env, "pageNotFound");
     const file = resolveFile(route, path);
     if (file === "directory") {
-      // The relative Location keeps local hosted sites on their own origin; one leading slash keeps it on this host.
       return new Response(null, {
         status: 308,
         headers: secureHeaders({
@@ -153,8 +150,6 @@ export const routeRequest = Effect.fn("SiteRouter.routeRequest")(
         ETag: object.httpEtag,
       },
     });
-    // This independent Effect owns the cache write until waitUntil settles. The response
-    // body remains owned by the Worker; returning it does not close the stream.
     runtime.schedule(
       storageCall(() => runtime.assetCache.put(assetCacheRequest(request, file), cacheResponse.clone())).pipe(
         Effect.catch((error) =>
@@ -252,12 +247,7 @@ function requestPath(pathname: string): string | null {
   }
 }
 
-/**
- * Returns "directory" for a directory address with no final slash. The caller redirects it, because
- * the browser resolves the relative links of a directory page one level up without the slash.
- */
 function resolveFile(route: HostedSiteRouteManifest, path: string): HostedSiteRouteFile | "directory" | null {
-  // Own keys only: `/constructor` must not find a member of `Object.prototype`.
   const fileAt = (key: string) => (Object.hasOwn(route.files, key) ? route.files[key] : undefined);
   if (!path) return fileAt("index.html") ?? null;
   const file = fileAt(path) ?? (path.endsWith("/") ? fileAt(`${path}index.html`) : undefined);
@@ -279,10 +269,6 @@ const readRouteManifest = Effect.fn("SiteRouter.readRouteManifest")(function* (o
   );
 });
 
-/**
- * `text` is the plain-text body. Clients that do not ask for HTML get it byte for byte as before.
- * `title` and `detail` are for the HTML page that a browser gets.
- */
 const siteErrors = {
   methodNotAllowed: {
     status: 405,
@@ -355,7 +341,6 @@ function errorResponse(request: Request, env: SiteRouterEnv, error: SiteError): 
   return new Response(errorPage(request, env, error, nonce), { status, headers });
 }
 
-/** True when the request lists `text/html` with a quality above zero. A wildcard alone is not enough. */
 function acceptsHtml(request: Request): boolean {
   const accept = request.headers.get("Accept");
   if (!accept) return false;
@@ -415,7 +400,6 @@ function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/gu, (character) => `&#${character.charCodeAt(0)};`);
 }
 
-/** Returns a URL on the account service origin, or null when `ACCOUNT_ORIGIN` is absent or not an HTTP origin. */
 function accountUrl(env: SiteRouterEnv, path: string): URL | null {
   if (!env.ACCOUNT_ORIGIN) return null;
   try {

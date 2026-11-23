@@ -5,7 +5,6 @@ import { type PreferenceFileFailure, PreferenceStore } from "./preference-file";
 export const MCP_SERVER_OWNERS_FILE = "openbot-mcp-server-owners-v1.json";
 
 interface McpServerOwnersFile {
-  /** The member ID of the person who added each MCP server, by MCP server ID. */
   owners: Record<string, string>;
 }
 
@@ -19,17 +18,8 @@ function decodeOwners(parsed: unknown): McpServerOwnersFile | null {
   return { owners };
 }
 
-/**
- * The member who added each MCP server of this host from a joined server (`mcp-member-access-v1`), so
- * a member can change only the servers that they added. A preference file rather than the database:
- * it needs no migration, and an older build ignores it.
- *
- * A server with no entry, such as one added on this computer or before this file existed, counts as
- * an admin's. A missing or damaged file reads as no entries, so it gives no member a server.
- */
 export class McpServerOwnersStore {
   readonly #store: PreferenceStore<McpServerOwnersFile>;
-  // `PreferenceStore` chains its writes, but each change here reads the map first.
   readonly #changes = Semaphore.makeUnsafe(1);
 
   constructor(path: string) {
@@ -40,7 +30,6 @@ export class McpServerOwnersStore {
     return this.#store.load();
   }
 
-  /** Whether `memberId` added the MCP server `mcpServerId`. */
   addedBy(mcpServerId: string, memberId: string): boolean {
     return this.#store.get().owners[mcpServerId] === memberId;
   }

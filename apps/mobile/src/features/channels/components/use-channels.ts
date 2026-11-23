@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 
-export function useChannels(serverId: string, channelId?: string) {
+export function useChannelSubscription(serverId: string) {
   const { channelStore } = useMobileWorkspaceActions();
   const subscribe = useCallback(
     (listener: () => void) => channelStore.subscribe(serverId, listener),
     [channelStore, serverId],
   );
+  return { channelStore, subscribe };
+}
+
+export function useChannels(serverId: string, channelId?: string) {
+  const { channelStore, subscribe } = useChannelSubscription(serverId);
   const snapshot = useCallback(() => channelStore.get(serverId), [channelStore, serverId]);
   const state = useSyncExternalStore(subscribe, snapshot);
   useEffect(
@@ -16,17 +21,8 @@ export function useChannels(serverId: string, channelId?: string) {
   return { ...state, store: channelStore };
 }
 
-/**
- * One channel of a server, and the server flags. The value stays the same while the list row, the page
- * and the flags of this channel stay the same, so a change to another channel does not render the caller
- * again. The page of the channel loads while the caller is mounted.
- */
 export function useChannel(serverId: string, channelId: string) {
-  const { channelStore } = useMobileWorkspaceActions();
-  const subscribe = useCallback(
-    (listener: () => void) => channelStore.subscribe(serverId, listener),
-    [channelStore, serverId],
-  );
+  const { channelStore, subscribe } = useChannelSubscription(serverId);
   const snapshot = useCallback(
     () => channelStore.channelView(serverId, channelId),
     [channelStore, serverId, channelId],
@@ -36,16 +32,8 @@ export function useChannel(serverId: string, channelId: string) {
   return { ...view, store: channelStore };
 }
 
-/**
- * Only the channel list of a server. The list keeps its identity while it stays the same, so a
- * message page that changes, such as on each event of a channel reply, does not render the caller again.
- */
 export function useChannelList(serverId: string) {
-  const { channelStore } = useMobileWorkspaceActions();
-  const subscribe = useCallback(
-    (listener: () => void) => channelStore.subscribe(serverId, listener),
-    [channelStore, serverId],
-  );
+  const { channelStore, subscribe } = useChannelSubscription(serverId);
   const snapshot = useCallback(() => channelStore.get(serverId).channels, [channelStore, serverId]);
   return useSyncExternalStore(subscribe, snapshot);
 }

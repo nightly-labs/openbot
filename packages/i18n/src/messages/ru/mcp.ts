@@ -28,6 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Ожидание браузера…",
   "mcp.signIn.continue": "Перейти к {name}",
   "mcp.signIn.pageDescription": "Эта страница открыта в браузере на {host}. Войдите здесь.",
+  "mcp.signIn.copyHint": "Если страница не загружается, скопируйте ссылку и откройте её в другом браузере.",
+  "mcp.signIn.copyLink": "Копировать ссылку",
+  "mcp.signIn.pasteHint":
+    "Если вы входите на другом устройстве, скопируйте адрес, который в конце покажет его браузер, и вставьте его сюда.",
   "mcp.test.connected": {
     one: "Подключено · {count} инструмент",
     few: "Подключено · {count} инструмента",
@@ -101,6 +105,7 @@ export const messages = {
   "mcp.panel.signIn": "Войти",
   "mcp.panel.signOut": "Выйти",
   "mcp.panel.cancelSignIn": "Отменить вход",
+  "mcp.panel.useAddress": "Использовать этот адрес",
   "mcp.panel.signInTo": "Войти в {name}",
   "mcp.panel.signInWaiting": {
     one: "Завершите вход в браузере. OpenBot ждёт не дольше {count} минуты.",

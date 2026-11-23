@@ -23,7 +23,6 @@ export interface OpenBotPlaygroundProps {
   dependencies?: OpenBotPlaygroundDependencies;
   options?: MockOpenBotOptions | undefined;
   variant?: "default" | "landing";
-  /** The colors of the landing variant. The home page is dark. */
   theme?: "dark" | "light";
 }
 
@@ -55,7 +54,6 @@ export function OpenBotPlayground(props: OpenBotPlaygroundProps) {
     void controllerLoading;
   }
 
-  // The desktop entry point starts this for each window. The preview renders `App` without it.
   onSettled(() => syncLogoColor());
 
   onSettled(() => {
@@ -102,7 +100,6 @@ export function OpenBotPlayground(props: OpenBotPlaygroundProps) {
     disposed = true;
     landingController?.dispose();
     mock.dispose();
-    // Storybook can mount a story again before it removes the first copy. That copy must not remove the API of the new one.
     if (window.openbot === mock.api) window.openbot = previousApi;
   });
 

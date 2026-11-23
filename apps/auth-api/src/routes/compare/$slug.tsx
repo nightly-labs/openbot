@@ -6,10 +6,6 @@ import { COMPARE_COLLECTION } from "../../lib/compare";
 import { articleUrl, type CollectionArticle, findArticle } from "../../lib/content-collection";
 import { articleHead } from "../../lib/content-metadata";
 
-// In `loader` for the reason given in routes/news/$slug.tsx: an unknown slug is a
-// real not-found response, not a 200 with an error card.
-// `loader` and `head` stay in the bundle of every page, so they import the comparisons when they
-// run. Only `component` goes to the chunk of this route, so it can import them at the top.
 async function loadComparison(slug: string): Promise<CollectionArticle> {
   const article = findArticle(COMPARE_COLLECTION, slug);
   const { COMPARISONS } = await import("../../content/compare");
@@ -27,8 +23,6 @@ export const Route = createFileRoute("/compare/$slug")({
     const page = COMPARISONS[loaderData.slug];
     if (!page) return head;
     const siteUrl = match.context.siteUrl;
-    // Each app in a roundup points to its own entry on the page, so no two items share
-    // a URL. OpenBot points to the home page.
     const pageUrl = articleUrl(COMPARE_COLLECTION, loaderData.slug, siteUrl);
     const itemList =
       page.kind === "roundup"
@@ -53,8 +47,6 @@ export const Route = createFileRoute("/compare/$slug")({
 function ComparisonRoute() {
   const article = Route.useLoaderData();
   return (
-    // Keyed: a link from one comparison to another keeps this route mounted, and
-    // CompareArticlePage picks its layout once, so each page gets a fresh tree.
     <Show when={COMPARISONS[article().slug]} keyed>
       {(page) => <CompareArticlePage collection={COMPARE_COLLECTION} article={article()} page={page} />}
     </Show>

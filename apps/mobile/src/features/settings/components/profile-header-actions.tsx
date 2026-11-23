@@ -12,17 +12,11 @@ import { useText } from "@/shared/lib/text";
 
 interface ProfileHeaderActionsProps {
   save: { dirty: boolean; canSave: boolean; pending: boolean; label: string; onSave: () => void };
-  /** Null while there is no activity to share: the action shows, disabled. */
   onShare: (() => void) | null;
   onSignOut: () => void;
   disabled: boolean;
 }
 
-/**
- * The top right of the Profile page: the Save button of the name draft, and the menu with Share
- * and Sign out. iOS shows both in one native bar. An Android header has one right slot, so the
- * Save button takes the place of the menu while the name has changes.
- */
 export function ProfileHeaderActions({ save, onShare, onSignOut, disabled }: ProfileHeaderActionsProps) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -32,7 +26,6 @@ export function ProfileHeaderActions({ save, onShare, onSignOut, disabled }: Pro
   const shareLabel = t("mobile.settings.profile.share");
   const signOutLabel = t("mobile.settings.profile.signOut");
   const canShare = Boolean(onShare);
-  // The header options change only when the menu looks different, as in `AndroidHeaderButton`.
   const actions = useRef({ onShare, onSignOut });
   useLayoutEffect(() => {
     actions.current = { onShare, onSignOut };

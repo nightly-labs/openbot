@@ -30,6 +30,8 @@ export const messages = {
   "settings.movingFaces.title": "Hareketli ajan yüzleri",
   "settings.movingFaces.description":
     "Ajan yüzleri göz kırpar ve hareket eder. GPU’su olmayan bir bilgisayarda başta durağandır.",
+  "settings.startupAnimation.title": "Açılış animasyonu",
+  "settings.startupAnimation.description": "OpenBot açılırken ajan animasyonunu gösterir.",
   "settings.logoColor.title": "Logo rengi",
   "settings.logoColor.description": "Dock'ta, görev çubuğunda ve Dynamic Island'da gösterilir.",
   "settings.logoColor.buildNote": "Bu derleme kendi logo rengini korur. Seçim, yayımlanan uygulamaya uygulanır.",
@@ -51,15 +53,17 @@ export const messages = {
   "settings.chatBackground.default": "Varsayılan",
   "settings.chatBackdrop.title": "Pencere arka planı",
   "settings.chatBackdrop.description":
-    "Bu cihazda tüm pencerenin arkasında bir sahne, resim veya GIF. Bir ajandan sahne isteyin, sonra yanıtında “Arka plan olarak kullan” seçeneğini seçin.",
+    "Bu cihazda tüm pencerenin arkasında bir sahne, resim, GIF veya video. Bir ajandan sahne isteyin, sonra yanıtında “Arka plan olarak kullan” seçeneğini seçin.",
   "settings.chatBackdrop.none": "Yok",
   "settings.chatBackdrop.pond": "Koi göleti",
   "settings.chatBackdrop.jellyfish": "Denizanaları",
   "settings.chatBackdrop.sunset": "Retro gün batımı",
   "settings.chatBackdrop.snowfall": "Kar yağışı",
   "settings.chatBackdrop.fireflies": "Ateş böcekleri",
-  "settings.chatBackdrop.upload": "Resim yükle…",
-  "settings.chatBackdrop.uploadRefused": "En fazla 20 MB boyutunda bir PNG, JPEG, GIF, WebP veya AVIF resmi kullanın.",
+  "settings.chatBackdrop.coast": "Neon sahil",
+  "settings.chatBackdrop.upload": "Yükle…",
+  "settings.chatBackdrop.uploadRefused":
+    "En fazla 20 MB boyutunda bir PNG, JPEG, GIF, WebP veya AVIF resmi ya da en fazla 100 MB boyutunda bir MP4 veya WebM videosu kullanın.",
   "settings.chatBackdrop.saveFailed": "Arka plan kaydedilmedi.",
   "settings.chatBackdrop.removeFailed": "Arka plan kaldırılmadı.",
   "settings.chatColor.title": "Sohbet rengi",
@@ -470,7 +474,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "Görüntü kopyalanamadı.",
   "settings.profile.share.createFailed": "Görüntü oluşturulamadı.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "OpenBot ile son altı ayım",
   "settings.profile.activity.title": "Bu bilgisayardaki etkinlik",
   "settings.profile.activity.activeDays": {
@@ -480,7 +483,6 @@ export const messages = {
   "settings.profile.activity.empty": "Henüz etkinlik yok",
   "settings.profile.activity.loading": "Etkinlik yükleniyor…",
   "settings.profile.activity.loadFailed": "Etkinliğiniz yüklenemedi.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "Son bir yılda {count} etkin günde {tokens} token",
     other: "Son bir yılda {count} etkin günde {tokens} token",
@@ -562,7 +564,6 @@ export const messages = {
   "settings.updates.autoInstall.title": "Güncellemeleri otomatik yükle",
   "settings.updates.autoInstall.description":
     "Ajanlar boştayken OpenBot yeniden başlar ve indirilen güncellemeyi yükler. Sunucularınızın üyelerinin bağlantısı kısa bir süre kesilir.",
-  // Ajan çalışmadığında OpenBot'u yeniden başlatın veya indirilmiş bir güncellemeyi yükleyin.
   "settings.updates.idleRestart.title": "OpenBot'u yeniden başlat",
   "settings.updates.idleRestart.relaunchDescription":
     "OpenBot hiçbir ajan çalışmadığında yeniden başlatılır. Yeni rutin çalıştırmaları o zamana kadar bekler.",
@@ -604,6 +605,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plan sona erdi",
   "settings.hostedServers.state.creating": "Oluşturuluyor",
   "settings.hostedServers.state.starting": "Başlatılıyor",
+  "settings.hostedServers.state.restoring": "Geri yükleniyor",
   "settings.hostedServers.state.running": "Çalışıyor",
   "settings.hostedServers.state.stopping": "Durduruluyor",
   "settings.hostedServers.state.stopped": "Durduruldu",
@@ -614,6 +616,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "Kurulum, Stripe ödemeyi onayladığında başlar.",
   "settings.hostedServers.planEndedDescription":
     "Plan sona erdi, bu nedenle sunucu durduruldu. Verileri kalır. Başlatmak için planı yenileyin.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "Plan sona erdi, bu nedenle sunucu durduruldu. Verileri {date} tarihine kadar kalır. Başlatmak için planı bu tarihten önce yenileyin.",
   "settings.hostedServers.pay": "Ödeme sayfasını aç",
   "settings.hostedServers.payLabel": "{name} için ödeme sayfasını aç",
   "settings.hostedServers.renew": "Planı yenile",
@@ -659,7 +663,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Günlük rutinleri olan küçük bir ekip için.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Çok sayıda ajan ve yoğun tarayıcı çalışması için.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dikte",
   "settings.voice.model.parakeet.description": "Hızlı. Konuşulan dili 25 Avrupa dili arasında kendisi bulur.",
   "settings.voice.model.parakeetUnified.description":
@@ -727,7 +730,43 @@ export const messages = {
   "settings.voice.speech.sample": "Merhaba. Yanıtlarınız böyle duyulacak.",
   "settings.voice.speech.listenFailed": "Örnek oynatılamadı.",
   "settings.voice.live.section": "Canlı ses",
+  "settings.voice.talk.section": "Sesli konuşma",
+  "settings.voice.talkKey.title": "Bas konuş tuşu",
+  "settings.voice.talkKey.description": "Sesli konuşmada konuşmak için bu tuşları basılı tutun.",
+  "settings.voice.talkKey.change": "Bas konuş tuşunu değiştir",
+  "settings.voice.talkKey.recording": "Tuşlara basın",
+  "settings.voice.talkKey.refused": "Bir tuş daha ekleyin",
+  "settings.voice.talkKey.reset": "Sıfırla",
+  "settings.tab.keyboard.title": "Klavye",
+  "settings.tab.keyboard.description": "Bu cihazdaki klavye kısayollarını değiştirin.",
+  "settings.shortcuts.section": "Kısayollar",
+  "settings.shortcuts.fixed.section": "Sabit kısayollar",
+  "settings.shortcuts.command.newThread": "Yeni mesaj dizisi",
+  "settings.shortcuts.command.previousThread": "Önceki mesaj dizisi",
+  "settings.shortcuts.command.nextThread": "Sonraki mesaj dizisi",
+  "settings.shortcuts.command.newAgent": "Yeni ajan",
+  "settings.shortcuts.command.globalSearch": "Her yerde ara",
+  "settings.shortcuts.command.searchChat": "Sohbette ara",
+  "settings.shortcuts.command.focusComposer": "Mesaj kutusuna git",
+  "settings.shortcuts.command.back": "Geri",
+  "settings.shortcuts.command.forward": "İleri",
+  "settings.shortcuts.command.toggleSidebar": "Kenar çubuğunu göster veya gizle",
+  "settings.shortcuts.command.showShortcuts": "Klavye kısayollarını göster",
+  "settings.shortcuts.command.openSettings": "Ayarları aç",
+  "settings.shortcuts.command.stopAllAgents": "Tüm ajanları durdur",
+  "settings.shortcuts.command.switchServer": "Sunucu değiştir",
+  "settings.shortcuts.command.zoom": "Yakınlaştırma",
+  "settings.shortcuts.refused.invalid": "Bir değiştirici tuş ekleyin",
+  "settings.shortcuts.refused.reserved": "Sistem bu kısayolu kullanıyor",
+  "settings.shortcuts.refused.taken": "{command} kullanıyor",
+  "settings.shortcuts.recording": "Tuşlara basın",
+  "settings.shortcuts.change": "{command} kısayolunu değiştir",
+  "settings.shortcuts.reset": "Sıfırla",
+  "settings.shortcuts.resetAll": "Tümünü sıfırla",
   "settings.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",
+  "settings.voice.live.account": "Hesap",
+  "settings.voice.live.accountAutomatic": "Otomatik",
+  "settings.voice.live.accountDescription": "Canlı sesin kullandığı ChatGPT hesabı. Planı sesi içeren bir hesap seçin.",
   "settings.transfer.title": "Bu sunucuyu başka bir bilgisayara taşıyın",
   "settings.transfer.lede": "Ajanlarınız, becerileri, rutinleri, bellekleri ve dosyaları tek bir dosyada toplanır.",
   "settings.transfer.flow.label": "Aktarım nasıl çalışır",
@@ -837,6 +876,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Kanalları, rutin akışları, iş akışları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "settings.transfer.copy.submit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "settings.transfer.copy.duplicatesTitle": "Yinelenen ajanlar kopyalansın mı?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
+  "settings.transfer.copy.duplicatesConfirm": "Yinelenenleri kopyala",
   "settings.transfer.copy.copying": "Kopyalanıyor…",
   "settings.transfer.copy.done": {
     one: "{count} ajan {server} sunucusuna kopyalandı.",

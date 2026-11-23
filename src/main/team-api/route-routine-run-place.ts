@@ -17,14 +17,6 @@ import {
   stringField,
 } from "./request-helpers";
 
-/**
- * `routine-run-place-v1`: where each routine of an agent runs. A member reads the places of an agent
- * that the member can see, and sets the place of one routine with manage access to the agent, as on
- * the released routine routes. Each member sees the routines that the released routes show them: the
- * schedule routines that those routes carry, and, for an owner or admin, the webhook routines of
- * `events-v1`. A set changes only the place: the schedule, the webhook route and its secret stay as
- * they are, and no routine card goes to the chat.
- */
 export async function routeRoutineRunPlace(
   context: TeamApiRequestContext,
   agents: Pick<TeamApiAgents, "listAgents" | "updateRoutine">,
@@ -36,7 +28,6 @@ export async function routeRoutineRunPlace(
     return "unmatched";
   if (!records || !capabilities.has(ROUTINE_RUN_PLACE_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.routineRunPlaceUnsupported"));
-  // `readJson` has already run the body through the routine-run-place wire codec.
   const body = await readJson(request);
   requireVisibleBodyAgent(body, hiddenAgentIds);
   const agentId = stringField(body, "agentId");
@@ -65,11 +56,8 @@ export async function routeRoutineRunPlace(
   function setPlace(store: TeamApiRoutineRunPlaces, current: OwnedRoutineRecord): void {
     try {
       if (current.trigger.kind === "schedule") {
-        // The client saved the routine on a released route just before, and that save shows its card in
-        // the chat. A second card for the place would only repeat it.
         agents.updateRoutine({ agentId, routineId, runIn }, { recordConversationEvent: false });
       } else {
-        // A webhook routine has no released update and no card. A null secret keeps the stored one.
         store.save(owner, routineId, {
           name: current.name,
           instruction: current.instruction,
@@ -87,7 +75,6 @@ export async function routeRoutineRunPlace(
         });
       }
     } catch (error) {
-      // A stored routine that the current rules refuse is the client's problem, not a host failure.
       if (error instanceof RoutineInputError) throw new HttpError(400, error.message);
       throw error;
     }

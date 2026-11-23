@@ -23,10 +23,6 @@ function brandOf(number: string): "visa" | "mastercard" | "amex" | "discover" | 
   return null;
 }
 
-/**
- * An empty Vault kept in memory. The import adds one login, as if the user chose a CSV file. The
- * preview has one host, so the `host*` calls of every server use the same items.
- */
 export function createMockVault(): OpenBotDesktopApi["vault"] {
   let state: VaultState = { ...EMPTY_VAULT, agentScope: true };
   const secrets = new Map<string, Partial<Record<VaultSecretField, string>>>();
@@ -71,7 +67,6 @@ export function createMockVault(): OpenBotDesktopApi["vault"] {
   const save = async ({ agents, ...input }: VaultSaveInput) => {
     const id = input.id ?? `mock-${nextId++}`;
     const saved = state.items.find((current) => current.id === id);
-    // Omitted agents keep the saved choice; null is every agent.
     const scope = agents === undefined ? saved?.agents : (agents ?? undefined);
     const item = { ...summary(input, id), ...(scope ? { agents: scope } : {}) };
     const exists = saved !== undefined;

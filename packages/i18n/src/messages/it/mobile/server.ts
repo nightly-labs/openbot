@@ -111,8 +111,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "Esaurito",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · Termina il {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · Dati conservati fino al {date}",
   "mobile.server.hosted.state.payment": "In attesa di pagamento",
   "mobile.server.hosted.state.setup": "Configurazione",
+  "mobile.server.hosted.state.restoring": "Ripristino dei dati",
   "mobile.server.hosted.state.starting": "Avvio",
   "mobile.server.hosted.state.running": "In esecuzione",
   "mobile.server.hosted.state.stopped": "Arrestato",
@@ -226,6 +228,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "In attesa. L'host esegue tanti turni quanti ne consente la sua memoria.",
   "mobile.server.threads.hold.agentBusy": "In attesa che finisca altro lavoro di questo agente.",
   "mobile.server.threads.hold.oneTurn": "In attesa. Il provider di questo agente esegue un turno alla volta.",
+  "mobile.server.threads.hold.signIn": "In attesa. Il provider di questo agente richiede l’accesso.",
   "mobile.server.threads.offline": "Connettiti a questo server per vedere i suoi thread.",
   "mobile.server.threads.loading": "Caricamento dei thread…",
   "mobile.server.threads.loadFailed": "Impossibile caricare i thread di alcuni agenti.",
@@ -332,6 +335,7 @@ export const messages = {
   "mobile.server.route.timezone": "Fuso orario",
   "mobile.server.route.personality": "Personalità dell’agente",
   "mobile.server.route.agents": "Agenti",
+  "mobile.server.route.voiceModel": "Riconoscimento vocale",
   "mobile.server.settings.storage": "Archiviazione",
   "mobile.server.route.storage": "Archiviazione",
   "mobile.server.route.storageFiles": "Tutti i file",
@@ -457,6 +461,19 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Connettiti a questo server come proprietario o admin per cambiarne il fuso orario.",
   "mobile.server.settings.timezoneUnsupported": "Aggiorna OpenBot su questo server per cambiarne qui il fuso orario.",
+  "mobile.server.settings.voiceModelDescription":
+    "Gli agenti su questo server usano questo modello per trascrivere l’audio dei video senza sottotitoli.",
+  "mobile.server.settings.voiceModelLoading": "Caricamento del riconoscimento vocale…",
+  "mobile.server.settings.voiceModelLoadFailed": "Impossibile caricare il modello di riconoscimento vocale del server.",
+  "mobile.server.settings.voiceModelSaveFailed": "Impossibile cambiare il modello di riconoscimento vocale. Riprova.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Aggiorna OpenBot su questo server per cambiarne qui il riconoscimento vocale.",
+  "mobile.server.settings.voiceModelReady": "Pronto",
+  "mobile.server.settings.voiceModelDownloading": "Download: {percent}",
+  "mobile.server.settings.voiceModelSize": "Download di {size}",
+  "mobile.server.settings.voiceModelDownload": "Scarica",
+  "mobile.server.settings.voiceModelCancel": "Ferma download",
+  "mobile.server.settings.voiceModelRemove": "Rimuovi",
   "mobile.server.settings.keySection": "Chiave del server",
   "mobile.server.settings.keyChanged": "Ultima modifica",
   "mobile.server.settings.keyChange": "Cambia chiave",
@@ -540,6 +557,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Aggiungi agenti",
   "mobile.server.browserProfiles.agentsHint":
     "Un tocco dà questo profilo all'agente o lo riporta al profilo condiviso. Una modifica chiude le schede aperte dell'agente.",
+  "mobile.server.browserProfiles.movedNote":
+    "Gli accessi ai siti restano nel profilo precedente. Un agente spostato deve accedere di nuovo a questi siti.",
   "mobile.server.browserProfiles.clear": "Cancella dati",
   "mobile.server.browserProfiles.clearTitle": "Cancellare i dati di {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -709,6 +728,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "In Proton Pass, crea una chiave di accesso che può leggere solo il vault che condividi con OpenBot, poi incollala qui. {host} conserva la chiave; questo telefono no.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Il tuo piano Proton non include lo strumento da riga di comando di Proton Pass. Serve un piano Proton che includa Pass Plus. Altri piani a pagamento, come Mail Plus, non lo includono. Cambia il piano del tuo account, poi connetti di nuovo.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} non è disponibile su questo server.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Accedi a {name} su questo telefono. Poi {host} crea un vault condiviso e una chiave di accesso in sola lettura per il vault, e conserva solo quella chiave. Gli agenti non vedono mai una password.",
@@ -737,8 +758,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Sola lettura",
   "mobile.server.connectors.passwordManager.keyExpires": "Sola lettura. Scade il {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Scaduta il {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "Lo strumento da riga di comando di {name} richiede un piano a pagamento. Cambia il piano del tuo account, poi connetti di nuovo.",
   "mobile.server.connectors.passwordManager.expiredTitle": "La chiave di {name} è scaduta",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Gli agenti su {host} non possono accedere con i tuoi login condivisi finché non connetti di nuovo.",
@@ -894,7 +913,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "La tua chat «Messaggio a te stesso» e le persone che autorizzi raggiungono OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "Le persone che autorizzi raggiungono OpenBot. Le altre ricevono un codice da darti.",
+    "La tua chat «Messaggio a te stesso» e le persone che autorizzi raggiungono OpenBot. Le altre ricevono un codice da darti.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp ha rimosso questo server dai dispositivi collegati. Collega di nuovo il numero.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1135,11 +1154,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Impossibile modificare i modelli. Riprova.",
   "mobile.server.providers.promptCache": "Cache dei prompt",
   "mobile.server.providers.promptCacheHint":
-    "Per quanto tempo Claude tiene in cache il contesto di un agente tra i turni. La modifica vale al prossimo avvio di Claude.",
-  "mobile.server.providers.promptCacheDefault": "Predefinito di Claude Code",
+    "Per quanto tempo Claude e Pi tengono il contesto di un agente nella cache tra un turno e l’altro. La modifica si applica al prossimo avvio del provider.",
+  "mobile.server.providers.promptCacheDefault": "Predefinito del provider",
   "mobile.server.providers.promptCacheHour": "1 ora",
   "mobile.server.providers.promptCacheLoadFailed":
     "Impossibile caricare la durata della cache dei prompt di questo server.",
+  "mobile.server.providers.cacheExpiryCompaction": "Compatta prima della scadenza della cache",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Quando una chat con 200K o più token di contesto è inattiva con una cache di 1 ora, l’agente compatta il contesto prima della scadenza della cache. Così il messaggio successivo non rilegge tutto il contesto senza cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Impossibile caricare l’impostazione di compattazione di questo server.",
   "mobile.server.providers.compactWindow": "Compatta le chat a",
   "mobile.server.providers.compactWindowHint":
     "Claude Code riassume i turni più vecchi di una chat quando la chat raggiunge questa dimensione. Più basso mantiene i turni rapidi ed economici. Più alto conserva più dettagli. Un modello con una finestra più piccola compatta al proprio limite.",
@@ -1195,6 +1219,8 @@ export const messages = {
     "ChatGPT usa questa chiave, non il tuo piano ChatGPT. OpenAI addebita ogni richiesta alla chiave. L'utilizzo del piano non viene mostrato.",
   "mobile.server.providers.codexKeyAlternative":
     "Oppure accedi con una chiave API di OpenAI. OpenAI addebita ogni richiesta alla chiave.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse usa questa chiave, non il tuo accesso. Per usare il tuo accesso, rimuovi la chiave.",
   "mobile.server.providers.sectionUse": "Utilizzo",
   "mobile.server.providers.unused": "Nessun agente lo usa",
   "mobile.server.providers.usedByCount": { one: "1 agente lo usa", other: "{count} agenti lo usano" },
@@ -1261,6 +1287,8 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Connesso · {count} strumento", other: "Connesso · {count} strumenti" },
   "mobile.server.mcp.signInOnComputer":
     "Questo server MCP chiede l’accesso. Accedi da OpenBot su un computer, poi prova di nuovo.",
+  "mobile.server.mcp.signIn": "Accedi",
+  "mobile.server.mcp.signInHere": "Questo server MCP chiede di accedere. Tocca Accedi, poi prova di nuovo.",
   "mobile.server.mcp.signedInDescription": "{server} ha eseguito l’accesso a questo server MCP.",
   "mobile.server.mcp.signOut": "Esci",
   "mobile.server.mcp.saveFailed": "Impossibile salvare la modifica. Riprova.",
@@ -1311,6 +1339,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 ore",
   "mobile.server.planLimits.window.hours": { one: "{count} ora", other: "{count} ore" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Aggiornamenti",
   "mobile.server.settings.updateAvailable": "Aggiornamento disponibile",
   "mobile.server.route.updates": "Aggiornamenti",
@@ -1361,7 +1390,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "In attesa di {reasons}.",
   "mobile.server.update.disabledTitle": "Gli aggiornamenti remoti sono disattivati",
   "mobile.server.update.disabledDescription":
-    "L'utente di {name} ha disattivato gli aggiornamenti dai membri del server. Chiedigli di aggiornare OpenBot o di riattivare l'impostazione.",
+    "L'utente di {name} ha disattivato gli aggiornamenti dai membri del server. Chiedigli di aggiornare OpenBot o di aprire Impostazioni > Aggiornamenti sul suo computer e attivare «Consenti aggiornamenti dai membri del server».",
   "mobile.server.update.managedTitle": "Gli aggiornamenti sono controllati da un Host Manager",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager aggiorna {name}. Contatta l'amministratore dell'host.",
@@ -1484,7 +1513,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "Aggiunto {member} a {role}",
   "mobile.server.audit.roleMemberRemoved": "Rimosso {member} da {role}",
   "mobile.server.audit.agentLevel": "{agent} per {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importa agenti",
   "mobile.server.route.import": "Importa agenti",
   "mobile.server.import.unsupported": "Aggiorna OpenBot su questo server per importare qui gli agenti.",
@@ -1557,7 +1585,6 @@ export const messages = {
   "mobile.server.import.channel": "Canale",
   "mobile.server.import.notImportedTitle": "Non importati",
   "mobile.server.import.resultWarnings": "Alcuni elementi non sono stati spostati",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Trasferimento",
   "mobile.server.route.transfer": "Trasferimento",
   "mobile.server.route.transferExport": "Esporta",
@@ -1634,6 +1661,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Vengono copiati anche i loro canali, i flussi di routine, i flussi di lavoro e la cartella condivisa. Chiavi API, accessi, connettori e cronologia delle chat non vengono copiati. Configurali di nuovo sull'altro server.",
   "mobile.server.transfer.copySubmit": { one: "Copia {count} agente", other: "Copia {count} agenti" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Copiare gli agenti duplicati?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} ha già agenti con questi nomi: {names}. La copia aggiunge un secondo agente per ciascuno. Ogni copia è un agente separato, con le sue chat, i suoi file e le sue memorie.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Copia i duplicati",
   "mobile.server.transfer.copying": "Copia in corso…",
   "mobile.server.transfer.copyFailed": "La copia non è terminata.",
   "mobile.server.transfer.copied": {
@@ -1644,4 +1675,42 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Gli agenti copiati usano le regole di approvazione di {server}.",
   "mobile.server.transfer.copyNoServer":
     "Connettiti a un altro server come proprietario o amministratore per copiarvi gli agenti.",
+  "mobile.server.route.ownerTransfer": "Trasferisci proprietà",
+  "mobile.server.ownerTransfer.unavailable":
+    "Connettiti a questo server come proprietario per trasferire la proprietà.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot ospita questo server, quindi il proprietario non può cambiare.",
+  "mobile.server.ownerTransfer.lede":
+    "Il nuovo proprietario riceve un’email e deve accettare dopo aver effettuato l’accesso con quell’email. Poi verrai rimosso da questo server.",
+  "mobile.server.ownerTransfer.email": "Email del nuovo proprietario",
+  "mobile.server.ownerTransfer.send": "Invia",
+  "mobile.server.ownerTransfer.sending": "Invio…",
+  "mobile.server.ownerTransfer.stays":
+    "Agenti, chat, routine, accessi ai provider, chiavi salvate, login del Vault, accessi del browser e app collegate restano sul server. Il nuovo proprietario può usarli.",
+  "mobile.server.ownerTransfer.expiry": "La richiesta scade dopo 7 giorni.",
+  "mobile.server.ownerTransfer.confirmTitle": "Rendere {email} proprietario?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Quando {email} accetta, diventa proprietario di {server} e tu perdi l’accesso. I dati restano sul server. La richiesta scade dopo 7 giorni.",
+  "mobile.server.ownerTransfer.confirm": "Trasferisci",
+  "mobile.server.ownerTransfer.sendFailed": "La richiesta non è stata inviata.",
+  "mobile.server.ownerTransfer.loadFailed": "Impossibile leggere il trasferimento in attesa.",
+  "mobile.server.ownerTransfer.pending": "In attesa del nuovo proprietario",
+  "mobile.server.ownerTransfer.expires": "Scade il {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} deve accettare dopo aver effettuato l’accesso con questa email. Fino ad allora resti tu il proprietario.",
+  "mobile.server.ownerTransfer.cancel": "Annulla",
+  "mobile.server.ownerTransfer.cancelTitle": "Annullare il trasferimento?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} non potrà più accettarlo.",
+  "mobile.server.ownerTransfer.keep": "Mantieni",
+  "mobile.server.ownerTransfer.cancelFailed": "Il trasferimento non è stato annullato.",
+  "mobile.server.ownerTransfer.incomingTitle": "Diventare proprietario di {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} vuole renderti proprietario di {server}. Avrai il pieno controllo del server, e i suoi agenti, chat, routine e accessi salvati restano lì. {name} perde l’accesso. Chi può ancora accedere al computer su cui gira il server può usare il tuo account OpenBot. Cambia le sue password e chiavi SSH.",
+  "mobile.server.ownerTransfer.accept": "Accetta",
+  "mobile.server.ownerTransfer.decline": "Rifiuta",
+  "mobile.server.ownerTransfer.accepted": "Ora sei il proprietario di {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Impossibile accettare il trasferimento",
+  "mobile.server.ownerTransfer.declineFailed": "Impossibile rifiutare il trasferimento",
+  "mobile.server.ownerTransfer.tryAgain": "Riprova più tardi.",
+  "mobile.server.providers.updateAll": "Aggiorna tutti",
+  "mobile.server.providers.updateAllFailed": "Alcuni aggiornamenti non sono partiti. Riprova.",
 } as const satisfies PartialTranslation<typeof source>;

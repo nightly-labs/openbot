@@ -66,7 +66,6 @@ export const messages = {
   "connector.github.disconnectEffectTools": "Każdy agent traci narzędzia GitHub, gh i git.",
   "connector.github.disconnectEffectRevoke": "Potem otworzy się GitHub, gdzie możesz cofnąć dostęp dla OpenBot.",
   "connector.github.disconnectEffectKept": "Czaty, pliki i pamięć agentów zostają na tym komputerze.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Każdy agent na serwerze {host} może używać twoich repozytoriów, zgłoszeń i pull requestów z GitHub oraz gh i git.",
   "connector.github.connectedSummaryHost": {
@@ -393,7 +392,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Do OpenBot trafiają wiadomości z twojego czatu „Wiadomość do siebie” i od osób, którym pozwolisz.",
   "connector.whatsapp.dedicatedNote":
-    "Do OpenBot trafiają wiadomości od osób, którym pozwolisz. Inne osoby dostają kod, który mają ci przekazać.",
+    "Do OpenBot trafiają wiadomości z twojego czatu „Wiadomość do siebie” i od osób, którym pozwolisz. Inne osoby dostają kod, który mają ci przekazać.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp usunął ten komputer z połączonych urządzeń. Połącz numer ponownie.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp usunął ten serwer z połączonych urządzeń. Połącz numer ponownie.",
   "connector.whatsapp.helpError":
@@ -662,9 +661,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agenci nie mogą logować się udostępnionymi danymi, dopóki nie zalogujesz się ponownie.",
   "connector.protonPass.reconnect": "Połącz ponownie",
-  "connector.protonPass.planTitle": "Proton Pass wymaga płatnego planu",
+  "connector.protonPass.planTitle": "Proton Pass wymaga planu z Pass Plus",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI działa tylko z płatnym planem Proton. Zmień plan, a potem połącz ponownie.",
+    "Proton Pass CLI wymaga planu Proton, który obejmuje Pass Plus. Inne płatne plany, takie jak Mail Plus, go nie obejmują. Zmień plan, a potem połącz ponownie.",
   "connector.protonPass.vaultTitle": "Udostępniony sejf",
   "connector.protonPass.vaultDescription":
     "Agenci mogą logować się danymi z tego sejfu. Przenieś do niego dane logowania, aby je udostępnić.",

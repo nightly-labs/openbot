@@ -2,13 +2,12 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/vault";
 
 export const messages = {
-  // The Vault of this computer: its encrypted file and the items that the user saves in it.
   "error.vault.unavailable": "这台电脑没有密钥存储，因此保险库无法保存项目。",
   "error.vault.unreadable": "保险库文件无法读取。请重置保险库后再使用。",
   "error.vault.tooLarge": "保险库已满。请删除一些项目，然后重试。",
   "error.vault.itemMissing": "该项目已不在保险库中。",
   "error.vault.valueTooLong": "某个值过长。",
-  "error.vault.websiteInvalid": "请填写 HTTPS 网站地址。",
+  "error.vault.websiteInvalid": "请填写 HTTP/HTTPS 网站地址。",
   "error.vault.passwordRequired": "请填写密码。",
   "error.vault.twoStepKeyInvalid": "这不是两步验证密钥。请填写该网站的设置密钥或 otpauth:// 链接。",
   "error.vault.cardNumberInvalid": "请填写有效的卡号。",

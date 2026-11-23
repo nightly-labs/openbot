@@ -32,7 +32,7 @@ export const messages = {
   "app.provider.restartFailed": "Nie udało się uruchomić ponownie: {name}",
   "app.provider.included": "{name} jest dołączony do OpenBot.",
   "app.clipboard.copyFailed": "Nie udało się skopiować tekstu.",
-  "app.voice.tooLong": "Nagrania głosowe są ograniczone do dwóch minut.",
+  "app.voice.tooLong": "Nagrania głosowe są ograniczone do 10 minut.",
   "app.avatar.type": "Wybierz obraz PNG, JPEG, GIF lub WebP.",
   "app.avatar.size": "Wybierz obraz mniejszy niż 10 MB.",
   "app.avatar.processingUnavailable": "Przetwarzanie obrazów jest niedostępne.",
@@ -95,6 +95,7 @@ export const messages = {
     "Moje agenty AI pracują teraz na moim komputerze z OpenBotem. Moje czaty i pliki zostają u mnie. Wypróbuj: {site}",
   "app.socialFollow.redditTitle": "Jak używam OpenBota",
   "app.rail.usageRings": "Użycie {name}: {windows}. Otwórz użycie",
+  "app.rail.usageUnavailable": "Użycie {name} niedostępne. Otwórz użycie",
   "app.rail.customAgentUsage": "Użycie {name}. Otwórz użycie",
   "app.rail.moreUsage": {
     one: "Jeszcze {count} konto. Otwórz użycie",

@@ -34,13 +34,6 @@ interface UpstreamSource {
 
 type UpstreamProvider = "openai" | "anthropic" | "cursor";
 
-/**
- * A vendored plugin in `bundles/<slug>/`, published as one skill `<slug>`. Its archive holds an index
- * `SKILL.md` and each folder of the plugin's `skills/` as `skills/<slug>-<folder>/`, which the app
- * installs as a skill of its own, so `$<slug>-<folder>` calls it with any provider. References to
- * other skills of the pack are renamed. `aliasPrefixes` lets the text name a skill without that
- * prefix, as pstack names `principle-fix-root-causes` the **fix-root-causes** principle.
- */
 interface PackSpec {
   slug: string;
   source: UpstreamProvider;
@@ -79,7 +72,6 @@ interface CatalogSpec {
   sources: Record<UpstreamProvider, UpstreamSource>;
   skills: SkillSpec[];
   agents: AgentSpec[];
-  /** Slugs of earlier agents that the publisher unlists. Installed copies keep their snapshot. */
   retiredAgents: string[];
 }
 
@@ -223,10 +215,6 @@ async function promptArchive(skill: SkillSpec, license: string, sources: Catalog
   );
 }
 
-/**
- * The index `SKILL.md`, the pack's `LICENSE` and `NOTICE.md`, and each skill of the pack in
- * `skills/<pack>-<folder>/`. The upstream text is not checked against `dependencyPattern`.
- */
 async function packArchive(pack: Pack, upstream: UpstreamSource): Promise<Uint8Array> {
   const prefix = pack.spec.slug;
   const root = join(sourceRoot, "bundles", prefix);
@@ -248,10 +236,6 @@ async function packArchive(pack: Pack, upstream: UpstreamSource): Promise<Uint8A
   return zipSync(entries, { level: 9 });
 }
 
-/**
- * One skill folder of a pack and, when it names one, the pack's subagent prompts in `agents/`.
- * Markdown is renamed by `renamePackReferences`; other files are copied unchanged.
- */
 async function packSkillFiles(pack: Pack, folder: string, upstream: UpstreamSource) {
   const root = join(sourceRoot, "bundles", pack.spec.slug);
   const sources = new Map<string, string>();
@@ -300,7 +284,6 @@ function skillDescription(markdown: string): string {
   return metadata.description.trim();
 }
 
-/** Sets the prefixed name, lets the model load the skill, and adds how the pack is installed. */
 function packSkillMarkdown(markdown: string, pack: Pack, folder: string, hasAgents: boolean, files: string[]): string {
   const prefix = pack.spec.slug;
   const end = markdown.indexOf("\n---", 3);
@@ -328,11 +311,6 @@ function packSkillMarkdown(markdown: string, pack: Pack, folder: string, hasAgen
   return `${frontmatter}${markdown.slice(end).trimEnd()}\n\n## ${prefix} in OpenBot\n\n${notes.map((note) => `- ${note}`).join("\n")}\n`;
 }
 
-/**
- * Renames what the upstream text calls another skill of the pack: relative links, slash commands,
- * `name` and **name** mentions, and `<upstreamPath>/skills/<name>/` paths. A link to a file that no
- * pack skill installs goes to the pinned upstream commit instead.
- */
 function renamePackReferences(
   text: string,
   source: string,
@@ -376,7 +354,6 @@ function renamePackReferences(
     );
 }
 
-/** Where a bundle path is installed, relative to the skills folder, or null when no skill has it. */
 function installedPackPath(path: string, pack: Pack): string | null {
   const [root, folder, ...rest] = path.split("/");
   if (root === "skills" && folder && pack.folders.includes(folder))
@@ -540,7 +517,6 @@ async function packSkillSpec(spec: PackSpec): Promise<SkillSpec> {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  // The app installs only a child whose folder name is a valid skill slug.
   const invalid = folders.find((folder) => !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(`${spec.slug}-${folder}`));
   if (invalid) throw new Error(`Pack ${spec.slug} has a skill folder that is not a valid slug: ${invalid}.`);
   return {
@@ -611,7 +587,6 @@ function parseAgentSpec(value: unknown): AgentSpec {
   ) {
     throw new Error("Production catalog contains an invalid agent.");
   }
-  // The publisher writes routines straight to D1, so they get the checks that a submission gets.
   const routines = value.routines ?? [];
   if (
     !Array.isArray(routines) ||
@@ -676,11 +651,6 @@ function utf8Bytes(value: string): Uint8Array {
   return Uint8Array.from(Buffer.from(value, "utf8"));
 }
 
-/*
- * Every category carries its own colour and mark, so a listing reads as a set and a Skill without
- * artwork of its own still shows more than the generic fallback glyph. The mark is drawn as paths
- * rather than as text: an emoji would depend on a font the reader's computer may not carry.
- */
 const categoryArtwork: Record<SkillCategory, { background: string; mark: string }> = {
   coding: { background: "#2463a6", mark: '<path d="M9 18 3 12 9 6"/><path d="m15 6 6 6-6 6"/>' },
   design: {

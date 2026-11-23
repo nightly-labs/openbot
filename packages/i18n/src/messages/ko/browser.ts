@@ -55,6 +55,8 @@ export const messages = {
   "browser.pip.close": "브라우저 팝업 닫기",
   "browser.pip.reattachFailed": "OpenBot이 브라우저를 다시 붙이지 못했어요.",
   "browser.pip.closeFailed": "OpenBot이 브라우저 팝업을 닫지 못했어요.",
+  "browser.window.open": "새 창에서 브라우저 열기",
+  "browser.window.openFailed": "OpenBot이 브라우저 창을 열지 못했어요.",
   "browser.popupBlocked.title": "팝업 차단됨",
   "browser.popupBlocked.dismiss": "팝업 메시지 닫기",
   "browser.liveView.label": "서버에 있는 페이지의 실시간 화면",
@@ -89,6 +91,7 @@ export const messages = {
   "browser.secret.submitting": "제출 중…",
   "browser.secret.takeOver": "직접 제어",
   "browser.secret.failed": "요청을 완료할 수 없어요. 연결을 확인한 후 다시 시도해 주세요.",
+  "browser.secret.ended": "이 로그인 요청은 종료되었어요. 에이전트에게 다시 시도해 달라고 요청해 주세요.",
   "browser.secret.vaultSkip.agentScript":
     "에이전트가 이 페이지에서 스크립트를 실행해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 사용하려면 에이전트에게 페이지를 새로고침하고 다시 시도해 달라고 요청하세요.",
   "browser.secret.vaultSkip.fieldKind":

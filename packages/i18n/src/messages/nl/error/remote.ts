@@ -24,6 +24,16 @@ export const messages = {
     "De host heeft OpenBot niet toegestaan het scherm op te nemen. Geef toestemming voor schermopname op de host en probeer het opnieuw.",
   "error.remote.windowsSessionDisconnected":
     "De Windows-sessie op de host is verbroken, dus er is geen scherm om te delen. Meld je aan bij Windows op het scherm van de host en probeer het opnieuw.",
+  "error.remote.windowsCaptureDenied":
+    "Windows op de host laat OpenBot het scherm niet opnemen. Ontgrendel Windows op het scherm van de host, sluit elke beheerdersprompt en probeer het opnieuw. Blijft het probleem, start de host dan opnieuw op.",
+  "error.remote.macScreenLocked":
+    "De Mac is vergrendeld en kan zijn scherm dus niet delen. Ontgrendel de Mac op zijn scherm en probeer het opnieuw.",
+  "error.remote.streamTooSlowLowerQuality":
+    "De verbinding met de host is te traag voor het beeld. Probeer het opnieuw: de volgende verbinding gebruikt een lagere kwaliteit.",
+  "error.remote.streamTooSlow":
+    "De verbinding met de host is te traag voor het beeld. Gebruik een sneller netwerk en probeer het opnieuw.",
+  "error.remote.noPictureSwitchEncoder":
+    "De host heeft geen beeld gestuurd. Probeer het opnieuw: de volgende verbinding gebruikt een video-instelling die op meer computers werkt.",
   "error.remote.teamSessionExpired": "De teamsessie is verlopen.",
   "error.remote.finishTestBeforeSwitch": "Rond de test van extern bureaublad af voordat je van beeldscherm wisselt.",
   "error.remote.displayNotFound": "Extern beeldscherm niet gevonden.",
@@ -84,8 +94,13 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Alleen de eigenaar kan deze server verwijderen.",
   "error.remote.requestTimeout": "Het externe verzoek duurde te lang.",
   "error.remote.requestFailed": "Het externe verzoek is mislukt.",
-  "error.remote.pinnedKeyMissing": "De externe host heeft geen vastgezette apparaatsleutel.",
-  "error.remote.hostDidNotConnect": "De WebRTC-host heeft geen verbinding gemaakt.",
+  "error.remote.hostKeyMissing":
+    "OpenBot kan deze server niet controleren, omdat de beveiligingssleutel ontbreekt of is gewijzigd. Vraag de eigenaar van de server om de server te controleren.",
+  "error.remote.connectionNotStarted":
+    "OpenBot kon de verbinding met deze server niet starten. Als dit blijft gebeuren, sluit OpenBot af en open het opnieuw.",
+  "error.remote.connectionServiceUnreachable":
+    "Deze computer kan de verbindingsdienst van OpenBot niet bereiken. Controleer de internetverbinding. OpenBot verbindt automatisch opnieuw.",
+  "error.remote.serverAnswerTimeout": "De server heeft niet op tijd geantwoord. OpenBot verbindt automatisch opnieuw.",
   "error.remote.connectionCancelled": "De externe verbinding is geannuleerd.",
   "error.remote.hostDisconnected":
     "De verbinding met de server is verbroken. Controleer of de actie is voltooid en probeer het dan opnieuw.",
@@ -186,6 +201,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Er kon geen directe verbinding met de host worden gemaakt. Een firewall, VPN of proxy kan deze blokkeren.",
   "error.remote.iceDisconnected": "De directe verbinding met de host is verbroken.",
+  "error.remote.webrtcBlocked":
+    "Dit apparaat blokkeert de verbinding die OpenBot nodig heeft. Als de isolatiemodus aan staat, zet die dan uit voor OpenBot via Instellingen > Privacy en beveiliging > Isolatiemodus.",
   "error.remote.directoryUnreachable": "OpenBot kan de OpenBot-service niet bereiken. Controleer je verbinding.",
   "error.remote.directoryTimeout": "De OpenBot-service reageerde niet op tijd. Probeer het opnieuw.",
   "error.remote.inviteAlreadyUsed": "Deze uitnodiging is al gebruikt. Vraag om een nieuwe uitnodiging.",
@@ -205,6 +222,10 @@ export const messages = {
   "error.remote.formUnavailable": "Dit formulier is niet meer beschikbaar.",
   "error.remote.hostedServerRemoval": "Gebruik Facturering om een gehoste server te verwijderen.",
   "error.remote.hostRemoved": "De eigenaar heeft deze server uit het account verwijderd.",
+  "error.remote.ownerTransferSelf": "Deze server is al van jou. Voer het e-mailadres van de nieuwe eigenaar in.",
+  "error.remote.ownerTransferHosted": "Een server die OpenBot host, kan niet van eigenaar wisselen.",
+  "error.remote.ownerTransferInvalid":
+    "Deze eigendomsoverdracht is niet meer beschikbaar. Vraag de eigenaar om hem opnieuw te sturen.",
   "error.remote.channelsUnsupported": "Werk deze desktopserver bij om kanalen te gebruiken.",
   "error.remote.channelDeleteUnsupported": "Werk deze desktopserver bij om kanalen te verwijderen.",
   "error.remote.historyRefreshFailed": "Het bericht is verstuurd, maar de chatgeschiedenis kon niet worden vernieuwd.",

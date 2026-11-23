@@ -19,15 +19,12 @@ import { stopProcessTree } from "./windows-process-tree";
 
 const logger = createOpenBotLogger("acp-sign-in");
 
-/** The messages this client sends: its requests, and a refusal for each request the server makes. */
 type AcpMessage =
   | { id: number; method: "initialize" | "logout" | "authenticate" | AcpExtensionMethod; params: DynamicRecord }
   | { id: unknown; error: { code: number; message: string } };
 
-/** A method of the agent's own, outside ACP. Its name starts with `_`. */
 export type AcpExtensionMethod = `_${string}`;
 
-/** The server's own text for a refused call, or `null` when it gave none. It is not redacted. */
 function serverText(error: unknown): string | null {
   if (!isDynamicRecord(error)) return null;
   const details = isDynamicRecord(error.data) ? error.data.details : undefined;
@@ -35,105 +32,44 @@ function serverText(error: unknown): string | null {
   return typeof text === "string" ? text : null;
 }
 
-/**
- * A server text that says the server could not reach the provider's service: a failed DNS lookup,
- * or a connection that did not open. Go servers (Antigravity) write `lookup <host> on <dns>: server
- * misbehaving`, `dial tcp …` or `connect: connection refused` (#9608), Rust servers `dns error` or
- * `error sending request for url`, and Node servers a system error code. A refused account is an
- * answer, and has none of them. It is matched on the full text: the short reason can cut it off.
- */
 const NETWORK_FAILURE_TEXT =
   /\blookup [\w-]+(?:\.[\w-]+)+\.? on \S+: |\bdial (?:tcp|udp)[46]?\b|\bconnect: (?:connection refused|connection timed out|network is unreachable|no route to host)\b|\bi\/o timeout\b|\bno such host\b|\bserver misbehaving\b|\berror sending request for url\b|\bdns error\b|\btcp connect error\b|\bgetaddrinfo\b|\bfetch failed\b|\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH)\b/iu;
 
-/**
- * The command line of an ACP server, or a function that makes it from the environment of the process.
- * Antigravity takes its state folder as a flag, not from the environment.
- */
 export type AcpArgv = readonly string[] | ((env: Readonly<Record<string, string | undefined>>) => readonly string[]);
 
-/** The command line of an ACP server for the environment `env`. */
 function acpArgv(argv: AcpArgv, env: Readonly<Record<string, string | undefined>>): readonly string[] {
   return typeof argv === "function" ? argv(env) : argv;
 }
 
-/**
- * Whether OpenBot, not the Gemini server, opens the Google sign-in page (`openGoogleSignIn`).
- *
- * The server opens the page with the `open` or `xdg-open` command that it finds on `PATH`, and OpenBot
- * puts its own command first. On Windows, the server starts `rundll32` with the page as an argument,
- * by its absolute path, so a sign-in at this computer lets the server open the page itself.
- * `onHost`: the user is at another device, and the page must not open here. On Windows that
- * sign-in is refused (`startAcpAuthentication`).
- */
 export function googleSignInByOpenBot(onHost: boolean): boolean {
   return onHost || process.platform !== "win32";
 }
 
-/**
- * A sign-in that is an ACP `authenticate` call, for a server that has no login command.
- *
- * The call runs in a process of its own, not in the client that serves turns: the server opens the
- * browser and waits there until the user finishes, and a status probe must never wait on that. The
- * server keeps what it signed in with, so the next process it starts is signed in already.
- *
- * With `logout`, a server that advertises ACP `logout` first removes what it kept. Its `authenticate`
- * then opens the browser, so a Reconnect is a new sign-in, not a check of the saved one.
- * With `logoutOnly`, the call is a sign-out only.
- *
- * `done` settles when the call answers, and the process is stopped then. It rejects when the call
- * fails, the process ends first, or `timeoutMs` passes.
- */
 export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   executable: string;
   argv: AcpArgv;
   env: Record<string, string>;
-  /** The sign-in method. A `logoutOnly` call sends no `authenticate`, and ignores it. */
   methodId: string;
   timeoutMs: number;
-  /** Signs the server out before `authenticate`, when it advertises ACP `logout`. */
   logout?: boolean;
-  /** Called when the server answered `logout`: what it kept is gone, whether the sign-in ends or not. */
   onLoggedOut?: () => void;
-  /**
-   * A sign-out, for a CLI that has no sign-out command: `done` settles when the server answers
-   * `logout`, with no `authenticate` after it. It rejects when the server does not advertise `logout`.
-   */
   logoutOnly?: boolean;
-  /**
-   * With `logoutOnly`, the agent's own sign-out method, which it does not advertise, in place of ACP
-   * `logout`.
-   */
   signOutMethod?: AcpExtensionMethod | undefined;
-  /**
-   * Gemini gives its Google page to OpenBot's `open` command instead of a browser, and OpenBot opens
-   * it, so a launch that fails shows an error. When the server opened it itself, a failure showed
-   * nothing (#3520). Without it, the server opens the page itself (`googleSignInByOpenBot`). On
-   * Windows the call fails at once: the server opens the page here, and OpenBot cannot catch it.
-   */
-  openGoogleSignIn?: (url: string) => Promise<void>;
-  /** A temporary folder of its own for the process (`provider-temp.ts`). */
+  openSignInPage?: { site: SignInPageSite; open: (url: string) => Promise<void> };
   privateTemp?: ProviderTempOptions | undefined;
-  /**
-   * A delegated sign-in (Mistral Vibe's `browser-auth-delegated`): the server opens no browser. Its
-   * `start` gives the page, which goes here for the user to open on any device, and its `complete`
-   * answers when the user finished there.
-   */
   onSignInUrl?: (url: string) => void;
 }) {
-  // A Windows CLI opens the page on this computer, so a user at another device cannot sign in. The
-  // refusal comes before the process starts, so a Reconnect does not sign the account out first.
-  if (options.openGoogleSignIn && process.platform === "win32")
+  if (options.openSignInPage?.site === "google" && process.platform === "win32")
     return yield* providerFailure(
       new ProviderSignInError({ message: sourceText("error.provider.antigravityRemoteWindowsSignIn") }),
     );
   const env = { ...process.env, ...options.env };
-  const opener = options.openGoogleSignIn
+  const opener = options.openSignInPage
     ? yield* Effect.acquireRelease(
         Effect.tryPromise({ try: () => makeOpenerFolder(), catch: providerFailure }),
         (folder) => Effect.promise(() => rm(folder, { recursive: true, force: true })),
       )
     : null;
-  // Cursor's Windows launcher is a `.cmd` file, which starts only through `cmd.exe`.
   const target = cliSpawnTarget(options.executable, acpArgv(options.argv, env));
   const child = yield* Effect.acquireRelease(
     Effect.try({
@@ -147,7 +83,6 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
               ...tempEnv,
             },
             windowsVerbatimArguments: target.windowsVerbatimArguments,
-            // Only Gemini delegates the browser launch. Other servers still open it themselves.
             stdio: ["pipe", "pipe", "pipe"],
             shell: false,
             windowsHide: process.platform === "win32",
@@ -167,9 +102,8 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
         resume(error ? Effect.fail(providerFailure(error)) : Effect.void);
       };
       const fail = (error: Error) => settle(error);
-      const openGoogleSignIn = options.openGoogleSignIn;
+      const signInPage = options.openSignInPage;
       let opened = false;
-      // A failed sign-out says so, whatever stopped it.
       const signInFailed = (message: string) =>
         fail(
           new ProviderSignInError({
@@ -179,32 +113,28 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
       const browserFailed = () =>
         signInFailed(
           sourceText(
-            process.platform === "linux"
-              ? "error.provider.geminiBrowserUnavailable"
-              : "error.provider.geminiBrowserOpenFailed",
+            signInPage?.site === "devin"
+              ? "error.provider.acpSignInFailed"
+              : process.platform === "linux"
+                ? "error.provider.geminiBrowserUnavailable"
+                : "error.provider.geminiBrowserOpenFailed",
           ),
         );
-      // The page holds the sign-in's OAuth state. It is registered as a secret and never logged.
       const readSignInPage = () => {
-        if (settled || opened || !opener || !openGoogleSignIn) return;
+        if (settled || opened || !opener || !signInPage) return;
         void readFile(join(opener, OPENER_PAGE), "utf8").then(
           (text) => {
-            // A line with no end is still being written.
             const end = text.indexOf("\n");
             if (settled || opened || end < 0) return;
             const url = URL.parse(text.slice(0, end).trim());
-            if (
-              url?.origin !== "https://accounts.google.com" ||
-              !GOOGLE_SIGN_IN_PATHS.has(url.pathname) ||
-              url.username ||
-              url.password
-            )
-              return browserFailed();
+            if (!url || !SIGN_IN_PAGES[signInPage.site](url) || url.username || url.password) return browserFailed();
             opened = true;
+            const page = SIGN_IN_PAGE_LINKS[signInPage.site](url);
             registerSecretValue(url.toString());
+            registerSecretValue(page);
             void Promise.resolve()
               .then(() => {
-                if (!settled) return openGoogleSignIn(url.toString());
+                if (!settled) return signInPage.open(page);
               })
               .catch(browserFailed);
           },
@@ -220,7 +150,6 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
         send({
           id: 2,
           method: "authenticate",
-          // Vibe 3.1.0 reads the arguments of its delegated sign-in from `_meta`, not from the params.
           params: { methodId: options.methodId, ...(options.onSignInUrl ? { _meta: { action: "start" } } : {}) },
         });
       child.once("error", fail);
@@ -236,21 +165,17 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           return;
         }
         if (!isDynamicRecord(message)) return;
-        // A request from the server gets a refusal, so it does not wait on a client that has no answer.
         if (typeof message.method === "string" && message.id !== undefined) {
           send({ id: message.id, error: { code: -32601, message: "Method not found" } });
           return;
         }
         if (message.error !== undefined && typeof message.id === "number" && message.id >= 1 && message.id <= 4) {
           const text = serverText(message.error);
-          // The reason that the user and the log see: redacted and short.
           const reason = signInReason(text);
-          // A refused sign-out keeps the server's reason, such as a token that the CLI did not save.
           if (options.logoutOnly && reason)
             return fail(
               new ProviderSignInError({ message: sourceText("error.provider.acpSignOutFailedReason", { reason }) }),
             );
-          // The resolver's or socket's words do not help the user, so they stay in the log.
           if (!options.logoutOnly && text && NETWORK_FAILURE_TEXT.test(text)) {
             logger.warn("An ACP sign-in could not reach the provider's service.", { reason });
             return signInFailed(sourceText("error.provider.acpSignInNetwork"));
@@ -261,7 +186,6 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
               : sourceText("error.provider.acpSignInFailed"),
           );
         } else if (message.id === 1) {
-          // A server without the method would refuse it with a reason that the user cannot act on.
           const result = isDynamicRecord(message.result) ? message.result : undefined;
           const methods = result?.authMethods;
           if (
@@ -270,7 +194,6 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
             !methods.some((method) => isDynamicRecord(method) && method.id === options.methodId)
           )
             return signInFailed(sourceText("error.provider.acpSignInMethodMissing"));
-          // A client must not call `logout` unless the server advertises it.
           const capabilities = isDynamicRecord(result?.agentCapabilities) ? result.agentCapabilities : undefined;
           const auth = isDynamicRecord(capabilities?.auth) ? capabilities.auth : undefined;
           const canLogOut = isDynamicRecord(auth?.logout);
@@ -287,14 +210,12 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           const page = typeof attempt?.signInUrl === "string" ? URL.parse(attempt.signInUrl) : null;
           if (page?.protocol !== "https:" || page.username || page.password || typeof attempt?.attemptId !== "string")
             return signInFailed(sourceText("error.provider.codeLoginNoLink"));
-          // The page and the attempt name the sign-in. They are registered as secrets and never logged.
           registerSecretValue(page.toString());
           registerSecretValue(attempt.attemptId);
           options.onSignInUrl(page.toString());
           const params = { methodId: options.methodId, _meta: { action: "complete", attemptId: attempt.attemptId } };
           send({ id: 4, method: "authenticate", params });
         } else if (message.id === 4) {
-          // Only a finished sign-in ends it. Another answer, such as a new attempt, is not one.
           if (delegatedResult(message.result, options.methodId)?.status === "completed") settle(null);
           else signInFailed(sourceText("error.provider.acpSignInFailed"));
         } else if (message.id === 2) {
@@ -309,7 +230,6 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           clientCapabilities: {
             fs: { readTextFile: false, writeTextFile: false },
             terminal: false,
-            // The server offers its delegated sign-in only to a client that says it shows the page.
             ...(options.onSignInUrl ? { _meta: { [options.methodId]: true } } : {}),
           },
           clientInfo: { name: "openbot", title: "OpenBot", version: "0.1.0" },
@@ -329,25 +249,45 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
   return { child, done: Fiber.join(done) };
 });
 
-/** The `_meta` record of a delegated sign-in's answer, under the name of its method. */
 function delegatedResult(result: unknown, methodId: string): DynamicRecord | undefined {
   const meta = isDynamicRecord(result) && isDynamicRecord(result._meta) ? result._meta[methodId] : undefined;
   return isDynamicRecord(meta) ? meta : undefined;
 }
 
-/** How often the page file is read while the server has not opened its page. */
 const OPENER_POLL_MS = 250;
 
-/** The file that OpenBot's `open` command writes the page to. */
 const OPENER_PAGE = "page";
 
-/** The Google sign-in pages that Antigravity opens: 1.5 uses the first, 1.4 the second. */
 const GOOGLE_SIGN_IN_PATHS = new Set(["/o/oauth2/auth", "/o/oauth2/v2/auth"]);
 
-/**
- * A private folder with an `open` (macOS) and an `xdg-open` (Linux) command that write their first
- * argument to the file `page` there, in place of a browser.
- */
+export type SignInPageSite = "google" | "devin";
+
+export function devinSignInPageRelayed(): boolean {
+  return process.platform === "linux";
+}
+
+const SIGN_IN_PAGES: Record<SignInPageSite, (url: URL) => boolean> = {
+  google: (url) => url.origin === "https://accounts.google.com" && GOOGLE_SIGN_IN_PATHS.has(url.pathname),
+  devin: (url) => url.origin === "https://app.devin.ai",
+};
+
+const GOOGLE_ACCOUNT_CHOOSER = "select_account";
+
+const GOOGLE_SILENT_SIGN_IN = "none";
+
+function withGoogleAccountChooser(url: URL): string {
+  const prompts = (url.searchParams.get("prompt") ?? "").split(" ").filter(Boolean);
+  if (prompts.includes(GOOGLE_ACCOUNT_CHOOSER) || prompts.includes(GOOGLE_SILENT_SIGN_IN)) return url.toString();
+  const page = new URL(url);
+  page.searchParams.set("prompt", [...prompts, GOOGLE_ACCOUNT_CHOOSER].join(" "));
+  return page.toString();
+}
+
+const SIGN_IN_PAGE_LINKS: Record<SignInPageSite, (url: URL) => string> = {
+  google: withGoogleAccountChooser,
+  devin: (url) => url.toString(),
+};
+
 async function makeOpenerFolder(): Promise<string> {
   const folder = await mkdtemp(join(tmpdir(), "openbot-sign-in-"));
   const page = join(folder, OPENER_PAGE).replaceAll("'", `'\\''`);

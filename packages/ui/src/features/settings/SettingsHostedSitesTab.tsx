@@ -19,22 +19,18 @@ import type { SettingsHostedSitesStore } from "./stores/hosted-sites-store";
 interface SettingsHostedSitesTabProps {
   store: SettingsHostedSitesStore;
   available: boolean;
-  /** An owner or admin of the server. A member sees the sites, without Delete. */
   canDelete: boolean;
   onOpenSite: (url: string) => void;
-  /** Opens the server plans, which have more sites. Shown at the site limit; without it, there is no offer. */
   onSeePlans?: (() => void) | undefined;
 }
 
 export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
   const { t, format } = useText();
   const formatDate = (value: string) => format.date(new Date(value), { dateStyle: "medium" });
-  /** The plans offer shows only when the server has no free site slot. */
   function plansOffer() {
     const limit = props.store.state.limit;
     return limit !== null && props.store.state.used >= limit ? props.onSeePlans : undefined;
   }
-  /** The limit as an object, so that a limit of 0 still shows the usage row. */
   function usage() {
     const limit = props.store.state.limit;
     return limit === null ? undefined : { count: limit };
@@ -96,7 +92,6 @@ export function SettingsHostedSitesTab(props: SettingsHostedSitesTabProps) {
                     >
                       <Badge variant="secondary">{t("settings.hostedSites.blocked")}</Badge>
                     </Show>
-                    {/* An upload with no proven server counts against the account's own site, not this server's plan. */}
                     <Show when={site.serverId === null}>
                       <Badge variant="secondary">{t("settings.hostedSites.unlinked")}</Badge>
                     </Show>

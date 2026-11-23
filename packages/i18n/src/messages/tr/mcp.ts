@@ -28,6 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Tarayıcı bekleniyor…",
   "mcp.signIn.continue": "{name} ile devam et",
   "mcp.signIn.pageDescription": "Bu sayfa {host} üzerindeki tarayıcıda açık. Burada oturum açın.",
+  "mcp.signIn.copyHint": "Sayfa yüklenmezse bağlantıyı kopyalayıp başka bir tarayıcıda aç.",
+  "mcp.signIn.copyLink": "Bağlantıyı kopyala",
+  "mcp.signIn.pasteHint":
+    "Başka bir cihazda oturum açarsan, sonunda o tarayıcının gösterdiği adresi kopyalayıp buraya yapıştır.",
   "mcp.test.connected": { one: "Bağlandı · {count} araç", other: "Bağlandı · {count} araç" },
   "mcp.status.testing": "Test ediliyor…",
   "mcp.status.failed": "Başarısız",
@@ -97,6 +101,7 @@ export const messages = {
   "mcp.panel.signIn": "Oturum aç",
   "mcp.panel.signOut": "Oturumu kapat",
   "mcp.panel.cancelSignIn": "Oturum açmayı iptal et",
+  "mcp.panel.useAddress": "Bu adresi kullan",
   "mcp.panel.signInTo": "Oturum aç: {name}",
   "mcp.panel.signInWaiting": {
     one: "Oturum açmayı tarayıcınızda tamamlayın. OpenBot {count} dakika sonra beklemeyi bırakır.",

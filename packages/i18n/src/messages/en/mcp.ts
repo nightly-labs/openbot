@@ -27,6 +27,10 @@ export const messages = defineMessages("mcp", {
   "mcp.signIn.waiting": "Waiting for the browser…",
   "mcp.signIn.continue": "Continue to {name}",
   "mcp.signIn.pageDescription": "This page is open in the browser on {host}. Sign in here.",
+  "mcp.signIn.copyHint": "If the page does not load, copy the link and open it in another browser.",
+  "mcp.signIn.copyLink": "Copy link",
+  "mcp.signIn.pasteHint":
+    "If you sign in on another device, copy the address that its browser shows at the end and paste it here.",
   "mcp.test.connected": { one: "Connected · {count} tool", other: "Connected · {count} tools" },
   "mcp.status.testing": "Testing…",
   "mcp.status.failed": "Failed",
@@ -96,6 +100,7 @@ export const messages = defineMessages("mcp", {
   "mcp.panel.signIn": "Sign in",
   "mcp.panel.signOut": "Sign out",
   "mcp.panel.cancelSignIn": "Cancel sign-in",
+  "mcp.panel.useAddress": "Use this address",
   "mcp.panel.signInTo": "Sign in to {name}",
   "mcp.panel.signInWaiting": {
     one: "Finish the sign-in in your browser. OpenBot stops waiting after {count} minute.",

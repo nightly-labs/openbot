@@ -8,10 +8,6 @@ interface PendingServerRequest {
   reject: (error: Error) => void;
 }
 
-/**
- * The requests a provider client sends to OpenBot, such as an approval or a tool call, that wait for
- * `respond` or `respondError`. An answer to an id this table does not hold is ignored.
- */
 export class PendingServerRequests {
   readonly #send: (request: AppServerRequest) => void;
   readonly #pending = new Map<RequestId, PendingServerRequest>();
@@ -20,11 +16,6 @@ export class PendingServerRequests {
     this.#send = send;
   }
 
-  /**
-   * `signal` aborts when the provider stops waiting for this request. The request then rejects and
-   * leaves the table, and the same signal on the sent request tells OpenBot to stop asking the user.
-   * `detachAfterMs` and `answerBeforeMs` go on the sent request as they are: see `AppServerRequest`.
-   */
   readonly call = Effect.fn("PendingServerRequests.call")(function* (
     this: PendingServerRequests,
     method: string,
@@ -32,6 +23,7 @@ export class PendingServerRequests {
     signal?: AbortSignal,
     detachAfterMs?: number,
     answerBeforeMs?: number,
+    subagent = false,
   ) {
     const id = randomUUID();
     return yield* Effect.callback<unknown, ProviderClientOperationError>((resume) => {
@@ -57,6 +49,7 @@ export class PendingServerRequests {
           signal: requestSignal,
           ...(detachAfterMs === undefined ? {} : { detachAfterMs }),
           ...(answerBeforeMs === undefined ? {} : { answerBeforeMs }),
+          ...(subagent ? { subagent: true as const } : {}),
         });
       } catch (cause) {
         resume(Effect.fail(new ProviderClientOperationError({ cause })));
@@ -83,7 +76,6 @@ export class PendingServerRequests {
     pending.reject(new Error(error.message));
   }
 
-  /** Rejects every waiting request, because the client that sent them stopped. */
   rejectAll(message: string): void {
     for (const pending of this.#pending.values()) pending.reject(new Error(message));
     this.#pending.clear();

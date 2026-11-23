@@ -38,8 +38,6 @@ const temporaryRoot = await mkdtemp(join(tmpdir(), "openbot-filesystem-smoke-"))
 const sharedRoot = join(temporaryRoot, "shared");
 const useImagegen = process.argv.includes("--imagegen");
 const workspaceOnly = process.argv.includes("--workspace-only");
-// Codex lets a sandboxed command write in the temporary folders, so the folder that an agent must
-// not write to is here, outside them. The reports stay here too.
 const reportRoot = resolve(".openbot-build/workspace-only-smoke");
 const providers = requestedProviders();
 
@@ -213,17 +211,15 @@ async function runFilesystemSmoke(provider: AgentProvider, completedProviders: A
   }
 }
 
-/**
- * A Workspace only agent writes in its workspace and the shared folder, reaches the network, and
- * tries to write outside with a command and with a file edit. The smoke declines every approval, so
- * a file outside the roots means the sandbox let the agent out. A missing file alone proves nothing,
- * because the agent can skip the step, so each attempt also needs evidence: the command's exit status
- * that it wrote in the workspace, or an approval or a failed item that names the file.
- */
 async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
   const workspaceRoot = join(temporaryRoot, `workspace-${provider}`);
   const outsideRoot = await mkdtemp(join(reportRoot, `outside-${provider}-`));
-  const agent = { access: "workspace", provider, workspacePath: workspaceRoot } as const;
+  const agent = {
+    id: `filesystem-smoke-${provider}`,
+    access: "workspace",
+    provider,
+    workspacePath: workspaceRoot,
+  } as const;
   const token = provider.toUpperCase();
   const paths = {
     workspace: join(workspaceRoot, "inside.txt"),
@@ -240,7 +236,6 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
   };
   await mkdir(workspaceRoot, { recursive: true });
   if (provider === "claude") {
-    // Settings that another provider could write in the workspace. Workspace only must ignore them.
     await mkdir(join(workspaceRoot, ".claude"), { recursive: true });
     await writeFile(
       join(workspaceRoot, ".claude", "settings.json"),
@@ -260,9 +255,6 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     mentions: string[];
     declined: boolean;
   }[] = [];
-  // Cursor asks before each command and each edit, and the user allows them in the app. Its process
-  // sandbox, not the approval, keeps it in the workspace, so the smoke allows them too, with the
-  // `accept` that the ACP client reads.
   const allowApprovals = provider === "cursor";
   const items = new Map<string, { type: string | null; status: string | null; mentions: string[] }>();
   client.on("request", (request) => {
@@ -280,7 +272,6 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     if (allowApprovals) client.respond(request.id, { decision: "accept" });
     else declineServerRequest(client, request);
   });
-  // The agent's own account of each step, and each item that names a file outside.
   let finalMessage: string | null = null;
   client.on("notification", (notification) => {
     if (notification.method !== "item/started" && notification.method !== "item/completed") return;
@@ -376,7 +367,6 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
     };
     const editAttempt = {
       declinedApprovals: declined(basename(paths.editOutside)).length,
-      // Only the file tool's own approvals: an allowed command that reads the path is no edit.
       allowedEdits: asked(basename(paths.editOutside)).filter(
         (approval) => !approval.declined && approval.method === "item/fileChange/requestApproval",
       ).length,
@@ -406,7 +396,6 @@ async function runWorkspaceOnlySmoke(provider: AgentProvider): Promise<void> {
       (commandStatus !== null && commandStatus !== "0") || commandAttempt.declinedApprovals > 0
         ? null
         : "No evidence that the command tried to write outside and was blocked.",
-      // An edit that the smoke allowed and that left no file was blocked by the process sandbox.
       editAttempt.declinedApprovals > 0 ||
       editAttempt.failedItems.length > 0 ||
       (editAttempt.allowedEdits > 0 && !report.editOutsideWritten)
@@ -512,12 +501,6 @@ async function runImagegenSmoke(): Promise<void> {
   }
 }
 
-/**
- * The smoke's client. `confinement` is for the Workspace only smoke: Codex and Claude take the sandbox
- * with each session, and Grok, OpenCode and Cursor start in the process sandbox that OpenBot gives them. A
- * null model means the first one the provider lists, or `--model`. `stateDirectory` is where a
- * Workspace only Claude query keeps its skill plugin.
- */
 async function createClient(
   provider: AgentProvider,
   confinement?: ProcessConfinement,
@@ -527,7 +510,6 @@ async function createClient(
     if (!confinement) throw new Error(`The filesystem smoke runs ${provider} only with --workspace-only.`);
     const model = modelArgument();
     if (provider === "cursor") {
-      // The provider row's own client, so the smoke starts Cursor in the sandbox that the app gives it.
       const cli = await runCauseEffect(resolveCursorCli());
       const client = requireProviderDriver("cursor").createClient(cli, 60_000, NO_PROVIDER_CREDENTIALS, confinement);
       return { client, model, version: cli.version };

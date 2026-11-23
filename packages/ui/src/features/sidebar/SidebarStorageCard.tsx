@@ -2,7 +2,6 @@ import { Button, IconButton, RadialProgress, X } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";
 
-/** "low": the disk is almost full. "full": a write can fail at any time. */
 export type SidebarStorageLevel = "low" | "full";
 
 export interface SidebarStorageCardProps {
@@ -11,20 +10,14 @@ export interface SidebarStorageCardProps {
   freeBytes: number;
   totalBytes: number;
   onFreeUpSpace: () => void;
-  /** Hides the card until the level is "full". At "full" the card has no close button. */
   onDismiss: () => void;
 }
 
-/**
- * The disk of the selected server, at the bottom of the sidebar, when it is almost full. The ring
- * shows the used part of the disk. "Free up space" opens the Storage tab of Server settings.
- */
 export function SidebarStorageCard(props: SidebarStorageCardProps) {
   const { t, format } = useText();
   const full = () => props.level === "full";
   const usedBytes = () => Math.max(0, props.totalBytes - props.freeBytes);
   const ratio = () => (props.totalBytes > 0 ? usedBytes() / props.totalBytes : 0);
-  // Round down so that a nearly full disk does not show 100% while space is left.
   const percent = () => format.percent(Math.floor(ratio() * 100) / 100);
   const bodyParams = () => ({
     used: format.fileSize(usedBytes()),

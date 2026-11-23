@@ -6,21 +6,21 @@ import {
   type InterfaceAddress,
   interfaceAddresses,
   type PhoneConnection,
+  type PhoneVpnState,
   phoneNetworkText,
+  phoneVpnState,
   probeShape,
 } from "./phone-network";
 import { supportLog } from "./support-log";
 
-/** Candidates of the phone's own interfaces come in a few milliseconds. No server is asked. */
 const GATHER_LIMIT_MS = 1_500;
 const NOT_READ = "Not read yet";
 
 let text = NOT_READ;
+let vpn: PhoneVpnState = "unknown";
 let reading: Promise<string> | null = null;
-/** The network changed while a read ran, so its result can be old. */
 let again = false;
 let installed = false;
-/** The shape of the probe goes to the log one time in each launch. */
 let shapeLogged = false;
 const listeners = new Set<() => void>();
 
@@ -29,17 +29,10 @@ function connectionOf(state: Network.NetworkState): PhoneConnection {
   if (state.type === Network.NetworkStateType.WIFI) return "wifi";
   if (state.type === Network.NetworkStateType.CELLULAR) return "cellular";
   if (state.type === Network.NetworkStateType.ETHERNET) return "ethernet";
-  // Android only. On iOS a VPN shows only as an interface.
   if (state.type === Network.NetworkStateType.VPN) return "vpn";
   return "unknown";
 }
 
-/**
- * The addresses of the phone's network interfaces, each with the mark of a VPN interface. The
- * native WebRTC library lists them when a connection gathers its own candidates. This connection
- * has no ICE server and no other side, so it sends nothing. Null in an app build without the
- * library, or when the read fails.
- */
 async function readInterfaces(): Promise<InterfaceAddress[] | null> {
   const webRtc = liveVoiceWebRtc;
   if (!webRtc) return null;
@@ -65,7 +58,6 @@ async function readInterfaces(): Promise<InterfaceAddress[] | null> {
     const stats = await probe.getStats();
     const reports = stats instanceof Map ? [...stats.values()] : [];
     const found = interfaceAddresses(reports);
-    // A library version whose statistics have no local candidates still gives their lines.
     for (const line of lines) {
       const address = candidateLineAddress(line);
       if (address && !found.some((entry) => entry.address === address))
@@ -84,18 +76,15 @@ async function readInterfaces(): Promise<InterfaceAddress[] | null> {
   }
 }
 
-async function read(): Promise<string> {
+async function read(): Promise<{ text: string; vpn: PhoneVpnState }> {
   const [state, addresses] = await Promise.all([
     Network.getNetworkStateAsync().catch((): Network.NetworkState => ({})),
     readInterfaces(),
   ]);
-  return phoneNetworkText({ connection: connectionOf(state), addresses });
+  const network = { connection: connectionOf(state), addresses };
+  return { text: phoneNetworkText(network), vpn: phoneVpnState(network) };
 }
 
-/**
- * Reads the network again and gives its text. A change goes to the support log, so a report shows
- * the VPN that was on when the problem came, and not only the one at the time of the report.
- */
 export function refreshPhoneNetwork(): Promise<string> {
   if (reading) {
     again = true;
@@ -105,7 +94,11 @@ export function refreshPhoneNetwork(): Promise<string> {
     let next = text;
     do {
       again = false;
-      next = await read().catch(() => text);
+      const result = await read().catch(() => null);
+      if (result) {
+        next = result.text;
+        vpn = result.vpn;
+      }
     } while (again);
     if (next !== text) {
       text = next;
@@ -120,9 +113,12 @@ export function refreshPhoneNetwork(): Promise<string> {
   return current;
 }
 
-/** The network and the VPN of the last read, such as `Wi-Fi · VPN: Tailscale`. */
 export function phoneNetwork(): string {
   return text;
+}
+
+export function phoneVpn(): PhoneVpnState {
+  return vpn;
 }
 
 export function subscribePhoneNetwork(listener: () => void): () => void {
@@ -130,7 +126,6 @@ export function subscribePhoneNetwork(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-/** Reads the network at the start, at each change of the network, and at each return to the app. */
 export function installPhoneNetwork(): void {
   if (installed) return;
   installed = true;
@@ -138,6 +133,5 @@ export function installPhoneNetwork(): void {
   AppState.addEventListener("change", (state) => {
     if (state === "active") void refreshPhoneNetwork();
   });
-  // After the first screen: the read makes a native connection object.
   requestIdleCallback(() => void refreshPhoneNetwork());
 }

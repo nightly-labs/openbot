@@ -1,9 +1,9 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("dialog", {
-  // Native file pickers.
   "dialog.chooseSiteDirectory": "Choose a static site directory",
   "dialog.chooseAgentFolder": "Choose a folder for {agent}",
+  "dialog.chooseChannelFolder": "Choose a folder for {channel}",
   "dialog.chooseAgentExclusion": "Choose a folder that {agent} must not change",
   "dialog.chooseSkill": "Choose a skill folder or ZIP",
   "dialog.filter.skillPackages": "Skill packages",
@@ -21,6 +21,8 @@ export const messages = defineMessages("dialog", {
   "dialog.saveTransfer": "Save the transfer file",
   "dialog.chooseTransfer": "Choose a transfer file",
   "dialog.filter.transfer": "OpenBot transfer files",
+  "dialog.saveWorkflow": "Save the workflow file",
+  "dialog.filter.workflow": "OpenBot workflow files",
   "dialog.chooseExternalLinkApp": "Choose a browser",
   "dialog.filter.applications": "Applications",
 });
