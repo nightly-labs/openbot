@@ -2677,7 +2677,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             turn.failureCause = turn.accountVerification
               ? "authentication"
               : rawCause === "unknown"
-                ? (sdkHarness.fallbackCause?.(detail) ?? rawCause)
+                ? (sdkHarness.fallbackCause?.(detail, failureAt > 0 || turn.reasoned || turn.toolNames.size > 0) ??
+                  rawCause)
                 : rawCause;
             turn.providerError =
               this.#mcpLoadFailureMessage(thread, detail) ??

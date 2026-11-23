@@ -108,7 +108,7 @@ export interface AcpFlavor {
     emptyOutputFailure?: RegExp;
     textToolCall?: { starts: readonly string[]; whole: RegExp };
     turnFailure(text: string): string;
-    fallbackCause?(text: string): CauseCode | null;
+    fallbackCause?(text: string, reachedModel: boolean): CauseCode | null;
     accountLink?(text: string, argv: readonly string[], sessionId: string): string | null;
     accountVerification?: RegExp;
     quota(text: string): string | null;

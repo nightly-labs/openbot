@@ -254,6 +254,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "由于 OpenBot 的实时 CPU 限制为 0，Linux 停止了该提供方。此限制来自你的系统。请安装并启动 rtkit（`rtkit-daemon`），运行 `systemctl --user restart xdg-desktop-portal`，然后重新启动 OpenBot。缺少 rtkit 时，仅重启 xdg-desktop-portal 没有作用。",
   "error.provider.cpuUnsupported": "这台电脑的处理器无法运行此服务商。请使用其他服务商。",
+  "error.provider.largeMemoryPages":
+    "此服务商无法在这个 Linux 内核上运行，因为该内核使用大于 4 KiB 的内存页（例如 Raspberry Pi 5 或 Asahi Linux）。请使用 4 KiB 页的内核，或使用其他服务商。",
+  "error.provider.ipv6Missing":
+    "此服务商需要 IPv6，但这台电脑上的 IPv6 已关闭。请开启 IPv6 后重试。在 WSL 中，请从 .wslconfig 中删除 ipv6.disable=1，然后运行 wsl --shutdown。",
   "error.provider.windowsBlocked": "Windows 安全设置（例如智能应用控制）阻止了此服务商启动。请使用其他服务商。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",

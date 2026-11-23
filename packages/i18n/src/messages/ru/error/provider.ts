@@ -285,6 +285,10 @@ export const messages = {
     "Linux остановил провайдера, потому что у OpenBot ограничение процессорного времени реального времени равно 0. Это ограничение задаёт ваша система. Установите и запустите rtkit (`rtkit-daemon`), выполните `systemctl --user restart xdg-desktop-portal`, затем перезапустите OpenBot. Один перезапуск xdg-desktop-portal не поможет, пока rtkit не установлен.",
   "error.provider.cpuUnsupported":
     "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
+  "error.provider.largeMemoryPages":
+    "Этот провайдер не может работать на этом ядре Linux, потому что ядро использует страницы памяти больше 4 КиБ, как на Raspberry Pi 5 или в Asahi Linux. Используйте ядро со страницами 4 КиБ или другого провайдера.",
+  "error.provider.ipv6Missing":
+    "Этому провайдеру нужен IPv6, а на этом компьютере IPv6 выключен. Включите IPv6 и повторите попытку. В WSL удалите ipv6.disable=1 из .wslconfig и выполните wsl --shutdown.",
   "error.provider.windowsBlocked":
     "Параметры безопасности Windows, например интеллектуальное управление приложениями, не дали запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":

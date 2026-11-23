@@ -301,6 +301,10 @@ export const messages = {
     "OpenBot のリアルタイム CPU 制限が 0 のため、Linux がプロバイダーを停止しました。この制限はシステムから来ています。rtkit をインストールして起動し (`rtkit-daemon`)、`systemctl --user restart xdg-desktop-portal` を実行してから OpenBot を再起動してください。rtkit がない間は、xdg-desktop-portal を再起動するだけでは解決しません。",
   "error.provider.cpuUnsupported":
     "このコンピューターのプロセッサーでは、このプロバイダーを実行できません。別のプロバイダーを使用してください。",
+  "error.provider.largeMemoryPages":
+    "この Linux カーネルは 4 KiB より大きいメモリーページを使用しているため、このプロバイダーを実行できません（Raspberry Pi 5 や Asahi Linux など）。4 KiB ページのカーネルか、別のプロバイダーを使用してください。",
+  "error.provider.ipv6Missing":
+    "このプロバイダーには IPv6 が必要ですが、このコンピューターでは IPv6 がオフになっています。IPv6 をオンにしてから、もう一度お試しください。WSL では、.wslconfig から ipv6.disable=1 を削除し、wsl --shutdown を実行してください。",
   "error.provider.windowsBlocked":
     "スマート アプリ コントロールなどの Windows のセキュリティ設定により、このプロバイダーを起動できませんでした。別のプロバイダーを使ってください。",
   "error.provider.opencodeDatabaseNewer":

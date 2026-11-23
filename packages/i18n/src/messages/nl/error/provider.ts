@@ -292,6 +292,10 @@ export const messages = {
     "Linux heeft de provider gestopt, omdat OpenBot een realtime-CPU-limiet van 0 heeft. De limiet komt van je systeem. Installeer en start rtkit (`rtkit-daemon`), voer `systemctl --user restart xdg-desktop-portal` uit en start OpenBot daarna opnieuw. Alleen xdg-desktop-portal opnieuw starten helpt niet zolang rtkit ontbreekt.",
   "error.provider.cpuUnsupported":
     "De processor van deze computer kan deze aanbieder niet uitvoeren. Gebruik een andere aanbieder.",
+  "error.provider.largeMemoryPages":
+    "Deze aanbieder kan niet draaien op deze Linux-kernel, omdat de kernel geheugenpagina’s groter dan 4 KiB gebruikt, zoals op Raspberry Pi 5 of Asahi Linux. Gebruik een kernel met pagina’s van 4 KiB of een andere aanbieder.",
+  "error.provider.ipv6Missing":
+    "Deze aanbieder heeft IPv6 nodig, en IPv6 staat uit op deze computer. Zet IPv6 aan en probeer het opnieuw. Verwijder in WSL ipv6.disable=1 uit .wslconfig en voer wsl --shutdown uit.",
   "error.provider.windowsBlocked":
     "Windows-beveiligingsinstellingen, zoals Slim app-beheer, hebben het starten van deze provider verhinderd. Gebruik een andere provider.",
   "error.provider.opencodeDatabaseNewer":

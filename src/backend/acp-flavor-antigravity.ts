@@ -5,7 +5,7 @@ import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { GEMINI_INVALID_ARGUMENT, GEMINI_INVALID_CREDENTIALS } from "./agent/provider-diagnostics";
+import { GEMINI_INVALID_ARGUMENT, GEMINI_INVALID_CREDENTIALS, GOOGLE_RESET_FIELDS } from "./agent/provider-diagnostics";
 import { getRecord, getString, isRecord } from "./protocol";
 
 const GEMINI_QUOTA_CHUNK = /^\s*(?:\u26A0 )?Usage Limit Reached\n\n([\s\S]*)$/u;
@@ -103,10 +103,14 @@ const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>>
   "error.provider.antigravityNetwork": "network",
 };
 
-function geminiRequestFailureText(key: GeminiRequestFailureKey, text: string): string {
+function geminiRequestFailureText(key: GeminiRequestFailureKey, text: string, fullText = text): string {
   if (key === "error.provider.antigravityNetwork")
     return sourceText(key, { cause: GEMINI_NETWORK_FAILURE.exec(text)?.[0] ?? "" });
-  return sourceText(key, { detail: shownFailureDetail(text) });
+  const detail = shownFailureDetail(text);
+  const resets = Array.from(fullText.matchAll(GOOGLE_RESET_FIELDS), ([field]) => field).filter(
+    (field) => !detail.includes(field),
+  );
+  return sourceText(key, { detail: resets.length > 0 ? `${detail}\n${resets.join(" ")}` : detail });
 }
 
 function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequestFailureKey | null } {
@@ -122,17 +126,20 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
   if (key) {
     const shown =
       logged && key !== "error.provider.antigravityNetwork" ? (GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text) : text;
-    return { message: geminiRequestFailureText(key, shown), key };
+    return { message: geminiRequestFailureText(key, shown, text), key };
   }
   if (logged || GEMINI_TERMINATED_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityTurnStopped"), key: null };
   return { message: shownFailureDetail(text), key };
 }
 
-function geminiTurnFailureCause(answer: string): CauseCode | null {
+const GEMINI_NOT_FOUND = /\bError 404, Message: .+?, Status: (?:NOT_FOUND|404\b)|\bNOT_FOUND \(code 404\)/u;
+
+function geminiTurnFailureCause(answer: string, reachedModel: boolean): CauseCode | null {
   if (geminiMcpLoadFailure(answer.replace(GEMINI_WARNING_ANSWER, "")) !== null) return null;
   const { key } = geminiAnswerFailure(answer);
-  return key ? (GEMINI_FAILURE_CAUSES[key] ?? null) : null;
+  if (key) return GEMINI_FAILURE_CAUSES[key] ?? null;
+  return reachedModel && GEMINI_NOT_FOUND.test(answer) ? "provider_unavailable" : null;
 }
 
 const GEMINI_INTERNAL_ERROR_PREFIX = /^(?:RequestError:\s*)?Internal error:\s*/u;

@@ -290,6 +290,10 @@ export const messages = {
     "OpenBot의 실시간 CPU 제한이 0이어서 Linux가 공급자를 중지했습니다. 이 제한은 시스템에서 옵니다. rtkit을 설치하고 시작한 다음(`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal`을 실행하고 OpenBot을 다시 시작하세요. rtkit이 없으면 xdg-desktop-portal만 다시 시작해서는 해결되지 않습니다.",
   "error.provider.cpuUnsupported":
     "이 컴퓨터의 프로세서에서는 이 제공자를 실행할 수 없어요. 다른 제공자를 사용해 주세요.",
+  "error.provider.largeMemoryPages":
+    "이 Linux 커널은 4 KiB보다 큰 메모리 페이지를 사용해서 이 제공자를 실행할 수 없어요. Raspberry Pi 5나 Asahi Linux가 그래요. 4 KiB 페이지 커널이나 다른 제공자를 사용해 주세요.",
+  "error.provider.ipv6Missing":
+    "이 제공자에는 IPv6가 필요한데, 이 컴퓨터에서 IPv6가 꺼져 있어요. IPv6를 켠 다음 다시 시도해 주세요. WSL에서는 .wslconfig에서 ipv6.disable=1을 지우고 wsl --shutdown을 실행해 주세요.",
   "error.provider.windowsBlocked":
     "스마트 앱 컨트롤 같은 Windows 보안 설정 때문에 이 공급자를 시작할 수 없습니다. 다른 공급자를 사용하세요.",
   "error.provider.opencodeDatabaseNewer":

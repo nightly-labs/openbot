@@ -49,6 +49,8 @@ const DOWNLOAD_FAILURE_CODES: Readonly<Record<string, string>> = {
   "error.provider.installRecordMismatch": "checksum_failed",
   "error.provider.unexpectedVersion": "version_mismatch",
   "error.provider.cpuUnsupported": "cpu_unsupported",
+  "error.provider.largeMemoryPages": "large_memory_pages",
+  "error.provider.ipv6Missing": "ipv6_missing",
   "error.provider.windowsBlocked": "windows_blocked",
   "error.provider.cliUpdateFailed": "cli_update_failed",
   "error.provider.cliActivateFailed": "cli_activate_failed",

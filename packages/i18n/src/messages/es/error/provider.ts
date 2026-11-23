@@ -298,6 +298,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux detuvo el proveedor porque OpenBot tiene un límite de CPU en tiempo real de 0. El límite viene de tu sistema. Instala e inicia rtkit (`rtkit-daemon`), ejecuta `systemctl --user restart xdg-desktop-portal` y luego reinicia OpenBot. Reiniciar solo xdg-desktop-portal no sirve mientras falte rtkit.",
   "error.provider.cpuUnsupported": "El procesador de este equipo no puede ejecutar este proveedor. Usa otro proveedor.",
+  "error.provider.largeMemoryPages":
+    "Este proveedor no puede ejecutarse en este kernel de Linux, porque el kernel usa páginas de memoria de más de 4 KiB, como en Raspberry Pi 5 o Asahi Linux. Usa un kernel con páginas de 4 KiB u otro proveedor.",
+  "error.provider.ipv6Missing":
+    "Este proveedor necesita IPv6, y IPv6 está desactivado en este equipo. Activa IPv6 y vuelve a intentarlo. En WSL, quita ipv6.disable=1 de .wslconfig y ejecuta wsl --shutdown.",
   "error.provider.windowsBlocked":
     "La configuración de seguridad de Windows, como el Control inteligente de aplicaciones, impidió que este proveedor se iniciara. Usa otro proveedor.",
   "error.provider.opencodeDatabaseNewer":

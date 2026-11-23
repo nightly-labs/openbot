@@ -50,6 +50,7 @@ import {
   AgentProcessExitError,
   type AgentProvider,
   reportsMissingProcessorFeature,
+  unsupportedKernelReason,
 } from "./../agent-client";
 import { AppServerError, CodexAppServerClient } from "./../app-server-client";
 import {
@@ -188,6 +189,8 @@ function userMustFixStart(reason: string | null | undefined): reason is string {
   return (
     reason === sourceText("error.provider.realtimeLimitZero") ||
     reason === sourceText("error.provider.cpuUnsupported") ||
+    reason === sourceText("error.provider.largeMemoryPages") ||
+    reason === sourceText("error.provider.ipv6Missing") ||
     reason === sourceText("error.provider.geminiSettingsUnreadable") ||
     reason === sourceText("error.provider.geminiAccountSettingsUnreadable") ||
     reason === sourceText("error.provider.grokDefaultModelNotAllowed")
@@ -3150,6 +3153,8 @@ export class ProviderRuntime implements ProviderPort {
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
     if (reportsMissingProcessorFeature(detailed.message, ILLEGAL_INSTRUCTION.test(error.message)))
       return new AgentProcessExitError(sourceText("error.provider.cpuUnsupported"), null, { cause: detailed });
+    const kernel = unsupportedKernelReason(detailed.message);
+    if (kernel) return new AgentProcessExitError(sourceText(kernel), null, { cause: detailed });
     return detailed;
   }
 

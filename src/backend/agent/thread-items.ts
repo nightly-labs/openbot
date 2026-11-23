@@ -148,6 +148,15 @@ function isUnencodableAntigravityHistory(provider: AgentProvider, message: strin
   return provider === "antigravity" && /\bcontains invalid UTF-8\b/.test(message);
 }
 
+function isUnsignedAntigravityThinking(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "antigravity" &&
+    /\bmessages\.\d+\.content\.\d+(?:\.thinking\.signature: Field required|: Invalid `signature` in `thinking` block)/u.test(
+      message,
+    )
+  );
+}
+
 function isStuckAcpTurn(provider: AgentProvider, message: string): boolean {
   return (provider === "mistral" || provider === "acp") && /\bA turn is already running\b/.test(message);
 }
@@ -220,7 +229,11 @@ export function refusedSessionFailure(
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isRefusedOpenCodeInput(provider, message)) return sourceText("error.provider.opencodeInputRefused");
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
-  if (isClearedAntigravityHistory(provider, message) || isUnencodableAntigravityHistory(provider, message))
+  if (
+    isClearedAntigravityHistory(provider, message) ||
+    isUnencodableAntigravityHistory(provider, message) ||
+    isUnsignedAntigravityThinking(provider, message)
+  )
     return sourceText("error.provider.antigravityHistoryUnreadable");
   if (isStuckAcpTurn(provider, message))
     return sourceText("error.provider.acpTurnStuck", { provider: providerLabel(provider) });

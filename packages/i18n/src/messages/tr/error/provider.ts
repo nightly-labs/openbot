@@ -292,6 +292,10 @@ export const messages = {
     "OpenBot'un gerçek zamanlı CPU sınırı 0 olduğu için Linux sağlayıcıyı durdurdu. Bu sınır sisteminizden geliyor. rtkit'i kurup başlatın (`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal` komutunu çalıştırın, ardından OpenBot'u yeniden başlatın. rtkit eksikken yalnızca xdg-desktop-portal'ı yeniden başlatmak işe yaramaz.",
   "error.provider.cpuUnsupported":
     "Bu bilgisayarın işlemcisi bu sağlayıcıyı çalıştıramıyor. Başka bir sağlayıcı kullanın.",
+  "error.provider.largeMemoryPages":
+    "Bu sağlayıcı bu Linux çekirdeğinde çalışamıyor, çünkü çekirdek 4 KiB’den büyük bellek sayfaları kullanıyor; Raspberry Pi 5 veya Asahi Linux’ta olduğu gibi. 4 KiB sayfalı bir çekirdek ya da başka bir sağlayıcı kullanın.",
+  "error.provider.ipv6Missing":
+    "Bu sağlayıcı IPv6 gerektiriyor ve bu bilgisayarda IPv6 kapalı. IPv6’yı açın, sonra yeniden deneyin. WSL’de .wslconfig dosyasından ipv6.disable=1 satırını kaldırın ve wsl --shutdown komutunu çalıştırın.",
   "error.provider.windowsBlocked":
     "Akıllı Uygulama Denetimi gibi Windows güvenlik ayarları bu sağlayıcının başlamasını engelledi. Başka bir sağlayıcı kullanın.",
   "error.provider.opencodeDatabaseNewer":
