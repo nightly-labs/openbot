@@ -4310,20 +4310,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: DynamicRecord,
   ): Effect.fn.Return<DynamicRecord, ProviderClientOperationError> {
     const sessionId = getString(params, "sessionId") ?? [...this.#threads.ids()][0];
-    const own = this.#flavor.userQuestions;
-    const isOwn = own?.method === method.replace(/^_/u, "");
-    if (sessionId && this.#historyReplays.has(sessionId)) return own && isOwn ? own.reply([], {}) : {};
+    const own = [this.#flavor.userQuestions, this.#flavor.planApproval].find(
+      (request) => request?.method === method.replace(/^_/u, ""),
+    );
+    if (sessionId && this.#historyReplays.has(sessionId)) return own ? own.reply([], {}) : {};
     const thread = sessionId ? this.#threads.get(sessionId) : undefined;
-    const asked = isOwn
-      ? getArray(params, "questions")
-          .filter(isRecord)
-          .map((question, index) => ({
-            ...question,
-            id: `question-${index}`,
-            question: getString(question, "question") ?? "",
-          }))
+    const asked = own
+      ? (own.questions?.(params) ?? getArray(params, "questions").filter(isRecord)).map((question, index) => ({
+          ...question,
+          id: `question-${index}`,
+          question: getString(question, "question") ?? "",
+        }))
       : null;
-    const toolCallId = isOwn ? getString(params, "toolCallId") : null;
+    const toolCallId = own ? getString(params, "toolCallId") : null;
     const questionCall = sessionId && toolCallId ? questionToolCallKey(sessionId, toolCallId) : null;
     const stoppedWaiting = new AbortController();
     if (questionCall) this.#openQuestionToolCalls.set(questionCall, stoppedWaiting);
