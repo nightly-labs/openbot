@@ -37,7 +37,6 @@ const DIRECT_NAMES = new Set([
   "forget_memory",
   "react_to_user_message",
   "request_api_key",
-  "request_location",
   "suggest_marketplace_app",
 ]);
 

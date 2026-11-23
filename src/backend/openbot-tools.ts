@@ -242,9 +242,7 @@ export const requestApiKeyToolSchema = z.strictObject({
 export const removeApiKeyToolSchema = z.strictObject({ name: apiKeyNameSchema });
 
 export const requestLocationToolSchema = z.strictObject({
-  reason: uiTextSchema(UI_BLOCK_LIMITS.title).describe(
-    "Why you need the location, in the user's language, such as To find restaurants near you.",
-  ),
+  reason: uiTextSchema(UI_BLOCK_LIMITS.title).describe("Why you need it, in the user's language."),
 });
 
 export const saveApiKeyToolSchema = z.strictObject({
@@ -748,12 +746,8 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "request_location",
-    description: [
-      "Ask the user for their current location, and wait. Use it only when the request needs where the user is, such as places near them, directions, or local weather or time. The location of this computer is not where the user is.",
-      "The user sees your reason and chooses to share once from their phone, or types a place on a computer.",
-      'Result JSON: {"status":"shared","latitude","longitude","accuracyMeters","capturedAt"} from a phone; {"status":"shared","place"} when the user typed a place; {"status":"declined"}; or {"status":"expired"} when the turn ended first.',
-      "Ask again in a later turn when you need a new location. Do not repeat the coordinates unless the user asks for them, and do not save them to memory or files. Not in an external chat or a channel.",
-    ].join(" "),
+    description:
+      'Ask the user for their current location when the request needs where they are, such as places near them or local weather. This computer\'s location is not theirs. Result: "shared" with latitude, longitude, accuracyMeters and capturedAt, or with a typed place; "declined"; or "expired". Not in a channel or an external chat.',
     shape: requestLocationToolSchema.shape,
   },
   {
