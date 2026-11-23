@@ -8,6 +8,7 @@ import { bridgedToolName, getArray, getRecord, getString, isRecord, type ThreadI
 const QUOTE_LIMIT = 48;
 const SHELL_WRAPPER = /^(?:\S*\/)?(?:ba|z|da)?sh\s+-l?c\s+['"]?/u;
 const PREFIX_WORDS = new Set(["sudo", "time", "nice", "command", "exec", "env", "nohup", "timeout", "&"]);
+const SETUP_PROGRAMS = new Set(["cd", "export", "set", "source", "set-location", "sl", "push-location", "pushd"]);
 const READ_PROGRAMS = new Set(["cat", "head", "tail", "less", "more", "bat", "sed", "awk", "jq", "wc", "file", "stat"]);
 const LIST_PROGRAMS = new Set(["ls", "find", "fd", "tree", "mdfind", "locate"]);
 const SEARCH_PROGRAMS = new Set(["rg", "grep", "ag", "ack", "git-grep"]);
@@ -76,10 +77,12 @@ function commandLabel(line: string): string | null {
   const command = line.trim().replace(SHELL_WRAPPER, "");
   for (const part of command.split(/&&|\|\||;|\n/u)) {
     const words = (part.split("|")[0] ?? "").match(/(?:'[^']*'|"[^"]*"|\S)+/gu) ?? [];
-    while (words.length > 0 && (PREFIX_WORDS.has(words[0] ?? "") || /^[A-Z_][A-Z0-9_]*=/u.test(words[0] ?? "")))
+    while (words.length > 0 && (PREFIX_WORDS.has(words[0] ?? "") || /^[A-Za-z_][A-Za-z0-9_]*=/u.test(words[0] ?? "")))
       words.shift();
-    const program = basename((words[0] ?? "").replace(/['"]/gu, ""));
-    if (!program || program === "cd" || program === "export" || program === "set" || program === "source") continue;
+    const first = words[0] ?? "";
+    if (first.startsWith("$") || first.startsWith("{")) continue;
+    const program = basename(first.replace(/['"]/gu, ""));
+    if (!program || SETUP_PROGRAMS.has(program.toLowerCase())) continue;
     return programLabel(program, words.slice(1));
   }
   return null;
