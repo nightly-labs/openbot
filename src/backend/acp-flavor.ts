@@ -264,7 +264,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
 const GROK_PLAN_APPROVE = sourceText("status.messaging.approve");
 const GROK_PLAN_STOP = sourceText("status.agent.planStop");
 const GROK_PLAN_UNANSWERED =
-  "The user could not answer the plan approval, so plan mode is off. Do not edit files yet. Show the plan to the user and wait for their reply.";
+  "The user did not answer the plan approval, so plan mode is off. Do not edit files yet. Show the plan to the user and wait for their reply.";
 
 function grokPlanQuestion(params: DynamicRecord): DynamicRecord {
   const plan = typeof params.planContent === "string" ? params.planContent.trim() : "";
