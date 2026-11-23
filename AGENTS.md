@@ -164,8 +164,7 @@ commit message, the PR description or `docs/`.
 Only these remain, because a tool reads them: license headers, shebangs, `/// <reference>`,
 `@vitest-environment`, `@ts-expect-error`, `biome-ignore`, `#__PURE__`, `# shellcheck`,
 `# syntax=`, JSDoc types in plain `.js` files, file headers that a generator writes, the
-`// scope:` line of each GritQL rule, the `// flag` markers of lint fixtures, the help text of
-`scripts/install-server.sh`, and the `# openbot-boat-pre-stop:` marker. Comments that are data
+`// scope:` line of each GritQL rule, the `// flag` markers of lint fixtures, and the `# openbot-boat-pre-stop:` marker. Comments that are data
 in a string stay too, such as a sample file or a task for a model.
 
 These files keep their comments: vendored code, fixtures, released schemas, released migrations

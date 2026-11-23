@@ -185,6 +185,9 @@ import type {
   WorkflowGitHubHistory,
   WorkflowGitHubRepositoryOptions,
   WorkflowGraph,
+  WorkflowMediaModel,
+  WorkflowMediaPriceRequest,
+  WorkflowMediaUnavailableModel,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowSaveResult,
@@ -228,6 +231,12 @@ import type { RemoteDesktopConnection } from "@/features/workspace/components/re
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 import type { PendingApproval } from "./pending-approvals";
+
+export interface WorkflowMediaModels {
+  models: readonly WorkflowMediaModel[];
+  unavailable?: readonly WorkflowMediaUnavailableModel[];
+  partial: boolean;
+}
 
 export interface AgentExportFile extends AgentExportParts {
   readAll: () => Promise<string>;
@@ -740,11 +749,18 @@ export interface MobileWorkspaceContextValue {
   restoreWorkflowVersion: (input: WorkflowVersionInput, serverId: string) => Promise<WorkflowDetail>;
   canUseWorkflowGitHub: (serverId: string) => boolean;
   canUseWorkflowChats: (serverId: string) => boolean;
+  canUseWorkflowMedia: (serverId: string) => boolean;
+  canUseWorkflowMediaSize: (serverId: string) => boolean;
+  canUseWorkflowAssets: (serverId: string) => boolean;
   canPauseWorkflows: (serverId: string) => boolean;
+  loadWorkflowMediaModels: (serverId: string) => Promise<WorkflowMediaModels>;
+  loadWorkflowMediaPrice: (input: WorkflowMediaPriceRequest, serverId: string) => Promise<number | null>;
+  loadWorkflowCreditBalance: (serverId: string) => Promise<number | null>;
   loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;
   loadWorkflowGitHubOptions: (repository: string, serverId: string) => Promise<WorkflowGitHubRepositoryOptions>;
   loadWorkflowGitHubHistory: (workflowId: string, serverId: string) => Promise<WorkflowGitHubHistory>;
   runWorkflowGitHubLastEvent: (input: WorkflowTriggerInput, serverId: string) => Promise<WorkflowRunDetail>;
+  keepWorkflowPicture: (draftId: string, serverId: string) => Promise<{ fileId: string }>;
   loadAgentTasks: (agentId: string, serverId: string) => Promise<AgentTasksSnapshot>;
   loadAgentTaskConversation: (input: AgentTaskInput, serverId: string) => Promise<ConversationSnapshot>;
   startAgentTask: (
@@ -838,6 +854,9 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflows"
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
+  | "canUseWorkflowMedia"
+  | "canUseWorkflowMediaSize"
+  | "canUseWorkflowAssets"
   | "canPauseWorkflows"
   | "canReadServerStorage"
   | "canOrganizeLibrary"

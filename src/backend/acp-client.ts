@@ -22,6 +22,7 @@ import {
   type SessionConfigOption,
   type SessionNotification,
   type SessionUpdate,
+  type ToolCallLocation,
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
@@ -241,6 +242,7 @@ interface AcpTurn {
   toolKinds: Map<string, string>;
   mediaKinds: Map<string, GeneratedMediaKind>;
   toolItems: Map<string, ThreadItem>;
+  toolLocations: Map<string, ToolCallLocation[]>;
   approvedEdits: { id: string; paths: readonly string[] }[];
   approvedEditRuns: Map<string, string>;
   approvedEditsRan: Set<string>;
@@ -2479,6 +2481,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       toolKinds: new Map(),
       mediaKinds: new Map(),
       toolItems: new Map(),
+      toolLocations: new Map(),
       approvedEdits: [],
       approvedEditRuns: new Map(),
       approvedEditsRan: new Set(),
@@ -3450,6 +3453,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         ...(reported === "failed" && update.content ? { error: update.content } : {}),
       };
       turn.toolItems.set(update.toolCallId, item);
+      if (update.locations?.length) turn.toolLocations.set(update.toolCallId, update.locations);
       this.#foldSubagentTool(thread, turn, update.toolCallId, update.content, item);
       const mediaKind = this.#flavor.mediaTools?.kind(update) ?? turn.mediaKinds.get(update.toolCallId);
       if (mediaKind) turn.mediaKinds.set(update.toolCallId, mediaKind);
@@ -3471,6 +3475,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             ?.abort(PROVIDER_STOPPED_WAITING);
         turn.messages.push(shown);
         turn.toolItems.delete(update.toolCallId);
+        turn.toolLocations.delete(update.toolCallId);
         turn.mediaKinds.delete(update.toolCallId);
         this.#countRepeatedFailure(thread, turn, reported === "failed" ? item : null);
       }
@@ -4066,6 +4071,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
     }
     turn.toolItems.clear();
+    turn.toolLocations.clear();
     const selfWakes =
       this.#flavor.wakesAfterPromptEnds === true && this.#steersByPrompt && status === "completed" && !turn.stopped
         ? this.#selfWakesStarted(turn)
@@ -4078,11 +4084,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#completeMessage(thread, turn, "final_answer", failureReport);
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
-      if (turn.accountVerification || this.#flavor.sdkHarness?.accountVerification?.test(detail)) {
+      const verification =
+        turn.accountVerification || this.#flavor.sdkHarness?.accountVerification?.test(detail) === true;
+      if (verification) {
         turn.accountLink = (yield* this.#readVerificationLink()) ?? turn.accountLink;
         turn.failureCause ??= "authentication";
       }
-      const message =
+      const shown =
         this.options.savedKeyLimitMessage?.(detail, error) ??
         this.#flavor.turnFailure?.(
           error,
@@ -4097,6 +4105,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           () => this.options.providerRefusalStatus?.(thread.id) ?? null,
         ) ??
         detail;
+      const verificationMessage = verification
+        ? null
+        : (this.#flavor.unexplainedFailureVerification?.(error, detail, shown) ?? null);
+      const verifiedLink = verificationMessage ? yield* this.#readVerificationLink() : null;
+      if (verifiedLink) {
+        turn.accountLink = verifiedLink;
+        turn.failureCause = "authentication";
+      }
+      const message = verifiedLink && verificationMessage ? verificationMessage : shown;
       const causeCode = turn.failureCause ?? acpFailureCause(error, this.#flavor, message, answer);
       this.emit("notification", {
         method: "error",
@@ -4267,10 +4284,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (thread?.needsResume && !thread.activeTurn) return { outcome: { outcome: "cancelled" } };
     const turn = thread?.activeTurn;
     const turnId = turn?.id ?? randomUUID();
+    const { toolCallId } = params.toolCall;
+    const toolKind = params.toolCall.kind ?? turn?.toolKinds.get(toolCallId);
+    const toolCall = {
+      ...params.toolCall,
+      locations: params.toolCall.locations ?? turn?.toolLocations.get(toolCallId) ?? null,
+      rawInput: params.toolCall.rawInput ?? turn?.toolItems.get(toolCallId)?.arguments,
+    };
     const kind =
-      params.toolCall.kind === "execute"
+      toolKind === "execute"
         ? "command"
-        : ["edit", "delete", "move"].includes(params.toolCall.kind ?? "")
+        : ["edit", "delete", "move"].includes(toolKind ?? "")
           ? "file-change"
           : "permissions";
     if (
@@ -4279,15 +4303,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       !turn.stopped &&
       !turn.completing &&
       ((this.options.confine &&
-        (callsBridgeTool(thread, params.toolCall, kind, this.#flavor.mcpCallInputNamesServer) ||
-          runsConfinedCommand(params.toolCall, kind, this.#flavor.mcpCallInputNamesServer))) ||
-        (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, params.toolCall.title)))
+        (callsBridgeTool(thread, toolCall, kind, this.#flavor.mcpCallInputNamesServer) ||
+          runsConfinedCommand(toolCall, kind, this.#flavor.mcpCallInputNamesServer))) ||
+        (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
       if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
     }
     const requestedPermissions = kind === "permissions" ? { [params.toolCall.kind ?? "file-system"]: true } : null;
-    const filePaths = kind === "file-change" ? permissionFilePaths(params.toolCall, thread?.cwd) : [];
+    const filePaths = kind === "file-change" ? permissionFilePaths(toolCall, thread?.cwd) : [];
     const result = yield* this.#waitForUser(
       turn,
       this.#serverRequests.call(
@@ -4295,11 +4319,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         {
           threadId: params.sessionId,
           turnId,
-          command: params.toolCall.kind === "execute" ? printableInput(params.toolCall.rawInput) : null,
-          reason: params.toolCall.title ?? null,
+          command: toolKind === "execute" ? printableInput(toolCall.rawInput) : null,
+          reason: toolCall.title ?? null,
           permissions: requestedPermissions,
           grantRoot: filePaths.length === 1 ? filePaths[0] : null,
-          ...(this.options.confine && params.toolCall.kind !== "move" ? { confinedWritePaths: filePaths } : {}),
+          ...(this.options.confine && toolKind !== "move" ? { confinedWritePaths: filePaths } : {}),
         },
         turn?.stop.signal,
       ),
@@ -4317,12 +4341,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         result.decision === "approved" ||
         (isRecord(result.permissions) && Object.keys(result.permissions).length > 0));
     const option = bestPermissionOption(params.options, accepted);
-    const { toolCallId } = params.toolCall;
-    const approvedKind = params.toolCall.kind ?? turn?.toolKinds.get(toolCallId);
-    if (turn && accepted && option && approvedKind === "edit" && this.#flavor.approvedEditSweep) {
+    if (turn && accepted && option && toolKind === "edit" && this.#flavor.approvedEditSweep) {
       turn.approvedEdits.push({
         id: toolCallId,
-        paths: toolCallPaths(params.toolCall, turn.toolItems.get(toolCallId)?.arguments),
+        paths: toolCallPaths(toolCall, turn.toolItems.get(toolCallId)?.arguments),
       });
     }
     return option
@@ -4619,10 +4641,12 @@ function callsBridgeTool(
   if (kind !== "permissions") return false;
   const title = toolCall.title?.trim().replace(/\?$/u, "");
   return thread.dynamicTools.some((namespace) =>
-    namespace.tools.some(
-      (tool) => title === `${namespace.name}__${tool.name}` || title === `Run mcp_${namespace.name}_${tool.name}`,
-    ),
+    namespace.tools.some((tool) => title !== undefined && namesBridgeTool(title, namespace.name, tool.name)),
   );
+}
+
+function namesBridgeTool(title: string, namespace: string, tool: string): boolean {
+  return [`${namespace}__${tool}`, `Run mcp_${namespace}_${tool}`, `mcp__${namespace}__${tool}`].includes(title);
 }
 
 function runsConfinedCommand(
@@ -4639,8 +4663,8 @@ function callsNoUpdateTool(thread: AcpThread, title: string | null | undefined):
   return thread.dynamicTools.some(
     (namespace) =>
       namespace.tools.some((tool) => tool.name === ROUTINE_NO_UPDATE_TOOL) &&
-      (title === `${namespace.name}__${ROUTINE_NO_UPDATE_TOOL}` ||
-        title === `Run mcp_${namespace.name}_${ROUTINE_NO_UPDATE_TOOL}`),
+      title != null &&
+      namesBridgeTool(title, namespace.name, ROUTINE_NO_UPDATE_TOOL),
   );
 }
 

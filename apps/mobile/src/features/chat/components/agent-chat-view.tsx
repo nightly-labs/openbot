@@ -176,7 +176,39 @@ export function MobileChatView({
     steers,
     conversation?.messages,
   );
-  const messages = useMemo(() => withFailureReasons(projected, queue.deliveries), [projected, queue.deliveries]);
+  const withLiveQuestions = useMemo(() => {
+    if (!online || !threadId) return projected;
+    const key = (turnId: string | undefined, requestId: string | number) => `${turnId ?? ""}\n${String(requestId)}`;
+    const saved = new Set(
+      projected.flatMap((message) =>
+        message.kind === "question" ? [key(message.turnId, message.prompt.requestId)] : [],
+      ),
+    );
+    const live = threadWaits.flatMap(
+      ({ reason, questions, agentId, requestId, threadId: waitThreadId, turnId, task }) => {
+        return reason === "question" &&
+          questions &&
+          !task &&
+          agentId === agent.id &&
+          waitThreadId === threadId &&
+          !saved.has(key(turnId, requestId))
+          ? [
+              {
+                id: `question-prompt:${turnId}:${String(requestId)}`,
+                kind: "question" as const,
+                turnId,
+                prompt: { requestId, questions, resolution: null },
+              },
+            ]
+          : [];
+      },
+    );
+    return live.length > 0 ? [...projected, ...live] : projected;
+  }, [online, threadId, projected, threadWaits, agent.id]);
+  const messages = useMemo(
+    () => withFailureReasons(withLiveQuestions, queue.deliveries),
+    [withLiveQuestions, queue.deliveries],
+  );
   const [historyLoadFailed, setHistoryLoadFailed] = useState(false);
   const [catchingUp, setCatchingUp] = useState(false);
   const [focus, setFocus] = useState<{ messageId: string; loaded: boolean; unread: boolean } | null>(() =>

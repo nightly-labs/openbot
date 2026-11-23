@@ -71,6 +71,7 @@ export interface AcpFlavor {
     refusalStatus: () => number | null,
   ): string;
   failureCause?(error: unknown, answer: string): CauseCode | null;
+  unexplainedFailureVerification?(error: unknown, detail: string, message: string): string | null;
   failureReport?: RegExp;
   emptyAnswerFailure?(
     turn: { reasoned: boolean; answered: boolean; showedPlanOrCompaction: boolean },

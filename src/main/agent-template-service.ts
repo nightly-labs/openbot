@@ -29,7 +29,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { containsSecret } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
 import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -414,7 +414,7 @@ function assertNoSecrets(snapshot: AgentTemplateSnapshot): void {
           : [],
     ),
   ];
-  for (const [message, text] of fields) if (redactText(text) !== text) throw new Error(message);
+  for (const [message, text] of fields) if (containsSecret(text)) throw new Error(message);
 }
 
 function isOwnedTemplate(value: unknown): value is OwnedTemplate {

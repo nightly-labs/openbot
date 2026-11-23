@@ -18,6 +18,7 @@ import {
   type WorkflowMediaCatalogModel,
   type WorkflowMediaOptionValue,
   type WorkflowMediaPriceRequest,
+  type WorkflowMediaUnavailableModel,
   type WorkflowNode,
   workflowFileAssetBytes,
   workflowVideoLengthChoices,
@@ -47,6 +48,11 @@ import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "@openbot/contracts/team-protoc
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import {
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CODECS,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-unavailable-v1";
 import {
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_CODECS,
@@ -110,6 +116,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import {
   decodeRemoteWorkflowDetail,
+  decodeRemoteWorkflowMediaUnavailable,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowVersions,
 } from "@openbot/team-client/workflow-decoding";
@@ -210,6 +217,12 @@ const CREDIT_MODEL: WorkflowMediaCatalogModel = {
   inputs: ["frames"],
 };
 let creditModels: readonly WorkflowMediaCatalogModel[] = [];
+const CREDIT_UNAVAILABLE: WorkflowMediaUnavailableModel = {
+  id: "openbot-kling_e2e",
+  name: "Kling e2e · Omni",
+  kinds: ["video"],
+};
+let creditUnavailable: readonly WorkflowMediaUnavailableModel[] = [];
 let creditBalance: { available: number; quota: number | null } | null = null;
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
@@ -527,6 +540,7 @@ async function startHost(): Promise<Host> {
             only === "openbot"
               ? creditModels
               : [...(higgsfieldSignedIn ? liveModels : []), ...(only === undefined ? creditModels : [])],
+          ...(only === undefined || only === "openbot" ? { unavailable: creditUnavailable } : {}),
         }),
       mediaPrice: (request) =>
         Effect.sync(() => {
@@ -2562,6 +2576,53 @@ try {
         higgsfieldSignedIn = false;
         creditModels = [];
         creditBalance = null;
+      }
+    },
+  );
+
+  await step(
+    "credit media unavailable: the host advertises workflows-credit-media-unavailable-v1 to protocol 10; its route lists a saved credit model with no route by name only, the credit catalog does not list it, and a peer without the capability gets server too old",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        decodeTeamProtocolSupportExpanded((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body)
+          .capabilities;
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY));
+      const route = WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES.list;
+      const codec = WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CODECS.get(route);
+      assert.ok(codec, `No codec for ${route}.`);
+      const raw = async (path: string, capabilities: readonly string[] = TEAM_CURRENT_CAPABILITIES) =>
+        call("POST", path, { token: member, body: {}, protocol: TEAM_PROTOCOL_V10, capabilities });
+      creditModels = [CREDIT_MODEL];
+      creditUnavailable = [CREDIT_UNAVAILABLE];
+      try {
+        codec.request({});
+        const response = await raw(route);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        const listed = codec.response(response.status, response.body);
+        assert.deepEqual(listed, { models: [CREDIT_UNAVAILABLE] });
+        assert.deepEqual(decodeRemoteWorkflowMediaUnavailable(response.body), [CREDIT_UNAVAILABLE]);
+        const catalog = await raw(WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog);
+        assert.equal(catalog.status, 200, JSON.stringify(catalog.body));
+        assert.deepEqual(catalog.body, { models: [CREDIT_MODEL] });
+        creditUnavailable = [];
+        const empty = await raw(route);
+        assert.deepEqual(codec.response(empty.status, empty.body), { models: [] });
+        const old = await raw(
+          route,
+          TEAM_CURRENT_CAPABILITIES.filter(
+            (capability) => capability !== WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
+          ),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        return { listed, catalog: catalog.body, empty: empty.body, old: old.status };
+      } finally {
+        creditModels = [];
+        creditUnavailable = [];
       }
     },
   );

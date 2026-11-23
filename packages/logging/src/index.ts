@@ -103,7 +103,11 @@ export function redactText(value: string): string {
 }
 
 export function redactSecrets(value: string): string {
-  return redact(value, false, true);
+  return redact(value, false, "keepPastScanBound");
+}
+
+export function containsSecret(value: string): boolean {
+  return redact(value, true, "keep") !== value;
 }
 
 export function redactPostText(value: string): string {
@@ -138,10 +142,12 @@ function isWholeToken(value: string, start: number, end: number): boolean {
   return SENTENCE_DOTS.test(POST_TOKEN_TAIL.exec(value.slice(end))?.[0] ?? "");
 }
 
-function redact(value: string, emails: boolean, keepUnscanned = false): string {
+type UnscannedText = "drop" | "keepPastScanBound" | "keep";
+
+function redact(value: string, emails: boolean, unscanned: UnscannedText = "drop"): string {
   const marked = markRegisteredSecrets(value);
   const redacted =
-    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, keepUnscanned), emails);
+    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, unscanned), emails);
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
@@ -223,7 +229,31 @@ const MAX_EMBEDDED_SCANS = 16;
 
 const UNSCANNED = "[redacted-unscanned]";
 
-function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boolean): string {
+const JSON_ONLY_SECRET_SHAPE = new RegExp(
+  String.raw`"headers"\s*:|"(?:name|key)"\s*:\s*"(?:${SECRET_LABEL}|keys?)"`,
+  "iu",
+);
+
+const JSON_ESCAPE = /\\(?:u([0-9A-Fa-f]{4})|(["\\/bfnrt]))/gu;
+
+const JSON_ESCAPED_CHARACTERS: Record<string, string> = { b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+
+function jsonUnescaped(text: string): string {
+  return text.replace(JSON_ESCAPE, (_escape: string, code: string | undefined, character: string) =>
+    code ? String.fromCharCode(Number.parseInt(code, 16)) : (JSON_ESCAPED_CHARACTERS[character] ?? character),
+  );
+}
+
+function hidesSecret(text: string, emails: boolean): boolean {
+  const decoded = jsonUnescaped(text);
+  return JSON_ONLY_SECRET_SHAPE.test(decoded) || (decoded !== text && applyTextRules(decoded, emails) !== decoded);
+}
+
+function keptOrUnscanned(text: string, emails: boolean): string {
+  return hidesSecret(text, emails) ? UNSCANNED : text;
+}
+
+function redactEmbeddedJson(value: string, emails: boolean, unscanned: UnscannedText): string {
   let result = "";
   let index = 0;
   let scans = 0;
@@ -231,18 +261,22 @@ function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boole
     const start = findPayloadStart(value, index);
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
-      if (keepUnscanned) return result + value.slice(index);
+      if (unscanned === "keepPastScanBound") return result + value.slice(index);
+      if (unscanned === "keep") return result + value.slice(index, start) + keptOrUnscanned(value.slice(start), emails);
       return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     scans += 1;
     const end = findBalancedEnd(value, start);
     if (end < 0 && startsLikeJson(value, start)) {
-      return `${result + value.slice(index, start)}${UNSCANNED}`;
+      if (unscanned !== "keep" || hidesSecret(value.slice(start), emails))
+        return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end), emails);
     if (parsed === null) {
       if (end >= 0 && startsLikeJson(value, start)) {
-        result += value.slice(index, start) + UNSCANNED;
+        result +=
+          value.slice(index, start) +
+          (unscanned === "keep" ? keptOrUnscanned(value.slice(start, end), emails) : UNSCANNED);
         index = end;
         continue;
       }
