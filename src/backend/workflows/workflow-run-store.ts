@@ -240,6 +240,16 @@ export class WorkflowRunStore {
     ).flatMap((row) => readableRun(row) ?? []);
   }
 
+  unreadableOpenRunIds(): Set<string> {
+    return new Set(
+      databaseRows(
+        this.#database.connection
+          .prepare(`SELECT run_id, graph_json FROM workflow_runs WHERE status IN (${placeholders(OPEN_RUN_STATUSES)})`)
+          .all(...OPEN_RUN_STATUSES),
+      ).flatMap((row) => (runGraph(row) ? [] : [requiredStringColumn(row, "run_id")])),
+    );
+  }
+
   setRunStatus(runId: string, status: WorkflowRunStatus, error: string | null, now = new Date()): boolean {
     const at = now.toISOString();
     const ended = isOneOf(OPEN_RUN_STATUSES, status) ? null : at;

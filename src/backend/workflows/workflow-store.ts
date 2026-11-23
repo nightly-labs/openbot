@@ -183,8 +183,9 @@ export class WorkflowStore {
     return this.#transaction(() => {
       const revision = this.#revision(workflowId);
       if (revision !== baseRevision) return { ok: false, conflict: this.#requireDetail(workflowId) };
-      this.#refusePlaceholders(workflowId, graph);
-      assertKnownValues(graph, () => this.#requireDetail(workflowId).graph.nodes);
+      const saved = this.#requireDetail(workflowId);
+      this.#refusePlaceholders(workflowId, saved, graph);
+      assertKnownValues(graph, () => saved.graph.nodes);
       this.#writeGraph(workflowId, graph, now);
       const next = this.#bumpRevision(workflowId, now);
       const last = this.#lastVersionAt(workflowId);
@@ -332,8 +333,8 @@ export class WorkflowStore {
     }));
   }
 
-  #refusePlaceholders(workflowId: string, graph: WorkflowGraph): void {
-    if (this.detail(workflowId)?.needsNewerApp) throw newerSteps();
+  #refusePlaceholders(workflowId: string, saved: WorkflowDetail, graph: WorkflowGraph): void {
+    if (saved.needsNewerApp) throw newerSteps();
     const stored = new Map(
       databaseRows(
         this.#database.connection

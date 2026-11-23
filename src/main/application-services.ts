@@ -3088,15 +3088,15 @@ export async function createApplicationServices({
       saveRoutineFlowPosition: (input) => routineFlowRuntime.savePosition(input),
       workflows: {
         workflows: () =>
-          workflowRuntime
-            .listWithGraphs()
-            .pipe(
-              Effect.map((list) =>
-                list.flatMap(({ summary, graph, needsNewerApp }) =>
-                  needsNewerApp ? [] : [{ title: summary.title, graph }],
-                ),
-              ),
+          workflowRuntime.listWithGraphs().pipe(
+            Effect.map((list) =>
+              list.map(({ summary, graph, needsNewerApp }) => ({
+                title: summary.title,
+                graph,
+                ...(needsNewerApp ? { needsNewerApp } : {}),
+              })),
             ),
+          ),
         createWorkflow: (input) => workflowRuntime.createCopy(input),
       },
       signedInProviders: () =>

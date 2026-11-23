@@ -5,6 +5,7 @@ import {
   WORKFLOW_UNLINKED_CONNECTION,
   type WorkflowFields,
   type WorkflowGraph,
+  type WorkflowIdField,
   type WorkflowIdKind,
   type WorkflowNode,
   workflowFormatIsNewer,
@@ -28,8 +29,14 @@ export interface TransferWorkflow {
   relink?: boolean;
 }
 
+export interface StoredTransferWorkflow {
+  title: string;
+  graph: WorkflowGraph;
+  needsNewerApp?: true;
+}
+
 export interface TransferWorkflowPort {
-  workflows(): Effect.Effect<{ title: string; graph: WorkflowGraph }[], unknown>;
+  workflows(): Effect.Effect<StoredTransferWorkflow[], unknown>;
   createWorkflow(input: CreateWorkflowInput): Effect.Effect<unknown, unknown>;
 }
 
@@ -40,16 +47,30 @@ const IMPORT_CLEARS: ReadonlySet<WorkflowIdKind> = new Set(["file"]);
 const TITLE_LIMIT = 160;
 
 export function exportWorkflows(
-  workflows: readonly { title: string; graph: WorkflowGraph }[],
+  workflows: readonly StoredTransferWorkflow[],
   agentKeys: ReadonlyMap<string, string>,
   channelKeys: ReadonlyMap<string, string>,
+  warnings: string[],
 ): TransferWorkflow[] {
-  return workflows.slice(0, TRANSFER_WORKFLOWS).map((workflow) => ({
-    title: workflow.title,
-    graph: remapGraph(workflow.graph, { agent: agentKeys, channel: channelKeys }, EXPORT_CLEARS, true),
-    format: workflowGraphFormat(workflow.graph),
-    ...(needsLink(workflow.graph) ? { relink: true } : {}),
-  }));
+  return workflows.slice(0, TRANSFER_WORKFLOWS).flatMap((workflow) => {
+    if (workflow.needsNewerApp) {
+      warnings.push(
+        sourceText("error.import.transferSettingSkipped", {
+          name: workflow.title,
+          reason: sourceText("error.workflow.newerSteps"),
+        }),
+      );
+      return [];
+    }
+    return [
+      {
+        title: workflow.title,
+        graph: remapGraph(workflow.graph, { agent: agentKeys, channel: channelKeys }, EXPORT_CLEARS, true),
+        format: workflowGraphFormat(workflow.graph),
+        ...(needsLink(workflow.graph) ? { relink: true } : {}),
+      },
+    ];
+  });
 }
 
 export const importWorkflows = Effect.fn("InstanceTransfer.importWorkflows")(function* (
@@ -112,24 +133,25 @@ function remapGraph(
   };
 }
 
-function connectionValues(node: WorkflowNode): unknown[] {
-  return workflowIdFields(node.kind)
-    .filter((field) => field.id === "connection")
-    .map((field) => node.fields[field.name]);
+function linkedConnection(field: WorkflowIdField, value: unknown): boolean {
+  return (
+    field.id === "connection" &&
+    typeof value === "string" &&
+    value !== "" &&
+    value !== WORKFLOW_UNLINKED_CONNECTION &&
+    !workflowIdFollowsTrigger(field, value)
+  );
 }
 
 function hasConnection(node: WorkflowNode): boolean {
-  return connectionValues(node).some(
-    (value) =>
-      typeof value === "string" && value !== "" && value !== "trigger" && value !== WORKFLOW_UNLINKED_CONNECTION,
-  );
+  return workflowIdFields(node.kind).some((field) => linkedConnection(field, node.fields[field.name]));
 }
 
 function unlinked(node: WorkflowNode, fields: WorkflowFields): WorkflowFields {
   const cleared: WorkflowFields = { ...fields };
   for (const field of workflowIdFields(node.kind)) {
     const value = fields[field.name];
-    if (field.id === "connection") cleared[field.name] = WORKFLOW_UNLINKED_CONNECTION;
+    if (linkedConnection(field, value)) cleared[field.name] = WORKFLOW_UNLINKED_CONNECTION;
     else if (field.id === "place" && !workflowIdFollowsTrigger(field, value)) cleared[field.name] = "";
   }
   if ("roles" in fields) cleared.roles = "";

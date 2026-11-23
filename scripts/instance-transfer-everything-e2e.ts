@@ -365,7 +365,13 @@ function profile(name: string) {
         ),
       workflows: {
         workflows: () =>
-          Effect.sync(() => workflows.listWithGraphs().map(({ summary, graph }) => ({ title: summary.title, graph }))),
+          Effect.sync(() =>
+            workflows.listWithGraphs().map(({ summary, graph, needsNewerApp }) => ({
+              title: summary.title,
+              graph,
+              ...(needsNewerApp ? { needsNewerApp } : {}),
+            })),
+          ),
         createWorkflow: (input) => Effect.try(() => workflows.create(input, new Date(), "saved")),
       },
       signedInProviders: () => [],
@@ -645,6 +651,13 @@ try {
       strokes: [],
     },
   });
+  const brokenRow = source.workflows.create({
+    title: "Broken row",
+    graph: { nodes: [{ id: "keep", kind: "text", at, fields: { text: "Keep me." } }], edges: [], strokes: [] },
+  });
+  source.database.connection
+    .prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ?")
+    .run('{"text":{"rich":true}}', brokenRow.summary.id);
 
   Object.assign(source.serverPreferences, {
     timezone: "Europe/Warsaw",
@@ -1024,6 +1037,12 @@ try {
     newLongDesk?.instructions.length === 2_000 &&
       exported.warnings.some((warning) => warning.startsWith("Long desk:") && warning.includes("2000")),
     JSON.stringify({ length: newLongDesk?.instructions.length, warnings: exported.warnings }),
+  );
+  pass(
+    "a workflow with a step that this OpenBot cannot read stays out of the file, and the user is told",
+    !(manifest.settings?.workflows ?? []).some((workflow) => workflow.title === "Broken row") &&
+      exported.warnings.some((warning) => warning.startsWith("Broken row is not imported.")),
+    JSON.stringify(exported.warnings),
   );
   assert.ok(newChannel);
   pass(

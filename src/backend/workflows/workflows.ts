@@ -1485,8 +1485,9 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             if (run.status === "stopping")
               for (const step of runs.steps(run.id)) if (isOpenStep(step)) yield* stopNow(step);
           }
+          const unreadable = runs.unreadableOpenRunIds();
           for (const step of runs.openSteps()) {
-            if (step.status !== "running") continue;
+            if (step.status !== "running" || (step.runId && unreadable.has(step.runId))) continue;
             let ended = false;
             if (step.kind === "agent") {
               if (!step.deliveryId) {
