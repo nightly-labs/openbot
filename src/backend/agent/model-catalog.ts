@@ -27,7 +27,9 @@ function isOlderListing(
   listed: ReadonlyMap<string, ModelListResponse["data"][number]>,
 ): boolean {
   if (server.hidden === true) return true;
-  return server.upgrade !== undefined && server.upgrade !== server.model && listed.has(server.upgrade);
+  if (server.upgrade === undefined || server.upgrade === server.model) return false;
+  const replacement = listed.get(server.upgrade);
+  return replacement !== undefined && replacement.hidden !== true;
 }
 
 function withPublicIds(models: AgentModelOption[]): AgentModelOption[] {
