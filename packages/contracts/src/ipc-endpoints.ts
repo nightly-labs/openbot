@@ -384,6 +384,7 @@ import type { HiddenAgentsSnapshot, SetAgentHiddenInput } from "./ipc-hidden-age
 import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
+import type { HostSignalHomeSettings } from "./ipc-host-signal-home";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
 import type { HostTurnLimits, HostTurnLimitsInput } from "./ipc-host-turn-limits";
 import type {
@@ -1223,6 +1224,8 @@ export const IPC_ENDPOINTS = {
     ),
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getSignalHome: scopedQuery<HostSignalHomeSettings, "required">()("host-admin:get-signal-home"),
+    setSignalHome: scopedRequest<string | null, HostSignalHomeSettings, "required">()("host-admin:set-signal-home"),
     getVoiceModel: scopedQuery<HostVoiceModel, "required">()("host-admin:get-voice-model"),
     changeVoiceModel: scopedRequest<HostVoiceModelChange, HostVoiceModel, "required">()(
       "host-admin:change-voice-model",

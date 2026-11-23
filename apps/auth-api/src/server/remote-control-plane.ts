@@ -325,6 +325,7 @@ export interface RemoteSignalPlan {
 interface SignalHostPlace {
   location: SignalLocation | null;
   country: string | null;
+  preferred: string | null;
 }
 
 export interface SignalLocation {
@@ -2531,6 +2532,7 @@ export class RemoteControlPlane {
         failedSignalUrl: string | null;
         location?: SignalLocation | null;
         country?: string | null;
+        preferredSignalHome?: string | null;
       } = {
         signalHome: null,
         failedSignalUrl: null,
@@ -2551,6 +2553,7 @@ export class RemoteControlPlane {
         ? yield* this.#placeHost(host, signal, placement.failedSignalUrl, {
             location: placement.location ?? null,
             country: placement.country ?? null,
+            preferred: placement.preferredSignalHome ?? null,
           })
         : null;
       const issued = yield* dependencies.signer.issue({
@@ -2704,6 +2707,21 @@ export class RemoteControlPlane {
         "webhook_route_limit",
         "This host has reached its webhook route limit.",
       );
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly listSignalHomes = Effect.fn("RemoteControlPlane.listSignalHomes")(
+    function* (
+      this: RemoteControlPlane,
+      hostId: string,
+      machineToken: string,
+    ): Effect.fn.Return<{ homes: RemoteSignalHome[] }, RemoteFailure, RemoteDependencies> {
+      const dependencies = yield* RemoteDependencies;
+      yield* this.authenticateHost(hostId, machineToken);
+      const signal = dependencies.signal;
+      if (!signal) return yield* remoteSignalNotConfigured();
+      return { homes: [...signal.homes].map(([id, url]) => ({ id, url })) };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
@@ -3459,8 +3477,14 @@ export class RemoteControlPlane {
     place: SignalHostPlace,
   ): Effect.fn.Return<RemoteSignalHome | null, RemoteFailure, RemoteDependencies> {
     const dependencies = yield* RemoteDependencies;
-    const candidates = nearSignalHomes(signal, failedSignalUrl, place);
     const current = configuredSignalHome(signal, host.signal_home);
+    const preferred = configuredSignalHome(signal, place.preferred);
+    if (preferred && preferred.url !== failedSignalUrl) {
+      if (preferred.id === host.signal_home) return preferred;
+      if (yield* signalAnswers(dependencies.fetch, preferred.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
+        return yield* this.#storeSignalHome(host, signal, preferred);
+    }
+    const candidates = nearSignalHomes(signal, failedSignalUrl, place);
     if (current && candidates.includes(current.id)) return current;
     const chosen = configuredSignalHome(signal, yield* rendezvousSignalHome(host.host_id, candidates));
     if (!chosen || chosen.id === host.signal_home) return chosen;
@@ -3470,6 +3494,16 @@ export class RemoteControlPlane {
       !(yield* signalAnswers(dependencies.fetch, chosen.url, SIGNAL_HOME_MOVE_TIMEOUT_MS))
     )
       return current;
+    return yield* this.#storeSignalHome(host, signal, chosen);
+  });
+
+  readonly #storeSignalHome = Effect.fn("RemoteControlPlane.storeSignalHome")(function* (
+    this: RemoteControlPlane,
+    host: RemoteHostRow,
+    signal: RemoteSignalPlan,
+    chosen: RemoteSignalHome,
+  ): Effect.fn.Return<RemoteSignalHome, RemoteFailure, RemoteDependencies> {
+    const dependencies = yield* RemoteDependencies;
     const stored = yield* remoteCall(() =>
       dependencies.database
         .prepare("UPDATE remote_hosts SET signal_home = ? WHERE host_id = ? AND signal_home IS ?")

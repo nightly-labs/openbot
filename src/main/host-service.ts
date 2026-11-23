@@ -210,6 +210,7 @@ interface HostServiceOptions {
   teamWebRtcBridge?: TeamWebRtcBridge;
   peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   privateNetwork?: () => boolean;
+  preferredSignalHome?: () => string | null;
   registerRemoteHost?: (input: {
     hostId: string;
     name: string;
@@ -592,6 +593,7 @@ export class HostService extends EventEmitter<HostEvents> {
           ...(options.peerMemberChanged ? { peerMemberChanged: options.peerMemberChanged } : {}),
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
+          ...(options.preferredSignalHome ? { preferredSignalHome: options.preferredSignalHome } : {}),
         })
       : null;
   }
@@ -599,6 +601,16 @@ export class HostService extends EventEmitter<HostEvents> {
   readonly applyNetworkRoute = Effect.fn("HostService.applyNetworkRoute")(function* (this: HostService) {
     if (this.#webrtcGateway) yield* this.#webrtcGateway.applyNetworkRoute();
   }).bind(this);
+
+  signalHome(): string | null {
+    return this.#webRtcOnline ? (this.#webrtcGateway?.signalHome() ?? null) : null;
+  }
+
+  followSignalHome(): Effect.Effect<void> {
+    return Effect.sync(() => {
+      if (this.#webRtcOnline) this.#webrtcGateway?.scheduleSignalHomeFollow();
+    });
+  }
 
   getStatus(): HostStatus {
     const capabilities = this.#remoteScreen.capabilities();

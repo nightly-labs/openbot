@@ -406,6 +406,25 @@ export const messages = {
     "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft. Op een server gebruikt ook de browser deze tijdzone na de volgende herstart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
+  "server.settings.connectionTitle": "Verbinding",
+  "server.settings.signalHome": "Signal-server",
+  "server.settings.signalHomeDescription":
+    "Leden maken via deze Signal-server verbinding met deze server. Een Signal-server met een lagere latentie geeft snellere verbindingen.",
+  "server.settings.signalHomeFallback":
+    "{chosen} antwoordt niet. De server gebruikt {name} tot {chosen} weer antwoordt.",
+  "server.settings.signalHomeMoving":
+    "De server gaat over naar {name}. Leden maken binnen enkele seconden opnieuw verbinding.",
+  "server.settings.signalHomeLoadFailed": "Kan de Signal-servers niet laden.",
+  "server.settings.signalHomeAutomatic": "Automatisch (dichtstbij)",
+  "server.settings.signalHomeAutomaticUsing": "Automatisch ({name})",
+  "server.settings.signalHomeOption": "{name} · {latency}",
+  "server.settings.signalHomeLatency": "{latency} ms",
+  "server.settings.signalHomeNoAnswer": "Geen antwoord",
+  "server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "server.settings.signalHomePlaceSanJose": "San Jose",
+  "server.settings.signalHomePlaceSydney": "Sydney",
+  "server.settings.signalHomePlaceSingapore": "Singapore",
   "server.settings.voiceModel.section": "Spraakherkenning",
   "server.settings.voiceModel.description":
     "Agents op deze server gebruiken dit model om het geluid van video’s zonder ondertiteling uit te schrijven.",

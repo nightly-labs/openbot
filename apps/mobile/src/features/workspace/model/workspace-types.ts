@@ -84,6 +84,7 @@ import type {
   HostProviderAccounts,
   HostReleaseStatus,
   HostSetMessagingEnabledInput,
+  HostSignalHomeSettings,
   HostSkillLearning,
   HostTimezoneSettings,
   HostUpdateSettingsChange,
@@ -413,6 +414,10 @@ export interface MobileWorkspaceContextValue {
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
   canManageServerVoiceModel: (serverId: string) => boolean;
+  canManageServerSignalHome: (serverId: string) => boolean;
+  servesServerSignalHome: (serverId: string) => boolean;
+  loadServerSignalHome: (serverId: string) => Promise<HostSignalHomeSettings>;
+  setServerSignalHome: (home: string | null, serverId: string) => Promise<HostSignalHomeSettings>;
   loadServerVoiceModel: (serverId: string) => Promise<HostVoiceModel>;
   changeServerVoiceModel: (change: HostVoiceModelChange, serverId: string) => Promise<HostVoiceModel>;
   canManageAgentMemoryLimit: (serverId: string) => boolean;
@@ -849,6 +854,8 @@ type ServerCheckKey =
   | "canRestartServerItself"
   | "canManageServerTimezone"
   | "canManageServerVoiceModel"
+  | "canManageServerSignalHome"
+  | "servesServerSignalHome"
   | "canReadMachineMetrics"
   | "canManageAgentMemoryLimit"
   | "canManageMemoryReview"

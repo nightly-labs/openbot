@@ -1200,6 +1200,11 @@ addresses on a private network, such as the Wi-Fi or a Tailscale tailnet. The de
 connection gets the same empty server list for each new stream, so it also uses only a direct path,
 which can be a public IPv6 address of the computer. Sign-in and Signal messages do not change.
 
+When an owner or an admin opens Server settings › General, the host sends a few `GET /health/ready`
+requests to each OpenBot Signal machine to measure its latency. The requests carry no account, server
+or chat data. When the owner or admin chooses a Signal machine, the host keeps the choice in a local
+file and sends only its name (such as `au`) with each Signal ticket request to the account service.
+
 The phone app shows a Remote Desktop in a web view that loads the host's viewer from a server on the
 phone's loopback address (`127.0.0.1`). That server takes only requests with a random token, serves
 one session, and stops when the screen closes. The viewer's files and its signaling go to the host
