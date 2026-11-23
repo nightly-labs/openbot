@@ -7,6 +7,7 @@ const ALLOWED_DIRECTORIES = [
   "src/renderer/stories/assets/",
   "packages/ui/src/assets/",
   "apps/mobile/assets/",
+  "apps/browser-extension/public/icons/",
   "apps/auth-api/public/",
   "apps/auth-api/content-art/",
   "apps/auth-api/src/content/guides/media/",

@@ -76,6 +76,10 @@ import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-co
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "@openbot/contracts/team-protocol/claude-user-setup-v1";
+import {
+  CLIENT_BROWSER_CAPABILITY,
+  type ClientBrowserCommandEvent,
+} from "@openbot/contracts/team-protocol/client-browser-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
 import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
@@ -314,6 +318,7 @@ import { encodeTeamProtocolV7BaseCurrentEvent } from "@openbot/contracts/team-pr
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "@openbot/contracts/team-protocol/v8";
 import { encodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import { TEAM_PROTOCOL_V10, type TeamProtocolSupportV10 } from "@openbot/contracts/team-protocol/v10";
+import { VOICE_TRANSCRIPTION_CAPABILITY } from "@openbot/contracts/team-protocol/voice-transcription-v1";
 import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
@@ -417,6 +422,7 @@ import { chatColorsOf, routeChatColors, visibleChatColors } from "./team-api/rou
 import { routeChatHistory } from "./team-api/route-chat-history";
 import { routeClaudeCompactWindow } from "./team-api/route-claude-compact-window";
 import { routeClaudeUserSetup } from "./team-api/route-claude-user-setup";
+import { routeClientBrowser } from "./team-api/route-client-browser";
 import { routeComputerActivity } from "./team-api/route-computer-activity";
 import { routeConnectors } from "./team-api/route-connectors";
 import { routeContextCompact } from "./team-api/route-context-compact";
@@ -504,6 +510,7 @@ import { routeThreadMessageSearch } from "./team-api/route-thread-message-search
 import { routeUsageCredits } from "./team-api/route-usage-credits";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
+import { routeVoiceTranscription } from "./team-api/route-voice-transcription";
 import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
 import { routeWhatsAppReadOnly } from "./team-api/route-whatsapp-read-only";
 import { routeWhatsAppStatusReactions } from "./team-api/route-whatsapp-status-reactions";
@@ -618,6 +625,7 @@ export class TeamApiServer {
   #stopAgentAccessListener: (() => void) | null = null;
   #stopMachineAlertListener: (() => void) | null = null;
   #stopLiveVoiceListener: (() => void) | null = null;
+  #stopClientBrowserListener: (() => void) | null = null;
   readonly #liveVoiceSessions = new TeamLiveVoiceSessions();
   #stopNotificationLevelsListener: (() => void) | null = null;
   #stopSidebarPinsListener: (() => void) | null = null;
@@ -720,6 +728,10 @@ export class TeamApiServer {
         if (event.type === "ended") this.#liveVoiceSessions.remove(event.sessionId);
         if (memberId) this.#sendLiveVoice(memberId, event);
       }) ?? null;
+    this.#stopClientBrowserListener =
+      this.#options.clientBrowser?.subscribe((memberId, sessionId, event) =>
+        this.#sendClientBrowserCommand(memberId, sessionId, event),
+      ) ?? null;
     this.#stopNotificationLevelsListener =
       this.#options.agentNotificationLevels?.subscribe((memberId) => this.#sendNotificationLevels(memberId)) ?? null;
     this.#stopSidebarPinsListener =
@@ -749,6 +761,8 @@ export class TeamApiServer {
     this.#stopMachineAlertListener = null;
     this.#stopLiveVoiceListener?.();
     this.#stopLiveVoiceListener = null;
+    this.#stopClientBrowserListener?.();
+    this.#stopClientBrowserListener = null;
     this.#stopNotificationLevelsListener?.();
     this.#stopNotificationLevelsListener = null;
     this.#stopSidebarPinsListener?.();
@@ -925,6 +939,23 @@ export class TeamApiServer {
       )
         client.send(payload);
     }
+  }
+
+  #sendClientBrowserCommand(memberId: string, sessionId: string, event: ClientBrowserCommandEvent): boolean {
+    const payload = JSON.stringify(event);
+    let sent = false;
+    for (const [client, connection] of this.#eventClients) {
+      if (
+        connection.memberId === memberId &&
+        connection.sessionId === sessionId &&
+        connection.capabilities.has(CLIENT_BROWSER_CAPABILITY) &&
+        client.readyState === webSockets.WebSocket.OPEN
+      ) {
+        client.send(payload);
+        sent = true;
+      }
+    }
+    return sent;
   }
 
   #sendNotificationLevels(memberId: string): void {
@@ -1392,6 +1423,8 @@ export class TeamApiServer {
         })) === "handled"
       )
         return;
+      if ((await routeVoiceTranscription(context, this.#options.voiceTranscription)) === "handled") return;
+      if ((await routeClientBrowser(context, this.#options.clientBrowser)) === "handled") return;
       if ((await routeRoutineFlows(context, this.#options.routineFlows, this.#options.agents, hidden)) === "handled")
         return;
       if ((await routeWorkflows(context, this.#options.workflows, this.#options.agents, hidden)) === "handled") return;
@@ -2184,6 +2217,7 @@ export class TeamApiServer {
         this.#options.liveActivityPush?.disconnected(sessionId);
         this.#options.pushNotifications?.disconnected(sessionId);
         this.#options.browser.releaseUserControlHeldBy({ kind: "session", sessionId });
+        this.#options.clientBrowser?.sessionEnded(sessionId);
         const liveVoice = this.#options.liveVoice;
         if (liveVoice)
           for (const voice of this.#liveVoiceSessions.ofTeamSession(sessionId)) {
@@ -2680,6 +2714,8 @@ export class TeamApiServer {
         if (capability === MCP_SERVERS_CAPABILITY) return this.#options.mcpServers !== undefined;
         if (capability === ATTACHMENT_PREVIEW_CAPABILITY) return this.#options.attachmentPreviews !== undefined;
         if (capability === LIVE_VOICE_CAPABILITY) return this.#options.liveVoice !== undefined;
+        if (capability === VOICE_TRANSCRIPTION_CAPABILITY) return this.#options.voiceTranscription !== undefined;
+        if (capability === CLIENT_BROWSER_CAPABILITY) return this.#options.clientBrowser !== undefined;
         if (capability === MCP_ACCOUNTS_CAPABILITY)
           return this.#options.mcpServers !== undefined && this.#options.mcpSignIns !== undefined;
         if (capability === MCP_SIGN_IN_CAPABILITY)
@@ -2980,6 +3016,7 @@ export class TeamApiServer {
       token,
       sessionId: authenticated.sessionId,
       sessionExpiresAt: authenticated.sessionExpiresAt,
+      fromChrome: this.#options.clientBrowser?.shares(authenticated.sessionId) === true,
       agentLevel: (agentId) => this.agentLevel(authenticated.member, agentId),
       json: (status, value) => this.#json(response, status, value),
       empty: (status) => this.#empty(response, status),

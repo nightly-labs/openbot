@@ -1,5 +1,5 @@
 import { VOICE_AUDIO_LIMITS } from "@openbot/contracts/ipc";
-import { currentText } from "@openbot/ui/text";
+import { currentText } from "./text";
 
 export function appendVoiceTranscript(draft: string, transcript: string): string {
   const text = transcript.trim();
@@ -83,4 +83,53 @@ function resample(input: Float32Array, sourceRate: number, targetRate: number): 
 
 function writeAscii(output: Uint8Array, offset: number, value: string): void {
   for (let index = 0; index < value.length; index += 1) output[offset + index] = value.charCodeAt(index);
+}
+
+export const VOICE_LEVEL_COUNT = 24;
+const VOICE_LEVEL_INTERVAL_MS = 80;
+const VOICE_DIGITAL_SILENCE_DB = -90;
+const VOICE_NOISE_RISE_DB = 0.1;
+const VOICE_NOISE_MARGIN_DB = 6;
+const VOICE_PEAK_FALL_DB = 0.05;
+const VOICE_MIN_RANGE_DB = 12;
+
+export function startVoiceMeter(stream: MediaStream, onLevels: (levels: number[]) => void): (() => void) | null {
+  let levels: number[] = new Array(VOICE_LEVEL_COUNT).fill(0);
+  onLevels(levels);
+  let context: AudioContext | undefined;
+  let analyser: AnalyserNode;
+  try {
+    context = new AudioContext();
+    analyser = context.createAnalyser();
+    analyser.fftSize = 512;
+    context.createMediaStreamSource(stream).connect(analyser);
+  } catch {
+    void context?.close();
+    return null;
+  }
+  const samples = new Float32Array(analyser.fftSize);
+  let noiseDb = Number.POSITIVE_INFINITY;
+  let peakDb = Number.NEGATIVE_INFINITY;
+  let shown = 0;
+  const timer = setInterval(() => {
+    analyser.getFloatTimeDomainData(samples);
+    let sum = 0;
+    for (const sample of samples) sum += sample * sample;
+    const db = 20 * Math.log10(Math.max(Math.sqrt(sum / samples.length), 1e-5));
+    if (db > VOICE_DIGITAL_SILENCE_DB) {
+      noiseDb = db < noiseDb ? db : Math.min(db, noiseDb + VOICE_NOISE_RISE_DB);
+      peakDb = Math.max(db, peakDb - VOICE_PEAK_FALL_DB);
+    }
+    const range = Math.max(VOICE_MIN_RANGE_DB, peakDb - noiseDb - VOICE_NOISE_MARGIN_DB);
+    const loudness = Math.min(1, Math.max(0, (db - noiseDb - VOICE_NOISE_MARGIN_DB) / range));
+    const level = loudness * loudness;
+    shown += (level - shown) * (level > shown ? 0.7 : 0.45);
+    levels = [...levels.slice(1), shown];
+    onLevels(levels);
+  }, VOICE_LEVEL_INTERVAL_MS);
+  const meterContext = context;
+  return () => {
+    clearInterval(timer);
+    void meterContext.close();
+  };
 }

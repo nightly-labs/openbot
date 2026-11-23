@@ -1,7 +1,7 @@
 import { agentWelcomeMessage } from "@openbot/contracts/agent-welcome";
 import { appLanguageOption } from "@openbot/i18n/languages";
-import type { FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
-import { currentText } from "@openbot/ui/text";
+import { currentText } from "../../text";
+import type { FirstAgentDraft } from "./FirstAgentSetup";
 
 export function createAgentInitialMessage(draft: Pick<FirstAgentDraft, "purpose">, welcomeSupported: boolean): string {
   if (welcomeSupported) return agentWelcomeMessage({ language: appLanguageOption(currentText().locale()).label });

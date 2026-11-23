@@ -21,6 +21,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateHostIdentityInput,
   VoiceLiveEvent,
+  VoiceTranscriptionResult,
 } from "@openbot/contracts/ipc";
 import type { Logger } from "@openbot/logging";
 import type { Effect } from "effect";
@@ -56,6 +57,7 @@ import type { CacheExpiryCompactionControl } from "../cache-expiry-compaction-pr
 import type { ChannelFolders } from "../channel-folders";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
+import type { ClientBrowserHub } from "../client-browser-hub";
 import type { CustomAgentChanges } from "../custom-agent-changes";
 import type { PeerCustomProviderChanges } from "../custom-provider-changes";
 import type { GitHubConnectorService } from "../github-connector-service";
@@ -102,6 +104,7 @@ import type { SkillLearningPreferenceStore } from "../skill-learning-preference-
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import type { TeamStore } from "../team-store";
 import type { VaultService } from "../vault-service";
+import type { VoiceOperationError } from "../voice-model-service";
 import type { WorkflowFileExporter } from "../workflow-file-export";
 import type { WorkflowFoldersService } from "../workflow-folders-service";
 
@@ -609,6 +612,15 @@ export type TeamApiLiveVoice = Pick<AgentService, "startLiveVoice" | "stopLiveVo
   subscribe(listener: (event: VoiceLiveEvent, memberId: string | null) => void): () => void;
 };
 
+export interface TeamApiVoiceTranscription {
+  transcribe(audio: Uint8Array): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError>;
+}
+
+export type TeamApiClientBrowser = Pick<
+  ClientBrowserHub,
+  "setPresence" | "resolve" | "sessionEnded" | "subscribe" | "shares"
+>;
+
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;
 
@@ -636,6 +648,8 @@ export interface TeamApiOptions {
   machine?: TeamApiMachine;
   backgroundProcesses?: TeamApiBackgroundProcesses;
   liveVoice?: TeamApiLiveVoice;
+  voiceTranscription?: TeamApiVoiceTranscription;
+  clientBrowser?: TeamApiClientBrowser;
   hostedSites?: TeamApiHostedSites;
   agentImport?: TeamApiAgentImport;
   hermesImport?: TeamApiHermesImport;
