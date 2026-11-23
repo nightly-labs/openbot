@@ -870,6 +870,21 @@ try {
     assert.equal(check.length, 1, "One finish check runs.");
     assert.ok(check[0]?.text.includes("they still work on them"), "The finish check knows about the open request.");
     assert.equal(continuationLines(lead.id).length, 0, "No continuation line shows.");
+    const quietChecks = loggedChecks().length;
+    const quiet = loggedTurns().length;
+    const status = await send(
+      lead.id,
+      `Status? ${verdicts({ verdict: "waiting" })} ${plan({ steps: [], answer: "I'm checking the build status." })}`,
+    );
+    assert.equal(await settled(status), "completed");
+    assert.deepEqual(
+      turnsSince(quiet)
+        .filter((turn) => turn.threadId === leadThread)
+        .map((turn) => turn.note),
+      [false],
+      "A turn with no tool does not continue on a next step while the teammate works.",
+    );
+    assert.equal(loggedChecks().length - quietChecks, 1, "The finish check runs in place of the next-step note.");
     await writeFile(release, "");
     await waitFor("the builder's answer and the lead's answer turn", () =>
       [lead.id, worker.id].every(
@@ -907,13 +922,15 @@ try {
       })}`,
     );
     assert.equal(await settled(delegated), "completed");
-    await waitFor("the runner's note", () =>
-      chatMessages(lead.id).some((message) => message.text.includes("The deploy runs in the background.")),
-    );
-    await waitFor("the lead's turn on the note", () =>
-      current.service.listQueue(lead.id).deliveries.every((delivery) => ended(delivery.status)),
-    );
+    const fromRunner = (text: string, part: string) => text.includes(part) && !text.includes("<<PLAN");
     const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Delegate the deploy."))?.threadId;
+    await waitFor(
+      "the lead's turn on the runner's note",
+      () =>
+        turnsSince(mark).some(
+          (turn) => turn.threadId === leadThread && fromRunner(turn.text, "The deploy runs in the background."),
+        ) && current.service.listQueue(lead.id).deliveries.every((delivery) => ended(delivery.status)),
+    );
     const checks = loggedChecks().length;
     const asked = loggedTurns().length;
     const news = await send(
@@ -938,7 +955,16 @@ try {
     assert.equal(continuationLines(lead.id).length, 0, "No continuation line shows.");
     await writeFile(release, "");
     const result = await waitFor("the runner's later result in the lead's chat", () =>
-      chatMessages(lead.id).find((message) => message.text.includes("deploy-ok")),
+      chatMessages(lead.id).find((message) => fromRunner(message.text, "deploy-ok")),
+    );
+    await waitFor(
+      "the lead's turn on the later result",
+      () =>
+        turnsSince(mark).some((turn) => turn.threadId === leadThread && fromRunner(turn.text, "deploy-ok")) &&
+        [lead.id, worker.id].every(
+          (agentId) =>
+            current.service.listQueue(agentId).deliveries.filter((delivery) => !ended(delivery.status)).length === 0,
+        ),
     );
     return { turns: turnsSince(mark).length, checks: check.length, result: result.text };
   });

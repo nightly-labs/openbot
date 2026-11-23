@@ -2444,7 +2444,7 @@ export class TurnLifecycle {
       const finishCheck: FinishCheckMode =
         latestAssistant === undefined ||
         this.#hooks.checkFinish === undefined ||
-        (toolSteps.length === 0 && !promisesWork(latestAssistant.text))
+        (toolSteps.length === 0 && !promisesWork(latestAssistant.text) && !awaitsEarlierRequest)
           ? "no"
           : continueMode;
       const proposed =
@@ -2461,7 +2461,7 @@ export class TurnLifecycle {
                 )?.plan ?? null,
               answer: latestAssistant?.text,
               finishCheck,
-              nextStep: !awaitsEarlierRequest || finishCheck === "no",
+              nextStep: !awaitsEarlierRequest,
             });
       let considered = proposed?.kind === "check" ? null : proposed;
       if (proposed?.kind === "check" && latestAssistant) {
