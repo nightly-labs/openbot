@@ -3,8 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: an upgrade loses or changes an attachment; a partial migration survives a failure; a retry
-// fails on the index that the failed run left; a newer or incomplete history is changed.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -21,7 +19,6 @@ function databaseAt(version: number): DatabaseSync {
   return db;
 }
 
-// One row of each owner kind that the app writes.
 function seedAttachments(db: DatabaseSync): void {
   db.exec(`INSERT INTO projection_attachments
       (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
@@ -48,14 +45,13 @@ function ownerIndexColumns(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 61 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 68 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
 }
 
 describe("attachment owner index migration", () => {
-  // The table is the same from the v8 baseline on, so the oldest and the newest released schema bound it.
   it.each([8, 40])("upgrades v%i and keeps every attachment", (version) => {
     const db = databaseAt(version);
     seedAttachments(db);
@@ -87,7 +83,6 @@ describe("attachment owner index migration", () => {
     const db = databaseAt(40);
     seedAttachments(db);
     const before = attachments(db);
-    // SQLite refuses an index whose name a table holds, even with IF NOT EXISTS.
     db.exec("CREATE TABLE attachments_owner (conflict TEXT)");
     expect(() => migrateOpenBotDatabase(db)).toThrow("migration to version 41 failed");
     expect(db.prepare("SELECT version FROM schema_migrations WHERE version = 41").all()).toEqual([]);
@@ -103,9 +98,9 @@ describe("attachment owner index migration", () => {
     const db = databaseAt(40);
     seedAttachments(db);
     const before = attachments(db);
-    db.exec("INSERT INTO schema_migrations VALUES(62, 'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(69, 'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version = 62; DELETE FROM schema_migrations WHERE version = 20");
+    db.exec("DELETE FROM schema_migrations WHERE version = 69; DELETE FROM schema_migrations WHERE version = 20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(attachments(db)).toEqual(before);
     expect(ownerIndexColumns(db)).toEqual([]);

@@ -2,10 +2,8 @@ import { avatarHueSwatch } from "@openbot/brand/bloub-avatar";
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 
-/** A starting role for the first agent. Its look is an ordinary avatar seed and hue. */
 export interface OnboardingRole {
   id: "builder" | "researcher" | "planner" | "writer" | "helper";
-  /** Each seed draws another body shape with a friendly resting face. */
   avatarSeed: string;
   avatarHue: AvatarHue;
   title: MobileTextKey;
@@ -60,18 +58,14 @@ export const ONBOARDING_ROLES: readonly OnboardingRole[] = [
   },
 ];
 
-/** The picker shows the roles, then the choice to start from scratch. */
 export const CUSTOM_CHOICE = ONBOARDING_ROLES.length;
 export const CHOICE_COUNT = ONBOARDING_ROLES.length + 1;
-// The choice to start from scratch has no colour yet, so it glows in a neutral grey.
 const CUSTOM_SWATCH = "#8e8e93";
-/** The colour of each choice in the picker, in picker order. */
 export const CHOICE_SWATCHES: readonly string[] = [
   ...ONBOARDING_ROLES.map((role) => avatarHueSwatch(role.avatarHue)),
   CUSTOM_SWATCH,
 ];
 
-/** The ideas for an agent that the user makes from scratch: they fit any role. */
 export const CUSTOM_AGENT_IDEAS: OnboardingRole["ideas"] = [
   "mobile.onboarding.idea.helper1",
   "mobile.onboarding.idea.helper2",

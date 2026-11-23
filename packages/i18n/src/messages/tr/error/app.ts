@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/app";
 
 export const messages = {
-  // Uygulama, bildirim ve gizli anahtar depolama eylemlerinden kaynaklanan hatalar.
   "error.app.externalLinkProtocol": "Harici tarayıcıda yalnızca HTTP(S) bağlantıları açılabilir.",
   "error.app.notificationsUnsupported": "Bu sistem masaüstü bildirimlerini desteklemiyor.",
   "error.app.notificationSettingsMissing": "Bu sistemin bildirim ayarları sayfası yok.",

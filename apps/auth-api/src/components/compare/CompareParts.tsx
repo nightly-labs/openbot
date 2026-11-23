@@ -8,10 +8,6 @@ import { createLandingReveal } from "../landing/createLandingReveal";
 import { LandingIcon } from "../landing/LandingIcon";
 import { RivalMark, type RivalMarkName } from "./RivalMark";
 
-// The parts that every kind of comparison page draws: OpenBot against a rival, two
-// other products against each other, and a roundup of many apps.
-
-/** A section with a heading that comes in as it scrolls into view. */
 export function RevealSection(props: {
   class: string;
   titleId: string;
@@ -38,14 +34,12 @@ export function RevealSection(props: {
   );
 }
 
-/** One side of a comparison. A side with no `mark` is OpenBot, drawn with its own logo. */
 export interface SideProps {
   side: string;
   name: string;
   mark?: RivalMarkName | undefined;
 }
 
-/** The mark of one side: OpenBot's logo, or the compared product's mark. */
 export function SideMark(props: { mark?: RivalMarkName | undefined; class: string; blink?: boolean }) {
   return (
     <Show
@@ -57,10 +51,6 @@ export function SideMark(props: { mark?: RivalMarkName | undefined; class: strin
   );
 }
 
-/**
- * The frosted plate with both marks and "vs" between them. The hero shows the
- * names under the marks; an index card shows the marks only.
- */
 export function CompareMarks(props: { sides: readonly [SideProps, SideProps]; small?: boolean }) {
   return (
     <span class={props.small ? "compare-marks compare-marks-small" : "compare-marks"}>
@@ -71,7 +61,6 @@ export function CompareMarks(props: { sides: readonly [SideProps, SideProps]; sm
   );
 }
 
-/** The frosted plate with the mark of every app in a roundup, in the order of the list. */
 export function CompareMarkRow(props: { apps: readonly Pick<RoundupApp, "mark">[]; small?: boolean }) {
   return (
     <span class={props.small ? "compare-marks compare-marks-small compare-mark-row" : "compare-marks compare-mark-row"}>
@@ -117,7 +106,6 @@ export function PlanCard(props: { plan: OpenBotPlan; index: number; highlighted?
   );
 }
 
-/** A value in the table. The better one says so in words, for a reader who does not see the mark. */
 export function ValueCell(props: { side: string; better: string | undefined; text: string }) {
   const isBetter = () => props.better === props.side;
   return (
@@ -133,7 +121,6 @@ export function ValueCell(props: { side: string; better: string | undefined; tex
   );
 }
 
-/** The pill on a card whose side is better on its topic. */
 function BetterBadge(props: { label: string }) {
   return (
     <span class="compare-better-badge">
@@ -200,11 +187,9 @@ export function SideCard(props: SideProps & { text: string; better: string | und
   );
 }
 
-/** The text with each use of a name held on one line: "Grok" at a line end and "Bot" under it reads as two words. */
 export function UnbrokenName(props: { text: string; names: readonly string[] }) {
   const parts = () => {
     const pattern = props.names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")).join("|");
-    // The capturing group keeps each name in the result, at the odd indexes.
     return props.text.split(new RegExp(`(${pattern})`, "u"));
   };
   return (
@@ -212,7 +197,6 @@ export function UnbrokenName(props: { text: string; names: readonly string[] }) 
   );
 }
 
-/** The date under the title, and a link to the sources. */
 export function CheckedMeta(props: { checkedAt: string }) {
   return (
     <p class="post-meta compare-meta">
@@ -245,7 +229,6 @@ export function CompareFaq(props: { faq: ComparePage["faq"] }) {
   );
 }
 
-/** `subject` names what the sources are about, as in "Every statement about {subject}". */
 export function CompareSources(props: { subject: string; page: Pick<ComparePage, "sources" | "checkedAt"> }) {
   return (
     <RevealSection class="compare-sources" titleId="compare-sources-title" title="Sources" id="compare-sources">

@@ -13,8 +13,8 @@ import { messages as composer } from "./composer";
 import { messages as computerUse } from "./computerUse";
 import { messages as connector } from "./connector";
 import { messages as conversation } from "./conversation";
+import { messages as crm } from "./crm";
 import { messages as customProvider } from "./customProvider";
-import { messages as diagram } from "./diagram";
 import { messages as dialog } from "./dialog";
 import { messages as files } from "./files";
 import { messages as importAgent } from "./import";
@@ -51,17 +51,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/**
- * The English source catalog. It is the key list every translation must satisfy and the text a
- * translation falls back to, so a string is written here first and translated second.
- *
- * Keys are `area.thing`, and the area is the surface a reader would go looking in. Each area is one
- * module; `defineMessages` makes every key in it start with the module's prefix. Nothing here is a
- * protocol value: provider identifiers, analytics event names, log lines and agent prompts stay in
- * English in the code that owns them. See docs/i18n.md.
- *
- * This is the desktop catalog: shared keys, source text, and every desktop area.
- */
 export const en = {
   ...shared,
   ...source,
@@ -102,7 +91,6 @@ export const en = {
   ...usage,
   ...sidebar,
   ...channel,
-  ...diagram,
   ...workflow,
   ...agent,
   ...agentTemplate,
@@ -114,6 +102,7 @@ export const en = {
   ...vault,
   ...uiBlock,
   ...sitePage,
+  ...crm,
 } as const satisfies MessageCatalog;
 
 export type AppMessages = typeof en;

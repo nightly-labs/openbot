@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { createReadStream, promises as nodeFsPromises } from "node:fs";
 import {
   copyFile,
   cp,
@@ -10,11 +10,11 @@ import {
   readlink,
   realpath,
   rename,
-  rm,
   rmdir,
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { avatarFileExtension, isAvatarMimeType, isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -77,7 +77,7 @@ import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { isEmptyStoredFile, parseStoredJson, writeFileAtomically } from "./atomic-json-file";
 import { automationRoot } from "./automation-command";
 import type { AgentModelChange } from "./database/agent-roster";
-import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
+import { type OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
@@ -86,42 +86,24 @@ type StoredAgent = AgentSummary & { access: AgentAccess; computerUse: boolean };
 type PersistedStoredAgent = Omit<StoredAgent, "avatarUrl" | "provider" | "access" | "computerUse"> & {
   avatarUrl?: string | null;
   provider?: AgentProviderId;
-  // Absent on every agent stored before the setting existed, which keeps the access it always had.
   access?: AgentAccess;
-  // Absent on every agent stored before the setting existed, which keeps Computer Use on.
   computerUse?: boolean;
-  // Absent on every agent stored before folders existed, and on an agent with none.
   additionalFolders?: string[];
-  // Absent on every agent stored before excluded folders existed, and on an agent with none.
   excludedFolders?: string[];
-  // Absent means the account default, which is off until the user changes it in Settings › Agents.
   allowAutomation?: boolean;
-  // Absent means the account default, which is off until the user changes it in Settings › Agents.
   allowNewChat?: boolean;
-  // Absent means the account default, which is off until the user changes it in Settings › Agents.
   quickAcknowledgement?: boolean;
-  // Absent on every agent stored before the setting existed, which keeps its tabs in the shared browser session.
   ownBrowserSession?: boolean;
-  // Absent on every agent stored before named browser profiles existed. Stored with
-  // `ownBrowserSession: true`, so an older OpenBot opens the agent's own session instead.
   browserProfileId?: string;
-  // Absent on every agent stored before the setting existed, which leaves the service tier to Codex.
   fastMode?: boolean;
-  // Only with `fastMode: true`. An older OpenBot drops it and runs the Fast tier.
   ultrafast?: boolean;
-  // Absent means the app default, as for every agent stored before the setting existed.
   busyMessageMode?: BusyMessageMode;
-  // Absent means the default task limit, as for every agent stored before tasks existed.
   taskLimit?: number;
-  // Absent means the provider's own sign-in, as for every agent stored before accounts existed.
   providerAccountId?: string;
-  // Absent means the agent asks before it leaves a model at its usage limit.
   backupModels?: AgentBackupModels;
-  // Present only while the agent works on a backup model for a usage limit.
   usageLimitReturn?: AgentUsageLimitReturn;
-  // Present only while a turn or task still runs on the previous provider.
   pendingRuntime?: AgentPendingRuntime;
-  // Present only while a user hides the agent. Absent on every agent stored before hiding existed.
+  pinnedAccountId?: string;
   hiddenAt?: string;
 };
 type StoredAgentBase = Omit<PersistedStoredAgent, "avatarSeed" | "avatarHue"> & DynamicRecord;
@@ -158,36 +140,24 @@ const LEGACY_AVATAR_COLORS = [
 ] as const;
 
 const NEW_AGENT_PREVIEW = "No messages yet";
-/** The longest agent preview the store keeps; a longer text is cut to it. */
 const AGENT_PREVIEW_MAX_LENGTH = 180;
 const DEFAULT_AGENT_MODEL: AgentModelId = "gpt-6-luna";
 export const DEFAULT_AGENT_PROVIDER: AgentProviderId = "codex";
-// A provider CLI reports the effort its own configuration uses -- Codex says `medium` for every
-// GPT-5.6 model -- which is not the one this product leads with: a new agent starts on the fast
-// model, where the extra thinking buys little and costs a visible wait on every turn.
 const DEFAULT_REASONING_EFFORT: AgentReasoningEffort = "low";
 
-// These three strings are history, not vocabulary. The first is the file a release before the move to
-// SQLite wrote its state into, and is only ever read: renaming it means that file is never found and the
-// data of anyone who has not yet run the importing release is lost. The second is the key that file's
-// agent array is stored under, and reading a different one discards every agent in it just as
-// silently. The third is the `command_id` of the import's roster event on existing installs. The next
-// roster write removes that event and its receipt; the roster event that write keeps is what stops the
-// legacy import running a second time. None of the three follows the bot-to-agent rename.
 const LEGACY_AGENTS_STATE_FILE = "bots.json";
 const LEGACY_AGENTS_STATE_KEY = "bots";
 const LEGACY_AGENTS_IMPORT_COMMAND_ID = "legacy-import:bots:v1";
-// The `command_id` of the one-time reset of Claude fast mode. Its receipt stops the reset from running
-// again, so the id never changes.
 const CLAUDE_FAST_MODE_RESET_COMMAND_ID = "agent-fast-mode:claude-reset:v1";
 
 const logger = createOpenBotLogger("agent-store");
 
-// Windows answers `EBUSY` or `EPERM` while a file in the tree is still open: a provider process that
-// is exiting after its session closed, an antivirus scan or the search indexer. Node retries these
-// codes with a growing delay, about 8 seconds in total, before the deletion reports a failure. The
-// Claude SDK's close does not wait for the `claude` process. On Windows it kills a process that has
-// not exited after 7 seconds, so a shorter wait fails a delete that a retry then completes.
+const fsPromisesWithoutAsarArchives: typeof nodeFsPromises = process.versions.electron
+  ? createRequire(import.meta.url)("original-fs").promises
+  : nodeFsPromises;
+
+const { rm } = fsPromisesWithoutAsarArchives;
+
 const AGENT_FILES_REMOVAL = { recursive: true, force: true, maxRetries: 10, retryDelay: 150 } as const;
 
 export class AgentStore {
@@ -197,7 +167,6 @@ export class AgentStore {
   readonly #sharedRoot: string;
   readonly #downloadsRoot: string;
   readonly #avatarsRoot: string;
-  /** Uploaded channel images. They live beside the agent avatars, but `ChannelService` owns them. */
   readonly channelImagesRoot: string;
   readonly #duplicationsRoot: string;
   readonly #automationRoot: string;
@@ -212,9 +181,8 @@ export class AgentStore {
   constructor(
     userDataPath: string,
     homePath: string,
-    database = new OpenBotDatabase(userDataPath),
+    database: OpenBotDatabase,
     agentDefaults: () => AgentDefaults = () => DEFAULT_AGENT_DEFAULTS,
-    /** The folder of the agents, shared files and downloads. A local server has its own. */
     openbotRoot = join(homePath, "OpenBot"),
   ) {
     this.#statePath = join(userDataPath, LEGACY_AGENTS_STATE_FILE);
@@ -234,7 +202,6 @@ export class AgentStore {
     );
   }
 
-  /** The account defaults that an agent with no value of its own follows; see `AGENT_DEFAULT_KEYS`. */
   agentDefaults(): AgentDefaults {
     return this.#agentDefaults();
   }
@@ -251,7 +218,6 @@ export class AgentStore {
     return this.#downloadsRoot;
   }
 
-  /** Where the automation server writes its URL and token files. */
   get automationRoot(): string {
     return this.#automationRoot;
   }
@@ -275,16 +241,6 @@ export class AgentStore {
       yield* this.#database.initialize();
       const persisted = this.#database.listAgents();
       if (persisted.length > 0 || this.#database.hasAggregateEvents("agents", "agents")) {
-        // Repaired field by field rather than accepted or refused as a whole. One stored value this build
-        // cannot read -- a model id a provider CLI has since renamed, an effort or a hue added by a later
-        // release, a marketplace source written as `null` -- used to stop the app from starting at all,
-        // and the message named the one cause this branch never tests: a `role` field cannot reach the
-        // database, because the `bots.json` import below rejects it before anything is written. Dropping
-        // the profile instead is not an option either: `replaceAgents` truncates the roster and re-inserts
-        // this list, so a dropped agent takes its chat out of the sidebar while its thread and every
-        // message stay on disk, unreachable. What `readStoredAgent` cannot guess -- the id, the workspace
-        // path, the thread -- still refuses to start, because guessing one of those three would point an
-        // agent at another agent's files or at an empty history.
         const agents: StoredAgent[] = [];
         const repairs: string[] = [];
         for (const stored of persisted) {
@@ -294,14 +250,9 @@ export class AgentStore {
           if (read.repaired.length > 0) repairs.push(`${read.agent.id}: ${read.repaired.join(", ")}`);
         }
         this.#state = { version: 2, examplesInitialized: true, agents };
-        // Recover missing agents before writing repairs. The latest roster event may still contain a
-        // complete roster, and writing the shortened projection first would make that incomplete list
-        // the newest event and erase the only source from which the missing agents can be restored.
         this.#restoreRosterFromEvents();
         if (repairs.length > 0) {
           logger.warn("Stored agent profile fields could not be read and were reset.", toLogValue(repairs));
-          // Written back at once, so the repair survives the next launch instead of running again on every
-          // start. The persist carries the whole roster, so the profiles that needed no repair are unchanged.
           this.#persist("agents.repaired");
         }
       } else {
@@ -316,11 +267,6 @@ export class AgentStore {
         legacy.examplesInitialized = true;
         this.#state = legacy;
         this.#database.replaceAgents(LEGACY_AGENTS_IMPORT_COMMAND_ID, legacy.agents, "agents.legacy-imported");
-        // Bound, then retired in the same breath. Migration v14 deactivates every provider session on this
-        // upgrade because the tool parameters were renamed, and a resumed transcript still remembers calls
-        // written against the old ones -- but a session imported out of `bots.json` arrives *after* the
-        // migrations ran, so it would be the one active session on the machine that v14 never saw. The row is
-        // kept rather than dropped: it is what a later handoff and the thread's own history read.
         for (const { agent, externalSessionId } of sessions) {
           const threadId = stableThreadId(agent.id);
           this.#database.bindProviderSession({
@@ -339,8 +285,6 @@ export class AgentStore {
       yield* this.#profileCreationRecovery.recover(this.#database, (agentId) =>
         this.deleteAgent(agentId).pipe(Effect.asVoid),
       );
-      // Last, so that a thread belonging to an agent the two recoveries above have just removed is gone
-      // rather than re-adopted.
       this.#reconcileUnclaimedThreads();
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
@@ -349,6 +293,15 @@ export class AgentStore {
 
   list(): AgentSummary[] {
     return this.#state.agents.map((agent) => ({ ...agent }));
+  }
+
+  get(id: string): AgentSummary | undefined {
+    const agent = this.#state.agents.find((candidate) => candidate.id === id);
+    return agent ? { ...agent } : undefined;
+  }
+
+  has(id: string): boolean {
+    return this.#state.agents.some((agent) => agent.id === id);
   }
 
   createAgent(input: Omit<CreateAgentInput, "initialMessage">, profileOperationId?: string) {
@@ -426,7 +379,6 @@ export class AgentStore {
         record.sessionSettingOverrides = structuredClone(source.sessionSettingOverrides);
       record.access = source.access;
       if (source.additionalFolders) record.additionalFolders = [...source.additionalFolders];
-      // An exclusion in the source workspace applies to the same folder in the copied workspace.
       if (source.excludedFolders)
         record.excludedFolders = source.excludedFolders.map((folder) =>
           isPathInside(source.workspacePath, folder)
@@ -434,10 +386,10 @@ export class AgentStore {
             : folder,
         );
       record.computerUse = source.computerUse;
+      if (source.memory === false) record.memory = false;
       if (source.busyMessageMode) record.busyMessageMode = source.busyMessageMode;
       if (source.taskLimit !== undefined) record.taskLimit = source.taskLimit;
       if (source.backupModels) record.backupModels = structuredClone(source.backupModels);
-      // A named profile carries over; "Only this agent" would give the copy a new, empty session.
       if (source.browserProfileId !== undefined) {
         record.browserProfileId = source.browserProfileId;
         record.ownBrowserSession = true;
@@ -539,11 +491,6 @@ export class AgentStore {
     const value = this.#database.commandResult(duplicationCommandId(operationId));
     if (value === undefined) return null;
     const result = isRecord(value) ? value.result : null;
-    // A receipt is a row a *released* build wrote, and that build spelled these two keys `sourceBotId`
-    // and `bot`. Migration v13 rewrote id values everywhere, so the value beside the key already reads
-    // `agent-<uuid>` and matches the caller; only the key name is from before the rename. Reading one
-    // spelling would make a duplication that committed before the upgrade throw on its first retry
-    // instead of returning the copy the user already has.
     const resultAgent = isRecord(result) ? (result.agent ?? result.bot) : null;
     const resultLayout = isRecord(result) ? result.layout : null;
     const receiptSourceId = isRecord(value) ? (value.sourceAgentId ?? value.sourceBotId) : null;
@@ -621,7 +568,6 @@ export class AgentStore {
       avatarUrl: null,
       updatedAt: new Date().toISOString(),
     });
-    // A profile draft names a hue only. The colour stays while the hue is the same.
     if (draft.avatarHue !== previous.avatarHue) delete agent.avatarColor;
     try {
       this.#persist("agent.updated");
@@ -698,22 +644,15 @@ export class AgentStore {
     }
   }
 
-  /** `initiatingAgentId` names the agent that asked for the change, for the audit entry of a model change. */
-
   updateAgent = Effect.fn("AgentStore.updateAgent")(function* (
     this: AgentStore,
     input: UpdateAgentInput & {
-      /** The model to go back to after a usage limit. `null` removes it. */
       usageLimitReturn?: AgentUsageLimitReturn | null;
-      /** The provider to use from the next turn. `null` removes it. */
       pendingRuntime?: AgentPendingRuntime | null;
-      /** The shared or the agent's own session. It replaces a named profile. */
+      pinnedAccountId?: string | null;
       ownBrowserSession?: boolean;
-      /** The named browser profile. `null` removes it. The caller checks that the profile exists. */
       browserProfileId?: string | null;
-      /** The whole list. The caller checks each folder; an empty list removes it. */
       additionalFolders?: string[];
-      /** The whole list, like `additionalFolders`. */
       excludedFolders?: string[];
     },
     initiatingAgentId?: string,
@@ -731,11 +670,6 @@ export class AgentStore {
         next.description = limitedText(input.description, "Agent description", INPUT_LIMITS.agentDescription);
       }
       if (input.notifications !== undefined) next.notifications = input.notifications;
-      // Checked here and not only in the IPC decoder, because the caller closest to the data is not a
-      // user: `AgentService` writes the provider, model and effort straight out of `listModels()`, which
-      // is a list of ids a provider CLI minted and can rename under a running install. A value the read
-      // guards reject must not reach the roster at all -- before `readStoredAgent`, storing one made the
-      // app refuse to start on its next launch.
       if (input.provider !== undefined) {
         if (!isOneOf(AGENT_PROVIDERS, input.provider)) throw new Error("Invalid agent provider.");
         next.provider = input.provider;
@@ -776,6 +710,11 @@ export class AgentStore {
         if (!isBoolean(input.allowNewChat)) throw new Error("Invalid new chat value.");
         next.allowNewChat = input.allowNewChat;
       }
+      if (input.memory !== undefined) {
+        if (!isBoolean(input.memory)) throw new Error("Invalid memory value.");
+        if (input.memory) delete next.memory;
+        else next.memory = false;
+      }
       if (input.quickAcknowledgement === null) delete next.quickAcknowledgement;
       else if (input.quickAcknowledgement !== undefined) {
         if (!isBoolean(input.quickAcknowledgement)) throw new Error("Invalid quick acknowledgement value.");
@@ -784,7 +723,6 @@ export class AgentStore {
       if (input.ownBrowserSession !== undefined) {
         if (!isBoolean(input.ownBrowserSession)) throw new Error("Invalid browser session value.");
         next.ownBrowserSession = input.ownBrowserSession;
-        // A choice of the shared or the agent's own session replaces a named profile.
         delete next.browserProfileId;
       }
       if (input.browserProfileId === null) delete next.browserProfileId;
@@ -797,20 +735,15 @@ export class AgentStore {
         if (!isBoolean(input.fastMode)) throw new Error("Invalid fast mode value.");
         next.fastMode = input.fastMode;
       } else if (input.provider !== undefined && input.provider !== agent.provider && next.fastMode) {
-        // The new provider has its own price, and Claude fast mode needs the user's confirmation.
         next.fastMode = false;
       }
-      // Ultrafast is a fast mode tier, so it comes only with a fast mode change.
       if (input.ultrafast !== undefined && (!isBoolean(input.ultrafast) || input.fastMode === undefined))
         throw new Error("Invalid fast mode value.");
-      // Each fast mode change names the tier: a change from a client that does not know Ultrafast,
-      // such as a remote client, sets Fast.
       if (input.fastMode !== undefined) {
         if (input.fastMode && input.ultrafast) next.ultrafast = true;
         else delete next.ultrafast;
       }
       if (!next.fastMode) delete next.ultrafast;
-      // A provider change without an account returns the agent to the new provider's own sign-in.
       if (
         input.providerAccountId === null ||
         input.providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ||
@@ -853,7 +786,6 @@ export class AgentStore {
         if (!isAvatarColor(input.chatColor)) throw new Error("Invalid chat color.");
         next.chatColor = input.chatColor;
       }
-      // A model the user picks ends the way back from a usage limit.
       if (
         input.usageLimitReturn === null ||
         (input.usageLimitReturn === undefined &&
@@ -871,8 +803,17 @@ export class AgentStore {
         if (!isAgentPendingRuntime(input.pendingRuntime)) throw new Error("Invalid pending runtime.");
         next.pendingRuntime = { ...input.pendingRuntime };
       } else if (next.provider !== agent.provider || next.providerAccountId !== agent.providerAccountId) {
-        // A handover that landed ends the queued change.
         delete next.pendingRuntime;
+      }
+      if (input.pinnedAccountId === null) delete next.pinnedAccountId;
+      else if (input.pinnedAccountId !== undefined) {
+        if (!isProviderAccountId(input.pinnedAccountId)) throw new Error("Invalid pinned account.");
+        next.pinnedAccountId = input.pinnedAccountId;
+      } else if (
+        (next.provider !== agent.provider || next.providerAccountId !== agent.providerAccountId) &&
+        (next.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) !== next.pinnedAccountId
+      ) {
+        delete next.pinnedAccountId;
       }
       next.updatedAt = new Date().toISOString();
       const previous = { ...agent };
@@ -890,8 +831,6 @@ export class AgentStore {
             }
           : undefined;
       Object.assign(agent, next);
-      // A copy cannot remove a field, and `null` above returned the agent to the app default or to
-      // the provider's own sign-in, and an agent flag to the account default.
       if (next.busyMessageMode === undefined) delete agent.busyMessageMode;
       if (next.taskLimit === undefined) delete agent.taskLimit;
       if (next.providerAccountId === undefined) delete agent.providerAccountId;
@@ -900,10 +839,12 @@ export class AgentStore {
       if (next.excludedFolders === undefined) delete agent.excludedFolders;
       if (next.usageLimitReturn === undefined) delete agent.usageLimitReturn;
       if (next.pendingRuntime === undefined) delete agent.pendingRuntime;
+      if (next.pinnedAccountId === undefined) delete agent.pinnedAccountId;
       if (next.browserProfileId === undefined) delete agent.browserProfileId;
       if (next.allowAutomation === undefined) delete agent.allowAutomation;
       if (next.allowNewChat === undefined) delete agent.allowNewChat;
       if (next.quickAcknowledgement === undefined) delete agent.quickAcknowledgement;
+      if (next.memory === undefined) delete agent.memory;
       if (next.ultrafast === undefined) delete agent.ultrafast;
       if (next.avatarColor === undefined) delete agent.avatarColor;
       if (next.chatColor === undefined) delete agent.chatColor;
@@ -919,10 +860,12 @@ export class AgentStore {
         if (previous.excludedFolders === undefined) delete agent.excludedFolders;
         if (previous.usageLimitReturn === undefined) delete agent.usageLimitReturn;
         if (previous.pendingRuntime === undefined) delete agent.pendingRuntime;
+        if (previous.pinnedAccountId === undefined) delete agent.pinnedAccountId;
         if (previous.browserProfileId === undefined) delete agent.browserProfileId;
         if (previous.allowAutomation === undefined) delete agent.allowAutomation;
         if (previous.allowNewChat === undefined) delete agent.allowNewChat;
         if (previous.quickAcknowledgement === undefined) delete agent.quickAcknowledgement;
+        if (previous.memory === undefined) delete agent.memory;
         if (previous.ultrafast === undefined) delete agent.ultrafast;
         if (previous.avatarColor === undefined) delete agent.avatarColor;
         if (previous.chatColor === undefined) delete agent.chatColor;
@@ -934,10 +877,6 @@ export class AgentStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Hides the agent at `hiddenAt`, or restores it when `hiddenAt` is null. A second hide keeps the
-   * first time. The roster event keeps the field, so the hidden state survives a restart.
-   */
   setHidden(agentId: string, hiddenAt: string | null): AgentSummary {
     const agent = this.#requireAgent(agentId);
     const previous = agent.hiddenAt;
@@ -956,7 +895,6 @@ export class AgentStore {
     return { ...agent };
   }
 
-  /** Whether a user hid the agent. An unknown agent is not hidden. */
   isHidden(agentId: string): boolean {
     return this.#state.agents.some((agent) => agent.id === agentId && agent.hiddenAt !== undefined);
   }
@@ -1053,23 +991,12 @@ export class AgentStore {
         yield* storedIO(() => rm(path, AGENT_FILES_REMOVAL));
       }
       yield* storedIO(() => rm(this.#duplicationMarkerPath(id), { force: true }));
-      // A workspace that could not follow the rename legitimately sits under the pre-rename root, and deleting
-      // only the derived path would leave that agent's files behind. Every path here is derived rather than
-      // read from `workspacePath`, because that column comes out of the user's own database file and a
-      // recursive delete must never follow a string this code did not build.
-      //
-      // The agent's own id is always safe to clear under the old root: nobody else can be stored under it.
-      // Migration v13 leaves a `bot-` id alone unless the application minted it, and a legacy `bots.json`
-      // import runs afterwards and keeps both the id and the `~/OpenBot/Bots/<id>` workspace it read, so an
-      // agent whose workspace is only ever there is a state the user can reach.
       const legacyPaths = [join(this.#legacyAgentsRoot, id)];
       const legacyId = this.#unclaimedLegacyId(id);
       if (legacyId !== null) {
         legacyPaths.push(join(this.#avatarsRoot, legacyId), join(this.#legacyAgentsRoot, legacyId));
       }
       for (const path of legacyPaths) yield* storedIO(() => rm(path, AGENT_FILES_REMOVAL));
-      // Keep the record for retry until every managed path is removed. Publish the new
-      // in-memory list only after the database transaction succeeds.
       const remaining = this.#state.agents.filter((candidate) => candidate.id !== id);
       this.#database.hardDeleteAgent(`agents:hard-delete:${randomUUID()}`, id, agent?.threadId ?? null, remaining);
       this.#state.agents = remaining;
@@ -1079,11 +1006,6 @@ export class AgentStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * An agent that is in the roster now. A conversation read or read mark, a reaction, a stop, and a steer
-   * use this, never `getOrCreate`: a device can still hold the id of an agent that another device deleted,
-   * and its next action on that id must not bring the agent back. For an agent that exists it does what `getOrCreate` does.
-   */
   existing = Effect.fn("AgentStore.existing")(function* (
     this: AgentStore,
     id: string,
@@ -1135,19 +1057,6 @@ export class AgentStore {
     }
   }, Effect.uninterruptible);
 
-  /**
-   * The file half of migration v13: `~/OpenBot/Bots/bot-<uuid>` becomes `~/OpenBot/Agents/agent-<uuid>`,
-   * and the uploaded avatar directory follows the id the same way. It cannot run inside that migration,
-   * because `runMigration` rolls its transaction back on a throw and a directory that has already moved
-   * cannot be rolled back.
-   *
-   * Resumable rather than atomic. On one volume `rename` is a single syscall, so no directory is ever
-   * half-moved, and what an interrupted run already did is read from whether the target directory exists
-   * -- never from a marker file, which can disagree with the disk. Nothing in here may stop the app: the
-   * database has already migrated by this point, so refusing to start over a directory name would leave
-   * the user with no way back in.
-   */
-
   #reconcileLegacyDirectoriesEffect = Effect.fn("AgentStore.reconcileLegacyDirectories")(function* (
     this: AgentStore,
   ): Effect.fn.Return<void, StoredStateFailure> {
@@ -1165,32 +1074,11 @@ export class AgentStore {
     }
   }, Effect.uninterruptible);
 
-  /**
-   * The name a pre-rename build would have given this agent, or `null` when another agent in the store is
-   * living under it right now. `legacyAgentId` reads syntax, and syntax is not ownership: `bot-<uuid>` is
-   * a valid id in its own right, so migration v13 leaving one in place beside an `agent-<uuid>` that shares
-   * its UUID is a state the user can reach. Every caller here either deletes a directory recursively or
-   * moves one, so a derived name that belongs to somebody else is the difference between tidying up after
-   * the rename and destroying an agent nobody touched.
-   *
-   * An id the application never minted -- `chief`, or one the user chose -- keeps its spelling, and that is
-   * not the same as having nothing to do: the *root* moved as well, so its workspace is still sitting in
-   * `OpenBot/Bots` under exactly this name. Nobody else can hold it, because ids are unique.
-   */
   #unclaimedLegacyId(id: string): string | null {
     const legacyId = legacyAgentId(id);
     if (legacyId === id) return id;
     return this.#state.agents.some((candidate) => candidate.id === legacyId) ? null : legacyId;
   }
-
-  /**
-   * Answers whether the agent's stored workspace path had to change, which is what has to be persisted.
-   *
-   * The destination is derived from the root and the id, never read from the stored path. An agent the
-   * user named themselves came out of the upgrade still recorded under `OpenBot/Bots/<id>`, because
-   * migration v13 rewrites id values and that id did not change -- so trusting the stored path would find
-   * the workspace already "at" its destination and leave it in the old root forever.
-   */
 
   #reconcileWorkspaceDirectoryEffect = Effect.fn("AgentStore.reconcileWorkspaceDirectory")(function* (
     this: AgentStore,
@@ -1202,17 +1090,9 @@ export class AgentStore {
       const targetPath = join(this.#agentsRoot, agent.id);
       const legacyPath = join(this.#legacyAgentsRoot, legacyId);
       if (legacyPath === targetPath) return false;
-      // A probe that cannot answer is not permission to guess. `EACCES` on either directory, or a Windows
-      // lock, leaves this run unable to tell a moved workspace from a missing one -- so it does nothing and
-      // the next launch tries again, rather than moving a directory on a false negative.
       const current = yield* probeDirectoryEffect(targetPath);
       const legacy = yield* probeDirectoryEffect(legacyPath);
       if (current !== false || legacy !== true) {
-        // A previous run moved the files but was interrupted before it could persist where they went -- and
-        // only then. Two directories at once is not that story: the move is a single atomic `rename`, so it
-        // never leaves both behind, and what this run is looking at is a destination that was never this
-        // agent's. Repointing the record at it would hand the agent somebody else's files and put its own
-        // out of reach, so an ambiguous pair leaves the path the agent has actually been reading alone.
         if (current === true && legacy === false && agent.workspacePath !== targetPath) {
           agent.workspacePath = targetPath;
           return true;
@@ -1234,11 +1114,6 @@ export class AgentStore {
         );
         if (Result.isFailure(attempt2)) {
           const error = attempt2.failure.cause;
-          // Only the move failed; the workspace itself is still there and still readable. `EXDEV` means
-          // `~/OpenBot/Bots` is a link onto another volume, so the move would be a copy, and a copy of a
-          // workspace interrupted halfway is lost data. A permission error, a Windows lock or an open handle
-          // leave exactly the same situation, so they get the same answer: the files stay where they are and
-          // the stored path is pointed back at them. An out-of-date directory name is cosmetic.
           logger.warn("Could not move an agent workspace to its new directory.", toLogValue(error));
           if (agent.workspacePath === legacyPath) return false;
           agent.workspacePath = legacyPath;
@@ -1252,14 +1127,6 @@ export class AgentStore {
     }
   }, Effect.uninterruptible);
 
-  /**
-   * Answers whether the agent's stored workspace path had to change. A database copied from another
-   * computer, or restored for another user, keeps the full workspace path of that home, and the folder
-   * cannot be made here: Windows refuses `mkdir` under another user's folder with `EPERM`, so the agent has
-   * no workspace and no screen can change it. Only an application-made path is changed -- `Agents/<id>` or
-   * `Bots/<id>` outside this computer's OpenBot root -- and only when nothing is there, so a path the
-   * user can still reach keeps its files. No file is moved or deleted.
-   */
   #rebaseForeignWorkspaceEffect = Effect.fn("AgentStore.rebaseForeignWorkspace")(function* (
     this: AgentStore,
     agent: StoredAgent,
@@ -1279,18 +1146,11 @@ export class AgentStore {
       );
     }
     logger.warn("An agent workspace path from another computer was changed to this computer.");
-    // An exclusion in the old workspace applies to the same folder in the new one, as for a duplicate.
     if (agent.excludedFolders)
       agent.excludedFolders = agent.excludedFolders.map((folder) => rebasedFolder(folder, stored, targetPath));
     agent.workspacePath = targetPath;
     return true;
   });
-
-  /**
-   * An uploaded avatar lives under the agent id, and `avatarUrl` derives that directory from the id
-   * migration v13 has just rewritten. Without this the file is still on disk under the old name and the
-   * app looks for it under the new one, so every uploaded avatar silently falls back to a drawn face.
-   */
 
   #reconcileAvatarDirectoryEffect = Effect.fn("AgentStore.reconcileAvatarDirectory")(function* (
     this: AgentStore,
@@ -1298,8 +1158,6 @@ export class AgentStore {
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       const legacyId = this.#unclaimedLegacyId(agent.id);
-      // An avatar directory is named after the id alone, so an id the rename left untouched has nowhere to
-      // move from. Only the workspace root changed for those.
       if (legacyId === null || legacyId === agent.id) return;
       const currentPath = join(this.#avatarsRoot, agent.id);
       const legacyPath = join(this.#avatarsRoot, legacyId);
@@ -1329,13 +1187,6 @@ export class AgentStore {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible);
-
-  /**
-   * Both directories exist, so neither can be moved onto the other -- but abandoning the old one strands the
-   * avatar the user actually uploaded, because `avatarUrl` resolves only under the new id and the app would
-   * fall back to a drawn face. What that URL names is one file, and one file is what gets carried across.
-   * Nothing is overwritten: a name already answering in the new directory is the newer upload.
-   */
 
   #adoptLegacyAvatarFileEffect = Effect.fn("AgentStore.adoptLegacyAvatarFile")(function* (
     this: AgentStore,
@@ -1411,9 +1262,6 @@ export class AgentStore {
         if (!isGeneratedAgentId(id)) continue;
         const agent = this.#agentByEitherSpelling(id);
         const marker = yield* this.#readDuplicationMarkerEffect(id);
-        // Everything below addresses the agent by the id it has *now*, which the marker name only equals
-        // when the same build wrote both. Using the file name would filter nothing out of the roster and
-        // hard-delete an id no row carries, leaving the half-made duplicate visible in the sidebar.
         const agentId = agent?.id ?? id;
         if (agent && marker) {
           const committed = this.committedAgentDuplication(marker.operationId, marker.sourceAgentId);
@@ -1431,9 +1279,6 @@ export class AgentStore {
             this.#state.agents,
           );
         }
-        // The copy this marker was tracking was made by whichever build crashed, so it can be sitting
-        // under either root, under either spelling of the id. Removing only the current one reports a
-        // clean recovery and leaves the half-written workspace on disk forever.
         const names = agentId === id ? [id] : [id, agentId];
         const roots = [this.#agentsRoot, this.#legacyAgentsRoot, this.#avatarsRoot];
         yield* Effect.all(
@@ -1454,28 +1299,6 @@ export class AgentStore {
     }
   }, Effect.uninterruptible);
 
-  /**
-   * Gives an agent back a thread that fell out of the roster, so its history stops being unreachable.
-   *
-   * A thread nothing claims is not visible and not reportable: the sidebar is the roster, no foreign key
-   * ties `projection_threads` to `projection_agents`, and nothing enumerates threads. The user sees an
-   * empty chat, or no chat, while every message is still on disk. Two ways in are covered -- an agent
-   * rebuilt under its own id by a `getOrCreate`, such as a message sent to that id, which comes back with
-   * no thread while its old row still names it; and a thread whose `agent_id` kept a pre-rename
-   * spelling, which `#agentByEitherSpelling` resolves.
-   *
-   * An agent that already holds a thread keeps it. It is reading that one, and handing it a second would
-   * hide the first -- the same trade `#reconcileWorkspaceDirectory` makes for an ambiguous pair. That
-   * also settles two threads naming one agent: the first in the ordering wins and the rest are reported.
-   *
-   * The thread of a channel context or an external conversation is never adopted: it is not the agent's
-   * own chat. An agent that an earlier build gave one keeps it, because its chat history is there now;
-   * `ConversationRuntime` keeps one snapshot for such a thread.
-   *
-   * The repair is one `#persist`, because `replaceAgents` runs `ensureThreadProjection` for every agent
-   * that holds a thread, which is what rewrites the row's `agent_id` to the spelling the roster uses.
-   * Nothing here may stop the app, so a thread this cannot place is counted and left alone.
-   */
   #reconcileUnclaimedThreads(): void {
     const unclaimed = this.#database.unclaimedThreads();
     if (unclaimed.length === 0) return;
@@ -1491,11 +1314,6 @@ export class AgentStore {
     if (stranded > 0) logger.warn("Threads remain that no agent claims.", stranded);
   }
 
-  /**
-   * The agent an id names, whether it is spelled the way this build writes ids or the way the build that
-   * wrote the file on disk did. The exact spelling is tried first, because migration v13 leaves a `bot-`
-   * id alone when the `agent-` spelling is already taken and both agents can then exist at once.
-   */
   #agentByEitherSpelling(id: string): StoredAgent | undefined {
     return (
       this.#state.agents.find((candidate) => candidate.id === id) ??
@@ -1517,10 +1335,6 @@ export class AgentStore {
           Effect.gen({ self: this }, function* () {
             try {
               const value = JSON.parse(yield* storedIO(() => readFile(this.#duplicationMarkerPath(id), "utf8")));
-              // A marker on disk was written by whichever build crashed, and a released one spells this
-              // `sourceBotId`. Failing to read it drops the file on the floor: recovery cannot then tell a
-              // duplication that finished from one that died mid-copy, so it deletes the agent the user kept
-              // along with its workspace.
               const storedSource = isRecord(value) ? (value.sourceAgentId ?? value.sourceBotId) : null;
               if (
                 !isRecord(value) ||
@@ -1531,11 +1345,6 @@ export class AgentStore {
               ) {
                 return null;
               }
-              // The value beside that key names the source agent as it was spelled when the marker was written,
-              // and migration v13 has renamed it since. Nothing rewrites a file outside the database, so the
-              // receipt this is about to be compared against already says `agent-<uuid>` while the marker still
-              // says `bot-<uuid>`: comparing them raw throws "The agent duplication receipt is invalid." out of
-              // recovery, and the app never finishes starting.
               const sourceAgentId = this.#agentByEitherSpelling(storedSource)?.id ?? storedSource;
               return { operationId: value.operationId, sourceAgentId };
             } catch (cause) {
@@ -1565,17 +1374,6 @@ export class AgentStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Derived from the agent id, never minted at random, and that is what makes losing a roster row
-   * survivable. A `getOrCreate` for an id whose `projection_agents` row is gone, such as a message sent
-   * to it, rebuilds the agent with no `threadId` and lands here. A random id
-   * would file the rebuilt agent against an empty thread and leave the user's own thread -- still on
-   * disk, with every message in it -- addressable by nothing, because no foreign key ties the two
-   * tables and nothing in the app enumerates threads. The stable id re-adopts the row the history is
-   * already under. The legacy `bots.json` import has always derived it this way.
-   *
-   * An agent that already holds a `threadId` keeps it, so no existing agent is repointed.
-   */
   ensureThreadIdNow(id: string): string {
     const agent = this.#requireAgent(id);
     if (agent.threadId) return agent.threadId;
@@ -1591,9 +1389,16 @@ export class AgentStore {
     agent.updatedAt = updatedAt;
   }
 
-  /** Whether this thread is an agent's own chat. It copies no agent, so a hot path can ask it. */
+  providerOf(id: string): AgentProviderId | undefined {
+    return this.#state.agents.find((agent) => agent.id === id)?.provider;
+  }
+
   ownsThread(threadId: string): boolean {
     return this.#state.agents.some((agent) => agent.threadId === threadId);
+  }
+
+  mainThreadAgentId(threadId: string): string | null {
+    return this.#state.agents.find((agent) => agent.threadId === threadId)?.id ?? null;
   }
 
   activeProviderSession(id: string): ProviderSession | null {
@@ -1629,10 +1434,6 @@ export class AgentStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * After "Delete history": the row shows the localized "no messages" text, and the agent keeps its
-   * place in the list.
-   */
   clearPreview = Effect.fn("AgentStore.clearPreview")(function* (
     this: AgentStore,
     id: string,
@@ -1654,7 +1455,6 @@ export class AgentStore {
           Effect.gen({ self: this }, function* () {
             try {
               const contents = yield* storedIO(() => readFile(this.#statePath, "utf8"));
-              // A power loss left the file without content: no agent in it can be recovered.
               if (isEmptyStoredFile(contents)) {
                 const empty: StoredState = { version: 2, examplesInitialized: false, agents: [] };
                 return empty;
@@ -1701,29 +1501,6 @@ export class AgentStore {
     }
   }, Effect.uninterruptible);
 
-  /**
-   * Put back any agent the roster projection has lost but the event log still names.
-   *
-   * `orchestration_events` is the source of truth and every roster write appends the whole list to one
-   * aggregate, but nothing read it back. An agent missing from the projection is therefore silent: the
-   * startup guard above accepts what it finds -- `.every()` on an empty list is true -- the agent has no
-   * chat in the sidebar, and the next `#persist` writes the shortened list as the new truth while each
-   * thread and message row stays on disk.
-   *
-   * Per agent, not only for an empty roster. A partial loss is the more likely half: `replaceAgents`
-   * truncates the roster and re-inserts the in-memory list, so a persist made with one agent missing
-   * drops that one row and keeps the rest. It is also the more dangerous half, because a later
-   * `getOrCreate` rebuilds the missing agent with `threadId: null` and both conversation read paths
-   * then report an empty history. The restored profile carries the `threadId` the event holds, which is
-   * what reaches a thread minted under a random id by an earlier build.
-   *
-   * The newest event only, never a fold over the aggregate: `hardDeleteAgent` appends the *remaining*
-   * agents, so an agent the user deleted on purpose is in no later payload and is never brought back.
-   * A profile the current guards reject is dropped rather than thrown on, because the event that holds
-   * it can be older than any shape this build knows and nothing here may stop the app from starting.
-   * The result is persisted so the repair survives the next launch, and it runs before
-   * `#reconcileUnclaimedThreads` so a restored agent can then claim the thread that names it.
-   */
   #restoreRosterFromEvents(): void {
     const replayed = this.#database.latestRosterAgents();
     if (replayed.length === 0) return;
@@ -1734,9 +1511,6 @@ export class AgentStore {
       readable.push(normalizeStoredAgent(read.agent));
     }
     const present = new Set(this.#state.agents.map((agent) => agent.id));
-    // Appended rather than put back at its old index: the sidebar orders agents by the layout's own
-    // `agentOrder`, so the position here is not what the user sees, and appending keeps the agents that
-    // survived exactly where they are.
     const restored = readable.filter((agent) => !present.has(agent.id));
     if (restored.length === 0) return;
     const dropped = replayed.length - readable.length;
@@ -1746,12 +1520,6 @@ export class AgentStore {
     logger.warn("Agents were restored to the roster from the event log.", restored.length);
   }
 
-  /**
-   * Turns fast mode off one time for each Claude agent. Before Claude fast mode existed, only Codex read
-   * `fastMode`, so a Claude agent has `true` only from a provider change. The user never confirmed the
-   * Claude price for it. The receipt of the command is the marker that stops a second run: the event of
-   * its own aggregate stays, so no roster write or sweep deletes the receipt.
-   */
   #resetClaudeFastModeOnce(): void {
     if (this.#database.commandResult(CLAUDE_FAST_MODE_RESET_COMMAND_ID) !== undefined) return;
     const agentIds = this.#state.agents
@@ -1844,15 +1612,6 @@ function duplicateAgentName(sourceName: string, agents: readonly StoredAgent[]):
   throw new Error(sourceText("error.agent.copyNameFailed"));
 }
 
-/**
- * The part of an agent a copy is actually built from, which is what "the agent changed" has to mean.
- *
- * `preview`, `updatedAt` and `threadId` move on their own the moment a message lands, and a
- * duplicate takes none of the three — it gets a fresh thread and its own empty preview. Signing them
- * aborted duplications that were never incoherent, and copying a large workspace takes long enough
- * for an incoming message to land inside the window. Everything else is signed by omission, so a new
- * `AgentSummary` field is guarded until someone decides otherwise here.
- */
 export function duplicationProfileSignature(agent: AgentSummary): string {
   const { preview, updatedAt, threadId, ...copied } = agent;
   return JSON.stringify(copied);
@@ -1984,10 +1743,6 @@ const probeDirectoryEffect = Effect.fn("AgentStore.probeDirectory")((path: strin
   ),
 );
 
-/**
- * Whether a stored workspace has the shape this application gives one: `Agents/<id>`, or `Bots/<id>` from
- * before the rename. Both separators are read, because the database can come from Windows or from macOS.
- */
 function isApplicationWorkspacePath(workspacePath: string, agentId: string): boolean {
   const parts = workspacePath.split(/[\\/]+/);
   const name = parts.at(-1);
@@ -1996,10 +1751,6 @@ function isApplicationWorkspacePath(workspacePath: string, agentId: string): boo
   return folder === "Bots" && (name === agentId || name === legacyAgentId(agentId));
 }
 
-/**
- * `folder` moved from `from` to `to` when it is inside `from`, else `folder`. A Windows path on macOS or
- * Linux has no native separator, so its segments are compared when the native check does not match.
- */
 function rebasedFolder(folder: string, from: string, to: string): string {
   if (isPathInside(from, folder)) return join(to, relative(from, folder));
   const fromParts = from.split(/[\\/]+/);
@@ -2047,6 +1798,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.allowAutomation === undefined || isBoolean(record.allowAutomation)) &&
     (record.allowNewChat === undefined || isBoolean(record.allowNewChat)) &&
     (record.quickAcknowledgement === undefined || isBoolean(record.quickAcknowledgement)) &&
+    (record.memory === undefined || record.memory === false) &&
     (record.ownBrowserSession === undefined || isBoolean(record.ownBrowserSession)) &&
     (record.browserProfileId === undefined || isBrowserProfileId(record.browserProfileId)) &&
     (record.fastMode === undefined || isBoolean(record.fastMode)) &&
@@ -2057,6 +1809,7 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
     (record.backupModels === undefined || isAgentBackupModels(record.backupModels)) &&
     (record.usageLimitReturn === undefined || isAgentUsageLimitReturn(record.usageLimitReturn)) &&
     (record.pendingRuntime === undefined || isAgentPendingRuntime(record.pendingRuntime)) &&
+    (record.pinnedAccountId === undefined || isProviderAccountId(record.pinnedAccountId)) &&
     (record.hiddenAt === undefined || isHiddenAt(record.hiddenAt)) &&
     isAvatarSeed(record.avatarSeed) &&
     (record.avatarHue === null || isAvatarHue(record.avatarHue)) &&
@@ -2068,7 +1821,6 @@ function isStoredAgent(value: unknown): value is PersistedStoredAgent {
 
 interface ReadStoredAgent {
   agent: PersistedStoredAgent;
-  /** The names of the fields this build could not read, in the order they are checked. */
   repaired: string[];
 }
 
@@ -2077,20 +1829,6 @@ interface UnreadableStoredAgent {
   id: string | null;
 }
 
-/**
- * A stored profile, with every field this build cannot read put back to a value it can.
- *
- * The three fields it refuses on instead are the ones no default can stand in for. `id` names the
- * avatar directory, the workspace under `~/OpenBot/Agents` and the agent every thread and receipt
- * points at; `workspacePath` is the directory the agent reads and writes, and a guessed one is either
- * another agent's files or an empty new directory beside the real one; `threadId` is the whole
- * conversation, and reading a broken one as `null` reports an empty history and mints a second thread
- * over the first. Everything else is a preference, a label or a drawn face: resetting one costs the
- * user a setting they can see and set again, while refusing costs them the application.
- *
- * `avatarUrl` is absent from the repair list on purpose -- `normalizeStoredAgent` already drops a URL
- * that does not parse, and has since before this reader existed.
- */
 function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgent {
   if (!isRecord(value)) return { unreadable: "profile", id: null };
   const id = value.id;
@@ -2112,12 +1850,10 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     : reset("model", provider === undefined ? DEFAULT_AGENT_MODEL : defaultProviderModel(provider));
   const access =
     value.access === undefined || isAgentAccess(value.access) ? value.access : reset("access", DEFAULT_AGENT_ACCESS);
-  // A list that this build cannot read keeps the folders it can, so the agent loses no more access than it must.
   const additionalFolders =
     value.additionalFolders === undefined || isAgentAdditionalFolders(value.additionalFolders)
       ? value.additionalFolders
       : readableFolders(value.additionalFolders, () => repaired.push("additionalFolders"));
-  // The same for excluded folders: a write block that this build cannot read stays for the paths it can.
   const excludedFolders =
     value.excludedFolders === undefined || isAgentAdditionalFolders(value.excludedFolders)
       ? value.excludedFolders
@@ -2136,12 +1872,11 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     value.quickAcknowledgement === undefined || isBoolean(value.quickAcknowledgement)
       ? value.quickAcknowledgement
       : reset("quickAcknowledgement", undefined);
+  const memory = value.memory === undefined || value.memory === false ? value.memory : reset("memory", undefined);
   const ownBrowserSession =
     value.ownBrowserSession === undefined || isBoolean(value.ownBrowserSession)
       ? value.ownBrowserSession
       : reset("ownBrowserSession", undefined);
-  // An id this build cannot read leaves `ownBrowserSession`, which a profile always sets: the tabs
-  // then use the agent's own session, never the shared one.
   const browserProfileId =
     value.browserProfileId === undefined || isBrowserProfileId(value.browserProfileId)
       ? value.browserProfileId
@@ -2174,8 +1909,10 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     value.pendingRuntime === undefined || isAgentPendingRuntime(value.pendingRuntime)
       ? value.pendingRuntime
       : reset("pendingRuntime", undefined);
-  // A time this build cannot read keeps the agent hidden, at the time of the read: a user hid it,
-  // and only the user puts it back in the list.
+  const pinnedAccountId =
+    value.pinnedAccountId === undefined || isProviderAccountId(value.pinnedAccountId)
+      ? value.pinnedAccountId
+      : reset("pinnedAccountId", undefined);
   const hiddenAt =
     value.hiddenAt === undefined || isHiddenAt(value.hiddenAt)
       ? value.hiddenAt
@@ -2193,9 +1930,6 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     if (isMarketplaceSource(value.marketplaceSource)) {
       marketplaceSource = normalizeMarketplaceSource(value.marketplaceSource);
     } else {
-      // Reset to "installed by hand" rather than kept: the listing and version ids are what an update
-      // check compares, and a half-read pair reports the wrong version. Installing the marketplace
-      // agent again over this one binds it back.
       reset("marketplaceSource", undefined);
     }
   }
@@ -2223,10 +1957,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     updatedAt: isString(value.updatedAt) || value.updatedAt === null ? value.updatedAt : reset("updatedAt", null),
     avatarSeed: isAvatarSeed(value.avatarSeed) ? value.avatarSeed : reset("avatarSeed", id),
     avatarHue,
-    // A released build reads only the fields it knows, so its next write removes the colour. A stored
-    // colour is thus always the newest choice, and it stays even if the nearest hue changes later.
     ...(avatarColor === undefined ? {} : { avatarColor }),
-    // Only a build with chat colours keeps it. It is separate from the avatar colour.
     ...(chatColor === undefined ? {} : { chatColor }),
     avatarUrl: isString(value.avatarUrl) ? value.avatarUrl : null,
     ...(provider === undefined ? {} : { provider }),
@@ -2237,6 +1968,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(allowAutomation === undefined ? {} : { allowAutomation }),
     ...(allowNewChat === undefined ? {} : { allowNewChat }),
     ...(quickAcknowledgement === undefined ? {} : { quickAcknowledgement }),
+    ...(memory === undefined ? {} : { memory }),
     ...(ownBrowserSession === undefined ? {} : { ownBrowserSession }),
     ...(browserProfileId === undefined ? {} : { browserProfileId }),
     ...(fastMode === undefined ? {} : { fastMode }),
@@ -2247,6 +1979,7 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
     ...(backupModels === undefined ? {} : { backupModels }),
     ...(usageLimitReturn === undefined ? {} : { usageLimitReturn }),
     ...(pendingRuntime === undefined ? {} : { pendingRuntime }),
+    ...(pinnedAccountId === undefined ? {} : { pinnedAccountId }),
     ...(hiddenAt === undefined ? {} : { hiddenAt }),
     ...(sessionSettingOverrides === undefined ? {} : { sessionSettingOverrides }),
     ...(sessionSettingResets === undefined ? {} : { sessionSettingResets }),
@@ -2255,13 +1988,6 @@ function readStoredAgent(value: unknown): ReadStoredAgent | UnreadableStoredAgen
   return { agent, repaired };
 }
 
-/**
- * The one message the startup dialog shows for a profile that cannot be read.
- *
- * It names the field, because the field is the whole diagnosis and a screenshot is usually all a
- * report carries. It never carries the *value*: `workspacePath` holds the user's home directory, and
- * this string reaches a dialog, a log and any diagnostics export.
- */
 function unreadableProfileMessage({ unreadable, id }: UnreadableStoredAgent): string {
   if (id === null) return sourceText("error.agent.storedProfileUnreadable", { field: unreadable });
   return sourceText("error.agent.storedProfileUnreadableId", { id, field: unreadable });
@@ -2269,9 +1995,6 @@ function unreadableProfileMessage({ unreadable, id }: UnreadableStoredAgent): st
 
 function isMarketplaceSource(value: unknown): boolean {
   if (value === undefined) return true;
-  // Agents installed before the marketplace listing id was renamed spell it `agentId`, which now
-  // means the local agent everywhere else. Both spellings are accepted here; `normalizeStoredAgent`
-  // writes only the new one back.
   return (
     isRecord(value) &&
     (isString(value.listingId) || isString(value.agentId)) &&
@@ -2297,11 +2020,6 @@ function isLegacyStoredAgent(value: unknown): value is LegacyStoredAgent {
   );
 }
 
-/**
- * Sets the colour of an agent. A colour sets the nearest released hue, which released apps and Team
- * API peers draw. `null` removes the colour. With no colour given, a changed hue removes the colour:
- * a released app or peer, which knows only hues, chose another colour.
- */
 function applyAvatarColor(
   agent: Pick<StoredAgent, "avatarHue" | "avatarColor">,
   hue: AvatarHue | null,
@@ -2360,11 +2078,6 @@ function normalizeStoredAgent(agent: PersistedStoredAgent): StoredAgent {
   };
 }
 
-/**
- * Agents installed before the marketplace listing id was renamed spell it `agentId`, which now means
- * the local agent everywhere else. `isMarketplaceSource` accepts either spelling; this writes only
- * the new one back, so a stored agent converts the first time it is read.
- */
 function normalizeMarketplaceSource(value: unknown): NonNullable<StoredAgent["marketplaceSource"]> {
   if (!isRecord(value)) throw new Error("The stored marketplace source is invalid.");
   const listingId = isString(value.listingId) ? value.listingId : value.agentId;

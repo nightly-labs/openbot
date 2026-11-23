@@ -20,4 +20,5 @@ export const messages = {
   "error.kind.service": "De service is niet beschikbaar. Wacht even en probeer het opnieuw.",
   "error.kind.clock":
     "Een beveiligde verbinding is mislukt, omdat de datum of tijd op de computer waarop OpenBot draait waarschijnlijk onjuist is. Corrigeer de datum en tijd en probeer het opnieuw.",
+  "error.kind.interrupted": "De verbinding werd verbroken voordat het antwoord klaar was. Stuur je bericht opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

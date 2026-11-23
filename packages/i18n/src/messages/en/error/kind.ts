@@ -1,6 +1,5 @@
 import { defineMessages } from "../../../message";
 
-/** The sentence for each kind `classifyUserError` decides. `@openbot/user-errors` owns the mapping. */
 export const messages = defineMessages("error.kind", {
   "error.kind.network": "Could not connect. Check your connection and try again.",
   "error.kind.timeout": "The request took too long. Check whether the action completed before you try again.",
@@ -18,4 +17,5 @@ export const messages = defineMessages("error.kind", {
   "error.kind.service": "The service is unavailable. Wait a moment, then try again.",
   "error.kind.clock":
     "A secure connection failed because the date or time on the computer running OpenBot is probably wrong. Correct the date and time, then try again.",
+  "error.kind.interrupted": "The connection closed before the answer was finished. Send your message again.",
 });

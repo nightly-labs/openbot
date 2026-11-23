@@ -20,4 +20,5 @@ export const messages = {
   "error.kind.service": "El servicio no está disponible. Espera un momento e inténtalo de nuevo.",
   "error.kind.clock":
     "No se pudo establecer una conexión segura porque la fecha o la hora del equipo que ejecuta OpenBot probablemente son incorrectas. Corrige la fecha y la hora e inténtalo de nuevo.",
+  "error.kind.interrupted": "La conexión se cerró antes de que terminara la respuesta. Envía tu mensaje de nuevo.",
 } as const satisfies PartialTranslation<typeof source>;

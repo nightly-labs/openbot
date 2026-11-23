@@ -148,8 +148,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Acesso do agente",
   "agentSettings.runtime.busyMessage": "Durante o trabalho",
   "agentSettings.runtime.busyMessageLabel": "Mensagens enquanto o agente trabalha",
-  "agentSettings.runtime.taskLimit": "Tópicos em paralelo",
-  "agentSettings.runtime.taskLimitLabel": "Tópicos executados ao mesmo tempo",
   "agentSettings.runtime.workingDirectory": "Diretório de trabalho",
   "agentSettings.runtime.notAvailable": "Ainda não disponível",
   "agentSettings.runtime.fullAccessNote":
@@ -168,19 +166,17 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Orientar",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} não pode orientar um turno em andamento. As mensagens enviadas enquanto ele trabalha esperam na fila.",
-  "agentSettings.taskLimit.default": "Padrão ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} executa um turno por vez. Os tópicos deste agente esperam uns pelos outros.",
   "agentSettings.notificationLevel.title": "Me notificar",
   "agentSettings.notificationLevel.server": "Padrão do servidor ({level})",
   "agentSettings.notificationLevel.note":
     "Esta escolha vale só para você, em todos os seus dispositivos. Se o servidor estiver silenciado ou em “Nada”, este agente também fica em silêncio.",
   "agentSettings.newChat.title": "Novo chat",
-  "agentSettings.newChat.description": "O agente esquece este chat. Sua configuração é mantida.",
+  "agentSettings.newChat.description":
+    "O agente começa do zero e ainda pode consultar este chat quando precisar. Sua configuração é mantida.",
   "agentSettings.newChat.button": "Iniciar",
   "agentSettings.newChat.confirmTitle": "Iniciar um novo chat com {name}?",
   "agentSettings.newChat.confirmDescription":
-    "O agente esquece este chat. As mensagens continuam visíveis acima de um separador. As instruções, o modelo, as ferramentas, as memórias, o espaço de trabalho e o navegador não mudam.",
+    "O agente começa do zero e ainda pode consultar este chat quando precisar. As mensagens continuam visíveis acima de um separador. As instruções, o modelo, as ferramentas, as memórias, o espaço de trabalho e o navegador não mudam.",
   "agentSettings.newChat.confirm": "Iniciar novo chat",
   "agentSettings.newChat.failed": "Não foi possível iniciar um novo chat.",
   "agentSettings.deleteHistory.title": "Excluir histórico",
@@ -201,6 +197,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Permitir acesso completo",
   "agentSettings.fullAccess.askConfirm": "Usar Perguntar antes",
   "agentSettings.links.usage": "Uso",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Todos os agentes",
   "agentSettings.links.memories": "Memórias",
   "agentSettings.links.memoriesCount": { one: "{count} salva", other: "{count} salvas" },
   "agentSettings.links.skills": "Habilidades",
@@ -228,6 +226,9 @@ export const messages = {
     "Permite que o agente inicie um novo chat quando o chat dele ficar longo. Ele salva notas antes.",
   "agentSettings.quickAcknowledgement.title": "Mostrar o plano antes de tarefas longas",
   "agentSettings.quickAcknowledgement.description": "Antes de uma tarefa longa, o agente mostra o plano.",
+  "agentSettings.builtinMemory.title": "Memória do OpenBot",
+  "agentSettings.builtinMemory.description":
+    "O agente salva e lê as próprias memórias. Desative para usar só um app de memória, como o Mem0. As memórias salvas continuam.",
   "agentSettings.browserProfile.label": "Perfil do navegador",
   "agentSettings.browserProfile.shared": "Compartilhado",
   "agentSettings.browserProfile.agent": "Somente este agente",
@@ -237,6 +238,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Cada perfil mantém logins e cookies próprios. Uma mudança fecha as abas abertas do agente.",
   "agentSettings.browserProfile.manage": "Gerenciar",
+  "agentSettings.browserProfile.movedNote":
+    "Os logins nos sites ficam no perfil antigo. O agente precisa entrar nesses sites novamente.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Todo o processo do {provider} é executado em um ambiente isolado, por isso a gravação fora desses locais falha. Disponível somente no macOS.",
 } as const satisfies PartialTranslation<typeof source>;

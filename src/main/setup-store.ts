@@ -14,11 +14,6 @@ import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } f
 interface StoredSetup {
   version: 2;
   preferredProvider: AgentProviderId;
-  /**
-   * Added after version 2 shipped, and the version stays at 2 on purpose: a bump would make every
-   * completed setup unreadable and send those users through onboarding again. A file without the
-   * field means the provider's own default model, which is what those users already have.
-   */
   preferredModel?: AgentModelId;
   completedAt: string;
 }
@@ -39,8 +34,6 @@ export function readSetupState(path: string): Effect.Effect<AppSetupState, Prefe
     return {
       completed: true,
       preferredProvider: parsed.preferredProvider,
-      // A malformed model is dropped rather than failing the whole read: the provider is still a
-      // usable answer, and the model falls back to that provider's default.
       preferredModel: isAgentModel(parsed.preferredModel) ? parsed.preferredModel : null,
     };
   }).pipe(

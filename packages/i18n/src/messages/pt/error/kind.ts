@@ -18,4 +18,5 @@ export const messages = {
   "error.kind.service": "O serviço está indisponível. Aguarde um momento e tente novamente.",
   "error.kind.clock":
     "Não foi possível estabelecer uma conexão segura porque a data ou a hora do computador que executa o OpenBot provavelmente está errada. Corrija a data e a hora e tente novamente.",
+  "error.kind.interrupted": "A conexão foi encerrada antes de a resposta terminar. Envie sua mensagem novamente.",
 } as const satisfies PartialTranslation<typeof source>;

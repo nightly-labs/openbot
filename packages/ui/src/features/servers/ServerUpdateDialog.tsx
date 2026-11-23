@@ -6,9 +6,7 @@ import { CircleCheck, CircleDot, RotateCcw, TriangleAlert } from "../../icons";
 import { useText } from "../../text";
 import { restartReasonKey } from "../updates/restart-reasons";
 
-/** `offer` waits for the user; `downloading`, `waiting` and `restarting` run on the host. */
 export type ServerUpdateStage = "offer" | "downloading" | "waiting" | "restarting" | "online" | "failed";
-/** `version`: the host came back with its old version. `restart`: it did not come back in time. */
 export type ServerUpdateFailure = "download" | "install" | "restart" | "version";
 export type ServerUpdateDownload = "pending" | "running" | "done" | "failed";
 export type ServerUpdateBusy = "start" | "now" | "cancel";
@@ -16,15 +14,11 @@ export type ServerUpdateBusy = "start" | "now" | "cancel";
 export interface ServerUpdateView {
   name: string;
   currentVersion: string;
-  /** The version that the update installs. */
   version: string;
   stage: ServerUpdateStage;
   download: ServerUpdateDownload;
-  /** The download percentage, or null while the host does not know it. */
   progress: number | null;
-  /** The mode of the restart that the host scheduled, or null when none is scheduled. */
   restartMode: UpdateRestartMode | null;
-  /** What the restart waits for, as `host-update-v1` reports it. */
   waitingFor: readonly string[];
   failure: ServerUpdateFailure | null;
   elapsedSeconds: number;
@@ -32,25 +26,15 @@ export interface ServerUpdateView {
 
 type StepStatus = "done" | "active" | "failed" | "pending";
 
-/**
- * The OpenBot update of a joined server: the download, the restart, and the server back online. One
- * confirm starts the download and the restart, because `host-update-v1` does both in one call. The
- * user can hide the dialog while the host works.
- */
 export function ServerUpdateDialog(props: {
-  /** Null closes the dialog. */
   update: ServerUpdateView | null;
-  /** Only an administrator can restart at once or cancel the restart. */
   canManage: boolean;
   busy: ServerUpdateBusy | null;
-  /** A request that failed. */
   error: string | null;
   onStart: (mode: UpdateRestartMode) => void;
   onRestartNow: () => void;
   onCancelRestart: () => void;
-  /** Later, Hide and Escape. The update continues on the host. */
   onHide: () => void;
-  /** Closes a finished or failed update. */
   onDone: () => void;
 }) {
   const { t, format } = useText();
@@ -70,14 +54,12 @@ export function ServerUpdateDialog(props: {
     return progress === null || progress === undefined ? null : format.percent(progress / 100);
   };
 
-  // A new update asks again whether the restart waits.
   createEffect(
     () => props.update === null,
     (closed) => {
       if (closed) setWhenIdle(true);
     },
   );
-  // The result moves focus to the button that closes the dialog.
   createEffect(
     () => stage() === "online" || stage() === "failed",
     (finished) => {
@@ -296,7 +278,6 @@ function StepIcon(props: { status: StepStatus }): JSX.Element {
   );
 }
 
-/** Minutes and seconds, as the restart dialog shows them. */
 function formatElapsed(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }

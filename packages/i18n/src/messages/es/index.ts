@@ -14,8 +14,8 @@ import { messages as composer } from "./composer";
 import { messages as computerUse } from "./computerUse";
 import { messages as connector } from "./connector";
 import { messages as conversation } from "./conversation";
+import { messages as crm } from "./crm";
 import { messages as customProvider } from "./customProvider";
-import { messages as diagram } from "./diagram";
 import { messages as dialog } from "./dialog";
 import { messages as files } from "./files";
 import { messages as importAgent } from "./import";
@@ -92,7 +92,6 @@ export const es = {
   ...usage,
   ...sidebar,
   ...channel,
-  ...diagram,
   ...workflow,
   ...agent,
   ...agentTemplate,
@@ -104,4 +103,5 @@ export const es = {
   ...vault,
   ...uiBlock,
   ...sitePage,
+  ...crm,
 } as const satisfies PartialTranslation<AppMessages>;

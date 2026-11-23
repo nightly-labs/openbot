@@ -1,13 +1,31 @@
 import {
-  BILLING_CURRENCIES,
+  BILLING_BASE_CURRENCIES,
   BILLING_INTERVALS,
+  BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
+  BILLING_STORAGE_UPGRADE_TIERS,
   type BillingCurrency,
   type BillingInterval,
+  type BillingOptionalCurrency,
   type BillingPlanId,
+  type BillingStorageUpgradeTier,
   billingListPrices,
   billingLookupKey,
+  storageTierListPrices,
+  storageTierLookupKey,
+  storageTierPriceMetadata,
 } from "@openbot/contracts/billing";
+import { VAT_TAX_RATE } from "@openbot/contracts/billing-details";
+import {
+  CREDIT_LOOKUP_KEYS,
+  CREDIT_METADATA,
+  CREDIT_METADATA_KIND,
+  CREDIT_PRODUCT_ID,
+  type CreditStop,
+  creditLookupKey,
+  creditStopPrice,
+  creditStops,
+} from "@openbot/contracts/credits";
 import {
   LICENSE_LOOKUP_KEYS,
   LICENSE_METADATA,
@@ -23,26 +41,11 @@ import {
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
 
-/**
- * Creates the Stripe catalog that the account server reads: one Product for each plan, and one Price
- * for each plan and interval with the lookup key `openbot_{plan}_{interval}`. It also creates the
- * license Product and one Price for each license plan (`LICENSE_PLANS`), and sets the Customer Portal
- * features. Run it again at any time: it changes only what differs.
- *
- *   STRIPE_SECRET_KEY=sk_test_... bun scripts/stripe-bootstrap.ts [--live] [--webhook-url <url>]
- *
- * Without `--live` it refuses a live key. `--webhook-url` creates or updates the webhook endpoint at
- * that URL. Stripe shows the signing secret of an endpoint only when it creates the endpoint, so the
- * script prints it one time, for STRIPE_WEBHOOK_SECRET. `bun run hosting:setup` calls
- * `bootstrapStripe` and stores the secret itself.
- */
-
 const logger = createOpenBotLogger("stripe-bootstrap");
 const STRIPE_API_VERSION = "2025-03-31.basil";
 
 const PLAN_NAME: Record<BillingPlanId, string> = { starter: "Starter", standard: "Standard", pro: "Pro" };
 
-/** The events that the webhook endpoint must receive. */
 export const BILLING_WEBHOOK_EVENTS = [
   "checkout.session.completed",
   "customer.subscription.created",
@@ -55,6 +58,8 @@ export const BILLING_WEBHOOK_EVENTS = [
   "invoice.paid",
   "invoice.payment_failed",
   "checkout.session.expired",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.async_payment_failed",
   "refund.created",
   "refund.updated",
   "refund.failed",
@@ -70,12 +75,43 @@ const priceSchema = z.object({
   currency: z.string(),
   unit_amount: z.number().int().nullable(),
   recurring: z.object({ interval: z.string() }).nullable(),
-  currency_options: z.record(z.string(), z.object({ unit_amount: z.number().int().nullable() })).optional(),
+  currency_options: z
+    .record(
+      z.string(),
+      z.object({ unit_amount: z.number().int().nullable(), tax_behavior: z.string().nullable().optional() }),
+    )
+    .optional(),
   metadata: z.record(z.string(), z.string()).optional(),
   active: z.boolean().optional(),
+  tax_behavior: z.string().nullable().optional(),
 });
 type Price = z.infer<typeof priceSchema>;
+const priceTierSchema = z.object({
+  up_to: z.number().int().nullable(),
+  flat_amount: z.number().int().nullable(),
+  unit_amount: z.number().int().nullable(),
+});
+const priceAmountsSchema = z.object({
+  currency_options: z.record(
+    z.string(),
+    z.object({
+      unit_amount: z.number().int().nullable(),
+      tax_behavior: z.string().nullable().optional(),
+      tiers: z.array(priceTierSchema).optional(),
+    }),
+  ),
+});
 const priceListSchema = z.object({ data: z.array(priceSchema) });
+const taxRateListSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      percentage: z.number(),
+      inclusive: z.boolean(),
+      metadata: z.record(z.string(), z.string()),
+    }),
+  ),
+});
 const portalConfigurationListSchema = z.object({ data: z.array(z.object({ id: z.string() })) });
 const webhookEndpointSchema = z.object({ id: z.string(), url: z.string(), secret: z.string().optional() });
 const webhookEndpointListSchema = z.object({ data: z.array(webhookEndpointSchema), has_more: z.boolean() });
@@ -101,7 +137,6 @@ class StripeAdmin {
     });
     const value = await response.json().catch(() => null);
     if (!response.ok) {
-      // Stripe's message names the request parameter at fault. It holds no key and no customer data here.
       const error = z.object({ error: z.object({ message: z.string().optional() }) }).safeParse(value);
       throw new Error(
         `Stripe ${method} ${path.split("?")[0]} failed with ${response.status}: ${error.data?.error.message ?? "no message"}`,
@@ -120,8 +155,122 @@ class StripeAdmin {
   }
 }
 
+function includesTax(price: Price): boolean {
+  return (
+    price.tax_behavior === "inclusive" ||
+    Object.values(price.currency_options ?? {}).some((option) => option.tax_behavior === "inclusive")
+  );
+}
+
+function withExclusiveTax(body: URLSearchParams): URLSearchParams {
+  body.set("tax_behavior", "exclusive");
+  const currencies = new Set([...body.keys()].flatMap((key) => key.match(/^currency_options\[(\w+)\]/)?.[1] ?? []));
+  for (const currency of currencies) body.set(`currency_options[${currency}][tax_behavior]`, "exclusive");
+  return body;
+}
+
+async function ensureExclusiveTax(stripe: StripeAdmin, price: Price): Promise<void> {
+  const pending = Object.entries(price.currency_options ?? {}).filter(
+    ([currency, option]) => currency !== price.currency && option.tax_behavior !== "exclusive",
+  );
+  if (price.tax_behavior === "exclusive" && pending.length === 0) return;
+  const body = new URLSearchParams({ tax_behavior: "exclusive" });
+  if (pending.length > 0) {
+    const query = new URLSearchParams({ "expand[]": "currency_options" });
+    for (const [currency] of pending) query.append("expand[]", `currency_options.${currency}.tiers`);
+    const amounts = await stripe.request("GET", `/v1/prices/${price.id}?${query}`, null, priceAmountsSchema);
+    for (const [currency] of pending) {
+      const option = amounts.currency_options[currency];
+      if (!option) throw new Error(`Price ${price.id} has no ${currency} amount.`);
+      const prefix = `currency_options[${currency}]`;
+      body.set(`${prefix}[tax_behavior]`, "exclusive");
+      if (!option.tiers?.length) {
+        if (option.unit_amount === null) throw new Error(`Price ${price.id} has no ${currency} amount.`);
+        body.set(`${prefix}[unit_amount]`, String(option.unit_amount));
+        continue;
+      }
+      option.tiers.forEach((tier, index) => {
+        body.set(`${prefix}[tiers][${index}][up_to]`, tier.up_to === null ? "inf" : String(tier.up_to));
+        if (tier.flat_amount !== null) body.set(`${prefix}[tiers][${index}][flat_amount]`, String(tier.flat_amount));
+        if (tier.unit_amount !== null) body.set(`${prefix}[tiers][${index}][unit_amount]`, String(tier.unit_amount));
+      });
+    }
+  }
+  await stripe.request("POST", `/v1/prices/${price.id}`, body, priceSchema);
+  logger.info(`Price ${price.lookup_key ?? price.id} now adds VAT on top.`);
+}
+
 function productId(plan: BillingPlanId): string {
   return `openbot_${plan}`;
+}
+
+function storageProductId(plan: BillingPlanId): string {
+  return `openbot_storage_${plan}`;
+}
+
+async function ensureStorageProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<void> {
+  const id = storageProductId(plan);
+  const body = new URLSearchParams({
+    name: `OpenBot ${PLAN_NAME[plan]} storage`,
+    active: "true",
+    "metadata[openbot_kind]": "storage",
+    "metadata[openbot_plan]": plan,
+  });
+  if (await stripe.findProduct(id)) {
+    await stripe.request("POST", `/v1/products/${id}`, body, productSchema);
+    logger.info(`Product ${id} is up to date.`);
+    return;
+  }
+  body.set("id", id);
+  await stripe.request("POST", "/v1/products", body, productSchema);
+  logger.info(`Created product ${id}.`);
+}
+
+async function ensureStoragePrice(
+  stripe: StripeAdmin,
+  existing: readonly Price[],
+  plan: BillingPlanId,
+  tier: BillingStorageUpgradeTier,
+  interval: BillingInterval,
+  optional: readonly BillingOptionalCurrency[],
+): Promise<string> {
+  const lookupKey = storageTierLookupKey(plan, tier, interval);
+  const amounts = storageTierListPrices(plan, tier, interval);
+  const metadata = storageTierPriceMetadata(plan, tier, interval);
+  const current = existing.find((price) => price.lookup_key === lookupKey);
+  const currencies = optionalCurrenciesOf(current, optional);
+  if (
+    current &&
+    current.active !== false &&
+    !includesTax(current) &&
+    current.product === storageProductId(plan) &&
+    current.currency === "eur" &&
+    current.unit_amount === amounts.eur &&
+    current.recurring?.interval === interval &&
+    current.currency_options?.usd?.unit_amount === amounts.usd &&
+    current.currency_options?.pln?.unit_amount === amounts.pln &&
+    currencies.every((currency) => current.currency_options?.[currency]?.unit_amount === amounts[currency]) &&
+    Object.entries(metadata).every(([key, value]) => current.metadata?.[key] === value)
+  ) {
+    await ensureExclusiveTax(stripe, current);
+    logger.info(`Price ${lookupKey} is up to date.`);
+    return current.id;
+  }
+  const body = new URLSearchParams({
+    product: storageProductId(plan),
+    currency: "eur",
+    unit_amount: String(amounts.eur),
+    "recurring[interval]": interval,
+    lookup_key: lookupKey,
+    transfer_lookup_key: "true",
+    "currency_options[usd][unit_amount]": String(amounts.usd),
+    "currency_options[pln][unit_amount]": String(amounts.pln),
+  });
+  for (const [key, value] of Object.entries(metadata)) body.set(`metadata[${key}]`, value);
+  for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amounts[currency]));
+  const created = await stripe.request("POST", "/v1/prices", withExclusiveTax(body), priceSchema);
+  logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
+  return created.id;
 }
 
 async function ensureProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<void> {
@@ -142,36 +291,47 @@ async function ensureProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<
   logger.info(`Created product ${id}.`);
 }
 
+function optionalCurrenciesOf(
+  current: Price | undefined,
+  optional: readonly BillingOptionalCurrency[],
+): BillingOptionalCurrency[] {
+  return BILLING_OPTIONAL_CURRENCIES.filter(
+    (currency) => optional.includes(currency) || current?.currency_options?.[currency] !== undefined,
+  );
+}
+
 function priceMatches(
   price: Price,
   plan: BillingPlanId,
   interval: BillingInterval,
   amounts: Record<BillingCurrency, number>,
+  optional: readonly BillingOptionalCurrency[],
 ): boolean {
   return (
+    !includesTax(price) &&
     price.product === productId(plan) &&
     price.currency === "eur" &&
     price.unit_amount === amounts.eur &&
     price.recurring?.interval === interval &&
     price.currency_options?.usd?.unit_amount === amounts.usd &&
-    price.currency_options?.pln?.unit_amount === amounts.pln
+    price.currency_options?.pln?.unit_amount === amounts.pln &&
+    optional.every((currency) => price.currency_options?.[currency]?.unit_amount === amounts[currency])
   );
 }
 
-/**
- * A Stripe Price amount cannot change. When the amounts differ, this creates a new Price and moves the
- * lookup key to it. Current subscriptions keep the old Price until they change plan.
- */
 async function ensurePrice(
   stripe: StripeAdmin,
   existing: readonly Price[],
   plan: BillingPlanId,
   interval: BillingInterval,
+  optional: readonly BillingOptionalCurrency[],
 ): Promise<string> {
   const lookupKey = billingLookupKey(plan, interval);
   const amounts = billingListPrices(plan, interval);
   const current = existing.find((price) => price.lookup_key === lookupKey);
-  if (current && priceMatches(current, plan, interval, amounts)) {
+  const currencies = optionalCurrenciesOf(current, optional);
+  if (current && priceMatches(current, plan, interval, amounts, currencies)) {
+    await ensureExclusiveTax(stripe, current);
     logger.info(`Price ${lookupKey} is up to date.`);
     return current.id;
   }
@@ -187,13 +347,70 @@ async function ensurePrice(
     "metadata[openbot_plan]": plan,
     "metadata[openbot_interval]": interval,
   });
-  const created = await stripe.request("POST", "/v1/prices", body, priceSchema);
+  for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amounts[currency]));
+  const created = await stripe.request("POST", "/v1/prices", withExclusiveTax(body), priceSchema);
   logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
   return created.id;
 }
 
-/** The amounts of a license plan as one metadata value, so a run can see that the Price is up to date. */
-/** The amounts and the users of the base tier. A change of either makes a new Price. */
+async function ensureCreditProduct(stripe: StripeAdmin): Promise<void> {
+  const body = new URLSearchParams({
+    name: "OpenBot credits",
+    active: "true",
+    [`metadata[${CREDIT_METADATA.kind}]`]: CREDIT_METADATA_KIND,
+  });
+  if (await stripe.findProduct(CREDIT_PRODUCT_ID)) {
+    await stripe.request("POST", `/v1/products/${CREDIT_PRODUCT_ID}`, body, productSchema);
+    logger.info(`Product ${CREDIT_PRODUCT_ID} is up to date.`);
+    return;
+  }
+  body.set("id", CREDIT_PRODUCT_ID);
+  await stripe.request("POST", "/v1/products", body, productSchema);
+  logger.info(`Created product ${CREDIT_PRODUCT_ID}.`);
+}
+
+async function ensureCreditPrice(
+  stripe: StripeAdmin,
+  existing: readonly Price[],
+  stop: CreditStop,
+  optional: readonly BillingOptionalCurrency[],
+): Promise<string> {
+  const lookupKey = creditLookupKey(stop);
+  const current = existing.find((price) => price.lookup_key === lookupKey);
+  const currencies = optionalCurrenciesOf(current, optional);
+  const amount = (currency: BillingCurrency) => creditStopPrice(stop, currency);
+  if (
+    current &&
+    current.active !== false &&
+    !includesTax(current) &&
+    current.product === CREDIT_PRODUCT_ID &&
+    current.recurring === null &&
+    current.currency === "eur" &&
+    current.unit_amount === amount("eur") &&
+    current.currency_options?.usd?.unit_amount === amount("usd") &&
+    current.currency_options?.pln?.unit_amount === amount("pln") &&
+    currencies.every((currency) => current.currency_options?.[currency]?.unit_amount === amount(currency))
+  ) {
+    await ensureExclusiveTax(stripe, current);
+    logger.info(`Price ${lookupKey} is up to date.`);
+    return current.id;
+  }
+  const body = new URLSearchParams({
+    product: CREDIT_PRODUCT_ID,
+    currency: "eur",
+    unit_amount: String(amount("eur")),
+    lookup_key: lookupKey,
+    transfer_lookup_key: "true",
+    "currency_options[usd][unit_amount]": String(amount("usd")),
+    "currency_options[pln][unit_amount]": String(amount("pln")),
+    [`metadata[${CREDIT_METADATA.kind}]`]: CREDIT_METADATA_KIND,
+  });
+  for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amount(currency)));
+  const created = await stripe.request("POST", "/v1/prices", withExclusiveTax(body), priceSchema);
+  logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
+  return created.id;
+}
+
 function licensePriceSignature(prices: Readonly<Record<string, LicensePrice>>, included: number): string {
   const amounts = Object.entries(prices)
     .map(([currency, price]) => `${currency}:${price.base}+${price.extraUser}`)
@@ -217,26 +434,24 @@ async function ensureLicenseProduct(stripe: StripeAdmin): Promise<void> {
   logger.info(`Created product ${LICENSE_PRODUCT_ID}.`);
 }
 
-/**
- * The Price of one license plan. The quantity is the number of users. A Team Price is graduated tiers:
- * the first tier is the base amount for the included users, and the second tier is the amount of each
- * extra user. A 1-user Price is a flat amount for each user. A bundle Price is for an account that pays
- * for a hosted server. EUR is the base currency, and USD and PLN are currency options with their own
- * amounts. Only an active Price with the same amounts is kept, so
- * an archived Price stays archived and a new Price takes its lookup key.
- */
-async function ensureLicensePrice(stripe: StripeAdmin, existing: readonly Price[], plan: LicensePlan): Promise<string> {
+async function ensureLicensePrice(
+  stripe: StripeAdmin,
+  existing: readonly Price[],
+  plan: LicensePlan,
+  optional: readonly BillingOptionalCurrency[],
+): Promise<string> {
   const lookupKey = licenseLookupKey(plan);
-  const prices = Object.fromEntries(
-    BILLING_CURRENCIES.map((currency) => [currency, licensePlanPrice(plan, currency)] as const),
-  );
+  const pricesIn = (currencies: readonly BillingCurrency[]) =>
+    Object.fromEntries(currencies.map((currency) => [currency, licensePlanPrice(plan, currency)] as const));
+  const current = existing.find((price) => price.lookup_key === lookupKey);
+  const prices = pricesIn([...BILLING_BASE_CURRENCIES, ...optionalCurrenciesOf(current, optional)]);
   const bundle = String(plan.bundle);
   const included = licenseIncludedUsers(plan.tier);
   const signature = licensePriceSignature(prices, included);
-  const current = existing.find((price) => price.lookup_key === lookupKey);
   if (
     current &&
     current.active !== false &&
+    !includesTax(current) &&
     current.product === LICENSE_PRODUCT_ID &&
     current.currency === "eur" &&
     current.recurring?.interval === plan.interval &&
@@ -245,6 +460,7 @@ async function ensureLicensePrice(stripe: StripeAdmin, existing: readonly Price[
     current.metadata?.[LICENSE_METADATA.interval] === plan.interval &&
     current.metadata?.[LICENSE_METADATA.bundle] === bundle
   ) {
+    await ensureExclusiveTax(stripe, current);
     logger.info(`Price ${lookupKey} is up to date.`);
     return current.id;
   }
@@ -276,15 +492,45 @@ async function ensureLicensePrice(stripe: StripeAdmin, existing: readonly Price[
     body.set(`${prefix}[1][up_to]`, "inf");
     body.set(`${prefix}[1][unit_amount]`, String(price.extraUser));
   }
-  const created = await stripe.request("POST", "/v1/prices", body, priceSchema);
+  const created = await stripe.request("POST", "/v1/prices", withExclusiveTax(body), priceSchema);
   logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
   return created.id;
 }
 
-/**
- * Portal sessions use the default configuration, and the API cannot create a default one. Stripe makes
- * it for the first Portal session, so this opens one session for a temporary customer and deletes it.
- */
+async function ensureVatTaxRate(stripe: StripeAdmin): Promise<string> {
+  const rates = (await stripe.request("GET", "/v1/tax_rates?active=true&limit=100", null, taxRateListSchema)).data;
+  const current = rates.filter((rate) => rate.metadata[VAT_TAX_RATE.metadataKey] === VAT_TAX_RATE.metadataValue);
+  const kept = current.find((rate) => rate.percentage === VAT_TAX_RATE.percentage && !rate.inclusive);
+  for (const rate of current) {
+    if (rate === kept) continue;
+    await stripe.request(
+      "POST",
+      `/v1/tax_rates/${rate.id}`,
+      new URLSearchParams({ active: "false" }),
+      z.object({ id: z.string() }),
+    );
+    logger.info(`Archived tax rate ${rate.id}.`);
+  }
+  if (kept) return kept.id;
+  const created = await stripe.request(
+    "POST",
+    "/v1/tax_rates",
+    new URLSearchParams({
+      display_name: "VAT",
+      description: "Polish VAT",
+      percentage: String(VAT_TAX_RATE.percentage),
+      inclusive: "false",
+      country: "PL",
+      jurisdiction: "PL",
+      tax_type: "vat",
+      [`metadata[${VAT_TAX_RATE.metadataKey}]`]: VAT_TAX_RATE.metadataValue,
+    }),
+    z.object({ id: z.string() }),
+  );
+  logger.info(`Created tax rate ${created.id} (Polish VAT, ${VAT_TAX_RATE.percentage}%).`);
+  return created.id;
+}
+
 async function defaultPortalConfiguration(stripe: StripeAdmin): Promise<string> {
   const find = async () =>
     (
@@ -319,26 +565,14 @@ async function defaultPortalConfiguration(stripe: StripeAdmin): Promise<string> 
   return created;
 }
 
-async function updatePortalConfiguration(stripe: StripeAdmin, prices: Record<BillingPlanId, string[]>): Promise<void> {
+async function updatePortalConfiguration(stripe: StripeAdmin): Promise<void> {
   const configuration = { id: await defaultPortalConfiguration(stripe) };
   const body = new URLSearchParams({
     "features[invoice_history][enabled]": "true",
     "features[payment_method_update][enabled]": "true",
     "features[subscription_cancel][enabled]": "true",
     "features[subscription_cancel][mode]": "at_period_end",
-    "features[subscription_update][enabled]": "true",
-    // An upgrade gives the larger server now, so it is charged now. A downgrade or a shorter interval
-    // starts at the next period, which the user already paid for.
-    "features[subscription_update][proration_behavior]": "always_invoice",
-    "features[subscription_update][schedule_at_period_end][conditions][0][type]": "decreasing_item_amount",
-    "features[subscription_update][schedule_at_period_end][conditions][1][type]": "shortening_interval",
-  });
-  body.append("features[subscription_update][default_allowed_updates][]", "price");
-  BILLING_PLAN_IDS.forEach((plan, index) => {
-    body.set(`features[subscription_update][products][${index}][product]`, productId(plan));
-    // One subscription pays for one server, so the quantity stays 1.
-    body.set(`features[subscription_update][products][${index}][adjustable_quantity][enabled]`, "false");
-    for (const price of prices[plan]) body.append(`features[subscription_update][products][${index}][prices][]`, price);
+    "features[subscription_update][enabled]": "false",
   });
   await stripe.request(
     "POST",
@@ -349,10 +583,6 @@ async function updatePortalConfiguration(stripe: StripeAdmin, prices: Record<Bil
   logger.info("Updated the default Customer Portal configuration.");
 }
 
-/**
- * Returns the signing secret when this call created the endpoint, and null when it updated one. Stripe
- * cannot show the secret of an endpoint again, so `replace` deletes the endpoint and creates it again.
- */
 async function ensureWebhookEndpoint(stripe: StripeAdmin, url: string, replace: boolean): Promise<string | null> {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" || !parsed.pathname.endsWith("/v1/stripe/webhook")) {
@@ -379,8 +609,6 @@ async function ensureWebhookEndpoint(stripe: StripeAdmin, url: string, replace: 
   const created = await stripe.request("POST", "/v1/webhook_endpoints", body, webhookEndpointSchema);
   logger.info(`Created webhook endpoint ${created.id}.`);
   if (!created.secret) throw new Error("Stripe did not return the signing secret of the new webhook endpoint.");
-  // The old endpoint goes only after the new one exists, so no event is made while no endpoint exists.
-  // Stripe retries the deliveries that fail until the Worker has the new secret.
   if (current) {
     await stripe.request("DELETE", `/v1/webhook_endpoints/${current.id}`, null, z.object({ id: z.string() }));
     logger.info(`Deleted the old webhook endpoint ${current.id}.`);
@@ -398,28 +626,31 @@ function optionValue(args: readonly string[], name: string): string | null {
 
 export interface StripeBootstrapOptions {
   secretKey: string;
-  /** Without it, a live key is refused. */
   live: boolean;
-  /** The webhook endpoint to create or update, or null for none. */
+  brl?: boolean;
   webhookUrl: string | null;
-  /** Deletes the endpoint at `webhookUrl` and creates it again, for a new signing secret. */
   replaceWebhook?: boolean;
 }
 
-/** Returns the signing secret of the webhook endpoint when this call created it, else null. */
 export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<string | null> {
   const { secretKey, live, webhookUrl } = options;
   if (!live && !/^(sk|rk)_test_/u.test(secretKey)) {
     throw new Error("STRIPE_SECRET_KEY is not a test-mode key. Add --live to change the live catalog.");
   }
   const stripe = new StripeAdmin(secretKey);
+  const optional: readonly BillingOptionalCurrency[] = options.brl ? ["brl"] : [];
 
   const lookupKeys = [
     ...BILLING_PLAN_IDS.flatMap((plan) => BILLING_INTERVALS.map((interval) => billingLookupKey(plan, interval))),
+    ...BILLING_PLAN_IDS.flatMap((plan) =>
+      BILLING_STORAGE_UPGRADE_TIERS.flatMap((tier) =>
+        BILLING_INTERVALS.map((interval) => storageTierLookupKey(plan, tier, interval)),
+      ),
+    ),
     ...LICENSE_LOOKUP_KEYS,
+    ...CREDIT_LOOKUP_KEYS,
   ];
   const existing: Price[] = [];
-  // Stripe accepts at most 10 lookup keys in one list request.
   for (let start = 0; start < lookupKeys.length; start += 10) {
     const query = new URLSearchParams({ limit: "100" });
     for (const key of lookupKeys.slice(start, start + 10)) query.append("lookup_keys[]", key);
@@ -430,17 +661,32 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
   const prices: Record<BillingPlanId, string[]> = { starter: [], standard: [], pro: [] };
   for (const plan of BILLING_PLAN_IDS) {
     await ensureProduct(stripe, plan);
-    for (const interval of BILLING_INTERVALS) prices[plan].push(await ensurePrice(stripe, existing, plan, interval));
+    for (const interval of BILLING_INTERVALS)
+      prices[plan].push(await ensurePrice(stripe, existing, plan, interval, optional));
   }
 
   for (const plan of BILLING_PLAN_IDS) logger.info(`Prices ${productId(plan)}: ${prices[plan].join(", ")}`);
 
-  // The license is not in the Portal product list, so the Portal cannot change its users or price.
+  for (const plan of BILLING_PLAN_IDS) {
+    await ensureStorageProduct(stripe, plan);
+    const storagePrices: string[] = [];
+    for (const tier of BILLING_STORAGE_UPGRADE_TIERS) {
+      for (const interval of BILLING_INTERVALS)
+        storagePrices.push(await ensureStoragePrice(stripe, existing, plan, tier, interval, optional));
+    }
+    logger.info(`Prices ${storageProductId(plan)}: ${storagePrices.join(", ")}`);
+  }
+
   await ensureLicenseProduct(stripe);
   for (const plan of LICENSE_PLANS)
-    logger.info(`Price ${licenseLookupKey(plan)}: ${await ensureLicensePrice(stripe, existing, plan)}`);
+    logger.info(`Price ${licenseLookupKey(plan)}: ${await ensureLicensePrice(stripe, existing, plan, optional)}`);
 
-  await updatePortalConfiguration(stripe, prices);
+  await ensureCreditProduct(stripe);
+  for (const stop of creditStops("eur"))
+    logger.info(`Price ${creditLookupKey(stop)}: ${await ensureCreditPrice(stripe, existing, stop, optional)}`);
+
+  logger.info(`Tax rate of Polish VAT: ${await ensureVatTaxRate(stripe)}`);
+  await updatePortalConfiguration(stripe);
   return webhookUrl ? await ensureWebhookEndpoint(stripe, webhookUrl, options.replaceWebhook ?? false) : null;
 }
 
@@ -448,10 +694,14 @@ async function main(args: readonly string[]): Promise<void> {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
   if (!secretKey) throw new Error("Set STRIPE_SECRET_KEY to a Stripe secret key.");
   const webhookUrl = optionValue(args, "--webhook-url");
-  const webhookSecret = await bootstrapStripe({ secretKey, live: args.includes("--live"), webhookUrl });
+  const webhookSecret = await bootstrapStripe({
+    secretKey,
+    live: args.includes("--live"),
+    brl: args.includes("--brl"),
+    webhookUrl,
+  });
   const lines: string[] = [];
   if (webhookSecret) {
-    // The operator asked for this secret, and Stripe never shows it again. Standard output only, not the log.
     process.stdout.write(`STRIPE_WEBHOOK_SECRET=${webhookSecret}\n`);
     lines.push("Put the STRIPE_WEBHOOK_SECRET line above in the env file of that Worker.");
   } else if (!webhookUrl) {

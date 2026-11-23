@@ -1,44 +1,21 @@
 import { contextBridge } from "electron";
 
-// The preload of the agent browser tabs. It has no IPC and exposes no world: the page gets no
-// `window.openbot` and no path to main. It only runs `matchChromePageValues` in the page world of
-// each frame, before the page's own scripts.
-
-/**
- * Makes the values that bot checks read from an Electron tab agree with Chrome:
- * - A hidden tab, or a tab of a minimized window, reports an outer size of 0x0 (Windows: 160x28),
- *   smaller than its viewport. Chrome's outer size always holds the viewport.
- * - Minimized Windows windows report a screen position of -32000.
- * - Electron's `window.chrome` is an empty object, and a `srcdoc` frame read before it loads has
- *   none. Chrome has `loadTimes`, `csi` and `app`.
- * - On macOS, Electron shows no passkey dialog, so a passkey sign-in waited with nothing on screen
- *   until the site's time limit (#6507). Such a request now fails at once, as when a person cancels
- *   Chrome's dialog, and the site offers its other sign-in methods.
- *
- * Electron serializes this function into the page, so it must use nothing from outside its body.
- * Each replaced function reads as native code through `Function.prototype.toString`.
- */
 function matchChromePageValues(): void {
-  // A masked `toString` called on an object with this key puts its map of replaced functions in
-  // the object, so that the frames of one page share one map. A native `toString` throws instead.
   const nativesRequest = "matchChromePageValues:natives";
   const onWindows = navigator.userAgent.includes("Windows");
   const onMac = navigator.userAgent.includes("Macintosh");
-  // The window frame and toolbar of a Chrome window with no bookmarks bar.
+  const onLinux = navigator.userAgent.includes("Linux");
   const frameWidth = onWindows ? 16 : 0;
   const toolbarHeight = onWindows ? 87 : 85;
 
   const isGlobal = (value: Window | null): value is Window & typeof globalThis => {
     try {
-      // A frame of another origin throws here, and its values are not ours to change.
       return value !== null && "Function" in value && typeof value.Function === "function";
     } catch {
       return false;
     }
   };
 
-  // A page can give the `toString` of one frame a function of another frame. Each frame runs its
-  // own copy of this function, so each frame uses the map of its highest same-origin ancestor.
   const sharedNatives = (): WeakMap<object, string> => {
     let shared: WeakMap<object, string> | undefined;
     let frame: Window = window;
@@ -49,38 +26,53 @@ function matchChromePageValues(): void {
         const request: { [nativesRequest]: WeakMap<object, string> | undefined } = { [nativesRequest]: undefined };
         try {
           frame.Function.prototype.toString.call(request);
-        } catch {
-          // The native `toString` of a frame with no map throws for an object.
-        }
+        } catch {}
         shared = request[nativesRequest] ?? shared;
       }
-    } catch {
-      // The frame left the page while this ran.
-    }
+    } catch {}
     return shared ?? new WeakMap<object, string>();
   };
   const natives = sharedNatives();
 
-  // A native function that throws from a trap below has one more stack frame than in Chrome: the
-  // trap. It is removed before the error goes to the page.
   const removeTrapFrame = (error: unknown): void => {
     try {
       if (typeof error === "object" && error !== null && "stack" in error && typeof error.stack === "string") {
         const lines = error.stack.split("\n");
         const trap = lines.findIndex(
-          (line, index) => index > 0 && /^\s+at Object\.apply \(<anonymous>:\d+:\d+\)$/.test(line),
+          (line, index) => index > 0 && /^\s+at Object\.(?:apply|setPrototypeOf) \(<anonymous>:\d+:\d+\)$/.test(line),
         );
         if (trap > 0) {
           lines.splice(trap, 1);
           error.stack = lines.join("\n");
         }
       }
-    } catch {
-      // An error with a fixed stack keeps it.
-    }
+    } catch {}
+  };
+
+  const nativeProxy = <Method extends (...args: never[]) => unknown>(
+    realm: typeof globalThis,
+    method: Method,
+    apply: NonNullable<ProxyHandler<Method>["apply"]>,
+  ): Method => {
+    const proxy: Method = new Proxy(method, {
+      apply,
+      setPrototypeOf: (inner, prototype: object | null) => {
+        for (let next = prototype, depth = 0; next !== null && depth < 10_000; depth += 1) {
+          if (next === proxy || next === inner) {
+            const error = new realm.TypeError("Cyclic __proto__ value");
+            removeTrapFrame(error);
+            throw error;
+          }
+          next = Object.getPrototypeOf(next);
+        }
+        return Reflect.setPrototypeOf(inner, prototype);
+      },
+    });
+    return proxy;
   };
 
   const wrapGetter = <Owner extends typeof globalThis | HTMLIFrameElement, Key extends keyof Owner & string>(
+    realm: typeof globalThis,
     owner: Owner,
     key: Key,
     fix: (value: Owner[Key]) => Owner[Key],
@@ -88,32 +80,25 @@ function matchChromePageValues(): void {
     const descriptor = Object.getOwnPropertyDescriptor(owner, key);
     const get = descriptor?.get;
     if (!descriptor || !get) return;
-    const wrapped = new Proxy(get, {
-      apply: (method, self: unknown) => {
-        let value: Owner[Key];
-        try {
-          value = method.call(self);
-        } catch (error) {
-          removeTrapFrame(error);
-          throw error;
-        }
-        return fix(value);
-      },
+    const wrapped = nativeProxy(realm, get, (method, self: unknown) => {
+      let value: Owner[Key];
+      try {
+        value = method.call(self);
+      } catch (error) {
+        removeTrapFrame(error);
+        throw error;
+      }
+      return fix(value);
     });
     natives.set(wrapped, `get ${key}`);
     Object.defineProperty(owner, key, { ...descriptor, get: wrapped });
   };
 
-  // Chromium reaches a security key with no dialog, so a request that can use one keeps the native
-  // path: a site that asks for a security key, or a credential that a security key can hold. A
-  // credential with no transports can be an older security key.
   const securityKeyTransports = new Set(["usb", "nfc", "ble", "smart-card"]);
   const opensPasskeyDialog = (options: CredentialRequestOptions | undefined): boolean => {
     try {
       const publicKey = options?.publicKey;
-      // Autofill (conditional) requests open no dialog, and an aborted request gets its native error.
       if (!publicKey || options.mediation === "conditional" || options.signal?.aborted) return false;
-      // TypeScript's DOM types do not have the WebAuthn Level 3 `hints` yet.
       if ("hints" in publicKey && Array.isArray(publicKey.hints) && publicKey.hints.includes("security-key")) {
         return false;
       }
@@ -122,37 +107,62 @@ function matchChromePageValues(): void {
         return transports.length === 0 || transports.some((transport) => securityKeyTransports.has(transport));
       });
     } catch {
-      // Options that cannot be read get the native error.
       return false;
     }
   };
 
   const refusePasskeyDialogs = (target: typeof globalThis): void => {
-    // `navigator.credentials` exists only in a secure context.
     if (!("CredentialsContainer" in target)) return;
     const prototype = target.CredentialsContainer.prototype;
     const descriptor = Object.getOwnPropertyDescriptor(prototype, "get");
     if (!descriptor || typeof descriptor.value !== "function") return;
-    const get = new Proxy(prototype.get, {
-      apply: (method, self: unknown, args: [CredentialRequestOptions?]) => {
-        if (self instanceof target.CredentialsContainer && opensPasskeyDialog(args[0])) {
-          return target.Promise.reject(
-            new target.DOMException(
-              "The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.",
-              "NotAllowedError",
-            ),
-          );
-        }
+    const get = nativeProxy(target, prototype.get, (method, self: unknown, args: [CredentialRequestOptions?]) => {
+      if (self instanceof target.CredentialsContainer && opensPasskeyDialog(args[0])) {
+        return target.Promise.reject(
+          new target.DOMException(
+            "The operation either timed out or was not allowed. See: https://www.w3.org/TR/webauthn-2/#sctn-privacy-considerations-client.",
+            "NotAllowedError",
+          ),
+        );
+      }
+      try {
+        return method.apply(self, args);
+      } catch (error) {
+        removeTrapFrame(error);
+        throw error;
+      }
+    });
+    natives.set(get, "get");
+    Object.defineProperty(prototype, "get", { ...descriptor, value: get });
+  };
+
+  const debugVendor = 0x9245; // WEBGL_debug_renderer_info.UNMASKED_VENDOR_WEBGL
+  const debugRenderer = 0x9246; // WEBGL_debug_renderer_info.UNMASKED_RENDERER_WEBGL
+  const laptopGpu = {
+    [debugVendor]: "Google Inc. (Intel)",
+    [debugRenderer]: "ANGLE (Intel, Mesa Intel(R) UHD Graphics 620 (KBL GT2), OpenGL 4.6)",
+  };
+  const replaceSoftwareGpuName = (target: typeof globalThis): void => {
+    for (const context of [target.WebGLRenderingContext, target.WebGL2RenderingContext]) {
+      const prototype = context?.prototype;
+      const descriptor = prototype && Object.getOwnPropertyDescriptor(prototype, "getParameter");
+      if (!descriptor || typeof descriptor.value !== "function") continue;
+      const getParameter = nativeProxy(target, prototype.getParameter, (method, self: unknown, args: [number]) => {
+        let value: unknown;
         try {
-          return method.apply(self, args);
+          value = method.apply(self, args);
         } catch (error) {
           removeTrapFrame(error);
           throw error;
         }
-      },
-    });
-    natives.set(get, "get");
-    Object.defineProperty(prototype, "get", { ...descriptor, value: get });
+        const name = args[0];
+        if (typeof value !== "string" || (name !== debugVendor && name !== debugRenderer)) return value;
+        const renderer = name === debugRenderer ? value : method.call(self, debugRenderer);
+        return typeof renderer === "string" && /SwiftShader/i.test(renderer) ? laptopGpu[name] : value;
+      });
+      natives.set(getParameter, "getParameter");
+      Object.defineProperty(prototype, "getParameter", { ...descriptor, value: getParameter });
+    }
   };
 
   const chromeValues = (target: typeof globalThis) => {
@@ -161,7 +171,6 @@ function matchChromePageValues(): void {
       const entry = performance.getEntriesByType("navigation")[0];
       return entry instanceof target.PerformanceNavigationTiming ? entry : undefined;
     };
-    // Seconds since the epoch, as Chrome reports them. A step that has not happened yet is 0.
     const seconds = (offset: number | undefined) => (offset ? (performance.timeOrigin + offset) / 1000 : 0);
     const methods = {
       loadTimes() {
@@ -227,25 +236,24 @@ function matchChromePageValues(): void {
     if (existing && "loadTimes" in existing && typeof existing.loadTimes === "function") return;
 
     const functionPrototype = target.Function.prototype;
-    const maskedToString = new Proxy(functionPrototype.toString, {
-      apply: (method, self: unknown) => {
-        if (typeof self === "object" && self !== null && nativesRequest in self) {
-          Object.defineProperty(self, nativesRequest, { value: natives });
-          return "";
-        }
-        const name = typeof self === "function" ? natives.get(self) : undefined;
-        if (name !== undefined) return `function ${name}() { [native code] }`;
-        try {
-          return method.call(self);
-        } catch (error) {
-          removeTrapFrame(error);
-          throw error;
-        }
-      },
+    const maskedToString = nativeProxy(target, functionPrototype.toString, (method, self: unknown) => {
+      if (typeof self === "object" && self !== null && nativesRequest in self) {
+        Object.defineProperty(self, nativesRequest, { value: natives });
+        return "";
+      }
+      const name = typeof self === "function" ? natives.get(self) : undefined;
+      if (name !== undefined) return `function ${name}() { [native code] }`;
+      try {
+        return method.call(self);
+      } catch (error) {
+        removeTrapFrame(error);
+        throw error;
+      }
     });
     natives.set(maskedToString, "toString");
     Object.defineProperty(functionPrototype, "toString", { value: maskedToString });
     if (onMac) refusePasskeyDialogs(target);
+    if (onLinux) replaceSoftwareGpuName(target);
 
     const chrome = existing ?? {};
     for (const [key, value] of Object.entries(chromeValues(target))) {
@@ -257,30 +265,25 @@ function matchChromePageValues(): void {
 
     const innerSize = (key: "innerWidth" | "innerHeight"): number => {
       try {
-        // A frame's outer size is the size of the top window, as in Chrome.
         return target.top?.[key] ?? target[key];
       } catch {
         return target[key];
       }
     };
-    wrapGetter(target, "outerWidth", (value) =>
+    wrapGetter(target, target, "outerWidth", (value) =>
       value < innerSize("innerWidth") ? innerSize("innerWidth") + frameWidth : value,
     );
-    wrapGetter(target, "outerHeight", (value) =>
+    wrapGetter(target, target, "outerHeight", (value) =>
       value <= innerSize("innerHeight") ? innerSize("innerHeight") + toolbarHeight : value,
     );
     for (const key of ["screenX", "screenY", "screenLeft", "screenTop"] as const) {
-      wrapGetter(target, key, (value) => (value <= -10_000 ? 0 : value));
+      wrapGetter(target, target, key, (value) => (value <= -10_000 ? 0 : value));
     }
-    // A page can read a new frame's window before the frame's own document, and this preload,
-    // load. That window gets the same values here.
-    wrapGetter(target.HTMLIFrameElement.prototype, "contentWindow", (value) => {
+    wrapGetter(target, target.HTMLIFrameElement.prototype, "contentWindow", (value) => {
       if (isGlobal(value)) {
         try {
           install(value);
-        } catch {
-          // A frame that refuses a change keeps its own values.
-        }
+        } catch {}
       }
       return value;
     });

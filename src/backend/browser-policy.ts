@@ -23,7 +23,6 @@ export function browserLoadOptions(): { extraHeaders: string } {
 export function browserRequestHeaders(
   url: string,
   requestHeaders: Record<string, string>,
-  /** The lower-case hint names that the origin asked for with `Accept-CH`. */
   requestedHints?: ReadonlySet<string>,
 ): Record<string, string> {
   const headers = { ...requestHeaders };
@@ -31,8 +30,6 @@ export function browserRequestHeaders(
   if (userAgent) {
     setRequestHeader(headers, "User-Agent", browserRequestUserAgent(url, userAgent[1], process.versions.electron));
   }
-  // Send the low-entropy hints, and the hints the origin asked for, on secure origins. Keep any
-  // hints Chromium supplies.
   const target = URL.parse(url);
   if (
     target?.protocol === "https:" ||
@@ -57,17 +54,12 @@ export function browserRequestHeaders(
       }
     }
   }
-  setRequestHeader(headers, "Accept-Language", preferredBrowserLanguages());
   return headers;
 }
 
-/**
- * The `Accept-Language` value. As Chrome does, each language with a region also gives its base
- * language, after the last language of that base: `en-GB` gives `en-GB,en;q=0.9`.
- * `navigator.languages` keeps the list without the added base languages, also as in Chrome.
- */
-function preferredBrowserLanguages(): string {
-  const codes = preferredBrowserLanguageCodes().split(",");
+export function preferredBrowserLanguageCodes(): string {
+  const languages = validLanguageTags(app.getPreferredSystemLanguages());
+  const codes = languages.length > 0 ? languages : [app.getLocale()];
   const base = (code: string) => code.split("-")[0] ?? code;
   const expanded: string[] = [];
   for (const [index, code] of codes.entries()) {
@@ -76,14 +68,26 @@ function preferredBrowserLanguages(): string {
     if (code.includes("-") && (next === undefined || base(next) !== base(code)) && !expanded.includes(base(code)))
       expanded.push(base(code));
   }
-  return expanded
-    .map((language, index) => (index === 0 ? language : `${language};q=${Math.max(1 - index * 0.1, 0.1).toFixed(1)}`))
-    .join(",");
+  return expanded.join(",");
 }
 
-export function preferredBrowserLanguageCodes(): string {
+export function replaceInvalidLinuxSystemLanguages(): void {
+  if (process.platform !== "linux") return;
   const languages = app.getPreferredSystemLanguages();
-  return (languages.length > 0 ? languages : [app.getLocale()]).join(",");
+  const valid = validLanguageTags(languages);
+  if (valid.length === languages.length) return;
+  const [locale = "en-US"] = validLanguageTags([app.getLocale()]);
+  process.env.LANGUAGE = (valid.length > 0 ? valid : [locale]).map((tag) => tag.replaceAll("-", "_")).join(":");
+}
+
+function validLanguageTags(values: readonly string[]): string[] {
+  return values.filter((value) => {
+    try {
+      return /^[a-z]{2,3}(?:-|$)/.test(Intl.getCanonicalLocales(value)[0] ?? "");
+    } catch {
+      return false;
+    }
+  });
 }
 
 function setRequestHeader(headers: Record<string, string>, name: string, value: string): void {
@@ -96,23 +100,10 @@ export function isAllowedMainUrl(value: string): boolean {
   return value === "about:blank" || isPersistableBrowserUrl(value);
 }
 
-/**
- * The embedded browser grants exactly one page permission: writing plain, sanitized content to the
- * clipboard. Chromium only asks for it behind a user gesture, which is what a page's own "copy
- * link" button is, and refusing it left such a button silently doing nothing. Reading the clipboard
- * stays refused -- a page must never see what the user copied elsewhere -- and so does everything
- * else, so camera, microphone, location and notifications are unchanged.
- */
 export function isAllowedBrowserPermission(permission: string): boolean {
-  return permission === "clipboard-sanitized-write";
+  return permission === "clipboard-sanitized-write" || permission === "storage-access";
 }
 
-/**
- * The host of a tab's URL, for a log line. `diagnosticUrl` below keeps the path, which is right for a
- * diagnostic the user reads back in the app but wrong for a log: a path carries tokens often enough
- * (`/reset/<secret>`, `/invite/<secret>`) that writing one to disk breaks the redaction rule. The host
- * is enough to tell which tab an agent closed.
- */
 export function logUrlHost(value: string): string | undefined {
   try {
     return new URL(value).hostname;

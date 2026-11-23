@@ -3,9 +3,9 @@ import { View } from "react-native";
 
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 
-// The heroui-native `TextArea` class sets a fixed height, and a utility class does not replace it on
-// native. The style prop comes after the classes. The iOS field uses the same height.
 const tallStyle = { height: 280 } as const;
+const FRAMELESS =
+  "android:[elevation:0] android:border-0 android:focus:border-transparent ios:outline-transparent ios:focus:outline-transparent";
 
 export function SheetFormField({
   hint,
@@ -38,7 +38,7 @@ export function SheetFormField({
         <View className="min-w-0 flex-1">
           <Control
             accessibilityLabel={label}
-            className={`rounded-2xl bg-grouped px-4 font-sans text-body ${multiline ? "min-h-28" : "min-h-12"} ${trailing ? "border-0 bg-transparent shadow-none" : error ? "border border-danger shadow-none" : appearance === "soft" ? "border-0 shadow-none" : ""}`}
+            className={`rounded-2xl bg-grouped px-4 font-sans text-body ${multiline ? "min-h-28" : "min-h-12"} ${trailing ? `border-0 bg-transparent shadow-none ${FRAMELESS}` : error ? "border border-danger shadow-none" : appearance === "soft" ? `border-0 shadow-none ${FRAMELESS}` : ""}`}
             multiline={multiline}
             style={multiline && tall ? tallStyle : undefined}
             variant="primary"

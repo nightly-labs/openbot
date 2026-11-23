@@ -1,9 +1,3 @@
-// Drives `discord-mobile-release-announcement.ts` and `publish-mobile-release.ts` as processes, in
-// a temporary copy of the files they read, against one local server that stands in for the account
-// Worker, the GitHub API and the Discord webhook. Writes .openbot-build/mobile-release-announcement-e2e.json.
-//
-//   bun scripts/mobile-release-announcement-e2e.ts
-
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -20,15 +14,12 @@ const REPOSITORY = "example/openbot";
 type Store = "ios" | "android";
 
 interface FakeState {
-  /** The versions that the live /v1/mobile/changelog lists for each store. */
   live: Record<Store, string[]>;
   latest: Record<Store, string>;
-  /** Live flags that differ from main. */
   wrongFlags: boolean;
   tags: Set<string>;
   posts: string[];
   discordStatus: number;
-  /** The status of a tag delete. A ruleset can refuse it. */
   deleteStatus: number;
 }
 
@@ -42,7 +33,6 @@ const state: FakeState = {
   deleteStatus: 204,
 };
 
-/** The text of `name` in a request body, or "". */
 function textField(body: unknown, name: string): string {
   const value = isDynamicRecord(body) ? body[name] : undefined;
   return isString(value) ? value : "";
@@ -93,7 +83,6 @@ const site = `http://127.0.0.1:${server.port}`;
 const work = mkdtempSync(join(tmpdir(), "openbot-mobile-release-e2e-"));
 mkdirSync(join(work, "apps/mobile"), { recursive: true });
 mkdirSync(join(work, "apps/auth-api/src/server"), { recursive: true });
-// The real file, with each version before the ones that the publish steps below set.
 writeFileSync(
   join(work, "apps/auth-api/src/server/mobile-features-config.ts"),
   readFileSync(join(root, "apps/auth-api/src/server/mobile-features-config.ts"), "utf8").replace(
@@ -113,7 +102,6 @@ writeFileSync(
 );
 writeFileSync(join(work, "apps/mobile/app.json"), JSON.stringify({ expo: { version: "1.4.7" } }));
 
-// Async, so that the server in this process can answer the child.
 async function cli(script: string, args: readonly string[]): Promise<{ status: number; output: string }> {
   const child = Bun.spawn(["bun", join(root, "scripts", script), ...args], {
     cwd: work,
@@ -151,7 +139,6 @@ function check(name: string, passed: boolean, detail: unknown): void {
 const lastPost = () => state.posts.at(-1) ?? "";
 
 try {
-  // A store date that the Worker does not show yet waits.
   writeChangelog({ "1.4.7": "2026-11-06 (iOS)", "1.4.6": "2026-11-04 (iOS), 2026-11-05 (Android)" });
   let result = await announce();
   check(
@@ -160,7 +147,6 @@ try {
     result.output,
   );
 
-  // The changelog is live, but the flags are not the ones in main.
   state.live.ios = ["1.4.7", "1.4.6"];
   state.latest.ios = "1.4.7";
   state.wrongFlags = true;
@@ -171,7 +157,6 @@ try {
     result.output,
   );
 
-  // Live: the first store gets its post, and a tag.
   state.wrongFlags = false;
   result = await announce();
   check(
@@ -184,13 +169,11 @@ try {
       state.tags.has("mobile-announced/v1.4.7/ios"),
     { output: result.output, post: lastPost(), tags: [...state.tags] },
   );
-  // 1.4.6 is older than the first tagged version, so it never posts without --version.
   check("leaves versions before the tags", !state.tags.has("mobile-announced/v1.4.6/android"), [...state.tags]);
 
   result = await announce();
   check("does not post twice", result.status === 0 && state.posts.length === 1, result.output);
 
-  // A failed Discord post removes the tag, so the next run tries again.
   writeChangelog({ "1.4.7": "2026-11-06", "1.4.6": "2026-11-04 (iOS), 2026-11-05 (Android)" });
   state.live.android = ["1.4.7"];
   state.latest.android = "1.4.7";
@@ -201,7 +184,6 @@ try {
     tags: [...state.tags],
   });
 
-  // GitHub does not remove the tag: the run says which tag to delete by hand.
   state.deleteStatus = 403;
   result = await announce();
   check(
@@ -224,7 +206,6 @@ try {
     { output: result.output, post: lastPost() },
   );
 
-  // Both stores at once: one post that names both.
   state.tags.clear();
   result = await announce();
   check(
@@ -235,7 +216,6 @@ try {
     { output: result.output, post: lastPost() },
   );
 
-  // A skipped store gets no line under the title.
   state.tags.clear();
   state.live.android = [];
   writeChangelog({ "1.4.7": "2026-11-06 (iOS), Skipped (Android)" });
@@ -246,7 +226,6 @@ try {
     { output: result.output, post: lastPost() },
   );
 
-  // The highlights are for the next version: the post waits, and the run does not fail.
   state.tags.clear();
   writeFileSync(
     join(work, "apps/mobile/release-announcement.json"),
@@ -265,7 +244,6 @@ try {
   );
   state.tags.add("mobile-announced/v1.4.7/ios");
 
-  // `--version --again` posts again, with a tag already there.
   result = await cli("discord-mobile-release-announcement.ts", [
     "announce",
     "--version",
@@ -280,7 +258,6 @@ try {
   ]);
   check("--again posts again", result.status === 0 && state.posts.length === 5, result.output);
 
-  // A feature at "0" is off for every version, so the publish step keeps it off.
   const configPath = join(work, "apps/auth-api/src/server/mobile-features-config.ts");
   const originalConfig = readFileSync(configPath, "utf8");
   writeFileSync(configPath, originalConfig.replace(/(browser: \{\s+ios: \{ upTo: ")[^"]+(")/, "$10$2"));
@@ -294,7 +271,6 @@ try {
   );
   writeFileSync(configPath, originalConfig);
 
-  // `--version` posts an older version, which is not the newest one in the store.
   writeChangelog({ "1.4.7": "2026-11-06", "1.4.6": "2026-11-04" });
   state.live.ios = ["1.4.7", "1.4.6"];
   writeFileSync(
@@ -325,7 +301,6 @@ try {
     JSON.stringify({ version: "1.4.7", highlights: ["One.", "Two.", "Three."] }),
   );
 
-  // The publish step: Android 1.4.7 available, with the older 1.4.5 marked as skipped.
   writeChangelog({ "1.4.7": "2026-11-06 (iOS)", "1.4.6": "2026-11-04", "1.4.5": "2026-11-01 (iOS)" });
   result = await cli("publish-mobile-release.ts", ["android", "--skip-older"]);
   const changelog = readFileSync(join(work, "apps/mobile/CHANGELOG.md"), "utf8");
@@ -347,7 +322,6 @@ try {
     config,
   );
 
-  // `check` shows the post of each store.
   result = await cli("discord-mobile-release-announcement.ts", ["check", "1.4.7"]);
   check(
     "check prints both posts",
@@ -355,8 +329,6 @@ try {
     result.output,
   );
 
-  // An OTA section is not a store version: the newest store version gets the post, and the OTA
-  // section gets no post, no tag and no highlights.
   state.tags.clear();
   state.live = { ios: ["1.4.7.1", "1.4.7"], android: ["1.4.7.1", "1.4.7"] };
   state.latest = { ios: "1.4.7", android: "1.4.7" };
@@ -375,7 +347,6 @@ try {
       [...state.tags].sort().join() === "mobile-announced/v1.4.7/android,mobile-announced/v1.4.7/ios",
     { output: result.output, post: lastPost(), tags: [...state.tags] },
   );
-  // The Changelog workflow asks for highlights only for the version that `available` prints.
   result = await cli("discord-mobile-release-announcement.ts", ["available", "CHANGELOG.before.md"]);
   check("an OTA section asks for no highlights", result.status === 0 && result.output.trim() === "", result.output);
   result = await cli("discord-mobile-release-announcement.ts", [
@@ -397,7 +368,6 @@ try {
     { output: result.output, tags: [...state.tags] },
   );
 
-  // The publish step does not make an OTA section the newest store version.
   writeChangelog({ "1.4.7.1": "2026-11-08 (Android)", "1.4.7": "2026-11-06 (Android)" });
   writeFileSync(configPath, originalConfig);
   const otaChangelog = readFileSync(join(work, "apps/mobile/CHANGELOG.md"), "utf8");
@@ -410,7 +380,6 @@ try {
       readFileSync(join(work, "apps/mobile/CHANGELOG.md"), "utf8") === otaChangelog,
     result.output,
   );
-  // iOS gets 1.4.7. The OTA section of 1.4.6 names only Android, and no store reviews it.
   writeChangelog({ "1.4.7": "2026-11-06 (Android)", "1.4.6.1": "2026-11-05 (Android)", "1.4.6": "2026-11-04" });
   result = await cli("publish-mobile-release.ts", ["ios", "--skip-older"]);
   const afterOta = readFileSync(join(work, "apps/mobile/CHANGELOG.md"), "utf8");

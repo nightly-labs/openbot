@@ -1,11 +1,3 @@
-// Runs the real account server hosted-server service on a migrated SQLite database with a fake boat API,
-// and checks the `ready` analytics event: the time from the start request to the usable sandbox.
-// A client wake that boat reports by webhook, and a provider stop that the cron sees, each send one event
-// with the time and the reason of the start. A second report of the same start sends none, and a start
-// time older than the limit sends none. Then it checks the OpenPanel body of the event.
-//
-// Run: bun run test:hosted-start-time
-// It writes .openbot-build/hosted-start-time-e2e/report.json and exits non-zero on a failure.
 import { createHmac } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -14,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import {
+  ACCOUNT_ANALYTICS_SCHEMA_VERSION,
   type AccountAnalyticsEvent,
   createAccountAnalytics,
   MAX_HOSTED_START_MS,
@@ -116,7 +109,6 @@ async function workerTimesEachStart() {
     return Effect.runPromise(service.handleWebhook({ deliveryId, timestamp, signature, body }));
   };
 
-  // 1. A client wake of a stopped server. boat reports the sandbox by webhook 42 seconds later.
   clock.now = t0;
   const woken = await Effect.runPromise(service.wake(OWNER, SERVER_ID));
   await Promise.all(scheduled.splice(0));
@@ -138,7 +130,6 @@ async function workerTimesEachStart() {
   await Effect.runPromise(service.wake(OWNER, SERVER_ID));
   check("a later report of the running sandbox sends no second event", ready().length === 1, ready());
 
-  // 2. boat stops the sandbox. The Worker starts it again, and the cron reads it as usable.
   const t1 = t0 + 20 * 60 * SECOND;
   boatState = "archived";
   await webhook("sandbox.archived", "archived", t1);
@@ -153,7 +144,6 @@ async function workerTimesEachStart() {
     ready(),
   );
 
-  // 3. A start time that a Worker without the column left behind gives no event.
   const t2 = t1 + 60 * 60 * SECOND;
   boatState = "archived";
   await webhook("sandbox.archived", "archived", t2);
@@ -205,7 +195,7 @@ async function openPanelBodyHasTheTime() {
     properties[0]?.action === "ready" &&
       properties[0]?.reason === "create" &&
       properties[0]?.duration_ms === 61_234 &&
-      properties[0]?.event_schema_version === 15,
+      properties[0]?.event_schema_version === ACCOUNT_ANALYTICS_SCHEMA_VERSION,
     properties[0],
   );
   check(

@@ -1,0 +1,249 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { Effect } from "effect";
+import { BillingSales, type BillingSalesSynced } from "../src/server/billing-sales";
+import { createHostedPoolAlert } from "../src/server/hosted-pool-alert";
+import type { StripeEvent } from "../src/server/stripe-client";
+import { sqliteD1 } from "./sqlite-d1";
+
+const ROOT = resolve(import.meta.dirname, "../../..");
+const OUT = join(ROOT, ".openbot-build", "billing-sale-alert-e2e");
+const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
+const ALERT_URL = "https://alerts.example/webhook";
+const NOW = Date.UTC(2026, 10, 15, 12);
+const DAY = "2026-11-15";
+const OWNER = { id: "owner", email: "owner@example.test" };
+
+const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
+function check(name: string, passed: boolean, detail?: unknown) {
+  checks.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
+}
+
+function invoice(type: StripeEvent["type"], id: string, object: StripeEvent["data"]["object"]): StripeEvent {
+  return { id: `evt_${id}`, type, created: NOW / 1_000, data: { object: { id: `in_${id}`, ...object } } };
+}
+
+const SERVER_RENEWED = "💵 **Renewed** server · `owner@example.test` · standard · $29/mo";
+const SERVER_ADJUSTED = "💵 **Paid** server · `owner@example.test` · standard · $12.50 · adjustment";
+const SERVER_FAILED = "⚠️ **Payment failed** server · `owner@example.test` · standard · $29/mo · card_declined";
+const LICENSE_PAID = "💵 **Renewed** license · `owner@example.test` · 5 users · PLN 480/yr";
+const LICENSE_REFUNDED = "↩️ **Refunded** license · `owner@example.test` · 5 users · PLN 120";
+
+async function eachPaidInvoiceSendsOneMessage() {
+  const database = new DatabaseSync(":memory:");
+  database.exec("PRAGMA foreign_keys = ON");
+  for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
+  database
+    .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
+    .run(OWNER.id, `email:${OWNER.email}`, OWNER.email);
+
+  const alerts: string[] = [];
+  const fetch = async (input: string, init: RequestInit) => {
+    if (input === ALERT_URL) {
+      alerts.push(String(JSON.parse(String(init.body)).content));
+      return new Response(null, { status: 204 });
+    }
+    return new Response(null, { status: 503 });
+  };
+  const options = { database: sqliteD1(database), clientId: "client", clientSecret: "secret", fetch, now: () => NOW };
+  const sales = new BillingSales({ ...options, saleAlert: createHostedPoolAlert(ALERT_URL, fetch) });
+  const run = (work: Effect.Effect<void, unknown>) => Effect.runPromise(work);
+  const pending = () =>
+    Number(
+      database.prepare("SELECT count(*) AS n FROM billing_sales_facts WHERE delivery_enqueued_at IS NULL").get()?.n,
+    );
+
+  const server: BillingSalesSynced = { userId: OWNER.id, plan: "standard", interval: "month", currency: "usd" };
+  const license: BillingSalesSynced = {
+    product: "license",
+    userId: OWNER.id,
+    users: 5,
+    interval: "year",
+    currency: "pln",
+  };
+
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "server", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 2900,
+        billing_reason: "subscription_create",
+      }),
+      server,
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "renewal", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 2900,
+        billing_reason: "subscription_cycle",
+      }),
+      server,
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "upgrade", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 1250,
+        billing_reason: "subscription_update",
+      }),
+      server,
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.payment_failed", "failed", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_due: 2900,
+        billing_reason: "subscription_cycle",
+        attempt_count: 1,
+        last_payment_error: { code: "card_declined" },
+      }),
+      server,
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "imported", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 2900,
+        billing_reason: "subscription_cycle",
+      }),
+      server,
+      null,
+      { suppressBillingAction: true },
+    ),
+  );
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "trial", {
+        subscription: "sub_trial",
+        currency: "usd",
+        amount_paid: 0,
+        billing_reason: "subscription_create",
+      }),
+      server,
+    ),
+  );
+  check("a webhook sends no message: only the ledger run does", alerts.length === 0, alerts);
+
+  await run(sales.processPending());
+  check(
+    "a renewal, an adjustment and a failed payment each send one message with the email, the plan, the amount and the period",
+    alerts.length === 3 &&
+      alerts.includes(SERVER_RENEWED) &&
+      alerts.includes(SERVER_ADJUSTED) &&
+      alerts.includes(SERVER_FAILED),
+    [...alerts],
+  );
+  check(
+    "a first purchase, an imported payment and a $0 trial invoice send no message, and no fact stays pending",
+    pending() === 0,
+    { pending: pending() },
+  );
+
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "license", {
+        subscription: "sub_license",
+        currency: "pln",
+        amount_paid: 59040,
+        total: 59040,
+        total_excluding_tax: 48000,
+        billing_reason: "subscription_cycle",
+      }),
+      license,
+    ),
+  );
+  await run(sales.processPending());
+  check(
+    "a paid license whose FX lookup fails stays pending and sends no message",
+    alerts.length === 3 && pending() === 1,
+    { alerts: [...alerts], pending: pending() },
+  );
+
+  database
+    .prepare("INSERT INTO billing_fx_rates (day, currency, source_day, usd_rate) VALUES (?, 'pln', ?, 0.25)")
+    .run(DAY, DAY);
+  await run(sales.processPending());
+  await run(sales.processPending());
+  check(
+    "the run that ends the fact sends its message one time, with the amount without VAT",
+    alerts.length === 4 && alerts[3] === LICENSE_PAID,
+    [...alerts],
+  );
+
+  await run(
+    sales.webhook(
+      {
+        id: "evt_refund",
+        type: "refund.created",
+        created: NOW / 1_000,
+        data: {
+          object: {
+            id: "re_license",
+            status: "succeeded",
+            payment_intent: "pi_license",
+            amount: 14760,
+            currency: "pln",
+          },
+        },
+      },
+      license,
+      { invoiceId: "in_license", subscriptionId: "sub_license", total: 59040, totalExcludingTax: 48000 },
+    ),
+  );
+  await run(sales.processPending());
+  check(
+    "a refund sends one message with the refunded amount without VAT",
+    alerts.length === 5 && alerts[4] === LICENSE_REFUNDED,
+    [...alerts],
+  );
+  check(
+    "a message has the account email and no account ID or Stripe ID",
+    alerts.every(
+      (alert) =>
+        alert.includes(`\`${OWNER.email}\``) && !alert.includes(`${OWNER.id} `) && !/\b(sub|in|re|pi|cus)_/.test(alert),
+    ),
+    [...alerts],
+  );
+
+  const silent = new BillingSales(options);
+  await run(
+    silent.webhook(
+      invoice("invoice.paid", "silent", {
+        subscription: "sub_server",
+        currency: "usd",
+        amount_paid: 2900,
+        billing_reason: "subscription_cycle",
+      }),
+      server,
+    ),
+  );
+  await run(silent.processPending());
+  check("a ledger with no alert ends the fact and sends nothing", alerts.length === 5 && pending() === 0, {
+    alerts: [...alerts],
+    pending: pending(),
+  });
+}
+
+let passed = false;
+try {
+  await eachPaidInvoiceSendsOneMessage();
+  passed = checks.every((item) => item.passed);
+} finally {
+  await mkdir(OUT, { recursive: true });
+  await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed, checks }, null, 2)}\n`);
+}
+for (const item of checks) console.log(`${item.passed ? "ok  " : "FAIL"} ${item.name}`);
+console.log(`Report: ${join(OUT, "report.json")}`);
+if (!passed) process.exit(1);

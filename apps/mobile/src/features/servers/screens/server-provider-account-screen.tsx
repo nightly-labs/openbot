@@ -12,9 +12,11 @@ import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/clau
 import { skipToken, useQuery } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
+import KeyRound from "lucide-react-native/icons/key-round";
 import LogOut from "lucide-react-native/icons/log-out";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Smartphone from "lucide-react-native/icons/smartphone";
 import Trash2 from "lucide-react-native/icons/trash";
 import UserMinus from "lucide-react-native/icons/user-minus";
 import UserPlus from "lucide-react-native/icons/user-plus";
@@ -23,6 +25,7 @@ import { Alert } from "react-native";
 import { useProviderAccountName } from "@/features/agents/components/agent-runtime-fields";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
+  isProviderKeyAccount,
   type ProviderAdmin,
   providerAccountStateKey,
   providerSignOutOffered,
@@ -49,11 +52,6 @@ const RESET_OUTCOME_KEYS = {
   alreadyRedeemed: "mobile.server.providers.resetUsageAlreadyRedeemed",
 } as const satisfies Record<ProviderUsageResetOutcome, string>;
 
-/**
- * Server settings > Providers > a provider > one of its accounts on the host: its name, its sign-in,
- * its place in the pool and its removal. A sign-in runs on the provider page, which has the relayed
- * sign-in.
- */
 export function ServerProviderAccountScreen() {
   const { t, errorMessage } = useText();
   const params = useLocalSearchParams<{ serverId: string; provider: string; accountId: string }>();
@@ -63,7 +61,6 @@ export function ServerProviderAccountScreen() {
   const list = accounts.list.data?.providers.find((entry) => entry.provider === provider)?.accounts ?? [];
   const index = list.findIndex((account) => account.id === params.accountId);
   const account = list[index];
-  // The host lists a pool only while it is on, and an older host has no pool.
   const pool = admin?.accounts?.setPool
     ? accounts.list.data?.pools?.find((entry) => entry.provider === provider)?.pool
     : undefined;
@@ -91,7 +88,6 @@ export function ServerProviderAccountScreen() {
       accounts={admin.accounts}
       pool={pool}
       usageResets={admin.usageResets}
-      // The provider's own sign-in signs out on the host, as the desktop account menu offers it.
       signOut={
         account.id === DEFAULT_PROVIDER_ACCOUNT_ID &&
         account.state === "connected" &&
@@ -123,7 +119,6 @@ function AccountPage({
   account: ProviderAccountStatus;
   index: number;
   accounts: NonNullable<ProviderAdmin["accounts"]>;
-  /** The pool of the provider's accounts, while it is on. */
   pool: ProviderAccountPool | undefined;
   usageResets: ProviderAdmin["usageResets"];
   signOut: ProviderAdmin["signOut"];
@@ -135,23 +130,22 @@ function AccountPage({
   const name = accountName(account, index);
   const [label, setLabel] = useState(account.label ?? "");
   const [pending, setPending] = useState<"rename" | "remove" | "reset" | "sign-out" | "pool" | null>(null);
-  /** How the last usage reset ended, when it did not fail. */
   const [notice, setNotice] = useState<string | null>(null);
+  const keyAccount = isProviderKeyAccount(provider, account.id);
   const queryScope = useQueryScope();
   const credits = useQuery({
     queryKey: queryKeys.providerUsageResets(queryScope, serverId, provider),
     retry: false,
     staleTime: 0,
-    queryFn: usageResets && account.state === "connected" ? () => usageResets.list(provider) : skipToken,
+    queryFn: usageResets && !keyAccount && account.state === "connected" ? () => usageResets.list(provider) : skipToken,
   });
   const resetsLeft =
-    account.state === "connected"
+    account.state === "connected" && !keyAccount
       ? (credits.data?.find((reading) => reading.accountId === account.id)?.available ?? 0)
       : 0;
   const openSignIn = useOpenSignIn();
   const [error, setError] = useState<string | null>(null);
   const locked = useRef(false);
-  // A removed account leaves the page before the list without it shows, so the page does not say "gone".
   const [leaving, setLeaving] = useState(false);
   useEffect(() => {
     if (!leaving) return;
@@ -169,7 +163,6 @@ function AccountPage({
       await operation();
       void haptics.notification("success");
       if (kind === "remove") setLeaving(true);
-      // A reset changes no account; it reads its credits again.
       else if (kind !== "reset") await onChanged();
     } catch (cause) {
       setError(
@@ -187,12 +180,15 @@ function AccountPage({
 
   const trimmed = label.trim();
   const dirty = trimmed !== (account.label ?? "");
-  // The host keeps the provider's own sign-in, and only the key page removes the Claude API key account.
   const setPool = accounts.setPool;
   const apiKeyAccount = provider === "claude" && account.id === CLAUDE_API_KEY_ACCOUNT_ID;
-  // A saved key has no plan limit, so it is not a pool member.
-  const inPool = pool !== undefined && !apiKeyAccount && !pool.leftOut.includes(account.id);
+  const inPool = pool !== undefined && !apiKeyAccount && !keyAccount && !pool.leftOut.includes(account.id);
   const removable = account.id !== DEFAULT_PROVIDER_ACCOUNT_ID && !apiKeyAccount;
+  const codeSignIn =
+    account.id !== DEFAULT_PROVIDER_ACCOUNT_ID &&
+    !apiKeyAccount &&
+    (account.state === "signed-out" || account.state === "error") &&
+    accounts.code?.offered(provider) === true;
   const value = (text: string) => (
     <Typography.Paragraph numberOfLines={1} className="shrink text-grouped-secondary">
       {text}
@@ -234,21 +230,51 @@ function AccountPage({
           </SettingsRow>
         ) : null}
       </SettingsSection>
-      {accounts.canSignIn(provider) ? (
+      {keyAccount ? (
+        accounts.connectKey ? (
+          <SettingsSection>
+            <SettingsRow
+              disabled={pending !== null}
+              leading={<RowIcon icon={KeyRound} tone="accent" />}
+              onPress={() =>
+                router.push({
+                  pathname: "/server-settings/provider-key",
+                  params: { serverId, provider, account: account.id },
+                })
+              }
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.server.providers.accountChangeKey")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          </SettingsSection>
+        ) : null
+      ) : accounts.canSignIn(provider) || codeSignIn ? (
         <SettingsSection footer={t("mobile.server.providers.relayHint")}>
-          <SettingsRow
-            disclosure={false}
-            disabled={pending !== null}
-            leading={<RowIcon icon={RefreshCw} tone="accent" />}
-            onPress={() =>
-              // The sign-in page runs the relayed sign-in and comes back here when it ends.
-              openSignIn({ serverId, provider, method: "relay", account: account.id })
-            }
-          >
-            <Typography.Paragraph className="text-accent">
-              {t("mobile.server.providers.accountSignInAgain")}
-            </Typography.Paragraph>
-          </SettingsRow>
+          {accounts.canSignIn(provider) ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={pending !== null}
+              leading={<RowIcon icon={RefreshCw} tone="accent" />}
+              onPress={() => openSignIn({ serverId, provider, method: "relay", account: account.id })}
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.server.providers.accountSignInAgain")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {codeSignIn ? (
+            <SettingsRow
+              disclosure={false}
+              disabled={pending !== null}
+              leading={<RowIcon icon={Smartphone} tone="accent" />}
+              onPress={() => openSignIn({ serverId, provider, method: "account-code", account: account.id })}
+            >
+              <Typography.Paragraph className="text-accent">
+                {t("mobile.server.providers.accountSignInWithCode")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
         </SettingsSection>
       ) : null}
       {usageResets && resetsLeft > 0 ? (
@@ -287,7 +313,7 @@ function AccountPage({
       ) : notice ? (
         <SettingsNote>{notice}</SettingsNote>
       ) : null}
-      {pool && !apiKeyAccount && setPool ? (
+      {pool && !apiKeyAccount && !keyAccount && setPool ? (
         <SettingsSection>
           <SettingsRow
             disclosure={false}

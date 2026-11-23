@@ -1,23 +1,26 @@
-// The ACP agent of `acp-turn-stall-e2e.ts`. Each prompt text names what the agent does:
-// - `hang` never answers and ignores `session/cancel`, as an OpenCode prompt that stays open (#2858).
-// - `tool` keeps one tool call open for `FAKE_TOOL_MS`, then answers.
-// - `stream` sends its answer in two chunks `FAKE_CHUNK_GAP_MS` apart, then answers.
-// - `hang-once` never answers until a `session/resume` of its session, as an Antigravity prompt that
-//   its harness lost (#4846). It sends only an `available_commands_update`. After the resume it
-//   answers at once.
-// - `quiet` sends one line, stays silent for `FAKE_QUIET_MS`, then answers, as a background task.
-// Each other prompt answers at once. `FAKE_NO_LOAD=1` offers no `session/load`, as some custom agents.
-// `FAKE_RESUME=1` offers `session/resume`, as Antigravity.
 import { type AcpParams, type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = [{ modelId: "fake-alpha", name: "Fake Alpha" }];
 const toolMs = Number(process.env.FAKE_TOOL_MS ?? 0);
 const chunkGapMs = Number(process.env.FAKE_CHUNK_GAP_MS ?? 0);
 const quietMs = Number(process.env.FAKE_QUIET_MS ?? 0);
+const retryMs = Number(process.env.FAKE_RETRY_MS ?? 0);
+const rateRetryMs = Number(process.env.FAKE_RATE_RETRY_MS ?? 0);
 const loadSession = process.env.FAKE_NO_LOAD !== "1";
+const silentNew = process.env.FAKE_SILENT_NEW === "1";
 const sessionCapabilities = process.env.FAKE_RESUME === "1" ? { sessionCapabilities: { resume: {} } } : {};
 const resumed = new Set<string>();
 let count = 0;
+
+function retryNotice(
+  peer: AcpPeer,
+  sessionId: string,
+  attempt: number | null,
+  message = "Timed out waiting for response headers",
+): void {
+  const retry = attempt === null ? null : { attempt, error: { message } };
+  peer.update(sessionId, { sessionUpdate: "session_info_update", _meta: { "opencode/retry": retry } });
+}
 
 function setup(sessionId: string) {
   return {
@@ -43,7 +46,6 @@ function restore(request: AcpRequest, peer: AcpPeer): void {
   peer.reply(request, setup(sessionId));
 }
 
-/** The user's text, without the instructions that OpenBot puts first in a new or loaded session. */
 function promptText(params: AcpParams): string {
   const text = (params.prompt ?? []).map((block) => block.text ?? "").join("");
   return text.replace(/^[\s\S]*<\/openbot-developer-instructions>/u, "");
@@ -61,6 +63,7 @@ serveFakeAcpAgent(
     "session/new": (request, peer) => {
       count += 1;
       logEntry({ event: "session/new" });
+      if (silentNew && count > 1) return;
       peer.reply(request, setup(`s-${process.pid}-${count}`));
     },
     "session/load": restore,
@@ -73,8 +76,43 @@ serveFakeAcpAgent(
       logEntry({ event: "prompt", sessionId, text });
       if (text === "hang") return;
       if (text === "hang-once" && !resumed.has(sessionId)) {
-        // An update about the session, not about the prompt: the prompt is still lost.
         peer.update(sessionId, { sessionUpdate: "available_commands_update", availableCommands: [] });
+        return;
+      }
+      if (text === "retry-once") {
+        setTimeout(() => {
+          retryNotice(peer, sessionId, 2);
+          setTimeout(() => {
+            peer.say(sessionId, "ok");
+            peer.reply(request, { stopReason: "end_turn" });
+          }, retryMs);
+        }, retryMs);
+        return;
+      }
+      if (text === "retry-forever") {
+        for (let attempt = 2; attempt <= 7; attempt += 1)
+          setTimeout(
+            () => {
+              if (attempt > 2) retryNotice(peer, sessionId, null);
+              retryNotice(peer, sessionId, attempt);
+            },
+            retryMs * (attempt - 1),
+          );
+        return;
+      }
+      if (text === "retry-rate-limit") {
+        for (let attempt = 2; attempt <= 4; attempt += 1)
+          setTimeout(
+            () => {
+              if (attempt > 2) retryNotice(peer, sessionId, null);
+              retryNotice(peer, sessionId, attempt, "Rate limit exceeded");
+            },
+            rateRetryMs * (attempt - 1),
+          );
+        setTimeout(() => {
+          peer.say(sessionId, "ok");
+          peer.reply(request, { stopReason: "end_turn" });
+        }, rateRetryMs * 3.5);
         return;
       }
       if (text === "quiet") {

@@ -20,6 +20,12 @@ export const messages = {
   "preview.unsupported.title": "Anteprima non disponibile",
   "preview.unsupported.description": "Questo tipo di file si può aprire con la sua app predefinita.",
   "preview.unsupported.openExternally": "Apri con un'altra app",
+  "preview.tooLarge.title": "File troppo grande per l'anteprima",
+  "preview.tooLarge.description":
+    "L'anteprima arriva fino a 100 MB. Puoi aprire questo file con la sua app predefinita.",
   "preview.spreadsheet.readFailed": "Impossibile leggere questo foglio di calcolo.",
   "preview.spreadsheet.truncated": "Anteprima limitata alle prime {rows} righe e {columns} colonne.",
+  "preview.document.readFailed": "Impossibile leggere questo documento.",
+  "preview.document.empty": "Questo documento non contiene testo da mostrare.",
+  "preview.document.truncated": "Anteprima limitata alla prima parte del documento.",
 } as const satisfies PartialTranslation<typeof source>;

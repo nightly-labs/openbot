@@ -116,9 +116,17 @@ export const messages = {
   "provider.picker.download": "הורדת {name}",
   "provider.picker.search": "חיפוש מודלים",
   "provider.picker.noMatches": "אין מודלים שתואמים לחיפוש.",
+  "provider.picker.openrouterNoMatches":
+    "אין מודלים שתואמים לחיפוש. הגדרות הפרטיות, הספקים ומגבלות ההגנה שלך ב-openrouter.ai יכולות להסתיר מודלים מהרשימה הזו.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "המודלים האלה לא עובדים עם „סביבת עבודה בלבד” ב-Windows וב-Linux. כדי להשתמש בהם, שנו את „הרשאות” בהגדרות הסוכן.",
   "provider.picker.olderModels": "מודלים ישנים",
   "provider.picker.olderModelsList": "מודלים ישנים של {name}",
-  "provider.picker.noModels": "אין מודלים זמינים מ-{name}.",
+  "provider.picker.noModels":
+    "לא מוצגים כאן מודלים של {name}. אם הם כבויים, מנהל יכול להפעיל אותם בהגדרות השרת ← ספקים ← {name} ← מודלים.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} מפעיל את נקודות הקצה המותאמות שלך. המודלים שלהן נמצאים בכרטיסייה מותאם אישית.",
+  "provider.picker.showCustomModels": "הצגת מודלים",
   "provider.picker.museNoModels":
     "Muse לא שלח מודלים עבור החשבון הזה. ייתכן ש-Muse אינו זמין במדינה שבה הסוכן הזה פועל. בחר מודל מספק אחר.",
   "provider.picker.customEmpty":
@@ -146,6 +154,8 @@ export const messages = {
   "provider.picker.selectEffort": "בחירת מאמץ",
   "provider.picker.custom": "מותאם אישית",
   "provider.picker.cliReady": "{cli} מוכן",
+  "provider.picker.modelSourceProvider": "משתמש ב-{name} מהגדרות {cli}",
+  "provider.picker.modelSourceCatalog": "משתמש ברשימת מודלים מהגדרות {cli}",
   "provider.status.signInRequired": "נדרשת התחברות",
   "provider.model.free": "חינם",
   "provider.model.new": "חדש",
@@ -164,6 +174,8 @@ export const messages = {
   "provider.geminiKey.title": "מפתח Gemini API",
   "provider.geminiKey.description":
     "אפשר לשמור מפתח Gemini API במחשב הזה. מפתח שמור בא במקום חשבון Google שלך. כדי להתחבר עם Google, יש להסיר את המפתח ולבחור חיבור בשורה של Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "אפשר לשמור מפתח Gemini API במארח. מפתח שמור בא במקום חשבון Google שלך. כדי להתחבר עם Google, יש להסיר את המפתח ולבחור חיבור בשורה של Gemini.",
   "provider.geminiKey.label": "מפתח Gemini API",
   "provider.claudeKey.title": "מפתח Anthropic API",
   "provider.claudeKey.description":
@@ -175,17 +187,29 @@ export const messages = {
   "provider.codexKey.descriptionHost":
     "Codex שומר את המפתח במארח. OpenAI מחייבת כל בקשה במפתח, ולא בתוכנית ChatGPT שלך. כדי לחזור להשתמש בתוכנית, יש לנתק את החשבון ולחבר את ChatGPT.",
   "provider.codexKey.label": "מפתח OpenAI API",
+  "provider.cursorKey.title": "מפתח Cursor API",
+  "provider.cursorKey.description":
+    "כל חשבון Cursor אחרי הראשון משתמש במפתח API. יש ליצור מפתח בלוח הבקרה של Cursor, תחת Integrations, ולהדביק אותו כאן. המפתח נשמר במחשב הזה.",
+  "provider.cursorKey.descriptionHost":
+    "כל חשבון Cursor אחרי הראשון משתמש במפתח API. יש ליצור מפתח בלוח הבקרה של Cursor, תחת Integrations, ולהדביק אותו כאן. המפתח נשמר במארח.",
+  "provider.cursorKey.label": "מפתח Cursor API",
   "provider.inceptionKey.title": "מפתח Inception API",
   "provider.inceptionKey.description":
     "אפשר לשמור מפתח Inception API במחשב הזה כדי להשתמש במודלים של Mercury. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.inceptionKey.descriptionHost":
+    "אפשר לשמור מפתח Inception API במארח כדי להשתמש במודלים של Mercury. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.inceptionKey.label": "מפתח Inception API",
   "provider.deepseekKey.title": "מפתח DeepSeek API",
   "provider.deepseekKey.description":
     "אפשר לשמור מפתח DeepSeek API במחשב הזה כדי להשתמש במודלים של DeepSeek. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.deepseekKey.descriptionHost":
+    "אפשר לשמור מפתח DeepSeek API במארח כדי להשתמש במודלים של DeepSeek. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.deepseekKey.label": "מפתח DeepSeek API",
   "provider.openrouterKey.title": "מפתח OpenRouter API",
   "provider.openrouterKey.description":
     "אפשר לשמור מפתח OpenRouter API במחשב הזה כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.openrouterKey.descriptionHost":
+    "אפשר לשמור מפתח OpenRouter API במארח כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.openrouterKey.label": "מפתח OpenRouter API",
   "provider.openCodeKey.title": "התחברות ל-OpenCode Go",
   "provider.openCodeKey.description": "מודלים חינמיים לא דורשים חשבון. מפתח פותח את מודלי Go בתשלום.",
@@ -201,6 +225,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "לא ניתן להתחבר מחדש.",
   "provider.account.add": "הוספת חשבון",
   "provider.account.addLabel": "הוספת חשבון {name} נוסף",
+  "provider.account.addWithCode": "הוספת חשבון עם קוד",
   "provider.account.count": { one: "חשבון אחד", two: "שני חשבונות", other: "{count} חשבונות" },
   "provider.account.numbered": "חשבון {number}",
   "provider.account.apiKey": "מפתח API",
@@ -292,6 +317,7 @@ export const messages = {
   "provider.settings.codexKeyInUse":
     "ChatGPT משתמש במפתח הזה, ולא בתוכנית ChatGPT שלך. OpenAI מחייבת כל בקשה במפתח. השימוש בתוכנית לא מוצג.",
   "provider.settings.codexKeyAlternative": "או להתחבר עם מפתח OpenAI API. OpenAI מחייבת כל בקשה במפתח.",
+  "provider.settings.museKeyInUse": "Muse משתמש במפתח הזה, לא בהתחברות שלך. כדי להשתמש בהתחברות, יש להסיר את המפתח.",
   "provider.settings.addKey": "הוספת מפתח",
   "provider.settings.changeKey": "החלפת מפתח",
   "provider.settings.runtime": "סביבת ריצה",
@@ -299,15 +325,25 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · {available} זמינה",
   "provider.settings.versionInstalledByUser": "{version} · הותקנה על ידיך",
   "provider.settings.versionDownloaded": "{version} · הורדה על ידי OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "לא בשימוש: {version} · הותקנה על ידיך",
+  "provider.settings.otherVersionDownloaded": "לא בשימוש: {version} · הורדה על ידי OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "חלק מהמודלים צריכים רכיב שחסר בגרסה הזו. הורד את הגרסה של OpenBot כדי להשתמש בהם.",
+  "provider.settings.useInstalledVersion": "השתמש בגרסה המותקנת",
+  "provider.settings.useDownloadedVersion": "השתמש בגרסה של OpenBot",
   "provider.settings.update": "עדכון",
   "provider.settings.downloadLabel": "הורדת {name}",
   "provider.settings.diagnostics": "אבחון",
   "provider.settings.cache": "מטמון",
   "provider.settings.promptCache": "מטמון הנחיות",
-  "provider.settings.promptCacheDescription": "כמה זמן Claude שומר במטמון את ההקשר של סוכן בין תורות.",
+  "provider.settings.promptCacheDescription": "כמה זמן Claude ו-Pi שומרים את ההקשר של סוכן במטמון בין תורות.",
   "provider.settings.promptCacheHour": "שעה",
-  "provider.settings.promptCacheDefault": "ברירת המחדל של Claude Code",
+  "provider.settings.promptCacheDefault": "ברירת המחדל של הספק",
   "provider.settings.promptCacheLoadFailed": "לא ניתן לטעון את זמן מטמון ההנחיות של השרת הזה.",
+  "provider.settings.cacheExpiryCompaction": "לכווץ לפני שהמטמון פג",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "כשצ׳אט עם הקשר של 200K טוקנים או יותר לא פעיל עם מטמון של שעה, הסוכן מכווץ את ההקשר לפני שהמטמון פג. כך ההודעה הבאה לא קוראת שוב את כל ההקשר בלי מטמון.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "לא ניתן לטעון את הגדרת הכיווץ של השרת הזה.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "שימוש בהגדרות Claude Code שלי",
   "provider.settings.claudeUserSetupDescription":
@@ -322,6 +358,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "ברירת המחדל של Claude Code",
   "provider.settings.compactWindowTokens": "{size} טוקנים",
   "provider.settings.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
+  "provider.settings.environment": "סביבה",
+  "provider.settings.environmentVariables": "משתנים",
+  "provider.settings.environmentDescription":
+    "מפתחות API, כתובות בסיס והגדרות אחרות שכל תהליך של {name} מקבל. שינוי חל כשהתורות הנוכחיים מסתיימים.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL, עם OPENAI_API_KEY כמפתח שלו, שולח את בקשות המודל של ChatGPT לכתובת הזו.",
+  "provider.settings.environmentShellNote": "הפקודות שסוכנים מריצים יכולות לקרוא את הערכים האלה.",
+  "provider.settings.environmentAdd": "הוספת משתנה",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "ערך",
+  "provider.settings.environmentSaved": "נשמר",
+  "provider.settings.environmentSensitive": "רגיש",
+  "provider.settings.environmentNameLabel": "שם משתנה {index}",
+  "provider.settings.environmentValueLabel": "הערך של {name}",
+  "provider.settings.environmentSensitiveLabel": "לשמור את {name} בסוד",
+  "provider.settings.environmentRemoveLabel": "הסרת {name}",
+  "provider.settings.environmentUnnamed": "משתנה {index}",
+  "provider.settings.environmentPending":
+    "השמירה מפעילה מחדש את {name} כשהתורות הנוכחיים שלו מסתיימים. ערכים רגישים נשארים בשרת.",
+  "provider.settings.environmentDone": "נשמר. {name} יופעל מחדש כשהתורות הנוכחיים שלו יסתיימו.",
+  "provider.settings.environmentDiscard": "ביטול",
+  "provider.settings.environmentSave": "שמירה",
+  "provider.settings.environmentLoadFailed": "לא ניתן לטעון את המשתנים של {name}.",
   "provider.settings.models": "מודלים",
   "provider.settings.modelsDescription": {
     one: "{shown} מתוך מודל אחד מוצג בבורר המודלים.",
@@ -356,4 +415,5 @@ export const messages = {
   },
   "provider.settings.disconnectLocalOnly":
     "OpenBot מנתק את {provider} במחשב הזה. ה-CLI של {provider} במסוף שלך נשאר מחובר.",
+  "provider.settings.updateAll": "עדכון הכול",
 } as const satisfies PartialTranslation<typeof source>;

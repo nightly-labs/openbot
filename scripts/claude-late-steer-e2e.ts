@@ -1,14 +1,3 @@
-// Checks that a message steered into a Claude turn as the turn ends is stored one time (#3365). Runs
-// the real agent service on a temporary profile, with the busy-message mode "steer". Claude is the
-// real `ClaudeAgentClient`, which the Claude Agent SDK connects to a stand-in `claude` executable.
-// Like the real CLI, the stand-in saves the session history, and a message that arrives after the
-// turn's last request runs as a new turn of its own, whose first frames carry the message's uuid.
-// The stand-in holds its first turn's answer until the steer arrives. After both turns, the service
-// starts again and imports the session history. Before this change, the import added the steered
-// answer a second time: the live turn had a random id, and the history names the turn by the uuid.
-// The chat also shows the steered message after the running turn's answer and above its own answer,
-// live and after the import. Before that change, the message stayed in the running turn (#6673).
-// `bun run test:claude-late-steer`. Writes .openbot-build/claude-late-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -37,11 +26,8 @@ const CLAUDE_MODEL = defaultProviderModel("claude");
 const OLD_ANSWER = "Answer of the running turn.";
 const STEERED_ANSWER = "Answer of the steered message.";
 const STEERED_MESSAGE = "Steered message.";
-/** Each answer under the message it answers. */
 const SHOWN_ORDER = [OLD_ANSWER, STEERED_MESSAGE, STEERED_ANSWER];
 
-// Before the service modules load: the stores and the CLI search read these. The history reader
-// finds the transcript in CLAUDE_CONFIG_DIR, as Bun's `homedir()` does not follow HOME.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 process.env.CLAUDE_CONFIG_DIR = claudeConfig;
@@ -54,8 +40,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end,
-// and saves each user and assistant entry as the CLI's session transcript does.
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { join } = require("node:path");
@@ -79,7 +63,6 @@ const save = (entry) => {
   parentUuid = entry.uuid;
 };
 const frame = (message) => ({ ...message, parent_tool_use_id: null, session_id: sessionId });
-/** Starts the answer to a user message: the first stream event names the message it answers. */
 const begin = (message, text) => {
   save({ type: "user", uuid: message.uuid, message: message.message });
   write(frame({ type: "stream_event", uuid: randomUUID(), user_message_uuid: message.uuid, user_message_uuids: [message.uuid],
@@ -97,12 +80,9 @@ const finish = (message, text) => {
     duration_ms: 1, duration_api_ms: 1, num_turns: 1, total_cost_usd: 0, usage: { input_tokens: 1, output_tokens: 1 },
     permission_denials: [] }));
 };
-/** The turn whose last answer is still being written, which ends when the next message arrives. */
 let held = null;
 const turn = (message) => {
   if (held) {
-    // The answer was written before the steer arrived, so the CLI ends that turn and runs the
-    // steer as a turn of its own.
     finish(held, ${JSON.stringify(OLD_ANSWER)});
     held = null;
     begin(message, ${JSON.stringify(STEERED_ANSWER)});
@@ -144,10 +124,6 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. Sessions, turns, history and events go to the real client.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -231,6 +207,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -249,7 +226,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, of its database or of the stand-in. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -260,7 +236,6 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-/** One run of the service on the profile, as one start of the app. */
 function startService() {
   const database = new OpenBotDatabase(userData);
   const store = new AgentStore(userData, home, database);
@@ -279,7 +254,6 @@ function startService() {
     connection ??= new DatabaseSync(database.path);
     return connection;
   };
-  /** The stored messages of the chat with this author and text. */
   const messages = (threadId: string, author: string, text: string): StoredAnswer[] =>
     sqlite()
       .prepare(
@@ -290,7 +264,6 @@ function startService() {
       .all(threadId, author, text)
       .map((row) => ({ messageId: String(row.message_id), turnId: row.turn_id === null ? null : String(row.turn_id) }));
   const answers = (threadId: string, text: string) => messages(threadId, "assistant", text);
-  /** The checked texts of the chat, in the order the chat shows them. */
   const shown = (agentId: string, threadId: string) =>
     database
       .readConversationPage(agentId, threadId, { type: "latest" }, 100)
@@ -324,7 +297,6 @@ try {
       model: CLAUDE_MODEL,
     }),
   );
-  // The running turn has written its answer and has not ended.
   await waitFor("the stand-in to hold its answer", () => existsSync(holdMarker));
   const threadId = first.store.list().find((item) => item.id === agent.id)?.threadId;
   assert.ok(threadId, "The agent has a chat thread.");
@@ -347,7 +319,6 @@ try {
   await first.stop();
   service = null;
 
-  // The next start imports the session history.
   const second = startService();
   service = second;
   const restartedAt = new Date().toISOString();

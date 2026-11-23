@@ -7,12 +7,7 @@ import { z } from "zod";
 import { nativeDerivePin } from "@/features/app-lock/model/app-lock-native";
 import * as LockedKeychain from "@/shared/lib/locked-keychain";
 
-/**
- * The app lock settings. They hold no secret, and the app reads them also when iOS starts it in the
- * background, so they use the keychain items that open after the first unlock.
- */
 const CONFIG_KEY = "openbot.mobile.app-lock.v1";
-/** The PIN hash and the failed attempts. Only an unlocked phone opens them, and they stay on this device. */
 const PIN_KEY = "openbot.mobile.app-lock.pin.v1";
 const ATTEMPTS_KEY = "openbot.mobile.app-lock.attempts.v1";
 const SECRET_OPTIONS: SecureStore.SecureStoreOptions = {
@@ -21,12 +16,6 @@ const SECRET_OPTIONS: SecureStore.SecureStoreOptions = {
 };
 
 export const PIN_LENGTH = 4;
-/**
- * A 4-digit PIN has 10,000 values, so no hash protects it from a person who can read the keychain.
- * The keychain and the attempt limit protect it. The slow hash only keeps the PIN out of plain sight.
- * Native code makes the hash in milliseconds. JavaScript takes seconds for the same rounds, so a build
- * without the native hash, such as Expo Go, uses fewer. Each stored hash keeps its own number of rounds.
- */
 const PIN_ITERATIONS = nativeDerivePin ? 30_000 : 2_000;
 
 export const LOCK_AFTER_OPTIONS_MS = [0, 60_000, 300_000, 900_000, 3_600_000] as const;
@@ -62,7 +51,6 @@ export function appLockEnabled(config: AppLockConfig): boolean {
   return config.pin || config.deviceUnlock;
 }
 
-/** Throws when the keychain is closed or the value is damaged. The caller keeps the app locked. */
 export async function readAppLockConfig(): Promise<AppLockConfig> {
   const stored = await LockedKeychain.getItemAsync(CONFIG_KEY);
   return stored === null ? DEFAULT_APP_LOCK_CONFIG : configSchema.parse(JSON.parse(stored));
@@ -96,7 +84,6 @@ export async function writePin(pin: string): Promise<void> {
   await SecureStore.setItemAsync(PIN_KEY, JSON.stringify(value), SECRET_OPTIONS);
 }
 
-/** Returns null when the phone has no PIN for the app, such as after a restore to another phone. */
 export async function checkPin(pin: string): Promise<boolean | null> {
   const stored = await SecureStore.getItemAsync(PIN_KEY, SECRET_OPTIONS);
   if (stored === null) return null;

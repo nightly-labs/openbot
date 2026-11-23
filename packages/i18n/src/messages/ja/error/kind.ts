@@ -20,4 +20,5 @@ export const messages = {
   "error.kind.service": "サービスを利用できません。しばらく待ってから、もう一度お試しください。",
   "error.kind.clock":
     "OpenBot を実行しているコンピューターの日付または時刻が正しくない可能性があるため、安全な接続に失敗しました。日付と時刻を修正してから、もう一度お試しください。",
+  "error.kind.interrupted": "回答が終わる前に接続が切れました。メッセージをもう一度送信してください。",
 } as const satisfies PartialTranslation<typeof source>;

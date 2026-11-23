@@ -1,12 +1,4 @@
 #!/bin/bash
-# The entrypoint of the OpenBot Docker image (docker/Dockerfile). It runs OpenBot as a self-hosted
-# server, as openbot-hosted-server does on a computer with systemd: a D-Bus session with an unlocked
-# keyring, so that Electron `safeStorage` can keep the account session, two virtual displays, and
-# `OPENBOT_SERVER=1`. Its owner signs it in with `docker exec -it openbot openbot login`.
-#
-# It runs as the image user. The home folder of that user is the /data volume, so the database, the
-# workspaces, the provider sign-ins and the keyring stay when the container is replaced. The keyring
-# has the key of the encrypted data in that folder, so the two always go together. See docs/docker.md.
 set -euo pipefail
 umask 077
 
@@ -15,9 +7,6 @@ fail() {
   exit 1
 }
 
-# The size of the virtual display, which computer use reads: $1 as WIDTHxHEIGHT, else 1280x800. A
-# value that is not valid writes a warning and does not stop the start. See
-# docs/self-hosted-server.md#display-size. openbot-hosted-server has the same rules.
 display_size() {
   if [[ $1 =~ ^([1-9][0-9]{2,3})x([1-9][0-9]{2,3})$ ]] &&
     [ "${BASH_REMATCH[1]}" -ge 640 ] && [ "${BASH_REMATCH[1]}" -le 2576 ] &&
@@ -31,31 +20,17 @@ display_size() {
 
 [ "$(id -u)" -ne 0 ] || fail "Run the OpenBot image as its own user, not as root."
 [ -w "$HOME" ] || fail "User $(id -u) cannot write to $HOME. Give the data volume to that user: chown -R $(id -u):$(id -g) <folder>"
-# The Electron sandbox stays on. It makes user namespaces, and the default seccomp profile of Docker
-# refuses them to a container. `--no-sandbox` is never the answer.
 unshare --user --map-root-user true 2>/dev/null ||
   fail "OpenBot cannot make a user namespace for the Electron sandbox. Start the container with --security-opt seccomp=seccomp.json. See https://github.com/nightly-labs/openbot/blob/main/docs/docker.md"
-# The control socket of `openbot`. Main refuses a directory that other users can enter. The socket of
-# the last run stays in the container, and `openbot` must not take it for the new one.
 mkdir -p "$XDG_RUNTIME_DIR"
 chmod 0700 "$XDG_RUNTIME_DIR"
 rm -f "$XDG_RUNTIME_DIR/control.sock"
 
-# D-Bus and the virtual display run in the background, and OpenBot replaces this script. tini then
-# gives the stop signal to OpenBot only and waits for it: OpenBot stops its agents and closes the
-# database. A wrapper such as xvfb-run would stop at once, and Docker would kill OpenBot with it.
-# An assignment first, so `set -e` stops the start when a daemon fails. `eval "$(…)"` ignores it.
 session=$(dbus-launch --sh-syntax)
 eval "$session"
-# OpenBot shows its windows on :0. The agents work on :1: main gives it to Computer Use, to remote
-# desktop and to the agent processes, so an agent's screenshot does not show the OpenBot window.
-# The locks of the last run stay in the container too.
 rm -f /tmp/.X0-lock /tmp/.X11-unix/X0 /tmp/.X1-lock /tmp/.X11-unix/X1
-# The subshells exit at once, so tini adopts Xvfb. As a child of OpenBot, Xvfb would get the high OOM
-# value of the agent processes, and OpenBot stops when the kernel kills its display. :1 has a white
-# root (`-wr`): remote desktop shows it, and the default black root looks like no video (#3554).
 (Xvfb :0 -screen 0 1280x800x24 -nolisten tcp >/dev/null 2>&1 &)
-(Xvfb :1 -screen 0 "$(display_size "${OPENBOT_DISPLAY_SIZE:-}")x24" -nolisten tcp -wr >/dev/null 2>&1 &)
+(Xvfb :1 -screen 0 "$(display_size "${OPENBOT_DISPLAY_SIZE:-}")x24" -nolisten tcp -wr -noreset >/dev/null 2>&1 &)
 export DISPLAY=:0 OPENBOT_AGENT_DISPLAY=:1
 for display in :0 :1; do
   for _ in $(seq 1 100); do
@@ -64,10 +39,9 @@ for display in :0 :1; do
   done
   xdpyinfo -display "$display" >/dev/null 2>&1 || fail "The virtual display $display did not start."
 done
+xsetroot -display :1 -cursor_name left_ptr || true
+(DISPLAY=:1 bash /opt/OpenBot/app/resources/hosting/openbot-desktop </dev/null &)
 
-# Each data volume makes its own keyring password on its first start. The password only lets the
-# daemon open the keyring without a person; the file is 0600. A keyring with no password file is not
-# new: a new password cannot open it, so the start stops.
 state="$HOME/.config/openbot-container"
 keyrings="$HOME/.local/share/keyrings"
 mkdir -p "$state" "$keyrings"
@@ -79,8 +53,6 @@ if [ ! -s "$state/keyring-password" ]; then
   head -c 32 /dev/urandom | base64 | tr -d '\n' >"$temporary"
   mv -f "$temporary" "$state/keyring-password"
 fi
-# libsecret stores in the `default` collection, so the alias points to the `login` keyring that the
-# daemon unlocks.
 printf login >"$keyrings/default"
 unlocked=$(gnome-keyring-daemon --unlock --components=secrets <"$state/keyring-password")
 eval "$unlocked"
@@ -88,8 +60,6 @@ started=$(gnome-keyring-daemon --start --components=secrets)
 eval "$started"
 export GNOME_KEYRING_CONTROL
 
-# Chromium keeps its shared memory in /dev/shm. Some runtimes, such as Kubernetes, give only 64 MB
-# and have no --shm-size. Below 1 GiB, Chromium keeps that memory in /tmp.
 chromium=()
 shm=$(df --output=size -k /dev/shm 2>/dev/null | tail -n 1 | tr -d ' ') || shm=0
 [ "${shm:-0}" -ge 1048576 ] 2>/dev/null || chromium+=(--disable-dev-shm-usage)

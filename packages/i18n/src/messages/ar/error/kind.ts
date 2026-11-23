@@ -16,4 +16,5 @@ export const messages = {
   "error.kind.service": "الخدمة غير متاحة. انتظر قليلًا، ثم أعد المحاولة.",
   "error.kind.clock":
     "تعذّر الاتصال الآمن لأن تاريخ أو وقت الحاسوب الذي يشغّل OpenBot غير صحيح على الأرجح. صحّح التاريخ والوقت، ثم أعد المحاولة.",
+  "error.kind.interrupted": "انقطع الاتصال قبل اكتمال الإجابة. أرسل رسالتك مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

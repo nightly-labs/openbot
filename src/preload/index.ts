@@ -7,6 +7,8 @@ import {
   decodeAgentAdminSettings,
   decodeAgentBackupModelSettings,
   decodeAgentBrowserProfile,
+  decodeAgentBuiltinMemorySettings,
+  decodeAgentDefaultsOverview,
   decodeAgentExclusionChangeFromMain,
   decodeAgentFastModeSettings,
   decodeAgentFolderBrowse,
@@ -18,12 +20,14 @@ import {
   decodeAgentNewChatSettings,
   decodeAgentPlanCardSettings,
   decodeAgentProfileDraft,
-  decodeAgentTaskLimitSettings,
   decodeBrowserProfileList,
   decodeBrowserProfileSummary,
   decodeBrowserProxySummary,
   decodeBrowserTabProfiles,
+  decodeCacheExpiryCompactionSetting,
   decodeChannel,
+  decodeChannelFolderChangeFromMain,
+  decodeChannelFolderListFromMain,
   decodeChannelMemories,
   decodeChannelMemory,
   decodeChannelPage,
@@ -44,11 +48,14 @@ import {
   decodeHostPersonality,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
+  decodeHostTurnLimits,
   decodeHostUpdateStatus,
+  decodeHostVoiceModel,
   decodeInstanceExportResult,
   decodeInstanceTransferPreview,
   decodeInstanceTransferResult,
   decodeInstanceTransferSummary,
+  decodeInstanceTransferUploadProgress,
   decodeLibraryFoldersSnapshot,
   decodeMachineAlertSettings,
   decodeMcpAccessSnapshot,
@@ -65,6 +72,9 @@ import {
   decodeOptionalStorageDisk,
   decodeOptionalStorageUsage,
   decodePromptCacheTtlSetting,
+  decodeProviderAccountCodeLoginStart,
+  decodeProviderAccountCodeLoginStatus,
+  decodeProviderEnvironment,
   decodeProviderHostSignInStatus,
   decodeProviderModelVisibility,
   decodeProviderRelaySignInStatus,
@@ -93,6 +103,7 @@ import {
   type Untyped,
 } from "@openbot/contracts/ipc";
 import {
+  decodeAgentWebhookSecret,
   decodeEventActivity,
   decodeEventRoutineRuns,
   decodeEventRoutines,
@@ -101,6 +112,7 @@ import {
   decodeWebhookSecret,
   decodeWebhookTestResult,
 } from "@openbot/contracts/ipc-events";
+import { decodeAcceptedOwnerTransfer, decodeOwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import {
   decodeAccountUsageFromMain,
@@ -123,6 +135,7 @@ import {
   decodeMemory,
   decodeMemorySelection,
   decodeOptionalMemorySelection,
+  decodePendingPrompts,
   decodeProviderApiKeyState,
   decodeProviderCodeLoginStart,
   decodeProviderUsageResetOutcomeFromMain,
@@ -161,17 +174,21 @@ import {
   decodeAppLogoColorPreference,
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
+  decodeBillingDetails,
   decodeBillingState,
   decodeBitwardenConnectorStatus,
   decodeBusyMessageModePreference,
   decodeCentralAuthState,
   decodeChatWindowTargets,
+  decodeCreditActivity,
+  decodeCreditsState,
   decodeCustomAgentCheckResult,
   decodeCustomAgentResult,
   decodeCustomAgents,
   decodeCustomAgentUsage,
   decodeCustomProviderResult,
   decodeCustomProviders,
+  decodeCustomServerCheckoutResult,
   decodeDetectedAcpAgents,
   decodeDetectedModelServers,
   decodeDiscoverModelsResult,
@@ -197,10 +214,13 @@ import {
   decodeNotificationPreference,
   decodeNullablePath,
   decodeOnePasswordConnectorStatus,
+  decodeOwnerTransferList,
+  decodeOwnerTransferOrNull,
   decodePendingAgentTemplate,
   decodePendingListing,
   decodePendingMarketplaceListing,
   decodeProviderDetectionSettings,
+  decodeReferralState,
   decodeRemoteDesktopSetupFromMain,
   decodeRemoteDesktopTestFromMain,
   decodeRemoteNetworkRouteState,
@@ -223,6 +243,7 @@ import {
   decodeVoiceStreamTranscript,
   decodeVoiceTranscriptionResult,
   decodeVoid,
+  decodeWorkflowNotificationOpenedEvent,
 } from "./app-decoding";
 import { decodeBackgroundProcesses } from "./background-process-decoding";
 import {
@@ -237,6 +258,9 @@ import {
   decodeBrowserTab,
   decodeBrowserTabs,
   decodeBrowserTeachSteps,
+  decodeBrowserWindowEvent,
+  decodeBrowserWindowModel,
+  decodeBrowserWindowModelUpdate,
 } from "./browser-decoding";
 import {
   decodeBrowserDockAction,
@@ -250,10 +274,12 @@ import {
   decodeComputerUseState,
 } from "./computer-use-decoding";
 import {
+  decodeActiveQueues,
   decodeAgentTask,
   decodeAgentTaskReadState,
   decodeAgentTaskReadStates,
   decodeAgentTasks,
+  decodeArchivedAgentTasks,
   decodeAttachment,
   decodeAttachmentDownloadProgress,
   decodeAttachmentImportProgress,
@@ -263,6 +289,8 @@ import {
   decodeConversationPageFromMain,
   decodeConversationSearchPageFromMain,
   decodeFilePreview,
+  decodeOptionalFilePreviewPageUrl,
+  decodePendingApproval,
   decodePinnedMessages,
   decodeQueue,
   decodeReadState,
@@ -272,7 +300,16 @@ import {
   decodeTaskPage,
   decodeTaskWindow,
   decodeWaits,
+  decodeWithdrawFeedbackResult,
 } from "./conversation-decoding";
+import {
+  decodeCrmActivityPage,
+  decodeCrmApplyResult,
+  decodeCrmCustomerPage,
+  decodeCrmOverview,
+  decodeCrmPaymentPage,
+  decodeCrmSettings,
+} from "./crm-decoding";
 import {
   decodeDynamicIslandAction,
   decodeDynamicIslandGeometry,
@@ -297,7 +334,6 @@ import {
   decodePasswordManagerResponses,
 } from "./password-manager-decoding";
 import { decodeProviderRuntimeSnapshot } from "./provider-runtime";
-import { decodeRoutineFlowCanvas, decodeRoutineFlowLink } from "./routine-flow-decoding";
 import {
   decodeRoutineResultDeliveries,
   decodeRoutineResultDestination,
@@ -311,6 +347,7 @@ import {
   decodeAgentTemplateDetail,
   decodeAgentTemplatePreview,
   decodeAgentTemplatePublication,
+  decodeGithubSkillSourceFromMain,
   decodeInstalledSkill,
   decodeInstalledSkillsFromMain,
   decodeMarketplaceAgentDetail,
@@ -350,14 +387,22 @@ import {
 import { decodeVaultCodes, decodeVaultImportResult, decodeVaultSecret, decodeVaultState } from "./vault-decoding";
 import {
   decodeWorkflowDetail,
+  decodeWorkflowFileSaveResult,
+  decodeWorkflowFoldersSnapshotFromMain,
   decodeWorkflowGitHubCatalog,
   decodeWorkflowGitHubHistory,
   decodeWorkflowGitHubOptions,
   decodeWorkflowGraph,
+  decodeWorkflowMediaCatalog,
+  decodeWorkflowMediaCredits,
+  decodeWorkflowMediaPrice,
+  decodeWorkflowMediaProviders,
+  decodeWorkflowPictureId,
   decodeWorkflowRunDetail,
   decodeWorkflowRunPage,
   decodeWorkflowSaveResult,
   decodeWorkflowStep,
+  decodeWorkflowStepSettings,
   decodeWorkflowSummaries,
   decodeWorkflowSummary,
   decodeWorkflowVersions,
@@ -365,10 +410,6 @@ import {
 } from "./workflow-decoding";
 
 const attachmentImportListeners = new Set<(event: AttachmentImportEvent) => void>();
-/**
- * The server of a window that main opened for one chat (#2964), from its `?window=chat&server=<id>`
- * URL. The window never selects a server, so it keeps this one while the main window selects others.
- */
 const chatWindowServerId = (() => {
   const query = new URLSearchParams(window.location.search);
   return query.get("window") === "chat" ? query.get("server") : null;
@@ -385,16 +426,12 @@ function invokeAgentForServer<Input, Result>(
   return ipcRenderer.invoke(endpoint.channel, request).then(decode);
 }
 
-// The one place the preload subscribes to main. It hands on the raw value, so a caller that keeps
-// only one server's events can decode and check it before the renderer sees it.
 function listen(endpoint: EventEndpoint, onValue: (value: unknown) => void): () => void {
   const handler = (_event: Electron.IpcRendererEvent, value: unknown) => onValue(value);
   ipcRenderer.on(endpoint.channel, handler);
   return () => ipcRenderer.removeListener(endpoint.channel, handler);
 }
 
-// An event decoder that answers null for a value the renderer must not see. The event is dropped,
-// not thrown: a deep link carries an id that began in a URL a web page chose.
 interface DroppingDecoder<Payload> {
   readonly drop: (value: unknown) => Payload | null;
 }
@@ -403,8 +440,6 @@ function dropInvalid<Payload>(decode: (value: unknown) => Payload | null): Dropp
   return { drop: decode };
 }
 
-// One decoder per endpoint of a bridged group. An untyped endpoint has no decoder type, so a group
-// that holds one cannot be bridged and stays written by hand.
 type DecoderFor<Endpoint> =
   Endpoint extends RequestEndpoint<string, infer Payload, infer Result>
     ? [Payload] extends [Untyped]
@@ -419,13 +454,6 @@ type GroupDecoders<Group extends IpcEndpointGroup> = { -readonly [Key in keyof G
 type BridgeDecoder = ((value: unknown) => unknown) | DroppingDecoder<unknown>;
 type BridgeMethod = (...args: never[]) => Promise<unknown> | (() => void);
 
-// Builds a whole group whose methods pass straight through, as `GroupApi` names them. The decoder map
-// is exhaustive, so a new endpoint without a decoder does not compile. It is a plain object of
-// functions, which `contextBridge` copies as it copies the literals around it.
-//
-// The typed signature is an overload because no loop can build a key-remapped type step by step.
-// The implementation sets one method for each endpoint under `groupApiMethodName`, the runtime twin
-// of the names `GroupApi` gives.
 function bridgeGroup<Group extends IpcEndpointGroup>(
   group: Group,
   decoders: NoInfer<GroupDecoders<Group>>,
@@ -439,12 +467,9 @@ function bridgeGroup(group: IpcEndpointGroup, decoders: Readonly<Record<string, 
     const decode = decoders[key];
     if (decode === undefined) throw new Error(`The preload has no decoder for ${endpoint.channel}.`);
     const name = groupApiMethodName(key, endpoint);
-    // Event `x` and request `onX` share one name, and the second would silently replace the first.
     if (Object.hasOwn(api, name)) throw new Error(`The preload has two methods named ${name}.`);
     if (endpoint.kind === "request") {
       if (typeof decode !== "function") throw new Error(`The preload cannot drop the result of ${endpoint.channel}.`);
-      // Main takes at most one payload, so nothing past it reaches the channel. The types erase which
-      // endpoints take none, so an argument given to such a method is still sent, and main ignores it.
       const { scope } = endpoint;
       api[name] =
         scope === undefined
@@ -463,14 +488,11 @@ function bridgeGroup(group: IpcEndpointGroup, decoders: Readonly<Record<string, 
   return api;
 }
 
-// The server is the argument after the payload, or the only one when the scope carries nothing. It is
-// read at call time, so a method bridged before the user switches servers follows the switch.
 function scopedRequest(scope: ServerScope, args: readonly unknown[]): AgentIpcRequest<unknown> {
   const [payload, server] = scope === "empty" ? [null, args[0]] : [args[0], args[1]];
   return { serverId: typeof server === "string" ? server : selectedServerId, payload };
 }
 
-// A chat window shows its own server as the active one, so the renderer scopes everything to it.
 function rememberActiveServer(servers: ServerSummary[]): ServerSummary[] {
   const pinned = chatWindowServerId;
   if (pinned !== null && servers.some((server) => server.id === pinned)) {
@@ -485,13 +507,8 @@ function emitAttachmentImport(event: AttachmentImportEvent): void {
   for (const listener of attachmentImportListeners) listener(event);
 }
 
-/**
- * The files of each import that this window started, by request id, until the import lands. A
- * failed import keeps its files for `retryAttachmentImport` until the renderer discards it.
- */
 const attachmentImportFiles = new Map<string, { serverId: string; files: NamedFile[] }>();
 
-/** A file and the name that the chip and the server show. A retry keeps the name. */
 interface NamedFile {
   file: File;
   name: string;
@@ -502,34 +519,32 @@ listen(IPC_ENDPOINTS.attachmentImports.importProgress, (value) => {
   if (attachmentImportFiles.has(progress.requestId)) emitAttachmentImport({ type: "progress", ...progress });
 });
 
-/**
- * Each file is its own import, so a failed file does not drop the others and can be sent again. A
- * set over the count or size limit stays one import, so main refuses it whole, as before.
- */
 async function importFiles(files: File[]): Promise<void> {
   if (files.length === 0) return;
   const serverId = selectedServerId;
+  const named = files.map((file) => ({ file, name: file.name || `pasted-${Date.now()}.png` }));
+  const fits = ({ file }: NamedFile) => file.size <= ATTACHMENT_LIMITS.fileBytes;
+  const fitting = named.filter(fits);
+  const tooLarge = named.filter((file) => !fits(file));
   const overLimit =
     files.length > INPUT_LIMITS.attachments ||
-    files.reduce((sum, file) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes;
-  // A pasted image has no name. It gets one here, so the chip and the server show the same name.
-  const named = files.map((file) => ({ file, name: file.name || `pasted-${Date.now()}.png` }));
+    fitting.reduce((sum, { file }) => sum + file.size, 0) > ATTACHMENT_LIMITS.totalBytes;
   if (overLimit) {
     await runAttachmentImport(crypto.randomUUID(), serverId, named, false);
     return;
   }
-  await Promise.all(named.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true)));
+  const imports = fitting.map((file) => runAttachmentImport(crypto.randomUUID(), serverId, [file], true));
+  if (tooLarge.length > 0)
+    imports.push(runAttachmentImport(crypto.randomUUID(), serverId, tooLarge, false, Promise.all(imports)));
+  await Promise.all(imports);
 }
 
-/**
- * `retryable` imports name their files, so the composer shows a chip for each, and keep them for a
- * retry. A set over a limit names none: a retry cannot pass, and the banner says why.
- */
 async function runAttachmentImport(
   requestId: string,
   serverId: string,
   named: NamedFile[],
   retryable: boolean,
+  reportAfter: Promise<unknown> = Promise.resolve(),
 ): Promise<void> {
   if (retryable) attachmentImportFiles.set(requestId, { serverId, files: named });
   emitAttachmentImport({
@@ -560,6 +575,7 @@ async function runAttachmentImport(
     attachmentImportFiles.delete(requestId);
     emitAttachmentImport({ type: "completed", requestId, serverId, attachments });
   } catch (error) {
+    await reportAfter;
     emitAttachmentImport({
       type: "error",
       requestId,
@@ -600,7 +616,6 @@ window.addEventListener("change", (event) => {
   void importFiles([...(input.files ?? [])]);
 });
 
-// Bridged apart from the API object, because `onEvent` narrows its `onScopedEvent`.
 const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   getStatus: decodeAgentStatusFromMain,
   getRuntimeSnapshot: decodeAgentRuntimeSnapshot,
@@ -653,12 +668,15 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   sendMessage: decodeReceipt,
   setMessageReaction: decodeVoid,
   deleteConversationMessage: decodeVoid,
+  withdrawFeedback: decodeWithdrawFeedbackResult,
   listQueue: decodeQueue,
+  listActiveQueues: decodeActiveQueues,
   listWaits: decodeWaits,
   listPinnedMessages: decodePinnedMessages,
   setMessagePinned: decodePinnedMessages,
   cancelWait: decodeVoid,
   listTasks: decodeAgentTasks,
+  listArchivedTasks: decodeArchivedAgentTasks,
   readTask: decodeTaskConversation,
   readTaskPage: decodeTaskPage,
   readTaskAround: decodeTaskWindow,
@@ -685,12 +703,13 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   compactTaskContext: decodeVoid,
   respondToPrompt: decodeVoid,
   respondToApproval: decodeVoid,
+  readPendingApproval: decodePendingApproval,
+  listPendingPrompts: decodePendingPrompts,
   respondToBrowserSecret: decodeVoid,
   respondToBrowserTakeover: decodeVoid,
   scopedEvent: decodeScopedAgentEvent,
 });
 
-// Bridged apart from the API object, because a dropped folder with no path reads the list.
 const agentFoldersGroup = bridgeGroup(IPC_ENDPOINTS.agentFolders, {
   listAgentFolders: decodeAgentFolderListFromMain,
   chooseAgentFolder: decodeAgentFolderChangeFromMain,
@@ -702,8 +721,6 @@ const agentFoldersGroup = bridgeGroup(IPC_ENDPOINTS.agentFolders, {
   browseAgentFolders: decodeAgentFolderBrowse,
 });
 
-// Bridged apart from the API object, because the server list calls record the selected server and
-// three events are narrowed to one server.
 const serversGroup = bridgeGroup(IPC_ENDPOINTS.servers, {
   list: decodeServers,
   select: decodeServers,
@@ -725,6 +742,9 @@ const serversGroup = bridgeGroup(IPC_ENDPOINTS.servers, {
   listInvites: decodeTeamInvites,
   revokeInvite: decodeVoid,
   createInvite: decodeInviteSummary,
+  getOwnerTransfer: decodeOwnerTransferOrNull,
+  startOwnerTransfer: decodeOwnerTransfer,
+  cancelOwnerTransfer: decodeVoid,
   setTyping: decodeVoid,
   scopedPresence: decodeScopedTeamPresence,
   listDirectThreads: decodeDirectThreads,
@@ -758,9 +778,7 @@ const openbotApi: OpenBotDesktopApi = {
     getApprovalAutomation: decodeApprovalAutomationPreference,
     approvalAutomation: decodeApprovalAutomationPreference,
     getBusyMessageModePreference: decodeBusyMessageModePreference,
-    setBusyMessageModePreference: decodeBusyMessageModePreference,
     getAgentDefaults: decodeAgentDefaults,
-    setAgentDefaults: decodeAgentDefaults,
     getAgentMemoryLimitPreference: decodeAgentMemoryLimitPreference,
     agentMemoryLimitPreference: decodeAgentMemoryLimitPreference,
     getAppBehaviorPreference: decodeAppBehaviorPreference,
@@ -805,6 +823,7 @@ const openbotApi: OpenBotDesktopApi = {
     setProviderOn: decodeAgentStatusFromMain,
     restartProvider: decodeAgentStatusFromMain,
     cancelProviderRestart: decodeAgentStatusFromMain,
+    chooseInstalledCli: decodeAgentStatusFromMain,
     updateProviderCli: decodeAgentStatusFromMain,
     setProviderApiKey: decodeAgentStatusFromMain,
     clearProviderApiKey: decodeAgentStatusFromMain,
@@ -812,10 +831,12 @@ const openbotApi: OpenBotDesktopApi = {
     startProviderCodeLogin: decodeProviderCodeLoginStart,
     cancelProviderCodeLogin: decodeAgentStatusFromMain,
     connectProviderAccount: decodeAgentStatusFromMain,
+    connectProviderAccountKey: decodeAgentStatusFromMain,
     cancelProviderAccountSignIn: decodeAgentStatusFromMain,
     renameProviderAccount: decodeAgentStatusFromMain,
     removeProviderAccount: decodeAgentStatusFromMain,
     setProviderAccountPool: decodeAgentStatusFromMain,
+    setLiveVoiceAccount: decodeAgentStatusFromMain,
     signOutProvider: decodeAgentStatusFromMain,
     providerUsageResets: decodeProviderUsageResetsFromMain,
     resetProviderUsage: decodeProviderUsageResetOutcomeFromMain,
@@ -837,6 +858,7 @@ const openbotApi: OpenBotDesktopApi = {
     action: decodeAgentDockAction,
     setInteractive: decodeVoid,
     setInputRegion: decodeVoid,
+    setExtent: decodeVoid,
     setXWayland: decodeVoid,
     closeChat: decodeVoid,
     listDisplays: decodeAgentDockDisplays,
@@ -855,6 +877,7 @@ const openbotApi: OpenBotDesktopApi = {
     performAction: decodeVoid,
     performHaptic: decodeVoid,
     action: decodeDynamicIslandAction,
+    openBrowserTakeover: decodeVoid,
     setInteractive: decodeVoid,
     setInputRegion: decodeVoid,
     setXWayland: decodeVoid,
@@ -884,19 +907,13 @@ const openbotApi: OpenBotDesktopApi = {
     checkForUpdates: decodeProviderRuntimeSnapshot,
     event: decodeProviderRuntimeSnapshot,
   }),
-  routineFlows: bridgeGroup(IPC_ENDPOINTS.routineFlows, {
-    canvas: decodeRoutineFlowCanvas,
-    savePosition: decodeVoid,
-    removePosition: decodeVoid,
-    connect: decodeRoutineFlowLink,
-    disconnect: decodeVoid,
-    updateLink: decodeRoutineFlowLink,
-  }),
   workflows: bridgeGroup(IPC_ENDPOINTS.workflows, {
     list: decodeWorkflowSummaries,
     get: decodeWorkflowDetail,
     create: decodeWorkflowDetail,
     rename: decodeWorkflowSummary,
+    setPaused: decodeWorkflowSummary,
+    exportFile: decodeWorkflowFileSaveResult,
     delete: decodeVoid,
     saveGraph: decodeWorkflowSaveResult,
     versions: decodeWorkflowVersions,
@@ -910,11 +927,31 @@ const openbotApi: OpenBotDesktopApi = {
     decide: decodeVoid,
     runs: decodeWorkflowRunPage,
     run: decodeWorkflowRunDetail,
+    stepSettings: decodeWorkflowStepSettings,
     rotateWebhookSecret: decodeWorkflowWebhookSecret,
     githubCatalog: decodeWorkflowGitHubCatalog,
     githubOptions: decodeWorkflowGitHubOptions,
     githubHistory: decodeWorkflowGitHubHistory,
     githubRunLastEvent: decodeWorkflowRunDetail,
+    keepPicture: decodeWorkflowPictureId,
+    mediaProviders: decodeWorkflowMediaProviders,
+    mediaCredits: decodeWorkflowMediaCredits,
+    mediaCatalog: decodeWorkflowMediaCatalog,
+    mediaPrice: decodeWorkflowMediaPrice,
+    folders: decodeWorkflowFoldersSnapshotFromMain,
+    folderAction: decodeWorkflowFoldersSnapshotFromMain,
+  }),
+  crm: bridgeGroup(IPC_ENDPOINTS.crm, {
+    overview: decodeCrmOverview,
+    customers: decodeCrmCustomerPage,
+    payments: decodeCrmPaymentPage,
+    activity: decodeCrmActivityPage,
+    apply: decodeCrmApplyResult,
+    sourceConnect: decodeCrmApplyResult,
+    sourceDisconnect: decodeCrmApplyResult,
+    sourceSync: decodeCrmApplyResult,
+    settings: decodeCrmSettings,
+    setSettings: decodeCrmSettings,
   }),
   routineResults: bridgeGroup(IPC_ENDPOINTS.routineResults, {
     options: decodeRoutineResultOptions,
@@ -985,7 +1022,11 @@ const openbotApi: OpenBotDesktopApi = {
     removeCompanySignIn: decodeCompanySignInSettings,
     createCompanySignInScimToken: decodeCompanySignInScimToken,
     revokeCompanySignInScimToken: decodeCompanySignInSettings,
+    listOwnerTransfers: decodeOwnerTransferList,
+    acceptOwnerTransfer: decodeAcceptedOwnerTransfer,
+    declineOwnerTransfer: decodeVoid,
     event: decodeCentralAuthState,
+    ownerTransfersChanged: decodeVoid,
   }),
   skills: bridgeGroup(IPC_ENDPOINTS.skills, {
     localList: decodeSkillDetails,
@@ -1035,8 +1076,6 @@ const openbotApi: OpenBotDesktopApi = {
     disconnect: decodeLinkAccountStatus,
     changed: decodeLinkAccountStatus,
   }),
-  // A status never holds a key or a password. A `changed` event for a manager that this build does
-  // not know is dropped.
   passwordManagers: bridgeGroup(IPC_ENDPOINTS.passwordManagers, {
     list: decodePasswordManagerResponses,
     connect: decodePasswordManagerResponse,
@@ -1100,6 +1139,12 @@ const openbotApi: OpenBotDesktopApi = {
   billing: bridgeGroup(IPC_ENDPOINTS.billing, {
     getState: decodeBillingState,
     openPortal: decodeVoid,
+    buyStorage: decodeBillingState,
+    getDetails: decodeBillingDetails,
+    setDetails: decodeBillingDetails,
+  }),
+  referral: bridgeGroup(IPC_ENDPOINTS.referral, {
+    getState: decodeReferralState,
   }),
   license: bridgeGroup(IPC_ENDPOINTS.license, {
     getState: decodeLicenseState,
@@ -1108,12 +1153,19 @@ const openbotApi: OpenBotDesktopApi = {
     changePlan: decodeLicenseState,
     setRenewal: decodeLicenseState,
   }),
+  credits: bridgeGroup(IPC_ENDPOINTS.credits, {
+    getState: decodeCreditsState,
+    getActivity: decodeCreditActivity,
+    openCheckout: decodeVoid,
+    transfer: decodeCreditsState,
+  }),
   hostedServers: bridgeGroup(IPC_ENDPOINTS.hostedServers, {
     lifecycle: decodeVoid,
     list: decodeHostedServerList,
     plans: decodeHostedServerCatalog,
     create: decodeHostedServer,
     openCheckout: decodeHostedServer,
+    openCustomCheckout: decodeCustomServerCheckoutResult,
     delete: decodeVoid,
     wake: decodeHostedServer,
     restart: decodeHostedServer,
@@ -1164,9 +1216,15 @@ const openbotApi: OpenBotDesktopApi = {
     startAccountSignIn: decodeVoid,
     accountSignInStatus: decodeProviderHostSignInStatus,
     cancelAccountSignIn: decodeVoid,
+    connectAccountKey: decodeVoid,
+    startAccountCodeLogin: decodeProviderAccountCodeLoginStart,
+    submitAccountCodeLogin: decodeVoid,
+    accountCodeLoginStatus: decodeProviderAccountCodeLoginStatus,
+    cancelAccountCodeLogin: decodeVoid,
     renameAccount: decodeVoid,
     removeAccount: decodeVoid,
     setAccountPool: decodeVoid,
+    setLiveVoiceAccount: decodeVoid,
     hostDefaultProvider: decodeHostDefaultProviderFromMain,
     setHostDefaultProvider: decodeHostDefaultProviderFromMain,
     usageResets: decodeProviderUsageResetsFromMain,
@@ -1228,7 +1286,7 @@ const openbotApi: OpenBotDesktopApi = {
     answerWhatsAppRequest: decodeVoid,
     setWhatsAppOwnNumber: decodeVoid,
     setWhatsAppWorkingMessage: decodeVoid,
-    // A joined server can list up to the Telegram limit; main has already read its states.
+    setWhatsAppStatusReactions: decodeVoid,
     hostOverview: decodeTelegramOverviewReply,
     hostConnect: decodeVoid,
     hostDisconnect: decodeVoid,
@@ -1252,10 +1310,12 @@ const openbotApi: OpenBotDesktopApi = {
     hostAnswerWhatsAppRequest: decodeVoid,
     hostSetWhatsAppOwnNumber: decodeVoid,
     hostSetWhatsAppWorkingMessage: decodeVoid,
+    hostSetWhatsAppStatusReactions: decodeVoid,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
     rotateHostKey: decodeVoid,
+    restartHost: decodeVoid,
     getUpdateStatus: decodeHostUpdateStatus,
     getReleaseStatus: (value) => (value === null ? null : decodeHostReleaseStatusFromMain(value)),
     checkRelease: decodeHostReleaseStatusFromMain,
@@ -1265,6 +1325,10 @@ const openbotApi: OpenBotDesktopApi = {
     setUpdateSettings: decodeHostUpdateStatus,
     getTimezone: decodeHostTimezoneSettings,
     setTimezone: decodeHostTimezoneSettings,
+    getVoiceModel: decodeHostVoiceModel,
+    changeVoiceModel: decodeHostVoiceModel,
+    getTurnLimits: decodeHostTurnLimits,
+    setTurnLimits: decodeHostTurnLimits,
     getPersonality: decodeHostPersonality,
     setPersonality: decodeHostPersonality,
     getAgentMemoryLimit: decodeHostAgentMemoryLimit,
@@ -1279,10 +1343,14 @@ const openbotApi: OpenBotDesktopApi = {
     setMachineAlerts: decodeMachineAlertSettings,
     getPromptCacheTtl: decodePromptCacheTtlSetting,
     setPromptCacheTtl: decodePromptCacheTtlSetting,
+    getCacheExpiryCompaction: decodeCacheExpiryCompactionSetting,
+    setCacheExpiryCompaction: decodeCacheExpiryCompactionSetting,
     getClaudeUserSetup: decodeClaudeUserSetupSetting,
     setClaudeUserSetup: decodeClaudeUserSetupSetting,
     getClaudeCompactWindow: decodeClaudeCompactWindowSetting,
     setClaudeCompactWindow: decodeClaudeCompactWindowSetting,
+    getProviderEnvironment: decodeProviderEnvironment,
+    setProviderEnvironment: decodeProviderEnvironment,
     getModelVisibility: decodeProviderModelVisibility,
     setModelVisibility: decodeProviderModelVisibility,
     getAgentAccess: decodeAgentAccessSnapshot,
@@ -1307,6 +1375,8 @@ const openbotApi: OpenBotDesktopApi = {
     choose: decodeInstanceTransferPreview,
     apply: decodeInstanceTransferResult,
     discard: decodeVoid,
+    copy: decodeInstanceTransferResult,
+    uploadProgress: decodeInstanceTransferUploadProgress,
   }),
   marketplaceAgents: bridgeGroup(IPC_ENDPOINTS.marketplaceAgents, {
     list: decodeMarketplaceAgentPage,
@@ -1380,6 +1450,7 @@ const openbotApi: OpenBotDesktopApi = {
       openMcpSignInRelay: decodeVoid,
       completeMcpSignInRelay: decodeVoid,
       cancelMcpSignIn: decodeVoid,
+      copyMcpSignInLink: decodeVoid,
       signOutMcpServer: decodeMcpSignInStates,
       listMcpSignIns: decodeMcpSignInStates,
       mcpSignInApp: decodeMcpSignInAppState,
@@ -1392,8 +1463,6 @@ const openbotApi: OpenBotDesktopApi = {
       updateAgentHostSettings: decodeAgentHostSettingsFromMain,
       getAgentBackupModels: decodeAgentBackupModelSettings,
       updateAgentBackupModels: decodeAgentBackupModelSettings,
-      getAgentTaskLimit: decodeAgentTaskLimitSettings,
-      updateAgentTaskLimit: decodeAgentTaskLimitSettings,
       getAgentNewChat: decodeAgentNewChatSettings,
       updateAgentNewChat: decodeAgentNewChatSettings,
       previewAgentTemplate: decodeAgentTemplatePreview,
@@ -1401,6 +1470,8 @@ const openbotApi: OpenBotDesktopApi = {
       unpublishAgentTemplate: decodeVoid,
       getAgentPlanCard: decodeAgentPlanCardSettings,
       updateAgentPlanCard: decodeAgentPlanCardSettings,
+      getAgentBuiltinMemory: decodeAgentBuiltinMemorySettings,
+      updateAgentBuiltinMemory: decodeAgentBuiltinMemorySettings,
       getAgentFastMode: decodeAgentFastModeSettings,
       updateAgentFastMode: decodeAgentFastModeSettings,
       listBrowserProfiles: decodeBrowserProfileList,
@@ -1410,6 +1481,9 @@ const openbotApi: OpenBotDesktopApi = {
       deleteBrowserProfile: decodeVoid,
       getAgentBrowserProfile: decodeAgentBrowserProfile,
       updateAgentBrowserProfile: decodeAgentBrowserProfile,
+      getAgentDefaultsOverview: decodeAgentDefaultsOverview,
+      updateAgentDefaultsOverview: decodeAgentDefaultsOverview,
+      setAgentDefaultChoice: decodeAgentDefaultsOverview,
       listBrowserProxies: decodeOptionalBrowserProxyList,
       saveBrowserProxy: decodeBrowserProxySummary,
       deleteBrowserProxy: decodeVoid,
@@ -1422,6 +1496,7 @@ const openbotApi: OpenBotDesktopApi = {
       installAgentSkill: decodeInstalledSkill,
       uninstallAgentSkill: decodeVoid,
       setAgentSkillEnabled: decodeInstalledSkill,
+      readGithubSkills: decodeGithubSkillSourceFromMain,
       addMarketplaceAgent: decodeAddedAgent,
       addTemplateAgent: decodeAddedAgent,
     }),
@@ -1438,18 +1513,24 @@ const openbotApi: OpenBotDesktopApi = {
       previewSharedFile: decodeFilePreview,
       previewWorkspaceFile: decodeFilePreview,
       releaseFilePreview: decodeVoid,
+      addPreviewPage: decodeOptionalFilePreviewPageUrl,
       listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     ...agentFoldersGroup,
+    ...bridgeGroup(IPC_ENDPOINTS.channelFolders, {
+      listChannelFolders: decodeChannelFolderListFromMain,
+      chooseChannelFolder: decodeChannelFolderChangeFromMain,
+      addChannelFolder: decodeChannelFolderChangeFromMain,
+      removeChannelFolder: decodeChannelFolderChangeFromMain,
+      browseChannelFolders: decodeAgentFolderBrowse,
+    }),
     ...bridgeGroup(IPC_ENDPOINTS.agentInstructions, {
       readAgentInstructions: decodeAgentInstructionsFileFromMain,
       saveAgentInstructions: decodeAgentInstructionsFileFromMain,
       revealAgentInstructions: decodeVoid,
     }),
-    // The page gets the folder, not its path, as for a dropped attachment.
     addDroppedAgentFolder: async (agentId, folder) => {
       const path = webUtils.getPathForFile(folder);
-      // An item from another app, with no path here: the page says that it is not a folder on this computer.
       if (!path)
         return {
           outcome: "refused",
@@ -1501,10 +1582,18 @@ const openbotApi: OpenBotDesktopApi = {
       dockPictureInPicture: decodeVoid,
       hidePictureInPicture: decodeVoid,
       pictureInPictureEvent: decodeBrowserPictureInPictureEvent,
+      openWindow: decodeBrowserBounds,
+      closeWindow: decodeVoid,
+      focusWindow: decodeVoid,
+      dockWindow: decodeVoid,
+      publishWindowModel: decodeVoid,
+      getWindowModel: decodeBrowserWindowModel,
+      sendWindowAction: decodeVoid,
+      windowModel: decodeBrowserWindowModelUpdate,
+      windowEvent: decodeBrowserWindowEvent,
       openLocalSignIn: decodeBrowserLocalSignInEnd,
       finishLocalSignIn: decodeBrowserLocalSignInResult,
     }),
-    // Untyped: the renderer and wire input shapes differ on purpose. See `IPC_ENDPOINTS.browserInput`.
     sendLiveViewInput: (input) =>
       ipcRenderer.invoke(IPC_ENDPOINTS.browserInput.sendLiveViewInput.channel, input).then(decodeVoid),
   },
@@ -1512,12 +1601,13 @@ const openbotApi: OpenBotDesktopApi = {
     getStatus: decodeUpdateStatus,
     check: decodeUpdateStatus,
     download: decodeUpdateStatus,
-    install: decodeVoid,
+    install: decodeUpdateStatus,
     getPreference: decodeUpdatePreference,
     setPreference: decodeUpdatePreference,
     cancelScheduledRestart: decodeUpdateStatus,
     restartWhenIdle: decodeUpdateStatus,
     cancelIdleRestart: decodeUpdateStatus,
+    restartNow: decodeUpdateStatus,
     event: decodeUpdateStatus,
     preference: decodeUpdatePreference,
   }),
@@ -1527,6 +1617,7 @@ const openbotApi: OpenBotDesktopApi = {
     test: decodeVoid,
     openSettings: decodeVoid,
     opened: decodeNotificationOpenedEvent,
+    workflowOpened: decodeWorkflowNotificationOpenedEvent,
   }),
   maintenance: bridgeGroup(IPC_ENDPOINTS.maintenance, {
     exportData: decodeExportResult,
@@ -1585,8 +1676,6 @@ const openbotApi: OpenBotDesktopApi = {
     createInvite: decodeInviteSummary,
     event: decodeHostStatus,
   }),
-  // The shared strict contract decoders, as MCP does: main decodes a remote answer with the same
-  // decoder before it reaches this point.
   events: bridgeGroup(IPC_ENDPOINTS.events, {
     getStatus: decodeEventStatus,
     listRoutines: decodeEventRoutines,
@@ -1595,12 +1684,11 @@ const openbotApi: OpenBotDesktopApi = {
     testRoutine: decodeVoid,
     rotateSecret: decodeWebhookSecret,
     setSecret: decodeVoid,
+    giveSecretToAgent: decodeAgentWebhookSecret,
     sendTestEvent: decodeWebhookTestResult,
     listActivity: decodeEventActivity,
     listRoutineRuns: decodeEventRoutineRuns,
   }),
-  // The shared contract decoder, as MCP does: it already bounds every row, and a remote answer was
-  // decoded in main before it reached this point.
   storage: bridgeGroup(IPC_ENDPOINTS.storage, {
     getUsage: decodeOptionalStorageUsage,
     getDisk: decodeOptionalStorageDisk,

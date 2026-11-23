@@ -1,33 +1,25 @@
-// Library folders of this host: the one place that gives a folder change what the stored snapshot
-// does not hold, which is the agents that exist and the agent of each file. The IPC handler of this
-// computer and the `library-folders-v1` route of the Team API both change the folders through it, so
-// a joined server applies the same rules.
-
-import type { LibraryFolderAction, LibraryFolderContext, LibraryFoldersSnapshot } from "@openbot/contracts/ipc";
+import type {
+  LibraryFolderAction,
+  LibraryFolderContext,
+  LibraryFoldersSnapshot,
+  StoredFileWorkflow,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
+import type { AgentLibraryFolders, LibraryFileStamp } from "../backend/agent/library-folder-tools";
 import type { LibraryFoldersStore } from "../backend/library-folders-store";
 import type { StorageUsageService } from "../backend/storage-usage";
 import { storedSync } from "../backend/stored-state-effects";
 
 export interface LibraryFoldersSources {
-  store: Pick<LibraryFoldersStore, "getSnapshot" | "mutate" | "removeAgent" | "removeFiles">;
-  /**
-   * The Library shows the files of the host scan, each below the agent that the scan gives it. A
-   * folder change must use the same agent, so it reads the same scan.
-   */
+  store: Pick<LibraryFoldersStore, "getSnapshot" | "mutate" | "placeInPath" | "removeAgent" | "removeFiles">;
   storage: Pick<StorageUsageService, "usage" | "invalidate">;
   agents: () => readonly { id: string }[];
 }
 
-/**
- * The agents and the folders that an action names, and the files whose agent it needs. A file that
- * goes out of its folder needs no scan: a folder holds only files of its own agent, so the folder
- * gives the agent.
- */
 function actionTargets(
   action: LibraryFolderAction,
   snapshot: LibraryFoldersSnapshot,
-): { agentIds: string[]; folderIds: string[]; fileIds: string[] } {
+): { agentIds: string[]; folderIds: string[]; fileIds: string[]; unfiledIds?: string[] } {
   switch (action.type) {
     case "create":
       return {
@@ -50,8 +42,13 @@ function actionTargets(
           agentIds: [],
           folderIds: action.fileIds.flatMap((fileId) => snapshot.placement[fileId] ?? []),
           fileIds: [],
+          unfiledIds: action.fileIds,
         };
-      return { agentIds: [], folderIds: [action.folderId], fileIds: action.fileIds };
+      return {
+        agentIds: [],
+        folderIds: [action.folderId, ...action.fileIds.flatMap((fileId) => snapshot.placement[fileId] ?? [])],
+        fileIds: action.fileIds,
+      };
     case "restore":
       return {
         agentIds: action.folders.map((entry) => entry.folder.agentId),
@@ -64,25 +61,21 @@ function actionTargets(
   }
 }
 
-/**
- * The agents whose Library an action changes, so the Team API can check the level of the member for
- * each one. A file whose agent the host does not have (a deleted agent, or no agent) cannot go into a
- * folder: `orphanFile` names it, so the route answers as for a file that is gone.
- */
+interface AgentlessFile {
+  id: string;
+  workflowId: string | null;
+}
+
 export interface LibraryFolderActionAgents {
   agentIds: ReadonlySet<string>;
   orphanFile: boolean;
+  agentlessFiles: readonly AgentlessFile[];
 }
 
-/**
- * The agents that an action names, the agents of the folders that it names, and the agents of the
- * files that it names. A folder or a file that the host does not have adds no agent; the change then
- * refuses it.
- */
 function actionAgents(
   targets: ReturnType<typeof actionTargets>,
   snapshot: LibraryFoldersSnapshot,
-  fileAgents: ReadonlyMap<string, string | null>,
+  known: KnownFiles,
   living: ReadonlySet<string>,
 ): LibraryFolderActionAgents {
   const folders = new Map(snapshot.folders.map((folder) => [folder.id, folder.agentId]));
@@ -92,14 +85,34 @@ function actionAgents(
     if (agentId !== undefined) agentIds.add(agentId);
   }
   let orphanFile = false;
-  for (const fileId of targets.fileIds) {
-    const agentId = fileAgents.get(fileId);
+  const agentlessFiles: AgentlessFile[] = [];
+  for (const fileId of new Set(targets.fileIds)) {
+    const agentId = known.agents.get(fileId);
     if (agentId === undefined) continue;
-    if (agentId === null || !living.has(agentId)) orphanFile = true;
+    if (agentId === null) agentlessFiles.push({ id: fileId, workflowId: known.workflows.get(fileId)?.id ?? null });
+    else if (!living.has(agentId)) orphanFile = true;
     else agentIds.add(agentId);
   }
-  return { agentIds, orphanFile };
+  for (const fileId of new Set(targets.unfiledIds)) {
+    const workflow = known.workflows.get(fileId);
+    if (workflow && known.agents.get(fileId) === null) agentlessFiles.push({ id: fileId, workflowId: workflow.id });
+  }
+  return { agentIds, orphanFile, agentlessFiles };
 }
+
+interface KnownFiles {
+  at: number;
+  agents: ReadonlyMap<string, string | null>;
+  workflows: ReadonlyMap<string, StoredFileWorkflow>;
+}
+
+function placeableAgent(known: KnownFiles, fileId: string): string | null | undefined {
+  const agentId = known.agents.get(fileId);
+  return agentId === null && !known.workflows.has(fileId) ? undefined : agentId;
+}
+
+const NO_FILES: KnownFiles = { at: 0, agents: new Map(), workflows: new Map() };
+const KEPT_FILES_MS = 60_000;
 
 export class LibraryFoldersService {
   readonly #sources: LibraryFoldersSources;
@@ -112,11 +125,6 @@ export class LibraryFoldersService {
     return this.#sources.store.getSnapshot();
   }
 
-  /**
-   * Applies one change. `authorize` gets the agents whose Library the change changes, from the same
-   * scan as the change, and throws to refuse it: its error is then the cause of the failure. The store
-   * refuses a change that the rules do not permit with a `LibraryFolderChangeRefused` as the cause.
-   */
   readonly change = Effect.fn("LibraryFolders.change")(function* (
     this: LibraryFoldersService,
     action: LibraryFolderAction,
@@ -124,46 +132,96 @@ export class LibraryFoldersService {
   ) {
     const snapshot = this.#sources.store.getSnapshot();
     const targets = actionTargets(action, snapshot);
-    const fileAgents = yield* this.#fileAgents(targets.fileIds);
+    const known =
+      targets.fileIds.length > 0
+        ? yield* this.#lookUp(
+            targets.fileIds.map((id) => ({ id, storedAt: null })),
+            false,
+          )
+        : authorize && targets.unfiledIds
+          ? yield* this.#lookUp([], true)
+          : NO_FILES;
     const agentIds = new Set(this.#sources.agents().map((agent) => agent.id));
     if (authorize) {
-      const agents = actionAgents(targets, snapshot, fileAgents, agentIds);
+      const agents = actionAgents(targets, snapshot, known, agentIds);
       yield* storedSync(() => authorize(agents));
     }
-    const context: LibraryFolderContext = { agentIds, fileAgent: (fileId) => fileAgents.get(fileId) };
+    const context: LibraryFolderContext = { agentIds, fileAgent: (fileId) => placeableAgent(known, fileId) };
     return yield* this.#sources.store.mutate(action, context);
   }).bind(this);
 
-  /** Removes the folders of a deleted agent and the entries of its files. */
+  readonly workflowFiles = Effect.fn("LibraryFolders.workflowFiles")(function* (this: LibraryFoldersService) {
+    const known = yield* this.#lookUp([], true);
+    return known.workflows;
+  }).bind(this);
+
   removeAgent(agentId: string) {
     return this.#sources.store.removeAgent(agentId);
   }
 
-  /**
-   * Removes the entries of deleted files. The files are already gone, so a failed write does not fail
-   * the delete: the next start removes the entries.
-   */
   removeFiles(fileIds: readonly string[]) {
+    const known = this.#known;
+    if (known) {
+      const agents = new Map(known.agents);
+      const workflows = new Map(known.workflows);
+      for (const fileId of fileIds) {
+        this.#unscanned.delete(fileId);
+        agents.delete(fileId);
+        workflows.delete(fileId);
+      }
+      this.#known = { at: known.at, agents, workflows };
+    }
     return this.#sources.store.removeFiles(fileIds).pipe(Effect.catch(() => Effect.void));
   }
 
-  /**
-   * The agent of each file that the host scan lists. The scan result is kept for a short time, so a
-   * file that an agent attached after it is not there: one new scan then finds it before the store
-   * refuses the file as unknown.
-   */
-  readonly #fileAgents = Effect.fn("LibraryFolders.fileAgents")(function* (
+  forAgents(): AgentLibraryFolders {
+    const store = this.#sources.store;
+    return {
+      getSnapshot: () => store.getSnapshot(),
+      placeInPath: (agentId, names, fileIds, context) => store.placeInPath(agentId, names, fileIds, context),
+      mutate: (action, context) => store.mutate(action, context),
+      removeAgent: (agentId) => store.removeAgent(agentId),
+      fileAgents: (files) => this.#lookUp(files, true).pipe(Effect.map((known) => known.agents)),
+      fileWorkflows: (files) => this.#lookUp(files, true).pipe(Effect.map((known) => known.workflows)),
+    };
+  }
+
+  #known: KnownFiles | null = null;
+  #keptAt = 0;
+  readonly #unscanned = new Set<string>();
+
+  readonly #lookUp = Effect.fn("LibraryFolders.fileAgents")(function* (
     this: LibraryFoldersService,
-    fileIds: readonly string[],
+    files: readonly LibraryFileStamp[],
+    useKept: boolean,
   ) {
-    if (fileIds.length === 0) return new Map<string, string | null>();
+    const missing = (known: KnownFiles) =>
+      files.some(
+        (file) =>
+          !known.agents.has(file.id) &&
+          !this.#unscanned.has(file.id) &&
+          (file.storedAt === null || Date.parse(file.storedAt) >= known.at),
+      );
+    const fresh = Date.now() - this.#keptAt < KEPT_FILES_MS;
+    if (useKept && fresh && this.#known && !missing(this.#known)) return this.#known;
     const scan = () =>
-      this.#sources.storage
-        .usage({ scope: "host" })
-        .pipe(Effect.map((usage) => new Map(usage.files.map((file) => [file.id, file.agentId]))));
+      this.#sources.storage.usage({ scope: "host" }).pipe(
+        Effect.map((usage) => {
+          const known: KnownFiles = {
+            at: Date.parse(usage.scannedAt),
+            agents: new Map(usage.files.map((file) => [file.id, file.agentId])),
+            workflows: new Map(usage.files.flatMap((file) => (file.workflow ? [[file.id, file.workflow]] : []))),
+          };
+          this.#known = known;
+          this.#keptAt = Date.now();
+          return known;
+        }),
+      );
     const known = yield* scan();
-    if (fileIds.every((fileId) => known.has(fileId))) return known;
+    if (!missing(known)) return known;
     this.#sources.storage.invalidate();
-    return yield* scan();
+    const rescanned = yield* scan();
+    for (const file of files) if (!rescanned.agents.has(file.id)) this.#unscanned.add(file.id);
+    return rescanned;
   }).bind(this);
 }

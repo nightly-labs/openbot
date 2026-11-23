@@ -1,8 +1,3 @@
-/*
- * The idle greeting emojis, cut from Noto Color Emoji (SIL Open Font License 1.1; see
- * noto-greeting-emoji-OFL.txt). A Linux desktop or server with no emoji font shows them with it.
- * It is last in the font list, so a system emoji font comes first.
- */
 @font-face {
   font-family: "OpenBot Greeting Emoji";
   src: url("../../assets/fonts/noto-greeting-emoji.woff2") format("woff2");
@@ -143,13 +138,6 @@
     scale var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
-/* While the island moves, the logo blurs more than the ear around it, so it reads as a shape in
-   motion, gets a little smaller, and half closes its eyes. All three follow the size of the move
-   (`--dynamic-island-compact-motion`, 0 to 1): a slow slider step barely changes the logo, and a
-   large move changes it in full. A large move also rounds its corners a little. These are
-   transitions, not a keyframe pulse, so they are interruptible and a drag keeps one steady state.
-   The logo is sharp and square again as the island settles. The squint scales the eye group, not
-   the eyes, so the blink keeps running. */
 .dynamic-island-shell[data-compact-resize] .dynamic-island-surface-logo {
   --app-logo-eye-squint: calc(1 - 0.45 * var(--dynamic-island-compact-motion, 1));
   filter: blur(calc(0.8px * var(--dynamic-island-compact-motion, 1)));
@@ -174,7 +162,10 @@
   flex: 0 0 20px;
 }
 
-/* The idle greeting is a little larger than the 14px trailing slot of a status. */
+.dynamic-island-idle-in-notch .dynamic-island-ear {
+  visibility: hidden;
+}
+
 .dynamic-island-idle .dynamic-island-trailing-content {
   width: var(--openbot-icon-md);
   height: var(--openbot-icon-md);
@@ -194,9 +185,6 @@
     scale var(--openbot-duration-slow) var(--openbot-ease-out);
 }
 
-/* While the island moves, the greeting gets a little fainter, as much as the move is large. When
-   a large move lands, it pops: a short overshoot with a small tilt each way, then rest. A small move,
-   such as one slow slider step, has no pop, so a slow drag stays quiet. */
 .dynamic-island-shell[data-compact-resize] .dynamic-island-surface-idle-greeting {
   opacity: calc(1 - 0.1 * var(--dynamic-island-compact-motion, 1));
 }
@@ -205,8 +193,6 @@
   animation: dynamic-island-greeting-pop 600ms var(--dynamic-island-greeting-pop-ease);
 }
 
-/* One damped spring (damping 0.5, response 0.4s, with a push), sampled, so the pop is one smooth
-   overshoot to about 1.01 and back, not a curve per keyframe. The tilt rides the same spring. */
 .dynamic-island-shell {
   --dynamic-island-greeting-pop-ease: linear(
     0,
@@ -251,8 +237,6 @@
   }
 }
 
-/* One greeting hands over to the next: the old one shrinks a little and blurs as it fades, and the
-   new one comes out of the blur, so the two read as one change. */
 .dynamic-island-surface-idle-greeting-layer {
   position: absolute;
   inset: 0;
@@ -272,7 +256,6 @@
   }
 }
 
-/* Mirrors the logo: its 20px box sits 10px from the left edge, this 16px box sits 6px from the right. */
 .dynamic-island-external.dynamic-island-idle .dynamic-island-surface-idle-greeting-layer {
   transform: translateX(-6px);
 }
@@ -282,9 +265,6 @@
   opacity: 1;
 }
 
-/* Each greeting is a small 3D card with a front and a back face. `idle-greeting-motion.ts` moves it
-   once as it shows: it turns the wave, the smile and the raised hands, and lights up and twinkles
-   each sparkle. Reduce motion turns the motions off, so the front face stays. */
 .dynamic-island-surface-idle-greeting-layer {
   perspective: 60px;
 }
@@ -304,8 +284,6 @@
   transform: rotateY(180deg);
 }
 
-/* Each copy of the sparkles glyph shows one star, through a star-shaped mask a little larger than the
-   star. The transform origin is the star's centre, so it twinkles in place. */
 .dynamic-island-surface-idle-greeting-face:has(.dynamic-island-surface-idle-greeting-sparkle) {
   display: grid;
 }
@@ -413,11 +391,6 @@
 .dynamic-island-surface-working-badge .ui-spinner {
   border-color: var(--openbot-success-soft);
   border-top-color: currentColor;
-}
-
-/* The island is above every app all day. Its spinner turns only while the user looks at it. */
-.openbot-dynamic-island-transition-root[data-ambient-motion="paused"] .ui-spinner {
-  animation-play-state: paused;
 }
 
 .dynamic-island[data-layout-state="expanded"] .dynamic-island-surface-compact-name {
@@ -535,7 +508,6 @@
   min-width: 0;
 }
 
-/* The stop button sits over the end of the row, so the row keeps the place the avatars move to. */
 .dynamic-island-surface-row-group:has(.dynamic-island-surface-row-stop) .dynamic-island-surface-row {
   padding-inline-end: calc(var(--openbot-control-sm) + var(--openbot-space-2));
 }
@@ -872,7 +844,6 @@ div.dynamic-island-surface-context-line span {
 
 .dynamic-island-surface-question-progress {
   display: inline-flex;
-  /* The step count reads "2 / 5" in any language, so the digit stack stays before the total. */
   direction: ltr;
   align-items: baseline;
   padding-top: 2px;
@@ -906,6 +877,26 @@ div.dynamic-island-surface-context-line span {
 .dynamic-island-surface-question-step {
   width: 100%;
   min-width: 0;
+}
+
+.dynamic-island-surface-question-detail {
+  max-height: calc(var(--openbot-leading-sm) * 3);
+  margin-bottom: 6px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.scroll-edges.dynamic-island-surface-question-detail > .scroll-edges-view {
+  --scroll-edges-fade-size: var(--openbot-leading-sm);
+
+  overscroll-behavior: contain;
+}
+
+.dynamic-island-surface-question-detail p {
+  margin: 0;
 }
 
 .dynamic-island-surface-question-actions {

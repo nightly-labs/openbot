@@ -1,9 +1,3 @@
-// Runs turns on the real OpenCode driver against a fake `opencode acp` that answers a finished
-// background subagent in a turn it sends no update for, as OpenCode 2.2.0 does (#3406). Checks that
-// the background turn shows as a turn of the agent's own, from `session/load`, with all its items;
-// that text before a tool call stays thinking there too; that a message sent meanwhile waits for it;
-// and that a stopped background turn does not come back.
-// `bun run test:opencode-background-turn`. Writes .openbot-build/opencode-background-turn-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,7 +10,6 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-background-turn-e2e");
-/** The background turn ends when its session stays unchanged for 15 s; this leaves room for that. */
 const WAIT_MS = 60_000;
 
 interface Event {
@@ -31,6 +24,7 @@ interface Event {
     text: string | null;
     status: string | null;
   } | null;
+  subagents: string[] | null;
 }
 
 interface Report {
@@ -44,7 +38,6 @@ const log = join(root, "fake.jsonl");
 const report: Report = { passed: false, events: {} };
 const clients: AgentClient[] = [];
 
-/** The notifications of one thread, and a wait for one that matches. */
 function record(client: AgentClient, thread: string) {
   const events: Event[] = [];
   report.events[thread] = events;
@@ -66,6 +59,10 @@ function record(client: AgentClient, thread: string) {
         text: getString(item, "text"),
         status: getString(item, "status"),
       },
+      subagents:
+        isRecord(params) && Array.isArray(params.subagents)
+          ? params.subagents.map((subagent) => getString(subagent, "status") ?? "")
+          : null,
     });
     for (const waiter of waiters) waiter();
   });
@@ -85,7 +82,6 @@ function record(client: AgentClient, thread: string) {
       waiters.add(check);
       check();
     });
-  /** The completed agent messages and tool calls of one turn, in order. */
   const items = (turnId: string) =>
     events
       .filter((event) => event.method === "item/completed" && event.turnId === turnId && event.item)
@@ -93,7 +89,6 @@ function record(client: AgentClient, thread: string) {
   return { events, until, items };
 }
 
-/** The turn that `runTurn` started: the last `turn/started` before its completion. */
 function lastTurnId(events: readonly Event[]): string {
   const started = events.filter((event) => event.method === "turn/started").at(-1);
   assert.ok(started?.turnId, "A turn started.");
@@ -111,7 +106,6 @@ function causes(error: unknown): unknown[] {
   return chain;
 }
 
-/** Waits until the fake has loaded the session again after the background turn's end. */
 async function loadedAfterEnd(session: string): Promise<void> {
   for (;;) {
     const entries = await readJsonl<{ event: string; session: string }>(log);
@@ -132,7 +126,6 @@ try {
   clients.push(client);
   client.start();
 
-  // Text before a tool call is thinking. The text of the last steps is one answer, in paragraphs.
   const first = await startThread(client, { cwd: workspace });
   const one = record(client, first);
   assert.equal((await runTurn(client, first, { text: "steps" })).status, "completed");
@@ -146,7 +139,6 @@ try {
     "The text before the tool call is thinking, and the answer keeps the text of both last steps.",
   );
 
-  // A background subagent's turn shows from `session/load`, as a turn of the agent's own.
   assert.equal((await runTurn(client, first, { text: "background" })).status, "completed");
   const own = await one.until("the background turn", (event) => event.method === "turn/started" && event.unprompted);
   assert.ok(own.turnId);
@@ -154,7 +146,6 @@ try {
     "the background turn's open tool call",
     (event) => event.turnId === own.turnId && event.method === "item/started" && event.item?.id === "tool_bg_check",
   );
-  // A message sent meanwhile does not join the agent's turn: the drain queues it again.
   const refused = await runTurn(client, first, { text: "ping", timeoutMs: WAIT_MS }).then(
     () => null,
     (error: unknown) => error,
@@ -188,7 +179,6 @@ try {
     "The replay after the prompt finds nothing new.",
   );
 
-  // A stopped background turn does not come back when the agent adds to it.
   const second = await startThread(client, { cwd: workspace });
   const two = record(client, second);
   assert.equal((await runTurn(client, second, { text: "background" })).status, "completed");
@@ -220,6 +210,52 @@ try {
   assert.ok(
     !two.events.some((event) => event.item?.text === "The background task finished: DONE."),
     "The rest of the stopped turn is not shown.",
+  );
+
+  const third = await startThread(client, { cwd: workspace });
+  const three = record(client, third);
+  assert.equal((await runTurn(client, third, { text: "background shell" })).status, "completed");
+  const shell = await three.until(
+    "the background shell command's turn",
+    (event) => event.method === "turn/started" && event.unprompted,
+  );
+  await writeFile(join(release, third), "");
+  const shellEnded = await three.until(
+    "the background shell command's turn end",
+    (event) => event.method === "turn/completed" && event.turnId === shell.turnId,
+  );
+  assert.equal(shellEnded.status, "completed");
+  assert.deepEqual(
+    three
+      .items(shell.turnId ?? "")
+      .filter((item) => item?.type === "agentMessage" && item.phase === "final_answer")
+      .map((item) => item?.text),
+    ["The background task finished: DONE."],
+    "The answer after the background shell command shows in the chat.",
+  );
+
+  const fourth = await startThread(client, { cwd: workspace });
+  const four = record(client, fourth);
+  assert.equal((await runTurn(client, fourth, { text: "child" })).status, "completed");
+  await four.until("the running background subagent", (event) => event.subagents?.[0] === "running");
+  await four.until("the background subagent's end", (event) => event.subagents?.[0] === "completed");
+  const answer = await four.until(
+    "the turn after the background subagent",
+    (event) => event.method === "turn/started" && event.unprompted,
+  );
+  await writeFile(join(release, fourth), "");
+  const answered = await four.until(
+    "the end of the turn after the background subagent",
+    (event) => event.method === "turn/completed" && event.turnId === answer.turnId,
+  );
+  assert.equal(answered.status, "completed");
+  assert.deepEqual(
+    four
+      .items(answer.turnId ?? "")
+      .filter((item) => item?.type === "agentMessage" && item.phase === "final_answer")
+      .map((item) => item?.text),
+    ["The background task finished: DONE."],
+    "The answer after the background subagent shows in the chat.",
   );
   report.passed = true;
 } finally {

@@ -116,7 +116,6 @@ const LANGUAGE_LABEL_KEYS: Partial<Record<ShjLanguage, MobileTextKey>> = {
   regex: "mobile.chat.code.language.regex",
 };
 
-/** The label of `codeLanguage` in the interface language. A name from the fence stays as written. */
 export function codeLanguageLabel(info: string | undefined, t: MobileTranslate): string {
   const { language, label } = codeLanguage(info);
   const key = LANGUAGE_LABEL_KEYS[language];
@@ -130,7 +129,6 @@ function highlightKey(text: string, info: string | undefined): string {
   return `${codeLanguage(info).language}\u0000${text}`;
 }
 
-/** The tokens of a block highlighted before in this app run, so a chat that opens again shows them at once. */
 export function cachedHighlight(text: string, info?: string): CodeToken[] | undefined {
   const key = highlightKey(text, info);
   const cached = highlights.get(key);
@@ -140,7 +138,6 @@ export function cachedHighlight(text: string, info?: string): CodeToken[] | unde
   return cached;
 }
 
-/** `keep` stores the result for the app run. A block that still streams changes, so it does not keep it. */
 export async function highlightCode(text: string, info?: string, keep = false): Promise<CodeToken[]> {
   const cached = cachedHighlight(text, info);
   if (cached) return cached;
@@ -152,7 +149,6 @@ export async function highlightCode(text: string, info?: string, keep = false): 
     result.push({ text: value, type, offset });
     offset += value.length;
   });
-  // A tokenizer failure must never change or duplicate the source shown to the user.
   const tokens = result.map((token) => token.text).join("") === text ? result : [{ text, offset: 0 }];
   if (!keep) return tokens;
   const oldest = highlights.keys().next().value;

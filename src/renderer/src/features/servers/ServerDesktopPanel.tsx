@@ -23,12 +23,18 @@ const ISSUE_TITLES = {
   client_update_required: "server.desktop.clientUpdateRequired",
   host_update_required: "server.desktop.hostUpdateRequired",
   protocol_error: "server.desktop.connectionUnavailable",
+  server_safe_mode: "server.desktop.connectionUnavailable",
   authentication_required: "server.desktop.connectionUnavailable",
   network_unavailable: "server.desktop.connectionUnavailable",
 } as const satisfies Record<ServerConnectionIssueCode, AppTextKey>;
 const REMOTE_HOST_GATEWAY_NAME = "OpenBot Remote Host Gateway";
 
-/** The Remote desktop section of the server settings. */
+function localComponentStatusKey(status: HostStatus | null | undefined): AppTextKey {
+  if (status?.remoteDesktopReady) return "server.desktop.componentInstalled";
+  if (status?.remoteDesktopNeedsX11Session) return "server.desktop.needsX11Session";
+  return "server.desktop.componentNotInstalled";
+}
+
 export function ServerDesktopPanel(props: {
   server: ServerSummary;
   platform: "darwin" | "win32" | "linux";
@@ -114,9 +120,7 @@ export function ServerDesktopPanel(props: {
             </ItemContent>
             <ItemActions class="server-settings-desktop-meta">
               <Badge variant={props.hostStatus?.remoteDesktopReady ? "success-light" : "warning-light"}>
-                {props.hostStatus?.remoteDesktopReady
-                  ? t("server.desktop.componentInstalled")
-                  : t("server.desktop.componentNotInstalled")}
+                {t(localComponentStatusKey(props.hostStatus))}
               </Badge>
               <Text as="span" variant="caption" tone="muted">
                 {t("server.desktop.sessions", {

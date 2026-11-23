@@ -14,12 +14,6 @@ import {
 
 const TAB_ICON = { apps: Blocks, agents: Bot, skills: BookOpen } as const;
 
-/**
- * The side panel of the Marketplace, as the settings page has: the kinds, then the apps that the user connected. While
- * a search runs, each kind shows how many rows match. A connected app opens its page.
- *
- * One row is selected: the app of "Your apps" whose page shows, otherwise the kind of the list or of the page.
- */
 export function MarketplaceNav(props: { scope: MarketplaceScope; lists: BrowseLists }) {
   const { t } = useText();
   const nav = () => props.scope.nav;
@@ -29,7 +23,6 @@ export function MarketplaceNav(props: { scope: MarketplaceScope; lists: BrowseLi
     const view = top();
     return view?.kind === "app" && view.id === id ? ("page" as const) : undefined;
   };
-  /** The kind of an app, agent or skill page stays selected, as the section that holds the page. */
   const kindCurrent = (tab: MarketplaceTab) => {
     const view = top();
     if (nav().state.tab !== tab || !view) return undefined;

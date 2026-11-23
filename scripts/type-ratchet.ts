@@ -3,14 +3,7 @@ import { resolve } from "node:path";
 import { runDebtRatchet } from "./debt-ratchet";
 import { typeCheckerScript } from "./type-checker";
 
-// Holds TypeScript options that are not yet on in tsconfig.base.json to the error count of each file
-// in tools/typescript/type-baseline.json. It runs the type checker (`scripts/type-checker.ts`) once for
-// each project and option, with the option turned on. `scripts/debt-ratchet.ts` has the rules of the
-// baseline. When an option has no errors left, turn it on in tsconfig.base.json and remove it from the
-// baseline.
-
 const ROOT = resolve(import.meta.dirname, "..");
-// Every project that extends tsconfig.base.json. apps/mobile extends the Expo base config.
 const PROJECTS = [
   "tsconfig.node.json",
   "tsconfig.web.json",
@@ -34,12 +27,9 @@ runDebtRatchet({
   count: (options) => new Map(options.map((option) => [option, countErrors(option)])),
 });
 
-// Error counts by file for one option, over all projects. A file that two projects include counts
-// each error once.
 function countErrors(option: string): Map<string, number> {
   const errors = new Set<string>();
   for (const project of PROJECTS) {
-    // `--incremental false` keeps this run from replacing the build info of the normal typecheck.
     const result = spawnSync(
       process.execPath,
       [typeCheckerScript(), "--noEmit", "--pretty", "false", "--incremental", "false", "-p", project, `--${option}`],

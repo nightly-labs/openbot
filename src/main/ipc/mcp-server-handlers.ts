@@ -1,12 +1,5 @@
-import { Duration, Effect, Result } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// MCP servers: the model-context servers an agent on this server may use.
-//
-// "Server" here is a joined team server or the local host; the MCP server is an unrelated thing, so
-// every name carries `mcp`. The list belongs to the server the settings modal is open for, which is
-// why nothing routes through the selected server.
-
 import {
+  canAdministerServer,
   decodeMcpAccessSnapshot,
   decodeMcpServerConfigs,
   decodeMcpSignInAppState,
@@ -14,12 +7,15 @@ import {
   decodeMcpSignInStatus,
   decodeMcpTestResult,
   decodeSignInRelayFlow,
+  hostOnlySignInPage,
   MCP_SERVERS_CAPABILITY,
   type McpAccessSnapshot,
   type McpServerConfig,
   parseSetMcpAccessInput,
+  type ServerSummary,
   type TestMcpServerInput,
 } from "@openbot/contracts/ipc";
+import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MCP_ACCESS_CAPABILITY, MCP_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import {
@@ -28,8 +24,13 @@ import {
 } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY, MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import {
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_ROUTES,
+} from "@openbot/contracts/team-protocol/sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
+import { Duration, Effect, Result, Schema } from "effect";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { MCP_STDIO_PROBE_TIMEOUT_MS } from "../../backend/mcp-probe";
@@ -38,6 +39,7 @@ import { type McpAccessControl, mcpAccessSnapshot } from "../mcp-access-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { ResponseDecoder } from "../remote-host-decoding";
 import type { RemoteRequestInit } from "../remote-server-client";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import { type SignInRelayClient, type SignInRelayRemote, signInRelayRemote } from "../sign-in-relay-client";
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import { LOCAL_OWNER } from "./host-admin-handlers";
@@ -53,7 +55,6 @@ import {
 } from "./mcp-inputs";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
-/** The AgentService members this registrar reaches, and nothing else. */
 type McpServerService = Pick<
   AgentService,
   | "listMcpServers"
@@ -63,6 +64,8 @@ type McpServerService = Pick<
   | "testMcpServer"
   | "signInMcpServer"
   | "cancelMcpSignIn"
+  | "mcpSignInLink"
+  | "receiveMcpSignInAddress"
   | "signOutMcpServer"
   | "listMcpSignIns"
   | "mcpSignInApp"
@@ -70,8 +73,8 @@ type McpServerService = Pick<
   | "removeMcpSignInApp"
 >;
 
-/** The RemoteServerManager members this registrar reaches, and nothing else. */
 interface McpRemoteServers {
+  list(): ServerSummary[];
   supportsCapability(serverId: string, capability: TeamCurrentCapability): boolean;
   request<T>(
     serverId: string,
@@ -81,22 +84,12 @@ interface McpRemoteServers {
   ): Effect.Effect<T, RemoteWorkflowError>;
 }
 
-/**
- * The managed tool runtimes as the MCP writers reach them. The IPC handlers and the host's Team
- * API routes share this shape: the routes call `AgentService` directly and would otherwise bypass
- * every preparation below, leaving a host with no Node unable to save or test its first server.
- */
 export interface McpToolRuntimePreparation {
   startToolRuntimes: () => void;
   ensureToolRuntimesReady: OmitThisParameter<ProviderRuntimeManager["ensureToolRuntimesReady"]>;
   toolRuntimes: () => McpToolRuntimes;
 }
 
-/**
- * What a connection test waits for: nothing for http and installed commands, the bounded
- * download for a command nothing names. Shared by the local Test button and the host route that
- * answers a remote Test.
- */
 export const prepareToolRuntimeForTest = Effect.fn("Mcp.prepareToolRuntimeForTest")(function* (
   config: McpServerConfig,
   preparation: McpToolRuntimePreparation,
@@ -111,37 +104,17 @@ export const prepareToolRuntimeForTest = Effect.fn("Mcp.prepareToolRuntimeForTes
 
 interface McpServerIpcDependencies {
   service: McpServerService;
-  /** Which agents get each MCP server of this computer, and the level of each role (`mcp-access-v1`). */
   mcpAccess: McpAccessControl;
   remoteServers: McpRemoteServers;
-  /**
-   * Fetches the tool runtimes an MCP server is started with, if this machine does not hold them
-   * yet. Onboarding asks for them first; this covers the user who was already past onboarding when
-   * OpenBot learned to download one. It answers at once and reports nothing, so a slow or failed
-   * download cannot turn saving a row into an error.
-   */
   startToolRuntimes: () => void;
-  /**
-   * The same download, waited for. A first stdio plugin must pass its connection test before it
-   * can be saved, and without a runtime that test answers `Command not found` on a machine that
-   * only needs a download. A failed download is not a test failure: the test still runs and
-   * reports what the machine can actually start.
-   */
   ensureToolRuntimesReady: OmitThisParameter<ProviderRuntimeManager["ensureToolRuntimesReady"]>;
-  /** What the managed store holds right now, so an installed command waits for no download. */
   toolRuntimes: () => McpToolRuntimes;
-  /** Opens the page of a joined server's sign-in in this computer's browser, and relays the callback. */
-  relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
+  relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste" | "receivesDeepLink">;
+  writeClipboard: (text: string) => Promise<void>;
 }
 
-/** How long a connection test waits for the managed runtimes before probing without them. */
 const TOOL_RUNTIME_TEST_WAIT_MS = 60_000;
 
-/**
- * The remote Test deadline: the host may wait out the preparation above before its own probe
- * deadline even starts, so the caller's request must cover both. Without this the 15-second
- * request limit reports a timeout for a download that is still running, before the host probes.
- */
 const REMOTE_TEST_TIMEOUT_MS = TOOL_RUNTIME_TEST_WAIT_MS + MCP_STDIO_PROBE_TIMEOUT_MS + 20_000;
 
 export function mcpServerIpcHandlers({
@@ -152,21 +125,18 @@ export function mcpServerIpcHandlers({
   ensureToolRuntimesReady,
   toolRuntimes,
   relay,
+  writeClipboard,
 }: McpServerIpcDependencies): Pick<IpcGroupHandlers, "mcpServers"> {
-  /** A host that predates the capability answers 404, so the reason is stated before the request. */
   function requireRemoteSupport(serverId: string): void {
     if (!remoteServers.supportsCapability(serverId, MCP_SERVERS_CAPABILITY))
       throw new Error(sourceText("error.mcp.unsupported"));
   }
 
-  // The shared contract decoder, as the channel-routine handlers do: it already bounds every field
-  // of every configuration, so a `FromHost` twin would be the same checks under a second name.
   function remoteList(serverId: string, path: string, body: unknown): Promise<McpServerConfig[]> {
     requireRemoteSupport(serverId);
     return runCauseEffect(remoteServers.request(serverId, path, decodeMcpServerConfigs, { method: "POST", body }));
   }
 
-  /** A host that predates `mcp-access-v1` has no access entries: each agent gets each server. */
   function remoteAccess(serverId: string, path: string, body: unknown): Promise<McpAccessSnapshot> {
     requireRemoteSupport(serverId);
     if (!remoteServers.supportsCapability(serverId, MCP_ACCESS_CAPABILITY))
@@ -184,20 +154,21 @@ export function mcpServerIpcHandlers({
     );
   }
 
-  /** A host without `mcp-sign-in-v1` cannot open a sign-in page for a client. */
   function requireRemoteSignIn(serverId: string): void {
     requireRemoteSupport(serverId);
     if (!remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY)) signInOnHost();
   }
 
-  /** The `sign-in-relay-v1` routes of one MCP sign-in on a joined server. */
   function relayRemote(serverId: string, input: TestMcpServerInput): SignInRelayRemote<RemoteWorkflowError> {
     const post = <T>(path: string, decoder: ResponseDecoder<T>, body: unknown) =>
       remoteServers.request(serverId, path, decoder, { method: "POST", body });
-    return signInRelayRemote(post, post(SIGN_IN_RELAY_ROUTES.mcpStart, decodeSignInRelayFlow, input));
+    const start =
+      remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_DEEP_LINK_CAPABILITY) && relay.receivesDeepLink()
+        ? SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart
+        : SIGN_IN_RELAY_ROUTES.mcpStart;
+    return signInRelayRemote(post, post(start, decodeSignInRelayFlow, input));
   }
 
-  /** A sign-in app is the host's: an older host cannot keep one, so the reason is stated first. */
   function remoteSignInApp(serverId: string, path: string, body: unknown) {
     requireRemoteSupport(serverId);
     if (!remoteServers.supportsCapability(serverId, MCP_SIGN_IN_APP_CAPABILITY))
@@ -205,19 +176,25 @@ export function mcpServerIpcHandlers({
     return runCauseEffect(remoteServers.request(serverId, path, decodeMcpSignInAppState, { method: "POST", body }));
   }
 
-  /** The host tab of each remote sign-in that waits, by server and address, for the panel's live view. */
   const remotePages = new Map<string, string | null>();
 
-  /**
-   * A sign-in on a joined server. The host runs it and opens the page in its own browser; this
-   * computer reads `status` until it ends, because one request cannot wait for a person to sign in.
-   */
   const signInRemotely = Effect.fn("Mcp.signInRemotely")(function* (serverId: string, input: TestMcpServerInput) {
     const key = remotePageKey(serverId, input.config.url);
-    // The user's own browser keeps their sessions and passkeys, so a host that can relay never shows
-    // its own tab. A relayed sign-in that fails does not fall back: the host already started it.
-    if (remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY))
-      return yield* relay.run(key, relayRemote(serverId, input));
+    if (remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_CAPABILITY)) {
+      const relayed = yield* relay
+        .run(key, hostOnlyRelayRemote(relayRemote(serverId, input)))
+        .pipe(Effect.catchTag("McpHostOnlySignInPage", () => Effect.succeed(null)));
+      if (relayed !== null) return relayed;
+      const server = remoteServers.list().find((summary) => summary.id === serverId);
+      if (!canAdministerServer(server?.role))
+        return { toolCount: 0, error: sourceText("error.mcp.signInPageOnServer") };
+      if (
+        !remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY) ||
+        !remoteServers.supportsCapability(serverId, TEAM_BROWSER_VIEW_CAPABILITY)
+      )
+        return { toolCount: 0, error: sourceText("error.mcp.signInOnHost") };
+      if (!server?.active) return { toolCount: 0, error: sourceText("error.mcp.signInPageOnServerSwitch") };
+    }
     const body = { url: input.config.url };
     yield* remoteServers.request(serverId, MCP_SIGN_IN_ROUTES.start, () => undefined, { method: "POST", body: input });
     remotePages.set(key, null);
@@ -232,7 +209,6 @@ export function mcpServerIpcHandlers({
         yield* Effect.sleep(REMOTE_SIGN_IN_POLL);
       }
     }).pipe(
-      // Nobody watches the page any more, so it must not stay open on the host for the full timeout.
       Effect.onError(() =>
         remoteServers
           .request(serverId, MCP_SIGN_IN_ROUTES.cancel, () => undefined, { method: "POST", body })
@@ -246,7 +222,6 @@ export function mcpServerIpcHandlers({
     mcpServers: {
       listMcpServers: scopedQueryHandler({
         local: () => service.listMcpServers(),
-        // The one read route, and the only one the host answers to a GET.
         remote: (serverId) => {
           requireRemoteSupport(serverId);
           return runCauseEffect(remoteServers.request(serverId, MCP_ROUTES.list, decodeMcpServerConfigs));
@@ -288,13 +263,7 @@ export function mcpServerIpcHandlers({
         },
         remote: (parsed, serverId) => remoteList(serverId, MCP_ROUTES.toggle, parsed),
       }),
-      // The machine that holds the configuration is the machine that must make the connection, so a
-      // test against a remote server runs on that host and not here.
       testMcpServer: scopedHandler(parseTestMcpServer, {
-        // Silent: a test spends the sign-in this computer holds and never opens a browser. A server
-        // that asks for one is answered with a sentence that points at Sign in, which the user then
-        // chooses, knowing a browser opens. The remote branch reaches the host's route, which spends
-        // the host's stored credentials in the same way.
         local: async (parsed) => {
           await runCauseEffect(
             prepareToolRuntimeForTest(parsed.config, {
@@ -316,8 +285,6 @@ export function mcpServerIpcHandlers({
           );
         },
       }),
-      // A sign-in opens the browser of the computer that runs OpenBot. On a joined server that is the
-      // host's browser, which the panel shows through the live view of the tab `mcpSignInPage` names.
       signInMcpServer: scopedHandler(parseTestMcpServer, {
         local: (parsed) => runCauseEffect(service.signInMcpServer(parsed)),
         remote: (parsed, serverId) => {
@@ -325,7 +292,6 @@ export function mcpServerIpcHandlers({
           return runCauseEffect(signInRemotely(serverId, parsed));
         },
       }),
-      // This computer's browser is the user's own, so a local sign-in shows no page here.
       mcpSignInPage: scopedHandler(parseCancelMcpSignIn, {
         local: () => null,
         remote: (parsed, serverId) => remotePages.get(remotePageKey(serverId, parsed.url)) ?? null,
@@ -340,10 +306,11 @@ export function mcpServerIpcHandlers({
         },
         remote: (parsed, serverId) => relay.open(remotePageKey(serverId, parsed.url)),
       }),
-      // A local sign-in takes its callback on this computer's own listener, so nothing waits for a paste.
       completeMcpSignInRelay: scopedHandler(parseCompleteMcpSignInRelay, {
-        local: () => {
-          throw new Error(sourceText("error.mcp.relayEnded"));
+        local: (parsed) => {
+          const outcome = service.receiveMcpSignInAddress(parsed);
+          if (outcome === "ended") throw new Error(sourceText("error.mcp.relayEnded"));
+          if (outcome === "invalid") throw new Error(sourceText("error.mcp.relayAddressInvalid"));
         },
         remote: (parsed, serverId) => relay.paste(remotePageKey(serverId, parsed.url), parsed.address),
       }),
@@ -359,7 +326,14 @@ export function mcpServerIpcHandlers({
           );
         },
       }),
-      // A sign-out names its row the way a removal does, so it is read by the same parser.
+      copyMcpSignInLink: scopedHandler(parseCancelMcpSignIn, {
+        local: (parsed) => {
+          const link = service.mcpSignInLink(parsed);
+          if (!link) throw new Error(sourceText("error.mcp.signInLinkNotReady"));
+          return writeClipboard(link);
+        },
+        remote: () => signInOnHost(),
+      }),
       signOutMcpServer: scopedHandler(parseRemoveMcpServer, {
         local: (parsed) => runCauseEffect(service.signOutMcpServer(parsed)),
         remote: (parsed, serverId) => {
@@ -372,7 +346,6 @@ export function mcpServerIpcHandlers({
           );
         },
       }),
-      // A host without `mcp-sign-in-v1` holds no sign-in state to show, which is not an error.
       listMcpSignIns: scopedQueryHandler({
         local: () => service.listMcpSignIns(),
         remote: (serverId) => {
@@ -385,7 +358,6 @@ export function mcpServerIpcHandlers({
           );
         },
       }),
-      // The client secret goes to the machine that signs in, and no answer carries it back.
       mcpSignInApp: scopedHandler(parseMcpSignInApp, {
         local: (parsed) => service.mcpSignInApp(parsed),
         remote: (parsed, serverId) => remoteSignInApp(serverId, MCP_SIGN_IN_APP_ROUTES.get, parsed),
@@ -402,8 +374,25 @@ export function mcpServerIpcHandlers({
   };
 }
 
-/** How often a remote sign-in asks the host whether it ended. */
 const REMOTE_SIGN_IN_POLL = Duration.seconds(1);
+
+class McpHostOnlySignInPage extends Schema.TaggedError<McpHostOnlySignInPage>()("McpHostOnlySignInPage", {}) {}
+
+function hostOnlyRelayRemote<E>(remote: SignInRelayRemote<E>): SignInRelayRemote<E | McpHostOnlySignInPage> {
+  return {
+    ...remote,
+    status: (flowId) =>
+      remote
+        .status(flowId)
+        .pipe(
+          Effect.flatMap((status) =>
+            status.result === null && status.authorizeUrl !== null && hostOnlySignInPage(status.authorizeUrl)
+              ? Effect.fail(new McpHostOnlySignInPage())
+              : Effect.succeed(status),
+          ),
+        ),
+  };
+}
 
 function remotePageKey(serverId: string, url: string): string {
   return `${serverId}\n${url}`;

@@ -7,7 +7,6 @@ import { loadPageText } from "../../lib/page-text";
 
 const NO_LISTINGS = [] as const;
 
-/** The plugins that /plugins listed. They are in the site's code, so the page reads no database. */
 export const Route = createFileRoute("/marketplace/apps")({
   validateSearch: marketplaceAppsSearch,
   loader: async ({ context }) => {

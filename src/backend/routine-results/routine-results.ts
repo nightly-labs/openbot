@@ -1,20 +1,3 @@
-/**
- * Routine results: an agent routine's answer sent on to a messaging place outside OpenBot.
- *
- * The routine's run is not changed: it succeeds when its agent answers, and the delivery of that answer
- * has a status of its own. When a run of a routine with a destination succeeds, the sweep keeps its
- * answer as a delivery and posts it. A connection that does not run now gets more attempts for a day.
- * A post that fails on its way is not sent again by itself: a long answer goes in more than one post,
- * so a part of it can be in the place already. The user can send any ended delivery again.
- *
- * Nothing here listens to the provider. The runtime sweeps whenever the agent service says a turn, a
- * queue or a routine changed, at startup, and when the next attempt is due. Sweeps run one at a time;
- * a request during a sweep runs one more after it.
- *
- * A destination only applies to the runs that end after it was set, so choosing a place never sends
- * the answers of earlier runs.
- */
-
 import type {
   AgentEvent,
   MessagingPlatform,
@@ -34,25 +17,21 @@ import type { RoutineResultOutgoing, RoutineResultStore } from "./routine-result
 
 const logger = createOpenBotLogger("routine-results");
 
-/** How far back a sweep looks for a run whose answer has no delivery yet. */
 const SWEEP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const FIRST_RETRY_MS = 60 * 1000;
 const LONGEST_RETRY_MS = 15 * 60 * 1000;
+const TEAMMATE_ANSWER_WAIT_MS = 24 * 60 * 60 * 1000;
 
 class RoutineResultFailed extends Schema.TaggedError<RoutineResultFailed>()("RoutineResultFailed", {
   cause: Schema.Defect(),
 }) {}
 
-/** A refusal the user reads: the text is already a sentence for them. */
 export class RoutineResultError extends Error {}
 
 export interface RoutineResultsDependencies {
   store: RoutineResultStore;
-  /** The turn that answered a run's delivery, or null when the delivery is gone. */
-  delivery(deliveryId: string): { turnId: string | null } | null;
-  /** The answer an agent gave in one turn, or null when it gave none. */
+  runTurns(deliveryId: string): { turnIds: string[]; waiting: boolean } | null;
   turnAnswer(agentId: string, turnId: string): string | null;
-  /** An enabled messaging connection of this host, or null when it is off or removed. */
   connection(connectionId: string): { platform: MessagingPlatform; name: string } | null;
   options(): Effect.Effect<RoutineResultConnectionOption[]>;
   post(
@@ -60,7 +39,6 @@ export interface RoutineResultsDependencies {
     placeId: string,
     markdown: string,
   ): Effect.Effect<{ posted: true } | { failure: MessagingPostFailure }>;
-  /** The agents whose routine deliveries changed. */
   changed(agentIds: string[]): void;
   now?: () => Date;
 }
@@ -73,12 +51,13 @@ interface RoutineResultsShape {
   ): Effect.Effect<RoutineResultDestination | null, RoutineResultFailed>;
   deliveries(input: RoutineResultRoutineInput): Effect.Effect<RoutineResultDelivery[], RoutineResultFailed>;
   resend(input: ResendRoutineResultInput): Effect.Effect<void, RoutineResultFailed>;
-  /** At startup: a post that a stop cut off may be in its place in part. Then starts a sweep and returns. */
   recover(): Effect.Effect<void>;
-  /** Keeps each new answer and posts each one that is due. */
   sweep(): Effect.Effect<void>;
-  /** Asks for a sweep when an agent event may have ended a run. Returns at once. */
   notice(event: AgentEvent): Effect.Effect<void>;
+}
+
+export function routineResultNoticeEvent(event: AgentEvent): boolean {
+  return event.type === "turn-completed" || event.type === "queue-changed" || event.type === "routines-changed";
 }
 
 class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape>()("openbot/backend/RoutineResults") {
@@ -90,11 +69,10 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
         const lock = yield* Semaphore.make(1);
         const { store } = dependencies;
         const now = () => (dependencies.now ?? (() => new Date()))();
-        /** A sweep running, and whether another was asked for while it ran. */
         let sweeping = false;
         let again = false;
-        /** The wait for the next pending attempt. */
         let timer: Fiber.Fiber<void> | null = null;
+        let waitEndsAt: string | null = null;
 
         const attempt = <A>(work: () => A) =>
           Effect.try({ try: work, catch: (cause) => new RoutineResultFailed({ cause }) });
@@ -147,20 +125,28 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
           yield* attempt(() => {
             if (store.deliveryOwner(input.runId) !== input.agentId)
               throw new RoutineResultError(sourceText("error.backend.routineResultNoDelivery"));
-            // A delivery that waits or is on its way already keeps going; there is nothing to restart.
             store.resend(input.runId, now().toISOString());
           });
           dependencies.changed([input.agentId]);
           yield* Effect.forkIn(sweep(), scope);
         });
 
-        /** Keeps the answer of each run that ended since the last sweep. Answers the agents it touched. */
         const recordAnswers = (since: string, at: string): Set<string> => {
           const changed = new Set<string>();
+          const waitedSince = new Date(Date.parse(at) - TEAMMATE_ANSWER_WAIT_MS).toISOString();
+          waitEndsAt = null;
           for (const run of store.runsWithoutDelivery(since)) {
-            const delivery = run.deliveryId ? dependencies.delivery(run.deliveryId) : null;
-            const output = delivery?.turnId ? dependencies.turnAnswer(run.agentId, delivery.turnId) : null;
-            // A Test run keeps the no-update marker in its chat; the place gets nothing for it.
+            const turns = run.deliveryId ? dependencies.runTurns(run.deliveryId) : null;
+            if (turns?.waiting && run.endedAt > waitedSince) {
+              const endsAt = new Date(Date.parse(run.endedAt) + TEAMMATE_ANSWER_WAIT_MS).toISOString();
+              if (!waitEndsAt || endsAt < waitEndsAt) waitEndsAt = endsAt;
+              continue;
+            }
+            let output: string | null = null;
+            for (const turnId of turns?.turnIds ?? []) {
+              output = dependencies.turnAnswer(run.agentId, turnId);
+              if (output) break;
+            }
             const answer = output && !isNoUpdateAnswer(output) ? output : null;
             store.createDelivery(run, answer ? resultText(run.routineName, answer) : null, at);
             if (answer) changed.add(run.agentId);
@@ -168,7 +154,6 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
           return changed;
         };
 
-        /** Posts one delivery and records what became of it. */
         const send = Effect.fn("RoutineResults.send")(function* (item: RoutineResultOutgoing) {
           const startedAt = now();
           if (item.expiresAt <= startedAt.toISOString()) {
@@ -179,7 +164,6 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
           const result = yield* dependencies
             .post(item.destination.connectionId, item.destination.placeId, item.text)
             .pipe(
-              // A stop or a defect during the post can leave it in part: the row says so, and does not stay `sending`.
               Effect.onExit((exit) =>
                 Exit.isSuccess(exit)
                   ? Effect.void
@@ -219,16 +203,12 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
           }
         });
 
-        /**
-         * Starts a wait for the next pending attempt, in place of the one before. The new wait is set before
-         * the old one stops, so a second call during the stop replaces it too. `shortest` keeps a sweep that
-         * failed from starting again at once.
-         */
         const schedule = Effect.fn("RoutineResults.schedule")(function* (shortest: number) {
           const previous = timer;
-          const next = store.nextAttemptAt();
+          const attemptAt = store.nextAttemptAt();
+          const next =
+            attemptAt && waitEndsAt ? (attemptAt < waitEndsAt ? attemptAt : waitEndsAt) : (attemptAt ?? waitEndsAt);
           const delay = next ? Math.max(shortest, Date.parse(next) - now().getTime()) : null;
-          // The wait lets go of itself before it sweeps, so the sweep's own `schedule` does not stop it.
           timer =
             delay === null
               ? null
@@ -287,7 +267,6 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
           }).pipe(Effect.withSpan("RoutineResults.sweep"));
 
         const recover = Effect.fn("RoutineResults.recover")(function* () {
-          // Under the lock: a sweep that an early event started can have a post of its own on its way.
           const touched = yield* lock.withPermit(attempt(() => store.interruptSending(now().toISOString()))).pipe(
             Effect.catchCause((cause) =>
               Effect.sync(() => {
@@ -297,13 +276,11 @@ class RoutineResults extends Context.Service<RoutineResults, RoutineResultsShape
             ),
           );
           if (touched.length > 0) dependencies.changed(touched);
-          // Forked: startup does not wait for the posts, and `close` stops them.
           yield* Effect.forkIn(sweep(), scope);
         });
 
         const notice = Effect.fn("RoutineResults.notice")(function* (event: AgentEvent) {
-          if (event.type !== "turn-completed" && event.type !== "queue-changed" && event.type !== "routines-changed")
-            return;
+          if (!routineResultNoticeEvent(event)) return;
           yield* Effect.forkIn(sweep(), scope);
         });
 
@@ -326,7 +303,6 @@ export interface RoutineResultsHandle extends RoutineResultsShape {
   close(): Effect.Effect<void>;
 }
 
-/** Starts the service on its own runtime; `close` stops the sweeps and the wait it forked. */
 export const createRoutineResults = Effect.fn("createRoutineResults")(function* (
   dependencies: RoutineResultsDependencies,
 ) {
@@ -338,12 +314,10 @@ export const createRoutineResults = Effect.fn("createRoutineResults")(function* 
   return { ...service, close: () => runtime.disposeEffect } satisfies RoutineResultsHandle;
 });
 
-/** 1, 2, 4 and 8 minutes, then each 15 minutes. */
 function retryDelay(attempts: number): number {
   return Math.min(LONGEST_RETRY_MS, FIRST_RETRY_MS * 2 ** Math.max(0, attempts - 1));
 }
 
-/** What the place gets: the routine's name over its answer. Both are the user's and the agent's own text. */
 export function resultText(routineName: string, answer: string): string {
   return `**${routineName}**\n\n${answer}`;
 }

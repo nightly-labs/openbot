@@ -19,4 +19,5 @@ export const messages = {
   "error.kind.service": "Usługa jest niedostępna. Poczekaj chwilę, a potem spróbuj ponownie.",
   "error.kind.clock":
     "Nie udało się nawiązać bezpiecznego połączenia, bo data lub godzina na komputerze, na którym działa OpenBot, jest prawdopodobnie błędna. Popraw datę i godzinę, a potem spróbuj ponownie.",
+  "error.kind.interrupted": "Połączenie zostało zamknięte, zanim odpowiedź się zakończyła. Wyślij wiadomość ponownie.",
 } as const satisfies PartialTranslation<typeof source>;
