@@ -187,6 +187,7 @@ try {
         () => "answered",
         (error: unknown) => String(error),
       );
+    assert.match(clientError, /timed out/i, "The MCP client gives up on the call at its own limit.");
     await cancelled;
     await client.close().catch(() => undefined);
     return clientError;
@@ -195,7 +196,6 @@ try {
   report.clientError = await takeOverUntilClientGivesUp();
   report.cardsAfterCancel = openCards();
   report.tabReleased = endedTakeovers.length > 0;
-  assert.match(report.clientError, /timed out/i, "The MCP client gives up on the call at its own limit.");
   assert.equal(report.cancelReason, PROVIDER_STOPPED_WAITING, "The client's cancel reads as 'stopped waiting'.");
   assert.equal(report.cardsAfterCancel, 1, "The takeover card stays open after the client's cancel.");
   assert.equal(report.tabReleased, false, "The user keeps control of the tab.");
