@@ -113,6 +113,9 @@ export const messages = {
   "error.backend.routineRunGone": "该自动化任务的此次运行已不存在。",
   "error.backend.routineRunFailedNoReason": "运行因错误而停止，但没有收到原因。打开这次运行，查看智能体做了什么。",
   "error.backend.turnNotStarted": "服务商未启动本轮对话。",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} 未及时确认已开始处理这条消息。为避免重复执行，OpenBot 不会再次发送。OpenBot 最多等待 5 分钟让智能体开始。",
+  "error.backend.turnStartAbandoned": "智能体在 5 分钟内未开始处理这条消息。请重新发送这条消息。",
   "error.backend.routineResultConnectionOff": "该消息连接已关闭或已移除，请另选投递位置。",
   "error.backend.routineResultNoDelivery": "本次运行没有可再次发送的回答。",
   "error.backend.channelMemoryLimit": "一个频道最多可有 {limit} 条记忆。",

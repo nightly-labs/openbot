@@ -136,6 +136,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "Der Lauf wurde mit einem Fehler beendet, aber ohne Grund. Öffne den Lauf, um zu sehen, was der Agent getan hat.",
   "error.backend.turnNotStarted": "Der Anbieter hat diesen Durchlauf nicht gestartet.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} hat nicht rechtzeitig bestätigt, dass diese Nachricht gestartet wurde. OpenBot sendet sie nicht erneut, damit die Arbeit nicht doppelt läuft. OpenBot wartet bis zu 5 Minuten, bis der Agent startet.",
+  "error.backend.turnStartAbandoned":
+    "Der Agent hat diese Nachricht in 5 Minuten nicht gestartet. Sende die Nachricht erneut.",
   "error.backend.routineResultConnectionOff":
     "Diese Messaging-Verbindung ist aus oder entfernt. Wähle einen anderen Ort.",
   "error.backend.routineResultNoDelivery": "Diese Ausführung hat keine Antwort, die erneut gesendet werden kann.",

@@ -136,6 +136,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "L’exécution s’est arrêtée sur une erreur, sans raison indiquée. Ouvrez l’exécution pour voir ce que l’agent a fait.",
   "error.backend.turnNotStarted": "Le fournisseur n’a pas démarré ce tour.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} n’a pas confirmé à temps qu’il a démarré ce message. OpenBot ne le renvoie pas, pour que le travail ne s’exécute pas deux fois. OpenBot attend jusqu’à 5 minutes que l’agent démarre.",
+  "error.backend.turnStartAbandoned": "L’agent n’a pas démarré ce message en 5 minutes. Renvoyez le message.",
   "error.backend.routineResultConnectionOff":
     "Cette connexion de messagerie est désactivée ou supprimée. Choisissez un autre emplacement.",
   "error.backend.routineResultNoDelivery": "Cette exécution n’a aucune réponse à renvoyer.",

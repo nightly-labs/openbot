@@ -121,6 +121,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "توقف التشغيل بسبب خطأ، لكن لم يصل معه أي سبب. افتح التشغيل لترى ما فعله الوكيل.",
   "error.backend.turnNotStarted": "لم يبدأ المزوّد هذا الدور.",
+  "error.backend.turnStartUnconfirmed":
+    "لم يؤكد {provider} في الوقت المحدد أنه بدأ هذه الرسالة. لا يرسلها OpenBot مرة أخرى، حتى لا يتكرر العمل. ينتظر OpenBot حتى 5 دقائق ليبدأ الوكيل.",
+  "error.backend.turnStartAbandoned": "لم يبدأ الوكيل هذه الرسالة خلال 5 دقائق. أرسل الرسالة مرة أخرى.",
   "error.backend.routineResultConnectionOff": "اتصال المراسلة هذا متوقف أو تمت إزالته. اختر مكانًا آخر.",
   "error.backend.routineResultNoDelivery": "لا توجد لهذا التشغيل إجابة لإرسالها مرة أخرى.",
   "error.backend.channelMemoryLimit": "يمكن أن تحتوي القناة على {limit} ذكريات كحد أقصى.",

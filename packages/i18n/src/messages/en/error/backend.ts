@@ -125,6 +125,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.routineRunFailedNoReason":
     "The run stopped with an error, but no reason came with it. Open the run to see what the agent did.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} did not confirm in time that it started this message. OpenBot does not send it again, so the work does not run twice. OpenBot waits up to 5 minutes for the agent to start.",
+  "error.backend.turnStartAbandoned": "The agent did not start this message in 5 minutes. Send the message again.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",
   "error.backend.channelMemoryLimit": "A channel can have up to {limit} memories.",

@@ -132,6 +132,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "De run is gestopt met een fout, maar zonder reden. Open de run om te zien wat de agent deed.",
   "error.backend.turnNotStarted": "De aanbieder heeft deze beurt niet gestart.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} heeft niet op tijd bevestigd dat dit bericht is gestart. OpenBot stuurt het niet opnieuw, zodat het werk niet twee keer wordt uitgevoerd. OpenBot wacht tot 5 minuten tot de agent begint.",
+  "error.backend.turnStartAbandoned":
+    "De agent heeft dit bericht niet binnen 5 minuten gestart. Stuur het bericht opnieuw.",
   "error.backend.routineResultConnectionOff":
     "Deze berichtenverbinding staat uit of is verwijderd. Kies een andere plek.",
   "error.backend.routineResultNoDelivery": "Deze run heeft geen antwoord om opnieuw te sturen.",

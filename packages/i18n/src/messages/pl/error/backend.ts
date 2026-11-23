@@ -131,6 +131,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "Uruchomienie zatrzymało się z błędem, ale bez podanego powodu. Otwórz uruchomienie, aby zobaczyć, co zrobił agent.",
   "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} nie potwierdził na czas, że rozpoczął tę wiadomość. OpenBot nie wysyła jej ponownie, aby praca nie wykonała się dwa razy. OpenBot czeka do 5 minut, aż agent zacznie.",
+  "error.backend.turnStartAbandoned": "Agent nie rozpoczął tej wiadomości w ciągu 5 minut. Wyślij wiadomość ponownie.",
   "error.backend.routineResultConnectionOff":
     "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",
   "error.backend.routineResultNoDelivery": "To uruchomienie nie ma odpowiedzi do ponownego wysłania.",

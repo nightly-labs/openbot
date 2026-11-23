@@ -125,6 +125,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "실행이 오류로 멈췄지만 이유가 전달되지 않았습니다. 실행을 열어 에이전트가 한 일을 확인하세요.",
   "error.backend.turnNotStarted": "제공자가 이 턴을 시작하지 않았어요.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider}이(가) 이 메시지를 시작했는지 제때 확인하지 않았어요. 작업이 두 번 실행되지 않도록 OpenBot은 메시지를 다시 보내지 않아요. OpenBot은 에이전트가 시작할 때까지 최대 5분 기다려요.",
+  "error.backend.turnStartAbandoned": "에이전트가 5분 안에 이 메시지를 시작하지 않았어요. 메시지를 다시 보내 주세요.",
   "error.backend.routineResultConnectionOff": "이 메시징 연결이 꺼져 있거나 제거되었어요. 다른 위치를 선택하세요.",
   "error.backend.routineResultNoDelivery": "이 실행에는 다시 보낼 답변이 없어요.",
   "error.backend.channelMemoryLimit": "채널 하나에는 메모리를 최대 {limit}개까지 둘 수 있어요.",
