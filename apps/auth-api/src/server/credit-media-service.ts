@@ -138,11 +138,15 @@ function upstreamParams(text: string): MediaUpstreamBody {
   return params;
 }
 
-function withOfferedPrices(model: CreditMediaModel): CreditMediaModel {
+function withOfferedPrices(model: CreditMediaModel): CreditMediaModel | null {
   if (model.resolutions.length === 0) return model;
+  if (model.defaultResolution !== null && !model.resolutions.includes(model.defaultResolution)) return null;
   const prices = model.prices.filter(
     (price) => price.resolution === null || model.resolutions.includes(price.resolution),
   );
+  const priced = (resolution: string) =>
+    prices.some((price) => price.resolution === null || price.resolution === resolution);
+  if (!model.resolutions.every(priced)) return null;
   return prices.length > 0 ? { ...model, prices } : model;
 }
 
@@ -167,7 +171,8 @@ function storedModels(rows: readonly ModelRow[]): StoredModel[] {
         silentCredits: row.silent_credits,
       })),
     });
-    return model ? [{ model: withOfferedPrices(model), route: routeOf(first) }] : [];
+    const offered = model ? withOfferedPrices(model) : null;
+    return offered ? [{ model: offered, route: routeOf(first) }] : [];
   });
 }
 

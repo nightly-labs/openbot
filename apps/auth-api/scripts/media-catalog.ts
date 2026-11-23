@@ -136,11 +136,12 @@ function readOptions(args: string[]): Options {
       options.silent = value === "none" ? "none" : Number(value);
       index += 1;
     } else if (arg === "--params" || arg === "--fields" || arg === "--specs" || arg === "--file") {
-      const value = args[index + 1] ?? null;
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith("--")) usage();
       if (arg === "--params") options.params = value;
       else if (arg === "--fields") options.fields = value;
       else if (arg === "--specs") options.specs = value;
-      else options.file = value ? resolve(value) : null;
+      else options.file = resolve(value);
       index += 1;
     } else if (arg === "--persist-to") {
       options.persistTo = args[index + 1] ? resolve(args[index + 1] ?? "") : null;
@@ -586,8 +587,14 @@ async function setRoute(options: Options): Promise<void> {
 function routeEntries(value: unknown): RouteEntry[] {
   if (!isDynamicRecord(value)) throw new Error("The routes file must be a JSON object.");
   return Object.entries(value).map(([modelId, entry]) => {
-    if (!isCreditMediaModelId(modelId) || !isDynamicRecord(entry) || !isString(entry.id))
-      throw new Error(`The route of ${modelId} needs an "id".`);
+    if (
+      !isCreditMediaModelId(modelId) ||
+      !isDynamicRecord(entry) ||
+      !isString(entry.id) ||
+      entry.id.length === 0 ||
+      entry.id.length > 200
+    )
+      throw new Error(`The route of ${modelId} needs an "id" of 1 to 200 characters.`);
     const params = entry.params ?? {};
     const fields = entry.fields ?? {};
     const specs = entry.specs ?? {};
