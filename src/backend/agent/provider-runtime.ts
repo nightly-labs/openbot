@@ -1116,7 +1116,7 @@ export class ProviderRuntime implements ProviderPort {
           Effect.gen(function* () {
             if (reconnecting.has(provider)) {
               const kept = available.has(provider) ? keptReading(provider) : null;
-              if (kept) collected.set(provider, kept);
+              if (kept && !usageWindowHasReset(kept)) collected.set(provider, kept);
               return;
             }
             if (available.has(provider)) yield* readDefault(provider).pipe(logFailure(provider));
