@@ -413,6 +413,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       this: CentralAuthManager,
       host: MobileConnectHostBinding,
     ): Effect.fn.Return<MobileConnectTicket, CentralAuthOperationError, CentralAuthTransport> {
+      const requestedAt = Date.now();
       const result = yield* this.#authorizedRequestEffect(
         "/v1/mobile-auth/ticket",
         {
@@ -420,16 +421,18 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ host }),
         },
-        decodeTicketResponse,
+        (value, response) => ({ ...decodeTicketResponse(value), serverDate: response.headers.get("Date") }),
       );
-      if (!result.ticket || !Number.isFinite(result.expiresAt) || result.expiresAt <= Date.now()) {
+      const receivedAt = Date.now();
+      const expiresAt = result.expiresAt - serverClockOffsetMs(result.serverDate, requestedAt, receivedAt);
+      if (!result.ticket || !Number.isFinite(expiresAt) || expiresAt <= receivedAt) {
         return yield* new CentralAuthOperationError({
           cause: new Error("The account service returned an invalid Mobile Connect ticket."),
         });
       }
       return {
         qrData: createMobileConnectUrl({ apiUrl: this.#options.mobileConnectApiUrl, ticket: result.ticket, host }),
-        expiresAt: result.expiresAt,
+        expiresAt,
       };
     },
     (operation) => this.#owned(operation),
@@ -2334,7 +2337,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     this: CentralAuthManager,
     path: string,
     init: RequestInit,
-    decoder: (value: unknown) => T,
+    decoder: (value: unknown, response: Response) => T,
     timeoutMs = 10_000,
   ): Effect.fn.Return<T, CentralAuthOperationError, CentralAuthTransport> {
     const response = yield* CentralAuthTransport.use((transport) =>
@@ -2348,7 +2351,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         cause: yield* AuthApiError.fromResponseEffect(response),
       });
     const value = response.status === 204 ? undefined : yield* authCall(() => response.json());
-    return yield* authDecode(() => decoder(value));
+    return yield* authDecode(() => decoder(value, response));
   });
 
   readonly #startupRequestEffect = Effect.fn("CentralAuth.startupRequest")(function* <T>(
@@ -2401,7 +2404,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     this: CentralAuthManager,
     path: string,
     init: RequestInit,
-    decoder: (value: unknown) => T,
+    decoder: (value: unknown, response: Response) => T,
     timeoutMs?: number,
   ): Effect.fn.Return<T, CentralAuthOperationError, CentralAuthTransport> {
     if (!this.#sessionToken)
@@ -2595,6 +2598,17 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       },
     });
   }
+}
+
+const HTTP_DATE_RESOLUTION_MS = 1_000;
+
+function serverClockOffsetMs(dateHeader: string | null, requestedAt: number, receivedAt: number): number {
+  const serverSecondStart = dateHeader ? Date.parse(dateHeader) : Number.NaN;
+  if (!Number.isFinite(serverSecondStart)) return 0;
+  if (serverSecondStart > receivedAt) return serverSecondStart - receivedAt;
+  const serverSecondEnd = serverSecondStart + HTTP_DATE_RESOLUTION_MS;
+  if (serverSecondEnd < requestedAt) return serverSecondEnd - requestedAt;
+  return 0;
 }
 
 export function readCentralAuthApiUrl(value: string | undefined, fallback = "http://127.0.0.1:3100"): string {
