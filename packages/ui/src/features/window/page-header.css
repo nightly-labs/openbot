@@ -14,10 +14,6 @@
   gap: var(--openbot-space-2);
 }
 
-.page-header:has(> .page-header-close) > .page-header-identity {
-  margin-inline-end: auto;
-}
-
 .page-header-back {
   margin-inline-start: calc(-1 * var(--openbot-space-2));
 }

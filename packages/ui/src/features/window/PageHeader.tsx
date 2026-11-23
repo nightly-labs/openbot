@@ -1,4 +1,4 @@
-import { ArrowLeft, Button, ChevronRight, IconButton, X } from "@openbot/ui";
+import { ArrowLeft, Button, ChevronRight, IconButton } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { For, onSettled, Show, untrack } from "solid-js";
@@ -24,6 +24,7 @@ export function PageHeader(props: {
 }) {
   const { t } = useText();
   let heading: HTMLHeadingElement | undefined;
+  let header: HTMLElement | undefined;
   onSettled(() => {
     if (untrack(() => props.onBack)) heading?.focus();
   });
@@ -86,7 +87,7 @@ export function PageHeader(props: {
     </>
   );
   return (
-    <header class={props.class ? `page-header ${props.class}` : "page-header"}>
+    <header ref={header} class={props.class ? `page-header ${props.class}` : "page-header"}>
       <Show
         when={props.pathLabel}
         fallback={
@@ -102,18 +103,17 @@ export function PageHeader(props: {
         )}
       </Show>
       {props.children}
-      <Show when={close()}>{(closePage) => <PageCloseButton onClose={() => closePage()()} />}</Show>
+      <Show when={close()}>{(closePage) => <CloseOnEscape within={() => header} onClose={() => closePage()()} />}</Show>
     </header>
   );
 }
 
-function PageCloseButton(props: { onClose: () => void }) {
-  const { t } = useText();
-  let button: HTMLButtonElement | undefined;
+function CloseOnEscape(props: { within: () => HTMLElement | undefined; onClose: () => void }) {
   onSettled(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
-      if (!button?.isConnected || button.closest("[inert]")) return;
+      const within = props.within();
+      if (!within?.isConnected || within.closest("[inert]")) return;
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("[role=dialog], [role=alertdialog], [role=menu], [role=listbox]")) return;
       if (target?.closest("input, textarea, select, [contenteditable]")) return;
@@ -123,16 +123,5 @@ function PageCloseButton(props: { onClose: () => void }) {
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   });
-  return (
-    <IconButton
-      ref={button}
-      class="page-header-close"
-      variant="ghost"
-      label={t("common.close")}
-      data-cuelume-tap="close"
-      onClick={() => props.onClose()}
-    >
-      <X />
-    </IconButton>
-  );
+  return null;
 }

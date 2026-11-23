@@ -23,17 +23,6 @@ export const WindowFrame: Story = {
   args: { hostName: "Studio Mac", onBack: fn(), frame: "window" },
 };
 
-export const WindowFrameControls: Story = {
-  args: { title: "Usage", onBack: fn(), frame: "window" },
-  render: (args) => (
-    <PageHeader {...args}>
-      <Button variant="outline" size="sm">
-        Last 7 days
-      </Button>
-    </PageHeader>
-  ),
-};
-
 export const Controls: Story = {
   args: { title: "Usage", hostName: "Studio Mac", onBack: fn() },
   render: (args) => (
