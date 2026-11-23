@@ -433,6 +433,18 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");
+  } else if (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId === delivery.recipientAgentId &&
+    delivery.replyToMessageId
+  ) {
+    text = [
+      "This is the result of the request that you sent to an OpenBot channel with openbot.send_to_channel. You did that channel work yourself, in the channel.",
+      "Give the result to the user naturally now. Do not do the work again here, do not send the request again, and do not answer with openbot.send_message. For a blocked or paused status, tell the user what stopped and what they can do in the channel.",
+      USER_LANGUAGE_LINE,
+      COLLABORATOR_SEPARATOR,
+      displayText,
+    ].join("\n");
   } else if (delivery.sender.kind === "agent" && delivery.sender.agentId === delivery.recipientAgentId) {
     text = [
       "This message comes from your own chat, which started this task with openbot.start_task. The task is a separate conversation beside that chat.",

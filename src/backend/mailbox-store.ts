@@ -1662,7 +1662,8 @@ export class MailboxStore {
     const holders = this.#requestHolders();
     for (const message of selectedStoredMessages) {
       const deliveries = deliveriesByMessage.get(message.id) ?? [];
-      if (message.sender.kind === "agent" && message.sender.agentId === agentId) {
+      const onlyToSelf = deliveries.length > 0 && deliveries.every((delivery) => delivery.recipientAgentId === agentId);
+      if (message.sender.kind === "agent" && message.sender.agentId === agentId && !onlyToSelf) {
         messages.push({
           id: `outbox-${message.id}`,
           turnId: turnIds.get(message.id),
