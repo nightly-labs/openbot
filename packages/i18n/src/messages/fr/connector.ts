@@ -58,7 +58,6 @@ export const messages = {
   "connector.github.disconnectEffectRevoke": "GitHub s’ouvre ensuite, et vous pouvez y révoquer OpenBot.",
   "connector.github.disconnectEffectKept":
     "Les discussions, les fichiers et la mémoire des agents restent sur cet ordinateur.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Chaque agent de {host} peut utiliser vos dépôts, tickets et pull requests GitHub, ainsi que gh et git.",
   "connector.github.connectedSummaryHost": {
@@ -359,7 +358,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Votre discussion « Message à vous-même » et les personnes que vous autorisez joignent OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Les personnes que vous autorisez joignent OpenBot. Les autres reçoivent un code à vous transmettre.",
+    "Votre discussion « Message à vous-même » et les personnes que vous autorisez joignent OpenBot. Les autres reçoivent un code à vous transmettre.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp a retiré cet ordinateur des appareils connectés. Associez à nouveau le numéro.",
   "connector.whatsapp.helpLoggedOutHost":

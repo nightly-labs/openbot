@@ -33,4 +33,6 @@ export const messages = {
   "error.billing.invalidRequest": "Некорректный запрос оплаты.",
   "error.billing.invalidResponse": "Некорректный ответ оплаты.",
   "error.billing.notStripePage": "Страница оплаты не принадлежит Stripe.",
+  "error.billing.customServerOfferMissing": "У этого сервера нет тарифа для оплаты.",
+  "error.billing.checkoutUnavailable": "Сейчас нельзя начать оплату. Повторите через минуту.",
 } as const satisfies PartialTranslation<typeof source>;

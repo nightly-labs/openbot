@@ -10,41 +10,30 @@ import { useText } from "../../text";
 import { formatMinorMoney } from "./money";
 import "./billing-server-lifecycle-preview.css";
 
-/** The disk of the server as the client measures it. */
 export interface StorageTierDisk {
-  /** "full" shows the meter in the danger color. */
   level: "low" | "full";
   freeBytes: number;
   totalBytes: number;
 }
 
 export interface StorageTierDialogProps {
-  /** "offer": the sidebar offer when the disk is almost full. "billing": "Add storage" in Billing. */
   mode: "offer" | "billing";
   serverName: string;
-  /** The disk meter. Billing does not know the disk, so it shows no meter. */
   disk?: StorageTierDisk | undefined;
-  /** The storage of the server now in GB. */
   storageGb: number;
   interval: BillingInterval;
   currency: BillingCurrency;
-  /** The list price of one period now, in minor units. Null shows no price on the current row. */
   amount: number | null;
-  /** The tiers that the owner can buy, smallest first. */
   upgrades: readonly BillingStorageUpgrade[];
-  /** The account server is adding the storage. */
   pending: boolean;
   error: string | null;
   onBuy: (tier: BillingStorageUpgradeTier) => void;
-  /** Offer mode only: opens the storage settings of the server. */
   onFreeUpSpace?: (() => void) | undefined;
   onClose: () => void;
 }
 
-/** The value of the disabled row of the storage that the server has now. */
 const CURRENT = "current";
 
-/** The tier with the lowest price for each GB, when there are two tiers to choose from. */
 function bestValueTier(upgrades: readonly BillingStorageUpgrade[]): BillingStorageUpgradeTier | undefined {
   if (upgrades.length < 2) return undefined;
   let best: { tier: BillingStorageUpgradeTier; perGb: number } | undefined;
@@ -56,17 +45,11 @@ function bestValueTier(upgrades: readonly BillingStorageUpgrade[]): BillingStora
   return best?.tier;
 }
 
-/**
- * The choice of a larger storage tier for a hosted server. A row shows the size and the price of one
- * period; the first row is the storage now and cannot be chosen. The primary button buys the chosen tier.
- */
 export function StorageTierDialog(props: StorageTierDialogProps) {
   const { t, format } = useText();
   let primary: HTMLButtonElement | undefined;
   const best = () => bestValueTier(props.upgrades);
   const [picked, setSelected] = createSignal<string | null>(null);
-  // The best value is chosen first, else the largest tier. A choice that the tiers no longer have (a load
-  // while the dialog is open) goes back to it.
   const selected = () => {
     const value = picked();
     return value !== null && props.upgrades.some((upgrade) => String(upgrade.tier) === value)
@@ -86,7 +69,6 @@ export function StorageTierDialog(props: StorageTierDialogProps) {
     ...props.upgrades.map((upgrade) => ({ value: String(upgrade.tier), ...upgrade })),
   ];
   const usedBytes = (disk: StorageTierDisk) => Math.max(0, disk.totalBytes - disk.freeBytes);
-  // Round down so that a nearly full disk does not show 100% while space is left.
   const percent = (disk: StorageTierDisk) =>
     disk.totalBytes > 0 ? Math.floor((usedBytes(disk) / disk.totalBytes) * 100) : 0;
   return (

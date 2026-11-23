@@ -1,10 +1,6 @@
 import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/language";
 
-/**
- * Language and region names for the dictation language picker. Hermes has no
- * `Intl.DisplayNames`, so the names are in the catalog.
- */
 export const messages = {
   "language.withRegion": "{language}（{region}）",
   "language.name.af": "南非荷兰语",

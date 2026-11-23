@@ -1,12 +1,3 @@
-// Runs the real Electron with the main-loop stall profiler:
-// 1. An in-process inspector session records a CPU profile of the main process, and the summary
-//    names the function that blocked the main thread.
-// 2. The summary holds no directory: only frames of the shape that analytics accepts.
-// 3. With `--trigger` (about 5 minutes): the resource monitor starts a profile after a minute with a
-//    stall, keeps it when the next minute stalls too, and writes `logs/stall-profiles.ndjson`.
-//
-// Run: bun scripts/main-loop-profile-e2e.ts [--trigger]
-// It writes .openbot-build/main-loop-profile-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { closeSync, openSync, readFileSync } from "node:fs";
@@ -21,7 +12,6 @@ const OUT = join(ROOT, ".openbot-build", "main-loop-profile-e2e");
 const TRIGGER = process.argv.includes("--trigger");
 const TIMEOUT_MS = TRIGGER ? 8 * 60_000 : 60_000;
 const BLOCKER = "blockMainLoopForTest app:main-loop-profile-electron.mjs:";
-// The Electron binary itself, not the `.bin/electron` Node wrapper.
 const electronPath = join(
   ROOT,
   "node_modules",

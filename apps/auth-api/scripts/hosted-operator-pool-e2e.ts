@@ -1,16 +1,3 @@
-// Runs the real account server hosted-server service and the pool snapshot on a migrated SQLite
-// database, with the real billing service and a Stripe that answers the subscription reads. The operator
-// runs a pool of machines (`operator_hosts`) in more than one location. A server on a machine of the
-// operator keeps its data for 30 days after its plan ends, as the Terms say. Then the cron deletes it
-// when Stripe confirms that the subscription is cancelled, and the operator reinstalls the machine for the
-// next customer. A renewal in the 30 days keeps the server. An open subscription that Stripe still
-// retries (`unpaid`) keeps it too. A server on boat is never deleted by this rule. A plan that ended
-// under the Worker from before migration 0053 gets the date of the first check. The snapshot of each
-// minute counts the machines of each location and product by state, and when they are free; the OpenPanel
-// event keeps only safe values.
-//
-// Run: bun run test:hosted-operator-pool
-// It writes .openbot-build/hosted-operator-pool-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -29,7 +16,6 @@ const OUT = join(ROOT, ".openbot-build", "hosted-operator-pool-e2e");
 const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const OWNER = { id: "owner", email: "owner@example.test" };
 const MINUTE = 60_000;
-/** The other cron of the production Worker (`wrangler.jsonc`). */
 const FIVE_MINUTE_CRON = "*/5 * * * *";
 const DAY = 24 * 60 * MINUTE;
 const FAR = 400 * DAY;
@@ -49,7 +35,6 @@ async function run() {
     .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
     .run(OWNER.id, `email:${OWNER.email}`, OWNER.email);
 
-  // The pool: four machines in Amsterdam, one in Washington, one in Sydney, and one that left the pool.
   const machine = database.prepare(
     "INSERT INTO operator_hosts(host_id, location, product, added_at, removed_at) VALUES (?, ?, ?, 1, ?)",
   );
@@ -64,7 +49,6 @@ async function run() {
   ] as const) {
     machine.run(id, location, product, removedAt);
   }
-  // Two machines wait for a new server. Only the free one counts as ready, and only while it was seen.
   database
     .prepare("UPDATE operator_hosts SET assign_token_hash = 'hash-' || host_id, seen_at = ? WHERE host_id IN (?, ?)")
     .run(t0 - 1000, "leaseweb:101", "leaseweb:104");
@@ -122,7 +106,6 @@ async function run() {
       t0,
     );
   };
-  // 101: in use. 102: the owner cancelled at the end of the period, in 60 days. 103: the plan ended.
   server("active", { machine: "leaseweb:101", status: "active" });
   server("cancelling", {
     machine: "leaseweb:102",
@@ -131,7 +114,6 @@ async function run() {
     cancelAtPeriodEnd: true,
   });
   server("ended", { machine: "leaseweb:103", status: "canceled" });
-  // 104 is free. 105: the plan ended under the Worker before migration 0053, so it has no date.
   server("old-ended", {
     machine: "leaseweb:105",
     desired: "stopped",
@@ -139,11 +121,8 @@ async function run() {
     error: "plan_ended",
     status: "canceled",
   });
-  // 106: Stripe still retries the payment.
   server("unpaid", { machine: "leaseweb:106", status: "unpaid" });
-  // 107 left the pool, and its server is deleted: the operator must still reinstall it.
   server("gone", { machine: "leaseweb:107", desired: "deleted", observed: "deleted", status: "canceled" });
-  // A server on boat whose plan ended 40 days ago, and a server whose owner pays again in the 30 days.
   server("boat-ended", {
     sandboxId: "bx_boat_ended",
     desired: "stopped",
@@ -167,7 +146,6 @@ async function run() {
     return Response.json({ ok: true });
   };
   const stripeCalls: string[] = [];
-  // The close of an open renewal Checkout page fails until a check sets this.
   const checkout = { closes: false };
   const billing = new BillingService({
     database: sqliteD1(database),
@@ -269,14 +247,12 @@ async function run() {
   const same = (group: HostedPoolGroup | undefined, expected: ReturnType<typeof counts>) =>
     JSON.stringify(counts(group)) === JSON.stringify(expected);
 
-  // An empty pool sends no event.
   const empty = new DatabaseSync(":memory:");
   for (const name of readdirSync(MIGRATIONS).sort()) empty.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
   const emptyGroups = await Effect.runPromise(readHostedPool(sqliteD1(empty), t0));
   check("an empty pool has no group", emptyGroups.length === 0, emptyGroups);
   empty.close();
 
-  // Before the first check: the plans of `ended` and `unpaid` ended, but the Worker did not see it yet.
   const before = await pool(t0);
   check(
     "the snapshot counts each machine of a location and product by state",
@@ -363,7 +339,6 @@ async function run() {
       }),
     afterEnd.groups,
   );
-  // The owner of `renewed` pays again 10 days after the end.
   database
     .prepare("UPDATE billing_subscriptions SET status = 'active', updated_at = ? WHERE server_id = 'renewed'")
     .run(t0 + 10 * DAY);
@@ -415,7 +390,6 @@ async function run() {
     afterDelete.find("AMS-01", "VPS02")?.to_reinstall === 1 && afterDelete.find("WDC-02", "VPS02")?.to_reinstall === 1,
     afterDelete.groups,
   );
-  // The operator reinstalls the machines and gives them back to the pool (`leaseweb-pool.ts sync`).
   database
     .prepare(
       "UPDATE hosted_servers SET operator_host = NULL WHERE operator_host IS NOT NULL AND observed_state = 'deleted'",
@@ -430,7 +404,6 @@ async function run() {
       reinstalled.find("all", "all")?.machines === 7,
     reinstalled.groups,
   );
-  // The plan that ends in 60 days frees its machine 30 days after that: in the 30 days from day 61.
   const later = await pool(t0 + 61 * DAY);
   check(
     "a plan cancelled at the end of its period is free 30 days after the period ends",
@@ -438,7 +411,6 @@ async function run() {
     later.groups,
   );
 
-  // The OpenPanel event of each group, and a group with a value that is not of the pool.
   const bodies: unknown[] = [];
   const sends: Effect.Effect<void>[] = [];
   const analytics = createAccountAnalytics({
@@ -472,7 +444,6 @@ async function run() {
     bodies,
   );
 
-  // The five-minute cron of the Worker sends the snapshot at each run; the each-minute cron sends none.
   const scheduledAt = t0 + OPERATOR_HOST_DATA_KEPT_MS + 5 * MINUTE;
   const snapshots = await scheduledSnapshots(database, scheduledAt, FIVE_MINUTE_CRON);
   const expected = await pool(scheduledAt);
@@ -489,7 +460,6 @@ async function run() {
   const minuteRun = await scheduledSnapshots(database, scheduledAt + 3 * MINUTE, SIGNAL_ENTRY_CRON);
   check("the each-minute cron sends no snapshot", minuteRun.length === 0, minuteRun);
 
-  // On reinstalled machines: a plan whose renewal page is still open, and a first payment that never came.
   const late = t0 + 40 * DAY;
   const ended = { desired: "stopped", observed: "stopped", error: "plan_ended", planEndedAt: late - 31 * DAY };
   server("checkout-open", { ...ended, machine: "leaseweb:104", status: "canceled" });
@@ -513,7 +483,6 @@ async function run() {
   );
 }
 
-/** The `hosted_pool_snapshot` request bodies that one run of the Worker cron sends to OpenPanel. */
 async function scheduledSnapshots(database: DatabaseSync, at: number, cron: string): Promise<string[]> {
   const snapshots: string[] = [];
   const originalFetch = globalThis.fetch;

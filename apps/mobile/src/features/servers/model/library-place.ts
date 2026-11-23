@@ -10,10 +10,6 @@ import {
 } from "@openbot/contracts/ipc";
 import { useSyncExternalStore } from "react";
 
-/**
- * The place in the Library that the page shows, as on desktop. `removed`: the files of agents that the
- * server no longer has. An agent and a folder also show the files of the folders in them.
- */
 export type LibraryPlace =
   | { kind: "all" }
   | { kind: "removed" }
@@ -22,10 +18,6 @@ export type LibraryPlace =
 
 const ALL_FILES: LibraryPlace = { kind: "all" };
 
-/**
- * The place of each server, kept while the app runs. The Library and the folder sheet read and set it,
- * so a choice in the sheet shows on the page under it.
- */
 const places = new Map<string, LibraryPlace>();
 const listeners = new Set<() => void>();
 
@@ -41,15 +33,10 @@ export function setLibraryPlace(serverId: string, place: LibraryPlace): void {
   for (const listener of listeners) listener();
 }
 
-/** The place that the user chose on this server. `resolveLibraryPlace` checks it against the folders. */
 export function useLibraryPlace(serverId: string): LibraryPlace {
   return useSyncExternalStore(subscribe, () => places.get(serverId) ?? ALL_FILES);
 }
 
-/**
- * The place to show: a place whose agent or folder is gone gives the place above it. Without folders,
- * the page shows all files.
- */
 export function resolveLibraryPlace(
   place: LibraryPlace,
   snapshot: LibraryFoldersSnapshot | null | undefined,
@@ -65,12 +52,10 @@ export function resolveLibraryPlace(
     : { kind: "agent", agentId: place.agentId };
 }
 
-/** A file of an agent that the server no longer has. A file of no agent is in no agent's Library. */
 export function fromRemovedAgent(file: StoredFileRow, livingAgentIds: ReadonlySet<string>): boolean {
   return file.agentId !== null && !livingAgentIds.has(file.agentId);
 }
 
-/** The files of the place. */
 export function filesOfPlace(
   files: readonly StoredFileRow[],
   place: LibraryPlace,
@@ -87,7 +72,6 @@ export function filesOfPlace(
   });
 }
 
-/** The folders of one parent of an agent, in the sequence of the snapshot. */
 export function childFolders(
   folders: readonly LibraryFolder[],
   agentId: string,
@@ -96,10 +80,6 @@ export function childFolders(
   return folders.filter((folder) => folder.agentId === agentId && folder.parentId === parentId);
 }
 
-/**
- * A folder can hold one more level of folders: a new folder, or the folder `movedId` with the folders
- * in it. `parentId` undefined is the top level of an agent. The host has the same limit.
- */
 export function canHoldFolder(
   folders: readonly LibraryFolder[],
   parentId: string | undefined,
@@ -110,7 +90,6 @@ export function canHoldFolder(
   return level + 1 + height <= LIBRARY_FOLDER_LIMITS.levels && folders.length < LIBRARY_FOLDER_LIMITS.folders;
 }
 
-/** The number of files in a folder and in the folders in it. */
 export function folderFileCount(
   files: readonly StoredFileRow[],
   snapshot: LibraryFoldersSnapshot,

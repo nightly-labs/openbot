@@ -1,10 +1,10 @@
 {
-  "version": "0.73.0",
+  "version": "0.76.1",
   "highlights": [
-    "Update your joined servers to this version too, so that custom image sizes and the Sunra and Higgsfield models work there.",
-    "See the side threads of each agent in the sidebar, and filter the sidebar by agents, channels, unread chats or folders.",
-    "Edit one workflow together with other people at the same time.",
-    "OpenBot uses much less CPU while many agents work, and its database uses much less space.",
-    "Agents finish a checkout when the bank asks for a 3-D Secure code that they can read in your email or SMS."
+    "Update your joined servers to this version too, so that parallel tasks, workflow folders, typed workflow answers and up to 20 provider accounts work there.",
+    "Agents can split unrelated work into tasks that run at the same time and combine the results for you.",
+    "Open the agent browser in its own window and move it to a second monitor.",
+    "Word documents open in the file preview, and the Files panel opens the workspace folder of the agent.",
+    "Change any keyboard shortcut in the new Keyboard tab of Settings."
   ]
 }

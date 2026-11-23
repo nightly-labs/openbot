@@ -1,11 +1,3 @@
-// Frozen optional agent-install-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can make the host add a new agent from a marketplace listing or from a shared agent
-// template. Only ids cross the wire: the host downloads the listing or template with its own
-// account, so a client never sends instructions, skills or routines. The response names the new
-// agent only; the client reads it with the agent list. A member cannot use either route;
-// `requireAdmin` on the host is the only gate. Widening any of it needs a second capability string.
 import { adminRoute, fields, identifier, type OptionalRouteCodec, string } from "./admin-wire";
 
 export const AGENT_INSTALL_CAPABILITY = "agent-install-v1";

@@ -1,26 +1,6 @@
-/**
- * The plugins the marketplace offers.
- *
- * Generated from marketplace/plugin-catalog/ by scripts/build-plugin-catalog.ts.
- * Do not edit by hand: run bun run marketplace:build:plugins, or
- * bun run marketplace:build:plugins -- --check to verify.
- */
-
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
-/**
- * The configuration an app installs as. The catalog states the name and how the server is reached -
- * an address, or a command, its words and its fixed settings; the rest of the record and `enabled`
- * are made here rather than stored as catalog data that could disagree with `normalizeMcpConfig`.
- *
- * A credential is never among them. What a server asks for is declared in `server.auth`, and the
- * value is typed by the user in the connect dialog, which hands back the configuration that
- * connected.
- *
- * The id is empty, which is what the store reads as "new". An id it does not hold is an edit of a
- * row that is gone, and the save is refused.
- */
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
   return {
     id: "",
@@ -579,6 +559,50 @@ const HINDSIGHT: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/hindsight",
+};
+
+const MEM0: MarketplacePluginDetail = {
+  id: "plugin-mem0",
+  slug: "mem0",
+  name: "Mem0",
+  tagline: "Memory layer for AI agents",
+  description:
+    "Mem0 gives agents a long-term memory in your Mem0 account. Agents add facts and preferences, search them by meaning, and update or delete them. Other AI tools that you connect to Mem0 share the same memories. To make Mem0 the only memory of an agent, turn off OpenBot memory in the agent's settings. What agents save goes to your Mem0 account.",
+  category: "productivity",
+  creatorName: "Mem0",
+  iconUrl: "https://app.mem0.ai/apple-icon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-recall", text: "Search Mem0 for what you know about my current projects before we start." },
+    { id: "prompt-save", text: "Add to Mem0 that I prefer short status updates with the open questions first." },
+    {
+      id: "prompt-clean",
+      text: "List my Mem0 memories about the old office and delete the ones that are out of date.",
+    },
+  ],
+  apps: [
+    {
+      id: "app-mem0-mcp",
+      name: "Mem0",
+      description:
+        "Add, search, update and delete memories in your Mem0 account over Mem0's MCP server with browser sign-in.",
+      iconUrl: "https://app.mem0.ai/apple-icon.png",
+      server: {
+        name: "mem0",
+        transport: "http",
+        url: "https://mcp.mem0.ai/mcp/",
+        auth: [{ id: "mem0-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://mem0.ai",
+  privacyPolicyUrl: "https://mem0.ai/privacy",
+  termsUrl: "https://mem0.ai/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/mem0",
 };
 
 const FIGMA: MarketplacePluginDetail = {
@@ -4125,6 +4149,46 @@ const DATADOG: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/datadog",
+};
+
+const DATADOG_EU: MarketplacePluginDetail = {
+  id: "plugin-datadog-eu",
+  slug: "datadog-eu",
+  name: "Datadog EU",
+  tagline: "Monitoring, logs and traces",
+  description:
+    "Datadog EU lets agents search logs, metrics, traces, monitors, dashboards and incidents in the organization of the signed-in account. Each user signs in to their own Datadog account on the EU site (datadoghq.eu) through the browser.",
+  category: "coding",
+  creatorName: "Datadog",
+  iconUrl: "https://www.datadoghq.com/favicon.ico",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-errors", text: "Which services had the most errors in the last hour?" },
+    { id: "prompt-monitor", text: "Why is the checkout latency monitor alerting?" },
+    { id: "prompt-incident", text: "Summarize the open incidents and their status." },
+  ],
+  apps: [
+    {
+      id: "app-datadog-eu-mcp",
+      name: "Datadog EU",
+      description: "Logs, metrics, traces, monitors, and incidents, over Datadog's EU MCP server with browser sign-in.",
+      iconUrl: "https://www.datadoghq.com/favicon.ico",
+      server: {
+        name: "datadog-eu",
+        transport: "http",
+        url: "https://mcp.datadoghq.eu/v1/mcp",
+        auth: [{ id: "datadog-eu-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://www.datadoghq.com",
+  privacyPolicyUrl: "https://www.datadoghq.com/legal/privacy/",
+  termsUrl: "https://www.datadoghq.com/legal/terms/",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/datadog-eu",
 };
 
 const DATAFORSEO: MarketplacePluginDetail = {
@@ -10653,6 +10717,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   COBRAIN,
   HONCHO,
   HINDSIGHT,
+  MEM0,
   FIGMA,
   PAPER,
   HIGGSFIELD,
@@ -10737,6 +10802,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   CUSTOMERIO,
   DART,
   DATADOG,
+  DATADOG_EU,
   DATAFORSEO,
   DEALROOM,
   DEEPLEDGER,

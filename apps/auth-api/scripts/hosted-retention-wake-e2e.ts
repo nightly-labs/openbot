@@ -1,13 +1,3 @@
-// Runs the real account server hosted-server service on a migrated SQLite database, with a boat API
-// that starts and stops sandboxes. boat deletes the disk of a sandbox 14 days after its stop, so the
-// cron must start an idle server with no use for 10 days, and the idle rule must stop it again when no
-// client connects. One start goes in each 10 minutes of cron time, and a start that boat failed or
-// refused goes again later, also after a refused start for a routine run. A sandbox that boat deleted
-// keeps its error. A server with less sleep, a disk that boat deleted, a due deletion, or a plan that
-// ended must not start.
-//
-// Run: bun run test:hosted-retention-wake
-// It writes .openbot-build/hosted-retention-wake-e2e/report.json and exits non-zero on a failure.
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -63,7 +53,6 @@ async function run() {
       lastActiveAt + 20 * MINUTE,
     );
   const nextRunAt = t0 + 30 * DAY;
-  // The oldest change goes first, so `flaky` is the first start.
   server("flaky", "idle", t0 - 11 * DAY);
   server("due", "idle", t0 - 10 * DAY, { nextRunAt });
   server("recent", "idle", t0 - 9 * DAY);
@@ -156,7 +145,6 @@ async function run() {
     { result: first, row: reverted },
   );
 
-  // The test Worker runs the cron each minute, production each 5 minutes.
   await tick(t0 + MINUTE);
   await tick(t0 + 5 * MINUTE);
   check("no keep-alive start until 10 minutes of cron time pass", resumes("due") === 0, calls);
@@ -221,8 +209,6 @@ async function run() {
   check("a server whose disk is older than 14 days never starts", resumes("expired") === 0, calls);
   check("a server with a due deletion never starts", resumes("deleting") === 0, calls);
 
-  // A 4xx refusal, such as an empty boat wallet, must not leave the server in `error`: no cron path
-  // starts it from there, so boat would delete its disk.
   const refusedAt = t0 + 10 * DAY + 20 * MINUTE;
   server("refused", "idle", refusedAt - 11 * DAY);
   refusals = 1;
@@ -240,7 +226,6 @@ async function run() {
   for (let slot = 1; slot <= 3; slot += 1) await tick(refusedAt + slot * 10 * MINUTE);
   check("a later slot starts the server again after the boat refusal", resumes("refused") === 2, calls);
 
-  // The start for a routine run has the same rule. The oldest change goes first, so `gone` takes the slot.
   const routineAt = refusedAt + 40 * MINUTE;
   server("routine", "idle", routineAt - 3 * DAY, { nextRunAt: routineAt + 5 * MINUTE });
   server("gone", "idle", routineAt - 11 * DAY);

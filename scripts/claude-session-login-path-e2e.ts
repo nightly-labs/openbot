@@ -1,10 +1,3 @@
-// Adapted from the reproduction in nightly-labs/openbot#2464.
-// A Claude agent session with OpenBot started the way Finder, the Dock or a login item starts it:
-// PATH=/usr/bin:/bin:/usr/sbin:/sbin. The session's Bash tool and hooks run with the PATH the Claude
-// process starts with, so that process must get the login shell's folders, such as Homebrew's.
-// The real Claude Agent SDK starts a stand-in Claude executable that records its PATH.
-// `bun run test:claude:login-path`; exit 0 = the session got the login-shell folder. Writes
-// .openbot-build/claude-session-login-path-e2e/report.json.
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -21,7 +14,6 @@ let client: ClaudeAgentClient | null = null;
 let passed = false;
 
 try {
-  // The user's login shell puts a tool folder on PATH, as Homebrew's `brew shellenv` or nvm does.
   const home = join(root, "home");
   const tools = join(home, "tools");
   await mkdir(tools, { recursive: true });
@@ -31,13 +23,11 @@ try {
   delete process.env.ZDOTDIR;
   if (process.platform !== "darwin") process.env.SHELL = "/bin/bash";
 
-  // OpenBot started from Finder, the Dock or a login item.
   process.env.PATH = "/usr/bin:/bin:/usr/sbin:/sbin";
 
   const shellPath = await runCauseEffect(runInLoginShell('printf %s "$PATH"'));
   assert.ok(shellPath.includes(tools), "Precondition: the login shell puts the tool folder on PATH.");
 
-  // The stand-in records the PATH it started with, then waits until the SDK closes its input.
   const recorded = join(root, "session-path.txt");
   const executable = join(root, "claude");
   await writeFile(
@@ -52,7 +42,6 @@ try {
   client.start();
   await runCauseEffect(client.request("thread/start", { cwd: workspace, persistSession: false }, (value) => value));
 
-  // The SDK starts the process when the query is made; wait for the file it writes.
   const sessionPath = await new Promise<string>((done, fail) => {
     let expired = false;
     const deadline = setTimeout(() => {

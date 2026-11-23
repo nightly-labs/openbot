@@ -31,13 +31,8 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { ImportResult } from "./AgentImportView";
 import { HERMES_PATH } from "./hermes-logo-shape";
 
-/**
- * `reading`: main reads the Hermes folder. `missing`: it found no profiles. `review`: the profiles are
- * open and nothing has changed. `importing`: agents are being made or updated. `done`: the result.
- */
 export type HermesImportPhase = "reading" | "missing" | "review" | "importing" | "done";
 
-/** One profile to import, with the items that need approval and that the user allows. */
 export interface HermesImportSelection {
   key: string;
   allow: string[];
@@ -47,20 +42,16 @@ export interface HermesImportViewProps {
   phase: HermesImportPhase;
   preview: HermesImportPreview | null;
   result: AgentImportResult | null;
-  /** Ids of the agents the import updated: profiles imported before. */
   updated?: ReadonlySet<string>;
   error?: string | null;
   onBack: () => void;
-  /** The folder is on a joined server, not on this computer. */
   server?: boolean;
-  /** Reads a folder that the user chooses. Not set: the user cannot choose another folder. */
   onChooseFolder?: (() => void) | undefined;
   onImport: (selection: HermesImportSelection[]) => void;
   onDone: () => void;
   onOpenAgent: (agentId: string) => void;
 }
 
-/** The Hermes Agent app icon: the portrait on a rounded tile. Light on a dark theme, dark on a light one. */
 export function HermesLogo(props: { class?: string }) {
   return (
     <svg class={`hermes-logo ${props.class ?? ""}`} viewBox="0 0 1024 1024" aria-hidden="true">
@@ -70,10 +61,6 @@ export function HermesLogo(props: { class?: string }) {
   );
 }
 
-/**
- * Server settings > Import > Hermes Agent. The review lists each profile as one agent, with every
- * item it holds and why an item needs approval or stays in Hermes, before anything changes.
- */
 export function HermesImportView(props: HermesImportViewProps) {
   const { t, sourceText } = useText();
   return (
@@ -128,7 +115,6 @@ export function HermesImportView(props: HermesImportViewProps) {
           )}
         </Show>
       </Show>
-      {/* Keyed, so a newly read folder starts with every profile selected again. */}
       <Show when={(props.phase === "review" || props.phase === "importing") && props.preview} keyed>
         {(preview) => (
           <HermesReview
@@ -262,7 +248,6 @@ function HermesReview(props: {
 
               <Show when={profile.agent}>
                 {(agent) => (
-                  // A second import updates the agent it made before. It never adds another one.
                   <div class="agent-import-rerun">
                     <span class="agent-import-row-note">{t("import.hermes.rerunNote", { name: agent().name })}</span>
                     <SlidingTabs.Root

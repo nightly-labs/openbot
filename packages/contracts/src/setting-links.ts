@@ -1,16 +1,7 @@
 import type { ConversationMessage } from "./ipc-conversation-messages";
 
-/**
- * A card in a chat that opens one setting: a row of the app settings of the computer that shows the
- * chat, or a row of the agent's own settings in the side panel. An agent posts it with `show_setting`
- * when a person asks for a feature that a setting turns on.
- *
- * The ids are saved in chat messages, so an id never changes and is never used again for another
- * setting. A client that does not know an id shows no card.
- */
 export const SETTING_LINK_ITEM_TYPE_PREFIX = "setting-link:";
 
-/** Each setting that a card can open, and where it is: `app` settings or the `agent` settings. */
 export const SETTING_LINK_SCOPES = {
   "general.send-shortcut": "app",
   "general.sort-chats": "app",
@@ -35,6 +26,8 @@ export const SETTING_LINK_SCOPES = {
   "voice.read-replies": "app",
   "voice.speech-voice": "app",
   "voice.speech-speed": "app",
+  "voice.codex-live": "app",
+  "voice.server": "app",
   "phones.devices": "app",
   "app.launch-at-login": "app",
   "app.restore-workspace": "app",
@@ -63,6 +56,7 @@ export const SETTING_LINK_SCOPES = {
   "agent.new-chat": "agent",
   "agent.starts-new-chats": "agent",
   "agent.plan-card": "agent",
+  "agent.builtin-memory": "agent",
 } as const satisfies Record<string, "app" | "agent">;
 
 export type SettingLinkId = keyof typeof SETTING_LINK_SCOPES;
@@ -78,7 +72,6 @@ export function settingLinkItemType(id: SettingLinkId): string {
   return `${SETTING_LINK_ITEM_TYPE_PREFIX}${id}`;
 }
 
-/** The setting of a card message, or null for another message or a setting this client does not know. */
 export function settingLinkEvent(message: ConversationMessage): { settingId: SettingLinkId } | null {
   if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
   if (!message.itemType?.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX)) return null;

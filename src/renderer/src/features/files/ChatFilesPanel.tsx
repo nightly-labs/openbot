@@ -1,25 +1,24 @@
 import { canPreviewAttachment, type StoredFileRow } from "@openbot/contracts/ipc";
+import type { AgentPickerAgent } from "@openbot/ui/features/agents/AgentPicker";
 import { ConversationFilesPanel } from "@openbot/ui/features/files/ConversationFilesPanel";
 import { type FilesPort, filesPort } from "./files-port";
 import { createStorageUsage } from "./storage-usage";
 
-/** One chat, or one channel: the files sent in its messages. */
 export type ChatFilesSource =
   | { scope: "conversation"; conversationId: string }
   | { scope: "channel"; channelId: string };
 
-/** Chat > Files: every file of one chat or channel, in the side-panel slot the file preview also uses. */
 export default function ChatFilesPanel(props: {
   serverId: string;
   source: ChatFilesSource;
   conversationTitle: string;
-  /** Owners and admins delete files. A member only reads. */
   canManage: boolean;
   onClose: () => void;
   onPreviewFile: (file: StoredFileRow) => void;
   onShowMessage: (messageId: string) => void;
-  /** The storage calls of a client without the desktop port. Absent, preload sends them. */
   calls?: FilesPort | undefined;
+  workspaceAgents: readonly AgentPickerAgent[];
+  onOpenWorkspace: (agentId: string) => void;
 }) {
   const storage = createStorageUsage(
     () => ({
@@ -29,7 +28,6 @@ export default function ChatFilesPanel(props: {
     () => props.calls ?? filesPort(),
   );
   const usage = () => storage.state.usage;
-  /** A chat counts its messages too. A channel counts only its files. */
   const bytes = () => {
     const source = props.source;
     const current = usage();
@@ -52,11 +50,12 @@ export default function ChatFilesPanel(props: {
       error={storage.error()}
       onRetry={() => void storage.refresh(true)}
       onClose={props.onClose}
-      // A file the preview panel cannot show opens in its app.
       onPreviewFile={(file) =>
         canPreviewAttachment(file) ? props.onPreviewFile(file) : void storage.fileAction(file, "open", showInChat)
       }
       onFileAction={(file, action) => storage.fileAction(file, action, showInChat)}
+      workspaceAgents={props.workspaceAgents}
+      onOpenWorkspace={props.onOpenWorkspace}
     />
   );
 }

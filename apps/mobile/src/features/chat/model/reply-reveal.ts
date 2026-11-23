@@ -11,12 +11,9 @@ export function replyWordDelay(word: string): number {
   return Math.min(80, 40 + word.trim().length * 3);
 }
 
-/** Playback time before a complete reply can show its remaining words at once. */
 export const REPLY_FLUSH_AFTER_MS = 1000;
-/** A remaining tail shorter than this plays to its end. */
 const REPLY_FLUSH_TAIL_MS = 500;
 
-/** A complete reply shows its remaining words at once unless only a short tail remains. */
 export function replyFlushes(words: readonly string[], from: number): boolean {
   let remaining = REPLY_FLUSH_TAIL_MS;
   for (const word of words.slice(from)) {
@@ -37,7 +34,6 @@ function isList(token: Token): token is Tokens.List {
 function isTable(token: Token): token is Tokens.Table {
   return token.type === "table";
 }
-/** Tokens that the reveal shows at once, as one word. */
 function isWholeWord(token: Token): boolean {
   return (
     token.type === "agentMention" ||
@@ -52,7 +48,6 @@ function hasChildren(token: Token): token is Token & { tokens: Token[] } {
   return "tokens" in token && Array.isArray(token.tokens);
 }
 
-/** Read the reveal words in order. History renders never need a clipped copy of the tree. */
 function collectWords(entries: Token[], words: string[]): void {
   for (const token of entries) {
     if (isList(token)) {
@@ -88,10 +83,6 @@ function wordCount(token: Token): number {
 
 const blockWords = new WeakMap<Token, readonly string[]>();
 
-/**
- * The reveal words of a block at the top level of a reply. A streamed chunk parses only the last
- * blocks again, and the blocks before them keep their tokens, so their words are read once.
- */
 function wordsOfBlock(token: Token): readonly string[] {
   let words = blockWords.get(token);
   if (!words) {
@@ -104,7 +95,6 @@ function wordsOfBlock(token: Token): readonly string[] {
   return words;
 }
 
-/** Reveal parsed leaves without reparsing Markdown at every animation step. */
 export function createReplyReveal(tokens: Token[]) {
   const words: string[] = [];
   for (const token of tokens) for (const word of wordsOfBlock(token)) words.push(word);
@@ -143,9 +133,6 @@ export function createReplyReveal(tokens: Token[]) {
           }
           result.push({ ...token, header, rows });
         } else if (isWholeWord(token)) {
-          // Code uses StreamingBlock's entrance. Keep its source intact so Copy
-          // never receives a prefix produced only by the playback animation.
-          // A formula is typeset whole: a prefix of it is not valid LaTeX.
           remaining -= 1;
           result.push(token);
         } else if (hasChildren(token)) {
@@ -173,10 +160,6 @@ export function createReplyReveal(tokens: Token[]) {
 
 const finishedReveals = new WeakMap<Token[], ReturnType<typeof createReplyReveal>>();
 
-/**
- * The reveal of a parse that does not change. The parse of a finished reply is shared across mounts,
- * so its reveal is too: a row that scrolls into view again does not collect its words again.
- */
 export function finishedReplyReveal(tokens: Token[]): ReturnType<typeof createReplyReveal> {
   let reveal = finishedReveals.get(tokens);
   if (!reveal) {

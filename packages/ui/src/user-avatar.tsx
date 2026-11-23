@@ -8,7 +8,6 @@ export interface UserAvatarProps {
   decorative?: boolean;
 }
 
-/** The two letters an avatar shows when the account has no photo. */
 export function userInitials(user: Pick<CentralAuthUser, "name" | "email">): string {
   const accountName = user.name?.trim() || user.email.split("@")[0] || "OpenBot";
   const parts = accountName.split(/[._\-\s]+/).filter(Boolean);

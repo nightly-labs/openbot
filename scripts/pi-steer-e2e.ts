@@ -1,12 +1,3 @@
-// Runs the real `deepseek` provider driver, which is the Pi client, over a fake Pi
-// (`provider-fakes/agents/pi-steer.ts`) to check that a steer goes into the running turn through
-// Pi's `steer` command (#3206). Cases: a steer, a steer that Pi refuses, a steer for a turn that is
-// not the running one, and a steer after the turn ended. A refused steer must fail alone: the running
-// turn goes on, so that the message can wait in the queue. Before the fix, Pi's refusal failed the
-// running turn while Pi went on working.
-// A steer also has OpenBot's steer note in front of it. Pi must get the note, and the turn's saved
-// user message must not show it. Claude Code and Grok Build get no note: they write their own.
-// `bun run test:pi-steer`. Writes .openbot-build/pi-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -27,7 +18,6 @@ interface LogEntry {
   text?: string;
   streamingBehavior?: string;
   images?: number;
-  /** The queued steers that `clear_queue` removed, joined by ", ". */
   steering?: string;
 }
 
@@ -45,7 +35,6 @@ interface Report {
 const root = await mkdtemp(join(tmpdir(), "openbot-pi-steer-e2e-"));
 const report: Report = { passed: false };
 const clients: AgentClient[] = [];
-/** The items that the client saved for each ended turn, by turn id. */
 const saved = new Map<string, ThreadItem[]>();
 
 async function open(): Promise<{ client: AgentClient; log: string }> {
@@ -54,7 +43,6 @@ async function open(): Promise<{ client: AgentClient; log: string }> {
   await installFakeAgent(executable, "pi-steer", { FAKE_LOG: log, FAKE_DIR: root });
   const client = requireProviderDriver("deepseek").createClient(
     { executable, version: "1.4.0", source: "managed" },
-    // Short, so that the steer that Pi does not answer times out soon. The fake answers the rest at once.
     2_000,
     {
       apiKey: () => null,
@@ -73,7 +61,6 @@ async function open(): Promise<{ client: AgentClient; log: string }> {
 const count = async (log: string, event: string) =>
   (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === event).length;
 
-/** Waits until the fake has logged `total` entries of this event, or fails after 10 seconds. */
 async function waitForCount(log: string, event: string, total: number): Promise<void> {
   const deadline = Date.now() + 10_000;
   while ((await count(log, event)) < total) {
@@ -84,13 +71,10 @@ async function waitForCount(log: string, event: string, total: number): Promise<
 
 interface RunningTurn {
   id: string;
-  /** True once `turn/completed` arrived. */
   completed: () => boolean;
-  /** The reply text, the `turn/completed` status and the turn's error message. */
   done: Promise<{ reply: string; status: string | null; error: string | null }>;
 }
 
-/** Starts a `work` turn, which stays open until the fake Pi gets a steer. */
 async function startWork(client: AgentClient, thread: string, log: string): Promise<RunningTurn> {
   let reply = "";
   let error: string | null = null;
@@ -128,10 +112,6 @@ async function startWork(client: AgentClient, thread: string, log: string): Prom
   return { id, completed: () => completed, done };
 }
 
-/**
- * Steers the turn with this text. `note` is OpenBot's steer note, a text block of its own in front of
- * the text, as `QueueControls.steer` sends it. Answers the turn id that the client reports.
- */
 function steer(
   client: AgentClient,
   thread: string,
@@ -166,7 +146,6 @@ try {
   const { client, log } = await open();
   const thread = await startThread(client, { cwd: root });
 
-  // A steer goes into the running turn through Pi's `steer` command, not a second `prompt`.
   const turn = await startWork(client, thread, log);
   const answer = await steer(client, thread, turn.id, "use the other branch");
   assert.equal(answer, turn.id);
@@ -181,15 +160,12 @@ try {
   assert.equal(await count(log, "prompt"), 1, "The steer must not send a prompt.");
   report.steered = { turnId: turn.id, reply: finished.reply, status: finished.status, steer: sent };
 
-  // A steer from the queue has OpenBot's note in front of it. Pi gets the note with the message. The
-  // saved turn shows the two messages that the user wrote, and no note.
   const note = steerNoteFor("deepseek", { kind: "user" }, "keep the tests");
   assert.ok(note, "A provider with no steer note of its own must get OpenBot's.");
   assert.ok(
     steerNoteFor("pi", { kind: "agent", agentId: "teammate" }, "keep the tests"),
     "A teammate's steer must get a note.",
   );
-  // The agent reads a command only at the start of the input, so no note goes in front of it.
   assert.equal(steerNoteFor("pi", { kind: "user" }, "/skill:review"), null, "A slash command must get no note.");
   const providersWithOwnNote = (["claude", "grok"] as const).filter(
     (provider) => steerNoteFor(provider, { kind: "user" }, "keep the tests") === null,
@@ -208,7 +184,6 @@ try {
   assert.deepEqual(savedUserMessages, ["work", "keep the tests"]);
   report.noted = { sentToPi, savedUserMessages, providersWithOwnNote };
 
-  // Pi refuses a steer. Only the steer fails: the turn goes on and takes the next steer.
   const second = await startWork(client, thread, log);
   const refused = await refusal(steer(client, thread, second.id, "refuse this"));
   assert.match(refused, /Pi refused the steer/u);
@@ -226,8 +201,6 @@ try {
     reply: secondFinished.reply,
   };
 
-  // Pi does not answer a steer in time, but queues it. The client removes it from Pi's queue, as the
-  // message also waits in OpenBot's queue. An earlier steer that Pi holds stays. The turn goes on.
   const slow = await startWork(client, thread, log);
   const cleared = await count(log, "clear_queue");
   assert.equal(cleared, 0, "A refused steer queues nothing, so it must not clear Pi's queue.");
@@ -235,7 +208,6 @@ try {
   const steersBefore = await count(log, "steer");
   const timedOut = await refusal(steer(client, thread, slow.id, "slow steer"));
   await waitForCount(log, "clear_queue", cleared + 1);
-  // The client sends the held steer again after the clear.
   await waitForCount(log, "steer", steersBefore + 2);
   const entries2 = await readJsonl<LogEntry>(log);
   assert.equal(entries2.find((entry) => entry.event === "clear_queue")?.steering, "hold this, slow steer");
@@ -247,7 +219,6 @@ try {
   assert.match(slowFinished.reply, /steered: hold this, after the timeout/u);
   report.timedOut = { refused: timedOut, queueCleared: true, status: slowFinished.status, reply: slowFinished.reply };
 
-  // A steer for a turn that is not the running one is refused before it reaches Pi.
   const third = await startWork(client, thread, log);
   const before = await count(log, "steer");
   const wrongTurn = await refusal(steer(client, thread, "another-turn", "late"));
@@ -256,7 +227,6 @@ try {
   await steer(client, thread, third.id, "end");
   await third.done;
 
-  // After the turn ended, Pi would start the message as a run of its own.
   const steers = await count(log, "steer");
   const prompts = await count(log, "prompt");
   const afterTurn = await refusal(steer(client, thread, third.id, "too late"));

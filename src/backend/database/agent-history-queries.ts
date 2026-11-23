@@ -13,6 +13,7 @@ import {
   databaseRows,
   decodeConversationMessageJson,
   optionalStringColumn,
+  requiredNumberColumn,
   requiredStringColumn,
 } from "./database-rows";
 
@@ -20,22 +21,17 @@ export interface AgentHistorySelection {
   before?: string;
   messageId?: string;
   author?: string;
-  /**
-   * Also the requests that this agent sent to teammates. The chat keeps them as system messages, so
-   * without this the agent could not read or search what it delegated (#10380).
-   */
   outgoing?: boolean;
+  acrossResets?: boolean;
   limit: number;
 }
 
-/** A `messageId` or `before` that names no message of the chat after its latest reset. */
 export class HistoryReferenceUnavailable extends Error {
   constructor() {
     super("History reference is unavailable. Read recent history again.");
   }
 }
 
-/** Model history reads use a thread and reset boundary; UI history remains unchanged. */
 export class AgentHistoryQueries {
   readonly #core: DatabaseCore;
   constructor(core: DatabaseCore) {
@@ -55,25 +51,27 @@ export class AgentHistoryQueries {
       AND json_extract(message_json, '$.source') = 'system' AND json_extract(message_json, '$.status') = 'completed'
       ORDER BY ${ORDER_KEY_DESC} LIMIT 1
     ), allowed AS (
-      SELECT * FROM visible WHERE NOT EXISTS (SELECT 1 FROM boundary)
+      SELECT * FROM visible WHERE ? OR NOT EXISTS (SELECT 1 FROM boundary)
       OR (${ORDER_KEY_COLUMNS}) > (SELECT ${ORDER_KEY_COLUMNS} FROM boundary)
     )`;
-    const bindings = [threadId, threadId, CONTEXT_RESET_ITEM_TYPE];
+    const bindings = [threadId, threadId, CONTEXT_RESET_ITEM_TYPE, selection.acrossResets ? 1 : 0];
     const reset = databaseRow(this.#core.connection.prepare(`${cte} SELECT message_id FROM boundary`).get(...bindings));
     const resetMessageId = reset ? requiredStringColumn(reset, "message_id") : null;
-    // An agent knows a teammate request by its "Message ID", which the chat keeps as the exchange's
-    // message: the sender's copy and the recipient's copy have their own ids (#10380).
     const anchorId = selection.messageId ?? selection.before;
     const anchor = anchorId
-      ? databaseRow(
+      ? (databaseRow(
+          this.#core.connection
+            .prepare(`${cte} SELECT message_id FROM allowed WHERE message_id = ?`)
+            .get(...bindings, anchorId),
+        ) ??
+        databaseRow(
           this.#core.connection
             .prepare(
-              `${cte} SELECT message_id FROM allowed
-              WHERE message_id = ? OR json_extract(message_json, '$.exchange.messageId') = ?
-              ORDER BY message_id = ? DESC, ${ORDER_KEY_DESC} LIMIT 1`,
+              `${cte} SELECT message_id FROM allowed WHERE json_extract(message_json, '$.exchange.messageId') = ?
+              ORDER BY ${ORDER_KEY_DESC} LIMIT 1`,
             )
-            .get(...bindings, anchorId, anchorId, anchorId),
-        )
+            .get(...bindings, anchorId),
+        ))
       : null;
     if (anchorId && !anchor) throw new HistoryReferenceUnavailable();
     const anchorMessageId = anchor ? requiredStringColumn(anchor, "message_id") : null;
@@ -83,6 +81,7 @@ export class AgentHistoryQueries {
       this.#core.connection
         .prepare(`${cte}
       SELECT message_json,
+        COALESCE((${ORDER_KEY_COLUMNS}) < (SELECT ${ORDER_KEY_COLUMNS} FROM boundary), 0) AS before_reset,
         (SELECT provider_session_id FROM projection_turns WHERE thread_id = ? AND turn_id = json_extract(allowed.message_json, '$.turnId')) AS provider_session_id
       FROM allowed WHERE (author IN ('user', 'assistant', 'agent') OR (? AND author = 'system'
           AND item_type = '${AGENT_EXCHANGE_ITEM_TYPE}' AND json_extract(message_json, '$.exchange.direction') = 'outgoing'))
@@ -110,14 +109,11 @@ export class AgentHistoryQueries {
       messages: rows.map((row) => ({
         message: decodeConversationMessageJson(requiredStringColumn(row, "message_json")),
         providerSessionId: optionalStringColumn(row, "provider_session_id"),
+        beforeReset: requiredNumberColumn(row, "before_reset") === 1,
       })),
     };
   }
 
-  /**
-   * The trace of a turn. Only one message of the turn holds it, and that message can be a thinking
-   * message that `read` leaves out, or on another page.
-   */
   turnTrace(threadId: string, turnId: string): ConversationTurnTrace | null {
     const row = databaseRow(
       this.#core.connection

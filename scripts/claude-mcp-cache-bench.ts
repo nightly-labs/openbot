@@ -1,18 +1,3 @@
-// Measures the prompt cache cost of a slow MCP server in Claude agents, with and without the two
-// changes that keep the request prefix stable:
-//   - `ENABLE_TOOL_SEARCH=auto` in the user's Claude settings becomes `true` in the flag settings, so
-//     the CLI keeps MCP tools deferred, also when they arrive after the first request;
-//   - a resumed query waits for its MCP servers (`MCP_CONNECTION_NONBLOCKING=0`).
-// Runs the real Claude CLI with the user's Claude login, on Claude Haiku, through `ClaudeAgentClient`,
-// with one extra stdio MCP server that answers 3 s late (`claude-mcp-cache-bench-server.ts`). The
-// `before` variant takes the change out of the query options; `after` is the current code.
-// Scenarios:
-//   tool-search-auto: the workspace sets `auto`; one session, four one-word turns.
-//   tool-search-auto-50: the same with `auto:50`, which acts as `auto` on a 1M context.
-//   resume-<mode>: the workspace sets <mode>; two turns, the query closes, the thread resumes, two turns.
-// Costs about 32 one-word Haiku turns per run. `bun scripts/claude-mcp-cache-bench.ts --runs=2`;
-// `--scenario=<name>` runs one scenario, `--delay=<ms>` sets the server delay, `--debug=<folder>` keeps CLI logs.
-// Writes .openbot-build/claude-mcp-cache-bench/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,21 +13,16 @@ const SERVER = resolve(import.meta.dirname, "claude-mcp-cache-bench-server.ts");
 const PROMPT = "Reply with the single word OK. Do not use any tool.";
 const MODEL = "claude-haiku-5-5";
 const argument = (name: string) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(`--${name}=`.length);
-/** `--delay=<ms>`: how late the bench MCP server answers `initialize`. */
 const SLOW_SERVER_DELAY_MS = Number(argument("delay") ?? "3000");
 
 interface Scenario {
   name: string;
-  /** `ENABLE_TOOL_SEARCH` in the workspace's `.claude/settings.local.json`; none when undefined. */
   toolSearch: string | undefined;
-  /** The query closes after this many turns and the thread resumes; no resume when undefined. */
   resumeAfter: number | undefined;
   turns: number;
-  /** Takes the change out of the query options for the `before` variant. */
   before: (options: Options) => Options;
 }
 
-/** The flag settings without the `ENABLE_TOOL_SEARCH=true` that `claude-client.ts` adds. */
 function withoutToolSearchOverride(options: Options): Options {
   const settings = options.settings;
   if (typeof settings !== "object" || !settings.env?.ENABLE_TOOL_SEARCH) return options;
@@ -51,7 +31,6 @@ function withoutToolSearchOverride(options: Options): Options {
   return { ...options, settings: Object.keys(env).length > 0 ? { ...rest, env } : rest };
 }
 
-/** The query environment without the `MCP_CONNECTION_NONBLOCKING=0` of a resumed query. */
 function withoutResumeWait(options: Options): Options {
   if (!options.env?.MCP_CONNECTION_NONBLOCKING) return options;
   const { MCP_CONNECTION_NONBLOCKING: _removed, ...env } = options.env;
@@ -60,7 +39,6 @@ function withoutResumeWait(options: Options): Options {
 
 const SCENARIOS: Scenario[] = [
   { name: "tool-search-auto", toolSearch: "auto", resumeAfter: undefined, turns: 4, before: withoutToolSearchOverride },
-  // `auto:50` on a 200k context has the 100k threshold that `auto` has on a 1M context: the tools stay below it.
   {
     name: "tool-search-auto-50",
     toolSearch: "auto:50",
@@ -83,9 +61,7 @@ interface RequestUsage {
 interface QueryStart {
   turn: number;
   resume: boolean;
-  /** The CLI's MCP server states in its `init` message. */
   mcpServers: string[];
-  /** The bench server's tools that the `init` message lists. */
   slowServerTools: number;
 }
 
@@ -96,7 +72,6 @@ interface RunReport {
   requests: RequestUsage[];
   queries: QueryStart[];
   totals: { prompt: number; cacheWrite: number; cacheRead: number; input: number; output: number };
-  /** Cache writes after the first request of the session, and after the resume. */
   laterCacheWrite: number;
   resumeCacheWrite: number | null;
   error?: string;
@@ -104,7 +79,6 @@ interface RunReport {
 
 const runs = Number(argument("runs") ?? "1");
 const onlyScenario = argument("scenario");
-/** `--debug=<folder>` keeps a CLI debug log of each query there. */
 const debugDirectory = argument("debug");
 if (debugDirectory) mkdirSync(debugDirectory, { recursive: true });
 const scenarios = onlyScenario ? SCENARIOS.filter((scenario) => scenario.name === onlyScenario) : SCENARIOS;
@@ -142,7 +116,6 @@ async function runOnce(scenario: Scenario, variant: "before" | "after", run: num
           query.slowServerTools = message.tools.filter((tool) => tool.startsWith("mcp__bench-catalog__")).length;
         }
       }
-      // A message repeats its request once per content block; the last copy has the final count.
       if (message.type === "assistant" && message.parent_tool_use_id === null) {
         const usage = message.message.usage;
         requests.set(message.message.id, {
@@ -220,8 +193,6 @@ async function runOnce(scenario: Scenario, variant: "before" | "after", run: num
 
 for (let run = 1; run <= runs; run++) {
   for (const scenario of scenarios) {
-    // Interleaved, so that a change in the Anthropic cache or the CLI over time hits both variants.
-    // The order changes on each run: the first query of a pair can write a prefix that the second reads.
     const order = run % 2 === 1 ? (["before", "after"] as const) : (["after", "before"] as const);
     for (const variant of order) {
       const result = await runOnce(scenario, variant, run);

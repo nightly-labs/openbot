@@ -4,34 +4,25 @@ import { type MediaSize, rememberedMediaSize, rememberMediaSize } from "./media-
 import { VideoPlayer } from "./VideoPlayer";
 import { VideoStage, type VideoStageMenu } from "./VideoStage";
 
-/** The shape of a video until its metadata gives the real one. */
 const DEFAULT_VIDEO_RATIO = "16 / 9";
 
 export function MediaFilePreview(props: {
   kind: "audio" | "video" | null;
-  /** The address of the file. A video without one shows Play, which calls `onLoad`. */
   src: string | undefined;
   name: string;
   class?: string;
   preload?: "none" | "metadata";
-  /** Plays at once: the user asked for it with the click that loaded the file. */
   autoplay?: boolean;
-  /** The file starts to play. */
   onPlay?: (() => void) | undefined;
-  /** Keeps the shape of a video that loaded before in this window. */
   attachmentId?: string | undefined;
-  /** True while `onLoad` gets the video. */
   loading?: boolean | undefined;
-  /** Gets the video when the user presses Play before there is a `src`, as in the web client. */
   onLoad?: (() => void) | undefined;
-  /** The video cannot play, as with a format that the app does not know. */
   onError?: (() => void) | undefined;
-  /** The details of a video, on hover, and its actions, on a right click. */
   menu?: VideoStageMenu | undefined;
+  onDownload?: (() => void) | undefined;
 }) {
   const [size, setSize] = createSignal<MediaSize | null>(untrack(() => rememberedMediaSize(props.attachmentId)));
   const { t } = useText();
-  // The dimensions come last, when the video gave them, as on a generated video.
   const menu = (): VideoStageMenu | undefined => {
     const base = props.menu;
     const known = size();
@@ -56,13 +47,11 @@ export function MediaFilePreview(props: {
             aria-label={props.name}
             onPlay={() => props.onPlay?.()}
           >
-            {/* Local files do not provide caption tracks. */}
             <track kind="captions" />
           </audio>
         )}
       </Show>
       <Show when={props.kind === "video"}>
-        {/* The same player as a generated video, not the controls of the browser. */}
         <VideoStage class={props.class} ratio={ratio()} menu={menu()}>
           <VideoPlayer
             src={props.src}
@@ -74,6 +63,7 @@ export function MediaFilePreview(props: {
             onPlay={props.onPlay}
             onError={props.onError}
             fullControls
+            onDownload={props.onDownload}
             onMetadata={(video) => {
               const next = { width: video.videoWidth, height: video.videoHeight };
               if (next.width <= 0 || next.height <= 0) return;

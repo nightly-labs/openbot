@@ -75,6 +75,10 @@ struct ShortcutDirectory: Decodable {
     return share.servers.first { $0.id == agent.serverId }
   }
 
+  func agent(id: String, serverId: String) -> Agent? {
+    ([agent].compactMap { $0 } + agents).first { $0.id == id && $0.serverId == serverId }
+  }
+
   static func avatar(_ name: String?) -> UIImage? {
     guard let name, !name.isEmpty, let folder = container?.appendingPathComponent(avatarFolder) else { return nil }
     return UIImage(contentsOfFile: folder.appendingPathComponent(name).path)
@@ -123,11 +127,17 @@ enum ShortcutText {
     "mobile.settings.shortcuts.card.noAgent.action": "Choose agent",
     "mobile.settings.shortcuts.card.locked.title": "OpenBot is locked",
     "mobile.settings.shortcuts.card.locked.action": "Open OpenBot",
+    "mobile.settings.shortcuts.card.message": "Message {name}",
+    "mobile.settings.shortcuts.card.messagePrompt": "Message to {name}",
   ]
 
   static func text(_ key: String, in directory: ShortcutDirectory?) -> String {
     if let value = directory?.text[key], !value.isEmpty { return value }
     return fallback[key] ?? ""
+  }
+
+  static func text(_ key: String, in directory: ShortcutDirectory?, name: String) -> String {
+    text(key, in: directory).replacingOccurrences(of: "{name}", with: name)
   }
 }
 

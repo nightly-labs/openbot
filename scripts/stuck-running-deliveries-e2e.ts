@@ -1,18 +1,3 @@
-// Checks that a failed turn end does not leave a delivery `running` and the agent's queue blocked
-// (#2214). Runs the real agent service on a temporary profile with a fake Codex app-server, and
-// injects one failure at a time into the mailbox or the database of that service:
-// (a) boot recovery cannot settle one of three orphaned deliveries: the other two settle, and the drain runs;
-// (b) a turn end fails, by a defect or by a stored-state failure: the delivery ends, and the next message runs;
-// (c) a late write after the turn ended does not open the turn row again;
-// (d) Stop on a delivery that stays running after its turn ended frees the queue;
-// (e) Stop while the normal turn end runs does not settle the completed turn as interrupted;
-// (f) a turn end that fails after its deliveries settled still closes the stored turn;
-// (g) a delivery that runs again under the same turn id, after its session was refused, runs to its end (#2468);
-// (h) a turn row that stays `running` although no thread names it as its active turn is closed at restart,
-//     in the agent's own chat, a task thread and a channel thread;
-// (i) a failed request from another agent closes its turn row as failed, also when the failure note to
-//     that agent saved the chat first (#10698).
-// `bun scripts/stuck-running-deliveries-e2e.ts`. Writes .openbot-build/stuck-running-deliveries-e2e/report.json.
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -30,10 +15,8 @@ const home = join(root, "home");
 const logPath = join(root, "protocol.jsonl");
 const controlPath = join(root, "control.json");
 const fakeCodex = join(root, "codex");
-/** How long a case waits for the state that the fix gives. Without the fix that state never comes. */
 const SETTLE_MS = 10_000;
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -49,15 +32,6 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { StoredStateFailure } = await import("../src/backend/stored-state-effects");
 
-/**
- * A Codex app-server with the methods that the service calls. `control.json` sets whether a new
- * turn is held until `turn/interrupt` or the process exits, how long a turn that is not held runs, and
- * whether `turn/started` comes before the `turn/start` answer. With `clientTurnIds`, a turn takes the
- * `clientUserMessageId` as its id, as Claude, ACP and Pi do, and a new turn is refused while a turn of
- * the thread runs, as Claude refuses it. With `refuseOnce`, the first turn of each id fails as a
- * refused session. With `failTurns`, each turn fails with a provider error after `turnMs`.
- * Like Codex, `turn/interrupt` for a turn that does not run is refused.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -71,9 +45,7 @@ const prefix = "p" + process.pid + "-";
 let buffer = "";
 let threads = 0;
 let turns = 0;
-/** turnId -> { threadId, timer } of each turn that runs. */
 const running = new Map();
-/** The turn ids that refuseOnce already refused. */
 const refused = new Set();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
@@ -179,7 +151,6 @@ interface Instance {
   errors: { code: string; agentId: string | null }[];
 }
 
-/** What a case saw, as it goes into the report. */
 type ReportValue = string | number | boolean | null | ReportValue[] | { [key: string]: ReportValue };
 type Details = { [key: string]: ReportValue };
 
@@ -201,6 +172,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -231,7 +203,6 @@ function codexStarts(): number {
   }
 }
 
-/** Waits for a state of the service. Gives null when the state does not come in time. */
 async function waitFor<T>(read: () => T | null | undefined | false, timeoutMs = SETTLE_MS): Promise<T | null> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -242,7 +213,6 @@ async function waitFor<T>(read: () => T | null | undefined | false, timeoutMs = 
   }
 }
 
-/** Like `waitFor`, for a state that the case needs before its check starts. */
 async function need<T>(label: string, read: () => T | null | undefined | false): Promise<T> {
   const value = await waitFor(read, 20_000);
   if (!value) throw new Error(`Timed out waiting for ${label}.`);
@@ -310,7 +280,6 @@ function turnRow(database: Database, turnId: string): TurnRow | null {
   return { status: getString(row, "status") ?? "missing", completedAt: getString(row, "completed_at") };
 }
 
-/** Creates an agent, and waits until its first message runs in a provider turn. */
 async function agentWithRunningTurn(
   instance: Instance,
   name: string,
@@ -335,7 +304,6 @@ async function agentWithRunningTurn(
   return { agentId: agent.id, deliveryId, turnId };
 }
 
-/** Sends a second message while the first runs, and checks that it waits in the queue. */
 async function queueSecond(instance: Instance, agentId: string): Promise<string> {
   const receipt = await runCauseEffect(instance.agents.sendMessage({ agentId, text: "Second message." }));
   const deliveryId = receipt.deliveries[0]?.id;
@@ -362,7 +330,6 @@ await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
 let current: Instance | null = null;
 
 try {
-  // (a) Three agents with a turn that runs when OpenBot stops, and a second message in each queue.
   await control({ holdTurns: true, turnMs: 0 });
   const first = await start();
   current = first;
@@ -383,7 +350,6 @@ try {
   const markTerminal = mailbox.markTerminal;
   const orphanIds = new Set(orphans.map((orphan) => orphan.deliveryId));
   let recoveryFailedId: string | null = null;
-  // The first orphan that the recovery reaches cannot be stored as settled.
   mailbox.markTerminal = (deliveryId, terminal, error = null) => {
     if (recoveryFailedId === null && orphanIds.has(deliveryId)) {
       recoveryFailedId = deliveryId;
@@ -451,7 +417,6 @@ try {
     );
     const afterLateSnapshot = turnRow(second.database, turnId);
     details.afterLateSnapshot = afterLateSnapshot;
-    // The thread row took the late turn id too; the check puts back what the service wrote.
     second.database.persistConversation(
       { ...second.database.readConversation(agentId, threadId), activeTurnId: null },
       "conversation.snapshot-updated",
@@ -528,7 +493,6 @@ try {
     await control({ holdTurns: false, turnMs: 1_000 });
     const target = await agentWithRunningTurn(second, "Orphan stop");
     const queuedId = await queueSecond(second, target.agentId);
-    // Every attempt to store the end fails, so the delivery stays running.
     mailbox.markTerminal = (deliveryId, terminal, error = null) =>
       deliveryId === target.deliveryId
         ? Effect.fail(new StoredStateFailure({ cause: injected("turn completion") }))
@@ -553,9 +517,6 @@ try {
   });
 
   await runCase("e: Stop while the turn end runs", async (details) => {
-    // `turn/started` comes first, so the turn takes its delivery itself. That write is held, and the
-    // normal end of the turn waits for it: a Stop in that wait comes after the provider ended the
-    // turn and before the end settled it.
     await control({ holdTurns: false, turnMs: 1_000, startedFirst: true });
     const target = await agentWithRunningTurn(second, "Stop during end");
     const queuedId = await queueSecond(second, target.agentId);
@@ -683,7 +644,6 @@ try {
       return id && isTerminal(status(mailbox, id)) ? id : null;
     });
     details.askerFirst = status(mailbox, askerFirst);
-    // The teammate is busy, so the request waits in its queue and starts when that turn ends.
     await control({ holdTurns: false, turnMs: 1_500 });
     const teammate = await agentWithRunningTurn(second, "Failed request");
     await control({ holdTurns: false, turnMs: 200, failTurns: true });
@@ -711,13 +671,11 @@ try {
     if (row?.status !== "failed") return "The stored turn of the failed request is not closed as failed.";
     return null;
   });
-  // The next cases run turns that do not fail.
   await control({ holdTurns: false, turnMs: 100 });
 
   await runCase("h: a running turn row that no thread names is closed at restart", async (details) => {
     const agent = second.store.list()[0];
     if (!agent?.threadId) return "No agent thread survived the restart.";
-    // The agent's own chat, a task thread and a channel thread each keep one stale row.
     const taskThreadId = new AgentThreadStore(second.database).create({
       agentId: agent.id,
       origin: "user",

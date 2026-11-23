@@ -1,6 +1,3 @@
-// Run: bun scripts/routine-dst-order-e2e.ts
-// Report: .openbot-build/routine-dst-order-e2e.json
-
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";

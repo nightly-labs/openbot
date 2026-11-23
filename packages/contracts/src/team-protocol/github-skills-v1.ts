@@ -1,14 +1,3 @@
-// Frozen optional github-skills-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can ask the host to read a link to a public GitHub repository, folder or `SKILL.md`. The
-// host reads it with no GitHub account, pins the commit it read, and answers with the skill folders
-// under the link and the text of each `SKILL.md`. Each skill id names that commit
-// (`github:<owner>/<repo>@<commit>:<folder>`). With this capability, the `skills-admin-v1` install
-// route also takes such an id: the host downloads the files of that commit itself, so a client
-// never sends skill files. A host that did not negotiate this capability refuses the id. A member
-// cannot use the route; `requireAdmin` on the host is the only gate. Widening any of it needs a
-// second capability string.
 import { adminRoute, fields, list, type OptionalRouteCodec, string } from "./admin-wire";
 
 export const GITHUB_SKILLS_CAPABILITY = "github-skills-v1";

@@ -4,17 +4,16 @@ import { type AttachmentSummary, type FilePreview, filePreviewKindForFile } from
 import { base64ToBytes } from "@openbot/team-client/base64";
 import { currentText } from "@openbot/ui/text";
 import type { WebAttachmentMedia } from "./web-attachment-media";
+import { createDownloadLimit, type DownloadLimit } from "./web-download-limit";
 import { createWebFileSaver } from "./web-file-download";
 import type { WebFile, WebWorkspaceRuntime } from "./web-runtime";
 
-/** Visual reply pages kept in memory. The chat list mounts a row again when it scrolls back. */
 const VISUAL_PAGE_CACHE = 8;
+const VISUAL_PAGE_READS = 4;
+const visualPageReads = new WeakMap<VisualPageRemote, DownloadLimit>();
 
-/**
- * Host files in the browser. There is no host file URL here, so a file is read through the host
- * connection: saved as a download, or previewed from its bytes. A file that the chat already shows
- * comes from `media`, so it does not cross the connection again.
- */
+type VisualPageRemote = Pick<WebWorkspaceRuntime, "download">;
+
 export function createWebAttachmentFiles(
   remote: Pick<WebWorkspaceRuntime, "download" | "sharedFile" | "workspaceFile">,
   hostId: () => string,
@@ -22,10 +21,10 @@ export function createWebAttachmentFiles(
 ) {
   const save = createWebFileSaver();
   const pages = new Map<string, Promise<string>>();
+  const readPage = visualPageQueue(remote);
   return {
     async download(id: string): Promise<void> {
       const held = await media.file(id);
-      // As the host path, the saved file has no media type: a blob URL of an SVG could run on this origin.
       save(
         held
           ? { name: held.name, blob: new Blob([held.blob], { type: "application/octet-stream" }) }
@@ -40,11 +39,9 @@ export function createWebAttachmentFiles(
       }
       const file = await remote.download(attachment.id);
       const bytes = base64ToBytes(file.base64);
-      // The next open, and the card in the chat, use these bytes.
       media.keep(attachment, bytes);
       return previewOf(file.name, file.mimeType, bytes);
     },
-    /** The HTML of a visual reply page. Only an HTML file that is not too large is a page. */
     visualPage(attachment: AttachmentSummary): Promise<string> {
       const key = `${hostId()}:${attachment.id}`;
       const cached = pages.get(key);
@@ -53,7 +50,7 @@ export function createWebAttachmentFiles(
         pages.set(key, cached);
         return cached;
       }
-      const page = readVisualPage(remote, attachment);
+      const page = readPage(() => readVisualPage(remote, attachment));
       pages.set(key, page);
       page.catch(() => pages.delete(key));
       for (const old of pages.keys()) {
@@ -68,16 +65,23 @@ export function createWebAttachmentFiles(
     async saveWorkspace(agentId: string, path: string): Promise<void> {
       save(await remote.workspaceFile(agentId, path));
     },
-    // The host sends a shared or workspace file as `application/octet-stream`, so its name gives the type.
     async previewShared(path: string): Promise<FilePreview> {
       const file = await remote.sharedFile(path);
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
     },
-    async previewWorkspace(agentId: string, path: string): Promise<FilePreview> {
-      const file = await remote.workspaceFile(agentId, path);
+    async previewWorkspace(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<FilePreview> {
+      const file = await remote.workspaceFile(agentId, path, options);
       return filePreview({ ...file, mimeType: attachmentMimeTypeForName(file.name) });
     },
   };
+}
+
+function visualPageQueue(remote: VisualPageRemote) {
+  const shared = visualPageReads.get(remote);
+  if (shared) return shared;
+  const queue = createDownloadLimit(VISUAL_PAGE_READS);
+  visualPageReads.set(remote, queue);
+  return queue;
 }
 
 async function readVisualPage(
@@ -106,7 +110,6 @@ function previewOf(name: string, mimeType: string, bytes: Uint8Array<ArrayBuffer
   };
 }
 
-/** Opens a link from a message in a new tab. Only web links open; anything else is refused. */
 export async function openWebLink(value: string): Promise<void> {
   const url = new URL(value);
   if (url.protocol !== "https:" && url.protocol !== "http:")

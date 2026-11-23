@@ -1,3 +1,6 @@
+import type { AvatarColor, AvatarHue } from "./ipc-agent-identity";
+import type { BrowserTabProfile } from "./ipc-browser-profiles";
+
 export interface BrowserTab {
   id: string;
   title: string;
@@ -5,37 +8,25 @@ export interface BrowserTab {
   loading: boolean;
   ownerThreadId: string | null;
   ownerAgentId: string | null;
-  /** Browser Automation V2 metadata. Optional to keep Team API protocol v1 wire-compatible. */
   environment?: BrowserEnvironment;
   recording?: boolean;
   diagnosticErrorCount?: number;
-  /** Live local popup relationship; not restored after an app restart. */
   openerTabId?: string;
-  /** Local popup failure, without authentication URLs or request data. */
   popupFailure?: { id: string; message: string };
-  /** A person controls this tab, so the owning agent waits for the release. */
   userControl?: true;
-  /** Whether the tab has a page to go back or forward to. Absent: unknown, such as from an older host. */
   canGoBack?: boolean;
   canGoForward?: boolean;
 }
 
-/**
- * One thing that a person did while they showed a task in an agent's tab: a page that loaded, or a
- * click on a control. `path` has no query and no hash. No step has typed text.
- */
 export interface BrowserTeachStep {
   kind: "page" | "click";
   host: string;
   path: string;
-  /** The title of the page. */
   title?: string;
-  /** The role and the name of the clicked control. */
   role?: string;
   name?: string;
 }
 
-/** Ends the recording of a tab. Without `save` the steps are deleted. */
 export interface BrowserTeachStopInput {
   tabId: string;
   save: boolean;
@@ -72,24 +63,16 @@ export interface BrowserElement {
   tag: string;
   value: string | null;
   states: string[];
-  /** Legacy convenience field; the canonical state is also present in states. */
   disabled: boolean;
   bounds: BrowserBounds | null;
   frame: { id: string; url: string } | null;
 }
 
-/**
- * Where a keystroke sent without a target arrives. An application that draws its own surface keeps
- * the focus itself, so this is the only way a caller can tell whether typing will reach the cell it
- * means to fill or the box it last used.
- */
 export interface BrowserFocus {
   tag: string;
   role: string | null;
   name: string;
-  /** True when the node takes text directly: an input, a textarea, or a contenteditable. */
   editable: boolean;
-  /** True when the focused node is inside a frame rather than the main document. */
   inFrame: boolean;
 }
 
@@ -111,19 +94,11 @@ export interface BrowserActionHistoryEntry {
   detail?: string | undefined;
 }
 
-/** A bot check that the snapshot found on the page, or one that passed while the snapshot waited. */
 export interface BrowserChallenge {
   vendor: string;
-  /**
-   * `checking`: a check that passes by itself is still running after this read's time ran out.
-   * `click-once`: the agent may click `target`, the checkbox of the check, one time.
-   * `needs-user`: a person must pass it. `blocked`: the site refuses this browser.
-   */
   status: "cleared" | "checking" | "click-once" | "needs-user" | "blocked";
   waitedMs: number;
-  /** The checkbox to click, with `click-once` only. */
   target?: { kind: "point"; x: number; y: number } | undefined;
-  /** What the agent does next. */
   next: string;
 }
 
@@ -136,17 +111,12 @@ export interface BrowserSnapshot {
   viewport: BrowserViewport;
   text: string;
   elements: BrowserElement[];
-  /** Page text or elements were left out to keep the snapshot within its size limit. */
   truncated: boolean;
   focus: BrowserFocus | null;
   diagnostics: BrowserDiagnosticEntry[];
   actions: BrowserActionHistoryEntry[];
   image?: { included: boolean; reason: string; width: number; height: number };
   challenge?: BrowserChallenge;
-  /**
-   * The agent's memories about the site of the page, newest first. A snapshot has them once per site
-   * in a tab and a turn.
-   */
   siteMemories?: BrowserSiteMemory[];
 }
 
@@ -164,10 +134,6 @@ export interface BrowserRecordingArtifact {
   stoppedReason: "requested" | "duration-limit" | "size-limit" | "tab-closed" | "error";
 }
 
-/**
- * A JSON value produced by a browser evaluation. The engine round-trips every result through
- * `JSON.stringify` before returning it, so this is the widest shape a caller can observe.
- */
 export type BrowserJsonValue = string | number | boolean | null | BrowserJsonValue[] | BrowserJsonObject;
 
 export interface BrowserJsonObject {
@@ -182,34 +148,40 @@ export interface BrowserPreview {
 
 export type BrowserControlPhase = "acting" | "waiting";
 
-export type BrowserControlAction =
-  | "open"
-  | "list-tabs"
-  | "snapshot"
-  | "click"
-  | "type"
-  | "key"
-  | "scroll"
-  | "back"
-  | "forward"
-  | "reload"
-  | "screenshot"
-  | "close-tab";
+export const BROWSER_CONTROL_ACTIONS = [
+  "open",
+  "list-tabs",
+  "snapshot",
+  "click",
+  "type",
+  "key",
+  "scroll",
+  "back",
+  "forward",
+  "reload",
+  "screenshot",
+  "close-tab",
+] as const;
 
-export type BrowserControlDetailAction =
-  | "status"
-  | "navigate"
-  | "press"
-  | "hover"
-  | "select-option"
-  | "set-checked"
-  | "drag"
-  | "upload-files"
-  | "wait-for"
-  | "evaluate"
-  | "set-environment"
-  | "recording-start"
-  | "recording-stop";
+export type BrowserControlAction = (typeof BROWSER_CONTROL_ACTIONS)[number];
+
+export const BROWSER_CONTROL_DETAIL_ACTIONS = [
+  "status",
+  "navigate",
+  "press",
+  "hover",
+  "select-option",
+  "set-checked",
+  "drag",
+  "upload-files",
+  "wait-for",
+  "evaluate",
+  "set-environment",
+  "recording-start",
+  "recording-stop",
+] as const;
+
+export type BrowserControlDetailAction = (typeof BROWSER_CONTROL_DETAIL_ACTIONS)[number];
 
 export interface BrowserControlSession {
   id: string;
@@ -218,7 +190,6 @@ export interface BrowserControlSession {
   callId: string;
   tabId: string | null;
   action: BrowserControlAction;
-  /** Local V2 UI detail. Team API v1 projection intentionally strips this optional field. */
   detailAction?: BrowserControlDetailAction;
   phase: BrowserControlPhase;
   startedAt: string;
@@ -247,6 +218,61 @@ export type BrowserPictureInPictureEvent =
   | { type: "dock" }
   | { type: "hide" };
 
+export interface BrowserTabAgent {
+  id: string;
+  name: string;
+  avatarSeed: string;
+  avatarHue: AvatarHue | null;
+  avatarColor?: AvatarColor | null;
+  avatarUrl: string | null;
+}
+
+export type BrowserTabLabel = BrowserTabProfile & { proxy?: string | undefined };
+
+export interface BrowserWindowTabDetails {
+  tabId: string;
+  control?: BrowserControlSession | undefined;
+  controller?: BrowserTabAgent | undefined;
+  owner?: BrowserTabAgent | undefined;
+  profile?: BrowserTabLabel | undefined;
+}
+
+export interface BrowserWindowHistoryEntry {
+  url: string;
+  title: string;
+  visits: number;
+}
+
+export interface BrowserWindowModel {
+  tabs: BrowserTab[];
+  activeTabId: string | null;
+  details: BrowserWindowTabDetails[];
+  history: BrowserWindowHistoryEntry[];
+  canReopen: boolean;
+  canCloseTabs: boolean;
+  liveViewTabId: string | null;
+  liveViewClipboard: boolean;
+  shortcuts: "mac" | "pc" | null;
+}
+
+export type BrowserWindowAction =
+  | { type: "activate"; tabId: string }
+  | { type: "close"; tabIds: string[] }
+  | { type: "new-tab"; afterId?: string | undefined }
+  | { type: "duplicate"; tabId: string }
+  | { type: "move"; tabId: string; index: number }
+  | { type: "reopen" }
+  | { type: "reload"; tabId: string }
+  | { type: "stop"; tabId: string }
+  | { type: "navigate"; tabId: string; direction: BrowserNavigationDirection }
+  | { type: "open-address"; url: string; tabId?: string | undefined };
+
+export type BrowserWindowEvent =
+  | { type: "bounds-changed"; bounds: BrowserBounds }
+  | { type: "dock" }
+  | { type: "hide" }
+  | { type: "action"; action: BrowserWindowAction };
+
 export interface BrowserOpenInput {
   url: string;
   ownerThreadId?: string | null;
@@ -254,34 +280,20 @@ export interface BrowserOpenInput {
   focus?: boolean;
 }
 
-/**
- * A sign-in on this computer for a tab of the active remote server. OpenBot opens the tab's address
- * in a local window with its own session in memory; Done sends the cookies of that site to the tab.
- * When the site looks signed in, the window ends its wait before the person selects Done.
- */
 export interface BrowserLocalSignInInput {
   tabId: string;
   url: string;
 }
 
-/** How the wait for the local sign-in window ends. */
 export interface BrowserLocalSignInEnd {
   signedIn: boolean;
 }
 
-/**
- * `send: false` discards the local sign-in. `check: true` keeps it when the server tab still shows a
- * sign-in step after the send, so the person can finish the sign-in in the window.
- */
 export interface BrowserLocalSignInFinish {
   send: boolean;
   check?: boolean | undefined;
 }
 
-/**
- * The count of cookies, and of page storage pairs, that the server set for the tab. `signedIn` is false when a checked
- * send left the server tab on a sign-in step.
- */
 export interface BrowserLocalSignInResult {
   cookies: number;
   signedIn: boolean;
@@ -299,23 +311,12 @@ export interface BrowserVisibilityInput {
   target?: BrowserViewTarget;
 }
 
-/**
- * A pointer or key event the user made over a live view of a remote tab, or the frame the view
- * has drawn. The acknowledgement is how a view that nobody clicks still tells the host which
- * frames it has left behind.
- *
- * Coordinates are a fraction of the frame the user was looking at, not pixels. The renderer draws a
- * frame at whatever size its panel is and the host's viewport is a third size again, so pixels would
- * mean one side has to know the other's scale. This mirrors the Team protocol's own input shape
- * rather than importing it: the wire may version, and the renderer's API must not move when it does.
- */
 export type BrowserLiveViewInput =
   | {
       type: "pointer";
       action: "move" | "down" | "up" | "wheel";
       x: number;
       y: number;
-      /** The frame the fraction belongs to, so the host expands it against that frame and no other. */
       sequence?: number;
       button: "left" | "middle" | "right";
       clickCount?: number;
@@ -325,21 +326,12 @@ export type BrowserLiveViewInput =
     }
   | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text?: string; modifiers?: number }
   | { type: "ack"; sequence: number }
-  /** Text from the user's own clipboard, inserted where the remote page has focus. */
   | { type: "paste"; text: string }
-  /** Asks for the remote page's selection; it comes back as a `copied` event. */
   | { type: "copy" }
-  /** Deletes the remote selection after a cut, once `text` is on the user's clipboard. */
   | { type: "cut"; text: string };
 
-/** The longest paste a live view sends, the same bound the Team protocol puts on one. */
 export const BROWSER_LIVE_VIEW_MAX_PASTE_TEXT = 100_000;
 
-/**
- * What a live view sends the renderer. The image is the host's own JPEG, not a data URL. `copied`
- * is the remote page's selection, for the renderer to put on the user's clipboard, and
- * `copyTooLarge` says the selection was longer than one copy carries.
- */
 export type BrowserLiveViewEvent =
   | { type: "frame"; tabId: string; sequence: number; width: number; height: number; image: Uint8Array }
   | { type: "stopped"; tabId: string; reason: string }

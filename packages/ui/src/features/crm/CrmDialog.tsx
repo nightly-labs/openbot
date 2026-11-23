@@ -23,9 +23,7 @@ type MethodChoice = CrmMethod | "none";
 const METHOD_CHOICES: MethodChoice[] = ["stripe", "transfer", "crypto", "paypal", "cash", "none"];
 const EVERY_CHOICES: CrmEvery[] = [...CRM_EVERY];
 const FALLBACK_CURRENCY = "EUR";
-/** A new payment is due this many days after today. */
 const DUE_AFTER_DAYS = 14;
-/** Each new part of a split is due this many days after the part before it. */
 const SPLIT_STEP_DAYS = 30;
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 
@@ -38,7 +36,6 @@ function useMethodText() {
   return (value: MethodChoice) => (value === "none" ? t("crm.method.none") : t(METHOD_KEY[value]));
 }
 
-/** The dialog frame. The submit button is off while the form is not valid or while it saves. */
 function FormDialog(props: {
   crm: CrmViewModel;
   title: string;
@@ -91,7 +88,6 @@ function FormDialog(props: {
   );
 }
 
-/** The currency that most customers use, for a new customer. */
 function usualCurrency(customers: readonly CrmCustomer[]): string {
   const counts = new Map<string, number>();
   for (const customer of customers) counts.set(customer.currency, (counts.get(customer.currency) ?? 0) + 1);
@@ -278,7 +274,6 @@ function AmountField(props: { label: string; value: string; currency: string; on
   );
 }
 
-/** The customer of a new payment. It reads the dialog layer, so it must render in the dialog. */
 function CustomerSelect(props: {
   crm: CrmViewModel;
   options: string[];
@@ -287,8 +282,6 @@ function CustomerSelect(props: {
   labelledBy: string;
 }) {
   const mount = usePopupMount();
-  // A ternary in the prop compiles to a getter that makes a memo on each read. The list reads the value
-  // in a tracked effect, where Solid does not permit a new memo, and then all updates stop.
   const value = () => (props.value === "" ? null : props.value);
   return (
     <SearchSelect<string>
@@ -320,7 +313,6 @@ function PaymentForm(props: { crm: CrmViewModel; customerId: string | null; paym
   const methodText = useMethodText();
   const editing = props.payment;
   const paidId = createUniqueId();
-  // The picker keeps one options array while the dialog is open.
   const customerIds = [...crm.customers()].sort((a, b) => a.name.localeCompare(b.name)).map((item) => item.id);
   const firstCustomer = editing?.customerId ?? props.customerId ?? customerIds[0] ?? "";
   const [form, setForm] = createStore<PaymentDraft>({
@@ -359,7 +351,6 @@ function PaymentForm(props: { crm: CrmViewModel; customerId: string | null; paym
       if (Object.keys(patch).length === 0) return true;
       return crm.ok({ kind: "payment-update", paymentId: editing.id, patch });
     }
-    // A paid payment keeps the local day that the user typed, at noon so that no time zone moves it.
     const paidAt = form.paid ? new Date(`${form.paidOn}T12:00:00`).toISOString() : null;
     const id = await crm.created({
       kind: "payment-create",
@@ -590,7 +581,6 @@ interface SplitPart {
   dueOn: string;
 }
 
-/** Splits the amount into equal parts. The last part takes the minor units that are left. */
 function evenParts(payment: CrmPayment, count: number): SplitPart[] {
   const share = Math.floor(payment.amountMinor / count);
   return Array.from({ length: count }, (_, index) => ({
@@ -704,7 +694,6 @@ function SplitForm(props: { crm: CrmViewModel; payment: CrmPayment }) {
   );
 }
 
-/** The dialog for a new or changed customer, payment or plan, a split of a payment, and a payment source. */
 export function CrmDialog(props: { crm: CrmViewModel; form: CrmForm }) {
   const crm = props.crm;
   const form = props.form;

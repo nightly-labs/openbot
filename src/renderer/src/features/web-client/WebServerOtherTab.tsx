@@ -2,7 +2,6 @@ import { AppLogo } from "@openbot/brand";
 import { Button, Heading, Text } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 
-/** Fills the window when another tab of this browser has the server open. "Use here" moves it to this tab. */
 export function WebServerOtherTab(props: { name: string; busy: boolean; onUseHere: () => void }) {
   const { t } = useText();
   return (

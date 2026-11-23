@@ -6,27 +6,10 @@ import { formatMessageTime } from "./app-message-projection";
 import { agentConversationKey } from "./features/conversation/conversation-keys";
 import { createSimpleContext } from "./simple-context";
 
-/**
- * A request that a joined server's connection dropped while it waited for the answer. The app
- * connects again by itself, so a background request with this failure is not the user's to fix.
- */
 export function isConnectionDrop(error: unknown): boolean {
   return errorReference(error) === "http/503/remote_disconnected";
 }
 
-/**
- * The inline error feed of an agent's message list.
- *
- * It sits above the per-server scope, and that placement is the whole point: an
- * error is reported by whichever command failed, and a command can outlive the
- * workspace it was issued from. A voice message whose transcription resolves
- * after the user has moved to another server still sends to the server it was
- * dictated on, so its rejection has to be waiting when they come back.
- *
- * Keys are `agentConversationKey(serverId, agentId)`, so entries for a server you
- * are not looking at are unreachable rather than merely unrendered - which is
- * why nothing prunes this on a switch, and why a shared owner is safe.
- */
 const UiErrors = createSimpleContext({
   name: "UI errors",
   init: () => {
@@ -36,7 +19,6 @@ const UiErrors = createSimpleContext({
       const { t, errorMessage } = currentText();
       const body = errorMessage(error, t("app.error.actionFailed"));
       const errorKey = agentConversationKey(serverId, agentId);
-      // The same failure again replaces the earlier one, so a server that is down shows it once.
       setUiErrors((current) => ({
         ...current,
         [errorKey]: [
@@ -53,7 +35,6 @@ const UiErrors = createSimpleContext({
       }));
     }
 
-    /** Removes the errors with `status` from the conversation `errorKey`, or from each conversation without it. */
     function clearUiErrors(status: string, errorKey?: string): void {
       setUiErrors((current) => {
         let next = current;

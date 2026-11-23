@@ -1,10 +1,5 @@
 import type { SpeechLanguage } from "./ipc-voice";
 
-/**
- * The Latin-script languages that Supertonic 3 reads: their frequent short words, and the letters
- * that only some of them use. A matched letter counts as two matched words; the language with the
- * highest count wins.
- */
 const LATIN_LANGUAGES: readonly { language: SpeechLanguage; words: ReadonlySet<string>; letters?: RegExp }[] = [
   {
     language: "en",
@@ -87,8 +82,6 @@ const LATIN_LANGUAGES: readonly { language: SpeechLanguage; words: ReadonlySet<s
       "je",
       "sur",
     ]),
-    // Italian also writes è, à and ù, but at the end of a word: French has them inside a word, and
-    // in the words à, là, déjà, voilà and où.
     letters: /[çêœ]|[èàù](?=\p{L})|(?:^|\P{L})(?:déj|voil|l)?à(?!\p{L})|(?:^|\P{L})où(?!\p{L})/gu,
   },
   {
@@ -110,8 +103,6 @@ const LATIN_LANGUAGES: readonly { language: SpeechLanguage; words: ReadonlySet<s
       "come",
       "ma",
     ]),
-    // The word è, and a word that ends in an accented vowel, such as città, più or così; not là, déjà,
-    // voilà or où.
     letters: /(?:^|\P{L})(?:è|(?!(?:l|o|déj|voil)[àù](?!\p{L}))\p{L}+[àèìòù])(?!\p{L})/gu,
   },
   {
@@ -133,7 +124,6 @@ const LATIN_LANGUAGES: readonly { language: SpeechLanguage; words: ReadonlySet<s
       "isso",
       "está",
     ]),
-    // French also counts ç, ê and the à of às: Portuguese writes them in você, faça, três and às.
     letters: /[ãõçê]|(?:^|\P{L})às(?!\p{L})/gu,
   },
   {
@@ -415,11 +405,6 @@ function count(text: string, pattern: RegExp): number {
   return text.match(pattern)?.length ?? 0;
 }
 
-/**
- * The language to read a reply in, from its letters and its frequent words. It answers null for a
- * script that Supertonic 3 does not read, such as Chinese or Hebrew, and `fallback` when the words
- * do not show a language.
- */
 export function speechLanguageOf(text: string, fallback: SpeechLanguage): SpeechLanguage | null {
   const letters = count(text, /\p{L}/gu);
   if (letters === 0) return fallback;
@@ -440,7 +425,6 @@ export function speechLanguageOf(text: string, fallback: SpeechLanguage): Speech
   return latinLanguage(text, fallback) ?? fallback;
 }
 
-/** A tie goes to `fallback` when it is one of the tied languages, else to the first in the list. */
 function latinLanguage(text: string, fallback: SpeechLanguage): SpeechLanguage | null {
   const lower = text.toLowerCase();
   const words = lower.match(/\p{L}+/gu) ?? [];

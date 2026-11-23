@@ -82,7 +82,6 @@ export interface MuseProviderOptions {
     ProviderClientOperationError
   >;
   profileGeneration?: boolean;
-  /** Test seam at the owned SDK process boundary. */
   spawn?: typeof spawnMspConnection;
 }
 
@@ -96,29 +95,29 @@ interface MuseTurn {
   id: string;
   compact: boolean;
   items: Map<string, MuseItem>;
-  /** Holds a trailing credential prefix until the next delta or authoritative item. */
   deltaPending: Map<string, string>;
 }
 interface MuseThread {
   id: string;
   cwd: string;
   instructions: string;
-  /** The instructions that the session already has, or null when the next turn must carry them. */
   instructionsSent: string | null;
   roots: string[];
   mcp: LocalMcpSession;
   turn: MuseTurn | null;
   approvals: Map<string, AbortController>;
-  /** Only cursors replayed by a gap fill; remove the live twin when it arrives. */
   replayed: Set<string>;
 }
 
-/** Owns one native MSP process, session MCP bridges, and the live view-to-OpenBot event adapter. */
+const MUSE_MODEL_UNAVAILABLE = /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu;
+const MUSE_CREDENTIAL_FAILURE =
+  /\b(?:40[123]|unauthori[sz]ed|forbidden|payment required|billing|invalid[ _-]?(?:api[ _-]?)?key|api[ _-]?key)\b/iu;
+
 export class MuseAgentClient extends EventEmitter<ClientEvents> implements AgentClient {
   readonly contextCompaction = "events";
   readonly provider: AgentProvider = "muse";
-  /** The memories and section-mates go with the turns, so a memory change sends no instructions again. */
   readonly turnContext = true;
+  readonly imageInput = (): boolean => true;
   readonly #turnContext = new TurnContext();
   readonly #cli: AgentCliInfo;
   readonly #options: MuseProviderOptions;
@@ -126,7 +125,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
   readonly #requests = new PendingServerRequests((request) => this.emit("request", request));
   readonly #threads = new Map<string, MuseThread>();
   readonly #children = new Map<string, MuseAgentClient>();
-  /** Owned children whose session open is in flight. They join `#children` when it succeeds. */
   readonly #opening = new Set<MuseAgentClient>();
   readonly #secrets = new Set<string>();
   readonly #diagnostics = createDiagnosticStream({
@@ -136,7 +134,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
   readonly #scope = Scope.makeUnsafe();
   #running = false;
   #host: SpawnedMspConnection | null = null;
-  /** The one launch that every caller waits for. It is not interrupted when a caller is. */
   #starting: Fiber.Fiber<SpawnedMspConnection, ProviderClientOperationError> | null = null;
   #handshake: ReturnType<typeof spawnMspConnection> | null = null;
   #events: Promise<void> = Promise.resolve();
@@ -157,9 +154,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
   canReleaseProcess = (): boolean =>
     [...this.#threads.values()].every((thread) => !thread.turn) &&
     [...this.#children.values()].every((child) => child.canReleaseProcess());
-  notify(): void {
-    /* The SDK completes the initialized handshake. */
-  }
+  notify(): void {}
   respond(id: RequestId, result: unknown): void {
     this.#requests.resolve(id, result);
     for (const child of this.#children.values()) child.respond(id, result);
@@ -236,7 +231,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         yield* this.#ensureHost();
         return {};
       case "account/read": {
-        // A Muse CLI without `account/read` keeps the unverified state instead of failing the start.
         const verified = this.#options.readAccount
           ? yield* this.#options.readAccount().pipe(Effect.option)
           : Option.none();
@@ -286,7 +280,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       case "thread/start":
         return yield* this.#openOwnedThread(params, false);
       case "thread/resume":
-        // A held session only takes the caller's instructions, such as new memories.
         return child ? yield* child.#openThread(params, true) : yield* this.#openOwnedThread(params, true);
       case "thread/read": {
         const id = yield* providerSync(() => requiredString(params, "threadId"));
@@ -337,7 +330,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (this.#options.profileGeneration)
       return yield* providerFailure(new Error(sourceText("error.provider.museProfileUnsupported")));
     if (this.#host) return this.#host;
-    // The fork starts on the next tick, so `#starting` is set before a failed launch resets it.
     if (!this.#starting) this.#starting = yield* Effect.forkDetach(this.#launch());
     const host = yield* Fiber.join(this.#starting);
     if (!host) return yield* providerFailure(new Error(sourceText("error.provider.museNotStarted")));
@@ -378,7 +370,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     });
     this.#handshake = handshake;
     return yield* this.#connect(handshake).pipe(
-      // A close failure replaces the launch failure, and the failed launch then stays cached.
       Effect.catch((error) =>
         providerCall(() => handshake.close()).pipe(
           Effect.andThen(
@@ -447,6 +438,13 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
   #redact(value: string): string {
     return redactMcpValues(redactText(value), this.#redactionValues());
   }
+  #turnFailureText(message: string, unexplained: boolean): string {
+    if (MUSE_MODEL_UNAVAILABLE.test(message))
+      return sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) });
+    if (this.#options.apiKey() && (unexplained || MUSE_CREDENTIAL_FAILURE.test(message)))
+      return sourceText("error.provider.museSavedKeyFailed", { detail: message });
+    return message;
+  }
   #fail(_error: unknown): void {
     if (!this.#running) return;
     this.#running = false;
@@ -493,7 +491,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     const id = resume ? yield* providerSync(() => requiredString(params, "threadId")) : host.connection.mintCommandId();
     const held = this.#threads.get(id);
     if (held) {
-      // The next turn carries changed instructions.
       held.instructions = getString(params, "developerInstructions") ?? held.instructions;
       this.#turnContext.set(id, params, true);
       return { thread: { id } };
@@ -536,16 +533,21 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       }
       this.#options.reportMcpDrops?.(this.provider, handoff.dropped);
       const mcpServers = Object.fromEntries(
-        [...handoff.servers, ...bridge.servers].map((server) => [
+        [
+          ...handoff.servers.map((server) => ({ server, mode: "optional" })),
+          ...bridge.servers.map((server) => ({ server, mode: "required" })),
+        ].map(({ server, mode }) => [
           server.name,
           "url" in server
             ? {
                 transport: "streamableHttp",
+                mode,
                 url: server.url,
                 headers: Object.fromEntries(server.headers.map((header) => [header.name, header.value])),
               }
             : {
                 transport: "stdio",
+                mode,
                 command: server.command,
                 args: server.args,
                 env: Object.fromEntries(server.env.map((entry) => [entry.name, entry.value])),
@@ -594,7 +596,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     );
   });
 
-  /** MSP has no session-close command. A session owns its process so MCP refresh can stop it. */
   readonly #openOwnedThread = Effect.fn("MuseAgentClient.openOwnedThread")(function* (
     this: MuseAgentClient,
     params: unknown,
@@ -632,11 +633,8 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (model && model !== "default")
       yield* this.#command("session/setModel", { sessionId: thread.id, model: { modelId: model, providerId: "meta" } });
     const input = compact ? [] : yield* musePrompt(params);
-    // The session keeps the instructions in its context until a compaction replaces them. With the
-    // instructions again, the memories and section-mates go in full too.
     const sendInstructions = !compact && thread.instructions && thread.instructionsSent !== thread.instructions;
     if (sendInstructions) this.#turnContext.resend(thread.id);
-    // A slash command gets no blocks: the agent reads a command only at the start of the input.
     const first = input[0];
     const command = first?.type === "text" && first.text?.startsWith("/") === true;
     if (!compact)
@@ -665,8 +663,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
       },
       id,
     ).pipe(
-      // `turn/started` is already out, so the turn must end too: without `turn/completed` the agent
-      // keeps it as its running turn and holds every later message.
       Effect.onError(() =>
         Effect.sync(() => {
           if (thread.turn?.id === id) this.#finish(thread, "failed");
@@ -685,7 +681,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     return { turn: { id, status: "inProgress" } };
   });
 
-  /** Only provider text is redacted. IDs, status, revisions, and numeric usage stay intact. */
   #publicItem(item: MuseItem, turn?: MuseTurn): ThreadItem {
     const redact = (text: string, field: string): string => {
       if (!turn || item.status !== "inProgress") return this.#redact(text);
@@ -733,7 +728,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (old && old.revision >= item.revision) return;
     turn.items.set(item.itemId, item);
     if (item.status !== "inProgress") {
-      // The final item replaces streamed text, including any held ordinary suffix.
       for (const key of turn.deltaPending.keys()) if (key.startsWith(`${item.itemId}:`)) turn.deltaPending.delete(key);
     }
     this.#emit(item.status === "inProgress" ? "item/started" : "item/completed", {
@@ -746,7 +740,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     const turn = thread.turn;
     if (!turn) return;
     thread.turn = null;
-    // The session may not have kept the input of a turn that failed.
     if (status === "failed" && !turn.compact) {
       thread.instructionsSent = null;
       this.#turnContext.resend(thread.id);
@@ -904,7 +897,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (method === "turn/completed" && thread.turn && !thread.turn.compact) {
       const terminal = yield* this.#decode(MuseTerminal, params);
       if (terminal.turnId !== thread.turn.id) return;
-      // A terminal can follow dropped ephemeral deltas. Read final durable items before publishing it.
       const history = yield* this.#history(thread.id);
       for (const item of history) this.#publish(thread, item);
       if (terminal.terminal === "failed") {
@@ -914,12 +906,7 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
         this.#emit("error", {
           threadId: thread.id,
           turnId: terminal.turnId,
-          error: {
-            // Meta refuses a model this way also where Muse is not offered (#5983).
-            message: /\bmodel\b.{0,80}\bdoes not exist or you lack access\b/iu.test(message)
-              ? sourceText("error.provider.museModelUnavailable", { detail: shownFailureDetail(message) })
-              : message,
-          },
+          error: { message: this.#turnFailureText(message, !terminal.error && !terminal.reason) },
           willRetry: false,
         });
       }
@@ -1015,7 +1002,6 @@ export class MuseAgentClient extends EventEmitter<ClientEvents> implements Agent
     if (!terminals && history.items) return history.items;
     if (!terminals && history.snapshot?.schemaVersion === 1 && history.mode === "snapshot")
       return history.snapshot.state.items;
-    // Paged mode and a partial compaction snapshot need the full durable view.
     const items = new Map<string, MuseItem>();
     const cursors = new Set<string>();
     let cursor: string | null = null;
@@ -1106,10 +1092,6 @@ const musePrompt = Effect.fn("MuseAgentClient.prompt")(function* (params: unknow
   if (!input.length) return yield* providerFailure(new Error(sourceText("error.provider.museEmptyInput")));
   return input;
 });
-/**
- * Muse accepts only canonical roots: the real path, in the verbatim `\\?\` form on Windows (#3356).
- * A root that does not resolve is sent as written, and Muse rejects it as before.
- */
 const museWorkspaceRoots = Effect.fn("MuseAgentClient.workspaceRoots")(function* (paths: string[]) {
   const roots = yield* Effect.forEach(paths, (path) => Effect.promise(() => realpath(path).catch(() => path)));
   return [...new Set(roots.map((root) => toNamespacedPath(root)))];

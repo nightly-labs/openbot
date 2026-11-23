@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub לא מכיר את ה-Client ID של ה-GitHub App הזה.",
   "error.connector.githubUnexpected": "GitHub שלח תשובה לא צפויה: {detail}",
   "error.connector.githubUnreachable": "OpenBot לא מצליח להגיע אל GitHub: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot לא מצליח להגיע אל GitHub. יש לבדוק את החיבור לאינטרנט ואת הגדרות ה-DNS של המחשב או השרת שמריץ את OpenBot, ולנסות שוב.",
   "error.connector.githubExpired": "החיבור ל-GitHub פג תוקף. יש לחבר את GitHub מחדש.",
   "error.connector.githubFileUnreadable": "קובץ החיבור ל-GitHub אינו קריא.",
   "error.connector.githubFileTooLarge": "קובץ החיבור ל-GitHub גדול מדי.",

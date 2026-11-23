@@ -1,9 +1,3 @@
-/**
- * The GitHub settings of a trigger and of an output card. A GitHub trigger starts a run for each event that
- * matches its repository, its event and its filters; the Events row lists what each event did. A GitHub
- * output makes one change on the issue or the pull request of the event, as OpenBot's bot.
- */
-
 import {
   WORKFLOW_GITHUB_ACTIONS,
   WORKFLOW_GITHUB_CLOSE_REASONS,
@@ -141,7 +135,6 @@ const EVENT_GROUP_LABEL = {
   both: "workflow.github.events.both",
 } as const;
 
-/** The events, in the groups of their menu. */
 const eventGroups = (t: AppTranslate) =>
   EVENT_KIND_GROUPS.map((kind) => ({
     label: t(EVENT_GROUP_LABEL[kind]),
@@ -153,7 +146,6 @@ const eventGroups = (t: AppTranslate) =>
 const isPullRequestAction = (action: WorkflowGitHubAction) =>
   WORKFLOW_GITHUB_PULL_REQUEST_ACTIONS.some((value) => value === action);
 
-/** A GitHub label colour as CSS. */
 const labelTone = (color: string | undefined) => (color ? `#${color}` : undefined);
 
 const itemIcon = (item: WorkflowGitHubItem) => () =>
@@ -168,7 +160,6 @@ function Warning(props: { children: string }) {
   );
 }
 
-/** Opens the connect dialog of the GitHub page, which shows the code that the user types on GitHub. */
 function ConnectButton(props: { github: WorkflowGitHubCanvas }) {
   const { t } = useText();
   const [open, setOpen] = createSignal(false);
@@ -187,7 +178,6 @@ function ConnectButton(props: { github: WorkflowGitHubCanvas }) {
   );
 }
 
-/** One page on GitHub fixes access, write access and events: the installation of the App. */
 function OpenGitHubButton(props: { github: WorkflowGitHubCanvas; label: string }) {
   const { t } = useText();
   return (
@@ -204,7 +194,6 @@ function OpenGitHubButton(props: { github: WorkflowGitHubCanvas; label: string }
   );
 }
 
-/** What stops a GitHub step on a repository, or undefined when it can act. Nothing shows while the host reads. */
 type AccessProblem = "missing" | "readOnly" | "eventsOff";
 
 function accessProblem(
@@ -227,7 +216,6 @@ const ACCESS_ALERT = {
   eventsOff: "workflow.github.alert.eventsOff",
 } as const satisfies Record<AccessProblem, string>;
 
-/** One alert for each repository that stops the step, and one button: one page on GitHub fixes them all. */
 function AccessAlerts(props: {
   github: WorkflowGitHubCanvas;
   repositories: readonly string[];
@@ -254,7 +242,6 @@ function AccessAlerts(props: {
   );
 }
 
-/** The rows of a GitHub step, or a Connect button when GitHub is not connected. */
 function Connected(props: { children: JSX.Element }) {
   const board = useBoard();
   const notConnected = () => {
@@ -284,11 +271,9 @@ function useRepositoryChoices() {
   };
 }
 
-/** The labels and people of the repositories, as the host reads them. A name in more than one shows once. */
 function useRepositoryOptions(repositories: () => readonly string[]) {
   const board = useBoard();
   const all = createMemo(() => repositories().map((name) => board.github()?.options(name)));
-  /** The labels by their name in lower case. */
   const labels = createMemo(() => {
     const byKey = new Map<string, { name: string; color: string }>();
     for (const options of all())
@@ -302,12 +287,10 @@ function useRepositoryOptions(repositories: () => readonly string[]) {
     labels: () => [...labels().values()].map((label) => label.name),
     tone: (name: string) => labelTone(labels().get(name.toLowerCase())?.color),
     people: () => [...new Set(all().flatMap((options) => options?.people ?? []))],
-    /** The host still reads them. */
     loading: () => all().some((options) => options === undefined),
   };
 }
 
-/** Keeps the values that the user chose, and the ones of the repository after them. */
 const withValues = (options: readonly string[], values: readonly string[]) => [
   ...values.filter((value) => !options.includes(value)),
   ...options,
@@ -318,10 +301,6 @@ const sameNames = (before: readonly string[], after: readonly string[]) =>
 const repositoryOwner = (fullName: string) => fullName.slice(0, Math.max(fullName.indexOf("/"), 0));
 const repositoryName = (fullName: string) => fullName.slice(fullName.indexOf("/") + 1);
 
-/**
- * The repositories of a trigger. One reads as a choice row; more show as tags, and a tag of a repository
- * that sends no events has the warning tone. The menu groups the repositories by owner and stays open.
- */
 function RepositoriesRow(props: {
   github: WorkflowGitHubCanvas | undefined;
   values: readonly string[];
@@ -333,7 +312,6 @@ function RepositoriesRow(props: {
   const entry = (fullName: string) => githubRepository(props.github, fullName);
   const noEvents = (fullName: string) => entry(fullName)?.events === false;
   const icon = (fullName: string) => (entry(fullName)?.private ? <Lock aria-hidden="true" /> : <GitHubIcon />);
-  /** The values as the catalog spells them, so each one checks its row. */
   const values = () => props.values.map((fullName) => entry(fullName)?.fullName ?? fullName);
   const chips = (fullName: string): PickerChip[] => [
     ...(entry(fullName)?.private ? [{ text: t("connector.github.private") }] : []),
@@ -341,8 +319,6 @@ function RepositoriesRow(props: {
       ? [{ icon: () => <TriangleAlert aria-hidden="true" />, text: t("workflow.github.noEvents") }]
       : []),
   ];
-  // A repository that the App no longer reaches stays in the list, so the user can turn it off. The rows
-  // change only when the catalog or these names change: a check keeps its row and the keyboard focus.
   const unknown = createMemo(() => props.values.filter((fullName) => !entry(fullName)), { equals: sameNames });
   const groups = createMemo((): PickerGroup<string>[] => {
     const known = props.github?.catalog()?.repositories.map((repository) => repository.fullName) ?? [];
@@ -418,12 +394,8 @@ function RepositoriesRow(props: {
   );
 }
 
-/* ------------------------------------------------------------- Trigger */
-
-/** The fields that a GitHub trigger stores when the user chooses it. The host reads the same names. */
 export const GITHUB_TRIGGER_DEFAULTS = { event: "issue.opened", filters: "notBot" } as const;
 
-/** The settings of a GitHub trigger. An output reads them too: it acts on the event. */
 function useGitHubTrigger(id: () => string) {
   const board = useBoard();
   const [repository] = useField<string>(id, "repository", "", asString);
@@ -440,16 +412,11 @@ function useGitHubTrigger(id: () => string) {
   const [labels, setLabels] = useListField(id, "labels", []);
   const [titleText, setTitleText] = useTextField(id, "titleText", "");
   const [branch, setBranch] = useTextField(id, "branch", "");
-  /** The base branch is a filter of pull requests only. */
   const filterOptions = (): WorkflowGitHubFilter[] =>
     WORKFLOW_GITHUB_FILTERS.filter(
       (filter) => filter !== "branch" || workflowGitHubEventItemKind(event()) === "pullRequest",
     );
   const filters = () => storedFilters().filter((filter) => filterOptions().some((option) => option === filter));
-  /**
-   * Labels are names that the item must have. They stay while one repository of the list stays; a list
-   * with none of the old repositories starts with no labels, in one change.
-   */
   const setRepositories = (values: readonly string[]) => {
     const old = new Set(repositories().map((name) => name.toLowerCase()));
     const keeps = values.some((name) => old.has(name.toLowerCase()));
@@ -477,7 +444,6 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
   const board = useBoard();
   const fields = useGitHubTrigger(() => props.id);
   const options = useRepositoryOptions(fields.repositories);
-  // On "Issue labeled", the list is the labels that start a run. On other events, the item must have one of them.
   const labelsName = () =>
     fields.event() === "issue.labeled"
       ? t("workflow.github.trigger.labelAdded")
@@ -565,7 +531,6 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
   );
 }
 
-/** Whether "Run with last event" can start: GitHub is connected and the trigger can read one of its repositories. */
 export function useGitHubTriggerReady(id: () => string) {
   const board = useBoard();
   const fields = useGitHubTrigger(id);
@@ -577,8 +542,6 @@ export function useGitHubTriggerReady(id: () => string) {
       .some((repository) => accessProblem(github, repository, { write: false, events: false }) !== "missing");
   };
 }
-
-/* ------------------------------------------------------ Events history */
 
 const SKIP_ICONS: Record<WorkflowGitHubSkipReason, () => JSX.Element> = {
   filter: () => <Filter aria-hidden="true" />,
@@ -596,7 +559,6 @@ const SKIP_TEXT = {
   refused: "workflow.github.skip.refused",
 } as const satisfies Record<WorkflowGitHubSkipReason, string>;
 
-/** The icon of an event: its issue or pull request, or the gap of an offline host. */
 function deliveryIcon(delivery: WorkflowGitHubDelivery) {
   return delivery.item ? itemIcon(delivery.item) : () => <WifiOff aria-hidden="true" />;
 }
@@ -604,12 +566,10 @@ function deliveryIcon(delivery: WorkflowGitHubDelivery) {
 const sameItem = (left: WorkflowGitHubItem, right: WorkflowGitHubItem) =>
   left.number === right.number && left.repository.toLowerCase() === right.repository.toLowerCase();
 
-/** The texts and the runs of the events of a GitHub trigger. */
 function useGitHubHistory(github: () => WorkflowGitHubCanvas | undefined) {
   const { t, format } = useText();
   const runName = (number: number) => t("workflow.canvas.run.number", { number });
   const clock = (at: string) => format.date(new Date(at), { hour: "numeric", minute: "2-digit" });
-  /** The open run on the item of an event that waits for it. */
   const waitsFor = (delivery: WorkflowGitHubDelivery) => {
     const item = delivery.item;
     const host = github();
@@ -665,7 +625,6 @@ function useGitHubHistory(github: () => WorkflowGitHubCanvas | undefined) {
     }
     return runChip(delivery.runId);
   };
-  /** With `withRepository`, the item names its repository, as GitHub writes `name#12`. */
   const label = (delivery: WorkflowGitHubDelivery, withRepository: boolean) => {
     const item = delivery.item;
     if (!item) return t("workflow.github.history.offline");
@@ -674,10 +633,6 @@ function useGitHubHistory(github: () => WorkflowGitHubCanvas | undefined) {
   return { runName, clock, waitsFor, outcomeChip, label };
 }
 
-/**
- * The events row at the end of a GitHub trigger: the newest event that GitHub sent, and how many wait.
- * Its menu lists each event with what it did. A run opens on the canvas; a skipped event opens on GitHub.
- */
 function EventsRow(props: { id: string; github: WorkflowGitHubCanvas; withRepository: boolean }) {
   const { t, format } = useText();
   const board = useBoard();
@@ -759,15 +714,11 @@ function EventsRow(props: { id: string; github: WorkflowGitHubCanvas; withReposi
   );
 }
 
-/* -------------------------------------------------------------- Output */
-
-/** The fields that a GitHub output stores when the user chooses it. The host reads the same names. */
 export const GITHUB_OUTPUT_DEFAULTS = { action: "comment" } as const;
 
 type OutputItem = "event" | "input";
 type LabelsFrom = "agent" | "list";
 
-/** The settings of a GitHub output, and what the trigger before it gives. */
 function useGitHubOutput(id: () => string) {
   const board = useBoard();
   const triggerId = () => board.githubTriggers(id())[0] ?? "";
@@ -796,23 +747,16 @@ function useGitHubOutput(id: () => string) {
     oneOf(WORKFLOW_GITHUB_CLOSE_REASONS),
   );
   const [title, setTitle] = useTextField(id, "title", "");
-  /**
-   * The repositories that the action can change. With "trigger", it is the repository of each event, so
-   * each repository of the trigger; empty when no GitHub trigger leads here.
-   */
   const targets = (): readonly string[] => {
     const value = repository();
     return value === "trigger" || !value ? trigger.repositories() : [value];
   };
   const creates = () => action() === "issue.create";
-  /** The action uses the trigger's repository or its item, but no GitHub trigger leads to it. */
   const noEvent = () =>
     !fromEvent() && (repository() === "trigger" || !repository() || (!creates() && item() === "event"));
-  /** The event starts on issues only, so actions of pull requests cannot act on it. */
   const issuesOnly = () =>
     fromEvent() && !creates() && item() === "event" && workflowGitHubEventItemKind(trigger.event()) === "issue";
   const pullRequestOnly = () => isPullRequestAction(action()) && issuesOnly();
-  /** A new repository keeps none of the labels or people of the old one, in one change. */
   const chooseRepository = (value: string) => board.setFields(id(), { repository: value, labels: "", person: "" });
   return {
     fromEvent,
@@ -841,7 +785,6 @@ function useGitHubOutput(id: () => string) {
   };
 }
 
-/** Whether a GitHub output can run alone: GitHub is connected, and it can change the repository. */
 export function useGitHubOutputReady(id: () => string) {
   const board = useBoard();
   const fields = useGitHubOutput(id);
@@ -865,7 +808,6 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
   const actionLabel = (action: WorkflowGitHubAction) => t(ACTION_LABEL[action]);
   const isLabels = () => fields.action() === "label.add" || fields.action() === "label.remove" || fields.creates();
   const isPerson = () => fields.action() === "assign" || fields.action() === "review.request";
-  /** The reason "not planned" exists only on issues. */
   const hasReason = () =>
     fields.action() === "close" &&
     !(
@@ -899,7 +841,11 @@ export function GitHubOutputRows(props: { id: string; locked: boolean }) {
   const people = (): Choice<string>[] => [
     { value: "agent", label: t("workflow.row.agentChooses"), icon: () => <Bot aria-hidden="true" /> },
     ...withValues(options.people(), fields.person() && fields.person() !== "agent" ? [fields.person()] : []).map(
-      (login) => ({ value: login, label: `@${login}`, icon: () => <UserPlus aria-hidden="true" /> }),
+      (login) => ({
+        value: login,
+        label: login.includes("{{") ? login : `@${login}`,
+        icon: () => <UserPlus aria-hidden="true" />,
+      }),
     ),
   ];
   const reasons = (): Choice<WorkflowGitHubCloseReason>[] => [

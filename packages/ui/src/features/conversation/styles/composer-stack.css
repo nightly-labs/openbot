@@ -1,20 +1,7 @@
-/*
- * Everything above the input is one card: the waiting block, the open waits, the queue, the reply
- * and the notices. The stack draws the one border and the one radius, and tucks its lower edge
- * under the input the way the queue did on its own. The cards inside keep their content, but lose
- * their own margins, corners and tucks, so they sit flush with a hairline between them.
- *
- * Each card pulls up by 1px over its own top line. The first card's line goes under the clip, so
- * the stack's own border is the only edge at the top, and every later line divides two cards.
- *
- * The stack only has a frame when something shows in it: the queue slot stays in the DOM while
- * closed, and a frame round an empty slot would be a line over the input.
- */
 .composer-stack {
   --composer-stack-inset: var(--openbot-space-3);
   --composer-stack-duration: var(--openbot-duration-overlay);
 
-  /* The frame fades in and out with its first and last card, so no line comes or goes in one frame. */
   border: 0 solid transparent;
   background: transparent;
   transition:
@@ -22,7 +9,6 @@
     background-color var(--composer-stack-duration) var(--openbot-ease-out);
 }
 
-/* A narrow pane gives the rows the width the side margins took. */
 @media (max-width: 620px) {
   .composer-stack {
     --composer-stack-inset: 2px;
@@ -30,7 +16,6 @@
 }
 
 .composer-stack:has(> :not(.agent-queue-slot), > .agent-queue-slot > .agent-queue-slot-inner > *) {
-  /* To the middle line of the one-line pill, so its round ends cover the lower corners. */
   --composer-stack-overlap: var(--composer-stack-pill-half, 24px);
 
   position: relative;
@@ -53,7 +38,6 @@
   box-shadow: none;
 }
 
-/* The stack tucks under the input now, so no card inside keeps room for a tuck of its own. */
 .composer-stack :is(.awaiting-replies, .agent-queue-panel) {
   padding-bottom: 0;
 }
@@ -62,12 +46,6 @@
   padding-bottom: var(--notice-inset);
 }
 
-/*
- * A compaction notice that leaves when it is the only card takes the frame with it: the frame drops
- * behind the input the way the notice did on its own. The notice keeps its own exit animation,
- * because its `onAnimationEnd` removes it. With reduced motion the notice fades in 1ms, so the frame
- * does not move.
- */
 @media (prefers-reduced-motion: no-preference) {
   .composer-stack:has(> .context-compaction-notice[data-leaving]):not(
     :has(> :not(.agent-queue-slot, [data-leaving]), > .agent-queue-slot > .agent-queue-slot-inner > *)
@@ -76,12 +54,6 @@
   }
 }
 
-/*
- * One row rhythm for every card in the stack, taken from the queue row and the input: a 29px row,
- * a 5px gutter, a 14px leading column that starts 13px from the edge, then the text 7px after it.
- * The text column is the one that the text in the input has. The main text has the size of the
- * text in the input; states and counts are one step smaller.
- */
 .composer-stack {
   --stack-row-height: 29px;
   --stack-row-gutter: 5px;
@@ -94,7 +66,6 @@
   min-height: calc(var(--stack-row-height) + var(--stack-row-gutter));
   gap: var(--stack-row-gap);
   padding-block: 0;
-  /* The button has a 1px border of its own. */
   padding-inline: calc(var(--stack-row-inset) - 1px);
 }
 
@@ -121,12 +92,10 @@
   padding-block: 0;
 }
 
-/* A two-line row keeps its text clear of the row above and below. */
 .composer-stack .open-waits-row {
   padding-block: var(--stack-row-gutter);
 }
 
-/* The avatar is 2px wider than the leading column, so it goes 1px over each side of it. */
 .composer-stack .awaiting-replies-avatar {
   margin-inline: calc((var(--stack-row-glyph) - var(--openbot-icon-md)) / 2);
 }
@@ -142,11 +111,6 @@
   margin-inline: calc((var(--stack-row-glyph) - var(--openbot-icon-md)) / 2);
 }
 
-/*
- * A notice is one row, as a waiting row is: the title, then the body on the same line, in the text
- * size of the input. A long body goes to more lines. The buttons are 24px, so a notice with a button
- * and a notice with text only have the same height.
- */
 .composer-stack .composer-notice,
 .composer-stack .composer-notice:not(:has(.ui-button)) {
   --notice-inset: 6px;
@@ -194,7 +158,6 @@
   padding-inline-start: var(--stack-row-inset);
 }
 
-/* Each card that is left goes down behind the input: the frame goes with the last one. */
 .composer-stack:not(
   :has(
     > .composer-stack-card[data-open="true"],
@@ -207,14 +170,6 @@
   background: transparent;
 }
 
-/*
- * One card of the stack. Its row opens from 0 to the height of the card, so the cards above it move
- * up with the frame while this one comes out from behind the input, and the reverse when it closes.
- * `ComposerStackCard` keeps the card in the page until the row is closed.
- *
- * The card pulls up by 1px over its own top line, as the cards in the queue slot do. The pull opens
- * and closes with the row, so a closed card takes no room.
- */
 .composer-stack-card {
   display: grid;
   grid-template-rows: 1fr;
@@ -252,13 +207,11 @@
   }
 }
 
-/* The row is the movement of a card in the stack, so the card does not also rise on its own. */
 .composer-stack-card-inner > :is(.awaiting-replies, .composer-notice, .composer-reply-preview) {
   margin-top: 0;
   animation: none;
 }
 
-/* The line between the cards above and the queue. The pull closes with the slot. */
 .composer-stack > .agent-queue-slot {
   transition:
     grid-template-rows var(--openbot-duration-overlay) var(--openbot-ease-out),
@@ -273,7 +226,6 @@
   margin-top: 0;
 }
 
-/* The transition still runs, so the card still tells `ComposerStackCard` that it is closed. */
 @media (prefers-reduced-motion: reduce) {
   .composer-stack {
     --composer-stack-duration: 1ms;
@@ -284,21 +236,15 @@
   }
 }
 
-/*
- * The last open card is a notice: its colour goes down into the part of the stack that is behind
- * the input, so the round ends of the pill show the colour of the notice, not the colour of the
- * frame. Only the last card does this, because the tint is not opaque and two layers make it darker.
- * A card that closes keeps the colour there while it fades, so no line in the colour of the frame shows below it.
- */
 .composer-stack
-> :is(.composer-stack-card, .composer-notice):not(
-  :has(
-    ~ .composer-stack-card[data-open="true"],
-    ~ .agent-queue-slot[data-open="true"],
-    ~ .composer-notice,
-    ~ .composer-reply-preview
-  )
-) {
+  > :is(.composer-stack-card, .composer-notice):not(
+    :has(
+      ~ .composer-stack-card[data-open="true"],
+      ~ .agent-queue-slot[data-open="true"],
+      ~ .composer-notice,
+      ~ .composer-reply-preview
+    )
+  ) {
   --stack-notice-tuck: var(--composer-stack-overlap);
 }
 
@@ -320,10 +266,6 @@
   clip-path: inset(0 0 calc(-1 * var(--composer-stack-overlap)) 0);
 }
 
-/*
- * The reference code of an error is on the line of the text, so an error with a code has the height
- * of the other notices. The copy button is taller than the line; it must not make the line taller.
- */
 .composer-stack .composer-notice-copy .ui-error-reference {
   display: inline-flex;
   height: 20px;
@@ -332,7 +274,6 @@
   vertical-align: top;
 }
 
-/* An empty ring is a full circle that the eye can find, not a mark that looks absent. */
 .composer-stack .task-list-donut-track {
   stroke: var(--openbot-text-muted);
 }

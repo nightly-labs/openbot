@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.connector", {
-  // The built-in GitHub connection: the device flow, the token refresh and the stored file.
   "error.connector.githubUnavailable": "This build of OpenBot has no GitHub App.",
   "error.connector.githubDenied": "The GitHub sign-in was refused.",
   "error.connector.githubCodeExpired": "The GitHub code expired. Connect GitHub again.",
@@ -9,6 +8,8 @@ export const messages = defineMessages("error.connector", {
   "error.connector.githubClientUnknown": "GitHub does not know the Client ID of this GitHub App.",
   "error.connector.githubUnexpected": "GitHub sent an unexpected answer: {detail}",
   "error.connector.githubUnreachable": "OpenBot cannot reach GitHub: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot cannot reach GitHub. Check the internet connection and the DNS settings of the computer or server that runs OpenBot, then try again.",
   "error.connector.githubExpired": "The GitHub connection expired. Connect GitHub again.",
   "error.connector.githubFileUnreadable": "The GitHub connection file is unreadable.",
   "error.connector.githubFileTooLarge": "The GitHub connection file is too large.",
@@ -21,7 +22,6 @@ export const messages = defineMessages("error.connector", {
   "error.connector.linkNoCard": "The Link account has no card. Add a card in Link.",
   "error.connector.linkFileUnreadable": "The Link connection file is unreadable.",
   "error.connector.linkFileTooLarge": "The Link connection file is too large.",
-  // The 1Password connection: the CLI that creates the service account, the token and the stored file.
   "error.connector.onePasswordCliMissing":
     "OpenBot cannot find the 1Password CLI. Install it and turn on its integration in the 1Password app, or use a service account token.",
   "error.connector.onePasswordCliInstallFailed":

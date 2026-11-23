@@ -42,7 +42,6 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
     { kind: "channel", id: channelId },
     serverId,
     available && !memorySection,
-    // Under "routines", so the routine change events of the channel reload this list too.
     [...queryKeys.channelInfo(queryScope, serverId, channelId, "routines"), "events"],
   );
   const query = memorySection ? memories : routines;

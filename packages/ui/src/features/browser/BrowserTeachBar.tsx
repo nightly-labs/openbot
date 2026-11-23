@@ -8,10 +8,6 @@ function elapsedLabel(milliseconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-/**
- * The bar above the page while the user shows a task to the agent. Before the recording it starts one.
- * During the recording it shows the time, and its button ends the recording and saves the steps.
- */
 export function BrowserTeachBar(props: BrowserTeachBarProps) {
   const { t } = useText();
   const [now, setNow] = createSignal(Date.now());

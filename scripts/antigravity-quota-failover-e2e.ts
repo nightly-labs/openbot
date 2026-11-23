@@ -1,32 +1,5 @@
-// Checks that a spent Gemini quota moves an agent to its backup model, also after the turn started
-// work. Runs the real agent service on a temporary profile with a fake Antigravity CLI 1.5.4.
-// A prompt with `QUOTA-NOW` on a `gemini-quota-*` model gets Antigravity's quota text as answer text,
-// in the 1.5 failure form ("\n⚠ <text>"), and the stop reason `end_turn`; with `ACT-FIRST` it runs a
-// tool step before that. `gemini-spent` gets the quota text before any step. `gemini-flash` always
-// answers. A prompt with `RATE-NOW` on `gemini-rate` gets a rate-limit text that only the Gemini
-// rules know, with no Google status name (#11099); with `ACT-FIRST` on `gemini-rate-*` it runs a tool
-// step before that. A prompt with `CREDITS-NOW` on a `gemini-credits-*` model gets the text of a spent
-// AI credits balance (#11332). `NET-NOW` on `gemini-net` gets Go's text of a dropped connection, and
-// `GONE-NOW` on `gemini-gone` gets "Unknown model ID", and on `gemini-gone-b` a model that "is
-// unavailable", which only the Gemini rules know (#12432). Each case has its own primary model: a
-// spent quota holds its model for all agents.
-// Checks:
-//   1. Quota before work, set to switch without asking: the message runs again on the backup.
-//   2. Quota after a tool step, set to switch without asking: the backup continues the work, with
-//      the work steps and no error.
-//   3. Quota after a tool step, set to ask: the backup continues the work too, as after a plan limit.
-//   4. As 3, but the first backup's quota is spent too: the next backup continues the same work.
-//   5. A rate limit before work, set to switch without asking: the message runs again on the backup.
-//   6. A spent AI credits balance before work, set to switch without asking: the message runs again
-//      on the backup.
-//   7. A spent AI credits balance after a tool step, set to ask: the backup continues the work.
-//   8. A rate limit after a tool step, set to switch without asking: the backup continues the work.
-//   9. A dropped connection to Google before work, set to switch without asking: the message runs
-//      again on the backup.
-//  10. A model that the account cannot use now, set to switch without asking: the message runs again
-//      on the backup.
-// `bun run test:antigravity-quota-failover`. Writes .openbot-build/antigravity-quota-failover-e2e/report.json.
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -43,13 +16,10 @@ const install = join(root, "antigravity");
 const fakeAgy = join(install, "1.5.4", "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
 const BACKUP = "gemini-flash";
-// The continuation note that a backup model gets for work that a usage limit stopped.
 const CONTINUATION =
   "The previous provider stopped after starting this task: it reached its usage limit or failed with an error.";
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
-// Bun's `os.homedir()` does not follow HOME. Keep the Gemini home off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(home, ".gemini");
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
@@ -61,7 +31,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** An Antigravity CLI that keeps each session's model and sends a spent quota as a 1.5 failure. */
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -71,7 +40,7 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -108,7 +77,11 @@ function handle(message) {
         ? "\u26A0 Agent execution terminated due to error: Post https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent: read tcp 192.0.2.5:5555->198.51.100.1:443: read: connection reset by peer"
         : model === "gemini-gone"
           ? "\u26A0 Unknown model ID: " + model
-          : "\u26A0 Model " + model + " is unavailable for this account";
+          : model === "gemini-gone-c"
+            ? "\u26A0 Agent execution error: request failed with code 410 Gone"
+            : model === "gemini-gone-d"
+              ? "\u26A0 The model " + model + " has been retired"
+              : "\u26A0 Model " + model + " is unavailable for this account";
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + failure } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
@@ -164,6 +137,7 @@ const report: { cases: CaseReport[]; passed: boolean; error?: string } = { cases
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -182,7 +156,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -226,7 +199,6 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Makes an agent on `model` with the backup models in `order`, and sends `text` after its first turn. */
 async function runCase(
   name: string,
   model: string,
@@ -363,6 +335,8 @@ try {
     ["dropped connection before work", "gemini-net", "NET-NOW"],
     ["unknown model before work", "gemini-gone", "GONE-NOW"],
     ["unavailable model before work", "gemini-gone-b", "GONE-NOW"],
+    ["410 Gone model before work", "gemini-gone-c", "GONE-NOW"],
+    ["retired model before work", "gemini-gone-d", "GONE-NOW"],
   ] as const) {
     const moved = await runCase(name, model, true, text);
     assert.deepEqual(
@@ -397,6 +371,96 @@ try {
     );
     credits.passed = true;
   }
+
+  const channelCase: CaseReport = {
+    name: "quota on a channel task, switch without asking",
+    status: "",
+    model: undefined,
+    prompts: [],
+    errors: 0,
+    passed: false,
+  };
+  report.cases.push(channelCase);
+  const member = await runCauseEffect(
+    agents.createAgent({
+      name: channelCase.name,
+      description: "Checks a spent Gemini quota.",
+      avatarSeed: "gemini-quota-e",
+      avatarHue: null,
+      provider: "antigravity",
+      model: "gemini-quota-e",
+      initialMessage: "Hello.",
+    }),
+  );
+  await waitFor(`${channelCase.name}: the first turn`, () => idle(member.id));
+  await runCauseEffect(
+    agents.updateAgent({
+      agentId: member.id,
+      backupModels: { automatic: true, order: [{ provider: "antigravity", model: BACKUP }] },
+    }),
+  );
+  const channelId = randomUUID();
+  const actor = { id: "local", name: "Alex" };
+  await runCauseEffect(
+    agents.channels.command(
+      {
+        type: "save",
+        operationId: randomUUID(),
+        channelId,
+        draft: {
+          name: "Quota",
+          title: "",
+          instructions: "Finish the assigned work.",
+          members: [{ agentId: member.id }],
+          leadAgentId: member.id,
+        },
+      },
+      actor,
+    ),
+  );
+  const channelBefore = prompts().length;
+  const ended = new Set<string>();
+  for (const text of ["QUOTA-NOW first", "QUOTA-NOW second"]) {
+    await runCauseEffect(
+      agents.channels.command(
+        {
+          type: "send",
+          operationId: randomUUID(),
+          channelId,
+          text,
+          recipientAgentId: member.id,
+          replyToMessageId: null,
+          attachmentDraftIds: [],
+        },
+        actor,
+      ),
+    );
+    const task = await waitFor(`${channelCase.name}: the channel task "${text}" to end`, () =>
+      agents.channels.store
+        .tasks(channelId)
+        .find((item) => !ended.has(item.id) && ["completed", "failed", "paused"].includes(item.state)),
+    );
+    ended.add(task.id);
+    channelCase.status = task.state;
+  }
+  channelCase.model = store.list().find((candidate) => candidate.id === member.id)?.model;
+  channelCase.prompts = prompts()
+    .slice(channelBefore)
+    .map((prompt) => ({
+      model: prompt.model,
+      quota: prompt.quota,
+      rate: prompt.rate,
+      continuation: prompt.text.includes(CONTINUATION),
+      workSteps: prompt.text.includes("Read notes.txt"),
+    }));
+  assert.deepEqual(
+    channelCase.prompts.map((prompt) => prompt.model),
+    ["gemini-quota-e", BACKUP],
+    "The next channel task runs on the backup, not on the spent model.",
+  );
+  assert.equal(channelCase.status, "completed", `${channelCase.name}: the next channel task completes`);
+  assert.equal(channelCase.model, BACKUP, `${channelCase.name}: the agent is on the backup model`);
+  channelCase.passed = true;
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

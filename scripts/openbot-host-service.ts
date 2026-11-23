@@ -25,10 +25,8 @@ export interface HostAdminOperations {
   startJobs: (tenants: HostTenant[]) => Promise<void>;
   presentCredentials: (credentials: HostCredential[]) => Promise<void>;
   tenantForUid: (uid: number) => Promise<HostTenant>;
-  /** Read-only status reads. A missing, stale or malformed tenant report gives null, never an error. */
   readState: () => Promise<HostUpdateState | null>;
   readTenantStatus: (uid: number) => Promise<HostTenantStatus | null>;
-  /** Every process inside the shared bundle, as the daemon reads it: main processes and helpers. */
   bundleProcesses: () => Promise<Array<{ uid: number; pid: number; main: boolean }>>;
   verifyState: () => Promise<void>;
   verifyDaemon: () => Promise<void>;
@@ -82,7 +80,6 @@ export async function setupHost(request: HostSetupRequest, ops: HostAdminOperati
   if (new Set(tenants.map((tenant) => tenant.uid)).size !== tenants.length) throw new Error("Duplicate tenant UID.");
   await ops.register(tenants.map((tenant) => tenant.uid));
   await ops.startJobs(tenants);
-  // The only password presentation occurs after registration and launchd setup succeed.
   await ops.presentCredentials(credentials);
 }
 
@@ -130,16 +127,13 @@ export async function verifyHost(ops: HostAdminOperations): Promise<HostVerifica
 export interface HostTenantReport {
   uid: number;
   name: string | null;
-  /** A fresh status report. Kept apart from the process list, which is a separate observation. */
   reporting: boolean;
-  /** Any process inside the shared bundle under this UID, main process or helper. */
   processRunning: boolean;
   pid: number | null;
   version: string | null;
   healthy: boolean;
   heartbeatAgeMs: number | null;
   idleForMs: number | null;
-  /** Earliest remaining idle grace. The host measures its own observation, so the real wait is longer. */
   readyInMs: number | null;
   blocker: string | null;
 }
@@ -152,15 +146,10 @@ export interface HostStatusReport {
   pendingVersion: string | null;
   error: string | null;
   stateAgeMs: number | null;
-  /** Only `waiting` and `stopping` rewrite state on every poll, so only they prove daemon progress. */
   stateStale: boolean;
-  /** Registered version field of the host state. Its meaning depends on the phase. */
   stateVersion: string | null;
-  /** Every UID outside the registered set with a bundle process. A helper alone still blocks `stopping`. */
   unregisteredProcesses: number[];
-  /** Unregistered main processes. Only these clear the host's idle map while it waits. */
   unregisteredMain: number[];
-  /** Bundle processes that still keep the host from replacing the application. */
   remainingProcesses: number;
   summary: string;
   tenants: HostTenantReport[];
@@ -189,7 +178,6 @@ function waitingBlocker(
   processMatch: boolean,
   now: number,
 ): string | null {
-  // Mirrors HostManager.#waitForIdle, including its rejection of an idle time in the future.
   if (!status.safeToRestart) return "not safe to restart";
   if (status.idleSince === null) return "working";
   if (status.idleSince > now) return "idle time is in the future";
@@ -198,7 +186,6 @@ function waitingBlocker(
 }
 
 function releasedBlocker(status: HostTenantStatus, state: HostUpdateState): string | null {
-  // Mirrors HostManager.#checkHealth: a fresh report with health, the installed version and the cycle.
   if (!status.healthy) return "not healthy after restart";
   if (status.currentVersion !== state.version) return `still runs ${status.currentVersion}`;
   return status.cycle === state.cycle ? null : "has not acknowledged this update cycle";
@@ -212,10 +199,8 @@ function describeTenant(
   suppressCountdown: boolean,
 ): HostTenantReport {
   const { status } = entry;
-  // Waiting mirrors the host's main-process check; stopping waits for every bundle process to exit.
   const matching = processes.filter((process) => process.uid === entry.uid && process.main);
   const anyProcess = processes.some((process) => process.uid === entry.uid);
-  // HostManager.#waitForExit reads the process list only, so tenant status cannot block this phase.
   const stopping = state?.phase === "stopping";
   const base = {
     uid: entry.uid,
@@ -227,8 +212,6 @@ function describeTenant(
     healthy: false,
   };
   const empty = { ...base, heartbeatAgeMs: null, idleForMs: null, readyInMs: null };
-  // Only these phases read tenant status. In any other phase a missing or stale report blocks nothing,
-  // so the activity columns still show it, but it is never named as a blocker.
   const usesStatus = state?.phase === "waiting" || state?.phase === "released";
   if (stopping && !status) return { ...empty, blocker: anyProcess ? "still running" : null };
   if (!status) {
@@ -238,7 +221,6 @@ function describeTenant(
   const heartbeatAgeMs = now - status.heartbeatAt;
   const fresh = heartbeatAgeMs >= 0 && heartbeatAgeMs <= HOST_HEARTBEAT_TIMEOUT_MS;
   const idleForMs = status.idleSince === null ? null : Math.max(0, now - status.idleSince);
-  // The host accepts exactly one registered process whose PID matches the reported one.
   const processMatch = matching.length === 1 && matching[0]?.pid === status.pid;
   const report = {
     uid: entry.uid,
@@ -259,7 +241,6 @@ function describeTenant(
       : state?.phase === "released"
         ? releasedBlocker(status, state)
         : waitingBlocker(status, state, processMatch, now);
-  // A stalled daemon honours no countdown, and an unregistered process empties the host's idle map.
   const readyInMs =
     !suppressCountdown && state?.phase === "waiting" && idleForMs !== null && blocker === null
       ? Math.max(0, HOST_IDLE_GRACE_MS - idleForMs)
@@ -275,8 +256,6 @@ function summarize(report: Omit<HostStatusReport, "summary">): string {
   if (report.stateStale) {
     return `The host state has not advanced for ${formatDuration(report.stateAgeMs ?? 0)} while ${report.phase}. The daemon is not polling, so neither shutdown nor installation can continue.`;
   }
-  // HostManager.#waitForIdle clears the idle map for an unregistered main process. No other phase
-  // reads it that way, and this text must not hide an installation warning or a failure reason.
   if (report.unregisteredMain.length && report.phase === "waiting") {
     return `OpenBot runs under unregistered UID ${report.unregisteredMain.join(", ")}. The host cannot start maintenance until it quits.`;
   }
@@ -322,12 +301,7 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
       input.processes.filter((process) => process.main && !registered.includes(process.uid)).map((p) => p.uid),
     ),
   ];
-  // HostManager.#waitForIdle clears its idle map and returns without publishing while an unregistered
-  // main process runs. A state that stops advancing then is not proof of a stopped daemon, but the
-  // host counts no grace either, so the countdowns still go.
   const waitingOnUnregistered = state?.phase === "waiting" && unregisteredMain.length > 0;
-  // An unmanaged host keeps its last state and publishes nothing, by the same early return in #tick
-  // that stops the update. The state is old because the work stopped, not because the daemon died.
   const managed = config?.managed === true;
   const stateStale =
     managed &&
@@ -335,8 +309,6 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
     stateAgeMs !== null &&
     stateAgeMs > HOST_HEARTBEAT_TIMEOUT_MS &&
     !waitingOnUnregistered;
-  // #tick applies no phase rule while management is off, so no tenant blocks and no countdown runs.
-  // A stopped daemon counts no idle grace either: the host keeps that count in memory only.
   const tenants = input.tenants.map((entry) =>
     describeTenant(
       entry,
@@ -352,7 +324,6 @@ export function describeHostStatus(input: HostStatusInput): HostStatusReport {
     phase: state?.phase ?? null,
     cycle: state?.cycle ?? "",
     stateVersion: state?.version ?? null,
-    // The host keeps the version field after a finished update, so only these phases have a pending release.
     pendingVersion: state && ["waiting", "stopping", "installing"].includes(state.phase) ? state.version : null,
     error: state?.error ?? null,
     stateAgeMs,
@@ -386,7 +357,6 @@ export function formatHostStatus(report: HostStatusReport): string {
   lines.push("", report.summary, "", "Tenants");
   for (const tenant of report.tenants) {
     const label = `${tenant.name ?? "unknown"} (${tenant.uid})`.padEnd(24);
-    // The report and the process list are separate observations. Never present one as the other.
     const activity = !tenant.reporting
       ? tenant.processRunning
         ? "runs without a fresh report"
@@ -395,7 +365,6 @@ export function formatHostStatus(report: HostStatusReport): string {
           tenant.processRunning ? "" : "no process, "
         }${tenant.idleForMs === null ? "working" : `idle ${formatDuration(tenant.idleForMs)}`}`;
     const ready = tenant.readyInMs === null ? "" : `  ready in ~${formatDuration(tenant.readyInMs)}`;
-    // "working" already appears in the activity column; every other reason is shown as it is.
     const blocker = tenant.blocker && tenant.blocker !== "working" ? `  blocks: ${tenant.blocker}` : "";
     lines.push(`  ${label} ${(tenant.version ?? "-").padEnd(9)} ${activity}${ready}${blocker}`);
   }
@@ -412,7 +381,6 @@ export async function collectHostStatus(ops: HostAdminOperations, now?: number):
       () => true,
       () => false,
     ),
-    // A failed scan must not become an empty process list: the daemon cannot advance without it either.
     ops.bundleProcesses(),
     Promise.all(
       (config?.tenants ?? []).map(async (uid) => ({
@@ -425,7 +393,6 @@ export async function collectHostStatus(ops: HostAdminOperations, now?: number):
       })),
     ),
   ]);
-  // Read the clock after the files, so a heartbeat written during these reads is not called stale.
   return describeHostStatus({ config, state, daemonRunning, processes, tenants, now: now ?? Date.now() });
 }
 

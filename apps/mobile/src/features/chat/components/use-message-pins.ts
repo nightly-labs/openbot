@@ -12,12 +12,10 @@ import { useText } from "@/shared/lib/text";
 
 const NO_PINS: readonly PinnedMessage[] = [];
 
-/** The key of one pin: its chat (the side thread, or the agent's own chat) and its message. */
 function pinKey(taskId: string | null, messageId: string): string {
   return `${taskId ?? ""}:${messageId}`;
 }
 
-/** True when `serverId` is online and keeps pinned messages (`message-pins-v1`). */
 export function useMessagePinsEnabled(serverId: string): boolean {
   return useMobileWorkspaceSelector(
     (current) =>
@@ -26,11 +24,6 @@ export function useMessagePinsEnabled(serverId: string): boolean {
   );
 }
 
-/**
- * The pinned messages of all chats of one agent, the newest pin first, and Pin or Unpin on one
- * message. The host sends `message-pins-changed` when a pin of the agent changes, also from the agent
- * or another device, and the list reads again. A host without `message-pins-v1` has no pins.
- */
 export function useMessagePins(serverId: string, agentId: string) {
   const queryScope = useQueryScope();
   const queryClient = useQueryClient();
@@ -45,7 +38,6 @@ export function useMessagePins(serverId: string, agentId: string) {
     queryFn: () => workspace().loadMessagePins(agentId, serverId),
   });
   const pins = enabled ? (query.data?.pins ?? NO_PINS) : NO_PINS;
-  /** Pins or unpins one message. The host answers the new list. A failure rejects and keeps the list. */
   const setPinned = useCallback(
     async (taskId: string | null, messageId: string, next: boolean) => {
       const snapshot = await workspace().setMessagePinned(
@@ -66,23 +58,16 @@ export function useMessagePins(serverId: string, agentId: string) {
   };
 }
 
-/** One pin as the list shows it. The names and the time are in the reader's language. */
 export interface PinnedMessageRow {
   key: string;
   pin: PinnedMessage;
   author: string;
   time: string;
   text: string;
-  /** The chat of the pin when it is not the chat in view: "Main chat", or the title of the side thread. */
   chat: string | null;
-  /** Who pinned the message, or null when the reader did. */
   pinnedBy: string | null;
 }
 
-/**
- * The pins as rows: the pins of the chat in view (`viewTaskId`, null for the agent's own chat) first,
- * then the others, each part with the newest pin first, as on desktop.
- */
 export function usePinnedMessageRows(
   serverId: string,
   agentId: string,
@@ -96,8 +81,6 @@ export function usePinnedMessageRows(
   );
   const accountUserId = useMobileSession().session?.user.id ?? null;
   return useMemo(() => {
-    // As in the chat: a message with no sender is the reader's own, and a host with no membership for
-    // its own user stamps `local-user:<account>`.
     const own = (senderId: string) =>
       senderId === memberId || (accountUserId !== null && senderId === `local-user:${accountUserId}`);
     const personName = (sender: PinnedMessage["sender"]): string | null => {

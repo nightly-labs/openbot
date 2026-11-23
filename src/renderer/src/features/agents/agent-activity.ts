@@ -9,10 +9,6 @@ import { attentionByAgent, keepEqualRecord } from "./agent-runtime-snapshot";
 import { agentThreadAttention } from "./agent-thread-attention";
 import { useAgents } from "./agents-context";
 
-/**
- * What each agent of the active server does now: its working turn, the badge state that the sidebar
- * and the agent dock show, and the face of its avatar. Both surfaces read it, so they always agree.
- */
 export function createAgentActivity() {
   const { agentList } = useAgents();
   const { activeTurns, subagentTurns, queues, failedTurns, usageLimits, pendingPrompts, pendingApprovals, approvals } =
@@ -20,8 +16,6 @@ export function createAgentActivity() {
   const { unreadReplies, recentReplies } = useConversation();
   const agentTasks = useAgentTasks();
 
-  /* The turn events of a side thread reach only its thread list, so an agent that works in a side
-   * thread is found there. A subagent that runs on after its turn keeps its agent at work. */
   const workingTurns = createMemo((previous?: Record<string, string | null>) => {
     const turns = { ...activeTurns() };
     const subagents = subagentTurns();
@@ -34,9 +28,6 @@ export function createAgentActivity() {
     return keepPrevious(previous, turns);
   });
 
-  /* The agent conversation shows only the waits of the agent's own thread. A wait in a channel
-   * thread stays out of "Needs you", because selecting the row cannot answer it. A state that did not
-   * change keeps its object, so a progress event of one agent does not run the rows of all agents. */
   const agentStates = createMemo((previous?: Record<string, SidebarAgentState>) =>
     keepPrevious(
       previous,
@@ -54,8 +45,6 @@ export function createAgentActivity() {
     ),
   );
 
-  /* The badge says what an agent is doing; the face says how it is going. `isAgentWorking` is
-   * shared, and a routine mark only replaces the badge for that same agent. */
   const agentMoods = createMemo((previous?: ReturnType<typeof computeAgentAvatarMoods>) =>
     keepPrevious(
       previous,
@@ -74,7 +63,6 @@ export function createAgentActivity() {
   return { workingTurns, agentStates, agentMoods };
 }
 
-/** The previous record when no entry changed. The first run has none. */
 function keepPrevious<Value>(
   previous: Record<string, Value> | undefined,
   next: Record<string, Value>,

@@ -1,12 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Manus here is taken from manus.im, its documentation, help
-// center, Trust Center, terms and privacy policy, and each page used is in `sources`.
-// Where they state nothing, the text says so. Where two of its pages disagree, the text
-// gives both or leaves the detail out. Check them again, and move `checkedAt`, whenever
-// this file changes.
-
 const MANUS_HELP = "https://help.manus.im/en/articles";
 
 export const MANUS_COMPARISON: Comparison = {
