@@ -286,6 +286,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux zatrzymał dostawcę, ponieważ OpenBot ma limit czasu procesora w czasie rzeczywistym równy 0. Ten limit pochodzi z Twojego systemu. Zainstaluj i uruchom rtkit (`rtkit-daemon`), uruchom `systemctl --user restart xdg-desktop-portal`, a potem uruchom ponownie OpenBot. Sam restart xdg-desktop-portal nie pomoże, dopóki brakuje rtkit.",
   "error.provider.cpuUnsupported": "Procesor tego komputera nie może uruchomić tego dostawcy. Użyj innego dostawcy.",
+  "error.provider.largeMemoryPages":
+    "Ten dostawca nie może działać na tym jądrze Linux, bo jądro używa stron pamięci większych niż 4 KiB, jak na Raspberry Pi 5 lub w Asahi Linux. Użyj jądra ze stronami 4 KiB albo innego dostawcy.",
+  "error.provider.ipv6Missing":
+    "Ten dostawca potrzebuje IPv6, a IPv6 jest wyłączone na tym komputerze. Włącz IPv6 i spróbuj ponownie. W WSL usuń ipv6.disable=1 z .wslconfig i uruchom wsl --shutdown.",
   "error.provider.windowsBlocked":
     "Ustawienia zabezpieczeń systemu Windows, takie jak Inteligentna kontrola aplikacji, nie pozwoliły uruchomić tego dostawcy. Użyj innego dostawcy.",
   "error.provider.opencodeDatabaseNewer":
@@ -395,6 +399,8 @@ export const messages = {
     "Hermes utracił połączenie podczas tej wiadomości, więc nie wie, czy praca się zakończyła. Sprawdź, co zrobił agent, zanim wyślesz wiadomość ponownie.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot nie mógł użyć tego modelu: model nie przyjął jego ustawienia myślenia. Wybierz inny model dla tego agenta, a potem wyślij wiadomość ponownie.",
+  "error.provider.copilotAnswerIncomplete":
+    "Model zatrzymał się, zanim skończył odpowiedź. Wyślij wiadomość ponownie lub wybierz inny model dla tego agenta.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
   "error.provider.claudeContextFull":
     "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
@@ -439,8 +445,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code nie znalazł zapisanej sesji tego czatu. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
   "error.provider.grokSignIn": "Uruchom `grok login` lub ustaw XAI_API_KEY, aby używać Grok.",
+  "error.provider.acpSignInNoStart":
+    "Dostawca się nie uruchomił, więc logowanie nie mogło się zacząć. Spróbuj ponownie lub uruchom ponownie OpenBot.",
   "error.provider.acpSignInTimedOut": "Upłynął limit czasu logowania.",
   "error.provider.acpSignInStopped": "Logowanie zatrzymało się przed zakończeniem.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Ten komputer nie ma przeglądarki do logowania w Google. Wybierz „Zaloguj się kodem”, otwórz link na dowolnym urządzeniu, a potem wklej kod.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini nie otworzył strony logowania. Zainstaluj przeglądarkę i xdg-utils, a potem połącz się z sesji pulpitu na tym hoście. Serwer bez pulpitu nie może ukończyć tego logowania.",
   "error.provider.geminiBrowserOpenFailed":

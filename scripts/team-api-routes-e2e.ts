@@ -183,6 +183,7 @@ import {
   AGENT_WAITS_REQUEST_TEXT_LIMIT,
   AGENT_WAITS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/antigravity-code-sign-in-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/attachment-preview-v1";
 import {
   BACKGROUND_PROCESS_COMMAND_LIMIT,
@@ -791,6 +792,7 @@ function check(name: string, passed: boolean, detail: unknown = null): void {
 }
 
 const MISTRAL_SIGN_IN_PAGE = "https://console.mistral.ai/vibe/sign-in/e2e";
+const GOOGLE_SIGN_IN_PAGE = "https://accounts.google.com/o/oauth2/auth?client_id=e2e";
 
 function record(method: string, ...args: unknown[]): void {
   calls.push({ method, args });
@@ -2961,6 +2963,8 @@ try {
         service: {
           startProviderCodeLogin: (provider) => {
             record("startProviderCodeLogin", provider);
+            if (provider === "antigravity")
+              return Effect.succeed({ kind: "paste", verificationUrl: GOOGLE_SIGN_IN_PAGE, expiresAt: 1 });
             if (provider !== "mistral") throw new Error(sourceText("error.provider.noCodeSignIn", { provider }));
             return Effect.succeed({ kind: "link", verificationUrl: MISTRAL_SIGN_IN_PAGE, expiresAt: 1 });
           },
@@ -9146,6 +9150,46 @@ try {
     check(
       "a member gets 403 and starts no Mistral sign-in",
       member.status === 403 && callsOf("startProviderCodeLogin").length === 1,
+      summary(member),
+    );
+  }
+
+  {
+    const newest = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises antigravity-code-sign-in-v1 to a protocol 10 peer only",
+      list(field(newest.body, "capabilities")).includes(ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY),
+      [summary(newest), summary(older)],
+    );
+    const v10 = {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [PROVIDERS_V8_CAPABILITY, ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY],
+    };
+    const before = callsOf("startProviderCodeLogin").length;
+    const started = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, {
+      ...v10,
+      json: { provider: "antigravity" },
+    });
+    check(
+      "an admin starts the Gemini code sign-in on providers-v8 and gets the Google link to paste a code from",
+      started.status === 200 &&
+        field(started.body, "kind") === "paste" &&
+        field(started.body, "verificationUrl") === GOOGLE_SIGN_IN_PAGE &&
+        isDeepStrictEqual(callsOf("startProviderCodeLogin").slice(before), [["antigravity"]]),
+      summary(started),
+    );
+    const member = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, {
+      ...v10,
+      token: bobToken,
+      json: { provider: "antigravity" },
+    });
+    check(
+      "a member gets 403 and starts no Gemini sign-in",
+      member.status === 403 && callsOf("startProviderCodeLogin").length === before + 1,
       summary(member),
     );
   }

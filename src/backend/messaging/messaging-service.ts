@@ -1464,9 +1464,13 @@ export class MessagingService {
           if (result.status === "duplicate") return;
           const key = `${result.link.linkId}:${message.platformMessageId}`;
           if (result.status === "busy") {
-            yield* adapter
-              .post(message.target, { text: sourceText("status.messaging.busy") })
-              .pipe(toMessagingOperationFailed);
+            if (
+              !this.#quietEnd(live.record.connectionId, message.target) &&
+              !this.#withoutStatusPost(live.record.connectionId)
+            )
+              yield* adapter
+                .post(message.target, { text: sourceText("status.messaging.busy") })
+                .pipe(toMessagingOperationFailed);
             yield* this.#react(live, message.target, message.platformMessageId, "failed", true);
             return;
           }

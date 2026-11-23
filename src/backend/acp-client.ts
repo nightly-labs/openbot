@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, rm, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   type ClientSideConnection,
@@ -40,7 +40,7 @@ import {
   modelsFromSessionSetup,
 } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
-import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpRetryCause } from "./acp-flavor";
+import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpReplyEvent, AcpRetryCause } from "./acp-flavor";
 import {
   foldAcpSubagentTool,
   foldOpenCodeChildUpdate,
@@ -214,6 +214,8 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
+type AcpEventReply = Omit<AcpReplyEvent, "sessionId">;
+
 interface AcpTurn {
   id: string;
   startedAt: number;
@@ -234,6 +236,9 @@ interface AcpTurn {
   sessionLost: boolean;
   sdkFailureAt: number | null;
   retryNotices: string;
+  eventReplies: AcpEventReply[];
+  replyFailure: AcpEventReply | null;
+  eventRetries: number;
   textToolCallAt: number | null;
   answerPaused: boolean;
   answerOptional: boolean;
@@ -547,6 +552,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #backgroundReplays = new Map<string, SessionUpdate[]>();
   readonly #openingTurns = new Map<string, number>();
   #privateSession: { connection: ClientSideConnection; sessionId: string } | null = null;
+  readonly #discardedSessions = new Set<string>();
   #privateAnswer: string[] | null = null;
   readonly #privatePromptLock = Semaphore.makeUnsafe(1);
   readonly #serverRequests = new PendingServerRequests((request) => this.emit("request", request));
@@ -591,6 +597,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
       deletesSessions: () => this.#deletesSessions,
+      discarded: (sessionId) => this.#discardedSessions.add(sessionId),
       effortCategories: options.flavor.effortCategories,
       stillStarting: options.flavor.stillStarting,
     });
@@ -607,6 +614,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       privateTemp: this.options.privateTemp,
       label: () => this.#label,
       redact: (text) => this.#redact(text),
+      peek: this.options.flavor.replyEvent ? (message) => this.#peekMessage(message) : undefined,
       diagnostic: (message, origin) => {
         const failedSession = this.options.flavor.sdkHarness?.failedSession(message);
         const failedTurn = failedSession ? this.#threads.get(failedSession)?.activeTurn : undefined;
@@ -795,6 +803,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     yield* this.#deleteThrowawaySessions();
+    const leftovers = this.#leftoverSessionFiles();
     yield* this.#transport
       .stop(
         Effect.gen({ self: this }, function* () {
@@ -821,7 +830,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }),
       )
       .pipe(Effect.ensuring(Scope.close(this.#scope, Exit.void)));
+    yield* Effect.forEach(
+      leftovers,
+      (path) => Effect.tryPromise(() => rm(path, { recursive: true, force: true })).pipe(Effect.ignore),
+      { concurrency: "unbounded", discard: true },
+    );
   }, Effect.uninterruptible);
+
+  #leftoverSessionFiles(): readonly string[] {
+    const ids = new Set(this.#discardedSessions);
+    this.#discardedSessions.clear();
+    const sessionFiles = this.#flavor.sessionFiles;
+    if (!sessionFiles || this.#deletesSessions) return [];
+    for (const id of this.#threads.ids()) if (this.#threads.get(id)?.throwaway) ids.add(id);
+    if (this.#privateSession) ids.add(this.#privateSession.sessionId);
+    const keptProbe = this.#configuration.takeKeptProbe();
+    if (keptProbe) ids.add(keptProbe);
+    return [...ids].flatMap((id) => sessionFiles(this.options.argv, id));
+  }
 
   readonly #deleteThrowawaySessions = Effect.fn("AcpAgentClient.deleteThrowawaySessions")(function* (
     this: AcpAgentClient,
@@ -1022,6 +1048,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ): Effect.fn.Return<string, ProviderClientOperationError> {
     const connection = yield* providerSync(() => this.#requireConnection());
     if (this.#privateSession?.connection !== connection) {
+      if (this.#privateSession) this.#discardedSessions.add(this.#privateSession.sessionId);
       const { sessionId } = yield* providerCall(() =>
         connection.newSession({
           cwd: this.options.discoveryCwd?.() ?? process.cwd(),
@@ -1040,6 +1067,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         Effect.gen({ self: this }, function* () {
           this.#privateAnswer = null;
           if (!Exit.hasInterrupts(exit)) return;
+          this.#discardedSessions.add(sessionId);
           this.#privateSession = null;
           yield* providerCall(() => connection.cancel({ sessionId })).pipe(Effect.ignore);
         }),
@@ -1445,7 +1473,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         protocolVersion: 1,
         clientCapabilities: this.#flavor.childSessionUpdates
           ? { ...OPENBOT_ACP_CLIENT_CAPABILITIES, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
-          : OPENBOT_ACP_CLIENT_CAPABILITIES,
+          : this.#flavor.clientMeta
+            ? { ...OPENBOT_ACP_CLIENT_CAPABILITIES, _meta: this.#flavor.clientMeta }
+            : OPENBOT_ACP_CLIENT_CAPABILITIES,
         clientInfo: this.#flavor.clientInfo ?? OPENBOT_ACP_CLIENT_INFO,
       }),
     );
@@ -2473,6 +2503,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       sessionLost: false,
       sdkFailureAt: null,
       retryNotices: "",
+      eventReplies: [],
+      replyFailure: null,
+      eventRetries: 0,
       textToolCallAt: null,
       answerPaused: false,
       answerOptional,
@@ -2680,7 +2713,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             turn.failureCause = turn.accountVerification
               ? "authentication"
               : rawCause === "unknown"
-                ? (sdkHarness.fallbackCause?.(detail) ?? rawCause)
+                ? (sdkHarness.fallbackCause?.(detail, failureAt > 0 || turn.reasoned || turn.toolNames.size > 0) ??
+                  rawCause)
                 : rawCause;
             turn.providerError =
               this.#mcpLoadFailureMessage(thread, detail) ??
@@ -3235,6 +3269,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       this.#releaseBeforeWakeEcho(thread, turn);
     }
+    if (this.#isEventReply(thread, turn, update)) return;
     const retry = turn.stopped ? null : this.#flavor.retryUpdate?.(update);
     if (retry) {
       turn.retrying = "model";
@@ -3253,6 +3288,45 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#emitTurnProgress(thread, turn, recovered);
     }
     this.#applyTurnUpdate(thread, turn, update);
+  }
+
+  #isEventReply(thread: AcpThread, turn: AcpTurn, update: SessionUpdate): boolean {
+    const failure = turn.replyFailure;
+    if (failure && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+      turn.replyFailure = null;
+      if (turn.providerError === failure.failure) turn.providerError = null;
+      this.#applyTurnUpdate(thread, turn, {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: failure.reply },
+      });
+    }
+    const text =
+      update.sessionUpdate === "agent_message_chunk" && update.content.type === "text" ? update.content.text : null;
+    const event = text === null ? undefined : turn.eventReplies.find(({ reply }) => reply === text);
+    if (!event) return false;
+    turn.eventReplies.splice(turn.eventReplies.indexOf(event), 1);
+    if (event.failure === null) {
+      turn.retrying = "model";
+      turn.eventRetries += 1;
+      this.#emitTurnProgress(
+        thread,
+        turn,
+        sourceText("status.provider.modelRetryServerError", { provider: this.#label, attempt: turn.eventRetries }),
+      );
+      return true;
+    }
+    turn.receivedOutput = true;
+    turn.replyFailure = event;
+    turn.providerError ??= event.failure;
+    return true;
+  }
+
+  #peekMessage(message: unknown): void {
+    if (!isRecord(message) || typeof message.method !== "string" || !isRecord(message.params)) return;
+    const event = this.#flavor.replyEvent?.(message.method, message.params);
+    const turn = event ? this.#threads.get(event.sessionId)?.activeTurn : undefined;
+    if (!event || !turn || turn.completing || turn.stopped) return;
+    turn.eventReplies.push({ reply: event.reply, failure: event.failure });
   }
 
   #releaseBeforeWakeEcho(thread: AcpThread, turn: AcpTurn): void {
@@ -3661,6 +3735,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
         if (yield* this.#endIfUnresponsive(thread)) return;
         answeredAt = Date.now();
+        if (yield* this.#endSilentTurn(thread, turn)) return;
         continue;
       }
       const silentFor = Date.now() - turn.lastActivityAt;
@@ -3680,6 +3755,39 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }),
       );
     }
+  });
+
+  readonly #endSilentTurn = Effect.fn("AcpAgentClient.endSilentTurn")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    turn: AcpTurn,
+  ) {
+    const limit = this.#flavor.silentTurnLimitMs;
+    const silentFor = Date.now() - turn.lastActivityAt;
+    if (limit === undefined || silentFor < limit || turn.toolItems.size > 0 || turn.waitingOnUser > 0) return false;
+    if (thread.activeTurn !== turn || turn.completing || turn.stopped) return false;
+    const sdkHarness = this.#flavor.sdkHarness;
+    const logged = sdkHarness?.silentFailure?.(this.options.argv, thread.id, turn.startedAt) ?? null;
+    this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
+    if (logged) this.emit("diagnostic", this.#redact(logged));
+    const cause = logged ? classifyFailure(logged) : "stalled";
+    turn.failureCause =
+      cause === "unknown"
+        ? (sdkHarness?.fallbackCause?.(
+            logged ?? "",
+            turn.text.length > 0 || turn.reasoned || turn.toolNames.size > 0,
+          ) ?? cause)
+        : cause;
+    yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
+    yield* this.#abandonTurn(
+      thread,
+      turn,
+      "failed",
+      logged && sdkHarness
+        ? sdkHarness.turnFailure(logged)
+        : sourceText("error.agent.turnStalled", { provider: this.#providerName(thread) }),
+    );
+    return true;
   });
 
   readonly #endIfUnresponsive = Effect.fn("AcpAgentClient.endIfUnresponsive")(function* (
@@ -4302,9 +4410,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       turn &&
       !turn.stopped &&
       !turn.completing &&
-      ((this.options.confine &&
-        (callsBridgeTool(thread, toolCall, kind, this.#flavor.mcpCallInputNamesServer) ||
-          runsConfinedCommand(toolCall, kind, this.#flavor.mcpCallInputNamesServer))) ||
+      (((this.options.confine || this.#flavor.bridgeToolsWithoutCard) &&
+        callsBridgeTool(thread, toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
+        (this.options.confine && runsConfinedCommand(toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
         (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, toolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");

@@ -254,6 +254,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "由于 OpenBot 的实时 CPU 限制为 0，Linux 停止了该提供方。此限制来自你的系统。请安装并启动 rtkit（`rtkit-daemon`），运行 `systemctl --user restart xdg-desktop-portal`，然后重新启动 OpenBot。缺少 rtkit 时，仅重启 xdg-desktop-portal 没有作用。",
   "error.provider.cpuUnsupported": "这台电脑的处理器无法运行此服务商。请使用其他服务商。",
+  "error.provider.largeMemoryPages":
+    "此服务商无法在这个 Linux 内核上运行，因为该内核使用大于 4 KiB 的内存页（例如 Raspberry Pi 5 或 Asahi Linux）。请使用 4 KiB 页的内核，或使用其他服务商。",
+  "error.provider.ipv6Missing":
+    "此服务商需要 IPv6，但这台电脑上的 IPv6 已关闭。请开启 IPv6 后重试。在 WSL 中，请从 .wslconfig 中删除 ipv6.disable=1，然后运行 wsl --shutdown。",
   "error.provider.windowsBlocked": "Windows 安全设置（例如智能应用控制）阻止了此服务商启动。请使用其他服务商。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
@@ -353,6 +357,7 @@ export const messages = {
     "Hermes 在处理这条消息时连接断开，因此不知道工作是否已完成。重新发送消息前，请先检查智能体做了什么。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
+  "error.provider.copilotAnswerIncomplete": "模型在完成回答前停止了。请重新发送消息，或为此 Agent 选择其他模型。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.claudeContextFull":
     "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
@@ -397,8 +402,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code 找不到此聊天已保存的会话。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
   "error.provider.grokSignIn": "请运行 `grok login`，或设置 XAI_API_KEY 以使用 Grok。",
+  "error.provider.acpSignInNoStart": "服务商没有启动，所以无法开始登录。请重试，或重新启动 OpenBot。",
   "error.provider.acpSignInTimedOut": "登录超时。",
   "error.provider.acpSignInStopped": "登录在完成之前就停止了。",
+  "error.provider.geminiNoBrowserUseCode":
+    "这台电脑没有可用于 Google 登录的浏览器。请选择“用验证码登录”，在任意设备上打开链接，然后粘贴验证码。",
   "error.provider.geminiBrowserUnavailable":
     "Gemini 无法打开登录页面。请安装浏览器与 xdg-utils，然后在该主机的桌面会话中连接。没有桌面的服务器无法完成该登录。",
   "error.provider.geminiBrowserOpenFailed": "Gemini 无法在浏览器中打开登录页面。请检查默认浏览器，然后重新连接。",
