@@ -128,6 +128,7 @@ export function AgentDockChat(props: {
   onRemove: () => void;
   onAdd: () => void;
   onOpenInMain: () => void;
+  onOpenTakeover: (takeover: AgentDockTakeover) => void;
   onOpenWindow?: (() => void) | undefined;
   voice?: AgentDockChatVoice | undefined;
   agents: ComposerAgent[];
@@ -506,11 +507,7 @@ export function AgentDockChat(props: {
                         tab={takeoverTab(current())}
                         preview={null}
                         previewStatus="idle"
-                        onOpen={() => {
-                          const openTakeover = props.answers?.openTakeover;
-                          if (openTakeover) openTakeover(current());
-                          else props.onOpenInMain();
-                        }}
+                        onOpen={() => props.onOpenTakeover(current())}
                         onComplete={
                           props.answers?.takeoverDone?.(current()) === false
                             ? undefined
