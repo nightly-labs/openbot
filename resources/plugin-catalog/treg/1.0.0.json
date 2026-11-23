@@ -1,16 +1,16 @@
 {
   "slug": "treg",
   "name": "Treg",
-  "tagline": "Search and use tools for web data and media generation",
-  "description": "Find tools for web search, keyword research, company data, and media generation. Compare prices before you run a tool. Sign in and choose a Treg team to use its connected tools and balance. Paid calls use that team's credits.",
+  "tagline": "Web research and media generation",
+  "description": "Find keyword search volumes, look up companies, or generate images and video. Sign in and choose a Treg team to use its connected tools. You can check a tool's price before a paid call uses team credits.",
   "category": "research",
   "creatorName": "Treg",
   "iconUrl": "https://treg.to/media/brand/logo.png",
   "version": "1.0.0",
   "prompts": [
-    { "id": "prompt-keywords", "text": "Find tools for monthly keyword search volume and compare their prices." },
+    { "id": "prompt-keywords", "text": "Find a tool for monthly keyword search volume. What does one lookup cost?" },
     { "id": "prompt-team", "text": "Which tools has my team connected to Treg?" },
-    { "id": "prompt-web", "text": "Search the web for the latest OpenBot release and link to the release notes." }
+    { "id": "prompt-web", "text": "Use Treg to find the latest OpenBot release and link to its release notes." }
   ],
   "apps": [
     {

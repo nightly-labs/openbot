@@ -1,26 +1,6 @@
-/**
- * The plugins the marketplace offers.
- *
- * Generated from marketplace/plugin-catalog/ by scripts/build-plugin-catalog.ts.
- * Do not edit by hand: run bun run marketplace:build:plugins, or
- * bun run marketplace:build:plugins -- --check to verify.
- */
-
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
-/**
- * The configuration an app installs as. The catalog states the name and how the server is reached -
- * an address, or a command, its words and its fixed settings; the rest of the record and `enabled`
- * are made here rather than stored as catalog data that could disagree with `normalizeMcpConfig`.
- *
- * A credential is never among them. What a server asks for is declared in `server.auth`, and the
- * value is typed by the user in the connect dialog, which hands back the configuration that
- * connected.
- *
- * The id is empty, which is what the store reads as "new". An id it does not hold is an edit of a
- * row that is gone, and the save is refused.
- */
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
   return {
     id: "",
@@ -9790,17 +9770,17 @@ const TREG: MarketplacePluginDetail = {
   id: "plugin-treg",
   slug: "treg",
   name: "Treg",
-  tagline: "Search and use tools for web data and media generation",
+  tagline: "Web research and media generation",
   description:
-    "Find tools for web search, keyword research, company data, and media generation. Compare prices before you run a tool. Sign in and choose a Treg team to use its connected tools and balance. Paid calls use that team's credits.",
+    "Find keyword search volumes, look up companies, or generate images and video. Sign in and choose a Treg team to use its connected tools. You can check a tool's price before a paid call uses team credits.",
   category: "research",
   creatorName: "Treg",
   iconUrl: "https://treg.to/media/brand/logo.png",
   version: "1.0.0",
   prompts: [
-    { id: "prompt-keywords", text: "Find tools for monthly keyword search volume and compare their prices." },
+    { id: "prompt-keywords", text: "Find a tool for monthly keyword search volume. What does one lookup cost?" },
     { id: "prompt-team", text: "Which tools has my team connected to Treg?" },
-    { id: "prompt-web", text: "Search the web for the latest OpenBot release and link to the release notes." },
+    { id: "prompt-web", text: "Use Treg to find the latest OpenBot release and link to its release notes." },
   ],
   apps: [
     {

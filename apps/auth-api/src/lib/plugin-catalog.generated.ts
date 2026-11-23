@@ -1420,7 +1420,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "treg",
       version: "1.0.0",
       featured: false,
-      detailSha256: "916a443edda7c2e16c868b50acf31c2e087bcb01e157cd42815df3df2f1ad1df",
+      detailSha256: "2049b4c6a77af2f5108ae0cc46f40fd44c7770ccec0ffe6e06cd09d752b1a408",
     },
     {
       slug: "truthifi",
@@ -10003,17 +10003,17 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
   treg: {
     slug: "treg",
     name: "Treg",
-    tagline: "Search and use tools for web data and media generation",
+    tagline: "Web research and media generation",
     description:
-      "Find tools for web search, keyword research, company data, and media generation. Compare prices before you run a tool. Sign in and choose a Treg team to use its connected tools and balance. Paid calls use that team's credits.",
+      "Find keyword search volumes, look up companies, or generate images and video. Sign in and choose a Treg team to use its connected tools. You can check a tool's price before a paid call uses team credits.",
     category: "research",
     creatorName: "Treg",
     iconUrl: "https://treg.to/media/brand/logo.png",
     version: "1.0.0",
     prompts: [
-      { id: "prompt-keywords", text: "Find tools for monthly keyword search volume and compare their prices." },
+      { id: "prompt-keywords", text: "Find a tool for monthly keyword search volume. What does one lookup cost?" },
       { id: "prompt-team", text: "Which tools has my team connected to Treg?" },
-      { id: "prompt-web", text: "Search the web for the latest OpenBot release and link to the release notes." },
+      { id: "prompt-web", text: "Use Treg to find the latest OpenBot release and link to its release notes." },
     ],
     apps: [
       {
