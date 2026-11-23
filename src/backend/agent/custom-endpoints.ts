@@ -550,7 +550,7 @@ export class CustomEndpoints {
         (provider === "acp"
           ? listed.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
           : undefined);
-      const backup = nearest ? null : this.#hooks.removedModelBackup(agent);
+      const backup = nearest || provider === "acp" ? null : this.#hooks.removedModelBackup(agent);
       const fallback = nearest ?? (provider === "acp" ? undefined : providerFallback);
       const keptEffort =
         family && family.reasoningEffortConfigurable !== false
