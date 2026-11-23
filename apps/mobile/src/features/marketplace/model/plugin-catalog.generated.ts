@@ -7936,6 +7936,38 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "treg",
+    name: "Treg",
+    tagline: "Search and use tools for web data and media generation",
+    description:
+      "Find tools for web search, keyword research, company data, and media generation. Compare prices before you run a tool. Sign in and choose a Treg team to use its connected tools and balance. Paid calls use that team's credits.",
+    category: "research",
+    creatorName: "Treg",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-keywords", text: "Find tools for monthly keyword search volume and compare their prices." },
+      { id: "prompt-team", text: "Which tools has my team connected to Treg?" },
+      { id: "prompt-web", text: "Search the web for the latest OpenBot release and link to the release notes." },
+    ],
+    websiteUrl: "https://treg.to",
+    privacyPolicyUrl: "https://treg.to/privacy",
+    termsUrl: "https://treg.to/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-treg-mcp",
+        name: "Treg",
+        description: "Search the Treg catalog, check prices, and call tools with your team's account.",
+        server: {
+          name: "treg",
+          transport: "http",
+          url: "https://treg.to/mcp/",
+          auth: [{ id: "treg-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "truthifi",
     name: "Truthifi",
     tagline: "Investment account insights",

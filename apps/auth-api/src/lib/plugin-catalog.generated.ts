@@ -1417,6 +1417,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "ac1e40265dca9338d5e59dd104c6da7227fb24e70c944a4467027a07ec9de65f",
     },
     {
+      slug: "treg",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "916a443edda7c2e16c868b50acf31c2e087bcb01e157cd42815df3df2f1ad1df",
+    },
+    {
       slug: "truthifi",
       version: "1.0.0",
       featured: false,
@@ -9992,6 +9998,40 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://transcriptapi.com",
     privacyPolicyUrl: "https://transcriptapi.com/privacy",
     termsUrl: "https://transcriptapi.com/terms",
+    skills: [],
+  },
+  treg: {
+    slug: "treg",
+    name: "Treg",
+    tagline: "Search and use tools for web data and media generation",
+    description:
+      "Find tools for web search, keyword research, company data, and media generation. Compare prices before you run a tool. Sign in and choose a Treg team to use its connected tools and balance. Paid calls use that team's credits.",
+    category: "research",
+    creatorName: "Treg",
+    iconUrl: "https://treg.to/media/brand/logo.png",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-keywords", text: "Find tools for monthly keyword search volume and compare their prices." },
+      { id: "prompt-team", text: "Which tools has my team connected to Treg?" },
+      { id: "prompt-web", text: "Search the web for the latest OpenBot release and link to the release notes." },
+    ],
+    apps: [
+      {
+        id: "app-treg-mcp",
+        name: "Treg",
+        description: "Search the Treg catalog, check prices, and call tools with your team's account.",
+        iconUrl: "https://treg.to/media/brand/logo.png",
+        server: {
+          name: "treg",
+          transport: "http",
+          url: "https://treg.to/mcp/",
+          auth: [{ id: "treg-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://treg.to",
+    privacyPolicyUrl: "https://treg.to/privacy",
+    termsUrl: "https://treg.to/terms",
     skills: [],
   },
   truthifi: {
