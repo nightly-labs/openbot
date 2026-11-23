@@ -4469,6 +4469,7 @@ const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (p
   const blocks: ContentBlock[] = [];
   let audioBase64Bytes = 0;
   let mediaBase64Bytes = 0;
+  let imagesFull = false;
   for (const item of getArray(params, "input")) {
     if (!isRecord(item)) continue;
     if (item.type === "text" && isString(item.text)) blocks.push({ type: "text", text: item.text });
@@ -4488,8 +4489,9 @@ const promptBlocksEffect = Effect.fn("AcpAgentClient.promptBlocks")(function* (p
     }
     if (item.type === "localImage" && isString(item.path)) {
       const path = item.path;
-      const image = promptImage(yield* providerCall(() => readFile(path)), path, media.fitImage);
-      if (mediaBase64Bytes + image.data.length > media.base64Bytes) {
+      const image = imagesFull ? null : promptImage(yield* providerCall(() => readFile(path)), path, media.fitImage);
+      if (!image || mediaBase64Bytes + image.data.length > media.base64Bytes) {
+        imagesFull = true;
         blocks.push({ type: "text", text: `Attached local file: ${path}` });
         continue;
       }
