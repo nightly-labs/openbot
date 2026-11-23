@@ -37,6 +37,7 @@ interface Report {
   passed: boolean;
   withOlderCopy?: { failedTry: FailedTry; retry: Retry };
   onlyCopy?: { failedTry: FailedTry; retry: Retry };
+  cancelledWait?: { phase: string; version: string | null; installKept: boolean };
   error?: string;
 }
 
@@ -164,11 +165,58 @@ async function runScenario(name: string, olderVersion: string | null) {
   }
 }
 
+async function runCancelledWait() {
+  const store = join(root, "cancelled-wait", "store");
+  const downloads = join(root, "cancelled-wait", "downloads");
+  mkdirSync(store, { recursive: true });
+  mkdirSync(downloads, { recursive: true });
+  const manager = new ProviderRuntimeManager({
+    root: store,
+    downloadRoot: downloads,
+    platform: "linux",
+    architecture: "x64",
+    lock,
+    fetchImpl,
+    availableDiskBytes: async () => Number.MAX_SAFE_INTEGER,
+    updateRuntime: (_runtime, _install, signal, onWait) =>
+      Effect.callback<void, ProviderRuntimeFailure>((resume) => {
+        onWait();
+        signal.addEventListener("abort", () =>
+          resume(Effect.fail(new ProviderRuntimeFailure({ cause: signal.reason }))),
+        );
+      }),
+  });
+  const waiting = new Promise<void>((resolveWait, reject) => {
+    const timer = setTimeout(() => reject(new Error("Timed out waiting for the update wait.")), WAIT_MS);
+    const listener = (snapshot: ProviderRuntimeSnapshot) => {
+      if (snapshot.providers.codex.progress !== 100) return;
+      clearTimeout(timer);
+      manager.off("status", listener);
+      resolveWait();
+    };
+    manager.on("status", listener);
+  });
+  try {
+    await runCauseEffect(manager.download("codex"));
+    await waiting;
+    const cancelled = await runCauseEffect(manager.cancel("codex"));
+    return {
+      phase: cancelled.providers.codex.phase,
+      version: cancelled.providers.codex.version,
+      installKept: existsSync(join(store, "codex", "linux-x64", VERSION)),
+    };
+  } finally {
+    await runCauseEffect(manager.stop()).catch(() => undefined);
+  }
+}
+
 try {
   const withOlderCopy = await runScenario("with-older-copy", "0.1.0");
   report.withOlderCopy = withOlderCopy;
   const onlyCopy = await runScenario("only-copy", null);
   report.onlyCopy = onlyCopy;
+  const cancelledWait = await runCancelledWait();
+  report.cancelledWait = cancelledWait;
 
   report.passed =
     withOlderCopy.failedTry.version === "0.1.0" &&
@@ -186,7 +234,10 @@ try {
     !onlyCopy.failedTry.archiveKept &&
     onlyCopy.retry.version === VERSION &&
     onlyCopy.retry.archiveRequests === 1 &&
-    onlyCopy.retry.starts === 2;
+    onlyCopy.retry.starts === 2 &&
+    cancelledWait.phase !== "ready" &&
+    cancelledWait.version === null &&
+    !cancelledWait.installKept;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {

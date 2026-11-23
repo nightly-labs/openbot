@@ -941,7 +941,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       if (Result.isFailure(result)) {
         if (installed && !this.#stopping) {
           const installRoot = this.#installRoot(spec);
-          if (yield* this.#workingBackupEffect(dirname(installRoot), spec, spec.version))
+          if (signal.aborted || (yield* this.#workingBackupEffect(dirname(installRoot), spec, spec.version)))
             yield* runtimeIO(() => rm(installRoot, { recursive: true, force: true }));
           else yield* this.#removeRuntimePartialsEffect(spec.runtime, spec.target);
         }
