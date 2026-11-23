@@ -20,6 +20,7 @@ import {
 import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import { type RoutineDraftKind, routineScheduleToDraft } from "@openbot/team-client/routine-schedule-draft";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import type { AddKey } from "./workflow-add";
 import {
   GITHUB_ACTION_LABEL,
   GITHUB_EVENT_LABEL,
@@ -165,6 +166,10 @@ export function kindLabel(kind: WorkflowNodeKind, t: MobileTranslate): string {
   return t(KIND_LABEL[kind]);
 }
 
+export function addKeyLabel(key: AddKey, t: MobileTranslate): string {
+  return key === "video" ? t("mobile.workflow.kind.video") : kindLabel(key, t);
+}
+
 export function stepLabel(node: WorkflowNode, agents: readonly MobileAgent[], t: MobileTranslate): string {
   if (node.kind === "trigger") return t(TRIGGER_LABEL[triggerType(node)]);
   if (node.kind === "agent") {
@@ -223,12 +228,24 @@ export function stepText(node: WorkflowNode, t: MobileTranslate): string {
       return fieldText(node, "text") || t("mobile.workflow.step.textEmpty");
     case "output":
       return outputText(node, t);
+    case "image":
+      return (
+        fieldText(node, "prompt") ||
+        t(
+          fieldText(node, "media") === "video"
+            ? "mobile.workflow.step.videoDefault"
+            : "mobile.workflow.step.imageDefault",
+        )
+      );
+    case "asset":
+      return fieldText(node, "file") || t("mobile.workflow.step.assetDefault");
     default:
       return t("mobile.workflow.step.computerOnly");
   }
 }
 
 export function stepProblem(node: WorkflowNode, agents: readonly MobileAgent[], t: MobileTranslate): string | null {
+  if (node.kind === "asset") return fieldText(node, "fileId") ? null : t("mobile.workflow.problem.noAsset");
   if (node.kind !== "agent") return null;
   const agentId = fieldText(node, "agentId");
   if (!agentId) return t("mobile.workflow.problem.noAgent");

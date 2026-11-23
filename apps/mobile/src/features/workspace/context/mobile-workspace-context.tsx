@@ -1831,8 +1831,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     load: hostRequests.actions.loadAgentNotificationLevels,
   });
   const workflows = useMemo(
-    () => createWorkflowActions({ request, capabilities: serverCapabilities.current }),
-    [request],
+    () =>
+      createWorkflowActions({
+        request,
+        capabilities: serverCapabilities.current,
+        loadAgentModels: hostRequests.actions.loadAgentModels,
+      }),
+    [request, hostRequests],
   );
   const browser = useMemo(
     () =>
