@@ -66,6 +66,7 @@ import {
   SlidingTabs,
   Switch,
   Text,
+  toast,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import {
@@ -1541,17 +1542,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     type="button"
                     aria-label={t("agentSettings.newChat.confirm")}
                     aria-haspopup="dialog"
-                    disabled={props.working}
-                    onClick={() => setNewChatOpen(true)}
+                    onClick={() => {
+                      if (props.working) {
+                        toast.info(t("agentSettings.newChat.busy"), { id: "agent-new-chat-busy" });
+                        return;
+                      }
+                      setNewChatOpen(true);
+                    }}
                   >
                     {t("agentSettings.newChat.button")}
                   </Button>
                 </div>
-                <Show when={props.working}>
-                  <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
-                    {t("agentSettings.newChat.busy")}
-                  </Text>
-                </Show>
               </Show>
               <Show when={props.onDeleteHistory}>
                 <div class="agent-settings-notifications">
