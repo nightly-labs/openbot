@@ -398,12 +398,12 @@ export function WorkflowStepScreen() {
       ) : null}
       {outline && (list || node.kind === "condition") ? (
         <SettingsSection>
-          {list && canMove(outline, node.id, -1) ? (
+          {list && canMove(draft.graph, outline, node.id, -1) ? (
             <SettingsRow disclosure={false} onPress={() => move(node.id, -1)}>
               <Typography.Paragraph>{t("mobile.workflow.editor.moveUp")}</Typography.Paragraph>
             </SettingsRow>
           ) : null}
-          {list && canMove(outline, node.id, 1) ? (
+          {list && canMove(draft.graph, outline, node.id, 1) ? (
             <SettingsRow disclosure={false} onPress={() => move(node.id, 1)}>
               <Typography.Paragraph>{t("mobile.workflow.editor.moveDown")}</Typography.Paragraph>
             </SettingsRow>

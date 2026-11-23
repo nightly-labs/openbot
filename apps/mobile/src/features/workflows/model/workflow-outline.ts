@@ -1,5 +1,6 @@
 import {
   isWorkflowStepKind,
+  WORKFLOW_PORTS,
   type WorkflowBranch,
   type WorkflowEdge,
   type WorkflowGraph,
@@ -263,6 +264,24 @@ function outlineEdges(outline: WorkflowOutline, graph: WorkflowGraph): WorkflowE
   return edges;
 }
 
+export function outlineFits(graph: WorkflowGraph, outline: WorkflowOutline): boolean {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
+  return outlineEdges(outline, graph).every((edge) => {
+    const from = nodes.get(edge.from);
+    const to = nodes.get(edge.to);
+    return (
+      from !== undefined &&
+      to !== undefined &&
+      WORKFLOW_PORTS[from.kind].out.includes(edge.type) &&
+      WORKFLOW_PORTS[to.kind].in.includes(edge.type)
+    );
+  });
+}
+
+function fitting(next: { graph: WorkflowGraph; outline: WorkflowOutline }) {
+  return outlineFits(next.graph, next.outline) ? next : null;
+}
+
 export function graphWithOutline(graph: WorkflowGraph, outline: WorkflowOutline): WorkflowGraph {
   const loose = new Set(outline.loose);
   return {
@@ -397,12 +416,14 @@ export function connectStep(
     nodes: graph.nodes.filter((item) => item.id !== id),
     edges: graph.edges.filter((edge) => edge.from !== id && edge.to !== id),
   };
-  return insertStep(
-    without,
-    { ...outline, loose: outline.loose.filter((item) => item !== id) },
-    list,
-    outline[list].length,
-    node,
+  return fitting(
+    insertStep(
+      without,
+      { ...outline, loose: outline.loose.filter((item) => item !== id) },
+      list,
+      outline[list].length,
+      node,
+    ),
   );
 }
 
@@ -448,14 +469,11 @@ export function moveStep(
   const nodes = graph.nodes.map((node) =>
     node.id === id ? { ...node, at: second.at } : node.id === other ? { ...node, at: first.at } : node,
   );
-  return { graph: { ...graph, nodes }, outline: { ...outline, [list]: items } };
+  return fitting({ graph: { ...graph, nodes }, outline: { ...outline, [list]: items } });
 }
 
-export function canMove(outline: WorkflowOutline, id: string, direction: -1 | 1): boolean {
-  const list = outlineListOf(outline, id);
-  if (!list || list === "loose") return false;
-  const index = outline[list].indexOf(id);
-  return index + direction >= 0 && index + direction < outline[list].length;
+export function canMove(graph: WorkflowGraph, outline: WorkflowOutline, id: string, direction: -1 | 1): boolean {
+  return moveStep(graph, outline, id, direction) !== null;
 }
 
 function chainSources(

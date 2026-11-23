@@ -1,5 +1,6 @@
 import {
   WORKFLOW_CATALOG_SOURCES,
+  WORKFLOW_MEDIA_CUSTOM_ASPECT,
   WORKFLOW_MEDIA_LEGACY_ASPECTS,
   type WorkflowMediaKind,
   type WorkflowMediaModel,
@@ -44,11 +45,9 @@ export function mediaChoice(
   const hostAspects = workflowMediaAspects(model, kind).filter(
     (aspect) => sizeHost || WORKFLOW_MEDIA_LEGACY_ASPECTS.includes(aspect),
   );
-  const specs = workflowMediaSpecs(
-    { ...node.fields, aspect: hostAspects.some((aspect) => aspect === savedAspect) ? savedAspect : "" },
-    kind,
-    model,
-  );
+  const custom = kind === "image" && sizeHost && savedAspect === WORKFLOW_MEDIA_CUSTOM_ASPECT;
+  const kept = custom || hostAspects.some((aspect) => aspect === savedAspect);
+  const specs = workflowMediaSpecs({ ...node.fields, aspect: kept ? savedAspect : "" }, kind, model);
   const chosen = saved ? models.find((option) => option.id === saved) : model;
   return { kind, models, model, chosen, hostAspects, specs };
 }
@@ -92,7 +91,7 @@ export function useMediaCredits(serverId: string, nodes: readonly WorkflowNode[]
   const media = nodes.filter((node) => node.kind === "image");
   const catalog = useMediaModels(serverId, media.length > 0);
   const priced = media.flatMap((node) => {
-    const choice = mediaChoice(node, catalog.data ?? [], sizeHost);
+    const choice = mediaChoice(node, catalog.data?.models ?? [], sizeHost);
     const request = priceRequest(choice);
     return request ? [{ node, choice, request }] : [];
   });

@@ -231,6 +231,11 @@ import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 import type { PendingApproval } from "./pending-approvals";
 
+export interface WorkflowMediaModels {
+  models: readonly WorkflowMediaModel[];
+  partial: boolean;
+}
+
 export interface AgentExportFile extends AgentExportParts {
   readAll: () => Promise<string>;
 }
@@ -746,7 +751,7 @@ export interface MobileWorkspaceContextValue {
   canUseWorkflowMediaSize: (serverId: string) => boolean;
   canUseWorkflowAssets: (serverId: string) => boolean;
   canPauseWorkflows: (serverId: string) => boolean;
-  loadWorkflowMediaModels: (serverId: string) => Promise<readonly WorkflowMediaModel[]>;
+  loadWorkflowMediaModels: (serverId: string) => Promise<WorkflowMediaModels>;
   loadWorkflowMediaPrice: (input: WorkflowMediaPriceRequest, serverId: string) => Promise<number | null>;
   loadWorkflowCreditBalance: (serverId: string) => Promise<number | null>;
   loadWorkflowGitHubCatalog: (serverId: string) => Promise<WorkflowGitHubCatalog>;

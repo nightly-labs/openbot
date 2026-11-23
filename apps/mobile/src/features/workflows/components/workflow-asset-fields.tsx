@@ -33,9 +33,17 @@ function workflowPictures(files: readonly StoredFileRow[] | undefined): StoredFi
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
+const PICKED_EXTENSION: Readonly<Record<string, string>> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
 function photoName(asset: ImagePicker.ImagePickerAsset): string {
-  const extension = asset.uri.split(".").at(-1)?.toLowerCase() ?? "jpg";
-  return asset.fileName?.trim() ? asset.fileName.replace(/[/\\]/gu, "_") : `photo.${extension}`;
+  const fileExtension = asset.uri.split(".").at(-1)?.toLowerCase() ?? "jpg";
+  const extension = (asset.mimeType ? PICKED_EXTENSION[asset.mimeType] : undefined) ?? fileExtension;
+  const base = asset.fileName?.trim() ? asset.fileName.replace(/[/\\]/gu, "_") : "photo";
+  return `${base.replace(/\.[^.]*$/u, "")}.${extension}`;
 }
 
 function PictureThumbnail({ serverId, file }: { serverId: string; file: StoredFileRow }) {

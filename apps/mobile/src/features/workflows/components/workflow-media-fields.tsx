@@ -71,7 +71,7 @@ export function MediaFields({ node, draft }: { node: WorkflowNode; draft: Workfl
   const setFields = useWorkflowDraft((state) => state.setFields);
   const sizeHost = useMobileWorkspaceSelector((current) => current.canUseWorkflowMediaSize(draft.serverId));
   const { byNode, available, catalog } = useMediaCredits(draft.serverId, [node]);
-  const { kind, models, model, hostAspects, specs } = mediaChoice(node, catalog.data ?? [], sizeHost);
+  const { kind, models, model, hostAspects, specs } = mediaChoice(node, catalog.data?.models ?? [], sizeHost);
   const savedModel = fieldText(node, "model");
   const custom = kind === "image" && sizeHost && fieldText(node, "aspect") === WORKFLOW_MEDIA_CUSTOM_ASPECT;
   const aspect = custom
@@ -101,7 +101,7 @@ export function MediaFields({ node, draft }: { node: WorkflowNode; draft: Workfl
       <SettingsSection
         title={t("mobile.workflow.media.settings")}
         footer={
-          catalog.isError
+          catalog.isError || catalog.data?.partial
             ? t("mobile.workflow.step.modelsFailed")
             : short && available !== null
               ? t("mobile.workflow.media.notEnough", { available: amount(available) })

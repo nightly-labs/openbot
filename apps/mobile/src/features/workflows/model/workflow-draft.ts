@@ -18,6 +18,7 @@ import {
   insertCondition,
   insertStep,
   moveStep,
+  outlineFits,
   outlineListOf,
   removeStep,
   type WorkflowEditMode,
@@ -203,7 +204,10 @@ export const useWorkflowDraft = create<DraftStore>((set, get) => {
         ...(source.size ? { size: source.size } : {}),
       };
       const index = draft.outline[list].indexOf(nodeId) + 1;
-      const added = changeOutline((current, outline) => insertStep(current.graph, outline, list, index, copy));
+      const added = changeOutline((current, outline) => {
+        const next = insertStep(current.graph, outline, list, index, copy);
+        return outlineFits(next.graph, next.outline) ? next : null;
+      });
       return added ? copy.id : null;
     },
   };
