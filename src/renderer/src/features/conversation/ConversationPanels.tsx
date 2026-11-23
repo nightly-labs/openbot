@@ -130,6 +130,7 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
           muted={conversation.muted()}
           levels={conversation.levels()}
           error={conversation.error()}
+          downloadProgress={conversation.downloadProgress()}
           onToggleMute={conversation.toggleMute}
           talkMode={talkMode()}
           onTalkModeChange={setVoiceTalkMode}

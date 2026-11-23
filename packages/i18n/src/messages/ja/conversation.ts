@@ -141,6 +141,7 @@ export const messages = {
   "conversation.voice.talkMode.open": "マイク常時オン",
   "conversation.voice.talkMode.push": "押して話す",
   "conversation.voice.holdToTalk": "押している間に話す",
+  "conversation.voice.downloading": "準備中 {progress}%",
   "conversation.voice.spaceKey": "スペース",
   "conversation.voice.key.ctrl": "Ctrl",
   "conversation.voice.key.alt": "Alt",
