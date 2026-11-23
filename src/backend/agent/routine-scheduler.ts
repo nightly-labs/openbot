@@ -201,10 +201,15 @@ export class RoutineScheduler implements RoutineDueSource {
       const waits = queuedRunsWait(agent.id);
       for (const routine of this.#routines.listRecords(agent.id)) {
         const runs = this.#routines.activeRuns(agent.id, routine.id);
-        if (runs.some((run) => !waits || run.status !== "queued")) return true;
+        if (runs.some((run) => !waits || run.status !== "queued" || this.#deliveryStarted(run))) return true;
       }
     }
     return false;
+  }
+
+  #deliveryStarted(run: RoutineRun): boolean {
+    const status = run.deliveryId ? this.#mailbox.getDelivery(run.deliveryId)?.delivery.status : undefined;
+    return status === "starting" || status === "running";
   }
 
   runForDelivery(deliveryId: string): RoutineRun | null {
