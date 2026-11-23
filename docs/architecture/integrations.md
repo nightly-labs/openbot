@@ -806,14 +806,16 @@ window.
   the connection when a tab opens, closes or changes. A command groups its tab on attach, unless the tab
   is in another group. Stop sharing ungroups the tabs, denies the cards that wait and detaches.
 - **Connection** (`src/client-browser-link.ts`). The page that holds the server connection (the side
-  panel, else the offscreen page) sends the presence when it changes, every 30 s and after a
-  reconnection. It passes each `client-browser-command` event to the worker and posts the worker's
+  panel, else the offscreen page) sends the presence when it changes (at most once in 5 s, and an
+  unchanged presence only every 30 s) and at once after a reconnection. It passes each `client-browser-command` event to the worker and posts the worker's
   answer to `/v1/client-browser/result`. While the user shares, the offscreen page does not close when
   it is idle, and the worker opens it when the last panel closes or the browser starts.
-- **Commands** (`src/client-browser-executor.ts`). CDP 1.3 on a tab of the group: it attaches on
-  demand and detaches after 30 s with no command. Page scripts run in an isolated world. `snapshot`
-  marks the interactive elements with `data-openbot-ref`, so a `ref` target finds them. A tab outside
-  the group gets `not-shared`, a closed one `not-found`.
+- **Commands** (`src/client-browser-executor.ts`). CDP 1.3 on any open web tab: it attaches on demand,
+  puts the tab into the OpenBot group of its window, and detaches after 30 s with no command. Page
+  scripts run in an isolated world. `snapshot` marks the interactive elements with `data-openbot-ref`,
+  so a `ref` target finds them. A command gets `not-shared` while sharing is off, and `not-found` for
+  a closed tab. The X agent's chat of each post is kept for its notification (`openbot.x-chats.v1`,
+  the newest 20), and becomes the chat to open only when the user clicks that notification.
 - **Approvals.** Before a command, the worker checks the site (origin) of the tab or address. A site
   that is not in `openbot.client-browser.sites.v1` gets a card in the side panel (Allow once / Always
   for this site / Deny), or a notification when no panel is open. The card waits 100 s, then the

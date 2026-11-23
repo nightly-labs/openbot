@@ -16,6 +16,8 @@ import { BROWSER_CHANGED_MESSAGE, BROWSER_PRESENCE_MESSAGE, BROWSER_RUN_MESSAGE 
 import { savePresenceAck } from "./extension-storage";
 
 const HEARTBEAT_MS = 30_000;
+const PRESENCE_GAP_MS = 5_000;
+const REPEAT_PRESENCE_MS = 25_000;
 
 export interface ClientBrowserLink {
   handleEvent: (event: RemoteTeamEvent) => void;
@@ -31,6 +33,9 @@ export function createClientBrowserLink(options: {
   const supported = options.capabilities.includes(CLIENT_BROWSER_CAPABILITY);
   let disposed = false;
   let shared = false;
+  let lastPosted = "";
+  let lastPostedAt = 0;
+  let trailing: ReturnType<typeof setTimeout> | undefined;
   let sending: Promise<void> = Promise.resolve();
 
   async function syncNow(): Promise<void> {
@@ -38,10 +43,18 @@ export function createClientBrowserLink(options: {
     if (disposed) return;
     options.onPresence?.(presence);
     if (!supported || (!presence.sharing && !shared)) return;
-    await options.request("POST", CLIENT_BROWSER_ROUTES.presence, () => undefined, {
-      sharing: presence.sharing,
-      tabs: presence.tabs.map((tab) => ({ ...tab })),
-    });
+    const body = { sharing: presence.sharing, tabs: presence.tabs.map((tab) => ({ ...tab })) };
+    const text = JSON.stringify(body);
+    const since = Date.now() - lastPostedAt;
+    if (text === lastPosted && since < REPEAT_PRESENCE_MS) return;
+    if (since < PRESENCE_GAP_MS && presence.sharing === shared) {
+      clearTimeout(trailing);
+      trailing = setTimeout(sync, PRESENCE_GAP_MS - since);
+      return;
+    }
+    await options.request("POST", CLIENT_BROWSER_ROUTES.presence, () => undefined, body);
+    lastPosted = text;
+    lastPostedAt = Date.now();
     shared = presence.sharing;
     await savePresenceAck({ sharing: presence.sharing, tabs: presence.tabs.length, at: Date.now() });
   }
@@ -85,10 +98,15 @@ export function createClientBrowserLink(options: {
       if (!supported || disposed || event.type !== CLIENT_BROWSER_EVENT) return;
       void run(event);
     },
-    refresh: sync,
+    refresh() {
+      lastPosted = "";
+      lastPostedAt = 0;
+      sync();
+    },
     dispose() {
       disposed = true;
       clearInterval(heartbeat);
+      clearTimeout(trailing);
       chrome.runtime.onMessage.removeListener(changed);
     },
   };

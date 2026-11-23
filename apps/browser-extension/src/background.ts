@@ -7,6 +7,7 @@ import {
 } from "@openbot/contracts/browser-extension-x";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { startClientBrowser } from "./client-browser-worker";
+import { openXChat } from "./extension-storage";
 import {
   decodeStorageRequest,
   decodeXLabels,
@@ -92,6 +93,7 @@ function fromExtensionPage(sender: chrome.runtime.MessageSender): boolean {
   return Boolean(sender.url?.startsWith(chrome.runtime.getURL("")));
 }
 
+const X_SENT_NOTIFICATION = "openbot-x-sent-";
 const panels = new Set<chrome.runtime.Port>();
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -162,7 +164,12 @@ function flushOutbox(force = false): Promise<void> {
         ).catch(() => null);
         if (answer?.ok) {
           if (labels)
-            await notify(`openbot-x-sent-${post.id}`, labels.sentTitle, post.attempts > 0 ? labels.sentBody : "", post);
+            await notify(
+              `${X_SENT_NOTIFICATION}${post.id}`,
+              labels.sentTitle,
+              post.attempts > 0 ? labels.sentBody : "",
+              post,
+            );
           continue;
         }
         const attempts = post.attempts + 1;
@@ -210,9 +217,11 @@ chrome.runtime.onStartup.addListener(() => void flushOutbox(true));
 chrome.runtime.onInstalled.addListener(() => void flushOutbox(true));
 void flushOutbox();
 chrome.notifications.onClicked.addListener((id) => {
-  if (id.startsWith("openbot-x-sent-")) {
+  if (id.startsWith(X_SENT_NOTIFICATION)) {
     void chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT }).catch(() => undefined);
-    for (const port of panels) port.postMessage(OPEN_X_CHAT_MESSAGE);
+    void openXChat(id.slice(X_SENT_NOTIFICATION.length)).then(() => {
+      for (const port of panels) port.postMessage(OPEN_X_CHAT_MESSAGE);
+    });
   }
   void chrome.notifications.clear(id).catch(() => undefined);
 });

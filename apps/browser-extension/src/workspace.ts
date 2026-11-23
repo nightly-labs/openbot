@@ -98,7 +98,7 @@ interface WorkspaceFolder {
   depth: number;
 }
 
-export type PendingPrompt = AgentRuntimeSnapshot["pendingPrompts"][number];
+type PendingPrompt = AgentRuntimeSnapshot["pendingPrompts"][number];
 
 export interface WorkspaceState {
   status: "loading" | "ready" | "failed";

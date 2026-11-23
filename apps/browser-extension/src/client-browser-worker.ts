@@ -117,6 +117,7 @@ async function currentWebTab(): Promise<chrome.tabs.Tab | null> {
 }
 
 async function addToGroup(tabId: number): Promise<number | null> {
+  if (!(await readSharing())) return null;
   const tab = await chrome.tabs.get(tabId);
   if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return null;
   const [inWindow] = await chrome.tabGroups.query({ title: OPENBOT_GROUP_TITLE, windowId: tab.windowId });
@@ -190,9 +191,12 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     downloadGuards.clear();
     for (const finish of [...waiting.values()]) finish("deny");
     await detachAll();
-    if (groupId === null) return;
-    const ids = (await chrome.tabs.query({ groupId })).flatMap((tab) => (tab.id === undefined ? [] : [tab.id]));
-    if (ids.length) await chrome.tabs.ungroup(ids).catch(() => undefined);
+    const groups = await chrome.tabGroups.query({ title: OPENBOT_GROUP_TITLE });
+    const groupIds = new Set([...groups.map((group) => group.id), ...(groupId === null ? [] : [groupId])]);
+    for (const id of groupIds) {
+      const ids = (await chrome.tabs.query({ groupId: id })).flatMap((tab) => (tab.id === undefined ? [] : [tab.id]));
+      if (ids.length) await chrome.tabs.ungroup(ids).catch(() => undefined);
+    }
   }
 
   async function notify(ask: BrowserAsk, labels: AskLabels): Promise<void> {

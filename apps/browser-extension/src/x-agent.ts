@@ -5,7 +5,7 @@ import { AGENT_TASKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-t
 import { runTeamEffect } from "@openbot/team-client";
 import { startAgentTask, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { currentText } from "@openbot/ui/text";
-import { saveChatToOpen } from "./extension-storage";
+import { saveXChat } from "./extension-storage";
 import { decodeAgents } from "./workspace";
 import type { XLabels, XSendResult, XStatusAnswer } from "./x-messages";
 import { xPostMessage } from "./x-post-message";
@@ -69,7 +69,7 @@ export async function xSend(target: XTarget, payload: XReplyPayload, clientMessa
         },
       );
     }
-    await saveChatToOpen({ hostId: target.hostId, agentId, taskId });
+    await saveXChat(clientMessageId, { hostId: target.hostId, agentId, taskId });
     return { ok: true };
   } catch (error) {
     return {

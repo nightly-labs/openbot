@@ -7,7 +7,9 @@ const DEVICE_KEY = "openbot.device.v1";
 const SERVER_KEY = "openbot.server.v1";
 const HOST_KEY_PREFIX = "openbot.host-key.v1:";
 const HOST_PROTOCOL_PREFIX = "openbot.host-protocol.v1:";
-export const OPEN_CHAT_KEY = "openbot.open-chat.v1";
+const OPEN_CHAT_KEY = "openbot.open-chat.v1";
+const X_CHATS_KEY = "openbot.x-chats.v1";
+const X_CHATS_KEPT = 20;
 
 let area: chrome.storage.StorageArea | null = null;
 
@@ -46,7 +48,7 @@ export function saveSession(session: ExtensionSession): Promise<void> {
 }
 
 export function clearSession(): Promise<void> {
-  return local().remove([SESSION_KEY, SERVER_KEY, OPEN_CHAT_KEY]);
+  return local().remove([SESSION_KEY, SERVER_KEY, OPEN_CHAT_KEY, X_CHATS_KEY]);
 }
 
 export interface ChatToOpen {
@@ -55,15 +57,49 @@ export interface ChatToOpen {
   taskId: string | null;
 }
 
-export function saveChatToOpen(chat: ChatToOpen): Promise<void> {
-  return local().set({ [OPEN_CHAT_KEY]: { ...chat } });
+function decodeChat(value: unknown): ChatToOpen | null {
+  if (!isDynamicRecord(value) || !isString(value.hostId) || !isString(value.agentId)) return null;
+  return { hostId: value.hostId, agentId: value.agentId, taskId: isString(value.taskId) ? value.taskId : null };
+}
+
+interface XChat {
+  postId: string;
+  chat: ChatToOpen;
+}
+
+async function readXChats(): Promise<XChat[]> {
+  const value = (await local().get(X_CHATS_KEY))[X_CHATS_KEY];
+  if (!isDynamicRecord(value)) return [];
+  return Object.entries(value).flatMap(([postId, stored]) => {
+    const chat = decodeChat(stored);
+    return chat ? [{ postId, chat }] : [];
+  });
+}
+
+function writeXChats(chats: XChat[]): Promise<void> {
+  return local().set({
+    [X_CHATS_KEY]: Object.fromEntries(
+      chats.map(({ postId, chat }) => [postId, { hostId: chat.hostId, agentId: chat.agentId, taskId: chat.taskId }]),
+    ),
+  });
+}
+
+export async function saveXChat(postId: string, chat: ChatToOpen): Promise<void> {
+  const kept = (await readXChats()).filter((entry) => entry.postId !== postId).slice(-(X_CHATS_KEPT - 1));
+  await writeXChats([...kept, { postId, chat }]);
+}
+
+export async function openXChat(postId: string): Promise<void> {
+  const chats = await readXChats();
+  const chat = chats.find((entry) => entry.postId === postId)?.chat;
+  await writeXChats(chats.filter((entry) => entry.postId !== postId));
+  if (chat) await local().set({ [OPEN_CHAT_KEY]: { hostId: chat.hostId, agentId: chat.agentId, taskId: chat.taskId } });
 }
 
 export async function takeChatToOpen(): Promise<ChatToOpen | null> {
   const value = (await local().get(OPEN_CHAT_KEY))[OPEN_CHAT_KEY];
   await local().remove(OPEN_CHAT_KEY);
-  if (!isDynamicRecord(value) || !isString(value.hostId) || !isString(value.agentId)) return null;
-  return { hostId: value.hostId, agentId: value.agentId, taskId: isString(value.taskId) ? value.taskId : null };
+  return decodeChat(value);
 }
 
 export async function deviceId(): Promise<string> {
