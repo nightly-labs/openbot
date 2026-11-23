@@ -116,6 +116,7 @@ export interface AcpFlavor {
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
     loggedFailure?(text: string, argv: readonly string[], sessionId: string): string | null;
+    silentFailure?(argv: readonly string[], sessionId: string, since: number): string | null;
     sessionLost?: RegExp;
   };
   cancelLocallyThenResume?: true;
@@ -126,6 +127,7 @@ export interface AcpFlavor {
   thoughtsInsideAnswer?: true;
   resumesAnswerAfterThought?: { report: RegExp };
   promptOpenForBackgroundTasks?: true;
+  silentTurnLimitMs?: number;
   unsentBackgroundTurns?: true;
   wakesAfterPromptEnds?: true;
   selfWakeTools?: RegExp;

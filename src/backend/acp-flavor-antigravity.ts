@@ -212,12 +212,11 @@ function logTail(file: string, size: number): string {
   }
 }
 
-function* antigravityRecentLogs(argv: readonly string[]): Generator<string> {
+function* antigravityRecentLogs(argv: readonly string[], since: number): Generator<string> {
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
   if (!home || !appData) return;
   const folder = join(home, appData, "log");
-  const since = Date.now() - GEMINI_LOG_RECENT_MS;
   let logs: { file: string; size: number; mtimeMs: number }[];
   try {
     logs = readdirSync(folder)
@@ -242,9 +241,13 @@ function* antigravityRecentLogs(argv: readonly string[]): Generator<string> {
   }
 }
 
-function antigravityLastPromptLog(argv: readonly string[], sessionId: string): string | null {
+function antigravityLastPromptLog(
+  argv: readonly string[],
+  sessionId: string,
+  since = Date.now() - GEMINI_LOG_RECENT_MS,
+): string | null {
   const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
-  for (const log of antigravityRecentLogs(argv)) {
+  for (const log of antigravityRecentLogs(argv, since)) {
     const at = log.lastIndexOf(prompt);
     if (at >= 0) return log.slice(at);
   }
@@ -272,12 +275,18 @@ function antigravityLoggedFailure(text: string, argv: readonly string[], session
   return causes?.at(-1)?.trim() ?? null;
 }
 
+const GEMINI_SILENT_FAILURE = /\bagent executor error: [^\n]+|\bError \d{3}, Message: [^\n]+/gu;
+
+function antigravitySilentFailure(argv: readonly string[], sessionId: string, since: number): string | null {
+  return antigravityLastPromptLog(argv, sessionId, since)?.match(GEMINI_SILENT_FAILURE)?.at(-1)?.trim() ?? null;
+}
+
 function antigravityAccountLink(text: string, argv: readonly string[]): string | null {
   const link = geminiAccountLink(text);
   if (link !== null || !GEMINI_VERIFICATION_REQUIRED.test(text)) return link;
   const answered = GEMINI_VERIFICATION_LINK.exec(text)?.[0].replace(/[.,;:]+$/u, "");
   if (answered) return answered;
-  for (const log of antigravityRecentLogs(argv)) {
+  for (const log of antigravityRecentLogs(argv, Date.now() - GEMINI_LOG_RECENT_MS)) {
     if (!log.includes("VALIDATION_REQUIRED")) continue;
     const links = log
       .replace(/\\+u0026/gu, "&")
@@ -409,6 +418,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     mcpLoadFailure: geminiMcpLoadFailure,
     refusedMcpTools: antigravityRefusedMcpTools,
     loggedFailure: antigravityLoggedFailure,
+    silentFailure: antigravitySilentFailure,
     sessionLost: GEMINI_CONNECTION_LOST_ANSWER,
   },
   cancelLocallyThenResume: true,
@@ -420,6 +430,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
       /^\s*(?:⚠️?\s*)?(?:Error: )?The stream was interrupted\. Please continue the task you were working on\.\s*$/u,
   },
   promptOpenForBackgroundTasks: true,
+  silentTurnLimitMs: 15 * 60_000,
   wakesAfterPromptEnds: true,
   selfWakeTools: /\b(?:start|invoke)_subagent\b|^(?:Run(?:ning)? )?schedule\??$/u,
   contextCompaction: "handoff",

@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- A Gemini turn that sends nothing for 15 minutes, with no tool or question open, now ends with the error that Gemini wrote to its log, such as a failed request to Google. When the log has no error, the turn ends as stopped responding. Before, the turn could show Working for hours.
+
 - When Google's servers answer a Gemini turn with "Requested entity was not found" after the agent already did work, the agent now continues the work on its backup model. Before, the turn stopped with this error and the work did not continue.
 - When Google says that a Gemini quota or rate limit is reached and gives the reset time, OpenBot now waits for that time before it tries the model again. Before, OpenBot tried the model again after 10 minutes and could hit the same limit.
 - When a Claude model in Gemini cannot read the thinking of an earlier turn, OpenBot now starts a new session with the chat history at the first failure. Before, the message failed and the same error came back on the next message.

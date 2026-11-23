@@ -3677,6 +3677,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
         if (yield* this.#endIfUnresponsive(thread)) return;
         answeredAt = Date.now();
+        if (yield* this.#endSilentTurn(thread, turn)) return;
         continue;
       }
       const silentFor = Date.now() - turn.lastActivityAt;
@@ -3696,6 +3697,39 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }),
       );
     }
+  });
+
+  readonly #endSilentTurn = Effect.fn("AcpAgentClient.endSilentTurn")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    turn: AcpTurn,
+  ) {
+    const limit = this.#flavor.silentTurnLimitMs;
+    const silentFor = Date.now() - turn.lastActivityAt;
+    if (limit === undefined || silentFor < limit || turn.toolItems.size > 0 || turn.waitingOnUser > 0) return false;
+    if (thread.activeTurn !== turn || turn.completing || turn.stopped) return false;
+    const sdkHarness = this.#flavor.sdkHarness;
+    const logged = sdkHarness?.silentFailure?.(this.options.argv, thread.id, turn.startedAt) ?? null;
+    this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
+    if (logged) this.emit("diagnostic", this.#redact(logged));
+    const cause = logged ? classifyFailure(logged) : "stalled";
+    turn.failureCause =
+      cause === "unknown"
+        ? (sdkHarness?.fallbackCause?.(
+            logged ?? "",
+            turn.text.length > 0 || turn.reasoned || turn.toolNames.size > 0,
+          ) ?? cause)
+        : cause;
+    yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
+    yield* this.#abandonTurn(
+      thread,
+      turn,
+      "failed",
+      logged && sdkHarness
+        ? sdkHarness.turnFailure(logged)
+        : sourceText("error.agent.turnStalled", { provider: this.#providerName(thread) }),
+    );
+    return true;
   });
 
   readonly #endIfUnresponsive = Effect.fn("AcpAgentClient.endIfUnresponsive")(function* (
