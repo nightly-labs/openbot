@@ -2649,7 +2649,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const failureAt = turn.sdkFailureAt ?? (sdkHarness.answerIsFailure.test(turn.text) ? 0 : null);
         const failure = failureAt === null ? "" : turn.text.slice(failureAt).trim();
         if (failureAt !== null) {
-          const detail = failure || turn.text.trim();
+          const answer = failure || turn.text.trim();
+          const logged = sdkHarness.loggedFailure?.(answer, this.options.argv, thread.id) ?? null;
+          if (logged) this.emit("diagnostic", this.#redact(logged));
+          const detail = logged ?? answer;
           turn.text = failure ? turn.text.slice(0, failureAt) : "";
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
             turn.accountLink = sdkHarness.accountLink?.(detail, this.options.argv, thread.id) ?? null;
@@ -2701,14 +2704,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     } catch (error) {
       const transport = thread.transport;
       const serverLost = !turn.stopped && !transport && this.#flavor.serverLost?.(error) === true;
-      const failure = serverLost
-        ? yield* this.#transport
-            .explainEnd(error, this.#transport.ended, true)
-            .pipe(Effect.catch(() => Effect.succeed(error)))
-        : transport && !turn.stopped
-          ? (yield* this.#explainSessionEnd(transport, error)).cause
-          : error;
-      if (serverLost && !turn.stopped && failure instanceof AgentProcessExitError) return;
+      const failure = turn.stopped
+        ? error
+        : serverLost
+          ? yield* this.#transport
+              .explainEnd(error, this.#transport.ended, true)
+              .pipe(Effect.catch(() => Effect.succeed(error)))
+          : transport
+            ? (yield* this.#explainSessionEnd(transport, error)).cause
+            : this.#transport.explainClose(error);
+      if (serverLost && failure instanceof AgentProcessExitError) return;
       if (!turn.stopped && this.#flavor.emptyAnswerError?.test(failureText(failure))) {
         if (turn.answerOptional) {
           yield* this.#completeTurn(thread, turn, "completed", null);

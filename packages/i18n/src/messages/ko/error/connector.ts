@@ -32,6 +32,8 @@ export const messages = {
   "error.connector.onePasswordRateLimited": "1Password에 요청이 너무 많아요. 몇 분 기다린 후 다시 시도해 주세요.",
   "error.connector.onePasswordNoVault":
     "서비스 계정이 볼트를 읽을 수 없어요. 볼트에 대한 접근 권한을 부여한 후 다시 시도해 주세요.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot이 1Password의 로그인 정보를 읽을 수 없어요. 1Password 연결을 해제한 후 다시 연결해 주세요.",
   "error.connector.onePasswordFileUnreadable": "1Password 연결 파일을 읽을 수 없어요.",
   "error.connector.onePasswordFileTooLarge": "1Password 연결 파일이 너무 커요.",
   "error.connector.bitwardenFailed":
@@ -44,6 +46,10 @@ export const messages = {
     "HTTPS 서버 주소, API 키의 client_id와 client_secret, 마스터 비밀번호를 입력해 주세요.",
   "error.connector.bitwardenHostFailed":
     "이 서버에서 Bitwarden을 열 수 없어요. 서버 주소, API 키, 마스터 비밀번호를 확인하고 Shared with OpenBot이라는 폴더가 하나 있는지 확인해 주세요. 그런 다음 다시 연결해 주세요.",
+  "error.connector.bitwardenHostSignInFailed":
+    "이 서버에서 Bitwarden에 로그인할 수 없어요. 서버 주소와 API 키를 확인한 후 다시 연결해 주세요.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "이 서버에서 Bitwarden 잠금을 해제할 수 없어요. 마스터 비밀번호를 확인한 후 다시 연결해 주세요.",
   "error.connector.bitwardenCliInstallFailed":
     "이 서버에 Bitwarden CLI를 설치하지 못했어요. 서버의 네트워크 연결을 확인한 후 다시 연결해 주세요.",
   "error.connector.bitwardenFileUnreadable": "Bitwarden 연결 파일을 읽을 수 없어요.",

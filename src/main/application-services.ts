@@ -2274,6 +2274,7 @@ export async function createApplicationServices({
     listAgents: () => service.listAgents(),
     agentDefaults: () => agentDefaults.get(),
     listModels: () => service.listModels(),
+    providerStatuses: () => service.getStatus().providers ?? [],
     listRoutines: (agentId) => service.listRoutines(agentId),
     runRoutine: (input) => service.runRoutineFromAutomation(input),
     sendMessage: (input) => service.sendMessage(input),

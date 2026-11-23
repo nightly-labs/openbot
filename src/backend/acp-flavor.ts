@@ -112,6 +112,7 @@ export interface AcpFlavor {
     quota(text: string): string | null;
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
+    loggedFailure?(text: string, argv: readonly string[], sessionId: string): string | null;
     sessionLost?: RegExp;
   };
   cancelLocallyThenResume?: true;

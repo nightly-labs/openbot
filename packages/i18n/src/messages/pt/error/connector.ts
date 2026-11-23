@@ -33,6 +33,8 @@ export const messages = {
     "O 1Password recebeu solicitações demais. Aguarde alguns minutos e tente novamente.",
   "error.connector.onePasswordNoVault":
     "A conta de serviço não consegue ler nenhum cofre. Dê acesso a um cofre e tente novamente.",
+  "error.connector.onePasswordReadFailed":
+    "O OpenBot não consegue ler seus logins no 1Password. Desconecte o 1Password e conecte-o novamente.",
   "error.connector.onePasswordFileUnreadable": "O arquivo de conexão com o 1Password não pode ser lido.",
   "error.connector.onePasswordFileTooLarge": "O arquivo de conexão com o 1Password é muito grande.",
   "error.connector.bitwardenFailed":
@@ -45,6 +47,10 @@ export const messages = {
     "Informe um endereço de servidor HTTPS, o client_id e o client_secret da chave de API e a senha mestra.",
   "error.connector.bitwardenHostFailed":
     "Não foi possível abrir o Bitwarden neste servidor. Verifique o endereço do servidor, a chave de API e a senha mestra, e confirme que uma pasta se chama Shared with OpenBot. Depois, conecte de novo.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Não foi possível entrar no Bitwarden neste servidor. Verifique o endereço do servidor e a chave de API e conecte de novo.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Não foi possível desbloquear o Bitwarden neste servidor. Verifique a senha mestra e conecte de novo.",
   "error.connector.bitwardenCliInstallFailed":
     "Não foi possível instalar a CLI do Bitwarden neste servidor. Verifique a conexão de rede dele e conecte de novo.",
   "error.connector.bitwardenFileUnreadable": "O arquivo de conexão do Bitwarden não pode ser lido.",

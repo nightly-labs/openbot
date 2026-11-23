@@ -300,6 +300,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} остановился без ответа. Отправьте сообщение ещё раз.",
   "error.provider.channelNoAnswer":
     "{provider} завершил ход без ответа. В канале нажмите «Продолжить», чтобы снова запустить задачу, или «Переназначить», чтобы передать её другому участнику.",
+  "error.provider.acpProcessStopped": "{provider} остановился, не успев ответить. Отправьте сообщение ещё раз.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",
@@ -338,6 +339,8 @@ export const messages = {
     "{provider} не завершил предыдущий ход, поэтому не принял это сообщение. OpenBot начал новый сеанс {provider} с историей чата. Отправьте сообщение ещё раз.",
   "error.provider.antigravityLocationUnsupported":
     "Google не разрешает Gemini работать из сетевого местоположения компьютера, на котором работает этот агент. Используйте Gemini на другом компьютере или выберите другого провайдера для этого агента.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini остановился из-за ошибки. Отправьте сообщение ещё раз. Если он снова остановится, выберите другую модель или другого провайдера.",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
   "error.provider.grokServiceFailure":

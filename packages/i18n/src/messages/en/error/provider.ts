@@ -296,6 +296,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
   "error.provider.channelNoAnswer":
     "{provider} ended the turn with no answer. In the channel, click Continue to run the task again, or Reassign to give it to another member.",
+  "error.provider.acpProcessStopped": "{provider} stopped before it answered. Send the message again.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",
@@ -334,6 +335,8 @@ export const messages = defineMessages("error.provider", {
     "{provider} did not end its earlier turn, so it did not accept this message. OpenBot started a new {provider} session with the chat history. Send your message again.",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini stopped because of an error. Send your message again. If it stops again, choose another model or provider.",
   "error.provider.antigravityConnectionLost":
     "Gemini lost the connection to its agent and stopped. Send a message to continue.",
   "error.provider.grokServiceFailure":
