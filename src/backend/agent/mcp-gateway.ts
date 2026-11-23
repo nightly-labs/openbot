@@ -508,7 +508,7 @@ export class McpGateway {
       .map((config) => ({
         mcpServerId: config.id,
         signedIn: oauth?.signedIn(config.url) ?? false,
-        needsSignIn: oauth?.needsSignIn(config.url) ?? false,
+        needsSignIn: this.#awaitsSignIn(config),
       }));
   }
 
