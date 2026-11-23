@@ -4,8 +4,9 @@ import { useCSSVariable } from "uniwind";
 const STAR =
   "M12 2.5c.9 0 1.3.8 1.6 1.9.8 3.1 2.9 5.2 6 6 1.1.3 1.9.7 1.9 1.6s-.8 1.3-1.9 1.6c-3.1.8-5.2 2.9-6 6-.3 1.1-.7 1.9-1.6 1.9s-1.3-.8-1.6-1.9c-.8-3.1-2.9-5.2-6-6C3.3 13.3 2.5 12.9 2.5 12s.8-1.3 1.9-1.6c3.1-.8 5.2-2.9 6-6 .3-1.1.7-1.9 1.6-1.9Z";
 
-export function CreditStar({ size = 20 }: { size?: number }) {
-  const fill = String(useCSSVariable("--openbot-credit-star-fill"));
+export function CreditStar({ size = 20, color }: { size?: number; color?: string }) {
+  const starFill = String(useCSSVariable("--openbot-credit-star-fill"));
+  const fill = color ?? starFill;
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden importantForAccessibility="no">
       <Path d={STAR} fill={fill} />

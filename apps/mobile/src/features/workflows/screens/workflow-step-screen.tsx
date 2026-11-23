@@ -14,6 +14,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { AssetFields } from "@/features/workflows/components/workflow-asset-fields";
 import {
   SlackOutputFields,
   TelegramOutputFields,
@@ -21,6 +22,7 @@ import {
 } from "@/features/workflows/components/workflow-chat-fields";
 import { DiscordOutputFields } from "@/features/workflows/components/workflow-discord-fields";
 import { GitHubOutputFields } from "@/features/workflows/components/workflow-github-fields";
+import { MediaFields } from "@/features/workflows/components/workflow-media-fields";
 import { confirmRemove } from "@/features/workflows/model/use-workflow-step-menu";
 import { useWorkflowGitHubSupported } from "@/features/workflows/model/use-workflows";
 import {
@@ -34,7 +36,7 @@ import { GITHUB_OUTPUT_DEFAULTS } from "@/features/workflows/model/workflow-gith
 import { fieldText } from "@/features/workflows/model/workflow-node-fields";
 import { canMove, outlineListOf } from "@/features/workflows/model/workflow-outline";
 import { draftProblems } from "@/features/workflows/model/workflow-problems";
-import { kindLabel } from "@/features/workflows/model/workflow-steps";
+import { addKeyLabel, kindLabel } from "@/features/workflows/model/workflow-steps";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -311,7 +313,14 @@ export function WorkflowStepScreen() {
 
   return (
     <SettingsContent>
-      <Stack.Screen options={{ title: kindLabel(node.kind, t) }} />
+      <Stack.Screen
+        options={{
+          title:
+            node.kind === "image" && fieldText(node, "media") === "video"
+              ? addKeyLabel("video", t)
+              : kindLabel(node.kind, t),
+        }}
+      />
       {problem ? (
         <Typography.Paragraph className="px-4 font-medium text-danger-text" style={typeScale.caption}>
           {problem}
@@ -376,6 +385,8 @@ export function WorkflowStepScreen() {
           placeholder={t("mobile.workflow.step.textPlaceholder")}
         />
       ) : null}
+      {node.kind === "image" ? <MediaFields node={node} draft={draft} /> : null}
+      {node.kind === "asset" ? <AssetFields node={node} draft={draft} /> : null}
       {node.kind === "output" ? (
         <>
           <OutputChoice node={node} draft={draft} />
