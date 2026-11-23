@@ -757,7 +757,9 @@ export class SkillMarketplaceService {
         if (Result.isFailure(revision)) continue;
         const outcome = yield* Effect.result(this.installLocal({ agentId, skillId, revision: revision.success }));
         if (Result.isFailure(outcome))
-          logger.warn(`OpenBot could not install global skill ${skillId} on agent ${agentId}: ${outcome.failure}`);
+          logger.warn(
+            `OpenBot could not install global skill ${skillId} on agent ${agentId}: ${outcome.failure.cause instanceof Error ? outcome.failure.cause.message : String(outcome.failure.cause)}`,
+          );
       }
     });
   }
@@ -774,13 +776,22 @@ export class SkillMarketplaceService {
       let installed = 0;
       let failed = 0;
       if (global) {
+        const revision = yield* this.latestRevision(skillId);
         for (const agent of this.listAgents()) {
-          const existing = yield* this.installedRevision(agent.id, skillId);
-          if (existing !== null) continue;
-          const revision = yield* this.latestRevision(skillId);
-          const outcome = yield* Effect.result(this.installLocal({ agentId: agent.id, skillId, revision }));
-          if (Result.isSuccess(outcome)) installed += 1;
-          else failed += 1;
+          const outcome = yield* Effect.result(
+            this.installedRevision(agent.id, skillId).pipe(
+              Effect.flatMap((existing) =>
+                existing !== null
+                  ? Effect.succeed("skip" as const)
+                  : this.installLocal({ agentId: agent.id, skillId, revision }).pipe(Effect.as("installed" as const)),
+              ),
+            ),
+          );
+          if (Result.isSuccess(outcome)) {
+            if (outcome.success === "installed") installed += 1;
+          } else {
+            failed += 1;
+          }
         }
       }
       return { installed, failed };
