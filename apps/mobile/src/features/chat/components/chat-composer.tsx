@@ -1,6 +1,8 @@
 import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { GlassView } from "expo-glass-effect";
 import { router, useIsFocused } from "expo-router";
+import type { NativeStackNavigationProp } from "expo-router/native-stack";
+import { type ParamListBase, useNavigation } from "expo-router/react-navigation";
 import { Button, Spinner, Typography } from "heroui-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import AudioLines from "lucide-react-native/icons/audio-lines";
@@ -15,6 +17,7 @@ import X from "lucide-react-native/icons/x";
 import { memo, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
+  Keyboard,
   Text as NativeText,
   Pressable,
   ScrollView,
@@ -57,7 +60,7 @@ import {
 import { useFontScale } from "@/shared/lib/font-scale";
 import { haptics } from "@/shared/lib/haptics";
 import { useMotionPreference, useReducedMotion } from "@/shared/lib/motion";
-import { isAndroid } from "@/shared/lib/platform";
+import { isAndroid, isIOS } from "@/shared/lib/platform";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 import { END_X, fieldDirectionStyle, layoutDirection, MIRROR_IN_RTL, textDirection } from "@/shared/lib/text-direction";
@@ -286,6 +289,30 @@ export const ChatComposer = memo(function ChatComposer({
     }, FOCUS_RETRY_INTERVAL_MS);
     return () => clearInterval(retry);
   }, [isFocused, disabled, handoffFocusVersion]);
+  const keyboardFieldUsable = useRef(false);
+  keyboardFieldUsable.current = !disabled && !voiceOpen && !dictationBusy;
+  const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
+  useEffect(() => {
+    if (!isIOS) return;
+    let keyboardShown = Keyboard.isVisible();
+    const willShow = Keyboard.addListener("keyboardWillShow", () => {
+      keyboardShown = true;
+    });
+    const didHide = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardShown = false;
+    });
+    const stopListening = navigation.addListener("transitionEnd", (event) => {
+      const input = inputRef.current;
+      if (event.data.closing || keyboardShown || !keyboardFieldUsable.current || !input?.isFocused()) return;
+      input.blur();
+      input.focus();
+    });
+    return () => {
+      willShow.remove();
+      didHide.remove();
+      stopListening();
+    };
+  }, [navigation]);
   const pasteFiles = (pasted: PastedFiles) => addPastedFiles(attachments, pasted);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
@@ -530,11 +557,8 @@ export const ChatComposer = memo(function ChatComposer({
   }, [draft]);
 
   useEffect(() => {
-    if (disabled) {
-      sendGate.cancel();
-      inputRef.current?.blur();
-    }
-  }, [disabled, sendGate]);
+    if (disabled) inputRef.current?.blur();
+  }, [disabled]);
 
   const suggestionCount = suggestions.length + tagSuggestions.length;
   const suggestionsVisible = Boolean((focused || isAndroid) && query && suggestionCount > 0 && !disabled);
@@ -618,14 +642,16 @@ export const ChatComposer = memo(function ChatComposer({
 
   function requestSend(): void {
     if (disabled || preparing) return;
-    const action = sendGate.request();
-    if (action === "blur") inputRef.current?.blur();
-    else if (action === "send") onSend(latestTextRef.current);
+    const input = inputRef.current;
+    const fieldFocused = input?.isFocused() ?? false;
+    if (!sendGate.submit(fieldFocused)) return;
+    onSend(latestTextRef.current);
+    if (fieldFocused) input?.blur();
   }
 
   function submitKey(text: string): void {
     if (control.mode !== "send" || !controlReady || voiceOpen) return;
-    if (sendGate.submit()) onSend(editMentionDraft(latestTextRef.current, text));
+    if (sendGate.submit(inputRef.current?.isFocused() ?? false)) onSend(editMentionDraft(latestTextRef.current, text));
   }
 
   function pressControl(): void {
@@ -939,6 +965,7 @@ export const ChatComposer = memo(function ChatComposer({
                       }}
                       onBlur={() => setFocused(false)}
                       onChangeText={(text) => {
+                        if (sendGate.ignoresFieldText()) return;
                         if (dictationBusy) {
                           if (dictating) finishDictation();
                           return;
@@ -971,12 +998,12 @@ export const ChatComposer = memo(function ChatComposer({
                         onChangeDraft(next);
                       }}
                       onSubmitEditing={({ nativeEvent }) => {
-                        if (!disabled && sendGate.submit())
+                        if (!disabled && sendGate.submit(true))
                           onSend(editMentionDraft(latestTextRef.current, nativeEvent.text));
                       }}
                       onEndEditing={({ nativeEvent: { text } }) => {
+                        if (sendGate.endEditing()) return;
                         latestTextRef.current = editMentionDraft(latestTextRef.current, text);
-                        if (sendGate.commit() && !disabled) onSend(latestTextRef.current);
                       }}
                     >
                       <NativeText>
