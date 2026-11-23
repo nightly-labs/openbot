@@ -1420,7 +1420,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "treg",
       version: "1.0.0",
       featured: false,
-      detailSha256: "faaaa080c6cf2ea76606ff4ecb7578ebf9738ee00cd37d1755ad0c31ef78b6e6",
+      detailSha256: "311141064e530d89fd8322d8739ba2f64135227df1ae3943df3e6890eab07c04",
     },
     {
       slug: "truthifi",
@@ -10006,7 +10006,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     tagline: "OpenRouter for agent tools",
     description:
       "Give your agent one connection to thousands of tools and your team's own APIs. It can search by task, check prices, and call tools while Treg handles the provider keys.",
-    category: "research",
+    category: "automation",
     creatorName: "Treg",
     iconUrl: "https://treg.to/media/brand/logo.png",
     version: "1.0.0",

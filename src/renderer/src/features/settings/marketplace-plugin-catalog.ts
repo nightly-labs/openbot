@@ -9773,7 +9773,7 @@ const TREG: MarketplacePluginDetail = {
   tagline: "OpenRouter for agent tools",
   description:
     "Give your agent one connection to thousands of tools and your team's own APIs. It can search by task, check prices, and call tools while Treg handles the provider keys.",
-  category: "research",
+  category: "automation",
   creatorName: "Treg",
   iconUrl: "https://treg.to/media/brand/logo.png",
   version: "1.0.0",
