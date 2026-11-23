@@ -2704,14 +2704,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     } catch (error) {
       const transport = thread.transport;
       const serverLost = !turn.stopped && !transport && this.#flavor.serverLost?.(error) === true;
-      const failure = serverLost
-        ? yield* this.#transport
-            .explainEnd(error, this.#transport.ended, true)
-            .pipe(Effect.catch(() => Effect.succeed(error)))
-        : transport && !turn.stopped
-          ? (yield* this.#explainSessionEnd(transport, error)).cause
-          : error;
-      if (serverLost && !turn.stopped && failure instanceof AgentProcessExitError) return;
+      const failure = turn.stopped
+        ? error
+        : serverLost
+          ? yield* this.#transport
+              .explainEnd(error, this.#transport.ended, true)
+              .pipe(Effect.catch(() => Effect.succeed(error)))
+          : transport
+            ? (yield* this.#explainSessionEnd(transport, error)).cause
+            : this.#transport.explainClose(error);
+      if (serverLost && failure instanceof AgentProcessExitError) return;
       if (!turn.stopped && this.#flavor.emptyAnswerError?.test(failureText(failure))) {
         if (turn.answerOptional) {
           yield* this.#completeTurn(thread, turn, "completed", null);

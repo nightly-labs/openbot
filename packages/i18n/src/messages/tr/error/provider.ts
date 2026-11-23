@@ -307,6 +307,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} yanıt vermeden durdu. Mesajı yeniden gönderin.",
   "error.provider.channelNoAnswer":
     "{provider} turu yanıt vermeden bitirdi. Kanalda görevi yeniden çalıştırmak için Devam et'e, başka bir üyeye vermek için Yeniden ata'ya tıklayın.",
+  "error.provider.acpProcessStopped": "{provider} yanıt vermeden önce durdu. Mesajı yeniden gönderin.",
   "error.provider.chatgptPageFailed": "OpenBot ChatGPT bağlantı sayfasını açamadı.",
   "error.provider.noneReady": "Hiçbir ajan sağlayıcısı hazır değil.",
   "error.provider.claudeTurnActive": "Bağlamını yenilemeden önce etkin Claude turunun bitmesini bekleyin.",

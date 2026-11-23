@@ -284,6 +284,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} עצר בלי תשובה. יש לשלוח את ההודעה שוב.",
   "error.provider.channelNoAnswer":
     "{provider} סיים את התור בלי תשובה. בערוץ, יש ללחוץ על המשך כדי להריץ את המשימה שוב, או על הקצאה מחדש כדי לתת אותה לחבר אחר.",
+  "error.provider.acpProcessStopped": "{provider} נעצר לפני שענה. יש לשלוח את ההודעה שוב.",
   "error.provider.chatgptPageFailed": "OpenBot לא הצליח לפתוח את דף החיבור של ChatGPT.",
   "error.provider.noneReady": "אין ספק סוכנים מוכן.",
   "error.provider.claudeTurnActive": "יש להמתין לפעולה הפעילה של Claude לפני רענון ההקשר שלו.",

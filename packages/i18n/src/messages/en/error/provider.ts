@@ -296,6 +296,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
   "error.provider.channelNoAnswer":
     "{provider} ended the turn with no answer. In the channel, click Continue to run the task again, or Reassign to give it to another member.",
+  "error.provider.acpProcessStopped": "{provider} stopped before it answered. Send the message again.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",

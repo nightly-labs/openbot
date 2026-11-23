@@ -266,6 +266,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} 已停止，没有给出回答。请重新发送消息。",
   "error.provider.channelNoAnswer":
     "{provider} 结束本轮对话时没有给出回答。请在频道中点击“继续”再次运行任务，或点击“重新分配”将它交给其他成员。",
+  "error.provider.acpProcessStopped": "{provider} 在回答前停止了。请重新发送消息。",
   "error.provider.chatgptPageFailed": "OpenBot 无法打开 ChatGPT 连接页面。",
   "error.provider.noneReady": "没有可用的助手服务商。",
   "error.provider.claudeTurnActive": "请等待当前 Claude 对话结束，再刷新其上下文。",

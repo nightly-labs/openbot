@@ -309,6 +309,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} parou sem resposta. Envie a mensagem novamente.",
   "error.provider.channelNoAnswer":
     "{provider} encerrou o turno sem resposta. No canal, clique em Continuar para executar a tarefa novamente, ou em Reatribuir para passá-la a outro membro.",
+  "error.provider.acpProcessStopped": "{provider} parou antes de responder. Envie a mensagem novamente.",
   "error.provider.chatgptPageFailed": "O OpenBot não conseguiu abrir a página de conexão do ChatGPT.",
   "error.provider.noneReady": "Nenhum provedor de agentes está pronto.",
   "error.provider.claudeTurnActive": "Aguarde o turno ativo do Claude terminar antes de atualizar seu contexto.",

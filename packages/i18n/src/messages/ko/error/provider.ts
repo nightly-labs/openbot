@@ -304,6 +304,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider}이(가) 답변 없이 멈췄어요. 메시지를 다시 보내 주세요.",
   "error.provider.channelNoAnswer":
     "{provider}이(가) 답변 없이 턴을 끝냈어요. 채널에서 '계속'을 눌러 작업을 다시 실행하거나, '다시 배정'을 눌러 다른 멤버에게 넘겨 주세요.",
+  "error.provider.acpProcessStopped": "{provider}이(가) 답변하기 전에 멈췄어요. 메시지를 다시 보내 주세요.",
   "error.provider.chatgptPageFailed": "OpenBot이 ChatGPT 연결 페이지를 열 수 없었어요.",
   "error.provider.noneReady": "준비된 에이전트 제공자가 없어요.",
   "error.provider.claudeTurnActive": "컨텍스트를 새로 고치기 전에 진행 중인 Claude 턴이 끝날 때까지 기다려 주세요.",

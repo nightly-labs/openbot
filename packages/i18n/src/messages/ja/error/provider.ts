@@ -316,6 +316,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} は回答せずに停止しました。メッセージをもう一度送信してください。",
   "error.provider.channelNoAnswer":
     "{provider} が回答なしでターンを終了しました。チャンネルで「続行」をクリックするとタスクをもう一度実行し、「再割り当て」をクリックすると別のメンバーに渡します。",
+  "error.provider.acpProcessStopped": "{provider} が回答する前に停止しました。メッセージをもう一度送信してください。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",

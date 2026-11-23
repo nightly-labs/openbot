@@ -307,6 +307,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
   "error.provider.channelNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Klik in het kanaal op Doorgaan om de taak opnieuw uit te voeren, of op Opnieuw toewijzen om hem aan een ander lid te geven.",
+  "error.provider.acpProcessStopped": "{provider} stopte voordat het antwoordde. Stuur het bericht opnieuw.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",
