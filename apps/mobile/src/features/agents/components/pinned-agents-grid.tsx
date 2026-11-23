@@ -205,7 +205,10 @@ const PinnedAgentItem = memo(function PinnedAgentItem({ agent }: { agent: Mobile
       <ChatDragArea drag={drag} fill>
         {isAndroid ? (
           <View className="w-full">
-            <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+            <Link
+              href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }}
+              asChild
+            >
               <Link.Trigger>{trigger}</Link.Trigger>
             </Link>
             {menuKey > 0 ? <AgentAndroidMenu key={menuKey} agent={agent} onClose={() => setMenuKey(0)} /> : null}

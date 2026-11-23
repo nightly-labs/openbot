@@ -21,17 +21,19 @@ export function AgentChatScreen() {
   const { t } = useText();
   const leaveChat = useLeaveChat();
 
-  const { agentId, messageId, focusAt } = useLocalSearchParams<{
+  const { agentId, serverId, messageId, focusAt } = useLocalSearchParams<{
     agentId: string;
+    serverId?: string;
     messageId?: string;
     focusAt?: string;
   }>();
   const foreground = useThemeColor("foreground");
   const insets = useSafeAreaInsets();
   const resolvedAgentId = firstParam(agentId);
+  const resolvedServerId = firstParam(serverId);
   const resolvedMessageId = firstParam(messageId);
   const agent = useMobileWorkspaceSelector(
-    (current) => current.agents.find((candidate) => candidate.id === resolvedAgentId),
+    (current) => findChatAgent(current.agents, resolvedAgentId, resolvedServerId, current.activeServer.id),
     sameChatAgent,
   );
   const openedAgentId = agent?.id;
@@ -76,6 +78,17 @@ export function AgentChatScreen() {
       </Pressable>
     </View>
   );
+}
+
+function findChatAgent(
+  agents: readonly MobileAgent[],
+  agentId: string | undefined,
+  serverId: string | undefined,
+  activeServerId: string,
+): MobileAgent | undefined {
+  const withId = agents.filter((agent) => agent.id === agentId);
+  if (serverId) return withId.find((agent) => agent.serverId === serverId);
+  return withId.find((agent) => agent.serverId === activeServerId) ?? withId[0];
 }
 
 function sameChatAgent(previous: MobileAgent | undefined, next: MobileAgent | undefined): boolean {
