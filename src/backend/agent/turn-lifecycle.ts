@@ -202,6 +202,7 @@ const POOL_PASS_OVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "usage_limit",
   "provider_unavailable",
   "authentication",
+  "model_not_found",
 ]);
 
 const COMPACTION_RETRY_CAUSES: ReadonlySet<CauseCode> = new Set(["network", "timeout"]);
@@ -1150,7 +1151,9 @@ export class TurnLifecycle {
   #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
     const resetDelayMs = providerResetDelayMs(failover.message);
     const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
-    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, failover.context.causeCode === "authentication");
+    const { causeCode, provider } = failover.context;
+    const notOffered = causeCode === "model_not_found" && provider === "claude";
+    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, causeCode === "authentication", notOffered);
   }
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {
