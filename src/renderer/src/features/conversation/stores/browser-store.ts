@@ -1,4 +1,4 @@
-import type { BrowserControlSession, BrowserPreview, BrowserTab, BrowserTeachStep } from "@openbot/contracts/ipc";
+import type { BrowserPreview, BrowserTab, BrowserTeachStep } from "@openbot/contracts/ipc";
 import { BROWSER_TEACH_CAPABILITY } from "@openbot/contracts/team-protocol/browser-teach-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
@@ -11,6 +11,11 @@ import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { actionToast } from "../../../action-toast";
 import { desktopAnalytics } from "../../../analytics";
+import {
+  newestBrowserControlSession,
+  ownsBrowserTab,
+  browserControlForTab as sharedBrowserControlForTab,
+} from "../../browser/browser-window-model";
 import { serverSupportsCapability } from "../../servers/server-capabilities";
 import { conversationPort } from "../conversation-port";
 import { conversationRuntime } from "../conversation-runtime";
@@ -48,6 +53,20 @@ function webHost(url: string | undefined): string | null {
   }
 }
 
+const LOOPBACK_HOST = /^(?:localhost|.+\.localhost|127(?:\.\d{1,3}){3}|\[::1\])$/iu;
+
+function returnsToBrowserComputer(redirect: string): boolean {
+  if (!URL.canParse(redirect)) return false;
+  const { protocol, hostname } = new URL(redirect);
+  return !/^https?:$/iu.test(protocol) || LOOPBACK_HOST.test(hostname);
+}
+
+function isLoopbackOAuthPage(url: string): boolean {
+  if (!URL.canParse(url)) return false;
+  const redirect = new URL(url).searchParams.get("redirect_uri");
+  return redirect !== null && returnsToBrowserComputer(redirect);
+}
+
 function canonicalBrowserUrl(url: string): string {
   try {
     return new URL(url).toString();
@@ -59,6 +78,7 @@ function canonicalBrowserUrl(url: string): string {
 interface BrowserPanels {
   activeRightPanel: () => RightPanelMode;
   setActiveRightPanel: (mode: RightPanelMode, agentId?: string) => void;
+  reattachBrowserWindow: () => void;
   closeBrowserPane: () => void;
 }
 
@@ -92,11 +112,9 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   const browserPipOpen = () => browserInteractionAvailable() && deps.panels.activeRightPanel() === "browser-pip";
   const screenOpen = () => browserSidebarOpen() || browserExpandedOpen() || browserPipOpen();
   const allBrowserTabs = createMemo(() => (deps.props.browserEnabled === false ? [] : deps.props.browserTabs));
-  const ownsTab = (agent: Pick<AgentProfile, "id" | "threadId">, tab: BrowserTab) =>
-    tab.ownerAgentId ? tab.ownerAgentId === agent.id : Boolean(agent.threadId && tab.ownerThreadId === agent.threadId);
   const tabsOwnedBy = (agent: Pick<AgentProfile, "id" | "threadId">) =>
-    allBrowserTabs().filter((tab) => ownsTab(agent, tab));
-  const browserTabOwner = (tab: BrowserTab) => deps.props.agents.find((agent) => ownsTab(agent, tab));
+    allBrowserTabs().filter((tab) => ownsBrowserTab(agent, tab));
+  const browserTabOwner = (tab: BrowserTab) => deps.props.agents.find((agent) => ownsBrowserTab(agent, tab));
   const channel = untrack(() => deps.props.channel);
   const viewId = () => deps.props.agent?.id ?? channel?.id ?? null;
   const viewOwner = () => ({ agentId: deps.props.agent?.id ?? null, threadId: deps.props.agent?.threadId ?? null });
@@ -301,29 +319,20 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     return browserTabOwner(tab) !== undefined && browserInteractionAvailable() && !closingBrowserTabIds.has(tab.id);
   };
 
-  createEffect(
-    () => {
-      const request = deps.takeoverPageRequest();
-      if (!request || request.agentId !== deps.props.agent?.id) return undefined;
-      return browserTabs().find((tab) => tab.id === request.tabId);
-    },
-    (tab) => {
-      if (!tab) return;
-      deps.setTakeoverPageRequest(null);
-      untrack(() => openBrowserTakeoverTab(tab));
-    },
-  );
-
   const [localSignIn, setLocalSignIn] = createSignal<LocalSignIn | null>(null);
-  const canSignInLocally = (tab: BrowserTab | undefined) =>
+  const canSendLocalSignIn = (tab: BrowserTab | undefined) =>
     !deps.props.runtime &&
     deps.props.server?.kind === "remote" &&
     serverSupportsCapability(deps.props.server, "browser-sign-in") &&
     webHost(tab?.url) !== null;
 
+  const canSignInLocally = (tab: BrowserTab | undefined) =>
+    canSendLocalSignIn(tab) && !isLoopbackOAuthPage(tab?.url ?? "");
+
   const canSignInTakeoverLocally = () => {
     const tab = browserTakeoverTab();
-    return tab !== undefined && browserTabs().some((entry) => entry.id === tab.id) && canSignInLocally(tab);
+    if (tab === undefined || !browserTabs().some((entry) => entry.id === tab.id)) return false;
+    return deps.props.browserTakeover?.reason === "sign-in-blocked" ? canSendLocalSignIn(tab) : canSignInLocally(tab);
   };
 
   const takeoverNeedsDesktopSignIn = () =>
@@ -335,6 +344,26 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       return undefined;
     return { server: deps.props.server?.name ?? "", signingIn: localSignIn()?.tabId === tab.id };
   }
+
+  createEffect(
+    () => {
+      const request = deps.takeoverPageRequest();
+      if (!request || request.agentId !== deps.props.agent?.id) return undefined;
+      const tab = browserTabs().find((entry) => entry.id === request.tabId);
+      if (!tab) return undefined;
+      const signInFromCard = deps.props.browserTakeover?.tabId === tab.id && blockedTakeoverSignIn() !== undefined;
+      return { tab, signInFromCard };
+    },
+    (target) => {
+      if (!target) return;
+      deps.setTakeoverPageRequest(null);
+      if (!target.signInFromCard) {
+        untrack(() => openBrowserTakeoverTab(target.tab));
+        return;
+      }
+      if (untrack(deps.panels.activeRightPanel) === "browser-expanded") deps.panels.setActiveRightPanel("browser");
+    },
+  );
 
   function updateLocalSignIn(tabId: string, change: Partial<LocalSignIn>) {
     setLocalSignIn((current) => (current?.tabId === tabId ? { ...current, ...change } : current));
@@ -414,16 +443,6 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
 
   const agentsByThreadId = createMemo(() => new Map(deps.props.agents.map((agent) => [agent.threadId, agent])));
 
-  const newestSession = (sessions: readonly BrowserControlSession[]) => {
-    let acting: BrowserControlSession | undefined;
-    let newest: BrowserControlSession | undefined;
-    for (const session of sessions) {
-      if (!newest || session.startedAt > newest.startedAt) newest = session;
-      if (session.phase === "acting" && (!acting || session.startedAt > acting.startedAt)) acting = session;
-    }
-    return acting ?? newest;
-  };
-
   const activeBrowserControl = createMemo(() => {
     if (deps.props.browserEnabled === false) return undefined;
     const sessions = deps.props.browserControlState.sessions;
@@ -435,7 +454,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       ? sessions.filter((session) => session.threadId === deps.props.agent?.threadId)
       : [];
     const candidates = forActiveTab.length > 0 ? forActiveTab : forActiveAgent;
-    return newestSession(candidates);
+    return newestBrowserControlSession(candidates);
   });
   const actingBrowserControl = createMemo(() => {
     const control = activeBrowserControl();
@@ -445,14 +464,8 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const control = activeBrowserControl();
     return control ? agentsByThreadId().get(control.threadId) : undefined;
   });
-  const browserControlForTab = (tab: BrowserTab) => {
-    const sessions = deps.props.browserControlState.sessions.filter(
-      (session) =>
-        session.tabId === tab.id ||
-        (session.tabId === null && tab.id === activeBrowserTab()?.id && session.threadId === tab.ownerThreadId),
-    );
-    return newestSession(sessions);
-  };
+  const browserControlForTab = (tab: BrowserTab) =>
+    sharedBrowserControlForTab(deps.props.browserControlState.sessions, tab, activeBrowserTab()?.id);
   const browserControllerForTab = (tab: BrowserTab) => {
     const control = browserControlForTab(tab);
     return control ? agentsByThreadId().get(control.threadId) : undefined;
@@ -730,7 +743,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (!canTeachBrowserTask() || teach()) return;
     const tab = activeBrowserTab() ?? (await openBrowserAddress(BROWSER_NEW_TAB_URL, true));
     if (!tab || closingBrowserTabIds.has(tab.id)) return;
-    deps.panels.setActiveRightPanel("browser-expanded");
+    deps.panels.reattachBrowserWindow();
     setTeach({ phase: "ready", pending: false });
   }
 

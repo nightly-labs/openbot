@@ -401,6 +401,9 @@ export const messages = {
   "mobile.agent.planCard.label": "הצגת התוכנית לפני משימות ארוכות",
   "mobile.agent.planCard.footer":
     "לפני משימה ארוכה הסוכן מציג את התוכנית שלו. היא מתחילה אחרי 10 שניות, או כשלוחצים על התחלה.",
+  "mobile.agent.builtinMemory.label": "הזיכרון של OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "הסוכן שומר וקורא את הזיכרונות שלו. כבו כדי להשתמש רק באפליקציית זיכרון, כמו Mem0. הזיכרונות השמורים נשארים.",
   "mobile.agent.workspace.title": "תיקיית סביבת עבודה",
   "mobile.agent.workspace.footer": "התיקייה של הסוכן הזה במחשב המארח.",
   "mobile.agent.advanced.behavior": "התנהגות",
@@ -614,7 +617,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "אין צ'אט פתוח",
   "mobile.agent.home.noChatOpenBody": "יש לבחור צ'אט ברשימה.",
   "mobile.agent.home.chatListWidth": "רוחב רשימת הצ'אטים",
-  "mobile.agent.home.serverTitle": "{name}, פתיחת שרתים",
   "mobile.agent.home.waiting": "ממתין לחיבור",
   "mobile.agent.home.waitingBody": "רשימת הסוכנים תיטען כשהשרת הזה יתחבר.",
   "mobile.agent.home.noAgents": "אין סוכנים בשרת הזה",

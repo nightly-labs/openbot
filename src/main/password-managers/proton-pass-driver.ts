@@ -39,6 +39,7 @@ const COMMAND_MS = 60_000;
 const SIGN_OUT_MS = 10_000;
 const SIGN_IN_MS = 11 * 60_000;
 const INDEX_MS = 10 * 60_000;
+const MISSED_ORIGIN_INDEX_MS = 30_000;
 const MAX_LOGINS = 500;
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 const PROTON_ID = /^[A-Za-z0-9_=-]{1,256}$/u;
@@ -311,6 +312,7 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
   #executable: string | null = null;
   #signedIn = false;
   #index: { readAt: number; logins: Map<string, IndexedLogin> } | null = null;
+  #missedOriginReadAt = Number.NEGATIVE_INFINITY;
   #error: string | null = null;
   #errorCode: PasswordManagerErrorCode | null = null;
 
@@ -445,10 +447,29 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
     origin: string,
   ): Effect.fn.Return<VaultLogin[] | null, PasswordVaultError> {
     if (!this.connected()) return null;
-    const logins = yield* this.#logins().pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause })));
-    return [...logins.entries()]
-      .filter(([, login]) => matchesOrigin(login, origin))
-      .map(([id, login]) => ({ id, title: login.title, username: login.username, hasOneTimePassword: login.hasTotp }));
+    const matching = (maxAge: number) =>
+      this.#logins(maxAge).pipe(
+        Effect.map((logins) =>
+          [...logins.entries()]
+            .filter(([, login]) => matchesOrigin(login, origin))
+            .map(([id, login]) => ({
+              id,
+              title: login.title,
+              username: login.username,
+              hasOneTimePassword: login.hasTotp,
+            })),
+        ),
+        Effect.mapError(({ cause }) => new PasswordVaultError({ cause })),
+      );
+    const found = yield* matching(INDEX_MS);
+    if (found.length > 0 || this.#now() - this.#missedOriginReadAt < MISSED_ORIGIN_INDEX_MS) return found;
+    this.#missedOriginReadAt = this.#now();
+    return yield* matching(MISSED_ORIGIN_INDEX_MS).pipe(
+      Effect.tapError(({ cause }) =>
+        Effect.sync(() => logger.warn("The Proton Pass logins could not be read again.", { cause: toLogValue(cause) })),
+      ),
+      Effect.orElseSucceed(() => found),
+    );
   }).bind(this);
 
   readonly secretFor = Effect.fn("ProtonPass.secretFor")(function* (
@@ -475,7 +496,7 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
           : this.#agentCall(["item", "view", `${item}/totp?totp=code`]).pipe(Effect.map((output) => output.trim())),
       );
       if (Result.isSuccess(read)) return read.success;
-      if ((yield* this.#logins(true)).has(id)) return yield* read.failure;
+      if ((yield* this.#logins(0)).has(id)) return yield* read.failure;
       return null;
     }).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause })));
     if (!value) return null;
@@ -738,11 +759,11 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
     );
   }
 
-  #logins(refresh = false): Effect.Effect<Map<string, IndexedLogin>, PasswordManagerError> {
+  #logins(maxAge = INDEX_MS): Effect.Effect<Map<string, IndexedLogin>, PasswordManagerError> {
     return this.#indexing.withPermit(
       Effect.gen({ self: this }, function* () {
         const current = this.#index;
-        if (!refresh && current && this.#now() - current.readAt < INDEX_MS) return current.logins;
+        if (current && this.#now() - current.readAt < maxAge) return current.logins;
         const vaultOutput = yield* this.#agentCall(["vault", "list", "--output", "json"]);
         const shareIds = yield* Effect.try({
           try: () => vaultShareIds(vaultOutput),

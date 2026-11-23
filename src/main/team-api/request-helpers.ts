@@ -42,6 +42,7 @@ import {
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-quiet-answers-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
@@ -322,6 +323,7 @@ export async function readJson(request: IncomingMessage): Promise<DynamicRecord>
         channelIsolation: capabilities.has(CHANNEL_ISOLATION_CAPABILITY),
         channelPicture: capabilities.has(CHANNEL_PICTURE_CAPABILITY),
         channelBrowser: capabilities.has(CHANNEL_BROWSER_CAPABILITY),
+        providerManyAccounts: capabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY),
       });
       if (!isDynamicRecord(input)) throw new Error("Invalid side-protocol request.");
       return input;

@@ -147,6 +147,7 @@ export interface LiveVoiceHooks {
   summarize(agentId: string, prompt: string): Effect.Effect<string, { readonly cause: unknown }>;
   emit(event: VoiceLiveEvent, memberId: string | null): void;
   redact(text: string): string;
+  otherAccounts(agentId: string): boolean;
 }
 
 interface LiveSession {
@@ -300,7 +301,7 @@ export class LiveVoice {
         .pipe(toLiveVoiceFailed);
       return answer;
     }).pipe(
-      Effect.mapError((failure) => this.#startFailure(failure)),
+      Effect.mapError((failure) => this.#startFailure(failure, session.agentId)),
       Effect.onError(() => Effect.sync(() => this.#end(session, null, false))),
     );
     return { sessionId: session.id, sdp } satisfies VoiceLiveSession;
@@ -343,12 +344,12 @@ export class LiveVoice {
         return;
       }
       case "thread/realtime/error": {
-        this.#end(session, this.#reason(getString(params, "message")));
+        this.#end(session, this.#reason(getString(params, "message"), session.agentId));
         return;
       }
       case "thread/realtime/closed": {
         const reason = getString(params, "reason");
-        this.#end(session, reason ? this.#reason(reason) : null);
+        this.#end(session, reason ? this.#reason(reason, session.agentId) : null);
         return;
       }
       case "thread/realtime/transcript/delta":
@@ -474,22 +475,25 @@ export class LiveVoice {
     fiber.addObserver(() => session.speaking.delete(fiber));
   }
 
-  #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
+  #startFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
     const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
-    const text = this.#plainText(message);
+    const text = this.#plainText(message, agentId);
     return text ? liveFailure(text) : failure;
   }
 
-  #reason(message: string | null): string {
+  #reason(message: string | null, agentId: string): string {
     if (!message) return sourceText("error.voice.live.disconnected");
     return (
-      this.#plainText(message) ??
+      this.#plainText(message, agentId) ??
       sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) })
     );
   }
 
-  #plainText(message: string): string | null {
-    if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
+  #plainText(message: string, agentId: string): string | null {
+    if (UNAUTHORIZED.test(message))
+      return sourceText(
+        this.#hooks.otherAccounts(agentId) ? "error.voice.live.chooseAccount" : "error.voice.live.signIn",
+      );
     const key = CALL_NOT_FOUND.test(message)
       ? "error.voice.live.unavailable"
       : FORBIDDEN.test(message)

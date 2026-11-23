@@ -82,6 +82,7 @@ export interface ConversationChannelSource {
   ownMessage: (message: AgentMessage) => boolean;
   workers: () => ChannelWorker[];
   memberThreadIds: () => ReadonlySet<string>;
+  memberAgentIds: () => ReadonlySet<string>;
   browserOwner: () => { agentId: string; threadId: string } | null;
   workingTurns: () => readonly string[];
   interactionAgentName: () => string | undefined;
@@ -221,6 +222,7 @@ export interface ConversationProps {
   agentAutoApproves?: boolean | undefined;
   remoteBackupModelsLoaded?: boolean | undefined;
   remotePlanCardLoaded?: boolean | undefined;
+  remoteBuiltinMemoryLoaded?: boolean | undefined;
   remoteComputerUseLoaded?: boolean | undefined;
   remoteNewChatLoaded?: boolean | undefined;
   remoteBusyMessageModeLoaded?: boolean | undefined;
@@ -232,7 +234,7 @@ export interface ConversationProps {
   onDeleteAgentHistory?: (() => Promise<void>) | undefined;
   onCompactAgentContext?: (() => Promise<void>) | undefined;
   onRespondToBrowserTakeover: (decision: "complete" | "cancel", options?: PromptAnswerOptions) => Promise<boolean>;
-  onCancelQueuedMessage: (deliveryId: string) => void;
+  onCancelQueuedMessage: (deliveryId: string, recipientAgentId?: string) => void;
   onCancelWait?: ((waitId: string) => void) | undefined;
   onSteerQueuedMessage: (deliveryId: string) => void;
   onSendQueuedMessageNow?: ((deliveryId: string) => void) | undefined;

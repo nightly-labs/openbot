@@ -40,7 +40,7 @@ const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 
 const INSTANCE_ID = developmentInstanceIdForWorktree(`${PROJECT_ROOT}#bench`);
 
-const BENCH_AGENT_MODEL = { provider: "claude", model: "claude-sonnet-5", reasoningEffort: "low" } as const;
+const BENCH_AGENT_MODEL = { provider: "claude", model: "claude-opus-5-5", reasoningEffort: "low" } as const;
 
 const CPU_PROFILE_MS = 15 * SECOND;
 const TRACE_MS = 5 * SECOND;

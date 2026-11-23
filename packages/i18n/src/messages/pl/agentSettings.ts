@@ -200,6 +200,7 @@ export const messages = {
     "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "agentSettings.newChat.confirm": "Rozpocznij nowy czat",
   "agentSettings.newChat.failed": "Nie udało się rozpocząć nowego czatu.",
+  "agentSettings.newChat.busy": "Agent pracuje. Aby rozpocząć nowy czat, poczekaj, aż skończy, albo go zatrzymaj.",
   "agentSettings.deleteHistory.title": "Usuń historię",
   "agentSettings.deleteHistory.description":
     "Wiadomości tego czatu znikają, a agent o nich zapomina. Jego konfiguracja zostaje.",
@@ -267,6 +268,9 @@ export const messages = {
     "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "agentSettings.quickAcknowledgement.title": "Pokaż plan przed długimi zadaniami",
   "agentSettings.quickAcknowledgement.description": "Przed długim zadaniem agent pokazuje swój plan.",
+  "agentSettings.builtinMemory.title": "Pamięć OpenBot",
+  "agentSettings.builtinMemory.description":
+    "Agent zapisuje i czyta własne wspomnienia. Wyłącz, aby używać tylko aplikacji pamięci, takiej jak Mem0. Zapisane wspomnienia zostają.",
   "agentSettings.browserProfile.label": "Profil przeglądarki",
   "agentSettings.browserProfile.shared": "Wspólny",
   "agentSettings.browserProfile.agent": "Tylko ten agent",

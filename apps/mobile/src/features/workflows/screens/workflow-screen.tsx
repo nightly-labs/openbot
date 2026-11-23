@@ -48,6 +48,7 @@ export function WorkflowScreen() {
     workflowId,
   );
   const { deleteWorkflow } = useMobileWorkspaceActions();
+  const canPause = useMobileWorkspaceSelector((current) => current.canPauseWorkflows(serverId));
   const commands = useWorkflowCommands(serverId);
   const [starting, setStarting] = useState(false);
   const { theme } = useUniwind();
@@ -111,17 +112,26 @@ export function WorkflowScreen() {
     ]);
   };
 
+  const paused = workflow?.summary.paused === true;
+  const pauseMenuActions = (): MenuAction[] => {
+    if (!workflow || !canPause) return [];
+    return paused
+      ? [{ id: "resume", title: t("mobile.workflow.action.resume"), image: "play" }]
+      : [{ id: "pause", title: t("mobile.workflow.action.pause"), image: "pause" }];
+  };
   const pinLabel = pinned ? t("mobile.workflow.action.unpin") : t("mobile.workflow.action.pin");
   const menuActions: MenuAction[] = [
     ...(workflow?.needsNewerApp
       ? []
       : [{ id: "edit", title: t("mobile.workflow.action.edit"), image: "pencil" } satisfies MenuAction]),
     { id: "pin", title: pinLabel, image: pinned ? "pin.slash" : "pin" },
+    ...pauseMenuActions(),
     ...viewMenuActions(view, t),
   ];
   const onMenu = (id: string) => {
     if (id === "edit") commands.edit(workflowId);
     else if (id === "pin") commands.togglePin(workflowId);
+    else if (id === "pause" || id === "resume") void commands.setPaused(workflowId, id === "pause");
     else if (id === "view-flow" || id === "view-list") {
       void haptics.selection();
       setView(id === "view-flow" ? "flow" : "list");

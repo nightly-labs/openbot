@@ -419,6 +419,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Uzun görevlerden önce planı göster",
   "mobile.agent.planCard.footer":
     "Uzun bir görevden önce ajan planını gösterir. 10 sn sonra veya Başlat'a bastığınızda başlar.",
+  "mobile.agent.builtinMemory.label": "OpenBot belleği",
+  "mobile.agent.builtinMemory.footer":
+    "Ajan kendi belleklerini kaydeder ve okur. Yalnızca Mem0 gibi bir bellek uygulaması kullanmak için kapatın. Kayıtlı bellekler kalır.",
   "mobile.agent.workspace.title": "Çalışma alanı klasörü",
   "mobile.agent.workspace.footer": "Bu ajanın ana makinedeki klasörü.",
   "mobile.agent.advanced.behavior": "Davranış",
@@ -628,7 +631,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Açık sohbet yok",
   "mobile.agent.home.noChatOpenBody": "Listeden bir sohbet seçin.",
   "mobile.agent.home.chatListWidth": "Sohbet listesi genişliği",
-  "mobile.agent.home.serverTitle": "{name}, sunucuları aç",
   "mobile.agent.home.waiting": "Bağlantı bekleniyor",
   "mobile.agent.home.waitingBody": "Ajan listesi bu sunucu bağlandığında yüklenecektir.",
   "mobile.agent.home.noAgents": "Bu sunucuda ajan yok",

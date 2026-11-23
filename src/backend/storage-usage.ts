@@ -28,6 +28,7 @@ import {
 import type { MailboxStore, MailboxStoredFile } from "./mailbox-store";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
 import type { UserFilesBytes } from "./user-files-bytes";
+import type { WorkflowFileOwner } from "./workflows/workflow-file-owners";
 
 interface StorageRoots {
   database: string;
@@ -53,6 +54,7 @@ export interface StorageUsageSources {
   agents: () => readonly StorageAgent[];
   channelFiles?: (channelId: string) => readonly StorageChannelFile[] | null;
   userFiles?: Pick<UserFilesBytes, "read" | "forget" | "dispose">;
+  workflowFiles?: () => ReadonlyMap<string, WorkflowFileOwner>;
 }
 
 export interface StorageChannelFile {
@@ -226,8 +228,12 @@ export class StorageUsageScanner {
       ),
       STORAGE_LIMITS.conversations,
     );
+    const workflowFiles =
+      input.scope === "host" && this.#sources.workflowFiles
+        ? yield* storedSync(this.#sources.workflowFiles)
+        : new Map<string, WorkflowFileOwner>();
     const fileRows = largestFirst(
-      files.map((file) => ({ bytes: file.bytes, row: this.#fileRow(file, threadById, scannedAt) })),
+      files.map((file) => ({ bytes: file.bytes, row: this.#fileRow(file, threadById, workflowFiles, scannedAt) })),
       STORAGE_LIMITS.files,
     );
     truncated ||= conversations.cut || fileRows.cut;
@@ -370,10 +376,16 @@ export class StorageUsageScanner {
     return measured;
   });
 
-  #fileRow(file: MeasuredFile, threadById: ReadonlyMap<string, StorageThread>, scannedAt: string): StoredFileRow {
+  #fileRow(
+    file: MeasuredFile,
+    threadById: ReadonlyMap<string, StorageThread>,
+    workflowFiles: ReadonlyMap<string, WorkflowFileOwner>,
+    scannedAt: string,
+  ): StoredFileRow {
     const thread = file.placement ? threadById.get(file.placement.threadId) : undefined;
     const conversationId = wireId(thread?.threadId);
     const messageId = conversationId ? wireId(file.placement?.messageId) : wireId(file.channelMessageId);
+    const owner = file.stored.source === "generated" ? workflowFiles.get(file.stored.attachment.id) : undefined;
     return {
       ...file.stored.attachment,
       source: file.stored.source,
@@ -381,9 +393,10 @@ export class StorageUsageScanner {
       conversation:
         thread && conversationId ? { id: conversationId, title: thread.title.slice(0, STORAGE_LIMITS.title) } : null,
       messageId,
-      createdAt: file.stored.createdAt ?? file.placement?.createdAt ?? file.modifiedAt ?? scannedAt,
+      createdAt: file.stored.createdAt ?? file.placement?.createdAt ?? owner?.createdAt ?? file.modifiedAt ?? scannedAt,
       status: file.status,
       deletable: true,
+      ...(owner ? { workflow: owner.workflow } : {}),
     };
   }
 

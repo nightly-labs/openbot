@@ -60,6 +60,8 @@ export const messages = {
   "browser.pip.close": "Закрыть окно браузера",
   "browser.pip.reattachFailed": "OpenBot не удалось вернуть браузер в боковую панель.",
   "browser.pip.closeFailed": "OpenBot не удалось закрыть окно браузера.",
+  "browser.window.open": "Открыть браузер в новом окне",
+  "browser.window.openFailed": "OpenBot не удалось открыть окно браузера.",
   "browser.popupBlocked.title": "Всплывающее окно заблокировано",
   "browser.popupBlocked.dismiss": "Скрыть сообщение о всплывающем окне",
   "browser.liveView.label": "Страница на сервере в реальном времени",
@@ -95,6 +97,7 @@ export const messages = {
   "browser.secret.submitting": "Отправка…",
   "browser.secret.takeOver": "Взять управление",
   "browser.secret.failed": "Не удалось выполнить запрос. Проверьте соединение и повторите попытку.",
+  "browser.secret.ended": "Этот запрос на вход завершён. Попросите агента повторить попытку.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot не использовал ваши сохранённые учётные данные, потому что агент запустил скрипт на этой странице. Чтобы их использовать, попросите агента перезагрузить страницу и попробовать снова.",
   "browser.secret.vaultSkip.fieldKind":

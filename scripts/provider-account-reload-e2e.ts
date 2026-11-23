@@ -59,7 +59,13 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       result = { account: value.email === null ? null : { type: "chatgpt", email: value.email } };
       break;
     }
-    case "account/rateLimits/read": result = { rateLimits: null, rateLimitsByLimitId: null }; break;
+    case "account/rateLimits/read":
+      if (fs.existsSync(path.join(folder, "usage-refused"))) {
+        fs.writeFileSync(path.join(folder, "usage-read"), "");
+        return write({ id: message.id, error: { code: -32603, message: "Usage service refused the read" } });
+      }
+      result = { rateLimits: null, rateLimitsByLimitId: null };
+      break;
     case "model/list": result = { data: [{ model: "gpt-5.5", displayName: "GPT-5.5" }] }; break;
     case "plugin/list": result = { marketplaces: [] }; break;
     case "config/read": result = { config: { mcp_servers: {} }, layers: [] }; break;
@@ -83,6 +89,8 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
   const agents = new AgentStore(join(root, "profile"), join(root, "home"), database);
   const accountsPath = join(root, "accounts.json");
   const accountsRoot = join(root, "accounts");
+  let claudeUsageRefused = false;
+  let claudeUsageReads = 0;
 
   function createRuntime(accounts: ProviderAccountStore): ProviderRuntime {
     return new ProviderRuntime({
@@ -137,6 +145,11 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
             setModel: async () => undefined,
             applyFlagSettings: async () => undefined,
             close: () => undefined,
+            usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET: async () => {
+              if (!claudeUsageRefused) return { rate_limits_available: false };
+              claudeUsageReads += 1;
+              return { rate_limits_available: true };
+            },
           }),
           undefined,
           5_000,
@@ -301,6 +314,23 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       assert.equal(row()?.state, "signed-out");
     }
     results.push({ name: "a turn that finds no login marks the account signed out", passed: true });
+    await stop(runtime);
+    runtime = undefined;
+
+    const refusedUsage = new ProviderAccountStore(accountsPath, accountsRoot);
+    await runCauseEffect(refusedUsage.load());
+    const codexSecondary = refusedUsage.list("codex")[0];
+    assert.ok(codexSecondary);
+    await writeFile(join(refusedUsage.home(codexSecondary), "usage-refused"), "");
+    claudeUsageRefused = true;
+    runtime = createRuntime(refusedUsage);
+    await runCauseEffect(runtime.start());
+    await waitForAccounts(runtime, "connected");
+    assert.ok(claudeUsageReads > 0, "the Claude account check read the usage");
+    await readFile(join(refusedUsage.home(codexSecondary), "usage-read"));
+    claudeUsageRefused = false;
+    await rm(join(refusedUsage.home(codexSecondary), "usage-refused"));
+    results.push({ name: "a background check whose usage read fails keeps the account connected", passed: true });
     await stop(runtime);
     runtime = undefined;
 

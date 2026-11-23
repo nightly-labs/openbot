@@ -386,6 +386,9 @@ export const messages = {
   "mobile.agent.browserProfile.saveFailed": "OpenBot 无法更改助手的浏览器配置文件。",
   "mobile.agent.planCard.label": "长任务开始前显示计划",
   "mobile.agent.planCard.footer": "长任务开始前，助手会先显示计划。10 秒后或你点按“开始”时，任务开始。",
+  "mobile.agent.builtinMemory.label": "OpenBot 记忆",
+  "mobile.agent.builtinMemory.footer":
+    "助手会保存并读取自己的记忆。关闭后只使用记忆应用，例如 Mem0。已保存的记忆会保留。",
   "mobile.agent.workspace.title": "工作区文件夹",
   "mobile.agent.workspace.footer": "该助手在主机电脑上的文件夹。",
   "mobile.agent.advanced.behavior": "行为",
@@ -582,7 +585,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "未打开聊天",
   "mobile.agent.home.noChatOpenBody": "请在列表中选择一个聊天。",
   "mobile.agent.home.chatListWidth": "聊天列表宽度",
-  "mobile.agent.home.serverTitle": "{name}，打开服务器列表",
   "mobile.agent.home.waiting": "等待连接",
   "mobile.agent.home.waitingBody": "该服务器连接成功后就会加载助手列表。",
   "mobile.agent.home.noAgents": "该服务器上没有助手",

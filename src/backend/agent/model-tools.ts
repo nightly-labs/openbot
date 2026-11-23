@@ -12,6 +12,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   AGENT_PROVIDERS,
+  composedCustomModelId,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   defaultProviderModel,
   sameAgentModelChoice,
@@ -43,6 +44,7 @@ interface ProviderModels {
   defaultModel: string;
   models: ToolModel[];
   omittedModels?: number;
+  turnedOffModels?: TurnedOffModels;
   accounts?: (Pick<ProviderAccountStatus, "id" | "label" | "state"> & { models?: ToolModel[] })[];
   noMatchReason?: string;
 }
@@ -129,6 +131,22 @@ export interface ListModelsRequest {
   query?: string | undefined;
   inUse?: readonly Pick<AgentModelChoice, "provider" | "model">[];
   customEndpoints?: readonly ListedCustomEndpoint[];
+  hiddenModels?: (provider: AgentProvider) => ReadonlySet<string> | undefined;
+}
+
+interface TurnedOffModels {
+  models: string[];
+  omittedModels?: number;
+  reason: string;
+}
+
+function turnedOffModels(provider: AgentProvider, off: readonly AgentModelOption[]): TurnedOffModels {
+  const listed = off.slice(0, SHORT_LIST_LENGTH).map((model) => model.id);
+  return {
+    models: listed,
+    ...(off.length > listed.length ? { omittedModels: off.length - listed.length } : {}),
+    reason: `These models are turned off, so the model picker does not show them. An admin turns them on in ${FIX_IN} > ${providerLabel(provider)} > Models.`,
+  };
 }
 
 export interface ListedCustomEndpoint {
@@ -146,6 +164,7 @@ interface CustomEndpointModels {
   provider: CustomProviderHarness;
   models: string[];
   omittedModels?: number;
+  turnedOffModels?: TurnedOffModels;
   message?: string;
 }
 
@@ -154,28 +173,32 @@ function customEndpointModels(
   models: readonly AgentModelOption[],
   statuses: readonly ProviderStatusRow[],
   words: readonly string[],
+  turnedOff: (model: AgentModelOption) => boolean,
 ): CustomEndpointModels[] {
   return endpoints.flatMap((endpoint) => {
     const runner = providerLabel(endpoint.provider);
     const canRun = providerCanRun(endpoint.provider, statuses);
-    const own = canRun
+    const all = canRun
       ? models.filter((model) => model.provider === endpoint.provider && model.id.startsWith(`${endpoint.id}/`))
       : [];
+    const own = all.filter((model) => !turnedOff(model));
+    const off = all.filter((model) => turnedOff(model) && (words.length === 0 || matchesQuery(model, words)));
     const matching = words.length > 0 ? own.filter((model) => matchesQuery(model, words)) : own;
     const listed = matching.slice(0, SHORT_LIST_LENGTH).map((model) => model.id);
     let message: string | undefined;
     if (!canRun) message = `${runner} runs this endpoint and cannot run now. The user fixes it in ${FIX_IN}.`;
     else if (endpoint.loading)
       message = `${runner} reads the last change of this endpoint after its current task stops.`;
-    else if (own.length === 0)
+    else if (all.length === 0)
       message = `${runner} lists no model of this endpoint. The user checks it in ${CUSTOM_PROVIDER_SETTINGS}.`;
-    if (listed.length === 0 && message === undefined) return [];
+    if (listed.length === 0 && message === undefined && off.length === 0) return [];
     return {
       id: endpoint.id,
       name: endpoint.name,
       provider: endpoint.provider,
       models: listed,
       ...(matching.length > listed.length ? { omittedModels: matching.length - listed.length } : {}),
+      ...(off.length > 0 ? { turnedOffModels: turnedOffModels(endpoint.provider, off) } : {}),
       ...(message === undefined ? {} : { message }),
     };
   });
@@ -215,28 +238,36 @@ export function listModelsPayload(
 } {
   const words = request.query?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
   let resultRoom = QUERY_RESULT_LIMIT;
+  const inUseKeys = new Set((request.inUse ?? []).map((choice) => `${choice.provider}\u0000${choice.model}`));
+  const turnedOff = (model: AgentModelOption) =>
+    request.hiddenModels?.(model.provider)?.has(model.id) === true &&
+    !inUseKeys.has(`${model.provider}\u0000${model.id}`);
   const providers = AGENT_PROVIDERS.filter((id) => request.provider === undefined || id === request.provider).flatMap(
     (id) => {
       const fallback = providerDefault(id, models);
       if (!fallback || !providerCanRun(id, statuses)) return [];
-      const own = models.filter((model) => model.provider === id);
+      const inUse = (request.inUse ?? []).filter((choice) => choice.provider === id).map((choice) => choice.model);
+      const own = models.filter((model) => model.provider === id && !turnedOff(model));
       const candidates = words.length > 0 ? own.filter((model) => matchesQuery(model, words)) : own;
       let listed: AgentModelOption[];
       if (words.length > 0) {
         listed = candidates.slice(0, resultRoom);
         resultRoom -= listed.length;
       } else {
-        const inUse = (request.inUse ?? []).filter((choice) => choice.provider === id).map((choice) => choice.model);
         listed = shortList(own, new Set([fallback.id, ...inUse]));
       }
       const omitted = candidates.length - listed.length;
       const rows = accounts(id);
+      const off = models.filter(
+        (model) => model.provider === id && turnedOff(model) && (words.length === 0 || matchesQuery(model, words)),
+      );
       return [
         {
           provider: id,
           defaultModel: fallback.id,
           models: listed.map(toolModel),
           ...(omitted > 0 ? { omittedModels: omitted } : {}),
+          ...(off.length > 0 ? { turnedOffModels: turnedOffModels(id, off) } : {}),
           ...(id === "openrouter" && words.length > 0 && candidates.length === 0
             ? { noMatchReason: OPENROUTER_NO_MATCH_REASON }
             : {}),
@@ -285,6 +316,7 @@ export function listModelsPayload(
     models,
     statuses,
     words,
+    turnedOff,
   );
   return {
     preferredProvider,
@@ -367,9 +399,13 @@ export function requestedToolModel(request: ModelRequest, models: AgentModelOpti
   let chosen: AgentModelOption | null = null;
   if (model !== undefined) {
     const own = (candidate: AgentModelOption) => provider === undefined || candidate.provider === provider;
+    const separator = model.indexOf("/");
+    const escaped =
+      separator > 0 ? composedCustomModelId(model.slice(0, separator), model.slice(separator + 1)) : model;
     chosen =
       models.find((candidate) => candidate.id === model && own(candidate)) ??
       models.find((candidate) => isEncodedModelOf(candidate.id, model) && own(candidate)) ??
+      models.find((candidate) => candidate.id === escaped && own(candidate)) ??
       null;
     if (!chosen && models.length === 0) throw new AgentSettingsRefused(sourceText("error.agent.modelUnavailable"));
     if (!chosen) {

@@ -20,6 +20,8 @@ export const messages = {
   "server.connection.loadingHint": "Du kannst einen anderen Server auswählen, während dieser geladen wird.",
   "server.connection.cachedHint":
     "Geladene Inhalte und Entwürfe bleiben erhalten. Serveraktionen werden nach dem erneuten Verbinden fortgesetzt.",
+  "server.connection.computerOffline":
+    "{name} ist offline. Prüfe, ob sein Computer eingeschaltet und OpenBot geöffnet ist und Server veröffentlichen unter Servereinstellungen > Mitglieder aktiviert ist.",
   "server.connection.conversationFailed": "Die Unterhaltung konnte nicht geladen werden. Versuche es erneut.",
   "server.connection.panelsFailed":
     "Einige Bereiche des Arbeitsbereichs konnten nicht geladen werden. Versuche es erneut.",
@@ -239,7 +241,7 @@ export const messages = {
   "server.plan.deletedOn": "Löschung am {date}",
   "server.plan.dialogTitle": "Lass deine Agenten nicht gehen",
   "server.plan.dialogDescription":
-    "{name} wurde gestoppt, weil der Tarif nicht bezahlt wurde. Am {date} löscht OpenBot die Agenten mit allen Chats und Dateien.",
+    "{name} wurde gestoppt, weil der Tarif beendet ist. Am {date} löscht OpenBot die Agenten mit allen Chats und Dateien.",
   "server.plan.dialogDaysLeft": {
     one: "Noch {count} Tag",
     other: "Noch {count} Tage",
@@ -248,6 +250,24 @@ export const messages = {
   "server.plan.keepAgents": "Agenten behalten",
   "server.plan.ownerRenews":
     "Die Agenten von {name} sind erst wieder verfügbar, wenn der Serverbesitzer den Tarif verlängert.",
+  "server.paywall.ready": "{name} ist bereit",
+  "server.paywall.wakeUp": "Deine Agenten wachen auf, wenn du abonnierst.",
+  "server.paywall.yourPlan": "Dein Tarif",
+  "server.paywall.vcpu": "{value} vCPU",
+  "server.paywall.memory": "{value} GB Arbeitsspeicher",
+  "server.paywall.storage": "{value} GB Speicherplatz",
+  "server.paywall.support": "Persönlicher Support",
+  "server.paywall.perYear": "pro Jahr",
+  "server.paywall.subscribe": "Abonnieren",
+  "server.paywall.checkoutFailed": "Checkout wurde nicht geöffnet",
+  "server.paywall.checkoutTitle": "Schließe die Zahlung im Browser ab",
+  "server.paywall.checkoutDescription": "Deine Agenten machen sich bereit.",
+  "server.paywall.openCheckoutAgain": "Checkout erneut öffnen",
+  "server.paywall.active": "{name} ist aktiv",
+  "server.paywall.activeDescription": "Danke. Deine Agenten sind wach.",
+  "server.paywall.open": "{name} öffnen",
+  "server.paywall.almostReady": "{name} ist fast bereit",
+  "server.paywall.ownerSubscribes": "Der Inhaber von {name} muss abonnieren, bevor deine Agenten starten können.",
   "server.select.failedTitle": "Server konnte nicht ausgewählt werden",
   "server.select.failedDescription": "Der Server konnte nicht gewechselt werden. Versuche es erneut.",
   "server.select.openAgentFailed": "{name} konnte nicht geöffnet werden. Suche ihn in der Seitenleiste.",
@@ -378,6 +398,12 @@ export const messages = {
     "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt. Auf einem Server verwendet auch der Browser sie nach dem nächsten Neustart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
+  "server.settings.voiceModel.section": "Spracherkennung",
+  "server.settings.voiceModel.description":
+    "Agenten auf diesem Server verwenden dieses Modell, um den Ton von Videos ohne Untertitel zu transkribieren.",
+  "server.settings.voiceModel.loadFailed": "Das Spracherkennungsmodell des Servers konnte nicht geladen werden.",
+  "server.settings.voiceModel.group": "Auf diesem Server",
+  "server.settings.voiceModel.removeLabel": "{name} von diesem Server entfernen",
   "server.settings.turnLimit": "Threads gleichzeitig",
   "server.settings.turnLimitDescription":
     "Wie viele Agent-Threads auf diesem Server gleichzeitig laufen können. Mehr Threads brauchen mehr Arbeitsspeicher.",
@@ -541,6 +567,7 @@ export const messages = {
     "Es gibt kein separates Passwort für den Remotedesktop. Die Einstellungen unten legen fest, wer diesen Computer steuern darf.",
   "server.desktop.componentInstalled": "Host-Komponente installiert",
   "server.desktop.componentNotInstalled": "Host-Komponente nicht installiert",
+  "server.desktop.needsX11Session": "X11-Sitzung nötig",
   "server.desktop.sessions": "Unbeaufsichtigt: {unattended} · Aktive Sitzungen: {active}/{max}",
   "server.desktop.unattendedEnabled": "aktiviert",
   "server.desktop.unattendedUnavailable": "nicht verfügbar",
@@ -624,7 +651,7 @@ export const messages = {
   "server.update.waitingFor": "Warten auf {reasons}.",
   "server.update.disabledTitle": "Remote-Updates sind deaktiviert",
   "server.update.disabledDescription":
-    "Der Benutzer von {name} hat Updates durch Servermitglieder deaktiviert. Bitte ihn, OpenBot zu aktualisieren oder die Einstellung zu aktivieren.",
+    "Der Benutzer von {name} hat Updates durch Servermitglieder deaktiviert. Bitte ihn, OpenBot zu aktualisieren oder auf seinem Computer Einstellungen > Updates zu öffnen und „Updates durch Servermitglieder erlauben“ zu aktivieren.",
   "server.update.managedTitle": "Ein Host Manager steuert Updates",
   "server.update.managedDescription": "OpenBot Host Manager aktualisiert {name}. Kontaktiere den Host-Administrator.",
   "server.update.unsupportedTitle": "{name} kann sich nicht selbst aktualisieren",

@@ -20,6 +20,7 @@ export const messages = {
   "account.usage.notReported": "보고된 한도 없음",
   "account.usage.value.notReported": "보고되지 않음",
   "account.usage.providerNotReported": "사용량 정보 없음",
+  "account.usage.readFailed": "사용량을 읽지 못함",
   "account.usage.row.unavailable": "{name}, 사용할 수 없음",
   "account.usage.row.notReported": "{name}, 사용량 보고되지 않음",
   "account.usage.row.loading": "{name}, 불러오는 중",

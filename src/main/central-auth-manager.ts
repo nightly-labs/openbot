@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { companySignInErrorKey } from "@openbot/contracts/company-sign-in";
+import { CREDIT_MEDIA_HOST_HEADER, CREDIT_MEDIA_HOST_TOKEN_HEADER } from "@openbot/contracts/credit-media";
 import type { HostKeyHandover } from "@openbot/contracts/host-key-handover";
 import { parseHostedServerClaim } from "@openbot/contracts/hosted-servers";
 import type {
@@ -653,6 +654,51 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     const machineToken = this.#teamHostTokens.get(hostId.toLowerCase());
     return machineToken ? { hostId, machineToken } : null;
   }
+
+  #hostHeaders(hostId: string, init: HeadersInit | undefined) {
+    return this.#hostMachineToken(hostId).pipe(
+      Effect.map((machineToken) => {
+        const headers = new Headers(init);
+        headers.set(CREDIT_MEDIA_HOST_HEADER, hostId);
+        headers.set(CREDIT_MEDIA_HOST_TOKEN_HEADER, machineToken);
+        return headers;
+      }),
+    );
+  }
+
+  requestAsHost<T>(
+    hostId: string,
+    path: string,
+    init: RequestInit,
+    decoder: (value: unknown) => T,
+    timeoutMs?: number,
+  ): Effect.Effect<T, CentralAuthOperationError> {
+    return this.#owned(
+      this.#hostHeaders(hostId, init.headers).pipe(
+        Effect.flatMap((headers) => this.#requestEffect(path, { ...init, headers }, decoder, timeoutMs)),
+      ),
+    );
+  }
+
+  readonly downloadAsHost = Effect.fn("CentralAuth.downloadAsHost")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      path: string,
+      timeoutMs = 30_000,
+    ): Effect.fn.Return<Uint8Array, CentralAuthOperationError, CentralAuthTransport> {
+      const headers = yield* this.#hostHeaders(hostId, undefined);
+      const response = yield* CentralAuthTransport.use((transport) =>
+        transport.fetch(new URL(path, this.#options.apiUrl), { headers, signal: AbortSignal.timeout(timeoutMs) }),
+      );
+      if (!response.ok)
+        return yield* new CentralAuthOperationError({
+          cause: yield* AuthApiError.fromResponseEffect(response),
+        });
+      return new Uint8Array(yield* authCall(() => response.arrayBuffer()));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
 
   readonly #hostMachineToken = Effect.fn("CentralAuth.hostMachineToken")(function* (
     this: CentralAuthManager,

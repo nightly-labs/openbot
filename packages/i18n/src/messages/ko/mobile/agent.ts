@@ -403,6 +403,9 @@ export const messages = {
   "mobile.agent.planCard.label": "긴 작업 전에 계획 표시",
   "mobile.agent.planCard.footer":
     "긴 작업 전에 에이전트가 계획을 보여줘요. 10초 후 또는 시작을 누르면 작업이 시작돼요.",
+  "mobile.agent.builtinMemory.label": "OpenBot 메모리",
+  "mobile.agent.builtinMemory.footer":
+    "에이전트가 자신의 메모리를 저장하고 읽어요. Mem0 같은 메모리 앱만 쓰려면 끄세요. 저장된 메모리는 그대로 남아요.",
   "mobile.agent.workspace.title": "워크스페이스 폴더",
   "mobile.agent.workspace.footer": "호스트 컴퓨터에 있는 이 에이전트의 폴더예요.",
   "mobile.agent.advanced.behavior": "동작",
@@ -602,7 +605,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "열린 채팅 없음",
   "mobile.agent.home.noChatOpenBody": "목록에서 채팅을 선택해 주세요.",
   "mobile.agent.home.chatListWidth": "채팅 목록 너비",
-  "mobile.agent.home.serverTitle": "{name}, 서버 열기",
   "mobile.agent.home.waiting": "연결 대기 중",
   "mobile.agent.home.waitingBody": "이 서버에 연결되면 에이전트 목록을 불러와요.",
   "mobile.agent.home.noAgents": "이 서버에 에이전트가 없어요",

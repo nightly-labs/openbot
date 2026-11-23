@@ -104,6 +104,16 @@ async function keepFile(
   }
 }
 
+function mediaTarget(serverId: string, attachment: AttachmentSummary): string | undefined {
+  try {
+    const file = mediaFile(serverId, attachment);
+    file.parentDirectory.create({ intermediates: true, idempotent: true });
+    return file.uri;
+  } catch {
+    return undefined;
+  }
+}
+
 function keptFile(serverId: string, attachment: AttachmentSummary): (RemoteFileUpload & { fileUri: string }) | null {
   const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
   if (!large && (!attachment.mimeType.startsWith("image/") || !dimensionCache.get(attachment.id))) return null;
@@ -221,8 +231,13 @@ function attachmentFileQuery(
       if (attachment.size > MOBILE_LARGE_FILE_BYTES) throw new Error(tooLarge);
       const kept = keptFile(serverId, attachment);
       if (kept) return kept;
-      const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment));
       const large = attachment.size > MOBILE_ATTACHMENT_BYTES;
+      const data = await downloadAttachment(
+        serverId,
+        attachment.id,
+        largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
+      );
+      if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
       const fileUri =
         large || data.mimeType.startsWith("image/") ? await keepFile(serverId, attachment, data) : undefined;
       return fileUri && large ? { ...data, base64: "", fileUri } : { ...data, fileUri };

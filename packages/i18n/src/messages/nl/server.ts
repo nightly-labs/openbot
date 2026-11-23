@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Je kunt een andere server kiezen terwijl deze laadt.",
   "server.connection.cachedHint":
     "Geladen inhoud en concepten blijven bewaard. Serveracties gaan verder zodra de verbinding terug is.",
+  "server.connection.computerOffline":
+    "{name} is offline. Controleer of de computer aan staat, OpenBot open is en Publiceer deze server aan staat in Serverinstellingen > Leden.",
   "server.connection.conversationFailed": "Het gesprek kon niet laden. Probeer het opnieuw.",
   "server.connection.panelsFailed": "Sommige panelen van de werkruimte konden niet laden. Probeer het opnieuw.",
   "server.connection.retry": "Opnieuw",
@@ -245,7 +247,7 @@ export const messages = {
   "server.plan.deletedOn": "Verwijderd op {date}",
   "server.plan.dialogTitle": "Laat je agents niet gaan",
   "server.plan.dialogDescription":
-    "{name} is gestopt omdat het abonnement niet is betaald. Op {date} verwijdert OpenBot de agents, met al hun chats en bestanden.",
+    "{name} is gestopt omdat het abonnement is beëindigd. Op {date} verwijdert OpenBot de agents, met al hun chats en bestanden.",
   "server.plan.dialogDaysLeft": {
     one: "Nog {count} dag",
     other: "Nog {count} dagen",
@@ -254,6 +256,25 @@ export const messages = {
   "server.plan.keepAgents": "Agents houden",
   "server.plan.ownerRenews":
     "De agents van {name} zijn niet beschikbaar tot de eigenaar van de server het abonnement verlengt.",
+  "server.paywall.ready": "{name} is klaar",
+  "server.paywall.wakeUp": "Je agents worden wakker zodra je een abonnement neemt.",
+  "server.paywall.yourPlan": "Je abonnement",
+  "server.paywall.vcpu": "{value} vCPU",
+  "server.paywall.memory": "{value} GB geheugen",
+  "server.paywall.storage": "{value} GB opslag",
+  "server.paywall.support": "Persoonlijke support",
+  "server.paywall.perYear": "per jaar",
+  "server.paywall.subscribe": "Abonneren",
+  "server.paywall.checkoutFailed": "Afrekenen is niet geopend",
+  "server.paywall.checkoutTitle": "Rond de betaling af in je browser",
+  "server.paywall.checkoutDescription": "Je agents maken zich klaar.",
+  "server.paywall.openCheckoutAgain": "Afrekenen opnieuw openen",
+  "server.paywall.active": "{name} is actief",
+  "server.paywall.activeDescription": "Bedankt. Je agents zijn wakker.",
+  "server.paywall.open": "{name} openen",
+  "server.paywall.almostReady": "{name} is bijna klaar",
+  "server.paywall.ownerSubscribes":
+    "De eigenaar van {name} moet een abonnement nemen voordat je agents kunnen starten.",
   "server.select.failedTitle": "Kan de server niet kiezen",
   "server.select.failedDescription": "Kan niet van server wisselen. Probeer het opnieuw.",
   "server.select.openAgentFailed": "Kan {name} niet openen. Zoek hem in de zijbalk.",
@@ -385,6 +406,12 @@ export const messages = {
     "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft. Op een server gebruikt ook de browser deze tijdzone na de volgende herstart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
+  "server.settings.voiceModel.section": "Spraakherkenning",
+  "server.settings.voiceModel.description":
+    "Agents op deze server gebruiken dit model om het geluid van video’s zonder ondertiteling uit te schrijven.",
+  "server.settings.voiceModel.loadFailed": "Kan het spraakherkenningsmodel van de server niet laden.",
+  "server.settings.voiceModel.group": "Op deze server",
+  "server.settings.voiceModel.removeLabel": "{name} van deze server verwijderen",
   "server.settings.turnLimit": "Threads tegelijk",
   "server.settings.turnLimitDescription":
     "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",
@@ -594,6 +621,7 @@ export const messages = {
     "Er is geen apart wachtwoord voor extern bureaublad. Met de instellingen hieronder kies je wie deze computer mag bedienen.",
   "server.desktop.componentInstalled": "Hostonderdeel geïnstalleerd",
   "server.desktop.componentNotInstalled": "Hostonderdeel niet geïnstalleerd",
+  "server.desktop.needsX11Session": "X11-sessie nodig",
   "server.desktop.sessions": "Onbeheerd: {unattended} · Actieve sessies: {active}/{max}",
   "server.desktop.unattendedEnabled": "ingeschakeld",
   "server.desktop.unattendedUnavailable": "niet beschikbaar",
@@ -677,7 +705,7 @@ export const messages = {
   "server.update.waitingFor": "Wacht op {reasons}.",
   "server.update.disabledTitle": "Updates op afstand staan uit",
   "server.update.disabledDescription":
-    "De gebruiker van {name} heeft updates van serverleden uitgezet. Vraag diegene om OpenBot bij te werken of de instelling aan te zetten.",
+    "De gebruiker van {name} heeft updates van serverleden uitgezet. Vraag diegene om OpenBot bij te werken, of om op die computer Instellingen > Updates te openen en “Sta updates van serverleden toe” aan te zetten.",
   "server.update.managedTitle": "Een Host Manager regelt updates",
   "server.update.managedDescription":
     "OpenBot Host Manager werkt {name} bij. Neem contact op met de beheerder van de host.",

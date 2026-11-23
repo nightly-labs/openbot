@@ -444,6 +444,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Не удается воспроизвести этот аудиофайл.",
   "mobile.chat.browserSecret.password": "Пароль",
   "mobile.chat.browserSecret.authenticatorCode": "Код из приложения-аутентификатора",
+  "mobile.chat.browserSecret.ended": "Этот запрос на вход завершён. Попросите агента повторить попытку.",
   "mobile.chat.browserSecret.oneTimeCode": "Одноразовый код",
   "mobile.chat.browserSecret.takeoverTitle": "Управление браузером",
   "mobile.chat.browserSecret.takeoverBody": "Выполните этот шаг в браузере на компьютере, где работает OpenBot.",

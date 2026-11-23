@@ -110,6 +110,7 @@ import {
   declinedMcpElicitationText,
   detachedPromptResult,
   dynamicPromptResult,
+  editedPreviewQuestions,
   expiredPromptResult,
   lateAnswerText,
   locationPromptResult,
@@ -189,6 +190,7 @@ interface PendingApproval {
   method: string;
   params: unknown;
   approval: AgentApproval;
+  executionThreadId: string;
   hostedSiteMutation?: HostedSiteMutationContext;
   decide?: (decision: ToolApprovalDecision, phone?: FeedbackPhone) => void;
   alwaysAsk?: boolean;
@@ -468,6 +470,7 @@ export interface AttentionRegistryOptions {
   confinedWritesAllowed?(agentId: string, paths: readonly string[]): boolean;
   messagingThread?(threadId: string): boolean;
   messagingRequestTurn?(agentId: string, turnId: string): boolean;
+  approvalChatThread?(agentId: string, threadId: string): string;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
@@ -514,6 +517,7 @@ export class AttentionRegistry {
   readonly #confinedWritesAllowed: (agentId: string, paths: readonly string[]) => boolean;
   readonly #messagingThread: (threadId: string) => boolean;
   readonly #messagingRequestTurn: (agentId: string, turnId: string) => boolean;
+  readonly #approvalChatThread: (agentId: string, threadId: string) => string;
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
@@ -542,6 +546,7 @@ export class AttentionRegistry {
     this.#confinedWritesAllowed = options.confinedWritesAllowed ?? (() => false);
     this.#messagingThread = options.messagingThread ?? (() => false);
     this.#messagingRequestTurn = options.messagingRequestTurn ?? (() => false);
+    this.#approvalChatThread = options.approvalChatThread ?? ((_agentId, threadId) => threadId);
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
@@ -642,7 +647,7 @@ export class AttentionRegistry {
           throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
         });
       }
-      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers });
+      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers }, { privileged: false });
     }
     const pending = [...this.#approvals.values()].find(
       (entry) => entry.approval.agentId === agentId && this.#localHandles.get(entry) === input.requestId,
@@ -663,11 +668,8 @@ export class AttentionRegistry {
     return handle;
   }
 
-  runtimeAttention(): RuntimeAttention {
-    const attentionComplete =
-      this.#prompts.size + this.#approvals.size + this.#takeovers.size <= AGENT_RUNTIME_ATTENTION_LIMIT;
-    let remainingAttention = AGENT_RUNTIME_ATTENTION_LIMIT;
-    const pendingPrompts = [...this.#prompts.values()].slice(0, remainingAttention).map((pending) => ({
+  pendingPrompts(): RuntimeAttention["pendingPrompts"] {
+    return [...this.#prompts.values()].map((pending) => ({
       requestId: pending.id,
       agentId: pending.agentId,
       threadId: pending.publicThreadId,
@@ -675,6 +677,13 @@ export class AttentionRegistry {
       questions: pending.questions.map(compactRuntimeQuestion),
       ...(outlivesTurn(pending) ? { detached: true as const } : {}),
     }));
+  }
+
+  runtimeAttention(): RuntimeAttention {
+    const attentionComplete =
+      this.#prompts.size + this.#approvals.size + this.#takeovers.size <= AGENT_RUNTIME_ATTENTION_LIMIT;
+    let remainingAttention = AGENT_RUNTIME_ATTENTION_LIMIT;
+    const pendingPrompts = this.pendingPrompts().slice(0, remainingAttention);
     remainingAttention -= pendingPrompts.length;
     const pendingApprovals = [...this.#approvals.values()]
       .slice(0, remainingAttention)
@@ -776,7 +785,7 @@ export class AttentionRegistry {
         ? ""
         : pending.uiBlock?.vault
           ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
-          : lateAnswerText(pending.questions, answers);
+          : lateAnswerText(editedPreviewQuestions(pending.questions, pending.uiBlock?.spec, preview), answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -948,8 +957,9 @@ export class AttentionRegistry {
   ) {
     const { pending, secret } = yield* attentionStep(() => {
       const value = this.#takeovers.get(input.requestId);
-      if (!value?.secret || value.request.agentId !== input.agentId || value.submitting)
-        throw new Error(sourceText("error.backend.authRequestInactive"));
+      if (!value?.secret || value.request.agentId !== input.agentId)
+        throw new InactiveAttentionRequest(sourceText("error.backend.authRequestInactive"));
+      if (value.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
       return { pending: value, secret: value.secret };
     });
     if (input.decision === "cancel") {
@@ -1044,6 +1054,21 @@ export class AttentionRegistry {
     }
   }
 
+  #holdApproval(pending: Omit<PendingApproval, "executionThreadId">): void {
+    const executionThreadId = pending.approval.threadId;
+    const approval = {
+      ...pending.approval,
+      threadId: this.#approvalChatThread(pending.approval.agentId, executionThreadId),
+    };
+    this.#approvals.set(pending.id, { ...pending, approval, executionThreadId });
+    this.#routines.markNeedsAttention(approval.turnId);
+    this.#emit({ type: "approval", approval });
+  }
+
+  approvalExecutionThreadId(requestId: RequestId): string | undefined {
+    return this.#approvals.get(requestId)?.executionThreadId;
+  }
+
   surfaceApproval(client: AgentClient, request: AppServerRequest, kind: AgentApprovalKind): void {
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId") ?? (kind === "file-change" ? String(request.id) : null);
@@ -1066,15 +1091,7 @@ export class AttentionRegistry {
       permissions: kind === "permissions" ? approvalPermissions(request.params) : null,
     };
     if (this.#answerWithoutAsking(client, request, approval)) return;
-    this.#approvals.set(request.id, {
-      client,
-      id: request.id,
-      method: request.method,
-      params: request.params,
-      approval,
-    });
-    this.#routines.markNeedsAttention(turnId);
-    this.#emit({ type: "approval", approval });
+    this.#holdApproval({ client, id: request.id, method: request.method, params: request.params, approval });
   }
 
   readonly awaitToolApproval = Effect.fn("AttentionRegistry.awaitToolApproval")(function* (
@@ -1107,7 +1124,7 @@ export class AttentionRegistry {
     const alwaysAsk = options.alwaysAsk || options.ownerOnly;
     if (!alwaysAsk && this.#answersForAgent(approval.agentId)) return { decision: "accept" } as const;
     const answer = Deferred.makeUnsafe<{ decision: ToolApprovalDecision; phone?: FeedbackPhone }>();
-    this.#approvals.set(request.id, {
+    this.#holdApproval({
       client,
       id: request.id,
       method: TOOL_APPROVAL_METHOD,
@@ -1119,8 +1136,6 @@ export class AttentionRegistry {
       ...(options.ownerOnly ? { ownerOnly: true } : {}),
       ...(options.needsPhone ? { needsPhone: true } : {}),
     });
-    this.#routines.markNeedsAttention(approval.turnId);
-    this.#emit({ type: "approval", approval });
     return yield* Deferred.await(answer);
   }).bind(this);
 
@@ -1141,7 +1156,7 @@ export class AttentionRegistry {
         .pipe(toAttentionOperationFailed);
       return;
     }
-    this.#approvals.set(request.id, {
+    this.#holdApproval({
       client,
       id: request.id,
       method: HOSTED_SITE_APPROVAL_METHOD,
@@ -1149,8 +1164,6 @@ export class AttentionRegistry {
       approval: prepared.approval,
       hostedSiteMutation: prepared.mutation,
     });
-    this.#routines.markNeedsAttention(prepared.approval.turnId);
-    this.#emit({ type: "approval", approval: prepared.approval });
   }, Effect.uninterruptible).bind(this);
 
   surfaceLegacyApproval(client: AgentClient, request: AppServerRequest): void {
@@ -1175,15 +1188,7 @@ export class AttentionRegistry {
       permissions: null,
     };
     if (this.#answerWithoutAsking(client, request, approval)) return;
-    this.#approvals.set(request.id, {
-      client,
-      id: request.id,
-      method: request.method,
-      params: request.params,
-      approval,
-    });
-    this.#routines.markNeedsAttention(approval.turnId);
-    this.#emit({ type: "approval", approval });
+    this.#holdApproval({ client, id: request.id, method: request.method, params: request.params, approval });
   }
 
   readonly surfaceBrowserTakeover = Effect.fn("AttentionRegistry.surfaceBrowserTakeover")(function* (
@@ -1310,6 +1315,13 @@ export class AttentionRegistry {
             pending.resolve(
               browserTakeoverError(
                 `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} On an HTTP page, OpenBot fills only a saved login. Use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.request.vaultSkip === "agent-script") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
@@ -2117,12 +2129,14 @@ export class AttentionRegistry {
     }
   }
 
-  cancelRequest(client: AgentClient, requestId: RequestId): void {
+  cancelRequest(client: AgentClient, requestId: RequestId, providerStoppedWaiting = false): void {
     let changed = false;
     const prompt = this.#prompts.get(requestId);
     if (prompt?.client === client && !prompt.detached) {
-      this.#routines.markRunningForTurn(prompt.turnId);
-      this.#expirePrompt(requestId, prompt);
+      if (!providerStoppedWaiting || !this.#detachForLateAnswer(requestId, prompt)) {
+        this.#routines.markRunningForTurn(prompt.turnId);
+        this.#expirePrompt(requestId, prompt);
+      }
       changed = true;
     }
     const approval = this.#approvals.get(requestId);
@@ -2174,9 +2188,14 @@ export class AttentionRegistry {
         this.#detachPrompt(requestId, pending);
   }
 
-  #detachPrompt(requestId: RequestId, pending: PendingPrompt): void {
-    const target = pending.detach?.target;
-    if (this.#prompts.get(requestId) !== pending || !target) return;
+  #detachForLateAnswer(requestId: RequestId, pending: PendingPrompt): boolean {
+    if (pending.saving || pending.questions.some((question) => question.isSecret)) return false;
+    const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
+    return target !== null && this.#detachPrompt(requestId, pending, target);
+  }
+
+  #detachPrompt(requestId: RequestId, pending: PendingPrompt, target = pending.detach?.target): boolean {
+    if (this.#prompts.get(requestId) !== pending || !target) return false;
     clearTimeout(pending.detach?.timer);
     delete pending.detach;
     pending.detached = target;
@@ -2189,6 +2208,7 @@ export class AttentionRegistry {
       }
     }
     this.#emitRuntimeSnapshot();
+    return true;
   }
 
   #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {

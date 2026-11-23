@@ -484,6 +484,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "الخوادم",
   "mobile.settings.voice.gptLive.serversFooter":
     "اضغط على خادم يحتاج إلى تسجيل الدخول لربط Codex بحساب ChatGPT. لا يرى تسجيل دخول الخادم إلا المالك أو المسؤول.",
+  "mobile.settings.voice.gptLive.account": "حساب الصوت المباشر في GPT",
   "mobile.settings.voice.gptLive.status.ready": "جاهز",
   "mobile.settings.voice.gptLive.status.supported": "مدعوم",
   "mobile.settings.voice.gptLive.status.offline": "غير متصل",

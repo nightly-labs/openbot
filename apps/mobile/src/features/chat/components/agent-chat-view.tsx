@@ -8,6 +8,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
 import { useChannelList } from "@/features/channels/components/use-channels";
+import { appendComposerDraft } from "@/features/chat/model/composer-drafts";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
 import { useChatPullPreference, useChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
@@ -395,11 +396,13 @@ export function MobileChatView({
   });
   const mentionSkills = useAgentMentionSkills(agent.id, agent.serverId, showsOnline(server));
   const mentionReferences = useAgentMentionReferences(agent.serverId, agent.id);
+  const returnUnsentPreview = useCallback((text: string) => appendComposerDraft(target, text), [target]);
   const questionForm = useQuestionPrompt(
     agent.id,
     activePrompt?.kind === "question" ? activePrompt : undefined,
     showsOnline(server) && !viewOnly,
     respondToPrompt,
+    returnUnsentPreview,
   );
   const swipeAction = useChatSwipePreference((state) => state.action);
   const browserAllowed = useBrowserFeature();

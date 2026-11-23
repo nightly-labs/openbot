@@ -1,12 +1,14 @@
 import {
+  defaultRangeExtractor,
   elementScroll,
   measureElement as measureRowElement,
   observeElementOffset,
   observeElementRect,
+  type Range,
   type VirtualItem,
   Virtualizer,
 } from "@tanstack/virtual-core";
-import { createEffect, createMemo, createSignal, createStore, onSettled, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, flush, onCleanup, onSettled, untrack } from "solid-js";
 
 interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement extends Element> {
   count: () => number;
@@ -15,9 +17,12 @@ interface ChatVirtualizerOptions<TScrollElement extends Element, TItemElement ex
   getItemKey: (index: number) => string | number;
   keyVersion: () => unknown;
   scrollMargin: () => number;
+  keptIndexes?: () => readonly number[];
   stickToLatest?: () => boolean;
   followLatest?: (element: TScrollElement) => void;
   onChange?: (virtualizer: Virtualizer<TScrollElement, TItemElement>) => void;
+  drawLatestFirst?: () => boolean;
+  onRowsDrawn?: (element: TScrollElement) => void;
 }
 
 export interface ChatVirtualizer<TItemElement extends Element> {
@@ -29,18 +34,34 @@ export interface ChatVirtualizer<TItemElement extends Element> {
   itemStart: (index: number) => number | undefined;
   scrollToIndex: (index: number, options?: { smooth?: boolean }) => void;
   scrollToOffset: (offset: number) => void;
+  firstDrawnIndex: () => number;
+  drawAllRows: () => void;
 }
 
 const STATIC_CHAT_LIMIT = 100;
 const STATIC_CHAT_RETURN = 10;
+const LATEST_ROWS_FIRST = 10;
+const EARLIER_ROWS_PER_FRAME = 5;
 const SCROLL_END_THRESHOLD = 80;
 
 export function createChatVirtualizer<TScrollElement extends Element, TItemElement extends Element>(
   options: ChatVirtualizerOptions<TScrollElement, TItemElement>,
 ): ChatVirtualizer<TItemElement> {
   const initialCount = untrack(options.count);
+  const drawsLatestFirst = (): boolean => untrack(() => options.drawLatestFirst?.() === true);
+  const latestRowsStart = (count: number): number => Math.max(0, count - LATEST_ROWS_FIRST);
+  let drawFrom = initialCount > STATIC_CHAT_LIMIT || !drawsLatestFirst() ? 0 : latestRowsStart(initialCount);
+  let drawFrame: number | undefined;
   const [virtualItems, setVirtualItems] = createSignal<VirtualItem[]>(
-    untrack(() => fallbackItems(initialCount, options.estimateSize, options.getItemKey, options.scrollMargin())),
+    untrack(() =>
+      fallbackItems(
+        initialCount,
+        fallbackStart(initialCount, drawFrom),
+        options.estimateSize,
+        options.getItemKey,
+        options.scrollMargin(),
+      ),
+    ),
   );
   const [totalSize, setTotalSize] = createSignal(initialCount * options.estimateSize(0));
   const stableItems = new Map<VirtualItem["key"], { item: VirtualItem; update: (next: VirtualItem) => void }>();
@@ -90,12 +111,89 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
   });
   let refreshQueued = false;
 
+  const stopDrawingEarlierRows = (): void => {
+    if (drawFrame !== undefined) cancelAnimationFrame(drawFrame);
+    drawFrame = undefined;
+    drawFrom = 0;
+  };
+
+  const unmeasuredRows = new Set<TItemElement>();
+  let measureQueued = false;
+
+  const measureNewRows = (): void => {
+    measureQueued = false;
+    for (const element of unmeasuredRows) if (element.isConnected) virtualizer.measureElement(element);
+    unmeasuredRows.clear();
+  };
+
+  const drawRowsFrom = (index: number): void => {
+    const element = options.getScrollElement();
+    const distanceFromEnd = element ? element.scrollHeight - element.scrollTop : undefined;
+    drawFrom = index;
+    flush(refresh);
+    const drawnRows = [...unmeasuredRows];
+    measureNewRows();
+    for (const row of drawnRows)
+      if (row.isConnected)
+        virtualizer.resizeItem(virtualizer.indexFromElement(row), Math.round(row.getBoundingClientRect().height));
+    if (element && distanceFromEnd !== undefined) {
+      element.scrollTop = element.scrollHeight - distanceFromEnd;
+      untrack(() => options.onRowsDrawn?.(element));
+    }
+    untrack(() => options.onChange?.(virtualizer));
+  };
+
+  const drawEarlierRows = (): void => {
+    drawFrame = undefined;
+    if (drawFrom === 0) return;
+    drawRowsFrom(Math.max(0, drawFrom - EARLIER_ROWS_PER_FRAME));
+    if (drawFrom > 0) drawFrame = requestAnimationFrame(drawEarlierRows);
+  };
+
+  const drawAllRows = (then?: () => void): void => {
+    if (drawFrom === 0) {
+      then?.();
+      return;
+    }
+    if (drawFrame !== undefined) cancelAnimationFrame(drawFrame);
+    drawFrame = requestAnimationFrame(() => {
+      drawFrame = undefined;
+      if (drawFrom > 0) drawRowsFrom(0);
+      then?.();
+    });
+  };
+
+  const opensOtherRows = (count: number): boolean => {
+    if (!drawsLatestFirst() || count <= LATEST_ROWS_FIRST || untrack(virtualized)) return false;
+    const checkedRows = drawFrom > 0 ? count : count - LATEST_ROWS_FIRST;
+    return !Array.from({ length: checkedRows }, (_, index) => options.getItemKey(index)).some((key) =>
+      stableItems.has(key),
+    );
+  };
+
+  const drawLatestRowsFirst = (count: number): void => {
+    stopDrawingEarlierRows();
+    drawFrom = latestRowsStart(count);
+    drawFrame = requestAnimationFrame(() => {
+      drawFrame = requestAnimationFrame(drawEarlierRows);
+    });
+  };
+
   const refresh = (): void => {
     const measured = [...virtualizer.getVirtualItems()];
     const count = options.count();
+    const isVirtualized = untrack(virtualized);
+    if (isVirtualized) stopDrawingEarlierRows();
+    drawFrom = Math.min(drawFrom, latestRowsStart(count));
     const items =
-      !untrack(virtualized) || measured.length === 0
-        ? fallbackItems(count, options.estimateSize, options.getItemKey, options.scrollMargin())
+      !isVirtualized || measured.length === 0
+        ? fallbackItems(
+            count,
+            fallbackStart(count, isVirtualized ? 0 : drawFrom),
+            options.estimateSize,
+            options.getItemKey,
+            options.scrollMargin(),
+          )
         : measured;
     const activeKeys = new Set(items.map((item) => item.key));
     const nextItems = items.map((item) => {
@@ -128,6 +226,56 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     });
   };
 
+  let keptRows: SelectedRows | undefined;
+  let keptKeys: readonly [VirtualItem["key"], VirtualItem["key"]] | undefined;
+  let keptPageIndexes: readonly number[] = [];
+
+  const drawnIndexes = (range: Range): number[] =>
+    withKeptIndexes(
+      keptRows ? withSelectedRows(range, keptRows) : defaultRangeExtractor(range),
+      keptPageIndexes,
+      range.count,
+    );
+
+  const keepRows = (rows: SelectedRows | undefined): void => {
+    if (rows?.[0] === keptRows?.[0] && rows?.[1] === keptRows?.[1]) return;
+    keptRows = rows;
+    keptKeys = rows && [options.getItemKey(rows[0]), options.getItemKey(rows[1])];
+    virtualizer.setOptions({
+      ...virtualizer.options,
+      rangeExtractor: (range) => drawnIndexes(range),
+    });
+    scheduleRefresh();
+  };
+
+  const selectedRows = (): SelectedRows | undefined => {
+    const selection = document.getSelection();
+    if (!untrack(virtualized) || !selection?.rangeCount) return undefined;
+    const range = selection.getRangeAt(0);
+    let first = Number.POSITIVE_INFINITY;
+    let last = -1;
+    for (const element of virtualizer.elementsCache.values()) {
+      if (!element.isConnected || !range.intersectsNode(element)) continue;
+      const index = virtualizer.indexFromElement(element);
+      first = Math.min(first, index);
+      last = Math.max(last, index);
+    }
+    return last < 0 ? undefined : [first, last];
+  };
+
+  const rowsWithKeys = (keys: readonly [VirtualItem["key"], VirtualItem["key"]], count: number) => {
+    let first = -1;
+    let last = -1;
+    for (let index = 0; index < count; index += 1) {
+      const key = options.getItemKey(index);
+      if (key === keys[0]) first = index;
+      if (key === keys[1]) last = index;
+    }
+    return first < 0 || last < first ? undefined : ([first, last] as const);
+  };
+
+  let drawnRowsVersion: unknown;
+
   createEffect(
     () => {
       const count = options.count();
@@ -135,10 +283,16 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         count,
         keyVersion: options.keyVersion(),
         scrollMargin: options.scrollMargin(),
+        kept: options.keptIndexes?.() ?? [],
       };
     },
-    ({ count, scrollMargin }) => {
+    ({ count, keyVersion, scrollMargin, kept }) => {
       untrack(() => {
+        keptPageIndexes = kept;
+        const rowsVersion = `${count}:${String(keyVersion)}`;
+        if (rowsVersion !== drawnRowsVersion && opensOtherRows(count)) drawLatestRowsFirst(count);
+        drawnRowsVersion = rowsVersion;
+        if (keptKeys) keepRows(rowsWithKeys(keptKeys, count));
         syncScrollEndThreshold(virtualizer);
         virtualizer.setOptions({
           ...virtualizer.options,
@@ -148,6 +302,7 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
           estimateSize: options.estimateSize,
           getItemKey: options.getItemKey,
           scrollMargin,
+          rangeExtractor: (range) => drawnIndexes(range),
           onChange: (instance) => {
             scheduleRefresh();
             untrack(() => options.onChange?.(instance));
@@ -159,11 +314,18 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
     },
   );
 
+  onCleanup(stopDrawingEarlierRows);
+
   onSettled(() => {
     const cleanup = virtualizer._didMount();
     virtualizer._willUpdate();
     scheduleRefresh();
-    return cleanup;
+    const keepSelectedRows = () => keepRows(selectedRows());
+    document.addEventListener("selectionchange", keepSelectedRows);
+    return () => {
+      document.removeEventListener("selectionchange", keepSelectedRows);
+      cleanup();
+    };
   });
 
   return {
@@ -177,15 +339,20 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         virtualizer.measureElement(null);
         return;
       }
-      queueMicrotask(() => {
-        if (element.isConnected) virtualizer.measureElement(element);
-      });
+      unmeasuredRows.add(element);
+      if (measureQueued) return;
+      measureQueued = true;
+      queueMicrotask(measureNewRows);
     },
     scrollMargin: options.scrollMargin,
     itemStart: (index) => virtualizer.measurementsCache[index]?.start,
     scrollToIndex: (index, scroll) =>
-      virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
+      drawAllRows(() =>
+        virtualizer.scrollToIndex(index, { align: "start", behavior: scroll?.smooth ? "smooth" : "auto" }),
+      ),
     scrollToOffset: (offset) => virtualizer.scrollToOffset(offset, { align: "start", behavior: "auto" }),
+    firstDrawnIndex: () => drawFrom,
+    drawAllRows: () => drawAllRows(),
   };
 }
 
@@ -213,6 +380,11 @@ export function calculateChatScrollMargin(
   );
 }
 
+function withKeptIndexes(drawn: number[], kept: readonly number[], count: number): number[] {
+  const added = kept.filter((index) => index >= 0 && index < count && !drawn.includes(index));
+  return added.length === 0 ? drawn : [...drawn, ...added].sort((left, right) => left - right);
+}
+
 function virtualItemsEqual(left: VirtualItem, right: VirtualItem): boolean {
   return (
     left.key === right.key &&
@@ -224,13 +396,25 @@ function virtualItemsEqual(left: VirtualItem, right: VirtualItem): boolean {
   );
 }
 
+type SelectedRows = readonly [first: number, last: number];
+
+function withSelectedRows(range: Range, [first, last]: SelectedRows): number[] {
+  const indexes = new Set(defaultRangeExtractor(range));
+  for (let index = first; index <= Math.min(last, range.count - 1); index += 1) indexes.add(index);
+  return [...indexes].sort((left, right) => left - right);
+}
+
+function fallbackStart(count: number, drawFrom: number): number {
+  return count <= STATIC_CHAT_LIMIT ? drawFrom : Math.max(0, count - STATIC_CHAT_RETURN);
+}
+
 function fallbackItems(
   count: number,
+  startIndex: number,
   estimateSize: (index: number) => number,
   getItemKey: (index: number) => string | number,
   scrollMargin: number,
 ): VirtualItem[] {
-  const startIndex = count <= 100 ? 0 : Math.max(0, count - 10);
   return Array.from({ length: count - startIndex }, (_, offset): VirtualItem => {
     const index = startIndex + offset;
     const size = estimateSize(index);

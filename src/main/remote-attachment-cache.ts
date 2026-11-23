@@ -46,6 +46,12 @@ export interface RemoteAttachment {
   mimeType: string;
 }
 
+interface PendingDownload {
+  serverId: string;
+  request: Deferred.Deferred<RemoteAttachment, RemoteWorkflowError>;
+  waiting: boolean;
+}
+
 interface CacheEntry {
   serverId: string;
   attachment: RemoteAttachment;
@@ -54,10 +60,7 @@ interface CacheEntry {
 
 export class RemoteAttachmentCache {
   readonly #entries = new Map<string, CacheEntry>();
-  readonly #pending = new Map<
-    string,
-    { serverId: string; request: Deferred.Deferred<RemoteAttachment, RemoteWorkflowError> }
-  >();
+  readonly #pending = new Map<string, PendingDownload>();
   readonly #downloads = new Map<string, Semaphore.Semaphore>();
   readonly #generations = new Map<string, number>();
   #epoch = 0;
@@ -76,6 +79,7 @@ export class RemoteAttachmentCache {
     attachmentId: string,
     download: () => Effect.Effect<RemoteAttachment, RemoteWorkflowError>,
     preview = false,
+    queued = preview,
   ) {
     this.#removeExpired();
     const key = JSON.stringify([serverId, attachmentId]);
@@ -87,12 +91,41 @@ export class RemoteAttachmentCache {
       return entry.attachment;
     }
     const pending = this.#pending.get(key);
-    if (pending) return yield* Deferred.await(pending.request);
+    if (pending && (queued || !preview || !pending.waiting)) return yield* Deferred.await(pending.request);
     const generation = this.#generation(serverId);
+    if (pending) {
+      pending.waiting = false;
+      return yield* this.#settle(key, serverId, generation, pending.request, download(), preview);
+    }
     const request = Deferred.makeUnsafe<RemoteAttachment, RemoteWorkflowError>();
-    this.#pending.set(key, { serverId, request });
-    const transfer = preview ? this.#downloadPermits(serverId).withPermit(download()) : download();
-    return yield* transfer.pipe(
+    const next: PendingDownload = { serverId, request, waiting: queued };
+    this.#pending.set(key, next);
+    const transfer = queued
+      ? Effect.raceFirst(
+          this.#downloadPermits(serverId)
+            .withPermit(
+              Effect.suspend(() => {
+                if (!next.waiting) return Effect.succeed(null);
+                next.waiting = false;
+                return download();
+              }),
+            )
+            .pipe(Effect.flatMap((attachment) => (attachment === null ? Effect.never : Effect.succeed(attachment)))),
+          Deferred.await(request),
+        )
+      : download();
+    return yield* this.#settle(key, serverId, generation, request, transfer, preview);
+  });
+
+  #settle(
+    key: string,
+    serverId: string,
+    generation: string,
+    request: Deferred.Deferred<RemoteAttachment, RemoteWorkflowError>,
+    transfer: Effect.Effect<RemoteAttachment, RemoteWorkflowError>,
+    preview: boolean,
+  ): Effect.Effect<RemoteAttachment, RemoteWorkflowError> {
+    return transfer.pipe(
       Effect.tap((attachment) =>
         Effect.sync(() => {
           if (this.#generation(serverId) === generation) this.#store(key, serverId, attachment, preview);
@@ -105,7 +138,7 @@ export class RemoteAttachmentCache {
         }),
       ),
     );
-  });
+  }
 
   holdUpload(serverId: string): (attachmentId: string, attachment: RemoteAttachment) => void {
     const generation = this.#generation(serverId);

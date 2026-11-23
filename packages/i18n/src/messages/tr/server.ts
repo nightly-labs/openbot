@@ -21,6 +21,8 @@ export const messages = {
   "server.connection.loadingHint": "Bu sunucu yüklenirken başka bir sunucu seçebilirsiniz.",
   "server.connection.cachedHint":
     "Yüklenen içerik ve taslaklar korunur. Sunucu işlemleri yeniden bağlandıktan sonra devam eder.",
+  "server.connection.computerOffline":
+    "{name} çevrimdışı. Bilgisayarının açık olduğundan, OpenBot'un açık olduğundan ve Sunucu ayarları > Üyeler bölümünde Bu sunucuyu yayımla seçeneğinin etkin olduğundan emin olun.",
   "server.connection.conversationFailed": "Konuşma yüklenemedi. Tekrar deneyin.",
   "server.connection.panelsFailed": "Bazı çalışma alanı panelleri yüklenemedi. Tekrar deneyin.",
   "server.connection.retry": "Tekrar dene",
@@ -236,7 +238,7 @@ export const messages = {
   "server.plan.deletedOn": "{date} tarihinde silinecek",
   "server.plan.dialogTitle": "Ajanlarını kaybetme",
   "server.plan.dialogDescription":
-    "{name}, planı ödenmediği için durdu. OpenBot {date} tarihinde ajanlarını tüm sohbetleri ve dosyalarıyla birlikte siler.",
+    "{name}, planı sona erdiği için durdu. OpenBot {date} tarihinde ajanlarını tüm sohbetleri ve dosyalarıyla birlikte siler.",
   "server.plan.dialogDaysLeft": {
     one: "{count} gün kaldı",
     other: "{count} gün kaldı",
@@ -244,6 +246,24 @@ export const messages = {
   "server.plan.later": "Sonra",
   "server.plan.keepAgents": "Ajanlarımı koru",
   "server.plan.ownerRenews": "Sunucu sahibi planı yenileyene kadar {name} ajanları kullanılamaz.",
+  "server.paywall.ready": "{name} hazır",
+  "server.paywall.wakeUp": "Abone olduğunuzda ajanlarınız uyanır.",
+  "server.paywall.yourPlan": "Planınız",
+  "server.paywall.vcpu": "{value} vCPU",
+  "server.paywall.memory": "{value} GB bellek",
+  "server.paywall.storage": "{value} GB depolama",
+  "server.paywall.support": "Kişisel destek",
+  "server.paywall.perYear": "yıllık",
+  "server.paywall.subscribe": "Abone ol",
+  "server.paywall.checkoutFailed": "Ödeme açılmadı",
+  "server.paywall.checkoutTitle": "Ödemeyi tarayıcınızda tamamlayın",
+  "server.paywall.checkoutDescription": "Ajanlarınız hazırlanıyor.",
+  "server.paywall.openCheckoutAgain": "Ödemeyi yeniden aç",
+  "server.paywall.active": "{name} etkin",
+  "server.paywall.activeDescription": "Teşekkürler. Ajanlarınız uyandı.",
+  "server.paywall.open": "{name} sunucusunu aç",
+  "server.paywall.almostReady": "{name} neredeyse hazır",
+  "server.paywall.ownerSubscribes": "Ajanlarınızın başlaması için {name} sahibinin abone olması gerekir.",
   "server.select.failedTitle": "Sunucu seçilemedi",
   "server.select.failedDescription": "Sunucular arasında geçiş yapılamadı. Tekrar deneyin.",
   "server.select.openAgentFailed": "{name} açılamadı. Onu kenar çubuğunda bulun.",
@@ -370,6 +390,12 @@ export const messages = {
     "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır. Bir sunucuda tarayıcı da bir sonraki yeniden başlatmadan sonra bunu kullanır.",
   "server.settings.timezoneAutomatic": "Otomatik ({zone})",
   "server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
+  "server.settings.voiceModel.section": "Konuşma tanıma",
+  "server.settings.voiceModel.description":
+    "Bu sunucudaki ajanlar, altyazısı olmayan videoların sesini yazıya dökmek için bu modeli kullanır.",
+  "server.settings.voiceModel.loadFailed": "Sunucunun konuşma tanıma modeli yüklenemedi.",
+  "server.settings.voiceModel.group": "Bu sunucuda",
+  "server.settings.voiceModel.removeLabel": "{name} modelini bu sunucudan kaldır",
   "server.settings.turnLimit": "Aynı anda mesaj dizileri",
   "server.settings.turnLimitDescription":
     "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",
@@ -532,6 +558,7 @@ export const messages = {
     "Uzak masaüstü için ayrı bir parola yok. Bu bilgisayarı kimin kontrol edebileceğini aşağıdaki ayarlar belirler.",
   "server.desktop.componentInstalled": "Ana makine bileşeni yüklendi",
   "server.desktop.componentNotInstalled": "Ana makine bileşeni yüklenmedi",
+  "server.desktop.needsX11Session": "X11 oturumu gerekli",
   "server.desktop.sessions": "Katılımsız: {unattended} · Etkin oturumlar: {active}/{max}",
   "server.desktop.unattendedEnabled": "etkin",
   "server.desktop.unattendedUnavailable": "kullanılamıyor",
@@ -614,7 +641,7 @@ export const messages = {
   "server.update.waitingFor": "{reasons} bekleniyor.",
   "server.update.disabledTitle": "Uzaktan güncellemeler kapalı",
   "server.update.disabledDescription":
-    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya ayarı açmasını isteyin.",
+    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya o bilgisayarda Ayarlar > Güncellemeler bölümünü açıp “Sunucu üyelerinin güncelleme yapmasına izin ver” seçeneğini açmasını isteyin.",
   "server.update.managedTitle": "Güncellemeleri OpenBot Host Manager yönetiyor",
   "server.update.managedDescription":
     "OpenBot Host Manager, {name} sunucusunu günceller. Ana makine yöneticisiyle iletişime geçin.",

@@ -21,6 +21,7 @@ import {
   type WebhookRoute,
   type WebhookSignatureFormat,
 } from "@openbot/contracts/signal-protocol/webhook-route";
+import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Fiber, Layer, Result, Schema } from "effect";
 import { IngressQueue, queueRouteKey, type RouteWaker } from "./ingress-queue";
 import {
@@ -267,6 +268,8 @@ const WEBHOOK_WAKE_RATE_FACTOR = 1 / 10;
 const WEBHOOK_WAKE_TOTAL_RATE_FACTOR = 1;
 const TELEGRAM_CALLBACK_TTL_MILLISECONDS = 15 * 60_000;
 const MAXIMUM_TELEGRAM_CALLBACKS = 100_000;
+const TELEGRAM_UNLINKED_NOTICE_INTERVAL_MILLISECONDS = 24 * 60 * 60_000;
+const MAXIMUM_TELEGRAM_UNLINKED_NOTICES = 100_000;
 const MAXIMUM_PENDING_TELEGRAM_CALLS = 32;
 const TELEGRAM_FORBIDDEN = telegramFailure(403, "forbidden");
 const DISCORD_SESSION_TOKEN_BYTES = 32;
@@ -287,6 +290,7 @@ export class SignalService {
   readonly #telegramLinks = new Map<string, { hostId: string; linkedAt: number; expiresAt: number }>();
   readonly #telegramCallbacks = new Map<string, { socketId: string; expiresAt: number }>();
   readonly #telegramCalls = new Map<string, Set<Fiber.Fiber<void>>>();
+  readonly #telegramUnlinkedNoticeTimes = new Map<string, number>();
   readonly #telegram: SignalTelegram | null;
   readonly #discordGuilds = new Map<string, string>();
   readonly #discordRouteFloor = new Map<string, number>();
@@ -739,7 +743,7 @@ export class SignalService {
       ).pipe(
         Effect.map(
           (outcome): SlackDeliveryResponse =>
-            outcome === "unavailable" && !delivery.chatter ? UNAVAILABLE : { status: 200 },
+            (outcome === "unavailable" || outcome === "unlinked") && !delivery.chatter ? UNAVAILABLE : { status: 200 },
         ),
       );
     }
@@ -891,6 +895,7 @@ export class SignalService {
     callbackQueryId: string | null,
     linked = false,
     wakes = false,
+    addresses = false,
   ): boolean {
     const route = telegramRouteKey(botId, chatId);
     const socketId = this.#telegramChats.get(route);
@@ -910,6 +915,7 @@ export class SignalService {
     }
     if (!ingress) {
       this.#metrics.telegramDeliveriesUnrouted += 1;
+      const noticeDue = addresses && !linked && this.#unlinkedNoticeDue(route, Date.now());
       this.#fork(
         this.#keep(
           { platform: "telegram", botId, chatId },
@@ -917,6 +923,10 @@ export class SignalService {
           wakes && !linked,
           frame,
           callbackQueryId ? { botId, queryId: callbackQueryId } : null,
+        ).pipe(
+          Effect.flatMap((outcome) =>
+            noticeDue && outcome === "unlinked" ? this.#sendUnlinkedNotice(botId, chatId, route) : Effect.void,
+          ),
         ),
       );
       return false;
@@ -926,6 +936,36 @@ export class SignalService {
     this.#send(ingress.socket, frame);
     return true;
   }
+
+  #unlinkedNoticeDue(route: string, now: number): boolean {
+    if (this.#telegramChats.has(route) || this.#telegramRouteFloor.has(route)) return false;
+    const last = this.#telegramUnlinkedNoticeTimes.get(route);
+    return last === undefined || now - last >= TELEGRAM_UNLINKED_NOTICE_INTERVAL_MILLISECONDS;
+  }
+
+  readonly #sendUnlinkedNotice = Effect.fn("Signal.sendUnlinkedNotice")(function* (
+    this: SignalService,
+    botId: string,
+    chatId: string,
+    route: string,
+  ) {
+    const now = Date.now();
+    if (!this.#telegram || !this.#unlinkedNoticeDue(route, now)) return;
+    for (const [key, sentAt] of this.#telegramUnlinkedNoticeTimes) {
+      if (
+        now - sentAt < TELEGRAM_UNLINKED_NOTICE_INTERVAL_MILLISECONDS &&
+        this.#telegramUnlinkedNoticeTimes.size < MAXIMUM_TELEGRAM_UNLINKED_NOTICES
+      )
+        break;
+      this.#telegramUnlinkedNoticeTimes.delete(key);
+    }
+    this.#telegramUnlinkedNoticeTimes.delete(route);
+    this.#telegramUnlinkedNoticeTimes.set(route, now);
+    yield* this.#telegram.bot.call(botId, "sendMessage", {
+      chat_id: Number(chatId),
+      text: sourceText("status.messaging.telegramNotLinked"),
+    });
+  });
 
   readonly #keepLink = Effect.fn("Signal.keepLink")(function* (
     this: SignalService,
@@ -965,6 +1005,7 @@ export class SignalService {
       const route = telegramRouteKey(botId, chatId);
       if (link.linkedAt < (this.#telegramRouteFloor.get(route) ?? 0)) return false;
       this.#telegramRouteFloor.set(route, link.linkedAt);
+      this.#queue.forget(queueRouteKey("telegram", route));
       const now = Date.now();
       for (const [key, entry] of this.#telegramLinks) {
         if (entry.expiresAt > now) break;

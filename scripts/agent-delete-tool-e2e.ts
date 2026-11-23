@@ -206,6 +206,7 @@ const agents = new AgentService({
     mutate: (action, context) => library.mutate(action, context),
     removeAgent: (agentId) => library.removeAgent(agentId),
     fileAgents: () => Effect.succeed(new Map<string, string | null>()),
+    fileWorkflows: () => Effect.succeed(new Map()),
   },
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),

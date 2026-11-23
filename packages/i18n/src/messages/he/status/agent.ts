@@ -145,7 +145,6 @@ export const messages = {
   "status.agent.vaultField.country": "קוד מדינה",
   "status.agent.vaultField.phone": "טלפון",
   "status.agent.vaultField.email": "כתובת אימייל",
-  "status.agent.finishCheckContinues": "הבקשה עוד לא הושלמה. הסוכן ממשיך ({current} מתוך {limit}).",
   "status.agent.nextStepContinues": "הסוכן נעצר לפני השלב הבא שלו. הוא ממשיך ({current} מתוך {limit}).",
   "status.agent.planContinues": "בתוכנית יש שלבים פתוחים. הסוכן ממשיך ({current} מתוך {limit}).",
   "status.agent.planStopped": "הסוכן עצר כשבתוכנית שלו יש שלבים פתוחים. שלחו הודעה כדי להמשיך.",

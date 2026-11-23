@@ -343,6 +343,7 @@ export const messages = {
   "mobile.server.route.timezone": "Saat dilimi",
   "mobile.server.route.personality": "Ajan kişiliği",
   "mobile.server.route.agents": "Ajanlar",
+  "mobile.server.route.voiceModel": "Konuşma tanıma",
   "mobile.server.settings.storage": "Depolama",
   "mobile.server.route.storage": "Depolama",
   "mobile.server.route.storageFiles": "Tüm dosyalar",
@@ -468,6 +469,19 @@ export const messages = {
     "Saat dilimini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.settings.timezoneUnsupported":
     "Saat dilimini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.voiceModelDescription":
+    "Bu sunucudaki ajanlar, altyazısı olmayan videoların sesini yazıya dökmek için bu modeli kullanır.",
+  "mobile.server.settings.voiceModelLoading": "Konuşma tanıma yükleniyor…",
+  "mobile.server.settings.voiceModelLoadFailed": "Sunucunun konuşma tanıma modeli yüklenemedi.",
+  "mobile.server.settings.voiceModelSaveFailed": "Konuşma tanıma modeli değiştirilemedi. Tekrar deneyin.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Konuşma tanımayı buradan değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.voiceModelReady": "Hazır",
+  "mobile.server.settings.voiceModelDownloading": "İndiriliyor: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} indirme",
+  "mobile.server.settings.voiceModelDownload": "İndir",
+  "mobile.server.settings.voiceModelCancel": "İndirmeyi durdur",
+  "mobile.server.settings.voiceModelRemove": "Kaldır",
   "mobile.server.settings.keySection": "Sunucu anahtarı",
   "mobile.server.settings.keyChanged": "Son değişiklik",
   "mobile.server.settings.keyChange": "Anahtarı değiştir",
@@ -903,7 +917,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "“Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler OpenBot'a ulaşır.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "İzin verdiğiniz kişiler OpenBot'a ulaşır. Diğer kişiler size iletmeleri için bir kod alır.",
+    "“Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler OpenBot'a ulaşır. Diğer kişiler size iletmeleri için bir kod alır.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1140,10 +1154,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Modeller değiştirilemedi. Tekrar deneyin.",
   "mobile.server.providers.promptCache": "İstem önbelleği",
   "mobile.server.providers.promptCacheHint":
-    "Claude'un turlar arasında bir ajanın bağlamını önbellekte tutma süresi. Değişiklik Claude yeniden başladığında uygulanır.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code varsayılanı",
+    "Claude ve Pi'nin bir ajanın bağlamını turlar arasında önbellekte ne kadar tuttuğu. Değişiklik sağlayıcı yeniden başladığında geçerli olur.",
+  "mobile.server.providers.promptCacheDefault": "Sağlayıcı varsayılanı",
   "mobile.server.providers.promptCacheHour": "1 saat",
   "mobile.server.providers.promptCacheLoadFailed": "Bu sunucunun istem önbelleği süresi yüklenemedi.",
+  "mobile.server.providers.cacheExpiryCompaction": "Önbelleğin süresi dolmadan sıkıştır",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "200K veya daha fazla token bağlamı olan bir sohbet 1 saatlik önbellekle boşta olduğunda, ajan önbelleğin süresi dolmadan bağlamı sıkıştırır. Böylece sonraki mesaj tüm bağlamı önbelleksiz yeniden okumaz.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Bu sunucunun sıkıştırma ayarı yüklenemedi.",
   "mobile.server.providers.compactWindow": "Sohbetleri sıkıştırma boyutu",
   "mobile.server.providers.compactWindowHint":
     "Sohbet bu boyuta ulaştığında Claude Code eski turları özetler. Düşük değer turları hızlı ve ucuz tutar. Yüksek değer daha fazla ayrıntı tutar. Daha küçük pencereli bir model kendi sınırında sıkıştırır.",
@@ -1198,6 +1216,8 @@ export const messages = {
     "ChatGPT, ChatGPT planınızı değil bu anahtarı kullanır. OpenAI her isteği anahtara faturalandırır. Planın kullanımı gösterilmez.",
   "mobile.server.providers.codexKeyAlternative":
     "Ya da bir OpenAI API anahtarıyla oturum açın. OpenAI her isteği anahtara faturalandırır.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse oturum açmanızı değil, bu anahtarı kullanır. Oturum açmanızı kullanmak için anahtarı kaldırın.",
   "mobile.server.providers.sectionUse": "Kullanım",
   "mobile.server.providers.unused": "Hiçbir ajan kullanmıyor",
   "mobile.server.providers.usedByCount": { one: "1 ajan kullanıyor", other: "{count} ajan kullanıyor" },
@@ -1366,7 +1386,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons} bekleniyor.",
   "mobile.server.update.disabledTitle": "Uzaktan güncellemeler kapalı",
   "mobile.server.update.disabledDescription":
-    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya ayarı açmasını isteyin.",
+    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya o bilgisayarda Ayarlar > Güncellemeler bölümünü açıp “Sunucu üyelerinin güncelleme yapmasına izin ver” seçeneğini açmasını isteyin.",
   "mobile.server.update.managedTitle": "Güncellemeleri OpenBot Host Manager yönetiyor",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager, {name} sunucusunu günceller. Ana makine yöneticisiyle iletişime geçin.",

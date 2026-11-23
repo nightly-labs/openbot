@@ -141,6 +141,7 @@ export const messages = {
   "error.provider.keyInvalidCharacters": "Ключ провайдера содержит пробел или символ, который не может быть в ключе.",
   "error.provider.noModel": "У выбранного провайдера нет доступной модели.",
   "error.provider.noModelNamed": "У {provider} нет доступной модели.",
+  "error.provider.acpModelsNotLoaded": "{provider} не смог загрузить свои модели. Отправьте сообщение ещё раз.",
   "error.provider.acpNoModels":
     "ACP CLI не сообщил ни одной модели ACP. OpenBot не будет подбирать запасную модель наугад.",
   "error.provider.endpointRemoveBusy":
@@ -179,6 +180,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "{provider} остановился до начала этого сообщения. Отправьте сообщение ещё раз.",
   "error.provider.sessionStartTimedOut":
     "{provider} не открыл новый чат вовремя, поэтому это сообщение не началось. На компьютере, где работает OpenBot, откройте «Провайдеры», выберите {provider} и нажмите «Перезапустить». Затем попробуйте ещё раз.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} не открыл этот чат вовремя, поэтому это сообщение не началось. На компьютере, где работает OpenBot, откройте «Провайдеры», выберите {provider} и нажмите «Перезапустить». Затем попробуйте ещё раз.",
   "error.provider.serviceUnreachable":
     "{provider} не может подключиться к своему сервису. Проверьте подключение к интернету. OpenBot повторит попытку.",
   "error.provider.serviceUnreachableRefresh":
@@ -241,6 +244,7 @@ export const messages = {
     "OpenCode Go отклонил запрос. Новый API-ключ это не исправит. Возможно, ваш план OpenCode Go не активен или OpenCode Go блокирует вашу сеть: некоторые сервисы блокируют VPN, прокси или некоторые страны. Проверьте в OpenCode Console, что план активен, или отключите VPN, затем повторите попытку. Также можно выбрать другую модель.",
   "error.provider.opencodeServiceFailure":
     "OpenCode не смог завершить этот ход из-за сбоя локальной службы. Повторите попытку. Если ошибка повторяется, подключите OpenCode заново в настройках.",
+  "error.provider.opencodeStillStarting": "OpenCode не успел загрузиться. OpenBot попробует снова.",
   "error.provider.opencodeRateLimited":
     "Провайдер моделей отклонил запрос из-за ограничения частоты. Подождите несколько минут или выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.opencodeBilling":
@@ -269,6 +273,8 @@ export const messages = {
     "OpenCode не смог прочитать рассуждения этой модели при этом уровне усилий. Выберите меньший уровень усилий или другую модель, затем отправьте сообщение снова.",
   "error.provider.opencodeModelNotServed":
     "Провайдер модели сейчас не предоставляет эту модель вашему аккаунту. Выберите другую модель и отправьте сообщение ещё раз.",
+  "error.provider.opencodeSafetyBlocked":
+    "Провайдер модели заблокировал это сообщение из-за своих правил безопасности. Отправьте запрос снова другими словами. Если он заблокирует и следующие сообщения, начните новый чат или выберите другую модель.",
   "error.provider.opencodeNetwork":
     "OpenCode не смог подключиться к провайдеру моделей. Проверьте сетевое подключение компьютера, где работает OpenBot, и повторите попытку.\n{detail}",
   "error.provider.codexStateBusy":
@@ -279,8 +285,12 @@ export const messages = {
     "Linux остановил провайдера, потому что у OpenBot ограничение процессорного времени реального времени равно 0. Это ограничение задаёт ваша система. Установите и запустите rtkit (`rtkit-daemon`), выполните `systemctl --user restart xdg-desktop-portal`, затем перезапустите OpenBot. Один перезапуск xdg-desktop-portal не поможет, пока rtkit не установлен.",
   "error.provider.cpuUnsupported":
     "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
+  "error.provider.windowsBlocked":
+    "Параметры безопасности Windows, например интеллектуальное управление приложениями, не дали запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode не смог открыть свою базу данных, потому что её изменила более новая версия OpenCode. Обновите OpenCode до версии 2 или новее и повторите попытку.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "Grok не запустился, потому что параметр allowed_models в его настройках не включает его модель по умолчанию. Добавьте модель по умолчанию в allowed_models или удалите allowed_models, затем повторите попытку.",
   "error.provider.opencodeNoAnswer":
     "Модель OpenCode завершила ход без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -292,6 +302,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} остановился без ответа. Отправьте сообщение ещё раз.",
   "error.provider.channelNoAnswer":
     "{provider} завершил ход без ответа. В канале нажмите «Продолжить», чтобы снова запустить задачу, или «Переназначить», чтобы передать её другому участнику.",
+  "error.provider.acpProcessStopped": "{provider} остановился, не успев ответить. Отправьте сообщение ещё раз.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",
@@ -330,6 +341,8 @@ export const messages = {
     "{provider} не завершил предыдущий ход, поэтому не принял это сообщение. OpenBot начал новый сеанс {provider} с историей чата. Отправьте сообщение ещё раз.",
   "error.provider.antigravityLocationUnsupported":
     "Google не разрешает Gemini работать из сетевого местоположения компьютера, на котором работает этот агент. Используйте Gemini на другом компьютере или выберите другого провайдера для этого агента.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini остановился из-за ошибки. Отправьте сообщение ещё раз. Если он снова остановится, выберите другую модель или другого провайдера.",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
   "error.provider.grokServiceFailure":
@@ -416,6 +429,8 @@ export const messages = {
     "Этот чат стал слишком большим, чтобы отправить его модели. Часто причина — изображения в чате. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.opencodeSessionRejected":
     "OpenCode отклонил запрос и не указал причину. Это может произойти в длинном чате или после смены модели. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель или меньший уровень усилий.",
+  "error.provider.opencodeInputRefused":
+    "Модель отклонила содержимое этого чата и не указала причину. Причиной может быть файл в чате, например PDF или изображение. OpenBot начал новый сеанс OpenCode с историей чата. Отправьте сообщение ещё раз без файла или выберите другую модель.",
   "error.provider.opencodeCompactionFailed":
     "Модель не смогла сжать этот длинный чат, чтобы освободить место в окне контекста. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите более сильную модель.",
   "error.provider.museMcpStartupFault":
@@ -525,6 +540,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Этот параметр недоступен в текущей сессии провайдера.",
   "error.provider.sessionSettingInvalid": "Это значение недоступно для параметра.",
   "error.provider.sessionSettingsBusy": "Дождитесь окончания текущего хода, прежде чем менять параметр сессии.",
+  "error.provider.sessionSettingsTimedOut": "Сессия агента не ответила вовремя. Попробуйте ещё раз.",
   "error.provider.piOutdated":
     "Pi {version} слишком старый. Установите Pi 1.1.0 или новее для поддержки нативного RPC и MCP.",
   "error.provider.nativeMissing": "CLI {provider} не установлен. Скачайте его в настройках.",
@@ -532,6 +548,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
   "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
   "error.provider.acpSessionBusy": "{provider} ещё завершает остановленный ход. Повторите попытку чуть позже.",
+  "error.provider.acpSessionStale":
+    "{provider} не удалось загрузить последнюю версию этого чата. Отправьте сообщение ещё раз.",
   "error.provider.acpModelNotOffered":
     "{provider} сейчас не предлагает {model}. Выберите другую модель для этого агента и попробуйте снова.",
   "error.provider.piStopped": "Pi не запущен. Подключите Pi и повторите попытку.",
@@ -576,6 +594,8 @@ export const messages = {
   "error.provider.museTurnFailed": "Ход Muse не удался.",
   "error.provider.museModelUnavailable":
     "Muse не может использовать эту модель. Возможно, Muse недоступен в стране, где работает этот агент, или у этой учётной записи нет доступа к модели. Выберите другую модель и повторите попытку.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "Muse не удалось выполнить этот запрос. Muse использует сохранённый ключ Meta API, а не ваш вход. Замените ключ или удалите его в настройках, чтобы использовать вход.\n{detail}",
   "error.provider.museProfileUnsupported":
     "Muse не может создать профиль без доступа к внешним инструментам. Создайте профиль с другим провайдером, затем выберите Muse для агента.",
   "error.provider.museAuthUnverified":

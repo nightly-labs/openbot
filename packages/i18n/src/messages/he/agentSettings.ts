@@ -188,6 +188,7 @@ export const messages = {
     "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "agentSettings.newChat.confirm": "התחלת צ'אט חדש",
   "agentSettings.newChat.failed": "לא ניתן להתחיל צ'אט חדש.",
+  "agentSettings.newChat.busy": "הסוכן עובד עכשיו. כדי להתחיל צ'אט חדש, צריך לחכות שיסיים או לעצור אותו.",
   "agentSettings.deleteHistory.title": "מחיקת היסטוריה",
   "agentSettings.deleteHistory.description": "ההודעות בצ'אט הזה נמחקות והסוכן שוכח אותן. ההגדרות שלו נשארות.",
   "agentSettings.deleteHistory.button": "מחיקה",
@@ -233,6 +234,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "לאפשר לסוכן להתחיל צ'אט חדש כשהצ'אט שלו מתארך. קודם הוא שומר הערות.",
   "agentSettings.quickAcknowledgement.title": "הצגת התוכנית לפני משימות ארוכות",
   "agentSettings.quickAcknowledgement.description": "לפני משימה ארוכה, הסוכן מציג את התוכנית שלו.",
+  "agentSettings.builtinMemory.title": "הזיכרון של OpenBot",
+  "agentSettings.builtinMemory.description":
+    "הסוכן שומר וקורא את הזיכרונות שלו. כבו כדי להשתמש רק באפליקציית זיכרון, כמו Mem0. הזיכרונות השמורים נשארים.",
   "agentSettings.browserProfile.label": "פרופיל דפדפן",
   "agentSettings.browserProfile.shared": "משותף",
   "agentSettings.browserProfile.agent": "רק הסוכן הזה",

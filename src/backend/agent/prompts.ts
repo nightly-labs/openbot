@@ -17,6 +17,7 @@ import { decodeSharedLocationAnswer } from "@openbot/contracts/team-protocol/ui-
 import {
   normalizeUiBlockSpec,
   UI_API_KEY_SCOPE_FIELD_ID,
+  UI_CONFIRM_ACTION_QUESTION_ID,
   UI_CONFIRM_EDIT_ACTION_ID,
   UI_LOCATION_FIELD_ID,
   UI_VAULT_REQUEST_FIELDS,
@@ -25,6 +26,7 @@ import {
   type UiBlockSpec,
   type UiFormField,
   type UiVaultRequestField,
+  uiBlockFallbackQuestions,
 } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import type { SavedApiKey } from "../agent-api-keys";
@@ -406,6 +408,19 @@ export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record
       return [`${quoted(question.question)}\n\n${values.join(", ")}`];
     })
     .join("\n\n");
+}
+
+export function editedPreviewQuestions(
+  questions: AgentPromptQuestion[],
+  spec: UiBlockSpec | undefined,
+  preview: string | undefined,
+): AgentPromptQuestion[] {
+  if (preview === undefined || spec?.type !== "confirm") return questions;
+  return uiBlockFallbackQuestions({ ...spec, preview: "" }).map((question) =>
+    question.id === UI_CONFIRM_ACTION_QUESTION_ID
+      ? { ...question, question: `${question.question}\n\n${preview}` }
+      : question,
+  );
 }
 
 export function vaultLateAnswerText(title: string, savedName: string | null): string {

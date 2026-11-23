@@ -1,11 +1,18 @@
-import type { AgentEvent, AgentTask, AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import type {
+  AgentEvent,
+  AgentTask,
+  AgentTasksSnapshot,
+  ArchivedAgentTasksCursor,
+  ConversationSnapshot,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { retryOperationIds } from "@openbot/team-client/retry-operation-id";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
-import { isRoutineSteerRefusal } from "../../routine-steer-refusal";
+import { isQuietSteerRefusal } from "../../quiet-steer-refusal";
 import { createScopeGuard } from "../../scope-lifetime";
 import type { AgentTasksPort } from "./agent-tasks-port";
 
@@ -27,7 +34,19 @@ interface AgentTasksState {
   conversations: Record<string, ConversationSnapshot>;
   unread: Record<string, Record<string, number>>;
   history: Record<string, TaskHistory>;
+  archived: Record<string, ArchivedPages>;
 }
+
+interface ArchivedPages {
+  tasks: AgentTask[];
+  hasMore: boolean;
+  loading: boolean;
+}
+
+const listIsFull = (snapshot: AgentTasksSnapshot) => snapshot.tasks.length >= INPUT_LIMITS.agentTasks;
+
+const listedBefore = (task: AgentTask, other: AgentTask) =>
+  task.updatedAt > other.updatedAt || (task.updatedAt === other.updatedAt && task.threadId < other.threadId);
 
 interface TaskHistory {
   hasOlder: boolean;
@@ -67,6 +86,7 @@ export interface AgentTasksOptions {
   messageDeletable: () => boolean;
   pageable: () => boolean;
   aroundReadable: () => boolean;
+  archivedPageable: () => boolean;
   reloadKey: () => unknown;
 }
 
@@ -84,9 +104,17 @@ export function createAgentTasks(options: AgentTasksOptions) {
     messageDeletable,
     pageable,
     aroundReadable,
+    archivedPageable,
   } = options;
   const scopeIsCurrent = createScopeGuard();
-  const [state, setState] = createStore<AgentTasksState>({ snapshots: {}, conversations: {}, unread: {}, history: {} });
+  const [state, setState] = createStore<AgentTasksState>({
+    snapshots: {},
+    conversations: {},
+    unread: {},
+    history: {},
+    archived: {},
+  });
+  const archivedRequests = new Map<string, number>();
   const listRequests = new Map<string, number>();
   const readRequests = new Map<string, number>();
   const unreadRequests = new Map<string, number>();
@@ -149,7 +177,9 @@ export function createAgentTasks(options: AgentTasksOptions) {
   }
 
   function setSnapshot(snapshot: AgentTasksSnapshot): boolean {
-    const ids = new Set(snapshot.tasks.map((task) => task.id));
+    const listed = new Set(snapshot.tasks.map((task) => task.id));
+    const pages = untrack(() => keptArchivedPages(snapshot, listed));
+    const ids = new Set([...listed, ...(pages?.tasks.map((task) => task.id) ?? [])]);
     const stored = untrack(() => {
       const byId = new Map<string, AgentTask>();
       for (const task of state.snapshots[snapshot.agentId]?.tasks ?? []) byId.set(task.id, task);
@@ -175,6 +205,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     });
     setState((current) => {
       current.snapshots[snapshot.agentId] = { ...snapshot, tasks };
+      if (pages) current.archived[snapshot.agentId] = pages;
       for (const [taskId, conversation] of Object.entries(current.conversations)) {
         if (conversation.agentId === snapshot.agentId && !ids.has(taskId)) {
           delete current.conversations[taskId];
@@ -184,6 +215,77 @@ export function createAgentTasks(options: AgentTasksOptions) {
       }
     });
     return staleQueue;
+  }
+
+  function keptArchivedPages(snapshot: AgentTasksSnapshot, listed: ReadonlySet<string>): ArchivedPages | undefined {
+    const pages = state.archived[snapshot.agentId];
+    if (!pages) return undefined;
+    const oldest = snapshot.tasks.findLast((task) => task.state === "closed");
+    const left = listIsFull(snapshot)
+      ? (state.snapshots[snapshot.agentId]?.tasks ?? []).filter(
+          (task) => task.state === "closed" && !listed.has(task.id) && !(oldest && listedBefore(task, oldest)),
+        )
+      : [];
+    const seen = new Set(listed);
+    const tasks = [...left, ...pages.tasks].filter((task) => !seen.has(task.id) && seen.add(task.id));
+    return { ...pages, tasks: tasks.map((task) => ({ ...task })) };
+  }
+
+  function loadArchivedPage(agentId: string): void {
+    const list = port().listArchivedTasks;
+    const snapshot = state.snapshots[agentId];
+    if (!list || !snapshot || state.archived[agentId]?.loading) return;
+    const last = state.archived[agentId]?.tasks.at(-1) ?? snapshot.tasks.findLast((task) => task.state === "closed");
+    const before: ArchivedAgentTasksCursor | null = last
+      ? { updatedAt: last.updatedAt, threadId: last.threadId }
+      : null;
+    const request = (archivedRequests.get(agentId) ?? 0) + 1;
+    archivedRequests.set(agentId, request);
+    setState((current) => {
+      const pages = current.archived[agentId];
+      current.archived[agentId] = { tasks: pages?.tasks ?? [], hasMore: pages?.hasMore ?? true, loading: true };
+    });
+    const settle = (change: (pages: ArchivedPages) => ArchivedPages) => {
+      if (!scopeIsCurrent() || archivedRequests.get(agentId) !== request) return;
+      setState((current) => {
+        current.archived[agentId] = change(current.archived[agentId] ?? { tasks: [], hasMore: true, loading: false });
+      });
+    };
+    list({ agentId, before })
+      .then((page) =>
+        settle((pages) => {
+          const seen = new Set([
+            ...(state.snapshots[agentId]?.tasks ?? []).map((task) => task.id),
+            ...pages.tasks.map((task) => task.id),
+          ]);
+          return {
+            tasks: [...pages.tasks, ...page.tasks.filter((task) => !seen.has(task.id))],
+            hasMore: page.hasMore,
+            loading: false,
+          };
+        }),
+      )
+      .catch((error) => {
+        settle((pages) => ({ ...pages, loading: false }));
+        if (!scopeIsCurrent() || archivedRequests.get(agentId) !== request) return;
+        const { t, errorMessage } = currentText();
+        actionToast.error(errorMessage(error, t("conversation.threads.error.load")));
+      });
+  }
+
+  function dropArchivedPages(agentId: string): void {
+    if (!untrack(() => state.archived[agentId])) return;
+    archivedRequests.set(agentId, (archivedRequests.get(agentId) ?? 0) + 1);
+    setState((current) => {
+      delete current.archived[agentId];
+    });
+  }
+
+  function updateArchivedPage(agentId: string, taskId: string, change: (tasks: AgentTask[]) => AgentTask[]): void {
+    setState((current) => {
+      const pages = current.archived[agentId];
+      if (pages?.tasks.some((task) => task.id === taskId)) pages.tasks = change(pages.tasks);
+    });
   }
 
   function queuedKey(task: AgentTask): string {
@@ -426,7 +528,10 @@ export function createAgentTasks(options: AgentTasksOptions) {
     }),
     ({ agentId, shown, running }) => {
       if (!shown) return;
-      for (const id of new Set([...(agentId ? [agentId] : []), ...running])) void loadTasks(id);
+      for (const id of new Set([...(agentId ? [agentId] : []), ...running])) {
+        dropArchivedPages(id);
+        void loadTasks(id);
+      }
     },
   );
 
@@ -611,7 +716,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       const task = state.snapshots[agentId]?.tasks.find((entry) => entry.id === taskId);
       if (task?.activeTurnId !== expectedTurnId) return;
       if (!task.queue?.some((delivery) => delivery.id === deliveryId)) return;
-      if (isRoutineSteerRefusal(error)) return;
+      if (isQuietSteerRefusal(error)) return;
       const { t, errorMessage } = currentText();
       actionToast.error(errorMessage(error, t("app.errorStatus.steer")));
     });
@@ -647,6 +752,10 @@ export function createAgentTasks(options: AgentTasksOptions) {
       () => port().renameTask({ agentId, taskId, title }),
       "conversation.threads.error.rename",
     );
+    if (done !== null && scopeIsCurrent())
+      updateArchivedPage(agentId, taskId, (tasks) =>
+        tasks.map((task) => (task.id === taskId ? { ...task, title } : task)),
+      );
     return done !== null;
   }
 
@@ -660,6 +769,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
       delete current.conversations[taskId];
       delete current.history[taskId];
     });
+    updateArchivedPage(agentId, taskId, (tasks) => tasks.filter((task) => task.id !== taskId));
     hidden.delete(taskId);
     return true;
   }
@@ -777,6 +887,7 @@ export function createAgentTasks(options: AgentTasksOptions) {
     for (const snapshot of Object.values(state.snapshots))
       if (snapshot.tasks.some((task) => task.state === "running")) agentIds.add(snapshot.agentId);
     for (const agentId of agentIds) {
+      dropArchivedPages(agentId);
       void loadTasks(agentId).then((loaded) => {
         if (!loaded) return;
         for (const [taskId, conversation] of Object.entries(state.conversations)) {
@@ -792,7 +903,19 @@ export function createAgentTasks(options: AgentTasksOptions) {
     queuedMessageMovable,
     filesAccepted,
     repliable,
-    snapshot: (agentId: string): AgentTasksSnapshot | undefined => state.snapshots[agentId],
+    snapshot: (agentId: string): AgentTasksSnapshot | undefined => {
+      const snapshot = state.snapshots[agentId];
+      const pages = state.archived[agentId]?.tasks;
+      return snapshot && pages?.length ? { ...snapshot, tasks: [...snapshot.tasks, ...pages] } : snapshot;
+    },
+    olderArchived: (agentId: string): { loading: boolean } | undefined => {
+      const snapshot = state.snapshots[agentId];
+      const pages = state.archived[agentId];
+      if (!snapshot || !archivedPageable() || !port().listArchivedTasks) return undefined;
+      if (pages ? !pages.hasMore : !listIsFull(snapshot)) return undefined;
+      return { loading: pages?.loading ?? false };
+    },
+    loadArchivedPage,
     conversation: (taskId: string): ConversationSnapshot | undefined => state.conversations[taskId],
     olderMessages: (taskId: string): { loading: boolean } | undefined => {
       const history = state.history[taskId];

@@ -440,8 +440,9 @@ loopback too. Its client is the OpenBot Meta app 1479376854168579, with no secre
 listener of the computer where the browser runs, and a joined server uses the
 [callback relay](#remote-sign-in-the-callback-relay) as before. The relay always names port 28417:
 when another program holds that port, the sign-in cannot finish. A sign-in app that the admin saves
-replaces the built-in client and uses the loopback address. The Meta app must list the relay address
-in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
+replaces the built-in client, but it keeps the built-in client's redirect: Meta refuses the loopback
+address for every app (#13663). The "Sign-in app" section shows that redirect as its callback URL.
+The Meta app must list the relay address in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
 App Review puts the app in Live mode. `bun run test:mcp-sign-in-https-relay` checks the Meta page,
 the relay, and that another server that names Meta's issuer does not get the app.
 

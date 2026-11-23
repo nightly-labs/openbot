@@ -410,6 +410,9 @@ export const messages = {
   "mobile.agent.planCard.label": "長いタスクの前に計画を表示",
   "mobile.agent.planCard.footer":
     "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
+  "mobile.agent.builtinMemory.label": "OpenBot のメモリー",
+  "mobile.agent.builtinMemory.footer":
+    "エージェントが自分のメモリーを保存して読み込みます。Mem0 などのメモリーアプリだけを使うにはオフにします。保存済みのメモリーは残ります。",
   "mobile.agent.workspace.title": "ワークスペースのフォルダー",
   "mobile.agent.workspace.footer": "ホストのコンピューター上にある、このエージェントのフォルダーです。",
   "mobile.agent.advanced.behavior": "動作",
@@ -614,7 +617,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "チャットが開いていません",
   "mobile.agent.home.noChatOpenBody": "リストからチャットを選んでください。",
   "mobile.agent.home.chatListWidth": "チャットリストの幅",
-  "mobile.agent.home.serverTitle": "{name}、サーバーを開く",
   "mobile.agent.home.waiting": "接続を待っています",
   "mobile.agent.home.waitingBody": "このサーバーが接続されると、エージェントの一覧が読み込まれます。",
   "mobile.agent.home.noAgents": "このサーバーにエージェントはいません",

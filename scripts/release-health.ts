@@ -251,17 +251,37 @@ const arrivalsSql = (windows: readonly Window[]) => {
   const target = `multiIf(${windows
     .map((window) => `created_at >= ${at(window.from)} AND created_at < ${at(window.installsTo)}, '${window.version}'`)
     .join(", ")}, '')`;
-  return `SELECT
-  installs.version AS version,
-  installs.grp AS grp,
-  count() AS installs,
-  countIf(starts.last_start >= installs.installed_at) AS arrived
+  const deadline = `multiIf(${windows
+    .map((window) => `installs.version = '${window.version}', ${at(window.to)}`)
+    .join(", ")}, ${at(windows[0]?.from ?? "")})`;
+  const firstFrom = at(windows.map((window) => window.from).sort()[0] ?? "");
+  const lastTo = at(
+    windows
+      .map((window) => window.to)
+      .sort()
+      .at(-1) ?? "",
+  );
+  return `SELECT version, grp, count() AS installs, countIf(arrived) AS arrived
 FROM (
-  SELECT profile_id, ${target} AS version, any(properties['platform']) AS grp, min(created_at) AS installed_at
+  SELECT
+    installs.version AS version,
+    installs.grp AS grp,
+    max(
+      starts.started_at >= installs.installed_at
+      AND starts.started_at < ${deadline}
+      AND starts.version != installs.from_version
+    ) AS arrived
+  FROM (
+  SELECT
+    profile_id,
+    ${target} AS version,
+    any(properties['platform']) AS grp,
+    min(created_at) AS installed_at,
+    argMin(properties['app_version'], created_at) AS from_version
   FROM events
   WHERE name = 'update_action' AND ${environment}
     AND properties['action'] = 'install' AND properties['result'] = 'succeeded'
-    AND created_at >= ${at(windows.map((window) => window.from).sort()[0] ?? "")}
+    AND created_at >= ${firstFrom}
     AND created_at < ${at(
       windows
         .map((window) => window.installsTo)
@@ -270,14 +290,15 @@ FROM (
     )}
     AND version != '' AND properties['app_version'] != version
   GROUP BY profile_id, version
-) AS installs
-LEFT JOIN (
-  SELECT profile_id, properties['app_version'] AS version, max(created_at) AS last_start
-  FROM events
-  WHERE name = 'system_startup' AND ${environment}
-    AND (${windows.map((window) => inWindow(window, "properties['app_version']")).join(" OR ")})
-  GROUP BY profile_id, version
-) AS starts ON installs.profile_id = starts.profile_id AND installs.version = starts.version
+  ) AS installs
+  LEFT JOIN (
+    SELECT profile_id, properties['app_version'] AS version, created_at AS started_at
+    FROM events
+    WHERE name = 'system_startup' AND ${environment}
+      AND created_at >= ${firstFrom} AND created_at < ${lastTo}
+  ) AS starts ON installs.profile_id = starts.profile_id
+  GROUP BY installs.profile_id, installs.version, installs.grp
+)
 GROUP BY version, grp WITH ROLLUP`;
 };
 

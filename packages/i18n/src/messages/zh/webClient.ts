@@ -36,7 +36,7 @@ export const messages = {
     "创建云服务器，即可在这个浏览器中与你的助手对话。你也可以在自己的电脑上运行 OpenBot，或通过邀请加入服务器。",
   "webClient.connect.stepInstall": "在你的电脑上安装并打开 OpenBot。",
   "webClient.connect.stepSignIn": "用邮箱登录。",
-  "webClient.connect.stepRemote": "开启远程访问。",
+  "webClient.connect.stepRemote": "在 OpenBot 中打开服务器设置 > 成员，然后打开发布该服务器。",
   "webClient.notice.download": "下载 OpenBot",
   "webClient.notice.createServer": "创建云服务器",
   "webClient.notice.join": "用邀请加入",

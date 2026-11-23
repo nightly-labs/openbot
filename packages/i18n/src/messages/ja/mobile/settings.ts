@@ -461,6 +461,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "サーバー",
   "mobile.settings.voice.gptLive.serversFooter":
     "サインインが必要なサーバーをタップすると、Codex を ChatGPT アカウントに接続できます。サーバーのサインインはオーナーと管理者にだけ表示されます。",
+  "mobile.settings.voice.gptLive.account": "GPT ライブ音声のアカウント",
   "mobile.settings.voice.gptLive.status.ready": "準備完了",
   "mobile.settings.voice.gptLive.status.supported": "対応",
   "mobile.settings.voice.gptLive.status.offline": "オフライン",

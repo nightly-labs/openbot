@@ -89,6 +89,10 @@ export const UserControl: Story = {
   args: { working: true, island: { kind: "activity", control: "user" }, onHandoff: fn() },
 };
 
+export const StepRequest: Story = {
+  args: { island: { kind: "activity", control: "request" }, onHandoff: fn() },
+};
+
 export const SecretRequest: Story = {
   args: { working: true, island: { kind: "secret", request: secretRequest } },
 };

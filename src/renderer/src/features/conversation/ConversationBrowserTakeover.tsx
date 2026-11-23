@@ -25,6 +25,8 @@ export function ConversationBrowserTakeover() {
   const { t, errorMessage } = useText();
   const runtime = conversationRuntime(props);
   const platform = usePlatform();
+  const signInStaysOffServer = () =>
+    localSignIn.blockedTakeover() !== undefined || localSignIn.needsDesktopForTakeover();
   const openPage = () => {
     const chatWindow = platform.chatWindow;
     const request = props.browserTakeover;
@@ -42,7 +44,7 @@ export function ConversationBrowserTakeover() {
             }),
           );
     }
-    return canOpenBrowserTakeoverTab() ? () => openBrowserTakeoverTab() : undefined;
+    return canOpenBrowserTakeoverTab() && !signInStaysOffServer() ? () => openBrowserTakeoverTab() : undefined;
   };
   const completeHere = () =>
     !(

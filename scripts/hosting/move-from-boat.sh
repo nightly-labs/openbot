@@ -39,7 +39,12 @@ for cache in "${BROWSER_CACHES[@]}"; do
   EXCLUDED+=("--exclude=./home/$SERVICE_USER/.config/OpenBot/$cache"
     "--exclude=./home/$SERVICE_USER/.config/OpenBot/Partitions/*/$cache")
 done
-unset browser cache
+MANAGED_PROVIDERS="codex claude grok opencode antigravity cursor cline kimi devin copilot mistral pi muse"
+EXCLUDED+=("--exclude=./home/$SERVICE_USER/.config/OpenBot/provider-runtimes/.downloads")
+for provider in $MANAGED_PROVIDERS; do
+  EXCLUDED+=("--exclude=./home/$SERVICE_USER/.config/OpenBot/provider-runtimes/$provider")
+done
+unset browser cache provider
 BASE_IMAGES=" c4ed68db-513f-4b6d-a61a-64b99b0c2a2c 5f37c910-7706-423d-b524-5c66b09885d2
   035a4024-1725-41b0-b527-92345aa06e52 08f1b42f-5ca2-42b9-8810-4f614bf15435 2834754b-4ed4-4046-b59b-b873c7d7a341
   2f3898e2-33f8-4a3d-899c-c5a895ce9553 3260cfc8-62ef-47a7-8df7-359044f467f1 42c68752-21f8-440d-b16c-0d965e3e3657
@@ -68,10 +73,6 @@ BASE_APT=" gir1.2-javascriptcoregtk-4.1 gir1.2-webkit2-4.1 libatk1.0-dev libbz2-
   libsqlite3-dev libssl-dev libusb-1.0-0 libwebkit2gtk-4.1-0 libxml2-dev libyaml-dev openjdk-11-jdk
   pkg-config tk-dev zlib1g-dev "
 IMAGE_CLIS=(
-  "/usr/local/lib/node_modules/@anthropic-ai/claude-code .claude/.credentials.json"
-  "/usr/local/lib/node_modules/@openai/codex .codex/auth.json"
-  "/usr/local/lib/node_modules/@earendil-works/pi-coding-agent .pi/agent/auth.json"
-  "/opt/cursor-agent .config/cursor/auth.json .cursor/auth.json"
   "/usr/local/lib/hermes-agent .hermes/auth.json .hermes/.env"
 )
 IMAGE_FILES=" ff8ca7fbf619841dedc57f117602b8fc860e69f041ec120a4e8deffa45590919 "
@@ -880,7 +881,7 @@ import_data() {
   done <<<"$clis"
   if [ -n "$missing" ]; then
     printf 'The sandbox had these commands from npm, and this machine does not have them:\n%s' "$missing"
-    echo "The customer did not sign in to these CLIs in the sandbox. OpenBot asks the customer to download a provider CLI before its first use."
+    echo "At start, OpenBot downloads the CLI of each provider that an agent uses. The customer downloads the CLI of another provider in OpenBot."
   fi
   groups=$(sed -n 's/^group=//p' <<<"$manifest" | grep -E '^[a-z_][a-z0-9_-]*$' || true)
   missing=""

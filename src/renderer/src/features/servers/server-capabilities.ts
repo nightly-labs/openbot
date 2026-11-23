@@ -66,6 +66,7 @@ export function serverSupportsCapability(
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
       capability === "agent-plan-card-v1" ||
+      capability === "agent-builtin-memory-v1" ||
       capability === "agent-defaults-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||
@@ -97,6 +98,8 @@ export function serverSupportsCapability(
       capability === "browsing-memory-v1" ||
       capability === "browser-teach-v1" ||
       capability === "prompt-cache-ttl-v1" ||
+      capability === "prompt-cache-ttl-pi-v1" ||
+      capability === "cache-expiry-compaction-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
@@ -129,6 +132,7 @@ export function serverSupportsCapability(
       capability === "agent-thread-replies-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
+      capability === "side-question-threads-v1" ||
       capability === "workflows-github-v1" ||
       capability === "agent-notification-levels-v1" ||
       capability === "sidebar-pins-v1" ||
@@ -150,6 +154,7 @@ export function serverSupportsCapability(
       capability === "workflows-channels-v1" ||
       capability === "workflows-media-v1" ||
       capability === "workflows-agent-files-v1" ||
+      capability === "workflow-folders-v1" ||
       capability === "vault-import-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||
@@ -162,7 +167,8 @@ export function serverSupportsCapability(
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
       capability === "owner-transfer-v1" ||
-      capability === "provider-detection-v1") &&
+      capability === "provider-detection-v1" ||
+      capability === "workspace-directory-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;
@@ -248,8 +254,13 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
 export function localCodeSignInProviders(platform: string | undefined): readonly AgentProviderId[] {
   const paste = platform !== undefined && pasteCodeSignInSupported(platform);
   return AGENT_PROVIDERS.filter((provider) => {
-    const codeSignIn = agentProviderDescriptor(provider).localCodeSignIn;
-    return codeSignIn === "device" || (codeSignIn === "paste" && paste);
+    const descriptor = agentProviderDescriptor(provider);
+    const codeSignIn = descriptor.localCodeSignIn;
+    return (
+      codeSignIn === "device" ||
+      (codeSignIn === "paste" && paste) ||
+      (platform === "win32" && descriptor.windowsCodeSignIn === "paste")
+    );
   });
 }
 

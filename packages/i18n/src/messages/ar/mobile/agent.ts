@@ -438,6 +438,9 @@ export const messages = {
   "mobile.agent.browserProfile.saveFailed": "تعذّر على OpenBot تغيير ملف تعريف المتصفح للوكيل.",
   "mobile.agent.planCard.label": "عرض الخطة قبل المهام الطويلة",
   "mobile.agent.planCard.footer": "قبل مهمة طويلة، يعرض الوكيل خطته. يبدأ بعد 10 ث، أو عندما تضغط «بدء».",
+  "mobile.agent.builtinMemory.label": "ذاكرة OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "يحفظ الوكيل ذكرياته ويقرؤها. أوقفها لاستخدام تطبيق ذاكرة فقط، مثل Mem0. تبقى الذكريات المحفوظة.",
   "mobile.agent.workspace.title": "مجلد مساحة العمل",
   "mobile.agent.workspace.footer": "مجلد هذا الوكيل على حاسوب المضيف.",
   "mobile.agent.advanced.behavior": "السلوك",
@@ -678,7 +681,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "لا دردشة مفتوحة",
   "mobile.agent.home.noChatOpenBody": "اختر دردشة من القائمة.",
   "mobile.agent.home.chatListWidth": "عرض قائمة الدردشات",
-  "mobile.agent.home.serverTitle": "{name}، فتح الخوادم",
   "mobile.agent.home.waiting": "في انتظار الاتصال",
   "mobile.agent.home.waitingBody": "ستُحمّل قائمة الوكلاء بعد اتصال هذا الخادم.",
   "mobile.agent.home.noAgents": "لا وكلاء على هذا الخادم",

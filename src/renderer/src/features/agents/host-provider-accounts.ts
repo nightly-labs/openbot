@@ -18,9 +18,15 @@ export function withHostAccounts(status: AgentStatus, host: HostProviderAccounts
     providers: status.providers.map((row) => {
       const rows = accounts.get(row.id);
       if (!rows) return row;
-      const { accountPool: _released, ...rest } = row;
+      const { accountPool: _released, liveVoiceAccount: _voice, ...rest } = row;
       const pool = pools.get(row.id);
-      return pool ? { ...rest, accounts: rows, accountPool: pool } : { ...rest, accounts: rows };
+      const liveVoiceAccount = row.id === "codex" ? host.liveVoiceAccount : null;
+      return {
+        ...rest,
+        accounts: rows,
+        ...(pool ? { accountPool: pool } : {}),
+        ...(liveVoiceAccount ? { liveVoiceAccount } : {}),
+      };
     }),
   };
 }

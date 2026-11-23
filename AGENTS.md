@@ -36,6 +36,9 @@ and state which default you set aside. Do not argue by citing this file.
 - **Keep the renderer-to-main trust boundary:** Electron sandboxing, context isolation, navigation
   policy, IPC sender validation, and their tests. Coding agents already have `danger-full-access`.
 - **Redact secrets** on every log, export, and send path, including diagnostics and analytics.
+  Exception: an agent's chat-app post (`redactPostText`) masks known key formats and a saved secret
+  only as a whole token, not inside a word, an email address or a domain, and not labeled passwords
+  that are not saved. Decided by the developer on 2026-11-22.
 - **Keep PolyForm Noncommercial 1.0.0.** Do not add incompatible dependencies or relicense files.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md#security-sensitive-changes) when a change touches the trust
@@ -59,6 +62,11 @@ adding a module or moving ownership between workspaces.
 - Cloudflare holds accounts, avatars, host configuration, memberships, invitations, and logical
   sessions; it does not hold chats, files, or commands. It also holds the signed JavaScript bundles
   of mobile over-the-air updates (`apps/mobile-updates`), which are public code and have no user data.
+  Exception: a workflow step with an OpenBot credits model sends its prompt and input pictures through
+  the account service (`/v1/media/*`) to the media generation processor, and the result file comes
+  back the same way. The account service passes them through in transit only: it does not store or
+  log them, and keeps only the credit hold record. Keep the processor's name, address, key and model
+  mapping in secrets and D1, never in the repository.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
@@ -136,6 +144,9 @@ are designed for a computer screen only.
   do not list phone gaps in reports. A narrow desktop window and the compact sidebar stay in scope.
   The narrowest window is the `minWidth` in `src/main/main-window.ts`: 960 px for the main window
   and 380 px for a separate chat window. Design the web client for 960 px and wider too.
+  On a tiling Linux desktop (`src/main/linux-tiling-desktop.ts`) the compositor sets the size and
+  the windows have no minimum. Below 721 px the main window zooms out, so its layout stays at
+  least 721 CSS px wide and keeps the desktop layout.
 - On a phone (narrow screen and touch pointer), the web client opens on `WebPhoneAppScreen`, which
   links to the App Store and Google Play. "Continue in browser" keeps the old phone layout
   (`WebMobileNavigation` and the `max-width: 720px` rules in `web-client.css`). Keep it working;

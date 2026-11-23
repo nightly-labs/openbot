@@ -78,7 +78,7 @@ export async function makeGitWorkspace(workspace: string): Promise<(...args: str
 
 export function openbotConfig(read: DynamicRecord | null, promptSettings = true) {
   return {
-    tools: { update_plan: { enabled: true } },
+    tools: { update_plan: { enabled: true }, experimental_request_user_input: { enabled: false } },
     ...CODEX_FEATURES_CONFIG,
     ...(promptSettings ? codexPromptSettings(read) : {}),
     project_doc_max_bytes: 65_536,

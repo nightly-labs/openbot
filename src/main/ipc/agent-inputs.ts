@@ -32,6 +32,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAgentTaskLimit,
+  isArchivedAgentTasksCursor,
   isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
@@ -41,6 +42,7 @@ import {
   isProviderAccountId,
   isReasoningEffort,
   isRoutineSchedule,
+  type ListArchivedAgentTasksInput,
   type ListChannelRoutineRunsInput,
   type ListRoutineRunsInput,
   type MarkAgentTaskReadInput,
@@ -629,6 +631,16 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   };
 }
 
+export function parseListArchivedAgentTasks(value: unknown): ListArchivedAgentTasksInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  if (value.before !== null && !isArchivedAgentTasksCursor(value.before))
+    throw new Error("Invalid archived thread place.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    before: value.before === null ? null : { updatedAt: value.before.updatedAt, threadId: value.before.threadId },
+  };
+}
+
 export function parseReadAgentTaskPage(value: unknown): ReadAgentTaskPageInput {
   if (!isObject(value)) throw new Error("Invalid task request.");
   return {
@@ -794,6 +806,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.allowNewChat !== undefined) {
     if (value.allowNewChat !== null && !isBoolean(value.allowNewChat)) throw new Error("Invalid new chat value.");
     result.allowNewChat = value.allowNewChat;
+  }
+  if (value.memory !== undefined) {
+    if (!isBoolean(value.memory)) throw new Error("Invalid memory value.");
+    result.memory = value.memory;
   }
   if (value.quickAcknowledgement !== undefined) {
     if (value.quickAcknowledgement !== null && !isBoolean(value.quickAcknowledgement))

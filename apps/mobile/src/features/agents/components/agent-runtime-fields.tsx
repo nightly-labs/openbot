@@ -187,7 +187,7 @@ export function AgentRuntimeFields({
                   onChange({ provider: undefined, model: undefined, reasoningEffort: undefined });
                   return;
                 }
-                const next = models.data?.find((option) => option.provider === value);
+                const next = models.data?.find((option) => option.provider === value && option.listing !== "kept");
                 if (next)
                   onChange({ provider: next.provider, model: next.id, reasoningEffort: next.defaultReasoningEffort });
               }}

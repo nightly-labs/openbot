@@ -150,7 +150,6 @@ export const messages = {
   "status.agent.vaultField.country": "رمز البلد",
   "status.agent.vaultField.phone": "الهاتف",
   "status.agent.vaultField.email": "عنوان البريد الإلكتروني",
-  "status.agent.finishCheckContinues": "لم يكتمل الطلب بعد. سيتابع الوكيل ({current} من {limit}).",
   "status.agent.nextStepContinues": "توقف الوكيل قبل خطوته التالية. سيتابع ({current} من {limit}).",
   "status.agent.planContinues": "في الخطة خطوات مفتوحة. سيتابع الوكيل ({current} من {limit}).",
   "status.agent.planStopped": "توقف الوكيل وفي خطته خطوات مفتوحة. أرسل رسالة للمتابعة.",

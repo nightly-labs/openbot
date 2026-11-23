@@ -436,6 +436,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Показывать план перед долгими задачами",
   "mobile.agent.planCard.footer":
     "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
+  "mobile.agent.builtinMemory.label": "Память OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "Агент сохраняет и читает свою память. Выключите, чтобы использовать только приложение памяти, например Mem0. Сохранённая память остаётся.",
   "mobile.agent.workspace.title": "Папка рабочего пространства",
   "mobile.agent.workspace.footer": "Папка этого агента на компьютере-хосте.",
   "mobile.agent.advanced.behavior": "Поведение",
@@ -670,7 +673,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Чат не открыт",
   "mobile.agent.home.noChatOpenBody": "Выберите чат в списке.",
   "mobile.agent.home.chatListWidth": "Ширина списка чатов",
-  "mobile.agent.home.serverTitle": "{name}, открыть серверы",
   "mobile.agent.home.waiting": "Ожидание подключения",
   "mobile.agent.home.waitingBody": "Список агентов загрузится, когда сервер подключится.",
   "mobile.agent.home.noAgents": "На этом сервере нет агентов",

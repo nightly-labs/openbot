@@ -417,6 +417,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Plan vor langen Aufgaben zeigen",
   "mobile.agent.planCard.footer":
     "Vor einer langen Aufgabe zeigt der Agent seinen Plan. Er beginnt nach 10 s oder wenn du auf Start drückst.",
+  "mobile.agent.builtinMemory.label": "OpenBot-Erinnerungen",
+  "mobile.agent.builtinMemory.footer":
+    "Der Agent speichert und liest eigene Erinnerungen. Schalte dies aus, um nur eine Gedächtnis-App wie Mem0 zu nutzen. Gespeicherte Erinnerungen bleiben.",
   "mobile.agent.workspace.title": "Arbeitsbereichsordner",
   "mobile.agent.workspace.footer": "Der Ordner dieses Agenten auf dem Host-Computer.",
   "mobile.agent.advanced.behavior": "Verhalten",
@@ -625,7 +628,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Kein Chat geöffnet",
   "mobile.agent.home.noChatOpenBody": "Wähle einen Chat in der Liste.",
   "mobile.agent.home.chatListWidth": "Breite der Chatliste",
-  "mobile.agent.home.serverTitle": "{name}, Server öffnen",
   "mobile.agent.home.waiting": "Warten auf Verbindung",
   "mobile.agent.home.waitingBody": "Die Agentenliste wird geladen, sobald dieser Server verbunden ist.",
   "mobile.agent.home.noAgents": "Keine Agenten auf diesem Server",

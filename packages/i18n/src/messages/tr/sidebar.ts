@@ -155,9 +155,9 @@ export const messages = {
   "sidebar.announce.movedPinned": "Sabitlenen sohbet {position}/{total} konumuna taşındı.",
   "sidebar.announce.personFallback": "kişi",
   "sidebar.announce.chatFallback": "sohbet",
-  "sidebar.mobileApp.title": "Mobil için OpenBot",
-  "sidebar.mobileApp.body": "Uygulama artık iPhone ve Android'de.",
-  "sidebar.mobileApp.howToInstall": "Nasıl yüklenir",
+  "sidebar.mobileApp.pocketTitle": "Ajanlarınız cebinizde",
+  "sidebar.mobileApp.iphone": "iPhone",
+  "sidebar.mobileApp.android": "Android",
   "sidebar.mobileApp.dismiss": "Mobil uygulama duyurusunu kapat",
   "sidebar.storage.lowTitle": "Depolama neredeyse dolu",
   "sidebar.storage.fullTitle": "Depolama dolu",
@@ -165,6 +165,10 @@ export const messages = {
   "sidebar.storage.fullBody":
     "{server} üzerinde {total} alanın {used} kadarı kullanılıyor. Ajanlar dosya kaydedemeyebilir.",
   "sidebar.storage.meterLabel": "{server} üzerinde kullanılan depolama",
+  "sidebar.storage.bodyThisComputer": "Bu bilgisayarda {total} alanın {used} kadarı kullanılıyor.",
+  "sidebar.storage.fullBodyThisComputer":
+    "Bu bilgisayarda {total} alanın {used} kadarı kullanılıyor. Ajanlar dosya kaydedemeyebilir.",
+  "sidebar.storage.meterLabelThisComputer": "Bu bilgisayarda kullanılan depolama",
   "sidebar.storage.used": "{percent} kullanılıyor",
   "sidebar.storage.freeUpSpace": "Yer aç",
   "sidebar.storage.dismiss": "Depolama dolana kadar gizle",

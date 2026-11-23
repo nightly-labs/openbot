@@ -24,4 +24,7 @@ export const messages = {
   "preview.tooLarge.description": "プレビューは 100 MB までです。このファイルは既定のアプリで開けます。",
   "preview.spreadsheet.readFailed": "このスプレッドシートを読み込めませんでした。",
   "preview.spreadsheet.truncated": "プレビューは最初の {rows} 行と {columns} 列までです。",
+  "preview.document.readFailed": "このドキュメントを読み込めませんでした。",
+  "preview.document.empty": "このドキュメントには表示できるテキストがありません。",
+  "preview.document.truncated": "プレビューはドキュメントの最初の部分までです。",
 } as const satisfies PartialTranslation<typeof source>;

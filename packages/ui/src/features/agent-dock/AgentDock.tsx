@@ -24,7 +24,7 @@ import {
   Show,
   untrack,
 } from "solid-js";
-import { AmbientMotion } from "../../ambient-motion";
+import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
 import type { AvatarMood } from "../../bloub-avatar";
 import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
@@ -357,7 +357,8 @@ export function AgentDock(props: AgentDockProps) {
   const tuck = motion.spring(untrack(() => props.tucked) ? TUCK_DISTANCE : 0, TUCK);
   const [dragging, setDragging] = createSignal(false);
   const [pointerOn, setPointerOn] = createSignal(false);
-  const ambientMotion = () => pointerOn() || dragging() || state.open !== null;
+  const windowMotion = useAmbientMotion();
+  const ambientMotion = () => windowMotion() && (pointerOn() || dragging() || state.open !== null);
   const seatMotion = new Map<string, { y: Spring; scale: Spring }>();
 
   function seatSprings(id: string, y = PANEL_HEIGHT / 2) {
@@ -924,7 +925,8 @@ export function AgentDock(props: AgentDockProps) {
     if (!props.onMove || event.button !== 0 || endSeatDrag || leaving.has(id) || !state.seats.includes(id)) return;
     const element = event.currentTarget;
     const pointerId = event.pointerId;
-    const startY = event.clientY;
+    const stageTop = () => stage.getBoundingClientRect().top;
+    const startY = event.clientY - stageTop();
     const springs = seatSprings(id);
     const initial = [...state.seats];
     let order = initial;
@@ -950,8 +952,9 @@ export function AgentDock(props: AgentDockProps) {
     };
     const scroll = () => {
       const view = seatScroll.getBoundingClientRect();
-      const above = view.top + SEAT_FADE - pointerY;
-      const below = pointerY - (view.bottom - SEAT_FADE);
+      const top = stageTop();
+      const above = view.top - top + SEAT_FADE - pointerY;
+      const below = pointerY - (view.bottom - top - SEAT_FADE);
       const step = above > 0 ? -above : below > 0 ? below : 0;
       const before = seatScroll.scrollTop;
       if (step !== 0) seatScroll.scrollTop = before + step * SEAT_DRAG_SCROLL;
@@ -969,7 +972,7 @@ export function AgentDock(props: AgentDockProps) {
     };
     const move = (moved: PointerEvent) => {
       if (moved.pointerId !== pointerId) return;
-      pointerY = moved.clientY;
+      pointerY = moved.clientY - stageTop();
       if (!started && Math.abs(pointerY - startY) < SEAT_DRAG_START) return;
       if (!started) start();
       follow();

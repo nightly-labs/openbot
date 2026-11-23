@@ -41,6 +41,7 @@ const SCRIPT_WORLD = 1_018;
 const PASSWORD_FIELD_SCRIPT = `Array.from(document.querySelectorAll("input[type=password]")).some((field) => field.getClientRects().length > 0)`;
 const STORAGE_SCRIPT = `({ origin: location.origin, entries: Object.keys(localStorage).map((name) => ({ name, value: localStorage.getItem(name) ?? "" })) })`;
 const STORAGE_READ_TIMEOUT_MS = 2_000;
+const ERR_ABORTED = -3;
 
 export class LocalSignInFailed extends Schema.TaggedError<LocalSignInFailed>()("LocalSignInFailed", {
   cause: Schema.Defect(),
@@ -57,7 +58,7 @@ interface PendingSignIn extends LocalSignInTarget {
   host: string;
   session: Session;
   window: BrowserWindow | null;
-  ended: Deferred.Deferred<LocalSignInEnd>;
+  ended: Deferred.Deferred<LocalSignInEnd, LocalSignInFailed>;
   signInSeen: boolean;
   cookieAfterSignIn: boolean;
   check: ReturnType<typeof setTimeout> | null;
@@ -135,7 +136,7 @@ export class LocalSignInWindows {
     const pending = this.#pending;
     if (pending && (pending.serverId !== target.serverId || pending.tabId !== target.tabId)) yield* this.discard();
     const current = this.#pending ?? this.#start(target, new URL(url).hostname);
-    if (Deferred.isDoneUnsafe(current.ended)) current.ended = Deferred.makeUnsafe<LocalSignInEnd>();
+    if (Deferred.isDoneUnsafe(current.ended)) current.ended = Deferred.makeUnsafe<LocalSignInEnd, LocalSignInFailed>();
     if (current.window && !current.window.isDestroyed()) {
       current.window.show();
       current.window.focus();
@@ -196,7 +197,7 @@ export class LocalSignInWindows {
       host,
       session,
       window: null,
-      ended: Deferred.makeUnsafe<LocalSignInEnd>(),
+      ended: Deferred.makeUnsafe<LocalSignInEnd, LocalSignInFailed>(),
       signInSeen: false,
       cookieAfterSignIn: false,
       check: null,
@@ -289,8 +290,21 @@ export class LocalSignInWindows {
       if (isMainFrame) this.#scheduleCheck(pending);
     });
     contents.on("did-stop-loading", () => this.#scheduleCheck(pending));
+    contents.on("did-fail-load", (_event, code, _description, _url, isMainFrame) => {
+      if (isMainFrame && code !== ERR_ABORTED) this.#fail(pending, window);
+    });
+    contents.on("render-process-gone", (_event, details) => {
+      if (details.reason !== "clean-exit") this.#fail(pending, window);
+    });
     this.#guard(contents, webPreferences);
     void window.loadURL(url).catch(() => undefined);
+  }
+
+  #fail(pending: PendingSignIn, window: BrowserWindow): void {
+    if (this.#pending !== pending || pending.window !== window || Deferred.isDoneUnsafe(pending.ended)) return;
+    const cause = new Error(sourceText("error.backend.browserSignInLoadFailed"));
+    Deferred.doneUnsafe(pending.ended, Exit.fail(new LocalSignInFailed({ cause })));
+    if (!window.isDestroyed()) window.destroy();
   }
 
   #guard(contents: WebContents, webPreferences: WebPreferences): void {

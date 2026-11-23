@@ -461,6 +461,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.voice.gptLive.serversTitle": "Servers",
   "mobile.settings.voice.gptLive.serversFooter":
     "Tap a server that needs a sign-in to connect Codex with a ChatGPT account. Only an owner or admin sees the sign-in of a server.",
+  "mobile.settings.voice.gptLive.account": "GPT live voice account",
   "mobile.settings.voice.gptLive.status.ready": "Ready",
   "mobile.settings.voice.gptLive.status.supported": "Supported",
   "mobile.settings.voice.gptLive.status.offline": "Offline",

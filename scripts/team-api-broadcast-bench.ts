@@ -399,6 +399,7 @@ const fakeAgents: TeamApiAgents = {
   compactTaskContext: unused("compactTaskContext"),
   agentIdForRequest: unused("agentIdForRequest"),
   pendingApproval: unused("pendingApproval"),
+  pendingPrompts: unused("pendingPrompts"),
   respondToPrompt: unused("respondToPrompt"),
   respondToApproval: unused("respondToApproval"),
   respondToBrowserSecret: unused("respondToBrowserSecret"),
