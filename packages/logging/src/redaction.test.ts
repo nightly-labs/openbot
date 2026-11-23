@@ -302,6 +302,11 @@ describe("redactText", () => {
     expect(containsSecret(links)).toBe(false);
     expect(containsSecret('const headers = {"Content-Type": type};')).toBe(false);
     expect(containsSecret('const body = {"name": "demo"')).toBe(false);
+    expect(
+      containsSecret(
+        `${code}\nconst line = {"text": "a\\nb\\t\\u00e9 \\"quoted\\" https:\\/\\/example.com\\/x", next};`,
+      ),
+    ).toBe(false);
   });
 
   it("finds a secret or an email past the scan bound and in a payload that does not parse", () => {
@@ -320,6 +325,10 @@ describe("redactText", () => {
     ).toBe(true);
     expect(containsSecret(`${code}\n{"body": "{\\"apiKey\\":\\"abcdef123456\\"}"}`)).toBe(true);
     expect(containsSecret(`${code}\n{"body": "{\\"headers\\":{\\"X-Custom\\":\\"abc123zz\\"}}"}`)).toBe(true);
+    expect(containsSecret(`${code}\n{"hook":"https:\\/\\/hooks.slack.com\\/services\\/T0\\/B0\\/abcdefgh"}`)).toBe(
+      true,
+    );
+    expect(containsSecret(`${code}\n{"auth": "Bearer\\tabcdef123456", retry}`)).toBe(true);
     registerSecretValue("saved-skill-secret-value");
     expect(containsSecret(`${code}\nuse saved-skill-secret-value here`)).toBe(true);
   });

@@ -230,12 +230,27 @@ const MAX_EMBEDDED_SCANS = 16;
 const UNSCANNED = "[redacted-unscanned]";
 
 const JSON_ONLY_SECRET_SHAPE = new RegExp(
-  String.raw`\\?"headers\\?"\s*:|\\u[0-9A-Fa-f]{4}|\\"(?:${SECRET_LABEL}|keys?)\\"\s*:|\\?"(?:name|key)\\?"\s*:\s*\\?"(?:${SECRET_LABEL}|keys?)\\?"`,
+  String.raw`"headers"\s*:|"(?:name|key)"\s*:\s*"(?:${SECRET_LABEL}|keys?)"`,
   "iu",
 );
 
-function keptOrUnscanned(text: string): string {
-  return JSON_ONLY_SECRET_SHAPE.test(text) ? UNSCANNED : text;
+const JSON_ESCAPE = /\\(?:u([0-9A-Fa-f]{4})|(["\\/bfnrt]))/gu;
+
+const JSON_ESCAPED_CHARACTERS: Record<string, string> = { b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" };
+
+function jsonUnescaped(text: string): string {
+  return text.replace(JSON_ESCAPE, (_escape: string, code: string | undefined, character: string) =>
+    code ? String.fromCharCode(Number.parseInt(code, 16)) : (JSON_ESCAPED_CHARACTERS[character] ?? character),
+  );
+}
+
+function hidesSecret(text: string, emails: boolean): boolean {
+  const decoded = jsonUnescaped(text);
+  return JSON_ONLY_SECRET_SHAPE.test(decoded) || (decoded !== text && applyTextRules(decoded, emails) !== decoded);
+}
+
+function keptOrUnscanned(text: string, emails: boolean): string {
+  return hidesSecret(text, emails) ? UNSCANNED : text;
 }
 
 function redactEmbeddedJson(value: string, emails: boolean, unscanned: UnscannedText): string {
@@ -247,20 +262,21 @@ function redactEmbeddedJson(value: string, emails: boolean, unscanned: Unscanned
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
       if (unscanned === "keepPastScanBound") return result + value.slice(index);
-      if (unscanned === "keep") return result + value.slice(index, start) + keptOrUnscanned(value.slice(start));
+      if (unscanned === "keep") return result + value.slice(index, start) + keptOrUnscanned(value.slice(start), emails);
       return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     scans += 1;
     const end = findBalancedEnd(value, start);
     if (end < 0 && startsLikeJson(value, start)) {
-      if (unscanned !== "keep" || JSON_ONLY_SECRET_SHAPE.test(value.slice(start)))
+      if (unscanned !== "keep" || hidesSecret(value.slice(start), emails))
         return `${result + value.slice(index, start)}${UNSCANNED}`;
     }
     const parsed = end < 0 ? null : parseRedacted(value.slice(start, end), emails);
     if (parsed === null) {
       if (end >= 0 && startsLikeJson(value, start)) {
         result +=
-          value.slice(index, start) + (unscanned === "keep" ? keptOrUnscanned(value.slice(start, end)) : UNSCANNED);
+          value.slice(index, start) +
+          (unscanned === "keep" ? keptOrUnscanned(value.slice(start, end), emails) : UNSCANNED);
         index = end;
         continue;
       }
