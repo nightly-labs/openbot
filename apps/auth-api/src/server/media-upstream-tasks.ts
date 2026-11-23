@@ -24,6 +24,7 @@ import {
 } from "./media-upstream";
 
 const UPLOAD_RETENTION_DAYS = 1;
+const REFUSED_IN_BODY = "refused";
 const INPUT_ROLES: Readonly<Record<CreditMediaInputRole, string>> = {
   first: "first_frame",
   last: "last_frame",
@@ -59,7 +60,7 @@ function taskStatus(value: unknown): CreditMediaJobStatus | null {
 function refused(reply: MediaUpstreamReply): MediaUpstreamError | null {
   const code = reply.body?.code;
   if (!isNumber(code) || code < 400 || code > 599) return null;
-  return new MediaUpstreamError({ status: code, code: "refused", retryAfterSeconds: null });
+  return new MediaUpstreamError({ status: code, code: REFUSED_IN_BODY, retryAfterSeconds: null });
 }
 
 function firstRecord(value: unknown): DynamicRecord | null {
@@ -178,7 +179,7 @@ export class TasksMediaUpstream implements MediaUpstream {
   #task(providerJobId: string) {
     return this.#call(`/v1/tasks/${encodeURIComponent(providerJobId)}`, {}).pipe(
       Effect.mapError((error) =>
-        error.status === 400
+        error.status === 400 && error.code !== REFUSED_IN_BODY
           ? new MediaUpstreamError({ status: 404, code: error.code, retryAfterSeconds: null })
           : error,
       ),
@@ -204,8 +205,10 @@ export class TasksMediaUpstream implements MediaUpstream {
     idempotencyKey: string,
     generation: MediaGeneration,
   ): Effect.fn.Return<MediaUpstreamJob, MediaUpstreamError> {
-    const urls = new Map<MediaGenerationInput, string>();
-    for (const [index, input] of generation.inputs.entries()) urls.set(input, yield* this.#upload(input, index));
+    const uploaded = yield* Effect.forEach(generation.inputs, (input, index) => this.#upload(input, index), {
+      concurrency: "unbounded",
+    });
+    const urls = new Map(generation.inputs.map((input, index) => [input, uploaded[index] ?? ""]));
     const { body } = yield* this.#call(`/v1/${generation.kind}s/generations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
