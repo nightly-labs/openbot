@@ -69,6 +69,7 @@ import {
   powerMonitor,
   powerSaveBlocker,
   screen,
+  session,
   shell,
   systemPreferences,
   webContents,
@@ -845,6 +846,13 @@ async function createMessagingServices({
     issueTelegramRoute: (hostId) => centralAuth.issueTelegramRoute(hostId).pipe(toRemoteWorkflowError),
     issueGitHubRoute,
     queueKey: () => loadIngressQueueKey(join(app.getPath("userData"), INGRESS_QUEUE_KEY_FILE), secretCipher),
+    resolveProxy: (url) =>
+      Effect.tryPromise(() => session.defaultSession.resolveProxy(url)).pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => logger.warn("OpenBot could not read the proxy settings. Signal connects directly.")),
+        ),
+        Effect.orElseSucceed(() => "DIRECT"),
+      ),
   });
   teardown.push(TEARDOWN_ORDER.signalIngress, "the Signal ingress socket", () =>
     Effect.runPromise(signalIngress.dispose()),
@@ -4086,7 +4094,7 @@ export async function createApplicationServices({
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
       agentWork: [
-        ...service.hasActiveWork(),
+        ...service.workBeforeRestart(),
         ...(workflowRuntime.working() ? ["routine-run"] : []),
         ...(localServers && localServers.workingAgents().length > 0 ? ["agent-turn"] : []),
       ],

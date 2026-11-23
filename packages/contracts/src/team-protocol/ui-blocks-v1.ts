@@ -22,7 +22,7 @@ export function withConversationUiBlocks(
     if (!isDynamicRecord(message) || message.uiBlock === undefined) continue;
     const normalized = normalizeConversationUiBlock(message.uiBlock);
     if (!normalized) throw new Error("Invalid conversation UI block.");
-    const { vault: _vault, apiKey: _apiKey, ...v1Block } = normalized;
+    const { vault: _vault, apiKey: _apiKey, location: _location, ...v1Block } = normalized;
     const json = JSON.stringify({ ...v1Block, state: v1State(v1Block.state) });
     if (isString(message.id)) candidates.push({ id: message.id, block: JSON.parse(json), size: json.length });
   }

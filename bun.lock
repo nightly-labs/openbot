@@ -24,6 +24,7 @@
         "effect": "catalog:",
         "electron-updater": "6.8.11",
         "fflate": "catalog:",
+        "https-proxy-agent": "7.0.6",
         "jose": "catalog:",
         "koffi": "3.3.5",
         "long": "catalog:",
@@ -176,6 +177,7 @@
         "expo-linking": "~58.0.17",
         "expo-local-authentication": "~58.0.3",
         "expo-localization": "~58.0.5",
+        "expo-location": "~58.0.22",
         "expo-media-library": "~58.0.14",
         "expo-network": "~58.0.5",
         "expo-notifications": "~58.1.9",
@@ -510,6 +512,7 @@
   },
   "packages": {
     "2g": ["2g@1.0.1", "", { "peerDependencies": { "typescript": ">=5.8.0" }, "optionalPeers": ["typescript"], "bin": { "2g": "bin/cli.js" } }, "sha512-+uViadKOS/wwR4pFu5g8TPn3QHpKqoX19JHCnp8k/3cLpImdcXozwvZA6Q/5PeW3AcU8neL8faaMidBcv7o8CA=="],
+    "expo-location": ["expo-location@58.0.22", "", { "dependencies": { "@expo/image-utils": "^0.12.7" }, "peerDependencies": { "expo": "*", "expo-task-manager": "*", "react": "*", "react-native": "*" }, "optionalPeers": ["expo-task-manager"] }, "sha512-riZCEjY9//enExdweKSMNvjGS2AGCNG7Z8NJa+3GP5In+ZtrPdkbnhPo3JHwhWZE0NE72yv2t+AKPWauen3fkA=="],
 
     "@1password/sdk": ["@1password/sdk@0.5.0", "", { "dependencies": { "@1password/sdk-core": "0.5.0" } }, "sha512-k6kov3pcA7PRg2tev9CgTfEf/3JSyAp11BPQNCEsqAD32QbqM032OXC1rfjyC8Ba0sfH+NHYZxcifUZToyGyYA=="],
 

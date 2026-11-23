@@ -113,6 +113,7 @@ import {
   editedPreviewQuestions,
   expiredPromptResult,
   lateAnswerText,
+  locationPromptResult,
   MCP_TOOL_CONSENT_ALLOW_ONCE,
   mcpElicitationQuestions,
   mcpElicitationResult,
@@ -167,6 +168,7 @@ export interface SurfacedUiBlock {
   spec: UiBlockSpec;
   apiKey?: { name: string; vault?: boolean };
   vault?: { kind: UiVaultRequestKind };
+  location?: true;
 }
 
 export interface PromptResponder {
@@ -722,21 +724,23 @@ export class AttentionRegistry {
         ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
         : pending.uiBlock?.vault
           ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
-          : pending.uiBlock
-            ? uiBlockPromptResult(
-                uiBlockResponse
-                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
-                  : { status: "skipped", blockId: pending.uiBlock.blockId },
-              )
-            : pending.responseKind === "dynamic-tool"
-              ? dynamicPromptResult(answers)
-              : pending.responseKind === "mcp-elicitation"
-                ? mcpElicitationResult(pending.params, answers)
-                : {
-                    answers: Object.fromEntries(
-                      Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
-                    ),
-                  };
+          : pending.uiBlock?.location
+            ? locationPromptResult(pending.uiBlock.blockId, uiBlockResponse)
+            : pending.uiBlock
+              ? uiBlockPromptResult(
+                  uiBlockResponse
+                    ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
+                    : { status: "skipped", blockId: pending.uiBlock.blockId },
+                )
+              : pending.responseKind === "dynamic-tool"
+                ? dynamicPromptResult(answers)
+                : pending.responseKind === "mcp-elicitation"
+                  ? mcpElicitationResult(pending.params, answers)
+                  : {
+                      answers: Object.fromEntries(
+                        Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
+                      ),
+                    };
       if (!pending.detached) pending.client.respond(pending.id, result);
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
@@ -756,6 +760,8 @@ export class AttentionRegistry {
             state.outcome = sourceText("status.agent.vaultAdded", {
               name: savedItem.item.name || (pending.uiBlock.spec.title ?? ""),
             }).slice(0, UI_BLOCK_LIMITS.outcome);
+          else if (pending.uiBlock.location && uiBlockResponse)
+            state.outcome = sourceText("status.agent.location.shared").slice(0, UI_BLOCK_LIMITS.outcome);
           else if (saved && saved.created !== null)
             state.outcome = sourceText(saved.created ? "status.agent.vaultAdded" : "status.agent.vaultUpdated", {
               name: saved.key.name,
@@ -1829,6 +1835,7 @@ export class AttentionRegistry {
       state: auto ? { status: "pending", autoAnswer: auto } : { status: "pending" },
       ...(block.vault ? { vault: { kind: block.vault.kind } } : {}),
       ...(block.apiKey?.vault ? { apiKey: true } : {}),
+      ...(block.location ? { location: true } : {}),
     });
     if (!threadId || !turnId || !agentId || !publicThreadId || !uiBlock || !validPromptQuestions(questions)) {
       client.respond(request.id, {

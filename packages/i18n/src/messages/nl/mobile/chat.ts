@@ -639,4 +639,18 @@ export const messages = {
   "mobile.chat.context.noAuto": "Deze agent comprimeert zijn context niet.",
   "mobile.chat.context.lastCompaction": "Laatste compressie: {before} → {after} tokens",
   "mobile.chat.context.unavailable": "Deze chat meldt zijn context nu niet.",
+  "mobile.chat.locationRequest.share": "Eén keer delen",
+  "mobile.chat.locationRequest.decline": "Niet delen",
+  "mobile.chat.locationRequest.alwaysAllow": "Altijd toestaan",
+  "mobile.chat.locationRequest.alwaysAllowed":
+    "Deze agent krijgt je locatie zonder te vragen terwijl je de app gebruikt.",
+  "mobile.chat.locationRequest.askEveryTime": "Elke keer vragen",
+  "mobile.chat.locationRequest.locating": "Je locatie zoeken…",
+  "mobile.chat.locationRequest.private": "De huidige locatie van je telefoon gaat één keer naar deze agent.",
+  "mobile.chat.locationRequest.shared": "Locatie gedeeld",
+  "mobile.chat.locationRequest.declined": "Niet gedeeld",
+  "mobile.chat.locationRequest.unavailable": "Je telefoon kon je locatie niet vinden. Probeer het opnieuw.",
+  "mobile.chat.locationRequest.deniedTitle": "Locatietoegang staat uit",
+  "mobile.chat.locationRequest.denied": "Sta OpenBot in Instellingen toe je locatie te gebruiken om die te delen.",
+  "mobile.chat.locationRequest.openSettings": "Open Instellingen",
 } as const satisfies PartialTranslation<typeof source>;

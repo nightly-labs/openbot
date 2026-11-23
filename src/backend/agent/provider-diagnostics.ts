@@ -150,6 +150,12 @@ export function isPiWarningDiagnostic(message: string): boolean {
   return PI_WARNING_RECORD.test(message);
 }
 
+const PI_COMPACTION_NO_OP = /^\s*(?:nothing to compact \(session too small\)|already compacted)\s*$/iu;
+
+export function isPiCompactionNoOp(message: string): boolean {
+  return PI_COMPACTION_NO_OP.test(message);
+}
+
 const CONTEXT_TOO_SMALL =
   /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bnothing to compact \(session too small\)|\bgreater than the context length\b|\blonger than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
 
