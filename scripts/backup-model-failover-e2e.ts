@@ -45,6 +45,7 @@ const REFUSED_MODEL_SWITCH =
   "API error: 429 This request would exceed your account's rate limit. Please try again later \u00b7 model not changed";
 const REFUSED_REQUEST =
   'API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"This model requires Responses for tool calls; this account only supports Chat Completions"}}';
+const MODEL_NOT_OFFERED = `There's an issue with the selected model (${PRIMARY}). It may not exist or you may not have access to it.`;
 
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
@@ -194,6 +195,13 @@ const turn = (message) => {
       content: [{ type: "text", text: refused }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
       parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
     result({ is_error: true, result: refused });
+    return;
+  }
+  if (input.includes("model-not-offered") && model === ${JSON.stringify(PRIMARY)}) {
+    write({ type: "assistant", error: "model_not_found", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "text", text: ${JSON.stringify(MODEL_NOT_OFFERED)} }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+      parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    result({ is_error: true, result: ${JSON.stringify(MODEL_NOT_OFFERED)} });
     return;
   }
   if (input.includes("refused-request") && model === ${JSON.stringify(PRIMARY)}) {
@@ -858,6 +866,41 @@ try {
     assert.deepEqual(errorsFor(refused.id, since), [], "No error shows for the moved turn.");
     await restart();
     return { ran: ran.map((turn) => turn.model) };
+  });
+
+  await check("a model that the account cannot use moves the agent to its backup model", async () => {
+    const denied = await withBackup("Denied");
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(denied.id, "model-not-offered");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.equal(agentOf(denied.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(denied.id, since), [], "No error shows for the moved turn.");
+    await restart();
+    return { ran: ran.map((turn) => turn.model) };
+  });
+
+  await check("a model that the account cannot use shows the error with no backup model", async () => {
+    const lone = await create("Unbacked");
+    await waitFor("the first turn of Unbacked to end", () =>
+      service.listQueue(lone.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const since = events.length;
+    const outcome = await send(lone.id, "model-not-offered");
+    assert.equal(outcome.status, "failed", "The message fails.");
+    assert.equal(agentOf(lone.id).model, PRIMARY, "The agent keeps its model.");
+    assert.ok(
+      errorsFor(lone.id, since).some((event) => JSON.stringify(event).includes("may not have access")),
+      "The provider's reason shows.",
+    );
+    await restart();
+    return { status: outcome.status };
   });
 
   await check("a model switch that the provider refuses at a limit moves the agent to its backup model", async () => {
