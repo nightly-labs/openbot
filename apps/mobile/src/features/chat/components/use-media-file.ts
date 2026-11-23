@@ -1,12 +1,14 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { create } from "zustand";
 import { supportLog } from "@/features/support/model/support-log";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { largeDownloadOf } from "../model/large-files";
 
 const MIME_EXTENSIONS: Record<string, string> = {
@@ -88,7 +90,8 @@ export function useMediaDownloads(serverId: string, attachments: readonly Attach
 
 export function useMediaFile(serverId: string, attachment: AttachmentSummary, enabled: boolean) {
   const { downloadAttachment } = useMobileWorkspaceActions();
-  return useQuery({
+  const foreground = useAppForeground();
+  const query = useQuery({
     enabled,
     queryKey: queryKeys.chatMediaFile(serverId, attachment.id),
     queryFn: async () => {
@@ -127,4 +130,10 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
     staleTime: Infinity,
     gcTime: 5 * 60 * 1000,
   });
+  const stoppedInBackground = query.error?.message === sourceText("error.remote.appInBackground");
+  const { refetch } = query;
+  useEffect(() => {
+    if (foreground && stoppedInBackground) void refetch({ cancelRefetch: false });
+  }, [foreground, stoppedInBackground, refetch]);
+  return query;
 }

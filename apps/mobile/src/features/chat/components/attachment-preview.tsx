@@ -10,7 +10,7 @@ import * as Sharing from "expo-sharing";
 import { useThemeColor } from "heroui-native/hooks";
 import FileText from "lucide-react-native/icons/file-text";
 import { useMemo, useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
@@ -425,6 +425,10 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
   }
 
   async function saveToFiles(only: readonly AttachmentSummary[] = attachments): Promise<boolean> {
+    if (Platform.OS === "ios" && (only.length === 1 || shareFilesNative)) {
+      await shareAll(only);
+      return false;
+    }
     let folder: Directory;
     try {
       folder = await Directory.pickDirectoryAsync();
@@ -464,11 +468,11 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     }
   }
 
-  async function shareAll() {
-    const only = attachments.length === 1 ? attachments[0] : undefined;
-    if (only) return shareFile(only);
+  async function shareAll(only: readonly AttachmentSummary[] = attachments) {
+    const single = only.length === 1 ? only[0] : undefined;
+    if (single) return shareFile(single);
     setBusy(true);
-    const images = attachments.every(showsAsImage);
+    const images = only.every(showsAsImage);
     try {
       if (!shareFilesNative)
         throw new Error(
@@ -476,7 +480,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         );
       const uris: string[] = [];
       const types = new Set<string>();
-      for (const attachment of attachments) {
+      for (const attachment of only) {
         const data = await load(attachment);
         const uri = data.fileUri ?? (await keepFile(serverId, attachment, data));
         if (!uri)
