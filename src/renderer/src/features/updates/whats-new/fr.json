@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Mettez aussi à jour vers cette version chaque serveur que vous avez rejoint. Sur un serveur, les modèles OpenBot payés en crédits, les workflows suspendus et exportés, les discussions WhatsApp en lecture seule, les demandes de localisation et le choix du serveur Signal ne fonctionnent que si le serveur a cette version.",
+      "Après cette mise à jour, une version plus ancienne d’OpenBot ne peut pas ouvrir vos données."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Achetez des crédits OpenBot pour vous ou pour un serveur depuis le bouton Credits de la barre de pages ou dans Réglages → Facturation. Une licence payante donne aussi des crédits gratuits chaque mois.",
+          "Les étapes image et vidéo d’un workflow peuvent utiliser les modèles OpenBot que vos crédits paient, sans autre connexion. Réglez Lot sur une étape pour obtenir jusqu’à 4 résultats en même temps.",
+          "Suspendez un workflow depuis le menu du workflow. Vous pouvez aussi exporter un workflow dans un fichier et l’importer sur un autre ordinateur ou serveur.",
+          "Tapez {{ dans une étape de workflow pour ajouter un champ d’une étape précédente. Les déclencheurs Planification, GitHub, Discord, Telegram et Slack donnent maintenant des champs aussi.",
+          "Un agent peut demander votre position quand une demande en a besoin, par exemple « restaurants près de moi ». Rien n’est envoyé tant que vous n’avez pas répondu.",
+          "Rendez un contact ou un groupe WhatsApp autorisé en lecture seule. Vos agents peuvent lire la discussion, et OpenBot n’y écrit jamais."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Une discussion Claude ou Pi inactive avec 200K jetons de contexte ou plus se compacte toute seule avant que son cache de prompt de 1 heure n’expire. Cela coûte moins que de relire tout le contexte. Désactivez-le dans Réglages du serveur → Fournisseurs.",
+          "Choisissez le serveur Signal d’un serveur dans Réglages du serveur → Général. « Automatique » garde le plus proche.",
+          "Les agents Gemini avec Accès complet utilisent les outils d’OpenBot, comme la mémoire, le navigateur et les canaux, sans carte d’approbation."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un message que vous envoyez à un agent Claude pendant qu’il travaille lui parvient maintenant tout de suite, aussi pendant qu’il exécute un sous-agent ou un long outil.",
+          "Un agent ChatGPT (Codex) réglé sur Demander d’abord vous demande maintenant avant d’exécuter une commande ou de modifier un fichier.",
+          "Un serveur hébergé ou auto-hébergé qui ne répond plus redémarre maintenant tout seul après 10 minutes.",
+          "Sur macOS, le dock des agents ne ralentit plus OpenBot ni tout l’ordinateur.",
+          "Les longues discussions défilent en douceur. Avant, une discussion de plus de 100 messages saccadait pendant le défilement."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.76.0",
     "date": "2026-11-21",
     "notices": [
