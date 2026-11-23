@@ -43,7 +43,9 @@ interface FakeTurn {
 const plan = (...turns: FakeTurn[]) =>
   `<<PLAN${JSON.stringify(turns).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")}PLAN>>`;
 
-type Verdict = { verdict: "done" | "continue" | "user" | "blocked"; missing?: string; delayMs?: number } | string;
+type Verdict =
+  | { verdict: "done" | "continue" | "user" | "blocked" | "waiting"; missing?: string; delayMs?: number }
+  | string;
 
 const verdicts = (...answers: Verdict[]) => `<<VERDICT${JSON.stringify(answers)}VERDICT>>`;
 
@@ -809,6 +811,61 @@ try {
       ),
     );
     return { turns: turnsSince(mark).length };
+  });
+
+  await check("a later turn that waits for a teammate's older request does not continue", async () => {
+    const lead = await createAgent("Waiter");
+    const worker = await createAgent("Builder");
+    const release = join(root, "builder-turn");
+    const mark = loggedTurns().length;
+    const delegated = await send(
+      lead.id,
+      `Delegate the build. ${plan({
+        steps: [],
+        answer: "I asked Builder for the build.",
+        calls: [
+          {
+            tool: "send_message",
+            arguments: {
+              recipientAgentIds: [worker.id],
+              text: plan({ steps: [], answer: "The build is done.", holdUntil: release }),
+            },
+          },
+        ],
+      })}`,
+    );
+    assert.equal(await settled(delegated), "completed");
+    const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Delegate the build."))?.threadId;
+    const checks = loggedChecks().length;
+    const asked = loggedTurns().length;
+    const news = await send(
+      lead.id,
+      `Any news? ${verdicts({ verdict: "waiting" })} ${plan({
+        steps: [],
+        commands: ["ls builds"],
+        answer: "Builder still works on it. Next, I'll review the build when Builder reports back.",
+      })}`,
+    );
+    assert.equal(await settled(news), "completed");
+    assert.deepEqual(
+      turnsSince(asked)
+        .filter((turn) => turn.threadId === leadThread)
+        .map((turn) => turn.note),
+      [false],
+      "The turn does not continue while the teammate works on the older request.",
+    );
+    const check = loggedChecks().slice(checks);
+    assert.equal(check.length, 1, "One finish check runs.");
+    assert.ok(check[0]?.text.includes("they still work on them"), "The finish check knows about the open request.");
+    assert.equal(continuationLines(lead.id).length, 0, "No continuation line shows.");
+    await writeFile(release, "");
+    await waitFor("the builder's answer and the lead's answer turn", () =>
+      [lead.id, worker.id].every(
+        (agentId) =>
+          current.service.listQueue(agentId).deliveries.filter((delivery) => !ended(delivery.status)).length === 0,
+      ),
+    );
+    return { turns: turnsSince(mark).length, checks: check.length };
   });
 
   await check("a request with no plan continues at most 2 times for a next step", async () => {

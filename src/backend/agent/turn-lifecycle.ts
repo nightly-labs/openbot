@@ -753,6 +753,7 @@ export class TurnLifecycle {
     plan: ConversationPlan | null,
     answer: string,
     continuations: number,
+    awaitsTeammate: boolean,
   ): Effect.Effect<string | null> {
     const check = this.#hooks.checkFinish;
     if (!check) return Effect.succeed(null);
@@ -788,6 +789,7 @@ export class TurnLifecycle {
       plan: plan && { ...plan, steps: plan.steps.map((step) => ({ ...step, text: redact(step.text) })) },
       answer: redact(answer),
       continuations,
+      ...(awaitsTeammate ? { awaitsTeammate } : {}),
     };
     const mayContinue = () =>
       this.#planContinuation.waitsForCheck(agentId, taskId) && this.#mayContinue(agentId, taskId, turnId, deliveries);
@@ -2413,6 +2415,7 @@ export class TurnLifecycle {
             ))))
           ? "no"
           : planMode;
+      const awaitsEarlierRequest = continueMode !== "no" && this.#mailbox.awaitsTeammate(agentId, laneTaskId, null);
       const turnPlan = snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null;
       const toolSteps = trace?.steps.filter((step) => step.kind === "tool") ?? [];
       const finishCheck: FinishCheckMode =
@@ -2435,6 +2438,7 @@ export class TurnLifecycle {
                 )?.plan ?? null,
               answer: latestAssistant?.text,
               finishCheck,
+              nextStep: !awaitsEarlierRequest,
             });
       let considered = proposed?.kind === "check" ? null : proposed;
       if (proposed?.kind === "check" && latestAssistant) {
@@ -2449,6 +2453,7 @@ export class TurnLifecycle {
           turnPlan,
           latestAssistant.text,
           proposed.continuations,
+          awaitsEarlierRequest,
         );
         considered = gap === null ? null : this.#planContinuation.afterFinishCheck(agentId, laneTaskId, gap);
       }
