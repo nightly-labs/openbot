@@ -200,6 +200,8 @@ export const messages = {
     "{provider} s’est arrêté avant le début de ce message. Envoyez de nouveau le message.",
   "error.provider.sessionStartTimedOut":
     "{provider} n’a pas ouvert de nouvelle conversation à temps, donc ce message n’a pas commencé. Sur l’ordinateur qui exécute OpenBot, ouvrez Fournisseurs, sélectionnez {provider} et cliquez sur Redémarrer. Puis réessayez.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} n’a pas ouvert cette conversation à temps, donc ce message n’a pas commencé. Sur l’ordinateur qui exécute OpenBot, ouvrez Fournisseurs, sélectionnez {provider} et cliquez sur Redémarrer. Puis réessayez.",
   "error.provider.serviceUnreachable":
     "{provider} ne parvient pas à se connecter à son service. Vérifiez votre connexion internet. OpenBot va réessayer.",
   "error.provider.serviceUnreachableRefresh":

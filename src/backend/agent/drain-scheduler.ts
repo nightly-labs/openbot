@@ -1252,7 +1252,9 @@ export class DrainScheduler {
             ? "error.provider.stoppedBeforeStart"
             : sessionStartTimedOut
               ? "error.provider.sessionStartTimedOut"
-              : null;
+              : isRequestTimeout(error, "thread/resume")
+                ? "error.provider.sessionResumeTimedOut"
+                : null;
           const stoppedReason =
             stoppedKey && recipient
               ? sourceText(stoppedKey, { provider: providerLabel(providerForAgent(recipient)) })
