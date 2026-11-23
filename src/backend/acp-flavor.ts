@@ -34,6 +34,7 @@ export interface AcpCustomEndpoint {
   readonly name: string;
   readonly hasCredentials: boolean;
   readonly stallMs?: number;
+  readonly contextWindow?: number;
 }
 
 export interface AcpMcpServerFailure {

@@ -24,6 +24,7 @@ export interface AgentClient {
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
   readonly compactsOnDemand?: boolean;
   promptCacheTtlMs?(externalThreadId: string): number | null;
+  contextWindow?(externalThreadId: string): number | null;
   readonly compactsItself?: boolean;
   readonly provisionalAnswers?: boolean;
   readonly turnContext?: boolean;
