@@ -378,6 +378,7 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Não é possível reproduzir este arquivo de áudio.",
   "mobile.chat.browserSecret.password": "Senha",
   "mobile.chat.browserSecret.authenticatorCode": "Código do autenticador",
+  "mobile.chat.browserSecret.ended": "Esta solicitação de login terminou. Peça ao agente que tente de novo.",
   "mobile.chat.browserSecret.oneTimeCode": "Código de uso único",
   "mobile.chat.browserSecret.takeoverTitle": "Assumir controle do navegador",
   "mobile.chat.browserSecret.takeoverBody": "Conclua esta etapa no navegador do computador que executa o OpenBot.",

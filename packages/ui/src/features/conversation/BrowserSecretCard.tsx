@@ -34,7 +34,7 @@ export function BrowserSecretCard(props: {
   vault?: BrowserSecretVault | undefined;
   onRespond: (input: LocalBrowserSecretResponse) => Promise<void>;
 }) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const saveId = `browser-secret-save-${createUniqueId()}`;
   const formId = createUniqueId();
   const [saveChoice, setSaveChoice] = createSignal<boolean | null>(null);
@@ -132,8 +132,9 @@ export function BrowserSecretCard(props: {
     try {
       await props.onRespond(input);
     } catch (cause) {
-      setFailureCode(errorReference(cause));
-      setError(t("browser.secret.failed"));
+      const ended = errorMessage(cause, t("browser.secret.failed")) === t("error.backend.authRequestInactive");
+      setFailureCode(ended ? null : errorReference(cause));
+      setError(ended ? t("browser.secret.ended") : t("browser.secret.failed"));
     } finally {
       if (input.decision === "submit") input.secret = "";
       setPending(false);
