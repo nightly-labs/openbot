@@ -454,6 +454,7 @@
     "test:team-api-routes": "bun --preload ./scripts/team-api-routes-e2e-electron.mjs scripts/team-api-routes-e2e.ts",
     "test:crm-team-api": "bun scripts/crm-team-api-e2e.ts",
     "test:team-legacy-clients": "bun scripts/team-api-legacy-clients-e2e.ts",
+    "test:team-protocol-decoders": "bun scripts/team-protocol-decoder-e2e.ts",
     "test:team-protocol-v10": "bun scripts/team-protocol-v10-e2e.ts",
     "test:team-webrtc-wire-parity": "bun scripts/team-webrtc-wire-parity-e2e.ts",
     "test:remote-viewer-proxy": "bun scripts/remote-viewer-proxy-e2e.ts",
