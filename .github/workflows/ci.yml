@@ -135,6 +135,10 @@ jobs:
         if: env.CODE == 'true'
         run: bun run check:assets
 
+      - name: Check plugin catalog
+        if: env.CODE == 'true'
+        run: bun run marketplace:build:plugins -- --check
+
       - name: Check Markdown links and anchors
         run: bun run check:doc-links
 
