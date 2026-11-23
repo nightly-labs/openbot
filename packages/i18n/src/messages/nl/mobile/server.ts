@@ -991,6 +991,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Een nummer kan maximaal {count} contacten en groepen toestaan.",
   "mobile.server.connectors.whatsapp.senderGroup": "Groep",
   "mobile.server.connectors.whatsapp.removeSender": "Verwijderen",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Alleen lezen",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Alleen lezen maken",
+  "mobile.server.connectors.whatsapp.allowWork": "Taken laten geven",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Alleen lezen: agents kunnen deze chat lezen en OpenBot schrijft er nooit in.",
   "mobile.server.connectors.whatsapp.addContact": "Contact toevoegen",
   "mobile.server.connectors.whatsapp.addGroup": "Groep toevoegen",
   "mobile.server.connectors.whatsapp.contactTitle": "Voeg een contact toe",

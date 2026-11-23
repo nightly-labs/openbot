@@ -1308,6 +1308,11 @@ export const messages = {
     "يمكن لرقم واحد أن يسمح بما يصل إلى {count} من جهات الاتصال والمجموعات.",
   "mobile.server.connectors.whatsapp.senderGroup": "مجموعة",
   "mobile.server.connectors.whatsapp.removeSender": "إزالة",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · للقراءة فقط",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "اجعله للقراءة فقط",
+  "mobile.server.connectors.whatsapp.allowWork": "اسمح له بإسناد العمل",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "للقراءة فقط: يمكن للوكلاء قراءة هذه المحادثة، ولا يكتب OpenBot فيها أبدًا.",
   "mobile.server.connectors.whatsapp.addContact": "إضافة جهة اتصال",
   "mobile.server.connectors.whatsapp.addGroup": "إضافة مجموعة",
   "mobile.server.connectors.whatsapp.contactTitle": "إضافة جهة اتصال",

@@ -968,6 +968,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "번호 하나에 연락처와 그룹을 최대 {count}개까지 허용할 수 있어요.",
   "mobile.server.connectors.whatsapp.senderGroup": "그룹",
   "mobile.server.connectors.whatsapp.removeSender": "제거",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · 읽기 전용",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "읽기 전용으로 설정",
+  "mobile.server.connectors.whatsapp.allowWork": "작업 요청 허용",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "읽기 전용: 에이전트는 이 채팅을 읽을 수 있지만 OpenBot은 여기에 절대 쓰지 않습니다.",
   "mobile.server.connectors.whatsapp.addContact": "연락처 추가",
   "mobile.server.connectors.whatsapp.addGroup": "그룹 추가",
   "mobile.server.connectors.whatsapp.contactTitle": "연락처 추가",

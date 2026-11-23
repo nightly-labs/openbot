@@ -1049,6 +1049,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Eine Nummer kann bis zu {count} Kontakte und Gruppen zulassen.",
   "mobile.server.connectors.whatsapp.senderGroup": "Gruppe",
   "mobile.server.connectors.whatsapp.removeSender": "Entfernen",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Nur lesen",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Auf Nur lesen setzen",
+  "mobile.server.connectors.whatsapp.allowWork": "Aufgaben erlauben",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Nur lesen: Agenten können diesen Chat lesen, und OpenBot schreibt nie darin.",
   "mobile.server.connectors.whatsapp.addContact": "Kontakt hinzufügen",
   "mobile.server.connectors.whatsapp.addGroup": "Gruppe hinzufügen",
   "mobile.server.connectors.whatsapp.contactTitle": "Kontakt hinzufügen",

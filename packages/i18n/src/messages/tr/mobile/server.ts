@@ -1018,6 +1018,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Bir numara en fazla {count} kişiye ve gruba izin verebilir.",
   "mobile.server.connectors.whatsapp.senderGroup": "Grup",
   "mobile.server.connectors.whatsapp.removeSender": "Kaldır",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Salt okunur",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Salt okunur yap",
+  "mobile.server.connectors.whatsapp.allowWork": "İş vermesine izin ver",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Salt okunur: ajanlar bu sohbeti okuyabilir ve OpenBot buraya asla yazmaz.",
   "mobile.server.connectors.whatsapp.addContact": "Kişi ekle",
   "mobile.server.connectors.whatsapp.addGroup": "Grup ekle",
   "mobile.server.connectors.whatsapp.contactTitle": "Bir kişi ekleyin",

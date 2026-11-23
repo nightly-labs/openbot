@@ -386,8 +386,15 @@ class WhatsAppAdapter implements MessagingAdapter {
           id: userJid(contact),
           name: savedName || (this.#handle.chats.name(contact) ?? maskedNumber(contact)),
           kind: "chat",
+          ...(rules.readOnly.has(contact) ? { readOnly: true as const } : {}),
         });
-      for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
+      for (const group of rules.groups)
+        places.push({
+          id: group,
+          name: yield* this.placeName(group),
+          kind: "channel",
+          ...(rules.readOnly.has(group) ? { readOnly: true as const } : {}),
+        });
       return { places };
     });
   }

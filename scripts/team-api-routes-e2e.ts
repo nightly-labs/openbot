@@ -57,6 +57,7 @@ import {
   isAccountUsage,
   isLocalVoiceModelId,
   isQueueSnapshot,
+  isWhatsAppReadOnlyList,
   isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type LibraryFolderAction,
@@ -85,9 +86,11 @@ import {
   type VoiceSettings,
   type WhatsAppAccount,
   type WhatsAppLinkState,
+  type WhatsAppReadOnlyList,
   type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
   withHostProviderAccountModels,
+  withWhatsAppReadOnly,
   withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
@@ -496,6 +499,11 @@ import {
   WHATSAPP_CONNECTOR_CODECS,
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import {
+  WHATSAPP_READ_ONLY_CAPABILITY,
+  WHATSAPP_READ_ONLY_CODECS,
+  WHATSAPP_READ_ONLY_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import {
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CODECS,
@@ -2373,6 +2381,13 @@ const whatsappMessaging: TeamApiConnectors["messaging"] = {
     Effect.sync(() => {
       record("whatsapp.setStatusReactions", workspaceId, statusReactions);
       whatsappAccount.statusReactions = statusReactions;
+    }),
+  setWhatsAppSenderReadOnly: (workspaceId, senderId, readOnly) =>
+    Effect.sync(() => {
+      record("whatsapp.setSenderReadOnly", workspaceId, senderId, readOnly);
+      whatsappAccount.allowedSenders = whatsappAccount.allowedSenders.map((sender) =>
+        sender.id === senderId ? { ...sender, readOnly } : sender,
+      );
     }),
 };
 const connectors: TeamApiConnectors = {
@@ -10915,6 +10930,100 @@ try {
         asClient(restored).numbers[0]?.statusReactions === true,
       [summary(on), summary(restored)],
     );
+  }
+
+  {
+    const v10 = { capabilities: [WHATSAPP_READ_ONLY_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const group = "120363000000000009@g.us";
+    whatsappAccount.allowedSenders = [
+      ...whatsappAccount.allowedSenders.filter((sender) => sender.id !== group),
+      { id: group, kind: "group", name: "Branding", readOnly: false },
+    ];
+    const settingCalls = () => calls.filter((entry) => entry.method === "whatsapp.setSenderReadOnly");
+    const groupOf = (overview: { accounts: WhatsAppAccount[] }) =>
+      overview.accounts[0]?.allowedSenders.find((sender) => sender.id === group);
+    const asClient = (reply: Reply): WhatsAppReadOnlyList => {
+      const codec = WHATSAPP_READ_ONLY_CODECS.get(WHATSAPP_READ_ONLY_ROUTES.list);
+      assert(codec, WHATSAPP_READ_ONLY_ROUTES.list);
+      const value = codec.response(reply.status, reply.body);
+      assert(isWhatsAppReadOnlyList(value), "the list does not pass the client's guard");
+      return value;
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the host advertises whatsapp-read-only-v1 to a protocol 10 peer only",
+      JSON.stringify(compatibility.body).includes(WHATSAPP_READ_ONLY_CAPABILITY) &&
+        !JSON.stringify(older.body).includes(WHATSAPP_READ_ONLY_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const update = { workspaceId: WHATSAPP_NUMBER, senderId: group, readOnly: true };
+    const unsupported = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, {
+      token: adaToken,
+      json: update,
+      capabilities: [],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const memberList = await call("POST", WHATSAPP_READ_ONLY_ROUTES.list, { token: bobToken, json: {}, ...v10 });
+    const memberUpdate = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, {
+      token: bobToken,
+      json: update,
+      ...v10,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or set the read-only chats",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberList, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        settingCalls().length === 0 &&
+        groupOf({ accounts: [whatsappAccount] })?.readOnly === false,
+      [summary(unsupported), summary(memberList), summary(memberUpdate)],
+    );
+    const before = await call("POST", WHATSAPP_READ_ONLY_ROUTES.list, { token: adaToken, json: {}, ...v10 });
+    const bad = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, {
+      token: adaToken,
+      json: { ...update, readOnly: "yes" },
+      ...v10,
+    });
+    const on = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, { token: adaToken, json: update, ...v10 });
+    const after = await call("POST", WHATSAPP_READ_ONLY_ROUTES.list, { token: adaToken, json: {}, ...v10 });
+    const overview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, {
+      token: adaToken,
+      json: {},
+      capabilities: [WHATSAPP_CONNECTOR_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const connectorCodec = WHATSAPP_CONNECTOR_CODECS.get(WHATSAPP_CONNECTOR_ROUTES.overview);
+    assert(connectorCodec, WHATSAPP_CONNECTOR_ROUTES.overview);
+    const plain = decodeHostWhatsAppOverview(connectorCodec.response(overview.status, overview.body));
+    check(
+      "an admin makes a group read only; a bad value is refused, and the released overview does not carry the mode",
+      before.status === 200 &&
+        asClient(before).numbers[0]?.workspaceId === WHATSAPP_NUMBER &&
+        asClient(before).numbers[0]?.readOnly.includes(group) === false &&
+        bad.status === 400 &&
+        on.status === 200 &&
+        settingCalls().length === 1 &&
+        asClient(after).numbers[0]?.readOnly.includes(group) === true &&
+        groupOf(plain)?.readOnly === undefined &&
+        groupOf(withWhatsAppReadOnly(plain, asClient(after)))?.readOnly === true &&
+        groupOf(withWhatsAppReadOnly(plain, null))?.readOnly === undefined,
+      [summary(before), summary(bad), summary(on), summary(after), summary(overview)],
+    );
+    const off = await call("POST", WHATSAPP_READ_ONLY_ROUTES.update, {
+      token: adaToken,
+      json: { ...update, readOnly: false },
+      ...v10,
+    });
+    const restored = await call("POST", WHATSAPP_READ_ONLY_ROUTES.list, { token: adaToken, json: {}, ...v10 });
+    check(
+      "an admin lets the group give work again",
+      off.status === 200 &&
+        settingCalls().length === 2 &&
+        asClient(restored).numbers[0]?.readOnly.includes(group) === false,
+      [summary(off), summary(restored)],
+    );
+    whatsappAccount.allowedSenders = whatsappAccount.allowedSenders.filter((sender) => sender.id !== group);
   }
 
   {

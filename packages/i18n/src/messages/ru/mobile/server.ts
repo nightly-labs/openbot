@@ -1117,6 +1117,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Номер может разрешить не более {count} контактов и групп.",
   "mobile.server.connectors.whatsapp.senderGroup": "Группа",
   "mobile.server.connectors.whatsapp.removeSender": "Удалить",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Только чтение",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Сделать только для чтения",
+  "mobile.server.connectors.whatsapp.allowWork": "Разрешить давать задачи",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Только чтение: агенты могут читать этот чат, а OpenBot никогда в нём не пишет.",
   "mobile.server.connectors.whatsapp.addContact": "Добавить контакт",
   "mobile.server.connectors.whatsapp.addGroup": "Добавить группу",
   "mobile.server.connectors.whatsapp.contactTitle": "Добавить контакт",

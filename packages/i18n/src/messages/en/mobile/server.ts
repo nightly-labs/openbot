@@ -1240,6 +1240,11 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.sendersLimit": "A number can allow up to {count} contacts and groups.",
   "mobile.server.connectors.whatsapp.senderGroup": "Group",
   "mobile.server.connectors.whatsapp.removeSender": "Remove",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Read only",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Make read only",
+  "mobile.server.connectors.whatsapp.allowWork": "Let it give work",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Read only: agents can read this chat, and OpenBot never writes in it.",
   "mobile.server.connectors.whatsapp.addContact": "Add contact",
   "mobile.server.connectors.whatsapp.addGroup": "Add group",
   "mobile.server.connectors.whatsapp.contactTitle": "Add a contact",

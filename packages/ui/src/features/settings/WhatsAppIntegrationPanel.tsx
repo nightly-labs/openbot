@@ -30,6 +30,11 @@ import {
   OctagonX,
   QrCode,
   RadioGroup,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   SettingsSection,
   Spinner,
   SwitchField,
@@ -100,6 +105,7 @@ export interface WhatsAppIntegrationPanelProps extends IntegrationPageSlots {
   loadGroups: (workspaceId: string) => Promise<readonly WhatsAppGroup[]>;
   onAddSender: (workspaceId: string, sender: WhatsAppSender) => void;
   onRemoveSender: (workspaceId: string, senderId: string) => void;
+  onSetSenderReadOnly: (workspaceId: string, senderId: string, readOnly: boolean) => void;
   onAnswerRequest: (workspaceId: string, code: string, approve: boolean) => void;
   loadError?: string | null | undefined;
   onRetry?: (() => void) | undefined;
@@ -367,6 +373,9 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
                   onAddContact={() => setAddingContact(entry.connection.workspaceId)}
                   onAddGroup={() => setAddingGroup(entry.connection.workspaceId)}
                   onRemove={(senderId) => props.onRemoveSender(entry.connection.workspaceId, senderId)}
+                  onSetReadOnly={(senderId, readOnly) =>
+                    props.onSetSenderReadOnly(entry.connection.workspaceId, senderId, readOnly)
+                  }
                 />
                 <Show when={!entry.account.ownNumber || entry.account.pendingRequests.length > 0}>
                   <RequestsSection
@@ -444,6 +453,7 @@ function SendersSection(props: {
   onAddContact: () => void;
   onAddGroup: () => void;
   onRemove: (senderId: string) => void;
+  onSetReadOnly: (senderId: string, readOnly: boolean) => void;
 }) {
   const { t } = useText();
   const senders = () => props.account.allowedSenders;
@@ -487,6 +497,13 @@ function SendersSection(props: {
                 </ItemDescription>
               </ItemContent>
               <ItemActions>
+                <Show when={sender.readOnly !== undefined}>
+                  <SenderAccessSelect
+                    sender={sender}
+                    busy={props.busy}
+                    onChange={(readOnly) => props.onSetReadOnly(sender.id, readOnly)}
+                  />
+                </Show>
                 <Button
                   type="button"
                   size="sm"
@@ -516,6 +533,35 @@ function SendersSection(props: {
         </Show>
       </ItemGroup>
     </SettingsSection>
+  );
+}
+
+const SENDER_ACCESS = ["reply", "read"] as const;
+type SenderAccess = (typeof SENDER_ACCESS)[number];
+const SENDER_ACCESS_LABEL = {
+  reply: "connector.whatsapp.senderReplies",
+  read: "connector.whatsapp.senderReadOnly",
+} as const satisfies Record<SenderAccess, AppTextKey>;
+
+function SenderAccessSelect(props: { sender: WhatsAppSender; busy: boolean; onChange: (readOnly: boolean) => void }) {
+  const { t } = useText();
+  const value = (): SenderAccess => (props.sender.readOnly ? "read" : "reply");
+  return (
+    <Select<SenderAccess>
+      options={[...SENDER_ACCESS]}
+      value={value()}
+      disabled={props.busy}
+      placement="bottom-end"
+      onChange={(next) => {
+        if (next !== null && next !== value()) props.onChange(next === "read");
+      }}
+      itemComponent={(item) => <SelectItem item={item.item}>{t(SENDER_ACCESS_LABEL[item.item.rawValue])}</SelectItem>}
+    >
+      <SelectTrigger size="sm" aria-label={t("connector.whatsapp.senderAccess", { name: props.sender.name })}>
+        <SelectValue<SenderAccess>>{(state) => t(SENDER_ACCESS_LABEL[state.selectedOption()])}</SelectValue>
+      </SelectTrigger>
+      <SelectContent />
+    </Select>
   );
 }
 
