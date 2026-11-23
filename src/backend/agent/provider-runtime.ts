@@ -102,6 +102,7 @@ import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { CliCodeLoginFailed, type CliCodePrompt, PROMPT_TIMEOUT_MS, startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
+import { readCodexRoutesToOpenai } from "./codex-model-source";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { FailureContext } from "./failure-signal";
 import { ModelCatalog } from "./model-catalog";
@@ -378,6 +379,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #resetCredits = new WeakMap<AgentClient, number | null>();
   readonly #ownResetCredits = new Map<AgentProvider, number | null>();
   readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
+  readonly #codexRoutesToOpenai = new WeakMap<AgentClient, boolean>();
   readonly #usageUnreported = new Set<AgentProvider>();
   readonly #usageReadFailed = new Set<AgentProvider>();
   readonly #usageForgets = new Map<AgentProvider, number>();
@@ -2904,7 +2906,7 @@ export class ProviderRuntime implements ProviderPort {
 
   applyPushedUsage(source: AgentClient, params: unknown): void {
     const provider = source.provider;
-    if (this.#clients.get(provider) !== source) return;
+    if (this.#clients.get(provider) !== source || this.#codexRoutesToOpenai.get(source) === false) return;
     const pushed = pushedUsageLimit(provider, params);
     if (!pushed) return;
     const kept = this.#lastUsage.get(provider);
@@ -4482,6 +4484,14 @@ export class ProviderRuntime implements ProviderPort {
     model?: string,
     emit = true,
   ) {
+    if (client.provider === "codex" && !(yield* this.#readCodexRoute(client))) {
+      if (this.#clients.get(client.provider) === client) {
+        this.#lastUsage.delete(client.provider);
+        this.#ownResetCredits.delete(client.provider);
+        this.#usageUnreported.add(client.provider);
+      }
+      return { limits: [] } satisfies AccountUsage;
+    }
     const rateLimits = yield* client
       .request(
         "account/rateLimits/read",
@@ -4506,6 +4516,18 @@ export class ProviderRuntime implements ProviderPort {
     if (emit) this.#emit({ type: "usage-changed", usage: structuredClone(usage) });
     return structuredClone(usage);
   });
+
+  #readCodexRoute(client: AgentClient) {
+    return readCodexRoutesToOpenai(client, providerCheckTimeoutMs(5_000)).pipe(
+      Effect.tap((routesToOpenai) => Effect.sync(() => this.#codexRoutesToOpenai.set(client, routesToOpenai))),
+      Effect.catch(() =>
+        Effect.sync(() => {
+          logger.warn("Codex did not give its model route. OpenBot reads the ChatGPT usage.");
+          return this.#codexRoutesToOpenai.get(client) ?? true;
+        }),
+      ),
+    );
+  }
 
   #setStatus(patch: Partial<AgentStatus>): void {
     const available: AgentProvider[] = [];
