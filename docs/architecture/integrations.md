@@ -824,7 +824,7 @@ window.
   command fails with `timeout`. A command also has a deadline 10 s before the host gives up on it
   (120 s from its arrival): after the deadline it does not act, so the agent is never told "timeout"
   for an action that then runs. "Stop sharing" ends the waiting cards with `not-shared`, not a denial. These ask every time, also on an allowed site, and have no "Always":
-  typing into a password field or a field with `autocomplete="cc-*"`; a download; and a click, key,
+  typing into a password field, a field with `autocomplete="cc-*"`, or a field inside a frame (card and login fields are often in a cross-origin frame that the page cannot see into); a download; and a click, key,
   `navigate` or `open` on an address whose path has `oauth` or `authorize` and that has a `client_id`
   parameter. `chrome.debugger` cannot stop downloads (`Page.setDownloadBehavior` is a browser-level
   command that an extension may not send), so the worker uses `chrome.downloads.onDeterminingFilename`:

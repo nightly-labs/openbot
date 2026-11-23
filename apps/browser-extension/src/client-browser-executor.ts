@@ -520,9 +520,11 @@ function typesText(key: string): boolean {
 function focusedField() {
   const field = document.activeElement;
   const tokens = (field?.getAttribute("autocomplete") ?? "").split(/\s+/);
+  const frame =
+    field instanceof HTMLIFrameElement || field instanceof HTMLFrameElement || field instanceof HTMLObjectElement;
   return {
     password: field instanceof HTMLInputElement && field.type === "password",
-    payment: tokens.some((token) => token.startsWith("cc-")),
+    payment: frame || tokens.some((token) => token.startsWith("cc-")),
   };
 }
 
@@ -864,6 +866,10 @@ function pageLocate(input: { target: ClientBrowserTarget; focus: boolean; intera
     href: link instanceof HTMLAnchorElement ? link.href : "",
     download: link instanceof HTMLAnchorElement && link.hasAttribute("download"),
     password: field instanceof HTMLInputElement && field.type === "password",
-    payment: tokens.some((token) => token.startsWith("cc-")),
+    payment:
+      [element, field].some(
+        (node) =>
+          node instanceof HTMLIFrameElement || node instanceof HTMLFrameElement || node instanceof HTMLObjectElement,
+      ) || tokens.some((token) => token.startsWith("cc-")),
   };
 }
