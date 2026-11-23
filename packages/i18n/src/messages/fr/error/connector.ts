@@ -33,6 +33,8 @@ export const messages = {
     "1Password a reçu trop de requêtes. Patientez quelques minutes, puis réessayez.",
   "error.connector.onePasswordNoVault":
     "Le compte de service ne peut lire aucun coffre. Donnez-lui accès à un coffre, puis réessayez.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot ne peut pas lire vos identifiants dans 1Password. Déconnectez 1Password, puis reconnectez-le.",
   "error.connector.onePasswordFileUnreadable": "Le fichier de connexion 1Password est illisible.",
   "error.connector.onePasswordFileTooLarge": "Le fichier de connexion 1Password est trop volumineux.",
   "error.connector.bitwardenFailed":

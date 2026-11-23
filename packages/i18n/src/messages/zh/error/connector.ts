@@ -28,6 +28,8 @@ export const messages = {
   "error.connector.onePasswordUnreachable": "OpenBot 无法连接到 1Password，请检查网络连接后重试。",
   "error.connector.onePasswordRateLimited": "1Password 收到的请求过多，请等待几分钟后重试。",
   "error.connector.onePasswordNoVault": "该服务账号无法读取任何保险库。请授予其保险库访问权限后重试。",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot 无法读取你在 1Password 中的登录信息。请断开 1Password，然后重新连接。",
   "error.connector.onePasswordFileUnreadable": "1Password 连接文件无法读取。",
   "error.connector.onePasswordFileTooLarge": "1Password 连接文件过大。",
   "error.connector.bitwardenFailed":

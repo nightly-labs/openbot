@@ -33,6 +33,8 @@ export const messages = {
     "1Password çok fazla istek aldı. Birkaç dakika bekleyin, ardından tekrar deneyin.",
   "error.connector.onePasswordNoVault":
     "Hizmet hesabı bir kasayı okuyamıyor. Ona bir kasaya erişim verin, ardından tekrar deneyin.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot, 1Password'deki girişlerinizi okuyamıyor. 1Password bağlantısını kesin, ardından yeniden bağlayın.",
   "error.connector.onePasswordFileUnreadable": "1Password bağlantı dosyası okunamıyor.",
   "error.connector.onePasswordFileTooLarge": "1Password bağlantı dosyası çok büyük.",
   "error.connector.bitwardenFailed":

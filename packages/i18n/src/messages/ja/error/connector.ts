@@ -33,6 +33,8 @@ export const messages = {
     "1Password へのリクエストが多すぎます。数分待ってから、もう一度お試しください。",
   "error.connector.onePasswordNoVault":
     "サービスアカウントは保管庫を読み取れません。保管庫へのアクセス権を付与してから、もう一度お試しください。",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot は 1Password のログイン情報を読み取れません。1Password を切断してから、もう一度接続してください。",
   "error.connector.onePasswordFileUnreadable": "1Password の接続ファイルを読み取れません。",
   "error.connector.onePasswordFileTooLarge": "1Password の接続ファイルが大きすぎます。",
   "error.connector.bitwardenFailed":

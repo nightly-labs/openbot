@@ -40,6 +40,8 @@ export const messages = defineMessages("error.connector", {
   "error.connector.onePasswordRateLimited": "1Password received too many requests. Wait a few minutes, then try again.",
   "error.connector.onePasswordNoVault":
     "The service account cannot read a vault. Give it access to a vault, then try again.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot cannot read your logins in 1Password. Disconnect 1Password, then connect it again.",
   "error.connector.onePasswordFileUnreadable": "The 1Password connection file is unreadable.",
   "error.connector.onePasswordFileTooLarge": "The 1Password connection file is too large.",
   "error.connector.bitwardenFailed":

@@ -33,6 +33,8 @@ export const messages = {
     "1Password получил слишком много запросов. Подождите несколько минут и повторите попытку.",
   "error.connector.onePasswordNoVault":
     "Сервисный аккаунт не может читать ни одно хранилище. Дайте ему доступ к хранилищу и повторите попытку.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot не может прочитать ваши логины в 1Password. Отключите 1Password, затем подключите его снова.",
   "error.connector.onePasswordFileUnreadable": "Файл подключения 1Password не читается.",
   "error.connector.onePasswordFileTooLarge": "Файл подключения 1Password слишком большой.",
   "error.connector.bitwardenFailed":
