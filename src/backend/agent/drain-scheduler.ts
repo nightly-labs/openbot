@@ -13,6 +13,7 @@ import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
 import {
   type AgentProvider,
+  ProviderModelLimitedError,
   ProviderModelNotOfferedError,
   ProviderSessionBusyError,
   ProviderStoppedError,
@@ -46,7 +47,7 @@ import type { MailboxSync } from "./mailbox-sync";
 import type { MemoryHold } from "./memory-hold";
 import type { PlanContinuation } from "./plan-continuation";
 import type { ProfileSave } from "./profile-save";
-import { isPlanLimitDiagnostic } from "./provider-diagnostics";
+import { isPlanLimitDiagnostic, providerResetDelayMs } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { RoutineStartRetry } from "./routine-start-retry";
@@ -1176,17 +1177,27 @@ export class DrainScheduler {
               yield* this.#retryBusySession(delivery.recipientAgentId);
             return;
           }
+          const modelLimited = error instanceof ProviderModelLimitedError;
           if (
-            error instanceof ProviderModelNotOfferedError &&
+            (error instanceof ProviderModelNotOfferedError || modelLimited) &&
             !channelDelivery &&
             !messagingDelivery &&
             this.#hooks.mayFailOver(delivery.recipientAgentId)
           ) {
-            logger.warn("A session does not offer the agent's model. The agent moves to its backup model.", {
-              agentId: delivery.recipientAgentId,
-              model: requestedModel,
-            });
-            this.#usageLimits.notOffered(delivery.recipientAgentId, requestedModel);
+            if (modelLimited) {
+              logger.warn("The provider refused the agent's model at a limit. The agent moves to its backup model.", {
+                agentId: delivery.recipientAgentId,
+                model: requestedModel,
+                reason: this.#hooks.redactMcp(error.message),
+              });
+              this.#usageLimits.failed(delivery.recipientAgentId, requestedModel, providerResetDelayMs(error.message));
+            } else {
+              logger.warn("A session does not offer the agent's model. The agent moves to its backup model.", {
+                agentId: delivery.recipientAgentId,
+                model: requestedModel,
+              });
+              this.#usageLimits.notOffered(delivery.recipientAgentId, requestedModel);
+            }
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             if (!this.#hooks.followUsageLimit(delivery.recipientAgentId))
