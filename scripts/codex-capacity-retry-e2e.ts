@@ -28,6 +28,8 @@ interface Retry {
 }
 const capacity: Retry = { info: "disconnected", details: AT_CAPACITY };
 const reset: Retry = { info: "disconnected", details: DISCONNECTED };
+type Step = Retry | "output";
+const isRetry = (step: Step): step is Retry => step !== "output";
 
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
@@ -85,6 +87,10 @@ const answer = (message) => {
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId, turn: { id: turnId } } });
       for (const [index, retry] of retries.entries()) {
+        if (retry === "output") {
+          write({ method: "item/agentMessage/delta", params: { threadId, turnId, itemId: "message-" + turnId, delta: "Done." } });
+          continue;
+        }
         const error = {
           message: "Reconnecting... " + (index + 2) + "/5",
           codexErrorInfo:
@@ -129,7 +135,7 @@ process.stdin.on("data", (chunk) => {
 
 interface CaseReport {
   name: string;
-  retries: Retry[];
+  retries: Step[];
   statusDuringRetries: string;
   finalStatus: string;
   turnStarts: number;
@@ -212,11 +218,16 @@ const stopLog = teeLogLines(["turn-lifecycle"], (line) => logLines.push(line));
 try {
   await runCauseEffect(agents.initialize());
 
-  const cases: { name: string; retries: Retry[]; notices: string[] }[] = [
+  const cases: { name: string; retries: Step[]; notices: string[] }[] = [
     { name: "model at capacity", retries: [capacity, capacity, capacity], notices: [NOTICE] },
     { name: "server overloaded info", retries: [{ info: "overloaded", details: null }], notices: [NOTICE] },
     { name: "connection reset", retries: [reset, reset], notices: [] },
     { name: "capacity, then connection resets", retries: [capacity, reset, reset], notices: [NOTICE, RETRYING] },
+    {
+      name: "connection resets, output, connection resets",
+      retries: [reset, reset, reset, "output", reset, reset, reset],
+      notices: [RETRYING, RETRYING],
+    },
   ];
 
   for (const [index, entry] of cases.entries()) {
@@ -234,7 +245,7 @@ try {
     const agentEvents = () => errorEvents.filter((event) => event.agentId === agent.id);
     const retryLines = () =>
       logLines.slice(firstLogLine).filter((line) => line.includes("A provider retries a request."));
-    await waitFor("all retries", () => retryLines().length === entry.retries.length);
+    await waitFor("all retries", () => retryLines().length === entry.retries.filter(isRetry).length);
     const running = agents
       .listQueue(agent.id)
       .deliveries.find((item) => item.status !== "completed" && item.status !== "failed");
@@ -259,7 +270,7 @@ try {
     assert.equal(result.turnStarts, 1, `${entry.name}: OpenBot started the turn again`);
     assert.deepEqual(
       result.retryLogLines.map((line) => line.includes('"atCapacity":true')),
-      entry.retries.map((retry) => retry !== reset),
+      entry.retries.filter(isRetry).map((retry) => retry !== reset),
       `${entry.name}: the log has the wrong cause`,
     );
     assert.deepEqual(

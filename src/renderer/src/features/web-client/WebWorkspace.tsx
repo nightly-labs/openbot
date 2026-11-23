@@ -249,6 +249,7 @@ import {
   agentErrorDetails,
   claimErrorToast,
   createTurnErrorBanners,
+  isRetryNotice,
   readableAgentError,
   remoteAgentError,
 } from "../agents/agent-error-text";
@@ -2051,6 +2052,15 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           errorBanners.noteTurnStarted(composerDraftKey({ agentId: event.agentId, serverId }));
         return;
       }
+      if (event.type === "conversation-delta") {
+        if (serverId && isMainThread(event.agentId, event.threadId))
+          errorBanners.clearAfterOutput(
+            composerDraftKey({ agentId: event.agentId, serverId }),
+            controller.setConversationErrors,
+            controller.setConversationErrorRuns,
+          );
+        return;
+      }
       if (event.type === "turn-completed") {
         if (!serverId) return;
         const key = composerDraftKey({ agentId: event.agentId, serverId });
@@ -2069,8 +2079,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         errorBanners.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         const details = agentErrorDetails(event.message, message);
+        const notice = isRetryNotice(event.message);
         controller.setConversationErrorRuns((current) => {
-          if (details) return { ...current, [key]: { message, run: null, details } };
+          if (details || notice)
+            return {
+              ...current,
+              [key]: { message, run: null, ...(details ? { details } : {}), ...(notice ? { notice } : {}) },
+            };
           if (!(key in current)) return current;
           const { [key]: _replaced, ...next } = current;
           return next;

@@ -1196,6 +1196,8 @@ export class TurnLifecycle {
     const itemId = getString(params, "itemId");
     const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
     if (!turnId || !itemId || delta === null || this.#compaction.isCompactionTurn(threadId, turnId)) return;
+    this.#turnRetries.delete(turnId);
+    this.#capacityNotices.delete(turnId);
     this.#itemTurns.set(itemId, turnId);
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
