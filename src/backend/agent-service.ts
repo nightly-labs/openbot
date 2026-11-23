@@ -296,7 +296,7 @@ import {
   providerLabel,
   type ToolUsageSignal,
 } from "./agent/thread-items";
-import { ThreadLifecycle } from "./agent/thread-lifecycle";
+import { type RuntimeRefreshTiming, ThreadLifecycle } from "./agent/thread-lifecycle";
 import { ToolOperationFailed, toToolOperationFailed } from "./agent/tool-operation";
 import { TurnContext } from "./agent/turn-context";
 import { type AgentBrowserHost, FAILOVER_CAUSES, isStreamingDelta, TurnLifecycle } from "./agent/turn-lifecycle";
@@ -659,7 +659,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       logger,
       hooks: {
         emitError: (code, error) => this.#emitError(code, error),
-        refreshAllAgentRuntimes: () => this.#threads.refreshAllAgentRuntimes(),
+        refreshAllAgentRuntimes: (timing) => this.#threads.refreshAllAgentRuntimes(timing),
       },
     });
     this.#mediaCatalog = new WorkflowMediaCatalogCache({
@@ -2655,8 +2655,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  refreshAllAgentRuntimes(): Effect.Effect<void, AgentLifecycleFailed> {
-    return this.#threads.refreshAllAgentRuntimes();
+  refreshAllAgentRuntimes(timing: RuntimeRefreshTiming): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#threads.refreshAllAgentRuntimes(timing);
   }
 
   testMcpServer(
@@ -2744,7 +2744,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   notifyComputerUseChanged(): Effect.Effect<void, AgentLifecycleFailed> {
-    return this.#mcp.changed().pipe(
+    return this.#mcp.changed("now").pipe(
       Effect.asVoid,
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "refresh computer use", cause: failure.cause }),
@@ -2760,7 +2760,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this: AgentService,
   ) {
     yield* this.#mcp
-      .changed()
+      .changed("now")
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "refresh GitHub tools", cause: failure.cause }),

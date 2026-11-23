@@ -48,6 +48,7 @@ import { mcpSecretValues, redactMcpValues } from "../mcp-redaction";
 import { McpServerError, type McpServerStore } from "../mcp-server-store";
 import type { ProviderClientContext } from "../provider-drivers";
 import { providerLabel } from "./thread-items";
+import type { RuntimeRefreshTiming } from "./thread-lifecycle";
 
 const SIGN_IN_FAILURE_CHECK_MS = 5_000;
 
@@ -69,7 +70,7 @@ export interface McpServiceSignIn {
 
 export interface McpGatewayHooks {
   emitError(code: string, error: unknown): void;
-  refreshAllAgentRuntimes(): Effect.Effect<void, McpGatewayFailed>;
+  refreshAllAgentRuntimes(timing: RuntimeRefreshTiming): Effect.Effect<void, McpGatewayFailed>;
 }
 
 export interface GitHubConnectorSource {
@@ -219,11 +220,12 @@ export class McpGateway {
   }
 
   readonly save = Effect.fn("McpGateway.save")(function* (this: McpGateway, input: SaveMcpServerInput) {
+    const added = !this.#servers.list().some((config) => config.id === input.config.id);
     yield* Effect.try({
       try: () => this.#servers.save(input.config),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
-    return yield* this.changed();
+    return yield* this.changed(added ? "after-background-work" : "now");
   }, Effect.uninterruptible);
 
   readonly remove = Effect.fn("McpGateway.remove")(function* (this: McpGateway, input: RemoveMcpServerInput) {
@@ -232,7 +234,7 @@ export class McpGateway {
       try: () => this.#servers.remove(input.mcpServerId),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
-    const list = yield* this.changed();
+    const list = yield* this.changed("now");
     const removedResource = removed?.transport === "http" ? mcpOAuthAccountKey(removed.url) : null;
     if (
       removed &&
@@ -253,12 +255,12 @@ export class McpGateway {
       try: () => this.#servers.setEnabled(input.mcpServerId, input.enabled),
       catch: (cause) => new McpGatewayFailed({ cause }),
     });
-    return yield* this.changed();
+    return yield* this.changed(input.enabled ? "after-background-work" : "now");
   }, Effect.uninterruptible);
 
-  readonly changed = Effect.fn("McpGateway.changed")(function* (this: McpGateway) {
+  readonly changed = Effect.fn("McpGateway.changed")(function* (this: McpGateway, timing: RuntimeRefreshTiming) {
     this.#reportedDrops.clear();
-    yield* this.#hooks.refreshAllAgentRuntimes();
+    yield* this.#hooks.refreshAllAgentRuntimes(timing);
     return this.list();
   });
 
@@ -324,7 +326,7 @@ export class McpGateway {
     const retried = yield* probe;
     if (retried.needs !== "sign_in") return retried;
     if (yield* stored.endRefusedSignIn(config.url, renewed).pipe(toMcpGatewayFailed))
-      yield* this.#hooks.refreshAllAgentRuntimes();
+      yield* this.#hooks.refreshAllAgentRuntimes("now");
     return retried;
   });
 
@@ -341,7 +343,7 @@ export class McpGateway {
     const route = saved !== undefined && this.#proxied(saved) ? mcpOAuthProxyRoute(saved.id, saved.url) : null;
     const failedStart = route !== null && this.#proxy.failedStart(route);
     if (this.#testedTools.get(key) === tools && !failedStart) return;
-    yield* this.#hooks.refreshAllAgentRuntimes();
+    yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
     if (route !== null && failedStart) this.#proxy.reportedFailedStart(route);
     this.#testedTools.set(key, tools);
   });
@@ -399,7 +401,7 @@ export class McpGateway {
       this.#servers
         .listEnabled()
         .some((config) => config.transport === "http" && mcpOAuthAccountKey(config.url) === resource);
-    if (result.error === null && inUse) yield* this.#hooks.refreshAllAgentRuntimes();
+    if (result.error === null && inUse) yield* this.#hooks.refreshAllAgentRuntimes("after-background-work");
     if (resource !== null) {
       if (result.error === null) this.#signInFailures.delete(resource);
       else if (matchingSourceKeys(result.error)[0] !== "error.backend.mcpSignInCancelled")
@@ -432,7 +434,7 @@ export class McpGateway {
       const resource = mcpOAuthAccountKey(config.url);
       if (resource !== null) this.#signInFailures.delete(resource);
       yield* this.#oauth.signOut(config.url).pipe(toMcpGatewayFailed);
-      yield* this.#hooks.refreshAllAgentRuntimes();
+      yield* this.#hooks.refreshAllAgentRuntimes("now");
     }
     return this.signIns();
   }, Effect.uninterruptible);
@@ -458,7 +460,7 @@ export class McpGateway {
     const dropped = yield* oauth
       .saveSignInApp(config.url, { clientId: input.clientId, clientSecret: input.clientSecret, scope: input.scope })
       .pipe(toMcpGatewayFailed);
-    if (dropped) yield* this.#hooks.refreshAllAgentRuntimes();
+    if (dropped) yield* this.#hooks.refreshAllAgentRuntimes("now");
     return this.signInApp(input);
   }, Effect.uninterruptible);
 
@@ -467,7 +469,8 @@ export class McpGateway {
     input: McpSignInAppInput,
   ) {
     const { config, oauth } = yield* this.#signInAppTarget(input.mcpServerId);
-    if (yield* oauth.removeSignInApp(config.url).pipe(toMcpGatewayFailed)) yield* this.#hooks.refreshAllAgentRuntimes();
+    if (yield* oauth.removeSignInApp(config.url).pipe(toMcpGatewayFailed))
+      yield* this.#hooks.refreshAllAgentRuntimes("now");
     return this.signInApp(input);
   }, Effect.uninterruptible);
 
