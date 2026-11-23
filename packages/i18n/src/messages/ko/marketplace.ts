@@ -600,6 +600,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "이 에이전트를 실행하는 컴퓨터에 {name}을(를) 설치해 주세요. 앱에 브라우저 로그인이 필요해요.",
   "marketplace.error.appInvalid": "{name}을(를) 추가할 수 없어요: {reason}",
+  "marketplace.error.appNotConnected": "{name}을(를) 연결할 수 없어요: {reason}",
   "marketplace.error.uninstallNoServer": "플러그인을 제거하려면 로컬 서버를 선택해 주세요.",
   "marketplace.error.uninstallPartial": "{name}의 일부를 제거하지 못했어요. {failures}",
   "marketplace.error.actionFailed": "마켓플레이스 작업을 완료할 수 없어요. 다시 시도해 주세요.",
