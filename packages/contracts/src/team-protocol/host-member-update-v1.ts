@@ -1,7 +1,3 @@
-// Optional member update access. Every authenticated server member can read status, check, and
-// request an idle update. Existing schedules are preserved. Host update restrictions still apply.
-// Forced restarts, cancellation, and preferences stay on the administrator-only host-update-v1 API.
-// The response and restart events retain the host-update-v1 wire shape.
 import { empty, type OptionalRouteCodec } from "./admin-wire";
 import { HOST_UPDATE_CODECS, HOST_UPDATE_ROUTES } from "./host-update-v1";
 
@@ -19,7 +15,6 @@ export const HOST_MEMBER_UPDATE_CODECS: ReadonlyMap<string, OptionalRouteCodec> 
   }),
 );
 
-/** Only the three member operations have a corresponding route. */
 export function memberUpdateRoute(adminRoute: string) {
   switch (adminRoute) {
     case HOST_UPDATE_ROUTES.status:

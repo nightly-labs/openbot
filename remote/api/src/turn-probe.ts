@@ -3,10 +3,6 @@ import { lookup } from "node:dns/promises";
 import { Effect, Schema } from "effect";
 import type { RemoteApiConfig } from "./config";
 
-// One real TURN allocation over UDP, as a client makes it (RFC 5766 with the TURN REST credentials
-// of `RemoteTokenService.iceServers`). A STUN answer alone does not show that the relay can allocate:
-// on 2026-10-30 coturn answered STUN but refused every Allocate with 486 at `total-quota`.
-
 const MAGIC_COOKIE = 0x2112a442;
 const ALLOCATE = 0x0003;
 const REFRESH = 0x0004;
@@ -22,15 +18,12 @@ const REQUESTED_TRANSPORT = 0x0019;
 const UDP_PROTOCOL = 17;
 const UNAUTHORIZED = 401;
 const ALLOCATION_QUOTA_REACHED = 486;
-// UDP can lose a datagram, so a request is sent again until it gets an answer.
 const RESEND_MILLISECONDS = 500;
 const PROBE_TIMEOUT_MILLISECONDS = 5_000;
 const REFRESH_TIMEOUT_MILLISECONDS = 1_000;
-// The credentials only have to outlive the probe.
 const CREDENTIAL_TTL_SECONDS = 60;
 const PROBE_USER = "openbot-status-probe";
 
-/** `full`: the relay refused the allocation at its quota. `refused`: another error. `no-answer`: no reply in time. */
 export class TurnProbeError extends Schema.TaggedError<TurnProbeError>()("TurnProbeError", {
   reason: Schema.Literals(["full", "refused", "no-answer"]),
 }) {}
@@ -73,7 +66,6 @@ function concat(parts: Uint8Array[]) {
 
 function encodeMessage(method: number, transactionId: Uint8Array, attributes: Attribute[], key: Uint8Array | null) {
   const body = concat(attributes.map(encodeAttribute));
-  // MESSAGE-INTEGRITY covers the header with a length that already counts its own 24 bytes.
   const header = new Uint8Array(20);
   const view = new DataView(header.buffer);
   view.setUint16(0, method);
@@ -86,7 +78,6 @@ function encodeMessage(method: number, transactionId: Uint8Array, attributes: At
   return concat([message, encodeAttribute({ type: MESSAGE_INTEGRITY, value: integrity })]);
 }
 
-/** The response to `transactionId`, or null for any other datagram. */
 function decodeResponse(bytes: Uint8Array, transactionId: Uint8Array): StunResponse | null {
   if (bytes.length < 20) return null;
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -120,8 +111,6 @@ const openSocket = (address: string, port: number) => {
       try: () =>
         Bun.udpSocket({
           connect: { hostname: address, port },
-          // When coturn is down, the host answers with ICMP port unreachable and the socket gets
-          // ECONNREFUSED. Without this handler Bun reports it as an uncaught error.
           socket: { data: (_socket, bytes) => receive?.(bytes), error: () => fail?.() },
         }),
       catch: noAnswer,
@@ -129,7 +118,6 @@ const openSocket = (address: string, port: number) => {
     (socket) => Effect.sync(() => socket.close()),
   ).pipe(
     Effect.map((socket) => ({
-      /** Sends the request until its response arrives. */
       request: (method: number, attributes: Attribute[], key: Uint8Array | null) =>
         Effect.callback<StunResponse, TurnProbeError>((resume) => {
           const transactionId = randomBytes(12);
@@ -143,7 +131,6 @@ const openSocket = (address: string, port: number) => {
             stop();
             resume(Effect.fail(noAnswer()));
           };
-          // A send can throw too. In the timer that would stop the process.
           const send = () => {
             try {
               socket.send(message);
@@ -166,7 +153,6 @@ const openSocket = (address: string, port: number) => {
   );
 };
 
-/** Allocates one UDP relay on the TURN server `host` and frees it at once. */
 export const probeTurnAllocation = Effect.fn("TurnProbe.allocate")(
   function* (host: string, config: Pick<RemoteApiConfig, "turnPort" | "turnSecret">) {
     const { address } = yield* Effect.tryPromise({
@@ -176,7 +162,6 @@ export const probeTurnAllocation = Effect.fn("TurnProbe.allocate")(
     const socket = yield* openSocket(address, config.turnPort);
     const transport = uint32(REQUESTED_TRANSPORT, UDP_PROTOCOL << 24);
 
-    // The first request has no credentials. The 401 gives the realm and the nonce.
     const challenge = yield* socket.request(ALLOCATE, [transport], null);
     const realm = challenge.attributes.get(REALM);
     const nonce = challenge.attributes.get(NONCE);
@@ -197,8 +182,6 @@ export const probeTurnAllocation = Effect.fn("TurnProbe.allocate")(
         reason: errorCode(allocation) === ALLOCATION_QUOTA_REACHED ? "full" : "refused",
       });
     }
-    // A lifetime of 0 frees the allocation now, so the probe does not hold quota for 10 minutes.
-    // The allocation already worked, so a lost answer here does not fail the probe.
     yield* socket
       .request(REFRESH, [uint32(LIFETIME, 0), ...credentials], key)
       .pipe(Effect.timeout(REFRESH_TIMEOUT_MILLISECONDS), Effect.ignore);

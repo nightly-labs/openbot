@@ -1,0 +1,54 @@
+name: Publish the Android APK
+
+# Makes the Android APK public when its version is marked as available.
+#
+# `release-android-apk.yml` saves the APK of each store build on a draft GitHub release, which is not
+# public. `bun run mobile:release:published android` sets the newest Google Play version in
+# `mobile-features-config.ts`, and openbot.run offers the APK of that version. When that change is on
+# main, this workflow makes the draft `android-v<version>` public. The account Worker deploys at the
+# end of CI, some minutes later, so the file is there before the site links to it. The release is a
+# prerelease, so it never becomes the "latest" release, which is the desktop app.
+#
+# A run that finds nothing to do changes nothing: the site offers no APK yet, or the release is
+# public already. A run fails when the version has no release, because the link on the site is then
+# dead. See apps/mobile/README.md#android-apk.
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/auth-api/src/server/mobile-features-config.ts
+  # After a failed run, or after `Stage the Android APK` made a draft for a version that the site
+  # already offers.
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  publish:
+    name: Make the APK release public
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # A group of its own. In the group of the stage job, a waiting run of this job could be
+    # replaced by a later stage run, and nothing would start it again.
+    concurrency:
+      group: publish-android-apk
+      cancel-in-progress: false
+    permissions:
+      # The `android-v<version>` release and its tag. A draft is visible only with write access.
+      contents: write
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun and Node
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Make the draft of the newest Google Play version public
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/android-apk-release.ts publish

@@ -22,22 +22,13 @@ import HtmlPreview from "./html-preview.dom";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 
-/** The lines of code that the card shows while the block streams, or when it cannot draw it. */
 const EXCERPT_LINES = 4;
 const PRESS_EASING = cubicBezier(0.23, 1, 0.32, 1);
-/** The picture is landscape: twice as wide as it is high. */
 const PREVIEW_ASPECT = 2;
-/** A wide, flat diagram is not drawn lower than this. */
 const DIAGRAM_MIN_HEIGHT = 72;
-/** The card is as wide as the bubble allows, as an image attachment is. */
 const CARD_SIDE_SPACE = 80;
+const knownCardWidths = new Map<number, number>();
 
-/**
- * A ```html or ```mermaid block in a reply, or the page of a visual reply: a card with a header and
- * a small picture of the page or the diagram, so the block does not fill the conversation. A tap
- * opens it on a screen of its own. While the block streams, the card shows its first lines of code
- * instead. A visual reply passes its `file`, so the screen can share it.
- */
 export const ChatCodePreview = memo(function ChatCodePreview({
   kind,
   text,
@@ -51,22 +42,19 @@ export const ChatCodePreview = memo(function ChatCodePreview({
   language?: string;
   streaming?: boolean;
   file?: CodePreviewEntry["file"];
-  /** The colors of a bubble with a message color, which the card and its header take. */
   tone?: BubbleTone;
 }) {
   const { t } = useText();
   const reducedMotion = useReducedMotion();
-  // A card that mounts during a fast fling of the chat draws its page or diagram when the list slows down.
   const settled = useListSettled();
-  // A web view starts only once the chat shows its history, so it does not slow the chat that opens.
   const historyShown = useHistoryShown();
   const [themeMuted, themeForeground] = useThemeColor(["muted", "foreground"]);
   const muted = tone?.muted ?? themeMuted;
   const foreground = tone?.foreground ?? themeForeground;
   const line = tone ? { borderColor: tone.line } : undefined;
   const [pressed, setPressed] = useState(false);
-  const [width, setWidth] = useState(0);
   const screen = useWindowDimensions();
+  const [width, setWidth] = useState(() => knownCardWidths.get(screen.width) ?? 0);
   const previewHeight = Math.round(width / PREVIEW_ASPECT);
   const title = kind === "html" ? t("mobile.chat.preview.htmlTitle") : t("mobile.chat.preview.mermaidTitle");
   const lineCount = text.split("\n").length;
@@ -79,8 +67,11 @@ export const ChatCodePreview = memo(function ChatCodePreview({
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       style={{ width: screen.width - CARD_SIDE_SPACE, maxWidth: "100%" }}
-      // The picture fills the card inside its 1-point border.
-      onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width) - 2)}
+      onLayout={(event) => {
+        const inner = Math.round(event.nativeEvent.layout.width) - 2;
+        if (inner > 0) knownCardWidths.set(screen.width, inner);
+        setWidth(inner);
+      }}
       onPress={() => {
         void haptics.impact("soft");
         const previewId = storeCodePreview({ kind, source: text, language, ...(file ? { file } : {}) });
@@ -128,7 +119,9 @@ export const ChatCodePreview = memo(function ChatCodePreview({
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
           {streaming ? (
             <CodeExcerpt text={text} color={tone?.muted} />
-          ) : width <= 0 ? null : !settled || (kind === "html" && !historyShown) ? (
+          ) : width <= 0 ? (
+            <View style={{ aspectRatio: PREVIEW_ASPECT }} />
+          ) : !settled || (kind === "html" && !historyShown) ? (
             <View style={{ height: previewHeight }} />
           ) : kind === "html" ? (
             <HtmlCardPreview text={text} title={title} height={previewHeight} />
@@ -142,7 +135,6 @@ export const ChatCodePreview = memo(function ChatCodePreview({
 });
 
 function CodeExcerpt({ text, color }: { text: string; color?: string }) {
-  // Each line keeps its row in the block, which is a stable key while the block streams.
   const excerpt = text
     .split("\n")
     .map((line, row) => ({ line, row }))
@@ -155,7 +147,6 @@ function CodeExcerpt({ text, color }: { text: string; color?: string }) {
           key={row}
           numberOfLines={1}
           className="bg-transparent p-0 text-muted"
-          // The last line fades, so the excerpt reads as the start of a longer block.
           style={[
             CODE_TEXT_STYLE,
             { fontSize: 12, lineHeight: 17, opacity: index === EXCERPT_LINES - 1 ? 0.45 : 1 },
@@ -169,7 +160,6 @@ function CodeExcerpt({ text, color }: { text: string; color?: string }) {
   );
 }
 
-/** The page at a phone width, scaled down to the card. It takes no touches, so the card opens it. */
 function HtmlCardPreview({ text, title, height }: { text: string; title: string; height: number }) {
   const background = useThemeColor("background");
   return (
@@ -191,11 +181,6 @@ function HtmlCardPreview({ text, title, height }: { text: string; title: string;
   );
 }
 
-/**
- * The diagram from the shared renderer at the full width of the card. A tall diagram shows its
- * top and the card cuts the rest; the screen shows it whole. Until `draw`, a diagram that is not
- * drawn yet waits in its drawing state, so the renderer's web view does not start.
- */
 function DiagramCardPreview({
   text,
   title,

@@ -16,32 +16,18 @@ import type { WebWorkspaceRuntime } from "./web-runtime";
 export function WebAgentSettings(props: {
   runtime: WebWorkspaceRuntime;
   capabilities: string[];
-  /** The host has no agents yet: the form shows the first-agent copy and cannot be cancelled. */
   first: boolean;
-  /** The provider that the server's provider step chose, for the model the draft starts on. */
   preference?: CreationPreference | null | undefined;
-  /** The host's endpoints, so the picker lists their models on its Custom tab. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
-  /** Opens the host's provider settings from a plus button in the model picker. */
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
-  /**
-   * The workspace's live catalog. A provider that the user connects while the form is open, such as
-   * from the picker's plus button, comes in here; the form's own read only starts it.
-   */
   liveModels?: ClientAgentModelOption[] | undefined;
   liveStatus?: AgentStatus | undefined;
-  /**
-   * The picker can choose a provider account (`provider-accounts-v1`). The host gives its accounts only
-   * to an owner or admin, so `liveStatus` must carry them.
-   */
   accountChoice?: boolean | undefined;
-  /** The plan readings that mark the spent models of each account in the picker. */
   accountUsage?: AccountUsage | null | undefined;
-  /** The draft the form starts from. */
   initialDraft?: FirstAgentDraft;
   onDraftChange?: (draft: FirstAgentDraft) => void;
   onClose: () => void;
-  onSaved: () => Promise<void>;
+  onSaved: (agentId: string) => Promise<void>;
 }) {
   const { t } = useText();
   const [state, setState] = createStore<{
@@ -51,7 +37,6 @@ export function WebAgentSettings(props: {
     busy: boolean;
     error: string | null;
     uncertain: boolean;
-    /** The user picked a model, so a new catalog no longer replaces it. */
     modelTouched: boolean;
   }>({
     draft: props.initialDraft ?? createFirstAgentDraft(),
@@ -82,8 +67,6 @@ export function WebAgentSettings(props: {
         (model) => model.provider === draft.draft.provider && model.id === draft.draft.model,
       );
       if (draft.modelTouched && selected) return;
-      // As in the desktop app. The web client does not know the host's saved setup choice, so
-      // only the server's provider step names a provider.
       const resolved = resolveCreationModel(props.preference ?? null, models, status);
       if (resolved) {
         draft.draft.provider = resolved.provider;
@@ -97,7 +80,6 @@ export function WebAgentSettings(props: {
     () => ({ models: props.liveModels, status: props.liveStatus }),
     ({ models, status }) => {
       if (!supportsModelSelection() || !models?.length || status?.phase !== "ready") return;
-      // A newer read wins, so the form's own read that is still in flight does not replace it.
       modelRequestGeneration += 1;
       showCatalog(models, status);
     },
@@ -147,7 +129,7 @@ export function WebAgentSettings(props: {
     let created = false;
     try {
       const selectedModel = state.models.find((model) => model.provider === value.provider && model.id === value.model);
-      await props.runtime.createAgent({
+      const agent = await props.runtime.createAgent({
         name: value.name,
         description: value.purpose,
         initialMessage: createAgentInitialMessage(value, props.capabilities.includes(AGENT_WELCOME_CAPABILITY)),
@@ -166,7 +148,7 @@ export function WebAgentSettings(props: {
       });
       created = true;
       if (!disposed) {
-        await props.onSaved();
+        await props.onSaved(agent.id);
         props.onClose();
       }
     } catch {

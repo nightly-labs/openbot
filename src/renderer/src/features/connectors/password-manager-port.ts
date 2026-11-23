@@ -8,16 +8,11 @@ import { sourceText } from "@openbot/i18n/source";
 
 type DesktopPasswordManagers = OpenBotDesktopApi["passwordManagers"];
 
-/**
- * What a password manager page reaches: the managers of one place, this computer or a joined server.
- * One port serves every manager, because the engine gives them all the same status.
- */
 export type PasswordManagerPort = Pick<
   DesktopPasswordManagers,
   "list" | "connect" | "cancel" | "disconnect" | "openSignIn" | "onChanged"
 >;
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function passwordManagerPort(): PasswordManagerPort {
   const api = () => window.openbot.passwordManagers;
   return {
@@ -30,26 +25,15 @@ export function passwordManagerPort(): PasswordManagerPort {
   };
 }
 
-/** The actions of a joined server's managers (`password-managers-v1`). */
 export type HostPasswordManagerActions = Omit<PasswordManagerPort, "onChanged">;
 
-/** How often a joined server's managers are read while a sign-in runs. */
 const HOST_POLL_MS = 2_000;
-/**
- * The first sign-in can download the manager's CLI, and the user signs in in the browser. After this
- * many reads (15 minutes), opening the page reads again.
- */
 const HOST_POLL_LIMIT = 450;
 
 const signingIn = (status: PasswordManagerStatus) => status.state === "signing-in";
 
-/**
- * A port to a joined server's managers. The host sends no event, so `onChanged` reads the list while
- * a sign-in runs, and stops when no sign-in runs or after `HOST_POLL_LIMIT` reads. A failed read counts as a read.
- */
 export function polledPasswordManagerPort(actions: HostPasswordManagerActions): PasswordManagerPort {
   const listeners = new Set<(status: PasswordManagerStatus) => void>();
-  /** The sign-ins that run, by manager, from the last status of each. */
   const running = new Set<PasswordManagerId>();
   let timer: ReturnType<typeof setTimeout> | null = null;
   let reads = 0;
@@ -109,7 +93,6 @@ export function polledPasswordManagerPort(actions: HostPasswordManagerActions): 
   };
 }
 
-/** The managers of the joined server that `serverId` names, through main. Main opens the sign-in page. */
 export function hostPasswordManagerPort(serverId: () => string | undefined): PasswordManagerPort {
   const server = () => {
     const id = serverId();

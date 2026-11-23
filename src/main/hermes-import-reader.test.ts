@@ -6,9 +6,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { readHermesProfiles } from "./hermes-import-reader";
 import { type HermesImportAgents, HermesImportService } from "./hermes-import-service";
 
-// Failure modes: a value from `.env` or `auth.json`, an MCP argument, address, environment value or
-// header, or a secret file inside a skill reaches the preview the renderer receives, or the profile
-// data the import later writes into agents and MCP settings.
 const SECRETS = [
   "sk-or-env-secret-1",
   "ghp_env_secret_2",

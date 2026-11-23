@@ -23,15 +23,12 @@ const args = (status: Partial<BitwardenConnectorStatus>, hostName?: string) => (
   hostName,
 });
 
-/** This computer: the user pastes a session key from `bw unlock --raw`. */
 export const SessionKey: Story = { args: args({}) };
 
 export const SessionKeyConnected: Story = { args: args({ connected: true }) };
 
-/** A joined server signs in with its own CLI, so the page asks for an API key and the master password. */
 export const HostApiKey: Story = { args: args({}, "Studio") };
 
-/** The host downloads `bw`, signs in and syncs; the page reads the status until it changes. */
 export const HostConnecting: Story = {
   args: args({ connecting: true, serverUrl: "https://vault.example.com" }, "Studio"),
 };

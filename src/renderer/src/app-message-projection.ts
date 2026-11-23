@@ -1,9 +1,15 @@
 import { feedbackSentIssue } from "@openbot/contracts/feedback";
 import { serverInstallEvent } from "@openbot/contracts/hosted-servers";
-import type { ClientAgentSummary, ConversationMessage, QueueDeliveryStatus } from "@openbot/contracts/ipc";
+import type {
+  ClientAgentSummary,
+  ConversationMessage,
+  ConversationSearchPage,
+  QueueDeliveryStatus,
+} from "@openbot/contracts/ipc";
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   AGENT_WELCOME_ITEM_TYPE,
+  CHANNEL_RESUME_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
@@ -16,12 +22,15 @@ import {
   mcpSignInEvent,
   modelSwitchReason,
   parseConversationPlanText,
+  replacedConversationPlans,
   routineConversationEvent,
   routineRunConversationEvent,
+  settingLinkEvent,
+  signInFailureProvider,
   skillConversationEvent,
   skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
-import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { markdownImageNames, markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { sourceText as englishSourceText } from "@openbot/i18n/source";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type {
@@ -30,16 +39,19 @@ import type {
   AgentMessagePlan,
   AgentProfile,
   ChatActionMarkerModel,
+  ComposerThreadMessageMatch,
 } from "@openbot/ui/data";
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
 import type { TaskListItem } from "@openbot/ui/features/conversation/TaskList";
 import { currentText } from "@openbot/ui/text";
 import { isRoutineEventItem } from "./features/conversation/conversation-read-state";
 
-/** The title in the host's thank-you text, which ends with it. Text from another host gives none. */
 function feedbackSentTitle(text: string): string {
-  const prefix = englishSourceText("status.agent.feedbackSent", { title: "" });
-  return text.startsWith(prefix) ? text.slice(prefix.length) : "";
+  for (const key of ["status.agent.feedbackSent", "status.agent.feedbackWithdrawn"] as const) {
+    const prefix = englishSourceText(key, { title: "" });
+    if (text.startsWith(prefix)) return text.slice(prefix.length);
+  }
+  return "";
 }
 
 export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
@@ -58,6 +70,7 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     ...(stored.allowAutomation === undefined ? {} : { allowAutomation: stored.allowAutomation }),
     ...(stored.allowNewChat === undefined ? {} : { allowNewChat: stored.allowNewChat }),
     ...(stored.quickAcknowledgement === undefined ? {} : { quickAcknowledgement: stored.quickAcknowledgement }),
+    ...(stored.memory === undefined ? {} : { memory: stored.memory }),
     ...(stored.fastMode === undefined ? {} : { fastMode: stored.fastMode }),
     ...(stored.ultrafast === undefined ? {} : { ultrafast: stored.ultrafast }),
     ...(stored.ownBrowserSession === undefined ? {} : { ownBrowserSession: stored.ownBrowserSession }),
@@ -81,6 +94,32 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     time: stored.updatedAt ? formatTime(stored.updatedAt) : currentText().t("chat.day.now"),
     preview: cleanPreview(stored.preview),
   };
+}
+
+function conversationMessageBody(message: ConversationMessage): string {
+  return message.author === "user" ? message.text : cleanAgentMessageText(message.text);
+}
+
+const THREAD_MESSAGE_SEARCH_PAGES = 3;
+const THREAD_MESSAGE_SEARCH_THREADS = 10;
+
+export async function collectThreadMessageMatches(
+  readPage: (cursor: string | undefined) => Promise<ConversationSearchPage>,
+): Promise<ComposerThreadMessageMatch[]> {
+  const matches: ComposerThreadMessageMatch[] = [];
+  const threads = new Set<string>();
+  let cursor: string | undefined;
+  for (let page = 0; page < THREAD_MESSAGE_SEARCH_PAGES; page += 1) {
+    const result = await readPage(cursor);
+    for (const { taskId, message } of result.results) {
+      if (!taskId) continue;
+      threads.add(taskId);
+      matches.push({ threadId: taskId, body: conversationMessageBody(message) });
+    }
+    if (!result.nextCursor || threads.size >= THREAD_MESSAGE_SEARCH_THREADS) break;
+    cursor = result.nextCursor;
+  }
+  return matches;
 }
 
 export function toAgentMessage(message: ConversationMessage, ownerAgentId?: string): AgentMessage {
@@ -109,7 +148,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     id: message.id,
     ...(message.turnId === undefined ? {} : { turnId: message.turnId }),
     author: message.author === "user" ? "you" : "agent",
-    body: message.author === "user" ? message.text : cleanAgentMessageText(message.text),
+    body: conversationMessageBody(message),
     time: formatMessageTime(message.createdAt),
     createdAt: message.createdAt,
     streaming: message.status === "streaming",
@@ -128,9 +167,11 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     ...(exchangeSenderId === undefined ? {} : { senderAgentId: exchangeSenderId }),
     ...(senderMember === undefined ? {} : { senderMember }),
     ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
+    ...(message.steered ? { steered: true as const } : {}),
     ...(message.attachments === undefined ? {} : { attachments: message.attachments }),
     ...(message.voiceRecording === undefined ? {} : { voiceRecording: message.voiceRecording }),
     ...(message.imageGeneration === undefined ? {} : { imageGeneration: message.imageGeneration }),
+    ...(message.videoGeneration === undefined ? {} : { videoGeneration: message.videoGeneration }),
     ...(message.questionPrompt === undefined ? {} : { questionPrompt: message.questionPrompt }),
     ...(message.uiBlock ? { uiBlock: message.uiBlock } : {}),
     ...(message.exchange === undefined ? {} : { exchange: message.exchange }),
@@ -147,10 +188,6 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
   };
 }
 
-/**
- * The plan of a `plan` message. A peer on a released Team API protocol sends only the checklist
- * text, so the plan is read back from it.
- */
 function messagePlan(message: ConversationMessage): AgentMessagePlan | null {
   if (message.author !== "assistant" || message.itemType !== CONVERSATION_PLAN_ITEM_TYPE) return null;
   const plan = message.plan ?? parseConversationPlanText(message.text);
@@ -158,10 +195,6 @@ function messagePlan(message: ConversationMessage): AgentMessagePlan | null {
   return { ...plan, stopped: message.status === "interrupted" || message.status === "failed" };
 }
 
-/**
- * The rows of a plan block. A step runs only while its turn runs: after the turn ends, a step that
- * was not finished shows as not started.
- */
 export function planItems(plan: AgentMessagePlan, streaming: boolean): TaskListItem[] {
   return plan.steps.map((step) => {
     const state =
@@ -172,18 +205,28 @@ export function planItems(plan: AgentMessagePlan, streaming: boolean): TaskListI
 
 const PLAN_TITLE_LIMIT = 80;
 
-/** The header of a plan block: a short explanation, else "Tasks", or "Stopped" for a stopped plan. */
-export function planTitle(plan: AgentMessagePlan): string {
+export function replacedPlanIds(messages: readonly AgentMessage[]): ReadonlySet<string> {
+  return replacedConversationPlans(
+    messages.map((message) => ({
+      id: message.id,
+      turnId: message.turnId,
+      agent:
+        message.author === "agent" && !message.exchange && !message.actionMarker && message.kind !== "memory-changes"
+          ? (message.senderAgentId ?? "")
+          : null,
+      plan: message.kind === "plan",
+    })),
+  );
+}
+
+export function planTitle(plan: AgentMessagePlan, replaced: boolean): string {
   const { t } = currentText();
-  if (plan.stopped && plan.steps.some((step) => step.status !== "completed")) return t("chat.taskList.stopped");
+  if (plan.stopped && !replaced && plan.steps.some((step) => step.status !== "completed"))
+    return t("chat.taskList.stopped");
   if (plan.explanation && plan.explanation.length <= PLAN_TITLE_LIMIT) return plan.explanation;
   return t("chat.taskList.title");
 }
 
-/**
- * The chat rows of stored messages. `convert` gives the row of the message at an index; a caller
- * that keeps the rows of unchanged messages passes it.
- */
 export function toAgentMessages(
   messages: readonly ConversationMessage[],
   ownerAgentId?: string,
@@ -196,8 +239,7 @@ export function toAgentMessages(
     if ((message.delivery?.status === "queued" || message.delivery?.status === "cancelled") && !message.routine) {
       continue;
     }
-    // A new agent's setup message is for the agent only: the chat starts with the agent's welcome.
-    if (message.itemType === AGENT_WELCOME_ITEM_TYPE) continue;
+    if (message.itemType === AGENT_WELCOME_ITEM_TYPE || message.itemType === CHANNEL_RESUME_ITEM_TYPE) continue;
     if (message.author !== "assistant" || message.itemType !== "commentary") {
       result.push(convert(message, index));
       continue;
@@ -260,6 +302,7 @@ export function agentProfilesEqual(left: AgentProfile, right: AgentProfile): boo
     left.allowAutomation === right.allowAutomation &&
     left.allowNewChat === right.allowNewChat &&
     left.quickAcknowledgement === right.quickAcknowledgement &&
+    left.memory === right.memory &&
     left.fastMode === right.fastMode &&
     left.ultrafast === right.ultrafast &&
     left.ownBrowserSession === right.ownBrowserSession &&
@@ -298,12 +341,14 @@ function stringArraysEqual(left: string[], right: string[]): boolean {
 }
 
 export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boolean {
+  if (left === right) return true;
   return (
     left.id === right.id &&
     left.turnId === right.turnId &&
     left.author === right.author &&
     left.body === right.body &&
     left.time === right.time &&
+    left.createdAt === right.createdAt &&
     left.kind === right.kind &&
     left.streaming === right.streaming &&
     left.itemType === right.itemType &&
@@ -312,20 +357,79 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.senderMember?.id === right.senderMember?.id &&
     left.senderMember?.name === right.senderMember?.name &&
     left.replyToMessageId === right.replyToMessageId &&
+    left.steered === right.steered &&
     left.reaction === right.reaction &&
-    JSON.stringify(left.reactions) === JSON.stringify(right.reactions) &&
-    JSON.stringify(left.reactionSummary) === JSON.stringify(right.reactionSummary) &&
-    JSON.stringify(left.attachments) === JSON.stringify(right.attachments) &&
-    JSON.stringify(left.questionPrompt) === JSON.stringify(right.questionPrompt) &&
-    JSON.stringify(left.exchange) === JSON.stringify(right.exchange) &&
-    JSON.stringify(left.routine) === JSON.stringify(right.routine) &&
-    JSON.stringify(left.actionMarker) === JSON.stringify(right.actionMarker) &&
-    JSON.stringify(left.items) === JSON.stringify(right.items) &&
-    JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
-    JSON.stringify(left.itemStreaming) === JSON.stringify(right.itemStreaming) &&
-    JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
-    JSON.stringify(left.subagents) === JSON.stringify(right.subagents)
+    sameJson(left.reactions, right.reactions) &&
+    sameJson(left.reactionSummary, right.reactionSummary) &&
+    sameJson(left.attachments, right.attachments) &&
+    sameJson(left.questionPrompt, right.questionPrompt) &&
+    sameJson(left.exchange, right.exchange) &&
+    sameJson(left.routine, right.routine) &&
+    sameJson(left.actionMarker, right.actionMarker) &&
+    sameJson(left.items, right.items) &&
+    sameJson(left.itemIds, right.itemIds) &&
+    sameJson(left.itemStreaming, right.itemStreaming) &&
+    sameJson(left.itemCreatedAt, right.itemCreatedAt) &&
+    sameJson(left.plan, right.plan) &&
+    sameJson(left.subagents, right.subagents) &&
+    sameJson(left.voiceRecording, right.voiceRecording) &&
+    sameJson(left.imageGeneration, right.imageGeneration) &&
+    sameJson(left.videoGeneration, right.videoGeneration) &&
+    sameJson(left.uiBlock, right.uiBlock) &&
+    sameJson(left.memoryChanges, right.memoryChanges) &&
+    sameJson(left.trace, right.trace)
   );
+}
+
+function sameJson(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (hasOwnJson(left) || hasOwnJson(right)) return JSON.stringify(left) === JSON.stringify(right);
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    if (left.some(hasOwnJson) || right.some(hasOwnJson)) return JSON.stringify(left) === JSON.stringify(right);
+    return left.length === right.length && left.every((item, index) => sameJsonArrayItem(item, right[index]));
+  }
+  if (isJsonObject(left) || isJsonObject(right)) {
+    if (!isJsonObject(left) || !isJsonObject(right)) return false;
+    const leftEntries = Object.entries(left).filter(([, value]) => !leftOutOfJson(value));
+    const rightEntries = Object.entries(right).filter(([, value]) => !leftOutOfJson(value));
+    const ownJson = ([, value]: [string, unknown]) => hasOwnJson(value);
+    if (leftEntries.some(ownJson) || rightEntries.some(ownJson)) return JSON.stringify(left) === JSON.stringify(right);
+    return (
+      leftEntries.length === rightEntries.length &&
+      leftEntries.every(([key, value], index) => {
+        const other = rightEntries[index];
+        return other !== undefined && other[0] === key && sameJson(value, other[1]);
+      })
+    );
+  }
+  return jsonScalar(left) === jsonScalar(right);
+}
+
+function hasOwnJson(value: unknown): boolean {
+  if (typeof value === "bigint") return true;
+  if (typeof value !== "object" || value === null) return false;
+  if ("toJSON" in value) return true;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype !== Object.prototype && prototype !== Array.prototype && prototype !== null;
+}
+
+function isJsonObject(value: unknown): value is object {
+  return typeof value === "object" && value !== null;
+}
+
+function leftOutOfJson(value: unknown): boolean {
+  return typeof value === "undefined" || typeof value === "function" || typeof value === "symbol";
+}
+
+function sameJsonArrayItem(left: unknown, right: unknown): boolean {
+  return sameJson(leftOutOfJson(left) ? null : left, leftOutOfJson(right) ? null : right);
+}
+
+function jsonScalar(value: unknown): string | number | boolean | null | undefined {
+  if (typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  return value === null ? null : undefined;
 }
 
 function chatActionMarker(
@@ -366,6 +470,9 @@ function chatActionMarker(
   if (isVaultChangeMarker(message)) return { kind: "vault-change", text: message.text, timestamp: message.createdAt };
   if (isPlanContinuationMarker(message))
     return { kind: "plan-continuation", text: message.text, timestamp: message.createdAt };
+  const signInProvider = signInFailureProvider(message);
+  if (signInProvider)
+    return { kind: "sign-in-failure", provider: signInProvider, text: message.text, timestamp: message.createdAt };
   if (message.author === "system" && message.itemType === AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE)
     return {
       kind: "instructions-change",
@@ -378,6 +485,8 @@ function chatActionMarker(
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);
   if (suggestion) return { kind: "marketplace-suggestion", appId: suggestion.appId, timestamp: message.createdAt };
+  const settingLink = settingLinkEvent(message);
+  if (settingLink) return { kind: "setting-link", settingId: settingLink.settingId, timestamp: message.createdAt };
   const skillSuggestion = skillSuggestionEvent(message);
   if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);
@@ -386,7 +495,13 @@ function chatActionMarker(
   if (install) return { kind: "server-install", ...install, timestamp: message.createdAt };
   const issue = feedbackSentIssue(message);
   if (issue)
-    return { kind: "feedback-sent", ...issue, title: feedbackSentTitle(message.text), timestamp: message.createdAt };
+    return {
+      kind: "feedback-sent",
+      messageId: message.id,
+      ...issue,
+      title: feedbackSentTitle(message.text),
+      timestamp: message.createdAt,
+    };
   if (routineEvent) {
     return {
       kind: "routine-lifecycle",
@@ -461,11 +576,6 @@ function deliveryStatus(status: QueueDeliveryStatus | undefined): Exclude<AgentD
   return status;
 }
 
-/**
- * Keeps the steps of the running turn that a snapshot does not hold yet. A turn that ended is
- * not kept: its last snapshot is what the thread stores, and a quiet routine run removes its
- * steps there on purpose, so a kept copy would show text that a reload no longer shows.
- */
 export function retainThinkingMessages(
   previous: AgentMessage[],
   next: AgentMessage[],
@@ -493,18 +603,20 @@ export function retainThinkingMessages(
 }
 
 export function withoutAgent<T>(values: Record<string, T>, agentId: string): Record<string, T> {
+  if (!Object.hasOwn(values, agentId)) return values;
   const next = { ...values };
   delete next[agentId];
   return next;
 }
 
 function cleanPreview(preview: string): string {
-  // The stored preview is the start of the message as written, Markdown and all.
-  const cleaned = markdownPreviewText(cleanAgentMessageText(preview))
+  if (!preview.trim()) return currentText().t("app.agent.noMessages");
+  const text = cleanAgentMessageText(preview);
+  const cleaned = markdownPreviewText(text)
     .replace(/\binbox\s+at\s+zero\b[:,]?\s*/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
-  return cleaned || currentText().t("app.agent.noMessages");
+  return cleaned || markdownImageNames(text).join(", ");
 }
 
 function formatTime(value: string): string {

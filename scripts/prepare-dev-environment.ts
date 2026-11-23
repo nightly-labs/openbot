@@ -17,20 +17,13 @@ export type DevelopmentCommandRunner = (
 
 export const supportedBunVersion = "1.4.2";
 
-// A stamp holds the fingerprint of the inputs of the last command that succeeded. `bun run dev`
-// skips the command while the fingerprint is the same, which saves several seconds on each start.
-// The install stamp is in `node_modules`, so deleting `node_modules` installs again. The root
-// `postinstall` writes it too, so a plain `bun install` on another branch does not leave it stale.
 const INSTALL_STAMP = join("node_modules", ".openbot-install-stamp");
-// Wrangler's local D1 state. Without it the local database is empty, whatever the stamp says.
 const LOCAL_D1_STATE = join("apps", "auth-api", ".wrangler", "state", "v3", "d1");
-// Inside the D1 state, so a state directory made again also loses the stamp.
 const MIGRATION_STAMP = join(LOCAL_D1_STATE, ".openbot-migrate-local-stamp");
 const MIGRATIONS_DIRECTORY = join("apps", "auth-api", "migrations");
 
 export interface DevelopmentPreparationInput {
   projectRoot?: string;
-  /** The main checkout that owns this worktree; read from git when omitted. */
   mainCheckoutRoot?: string;
   executable?: string;
   bunVersion?: string;
@@ -40,10 +33,8 @@ export interface DevelopmentPreparationInput {
 export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput = {}): DevelopmentStateOutcome {
   const projectRoot = input.projectRoot ?? developmentProjectRoot;
   assertSupportedBunVersion(input.bunVersion ?? process.versions.bun ?? "unknown");
-  // Copy state before generation so a new worktree retains the main checkout's identity.
   const copied = copyWorktreeIncludes(projectRoot, input.mainCheckoutRoot ?? findMainCheckoutRoot(projectRoot));
   for (const path of copied) process.stdout.write(`Copied ${path} from the main checkout.\n`);
-  // State generation uses Node built-ins and needs no decryption key or installed packages.
   const stateOutcome = ensureDevelopmentState(projectRoot);
 
   const executable = input.executable ?? process.execPath;
@@ -63,10 +54,6 @@ export function prepareDevelopmentEnvironment(input: DevelopmentPreparationInput
   return stateOutcome;
 }
 
-/**
- * Runs `command` unless the stamp holds the current fingerprint, then stamps the fingerprint that
- * holds after it. `null` means the inputs are not there yet: the command runs and nothing is stamped.
- */
 function runUnlessStamped(stampPath: string, fingerprint: () => string | null, command: () => void): void {
   const before = fingerprint();
   if (before !== null && readStamp(stampPath) === before) return;
@@ -80,7 +67,6 @@ function writeStamp(path: string, fingerprint: string): void {
   writeFileSync(path, `${fingerprint}\n`);
 }
 
-/** Stamps the inputs of the install that just finished. The root `postinstall` calls it. */
 export function writeInstallStamp(projectRoot = developmentProjectRoot): void {
   writeStamp(join(projectRoot, INSTALL_STAMP), installFingerprint(projectRoot));
 }
@@ -93,10 +79,6 @@ function readStamp(path: string): string | null {
   }
 }
 
-/**
- * The inputs of `bun install --frozen-lockfile`: the lockfile, every workspace manifest, the Bun
- * configuration and patches, and the Bun version.
- */
 export function installFingerprint(projectRoot: string): string {
   const files = ["bun.lock", "bunfig.toml", "package.json", ...workspaceManifests(projectRoot)];
   const patches = join(projectRoot, "patches");
@@ -108,7 +90,6 @@ export function installFingerprint(projectRoot: string): string {
   return fingerprintFiles(projectRoot, files, [`bun ${process.versions.bun ?? "unknown"}`]);
 }
 
-/** The names and contents of the Account API migrations that `api:migrate:local` applies. */
 export function migrationFingerprint(projectRoot: string): string {
   const directory = join(projectRoot, MIGRATIONS_DIRECTORY);
   const names = existsSync(directory) ? readdirSync(directory) : [];
@@ -119,7 +100,6 @@ export function migrationFingerprint(projectRoot: string): string {
   );
 }
 
-// `apps/*`-style workspace patterns from the root `package.json`, which is all the repository uses.
 function workspaceManifests(projectRoot: string): string[] {
   let patterns: unknown;
   try {
@@ -172,11 +152,6 @@ export function prepareDevelopmentWorktree(input: DevelopmentPreparationInput = 
   return stateOutcome;
 }
 
-/**
- * Copies each ignored file that `.worktreeinclude` lists from the main checkout, so a worktree made
- * by any harness gets the local secrets without a manual copy. An existing file is never replaced.
- * Lines are literal paths, not gitignore patterns. A path that leaves the checkout is skipped.
- */
 export function copyWorktreeIncludes(projectRoot: string, mainCheckoutRoot: string | undefined): string[] {
   if (!mainCheckoutRoot || resolve(mainCheckoutRoot) === resolve(projectRoot)) return [];
   const listPath = join(projectRoot, ".worktreeinclude");
@@ -209,7 +184,6 @@ function findMainCheckoutRoot(projectRoot: string): string | undefined {
     }).trim();
     return dirname(commonDir);
   } catch {
-    // A source archive has no git metadata, so there is nothing to copy from.
     return undefined;
   }
 }
@@ -231,8 +205,6 @@ function execDevelopmentCommand(
 }
 
 if (import.meta.main) {
-  // Generating secrets without saying so leaves a contributor guessing where the file came from.
-  // stdout rather than a logger, because this runs before `bun install` on a fresh clone.
   if (prepareDevelopmentWorktree() === "created") {
     process.stdout.write("Prepared local development state.\n");
   }

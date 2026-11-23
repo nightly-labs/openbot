@@ -18,13 +18,10 @@ import { useText } from "../../text";
 
 export interface CreateLocalServerDialogProps {
   onClose: () => void;
-  /** This computer has `LOCAL_SERVER_LIMIT` servers. The dialog says so and does not create one. */
   limitReached: boolean;
-  /** Resolves when the server runs and the desktop is connected to it. A failure stays in the dialog. */
   onCreate: (name: string) => Promise<void>;
 }
 
-/** Asks for the name of a new server that runs on this computer, with its own agents, chats and files. */
 export function CreateLocalServerDialog(props: CreateLocalServerDialogProps) {
   const { t, errorMessage } = useText();
   const [name, setName] = createSignal("");
@@ -41,7 +38,7 @@ export function CreateLocalServerDialog(props: CreateLocalServerDialogProps) {
       await props.onCreate(trimmedName());
       props.onClose();
     } catch (cause) {
-      setError(errorMessage(cause, t("server.local.createFailed")));
+      setError(errorMessage(cause, t("server.local.createFailedRetry")));
       setCreating(false);
     }
   }

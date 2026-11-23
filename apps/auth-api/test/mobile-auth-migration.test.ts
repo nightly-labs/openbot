@@ -44,7 +44,6 @@ describe("mobile auth sessions migration", () => {
         .prepare("SELECT json_extract(payload, '$.sessionId') AS sessionId FROM remote_auth_events ORDER BY sessionId")
         .all(),
     ).toEqual([{ sessionId: "legacy" }, { sessionId: "remote-1" }]);
-    // The deployed Worker's unbound INSERT remains valid during the deploy gap.
     database.exec(`INSERT OR IGNORE INTO remote_sessions(session_id, host_id, user_id, membership_id, started_at, expires_at)
       VALUES ('legacy-after-migration', 'host', 'owner', 'member', 1, 8640000000000000)`);
     expect(
@@ -79,7 +78,6 @@ describe("mobile auth sessions migration", () => {
       revoked_at: 2,
       expires_at: future,
     });
-    // The old Worker's UPDATE and INSERT statements remain valid after the additive migration.
     database.exec("INSERT INTO team_auth_tickets(ticket_hash) VALUES ('legacy-ticket')");
     database.exec("UPDATE auth_sessions SET revoked_at = 42 WHERE id = 'phone'");
     expect(database.prepare("SELECT session_id, ended_at FROM remote_sessions ORDER BY session_id").all()).toEqual([

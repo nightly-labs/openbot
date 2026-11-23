@@ -1,6 +1,5 @@
 import type { MobileAnalytics, MobileAnalyticsScope } from "./analytics-core";
 
-/** One outcome per visible visit, including reads from the local conversation cache. */
 export class MobileConversationAnalytics {
   private visit: { scope: MobileAnalyticsScope; started: number; reported: boolean } | null = null;
   constructor(private readonly analytics: MobileAnalytics) {}

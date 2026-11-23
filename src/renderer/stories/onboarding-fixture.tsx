@@ -40,7 +40,6 @@ export const noProvidersConnectedAgentStatus: AgentStatus = {
   message: "Connect ChatGPT or Claude to create a local agent.",
 };
 
-/** A new computer: no provider is downloaded yet, Gemini, Cursor, Cline and Kimi included. */
 export const lazyProviders: AgentProviderStatus[] = [
   ...(noProvidersConnectedAgentStatus.providers ?? []).map(
     ({ connectionState: _connectionState, ...provider }): AgentProviderStatus => ({
@@ -72,7 +71,6 @@ const initialRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeStat
   opencode: { phase: "not-downloaded", progress: null, message: null, version: null },
 });
 
-/** ChatGPT, Claude and Grok downloaded and waiting to connect; OpenCode still to download. */
 const downloadedAgentStatus: AgentStatus = {
   ...lazyProviderAgentStatus,
   providers: lazyProviders.map((provider) =>
@@ -93,7 +91,6 @@ const downloadedRuntimeStatuses = (): Record<ManagedProviderId, ProviderRuntimeS
   grok: { phase: "ready", progress: 100, message: null, version: "1.0.5" },
 });
 
-/** Installs the mock `window.openbot` before the flow renders, and a toaster beside it. */
 export function MockedOnboardingApi(props: { permissions?: boolean; children: JSX.Element }) {
   const previousApi = window.openbot;
   const mock = createMockOpenBot();
@@ -121,7 +118,6 @@ export function MockedOnboardingApi(props: { permissions?: boolean; children: JS
   );
 }
 
-/** The flow arguments that `FakeProviderDownloads` supplies. The story spreads them over its own. */
 type FakeProviderArgs = Pick<
   FirstRunFlowProps,
   | "agentStatus"
@@ -136,10 +132,6 @@ type FakeProviderArgs = Pick<
   | "connection"
 >;
 
-/**
- * Fake provider downloads and connections: a download ticks every `tickMs` (default 160), finishes
- * in 700 ms, and a connection succeeds after 1.2 s.
- */
 export function FakeProviderDownloads(props: {
   render: (fake: FakeProviderArgs) => JSX.Element;
   failGrokOnce?: boolean | undefined;
@@ -147,7 +139,6 @@ export function FakeProviderDownloads(props: {
   initialAgentStatus?: AgentStatus | undefined;
   tickMs?: number | undefined;
 }) {
-  // The story chooses the start state once; later changes come from the fake actions below.
   const [agentStatus, setAgentStatus] = createSignal(
     untrack(() => props.initialAgentStatus ?? (props.downloaded ? downloadedAgentStatus : lazyProviderAgentStatus)),
   );
@@ -155,7 +146,6 @@ export function FakeProviderDownloads(props: {
     untrack(() => (props.downloaded ? downloadedRuntimeStatuses() : initialRuntimeStatuses())),
   );
   const [grokFailed, setGrokFailed] = createSignal(false);
-  // One offer, so the row actions menu shows both an Update and a "Check for updates".
   const [availableVersions, setAvailableVersions] = createSignal<Partial<Record<AgentProviderId, string | null>>>({
     claude: "2.1.250",
   });
@@ -181,7 +171,6 @@ export function FakeProviderDownloads(props: {
     setRuntimeStatuses((current) => ({ ...current, [provider]: { ...current[provider], ...status } }));
   }
 
-  /** Sets `update` on one provider. A connection state that `update` does not set is removed. */
   function updateProvider(provider: AgentProviderId, update: Partial<AgentProviderStatus>): void {
     setAgentStatus((current) => ({
       ...current,
@@ -272,7 +261,6 @@ export function FakeProviderDownloads(props: {
     for (const provider of providerTimers.keys()) clearProviderTimers(provider);
   });
 
-  // The getters keep the flow reactive: the flow reads each value when it uses it.
   return props.render({
     get agentStatus() {
       return agentStatus();

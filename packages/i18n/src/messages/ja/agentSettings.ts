@@ -146,8 +146,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "エージェントのアクセス",
   "agentSettings.runtime.busyMessage": "作業中",
   "agentSettings.runtime.busyMessageLabel": "エージェントの作業中に送るメッセージ",
-  "agentSettings.runtime.taskLimit": "並列スレッド",
-  "agentSettings.runtime.taskLimitLabel": "同時に実行するスレッド",
   "agentSettings.runtime.workingDirectory": "作業ディレクトリ",
   "agentSettings.runtime.notAvailable": "まだ利用できません",
   "agentSettings.runtime.fullAccessNote":
@@ -167,9 +165,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "方向を修正",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} は実行中のターンの方向を修正できません。作業中に送ったメッセージはキューで待ちます。",
-  "agentSettings.taskLimit.default": "デフォルト ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} は一度に1ターンずつ実行します。このエージェントのスレッドは互いに待ち合わせます。",
 
   "agentSettings.notificationLevel.title": "自分への通知",
   "agentSettings.notificationLevel.server": "サーバーの既定 ({level})",
@@ -177,13 +172,16 @@ export const messages = {
     "この設定はあなただけに適用され、すべてのデバイスで有効です。サーバーがミュート中か「なし」の場合、このエージェントも通知しません。",
 
   "agentSettings.newChat.title": "新しいチャット",
-  "agentSettings.newChat.description": "エージェントはこのチャットを忘れます。設定はそのままです。",
+  "agentSettings.newChat.description":
+    "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。設定はそのままです。",
   "agentSettings.newChat.button": "開始",
   "agentSettings.newChat.confirmTitle": "{name} と新しいチャットを始めますか？",
   "agentSettings.newChat.confirmDescription":
-    "エージェントはこのチャットを忘れます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
+    "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.newChat.confirm": "新しいチャットを開始",
   "agentSettings.newChat.failed": "新しいチャットを始められませんでした。",
+  "agentSettings.newChat.busy":
+    "エージェントが作業中です。新しいチャットを始めるには、終わるまで待つか、停止してください。",
   "agentSettings.deleteHistory.title": "履歴を削除",
   "agentSettings.deleteHistory.description":
     "このチャットのメッセージを削除し、エージェントも忘れます。設定は残ります。",
@@ -204,6 +202,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "事前に確認を使用",
 
   "agentSettings.links.usage": "使用状況",
+  "agentSettings.links.apps": "アプリ",
+  "agentSettings.links.appsScope": "すべてのエージェント",
   "agentSettings.links.memories": "メモリー",
   "agentSettings.links.memoriesCount": { other: "{count} 件保存済み" },
   "agentSettings.links.skills": "スキル",
@@ -230,6 +230,9 @@ export const messages = {
     "チャットが長くなったときに、エージェントが新しいチャットを開始できます。開始前にメモを保存します。",
   "agentSettings.quickAcknowledgement.title": "長いタスクの前に計画を表示",
   "agentSettings.quickAcknowledgement.description": "長いタスクの前に、エージェントが計画を表示します。",
+  "agentSettings.builtinMemory.title": "OpenBot のメモリー",
+  "agentSettings.builtinMemory.description":
+    "エージェントが自分のメモリーを保存して読み込みます。Mem0 などのメモリーアプリだけを使うにはオフにします。保存済みのメモリーは残ります。",
   "agentSettings.browserProfile.label": "ブラウザープロファイル",
   "agentSettings.browserProfile.shared": "共有",
   "agentSettings.browserProfile.agent": "このエージェントのみ",
@@ -239,6 +242,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "各プロファイルは専用のサインインと Cookie を保持します。変更すると、エージェントの開いているタブが閉じます。",
   "agentSettings.browserProfile.manage": "管理",
+  "agentSettings.browserProfile.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。エージェントはこれらのサイトに再度サインインする必要があります。",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "{provider} のプロセス全体がサンドボックス内で実行されるため、外部への書き込みは失敗します。macOS でのみ利用できます。",
 } as const satisfies PartialTranslation<typeof source>;

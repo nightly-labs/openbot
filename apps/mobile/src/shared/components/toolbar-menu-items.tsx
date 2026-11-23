@@ -1,12 +1,6 @@
 import { Stack } from "expo-router";
 import type { MenuAction } from "@/shared/components/menu-view";
 
-/**
- * The items of a `MenuView` menu as items of a native bar menu, so one list of actions serves both.
- * A group with `displayInline` is an inline section; other groups are submenus. Call it in place of
- * the children: on iOS, a bar menu reads only its direct `Stack.Toolbar.Menu` and
- * `Stack.Toolbar.MenuAction` children, so the items inside a wrapper component do not show.
- */
 export function toolbarMenuItems(actions: readonly MenuAction[], onPressAction: (id: string) => void) {
   return actions.map((action, index) => {
     const key = action.id ?? `${action.title}:${index}`;

@@ -5,16 +5,6 @@ import { MOBILE_ANNOUNCEMENT_FILE } from "./discord-mobile-release-announcement"
 import { appVersion, publishPlan } from "./mobile-release-steps";
 import { MOBILE_STORE_NAMES, MOBILE_STORES } from "./release-notes";
 
-//   bun scripts/publish-mobile-release.ts <ios|android|both> [--version x.y.z] [--skip-older]
-//
-// Run when a store makes the build available. It writes today's date for that store in the
-// heading of the app.json version, or of `--version`, so the Mobile tab of /changelog shows the
-// version and the stores that have it. It also raises that store's feature flags and newest version
-// in apps/auth-api/src/server/mobile-features-config.ts. `--skip-older` marks the older versions that
-// the store still reviews as skipped. After the merge and the Worker deploy, Discord gets a post for
-// the store, so the command stops while apps/mobile/release-announcement.json is not ready.
-// `bun run mobile:release` does the same from a menu, and opens the pull request.
-
 const logger = createOpenBotLogger("publish-mobile-release");
 const USAGE = "Usage: bun run mobile:release:published <ios|android|both> [--version x.y.z] [--skip-older]";
 

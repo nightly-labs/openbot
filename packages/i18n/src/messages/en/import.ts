@@ -143,7 +143,7 @@ export const messages = defineMessages("import", {
   "import.hermes.reason.invalidSkill": "Its SKILL.md has no valid name and description.",
   "import.hermes.reason.duplicateSkill": "Another skill in this profile has the same name.",
   "import.hermes.reason.builtIn": "They come with Hermes. OpenBot has its own skills.",
-  "import.hermes.reason.mcpOff": "It is added turned off. Check it, then turn it on in MCP settings.",
+  "import.hermes.reason.mcpOff": "It is added turned off. Check it, then turn it on in Marketplace, Apps.",
   "import.hermes.reason.mcpNameTaken": "A server with this name is already here.",
   "import.hermes.reason.routineSchedule": "OpenBot cannot run its schedule, or its time has passed.",
   "import.hermes.reason.routineScript": "It runs a script, not the agent.",

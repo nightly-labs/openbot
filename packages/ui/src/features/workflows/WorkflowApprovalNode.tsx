@@ -1,24 +1,17 @@
-/** An approval: a stop in the run that waits for the user. */
-
-import { Button, Check, CircleCheck, Textarea, UserCheck, X } from "@openbot/ui";
+import { Button, Check, CircleCheck, UserCheck, X } from "@openbot/ui";
 import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
+import { NameField } from "./workflow-name-field";
 import { Field, NodeShell, NodeToolbar, useLocked, useTextField } from "./workflow-node-parts";
 
-/* ----------------------------------------------------------- Approval */
-
-/** The answer of the user, with the time of the answer and the step that it answers. */
 interface Answer {
   kind: "approved" | "rejected";
   at: Date;
   step: string | undefined;
 }
 
-/**
- * A stop in the run. The run waits here until the user approves or rejects the question. Reject
- * stops the run.
- */
 export function ApprovalNode(props: { id: string; question?: string }) {
   const board = useBoard();
   const { t, format } = useText();
@@ -28,7 +21,6 @@ export function ApprovalNode(props: { id: string; question?: string }) {
     untrack(() => props.question ?? ""),
   );
   const [answer, setAnswer] = createSignal<Answer>();
-  /** The answer to the newest step. A new run asks again. */
   const decision = () => {
     const current = answer();
     return current && current.step === board.step(props.id) ? current : undefined;
@@ -37,7 +29,6 @@ export function ApprovalNode(props: { id: string; question?: string }) {
     t("workflow.approval.approvedAt", { time: format.date(at, { hour: "2-digit", minute: "2-digit" }) });
   const [locked, setLocked] = useLocked(() => props.id);
   const waiting = () => board.status(props.id) === "approval" && decision() === undefined;
-  /** Sends the answer. When it does not get to the run, the approval asks again. */
   const decide = (approved: boolean) => {
     const sent: Answer = { kind: approved ? "approved" : "rejected", at: new Date(), step: board.step(props.id) };
     setAnswer(sent);
@@ -58,7 +49,8 @@ export function ApprovalNode(props: { id: string; question?: string }) {
       toolbar={<NodeToolbar id={props.id} name={t("workflow.approval.name")} locked={locked()} onLock={setLocked} />}
     >
       <Field class="wfn-block-field">
-        <Textarea
+        <NameField
+          node={props.id}
           class="wfn-input"
           aria-label={t("workflow.approval.question")}
           placeholder={t("workflow.approval.questionPlaceholder")}
@@ -67,6 +59,7 @@ export function ApprovalNode(props: { id: string; question?: string }) {
           onValueChange={setQuestion}
         />
       </Field>
+      <AnswerProblems id={props.id} />
       <Show when={waiting()}>
         <div class="wfn-block-actions">
           <Button size="sm" onClick={() => decide(true)}>

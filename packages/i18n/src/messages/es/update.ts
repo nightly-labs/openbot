@@ -43,6 +43,11 @@ export const messages = {
   "update.idleRestart.description": "Las nuevas ejecuciones de rutinas esperan hasta el reinicio.",
   "update.idleRestart.waitingFor": "Esperando: {reasons}.",
   "update.idleRestart.cancel": "Cancelar reinicio",
+  "update.idleRestart.restartNow": "Reiniciar ahora",
+  "update.idleRestart.restartNowTitle": "¿Reiniciar OpenBot ahora?",
+  "update.idleRestart.restartNowDescription":
+    "Los turnos de agente y las ejecuciones de rutinas sin terminar se detienen ahora.",
+  "update.idleRestart.keepWaiting": "Seguir esperando",
   "update.idleRestart.cancelFailed": "No se pudo cancelar el reinicio.",
   "update.idleRestart.requestFailed": "No se pudo programar el reinicio.",
   "update.idleRestart.failedTitle": "OpenBot no se reinició",
@@ -69,4 +74,10 @@ export const messages = {
   "update.whatsNew.changelog": "Todos los cambios",
   "update.whatsNew.changelogFailed": "OpenBot no pudo abrir el registro de cambios.",
   "update.whatsNew.done": "Entendido",
+  "update.required.title": "Actualización necesaria",
+  "update.required.description":
+    "OpenBot {version} ya no tiene soporte. Actualiza a {minimum} o posterior para continuar.",
+  "update.required.download": "Descargar OpenBot",
+  "update.required.continue": "Continuar sin actualizar",
+  "update.required.failed": "La actualización no terminó.",
 } as const satisfies PartialTranslation<typeof source>;

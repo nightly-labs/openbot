@@ -83,6 +83,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name}이(가) 완료되지 않았어요",
   "marketplace.app.partialDescription": "일부 앱 또는 스킬이 설치되지 않았어요. 다시 연결하면 설치돼요.",
   "marketplace.app.notConnected": "연결 안 됨",
+  "marketplace.app.paused": "일시 중지됨",
   "marketplace.app.custom": "MCP 서버",
   "marketplace.app.githubTagline": "저장소, 이슈, 풀 리퀘스트",
   "marketplace.app.onePasswordTagline": "공유한 로그인 정보로 사이트에 로그인",
@@ -107,6 +108,10 @@ export const messages = {
   "marketplace.app.remove.action": "제거",
   "marketplace.app.remove.confirmTitle": "{name}을(를) 제거할까요?",
   "marketplace.app.remove.keep": "유지",
+  "marketplace.app.replace.title": "{server}을(를) 바꿀까요?",
+  "marketplace.app.replace.description":
+    "{server}(이)라는 서버가 이미 있지만 {name}이(가) 아닙니다. {name}(으)로 바꿀까요? 주소와 저장된 키가 삭제됩니다.",
+  "marketplace.app.replace.action": "바꾸기",
   "marketplace.app.connection": "연결",
   "marketplace.app.access.use": "사용 가능",
   "marketplace.app.access.noAgents": "에이전트 없음",
@@ -124,6 +129,7 @@ export const messages = {
     "{host}의 OpenBot 버전이 오래되어 앱을 연결할 수 없습니다. {host}의 OpenBot을 업데이트하거나 소유자에게 업데이트를 요청하세요.",
   "marketplace.app.blocked.member":
     "{host}에서는 소유자나 관리자만 앱을 연결할 수 있습니다. 이들에게 {name} 연결을 요청하거나, 멤버도 앱을 연결할 수 있도록 {host}의 OpenBot 업데이트를 요청하세요.",
+  "marketplace.app.blocked.mac": "{name}은(는) OpenBot을 실행하는 Mac에서만 작동합니다.",
   "marketplace.app.connectAgain": "다시 연결",
   "marketplace.app.automation.askOnInstall": "설치할 때 macOS에 접근 요청",
   "marketplace.app.automation.title": "Apple 앱 접근",
@@ -233,6 +239,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Higgsfield로 나무 테이블 위 세라믹 머그잔의 제품 사진을 만들어 줘.",
   "marketplace.plugin.higgsfield.prompt.clip": "Higgsfield로 해 질 녘 파도의 5초 동영상을 만들어 줘.",
+  "marketplace.plugin.sunra.tagline": "AI 이미지, 동영상, 오디오, 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra를 사용하면 에이전트가 GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling, Veo 같은 모델로 이미지, 동영상, 오디오, 3D 모델을 만들고, 크레딧 잔액을 확인하고, 결과를 가져올 수 있습니다. 결과는 사용자의 Sunra 계정에 있는 프로젝트에 저장됩니다. 각 사용자는 브라우저에서 자신의 Sunra 계정에 로그인합니다. Sunra는 생성할 때마다 먼저 비용을 알려 주고, 확인을 받은 뒤에만 그 계정의 크레딧을 사용합니다.",
+  "marketplace.plugin.sunra.app":
+    "Sunra MCP 서버를 통한 이미지·동영상·오디오·3D 생성, 크레딧, 결과. 브라우저에서 로그인합니다.",
+  "marketplace.plugin.sunra.prompt.balance": "Sunra 크레딧이 얼마나 남았어?",
+  "marketplace.plugin.sunra.prompt.poster": "Sunra로 비 오는 야시장 포스터를 세로 형식으로 만들어 줘.",
+  "marketplace.plugin.sunra.prompt.clip": "Sunra로 강 위에 떠 있는 종이배의 5초 동영상을 만들어 줘. 비용부터 알려 줘.",
   "marketplace.plugin.elevenlabs.tagline": "음성, 보이스, 음성 에이전트",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs로 에이전트가 텍스트를 음성으로 바꾸고, 보이스를 다루고, ElevenLabs 음성 에이전트와 그 대화를 만들고 테스트하고 검토할 수 있습니다. 생성된 오디오는 잠시만 유효한 다운로드 링크로 돌아옵니다. 각 사용자는 브라우저에서 자신의 ElevenLabs 계정에 로그인하며, 생성할 때마다 그 계정의 크레딧을 사용합니다.",
@@ -351,8 +365,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "이 프로젝트의 결정 사항에 대해 내 노트에는 뭐라고 적혀 있어?",
   "marketplace.plugin.obsidian.prompt.save": "이 결정을 내 보관함에 새 노트로 저장해 줘.",
   "marketplace.plugin.obsidian.prompt.log": "오늘 한 작업 요약을 내 작업 로그 노트에 추가해 줘.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'Obsidian에서 Settings > Local REST API를 여세요. API 키를 복사하고 "Enable non-encrypted (HTTP) server"를 켜세요.',
+  "marketplace.plugin.obsidian.hint.apiKey": "Obsidian에서 Settings > Local REST API를 열고 API 키를 복사하세요.",
   "marketplace.plugin.resend.tagline": "트랜잭션 이메일",
   "marketplace.plugin.resend.description":
     "Resend를 사용하면 에이전트가 API 하나로 트랜잭션 이메일을 보내고 전송 상태를 확인할 수 있어요. Resend 대시보드의 API 키는 환경 변수 하나로 로컬 서버에 전달돼요.",
@@ -362,13 +375,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "새 플로우에 맞는 비밀번호 재설정 이메일 초안을 작성해 줘.",
   "marketplace.plugin.omnisend.tagline": "이메일 및 SMS 마케팅",
   "marketplace.plugin.omnisend.description":
-    "Omnisend를 사용하면 에이전트가 캠페인과 양식 보고서를 읽고, 연락처와 세그먼트를 찾고, 캠페인, 자동화, 이메일 템플릿, 양식, 상품을 만들고 수정할 수 있습니다. 각 사용자는 브라우저에서 자신의 Omnisend 계정에 로그인하고 동의 화면에서 액세스 수준을 선택합니다. 쓰기 액세스가 있으면 에이전트가 캠페인을 보내고 데이터를 삭제할 수도 있습니다. 에이전트에게 보고서만 필요하면 읽기 전용 액세스를 선택하세요.",
+    "Omnisend를 사용하면 에이전트가 캠페인과 양식 보고서를 읽고, 연락처와 세그먼트를 찾고, 캠페인, 자동화, 이메일 템플릿, 양식, 상품을 만들고 수정할 수 있습니다. 각 사용자는 자신의 Omnisend 계정에서 받은 API 키로 연결합니다. 에이전트는 키가 허용하는 작업을 할 수 있으며, 여기에는 캠페인 발송과 데이터 삭제가 포함될 수 있습니다.",
   "marketplace.plugin.omnisend.app":
-    "캠페인, 자동화, 연락처, 세그먼트, 양식, 보고서. 브라우저 로그인으로 Omnisend MCP 서버를 통해 사용합니다.",
+    "캠페인, 자동화, 연락처, 세그먼트, 양식, 보고서. API 키로 Omnisend MCP 서버를 통해 사용합니다.",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "지난주 캠페인 성과는 그 전 주와 비교해 어땠어?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 세그먼트에 연락처가 몇 개 있고, 이번 달에 어떻게 바뀌었어?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "새 컬렉션용 캠페인 초안을 작성해 줘. 단, 보내지는 마.",
   "marketplace.plugin.postiz.tagline": "소셜 미디어 예약",
+  "marketplace.plugin.omnisend.hint.apiKey": "Omnisend에서 Store settings > API keys를 열고 키를 만드세요.",
   "marketplace.plugin.postiz.description":
     "Postiz를 사용하면 에이전트가 소셜 미디어 채널을 나열하고 X, LinkedIn, Instagram, TikTok 등 30개 이상의 네트워크에서 게시물 초안 작성, 예약, 게시를 할 수 있습니다. 미디어를 업로드하고 AI 이미지와 동영상을 만들 수도 있습니다. 브라우저에서 Postiz 계정에 로그인하거나 Postiz의 Settings › Developers에서 API 키를 붙여 넣으세요. 모든 Postiz 클라우드 요금제에 API 액세스가 포함됩니다. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요.",
   "marketplace.plugin.postiz.app":
@@ -376,6 +390,14 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "Postiz에 연결된 소셜 미디어 채널은 무엇인가요?",
   "marketplace.plugin.postiz.prompt.week": "다음 주에 예약된 게시물은 무엇인가요?",
   "marketplace.plugin.postiz.prompt.draft": "새 릴리스에 대한 LinkedIn 게시물 초안을 작성해 줘. 단, 예약하지는 마.",
+  "marketplace.plugin.trypost.tagline": "소셜 미디어 예약",
+  "marketplace.plugin.trypost.description":
+    "TryPost를 사용하면 에이전트가 연결된 채널을 확인하고 X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest 등에 게시물을 작성, 예약, 대기열에 추가, 게시할 수 있습니다. 에이전트는 분석을 읽고, 아이디어와 승인을 관리하고, 게시 시간을 설정할 수도 있습니다. 브라우저에서 TryPost 계정에 로그인하고 워크스페이스를 선택하세요. 에이전트가 게시물을 바로 게시할 수 있으므로 승인하기 전에 각 게시물을 검토하세요.",
+  "marketplace.plugin.trypost.app":
+    "브라우저 로그인을 사용하는 TryPost MCP 서버를 통한 채널, 게시물, 대기열, 아이디어, 분석.",
+  "marketplace.plugin.trypost.prompt.week": "이번 주에 예약된 게시물은 무엇인가요?",
+  "marketplace.plugin.trypost.prompt.draft": "새 릴리스에 대한 LinkedIn 게시물 초안을 작성하되, 예약하지는 마세요.",
+  "marketplace.plugin.trypost.prompt.analytics": "지난달 내 게시물 중 참여가 가장 많았던 것은 무엇인가요?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub 외 1,000개 이상의 앱",
   "marketplace.plugin.composio.description":
     "Composio는 MCP 서버 하나로 에이전트를 Gmail, Slack, GitHub 등 1,000개 이상의 앱에 연결해요. Composio 계정으로 로그인하세요. 에이전트에게 앱이 필요하면 그 앱을 연결해 달라고 요청해요.",
@@ -523,6 +545,13 @@ export const messages = {
   "marketplace.skills.origin.local": "이 컴퓨터에서 만듦",
   "marketplace.skills.origin.workspace": "이 에이전트의 폴더에 있음",
   "marketplace.skills.origin.marketplace": "마켓플레이스 · 버전 {version}",
+  "marketplace.skills.origin.github": "GitHub · {repository}",
+  "marketplace.skills.github.search": "검색하거나 GitHub 링크 붙여 넣기",
+  "marketplace.skills.github.reading": "저장소에서 스킬을 찾는 중",
+  "marketplace.skills.github.trust": "OpenBot은 GitHub의 스킬을 검토하지 않았어요. 추가하기 전에 스킬을 읽어 보세요.",
+  "marketplace.skills.github.source": "GitHub · {repository} 커밋 {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "GitHub에서 {repository} 열기",
   "marketplace.skills.status.notAdded": "추가 안 됨",
   "marketplace.skills.status.on": "{agents}에서 켜짐",
   "marketplace.skills.agentCount": { other: "에이전트 {count}개" },
@@ -571,6 +600,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "이 에이전트를 실행하는 컴퓨터에 {name}을(를) 설치해 주세요. 앱에 브라우저 로그인이 필요해요.",
   "marketplace.error.appInvalid": "{name}을(를) 추가할 수 없어요: {reason}",
+  "marketplace.error.appNotConnected": "{name}을(를) 연결할 수 없어요: {reason}",
   "marketplace.error.uninstallNoServer": "플러그인을 제거하려면 로컬 서버를 선택해 주세요.",
   "marketplace.error.uninstallPartial": "{name}의 일부를 제거하지 못했어요. {failures}",
   "marketplace.error.actionFailed": "마켓플레이스 작업을 완료할 수 없어요. 다시 시도해 주세요.",

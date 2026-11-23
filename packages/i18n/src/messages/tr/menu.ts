@@ -8,6 +8,7 @@ export const messages = {
   "menu.actualSize": "Gerçek Boyut",
   "menu.zoomIn": "Yakınlaştır",
   "menu.zoomOut": "Uzaklaştır",
+  "menu.closeDeveloperTools": "Geliştirici araçlarını kapat",
   "menu.copyLink": "Bağlantıyı Kopyala",
   "menu.copyImage": "Görüntüyü Kopyala",
   "menu.quit": "OpenBot'tan çık",
@@ -15,6 +16,10 @@ export const messages = {
   "menu.quitConfirmBody": "OpenBot'u yeniden açana kadar ajanlar ve rutinler durur.",
   "menu.quitConfirm": "Çık",
   "menu.quitHint": "Çıkmak için ⌘Q'yu basılı tutun veya iki kez basın",
+  "menu.closeWorkingTitle": { one: "{count} ajan hâlâ çalışıyor", other: "{count} ajan hâlâ çalışıyor" },
+  "menu.closeWorkingBody":
+    "OpenBot'tan çıkarsanız ajanlar durur. Bitirmeleri için çalışır bırakın. Pencereyi yeniden göstermek için OpenBot'u açın.",
+  "menu.closeKeepRunning": "Çalışsın",
   "menu.trayOpen": "OpenBot'u aç",
   "menu.trayQuit": "OpenBot'tan çık",
   "menu.trayTooltip": "OpenBot",

@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "Trabalhando nisso…",
-  "status.messaging.queued": "Aguardando: o OpenBot está atendendo outra solicitação. A resposta chegará aqui.",
+  "status.messaging.queued": "Aguardando o fim de uma solicitação anterior. A resposta chegará aqui.",
   "status.messaging.busy": "Há muitas solicitações na fila. Tente novamente mais tarde.",
   "status.messaging.failed":
     "O OpenBot não conseguiu concluir esta solicitação. Os detalhes estão no computador anfitrião do OpenBot.",
@@ -13,6 +13,7 @@ export const messages = {
   "status.messaging.stopped": "Interrompido.",
   "status.messaging.stop": "Parar",
   "status.messaging.approvalTitle": "O OpenBot pede aprovação para continuar.",
+  "status.messaging.approvalTitleTeammate": "O colega {agent} pede aprovação para continuar.",
   "status.messaging.approvalCommand": "Executar um comando",
   "status.messaging.approvalFileChange": "Alterar arquivos",
   "status.messaging.approvalPermissions": "Obter mais permissões",
@@ -37,9 +38,11 @@ export const messages = {
   "status.messaging.signInUnknown":
     "O OpenBot não iniciou esta instalação do Slack. Inicie a instalação novamente no OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Nenhum agente pode responder aqui ainda. Adicione o Orquestrador do Telegram no OpenBot.",
+    "Nenhum agente pode responder aqui ainda. No OpenBot, abra Loja > Apps > Telegram e clique em Adicionar agente.",
   "status.messaging.telegramLinked":
     "O OpenBot está conectado a este chat. Mencione {bot} ou responda a uma mensagem do OpenBot para falar com os agentes.",
+  "status.messaging.telegramNotLinked":
+    "O OpenBot não está conectado a este chat. Para conectá-lo, abra o app OpenBot, vá em Loja → Apps → Telegram e selecione “Adicionar a um grupo” ou “Abrir um chat direto”.",
   "status.messaging.telegramOrchestratorName": "Orquestrador do Telegram",
   "status.messaging.telegramOrchestratorTitle": "Responde no Telegram e consulta a equipe",
   "status.messaging.whatsappNoAgent":
@@ -54,6 +57,10 @@ export const messages = {
     "👋 *O OpenBot está conectado*\n\nEscreva aqui para pedir aos seus agentes. O WhatsApp Orchestrator responde ou passa o trabalho para o agente certo.\n\nEnvie *stop* para parar um pedido.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *O OpenBot está conectado*\n\nAs pessoas que você permitir no OpenBot já podem escrever para este número. Uma pessoa nova recebe um código: aprove-o no OpenBot, em Pedidos.\n\nEnvie *stop* para parar um pedido.",
+  "status.messaging.whatsappOtherOpenBot":
+    "Outro OpenBot está conectado a este número do WhatsApp, então você pode receber duas respostas. Para corrigir, abra Dispositivos conectados no WhatsApp do seu celular e desconecte o OpenBot que você não usa.",
+  "status.messaging.whatsappPaused":
+    "O OpenBot parou de responder aqui por 10 minutos: chegaram mensagens demais em pouco tempo. Se outro OpenBot estiver conectado a este número, abra Dispositivos conectados no WhatsApp do seu celular e desconecte o OpenBot que você não usa.",
   "status.messaging.whatsappOrchestratorName": "Orquestrador do WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Responde no WhatsApp e consulta a equipe",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,12 +1,3 @@
-/**
- * Hermes Agent import: the profiles of a Hermes folder on this computer, read by the main process.
- *
- * Only the local server imports from Hermes, because the folder is on this computer. The renderer
- * never receives a path to read or a file's text: main keeps the profiles under a token and answers
- * what each one holds, item by item. The renderer names the token, the profiles, and the items the
- * user allows. Values in `.env` and `auth.json` are never read into a preview.
- */
-
 import { INPUT_LIMITS } from "./input-limits";
 import {
   AGENT_IMPORT_LIMITS,
@@ -27,7 +18,6 @@ export const HERMES_IMPORT_LIMITS = {
   model: 200,
 } as const;
 
-/** The name of a Hermes profile, as Hermes checks it. `default` is the Hermes folder itself. */
 export const HERMES_PROFILE_KEY = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
 
 export const HERMES_IMPORT_ITEM_KINDS = [
@@ -46,11 +36,9 @@ export const HERMES_IMPORT_ITEM_KINDS = [
 ] as const;
 export type HermesImportItemKind = (typeof HERMES_IMPORT_ITEM_KINDS)[number];
 
-/** `ready`: imports. `approve`: imports only when the user allows it. `skipped`: stays in Hermes. */
 export const HERMES_IMPORT_ITEM_STATUSES = ["ready", "approve", "skipped"] as const;
 export type HermesImportItemStatus = (typeof HERMES_IMPORT_ITEM_STATUSES)[number];
 
-/** Why an item needs approval or stays in Hermes. The renderer shows the text for each one. */
 export const HERMES_IMPORT_REASONS = [
   "defaultSoul",
   "scripts",
@@ -70,40 +58,31 @@ export const HERMES_IMPORT_REASONS = [
 export type HermesImportReason = (typeof HERMES_IMPORT_REASONS)[number];
 
 export interface HermesImportItem {
-  /** Unique in its profile, such as `skill:github-pr-review` or `mcp:github`. */
   id: string;
   kind: HermesImportItemKind;
   status: HermesImportItemStatus;
-  /** The skill, server, routine, platform or key names in the item, in Hermes's order. */
   names: string[];
-  /** Entries, skills, jobs or keys the item stands for. */
   count: number;
   reason: HermesImportReason | null;
 }
 
 export interface HermesImportProfile {
   key: string;
-  /** The name the new agent gets. */
   name: string;
-  /** The profile folder, with the home folder shown as `~`. */
   path: string;
-  /** The model in `config.yaml`, for the user to recognize the profile. The agent keeps OpenBot's model. */
   model: string | null;
-  /** The agent an earlier import made from this profile, while it is still on this computer. */
   agent: { id: string; name: string } | null;
   items: HermesImportItem[];
 }
 
 export interface HermesImportPreview {
   token: string;
-  /** The Hermes folder, with the home folder shown as `~`. */
   home: string;
   profiles: HermesImportProfile[];
 }
 
 export interface ApplyHermesImportInput {
   token: string;
-  /** The profiles to import, each with the ids of the `approve` items the user allows. */
   profiles: { key: string; allow: string[] }[];
 }
 
@@ -225,7 +204,6 @@ export function parseApplyHermesImportInput(value: unknown): ApplyHermesImportIn
   return { token: input.token, profiles };
 }
 
-/** The result of a Hermes import, in the shape of an agent import. A skipped entry names a profile key. */
 export function decodeHermesImportResult(value: unknown): AgentImportResult {
   const result = record(value, "Hermes import result");
   if (!Array.isArray(result.agents) || !result.agents.every(isAgentSummary)) invalid("Hermes import result");

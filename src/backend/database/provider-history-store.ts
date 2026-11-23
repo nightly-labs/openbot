@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { migration as compactionMigration } from "../migrations/0064-provider-history-compaction";
 import { decodeThreadItem, type ThreadItem } from "../protocol";
 import type { ProviderHistoryFragment } from "../provider-history";
 import type { DatabaseCore } from "./database-core";
@@ -11,6 +13,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database-rows";
+import { withTransaction } from "./sqlite-transaction";
 
 export interface ProviderHistorySessionInput {
   sessionId: string;
@@ -26,9 +29,16 @@ export interface ProviderHistoryImportState extends ProviderHistorySessionInput 
   updatedAt: string;
 }
 
-/** The import state after staging, and whether the staged turn is still imported unchanged. */
 export interface ProviderHistoryStageResult extends ProviderHistoryImportState {
   turnImported: boolean;
+  rewroteItems: boolean;
+  compactedItems: boolean;
+}
+
+export interface ProviderHistoryCompactionBatch {
+  lastRowId: number | null;
+  rows: number;
+  bytes: number;
 }
 
 export interface ProviderHistoryStagedTurn {
@@ -41,7 +51,6 @@ export interface ProviderHistoryStagedTurn {
   updatedAt: string;
 }
 
-/** Keyset cursor for the newest-first staged-turn order. */
 export interface ProviderHistoryTurnCursor {
   startedAt: number | null;
   turnId: string;
@@ -62,17 +71,25 @@ export interface ProviderHistoryStagedItem {
   updatedAt: string;
 }
 
+const COMPACTED_PROVIDERS_SQL = "('codex', 'claude')";
+const COMPACTED_PREFIX = '"sha256:';
+const compactedSql = (column: string) => `substr(${column}, 1, ${COMPACTED_PREFIX.length}) = '${COMPACTED_PREFIX}'`;
+const COMPACTION_SCHEMA_VERSION = compactionMigration.version;
+const COMPACTION_BATCH_ROWS = 256;
+const COMPACTION_BATCH_BYTES = 4 * 1024 * 1024;
+
+export function compactedItemJson(itemJson: string): string {
+  return JSON.stringify(`sha256:${createHash("sha256").update(itemJson).digest("hex")}`);
+}
+
+function isCompactedItemJson(itemJson: string): boolean {
+  return itemJson.startsWith(COMPACTED_PREFIX);
+}
+
 export interface ProviderHistoryStoreOptions {
   core: DatabaseCore;
 }
 
-/**
- * Durable provider history import state.
- *
- * A provider page is written as item rows and a cursor update in one transaction. The staging
- * rows are additive: a partial page never replaces or deletes an older conversation row. The
- * class owns only provider replay state and never imports the OpenBot facade.
- */
 export class ProviderHistoryStore {
   readonly #core: DatabaseCore;
 
@@ -100,14 +117,6 @@ export class ProviderHistoryStore {
     });
   }
 
-  /**
-   * Stages one provider fragment and advances the import cursor atomically.
-   *
-   * `cursor` is opaque to this layer. The adapter owns its meaning and passes it back on the next
-   * request. Items are keyed by their provider id where available, with a stable index fallback for
-   * providers that omit item ids. A changed item clears its imported marker so it can be replayed.
-   * An unchanged item is not written again.
-   */
   stageProviderHistoryFragment(input: {
     sessionId: string;
     fragment: ProviderHistoryFragment;
@@ -135,6 +144,9 @@ export class ProviderHistoryStore {
       );
       const maxItemIndex = maxItemRow ? optionalNumberColumn(maxItemRow, "max_item_index") : null;
       const itemOffset = input.fragment.itemOffset ?? (maxItemIndex === null ? 0 : maxItemIndex + 1);
+      const turnWasImported = existingTurn !== null && requiredNumberColumn(existingTurn, "imported") === 1;
+      const compactedBefore =
+        existingTurn !== null && this.#hasCompactedItems(db, input.sessionId, input.fragment.turnId);
       let changed =
         !existingTurn ||
         requiredNumberColumn(existingTurn, "complete") !==
@@ -178,6 +190,8 @@ export class ProviderHistoryStore {
         `SELECT item_index, item_json FROM provider_history_staging
          WHERE session_id = ? AND turn_id = ? AND item_key = ?`,
       );
+      let expand = compactedBefore && (changed || !turnWasImported);
+      const unchangedCompacted: Array<() => void> = [];
       for (const [itemIndex, item] of input.fragment.items.entries()) {
         const provisionalIndex = itemOffset + itemIndex;
         const provisionalKey = item.id ?? `${item.type}:${provisionalIndex}`;
@@ -188,25 +202,37 @@ export class ProviderHistoryStore {
               itemJson: requiredStringColumn(previousRow, "item_json"),
             }
           : null;
+        const previousCompacted = previous !== null && isCompactedItemJson(previous.itemJson);
         const absoluteIndex =
           previous && item.id && input.fragment.itemOffset === undefined ? previous.itemIndex : provisionalIndex;
         const itemKey = item.id ?? `${item.type}:${absoluteIndex}`;
         const storedItem =
-          previous && item.id && input.fragment.itemOffset === undefined
+          previous && !previousCompacted && item.id && input.fragment.itemOffset === undefined
             ? mergeHistoryItem(previous.itemJson, item)
             : item;
         const itemJson = JSON.stringify(storedItem);
-        if (previous && previous.itemIndex === absoluteIndex && previous.itemJson === itemJson) continue;
+        const write = () =>
+          writeItem.run(input.sessionId, input.fragment.turnId, itemKey, absoluteIndex, itemJson, now);
+        const unchanged =
+          previous !== null &&
+          previous.itemIndex === absoluteIndex &&
+          previous.itemJson === (previousCompacted ? compactedItemJson(itemJson) : itemJson);
+        if (unchanged && !(previousCompacted && expand)) {
+          if (previousCompacted) unchangedCompacted.push(write);
+          continue;
+        }
         changed = true;
-        writeItem.run(input.sessionId, input.fragment.turnId, itemKey, absoluteIndex, itemJson, now);
+        if (compactedBefore && !expand) {
+          expand = true;
+          for (const writeEarlier of unchangedCompacted.splice(0)) writeEarlier();
+        }
+        write();
       }
       if (changed) {
         db.prepare(
           "UPDATE provider_history_turns SET imported = 0, updated_at = ? WHERE session_id = ? AND turn_id = ?",
         ).run(now, input.sessionId, input.fragment.turnId);
       }
-      // A complete import keeps its `updated_at` when nothing changed, so the time stays the time
-      // of the last full read.
       if (changed || existing.state !== "complete" || input.cursor !== undefined) {
         db.prepare(
           `UPDATE provider_history_imports
@@ -225,7 +251,9 @@ export class ProviderHistoryStore {
       }
       return {
         ...this.#requireImport(db, input.sessionId),
-        turnImported: !changed && existingTurn !== null && requiredNumberColumn(existingTurn, "imported") === 1,
+        turnImported: !changed && turnWasImported,
+        rewroteItems: compactedBefore && expand,
+        compactedItems: compactedBefore && this.#hasCompactedItems(db, input.sessionId, input.fragment.turnId),
       };
     });
   }
@@ -259,7 +287,6 @@ export class ProviderHistoryStore {
     return this.readStagedTurnPage(sessionId, { limit }).turns;
   }
 
-  /** Reads a bounded newest-first page without retaining the session's full turn list. */
   readStagedTurnPage(
     sessionId: string,
     input: { after?: ProviderHistoryTurnCursor; limit?: number } = {},
@@ -324,18 +351,21 @@ export class ProviderHistoryStore {
         )
         .all(...parameters),
     );
-    return rows.map((row) => ({
-      sessionId: requiredStringColumn(row, "session_id"),
-      turnId: requiredStringColumn(row, "turn_id"),
-      itemKey: requiredStringColumn(row, "item_key"),
-      itemIndex: requiredNumberColumn(row, "item_index"),
-      item: decodeStoredThreadItem(JSON.parse(requiredStringColumn(row, "item_json"))),
-      imported: requiredNumberColumn(row, "imported") === 1,
-      updatedAt: requiredStringColumn(row, "updated_at"),
-    }));
+    return rows.map((row) => {
+      const itemJson = requiredStringColumn(row, "item_json");
+      if (isCompactedItemJson(itemJson)) throw new Error("A compacted provider history item has no content.");
+      return {
+        sessionId: requiredStringColumn(row, "session_id"),
+        turnId: requiredStringColumn(row, "turn_id"),
+        itemKey: requiredStringColumn(row, "item_key"),
+        itemIndex: requiredNumberColumn(row, "item_index"),
+        item: decodeStoredThreadItem(JSON.parse(itemJson)),
+        imported: requiredNumberColumn(row, "imported") === 1,
+        updatedAt: requiredStringColumn(row, "updated_at"),
+      };
+    });
   }
 
-  /** Marks only the staged rows covered by one normalized page. */
   markItemsImportedThrough(sessionId: string, turnId: string, throughItemIndex: number): void {
     if (!Number.isSafeInteger(throughItemIndex) || throughItemIndex < 0) {
       throw new Error("Invalid provider history item progress.");
@@ -359,6 +389,72 @@ export class ProviderHistoryStore {
         turnId,
       );
     });
+  }
+
+  compactImportedTurn(sessionId: string, turnId: string): void {
+    this.#transaction((db) => {
+      if (!hasCompactionSchema(db)) return;
+      const rows = databaseRows(
+        db
+          .prepare(
+            `SELECT s.rowid AS row_id, s.item_json FROM provider_history_staging s
+             JOIN provider_history_turns t ON t.session_id = s.session_id AND t.turn_id = s.turn_id
+             JOIN provider_history_imports i ON i.session_id = s.session_id
+             WHERE s.session_id = ? AND s.turn_id = ? AND s.imported = 1 AND NOT ${compactedSql("s.item_json")}
+               AND t.complete = 1 AND t.imported = 1 AND i.provider IN ${COMPACTED_PROVIDERS_SQL}`,
+          )
+          .all(sessionId, turnId),
+      );
+      compactRows(db, rows);
+    });
+  }
+
+  compactImportedItems(afterRowId: number): ProviderHistoryCompactionBatch {
+    return this.#transaction((db) => {
+      if (!hasCompactionSchema(db)) return { lastRowId: null, rows: 0, bytes: 0 };
+      const select = db.prepare(
+        `SELECT s.rowid AS row_id, s.item_json FROM provider_history_staging s
+         CROSS JOIN provider_history_turns t ON t.session_id = s.session_id AND t.turn_id = s.turn_id
+         CROSS JOIN provider_history_imports i ON i.session_id = s.session_id
+         WHERE s.rowid > ? AND s.imported = 1 AND NOT ${compactedSql("s.item_json")}
+           AND t.complete = 1 AND t.imported = 1 AND i.provider IN ${COMPACTED_PROVIDERS_SQL}
+         ORDER BY s.rowid`,
+      );
+      const rows: DynamicRecord[] = [];
+      let lastRowId = afterRowId;
+      let bytes = 0;
+      for (const value of select.iterate(afterRowId)) {
+        const row = databaseRow(value);
+        if (!row) continue;
+        rows.push(row);
+        lastRowId = requiredNumberColumn(row, "row_id");
+        bytes += Buffer.byteLength(requiredStringColumn(row, "item_json"));
+        if (rows.length >= COMPACTION_BATCH_ROWS || bytes >= COMPACTION_BATCH_BYTES) break;
+      }
+      const saved = compactRows(db, rows);
+      return { lastRowId: rows.length === 0 ? null : lastRowId, rows: rows.length, bytes: saved };
+    });
+  }
+
+  dropCompactedItems(sessionId: string, turnId: string): void {
+    this.#transaction((db) => {
+      db.prepare(
+        `DELETE FROM provider_history_staging WHERE session_id = ? AND turn_id = ? AND ${compactedSql("item_json")}`,
+      ).run(sessionId, turnId);
+    });
+  }
+
+  #hasCompactedItems(db: DatabaseSync, sessionId: string, turnId: string): boolean {
+    return (
+      databaseRow(
+        db
+          .prepare(
+            `SELECT 1 AS found FROM provider_history_staging
+             WHERE session_id = ? AND turn_id = ? AND ${compactedSql("item_json")} LIMIT 1`,
+          )
+          .get(sessionId, turnId),
+      ) !== null
+    );
   }
 
   #readImport(db: DatabaseSync, sessionId: string): ProviderHistoryImportState | null {
@@ -396,17 +492,49 @@ export class ProviderHistoryStore {
 
   #transaction<T>(operation: (db: DatabaseSync) => T): T {
     const db = this.#core.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = operation(db);
-      if (ownsTransaction) db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    return withTransaction(db, () => operation(db));
   }
+}
+
+function hasCompactionSchema(db: DatabaseSync): boolean {
+  return (
+    databaseRow(
+      db.prepare("SELECT 1 AS found FROM schema_migrations WHERE version = ?").get(COMPACTION_SCHEMA_VERSION),
+    ) !== null
+  );
+}
+
+function compactRows(db: DatabaseSync, rows: readonly DynamicRecord[]): number {
+  const select = db.prepare(
+    `SELECT session_id, turn_id, item_key, item_index, imported, updated_at
+     FROM provider_history_staging WHERE rowid = ?`,
+  );
+  const remove = db.prepare("DELETE FROM provider_history_staging WHERE rowid = ?");
+  const insert = db.prepare(
+    `INSERT INTO provider_history_staging
+       (rowid, session_id, turn_id, item_key, item_index, item_json, imported, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  let bytes = 0;
+  for (const row of rows) {
+    const rowId = requiredNumberColumn(row, "row_id");
+    const itemJson = requiredStringColumn(row, "item_json");
+    const kept = databaseRow(select.get(rowId));
+    if (!kept) continue;
+    remove.run(rowId);
+    insert.run(
+      rowId,
+      requiredStringColumn(kept, "session_id"),
+      requiredStringColumn(kept, "turn_id"),
+      requiredStringColumn(kept, "item_key"),
+      requiredNumberColumn(kept, "item_index"),
+      compactedItemJson(itemJson),
+      requiredNumberColumn(kept, "imported"),
+      requiredStringColumn(kept, "updated_at"),
+    );
+    bytes += Buffer.byteLength(itemJson);
+  }
+  return bytes;
 }
 
 function boundedLimit(value: number): number {
@@ -414,7 +542,6 @@ function boundedLimit(value: number): number {
   return Math.max(1, Math.min(500, Math.floor(value)));
 }
 
-/** ACP sends text deltas with one item id; combine them while keeping retries idempotent. */
 function mergeHistoryItem(previousJson: string, next: ThreadItem): ThreadItem {
   let previous: ThreadItem;
   try {
@@ -431,7 +558,6 @@ function mergeHistoryItem(previousJson: string, next: ThreadItem): ThreadItem {
   return { ...previous, ...next, text };
 }
 
-/** Keep provider-specific item fields (for example image metadata) after boundary validation. */
 function decodeStoredThreadItem(value: unknown): ThreadItem {
   const decoded = decodeThreadItem(value);
   const result: ThreadItem = { type: decoded.type };

@@ -1,23 +1,53 @@
+import { isAndroid } from "@/shared/lib/platform";
+
 let open: (() => void) | null = null;
 let pending = false;
+let requested = false;
+let held = false;
+let takeInOpenSheet: (() => void) | null = null;
 
-/**
- * Opens the share sheet over the chat list. When a share starts the app, the signed-in stack mounts
- * only after this request. Android shows a sheet that the stack mounts with its first screen at full
- * height, with the header under the status bar. So the request waits until the stack has mounted.
- */
-export function openShareSheet(): void {
-  if (open) open();
-  else pending = true;
+function flush(): void {
+  if (!pending || !open || held) return;
+  pending = false;
+  open();
 }
 
-/** The signed-in stack opens the share sheet. A request that came before opens now. */
+export function openShareSheet(): void {
+  if (isAndroid) {
+    if (requested) return;
+    requested = true;
+    if (takeInOpenSheet) {
+      takeInOpenSheet();
+      return;
+    }
+  }
+  pending = true;
+  flush();
+}
+
+export function endShareSheetRequest(): void {
+  requested = false;
+}
+
+export function holdShareSheet(): void {
+  if (isAndroid) held = true;
+}
+
+export function releaseShareSheet(): void {
+  held = false;
+  flush();
+}
+
+export function setOpenShareSheet(take: () => void): () => void {
+  takeInOpenSheet = take;
+  return () => {
+    if (takeInOpenSheet === take) takeInOpenSheet = null;
+  };
+}
+
 export function setShareSheetOpener(next: () => void): () => void {
   open = next;
-  if (pending) {
-    pending = false;
-    next();
-  }
+  flush();
   return () => {
     if (open === next) open = null;
   };

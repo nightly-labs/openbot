@@ -1,0 +1,82 @@
+name: Provider live E2E
+
+# One real turn on Codex, Claude and Gemini, each in its own desktop app, at the same time
+# (`bun run test:provider-live`, docs/provider-live-e2e.md). The job runs on the Mac mini runner: each
+# provider uses the sign-in of the runner's user, so the job has no provider secret. It runs only
+# when a person with write access starts it. The release-upgrade-safety skill starts it on the pull
+# request branch of a release, before the merge and the tag. It has no `pull_request` trigger: a
+# pull request must not start its own code on a computer that holds provider sign-ins.
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: The provider to test. Gemini is `antigravity`.
+        type: choice
+        default: all
+        options:
+          - all
+          - codex
+          - claude
+          - antigravity
+
+permissions: {}
+
+# Each run uses the same app profiles on the runner's computer.
+concurrency:
+  group: provider-live-e2e
+  cancel-in-progress: false
+
+jobs:
+  providers:
+    name: Real provider turns
+    if: github.repository == 'nightly-labs/openbot'
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+
+      # e2e needs Node.js 24.8.0 or newer. The runner's tool cache can hold an older 24.x, and
+      # `.nvmrc` (24) then selects it.
+      - name: Set up the newest Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          check-latest: true
+
+      - name: Run the live provider test
+        env:
+          PROVIDER: ${{ inputs.provider }}
+        run: |
+          # Outside the checkout: each job of this runner cleans the checkout, and the profiles hold
+          # the sign-in of the test accounts and the record of an app that an earlier run left.
+          export OPENBOT_PROVIDER_LIVE_DIR="$HOME/Library/Caches/openbot-provider-live"
+          if [ -n "$PROVIDER" ] && [ "$PROVIDER" != "all" ]; then
+            bun run test:provider-live --target="$PROVIDER"
+          else
+            bun run test:provider-live
+          fi
+
+      - name: Show the result of each provider
+        if: ${{ !cancelled() }}
+        run: |
+          if [ -f scripts/provider-live/.e2e/summary.md ]; then
+            cat scripts/provider-live/.e2e/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provider-live-e2e
+          path: scripts/provider-live/.e2e/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
