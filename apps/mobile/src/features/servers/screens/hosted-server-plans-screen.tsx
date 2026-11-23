@@ -5,12 +5,13 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { Button, Chip, Skeleton, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
-import CreditCard from "lucide-react-native/icons/credit-card";
 import Monitor from "lucide-react-native/icons/monitor";
 import Ticket from "lucide-react-native/icons/ticket";
-import { type ReactNode, useEffect, useMemo } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
+import { useCSSVariable } from "uniwind";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -123,15 +124,9 @@ function PlansReady({
         </SettingsSection>
       ) : null}
 
-      {showPlans ? (
-        <SettingsSection title={t("mobile.server.hosted.plans")}>
-          {plans.map((entry) => (
-            <PlanRow key={entry.id} plan={entry} current={ownedPlans.has(entry.id)} />
-          ))}
-        </SettingsSection>
-      ) : null}
+      {showPlans ? <ComputerSteps showChangePlan={owned.length > 0} /> : null}
 
-      {showPlans ? <ComputerSteps /> : null}
+      {showPlans ? <PlanDetails plans={plans} ownedPlans={ownedPlans} /> : null}
 
       <LocalServerOptions pathname="/hosted-server/local" />
       <OtherOptions />
@@ -349,23 +344,74 @@ function PlanRow({ plan, current }: { plan: HostedServerCatalogPlan; current: bo
   );
 }
 
-function ComputerSteps() {
-  const { t } = useText();
-  const [foreground] = useThemeColor(["foreground"]);
+const COMPUTER_STEPS = [
+  "mobile.server.hosted.steps.open",
+  "mobile.server.hosted.steps.settings",
+  "mobile.server.hosted.steps.add",
+] as const satisfies readonly MobileTextKey[];
+
+function ComputerSteps({ showChangePlan }: { showChangePlan: boolean }) {
+  const { t, format } = useText();
+  const accent = String(useCSSVariable("--openbot-accent-text"));
   return (
-    <SettingsSection title={t("mobile.server.hosted.computer.title")}>
+    <View className="gap-4 rounded-grouped bg-grouped p-4">
+      <View className="flex-row items-center gap-3">
+        <View className="size-11 items-center justify-center rounded-xl bg-accent/15">
+          <Monitor color={accent} size={24} strokeWidth={1.8} />
+        </View>
+        <Typography.Paragraph weight="semibold" className="min-w-0 flex-1">
+          {t("mobile.server.hosted.steps.title")}
+        </Typography.Paragraph>
+      </View>
+      <View accessibilityRole="list" className="gap-3">
+        {COMPUTER_STEPS.map((key, index) => (
+          <View key={key} accessibilityRole="text" className="flex-row gap-3">
+            <View className="size-6 items-center justify-center rounded-full border border-grouped-border">
+              <Typography.Paragraph type="body-xs" weight="semibold" className="text-text-secondary">
+                {format.number(index + 1)}
+              </Typography.Paragraph>
+            </View>
+            <Typography.Paragraph className="min-w-0 flex-1">{t(key)}</Typography.Paragraph>
+          </View>
+        ))}
+      </View>
+      <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
+        {t("mobile.server.hosted.steps.ready")}
+      </Typography.Paragraph>
+      {showChangePlan ? (
+        <View className="gap-1 border-t border-grouped-border pt-4">
+          <Typography.Paragraph weight="semibold">{t("mobile.server.hosted.computer.change")}</Typography.Paragraph>
+          <Typography.Paragraph type="body-xs" className="text-grouped-secondary">
+            {t("mobile.server.hosted.computer.changeHint")}
+          </Typography.Paragraph>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function PlanDetails({
+  plans,
+  ownedPlans,
+}: {
+  plans: HostedServerCatalogPlan[];
+  ownedPlans: ReadonlySet<HostedServerCatalogPlan["id"]>;
+}) {
+  const { t } = useText();
+  const [muted] = useThemeColor(["muted"]);
+  const [open, setOpen] = useState(false);
+  const Disclosure = open ? ChevronDown : ChevronRight;
+  return (
+    <SettingsSection>
       <SettingsRow
-        leading={<Monitor color={foreground} size={22} strokeWidth={1.8} />}
-        supportingText={t("mobile.server.hosted.computer.addHint")}
+        disclosure={false}
+        expanded={open}
+        trailing={<Disclosure size={18} color={muted} strokeWidth={1.5} style={open ? undefined : MIRROR_IN_RTL} />}
+        onPress={() => setOpen((value) => !value)}
       >
-        <Typography.Paragraph>{t("mobile.server.hosted.computer.add")}</Typography.Paragraph>
+        <Typography.Paragraph>{t("mobile.server.hosted.plansToggle")}</Typography.Paragraph>
       </SettingsRow>
-      <SettingsRow
-        leading={<CreditCard color={foreground} size={22} strokeWidth={1.8} />}
-        supportingText={t("mobile.server.hosted.computer.changeHint")}
-      >
-        <Typography.Paragraph>{t("mobile.server.hosted.computer.change")}</Typography.Paragraph>
-      </SettingsRow>
+      {open ? plans.map((entry) => <PlanRow key={entry.id} plan={entry} current={ownedPlans.has(entry.id)} />) : null}
     </SettingsSection>
   );
 }
