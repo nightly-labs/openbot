@@ -69,6 +69,7 @@ import {
   powerMonitor,
   powerSaveBlocker,
   screen,
+  session,
   shell,
   systemPreferences,
   webContents,
@@ -843,6 +844,8 @@ async function createMessagingServices({
     issueTelegramRoute: (hostId) => centralAuth.issueTelegramRoute(hostId).pipe(toRemoteWorkflowError),
     issueGitHubRoute,
     queueKey: () => loadIngressQueueKey(join(app.getPath("userData"), INGRESS_QUEUE_KEY_FILE), secretCipher),
+    resolveProxy: (url) =>
+      Effect.tryPromise(() => session.defaultSession.resolveProxy(url)).pipe(Effect.orElseSucceed(() => "DIRECT")),
   });
   teardown.push(TEARDOWN_ORDER.signalIngress, "the Signal ingress socket", () =>
     Effect.runPromise(signalIngress.dispose()),

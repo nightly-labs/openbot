@@ -27,6 +27,7 @@ import {
 } from "@openbot/contracts/signal-protocol/webhook-route";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope, Semaphore } from "effect";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import WebSocket from "ws";
 import {
   DiscordApiError,
@@ -83,6 +84,16 @@ export interface SignalIngressOptions {
   issueGitHubRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
   issueTelegramRoute?(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
   queueKey?(): Effect.Effect<IngressQueueKey | null>;
+  resolveProxy?(url: string): Effect.Effect<string>;
+}
+
+const CHROMIUM_PROXY_RULE = /^(PROXY|HTTPS)\s+(\S+)$/u;
+
+function proxyUrlFromRules(rules: string): string | null {
+  const match = CHROMIUM_PROXY_RULE.exec(rules.split(";")[0]?.trim() ?? "");
+  if (!match) return null;
+  const url = `${match[1] === "HTTPS" ? "https" : "http"}://${match[2]}`;
+  return URL.canParse(url) ? url : null;
 }
 
 class SignalIngressAccount extends Context.Service<
@@ -184,6 +195,7 @@ export class SignalIngress implements MessagingIngress {
   #githubLostAt: number | null = null;
   #telegramMissing = false;
   #telegramBackoffMs = BACKOFF_START_MS;
+  #directNext = false;
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
   readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
   #discordGuilds: ReadonlySet<string> | null = null;
@@ -490,6 +502,7 @@ export class SignalIngress implements MessagingIngress {
       ...(telegramRoute === null ? {} : { telegramRoute: telegramRoute.ticket }),
       ...(githubRoute === null ? {} : { githubRoute }),
     };
+    const proxyUrl = this.#directNext ? null : yield* this.#proxyFor(bootstrap.signalUrl);
     const queueKey = yield* this.#loadQueueKey;
     this.#queueKey = queueKey;
     if (generation !== this.#generation || this.#unheld()) return;
@@ -498,7 +511,7 @@ export class SignalIngress implements MessagingIngress {
     this.#telegramMissing = telegram && telegramRoute === null;
     if (telegram && telegramRoute !== null) this.#telegramBackoffMs = BACKOFF_START_MS;
     this.#pendingLinkedRoutes = { slack: linkedRouteIds(slackRoute), telegram: linkedRouteIds(telegramRoute) };
-    const socket = new WebSocket(bootstrap.signalUrl);
+    const socket = new WebSocket(bootstrap.signalUrl, proxyUrl ? { agent: new HttpsProxyAgent(proxyUrl) } : {});
     this.#socket = socket;
     this.#clearReadyDeadline();
     this.#readyDeadline = setTimeout(() => {
@@ -524,6 +537,7 @@ export class SignalIngress implements MessagingIngress {
     socket.on("close", () => {
       if (socket !== this.#socket) return;
       this.#socket = null;
+      this.#directNext = proxyUrl !== null && this.#state !== "online";
       this.#discordSession = null;
       this.#discordGuilds = null;
       this.#linkedRoutes = { slack: null, telegram: null };
@@ -747,6 +761,12 @@ export class SignalIngress implements MessagingIngress {
       this.#retry = null;
       this.#run(this.#open());
     }, delay);
+  }
+
+  #proxyFor(signalUrl: string): Effect.Effect<string | null> {
+    const resolveProxy = this.#options.resolveProxy;
+    if (!resolveProxy) return Effect.succeed(null);
+    return resolveProxy(signalUrl.replace(/^ws/u, "http")).pipe(Effect.map(proxyUrlFromRules));
   }
 
   #retryRoutes(): void {
