@@ -6,7 +6,6 @@ export function voiceCaptureError(error: unknown) {
     return t("composer.voice.blocked");
   }
   if (error instanceof DOMException && error.name === "NotFoundError") return t("composer.voice.noMicrophone");
-  // The OS could not open the device: another app holds it, or a driver or setting stops it.
   if (error instanceof DOMException && (error.name === "NotReadableError" || error.name === "AbortError")) {
     return t("composer.voice.microphoneUnavailable");
   }

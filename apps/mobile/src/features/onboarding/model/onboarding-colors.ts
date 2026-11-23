@@ -1,10 +1,6 @@
 const DARK_TEXT = "#141414";
 const LIGHT_TEXT = "#ffffff";
 
-/**
- * The text colour that reads on a filled colour: dark on a light fill such as yellow, white on a
- * dark one. It compares the WCAG contrast of both and keeps the higher one.
- */
 export function readableOn(fill: string) {
   const hex = fill.replace("#", "");
   if (!/^[0-9a-f]{6}/i.test(hex)) return LIGHT_TEXT;

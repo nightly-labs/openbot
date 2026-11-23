@@ -12,8 +12,6 @@ import {
   emptyAnalyticsTotals,
 } from "@openbot/contracts/ipc";
 
-// The weight separates the agents from each other: without it every mock agent draws the
-// same curve, and the per-agent table previews as identical rows with equal shares.
 export function mockAgentAnalytics(
   input: AgentAnalyticsInput,
   agent: Pick<ClientAgentSummary, "id" | "model" | "provider">,
@@ -93,9 +91,6 @@ export function mockHostAnalytics(
     return total;
   }
   const totals = sum(reports.map((report) => report.totals));
-  // Each mock report covers one provider, and two agents can share one, so the grid is the
-  // reports' daily rows folded together by [date, provider] - the same shape and order the
-  // read path produces.
   const providerDays = new Map<string, AnalyticsProviderDay>();
   for (const [index, report] of reports.entries()) {
     const provider = selected[index]?.provider ?? "";
@@ -157,7 +152,6 @@ export function mockHostAnalytics(
   };
 }
 
-// Skill name, loads for each agent, and the size of its SKILL.md in tokens.
 const MOCK_SKILLS = [
   ["release-notes", 14, 2_400],
   ["code-review", 9, 3_900],
@@ -166,7 +160,6 @@ const MOCK_SKILLS = [
   ["incident-postmortem", 1, 2_800],
 ] as const;
 
-/** The skill loads of the mock agents, ranked by tokens as the host ranks them. */
 function mockSkills(agents: number, costPerToken: number): AnalyticsSkill[] {
   const rows = MOCK_SKILLS.map(([skill, loads, size], index) => {
     const users = Math.max(0, agents - index);

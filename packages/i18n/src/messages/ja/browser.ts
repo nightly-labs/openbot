@@ -57,6 +57,8 @@ export const messages = {
   "browser.pip.close": "ブラウザーのポップアップを閉じる",
   "browser.pip.reattachFailed": "OpenBot はブラウザーをサイドバーに戻せませんでした。",
   "browser.pip.closeFailed": "OpenBot はブラウザーのポップアップを閉じられませんでした。",
+  "browser.window.open": "ブラウザーを新しいウィンドウで開く",
+  "browser.window.openFailed": "OpenBot はブラウザーのウィンドウを開けませんでした。",
   "browser.popupBlocked.title": "ポップアップがブロックされました",
   "browser.popupBlocked.dismiss": "ポップアップのメッセージを閉じる",
   "browser.liveView.label": "サーバー上のページのライブビュー",
@@ -91,6 +93,7 @@ export const messages = {
   "browser.secret.submitting": "送信しています…",
   "browser.secret.takeOver": "操作を引き継ぐ",
   "browser.secret.failed": "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
+  "browser.secret.ended": "このサインインのリクエストは終了しました。エージェントにもう一度試すよう依頼してください。",
   "browser.secret.vaultSkip.agentScript":
     "エージェントがこのページでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
   "browser.secret.vaultSkip.fieldKind":

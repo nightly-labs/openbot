@@ -19,44 +19,17 @@ import {
 import { refreshThreadOrder } from "../database/thread-message-order";
 import type { OpenBotDatabase } from "../openbot-database";
 
-// `projection_agent_threads` has one row for each side thread; the agent's own chat
-// (`projection_agents.thread_id`) has no row. Migrations 47, 48 and 54 make the table. Deleting the thread deletes
-// the row.
-//
-// `legacy_task_id` is the id of a task from before migration 47; mailbox records and Team API clients still name the
-// thread by it. It is null for a thread created after 47. `origin` says who started it: the person, or the agent with
-// its `start_task` tool. `title_source` says where the title came from: the first message (`auto`), the agent's
-// `start_task` call (`agent`), or a rename (`user`). `outcome` is the end of the last turn, null before its first turn
-// ends. `error` is the redacted provider error of the last failed turn; a new turn clears it. `archived_at` is set
-// when the person or the agent archives the thread; an archived thread takes no message until it is restored. The
-// title lives only here: the roster rewrites `projection_threads.title` to the agent name.
-//
-// The `branch_*` columns (migration 48) link a branch to the place it was copied from: the source thread, the message
-// the person chose there, and the last copied row in the branch. They have no foreign key, because the branch outlives
-// its source. All three are null for a thread that is not a branch, or all three are set; this store keeps that rule.
-//
-// `routine_id` (migration 54) names the routine of the agent whose runs go to this thread. Each routine has one thread
-// at most, open or archived. It has no foreign key: routines are not in this database. It is null for every other
-// thread.
 const AGENT_THREAD_ORIGINS = ["user", "agent"] as const;
 export type AgentThreadOrigin = (typeof AGENT_THREAD_ORIGINS)[number];
 
 const AGENT_THREAD_TITLE_SOURCES = ["auto", "agent", "user"] as const;
 type AgentThreadTitleSource = (typeof AGENT_THREAD_TITLE_SOURCES)[number];
 
-/** A side thread in the list of `recent`, as its sort keys: the next page starts after it. */
 export interface ThreadListPosition {
   updatedAt: string;
   threadId: string;
 }
 
-/**
- * A side thread: a second conversation of one agent, with its own thread, next to the agent's own chat.
- *
- * `taskId` is the id that mailbox records, the drain's lanes and `agent-tasks-v1` clients use: the task id
- * of a thread from before migration 47, else the thread id. The two never collide: task ids start with
- * `agent-task-` and thread ids with `openbot-thread-`.
- */
 export interface AgentThreadRecord {
   taskId: string;
   agentId: string;
@@ -64,34 +37,23 @@ export interface AgentThreadRecord {
   origin: AgentThreadOrigin;
   title: string;
   titleSource: AgentThreadTitleSource;
-  /** The end of the last turn. Null before the first turn ends. */
   outcome: AgentTaskOutcome | null;
-  /** The redacted provider error of the last failed turn. A new turn clears it. */
   error: string | null;
   createdAt: string;
   updatedAt: string;
-  /** An archived thread takes no message until it is restored. */
   closedAt: string | null;
-  /** Where a branch was copied from. Null for a thread that is not a branch. */
   branch: AgentThreadBranch | null;
-  /** The routine whose runs this thread takes. Null for every other thread. */
   routineId: string | null;
 }
 
-/** The `branch_*` columns: all three are set, or the thread is not a branch. */
 interface AgentThreadBranch {
-  /** The agent's own chat or a side thread. The id stays when the source is deleted. */
   sourceThreadId: string;
-  /** The message in the source that the person chose. */
   sourceMessageId: string;
-  /** The last copied row in the branch, by the shown order. */
   throughMessageId: string;
 }
 
-/** A branch and its copied conversation, which `copyBranchMessages` made. */
 export interface AgentThreadBranchInput {
   agentId: string;
-  /** The person's id for this branch action. A retry with the same id gets the same branch. */
   requestId: string;
   threadId: string;
   title: string;
@@ -105,18 +67,11 @@ export interface AgentThreadInput {
   origin: AgentThreadOrigin;
   title: string;
   titleSource: Exclude<AgentThreadTitleSource, "user">;
-  /** Set only for the one thread of a routine. */
   routineId?: string;
 }
 
 const SELECT_THREAD = "SELECT *, COALESCE(legacy_task_id, thread_id) AS task_id FROM projection_agent_threads";
 
-/**
- * Owns `projection_agent_threads`. It never imports the database facade's callers.
- *
- * A thread creates a row in `projection_threads`, so it goes through `dispatch`, as a messaging link
- * does. Its event payload holds ids only: the event log is append-only and must not keep the title.
- */
 export class AgentThreadStore {
   readonly #database: OpenBotDatabase;
 
@@ -124,7 +79,6 @@ export class AgentThreadStore {
     this.#database = database;
   }
 
-  /** The thread by its task id: the legacy task id, or the thread id of a newer thread. */
   task(taskId: string): AgentThreadRecord | null {
     const row = databaseRow(
       this.#database.connection
@@ -134,7 +88,6 @@ export class AgentThreadStore {
     return row ? decodeThread(row) : null;
   }
 
-  /** The thread of this routine, open or archived. */
   threadForRoutine(agentId: string, routineId: string): AgentThreadRecord | null {
     const row = databaseRow(
       this.#database.connection
@@ -149,7 +102,6 @@ export class AgentThreadStore {
     return row ? decodeThread(row) : null;
   }
 
-  /** The open threads of this agent first, then the newest archived ones, up to `INPUT_LIMITS.agentTasks`. */
   list(agentId: string): AgentThreadRecord[] {
     return databaseRows(
       this.#database.connection
@@ -161,11 +113,19 @@ export class AgentThreadStore {
     ).map(decodeThread);
   }
 
-  /**
-   * The threads of this agent, open and archived, with activity (`updated_at`: a turn start, a close
-   * or a reopen) at or after `after`. The latest activity first. With `last`, the threads that come
-   * after it in this order: the next page of a list that ended with `last`.
-   */
+  archivedPage(agentId: string, last: ThreadListPosition | null, limit: number): AgentThreadRecord[] {
+    const lastUpdatedAt = last?.updatedAt ?? null;
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `${SELECT_THREAD} WHERE agent_id = ? AND archived_at IS NOT NULL
+           AND (? IS NULL OR updated_at < ? OR (updated_at = ? AND thread_id > ?))
+           ORDER BY updated_at DESC, thread_id LIMIT ?`,
+        )
+        .all(agentId, lastUpdatedAt, lastUpdatedAt, lastUpdatedAt, last?.threadId ?? null, limit),
+    ).map(decodeThread);
+  }
+
   recent(
     agentId: string,
     after: string | null,
@@ -184,14 +144,12 @@ export class AgentThreadStore {
     ).map(decodeThread);
   }
 
-  /** The agent id and thread id of every side thread, for boot recovery. */
   executionThreads(): Array<{ id: string; threadId: string }> {
     return databaseRows(
       this.#database.connection.prepare("SELECT agent_id, thread_id FROM projection_agent_threads").all(),
     ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
   }
 
-  /** The agent id and thread id of every open side thread, the newest first. */
   openExecutionThreads(): Array<{ id: string; threadId: string }> {
     return databaseRows(
       this.#database.connection
@@ -203,7 +161,6 @@ export class AgentThreadStore {
     ).map((row) => ({ id: requiredStringColumn(row, "agent_id"), threadId: requiredStringColumn(row, "thread_id") }));
   }
 
-  /** The task ids of the open threads of this agent, oldest first, so a thread that waits longer starts first. */
   openTaskIds(agentId: string): string[] {
     return databaseRows(
       this.#database.connection
@@ -233,14 +190,12 @@ export class AgentThreadStore {
     ).map((row) => requiredStringColumn(row, "thread_id"));
   }
 
-  /** The titles of all threads of this agent, open and archived. */
   titles(agentId: string): string[] {
     return databaseRows(
       this.#database.connection.prepare("SELECT title FROM projection_agent_threads WHERE agent_id = ?").all(agentId),
     ).map((row) => requiredStringColumn(row, "title"));
   }
 
-  /** The branch that an earlier call with this request id made, while it exists. */
   branchFor(agentId: string, requestId: string): AgentThreadRecord | null {
     const result = this.#database.commandResult(branchCommandId(agentId, requestId));
     if (!isDynamicRecord(result) || !isString(result.threadId)) return null;
@@ -248,11 +203,6 @@ export class AgentThreadStore {
     return thread?.agentId === agentId ? thread : null;
   }
 
-  /**
-   * The rows of a thread that a branch from `messageId` copies, in stored order: every group (a turn,
-   * or a message alone) up to and with the chosen message's group. Null when the message is not a
-   * finished message of the agent in this thread.
-   */
   branchSource(threadId: string, messageId: string): ConversationMessage[] | null {
     const db = this.#database.connection;
     const chosen = databaseRow(
@@ -280,12 +230,6 @@ export class AgentThreadStore {
     return rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
   }
 
-  /**
-   * Creates a branch: a side thread with a copy of a conversation, in one transaction. A retry with
-   * the same request id returns the branch that the first call made. The thread event holds the
-   * copied conversation, as each conversation write does, so a replay rebuilds it; the side-thread
-   * event holds ids only.
-   */
   branch(input: AgentThreadBranchInput): AgentThreadRecord {
     const result = this.#database.dispatch(
       branchCommandId(input.agentId, input.requestId),
@@ -330,7 +274,6 @@ export class AgentThreadStore {
           now,
           conversationSequence,
         );
-        // No usage row and no turn row: the copied turns ran, and were counted, in the source.
         const insertMessage = db.prepare(`
           INSERT INTO projection_thread_messages (
             thread_id, message_id, turn_id, author, status, item_type, created_at,
@@ -400,7 +343,6 @@ export class AgentThreadStore {
     return created;
   }
 
-  /** Creates the side thread and its conversation in one transaction. */
   create(input: AgentThreadInput): AgentThreadRecord {
     const threadId = `openbot-thread-${randomUUID()}`;
     this.#database.dispatch(
@@ -448,7 +390,6 @@ export class AgentThreadStore {
     return created;
   }
 
-  /** A rename by a person. The title no longer follows the first message. */
   rename(threadId: string, title: string): void {
     this.#database.dispatch(
       `agent-thread-renamed:${threadId}:${randomUUID()}`,
@@ -463,7 +404,6 @@ export class AgentThreadStore {
     );
   }
 
-  /** A title that OpenBot gave, such as the name of a renamed routine. A person's title stays. */
   retitle(threadId: string, title: string): void {
     this.#database.dispatch(
       `agent-thread-retitled:${threadId}:${randomUUID()}`,
@@ -478,21 +418,18 @@ export class AgentThreadStore {
     );
   }
 
-  /** Records the end of the thread's last turn. */
   setOutcome(taskId: string, outcome: AgentTaskOutcome): void {
     this.#database.connection
       .prepare(`UPDATE projection_agent_threads SET outcome = ?, updated_at = ? WHERE ${BY_TASK_ID}`)
       .run(outcome, new Date().toISOString(), taskId, taskId);
   }
 
-  /** Keeps the error of the thread's last turn, or clears it when a turn starts. */
   setError(taskId: string, error: string | null): void {
     this.#database.connection
       .prepare(`UPDATE projection_agent_threads SET error = ? WHERE ${BY_TASK_ID}`)
       .run(error, taskId, taskId);
   }
 
-  /** Marks new activity, so the thread lists first among its peers. */
   touch(taskId: string): void {
     this.#database.connection
       .prepare(`UPDATE projection_agent_threads SET updated_at = ? WHERE ${BY_TASK_ID}`)
@@ -514,16 +451,11 @@ export class AgentThreadStore {
       .run(new Date().toISOString(), taskId, taskId);
   }
 
-  /**
-   * Removes one side thread with its conversation, attachments and history. The caller stops its turns,
-   * cancels its queued messages and releases its provider sessions first.
-   */
   delete(taskId: string): void {
     const thread = this.task(taskId);
     if (!thread) return;
     this.#database.dispatch(
       `agent-thread-deleted:${thread.threadId}:${randomUUID()}`,
-      // Recorded on the agent: the thread's own history goes below.
       [
         {
           aggregateType: "agent-threads",
@@ -539,10 +471,6 @@ export class AgentThreadStore {
     );
   }
 
-  /**
-   * Removes every side thread of an agent, with the conversations and their history. The caller releases
-   * the provider sessions of `threadIdsForAgent` first.
-   */
   deleteForAgent(agentId: string): void {
     const threads = databaseRows(
       this.#database.connection.prepare(`${SELECT_THREAD} WHERE agent_id = ?`).all(agentId),
@@ -566,17 +494,10 @@ export class AgentThreadStore {
   }
 }
 
-/** One branch action of one agent: the receipt of this command makes a retry return the same branch. */
 function branchCommandId(agentId: string, requestId: string): string {
   return `agent-thread-branch:${agentId}:${requestId}`;
 }
 
-/**
- * The branch's copy of the source rows, in the same order. Each row gets a new id; its turn, author,
- * item type, time and content stay. Reactions and queue state stay in the source. A reply link names
- * the copy of its target, or goes when the target was not copied. `files` maps a source attachment id
- * to the branch's copy of the file; an attachment with no copy keeps its card as it is.
- */
 export function copyBranchMessages(
   messages: readonly ConversationMessage[],
   files: ReadonlyMap<string, AttachmentSummary>,
@@ -600,7 +521,6 @@ const BY_TASK_ID = "(legacy_task_id = ? OR (legacy_task_id IS NULL AND thread_id
 
 type Connection = OpenBotDatabase["connection"];
 
-/** The history of a migrated thread is also under its old task aggregate. The thread row takes the side-thread row. */
 function deleteThreadRows(db: Connection, threads: readonly AgentThreadRecord[]): void {
   deleteAggregateHistory(
     db,

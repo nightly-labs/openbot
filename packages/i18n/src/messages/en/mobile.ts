@@ -20,7 +20,6 @@ import { messages as mobileWorkspace } from "./mobile/workspace";
 import { shared } from "./shared";
 import { source } from "./source";
 
-/** The mobile catalog: shared keys, source text, and the mobile areas only. */
 export const enMobile = {
   ...shared,
   ...source,

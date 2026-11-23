@@ -1,21 +1,3 @@
-/**
- * The setup page of a self-hosted server in a container, such as the Umbrel app (docs/umbrel.md). A
- * container has no terminal that a user of an app store can open with ease, so this page signs the
- * server in with the email code, as `openbot login` does, and shows its status. The page is the
- * `server-setup` entry of the renderer build: the sign-in screen of the app, `AccountLogin`.
- *
- * The page listens on a TCP port of the container, which publishes no port. Only the network of the
- * container reaches it: on Umbrel, the app proxy, which asks for the Umbrel login first. Other programs
- * on that network can reach the port too, so the page answers only the requests of
- * `ServerSetupAction`: status, the retry of the account and the email-code sign-in, which a server
- * with a session refuses. It has no
- * sign-out, claim, rename or Mobile Connect code. It never sends the session token, the code or the
- * challenge of another request back. It serves only its page and the files in `assets/`.
- *
- * Each `/api/` request must have the header `x-openbot-setup: 1`. A page of another site cannot send
- * that header without a CORS preflight, which this listener refuses, so it cannot submit a sign-in.
- */
-
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Socket } from "node:net";
@@ -30,7 +12,6 @@ import type { ServerModeAnswer, ServerSetupAction } from "./server-mode";
 
 const MAX_BODY_BYTES = 4096;
 const PAGE_FILE = "server-setup.html";
-/** A file name of the build in `assets/`. No directory, no `..`, no query. */
 const ASSET_PATH = /^\/assets\/([\w-]+(?:\.[\w-]+)*\.[a-z0-9]+)$/u;
 
 const API_ROUTES: Record<string, ServerSetupAction> = {
@@ -45,7 +26,6 @@ const SECURITY_HEADERS = {
   "referrer-policy": "no-referrer",
 };
 
-/** As the policy of the app window (content-security-policy.ts), with no outside source. */
 const PAGE_POLICY = [
   "default-src 'none'",
   "script-src 'self'",
@@ -60,9 +40,7 @@ const PAGE_POLICY = [
 
 export interface ServerSetupPageOptions {
   port: number;
-  /** The address to bind. A container binds all of its addresses; a test binds the loopback address. */
   address: string;
-  /** The renderer build: `server-setup.html` and its `assets/`. */
   rendererRoot: string;
   request: (action: ServerSetupAction, body: URLSearchParams) => Effect.Effect<ServerModeAnswer, RemoteWorkflowError>;
   onError: (message: string, error: unknown) => void;
@@ -118,7 +96,6 @@ export class ServerSetupPage {
     }
     const asset = request.method === "GET" ? ASSET_PATH.exec(path)?.[1] : undefined;
     if (asset) {
-      // The build gives each file a name with its hash, so a file never changes.
       await this.#sendFile(response, join("assets", asset), { "cache-control": "public, max-age=31536000, immutable" });
       return;
     }
@@ -137,7 +114,6 @@ export class ServerSetupPage {
       answer = body === null ? failure(413, "too_large") : await runCauseEffect(this.#options.request(action, body));
     } catch (error) {
       this.#options.onError("A server setup page request failed.", error);
-      // The messages of the account and host services are the ones the app shows. They name no secret.
       answer = failure(400, "failed", error instanceof Error ? error.message : null);
     }
     sendJson(response, answer.status, presentLines(answer.lines));
@@ -157,7 +133,6 @@ export class ServerSetupPage {
   }
 }
 
-/** A same-origin request of the page script, never a form or a page of another site. */
 function isPageRequest(request: IncomingMessage): boolean {
   if (request.headers[SERVER_SETUP_HEADER] !== "1") return false;
   const site = request.headers["sec-fetch-site"];
@@ -175,7 +150,6 @@ function failure(status: number, error: string, message: string | null = null): 
   return { status, lines: { error, message } };
 }
 
-/** The lines that have a value. Messages stay in English: the page shows them in its language. */
 function presentLines(lines: ServerModeAnswer["lines"]): Record<string, string | number> {
   const result: Record<string, string | number> = {};
   for (const [key, value] of Object.entries(lines)) {

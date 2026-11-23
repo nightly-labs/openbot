@@ -27,6 +27,9 @@ export const messages = {
   "mcp.signIn.waiting": "ממתין לדפדפן…",
   "mcp.signIn.continue": "המשך אל {name}",
   "mcp.signIn.pageDescription": "הדף הזה פתוח בדפדפן ב-{host}. יש להתחבר כאן.",
+  "mcp.signIn.copyHint": "אם הדף לא נטען, יש להעתיק את הקישור ולפתוח אותו בדפדפן אחר.",
+  "mcp.signIn.copyLink": "העתקת קישור",
+  "mcp.signIn.pasteHint": "אם מתחברים במכשיר אחר, יש להעתיק את הכתובת שהדפדפן שלו מציג בסוף ולהדביק אותה כאן.",
   "mcp.test.connected": { one: "מחובר · כלי אחד", two: "מחובר · שני כלים", other: "מחובר · {count} כלים" },
   "mcp.status.testing": "בודק…",
   "mcp.status.failed": "נכשל",
@@ -93,6 +96,7 @@ export const messages = {
   "mcp.panel.signIn": "התחברות",
   "mcp.panel.signOut": "התנתקות",
   "mcp.panel.cancelSignIn": "ביטול התחברות",
+  "mcp.panel.useAddress": "שימוש בכתובת הזו",
   "mcp.panel.signInTo": "התחברות ל-{name}",
   "mcp.panel.signInWaiting": {
     one: "יש לסיים את ההתחברות בדפדפן. OpenBot מפסיק להמתין אחרי דקה.",

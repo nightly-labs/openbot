@@ -11,14 +11,6 @@ const ROUTES: ReadonlySet<string> = new Set(Object.values(CONNECTORS_ROUTES));
 
 const page = (opened: MessagingConnectPage | null) => ({ url: opened?.url ?? null, nonce: opened?.nonce ?? null });
 
-/**
- * The connections of this host that an administrator manages from their own computer. Frozen by
- * `connectors-v1`.
- *
- * A connect or a disconnect opens no page on this host: the client opens GitHub's, Slack's, Discord's
- * or Telegram's page in the user's own browser. No answer carries a token. `requireAdmin` runs on
- * every route.
- */
 export async function routeConnectors(
   context: TeamApiRequestContext,
   connectors: TeamApiConnectors | undefined,
@@ -28,12 +20,9 @@ export async function routeConnectors(
   if (!connectors || !capabilities.has(CONNECTORS_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.connectorsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `connectors-v1` codec.
   const body = await readJson(request);
   const { github, messaging } = connectors;
   const status = (current: ReturnType<typeof github.status>) => ({ ...current, ...github.pages() });
-  // The codec allows only these values; a GitHub route has no platform.
-  // WhatsApp is not one of them: it has its own routes (`whatsapp-connector-v1`).
   const platform = CONNECTOR_MESSAGING_PLATFORMS.find((id) => id === body.platform) ?? "telegram";
   const workspaceId = () => stringField(body, "workspaceId", false, 128);
   switch (url.pathname) {
@@ -90,7 +79,6 @@ export async function routeConnectors(
       await runCauseEffect(messaging.setEnabled(platform, workspaceId(), body.enabled === true));
       return json(200, {});
     default: {
-      // The orchestrator starts on a new agent's default provider and model, as the host picks it.
       const added =
         platform === "telegram" || body.workspaceId === null
           ? messaging.addTelegramOrchestrator({})

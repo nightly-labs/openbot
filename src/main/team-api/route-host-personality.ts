@@ -10,10 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * The server personality of this computer, read and set from a joined server. Frozen by
- * `host-personality-v1`: any member reads it, an owner or admin sets it.
- */
 export async function routeHostPersonality(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,

@@ -32,6 +32,7 @@ import {
   isAgentModel,
   isAgentProvider,
   isAgentTaskLimit,
+  isArchivedAgentTasksCursor,
   isAvatarColor,
   isAvatarHue,
   isAvatarSeed,
@@ -41,6 +42,7 @@ import {
   isProviderAccountId,
   isReasoningEffort,
   isRoutineSchedule,
+  type ListArchivedAgentTasksInput,
   type ListChannelRoutineRunsInput,
   type ListRoutineRunsInput,
   type MarkAgentTaskReadInput,
@@ -107,7 +109,6 @@ function parseAgentRequest(value: unknown): AgentIpcRequest {
   };
 }
 
-/** Checks the server scope first, then decodes the payload inside it. */
 export function agentRequest<Payload>(decode: PayloadDecoder<Payload>): PayloadDecoder<AgentIpcRequest<Payload>> {
   return (value) => {
     const scoped = parseAgentRequest(value);
@@ -115,7 +116,6 @@ export function agentRequest<Payload>(decode: PayloadDecoder<Payload>): PayloadD
   };
 }
 
-/** Checks the server scope of a request that carries nothing else. The preload sends `null`. */
 export function agentScope(value: unknown): AgentIpcRequest<null> {
   return { serverId: parseAgentRequest(value).serverId, payload: null };
 }
@@ -124,7 +124,6 @@ export function parseAgentId(value: unknown): string {
   return requireString(value, "agentId", INPUT_LIMITS.identifier);
 }
 
-/** The agents of one `listActiveQueues` read. */
 export function parseAgentIdList(value: unknown): string[] {
   return parseIdentifierList(value, "agent IDs", AGENT_ACTIVE_QUEUES_LIMIT);
 }
@@ -137,7 +136,6 @@ export function parseAttachmentId(value: unknown): string {
   return requireString(value, "attachmentId", INPUT_LIMITS.identifier);
 }
 
-/** HTML that the renderer holds. Main bounds it again by bytes when it keeps the page. */
 export function parsePreviewPageHtml(value: unknown): string {
   if (typeof value !== "string" || value.length > CHAT_VISUAL_PAGE_LIMIT) throw new Error("Invalid preview page.");
   return value;
@@ -153,7 +151,6 @@ export function parseOptionalAgentId(value: unknown): string | undefined {
   return parseAgentId(value);
 }
 
-/** An action of the renderer or of `sidebar-folders-v1`: it can nest a folder in a folder. */
 export function parseSidebarFolderAction(value: unknown): SidebarLayoutAction {
   if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
   if (value.type === "nest") {
@@ -174,7 +171,6 @@ export function parseSidebarFolderAction(value: unknown): SidebarLayoutAction {
   return { ...action, parentId: requireString(value.parentId, "parentId", INPUT_LIMITS.identifier) };
 }
 
-/** An action of the released `/v1/sidebar-layout/actions` route: every folder is at the top level. */
 export function parseSidebarLayoutAction(value: unknown): SidebarLayoutAction {
   if (!isObject(value) || !isString(value.type)) throw new Error("Invalid sidebar layout action.");
   switch (value.type) {
@@ -373,7 +369,6 @@ export function parseTestRoutine(value: unknown): TestRoutineInput {
   return parseDeleteRoutine(value);
 }
 
-/** The range is a whole number of instants the host reads in one pass, so its length is limited. */
 export function parseRoutineCalendar(value: unknown): RoutineCalendarInput {
   if (!isObject(value)) throw new Error("Invalid routine calendar request.");
   const from = new Date(requireString(value.from, "from"));
@@ -400,11 +395,6 @@ function parseRoutineSchedule(value: unknown): CreateRoutineInput["schedule"] {
   return structuredClone(value);
 }
 
-/**
- * The channel twins of the agent parsers above. They read `channelId` where the agent ones read
- * `agentId` and reuse every other limit, because a channel memory and a channel routine hold the
- * same fields as an agent one.
- */
 export function parseCreateChannelMemory(value: unknown): CreateChannelMemoryInput {
   if (!isObject(value)) throw new Error("Invalid memory creation request.");
   return {
@@ -535,7 +525,6 @@ export function parseSearchConversationMessages(value: unknown): SearchConversat
   };
 }
 
-/** An empty query is allowed: it lists the newest files. */
 export function parseSearchConversationFiles(value: unknown): SearchConversationFilesInput {
   if (!isObject(value) || !isString(value.query)) throw new Error("Invalid conversation file search request.");
   if (value.query.length > INPUT_LIMITS.attachmentName) throw new Error("query is too long.");
@@ -642,13 +631,22 @@ export function parseAgentTask(value: unknown): AgentTaskInput {
   };
 }
 
+export function parseListArchivedAgentTasks(value: unknown): ListArchivedAgentTasksInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  if (value.before !== null && !isArchivedAgentTasksCursor(value.before))
+    throw new Error("Invalid archived thread place.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    before: value.before === null ? null : { updatedAt: value.before.updatedAt, threadId: value.before.threadId },
+  };
+}
+
 export function parseReadAgentTaskPage(value: unknown): ReadAgentTaskPageInput {
   if (!isObject(value)) throw new Error("Invalid task request.");
   return {
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
     beforeMessageId: requireString(value.beforeMessageId, "beforeMessageId", INPUT_LIMITS.identifier),
-    // 0 asks only whether the thread has older messages.
     limit: value.limit === 0 ? 0 : parsePageLimit(value.limit),
   };
 }
@@ -800,7 +798,6 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
     if (!isBoolean(value.computerUse)) throw new Error("Invalid Computer Use value.");
     result.computerUse = value.computerUse;
   }
-  // `null` returns the agent to the account default.
   if (value.allowAutomation !== undefined) {
     if (value.allowAutomation !== null && !isBoolean(value.allowAutomation))
       throw new Error("Invalid automation value.");
@@ -809,6 +806,10 @@ export function parseUpdateAgent(value: unknown): UpdateAgentInput {
   if (value.allowNewChat !== undefined) {
     if (value.allowNewChat !== null && !isBoolean(value.allowNewChat)) throw new Error("Invalid new chat value.");
     result.allowNewChat = value.allowNewChat;
+  }
+  if (value.memory !== undefined) {
+    if (!isBoolean(value.memory)) throw new Error("Invalid memory value.");
+    result.memory = value.memory;
   }
   if (value.quickAcknowledgement !== undefined) {
     if (value.quickAcknowledgement !== null && !isBoolean(value.quickAcknowledgement))
@@ -923,7 +924,6 @@ export function parseImportAttachments(value: unknown): ImportAttachmentsInput {
   };
 }
 
-/** A renderer can provide file bytes, but it cannot ask main to read a disk path. */
 export function parseAttachmentData(value: unknown): ImportAttachmentsInput["data"] {
   if (!Array.isArray(value)) throw new Error("Invalid attachment data.");
   return parseImportAttachments({ paths: [], data: value }).data;

@@ -58,6 +58,8 @@ export const messages = {
   "browser.pip.close": "Fermer la fenêtre du navigateur",
   "browser.pip.reattachFailed": "OpenBot n’a pas pu rattacher le navigateur.",
   "browser.pip.closeFailed": "OpenBot n’a pas pu fermer la fenêtre du navigateur.",
+  "browser.window.open": "Ouvrir le navigateur dans une nouvelle fenêtre",
+  "browser.window.openFailed": "OpenBot n’a pas pu ouvrir la fenêtre du navigateur.",
   "browser.popupBlocked.title": "Fenêtre contextuelle bloquée",
   "browser.popupBlocked.dismiss": "Ignorer le message de fenêtre contextuelle",
   "browser.liveView.label": "Vue en direct de la page sur le serveur",
@@ -93,6 +95,7 @@ export const messages = {
   "browser.secret.submitting": "Envoi…",
   "browser.secret.takeOver": "Prendre la main",
   "browser.secret.failed": "Impossible de terminer la demande. Vérifiez la connexion et réessayez.",
+  "browser.secret.ended": "Cette demande de connexion est terminée. Demandez à l’agent de réessayer.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a exécuté un script sur cette page. Pour l’utiliser, demandez à l’agent de recharger la page et de réessayer.",
   "browser.secret.vaultSkip.fieldKind":

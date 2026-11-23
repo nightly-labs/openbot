@@ -10,17 +10,8 @@ import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values"
 import { databaseRow, databaseRows, optionalStringColumn, requiredStringColumn } from "../database/database-rows";
 import { type CrmDetails, type CrmStore, CrmWrite, crmRefused, newCrmId } from "./crm-store";
 
-/**
- * The rows of a payment source in the CRM: the `crm_sources` row, the refs that a person deleted,
- * and the customers, plans and payments that a sync writes. The source owns the plans and payments it
- * writes; customers take its fields only at import, and later CRM edits stay.
- */
-
-/** A customer at the source. `currency` is the customer's, else the account default. */
 export interface SourceCustomer {
-  /** Unique over all sources, such as `stripe:cus_…`. */
   ref: string;
-  /** The id at the source, kept in `stripeCustomerId`. */
   externalId: string;
   name: string;
   email: string;
@@ -28,7 +19,6 @@ export interface SourceCustomer {
   currency: string;
 }
 
-/** A subscription. `every` null: an interval that the CRM does not have. */
 export interface SourcePlan {
   ref: string;
   customer: SourceCustomer;
@@ -40,7 +30,6 @@ export interface SourcePlan {
   endsOn: string | null;
 }
 
-/** An invoice. `removed`: the source voided or deleted it. */
 export interface SourcePayment {
   ref: string;
   customer: SourceCustomer;
@@ -74,7 +63,6 @@ export interface SourceStatePatch {
 
 const TABLES = ["crm_customers", "crm_plans", "crm_payments"] as const;
 
-/** Source text as a CRM label: no outer spaces, as the decoders need, and at most `limit` long. */
 function cut(value: string, limit: number): string {
   return value.trim().slice(0, limit).trim();
 }
@@ -90,7 +78,6 @@ export class CrmSourceStore {
     return this.#store.db;
   }
 
-  /** Adds the source and gives it back the rows of an earlier connection of the same kind. */
   insert(input: { kind: CrmSourceKind; testMode: boolean; accountLabel: string; keyHint: string }): CrmSource {
     return this.#store.transaction(() => {
       if (databaseRow(this.#db.prepare("SELECT 1 AS found FROM crm_sources WHERE kind = ?").get(input.kind)))
@@ -109,7 +96,6 @@ export class CrmSourceStore {
           input.keyHint,
           this.#store.timestamp(),
         );
-      // Refs start with the kind, and one source of each kind can be connected.
       for (const table of TABLES)
         this.#db
           .prepare(`UPDATE ${table} SET source_id = ? WHERE source_id IS NULL AND source_ref LIKE ? ESCAPE '\\'`)
@@ -118,7 +104,6 @@ export class CrmSourceStore {
     });
   }
 
-  /** Removes the source. Its rows stay, editable, with their refs for a later reconnect. */
   delete(sourceId: string): CrmSource {
     return this.#store.transaction(() => {
       const source = this.#store.source(sourceId);
@@ -129,7 +114,6 @@ export class CrmSourceStore {
     });
   }
 
-  /** Writes the sync state. False when the source is gone, such as after a disconnect during a sync. */
   setState(sourceId: string, patch: SourceStatePatch): boolean {
     const sets = ["state = ?", "error_code = ?"];
     const values: (string | null)[] = [patch.state, patch.errorCode ?? null];
@@ -147,7 +131,6 @@ export class CrmSourceStore {
     return Number(result.changes) > 0;
   }
 
-  /** The plans and open payments that the source owns and that can still change. */
   openRefs(sourceId: string): string[] {
     const rows = databaseRows(
       this.#db
@@ -160,7 +143,6 @@ export class CrmSourceStore {
     return rows.map((row) => requiredStringColumn(row, "source_ref"));
   }
 
-  /** Writes one page of the source in one transaction. */
   apply(sourceId: string, batch: SourceBatch, skips: SourceSkips): { changed: boolean } {
     return this.#store.transaction(() => {
       const source = this.#store.source(sourceId);
@@ -173,7 +155,6 @@ export class CrmSourceStore {
   }
 }
 
-/** The rows of one page. Customers resolve in this order: ref, source id, one email match, import. */
 class SourceSync {
   readonly #store: CrmStore;
   readonly #source: CrmSource;
@@ -214,7 +195,6 @@ class SourceSync {
       .run(this.#source.id, id, this.#source.id);
   }
 
-  /** The CRM customer of `customer`, or null when a person deleted it. `paying` sets the status of an import. */
   customer(customer: SourceCustomer, paying: boolean): string | null {
     const known = this.#resolved.get(customer.ref);
     if (known !== undefined) {
@@ -270,7 +250,6 @@ class SourceSync {
     return customerId;
   }
 
-  /** An unlinked customer with the same source id, else the only one with the same email. */
   #match(customer: SourceCustomer): string | null {
     const byId = databaseRow(
       this.#db
@@ -309,7 +288,6 @@ class SourceSync {
     return emails;
   }
 
-  /** A lead that pays becomes a customer. */
   #promote(customerId: string): void {
     const customer = this.#store.customerRecord(customerId);
     if (customer.statusId !== "lead") return;
@@ -319,7 +297,6 @@ class SourceSync {
     this.#record(customerId, "status-changed", { from: from.id, to: to.id, fromLabel: from.label, toLabel: to.label });
   }
 
-  /** The customer of a plan or payment in its currency, or null when the row is skipped. */
   #owner(customer: SourceCustomer, currency: string, paying: boolean): string | null {
     const customerId = this.customer(customer, paying);
     if (customerId === null) return null;
@@ -333,11 +310,9 @@ class SourceSync {
   plan(plan: SourcePlan): void {
     const active = plan.endsOn === null || plan.endsOn >= this.#store.today();
     const existing = this.#row("crm_plans", plan.ref);
-    // A subscription that ended before the CRM knew it is history that the invoices already show.
     if (existing === null && !active) return;
     if (plan.every === null) {
       if (existing === null) this.#skips.interval += 1;
-      // The CRM cannot show the new interval, but it still shows that the plan ended.
       else this.#planEnd(existing, plan.endsOn, cut(plan.name, CRM_LIMITS.label));
       return;
     }
@@ -384,7 +359,6 @@ class SourceSync {
     const planId = requiredStringColumn(existing, "plan_id");
     const owner = requiredStringColumn(existing, "customer_id");
     this.#own("crm_plans", "plan_id", planId);
-    // Remove the old end first: the CHECK ends_on >= starts_on refuses a new start after the old end.
     if (existing.ends_on !== plan.endsOn && existing.ends_on !== null)
       this.#db.prepare("UPDATE crm_plans SET ends_on = NULL WHERE plan_id = ?").run(planId);
     const before = existing.name;

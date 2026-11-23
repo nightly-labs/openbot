@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/computerUse";
 
 export const messages = {
-  // Computer Use settings, the permission help window, and the window highlight.
   "computerUse.permission.screenRecording.title": "Enregistrement de l’écran",
   "computerUse.permission.screenRecording.description": "Permet à OpenBot de voir les fenêtres des apps.",
   "computerUse.permission.screenRecording.pane": "Enregistrement de l’écran et de l’audio du système",
@@ -20,6 +19,7 @@ export const messages = {
   "computerUse.ready.title": "Computer Use est prêt",
   "computerUse.ready.description":
     "OpenBot peut voir les apps de cet ordinateur et interagir avec elles. Ce système ne demande aucune autorisation supplémentaire.",
+  "computerUse.limited.title": "Computer Use est limité sur ce bureau",
   "computerUse.openSettingsFailed.title": "Impossible d’ouvrir Réglages Système",
   "computerUse.restartRequired.title": "Redémarrage nécessaire",
   "computerUse.restartRequired.description":

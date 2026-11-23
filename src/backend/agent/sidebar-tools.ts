@@ -11,7 +11,6 @@ const name = z.string().trim().min(1).max(INPUT_LIMITS.sidebarSectionName);
 export const createSectionToolSchema = z.object({ name }).strict();
 export const renameSectionToolSchema = z.object({ sectionId, name }).strict();
 export const deleteSectionToolSchema = z.object({ sectionId }).strict();
-/** `agentId` also takes a channel id: the sidebar files a channel in a folder as it does an agent. */
 export const assignAgentSectionToolSchema = z
   .object({
     agentId: z.string().min(1).max(INPUT_LIMITS.identifier),
@@ -19,7 +18,14 @@ export const assignAgentSectionToolSchema = z
   })
   .strict();
 
-/** `removeAgent` is for `delete_agent`, which removes a deleted agent from the sidebar as the app does. */
+export const SIDEBAR_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "list_sections",
+  "create_section",
+  "rename_section",
+  "delete_section",
+  "assign_agent_section",
+]);
+
 export type AgentSidebar = Pick<SidebarLayoutStore, "getSnapshot" | "mutate" | "withProfileAssignment" | "removeAgent">;
 
 export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
@@ -56,7 +62,11 @@ export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
       return null;
   }
   if (!sidebar) return yield* new ToolOperationFailed({ cause: new Error("Sidebar sections are unavailable.") });
-  // The sidebar files agents and channels alike (`AgentService.sidebarChatIds`).
+  const targetSectionId = action && "sectionId" in action ? action.sectionId : null;
+  if (targetSectionId !== null && !sidebar.getSnapshot().sections.some((section) => section.id === targetSectionId))
+    return openBotToolFailure(
+      `Unknown sidebar section "${targetSectionId}". Use a sectionId from openbot.list_sections, not a section name.`,
+    );
   const layout = action
     ? yield* sidebar.mutate(action, new Set([...agentIds(), ...channelIds()])).pipe(toToolOperationFailed)
     : sidebar.getSnapshot();

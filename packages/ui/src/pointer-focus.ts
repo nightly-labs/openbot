@@ -1,14 +1,4 @@
-/*
- * Chromium shows the keyboard focus ring when a script moves focus away from an element that had
- * the ring, and it counts the first script focus on a page as keyboard focus. Kobalte moves focus
- * from script when a select, menu, popover or dialog opens and closes, so a mouse click can end
- * with the ring on the button the person clicked. After a pointer press, a script focus call that
- * does not set `focusVisible` asks for no ring. The next key press brings the default back, so a
- * menu closed with Escape or Enter still returns the ring to its trigger.
- */
-
 const MODIFIER_KEYS = new Set(["Alt", "AltGraph", "Control", "Meta", "Shift"]);
-// Chromium always shows the ring in a text field, and the caret needs it. Script focus there keeps it.
 const NON_TEXT_INPUT_TYPES = new Set([
   "button",
   "checkbox",
@@ -28,7 +18,6 @@ function takesText(element: HTMLElement): boolean {
   return element instanceof HTMLInputElement && !NON_TEXT_INPUT_TYPES.has(element.type);
 }
 
-/** Installs the guard once per window and returns the function that removes it. */
 export function installPointerFocusGuard(doc: Document = document): () => void {
   const view = doc.defaultView;
   if (!view) return () => {};
@@ -45,7 +34,6 @@ export function installPointerFocusGuard(doc: Document = document): () => void {
     pointer = false;
   };
 
-  // Test tools such as Storybook's can own `focus` as a getter, so the guard replaces the property.
   const nativeDescriptor = Object.getOwnPropertyDescriptor(prototype, "focus");
   const nativeFocus = prototype.focus;
   function focus(this: HTMLElement, options?: FocusOptions) {

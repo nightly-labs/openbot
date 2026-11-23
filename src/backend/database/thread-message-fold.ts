@@ -5,13 +5,11 @@ import { keptUnsavedImage } from "./conversation-writer";
 import { objectValue } from "./database-rows";
 import { currentConversationMessage } from "./legacy-conversation-message";
 
-/** The conversation values of one thread event payload, read the way a replay reads them. */
 export interface ThreadEventMessages {
   snapshot: ConversationSnapshot | null;
   appendedMessage: ConversationMessage | null;
   streamedMessage: ConversationMessage | null;
   importedMessage: ConversationMessage | null;
-  /** One value for each item of the payload's `changedMessages`, null for an item that is not a message. */
   changedEntries: Array<ConversationMessage | null>;
   changedMessages: ConversationMessage[];
   removedMessageIds: string[];
@@ -19,7 +17,6 @@ export interface ThreadEventMessages {
   hasActiveTurnChange: boolean;
 }
 
-/** Which part of the fold an event takes. `none` changes no message and not the latest sequence. */
 export type ThreadEventBranch = "snapshot" | "streamed" | "message" | "changes" | "none";
 
 export function threadEventMessages(record: DynamicRecord | null): ThreadEventMessages {
@@ -39,13 +36,6 @@ export function threadEventMessages(record: DynamicRecord | null): ThreadEventMe
   };
 }
 
-/**
- * The messages and the active turn of one thread, folded from its events in sequence order.
- *
- * The one copy of the message rules of a replay. `ThreadReplay` uses it to rebuild a thread, and
- * `ThreadEventCompaction` uses it to find the parts of an event that a replay does not need. A
- * change here changes what both of them do.
- */
 export class ThreadMessageFold {
   readonly #agentId: string;
   readonly #threadId: string;
@@ -82,10 +72,6 @@ export class ThreadMessageFold {
       this.#latest = event.snapshot;
       this.#latestSequence = sequence;
     } else if (branch === "streamed" && this.#latest && event.streamedMessage) {
-      // A flush of streamed text carries the message whole, not the delta, so it replaces the
-      // one it names. Replacing rather than appending is what makes it safe to lose the earlier
-      // flushes of the same run, which both the supersede on write and the prune on the next
-      // whole snapshot do.
       const latest = this.#latest;
       const streamedMessage = event.streamedMessage;
       const index = latest.messages.findIndex((message) => message.id === streamedMessage.id);
@@ -139,9 +125,6 @@ export class ThreadMessageFold {
 }
 
 export function conversationSnapshotValue(value: DynamicRecord | null): ConversationSnapshot | null {
-  // Snapshots written before the bot-to-agent rename spell the id `botId`, and a database restored from
-  // the user's own file copy still carries them however far the migrations have run. Rejecting one here
-  // makes `rebuildThreadProjection` throw and the conversation unrecoverable, so both spellings are read.
   const agentId = value?.agentId ?? value?.botId;
   if (
     !value ||
@@ -196,7 +179,6 @@ export function mergeReplayedLiveMessage(
     ...updated,
     id: existing.id,
     author: existing.author,
-    // Mailbox updates can move a queued message to the time it joined a running turn.
     createdAt: updated.delivery ? updated.createdAt : existing.createdAt,
     ...(turnId === undefined ? {} : { turnId }),
   };

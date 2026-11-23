@@ -3,10 +3,6 @@ import { isPluginSlug } from "./plugin-links";
 
 export const MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX = "marketplace-suggestion:";
 
-/**
- * Every connector, in the order that Marketplace › Apps shows them. A
- * connector id is also its Marketplace app id, so an agent can suggest it in a conversation.
- */
 export const CONNECTOR_IDS = [
   "slack",
   "discord",
@@ -20,9 +16,7 @@ export const CONNECTOR_IDS = [
 
 export type ConnectorId = (typeof CONNECTOR_IDS)[number];
 
-/** A Marketplace app an agent suggests in the conversation. The person decides in the card. */
 export interface MarketplaceSuggestionEvent {
-  /** A catalog plugin slug, or a `ConnectorId`. */
   appId: string;
 }
 

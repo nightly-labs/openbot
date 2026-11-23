@@ -49,7 +49,6 @@ const modelGroups: ModelGroup[] = [
   { label: "xAI", models: ["Text to Speech"] },
 ];
 
-/** Options in groups: `SelectSection` names each group. */
 function GroupedSelect() {
   const [value, setValue] = createSignal("Supertonic 3");
   return (
@@ -85,7 +84,6 @@ export const Gallery: Story = {
   ),
 };
 
-// V8 lists canonical zones only, as the Timezone setting does.
 const zones = ["UTC", ...Intl.supportedValuesOf("timeZone").filter((zone) => zone !== "UTC")];
 
 function TimezoneSelect() {

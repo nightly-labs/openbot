@@ -25,14 +25,8 @@ interface MobileConnectStoreProps {
   onSetRemoteNetworkRoute?: (route: RemoteNetworkRoute) => Promise<RemoteNetworkRouteState>;
 }
 
-/** A generated Mobile Connect code, from the moment it is displayed until it is cleared. */
 interface MobileConnectSession {
-  /** True while the success banner plays its collapse animation. */
   collapsing: boolean;
-  /**
-   * When this code became able to pair a phone. Null while a replacement code is being generated:
-   * the code on screen is still the old one, and a device that appears now is not its doing.
-   */
   startedAt: number | null;
   successDeviceName: string | null;
   ticket: MobileConnectTicket;
@@ -42,37 +36,29 @@ interface MobileConnectPanel {
   busy: boolean;
   cancelling: boolean;
   error: string | null;
-  /** Carries `startedAt`, so neither can exist without the other. */
   session: MobileConnectSession | null;
 }
 
 interface MobileDeviceList {
   devices: MobileConnectedDevice[];
   error: string | null;
-  /** Stays true across a refresh, so the list keeps rendering while `loading` is also true. */
   loaded: boolean;
   loading: boolean;
   revokingSessionId: string | null;
 }
 
-/** The persistent link: made once, shown again each time the tab opens, until it is revoked. */
 interface MobileConnectLinkPanel {
   link: MobileConnectLink | null;
   loaded: boolean;
   busy: "create" | "revoke" | null;
-  /** The action that waits for the user to confirm it. */
   confirm: "replace" | "revoke" | null;
-  /** The link and its QR code stay hidden until the user shows them, as on a shared screen. */
   revealed: boolean;
-  /** When the link was shown. A device that connects after this is shown as connected with the link. */
   revealedAt: number | null;
   successDeviceName: string | null;
   error: string | null;
 }
 
-/** How devices that connect to this computer send chats and files. */
 interface RemoteNetworkRoutePanel {
-  /** Null until main answers. */
   current: RemoteNetworkRouteState | null;
   busy: boolean;
   error: string | null;
@@ -85,10 +71,6 @@ interface SettingsMobileConnectPanels {
   route: RemoteNetworkRoutePanel;
 }
 
-/**
- * The Mobile Connect tab: the one-time code, the connected device list, and every timer either
- * needs — the countdown clock, the device poll and the success-banner collapse.
- */
 export function createSettingsMobileConnectStore(props: MobileConnectStoreProps, isActive: () => boolean) {
   const [panels, setPanels] = createStore<SettingsMobileConnectPanels>({
     connect: { busy: false, cancelling: false, error: null, session: null },
@@ -105,7 +87,6 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     },
     route: { current: null, busy: false, error: null },
   });
-  /** A clock, not panel state: it ticks the code's countdown and the device list's "3m ago" labels. */
   const [now, setNow] = createSignal(Date.now());
   const [pageVisible, setPageVisible] = createSignal(document.visibilityState !== "hidden");
   const updatePageVisible = () => setPageVisible(document.visibilityState !== "hidden");
@@ -134,8 +115,6 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
       let running = true;
       let timer: number | undefined;
 
-      // Only a live code or a shown link polls, to see the phone that uses it. Otherwise the list loads
-      // when the tab opens or the window is shown again: an idle poll cost one account Worker request a minute.
       const scheduleRefresh = () => {
         const ticket = panels.connect.session?.ticket;
         if ((!ticket || ticket.expiresAt <= Date.now()) && !panels.link.revealed) return;
@@ -160,7 +139,6 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     ({ open, active, get }) => {
       if (!open || !active || !get) return;
       let current = true;
-      // Each visit starts with the link hidden.
       hideLink();
       setPanels((state) => {
         state.link.confirm = null;
@@ -187,7 +165,6 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     },
   );
 
-  // Each visit reads the route again, so a Tailscale that started since the last visit shows.
   createEffect(
     () => ({ open: props.open, active: isActive(), get: props.onGetRemoteNetworkRoute }),
     ({ open, active, get }) => {
@@ -268,7 +245,6 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     setPanels((state) => {
       state.connect.busy = true;
       state.connect.error = null;
-      // The old code stays on screen while the new one is generated, but stops being able to pair.
       if (state.connect.session) {
         state.connect.session.collapsing = false;
         state.connect.session.startedAt = null;
@@ -304,7 +280,6 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
     }
   }
 
-  /** Spends the code on the account service, then closes it like a used code. */
   async function cancelTicket(): Promise<void> {
     if (panels.connect.busy || panels.connect.cancelling || !panels.connect.session || !props.onCancelMobileConnect)
       return;
@@ -437,7 +412,6 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
         state.link.revealed = false;
         state.link.revealedAt = null;
       });
-      // The name stays until the region has collapsed, so the success state does not flash back to the code.
       linkCleanupTimer = window.setTimeout(() => {
         setPanels((state) => {
           state.link.successDeviceName = null;
@@ -548,7 +522,6 @@ export function createSettingsMobileConnectStore(props: MobileConnectStoreProps,
         state.link.link = null;
         state.link.confirm = null;
       });
-      // The phones that the link signed in are signed out with it.
       void refreshDevices(false);
     } catch (error) {
       setPanels((state) => {

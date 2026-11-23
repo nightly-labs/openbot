@@ -1,12 +1,3 @@
-// Checks workflow loops on the real SQLite and the real workflow service, on a temporary profile. The
-// graph is a prompt, two approvals and an output, with a connection from the second approval back to
-// the first. Approvals need no provider, so no model, agent, account or network is started. A save
-// keeps the loop; each approval of the second step starts the next pass with its answer as one more
-// input, and the output runs once for each pass; a rejection ends the loop and stops the run. A run
-// from a node inside the loop starts at that node and takes the earlier answer of the node before it.
-//
-// Run: bun scripts/workflow-loop-e2e.ts
-// Writes .openbot-build/workflow-loop-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -54,6 +45,31 @@ const GRAPH: WorkflowGraph = {
   strokes: [],
 };
 
+const RESEARCH_CHAIN: WorkflowGraph["edges"] = [
+  { id: "task>fork", from: "task", to: "fork", type: "text" },
+  { id: "fork>search", from: "fork", to: "search", type: "text" },
+  { id: "search>reviewer", from: "search", to: "reviewer", type: "text" },
+  { id: "reviewer>enough", from: "reviewer", to: "enough", type: "text" },
+  { id: "enough>fork", from: "enough", to: "fork", type: "text" },
+];
+const TASK_TO_REVIEWER: WorkflowGraph["edges"][number] = {
+  id: "task>reviewer",
+  from: "task",
+  to: "reviewer",
+  type: "text",
+};
+const RESEARCH: WorkflowGraph = {
+  nodes: [
+    { id: "task", kind: "prompt", at: { x: 0, y: 0 }, fields: { text: "Find sources" } },
+    { id: "fork", kind: "approval", at: { x: 300, y: 0 }, fields: { question: "Search?" } },
+    { id: "search", kind: "approval", at: { x: 600, y: 0 }, fields: { question: "Sources?" } },
+    { id: "reviewer", kind: "approval", at: { x: 900, y: 0 }, fields: { question: "Good?" } },
+    { id: "enough", kind: "approval", at: { x: 1200, y: 0 }, fields: { question: "Enough?" } },
+  ],
+  edges: [TASK_TO_REVIEWER, ...RESEARCH_CHAIN],
+  strokes: [],
+};
+
 const directory = await mkdtemp(join(tmpdir(), "openbot-workflow-loop-"));
 const database = new OpenBotDatabase(directory);
 let service: WorkflowsHandle | null = null;
@@ -91,7 +107,6 @@ async function close() {
   database.close();
 }
 
-/** Waits until the run has a step that waits for a decision, and gives it. */
 async function waiting(workflows: WorkflowsHandle, runId: string): Promise<WorkflowStep> {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -101,7 +116,6 @@ async function waiting(workflows: WorkflowsHandle, runId: string): Promise<Workf
     await new Promise((done) => setImmediate(done));
   }
 }
-/** The input of a step, as the store keeps it; the public step does not show it. */
 const inputOf = (step: WorkflowStep) => new WorkflowRunStore({ database }).step(step.id)?.input;
 const runStatus = async (workflows: WorkflowsHandle, runId: string) =>
   (await runCauseEffect(workflows.run(runId))).run.status;
@@ -185,6 +199,62 @@ try {
   );
   await runCauseEffect(workflows.stopRun(from.id));
   check("a stop ends the loop", (await runStatus(workflows, from.id)) === "stopped");
+
+  check(
+    "a loop that one more connection also enters goes back to its leftmost entry, in any edge order",
+    [[...RESEARCH_CHAIN, TASK_TO_REVIEWER], RESEARCH.edges].every(
+      (edges) => [...workflowLoopEdges(RESEARCH.nodes, edges)].join() === "enough>fork",
+    ),
+  );
+  const column = RESEARCH.nodes.map((node, index) => ({ ...node, at: { x: 0, y: index * 200 } }));
+  check(
+    "in one column, the loop goes back to its top entry, in any edge order",
+    [[...RESEARCH_CHAIN, TASK_TO_REVIEWER], RESEARCH.edges].every(
+      (edges) => [...workflowLoopEdges(column, edges)].join() === "enough>fork",
+    ),
+  );
+  const research = await runCauseEffect(workflows.create({ title: "Research loop" }));
+  const researchId = research.summary.id;
+  const researchSaved = await runCauseEffect(
+    workflows.saveGraph({ workflowId: researchId, baseRevision: research.revision, graph: RESEARCH }),
+  );
+  check("the research loop saves", researchSaved.ok, researchSaved);
+  const full = (await runCauseEffect(workflows.startRun({ workflowId: researchId, requestId: "research-1" }))).run;
+  const order: string[] = [];
+  for (let index = 0; index < 4; index += 1) {
+    step = await waiting(workflows, full.id);
+    order.push(step.nodeId);
+    await runCauseEffect(workflows.decide({ stepId: step.id, approved: true }));
+  }
+  step = await waiting(workflows, full.id);
+  check(
+    "a full run goes through the fork and the search before the reviewer, then loops back to the fork",
+    order.join() === "fork,search,reviewer,enough" && step.nodeId === "fork" && step.attempt === 2,
+    { order, step },
+  );
+  await runCauseEffect(workflows.stopRun(full.id));
+  const searched = (await runCauseEffect(workflows.run(full.id))).steps.find((each) => each.nodeId === "search");
+
+  const resumed = (
+    await runCauseEffect(
+      workflows.startRun({ workflowId: researchId, requestId: "research-2", fromNodeId: "reviewer" }),
+    )
+  ).run;
+  step = await waiting(workflows, resumed.id);
+  const resumedSteps = (await runCauseEffect(workflows.run(resumed.id))).steps;
+  const reusedSearch = resumedSteps.find((each) => each.nodeId === "search");
+  check(
+    "a run from the reviewer inside the loop starts at the reviewer and reuses the last search answer",
+    step.nodeId === "reviewer" &&
+      reusedSearch?.status === "done" &&
+      reusedSearch.output === searched?.output &&
+      resumedSteps
+        .filter((each) => each.nodeId === "search" || each.nodeId === "fork")
+        .every((each) => each.status === "done") &&
+      (inputOf(step) ?? "").includes(searched?.output?.trim() ?? "missing"),
+    { step, input: inputOf(step), steps: resumedSteps.map((each) => `${each.nodeId}:${each.attempt}:${each.status}`) },
+  );
+  await runCauseEffect(workflows.stopRun(resumed.id));
 
   report.passed = true;
 } catch (error) {

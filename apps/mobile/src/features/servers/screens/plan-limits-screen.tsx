@@ -1,4 +1,4 @@
-import { type PlanLimitWindow, usagePaceRemainingPercent } from "@openbot/team-client/plan-limits";
+import { type PlanLimitListedWindow, usagePaceRemainingPercent } from "@openbot/team-client/plan-limits";
 import { useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -8,16 +8,15 @@ import { PLAN_LIMIT_TONE_TEXT, PlanLimitRing } from "@/features/servers/componen
 import {
   lowestPlanLimitsFirst,
   PLAN_LIMIT_RESET_FORMAT,
+  planLimitListedWindowLabel,
   planLimitName,
   planLimitResetDate,
   planLimitWindowKey,
-  planLimitWindowLabel,
   usePlanLimits,
 } from "@/features/servers/model/plan-limits";
 import { SettingsContent, SettingsNote, SettingsSection } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
-/** The limits of every provider of a server, the provider with the least left first. */
 export function PlanLimitsScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -34,7 +33,7 @@ export function PlanLimitsScreen() {
               {planLimitName(row, accounts, t)}
             </Typography.Paragraph>
           </View>
-          {row.windows.map((window, index) => (
+          {row.listedWindows.map((window, index) => (
             <PlanLimitWindowRow key={planLimitWindowKey(window, index)} window={window} />
           ))}
         </SettingsSection>
@@ -43,19 +42,18 @@ export function PlanLimitsScreen() {
   );
 }
 
-function PlanLimitWindowRow({ window }: { window: PlanLimitWindow }) {
+function PlanLimitWindowRow({ window }: { window: PlanLimitListedWindow }) {
   const { t, format } = useText();
   const track = String(useThemeColor("foreground"));
   const [success, warning, danger] = useCSSVariable(["--openbot-success", "--openbot-warning", "--openbot-danger"]);
   const fill = { neutral: success, warning, critical: danger }[window.tone];
   const resetsAt = planLimitResetDate(window);
-  // The amount left at an even pace, as on desktop. A fill that ends before the mark runs out before the reset.
   const pace = usagePaceRemainingPercent(window.durationMins, window.resetsAt, Date.now());
   return (
     <View className="gap-1.5 px-4 py-3">
       <View className="flex-row items-baseline justify-between gap-3">
         <Typography.Paragraph numberOfLines={1} className="shrink">
-          {planLimitWindowLabel(window.durationMins, t)}
+          {planLimitListedWindowLabel(window, t)}
         </Typography.Paragraph>
         <Typography.Paragraph className={PLAN_LIMIT_TONE_TEXT[window.tone]} style={{ fontVariant: ["tabular-nums"] }}>
           {t("mobile.server.planLimits.left", { percent: window.remainingPercent })}
@@ -63,7 +61,6 @@ function PlanLimitWindowRow({ window }: { window: PlanLimitWindow }) {
       </View>
       <View className="h-1.5 justify-center">
         <View className="h-full overflow-hidden rounded-full">
-          {/* The track of the desktop rings: the text colour, faint. */}
           <View className="absolute inset-0" style={{ backgroundColor: track, opacity: 0.15 }} />
           <View
             className="h-full rounded-full"

@@ -7,7 +7,7 @@ export const messages = {
   "error.vault.tooLarge": "الخزنة ممتلئة. احذف بعض العناصر، ثم حاول مرة أخرى.",
   "error.vault.itemMissing": "لم يعد هذا العنصر في الخزنة.",
   "error.vault.valueTooLong": "إحدى القيم طويلة جدًا.",
-  "error.vault.websiteInvalid": "أدخل عنوان موقع ويب يبدأ بـ HTTPS.",
+  "error.vault.websiteInvalid": "أدخل عنوان موقع ويب يبدأ بـ HTTP/HTTPS.",
   "error.vault.passwordRequired": "أدخل كلمة مرور.",
   "error.vault.twoStepKeyInvalid": "هذا ليس مفتاح تحقق بخطوتين. أدخل مفتاح الإعداد أو رابط otpauth:// الخاص بالموقع.",
   "error.vault.cardNumberInvalid": "أدخل رقم بطاقة صالحًا.",

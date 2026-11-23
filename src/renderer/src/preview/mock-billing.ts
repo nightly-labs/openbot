@@ -22,13 +22,11 @@ interface PreviewStoragePlan {
   currency: BillingCurrency;
 }
 
-/** The list price of one period of the plan and the storage add-on of `tier`. */
 function previewAmount(plan: PreviewStoragePlan, tier: BillingStorageTier): number {
   const base = billingListPrices(plan.plan, plan.interval)[plan.currency];
   return tier === 0 ? base : base + storageTierListPrices(plan.plan, tier, plan.interval)[plan.currency];
 }
 
-/** The storage, price and larger tiers of a server on a VPS at `tier`, as the account server sends them. */
 export function previewStorageFields(
   plan: PreviewStoragePlan,
   tier: BillingStorageTier,
@@ -46,7 +44,6 @@ export function previewStorageFields(
   };
 }
 
-/** Three servers of one account: a yearly plan, a plan with a failed payment, and a plan that ends. */
 export function previewBillingServers(now = Date.now()): BillingServerPlan[] {
   return [
     {
@@ -88,10 +85,6 @@ export function previewBillingServers(now = Date.now()): BillingServerPlan[] {
   ];
 }
 
-/**
- * The account pays for three servers. The Portal calls act as Stripe would after the user confirms:
- * cancel ends the plan at the period end, and the plain Portal renews it. A storage tier applies at once.
- */
 export function createMockBilling(
   servers: BillingServerPlan[] = previewBillingServers(),
   savedDetails: BillingDetails = { country: "PL", vatId: null },

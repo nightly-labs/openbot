@@ -1,5 +1,3 @@
-// Slug to provider page for /providers. Eager, for the reason given in content/news/index.ts.
-
 import { CLAUDE_CODE_PROVIDER } from "./claude-code";
 import { CLINE_PROVIDER } from "./cline";
 import { CODEX_PROVIDER } from "./codex";
@@ -29,7 +27,6 @@ export const PROVIDER_PAGES: Readonly<Record<string, ProviderPage>> = {
   "local-models": LOCAL_MODELS_PROVIDER,
 };
 
-/** The slug of the provider page about a plan's provider, for a link from a comparison. */
 export function providerPageSlug(provider: ProviderPage["provider"]): string | undefined {
   return Object.keys(PROVIDER_PAGES).find((slug) => PROVIDER_PAGES[slug]?.provider === provider);
 }

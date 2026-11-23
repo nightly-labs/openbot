@@ -79,7 +79,6 @@ import { isEventRoutine, routineListSummary, routinePausedByRunLabel, routineSch
 import type { RoutineEditorRecord, RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
-  /** Null starts a new routine. */
   routineId: string | null;
   routineName: string;
   nonce: number;
@@ -91,14 +90,16 @@ type PendingRoutineExit =
   | "new"
   | { kind: "routine-selection"; routine: RoutineEditorRecord | null; routineName: string }
   | { kind: "conversation-message"; messageId: string; routineId: string | null }
-  | { kind: "routine-thread"; routineId: string };
+  | { kind: "routine-thread"; routineId: string }
+  | { kind: "leave"; leave: () => void };
+
+export type DetailLeaveGuard = (leave: () => void) => void;
 
 interface RoutineDraft {
   id: string | null;
   name: string;
   instruction: string;
   active: boolean;
-  /** Saved as it is until the user changes a chip, so a rename keeps a schedule the chips cannot show. */
   schedule: RoutineSchedule;
   scheduleDraft: RoutineScheduleDraft;
   limitPolicy: RoutineLimitPolicy;
@@ -107,7 +108,6 @@ interface RoutineDraft {
   triggerKind: "schedule" | "webhook";
   eventType: string;
   eventFilters: EventFilterDraft[];
-  /** Undefined until the user picks a place: the saved one applies. Null stops sending. */
   destination: RoutineResultChoice | null | undefined;
 }
 
@@ -129,24 +129,15 @@ const MISSED_POLICY_LABELS = {
 const NEW_ROUTINE_SCHEDULE: RoutineScheduleDraft = { kind: "daily", days: ROUTINE_EVERY_DAY, time: "09:00" };
 
 interface AgentRoutinesSettingsProps {
-  /** Names the owner and owns every call. A channel passes `channelRoutinesPort` here. */
   port: RoutinesPort;
   onCountChange: (count: number) => void;
   onBack?: (() => void) | undefined;
   onClose?: (() => void) | undefined;
+  registerLeaveGuard?: ((guard: DetailLeaveGuard | null) => void) | undefined;
   selectionRequest?: RoutineSelectionRequest | null | undefined;
   onSelectionRequestHandled?: ((nonce: number) => void) | undefined;
-  /** `routineId` names the routine of the run, so a run in the routine's side thread opens there. */
   onOpenRun?: ((messageId: string, routineId?: string) => void) | undefined;
-  /**
-   * Opens the side thread where the routine runs. Resolves false when the routine has no thread, for
-   * example on a host that runs routines in the agent's own chat.
-   */
   onOpenThread?: ((routineId: string) => Promise<boolean>) | undefined;
-  /**
-   * The name of the agent that owns the routines. A channel passes nothing: a channel routine has no
-   * single agent that can keep its signing secret as an API key.
-   */
   agentName?: string | undefined;
 }
 
@@ -159,18 +150,14 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const text = useText();
   const { t, errorMessage } = text;
   const [routines, setRoutines] = createSignal<RoutineEditorRecord[]>([]);
-  // The host lists the last changed routine first. Newest-created first keeps a row in place
-  // when it is paused or edited. Ties use code-unit order, as SQLite does.
   const listedRoutines = createMemo(() =>
     [...routines()].sort((a, b) => codeUnitOrder(b.createdAt, a.createdAt) || codeUnitOrder(a.id, b.id)),
   );
   const [draft, setDraft] = createSignal<RoutineDraft | null>(null);
   const [runs, setRuns] = createSignal<RoutineRunFields[]>([]);
-  // Where the open routine sends its answers. Only an agent routine on this computer has a place.
   const [resultOptions, setResultOptions] = createSignal<RoutineResultConnectionOption[]>([]);
   const [savedDestination, setSavedDestination] = createSignal<RoutineResultDestination | null>(null);
   const [deliveries, setDeliveries] = createSignal<RoutineResultDelivery[]>([]);
-  // Webhook state that is not part of the saved routine. `secret` is the one-time reveal after a save or a regeneration.
   const [webhook, setWebhook] = createStore<WebhookEditorState>({
     secret: null,
     connected: null,
@@ -181,21 +168,17 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
   const [dirty, setDirty] = createSignal(false);
   const [testing, setTesting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  // Set by a Save of a draft with a missing field, so the fields say what is missing.
   const [showErrors, setShowErrors] = createSignal(false);
   const [confirmDelete, setConfirmDelete] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
-  // The list rows whose active switch waits for the host.
   const [togglingIds, setTogglingIds] = createSignal<ReadonlySet<string>>(new Set());
   const [pendingExit, setPendingExit] = createSignal<PendingRoutineExit | null>(null);
   const scrollFades = createScrollFades();
   let draftRevision = 0;
-  // The saved routine the open draft started from. A field that still matches it is unedited.
   let draftBase: RoutineEditorRecord | null = null;
 
   onCleanup(scrollFades.stop);
 
-  // Only the newest list applies: an older response can arrive after a save and undo it.
   let listRequest = 0;
 
   async function loadRoutines(): Promise<void> {
@@ -227,7 +210,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
-  /** The open routine's place and deliveries. A late answer for a routine that is no longer open is dropped. */
   async function loadResults(routineId: string): Promise<void> {
     const results = props.port.results;
     if (!results) return;
@@ -272,8 +254,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       }),
   );
 
-  // The port is new after each activity of the agent, and an effect runs again for an equal value.
-  // The memo closes the open routine only when the owner changes.
   const ownerId = createMemo(() => props.port.ownerId);
   createEffect(ownerId, () => {
     closeEditor();
@@ -286,7 +266,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     () => (draft()?.triggerKind === "webhook" ? props.port.events?.api : undefined),
     (api) => {
       if (!api) return;
-      // The status only explains a missing URL, so a failed check leaves the connection unknown.
       void api.getStatus().then(
         (status) =>
           setWebhook((state) => {
@@ -313,7 +292,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       lastSelectionRequestNonce = request.nonce;
       props.onSelectionRequestHandled?.(request.nonce);
       if (!loaded) return;
-      // The editor state is read once, when the request arrives; a later edit must not run it again.
       untrack(() => {
         if (request.routineId === null) {
           requestExit("new");
@@ -324,6 +302,29 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     },
   );
 
+  const [waitingLeave, setWaitingLeave] = createSignal<(() => void) | null>(null);
+  function requestLeave(leave: () => void): void {
+    if (!draft()) {
+      leave();
+      return;
+    }
+    if (saving()) {
+      setWaitingLeave(() => leave);
+      return;
+    }
+    requestExit({ kind: "leave", leave });
+  }
+  createEffect(
+    () => ({ leave: waitingLeave(), saving: saving() }),
+    ({ leave, saving: isSaving }) => {
+      if (!leave || isSaving) return;
+      setWaitingLeave(null);
+      untrack(() => requestLeave(leave));
+    },
+  );
+  untrack(() => props.registerLeaveGuard?.(requestLeave));
+  onCleanup(() => props.registerLeaveGuard?.(null));
+
   createEffect(
     () => [draft(), routines().length, runs().length, loading(), confirmDelete(), error()] as const,
     () => {
@@ -331,10 +332,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     },
   );
 
-  /**
-   * Takes a change saved elsewhere, such as from a chat card, into each field the person did not
-   * edit here. Without it, the next Save would write the old values back.
-   */
   function refreshDraft(routine: RoutineEditorRecord): void {
     const base = draftBase;
     draftBase = routine;
@@ -490,6 +487,11 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       void props.onOpenThread?.(target.routineId);
       return;
     }
+    if (target.kind === "leave") {
+      closeEditor();
+      target.leave();
+      return;
+    }
     closeEditor();
     if (target.routine) {
       openRoutine(target.routine);
@@ -503,7 +505,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     if (target) performExit(target);
   }
 
-  /** A done one-time routine that gets a later time is active again, so it runs at that time. */
   function reopened(value: RoutineDraft): RoutineDraft {
     const base = draftBase;
     if (value.active || value.schedule.kind !== "once" || !base || !routineCompleted(base)) return value;
@@ -535,19 +536,16 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
         name: current.name.trim(),
         instruction: current.instruction.trim(),
         active: current.active,
-        // An update keeps the saved zone, so an edit on a computer in another zone does not move the schedule.
         timezone:
           (current.id ? draftBase?.timezone : undefined) ?? (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
         schedule: current.schedule,
         trigger: webhookTriggerOf(current) ?? { kind: "schedule", schedule: current.schedule },
         limitPolicy: current.limitPolicy,
         missedPolicy: current.missedPolicy,
-        // Only a changed place goes: a remote host sends it on a route of its own, after the save.
         ...(props.port.runIn && current.runIn !== ((current.id ? draftBase?.runIn : undefined) ?? "chat")
           ? { runIn: current.runIn }
           : {}),
       });
-      // A remote answer leaves out the place that the host kept.
       const saved =
         props.port.runIn && result.routine.runIn === undefined
           ? { ...result.routine, runIn: current.runIn }
@@ -562,8 +560,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       setDraft((latest) => (latest && latest.id === current.id ? { ...latest, id: saved.id } : latest));
       if (draft()?.id === current.id) draftBase = saved;
       const destinationSaved = await saveDestination(saved.id, current.destination);
-      // A remote host can keep the new routine but not its place. The editor keeps the change, so Save
-      // tries again.
       const placeSaved = !props.port.runIn || saved.runIn === current.runIn;
       if (!placeSaved) setError(t("routine.settings.runInSaveFailed"));
       if (draftRevision === savingRevision && destinationSaved && placeSaved) setDirty(false);
@@ -586,10 +582,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
-  /**
-   * Saves the place after the routine, which a new routine needs first. The routine stays saved when
-   * this fails, and the editor keeps its changes so that Save tries again.
-   */
   async function saveDestination(
     routineId: string,
     destination: RoutineResultChoice | null | undefined,
@@ -611,7 +603,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
-  /** A joined server keeps the deliveries on its host, so its history has none. */
   function deliveryHistory() {
     return props.port.results?.deliveries ? { items: deliveries(), onResend: resendDelivery } : undefined;
   }
@@ -652,10 +643,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
-  /**
-   * Pauses or resumes a routine from the list. It saves the routine as the editor does, with only
-   * `active` changed, so the host keeps every other field.
-   */
   async function setRoutineActive(routine: RoutineEditorRecord, active: boolean): Promise<void> {
     if (togglingIds().has(routine.id)) return;
     setTogglingIds((current) => new Set(current).add(routine.id));
@@ -701,8 +688,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
       await props.port.test(current.id);
       trackRoutineAction(analytics, "test", current, startedAt, "succeeded");
       await loadRuns(current.id);
-      // A test run of a routine that runs in its own thread runs there, so the chat shows it there. The saved
-      // place applies, not a change that the user did not save.
       if (props.onOpenThread && draftBase?.runIn === "thread")
         requestExit({ kind: "routine-thread", routineId: current.id });
     } catch (caught) {
@@ -713,10 +698,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     }
   }
 
-  /**
-   * The menu that changes the schedule frequency. A host without events keeps the schedule chips only.
-   * It reads the draft through `current` in its props, so a draft change does not make a new menu.
-   */
   function triggerMenu(current: () => RoutineDraft): JSX.Element {
     if (!props.port.events) return undefined;
     return (
@@ -736,10 +717,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     return props.port.onceSchedule ? ROUTINE_LOCAL_DRAFT_KINDS : ROUTINE_SAVED_DRAFT_KINDS;
   }
 
-  /**
-   * Sends one signed test event to the saved routine, then shows its run. Undefined when the host
-   * cannot send one; the card shows the step disabled until the routine is saved.
-   */
   function sendTestEvent(): (() => Promise<WebhookTestResult>) | undefined {
     const events = props.port.events;
     const send = events?.api.sendTestEvent;
@@ -764,7 +741,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     });
   }
 
-  /** Uses a secret that the sender made. Undefined when the host cannot do this. */
   function senderSecret(): ((secret: string) => Promise<void>) | undefined {
     const events = props.port.events;
     const set = events?.api.setSecret;
@@ -780,7 +756,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     };
   }
 
-  /** Gives a new secret to the agent that owns the routine. Undefined when the host cannot do this. */
   function agentSecret(): RoutineWebhookTriggerProps["agentSecret"] {
     const events = props.port.events;
     const give = events?.api.giveSecretToAgent;
@@ -800,7 +775,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     };
   }
 
-  /** The saved record of the open draft. Its trigger, not the draft, says whether a URL and a secret exist. */
   const savedRoutine = () => {
     const id = draft()?.id;
     return id ? routines().find((routine) => routine.id === id) : undefined;
@@ -809,7 +783,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
     const routine = savedRoutine();
     return routine && isEventRoutine(routine) && routine.trigger.kind === "webhook" ? routine.trigger : null;
   };
-  /** Only a saved webhook routine receives requests, so only it loads webhook activity. */
   const webhookActivity = () => {
     const events = props.port.events;
     const id = draft()?.id;
@@ -920,7 +893,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                                 </Show>
                               </span>
                             </Button>
-                            {/* A done one-time routine needs a new time to run again, so only the editor resumes it. */}
                             <Switch
                               aria-label={routine().name}
                               checked={routine().active}
@@ -1037,7 +1009,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
               </label>
               <section class="agent-routine-when" aria-labelledby="agent-routine-when-heading">
                 <h3 id="agent-routine-when-heading">{t("routine.settings.whenToRun")}</h3>
-                {/* A host with events offers both triggers, so the choice is always in view. */}
                 <Show when={props.port.events}>
                   <fieldset class="agent-routine-trigger-kind">
                     <legend class="sr-only">{t("routine.trigger.kind")}</legend>
@@ -1132,14 +1103,12 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                     {t("routine.settings.instructionRequired")}
                   </Text>
                 </Show>
-                {/* A scheduled run of an agent routine that answers only the marker posts nothing. */}
                 <Show when={props.port.ownerNoun !== "channel"}>
                   <Text id="agent-routine-no-update-hint" variant="caption" tone="muted">
                     {t("routine.settings.instructionNoUpdateHint")}
                   </Text>
                 </Show>
               </div>
-              {/* The host does not skip a one-time run at a spent plan: it waits, so the reminder is not lost. */}
               <Show
                 when={
                   props.port.limitPolicy &&
@@ -1226,7 +1195,6 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
           )}
         </Show>
       </div>
-      {/* Out of the scroll area, so the offer stays at the bottom of the panel. */}
       <Show when={!draft() && !loading()}>
         <div class="agent-routines-footer">
           <HostedUpsellRoutinesNotice count={routines().filter((routine) => routine.active).length} />
@@ -1256,10 +1224,6 @@ function routineCompleted(routine: RoutineEditorRecord): boolean {
   });
 }
 
-/**
- * The draft with a new schedule. A switch to a one-time run also runs it when OpenBot opens after
- * its time, so a reminder is not lost; the person can still choose to skip it.
- */
 function withSchedule(value: RoutineDraft, scheduleDraft: RoutineScheduleDraft): RoutineDraft {
   const missedPolicy =
     scheduleDraft.kind === "once" && value.scheduleDraft.kind !== "once" ? "run-once" : value.missedPolicy;
@@ -1276,7 +1240,6 @@ function routineTriggerKind(routine: RoutineEditorRecord): RoutineDraft["trigger
   return isEventRoutine(routine) && routine.trigger.kind === "webhook" ? "webhook" : "schedule";
 }
 
-/** The trigger fields of a draft that opens `routine`. */
 function triggerDraftOf(
   routine: RoutineEditorRecord,
 ): Pick<RoutineDraft, "schedule" | "scheduleDraft" | "triggerKind" | "eventType" | "eventFilters"> {
@@ -1290,7 +1253,6 @@ function triggerDraftOf(
   };
 }
 
-/** The webhook trigger that a save sends, or that a saved routine has. The host-made URL is not part of it. */
 function webhookTriggerOf(routine: RoutineEditorRecord | RoutineDraft): RoutineWebhookTriggerInput | null {
   if ("triggerKind" in routine) {
     return routine.triggerKind === "webhook"

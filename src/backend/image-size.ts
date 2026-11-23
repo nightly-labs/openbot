@@ -1,6 +1,5 @@
 import { open } from "node:fs/promises";
 
-/** The start of a file that holds the size of a PNG, a WebP, and a JPEG after its usual metadata. */
 const HEADER_BYTES = 256 * 1024;
 
 export interface ImageSize {
@@ -8,12 +7,6 @@ export interface ImageSize {
   height: number;
 }
 
-/**
- * The width and height of a PNG, JPEG or WebP file, read from its header without decoding it, or null.
- * OpenBot ships no image library: WhatsApp needs the size to show an image without a crop, and the
- * chat shows the size of a generated image. The size is as stored: a JPEG rotation in its EXIF data
- * is not applied.
- */
 export async function imageSize(path: string): Promise<ImageSize | null> {
   const file = await open(path, "r");
   try {
@@ -25,7 +18,6 @@ export async function imageSize(path: string): Promise<ImageSize | null> {
   }
 }
 
-/** The width and height of PNG, JPEG or WebP data, or null. */
 export function imageSizeOfBytes(bytes: Uint8Array): ImageSize | null {
   const data = Buffer.from(bytes.buffer, bytes.byteOffset, Math.min(bytes.byteLength, HEADER_BYTES));
   const size = headerSize(data);
@@ -52,13 +44,11 @@ function webpSize(data: Buffer): ImageSize | null {
   return null;
 }
 
-/** The size in the first frame header (SOF0 to SOF15, without DHT, JPG and DAC), after the segments before it. */
 function jpegSize(data: Buffer): ImageSize | null {
   let offset = 2;
   while (offset + 9 <= data.length) {
     if (data[offset] !== 0xff) return null;
     const marker = data[offset + 1] ?? 0;
-    // Fill bytes, and the markers that have no length.
     if (marker === 0xff) offset += 1;
     else if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) offset += 2;
     else if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc)

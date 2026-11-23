@@ -25,7 +25,6 @@ export function SettingsPicker<T extends string | number>({
 }: SettingsPickerProps<T>) {
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
   const selected = options.find((option) => option.value === value);
-  // A menu picker draws its value in the primary colour, so the menu has its own gray label.
   return (
     <Host matchContents colorScheme={dark ? "dark" : "light"}>
       <Menu

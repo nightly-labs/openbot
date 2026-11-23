@@ -9,7 +9,6 @@ import {
   requestRemoteControlPlane,
 } from "../../../../../server/request-auth";
 
-// Unlinks a Slack workspace from the host that proves its machine token.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/slack-disconnect")({
   server: {
     handlers: {

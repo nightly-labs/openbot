@@ -3,7 +3,6 @@ import { createScrollFades } from "@openbot/ui/components/createScrollFades";
 import { useText } from "@openbot/ui/text";
 import { createStore, For, onCleanup, Show } from "solid-js";
 
-/** A skill of the update whose copy on the agent has local changes. */
 export interface AgentUpdateChangedSkill {
   skillId: string;
   name: string;
@@ -11,19 +10,12 @@ export interface AgentUpdateChangedSkill {
 
 export interface AgentUpdateDialogProps {
   agentName: string;
-  /** The skills of the update with local changes. Each one is kept unless the user picks Replace. */
   changed: readonly AgentUpdateChangedSkill[];
-  /** The number of other skills of the update, which update with no question. */
   othersCount: number;
   onCancel: () => void;
-  /** The ids of the changed skills that the update replaces. */
   onConfirm: (replaceSkillIds: string[]) => void;
 }
 
-/**
- * Asks before an agent update that meets skills with local changes. Each changed skill keeps the
- * user's files unless the user picks Replace on its row; the other skills update with no question.
- */
 export function AgentUpdateDialog(props: AgentUpdateDialogProps) {
   const { t } = useText();
   const [replace, setReplace] = createStore<Record<string, boolean>>({});

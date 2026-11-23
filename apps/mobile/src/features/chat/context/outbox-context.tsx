@@ -20,6 +20,7 @@ import {
 import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
+import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import type { OutboxMessage } from "../model/outbox";
 import { createOutboxFiles } from "../model/outbox-files";
 import {
@@ -35,12 +36,9 @@ const NO_SERVERS: ReadonlySet<string> = new Set();
 
 interface AccountOutbox {
   store: OutboxStore;
-  /** Reads the workspace that sends now. A send in flight keeps the one that started it. */
   workspace: { current: (() => MobileWorkspaceContextValue) | null };
 }
 
-// One outbox per account for the whole run. A sign-out and a sign-in to the same account use it
-// again: a second store would read the same file while the first one still writes it.
 const accountOutboxes = new Map<string, AccountOutbox>();
 
 function createAccountOutbox(scope: string | null): AccountOutbox {
@@ -62,7 +60,6 @@ function createAccountOutbox(scope: string | null): AccountOutbox {
 }
 
 function accountOutbox(scope: string | null): AccountOutbox {
-  // Signed out: nothing to keep, and nothing to send.
   if (!scope) return createAccountOutbox(null);
   let outbox = accountOutboxes.get(scope);
   if (!outbox) {
@@ -72,12 +69,7 @@ function accountOutbox(scope: string | null): AccountOutbox {
   return outbox;
 }
 
-/**
- * The messages of this account that wait for their server. It sends them while the app runs, in any
- * screen, and the phone keeps them over a restart.
- */
 export function OutboxProvider({ children }: PropsWithChildren) {
-  // The provider reads the workspace when it sends, so a message for an agent does not render the app again.
   const readWorkspace = useMobileWorkspaceReader();
   const { session } = useMobileSession();
   const [{ store, workspace: current }] = useState(() =>
@@ -91,14 +83,17 @@ export function OutboxProvider({ children }: PropsWithChildren) {
       .sort()
       .join("\n"),
   );
-  const online = useMemo(() => new Set(onlineKey ? onlineKey.split("\n") : []), [onlineKey]);
+  const foreground = useAppForeground();
+  const online = useMemo(
+    () => (foreground && onlineKey ? new Set(onlineKey.split("\n")) : NO_SERVERS),
+    [foreground, onlineKey],
+  );
   useEffect(() => {
     void store.load();
   }, [store]);
   useEffect(() => {
     store.setOnline(online);
   }, [store, online]);
-  // After sign-out nothing starts. A send in flight still saves its result for this account.
   useEffect(() => () => store.setOnline(NO_SERVERS), [store]);
   return <OutboxContext value={store}>{children}</OutboxContext>;
 }
@@ -148,18 +143,15 @@ async function deliverOutboxMessage(
     upload: (file, onProgress) => channelStore.upload(target.serverId, file, onProgress),
     discard: (id) => channelStore.discard(target.serverId, id),
     send: async (ids) => {
-      // The host keeps the receipt of a channel operation with the channel, so a repeat is always safe.
       await delivery.beforeStore(true);
       try {
         await channelStore.command(
           target.serverId,
           {
             type: "send",
-            // The outbox id, so a repeat after a lost answer stores the message once.
             operationId: message.clientMessageId,
             channelId: target.channelId,
             text: message.text,
-            // The member that the message names at its start, as the person saw the channel.
             recipientAgentId: target.recipientAgentId,
             replyToMessageId: message.replyToMessageId,
             attachmentDraftIds: ids,
@@ -167,8 +159,6 @@ async function deliverOutboxMessage(
           { waitForRefresh: true },
         );
       } catch (error) {
-        // The host stored the message. The next channel read shows it, so a failed read is not a
-        // failed send, and its drafts must not be discarded.
         if (!(error instanceof ChannelHistoryRefreshError)) throw error;
       }
       return "";

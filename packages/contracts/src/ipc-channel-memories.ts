@@ -2,7 +2,6 @@ import { INPUT_LIMITS } from "./input-limits";
 import { isMemoryEntry, type MemoryEntry } from "./ipc-agent-memories";
 import { isDynamicRecord, isString } from "./runtime-values";
 
-/** A channel memory is an agent memory with a channel for an owner. Same shape, same limits. */
 export interface ChannelMemory extends MemoryEntry {
   channelId: string;
 }

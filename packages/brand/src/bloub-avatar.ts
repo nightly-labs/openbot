@@ -12,18 +12,72 @@ export type SupportedAvatarSilhouetteId = Exclude<ShapeId, "goutte">;
 
 export interface BloubAvatarProfile {
   shape: SupportedAvatarSilhouetteId;
-  /** A `#rrggbb` colour, which Bloub draws as given. */
   color: string;
   expression: ExpressionId;
 }
 
 const AUTOMATIC_COLORS = ["rouge", "orange", "ambre", "vert", "turquoise", "bleu", "violet", "rose"] as const;
 const UNSUPPORTED_AVATAR_SILHOUETTE = "goutte" as const satisfies ShapeId;
-export const SUPPORTED_AVATAR_SILHOUETTES = SHAPES.map((option) => option.id).filter(
-  (silhouette): silhouette is SupportedAvatarSilhouetteId => silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE,
-);
+function isSupportedSilhouette<Silhouette extends ShapeId>(
+  silhouette: Silhouette,
+): silhouette is Exclude<Silhouette, typeof UNSUPPORTED_AVATAR_SILHOUETTE> {
+  return silhouette !== UNSUPPORTED_AVATAR_SILHOUETTE;
+}
+export const SUPPORTED_AVATAR_SILHOUETTES = SHAPES.map((option) => option.id).filter(isSupportedSilhouette);
+const SEEDED_AVATAR_SILHOUETTES = [
+  "cercle",
+  "galet",
+  "squircle",
+  "capsule",
+  "triangle",
+  "hexagone",
+  "nuage",
+  "goutte",
+  "carre",
+  "losange",
+  "pentagone",
+] as const satisfies readonly ShapeId[];
+type SeededSilhouette = (typeof SEEDED_AVATAR_SILHOUETTES)[number];
+type SeededSupportedSilhouette = Exclude<SeededSilhouette, typeof UNSUPPORTED_AVATAR_SILHOUETTE>;
+type NamedSilhouette = Exclude<ShapeId, SeededSilhouette>;
+const SEEDED_SUPPORTED_SILHOUETTES = SEEDED_AVATAR_SILHOUETTES.filter(isSupportedSilhouette);
+const NAMED_SILHOUETTE_LOOKALIKES: Readonly<Record<NamedSilhouette, SeededSupportedSilhouette>> = {
+  fantome: "squircle",
+  meduse: "galet",
+  poulpe: "nuage",
+};
+const NAMED_SILHOUETTE_SEED_PATTERN = /:([a-z]+):(?:face|flat):\d+$/;
 
-// Bloub has no lime or indigo. They have the OKLCH lightness and chroma of its other colours.
+function isNamedSilhouette(silhouette: string): silhouette is NamedSilhouette {
+  return Object.hasOwn(NAMED_SILHOUETTE_LOOKALIKES, silhouette);
+}
+
+function namedSilhouette(seed: string): NamedSilhouette | null {
+  const silhouette = NAMED_SILHOUETTE_SEED_PATTERN.exec(seed)?.[1];
+  return silhouette !== undefined && isNamedSilhouette(silhouette) ? silhouette : null;
+}
+
+function seededSilhouette(seed: string): SeededSupportedSilhouette {
+  const silhouette = requiredItem(
+    SEEDED_AVATAR_SILHOUETTES,
+    stableIndex(`${seed}:shape`, SEEDED_AVATAR_SILHOUETTES.length),
+  );
+  return silhouette === UNSUPPORTED_AVATAR_SILHOUETTE
+    ? requiredItem(
+        SEEDED_SUPPORTED_SILHOUETTES,
+        stableIndex(`${seed}:shape:replacement`, SEEDED_SUPPORTED_SILHOUETTES.length),
+      )
+    : silhouette;
+}
+
+function seededLookalike(silhouette: SupportedAvatarSilhouetteId): SeededSupportedSilhouette {
+  return isNamedSilhouette(silhouette) ? NAMED_SILHOUETTE_LOOKALIKES[silhouette] : silhouette;
+}
+
+function seededExpression(seed: string): ExpressionId {
+  return requiredItem(EXPRESSIONS, stableIndex(`${seed}:expression`, EXPRESSIONS.length)).id;
+}
+
 const HUE_COLORS: Readonly<Record<AvatarHue, string>> = {
   0: colorHex("rouge"),
   30: colorHex("orange"),
@@ -37,10 +91,8 @@ const HUE_COLORS: Readonly<Record<AvatarHue, string>> = {
   320: colorHex("rose"),
 };
 
-/** The eyes a person can pick, in the order Bloub lists them. */
 export const AVATAR_EXPRESSIONS: readonly ExpressionId[] = EXPRESSIONS.map((option) => option.id);
 
-/** The hues, which browser profiles and channel pictures also take. */
 export const AVATAR_HUE_CHOICES: ReadonlyArray<{ hue: AvatarHue; label: string }> = [
   { hue: 0, label: "Red" },
   { hue: 30, label: "Orange" },
@@ -54,7 +106,6 @@ export const AVATAR_HUE_CHOICES: ReadonlyArray<{ hue: AvatarHue; label: string }
   { hue: 320, label: "Magenta" },
 ];
 
-/** The preset colours that are not hues. Bloub has no pink, sky blue, navy, wine or sand. */
 export const AVATAR_COLOR_PRESETS = {
   pink: "#f27ba5",
   sky: "#38bdf8",
@@ -66,7 +117,6 @@ export const AVATAR_COLOR_PRESETS = {
 } as const satisfies Record<string, AvatarColor>;
 export type AvatarColorPresetId = keyof typeof AVATAR_COLOR_PRESETS;
 
-/** One colour in an agent colour picker. It saves `hue` and `color` as `avatarHue` and `avatarColor`. */
 export type AvatarColorChoice =
   | { kind: "hue"; hue: AvatarHue; color: null; swatch: string }
   | { kind: "preset"; preset: AvatarColorPresetId; hue: AvatarHue | null; color: AvatarColor; swatch: string };
@@ -80,7 +130,6 @@ function presetChoice(preset: AvatarColorPresetId): AvatarColorChoice {
   return { kind: "preset", preset, hue: nearestAvatarHue(color), color, swatch: color };
 }
 
-/** The colours of the agent pickers, in the order they show: two rows of 9 with the automatic colour. */
 export const AVATAR_COLOR_CHOICES: readonly AvatarColorChoice[] = [
   hueChoice(0),
   hueChoice(30),
@@ -101,7 +150,6 @@ export const AVATAR_COLOR_CHOICES: readonly AvatarColorChoice[] = [
   presetChoice("grey"),
 ];
 
-/** True when an agent with this hue and colour shows the choice as selected. */
 export function isAvatarColorChoice(
   choice: AvatarColorChoice,
   hue: AvatarHue | null,
@@ -110,24 +158,13 @@ export function isAvatarColorChoice(
   return choice.color === null ? (color ?? null) === null && hue === choice.hue : color === choice.color;
 }
 
-/**
- * The face and colour that an agent draws. `color` is the agent's `avatarColor`: it wins over `hue`.
- * Without both, the seed chooses the colour.
- */
 export function bloubAvatarProfile(
   seed: string,
   hue: AvatarHue | null,
   color: AvatarColor | null = null,
 ): BloubAvatarProfile {
-  const storedSilhouette = requiredItem(SHAPES, stableIndex(`${seed}:shape`, SHAPES.length)).id;
-  const silhouette =
-    storedSilhouette === UNSUPPORTED_AVATAR_SILHOUETTE
-      ? requiredItem(
-          SUPPORTED_AVATAR_SILHOUETTES,
-          stableIndex(`${seed}:shape:replacement`, SUPPORTED_AVATAR_SILHOUETTES.length),
-        )
-      : storedSilhouette;
-  const expression = requiredItem(EXPRESSIONS, stableIndex(`${seed}:expression`, EXPRESSIONS.length)).id;
+  const silhouette = namedSilhouette(seed) ?? seededSilhouette(seed);
+  const expression = seededExpression(seed);
 
   return {
     shape: silhouette,
@@ -144,22 +181,12 @@ export function avatarHeadColor(seed: string, hue: AvatarHue | null, color: Avat
   return bloubAvatarProfile(seed, hue, color).color;
 }
 
-/**
- * The colour of a server's plush logo, which shows when the server has no logo of its own. It is
- * the automatic colour of an agent with the same seed. Each colour has a picture in
- * `packages/ui/src/assets/plush/server/<colour>.webp`: the grey Bloub squircle body, tinted with `tintRamp` of
- * `@norbert_bodziony/bloub/plush` in this colour and cropped to the fur.
- */
 export type ServerPlushColor = (typeof AUTOMATIC_COLORS)[number];
 
 export function serverPlushColor(serverId: string): ServerPlushColor {
   return automaticColor(serverId);
 }
 
-/**
- * The `#rrggbb` body colour of a server plush: the colour an owner or admin chose, or the automatic
- * colour of the server ID.
- */
 export function serverPlushHex(serverId: string, color: string | null | undefined): string {
   return (color ?? colorHex(automaticColor(serverId))).toLowerCase();
 }
@@ -171,7 +198,7 @@ function automaticColor(seed: string): ServerPlushColor {
 export function avatarCandidateSeeds(agentId: string, currentSeed: string, batch: number): string[] {
   const candidates = [currentSeed];
   const firstProfile = bloubAvatarProfile(currentSeed, null);
-  const unseenSilhouetteIds = new Set<SupportedAvatarSilhouetteId>(SUPPORTED_AVATAR_SILHOUETTES);
+  const unseenSilhouetteIds = new Set<SupportedAvatarSilhouetteId>(SEEDED_SUPPORTED_SILHOUETTES);
   const usedExpressions = new Set<ExpressionId>([firstProfile.expression]);
   unseenSilhouetteIds.delete(firstProfile.shape);
   let index = 1;
@@ -199,55 +226,47 @@ export function avatarCandidateSeeds(agentId: string, currentSeed: string, batch
   return candidates;
 }
 
-/** About 50 times the tries that one shape and eyes pair needs on average. */
 const FACE_SEED_TRIES = 10_000;
 
-/** How a generated agent face is drawn. `flat` is the Bloub that agents had before the plush. */
 export type AvatarStyle = "plush" | "flat";
 
 export const AVATAR_STYLES: readonly AvatarStyle[] = ["plush", "flat"];
 
-/** The seed segment of each style. Plush keeps the segment that faces had before styles existed. */
 const STYLE_SEED_SEGMENT: Readonly<Record<AvatarStyle, string>> = { plush: "face", flat: "flat" };
 
 const FLAT_SEED_PATTERN = /:flat:\d+$/;
 
-/**
- * The style that a seed draws. Only `avatarSeedForFace` makes a flat seed, and only the seed is saved,
- * so the style needs no new saved field. An app that does not know styles draws the same shape and eyes
- * from a flat seed, as a plush.
- */
 export function avatarStyleForSeed(seed: string): AvatarStyle {
   return FLAT_SEED_PATTERN.test(seed) ? "flat" : "plush";
 }
 
-/** The seed of the agent's own face in a style: the agent ID for the plush, and the same face flat. */
 export function avatarDefaultSeed(agentId: string, style: AvatarStyle): string {
   if (style === "plush") return agentId;
   const face = bloubAvatarProfile(agentId, null);
   return avatarSeedForFace(agentId, { shape: face.shape, expression: face.expression }, style);
 }
 
-/**
- * A seed that draws the given shape and eyes. Only the seed is saved, so a face that a person
- * builds must come from a seed: every app then draws it, with no new saved field. The same agent
- * and choice always give the same seed. The automatic colour also comes from the seed, and the
- * hash ties it to the eyes, so new eyes can change it: keep the colour with `avatarHueForColor`.
- */
 export function avatarSeedForFace(
   agentId: string,
   face: { shape: SupportedAvatarSilhouetteId; expression: ExpressionId },
   style: AvatarStyle = "plush",
 ): string {
+  const named = isNamedSilhouette(face.shape) ? face.shape : null;
+  const prefix = named ? `${agentId}:${named}` : agentId;
+  const seededShape = seededLookalike(face.shape);
   for (let index = 0; index < FACE_SEED_TRIES; index += 1) {
-    const candidate = `${agentId}:${STYLE_SEED_SEGMENT[style]}:${index}`;
-    const profile = bloubAvatarProfile(candidate, null);
-    if (profile.shape === face.shape && profile.expression === face.expression) return candidate;
+    const candidate = `${prefix}:${STYLE_SEED_SEGMENT[style]}:${index}`;
+    if (
+      namedSilhouette(candidate) === named &&
+      seededSilhouette(candidate) === seededShape &&
+      seededExpression(candidate) === face.expression
+    ) {
+      return candidate;
+    }
   }
   throw new Error("No avatar seed draws this face.");
 }
 
-/** The hue that draws an automatic colour, so the colour can stay when the seed changes. */
 export function avatarHueForColor(color: string): AvatarHue | null {
   return AVATAR_HUE_CHOICES.find((option) => HUE_COLORS[option.hue] === color)?.hue ?? null;
 }

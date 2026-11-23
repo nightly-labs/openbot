@@ -17,60 +17,30 @@ import { isWithin, rebaseLegacyWorkspacePath, sharedPathFromInput, workspacePath
 import type { ConversationRuntime } from "./conversation-runtime";
 import { type AgentLibraryFolders, placeInLibraryFolder } from "./library-folder-tools";
 import { type OpenBotToolResponse, openBotToolResult } from "./routine-tools";
+import { effectiveAgentFolders } from "./workspace-sandbox";
 
 export interface AttachmentGatewayHooks {
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
 }
 
-/**
- * Where a path a tool named is allowed to point.
- *
- * The default is the attachment policy: the file must resolve inside this agent's own workspace or the
- * OpenBot shared directory, and a symlink anywhere on the way is refused outright.
- *
- * `allowAnyReadablePath` is the browser-upload policy. `openbot_browser.upload_files` hands a local
- * file to a page, and the file the user names is almost never one the agent already copied into its
- * workspace, so containment would make the tool unusable. It grants no capability an agent does not
- * already have -- every agent can read any file its user can, and Workspace only limits writes, not
- * reads -- and it drops exactly two checks: the containment guard, and the symlink
- * pre-check that would refuse a path reached through a link the agent does not own. Everything that
- * makes the open itself safe still runs: the file must be a regular file, it is opened `O_NOFOLLOW` on
- * its fully resolved path, and its dev/ino are re-validated after the open, so a path swapped
- * mid-flight is still rejected.
- */
 export interface AttachmentSourceScope {
   allowAnyReadablePath: boolean;
 }
 
 const WORKSPACE_OR_SHARED: AttachmentSourceScope = { allowAnyReadablePath: false };
 
-/** A file that an answer only names is attached up to this size; a larger one stays a path. */
 const ANSWER_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_ANSWER_FILES = INPUT_LIMITS.attachments;
 
 export interface AttachmentGatewayOptions {
   conversation: ConversationRuntime;
   mailbox: MailboxStore;
-  /** `AgentStore.sharedRoot`, passed as a string so this class never opens the store. */
   sharedRoot: string;
-  /** The Library folders of this host. With none, the `folder` of an attach call places no file. */
   libraryFolders?: AgentLibraryFolders | null;
   hooks: AttachmentGatewayHooks;
 }
 
-/**
- * The `attach_files_to_response` tool: opens agent-workspace files with
- * TOCTOU-safe checks and stages them as a completed `agent_attachment`
- * message on the sender's conversation.
- *
- * Owns the in-flight dedup map keyed by
- * `responseAttachmentMessageId(threadId, turnId, callId)`, so a retried tool
- * call joins the running command instead of staging the files twice. Path
- * policy (workspace-or-shared, no symlinks, `O_NOFOLLOW`, dev/ino
- * re-validation after open) lives in `#openSource` — the one reason this
- * file changes.
- */
 export class AttachmentGateway {
   readonly #conversation: ConversationRuntime;
   readonly #mailbox: MailboxStore;
@@ -105,11 +75,6 @@ export class AttachmentGateway {
     return yield* exit;
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Opens local files for a caller that stages them itself instead of attaching them to a conversation
-   * -- `browser-uploads.ts` copies them into a private staging directory before a page ever sees them.
-   * The handles belong to the caller, which must close every one it is given.
-   */
   openSources(
     agentId: string,
     paths: string[],
@@ -118,13 +83,6 @@ export class AttachmentGateway {
     return this.#openSources(agentId, paths, scope);
   }
 
-  /**
-   * Attaches the files that a finished answer names by path to that answer, as if the agent had attached
-   * them. Each path gets the attachment checks on its own: a path outside the permitted folders, a
-   * folder, a missing or large file is skipped, not an error. A name that the turn already attached is
-   * skipped too, and the first files that pass fill the limit. The caller saves and publishes the
-   * conversation after this.
-   */
   readonly attachAnswerFiles = Effect.fn("AttachmentGateway.attachAnswerFiles")(function* (
     this: AttachmentGateway,
     agentId: string,
@@ -169,7 +127,6 @@ export class AttachmentGateway {
           { turnId: answer.turnId, messageId: answer.id, attachmentCount: attachments.length },
           attachments.map((attachment) => attachment.id),
         );
-        // No remembered signature: the turn end saves and publishes its other changes after this.
         snapshot.revision = persisted.revision;
       } catch (error) {
         if (previous) answer.attachments = previous;
@@ -186,19 +143,12 @@ export class AttachmentGateway {
     );
   }, Effect.uninterruptible).bind(this);
 
-  /**
-   * Discards each staged file whose bytes match a file that a message of this turn already shows, and
-   * returns the files to keep and the shown files that they copy. An agent often copies a generated
-   * image and attaches it again, and the chat then showed the same image two times (#7178). An agent
-   * also attaches again the files of a teammate's message, which the chat shows already (#11589).
-   */
   readonly #withoutTurnCopies = Effect.fn("AttachmentGateway.withoutTurnCopies")(function* (
     this: AttachmentGateway,
     snapshot: ConversationSnapshot,
     turnId: string | undefined,
     staged: AttachmentSummary[],
   ) {
-    // A message with no turn has nothing to compare with: older history is not this answer.
     if (turnId === undefined) return { attachments: staged, shown: [] };
     const shownByDigest = new Map<string, AttachmentSummary>();
     for (const message of snapshot.messages) {
@@ -219,8 +169,6 @@ export class AttachmentGateway {
         copies.push(attachment.id);
       } else attachments.push(attachment);
     }
-    // The store forgets the copies before it removes their files, so a failed removal leaves only a
-    // file on disk. It must not fail the attachment of the other files.
     if (copies.length > 0) yield* this.#mailbox.discardStagedGeneratedAttachments(copies).pipe(Effect.ignore);
     return { attachments, shown };
   });
@@ -244,8 +192,6 @@ export class AttachmentGateway {
     const publicThreadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
     const snapshot = this.#conversation.ensureSnapshot(senderAgentId, publicThreadId);
     const existing = snapshot.messages.find((message) => message.id === messageId);
-    // A repeated call finds its message. It puts the files into the folder again, which changes
-    // nothing when the first attempt did it, and completes an attempt that stopped before it.
     if (existing) return yield* this.#attachedResult(senderAgentId, messageId, existing.attachments ?? [], [], folder);
 
     return yield* Effect.acquireUseRelease(
@@ -261,7 +207,6 @@ export class AttachmentGateway {
             .pipe(Effect.mapError((failure) => attachmentFailure(failure.cause)));
           const { attachments, shown } = yield* this.#withoutTurnCopies(snapshot, params.turnId, staged);
           const alreadyShown = shown.map((attachment) => ({ id: attachment.id, name: attachment.name }));
-          // The user already sees each file, so no message is added and the answer must not show them again.
           if (attachments.length === 0) {
             return yield* this.#attachedResult(senderAgentId, null, [], alreadyShown, folder);
           }
@@ -304,9 +249,7 @@ export class AttachmentGateway {
           } catch (error) {
             try {
               this.#hooks.emitError("conversation_publication_failed", error, senderAgentId);
-            } catch {
-              // A committed attachment remains successful even if event listeners fail.
-            }
+            } catch {}
           }
           return yield* this.#attachedResult(senderAgentId, messageId, attachments, alreadyShown, folder);
         }),
@@ -315,10 +258,6 @@ export class AttachmentGateway {
     );
   });
 
-  /**
-   * The tool result for files that the conversation holds. The folder step runs after the files are
-   * saved and cannot fail the call: the result names the folder, or says why the files are in none.
-   */
   readonly #attachedResult = Effect.fn("AttachmentGateway.attachedResult")(function* (
     this: AttachmentGateway,
     senderAgentId: string,
@@ -327,7 +266,6 @@ export class AttachmentGateway {
     alreadyShown: readonly { id: string; name: string }[],
     folder: string | undefined,
   ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
-    // A file that the answer already shows goes into the folder also: the agent asked for it there.
     const placed =
       folder === undefined
         ? null
@@ -383,9 +321,8 @@ export class AttachmentGateway {
     const [workspaceRoot, sharedRoot] = yield* attachmentCall(() =>
       Promise.all([realpath(agent.workspacePath), realpath(this.#sharedRoot)]),
     );
-    // The folders the user gave the agent. One that was moved or deleted is left out.
     const folderRoots = yield* attachmentCall(async () =>
-      (await Promise.allSettled((agent.additionalFolders ?? []).map((folder) => realpath(folder)))).flatMap((result) =>
+      (await Promise.allSettled(effectiveAgentFolders(agent).map((folder) => realpath(folder)))).flatMap((result) =>
         result.status === "fulfilled" ? [result.value] : [],
       ),
     );
@@ -393,16 +330,12 @@ export class AttachmentGateway {
     const sharedReference = ["~/OpenBot/Shared/", "OpenBot/Shared/", "Shared/"].some((prefix) =>
       normalized.startsWith(prefix),
     );
-    // An absolute path may be one the provider's own transcript still names under this agent's pre-rename
-    // workspace root. The rebased twin is just another candidate, so it goes through the same containment
-    // and symlink checks below as the original.
     const candidates = isAbsolute(value)
       ? [value, rebaseLegacyWorkspacePath(agent.workspacePath, agent.id, value)].filter((path) => path !== null)
       : sharedReference
         ? [sharedPathFromInput(this.#sharedRoot, value)]
         : [workspacePathFromInput(agent.workspacePath, agent.id, value), sharedPathFromInput(this.#sharedRoot, value)];
 
-    // Why each candidate failed, so the agent and the log get the real cause (#4564).
     const reasons: string[] = [];
     for (const candidate of candidates) {
       try {
@@ -449,7 +382,6 @@ export class AttachmentGateway {
           ),
         );
       } catch (error) {
-        // Try the other permitted root for relative paths.
         reasons.push(sourceFailureReason(error));
       }
     }
@@ -468,16 +400,10 @@ export class AttachmentGateway {
   });
 }
 
-/**
- * A Windows path that a JavaScript string changed: OpenCode's `execute` turns `"C:\Users\…"` into
- * `C:Users…`, and `\r`, `\n` or `\t` into a control character (#8635). The reason says so, without
- * the path, so that the agent writes the path again.
- */
 function lostBackslashes(path: string): boolean {
   return /^[a-z]:(?![\\/])/iu.test(path) || [...path].some((character) => character.charCodeAt(0) < 0x20);
 }
 
-/** A Node error names its code and call, not the path, so the reason does not repeat a local path. */
 function sourceFailureReason(error: unknown): string {
   if (error instanceof Error && "code" in error && typeof error.code === "string") {
     return "syscall" in error && typeof error.syscall === "string" ? `${error.code} from ${error.syscall}` : error.code;

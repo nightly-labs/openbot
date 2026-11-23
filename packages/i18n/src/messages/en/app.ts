@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("app", {
-  // The app shell, shared state, and shared controls without a feature of their own.
   "app.loading": "Loading OpenBot",
   "app.leftPanel.resize": "Resize left sidebar",
   "app.host.thisMac": "This Mac",
@@ -32,7 +31,7 @@ export const messages = defineMessages("app", {
   "app.provider.restartFailed": "Could not restart {name}",
   "app.provider.included": "{name} is included with OpenBot.",
   "app.clipboard.copyFailed": "Could not copy the text.",
-  "app.voice.tooLong": "Voice recordings are limited to two minutes.",
+  "app.voice.tooLong": "Voice recordings are limited to 10 minutes.",
   "app.avatar.type": "Choose a PNG, JPEG, GIF, or WebP image.",
   "app.avatar.size": "Choose an image smaller than 10 MB.",
   "app.avatar.processingUnavailable": "Image processing is unavailable.",
@@ -47,7 +46,6 @@ export const messages = defineMessages("app", {
   "app.questionnaire.empty": "No questions",
   "app.standingApproval.title": "Always allow {name}?",
   "app.standingApproval.titleUnnamed": "Always allow this agent?",
-  // The page rail and the settings page of the desktop window.
   "app.rail.label": "Pages",
   "app.rail.website": "OpenBot website",
   "app.rail.agents": "Agents",
@@ -55,6 +53,8 @@ export const messages = defineMessages("app", {
   "app.rail.tasks": "Tasks",
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Usage",
+  "app.rail.credits": "Credits",
+  "app.rail.creditsBalance": { one: "Credits: {amount} credit", other: "Credits: {amount} credits" },
   "app.rail.library": "Library",
   "app.rail.providers": "Providers",
   "app.rail.crm": "CRM",
@@ -96,6 +96,7 @@ export const messages = defineMessages("app", {
     "My AI agents now work on my own computer with OpenBot. My chats and files stay with me. Try it: {site}",
   "app.socialFollow.redditTitle": "How I use OpenBot",
   "app.rail.usageRings": "{name} usage: {windows}. Open usage",
+  "app.rail.usageUnavailable": "{name} usage unavailable. Open usage",
   "app.rail.customAgentUsage": "{name} usage. Open usage",
   "app.rail.moreUsage": { one: "{count} more account. Open usage", other: "{count} more accounts. Open usage" },
   "app.rail.moreUsageCount": "+{count}",

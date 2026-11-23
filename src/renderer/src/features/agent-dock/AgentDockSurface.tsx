@@ -1,3 +1,4 @@
+import { chatVisualItemType } from "@openbot/contracts/chat-visual";
 import type {
   AgentApproval,
   AgentDockAction,
@@ -7,6 +8,7 @@ import type {
   AgentDockSeatRef as AgentDockSeatContract,
   AgentRuntimeApproval,
 } from "@openbot/contracts/ipc";
+import { AGENT_DOCK_LIMITS, LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   AgentDock,
@@ -22,7 +24,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
-import { windowShape } from "../../window-shape";
+import { windowExtent, windowShape } from "../../window-shape";
 import {
   AGENT_DOCK_STRIP_FEEL,
   AGENT_DOCK_STRIP_REST,
@@ -32,38 +34,39 @@ import {
 import { agentDockPort } from "./agent-dock-port";
 import { createAgentDockVoice } from "./agent-dock-voice";
 
-/** The time without use before the dock slides into the edge, when the user wants it hidden. */
 const TUCK_DELAY_MS = 900;
-/** The width of the strip at the screen edge where the pointer brings a hidden dock back. */
 const EDGE_STRIP = 4;
-/**
- * Linux gives no pointer moves to a window that lets the pointer through. There the window shape is
- * the dock: the pointer goes to the apps outside it, and nothing outside it shows.
- */
-const SHAPED_WINDOW = currentDevicePlatform() === "linux";
-/**
- * Windows gives this window the pointer moves only in the zone that it reports: each forwarded move holds
- * the cursor of the whole computer until main has it. The zone is the dock parts and the strip, out to
- * the distance where the strip feels the pointer.
- */
-const POINTER_ZONE_WINDOW = currentDevicePlatform() === "win32";
+const SHAPED_WINDOW = currentDevicePlatform() === "linux" || currentDevicePlatform() === "win32";
+const FITTED_WINDOW = currentDevicePlatform() === "darwin";
+const POINTER_ZONE_WHILE_MOVING = currentDevicePlatform() === "win32";
+const WIDEN_WAIT_MS = 250;
 
-/**
- * The agent dock in its own window at the left or right edge of the screen. The main renderer owns the
- * conversations: this window shows what it publishes and sends each action back. Main sends the
- * messages typed here.
- *
- * The window lets the pointer through, except over the dock shapes. It takes key input while a chat
- * or a menu is open, and a click in another app closes the chat. When the user wants it hidden, the dock
- * slides into the edge while nobody uses it, and comes back when the pointer touches the edge. With the
- * edge strip on, only the pointer near the strip brings it back.
- */
+function nextGrowth(): Promise<void> {
+  return new Promise((resolve) => {
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    const done = () => {
+      window.removeEventListener("resize", resized);
+      clearTimeout(timer);
+      resolve();
+    };
+    const resized = () => {
+      const grew = window.innerWidth > width || window.innerHeight > height;
+      width = window.innerWidth;
+      height = window.innerHeight;
+      if (grew) done();
+    };
+    const timer = setTimeout(done, WIDEN_WAIT_MS);
+    window.addEventListener("resize", resized);
+  });
+}
+
 export function AgentDockSurface() {
   const { t, errorMessage } = useText();
   const [presentation, setPresentation] = createSignal<AgentDockPresentation | null>(null);
   const [closeRequest, setCloseRequest] = createSignal(0);
+  const [blurRequest, setBlurRequest] = createSignal(0);
   const [tucked, setTuckedSignal] = createSignal(false);
-  /* A plain copy: a signal write shows in a read only after the next flush. */
   let isTucked = false;
   const setTucked = (value: boolean) => {
     if (isTucked === value) return;
@@ -74,22 +77,18 @@ export function AgentDockSurface() {
   let received = false;
   let chatOpen = false;
   let pointerIn = false;
+  let menuWanted = false;
+  let widening: Promise<void> | null = null;
   let dragging = false;
-  /** The finished-work shelf shows results. */
   let shelfShown = false;
-  /** A plain copy of the hide setting: the tuck timer and the pointer handlers read it outside a tracking scope. */
   let autoHide = false;
-  /** A plain copy of the edge strip setting. */
   let edgeStrip = false;
-  /** The pointer is close to the edge strip. */
   let near = false;
   let tuckTimer: ReturnType<typeof setTimeout> | undefined;
-  /** Null until the first send: a reloaded page cannot know what the window takes (#11606). */
   let sent: { interactive: boolean; keyboard: boolean } | null = null;
-  /** The dock parts at rest, or null while the dock moves. */
   let dockShape: readonly AgentDockShapeRect[] | null = null;
   let sentShape = "";
-  /** A retry of a failed draft keeps its id, so the agent or the channel gets the message once. */
+  let sentExtent = "";
   let failed: { seatKey: string; text: string; clientMessageId: string } | null = null;
 
   const apply = (next: AgentDockPresentation | null) => {
@@ -106,7 +105,6 @@ export function AgentDockSurface() {
     tuckTimer = undefined;
   };
 
-  /** Slides the dock into the edge a moment after the use ends; a use in the meantime keeps it out. */
   const updateTuck = () => {
     if (!autoHide || inUse()) {
       stopTuckTimer();
@@ -133,49 +131,65 @@ export function AgentDockSurface() {
       syncShape();
     },
   );
-  /** The strip shows only on a dock that hides. */
   const stripOn = () => (presentation()?.autoHide ?? false) && (presentation()?.edgeStrip ?? false);
   const asks = createMemo(() => (presentation()?.seats ?? []).some((seat) => seat.state?.kind === "waiting"));
 
-  /**
-   * Linux: tells main the parts of the window that take the pointer. The whole window while the dock
-   * moves or a menu is open, so that nothing is cut off; the strip at the edge while the dock is hidden.
-   * With the edge strip on, only the visible strip at rest takes the pointer: the pointer goes past it elsewhere.
-   * Windows: tells main the same parts, with all of the strip and the distance where the strip feels the
-   * pointer, as the zone that gets the pointer moves.
-   */
+  function tuckedStrip(body: DOMRect | undefined, reach: number): AgentDockShapeRect {
+    const width = body ? AGENT_DOCK_STRIP_WIDTH + reach : EDGE_STRIP;
+    const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
+    if (!body) {
+      return {
+        x,
+        y: window.innerHeight / 2 - AGENT_DOCK_LIMITS.inputExtent,
+        width,
+        height: AGENT_DOCK_LIMITS.inputExtent * 2,
+      };
+    }
+    return {
+      x,
+      y: Math.round(body.top + (body.height * (1 - AGENT_DOCK_STRIP_REST)) / 2) - reach,
+      width,
+      height: Math.round(body.height * AGENT_DOCK_STRIP_REST) + reach * 2,
+    };
+  }
+
+  const fitted = () => sentExtent !== "" && sentExtent !== "null";
+
+  function syncExtent() {
+    const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
+    if (menuOpen()) menuWanted = false;
+    const extent =
+      dockShape === null || menuWanted || menuOpen() || (pointerIn && !fitted())
+        ? null
+        : windowExtent(
+            isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
+            presentation()?.edge ?? "right",
+          );
+    const key = JSON.stringify(extent);
+    if (key === sentExtent) return;
+    if (extent === null && fitted()) {
+      const resized = nextGrowth();
+      widening = resized;
+      void resized.then(() => {
+        if (widening === resized) widening = null;
+      });
+    }
+    sentExtent = key;
+    void agentDockPort()
+      .agentDock.setExtent(extent)
+      .catch(() => undefined);
+  }
+
   function syncShape() {
-    if (!SHAPED_WINDOW && !POINTER_ZONE_WINDOW) return;
+    if (FITTED_WINDOW) syncExtent();
+    if (!SHAPED_WINDOW) return;
     const whole = { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight };
     const parts = dockShape === null || menuOpen() ? [whole] : [...dockShape];
     if (isTucked) {
       const body = edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
-      const width = body ? AGENT_DOCK_STRIP_WIDTH : EDGE_STRIP;
-      const x = presentation()?.edge === "left" ? 0 : window.innerWidth - width;
-      // The strip feels the pointer along all of the dock body.
-      const rest = POINTER_ZONE_WINDOW ? 1 : AGENT_DOCK_STRIP_REST;
-      parts.push(
-        body
-          ? {
-              x,
-              y: Math.round(body.top + (body.height * (1 - rest)) / 2),
-              width,
-              height: Math.round(body.height * rest),
-            }
-          : { x, y: 0, width, height: window.innerHeight },
-      );
+      parts.push(tuckedStrip(body, 0));
     }
-    const feel = AGENT_DOCK_STRIP_FEEL;
-    const shape = windowShape(
-      POINTER_ZONE_WINDOW
-        ? parts.map((part) => ({
-            x: part.x - feel,
-            y: part.y - feel,
-            width: part.width + feel * 2,
-            height: part.height + feel * 2,
-          }))
-        : parts,
-    );
+    const shape = POINTER_ZONE_WHILE_MOVING && dockShape === null && !menuOpen() ? [] : windowShape(parts);
     const key = JSON.stringify(shape);
     if (key === sentShape) return;
     sentShape = key;
@@ -184,9 +198,9 @@ export function AgentDockSurface() {
       .catch(() => undefined);
   }
 
-  /** Tells main when the window takes the pointer and the keys. Only a change is sent. */
   const sync = () => {
     updateTuck();
+    if (FITTED_WINDOW) syncExtent();
     const next = { interactive: pointerIn, keyboard: chatOpen || menuOpen() };
     if (next.interactive === sent?.interactive && next.keyboard === sent.keyboard) return;
     sent = next;
@@ -197,7 +211,6 @@ export function AgentDockSurface() {
 
   onSettled(() => {
     const unsubscribe = agentDockPort().agentDock.onPresentation(apply);
-    // The dock on another display opened a chat. One chat is open at a time.
     const stopCloseChat = agentDockPort().agentDock.onCloseChat(() => setCloseRequest((value) => value + 1));
     void agentDockPort()
       .agentDock.getPresentation()
@@ -206,7 +219,6 @@ export function AgentDockSurface() {
       })
       .catch(() => undefined);
 
-    // The dock shapes take the pointer; the empty page, the body and the root let it through.
     const onPointer = (event: MouseEvent) => {
       if (isTucked && !edgeStrip && atEdge(event)) {
         stopTuckTimer();
@@ -218,14 +230,50 @@ export function AgentDockSurface() {
         target !== document.documentElement &&
         target !== document.body &&
         target.id !== "root";
+      if (event.type === "mousemove" && !pointerIn) menuWanted = false;
       sync();
     };
     const onLeave = () => {
       pointerIn = false;
+      menuWanted = false;
       sync();
     };
-    const onBlur = () => setCloseRequest((value) => value + 1);
-    // A menu opens and closes in a portal on the body.
+    const onContextMenu = (event: MouseEvent) => {
+      const target = event.target;
+      if (!FITTED_WINDOW || !event.isTrusted || !(target instanceof Element)) return;
+      if (fitted()) {
+        menuWanted = true;
+        syncExtent();
+      }
+      const resized = widening;
+      if (!resized) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const before = agentDockBody()?.getBoundingClientRect();
+      void resized.then(() => {
+        if (!target.isConnected) return;
+        const after = agentDockBody()?.getBoundingClientRect();
+        target.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window,
+            button: event.button,
+            buttons: event.buttons,
+            screenX: event.screenX,
+            screenY: event.screenY,
+            clientX: event.clientX + (before && after ? after.left - before.left : 0),
+            clientY: event.clientY + (before && after ? after.top - before.top : 0),
+            ctrlKey: event.ctrlKey,
+            shiftKey: event.shiftKey,
+            altKey: event.altKey,
+            metaKey: event.metaKey,
+          }),
+        );
+      });
+    };
+    const onBlur = () => setBlurRequest((value) => value + 1);
     const menus = new MutationObserver(() => {
       sync();
       syncShape();
@@ -234,6 +282,7 @@ export function AgentDockSurface() {
     document.addEventListener("mouseover", onPointer);
     document.addEventListener("mousemove", onPointer);
     document.documentElement.addEventListener("mouseleave", onLeave);
+    window.addEventListener("contextmenu", onContextMenu, true);
     window.addEventListener("blur", onBlur);
     return () => {
       unsubscribe();
@@ -242,12 +291,12 @@ export function AgentDockSurface() {
       document.removeEventListener("mouseover", onPointer);
       document.removeEventListener("mousemove", onPointer);
       document.documentElement.removeEventListener("mouseleave", onLeave);
+      window.removeEventListener("contextmenu", onContextMenu, true);
       window.removeEventListener("blur", onBlur);
       stopTuckTimer();
     };
   });
 
-  /** The pointer is on the strip at the screen edge that holds the dock. */
   const atEdge = (event: MouseEvent) =>
     presentation()?.edge === "left" ? event.clientX < EDGE_STRIP : event.clientX >= window.innerWidth - EDGE_STRIP;
 
@@ -284,6 +333,7 @@ export function AgentDockSurface() {
           body: message.body,
           time: "",
           attachments: message.attachments,
+          ...(message.visual ? { itemType: chatVisualItemType() } : {}),
         }),
       );
       bySeat.set(agentDockSeatKey(chat.seat), {
@@ -310,11 +360,6 @@ export function AgentDockSurface() {
       takeover: null,
       usageLimit: null,
     };
-  /**
-   * The main renderer answers the requests of the chat. A failed answer comes back as a new attempt of
-   * the same request, so the card shows its controls again. A password or a code goes to main from this
-   * window, and not through the main renderer.
-   */
   const answersFor = (server: string): AgentDockChatAnswers => ({
     approval: async (approval, decision) => {
       await perform({
@@ -348,6 +393,7 @@ export function AgentDockSurface() {
       });
       return true;
     },
+    takeoverDone: ({ request }) => server === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, server),
     usageLimitSend: async (limit, option, remember) => {
       await perform({
@@ -357,8 +403,6 @@ export function AgentDockSurface() {
         optionKey: option.key,
         remember,
       });
-      // The result comes with a later presentation: the card goes, or a failure shows it again. Until
-      // then the card stays busy, so this promise does not settle.
       await new Promise<never>(() => undefined);
     },
     usageLimitWait: (limit) =>
@@ -367,7 +411,6 @@ export function AgentDockSurface() {
 
   const serverId = createMemo(() => presentation()?.serverId ?? null);
   const voice = createAgentDockVoice(() => serverId() ?? "local");
-  /* A dock of another server starts with no chat, shelf or drag: the old dock reports no end when it goes. */
   createEffect(serverId, () => {
     chatOpen = false;
     shelfShown = false;
@@ -375,7 +418,6 @@ export function AgentDockSurface() {
     sync();
   });
 
-  /* Each server has its own dock; a new presentation of the same server keeps the open chat. */
   return (
     <Show when={serverId()} keyed>
       {(server) => (
@@ -386,11 +428,12 @@ export function AgentDockSurface() {
             availableChannels={availableChannels()}
             chat={chat}
             closeRequest={closeRequest()}
+            blurRequest={blurRequest()}
             voice={voice}
             side={presentation()?.edge ?? "right"}
             tucked={tucked()}
             onShapeChange={
-              SHAPED_WINDOW || POINTER_ZONE_WINDOW
+              SHAPED_WINDOW || FITTED_WINDOW
                 ? (parts) => {
                     dockShape = parts;
                     syncShape();
@@ -418,7 +461,6 @@ export function AgentDockSurface() {
               void perform({ type: "remove", serverId: server, seat: contractSeat(seat) }).catch(() => undefined)
             }
             onMove={async (seat, before) => {
-              // A failed move puts the seats back in the dock.
               await perform({
                 type: "move",
                 serverId: server,
@@ -461,7 +503,6 @@ export function AgentDockSurface() {
             onHide={() => void perform({ type: "hide" }).catch(() => undefined)}
             results={results()}
             onShelfChange={(shown) => {
-              // A result that came shows the hidden dock until the shelf is empty.
               shelfShown = shown;
               sync();
             }}
@@ -487,17 +528,14 @@ export function AgentDockSurface() {
   );
 }
 
-/** The members of a channel as the shared channel avatar reads them. */
 function uiChannel(channel: AgentDockChannel): AgentDockUiChannel {
   return { ...channel, members: channel.members.map((agentId) => ({ agentId })) };
 }
 
-/** A plain seat for the action: the dock state can hold a store copy. */
 function contractSeat(seat: AgentDockSeatRef): AgentDockSeatContract {
   return seat.kind === "channel" ? { kind: "channel", id: seat.id } : { kind: "agent", id: seat.id };
 }
 
-/** The approval as the card reads it. A cut approval gets its runtime mark back, so the card offers only Deny. */
 function shownApproval(current: AgentDockApproval): AgentApproval {
   if (!current.cut) return current.approval;
   const cut: AgentRuntimeApproval = { ...current.approval, truncated: true };

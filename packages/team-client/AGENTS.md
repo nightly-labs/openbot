@@ -16,6 +16,9 @@ Profile tab and the phone Profile page show the same numbers.
   [contract rules](../contracts/AGENTS.md).
 - Keep the code independent of Electron, Node, and the DOM beyond WebRTC and `fetch`. Mobile runs it
   in React Native. Pass platform objects in as arguments, as `TeamClientFetch` does.
-- Do not re-export `@openbot/contracts/team-protocol` from `index.ts`. The comment there says why.
-  Each module has its own subpath in `package.json`.
+- Do not re-export `@openbot/contracts/team-protocol` from `index.ts`. That barrel adds every
+  frozen protocol codec and adapter to each consumer of the root export. On React Native and in a
+  browser, that is bundle weight for protocol versions that the client never uses. A consumer that
+  needs a protocol symbol imports it from its contracts subpath. Each module of this package has
+  its own subpath in `package.json`.
 - Do not log tokens, tickets, or message bodies.

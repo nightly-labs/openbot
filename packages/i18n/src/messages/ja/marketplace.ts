@@ -657,6 +657,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "{name} は、これらのエージェントを実行するコンピューターにインストールしてください。そのアプリはブラウザーでのサインインが必要です。",
   "marketplace.error.appInvalid": "{name} を追加できません: {reason}",
+  "marketplace.error.appNotConnected": "{name} に接続できません: {reason}",
   "marketplace.error.uninstallNoServer": "プラグインをアンインストールするローカルサーバーを選択してください。",
   "marketplace.error.uninstallPartial": "{name} の一部を削除できませんでした。{failures}",
   "marketplace.error.actionFailed": "マーケットプレイスの操作を完了できませんでした。もう一度お試しください。",

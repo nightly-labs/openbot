@@ -1,8 +1,3 @@
-/**
- * The right-click menu on an agent, in the pinned group and in a section alike. Filing the agent
- * away is `SidebarMoveToSubmenu`, which the channel menu shows too; everything here is agent-only.
- */
-
 import {
   AppWindow,
   Bell,
@@ -25,7 +20,6 @@ import { SidebarMoveToSubmenu } from "./SidebarMoveToSubmenu";
 import type { SidebarPinnedItem } from "./sidebar-pins";
 import { useSidebarScope } from "./sidebar-scope";
 
-/** `userHidden` swaps the hide item for a restore item that names the section the agent goes back to. */
 export function SidebarAgentContextMenu(menuProps: { agent: AgentProfile; pinned: boolean; userHidden?: boolean }) {
   const { customSectionById, openDelete, props } = useSidebarScope();
   const { t } = useText();

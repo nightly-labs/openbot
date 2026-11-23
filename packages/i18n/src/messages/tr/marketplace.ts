@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/marketplace";
 
 export const messages = {
-  // The listing: categories, rows, and the words for each kind of listing.
   "marketplace.category.coding": "Kodlama",
   "marketplace.category.design": "Tasarım",
   "marketplace.category.dataAnalytics": "Veri ve analitik",
@@ -19,7 +18,6 @@ export const messages = {
   "marketplace.loadMore": "Daha fazla yükle",
   "marketplace.version": "Sürüm {version}",
 
-  // The dialog frame: title, close and tabs.
   "marketplace.title": "Pazaryeri",
   "marketplace.kinds": "Pazaryeri içerik türleri",
   "marketplace.tab.agents": "Ajanlar",
@@ -28,10 +26,8 @@ export const messages = {
   "marketplace.description.agents": "Kendi talimatları ve becerileri olan hazır ajanlar.",
   "marketplace.description.skills": "Bir ajana bir görevi veya aracı öğreten talimatlar.",
 
-  // A plugin link.
   "marketplace.plugins.missing": "Bu eklenti OpenBot kataloğunda yok.",
 
-  // The agent page.
   "marketplace.agents.loadingDetail": "Ajan ayrıntıları yükleniyor…",
   "marketplace.agents.skills": "Beceriler",
   "marketplace.agents.routines": "Rutinler",
@@ -50,7 +46,6 @@ export const messages = {
     "OpenBot incelemeden önce yapan kişi tarafından paylaşıldı. Eklendiğinde sizin adınıza işlem yapabilir.",
   "marketplace.agents.source.pending": "Henüz incelenmedi",
 
-  // The skill page, and why Try is off.
   "marketplace.skill.loading": "Beceri yükleniyor",
   "marketplace.try.readFailed": "OpenBot bu ajanın becerilerini okuyamadı. Tekrar deneyin.",
   "marketplace.try.enable": "Bu beceriyi denemek için ajan ayarlarından etkinleştirin.",
@@ -58,7 +53,6 @@ export const messages = {
   "marketplace.try.update": "Bu sürümü denemek için bu beceriyi güncelleyin.",
   "marketplace.try.composerUnavailable": "Ajan mesaj kutusu kullanılamıyor.",
 
-  // The Marketplace window. {name} is an agent, app or skill name. {count} is a number.
   "marketplace.open": "{name} öğesini aç",
   "marketplace.tab.apps": "Uygulamalar",
   "marketplace.crumbs.label": "Konum",
@@ -92,7 +86,6 @@ export const messages = {
   "marketplace.properties.updated": "Güncellendi",
   "marketplace.properties.installs": "Yüklemeler",
 
-  // Agents.
   "marketplace.agent.add": "Ekle",
   "marketplace.agent.addNamed": "Ekle: {name}",
   "marketplace.agent.addAgent": "Ajan ekle",
@@ -101,7 +94,6 @@ export const messages = {
   "marketplace.agent.update": "Güncelle",
   "marketplace.agent.openChat": "Sohbeti aç",
 
-  // Apps.
   "marketplace.app.connect": "Bağlan",
   "marketplace.app.reconnect": "Yeniden bağlan",
   "marketplace.app.connectNamed": "{name} uygulamasına bağlan",
@@ -121,7 +113,6 @@ export const messages = {
   "marketplace.app.whatsappTagline": "WhatsApp'ta kendi sohbetiniz ve izin verdiğiniz kişiler",
   "marketplace.app.bitwardenTagline": "Paylaşılan bir klasördeki oturum bilgileriyle sitelerde oturum açın",
   "marketplace.app.protonPassTagline": "Paylaşılan bir kasadaki oturum bilgileriyle sitelerde oturum açın",
-  // The category row in the 1Password page's information.
   "marketplace.app.onePasswordCategory": "Oturum açma ve kimlik bilgisi yönetimi",
   "marketplace.app.yourApps": "Uygulamalarınız",
   "marketplace.app.addCustom": "Özel ekle",
@@ -180,9 +171,6 @@ export const messages = {
   "marketplace.app.signInDescription":
     "{name} kayıtlı oturumu reddetti. Yeniden oturum açana kadar ajanlarınız bu uygulamayı kullanamaz.",
 
-  // The catalog apps' listing text, by slug. Each English text is the catalog's own text, byte for
-  // byte: a key whose English no longer matches the catalog is not used. The prompts are requests that
-  // the user sends to an agent.
   "marketplace.plugin.aave.tagline": "Aave verileri ve işlemleri",
   "marketplace.plugin.aave.description":
     "Aave, kullanıcıların canlı Aave V3 ve V4 piyasalarını keşfetmesine, cüzdan pozisyonlarını ve DAO yönetişimini incelemesine, borç verme işlemlerini simüle etmesine ve emanetsiz işlemler hazırlamasına yardımcı olur. Her işlem imzasız olarak döndürülür: eklenti piyasaları okur ve çağrıyı yazar, cüzdan ise kullanıcıda kalır.",
@@ -578,7 +566,6 @@ export const messages = {
   "marketplace.auth.personalApiKey": "Kişisel API anahtarı",
   "marketplace.auth.createKey": "Anahtar oluştur",
 
-  // Skills. {label} is the install button text: an agent name, "All agents" or "2 agents".
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "{name} içinde dene",
   "marketplace.skills.yours": "Becerileriniz",
@@ -653,7 +640,6 @@ export const messages = {
   "marketplace.skills.dialog.unread": "Beceriler okunamadı",
   "marketplace.skills.local.gone": "Şu anda hiçbir ajanda bu beceri yok.",
 
-  // Results that a screen reader hears. {agents} is a list of agent names.
   "marketplace.notice.agentAdded": "{name} eklendi.",
   "marketplace.notice.agentUpdated": "{name} güncellendi.",
   "marketplace.notice.appConnected": "{name} bağlandı.",
@@ -669,7 +655,6 @@ export const messages = {
   },
   "marketplace.error.skillPartial": "{name} şu ajanlarda değiştirilemedi: {agents}. {reason}",
 
-  // Errors. {reason} is an error message. {failures} is a list of error messages.
   "marketplace.error.openLink": "Bağlantı açılamadı.",
   "marketplace.error.copyLink": "Bağlantı kopyalanamadı.",
   "marketplace.error.connectNoServer": "Bu uygulamayı bağlamak için yerel bir sunucu seçin.",
@@ -680,6 +665,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "{name} uygulamasını bu ajanları çalıştıran bilgisayara yükleyin: uygulaması tarayıcıda oturum açmayı gerektirir.",
   "marketplace.error.appInvalid": "{name} eklenemiyor: {reason}",
+  "marketplace.error.appNotConnected": "{name} bağlanamıyor: {reason}",
   "marketplace.error.uninstallNoServer": "Bir eklentiyi kaldırmak için yerel bir sunucu seçin.",
   "marketplace.error.uninstallPartial": "{name} uygulamasının bazı kısımları kaldırılamadı. {failures}",
   "marketplace.error.actionFailed": "Pazaryeri eylemi tamamlanamadı. Tekrar deneyin.",

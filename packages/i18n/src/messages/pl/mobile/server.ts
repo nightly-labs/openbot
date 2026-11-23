@@ -131,8 +131,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "Wyprzedany",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · Kończy się {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · Dane zostają do {date}",
   "mobile.server.hosted.state.payment": "Oczekuje na płatność",
   "mobile.server.hosted.state.setup": "Konfigurowanie",
+  "mobile.server.hosted.state.restoring": "Przywracanie danych",
   "mobile.server.hosted.state.starting": "Uruchamianie",
   "mobile.server.hosted.state.running": "Działa",
   "mobile.server.hosted.state.stopped": "Zatrzymany",
@@ -269,6 +271,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Czekanie. Host wykonuje tyle tur, na ile pozwala jego pamięć.",
   "mobile.server.threads.hold.agentBusy": "Czekanie na zakończenie innej pracy tego agenta.",
   "mobile.server.threads.hold.oneTurn": "Czekanie. Dostawca tego agenta wykonuje jedną turę naraz.",
+  "mobile.server.threads.hold.signIn": "Czekanie. Dostawca tego agenta wymaga zalogowania.",
   "mobile.server.threads.offline": "Połącz się z tym serwerem, aby zobaczyć jego wątki.",
   "mobile.server.threads.loading": "Wczytywanie wątków…",
   "mobile.server.threads.loadFailed": "Nie udało się wczytać wątków niektórych agentów.",
@@ -379,6 +382,7 @@ export const messages = {
   "mobile.server.route.timezone": "Strefa czasowa",
   "mobile.server.route.personality": "Osobowość agenta",
   "mobile.server.route.agents": "Agenci",
+  "mobile.server.route.voiceModel": "Rozpoznawanie mowy",
   "mobile.server.settings.storage": "Pamięć dyskowa",
   "mobile.server.route.storage": "Pamięć dyskowa",
   "mobile.server.route.storageFiles": "Wszystkie pliki",
@@ -514,6 +518,19 @@ export const messages = {
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zmienić jego strefę czasową.",
   "mobile.server.settings.timezoneUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego strefę czasową.",
+  "mobile.server.settings.voiceModelDescription":
+    "Agenci na tym serwerze używają tego modelu, aby transkrybować dźwięk filmów bez napisów.",
+  "mobile.server.settings.voiceModelLoading": "Wczytywanie rozpoznawania mowy…",
+  "mobile.server.settings.voiceModelLoadFailed": "Nie udało się wczytać modelu rozpoznawania mowy serwera.",
+  "mobile.server.settings.voiceModelSaveFailed": "Nie udało się zmienić modelu rozpoznawania mowy. Spróbuj ponownie.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego rozpoznawanie mowy.",
+  "mobile.server.settings.voiceModelReady": "Gotowy",
+  "mobile.server.settings.voiceModelDownloading": "Pobieranie: {percent}",
+  "mobile.server.settings.voiceModelSize": "Pobieranie {size}",
+  "mobile.server.settings.voiceModelDownload": "Pobierz",
+  "mobile.server.settings.voiceModelCancel": "Zatrzymaj",
+  "mobile.server.settings.voiceModelRemove": "Usuń",
   "mobile.server.settings.keySection": "Klucz serwera",
   "mobile.server.settings.keyChanged": "Ostatnia zmiana",
   "mobile.server.settings.keyChange": "Zmień klucz",
@@ -611,6 +628,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Dodaj agentów",
   "mobile.server.browserProfiles.agentsHint":
     "Dotknięcie daje agentowi ten profil lub przenosi go z powrotem do profilu wspólnego. Zmiana zamyka otwarte karty agenta.",
+  "mobile.server.browserProfiles.movedNote":
+    "Logowania do witryn zostają w starym profilu. Przeniesiony agent musi ponownie zalogować się na tych witrynach.",
   "mobile.server.browserProfiles.clear": "Wyczyść dane",
   "mobile.server.browserProfiles.clearTitle": "Wyczyścić dane profilu {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -1002,7 +1021,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Do OpenBot trafiają wiadomości z twojego czatu „Wiadomość do siebie” i od osób, którym pozwolisz.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "Do OpenBot trafiają wiadomości od osób, którym pozwolisz. Inne osoby dostają kod, który mają ci przekazać.",
+    "Do OpenBot trafiają wiadomości z twojego czatu „Wiadomość do siebie” i od osób, którym pozwolisz. Inne osoby dostają kod, który mają ci przekazać.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp usunął ten serwer z połączonych urządzeń. Połącz numer ponownie.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1243,11 +1262,16 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Nie udało się zmienić modeli. Spróbuj ponownie.",
   "mobile.server.providers.promptCache": "Pamięć podręczna promptów",
   "mobile.server.providers.promptCacheHint":
-    "Jak długo Claude trzyma kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu Claude.",
-  "mobile.server.providers.promptCacheDefault": "Domyślne Claude Code",
+    "Jak długo Claude i Pi trzymają kontekst agenta w pamięci podręcznej między turami. Zmiana działa po ponownym uruchomieniu dostawcy.",
+  "mobile.server.providers.promptCacheDefault": "Domyślne ustawienie dostawcy",
   "mobile.server.providers.promptCacheHour": "1 godzina",
   "mobile.server.providers.promptCacheLoadFailed":
     "Nie udało się wczytać czasu pamięci podręcznej promptów tego serwera.",
+  "mobile.server.providers.cacheExpiryCompaction": "Kompaktuj przed wygaśnięciem pamięci podręcznej",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Gdy czat z kontekstem 200K lub więcej tokenów jest nieaktywny z pamięcią podręczną na 1 godzinę, agent kompaktuje kontekst przed jej wygaśnięciem. Wtedy następna wiadomość nie czyta całego kontekstu ponownie bez pamięci podręcznej.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "Nie udało się wczytać ustawienia kompaktowania tego serwera.",
   "mobile.server.providers.compactWindow": "Kompaktuj czaty przy",
   "mobile.server.providers.compactWindowHint":
     "Claude Code streszcza starsze tury czatu, gdy czat osiągnie ten rozmiar. Mniej to szybsze i tańsze tury. Więcej zachowuje więcej szczegółów. Model z mniejszym oknem kompaktuje przy własnym limicie.",
@@ -1302,6 +1326,8 @@ export const messages = {
     "ChatGPT używa tego klucza, a nie Twojego planu ChatGPT. OpenAI nalicza opłatę za każde żądanie na klucz. Użycie planu nie jest pokazywane.",
   "mobile.server.providers.codexKeyAlternative":
     "Lub zaloguj się kluczem API OpenAI. OpenAI nalicza opłatę za każde żądanie na klucz.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse używa tego klucza, a nie Twojego logowania. Aby używać logowania, usuń klucz.",
   "mobile.server.providers.sectionUse": "Użycie",
   "mobile.server.providers.unused": "Żaden agent go nie używa",
   "mobile.server.providers.usedByCount": {
@@ -1378,6 +1404,9 @@ export const messages = {
   },
   "mobile.server.mcp.signInOnComputer":
     "Ten serwer MCP prosi o zalogowanie. Zaloguj się w OpenBot na komputerze, a potem przetestuj ponownie.",
+  "mobile.server.mcp.signIn": "Zaloguj się",
+  "mobile.server.mcp.signInHere":
+    "Ten serwer MCP prosi o zalogowanie. Stuknij Zaloguj się, a potem przetestuj ponownie.",
   "mobile.server.mcp.signedInDescription": "{server} jest zalogowany do tego serwera MCP.",
   "mobile.server.mcp.signOut": "Wyloguj",
   "mobile.server.mcp.saveFailed": "Nie udało się zapisać zmiany. Spróbuj ponownie.",
@@ -1438,6 +1467,7 @@ export const messages = {
     other: "{count} godz.",
   },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Aktualizacje",
   "mobile.server.settings.updateAvailable": "Dostępna aktualizacja",
   "mobile.server.route.updates": "Aktualizacje",
@@ -1488,7 +1518,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "Oczekiwanie na: {reasons}.",
   "mobile.server.update.disabledTitle": "Zdalne aktualizacje są wyłączone",
   "mobile.server.update.disabledDescription":
-    "Użytkownik serwera {name} wyłączył aktualizacje od członków serwera. Poproś go o zaktualizowanie OpenBot lub włączenie tego ustawienia.",
+    "Użytkownik serwera {name} wyłączył aktualizacje od członków serwera. Poproś go o zaktualizowanie OpenBot lub o otwarcie sekcji Ustawienia > Aktualizacje na jego komputerze i włączenie „Zezwalaj członkom serwera na aktualizacje”.",
   "mobile.server.update.managedTitle": "Aktualizacjami zarządza Host Manager",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager aktualizuje serwer {name}. Skontaktuj się z administratorem hosta.",
@@ -1630,7 +1660,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "Dodano {member} do roli {role}",
   "mobile.server.audit.roleMemberRemoved": "Usunięto {member} z roli {role}",
   "mobile.server.audit.agentLevel": "{agent} dla {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Importuj agentów",
   "mobile.server.route.import": "Importuj agentów",
   "mobile.server.import.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby importować tutaj agentów.",
@@ -1733,7 +1762,6 @@ export const messages = {
   "mobile.server.import.channel": "Kanał",
   "mobile.server.import.notImportedTitle": "Nie zaimportowano",
   "mobile.server.import.resultWarnings": "Niektóre elementy nie zostały przeniesione",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Przeniesienie",
   "mobile.server.route.transfer": "Przeniesienie",
   "mobile.server.route.transferExport": "Eksport",
@@ -1826,6 +1854,10 @@ export const messages = {
     many: "Kopiuj {count} agentów",
     other: "Kopiuj {count} agenta",
   },
+  "mobile.server.transfer.copyDuplicatesTitle": "Skopiować zduplikowanych agentów?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} ma już agentów o tych nazwach: {names}. Kopiowanie doda drugiego agenta dla każdego z nich. Każda kopia to osobny agent z własnymi czatami, plikami i wspomnieniami.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Kopiuj duplikaty",
   "mobile.server.transfer.copying": "Kopiowanie…",
   "mobile.server.transfer.copyFailed": "Kopiowanie nie zostało ukończone.",
   "mobile.server.transfer.copied": {
@@ -1838,4 +1870,41 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Skopiowani agenci używają reguł zatwierdzania serwera {server}.",
   "mobile.server.transfer.copyNoServer":
     "Połącz się z innym serwerem jako właściciel lub administrator, aby skopiować na niego agentów.",
+  "mobile.server.route.ownerTransfer": "Przekaż własność",
+  "mobile.server.ownerTransfer.unavailable": "Połącz się z tym serwerem jako właściciel, aby przekazać własność.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot hostuje ten serwer, więc jego właściciel nie może się zmienić.",
+  "mobile.server.ownerTransfer.lede":
+    "Nowy właściciel dostanie e-mail i musi zaakceptować, będąc zalogowanym na ten adres. Potem zostaniesz usunięty z tego serwera.",
+  "mobile.server.ownerTransfer.email": "E-mail nowego właściciela",
+  "mobile.server.ownerTransfer.send": "Wyślij",
+  "mobile.server.ownerTransfer.sending": "Wysyłanie…",
+  "mobile.server.ownerTransfer.stays":
+    "Agenci, czaty, rutyny, logowania do dostawców, zapisane klucze, loginy z Vault, logowania w przeglądarce i połączone aplikacje zostają na serwerze. Nowy właściciel może z nich korzystać.",
+  "mobile.server.ownerTransfer.expiry": "Prośba wygasa po 7 dniach.",
+  "mobile.server.ownerTransfer.confirmTitle": "Uczynić {email} właścicielem?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Gdy {email} zaakceptuje, ta osoba zostanie właścicielem {server}, a ty stracisz dostęp. Dane zostają na serwerze. Prośba wygasa po 7 dniach.",
+  "mobile.server.ownerTransfer.confirm": "Przekaż",
+  "mobile.server.ownerTransfer.sendFailed": "Prośba nie została wysłana.",
+  "mobile.server.ownerTransfer.loadFailed": "Nie udało się odczytać oczekującego przekazania.",
+  "mobile.server.ownerTransfer.pending": "Czeka na nowego właściciela",
+  "mobile.server.ownerTransfer.expires": "Wygasa {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} musi zaakceptować, będąc zalogowanym na ten adres. Do tego czasu pozostajesz właścicielem.",
+  "mobile.server.ownerTransfer.cancel": "Anuluj",
+  "mobile.server.ownerTransfer.cancelTitle": "Anulować przekazanie?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} nie będzie już mógł go zaakceptować.",
+  "mobile.server.ownerTransfer.keep": "Zostaw",
+  "mobile.server.ownerTransfer.cancelFailed": "Przekazanie nie zostało anulowane.",
+  "mobile.server.ownerTransfer.incomingTitle": "Zostać właścicielem {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} chce uczynić cię właścicielem {server}. Dostaniesz pełną kontrolę nad serwerem, a jego agenci, czaty, rutyny i zapisane logowania na nim zostają. {name} traci dostęp. Każdy, kto nadal może zalogować się na komputerze, na którym działa serwer, może używać twojego konta OpenBot. Zmień na nim hasła i klucze SSH.",
+  "mobile.server.ownerTransfer.accept": "Akceptuj",
+  "mobile.server.ownerTransfer.decline": "Odrzuć",
+  "mobile.server.ownerTransfer.accepted": "Jesteś teraz właścicielem {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Nie udało się zaakceptować",
+  "mobile.server.ownerTransfer.declineFailed": "Nie udało się odrzucić",
+  "mobile.server.ownerTransfer.tryAgain": "Spróbuj ponownie później.",
+  "mobile.server.providers.updateAll": "Aktualizuj wszystkie",
+  "mobile.server.providers.updateAllFailed": "Niektóre aktualizacje się nie rozpoczęły. Spróbuj ponownie.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -5,7 +5,6 @@ import { FILL, FRAME_RADIUS } from "../model/attachment-frame";
 import { useGlidingProgress } from "./upload-progress";
 
 const STROKE = 2;
-// The line runs on the frame's edge, inside it, so the frame's clip does not cut it.
 const INSET = STROKE / 2;
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const FADE: CSSTransitionProperties = {
@@ -14,7 +13,6 @@ const FADE: CSSTransitionProperties = {
   transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
 };
 
-/** The frame's edge, from the top centre, clockwise, and its length. */
 function edge(width: number, height: number) {
   const r = FRAME_RADIUS - INSET;
   const [left, top, right, bottom] = [INSET, INSET, width - INSET, height - INSET];
@@ -34,10 +32,6 @@ function edge(width: number, height: number) {
   return { d, length };
 }
 
-/**
- * A line on the edge of a video frame that fills clockwise as the file downloads. It fades out when
- * `done`.
- */
 export function VideoDownloadRing({
   width,
   height,
@@ -46,7 +40,6 @@ export function VideoDownloadRing({
 }: {
   width: number;
   height: number;
-  /** From 0 to 1. */
   progress: number;
   done: boolean;
 }) {
@@ -55,7 +48,6 @@ export function VideoDownloadRing({
   const { d, length } = edge(width, height);
   const lineProps = useAnimatedProps(() => ({
     strokeDashoffset: length * (1 - value.get()),
-    // A round cap draws a dot even for an empty line, so the line waits for the first byte.
     strokeOpacity: value.get() > 0.002 ? 1 : 0,
   }));
   return (

@@ -1,8 +1,3 @@
-// Checks that a reply quote renders the original's Markdown in a running Storybook, which renders
-// the real shared message body and the real conversation composer.
-// Pass the URL that `bun run storybook` reports:
-// `bun scripts/reply-quote-markdown-e2e.ts --storybook=http://localhost:6006`.
-// Writes .openbot-build/reply-quote-markdown-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -37,7 +32,6 @@ async function openStory(page: Page, id: string): Promise<void> {
   await page.goto(`${storybook}/iframe.html?id=${id}&viewMode=story`);
 }
 
-/** The quote is inert, so its roles are read with `includeHidden`. */
 async function readQuote(quote: Locator): Promise<QuoteResult> {
   await quote.waitFor({ timeout: 60_000 });
   return {
@@ -74,7 +68,6 @@ try {
   assertMarkdownQuote(report.sent, "Sent message");
   await page.locator(".message-reply-context").screenshot({ path: resolve(OUT, "sent-quote.png") });
 
-  // A quote cut inside an open code fence must leave the reply under it readable and reachable.
   await openStory(page, "conversation-messagebody--reply-markdown-open-fence");
   const openFenceQuote = page.locator(".message-reply-context .message-reply-quote");
   await openFenceQuote.waitFor({ timeout: 60_000 });

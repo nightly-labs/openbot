@@ -3,11 +3,6 @@ import type { JSX } from "@solidjs/web";
 import { type Accessor, createEffect, createSignal, For, untrack } from "solid-js";
 import { CHANGELOG_PLATFORMS, type ChangelogPlatform } from "../../lib/changelog";
 
-// A change of tab dissolves one list into the other with the header menu's motion: the list
-// being closed leaves through a blur toward the side of the tab that was pressed, and the new one
-// comes in through a blur from the other side. Every part of the page that differs by app is its
-// own swap, and all of them share one state, so they move as one.
-
 type SwapMotion = "from-start" | "from-end" | "to-start" | "to-end";
 
 interface SwapMotions {
@@ -17,10 +12,8 @@ interface SwapMotions {
 
 export interface PlatformSwap {
   platform: Accessor<ChangelogPlatform>;
-  /** The lists on screen: the open one, and the one still animating out. */
   shown: Accessor<readonly ChangelogPlatform[]>;
   motion: (platform: ChangelogPlatform) => SwapMotion | undefined;
-  /** Ends the motion of `platform`, and takes it off the screen when it is not the open one. */
   settle: (platform: ChangelogPlatform) => void;
 }
 
@@ -33,7 +26,6 @@ export function createPlatformSwap(platform: Accessor<ChangelogPlatform>): Platf
     const previous = current;
     if (next === previous) return;
     current = next;
-    // Nothing would end the motion, so the closed list would stay.
     if (prefersReducedMotion()) {
       setMotions({});
       setShown([next]);
@@ -44,8 +36,6 @@ export function createPlatformSwap(platform: Accessor<ChangelogPlatform>): Platf
       opened: forward ? "from-end" : "from-start",
       closed: { platform: previous, motion: forward ? "to-start" : "to-end" },
     });
-    // A list older than `previous` has lost its motion, and with it the animation that kept it
-    // visible.
     setShown([previous, next]);
   });
 
@@ -85,7 +75,6 @@ export function ChangelogSwap(props: ChangelogSwapProps) {
             data-motion={props.swap.motion(platform)}
             inert={platform !== props.swap.platform()}
             onAnimationEnd={(event) => {
-              // A release inside has its own entrance, and its end bubbles up to here.
               if (event.target === event.currentTarget) props.swap.settle(platform);
             }}
           >

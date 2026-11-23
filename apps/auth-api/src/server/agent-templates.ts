@@ -15,10 +15,6 @@ import { marketplaceCreatorName } from "./marketplace-pagination";
 import { MarketplaceStorage } from "./marketplace-storage";
 import type { AuthUser, WorkerBindings } from "./types";
 
-/**
- * Published templates for one account. Unpublished rows do not count. The Worker enforces it in the
- * statement that writes the row, so no client, and no two requests at once, can pass it.
- */
 const MAX_TEMPLATES_PER_USER = 5;
 const TEMPLATE_LIMIT_MESSAGE = `You can publish up to ${MAX_TEMPLATES_PER_USER} agents. Unpublish one to publish another.`;
 
@@ -32,11 +28,6 @@ interface TemplateRow {
   creator_name: string | null;
 }
 
-/**
- * Link-only agent templates. Unlike the marketplace there is no review and no listing: a template is
- * public to whoever has its id, and its owner can replace or delete it at any time. The creator is
- * shown by account name only; the account email is never public here.
- */
 export class AgentTemplates {
   constructor(private readonly bindings: Pick<WorkerBindings, "DB" | "SKILLS">) {}
 
@@ -45,7 +36,6 @@ export class AgentTemplates {
     sourceAgentId: unknown;
     snapshot: unknown;
     avatar: { bytes: Uint8Array; mimeType: string } | null;
-    /** The share card for link previews: a PNG of `AGENT_TEMPLATE_CARD` size. */
     card?: Uint8Array | null;
   }) {
     return Effect.fn("AgentTemplates.publish")(() =>
@@ -80,7 +70,6 @@ export class AgentTemplates {
             marketplaceError(new AgentMarketplaceError(400, "invalid_card", "The share card must be a 1200×630 PNG.")),
           );
 
-        // The row of an unpublished agent is found too: publishing it again gives it back the same id.
         const existing = yield* marketplaceCall(() =>
           bindings.DB.prepare(
             "SELECT id, unpublished_at FROM agent_templates WHERE owner_user_id = ? AND source_agent_id = ?",
@@ -120,13 +109,6 @@ export class AgentTemplates {
           const key = cardKey;
           yield* marketplaceCall(() => bindings.SKILLS.put(key, card, { httpMetadata: { contentType: "image/png" } }));
         }
-        // If this batch fails after it committed, the row names the new images, so a failure here does
-        // not delete them: an unused image is better than a live template with a broken one.
-        // One transaction reads the image keys the row has and writes the new row, so the keys this
-        // publish replaces are the ones it deletes, even when two publishes of one agent run at once.
-        // The upsert means two first publishes meet here, not in a constraint error. The limit is
-        // checked in the same statement: the row is written only while the owner has fewer than the limit of
-        // published agents, or when this agent is already one of them.
         const written = yield* marketplaceCall(() =>
           bindings.DB.batch([
             bindings.DB.prepare(
@@ -168,13 +150,11 @@ export class AgentTemplates {
         const previous = yield* marketplaceDecode(() => storedImages(written[0]?.results?.[0]));
         const returned = written[1]?.results?.[0];
         if (!isDynamicRecord(returned) || typeof returned.id !== "string") {
-          // Nothing was written: the limit stopped it, so the new images are not named by any row.
           yield* this.deleteImagesEffect([avatarKey, cardKey]);
           return yield* Effect.fail(
             marketplaceError(new AgentMarketplaceError(409, "template_limit", TEMPLATE_LIMIT_MESSAGE)),
           );
         }
-        // The publish has succeeded; the old images are removed on a best-effort basis.
         yield* this.deleteImagesEffect([previous.avatarKey, previous.cardKey]);
         return { id: returned.id, sourceAgentId, updatedAt: new Date(now).toISOString() };
       }),
@@ -229,8 +209,6 @@ export class AgentTemplates {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /** With the request headers, an unchanged image comes back without a body, for a 304. */
-
   avatar(id: string, conditions?: Headers) {
     return Effect.fn("AgentTemplates.avatar")(() =>
       Effect.gen({ self: this }, function* () {
@@ -277,19 +255,12 @@ export class AgentTemplates {
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
   }
 
-  /**
-   * Removes everything the link shows: the snapshot, the avatar and the card. The row keeps only its
-   * id, the owner and the local agent, so publishing the same agent again gives back the same link.
-   */
-
   unpublish(userId: string, id: string) {
     return Effect.fn("AgentTemplates.unpublish")(() =>
       Effect.gen({ self: this }, function* () {
         const bindings = yield* MarketplaceStorage;
 
         const now = Date.now();
-        // One transaction reads the image keys and clears them, so a republish racing this unpublish
-        // cannot leave an image that no row names.
         const [before] = yield* marketplaceCall(() =>
           bindings.DB.batch([
             bindings.DB.prepare(
@@ -304,8 +275,6 @@ export class AgentTemplates {
         const row = before?.results?.[0];
         if (!row) return yield* Effect.fail(marketplaceError(notFound()));
         const images = yield* marketplaceDecode(() => storedImages(row));
-        // The unpublish has happened; a failed delete must not turn it into an error that a retry
-        // can no longer fix, because the row no longer names these images.
         yield* this.deleteImagesEffect([images.avatarKey, images.cardKey]);
       }),
     )().pipe(Effect.provide(MarketplaceStorage.layer(this.bindings)));
@@ -351,7 +320,6 @@ export class AgentTemplates {
     )();
   }
 
-  /** A marketplace skill travels by reference, so it must name an approved version that exists. */
   private validateSkillsEffect(
     snapshot: AgentTemplateSnapshot,
   ): Effect.Effect<void, AgentMarketplaceError | AgentTemplatesStorageError, MarketplaceStorage> {
@@ -399,7 +367,6 @@ function notFound(): AgentMarketplaceError {
   return new AgentMarketplaceError(404, "template_not_found", "The agent was not found.");
 }
 
-/** 16 random bytes as base64url: 22 characters, the shape `isAgentTemplateId` accepts. */
 function newTemplateId(): string {
   return encodeBase64Url(crypto.getRandomValues(new Uint8Array(16)));
 }
