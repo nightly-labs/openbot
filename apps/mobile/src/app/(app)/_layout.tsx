@@ -33,6 +33,7 @@ import {
   MobileWorkspaceProvider,
   useMobileWorkspaceReader,
 } from "@/features/workspace/context/mobile-workspace-context";
+import { findChatAgent } from "@/features/workspace/model/directory-agents";
 import {
   knownSideThread,
   type OutsideTarget,
@@ -129,14 +130,24 @@ function AuthenticatedStack() {
         : screen === "task" && typeof openTaskId === "string"
           ? { agentId: openAgentId, serverId: shownServerId, taskId: openTaskId }
           : null;
-  const showsChat = useCallback((agentId: string, serverId: string | null = null) => {
-    const current = shown.current;
-    return (
-      current?.agentId === agentId &&
-      current.taskId === null &&
-      (serverId === null || current.serverId === null || current.serverId === serverId)
-    );
-  }, []);
+  const workspace = useMobileWorkspaceReader();
+  const showsAgent = useCallback(
+    (agentId: string, serverId: string | null) => {
+      const current = shown.current;
+      if (current?.agentId !== agentId) return false;
+      if (serverId === null) return true;
+      const state = workspace();
+      const shownServer =
+        current.serverId ?? findChatAgent(state.agents, agentId, undefined, state.activeServer.id)?.serverId;
+      return shownServer === undefined || shownServer === serverId;
+    },
+    [workspace],
+  );
+  const showsChat = useCallback(
+    (agentId: string, serverId: string | null = null) =>
+      showsAgent(agentId, serverId) && shown.current?.taskId === null,
+    [showsAgent],
+  );
   const showChat = useCallback(
     (agentId: string | null, serverId: string | null = null) => {
       closeDrawer();
@@ -151,7 +162,7 @@ function AuthenticatedStack() {
     ({ serverId, agentId, taskId }: SideThreadDestination) => {
       closeDrawer();
       const current = shown.current;
-      if (current?.agentId === agentId) {
+      if (current && showsAgent(agentId, serverId)) {
         if (current.taskId === taskId) return;
         if (current.taskId !== null) {
           router.setParams<"/task/[taskId]">({ taskId });
@@ -160,7 +171,7 @@ function AuthenticatedStack() {
       } else if (router.canDismiss()) router.dismissAll();
       router.push({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId } });
     },
-    [closeDrawer],
+    [closeDrawer, showsAgent],
   );
   const openFromOutside = useCallback(
     (agentId: string | null, serverId: string | null = null) => whenUnlocked(() => showChat(agentId, serverId)),
@@ -207,7 +218,6 @@ function AuthenticatedStack() {
   useEffect(() => setShortcutNavigator(openShortcutTarget), [openShortcutTarget]);
   useEffect(() => setShareSheetOpener(() => whenUnlocked(() => router.push("/share"))), []);
   useEffect(() => (isAndroid ? watchAndroidShares() : undefined), []);
-  const workspace = useMobileWorkspaceReader();
   const queryClient = useQueryClient();
   const scope = useQueryScope();
   const queryScope = useRef(scope);
@@ -282,10 +292,10 @@ function AuthenticatedStack() {
   const onScreen = useCallback(
     (target: NotificationTarget) => {
       const current = shown.current;
-      if (!current || current.agentId !== target.agentId) return false;
+      if (!current || !showsAgent(target.agentId, target.serverId)) return false;
       return current.taskId === (knownSideThread(target, targetSources)?.taskId ?? null);
     },
-    [targetSources],
+    [targetSources, showsAgent],
   );
   useNotificationTaps(openTarget, onScreen);
 

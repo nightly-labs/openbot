@@ -11,7 +11,7 @@ import { firstParam } from "@/features/chat/components/use-conversation-message"
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { noteChatOpened } from "@/features/quick-actions/model/recent-agents";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
-import { sameAgentApartFromMessage } from "@/features/workspace/model/directory-agents";
+import { findChatAgent, sameAgentApartFromMessage } from "@/features/workspace/model/directory-agents";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -78,17 +78,6 @@ export function AgentChatScreen() {
       </Pressable>
     </View>
   );
-}
-
-function findChatAgent(
-  agents: readonly MobileAgent[],
-  agentId: string | undefined,
-  serverId: string | undefined,
-  activeServerId: string,
-): MobileAgent | undefined {
-  const withId = agents.filter((agent) => agent.id === agentId);
-  if (serverId) return withId.find((agent) => agent.serverId === serverId);
-  return withId.find((agent) => agent.serverId === activeServerId) ?? withId[0];
 }
 
 function sameChatAgent(previous: MobileAgent | undefined, next: MobileAgent | undefined): boolean {
