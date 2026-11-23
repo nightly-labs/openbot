@@ -436,8 +436,12 @@ export const messages = defineMessages("error.provider", {
   "error.provider.claudeSessionMissing":
     "Claude Code could not find the saved session of this chat. OpenBot started a new Claude Code session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
+  "error.provider.acpSignInNoStart":
+    "The provider did not start, so the sign-in could not begin. Try again, or restart OpenBot.",
   "error.provider.acpSignInTimedOut": "The sign-in timed out.",
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",
+  "error.provider.geminiNoBrowserUseCode":
+    "This computer has no browser for the Google sign-in. Choose Log in with code, open the link on any device, then paste the code.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini could not open the sign-in page. Install a browser and xdg-utils, then connect from a desktop session on this host. A server with no desktop cannot complete this sign-in.",
   "error.provider.geminiBrowserOpenFailed":

@@ -323,6 +323,7 @@
     "test:codex-sign-in-watch": "bun scripts/codex-sign-in-watch-e2e.ts",
     "test:antigravity-usage": "bun scripts/antigravity-usage-e2e.ts",
     "test:antigravity-session-files": "bun scripts/antigravity-session-files-e2e.ts",
+    "test:acp-sign-in-errors": "bun scripts/acp-sign-in-errors-e2e.ts",
     "test:workflow-model-steps": "bun scripts/workflow-model-steps-e2e.ts",
     "test:credit-media-workflow": "bun scripts/credit-media-workflow-e2e.ts",
     "test:workflow-paid-media": "bun scripts/workflow-paid-media-e2e.ts",

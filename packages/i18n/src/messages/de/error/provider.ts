@@ -466,8 +466,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code hat die gespeicherte Sitzung dieses Chats nicht gefunden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.grokSignIn": "Führe `grok login` aus oder setze XAI_API_KEY, um Grok zu verwenden.",
+  "error.provider.acpSignInNoStart":
+    "Der Anbieter ist nicht gestartet, darum konnte die Anmeldung nicht beginnen. Versuche es erneut oder starte OpenBot neu.",
   "error.provider.acpSignInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen.",
   "error.provider.acpSignInStopped": "Die Anmeldung wurde vor dem Abschluss gestoppt.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Dieser Computer hat keinen Browser für die Google-Anmeldung. Wähle „Mit Code anmelden“, öffne den Link auf einem beliebigen Gerät und füge dann den Code ein.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini konnte die Anmeldeseite nicht öffnen. Installiere einen Browser und xdg-utils und verbinde dich dann aus einer Desktop-Sitzung auf diesem Host. Ein Server ohne Desktop kann diese Anmeldung nicht abschließen.",
   "error.provider.geminiBrowserOpenFailed":

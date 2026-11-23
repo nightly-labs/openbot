@@ -421,8 +421,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "لم يعثر Claude Code على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.grokSignIn": "شغّل `grok login` أو عيّن XAI_API_KEY لاستخدام Grok.",
+  "error.provider.acpSignInNoStart": "لم يبدأ المزوّد، لذلك لم يبدأ تسجيل الدخول. حاول مرة أخرى، أو أعد تشغيل OpenBot.",
   "error.provider.acpSignInTimedOut": "انتهت مهلة تسجيل الدخول.",
   "error.provider.acpSignInStopped": "توقف تسجيل الدخول قبل اكتماله.",
+  "error.provider.geminiNoBrowserUseCode":
+    "لا يوجد متصفح على هذا الكمبيوتر لتسجيل الدخول إلى Google. اختر «تسجيل الدخول برمز»، وافتح الرابط على أي جهاز، ثم الصق الرمز.",
   "error.provider.geminiBrowserUnavailable":
     "تعذّر على Gemini فتح صفحة تسجيل الدخول. ثبّت متصفحًا وxdg-utils، ثم اتصل من جلسة سطح مكتب على هذا المضيف. لا يمكن لخادم بلا سطح مكتب إكمال تسجيل الدخول هذا.",
   "error.provider.geminiBrowserOpenFailed":

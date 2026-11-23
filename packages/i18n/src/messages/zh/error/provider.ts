@@ -401,8 +401,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code 找不到此聊天已保存的会话。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
   "error.provider.grokSignIn": "请运行 `grok login`，或设置 XAI_API_KEY 以使用 Grok。",
+  "error.provider.acpSignInNoStart": "服务商没有启动，所以无法开始登录。请重试，或重新启动 OpenBot。",
   "error.provider.acpSignInTimedOut": "登录超时。",
   "error.provider.acpSignInStopped": "登录在完成之前就停止了。",
+  "error.provider.geminiNoBrowserUseCode":
+    "这台电脑没有可用于 Google 登录的浏览器。请选择“用验证码登录”，在任意设备上打开链接，然后粘贴验证码。",
   "error.provider.geminiBrowserUnavailable":
     "Gemini 无法打开登录页面。请安装浏览器与 xdg-utils，然后在该主机的桌面会话中连接。没有桌面的服务器无法完成该登录。",
   "error.provider.geminiBrowserOpenFailed": "Gemini 无法在浏览器中打开登录页面。请检查默认浏览器，然后重新连接。",

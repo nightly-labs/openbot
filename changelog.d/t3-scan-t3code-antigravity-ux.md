@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- When Gemini has no browser for the Google sign-in, as on a server with no desktop, the error now says to log in with a code. When the provider does not start, a sign-in now says that, not only that it timed out.
 - A Gemini turn that sends nothing for 15 minutes, with no tool or question open, now ends with the error that Gemini wrote to its log, such as a failed request to Google. When the log has no error, the turn ends as stopped responding. Before, the turn could show Working for hours.
 
 - When Google's servers answer a Gemini turn with "Requested entity was not found" after the agent already did work, the agent now continues the work on its backup model. Before, the turn stopped with this error and the work did not continue.

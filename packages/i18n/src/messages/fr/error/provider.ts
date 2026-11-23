@@ -469,8 +469,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code n’a pas trouvé la session enregistrée de cette conversation. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
   "error.provider.grokSignIn": "Exécutez `grok login` ou définissez XAI_API_KEY pour utiliser Grok.",
+  "error.provider.acpSignInNoStart":
+    "Le fournisseur n’a pas démarré, donc la connexion n’a pas pu commencer. Réessayez ou redémarrez OpenBot.",
   "error.provider.acpSignInTimedOut": "La connexion a expiré.",
   "error.provider.acpSignInStopped": "La connexion s’est arrêtée avant la fin.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Cet ordinateur n’a pas de navigateur pour la connexion à Google. Choisissez « Connexion par code », ouvrez le lien sur n’importe quel appareil, puis collez le code.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini n’a pas pu ouvrir la page de connexion. Installez un navigateur et xdg-utils, puis connectez-vous depuis une session de bureau sur cet hôte. Un serveur sans bureau ne peut pas terminer cette connexion.",
   "error.provider.geminiBrowserOpenFailed":

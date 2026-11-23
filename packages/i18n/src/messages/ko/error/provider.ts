@@ -446,8 +446,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code가 이 채팅의 저장된 세션을 찾지 못했어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.grokSignIn": "Grok을 사용하려면 `grok login`을 실행하거나 XAI_API_KEY를 설정하세요.",
+  "error.provider.acpSignInNoStart":
+    "제공자가 시작되지 않아 로그인을 시작할 수 없었어요. 다시 시도하거나 OpenBot을 다시 시작해 주세요.",
   "error.provider.acpSignInTimedOut": "로그인 시간이 초과되었어요.",
   "error.provider.acpSignInStopped": "로그인이 완료되기 전에 중단되었어요.",
+  "error.provider.geminiNoBrowserUseCode":
+    "이 컴퓨터에는 Google 로그인에 쓸 브라우저가 없어요. ‘코드로 로그인’을 선택하고 아무 기기에서 링크를 연 다음 코드를 붙여넣어 주세요.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini가 로그인 페이지를 열 수 없었어요. 브라우저와 xdg-utils를 설치한 후 이 호스트의 데스크톱 세션에서 연결하세요. 데스크톱이 없는 서버에서는 이 로그인을 완료할 수 없어요.",
   "error.provider.geminiBrowserOpenFailed":

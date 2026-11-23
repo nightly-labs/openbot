@@ -442,8 +442,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code не нашёл сохранённую сессию этого чата. OpenBot начал новую сессию Claude Code с историей чата. Повторите попытку.",
   "error.provider.grokSignIn": "Выполните `grok login` или задайте XAI_API_KEY, чтобы использовать Grok.",
+  "error.provider.acpSignInNoStart":
+    "Провайдер не запустился, поэтому вход не смог начаться. Повторите попытку или перезапустите OpenBot.",
   "error.provider.acpSignInTimedOut": "Время входа истекло.",
   "error.provider.acpSignInStopped": "Вход прервался, не завершившись.",
+  "error.provider.geminiNoBrowserUseCode":
+    "На этом компьютере нет браузера для входа в Google. Выберите «Войти по коду», откройте ссылку на любом устройстве, затем вставьте код.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini не удалось открыть страницу входа. Установите браузер и xdg-utils, затем подключитесь из сеанса рабочего стола на этом хосте. Сервер без рабочего стола не может завершить этот вход.",
   "error.provider.geminiBrowserOpenFailed":

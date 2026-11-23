@@ -453,8 +453,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code bu sohbetin kayıtlı oturumunu bulamadı. OpenBot sohbet geçmişiyle yeni bir Claude Code oturumu başlattı. Tekrar deneyin.",
   "error.provider.grokSignIn": "Grok'u kullanmak için `grok login` komutunu çalıştırın veya XAI_API_KEY ayarlayın.",
+  "error.provider.acpSignInNoStart":
+    "Sağlayıcı başlamadı, bu yüzden oturum açma başlayamadı. Yeniden deneyin veya OpenBot’u yeniden başlatın.",
   "error.provider.acpSignInTimedOut": "Oturum açma zaman aşımına uğradı.",
   "error.provider.acpSignInStopped": "Oturum açma tamamlanmadan önce durdu.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Bu bilgisayarda Google ile oturum açmak için tarayıcı yok. “Kodla oturum aç”ı seçin, bağlantıyı herhangi bir cihazda açın, sonra kodu yapıştırın.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini oturum açma sayfasını açamadı. Bir tarayıcı ve xdg-utils yükleyin, ardından bu ana makinede bir masaüstü oturumundan bağlanın. Masaüstü olmayan bir sunucu bu oturum açma işlemini tamamlayamaz.",
   "error.provider.geminiBrowserOpenFailed":

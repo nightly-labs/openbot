@@ -450,8 +450,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.grokSignIn": "Voer `grok login` uit of stel XAI_API_KEY in om Grok te gebruiken.",
+  "error.provider.acpSignInNoStart":
+    "De aanbieder is niet gestart, dus het inloggen kon niet beginnen. Probeer het opnieuw of start OpenBot opnieuw.",
   "error.provider.acpSignInTimedOut": "Het inloggen duurde te lang.",
   "error.provider.acpSignInStopped": "Het inloggen is gestopt voordat het klaar was.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Deze computer heeft geen browser voor de Google-aanmelding. Kies ‘Inloggen met code’, open de link op een willekeurig apparaat en plak daarna de code.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini kon de inlogpagina niet openen. Installeer een browser en xdg-utils en verbind vanuit een desktopsessie op deze host. Een server zonder desktop kan deze inlog niet afronden.",
   "error.provider.geminiBrowserOpenFailed":

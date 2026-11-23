@@ -455,8 +455,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code non ha trovato la sessione salvata di questa chat. OpenBot ha avviato una nuova sessione di Claude Code con la cronologia della chat. Riprova.",
   "error.provider.grokSignIn": "Esegui `grok login` o imposta XAI_API_KEY per usare Grok.",
+  "error.provider.acpSignInNoStart":
+    "Il provider non si è avviato, quindi l’accesso non è potuto iniziare. Riprova o riavvia OpenBot.",
   "error.provider.acpSignInTimedOut": "L'accesso è scaduto.",
   "error.provider.acpSignInStopped": "L'accesso si è interrotto prima di essere completato.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Questo computer non ha un browser per l’accesso a Google. Scegli «Accedi con un codice», apri il link su qualsiasi dispositivo, poi incolla il codice.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini non è riuscito ad aprire la pagina di accesso. Installa un browser e xdg-utils, poi connettiti da una sessione desktop su questo host. Un server senza desktop non può completare questo accesso.",
   "error.provider.geminiBrowserOpenFailed":
