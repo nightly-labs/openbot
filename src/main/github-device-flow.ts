@@ -1,9 +1,3 @@
-// The OAuth device flow of a GitHub App, and the token refresh that follows it.
-//
-// Only the public Client ID is used. GitHub refreshes a token that the device flow issued without
-// the client secret, so the whole sign-in stays on this computer and no account server takes part.
-// https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app#using-the-device-flow-to-generate-a-user-access-token
-
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result, Schema } from "effect";
 import { z } from "zod";
@@ -12,20 +6,15 @@ import { GitHubOperationError, githubCall, githubDecode } from "./github-effects
 const GITHUB_DEVICE_CODE_URL = "https://github.com/login/device/code";
 const GITHUB_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
 const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
-/** GitHub asks for this much more wait after each `slow_down`. */
 const SLOW_DOWN_MS = 5_000;
-/** A request that GitHub has not answered in this time fails as unreachable, so a sign-in never hangs. */
 export const GITHUB_REQUEST_TIMEOUT_MS = 30_000;
 
-/** A field that is missing or of the wrong type reads as absent, so each caller names what it needs. */
 const text = z.string().min(1).optional().catch(undefined);
-/** A form-encoded answer carries numbers as text. */
 const count = z
   .union([z.number().finite(), z.string().regex(/^\d+$/u).transform(Number)])
   .optional()
   .catch(undefined);
 
-/** Every field of a device code, token or OAuth error answer that this module reads. */
 const oauthAnswerSchema = z.object({
   error: text,
   error_description: text,
@@ -47,23 +36,17 @@ export interface GitHubDeviceCode {
   deviceCode: string;
   userCode: string;
   verificationUri: string;
-  /** Epoch milliseconds. */
   expiresAt: number;
   intervalMs: number;
 }
 
 export interface GitHubTokenSet {
   accessToken: string;
-  /** Epoch milliseconds, or null when the GitHub App issues tokens that do not expire. */
   accessTokenExpiresAt: number | null;
   refreshToken: string | null;
   refreshTokenExpiresAt: number | null;
 }
 
-/**
- * Why the flow stopped. `denied`, `expired` and `refresh_rejected` are the user's or GitHub's final
- * answer; the others are a fault that a retry can fix.
- */
 export type GitHubDeviceFlowFailure =
   | "denied"
   | "expired"
@@ -101,8 +84,6 @@ export interface PollGitHubDeviceTokenOptions extends GitHubDeviceFlowOptions {
   signal: AbortSignal;
 }
 
-/** Asks GitHub for a user code. The user types it at `verificationUri`. An abort rejects with the signal's reason. */
-
 export const requestGitHubDeviceCode = Effect.fn("GitHub.requestDeviceCode")(function* (
   options: GitHubDeviceFlowOptions & { signal: AbortSignal },
 ): Effect.fn.Return<GitHubDeviceCode, GitHubOperationError> {
@@ -131,8 +112,6 @@ export const requestGitHubDeviceCode = Effect.fn("GitHub.requestDeviceCode")(fun
     intervalMs: Math.max(1, body.interval ?? 5) * 1_000,
   };
 });
-
-/** Keep GitHub's polling interval and retry only unreachable requests. */
 
 export const pollGitHubDeviceToken = Effect.fn("GitHub.pollDeviceToken")(function* (
   options: PollGitHubDeviceTokenOptions,
@@ -210,14 +189,7 @@ const postFormEffect = Effect.fn("GitHub.postForm")(function* (
     Effect.mapError(
       ({ cause }) =>
         new GitHubOperationError({
-          cause: signal?.aborted
-            ? signal.reason
-            : new GitHubDeviceFlowError(
-                "unreachable",
-                sourceText("error.connector.githubUnreachable", {
-                  detail: cause instanceof Error ? cause.message : String(cause),
-                }),
-              ),
+          cause: signal?.aborted ? signal.reason : githubUnreachable(cause),
         }),
     ),
   );
@@ -242,9 +214,40 @@ function flowError(code: string, body: OAuthAnswer | null): GitHubDeviceFlowErro
     case "bad_refresh_token":
       return new GitHubDeviceFlowError("refresh_rejected", sourceText("error.connector.githubExpired"));
     default:
-      // The error code and GitHub's own description only. Never the body: it can hold a token.
       return unexpected([code, body?.error_description].filter(Boolean).join(": "));
   }
+}
+
+/** Codes that say the request never got to GitHub: no name lookup, no route, or no connection. */
+const NETWORK_CODES = new Set([
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ENETUNREACH",
+  "ENETDOWN",
+  "EHOSTUNREACH",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/**
+ * A request that got no answer. Node rejects it with a bare "fetch failed", and the reason (DNS, a
+ * refused connection) is only on its `cause`, sometimes in an `AggregateError`. A network reason
+ * gets a sentence that says what to check; any other failure names its innermost reason.
+ */
+export function githubUnreachable(error: unknown): GitHubDeviceFlowError {
+  let detail = error instanceof Error ? error.message : String(error);
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth++) {
+    const code = "code" in current ? current.code : undefined;
+    if (typeof code === "string" && NETWORK_CODES.has(code)) {
+      return new GitHubDeviceFlowError("unreachable", sourceText("error.connector.githubOffline"));
+    }
+    if (current.message) detail = current.message;
+    current = current.cause ?? (current instanceof AggregateError ? current.errors[0] : undefined);
+  }
+  return new GitHubDeviceFlowError("unreachable", sourceText("error.connector.githubUnreachable", { detail }));
 }
 
 function unexpected(detail: string): GitHubDeviceFlowError {

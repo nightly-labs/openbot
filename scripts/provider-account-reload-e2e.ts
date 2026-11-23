@@ -1,6 +1,3 @@
-// Checks saved accounts through the real runtime, account store, and provider adapters with local CLI fixtures.
-// Run: bun scripts/provider-account-reload-e2e.ts
-// Report: .openbot-build/provider-update-busy-e2e/account-reload-report.json
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -31,7 +28,6 @@ export async function checkProviderAccountReload(): Promise<void> {
     OPENBOT_CLAUDE_PATH: process.env.OPENBOT_CLAUDE_PATH,
   };
 
-  // Account status comes from a file in the selected account folder, never from a real sign-in.
   const FAKE_CLI = `#!${process.execPath}
 const fs = require("node:fs");
 const path = require("node:path");
@@ -63,7 +59,13 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       result = { account: value.email === null ? null : { type: "chatgpt", email: value.email } };
       break;
     }
-    case "account/rateLimits/read": result = { rateLimits: null, rateLimitsByLimitId: null }; break;
+    case "account/rateLimits/read":
+      if (fs.existsSync(path.join(folder, "usage-refused"))) {
+        fs.writeFileSync(path.join(folder, "usage-read"), "");
+        return write({ id: message.id, error: { code: -32603, message: "Usage service refused the read" } });
+      }
+      result = { rateLimits: null, rateLimitsByLimitId: null };
+      break;
     case "model/list": result = { data: [{ model: "gpt-5.5", displayName: "GPT-5.5" }] }; break;
     case "plugin/list": result = { marketplaces: [] }; break;
     case "config/read": result = { config: { mcp_servers: {} }, layers: [] }; break;
@@ -87,6 +89,8 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
   const agents = new AgentStore(join(root, "profile"), join(root, "home"), database);
   const accountsPath = join(root, "accounts.json");
   const accountsRoot = join(root, "accounts");
+  let claudeUsageRefused = false;
+  let claudeUsageReads = 0;
 
   function createRuntime(accounts: ProviderAccountStore): ProviderRuntime {
     return new ProviderRuntime({
@@ -141,6 +145,11 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
             setModel: async () => undefined,
             applyFlagSettings: async () => undefined,
             close: () => undefined,
+            usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET: async () => {
+              if (!claudeUsageRefused) return { rate_limits_available: false };
+              claudeUsageReads += 1;
+              return { rate_limits_available: true };
+            },
           }),
           undefined,
           5_000,
@@ -256,8 +265,6 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
       runtime = undefined;
     }
 
-    // An account that lost its login after its check: the start of an agent on it must say so and
-    // change the row, which stayed "connected" (#8277).
     const lostLogin = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(lostLogin.load());
     runtime = createRuntime(lostLogin);
@@ -282,8 +289,6 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
     await stop(runtime);
     runtime = undefined;
 
-    // A login that ends while the agent's process runs: the turn fails, and the row must not stay
-    // "connected" (#12479). A refusal without the sign-in expired text keeps it connected.
     const turnLostLogin = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(turnLostLogin.load());
     runtime = createRuntime(turnLostLogin);
@@ -312,7 +317,23 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
     await stop(runtime);
     runtime = undefined;
 
-    // A provider that reports no account must finish its check without removing the saved account.
+    const refusedUsage = new ProviderAccountStore(accountsPath, accountsRoot);
+    await runCauseEffect(refusedUsage.load());
+    const codexSecondary = refusedUsage.list("codex")[0];
+    assert.ok(codexSecondary);
+    await writeFile(join(refusedUsage.home(codexSecondary), "usage-refused"), "");
+    claudeUsageRefused = true;
+    runtime = createRuntime(refusedUsage);
+    await runCauseEffect(runtime.start());
+    await waitForAccounts(runtime, "connected");
+    assert.ok(claudeUsageReads > 0, "the Claude account check read the usage");
+    await readFile(join(refusedUsage.home(codexSecondary), "usage-read"));
+    claudeUsageRefused = false;
+    await rm(join(refusedUsage.home(codexSecondary), "usage-refused"));
+    results.push({ name: "a background check whose usage read fails keeps the account connected", passed: true });
+    await stop(runtime);
+    runtime = undefined;
+
     const signedOut = new ProviderAccountStore(accountsPath, accountsRoot);
     await runCauseEffect(signedOut.load());
     for (const account of signedOut.list()) await saveAccount(signedOut.home(account), null);

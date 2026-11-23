@@ -21,6 +21,10 @@ export const messages = {
   "channel.panel.close": "סגירת חלונית הערוץ",
   "channel.settings.title": "הגדרות ערוץ",
   "channel.settings.memories": "זיכרונות",
+  "channel.settings.folders.title": "תיקיות",
+  "channel.settings.folders.description": "כל החברים ב־{channel} יכולים לשנות קבצים ולהריץ פקודות בתיקיות האלה.",
+  "channel.settings.folders.toastAdded": "החברים ב־{channel} יכולים עכשיו לשנות קבצים ב־{folder}",
+  "channel.settings.folders.toastRemoved": "החברים ב־{channel} כבר לא יכולים לשנות קבצים ב־{folder}",
   "channel.settings.isolated": "שמירת הזיכרונות בערוץ הזה",
   "channel.settings.isolatedDescription":
     "הסוכנים שומרים כאן את מה שלמדו כזיכרונות של הערוץ. הצ'אטים האחרים שלהם לא רואים אותם.",

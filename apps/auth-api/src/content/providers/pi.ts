@@ -1,9 +1,5 @@
 import type { ProviderPage } from "./provider-page";
 
-// Every statement about Pi here is taken from pi.dev, Pi's GitHub repository and Earendil's
-// release post. Each page used is in `sources`. Check them again, and move `checkedAt`,
-// whenever this file changes.
-
 const REPO = "https://github.com/earendil-works/pi";
 
 export const PI_PROVIDER: ProviderPage = {

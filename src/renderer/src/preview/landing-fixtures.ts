@@ -14,8 +14,6 @@ import type {
   DirectMessage,
   DirectThreadSummary,
   Routine,
-  RoutineFlowLink,
-  RoutineFlowStep,
   RoutineRun,
   RoutineSchedule,
   ServerSummary,
@@ -31,11 +29,6 @@ import productionLogoUrl from "../assets/openbot-logo-production.png";
 import { STORY_AGENT_STATUS, STORY_PRESENCE } from "./fixtures";
 import type { MockChannelSeed } from "./mock-channels";
 import type { MockOpenBotOptions } from "./mock-openbot";
-
-/*
- * The app demo on the home page: four agents, each on a different provider, that plan a launch
- * together. Every time is an offset from the moment the page opens, so the demo always shows today.
- */
 
 const LANDING_PREVIEW_EMAIL = "norbertbodziony@gmail.com";
 const MINUTE_MS = 60_000;
@@ -58,7 +51,6 @@ const LANDING_CONTEXT_WINDOWS: Record<string, number> = {
   pulse: 256_000,
 };
 
-/** The tokens in each agent's context window before and after its demo scene. */
 export const LANDING_CONTEXT_TOKENS: Record<string, { before: number; after: number }> = {
   atlas: { before: 41_200, after: 96_800 },
   scout: { before: 118_000, after: 212_000 },
@@ -89,7 +81,6 @@ function landingContextState(agentId: string, usedTokens: number): AgentContextS
   };
 }
 
-/** A runtime snapshot with no turn running. It carries the context meter of each agent. */
 export function landingRuntimeSnapshot(
   agents: readonly ClientAgentSummary[],
   contextTokens: Record<string, number>,
@@ -307,7 +298,6 @@ function landingServers(): ServerSummary[] {
   ];
 }
 
-/** The two teammates of the demo: Alice and Maya. */
 const LANDING_MEMBER_IDS = new Set(["member-self", "member-alice", "member-maya"]);
 
 function landingPresence(at: (minutesAgo: number) => string): TeamPresenceSnapshot {
@@ -446,15 +436,8 @@ function landingUpdateStatus(at: (minutesAgo: number) => string): UpdateStatus {
   };
 }
 
-type LandingRoutines = Required<
-  Pick<MockOpenBotOptions, "routines" | "routineRuns" | "routineFlowLinks" | "routineFlowSteps">
->;
+type LandingRoutines = Required<Pick<MockOpenBotOptions, "routines" | "routineRuns">>;
 
-/**
- * The routines, with links and the steps of the last run, so the Routines canvas shows what each
- * agent was asked and what it answered. They use the visitor's time zone, so the app does not offer
- * to move them.
- */
 function landingRoutines(at: (minutesAgo: number) => string, timezone: string): LandingRoutines {
   const createdAt = at(14 * 24 * 60);
   const routine = (
@@ -494,10 +477,6 @@ function landingRoutines(at: (minutesAgo: number) => string, timezone: string): 
     createdAt: at(minutesAgo),
     updatedAt: at(minutesAgo - durationMinutes),
   });
-  /** The message a linked agent gets, in the template of `handoffText` in `src/backend/routine-flows/routine-flows.ts`. */
-  const handoff = (routineName: string, from: string, answer: string, instruction: string) =>
-    `The routine "${routineName}" continues with you.\n\n${from} answered:\n\n${answer}\n\n${instruction}`;
-
   const brief = routine("atlas", "landing-routine-morning-brief", {
     name: "Morning launch brief",
     instruction: "Summarize launch progress, blockers, owners, and the next decision in five bullets.",
@@ -537,74 +516,9 @@ function landingRoutines(at: (minutesAgo: number) => string, timezone: string): 
   const briefRun = run(brief, "landing-run-morning-brief", 120, 6);
   const scanRun = run(scan, "landing-run-competitor-scan", 150, 3);
 
-  const toScout = "Check each claim in the brief against a primary source. Mark it confirmed, changed, or unverified.";
-  const toPulse = "Add what people say about each item this week, with the strongest signal first.";
-  const scoutToForge = "Do not change code yet. List the changes the changed claims need, smallest first.";
-  const atlasAnswer = [
-    "- Progress: the pricing page fix is in review, and the launch post has a draft.",
-    "- Blocker: the demo video needs one more review.",
-    "- Owners: Forge has the PR, Scout has the comparison table, Pulse has the launch post.",
-    "- Risk: two competitor prices in the table are from last month.",
-    "- Next decision: launch on Friday at 10:00, or wait for the video.",
-  ].join("\n");
-  const scoutAnswer = [
-    "- Pricing page fix in review: confirmed, PR #412.",
-    "- Competitor prices: changed. Both raised their team plans by $5 per seat on Tuesday.",
-    "- Demo video: confirmed in the review thread.",
-  ].join("\n");
-  const pulseAnswer = [
-    "1. Agent teams: mentions up 34%, mostly positive.",
-    "2. Context that survives a model switch: the top request.",
-    "3. Pricing: two threads compare per-seat prices.",
-  ].join("\n");
-  const forgeAnswer = [
-    "1. Change the two competitor prices in `pricing-table.json`.",
-    "2. Run the pricing page tests again.",
-    "No other change is needed for the claims in this brief.",
-  ].join("\n");
-
-  const step = (
-    id: string,
-    agentId: string,
-    input: string,
-    output: string,
-    minutesAgo: number,
-    delivered: boolean,
-  ): RoutineFlowStep => ({
-    id: `landing-step-${id}`,
-    runId: briefRun.id,
-    agentId,
-    deliveryId: delivered ? `landing-step-${id}-delivery` : null,
-    input,
-    output,
-    status: "succeeded",
-    error: null,
-    createdAt: at(minutesAgo),
-    updatedAt: at(minutesAgo - 2),
-  });
-  const link = (id: string, fromAgentId: string, toAgentId: string, instruction: string): RoutineFlowLink => ({
-    id: `landing-link-${id}`,
-    routineId: brief.id,
-    fromAgentId,
-    toAgentId,
-    instruction,
-    createdAt,
-  });
-
   return {
     routines: { atlas: [brief, review], scout: [scan], forge: [dependencies], pulse: [signals] },
     routineRuns: { [brief.id]: [briefRun], [scan.id]: [scanRun] },
-    routineFlowLinks: [
-      link("brief-scout", "atlas", "scout", toScout),
-      link("brief-pulse", "atlas", "pulse", toPulse),
-      link("scout-forge", "scout", "forge", scoutToForge),
-    ],
-    routineFlowSteps: [
-      step("brief-atlas", "atlas", brief.instruction, atlasAnswer, 120, false),
-      step("brief-scout", "scout", handoff(brief.name, "Atlas", atlasAnswer, toScout), scoutAnswer, 118, true),
-      step("brief-pulse", "pulse", handoff(brief.name, "Atlas", atlasAnswer, toPulse), pulseAnswer, 118, true),
-      step("brief-forge", "forge", handoff(brief.name, "Scout", scoutAnswer, scoutToForge), forgeAnswer, 116, true),
-    ],
   };
 }
 
@@ -612,7 +526,6 @@ const LANDING_CHANNEL_ID = "channel-launch";
 
 type LandingChannelLine = [author: "member-self" | "atlas" | "pulse" | "scout", text: string, minutesAgo: number];
 
-/** The launch channel: you and the agents plan Friday together. */
 function landingChannels(at: (minutesAgo: number) => string): MockChannelSeed[] {
   const authors = {
     "member-self": { kind: "member", id: "member-self", name: "Norbert" },
@@ -664,7 +577,6 @@ function landingChannels(at: (minutesAgo: number) => string): MockChannelSeed[] 
   ];
 }
 
-/** Two sections: the launch work, and the research that feeds it. */
 function landingSidebarLayout(): SidebarLayoutSnapshot {
   return {
     revision: 1,
@@ -684,7 +596,6 @@ function landingSidebarLayout(): SidebarLayoutSnapshot {
   };
 }
 
-/** Each chat starts read through its last message, so a reply that lands later shows as unread. */
 function landingConversationReads(
   snapshots: Record<string, ConversationSnapshot>,
 ): Record<string, ConversationReadState> {
@@ -739,7 +650,6 @@ export function createLandingPreviewOptions(now: Date): MockOpenBotOptions {
     browserTabs: [],
     browserControlState: { sessions: [] },
     remoteDesktopSessions: [],
-    // The team server serves every capability, `host-update-v1` too; it is up to date, so no update notice shows.
     hostUpdate: {
       phase: "idle",
       currentVersion: "0.49.0",

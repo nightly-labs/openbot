@@ -27,6 +27,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "メイン画面をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureChannel":
     "画像はチャンネル {channel} に表示され、このサーバーでチャンネルを読むメンバー全員が見ることができます。",
+  "status.agent.screenCapturePermissionNext": "その後、macOS が OpenBot に画面収録を許可するよう求めることがあります。",
   "status.agent.screenCaptureDisplay":
     "ディスプレイ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.screenCaptureWindow": "ウィンドウ {name} をキャプチャし、その画像をエージェントのモデルに送信します。",
@@ -71,6 +72,7 @@ export const messages = {
   "status.agent.browserActing": "Web ページを操作しています…",
   "status.agent.browserReviewing": "Web ページを確認しています…",
   "status.agent.memoriesSearching": "メモリーを検索しています…",
+  "status.agent.chatsSearching": "過去のチャットを検索しています…",
   "status.agent.memoriesSearched": { other: "メモリーを検索しました: {count} 件見つかりました" },
   "status.agent.memoriesUpdating": "メモリーを更新しています…",
   "status.agent.skillUsing": "スキル {name} を使用しています…",
@@ -108,7 +110,6 @@ export const messages = {
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
   "status.agent.mcpToolCall": "MCP サーバー {name} のツール {tool} を実行します。",
   "status.agent.uiBlockClosedByMessage": "新しいメッセージで閉じられました",
-  "status.agent.finishCheckContinues": "依頼はまだ終わっていません。エージェントが続けます（{current}/{limit}）。",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
   "status.agent.planStopped":
@@ -117,4 +118,8 @@ export const messages = {
     "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
   "status.agent.providerExitContinues": "エージェントは回答を終える前に停止しました。エージェントは続行します。",
   "status.agent.branchTitle": "分岐したチャット",
+  "status.agent.location.field": "現在地",
+  "status.agent.location.placeholder": "市区町村、住所、場所",
+  "status.agent.location.submit": "共有",
+  "status.agent.location.shared": "位置情報を共有しました",
 } as const satisfies PartialTranslation<typeof source>;

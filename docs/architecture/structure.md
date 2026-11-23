@@ -109,7 +109,9 @@ SolidJS, provider, Cloudflare, and application code; and the account server to d
   an MCP tool (`_meta.codex_approval_kind` `mcp_tool_call`, a tool set to ask every time included), and
   saves nothing: "Always allow" stays the user's choice, which Codex keeps per server and tool. A
   Workspace only agent keeps its card; a Computer Use tool does not. OpenBot keeps Codex's `approvalPolicy`
-  at `on-request`, because `never` denies MCP tool calls and rejects elicitations. Other questions, MCP
+  at `on-request`, because `never` denies MCP tool calls and rejects elicitations. At Ask first
+  (`codexApprovalPolicy`) it sends `untrusted`: with no sandbox, `on-request` asks before almost no
+  command, and `untrusted` asks before each command and file change. Other questions, MCP
   forms and sign-in requests, and browser takeovers remain interactive.
 - A Workspace only agent can change files in its workspace, the shared folder, and the folders that the
   user added (`AgentSummary.additionalFolders`, in `agent_json`, real paths, at most 32). One function,

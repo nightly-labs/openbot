@@ -76,6 +76,8 @@ export const messages = defineMessages("mobile.channel", {
   "mobile.channel.form.deselectAll": "Deselect all",
   "mobile.channel.form.memories": "Memories",
   "mobile.channel.form.routines": "Routines",
+  "mobile.channel.folders.description": "All members of {channel} can change files and run commands in these folders.",
+  "mobile.channel.folders.removeBody": "Members of {channel} can no longer change files in {folder}",
   "mobile.channel.form.deleteTitle": "Delete channel?",
   "mobile.channel.form.deleteBody":
     "This stops the channel. Its history stays in Deleted channels for preview only. You can restore it from there. Member agents are kept.",

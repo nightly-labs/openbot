@@ -11,7 +11,6 @@ export const messages = {
   "error.billing.storageUnavailable": "Bu depolama alanı bu sunucu için kullanılamaz.",
   "error.billing.storagePaymentFailed":
     "Depolama alanının ödemesi başarısız oldu. Ödeme yöntemini güncelleyip tekrar deneyin.",
-  // Masaüstü ve web istemcilerinin oluşturduğu faturalandırma hataları.
   "error.billing.licenseExists": "Bu hesabın zaten bir lisansı var. Bunun yerine kullanıcı sayısını değiştirin.",
   "error.billing.licenseCurrency": "Lisans, diğer planlarınızın para birimini kullanmalıdır.",
   "error.billing.planCurrency": "Yeni bir plan, diğer planlarınızın para birimini kullanmalıdır.",
@@ -33,4 +32,6 @@ export const messages = {
   "error.billing.invalidRequest": "Faturalandırma isteği geçersiz.",
   "error.billing.invalidResponse": "Faturalandırma yanıtı geçersiz.",
   "error.billing.notStripePage": "Faturalandırma sayfası bir Stripe sayfası değil.",
+  "error.billing.customServerOfferMissing": "Bu sunucunun ödenecek bir planı yok.",
+  "error.billing.checkoutUnavailable": "Ödeme şu anda başlatılamıyor. Bir dakika sonra yeniden deneyin.",
 } as const satisfies PartialTranslation<typeof source>;

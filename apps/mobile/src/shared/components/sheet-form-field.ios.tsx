@@ -11,7 +11,6 @@ import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.t
 import { APP_FONT } from "@/shared/lib/app-font";
 import { layoutDirection, textDirection } from "@/shared/lib/text-direction";
 
-// Fast typing can be some keystrokes in front of JS. This many recent field texts count as echoes.
 const RECENT_FIELD_TEXTS = 8;
 
 export function SheetFormField({
@@ -39,14 +38,8 @@ export function SheetFormField({
   value,
 }: SheetFormFieldProps) {
   const [foreground, muted, border, danger] = useThemeColor(["foreground", "muted", "border", "danger"]);
-  // The SwiftUI field is not a React Native `Text`, so it takes the text size of the app here.
   const textScale = useTextScale();
   const nativeValue = useNativeState(value);
-  // On iOS 18 and later, SwiftUI stops the app ("String index is out of bounds") when JS replaces the
-  // text of a focused field: the selection still points into the old text (expo/expo#47434, #48274).
-  // When the user types fast, a re-render can send back an older text that the field sent. Such an
-  // echo is not written to the field. Other values from JS, such as a paste, go at once. A clear goes
-  // at once too: it is safe, because the field drops each selection past the end of the new text.
   const fieldTexts = useRef([value]);
   useEffect(() => {
     const [current, ...older] = fieldTexts.current;
@@ -55,7 +48,6 @@ export function SheetFormField({
     nativeValue.set(value);
   }, [nativeValue, value]);
   const lines = multiline ? (tall ? 14 : 4) : 1;
-  // A tall field takes the height of its lines, so the lines fill it.
   const height = tall && multiline ? undefined : multiline ? 108 : 54;
 
   return (
@@ -88,8 +80,6 @@ export function SheetFormField({
             modifiers={[accessibilityLabel(label)]}
             multiline={multiline}
             numberOfLines={lines}
-            // SwiftUI aligns to the leading or trailing side of the layout. Text in the other
-            // direction than the layout goes to the trailing side.
             textAlign={textAlign ?? (textDirection(value, layoutDirection()) === layoutDirection() ? "left" : "right")}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}

@@ -3,7 +3,6 @@ import { dirname } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { type ReportStorage, telemetryIO } from "./queue";
 
-/** Atomic replacement; the file contains sanitized reports only. */
 export function fileReportStorage(path: string): ReportStorage {
   return {
     read: () =>

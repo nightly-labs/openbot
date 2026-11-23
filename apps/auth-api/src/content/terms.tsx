@@ -1,6 +1,3 @@
-// The text of the terms and conditions. Legal wording: change it only from the approved source text,
-// and move `TERMS_UPDATED_AT` with it.
-
 import { Link } from "@tanstack/solid-router";
 
 const CONTACT_EMAIL = "hello@openbot.run";
@@ -71,7 +68,7 @@ export function Terms() {
       <ul>
         <li>Starter License – intended for one individual user (one Seat).</li>
         <li>
-          Team License – intended for teams of at least five individual users (a minimum of five Seats), with the option
+          Team License – intended for teams of at least two individual users (a minimum of two Seats), with the option
           to purchase additional Seats.
         </li>
       </ul>
@@ -97,6 +94,7 @@ export function Terms() {
         The available Hosted Server plans include Starter, Standard, and Pro, which differ in their intended use,
         available resources, storage capacity, performance, and other technical characteristics.
       </p>
+      <p>A monthly data transfer limit of 10 TB applies per Hosted Server.</p>
       <p>
         Hosted Server Services are purchased separately from Commercial Licenses. Purchasing a Hosted Server does not
         grant a Commercial License, and purchasing a Commercial License does not include a Hosted Server.
@@ -116,23 +114,62 @@ export function Terms() {
         Licenses. The applicable discounts and final charges are presented before completing the purchase.
       </p>
       <p>
-        A user may share an invite link. An account that is created with that link gets 10% off each payment for a
-        Hosted Server or a Commercial License. For each paid invoice of that account, the user who shared the link gets
-        10% of the amount without tax as credit on the user's Stripe account, which is taken off the user's next
-        invoices. The credit starts when that account pays a second time, at the first renewal of its plan. Credit from
-        the payments before that renewal is given at the renewal, and no credit is given if the plan stops before it.
-        Credit collects until it reaches US$20 (€17, 67 zł or R$100), and then goes to the user's Stripe account. Credit
-        has no cash value and is not paid out. When a payment is refunded or a dispute is lost, the credit from that
-        payment is taken back, up to the credit that remains. A user cannot use the user's own link. A person who signs
-        in can also enter an invite link or code at sign-in; it counts only when that sign-in creates the account. When
-        an invited account pays with a card that the user who shared the link also used, the invite ends: the account
-        loses the discount, and the credit from that account that was not yet given is not given.
+        A user may share an invite link. An account that is created with that link gets 10% off the first payment of its
+        first purchase of a Hosted Server or a Commercial License. Accounts that got the invite discount before 20
+        November 2026 keep 10% off each payment of the plans that they bought before that date. For each paid invoice of
+        that account, the user who shared the link gets 10% of the amount without tax as credit on the user's Stripe
+        account, which is taken off the user's next invoices. For a yearly invoice, the credit is given in 12 equal
+        parts, one part every 30 days after the payment. For other invoices, the credit starts when that account pays a
+        second time, at the first renewal of its plan. Credit from the payments before that renewal is given at the
+        renewal, and no credit is given if the plan stops before it. Credit collects until it reaches US$20 (€17, 67 zł
+        or R$100), and then goes to the user's Stripe account. Credit has no cash value and is not paid out. When a
+        payment is refunded or a dispute is lost, the credit from that payment is taken back, up to the credit that
+        remains. A user cannot use the user's own link. A person who signs in can also enter an invite link or code at
+        sign-in; it counts only when that sign-in creates the account. When an invited account pays with a card that the
+        user who shared the link also used, the invite ends: the account loses the discount, and the credit from that
+        account that was not yet given is not given.
       </p>
       <p>All payments for Commercial Licenses and Hosted Server subscriptions are processed through Stripe.</p>
       <p>
         The renewal, cancellation, and termination of Commercial Licenses are governed by the Commercial License
         Agreement. The corresponding conditions for Hosted Server subscriptions are governed by the relevant provisions
         of these Terms.
+      </p>
+
+      <h2>OpenBot Credits</h2>
+      <p>
+        OpenBot credits ("Credits") are prepaid units that you buy with a one-time payment. A Credits purchase is not a
+        subscription and does not renew. The price, the currency, the number of Credits and the taxes are shown before
+        you pay. All payments for Credits are processed through Stripe.
+      </p>
+      <p>Credits that you buy do not expire.</p>
+      <p>
+        A paid commercial license also includes free Credits each month: 50 Credits for a Starter license, and 100
+        Credits for a Team license plus 50 Credits for each user after the first. The free Credits go to the balance of
+        the license owner at the start of each paid month, also during a yearly license. A free trial does not include
+        them. OpenBot uses free Credits before bought Credits. Free Credits that are not used expire at the end of their
+        month. When the owner moves free Credits to a server, they keep the same end date. When a license changes during
+        a month, the free Credits of that month do not change. Free Credits have no cash value and are not refunded.
+      </p>
+      <p>
+        You can buy Credits for your own balance or for the balance of a server where you are an active member. The
+        owner of a server can move Credits between the owner's own balance and the balance of that server. Credits
+        cannot be moved to another account, sold, or exchanged for money, and they have no cash value.
+      </p>
+      <p>
+        When a server is removed or deleted, the Credits on its balance go to the balance of the server owner. When a
+        payment for a server completes after that server was removed, the Credits go to the balance of the user who
+        paid.
+      </p>
+      <p>
+        Credits are not refunded, and the 2-hour refund offer in "Consumer Right of Withdrawal" does not apply to
+        Credits. This does not limit your mandatory statutory rights. When you are a consumer with a statutory right of
+        withdrawal, you can ask at checkout that OpenBot delivers the Credits at once. You then lose the right of
+        withdrawal when the Credits are delivered to the balance.
+      </p>
+      <p>
+        When a payment for Credits is refunded or a dispute is lost, OpenBot takes the Credits of that payment back from
+        the balance that received them, up to the Credits that remain on it.
       </p>
 
       <h2>Conclusion and Duration of the Agreement</h2>
@@ -546,7 +583,7 @@ export function Terms() {
       <h2>Fees, Subscriptions and Payments</h2>
       <p>
         Certain OpenBot Services, including Commercial Licenses and Hosted Server Services, are available on a paid
-        subscription basis.
+        subscription basis. Credits are bought with one-time payments, as described in "OpenBot Credits".
       </p>
       <p>
         The applicable fees, billing periods, plan characteristics, and any additional charges are presented on the{" "}
@@ -621,13 +658,13 @@ export function Terms() {
         renewal, retain server data, delete a server immediately, or schedule its deletion at the end of the paid
         billing period.
       </p>
+      <p>Upon expiry of the paid subscription, the Hosted Server will be deactivated.</p>
       <p>
-        When a paid subscription expires, the Hosted Server ceases to operate under that subscription. Where the User
-        has not requested deletion, the expiry of the subscription does not itself constitute an instruction to delete
-        the associated workspace data.
+        Where the User has not requested deletion, the expiry of the subscription does not itself constitute an
+        instruction to delete the associated workspace data.
       </p>
       <p>
-        If the subscription is not renewed, the associated Hosted Server data will be retained for 30 days following the
+        If the subscription is not renewed, the associated Hosted Server data will be retained for 14 days following the
         expiry of the paid billing period. If the subscription is not renewed or reactivated within this period, the
         associated Hosted Server data will be deleted.
       </p>
@@ -636,6 +673,18 @@ export function Terms() {
         Where a User chooses to delete a Hosted Server, the associated server environment and its contents, including
         agent workspaces, conversations, files, and related materials, are removed in accordance with the applicable
         functionality.
+      </p>
+      <p>
+        In the case of a refund for a Hosted Server subscription, the associated Hosted Server, including its
+        environment and all stored content, will be deleted immediately upon approval of the refund request by us,
+        without the 14-day data retention period otherwise applicable following subscription expiry. Such deletion is
+        permanent, and the associated data cannot be recovered.
+      </p>
+      <p>
+        In the case of a payment dispute or chargeback for a Hosted Server subscription within 30 days of the start of
+        that subscription, the associated Hosted Server, including its environment and all stored content, will be
+        deleted immediately, without the 14-day data retention period. Such deletion is permanent, and the associated
+        data cannot be recovered.
       </p>
       <p>
         Users are responsible for saving or exporting any content they wish to retain before deleting a Hosted Server.
@@ -650,7 +699,8 @@ export function Terms() {
       <p>
         If you submit a refund request by email to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> within 2
         hours of completing your purchase, OpenBot offers a refund of 90% of the amount paid, retaining the remaining
-        10% as an administrative handling fee, provided that this does not limit your mandatory statutory rights.
+        10% as an administrative handling fee, provided that this does not limit your mandatory statutory rights. This
+        offer does not apply to Credits.
       </p>
       <p>
         If you are a consumer residing in the European Union, the United Kingdom, or Turkey and exercise your statutory
@@ -699,15 +749,14 @@ export function Terms() {
       <ul>
         <li>serious or repeated violations of these Terms;</li>
         <li>unlawful activities or unauthorised use of the Services;</li>
-        <li>threats to the security or integrity of the Platform or connected infrastructure;</li>
+        <li>
+          activities that may harm the Platform, compromise its security or integrity, or disrupt its proper operation.
+        </li>
         <li>
           failure to fulfil payment obligations relating to paid Services, in accordance with the applicable contractual
           conditions; or
         </li>
         <li>compliance with applicable legal obligations or binding decisions of competent authorities.</li>
-        <li>
-          activities that may harm the Platform, compromise its security or integrity, or disrupt its proper operation.
-        </li>
       </ul>
       <p>Any measures taken will be appropriate and proportionate to the circumstances, subject to applicable law.</p>
       <p>

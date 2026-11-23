@@ -12,7 +12,6 @@ export async function recordingToWav(recording: Blob): Promise<Uint8Array> {
   return encodePcmWav(await recordingToSamples(recording), VOICE_AUDIO_LIMITS.sampleRate);
 }
 
-/** The recording as mono samples at the 16 kHz rate that both local models and ElevenLabs take. */
 export async function recordingToSamples(recording: Blob): Promise<Float32Array> {
   const context = new AudioContext();
   try {
@@ -48,7 +47,6 @@ function encodePcmWav(samples: Float32Array, sampleRate: number): Uint8Array {
   return output;
 }
 
-/** Signed 16-bit little-endian samples, with no header. */
 export function encodePcm16(samples: Float32Array): Uint8Array {
   const output = new Uint8Array(samples.length * 2);
   const view = new DataView(output.buffer);

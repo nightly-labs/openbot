@@ -7,8 +7,7 @@
   color: var(--openbot-text-primary);
   background: var(--openbot-bg-canvas);
 }
-/* A backdrop paints at -1 under the page, so the page is clear while it shows. The root keeps the
- * canvas color behind the backdrop. */
+
 :root[data-openbot-window-glass] .web-app {
   background: transparent;
 }
@@ -17,7 +16,15 @@
   height: 100%;
 }
 
-/* The browser has no window controls, so the rail starts at the top. */
+.web-slow-load-notice {
+  position: fixed;
+  z-index: var(--openbot-layer-toast);
+  bottom: var(--openbot-space-6);
+  left: 50%;
+  width: min(356px, calc(100vw - 2 * var(--openbot-space-4)));
+  translate: -50% 0;
+}
+
 .web-app-frame > .server-rail,
 .web-other-tab-window > .server-rail {
   padding-top: var(--openbot-space-3);
@@ -37,7 +44,6 @@
   display: none;
 }
 
-/* The phone app screen: the store links under the sign-in title, and the browser choice as a quiet link. */
 .web-phone-app-stores {
   width: 100%;
   display: grid;
@@ -61,7 +67,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The analytics box of the sign-in form is a line of the form, not a row of a grouped list. */
 .web-consent-row.first-run-choice-improve {
   align-items: flex-start;
   border-top: 0;
@@ -72,7 +77,6 @@
   margin-top: 1px;
 }
 
-/* The Terms notice sits under the lock line in the page footer of the sign-in screen. */
 .account-login-legal .first-run-consent-notice {
   width: auto;
   margin: 0;
@@ -83,12 +87,20 @@
   inset-inline-end: 0;
 }
 
+.web-app-window[data-loading-waited-long] > .app-loading {
+  z-index: var(--openbot-layer-dropdown);
+}
+
+.web-app-window[data-loading-waited-long] > .window-rail {
+  z-index: calc(var(--openbot-layer-dropdown) + 1);
+  background: var(--window-frame);
+}
+
 @media (max-width: 720px) {
   .web-app-window {
     --web-mobile-navigation-height: 64px;
   }
 
-  /* The workspace pane shows the page rail at its left, so its pages stay in reach on a phone. */
   .web-app-window:has(> .web-app-frame[data-web-mobile-pane="workspace"]) > .window-rail {
     display: flex;
     padding-bottom: calc(
@@ -99,7 +111,6 @@
   }
 
   .web-app-frame {
-    /* The workspace pane gives the rail a 56px column, also in the macOS geometry. */
     --server-rail-width: 56px;
 
     grid-template-columns: minmax(0, 1fr);
@@ -115,13 +126,11 @@
     display: none;
   }
 
-  /* One pane at a time leaves nothing to resize. */
   .web-app-frame > .left-panel-resizer {
     display: none;
   }
 
   .web-app-frame[data-web-mobile-pane="conversation"] .conversation-panel,
-  .web-app-frame[data-web-mobile-pane="conversation"] .diagram-view,
   .web-app-frame[data-web-mobile-pane="conversation"] .remote-compatibility-screen {
     grid-column: 1;
     min-width: 0;
@@ -132,7 +141,6 @@
   }
 
   .web-app-frame[data-web-mobile-pane="workspace"] .conversation-panel,
-  .web-app-frame[data-web-mobile-pane="workspace"] .diagram-view,
   .web-app-frame[data-web-mobile-pane="workspace"] .remote-compatibility-screen,
   .web-app-frame[data-web-mobile-pane="workspace"] > .server-connection-workspace {
     display: none;
@@ -151,7 +159,6 @@
     width: auto;
   }
 
-  /* The server menu view draws no rail, so the sidebar takes the full width. */
   .web-app-frame[data-web-mobile-pane="workspace"]:not(.app-frame-with-server-rail) {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -236,11 +243,6 @@
     max-width: 100%;
   }
 
-  /*
-   * A phone has no room beside the chat. An open pane takes the full width under the chat header,
-   * which keeps its panel button, and the tab row is a second row. A maximized pane covers the chat
-   * header, as on desktop.
-   */
   .web-app-frame[data-web-mobile-pane="conversation"]
     .side-panel-docked:not(.side-panel-maximized)
     > .conversation-header {
@@ -274,7 +276,6 @@
     top: calc(2 * var(--left-header-height, 38px));
   }
 
-  /* The pane list has no tabs, so it starts under the chat header. */
   .web-app-frame[data-web-mobile-pane="conversation"] .side-panel-docked:has(> .side-panel-empty) > .side-panel-header {
     display: none;
   }
@@ -302,7 +303,6 @@
   }
 }
 
-/* Takes the conversation-panel grid cell, so it follows the same desktop and mobile placement. */
 .web-connect.conversation-panel {
   display: grid;
   place-items: center;
@@ -396,7 +396,6 @@
   gap: var(--openbot-space-3);
 }
 
-/* Side by side; the buttons stack when the card is too narrow for both labels. */
 .web-connect-primary-actions {
   display: flex;
   width: 100%;
@@ -409,7 +408,6 @@
   flex: 1 1 0;
 }
 
-/* The public site sets `a { color: inherit }`, which beats the zero-specificity button colour. */
 .web-connect-download.ui-button-variant-default,
 .web-connect-download.ui-button-variant-default:hover {
   color: var(--openbot-text-on-light);
@@ -419,7 +417,6 @@
   color: var(--openbot-text-secondary);
 }
 
-/* The same hover query as the shared outline button, so a tap leaves no hover colour. */
 @media (hover: hover) and (pointer: fine) and (min-width: 601px) {
   .web-connect-download.ui-button-variant-outline:hover {
     color: var(--openbot-text-primary);
@@ -447,7 +444,6 @@
   height: var(--openbot-icon-sm);
 }
 
-/* Takes the whole window in place of the workspace. */
 .web-other-tab-window {
   display: flex;
   height: 100%;

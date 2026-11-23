@@ -11,7 +11,6 @@ import {
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/")({
   server: {
     handlers: {
-      // The owner removes the host from the account service. The host does not need to be online.
       DELETE: ({ request, params }) =>
         runApiResponse(
           Effect.gen(function* () {

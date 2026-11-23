@@ -25,4 +25,7 @@ export const messages = {
     "Die Vorschau endet bei 100 MB. Du kannst diese Datei in ihrer Standardanwendung öffnen.",
   "preview.spreadsheet.readFailed": "Diese Tabelle konnte nicht gelesen werden.",
   "preview.spreadsheet.truncated": "Vorschau auf die ersten {rows} Zeilen und {columns} Spalten begrenzt.",
+  "preview.document.readFailed": "Dieses Dokument konnte nicht gelesen werden.",
+  "preview.document.empty": "Dieses Dokument enthält keinen Text zum Anzeigen.",
+  "preview.document.truncated": "Vorschau auf den ersten Teil des Dokuments begrenzt.",
 } as const satisfies PartialTranslation<typeof source>;

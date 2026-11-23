@@ -8,11 +8,6 @@ import type { DynamicToolResult } from "../protocol";
 
 const logger = createOpenBotLogger("browser-screenshot-file");
 
-/**
- * `openbot_browser.screenshot` with `save: true` also writes the image as a PNG or JPEG file in the agent's
- * workspace. The inline image reaches only the model, so an agent could not attach it to its response
- * or put it in a report (#7328, #7405). The workspace is a folder that `attach_files_to_response` reads.
- */
 export const saveBrowserScreenshot = Effect.fn("saveBrowserScreenshot")(function* (
   workspacePath: () => string,
   args: unknown,
@@ -46,7 +41,6 @@ export const saveBrowserScreenshot = Effect.fn("saveBrowserScreenshot")(function
   );
 });
 
-/** Decodes the arguments as the browser host does, so a repaired or wrapped call also saves its file. */
 function savesFile(args: unknown): boolean {
   try {
     const call = parseBrowserToolCall("screenshot", args);

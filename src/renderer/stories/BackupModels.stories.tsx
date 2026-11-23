@@ -20,7 +20,6 @@ type Story = StoryObj<typeof meta>;
 
 const OWN: AgentModelChoice = { provider: "claude", model: "claude-opus-5-5" };
 
-/** Claude Opus 5.5 is at its usage limit, so the page marks it and the card does not offer it. */
 const SOURCE: BackupModelSource = {
   modelOptions: STORY_MODELS,
   providers: STORY_AGENT_STATUS.providers,
@@ -36,7 +35,6 @@ const ORDER: AgentBackupModels = {
   ],
 };
 
-/** A fixed moment, so the story reads the same on every run and in every review screenshot. */
 const RESETS_AT = Date.UTC(2026, 8, 21, 9, 0) / 1_000;
 
 function Page(props: { value: AgentBackupModels | null }) {
@@ -55,13 +53,10 @@ function Page(props: { value: AgentBackupModels | null }) {
   );
 }
 
-/** The default: no order, and the agent asks before it switches. */
 export const AskFirst: Story = { render: () => <Page value={null} /> };
 
-/** A saved order. The model at its usage limit is skipped. */
 export const SavedOrder: Story = { render: () => <Page value={ORDER} /> };
 
-/** The chat card while a usage limit holds a message that has not started. */
 export const AskCard: Story = {
   render: () => (
     <div style={{ width: "640px" }}>

@@ -1,10 +1,6 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import type { CompanySignInCalls } from "./features/servers/ServerCompanySignInSection";
 
-/**
- * What the app shell and the cross-domain root modules reach in main, plus the shell actions
- * (`openUrl`, `openExternal`) that several domains share.
- */
 export interface AppPort {
   getAppInfo: OpenBotDesktopApi["getAppInfo"];
   getAppAppearancePreference: OpenBotDesktopApi["getAppAppearancePreference"];
@@ -36,18 +32,25 @@ export interface AppPort {
   acpRegistry: OpenBotDesktopApi["acpRegistry"];
   hostedSites: OpenBotDesktopApi["hostedSites"];
   billing: OpenBotDesktopApi["billing"];
+  credits: OpenBotDesktopApi["credits"];
   referral: OpenBotDesktopApi["referral"];
   license: OpenBotDesktopApi["license"];
-  auth: CompanySignInCalls;
+  auth: CompanySignInCalls &
+    Pick<
+      OpenBotDesktopApi["auth"],
+      "listOwnerTransfers" | "acceptOwnerTransfer" | "declineOwnerTransfer" | "onOwnerTransfersChanged"
+    >;
   hostedServers: OpenBotDesktopApi["hostedServers"];
   routineFeed: OpenBotDesktopApi["routineFeed"];
   events: OpenBotDesktopApi["events"];
   plugins: Pick<OpenBotDesktopApi["plugins"], "onOpenListing" | "takePendingListing">;
   marketplace: Pick<OpenBotDesktopApi["marketplace"], "onOpenListing" | "takePendingListing">;
-  servers: Pick<OpenBotDesktopApi["servers"], "onInvite" | "takePendingInvite">;
+  servers: Pick<
+    OpenBotDesktopApi["servers"],
+    "onInvite" | "takePendingInvite" | "getOwnerTransfer" | "startOwnerTransfer" | "cancelOwnerTransfer"
+  >;
 }
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function appPort(): AppPort {
   return window.openbot;
 }

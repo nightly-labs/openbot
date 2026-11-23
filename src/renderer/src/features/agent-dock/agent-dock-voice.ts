@@ -6,26 +6,15 @@ import { composerDraftKey } from "../conversation/conversation-keys";
 import type { ComposerDraft } from "../conversation/conversation-types";
 import { createVoiceStore, VOICE_LEVEL_COUNT, type VoiceStoreDeps } from "../conversation/stores/voice-store";
 
-/**
- * The microphone of the dock chats, with the voice store of the chat composer. The words go into the
- * draft of the chat that started the recording; a send while it records sends the draft with them.
- * Call it in a component: the recording stops when the component goes.
- */
 export function createAgentDockVoice(serverId: () => string): AgentDockVoice {
   const [phase, setPhase] = createSignal<ReturnType<VoiceStoreDeps["voicePhase"]>>("idle");
   const [levels, setLevels] = createSignal<number[]>(Array.from({ length: VOICE_LEVEL_COUNT }, () => 0));
   const [elapsedSeconds, setElapsedSeconds] = createSignal(0);
   const [liveText, setLiveText] = createSignal("");
   const [modelProgress, setModelProgress] = createSignal<number | null>(null);
-  /**
-   * The chat of the last recording. It stays set while the words are transcribed. A plain value: the
-   * store reads it in the same task that sets it, before a signal write would show.
-   */
   let current: AgentDockVoiceTarget | undefined;
   const target = () => current;
   let mounted = true;
-  /* The voice store keys its recording by agent id. The seat key stands in for it: it names an agent or
-     a channel seat, and nothing outside this adapter reads it. */
   const recordingTarget = () => ({ agentId: target()?.seatKey ?? "", serverId: serverId() });
   const key = () => composerDraftKey(recordingTarget());
   const draft = (): ComposerDraft => ({ ...EMPTY_DRAFT, text: target()?.draft() ?? "" });
@@ -65,7 +54,6 @@ export function createAgentDockVoice(serverId: () => string): AgentDockVoice {
     voiceElapsedSeconds: elapsedSeconds,
     setVoiceElapsedSeconds: setElapsedSeconds,
     setVoiceLiveTranscript: (transcript) => setLiveText(transcript?.text ?? ""),
-    // The dock chats have no side threads.
     voiceThreadKey: () => undefined,
     setVoiceThreadKey: () => {},
     setVoiceLevels: setLevels,

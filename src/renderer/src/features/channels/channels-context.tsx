@@ -1,5 +1,6 @@
 import { CHANNEL_CHATS_CAPABILITY, CHANNEL_TASK_CANCEL_CAPABILITY } from "@openbot/contracts/ipc";
 import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHAT_HISTORY_CAPABILITY } from "@openbot/contracts/team-protocol/chat-history-v1";
@@ -27,12 +28,10 @@ export function useChannels(): ChannelsController {
   }
 }
 
-/** Mounts a channels controller that a client built with its own environment. */
 export function ChannelsControllerProvider(props: ParentProps<{ controller: ChannelsController }>) {
   return <ChannelsContext value={props.controller}>{props.children}</ChannelsContext>;
 }
 
-/** The desktop channels domain: preload is the runtime, and the app's contexts are the environment. */
 export function ChannelsProvider(props: ParentProps) {
   const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
   const { agentList, setAgentSetupOpen } = useAgents();
@@ -44,7 +43,6 @@ export function ChannelsProvider(props: ParentProps) {
     const auth = centralAuth();
     return auth.status === "signed_in" ? auth.user.id : auth.status;
   };
-  /** A message in a channel asks its members, so a workflow that one of them makes opens here (#11072). */
   const port = (): ChannelsPort => {
     const base = channelsPort();
     return {
@@ -82,26 +80,26 @@ export function ChannelsProvider(props: ParentProps) {
     browserSupported: () => activeServerSupportsCapability(CHANNEL_BROWSER_CAPABILITY),
     messageDeletionSupported: () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY),
     deletesAnyMessage: () => activeServer()?.kind === "local" || serverRoleCanAdminister(activeServer()),
-    // A joined server keeps the picture with `channel-picture-v1`. Until the server is known, the editor stays hidden.
     pictureSupported: () =>
       activeServer()?.kind === "local" || activeServerSupportsCapability(CHANNEL_PICTURE_CAPABILITY),
-    // Until the server is known, the rows stay hidden.
     contextActionsSupported: () =>
       activeServer() !== undefined && activeServerSupportsCapability(CHAT_HISTORY_CAPABILITY),
+    foldersMode: () => {
+      const server = activeServer();
+      if (server?.kind === "local") return "local";
+      return server?.kind === "remote" &&
+        activeServerSupportsCapability(CHANNEL_FOLDERS_CAPABILITY) &&
+        serverRoleCanAdminister(server)
+        ? "remote"
+        : null;
+    },
     beforeOpen: () => {
       setAgentSetupOpen(false);
-      // The channel covers the workspace, and a direct conversation left selected under it is read
-      // automatically as its messages arrive. Selecting an agent closes the channel in the shared
-      // navigation; this is the same exchange the other way round.
       setDirectTyping(false);
       clearDirectSelection();
       windowPage.showAgents();
     },
-    // A rail page, such as Usage or Settings, covers the workspace content, so a message that
-    // arrives behind it was never seen, however focused the window is. The channel stays
-    // selected under the report, which is the state this read has to refuse.
     canMarkRead: () => document.hasFocus() && !windowPage.conversationCovered(),
-    // The rows of a joined server's channels go to its frame for the next start.
     onList: (channels) => {
       const server = activeServer();
       const auth = centralAuth();

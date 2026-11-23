@@ -68,12 +68,9 @@ import { messagingStateUnknown } from "./SlackIntegrationPanel";
 import { telegramOrchestrator } from "./TelegramIntegrationPanel";
 
 export type WhatsAppIntegrationAgent = ChannelAgent;
-/** The model of the WhatsApp Orchestrator that the user picks in the link dialog. */
 export type WhatsAppOrchestratorChoice = ChannelOrchestratorChoice;
-/** The catalog behind the model picker. Absent, the orchestrator starts on a new agent's default. */
 export type WhatsAppOrchestratorModels = ChannelOrchestratorModels;
 
-/** No link runs. */
 export const WHATSAPP_LINK_IDLE: WhatsAppLinkState = {
   status: "idle",
   qr: null,
@@ -83,44 +80,28 @@ export const WHATSAPP_LINK_IDLE: WhatsAppLinkState = {
 };
 
 export interface WhatsAppIntegrationPanelProps extends IntegrationPageSlots {
-  /** Every agent on the server. */
   agents: WhatsAppIntegrationAgent[];
-  /** The joined server whose numbers these are. Absent: this computer. */
   hostName?: string | undefined;
-  /** The linked WhatsApp numbers. */
   connections: MessagingConnection[];
-  /** The settings of each linked number, by `workspaceId`. */
   accounts: WhatsAppAccount[];
-  /** True while an action runs. Every button waits for it. */
   busy: boolean;
   models?: WhatsAppOrchestratorModels | undefined;
-  /** The link that runs now. The caller reads it again while it waits for the phone. */
   link: WhatsAppLinkState;
   onStartLink: (input: StartWhatsAppLinkInput) => void;
-  /** The link dialog closed. The caller cancels a link that did not end in `linked`. */
   onEndLink: () => void;
   onDisconnectNumber: (workspaceId: string) => void;
-  /** Disconnects every number. */
   onDisconnectAll: () => void;
   onReconnect: (workspaceId: string) => void;
   onSetEnabled: (workspaceId: string, enabled: boolean) => void;
   onSetOwnNumber: (workspaceId: string, ownNumber: boolean) => void;
-  /** Shown only for a number whose account carries `workingMessage`: an older joined server cannot set it. */
   onSetWorkingMessage: (workspaceId: string, workingMessage: boolean) => void;
-  /** Shown only for a number whose account carries `statusReactions`: an older joined server cannot set it. */
   onSetStatusReactions: (workspaceId: string, statusReactions: boolean) => void;
   onAddOrchestrator: (choice: WhatsAppOrchestratorChoice | null) => void;
-  /** The groups of a linked number, to choose from. Rejects with the reason. */
   loadGroups: (workspaceId: string) => Promise<readonly WhatsAppGroup[]>;
   onAddSender: (workspaceId: string, sender: WhatsAppSender) => void;
   onRemoveSender: (workspaceId: string, senderId: string) => void;
   onAnswerRequest: (workspaceId: string, code: string, approve: boolean) => void;
-  /**
-   * Why the last read of the numbers failed. `connections` are from an earlier read; with none, the
-   * state is not known, so the page shows the reason and Retry and offers no link.
-   */
   loadError?: string | null | undefined;
-  /** Reads the numbers again. */
   onRetry?: (() => void) | undefined;
 }
 
@@ -158,21 +139,17 @@ const WHATSAPP_TEXT = {
   close: "connector.whatsapp.close",
 } as const satisfies ChannelText;
 
-/** On a joined server, the numbers link the host, not this computer. */
 const WHATSAPP_HOST_TEXT = {
   ...WHATSAPP_TEXT,
   description: "connector.whatsapp.descriptionHost",
 } as const satisfies ChannelText;
 
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
-  // WhatsApp removed the linked device: only a new link brings the number back.
   invalid_token: "connector.whatsapp.helpLoggedOut",
-  // The saved keys of the number cannot be read: a reconnect has nothing to connect with.
   secret_storage_unavailable: "connector.whatsapp.helpKeysUnreadable",
   error: "connector.whatsapp.helpError",
 };
 
-/** True when only a new link from the phone brings the number back. */
 const needsNewLink = (connection: MessagingConnection) =>
   connection.state === "invalid_token" || connection.state === "secret_storage_unavailable";
 
@@ -183,30 +160,24 @@ const LINK_ERROR = {
   unavailable: "connector.whatsapp.failedUnavailable",
 } as const satisfies Record<NonNullable<WhatsAppLinkState["error"]>, AppTextKey>;
 
-/** A WhatsApp number in digits, as people write it. */
 function phoneNumber(digits: string): string {
   return `+${digits}`;
 }
 
-/** A phone number with only its country part and its last digits visible. */
 function maskedNumber(digits: string): string {
   return `+${digits.slice(0, 2)} ••• ${digits.slice(-3)}`;
 }
 
-/** The pairing code in two groups of four, as WhatsApp shows the field for it. */
 function groupedCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
-/** The name of a linked number: its WhatsApp name, or the number. */
 function numberName(connection: MessagingConnection): string {
   return connection.workspaceName || phoneNumber(connection.workspaceId);
 }
 
-/** The one orchestrator agent of all WhatsApp numbers, when it still exists. Telegram shares one in the same way. */
 export const whatsappOrchestrator = telegramOrchestrator;
 
-/** The state of the whole WhatsApp integration, for the page header and the Marketplace. */
 export function whatsappIntegrationState(
   connections: readonly MessagingConnection[],
   agents: readonly { id: string }[],
@@ -224,27 +195,17 @@ export function whatsappIntegrationState(
   );
 }
 
-/** Where the link dialog starts: at the number link, or at the orchestrator of the linked numbers. */
 type DialogStart = "number" | "agent";
 
-/**
- * Marketplace > Apps > WhatsApp. Each number links this computer as a device from WhatsApp on the
- * phone, and one WhatsApp Orchestrator agent receives the messages of all numbers, asks the team and
- * answers. Only the allowed contacts and groups reach it; on a number only for OpenBot, an unknown
- * person gets a code that the owner approves here.
- */
 export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
   const { t, format } = useText();
   const [dialogOpen, setDialogOpen] = createSignal(false);
-  /** Kept after the dialog closes, so its last step stays while it closes. */
   const [dialogStart, setDialogStart] = createSignal<DialogStart>("number");
   const [disconnecting, setDisconnecting] = createSignal<MessagingConnection | null>(null);
-  /** The number that the contact or group dialog adds to; each dialog is open while it is set. */
   const [addingContact, setAddingContact] = createSignal<string | null>(null);
   const [addingGroup, setAddingGroup] = createSignal<string | null>(null);
   const orchestrator = () => whatsappOrchestrator(props.connections, props.agents);
   const account = (workspaceId: string) => props.accounts.find((entry) => entry.workspaceId === workspaceId);
-  /** The numbers whose settings are known, in the order of the number list. */
   const linked = () =>
     props.connections.flatMap((connection) => {
       const settings = account(connection.workspaceId);
@@ -283,7 +244,6 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
     setDialogOpen(false);
     if (dialogStart() === "number") props.onEndLink();
   };
-  // A page that goes away with the dialog open ends its link too: nothing reads it after.
   onCleanup(() => {
     if (dialogOpen() && dialogStart() === "number") props.onEndLink();
   });
@@ -408,7 +368,6 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
                   onAddGroup={() => setAddingGroup(entry.connection.workspaceId)}
                   onRemove={(senderId) => props.onRemoveSender(entry.connection.workspaceId, senderId)}
                 />
-                {/* A personal number answers no stranger, so it shows requests only when some still wait. */}
                 <Show when={!entry.account.ownNumber || entry.account.pendingRequests.length > 0}>
                   <RequestsSection
                     connection={entry.connection}
@@ -463,7 +422,6 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
         title={t("connector.whatsapp.disconnectTitle", { number: disconnectingName() })}
         description={t("connector.whatsapp.disconnectDescription", { number: disconnectingName() })}
         effect={t("connector.whatsapp.disconnectEffect", { number: disconnectingName() })}
-        // The last linked number: its disconnect deletes the WhatsApp Orchestrator.
         deletesOrchestrator={props.connections.length === 1 && orchestrator() !== null}
         onConfirm={(workspaceId) => {
           setDisconnecting(null);
@@ -479,7 +437,6 @@ function orchestratorList(agent: WhatsAppIntegrationAgent | null): WhatsAppInteg
   return agent ? [agent] : [];
 }
 
-/** The contacts and groups that can give work through one number, and the steps that add one. */
 function SendersSection(props: {
   connection: MessagingConnection;
   account: WhatsAppAccount;
@@ -562,7 +519,6 @@ function SendersSection(props: {
   );
 }
 
-/** The people who wrote to a number only for OpenBot and wait for the owner. */
 function RequestsSection(props: {
   connection: MessagingConnection;
   requests: readonly WhatsAppPairingRequest[];
@@ -632,9 +588,7 @@ function RequestsSection(props: {
   );
 }
 
-/** Adds a contact by phone number. Main keeps the number in digits; the name is optional. */
 function ContactDialog(props: {
-  /** The number that the contact can write to; the dialog is open while it is set. */
   workspaceId: string | null;
   busy: boolean;
   onAdd: (workspaceId: string, sender: WhatsAppSender) => void;
@@ -719,11 +673,8 @@ function ContactDialog(props: {
   );
 }
 
-/** Adds one group of the number. It reads the number's groups when it opens. */
 function GroupDialog(props: {
-  /** The number whose groups show; the dialog is open while it is set. */
   workspaceId: string | null;
-  /** The senders that the number allows now. Their groups show as added. */
   allowed: readonly WhatsAppSender[];
   busy: boolean;
   loadGroups: (workspaceId: string) => Promise<readonly WhatsAppGroup[]>;
@@ -737,7 +688,6 @@ function GroupDialog(props: {
     error: string;
     query: string;
   }>({ status: "loading", groups: [], error: "", query: "" });
-  /** Each read replaces the one before it, so a slow answer never overwrites a newer one. */
   let reads = 0;
   const load = (workspaceId: string) => {
     const read = ++reads;
@@ -871,18 +821,10 @@ function GroupDialog(props: {
   );
 }
 
-/** 0 links a number, 1 adds the orchestrator, and 2 is done. */
 type LinkStep = 0 | 1 | 2;
 
-/** What the number step shows: the choice, the wait for a code, the code, a failure, or the link. */
 type LinkPhase = "choose" | "starting" | "waiting" | "failed" | "linked";
 
-/**
- * Links WhatsApp in two steps. First the user selects what the number is and how the phone links:
- * by a QR code, or by a pairing code for the phone number. The phone links in WhatsApp, so the step
- * follows `link`, which the caller reads again. From `start` "agent", the dialog adds the orchestrator
- * of the numbers that are linked. With a number and the orchestrator, it is done.
- */
 export function WhatsAppLinkDialog(props: {
   open: boolean;
   start: DialogStart;
@@ -891,7 +833,6 @@ export function WhatsAppLinkDialog(props: {
   busy: boolean;
   models?: WhatsAppOrchestratorModels | undefined;
   link: WhatsAppLinkState;
-  /** True for a joined server: the phone links the host. */
   host?: boolean | undefined;
   onStartLink: (input: StartWhatsAppLinkInput) => void;
   onAddOrchestrator: (choice: WhatsAppOrchestratorChoice | null) => void;
@@ -903,7 +844,6 @@ export function WhatsAppLinkDialog(props: {
     method: StartWhatsAppLinkInput["method"];
     phone: string;
     invalid: boolean;
-    /** True until the user starts a link, and again after Try again. */
     choosing: boolean;
   }>({ ownNumber: true, method: "qr", phone: "", invalid: false, choosing: true });
   const [choice, setChoice] = createSignal<WhatsAppOrchestratorChoice | null>(null);
@@ -911,7 +851,6 @@ export function WhatsAppLinkDialog(props: {
     () => props.open,
     (open) => {
       if (!open) return;
-      // A link that runs already shows itself.
       const running = untrack(() => props.link.status) !== "idle";
       setForm((draft) => {
         draft.ownNumber = true;
@@ -933,11 +872,9 @@ export function WhatsAppLinkDialog(props: {
       case "linked":
         return "linked";
       case "idle":
-        // The start is on its way; a start that failed reported why, and the choice shows again.
         return props.busy ? "starting" : "choose";
     }
   };
-  /** The number that the dialog is about: the new one, or the first one for the orchestrator. */
   const current = () => {
     if (props.start === "agent") return props.connections[0] ?? null;
     const workspaceId = props.link.workspaceId;
@@ -999,14 +936,12 @@ export function WhatsAppLinkDialog(props: {
       open={props.open}
       closeLabel={t("connector.whatsapp.close")}
       onClose={props.onClose}
-      // A click outside must not stop a link that waits for the phone.
       dismissible={phase() !== "waiting"}
       logo={<WhatsAppTile />}
       link={dialogLink()}
       title={copy().title}
       description={copy().description}
       stepper={<Stepper steps={steps()} current={step()} label={t("connector.whatsapp.connect")} />}
-      // Only the choice has a field and a submit; Enter elsewhere does nothing.
       onSubmit={() => {
         if (step() === 0 && phase() === "choose") submit();
       }}
@@ -1107,7 +1042,6 @@ export function WhatsAppLinkDialog(props: {
           {(code) => (
             <>
               <div class="whatsapp-pairing-code">
-                {/* Read one character at a time: the user types it on the phone from this screen alone. */}
                 <output
                   class="whatsapp-pairing-digits"
                   aria-label={t("connector.whatsapp.codeLabel", { code: code().split("").join(" ") })}
@@ -1150,7 +1084,6 @@ export function WhatsAppLinkDialog(props: {
   );
 }
 
-/** What the number is, and how the phone links: by a QR code, or by a pairing code for its number. */
 function LinkChoice(props: {
   ownNumber: boolean;
   method: StartWhatsAppLinkInput["method"];
@@ -1213,7 +1146,6 @@ function LinkChoice(props: {
   );
 }
 
-/** One option of a choice: a card with a radio dot. */
 function ChoiceCard(props: { value: string; label: string; description?: string }) {
   return (
     <RadioGroup.Item class="whatsapp-choice-option" value={props.value}>
@@ -1233,7 +1165,6 @@ function ChoiceCard(props: { value: string; label: string; description?: string 
   );
 }
 
-/** The steps on the phone. */
 function LinkSteps(props: { steps: readonly AppTextKey[] }) {
   const { t } = useText();
   return (

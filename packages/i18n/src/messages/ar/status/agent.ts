@@ -25,6 +25,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "التقاط الشاشة الرئيسية وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureChannel":
     "تظهر الصورة في القناة {channel}، ويمكن لكل عضو في هذا الخادم يقرأ القناة رؤيتها.",
+  "status.agent.screenCapturePermissionNext": "قد يطلب منك macOS بعد ذلك السماح لـ OpenBot بـ «تسجيل الشاشة».",
   "status.agent.screenCaptureDisplay": "التقاط الشاشة {name} وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureWindow": "التقاط النافذة {name} وإرسال الصورة إلى نموذج الوكيل.",
   "status.agent.screenCaptureRegion":
@@ -70,6 +71,7 @@ export const messages = {
   "status.agent.browserActing": "جارٍ استخدام صفحة الويب…",
   "status.agent.browserReviewing": "جارٍ مراجعة صفحة الويب…",
   "status.agent.memoriesSearching": "جارٍ البحث في ذكرياته…",
+  "status.agent.chatsSearching": "جارٍ البحث في دردشاته السابقة…",
   "status.agent.memoriesSearched": {
     zero: "بحث في ذكرياته: لم يُعثر على شيء",
     one: "بحث في ذكرياته: عُثر على ذكرى واحدة",
@@ -116,6 +118,7 @@ export const messages = {
     "إضافة خادم MCP {name}: {target}. يحصل كل وكيل على هذا الخادم على أدواته. يتصل OpenBot به لاختباره.",
   "status.agent.mcpServerChange":
     "تغيير خادم MCP {name} إلى {target}. يحصل كل وكيل على هذا الخادم على أدواته. يتصل OpenBot به لاختباره.",
+  "status.agent.mcpServerHeaders": "ويغيّر أيضًا هذه الترويسات: {names}.",
   "status.agent.mcpServerEnable": "تشغيل خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerDisable": "إيقاف خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerRemove": "إزالة خادم MCP {name} وتسجيل دخوله من كل وكيل على هذا الخادم.",
@@ -147,11 +150,14 @@ export const messages = {
   "status.agent.vaultField.country": "رمز البلد",
   "status.agent.vaultField.phone": "الهاتف",
   "status.agent.vaultField.email": "عنوان البريد الإلكتروني",
-  "status.agent.finishCheckContinues": "لم يكتمل الطلب بعد. سيتابع الوكيل ({current} من {limit}).",
   "status.agent.nextStepContinues": "توقف الوكيل قبل خطوته التالية. سيتابع ({current} من {limit}).",
   "status.agent.planContinues": "في الخطة خطوات مفتوحة. سيتابع الوكيل ({current} من {limit}).",
   "status.agent.planStopped": "توقف الوكيل وفي خطته خطوات مفتوحة. أرسل رسالة للمتابعة.",
   "status.agent.compactionContinues": "توقف الاتصال أثناء ضغط الوكيل لسياقه. يتابع الوكيل.",
   "status.agent.providerExitContinues": "توقف الوكيل قبل أن يكمل إجابته. يتابع الوكيل.",
   "status.agent.branchTitle": "دردشة متفرعة",
+  "status.agent.location.field": "موقعك",
+  "status.agent.location.placeholder": "مدينة أو عنوان أو مكان",
+  "status.agent.location.submit": "مشاركة",
+  "status.agent.location.shared": "تمت مشاركة الموقع",
 } as const satisfies PartialTranslation<typeof source>;

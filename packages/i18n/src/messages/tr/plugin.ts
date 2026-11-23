@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/plugin";
 
 export const messages = {
-  // Eklenti pazar yeri sayfası.
   "plugin.link.website": "Web sitesi",
   "plugin.link.privacyPolicy": "Gizlilik Politikası",
   "plugin.link.terms": "Hizmet Şartları",
@@ -14,7 +13,6 @@ export const messages = {
   "plugin.info.category": "Kategori",
   "plugin.info.version": "Sürüm",
 
-  // Kaldırma onayı. {number} burada çoğul formu olmayan bir sayıdır.
   "plugin.uninstallDialog.title": "{name} bağlantısı kesilsin mi?",
   "plugin.uninstallDialog.description":
     "Bu işlem, {name} tarafından bu bilgisayara yüklenenleri kaldırır. Bu ana makinede veya bu ajanda başka hiçbir şey değişmez.",

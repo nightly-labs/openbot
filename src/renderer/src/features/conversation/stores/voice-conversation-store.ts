@@ -2,11 +2,15 @@ import {
   type ConversationMessage,
   DEFAULT_SPEECH_SETTINGS,
   LOCAL_SERVER_ID,
+  SPEECH_MODEL,
+  type SpeechModelStatus,
   VOICE_AUDIO_LIMITS,
   VOICE_MODELS,
   VOICE_STREAM_LIMITS,
+  type VoiceModelId,
+  type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
-import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
+import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { encodePcm16, recordingToSamples, recordingToWav } from "@openbot/ui/voice-recording";
 import { createEffect, createStore, onCleanup } from "solid-js";
@@ -25,47 +29,32 @@ import type { ComposerDraft, ConversationTarget } from "../conversation-types";
 import { voiceCaptureError, voiceTranscriptionError } from "../voice-status";
 import type { VoiceSend } from "./composer-actions";
 
-/** How often the microphone loudness is read, for the face and to find the end of a turn. */
 const LEVEL_INTERVAL_MS = 80;
-/** The loudness, above the room noise, that counts as speech, and how long speech must last. */
 const SPEECH_LOUDNESS = 0.3;
 const SPEECH_START_MS = 240;
-/**
- * While the reply plays, speech must be louder and longer to interrupt it, so that what is left of
- * the reply after echo cancellation does not.
- */
 const REPLY_SPEECH_LOUDNESS = 0.5;
 const REPLY_SPEECH_START_MS = 400;
-/**
- * A sound that holds the reply for this long, and goes on, is transcribed once. With no words, such
- * as running water, the reply goes on and the sound becomes the room noise.
- */
 const HOLD_WORDS_MS = 2_000;
-/** A transcript with no letter or digit, such as ".", has no words. */
 const WORD = /[\p{L}\p{N}]/u;
-/** A recording with no speech starts again after this long, at a pause, so it does not keep the silence. */
 const SILENT_RECORDING_MS = 4_000;
+const TURN_MAXIMUM_SECONDS = 120;
 const RESTART_QUIET_MS = 600;
-/** How often the words so far are transcribed again while the user speaks. */
+const PUSH_TO_TALK_MIN_MS = 300;
 const LIVE_TRANSCRIPT_INTERVAL_MS = 1_200;
-/** The same loudness scale as the dictation waveform, in dB. */
 const DIGITAL_SILENCE_DB = -90;
 const NOISE_RISE_DB = 0.1;
 const NOISE_MARGIN_DB = 6;
 const PEAK_FALL_DB = 0.05;
 const MIN_RANGE_DB = 12;
-/** What the user said is kept as Opus: about 4 KB a second, an eighth of the WAV that is transcribed. */
 const RECORDING_TYPE = "audio/webm;codecs=opus";
 const RECORDING_BITS_PER_SECOND = 32_000;
 
-/** A recorder that writes Opus, or the default format when this computer has no Opus encoder. */
 function createRecorder(stream: MediaStream): MediaRecorder {
   return MediaRecorder.isTypeSupported(RECORDING_TYPE)
     ? new MediaRecorder(stream, { mimeType: RECORDING_TYPE, audioBitsPerSecond: RECORDING_BITS_PER_SECOND })
     : new MediaRecorder(stream);
 }
 
-/** The recording that the turn makes now, so that it can be transcribed after a new one replaces it. */
 function currentRecording(turn: Recording): Recording {
   return { recorder: turn.recorder, chunks: turn.chunks, startedAt: turn.startedAt, livePreview: turn.livePreview };
 }
@@ -78,15 +67,13 @@ type VoiceConversationStep = "starting" | "listening" | "transcribing" | "waitin
 
 interface VoiceConversationState {
   phase: VoiceConversationStep;
-  /** The microphone stays off until the user unmutes it. */
   muted: boolean;
-  /** The agent's server is not connected, so the pane does not listen. */
+  talking: boolean;
   offline: boolean;
-  /** What the user said in this turn, so far. */
   heard: string;
   error: string | null;
-  /** The latest loudness readings of the microphone, from 0 to 1, oldest first. */
   levels: number[];
+  downloadProgress: number | null;
 }
 
 export interface VoiceConversationDeps {
@@ -99,90 +86,66 @@ export interface VoiceConversationDeps {
     submittedSnapshot: ComposerDraft,
     voice: VoiceSend,
   ) => Promise<boolean>;
-  /** The server of the agent is connected. The local server always is. */
   serverOnline: () => boolean;
-  /** Whether a step of a reply is a progress update, which the conversation reads aloud before the answer. */
   progressUpdate: (message: ConversationMessage) => boolean;
 }
 
-/** One recording of a turn, and the live preview that reads it. */
 interface Recording {
   recorder: MediaRecorder;
   chunks: Blob[];
-  /** When the recording started, on the `performance.now()` clock. */
   startedAt: number;
   livePreview: Promise<void> | undefined;
 }
 
-/**
- * One turn of listening: the microphone, its recorder and the loudness meter. While the turn before
- * it is transcribed and while the agent thinks or speaks, the next turn already listens, so no words
- * are lost and the user can interrupt the agent by voice.
- */
 interface Turn extends Recording {
-  /** The generation of the turn. A resumed turn gets a new one. */
   own: number;
   stream: MediaStream;
   context: AudioContext | undefined;
   timers: Array<ReturnType<typeof setInterval>>;
-  /** The user spoke in this turn. */
   spoke: boolean;
-  /** The sound now has no words: the meter takes its level as the room noise. */
   roomNoise: boolean;
 }
 
-/**
- * A conversation by voice with one agent. It listens until the user stops speaking, transcribes the
- * words, sends them to the chat, and waits while the reply is read aloud; then it listens again. It
- * ends with its owner, so the microphone is released when the pane closes.
- */
 export function createVoiceConversation(deps: VoiceConversationDeps) {
   const target = { agentId: deps.agentId, serverId: deps.serverId };
   const [state, setState] = createStore<VoiceConversationState>({
     phase: "starting",
     muted: false,
+    talking: false,
     offline: false,
     heard: "",
     error: null,
     levels: quietLevels(),
+    downloadProgress: null,
   });
-  /** Each new turn, interruption and the end make the work of the turn before them stale. */
   let generation = 0;
   let disposed = false;
   let turn: Turn | undefined;
-  /** Both models are ready, so a turn can be transcribed and its reply read aloud. */
   let ready = false;
+  let loading = false;
+  let pushToTalk = false;
+  let talking = false;
+  let talkingAt = 0;
+  let releaseWhenListening = false;
   let livePreview = false;
   let streamed = false;
-  /** A cloud model takes the dictation: ElevenLabs streams, Groq takes each whole turn. */
   let cloud = false;
-  /** The pause after speech that ends the turn: the user's choice in Settings, read at the start. */
   let turnEndSilenceMs: number = DEFAULT_SPEECH_SETTINGS.turnPauseMs;
-  // The logic reads these copies: a store read shows a write only after the next flush.
   let step: VoiceConversationStep = "starting";
   let muted = false;
   let online = true;
-  /**
-   * The user can speak over the agent: its reply waits, paused, until the turn is transcribed. Only
-   * words stop the reply. A sound with no words, such as a cough, lets it go on.
-   */
   let held = false;
-  /** When the hold started, until the sound that caused it is checked for words. */
   let heldAt: number | undefined;
-  /** The reply ended while it waited, for example a turn with no answer to read. */
   let heldReplyEnded = false;
-  /** The words of the turn that waits for its reply, to show again when the reply goes on. */
   let sentHeard = "";
-  /** The generation of the send whose reply the pane waits for. A hold that ends with no words keeps it. */
   let waitingSend = 0;
-  /** The sends in progress. Speech during a send is the next turn, and does not stop the send. */
   let sending = 0;
   const startedAt = performance.now();
-  /** The turns that were sent to the chat. */
   let sentTurns = 0;
   const serverKind = deps.serverId === LOCAL_SERVER_ID ? "local" : "remote";
-  // True when the user's own voice server takes the dictation.
   let ownServer = false;
+  const downloadListeners: Array<() => void> = [];
+  const downloads: Array<{ modelId: string; bytes: number; share: number }> = [];
   const transcription = () => {
     if (ownServer) return "server";
     return cloud ? "cloud" : "local";
@@ -191,6 +154,12 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
 
   function setStep(next: VoiceConversationStep): void {
     step = next;
+    if (next === "listening" && releaseWhenListening) {
+      releaseWhenListening = false;
+      queueMicrotask(() => {
+        if (!talking && pushToTalk && !disposed) releaseTalk();
+      });
+    }
     setState((draft) => {
       draft.phase = next;
     });
@@ -203,13 +172,19 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
   }
 
+  function setTalking(next: boolean): void {
+    talking = next;
+    setState((draft) => {
+      draft.talking = next;
+    });
+  }
+
   const stopReplyEnd = onDictatedReplyEnd((agent) => {
     if (agent.serverId !== deps.serverId || agent.agentId !== deps.agentId) return;
     if (held) heldReplyEnded = true;
     else if (step === "waiting") resumeListening();
   });
 
-  /** No reply comes while the server is away, so the pane stops listening until it is back. */
   createEffect(deps.serverOnline, (next) => {
     if (next === online) return;
     online = next;
@@ -233,23 +208,67 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (ready && step === "listening") void listen();
   });
 
+  function showDownload(status: VoiceModelStatus | SpeechModelStatus): void {
+    const index = downloads.findIndex((download) => download.modelId === status.modelId);
+    if (index < 0 || status.phase !== "downloading" || disposed) return;
+    downloads.forEach((download, position) => {
+      if (position < index) download.share = 1;
+    });
+    const current = downloads[index];
+    if (current) current.share = (status.progress ?? 0) / 100;
+    const total = downloads.reduce((sum, download) => sum + download.bytes, 0);
+    const received = downloads.reduce((sum, download) => sum + download.share * download.bytes, 0);
+    setState((draft) => {
+      draft.downloadProgress = Math.min(100, Math.floor((received / total) * 100));
+    });
+  }
+
+  function planDownloads(
+    speechModel: SpeechModelStatus | null,
+    dictationModelId: VoiceModelId | null,
+    dictationStatuses: VoiceModelStatus[] | null,
+  ): void {
+    downloads.length = 0;
+    if (speechModel?.modelId === SPEECH_MODEL.id && speechModel.phase !== "ready")
+      downloads.push({ modelId: speechModel.modelId, bytes: SPEECH_MODEL.bytes, share: 0 });
+    const dictation = VOICE_MODELS.find((candidate) => candidate.id === dictationModelId);
+    const dictationStatus = dictationStatuses?.find((status) => status.modelId === dictationModelId);
+    if (dictation?.kind === "local" && dictationStatus && dictationStatus.phase !== "ready")
+      downloads.push({ modelId: dictation.id, bytes: dictation.bytes, share: 0 });
+  }
+
+  function removeDownloadListeners(): void {
+    for (const stop of downloadListeners.splice(0)) stop();
+  }
+
+  function stopDownloadProgress(): void {
+    removeDownloadListeners();
+    setState((draft) => {
+      draft.downloadProgress = null;
+    });
+  }
+
   async function start(): Promise<void> {
     const own = generation;
     const analytics = desktopAnalytics.scope();
     const startingAt = performance.now();
+    loading = true;
     try {
       const speech = speechPort().voice;
-      const [server, turnPauseMs] = await Promise.all([
+      downloadListeners.push(speech.onSpeechModelStatus(showDownload), deps.voice.onModelStatus(showDownload));
+      const [server, turnPauseMs, plannedSettings, dictationStatuses] = await Promise.all([
         speech.getServer(),
-        // Without the saved pause, the conversation still starts, with the default pause.
         speech.getSpeechSettings().then(
-          (settings) => settings.turnPauseMs,
+          (speechSettings) => speechSettings.turnPauseMs,
           () => DEFAULT_SPEECH_SETTINGS.turnPauseMs,
         ),
+        deps.voice.getSettings(),
+        speech.getModelStatuses().catch(() => null),
       ]);
       turnEndSilenceMs = turnPauseMs;
-      // The user's own server reads the replies, so the speech model is not necessary.
-      if (!server?.routes.speech && (await speech.getSpeechModelStatus()).phase !== "ready") {
+      const speechModel = server?.routes.speech ? null : await speech.getSpeechModelStatus();
+      planDownloads(speechModel, server?.routes.dictation ? null : plannedSettings.modelId, dictationStatuses);
+      if (speechModel && speechModel.phase !== "ready") {
         const downloadAt = performance.now();
         const status = await speech.downloadSpeechModel().catch((error: unknown) => {
           analytics.track("speech_model_action", {
@@ -266,7 +285,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           entry_point: "voice_conversation",
           result: status.phase === "ready" ? "succeeded" : "failed",
           duration_ms: elapsedMs(downloadAt),
-          // A download that the settings cancelled ends as "missing".
           ...(status.phase === "ready"
             ? {}
             : { failure_code: status.phase === "missing" ? "cancelled" : "download_failed" }),
@@ -278,10 +296,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       if (model.phase !== "ready")
         throw new Error(currentText().errorMessage(model.message, currentText().t("composer.voice.prepareFailed")));
       const selected = VOICE_MODELS.find((candidate) => candidate.id === settings.modelId);
-      // The user's own server takes the whole recording once: it has no live preview or stream.
       ownServer = server?.routes.dictation === true;
       cloud = !ownServer && selected?.kind === "cloud";
-      // Only ElevenLabs streams. Groq takes the whole recording once, as the user's own server does.
       streamed = selected?.kind === "cloud" && selected.provider === "elevenlabs" && !ownServer;
       livePreview = !ownServer && !streamed && (selected?.livePreview ?? true);
       ready = true;
@@ -307,6 +323,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       setState((draft) => {
         draft.error = currentText().errorMessage(error, currentText().t("conversation.voice.error"));
       });
+    } finally {
+      loading = false;
+      stopDownloadProgress();
     }
   }
 
@@ -321,11 +340,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     await openTurn(own);
   }
 
-  /**
-   * The turn that listened while the agent thought or spoke goes on as the next turn, with no gap.
-   * Before the user speaks, its recording holds only the reply, so a new recording starts.
-   * A new generation makes a late failure of the earlier send stale.
-   */
   function resumeListening(): void {
     if (!turn) {
       void listen();
@@ -339,16 +353,11 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
   }
 
-  /** The reply of the agent is not read, or stops. */
   function dropReply(): void {
     held = false;
     dropDictatedReply(target);
   }
 
-  /**
-   * The user can speak over the agent: its reply waits, and the turn listens. The words of the turn
-   * decide if the reply stops.
-   */
   function holdReply(): void {
     held = true;
     heldAt = performance.now();
@@ -357,9 +366,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     resumeListening();
   }
 
-  /** The turn had words, so the user spoke over the agent: its reply stops. */
   function interruptByVoice(): void {
-    // A reply that ended while the user spoke was not interrupted.
     if (!heldReplyEnded)
       desktopAnalytics.track("voice_conversation_action", {
         action: "interrupt",
@@ -370,7 +377,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     dropReply();
   }
 
-  /** The turn had no words: the reply goes on, and the pane waits for it again. */
   async function resumeReply(): Promise<void> {
     held = false;
     releaseSpeech(target, true);
@@ -386,22 +392,16 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     await listenWhileWaiting(generation);
   }
 
-  /**
-   * The turn that listened while the last one was transcribed and sent goes on while the agent thinks
-   * and speaks. When the user spoke in it, they speak over the agent.
-   */
   async function listenWhileWaiting(own: number): Promise<void> {
     if (turn?.spoke) holdReply();
     else if (!turn) await openTurn(own);
   }
 
-  /** Opens the microphone for the next turn. It listens now, or while the agent thinks and speaks. */
   async function openTurn(own: number): Promise<void> {
     if (muted || disposed || !online) return;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        // The reply plays while the microphone listens: the echo canceller removes it.
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         video: false,
       });
@@ -442,35 +442,26 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (livePreview)
       current.timers.push(
         setInterval(() => {
-          // The voice host takes one request at a time: no preview while the turn before is transcribed.
           if (step === "listening" && current.spoke && !current.livePreview && current.recorder.state === "recording")
             current.livePreview = refreshHeard(current).finally(() => {
               current.livePreview = undefined;
             });
         }, LIVE_TRANSCRIPT_INTERVAL_MS),
       );
-    // The check runs each second, and the recording can run a little longer than its check.
     current.timers.push(
       setInterval(() => {
-        if (turn !== current || performance.now() - current.startedAt < (VOICE_AUDIO_LIMITS.maximumSeconds - 2) * 1_000)
-          return;
-        if (current.spoke) endTurn(current);
+        if (turn !== current || performance.now() - current.startedAt < (TURN_MAXIMUM_SECONDS - 2) * 1_000) return;
+        if (current.spoke || (pushToTalk && talking)) endTurn(current);
         else restartRecording(current);
       }, 1_000),
     );
   }
 
-  /**
-   * Starts a recording of the turn. A stop that no new recording caused means that the microphone
-   * ended, as when a headset disconnects.
-   */
   function record(current: Turn, recorder: MediaRecorder): void {
     const chunks: Blob[] = [];
     current.recorder = recorder;
     current.chunks = chunks;
     current.startedAt = performance.now();
-    // A recording that a new one replaced, or that a mute released, still gets its last data: the end
-    // of a turn needs it. The data of a discarded recording goes with it.
     recorder.addEventListener("dataavailable", (event) => {
       if (event.data.size > 0) chunks.push(event.data);
     });
@@ -478,26 +469,17 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       if (turn !== current || current.recorder !== recorder) return;
       const ended = currentRecording(current);
       releaseTurn();
-      // While the agent waits, or while the turn before is transcribed, the next step opens a new turn.
       if (step === "listening") void finishTurn(ended, current.own);
     });
     recorder.start(LIVE_TRANSCRIPT_INTERVAL_MS);
   }
 
-  /**
-   * Replaces a recording that holds no speech, so the turn does not keep the silence, or the reply that
-   * played while it listened. The microphone stays open.
-   */
   function restartRecording(current: Turn): void {
     const previous = current.recorder;
     record(current, createRecorder(current.stream));
     if (previous.state !== "inactive") previous.stop();
   }
 
-  /**
-   * Reads the loudness above the room noise, as the dictation waveform does, and ends the turn at a
-   * pause. While the agent thinks or speaks, speech interrupts it.
-   */
   function startMeter(current: Turn): void {
     let analyser: AnalyserNode;
     try {
@@ -517,7 +499,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     let shown = 0;
     let loudFor = 0;
     let quietFor = 0;
-    // Below the speech level of a turn that listens. Soft words over the reply are not silence.
     let silentFor = 0;
     current.timers.push(
       setInterval(() => {
@@ -539,7 +520,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         const level = loudness * loudness;
         shown += (level - shown) * (level > shown ? 0.7 : 0.45);
         const value = shown;
-        // While the agent thinks or speaks, the pane shows its state, not the microphone.
         if (step === "listening")
           setState((draft) => {
             draft.levels = [...draft.levels.slice(1), value];
@@ -547,6 +527,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         silentFor = loudness >= SPEECH_LOUDNESS ? 0 : silentFor + LEVEL_INTERVAL_MS;
         if (
           !current.spoke &&
+          !(pushToTalk && talking) &&
           silentFor >= RESTART_QUIET_MS &&
           performance.now() - current.startedAt >= SILENT_RECORDING_MS
         )
@@ -565,21 +546,15 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         } else {
           loudFor = 0;
           quietFor += LEVEL_INTERVAL_MS;
-          if (current.spoke && quietFor >= turnEndSilenceMs) endTurn(current);
+          if (current.spoke && quietFor >= turnEndSilenceMs && !pushToTalk) endTurn(current);
         }
-        if (held && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
+        if (held && !pushToTalk && heldAt !== undefined && current.spoke && performance.now() - heldAt >= HOLD_WORDS_MS)
           checkHeldWords(current);
       }, LEVEL_INTERVAL_MS),
     );
   }
 
-  /**
-   * The sound that holds the reply goes on. Only words stop the reply, so the recording so far is
-   * transcribed once. With no words, the reply goes on, and the sound is the room noise from now on.
-   * A failed check keeps the hold: the end of the turn decides.
-   */
   function checkHeldWords(current: Turn): void {
-    // The voice host takes one request at a time: the check waits for the live preview.
     if (step !== "listening" || current.livePreview || current.chunks.length === 0) return;
     heldAt = undefined;
     if (WORD.test(state.heard)) return;
@@ -594,8 +569,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
           });
           return;
         }
-        // The recording stays: the user can start to speak while the check runs. At the next quiet
-        // moment, the meter starts a new recording, as for any turn with no speech.
         current.spoke = false;
         current.roomNoise = true;
         void resumeReply();
@@ -607,7 +580,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     current.livePreview = check;
   }
 
-  /** Shows the words so far. A failure says nothing that the final pass does not say better. */
   async function refreshHeard(current: Turn): Promise<void> {
     try {
       const audio = await recordingToWav(new Blob(current.chunks, { type: current.recorder.mimeType }));
@@ -616,15 +588,9 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         setState((draft) => {
           draft.heard = result.text.trim();
         });
-    } catch {
-      // The final transcription reports its own error.
-    }
+    } catch {}
   }
 
-  /**
-   * Transcribes what the user said. The microphone and its meter stay open, and a new recording
-   * starts at once: what the user says while this turn is transcribed and sent is the next turn.
-   */
   function endTurn(current: Turn): void {
     if (step !== "listening" || current.recorder.state !== "recording") return;
     const ended = currentRecording(current);
@@ -652,7 +618,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     let text: string;
     let recording: Blob;
     try {
-      // The voice host takes one request at a time.
       await current.livePreview;
       if (current.chunks.length === 0) throw new Error(currentText().t("composer.voice.noSpeechRecorded"));
       recording = new Blob(current.chunks, { type: mimeType });
@@ -693,8 +658,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       draft.heard = text;
       draft.error = null;
     });
-    // A send can fail after it is queued, so the wait for the reply ends there too.
-    // A later failure, after a Retry, belongs to a turn that is over.
     const notSent = () => {
       if (disposed || own !== waitingSend || step !== "waiting") return;
       forgetDictatedMessage(target);
@@ -730,7 +693,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
     if (delivered) {
       sentTurns += 1;
-      // The next turn listens while the agent thinks and speaks, so the user can interrupt it.
       if (step === "waiting") await listenWhileWaiting(own);
       return;
     }
@@ -738,11 +700,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     notSent();
   }
 
-  /**
-   * Keeps what the user said, so the chat can play it again. The text goes without it when this
-   * computer cannot keep it: the turn matters more than its replay. Only the local server stores it;
-   * the Team API sends text only.
-   */
   async function keepRecording(recording: Blob): Promise<string | undefined> {
     if (deps.serverId !== LOCAL_SERVER_ID || !recording.type.startsWith("audio/webm")) return undefined;
     if (recording.size > VOICE_AUDIO_LIMITS.maximumRecordingBytes) return undefined;
@@ -753,7 +710,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     }
   }
 
-  /** The recording is a draft of this computer, whichever server the message was for. */
   function discardRecording(id: string | undefined): void {
     if (id)
       void speechPort()
@@ -761,7 +717,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         .catch(() => {});
   }
 
-  /** The words of a recording, from the dictation model that the user chose. */
   async function transcribe(recording: Blob): Promise<string> {
     const result = streamed
       ? await transcribeStreamed(recording)
@@ -769,7 +724,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     return result.text.trim();
   }
 
-  /** ElevenLabs hears through a stream: the whole recording is sent, then the stream ends. */
   async function transcribeStreamed(recording: Blob): Promise<{ text: string }> {
     const pcm = encodePcm16(await recordingToSamples(recording));
     const { streamId } = await deps.voice.startStream();
@@ -794,7 +748,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     for (const track of current.stream.getTracks()) track.stop();
   }
 
-  /** Discards the turn that listens now: nothing is transcribed. */
   function releaseTurn(): void {
     const current = turn;
     if (!current) return;
@@ -804,24 +757,88 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   }
 
   function toggleMute(): void {
-    setMuted(!muted);
     desktopAnalytics.track("voice_conversation_action", {
-      action: muted ? "mute" : "unmute",
+      action: muted ? "unmute" : "mute",
       server_kind: serverKind,
       result: "succeeded",
     });
+    applyMute(!muted);
+  }
+
+  function setTalkMode(mode: VoiceTalkMode): void {
+    const push = mode === "push";
+    if (push === pushToTalk) return;
+    pushToTalk = push;
+    releaseWhenListening = false;
+    setTalking(false);
+    if (push !== muted) applyMute(push);
+  }
+
+  function startTalking(): void {
+    if (!pushToTalk || talking) return;
+    setTalking(true);
+    talkingAt = performance.now();
+    releaseWhenListening = false;
+    if (step === "waiting" && sending === 0) holdReply();
+    if (muted) applyMute(false);
+  }
+
+  function stopTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    if (muted) {
+      if (held && step === "listening") void resumeReply();
+      return;
+    }
+    const current = turn;
+    const long = performance.now() - talkingAt >= PUSH_TO_TALK_MIN_MS;
+    if (long && current?.spoke && (step === "transcribing" || step === "waiting")) {
+      releaseWhenListening = true;
+      return;
+    }
+    releaseTalk(long);
+  }
+
+  function releaseTalk(long = true): void {
+    const current = turn;
+    if (long && current && step === "listening" && current.recorder.state === "recording") {
+      endTurn(current);
+      setMuted(true);
+      releaseTurn();
+      return;
+    }
+    if (held) {
+      desktopAnalytics.track("voice_conversation_action", {
+        action: "interrupt",
+        server_kind: serverKind,
+        result: "succeeded",
+        trigger: "button",
+      });
+      dropReply();
+    }
+    applyMute(true);
+  }
+
+  function cancelTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    releaseWhenListening = false;
+    if (!muted) applyMute(true);
+    else if (held && step === "listening") void resumeReply();
+  }
+
+  function applyMute(next: boolean): void {
+    setMuted(next);
     if (!muted)
       setState((draft) => {
         draft.error = null;
       });
-    // A start that failed starts again.
-    if (!muted && !ready) {
+    if (!muted && !ready && !loading) {
       setStep("starting");
       void start();
       return;
     }
     if (step === "waiting" || step === "transcribing") {
-      // The turn that waits for the transcription or the reply listens only while the microphone is on.
       if (muted) releaseTurn();
       else void openTurn(generation);
       return;
@@ -830,7 +847,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (muted) {
       generation += 1;
       releaseTurn();
-      // The turn that could stop the reply ends with no words.
       if (held) {
         void resumeReply();
         return;
@@ -842,7 +858,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     } else void listen();
   }
 
-  /** Stops the reply, or the wait for it, and listens again. The agent's turn goes on. */
   function interrupt(): void {
     if (step !== "waiting" && step !== "transcribing") return;
     desktopAnalytics.track("voice_conversation_action", {
@@ -851,7 +866,6 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       result: "succeeded",
       trigger: "button",
     });
-    // The turn that listened while the agent thought, or while the last turn was transcribed, goes on.
     resumeListening();
     dropReply();
   }
@@ -869,12 +883,12 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
     generation += 1;
     stopReplyEnd();
+    removeDownloadListeners();
     releaseTurn();
     dropReply();
   }
   onCleanup(dispose);
 
-  /** What the pane shows: the reply speaks while its words play, and the agent thinks until then. */
   const reading = () => {
     const current = speechReading();
     return current?.serverId === deps.serverId && current.agentId === deps.agentId ? current : null;
@@ -891,9 +905,15 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   return {
     phase,
     muted: () => state.muted,
+    talking: () => state.talking,
     error: () => state.error,
+    downloadProgress: () => state.downloadProgress,
     levels: () => (phase() === "speaking" ? (reading()?.levels ?? state.levels) : state.levels),
     toggleMute,
+    setTalkMode,
+    startTalking,
+    stopTalking,
+    cancelTalking,
     interrupt,
   };
 }

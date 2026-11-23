@@ -1,6 +1,3 @@
-// The text of the contributor license agreement. Legal wording: change it only from the approved source text,
-// replace `public/openbot-cla.pdf` with it, and move `CLA_UPDATED_AT`.
-
 import { Link } from "@tanstack/solid-router";
 import { CLA_PDF_PATH } from "../lib/cla";
 

@@ -16,7 +16,6 @@ import { messages as connector } from "./connector";
 import { messages as conversation } from "./conversation";
 import { messages as crm } from "./crm";
 import { messages as customProvider } from "./customProvider";
-import { messages as diagram } from "./diagram";
 import { messages as dialog } from "./dialog";
 import { messages as extension } from "./extension";
 import { messages as files } from "./files";
@@ -54,18 +53,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/**
- * Italian. Written from the English source: a key that is missing here renders its English source.
- *
- * Notes for a reviewer. The text addresses the user with the informal *tu*, and buttons and menu
- * items use the imperative («Apri», «Salva»), as Apple's Italian interface does. Labels stay short.
- * Typography follows Italian convention: quoted words use «caporali», and the ellipsis is the
- * single character …. Plurals fill the one and other forms. Product names stay as they are, and so
- * do the English words an Italian user already reads in this kind of app: skill, routine, provider,
- * server, host, chat, plugin, prompt, token, tool, workspace.
- *
- * This is the desktop catalog: shared keys, source text, and every desktop area.
- */
 export const it = {
   ...shared,
   ...source,
@@ -107,7 +94,6 @@ export const it = {
   ...usage,
   ...sidebar,
   ...channel,
-  ...diagram,
   ...workflow,
   ...agent,
   ...agentTemplate,

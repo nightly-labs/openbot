@@ -1,22 +1,3 @@
-// Optional crm-v1 wire contract. Not released yet; freeze it with the first release that ships it.
-// Keep IPC types and limits out of this file.
-//
-// What it grants: an owner or admin of a
-// server reads and changes its CRM: the statuses, tags, customers with their plans, payments,
-// activity and the changes that agents propose. A member gets 403 on every route, and the host sends
-// the `crm-changed` event only to clients that may read the CRM. Customers cross in pages of at most
-// 500, ordered by their `number`; payments and activity cross in pages of at most 500, with an
-// opaque cursor. Amounts are whole minor units of the customer's ISO 4217 currency, and due dates are
-// calendar dates (`YYYY-MM-DD`). `apply` takes one change; a customer update names the revision it
-// read, and the host answers a conflict instead of writing over a newer change. An approved proposal
-// applies its change as the person who approved it. Activity kinds cross as open names, so a newer
-// host can add one; a client shows an unknown kind plainly. The event names no customer; the client
-// reads the CRM again. An owner or admin also connects a payment source (Stripe) with a read-only
-// key, starts a sync, and disconnects it. The key crosses only in the connect request; no response
-// holds it. Rows that a connected source owns cross with `source` set. An owner or admin reads and
-// sets the CRM switch (`settings`, `set-settings`); while it is off, the client shows no CRM, but the
-// other routes still answer. After the release, widening any
-// of it needs a second capability string.
 import { isDynamicRecord, isString } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -51,7 +32,6 @@ export const CRM_ROUTES = {
 
 export type CrmEvent = { type: "crm-changed" };
 
-/** The CRM event in `value`, or null for any other event. */
 export function crmEvent(value: unknown): CrmEvent | null {
   if (!isDynamicRecord(value) || value.type !== "crm-changed") return null;
   return { type: "crm-changed" };

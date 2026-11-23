@@ -12,6 +12,7 @@ import {
   ItemDescription,
   ItemGroup,
   ItemTitle,
+  Keyboard,
   SettingsSection,
   SlidersHorizontal,
   SwitchField,
@@ -35,8 +36,9 @@ import { SettingsProfileTab } from "@openbot/ui/features/settings/SettingsProfil
 import { SidebarChatOrderSelect } from "@openbot/ui/features/settings/SidebarChatOrderSelect";
 import { SoundChoiceSelect } from "@openbot/ui/features/settings/SoundChoiceSelect";
 import { createSettingsProfileStore } from "@openbot/ui/features/settings/stores/profile-store";
+import { TalkKeyRecorder } from "@openbot/ui/features/settings/TalkKeyRecorder";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { readActionSoundChoice, setActionSoundChoice } from "../../action-sounds";
 import { setShowAgentSteps, useShowAgentSteps } from "../../agent-steps-preference";
 import { setChatBubbleStyle, useChatBubbleStyle } from "../../chat-bubble-style-preference";
@@ -45,15 +47,18 @@ import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-s
 import { webReportsEnabled } from "../../error-reports";
 import { useLayout } from "../../layout";
 import { currentDevicePlatform, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
+import { setVoiceTalkKey, useVoiceTalkKey } from "../conversation/voice-talk-key";
 import { ChatBackdropSetting } from "../settings/ChatBackdropSetting";
+import { type LiveVoiceAccountChoice, LiveVoiceAccountRow } from "../settings/LiveVoiceAccountRow";
 import { MotionSwitches } from "../settings/MotionSwitches";
+import { SettingsKeyboardTab } from "../settings/SettingsKeyboardTab";
 import type { WebAccountCalls } from "./web-account";
 import { sendWebAnalyticsChoice, setWebAnalyticsEnabled } from "./web-analytics";
 import { setWebChatBackground, useWebChatBackground } from "./web-chat-background";
 import { setWebLiveVoice, useWebLiveVoice } from "./web-live-voice";
 import type { WebNotificationSettings } from "./web-notification-settings";
 
-const TABS = ["profile", "preferences", "referral"] as const;
+const TABS = ["profile", "preferences", "keyboard", "referral"] as const;
 type WebAccountSettingsTab = (typeof TABS)[number];
 
 const TAB_ITEMS = {
@@ -66,6 +71,11 @@ const TAB_ITEMS = {
     titleKey: "webClient.settings.preferences.title",
     descriptionKey: "webClient.settings.preferences.description",
     icon: SlidersHorizontal,
+  },
+  keyboard: {
+    titleKey: "settings.tab.keyboard.title",
+    descriptionKey: "settings.tab.keyboard.description",
+    icon: Keyboard,
   },
   referral: {
     titleKey: "settings.tab.referral.title",
@@ -80,30 +90,22 @@ const TAB_ITEMS = {
 export interface WebAccountSettingsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Where the settings page shows, or nothing while the page is not on screen. */
   page: SettingsPagePlacement | undefined;
   account: CentralAuthUser;
   calls: WebAccountCalls;
+  liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   language: AppLanguage;
   onChangeLanguage: (language: AppLanguage) => void;
   appearance: AppAppearance;
   onChangeAppearance: (appearance: AppAppearance) => void;
-  /** Closes these settings and opens the plans and servers of the account. */
   onOpenBilling: () => void;
-  /** Invite friends: the invite link, the credit and the friends of the account. */
   referral: ReferralCalls;
   onSignOut: () => Promise<void>;
-  /** The levels of each host and its agents, which apply on all devices of the user. */
   notifications: WebNotificationSettings;
-  /** Opens Preferences at the notification row of one host. Each nonce opens once. */
   notificationFocusRequest?: { serverId: string; nonce: number } | null | undefined;
+  keyboardFocusRequest?: number | null | undefined;
 }
 
-/**
- * The account's own settings in the web client, where Settings opens the settings of a host. Profile
- * is the desktop tab and store; Preferences holds what this browser keeps. Sites are in the settings
- * of their server.
- */
 export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const [reportsEnabled, setReportsEnabled] = createSignal(webReportsEnabled());
   const { t, errorMessage } = useText();
@@ -120,7 +122,7 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
   const bubbleStyle = useChatBubbleStyle();
   const chatBackground = useWebChatBackground();
   const webLiveVoice = useWebLiveVoice();
-  // Playback reads the stored value on each event, so the menus follow a change from another tab.
+  const talkKey = useVoiceTalkKey();
   const [soundChoice, setSoundChoice] = createSignal(readActionSoundChoice());
   const readSoundSettings = () => {
     setTaskSoundChoice(readTaskSound());
@@ -150,11 +152,16 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
     () => props.open && activeTab() === "referral",
   );
   const navItem = () => TAB_ITEMS[activeTab()];
-  // A server menu or a settings link opens the notification levels, which are in Preferences.
   createEffect(
     () => (props.open ? props.notificationFocusRequest : null),
     (request) => {
       if (request) setActiveTab("preferences");
+    },
+  );
+  createEffect(
+    () => (props.open ? props.keyboardFocusRequest : null),
+    (request) => {
+      if (request) setActiveTab("keyboard");
     },
   );
 
@@ -220,6 +227,10 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
             canRevokeSession
             onSignOut={props.onSignOut}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="keyboard" class="settings-modal-tab-panel" data-tab="keyboard">
+          <SettingsKeyboardTab />
         </Tabs.Content>
 
         <Tabs.Content value="referral" class="settings-modal-tab-panel" data-tab="referral">
@@ -290,7 +301,6 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                   <AppearanceSelect
                     value={props.appearance}
                     onChange={(value) => {
-                      // The web client lists no palettes, so each value is an appearance.
                       if (isAppAppearance(value)) props.onChangeAppearance(value);
                     }}
                     {...(modalElement ? { mount: modalElement } : {})}
@@ -345,7 +355,19 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
               <MotionSwitches />
             </ItemGroup>
           </SettingsSection>
-          {/* The choice is kept in this browser and holds for each server that serves live voice. */}
+          <SettingsSection title={t("settings.voice.talk.section")}>
+            <ItemGroup class="settings-modal-card">
+              <Item class="settings-modal-row">
+                <ItemContent>
+                  <ItemTitle>{t("settings.voice.talkKey.title")}</ItemTitle>
+                  <ItemDescription>{t("settings.voice.talkKey.description")}</ItemDescription>
+                </ItemContent>
+                <ItemActions>
+                  <TalkKeyRecorder binding={talkKey()} onChange={(key) => setVoiceTalkKey(key, talkKey().platform)} />
+                </ItemActions>
+              </Item>
+            </ItemGroup>
+          </SettingsSection>
           <SettingsSection title={t("settings.voice.live.section")}>
             <ItemGroup class="settings-modal-card">
               <SwitchField
@@ -354,6 +376,11 @@ export default function WebAccountSettings(props: WebAccountSettingsProps) {
                 label={t("settings.voice.speech.codexLive.title")}
                 description={t("settings.voice.speech.codexLive.serverDescription")}
               />
+              <Show when={props.liveVoiceAccount}>
+                {(choice) => (
+                  <LiveVoiceAccountRow choice={choice()} disabled={!webLiveVoice()} selectMount={modalElement} />
+                )}
+              </Show>
             </ItemGroup>
           </SettingsSection>
           <SettingsSection title={t("settings.analytics.title")}>

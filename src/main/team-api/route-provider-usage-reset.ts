@@ -10,13 +10,10 @@ import type { TeamApiProviderUsageResets } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
+import { requireProviderAccountsFit } from "./route-provider-accounts";
 
 const ROUTES: ReadonlySet<string> = new Set(Object.values(PROVIDER_USAGE_RESET_ROUTES));
 
-/**
- * The usage reset credits of this host's provider accounts, read and spent from a joined server.
- * Frozen by `provider-usage-reset-v1`. `requireAdmin` runs on every route.
- */
 export async function routeProviderUsageReset(
   context: TeamApiRequestContext,
   resets: TeamApiProviderUsageResets | undefined,
@@ -26,11 +23,13 @@ export async function routeProviderUsageReset(
   if (!resets || !capabilities.has(PROVIDER_USAGE_RESET_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providersUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `provider-usage-reset-v1` codec.
   const body = await readJson(request);
   const provider = parseProviderId(body.provider);
-  if (url.pathname === PROVIDER_USAGE_RESET_ROUTES.list)
-    return json(200, { accounts: await runCauseEffect(resets.providerUsageResets(provider)) });
+  if (url.pathname === PROVIDER_USAGE_RESET_ROUTES.list) {
+    const accounts = await runCauseEffect(resets.providerUsageResets(provider));
+    requireProviderAccountsFit(capabilities, accounts.length);
+    return json(200, { accounts });
+  }
   if (!isProviderAccountId(body.accountId)) throw new HttpError(400, "accountId is invalid.");
   return json(200, { outcome: await runCauseEffect(resets.resetProviderUsage(provider, body.accountId)) });
 }

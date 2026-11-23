@@ -42,7 +42,6 @@ function codeSentState(overrides: Partial<Extract<CentralAuthState, { status: "c
 
 export const SignIn: Story = {};
 
-/** Opened from an invite link: confetti from the logo, and the corner shows the code. */
 export const FromInviteLink: Story = {
   args: { initialInviteCode: "b5c9ygn2" },
 };

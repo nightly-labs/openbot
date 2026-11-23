@@ -16,7 +16,6 @@ import { messages as connector } from "./connector";
 import { messages as conversation } from "./conversation";
 import { messages as crm } from "./crm";
 import { messages as customProvider } from "./customProvider";
-import { messages as diagram } from "./diagram";
 import { messages as dialog } from "./dialog";
 import { messages as extension } from "./extension";
 import { messages as files } from "./files";
@@ -54,19 +53,6 @@ import { messages as webClient } from "./webClient";
 import { messages as window } from "./window";
 import { messages as workflow } from "./workflow";
 
-/**
- * Dutch. Written from the English source and not yet reviewed by a native speaker: read it as a
- * first draft that is safe to ship behind an explicit language choice, not as final copy. A key that
- * is missing here renders its English source.
- *
- * Notes for a reviewer. Sentences use the informal je and the imperative for actions, as
- * docs/i18n.md says. Text is in sentence case, compounds are one word or take a hyphen after an
- * abbreviation or a brand (MCP-server), and the apostrophe is the typographic ’ (foto’s). Product
- * names stay as they are: OpenBot is the application name, and ZIP and JSON are the file formats a
- * picker shows.
- *
- * This is the desktop catalog: shared keys, source text, and every desktop area.
- */
 export const nl = {
   ...shared,
   ...source,
@@ -108,7 +94,6 @@ export const nl = {
   ...usage,
   ...sidebar,
   ...channel,
-  ...diagram,
   ...workflow,
   ...agent,
   ...agentTemplate,

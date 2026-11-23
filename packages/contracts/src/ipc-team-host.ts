@@ -1,3 +1,4 @@
+import type { CustomServerPlan } from "./custom-server-plans";
 import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
@@ -9,22 +10,13 @@ import type { MachineAlertEvent } from "./team-protocol/machine-resources-v1";
 
 export type { HostAppearanceEvent, ServerAppearance, ServerAppearanceShape } from "./team-protocol/host-appearance-v1";
 
-// The id every IPC payload carries for "this computer" rather than a remote team server. It is a
-// wire value the main process, the preload bridge and the renderer all compare against, so it lives
-// beside the types they share instead of being retyped at each comparison.
 export const LOCAL_SERVER_ID = "local";
 
-// The most servers that a user can create on this computer, in addition to "Local". Each one is a
-// full OpenBot process that runs all the time, so main refuses one more and the dialog says why.
 export const LOCAL_SERVER_LIMIT = 5;
 
 export type ServerConnectionState = "online" | "connecting" | "offline" | "error" | "incompatible";
 export type TeamRole = "owner" | "admin" | "member";
 
-/**
- * The owner and admins manage the server, its members and its invitations. The owner is an admin
- * that nobody can change or remove. A missing role manages nothing.
- */
 export function canAdministerServer(role: TeamRole | null | undefined): boolean {
   return role === "owner" || role === "admin";
 }
@@ -33,7 +25,6 @@ export type ServerConnectionIssueCode =
   | "client_update_required"
   | "host_update_required"
   | "protocol_error"
-  /** The server stopped its start loop. The message is the reason that the host sent. */
   | "server_safe_mode"
   | "authentication_required"
   | "network_unavailable";
@@ -42,7 +33,6 @@ export interface ServerConnectionIssue {
   code: ServerConnectionIssueCode;
   message: string;
   retryable: boolean;
-  /** A short code a user can copy into a report, such as `signal/host_busy`. */
   reference?: string;
 }
 
@@ -55,12 +45,9 @@ export interface ServerCompatibility {
   capabilities: string[];
 }
 
-// How much of a server's agent activity reaches the desktop as an OS notification. "needs-me" keeps
-// only input requests and approvals.
 export type ServerNotificationLevel = "all" | "needs-me" | "nothing";
 export const SERVER_NOTIFICATION_LEVELS: readonly ServerNotificationLevel[] = ["all", "needs-me", "nothing"];
 
-// The timed mute choices the server menu offers. A mute without a duration lasts until it is undone.
 export const SERVER_MUTE_DURATIONS_MS: readonly number[] = [
   15 * 60_000,
   60 * 60_000,
@@ -72,7 +59,6 @@ export const SERVER_MUTE_DURATIONS_MS: readonly number[] = [
 export interface SetServerMutedInput {
   serverId: string;
   muted: boolean;
-  // One of `SERVER_MUTE_DURATIONS_MS`. Absent means the mute lasts until the user undoes it.
   durationMs?: number;
 }
 
@@ -83,7 +69,6 @@ export interface SetServerNotificationLevelInput {
 
 export interface ServerSummary {
   notificationsMuted: boolean;
-  // Epoch milliseconds when a timed mute ends; null for no mute or a mute without an end.
   notificationsMutedUntil: number | null;
   notificationLevel: ServerNotificationLevel;
   id: string;
@@ -93,69 +78,33 @@ export interface ServerSummary {
   apiUrl: string | null;
   remoteDesktopAvailable: boolean;
   logoUrl: string | null;
-  /**
-   * The shape and colour that the server shows with no logo (`host-appearance-v1`). Null for the
-   * automatic look. Absent when nothing said it: an older host or account server.
-   */
   appearance?: ServerAppearance | null;
   role: TeamRole | null;
   active: boolean;
-  /** The active members that the host allows. Absent when the account server did not give one. */
   memberLimit?: number;
-  /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
-  /**
-   * False for a hosted server that the account service cannot restart: an operator runs its machine. Absent
-   * for each other server, and when the account server did not say.
-   */
   restartAvailable?: boolean;
-  /**
-   * The storage, in GB, that the plan of a hosted server gives for the files of its users. The base image of
-   * the server is not in it. Absent for a server that is not hosted, or when the account server did not say.
-   */
   storageGb?: number;
-  /**
-   * When the host last changed its key, in milliseconds since the epoch. Only a change that both the
-   * previous and the new key signed. Absent when the server list has no such change.
-   */
+  paymentRequired?: true;
+  customPlan?: CustomServerPlan;
   keyChangedAt?: number;
-  /**
-   * A local server: a second server on this computer, which this app runs as its child process. It
-   * is reached as a joined server, so `kind` stays `"remote"`. Absent for every other server.
-   */
   thisComputer?: true;
   compatibility?: ServerCompatibility | null;
   issue?: ServerConnectionIssue | null;
   connectionSequence?: number;
-  /**
-   * A new connection whose capability read has not ended. The workspace load waits for it, so that one
-   * load reads all the data the host can give. Absent at all other times. Local IPC metadata.
-   */
   capabilitiesPending?: true;
-  /** The host said it restarts into an update (`host-update-v1`). Cleared when the connection comes back. */
   hostRestart?: { state: Exclude<HostRestartState, "none">; version: string | null } | null;
-  /**
-   * A hosted server that the account service stopped for no use (`sleeping`), or that starts after the
-   * user's input (`waking`). Cleared when the connection comes back.
-   */
   hostedSleep?: HostedServerSleep | null;
-  /** A hosted start needs user action. This is local IPC metadata, not a Team API field. */
   hostedIssue?: HostedServerIssue | null;
-  /** The step of a hosted start in progress, while `hostedSleep` is `waking`. Local IPC metadata. */
   hostedStart?: HostedServerStart | null;
 }
 
 export type HostedServerIssue = "plan_ended" | "wake_failed" | "start_timeout";
 
-/**
- * `machine`: the provider starts the machine. `openbot`: the machine runs and OpenBot on it starts.
- * `provider_limit`: the provider refused the start for a short time, and the account server tries again.
- */
-export type HostedServerStartStep = "machine" | "openbot" | "provider_limit";
+export type HostedServerStartStep = "machine" | "restore" | "openbot" | "provider_limit";
 
 export interface HostedServerStart {
   step: HostedServerStartStep;
-  /** When the client began to wait, in milliseconds since the epoch. */
   startedAt: number;
 }
 
@@ -193,13 +142,11 @@ export interface HostStatus {
   serverName: string | null;
   apiUrl: string | null;
   logoUrl: string | null;
-  /** The shape and colour that this server shows with no logo. Null for the automatic look. */
   appearance: ServerAppearance | null;
   apiOnline: boolean;
   remoteDesktopReady: boolean;
-  // True once this host has refused a member because the operating system will not let OpenBot record
-  // the screen. The member's error tells them to ask the host owner; this is what the host owner sees.
   remoteDesktopScreenRecordingDenied: boolean;
+  remoteDesktopNeedsX11Session: boolean;
   remoteDesktopUnattended: boolean;
   remoteDesktopActiveSessions: number;
   remoteDesktopMaxSessions: number;
@@ -214,7 +161,6 @@ export interface ConfigureHostInput {
 export interface UpdateHostIdentityInput {
   serverName?: string;
   logo?: AvatarImageInput | null;
-  /** Null gives the server its automatic look again. On a joined server it needs `host-appearance-v1`. */
   appearance?: ServerAppearance | null;
 }
 
@@ -224,7 +170,6 @@ export interface TeamMemberSummary {
   email: string | null;
   name: string | null;
   avatarUrl?: string | null;
-  /** The chat colour from the member's OpenBot account. Absent means no chat colour. Peers read it through `chat-colors-v1`. */
   chatColor?: AvatarColor;
   role: TeamRole;
   createdAt: string;
@@ -297,7 +242,6 @@ export interface DirectConversationPage {
   pageInfo: {
     hasOlder: boolean;
     olderCursor: string | null;
-    /** As in `ConversationPageInfo`: the unloaded length, for the scroll rail. Absent from a remote host. */
     olderCount?: number;
     oldestAt?: string;
   };
@@ -509,9 +453,6 @@ export interface RemoteDesktopDisplay {
   primary: boolean;
 }
 
-// The ICE servers the Signal service hands a peer, forwarded to the renderer unchanged. It is the
-// same shape by construction rather than by coincidence: this is the IPC-side name for it, kept
-// because it is what every `remoteDesktop:*` payload already spells.
 export type RemoteDesktopIceServer = IceServer;
 
 export interface RemoteDesktopCapabilities {
@@ -529,9 +470,6 @@ export interface RemoteDesktopCapabilities {
 export type RemoteDesktopPhase = "starting_host" | "connecting" | "connected" | "disconnecting" | "error";
 export type RemoteDesktopTransport = "unknown" | "p2p" | "relay";
 
-// Every reason a host gives for refusing a remote screen, as a closed table. Exported as values
-// because both ends need to check a code they were handed: the host writes one into a session it is
-// ending, and the client decodes one out of a host's answer.
 export const REMOTE_DESKTOP_ERROR_CODES = [
   "host_unavailable",
   "host_permissions_required",
@@ -544,17 +482,11 @@ export const REMOTE_DESKTOP_ERROR_CODES = [
 
 export type RemoteDesktopErrorCode = (typeof REMOTE_DESKTOP_ERROR_CODES)[number];
 
-/**
- * Who may control this computer through remote desktop. `members` is every member, as before the
- * setting existed; `admins` is the owner and the admins; `owner` is only the owner.
- */
 export const REMOTE_CONTROL_ACCESS_LEVELS = ["owner", "admins", "members"] as const;
 export type RemoteControlAccess = (typeof REMOTE_CONTROL_ACCESS_LEVELS)[number];
 
-/** The host owner's remote control choices, as they are stored and as they cross IPC. */
 export interface RemoteControlPolicy {
   access: RemoteControlAccess;
-  /** Ask the person at this computer to allow each remote control session before it starts. */
   askOnHost: boolean;
 }
 
@@ -584,15 +516,6 @@ export interface RemoteDesktopSession {
   grantExpiresAt: string;
 }
 
-/**
- * What `remoteDesktop.connect` answers.
- *
- * A host that refuses names its reason, and the reason decides what the workspace can offer: a
- * missing screen recording grant is a setup step on the host, while a failed connection is a retry.
- * Rejecting the call would leave the renderer holding the sentence and none of the code -- an IPC
- * rejection carries a message and nothing else -- so a refusal the host answered with travels as a
- * value. A call that never reached the host still rejects.
- */
 export type RemoteDesktopConnectResult =
   | { status: "connected"; session: RemoteDesktopSession }
   | { status: "refused"; errorCode: RemoteDesktopErrorCode; message: string };

@@ -6,38 +6,27 @@ import { TRANSLATED_LOCALES } from "@openbot/i18n";
 import { matchingSourceKeys } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 
-// Checks the catalogs in packages/i18n/src/messages. See docs/i18n.md.
-//
-// Fails on:
-// - a key that does not start with its module's prefix, or a key in two modules;
-// - a French or Japanese key that English does not have, a placeholder English does not have, or
-//   a string where English has plural forms (and the reverse);
-// - a source template that more than one source key can match, so the reverse lookup is ambiguous;
-// - an English key no code names. Write keys as literals, so this check and a search find them;
-// - a key that a locale does not translate and packages/i18n/untranslated.json does not list.
-//
-// Reports, and does not fail on, translated modules whose keys are not in the English order.
-// `--fix` puts those keys in the English order; it moves each key with the comments and blank lines
-// above it and does not change the text. `--fix` also removes translated keys from
-// untranslated.json. `--json` writes the report to .openbot-build/i18n-report.json.
-
 const ROOT = resolve(import.meta.dirname, "..");
 const MESSAGES = resolve(ROOT, "packages/i18n/src/messages");
-/** For each key, the locales that did not translate it when the check started to fail on new gaps. */
 const GAPS = resolve(ROOT, "packages/i18n/untranslated.json");
-/** Files that spread area modules together. They hold no keys of their own. */
 const AGGREGATORS = new Set(["index", "mobile", "source", "shared"]);
-/** Where code that names a key lives. The catalogs themselves are left out. */
-const CODE_ROOTS = ["src", "packages", "apps/mobile/src", "apps/auth-api/src", "apps/browser-extension/src", "scripts"];
+const CODE_ROOTS = [
+  "src",
+  "packages",
+  "apps/mobile/src",
+  "apps/auth-api/src",
+  "apps/browser-extension/src",
+  "remote/api/src",
+  "scripts",
+];
 const CODE_EXTENSIONS = /\.(?:ts|tsx)$/;
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", "out", ".expo"]);
-/** Keys that no current code sends, but older hosts still do. Keep them so their text is translated. */
 const RELEASED_SOURCE_KEYS = new Set([
   "error.agent.noStartingModel",
+  "error.agent.queueEditRejected",
+  "error.agent.claudeSandboxUnavailable",
   "error.provider.cliBusyUpdate",
-  // Hosts before #8071 send it for a provider that stopped starting.
   "error.provider.startStopped",
-  // Hosts before side threads send these for the agent-tasks-v1 routes.
   "error.backend.taskNotFound",
   "error.backend.taskStillRunning",
   "error.backend.taskClosed",
@@ -45,24 +34,19 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.taskOpenLimitReached",
   "error.backend.taskRemoteUnsupported",
   "error.backend.taskMoveRefused",
-  // A channel task from v0.22.0 can keep this text as its stored error.
   "error.backend.channelHistoryArriving",
-  // A channel task from v0.59.0 can keep this text as its stored error.
   "error.backend.channelHistoryLeadRequired",
-  // A channel task from v0.66.0 or earlier can keep this text as its stored error, and an older host sends it.
   "error.backend.channelRoutingUnreadable",
-  // A host without `agent-hidden-work` refuses a message to a hidden agent with this text.
+  "error.backend.channelLeadTimedOut",
+  "error.backend.channelRequestMemberRequired",
   "error.backend.recipientHidden",
-  // A host from v0.57.0 to v0.73.0 sends this when a custom endpoint refuses a turn.
   "error.provider.customEndpointKeyRefused",
-  // Hosts up to v0.73.0 send this when the Proton plan does not include the Proton Pass CLI.
   "error.connector.protonPassPlan",
 ]);
 
 const logger = createOpenBotLogger("i18n-check");
 const failures: string[] = [];
 const OBJECT_START = "export const messages = {";
-/** The quoted key of a catalog entry, after the comments and blank lines above it. */
 const LEADING_KEY = /^(?:\s|\/\/[^\n]*)*"([^"\\]+)"\s*:/;
 
 function files(directory: string, match: RegExp): string[] {
@@ -73,7 +57,6 @@ function files(directory: string, match: RegExp): string[] {
   });
 }
 
-/** `mobile/settings` for messages/en/mobile/settings.ts. */
 function moduleName(locale: string, path: string): string {
   return relative(resolve(MESSAGES, locale), path).replaceAll(sep, "/").replace(/\.ts$/, "");
 }
@@ -108,7 +91,6 @@ function placeholders(message: Message): Set<string> {
   return new Set(forms(message).flatMap((form) => [...form.matchAll(/\{(\w+)\}/g)].map((match) => match[1] ?? "")));
 }
 
-/** The index after the string literal that starts at `start`. */
 function stringEnd(text: string, start: number): number {
   const quote = text[start];
   for (let index = start + 1; index < text.length; index += 1) {
@@ -120,10 +102,6 @@ function stringEnd(text: string, start: number): number {
   throw new Error("a string literal does not end.");
 }
 
-/**
- * Splits the `messages` object at its top-level commas. Each entry keeps the comments and blank
- * lines above its key, so they move with it.
- */
 function catalogEntries(text: string): { head: string; entries: string[]; tail: string } {
   const open = text.indexOf(OBJECT_START);
   if (open < 0 || text.indexOf(OBJECT_START, open + 1) >= 0) throw new Error(`expected one \`${OBJECT_START}\`.`);
@@ -167,7 +145,6 @@ function entryKey(entry: string): string {
   return key;
 }
 
-/** Puts the keys of a translated module in `order`. Keys that English does not have go last. */
 function sortCatalog(text: string, order: readonly string[]): string {
   const { head, entries, tail } = catalogEntries(text);
   const rank = new Map(order.map((key, index) => [key, index]));
@@ -175,7 +152,6 @@ function sortCatalog(text: string, order: readonly string[]): string {
     .map((entry, index) => ({ entry, rank: rank.get(entryKey(entry)) ?? order.length + index }))
     .sort((left, right) => left.rank - right.rank)
     .map(({ entry }) => entry);
-  // A blank line separates groups; the first key in the object has none above it.
   const [first, ...rest] = sorted;
   if (first === undefined) return text;
   return `${head}${[first.replace(/^\n(?:[ \t]*\n)+/, "\n"), ...rest].join(",")},${tail}`;
@@ -272,9 +248,6 @@ for (const locale of TRANSLATED_LOCALES.filter((locale) => locale !== "en")) {
   }
 }
 
-// A key that a locale does not translate must be in GAPS for that locale, so new text does not ship
-// in English. `--fix` removes the keys that are now translated; it never adds one. `--accept=<tag>`
-// adds all keys that the locale does not translate, for a new language.
 const gapsFile = relative(ROOT, GAPS);
 const known = JSON.parse(readFileSync(GAPS, "utf8"));
 const listed = new Map<string, readonly unknown[]>();
@@ -290,7 +263,6 @@ const accept = process.argv.find((arg) => arg.startsWith("--accept="))?.slice("-
 if (accept !== undefined && !(accept in untranslated)) failures.push(`--accept=${accept} is not a translated locale.`);
 const gaps = new Map<string, string[]>();
 const missing = Object.entries(untranslated).map(([locale, keys]) => [locale, new Set(keys)] as const);
-// Sorted, so the file does not depend on the order in which the file system lists the modules.
 for (const key of [...owner.keys()].sort()) {
   const locales: string[] = [];
   for (const [locale, keys] of missing) {
@@ -304,7 +276,6 @@ if (fix || accept) {
   const entries = [...gaps];
   const lines = entries.map(([key, locales], index) => {
     const line = `  ${JSON.stringify(key)}: [${locales.map((locale) => JSON.stringify(locale)).join(", ")}]`;
-    // Biome's line width is 120, with the comma that follows each entry but the last.
     if (line.length + (index < entries.length - 1 ? 1 : 0) <= 120) return line;
     return `  ${JSON.stringify(key)}: [\n${locales.map((locale) => `    ${JSON.stringify(locale)}`).join(",\n")}\n  ]`;
   });
@@ -315,8 +286,6 @@ if (fix || accept) {
   failures.push(`${gapsFile} lists keys that are translated or removed. Run \`bun run i18n:check --fix\`.`);
 }
 
-// Each source template, with a number for {count} and its own placeholder text for the rest, must
-// map back to its own key only.
 for (const [name, messages] of english) {
   if (!name.startsWith("error/") && !name.startsWith("status/")) continue;
   for (const [key, message] of Object.entries(messages)) {

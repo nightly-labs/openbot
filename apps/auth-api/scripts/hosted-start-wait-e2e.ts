@@ -1,11 +1,3 @@
-// Runs the real account server hosted-server service on a migrated SQLite database, with a boat API
-// that refuses starts with a rate limit (#2229). The server must stay `waking` with `provider_limit`,
-// and the start must go again after a growing delay, from a client wake and from the cron. Then it runs
-// the shared client wake helper: a client waits while the machine starts, and only the host start of a
-// running machine has a time limit.
-//
-// Run: bun run test:hosted-start-wait
-// It writes .openbot-build/hosted-start-wait-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -72,7 +64,6 @@ async function workerRetriesRateLimitedStart() {
       }
       return Response.json({ ok: true });
     }
-    // A provider read during the wait would see the stopped sandbox.
     return Response.json({ ok: true, sandbox: { id: SANDBOX_ID, state: "archived" } });
   };
   const service = new HostedServerService(
@@ -136,8 +127,6 @@ async function workerRetriesRateLimitedStart() {
   await tick(t0 + 124 * SECOND);
   check("the cron sends it again after the doubled delay", resumes() === 4, calls);
 
-  // The next start is due at 248 seconds. At 246 seconds the start waits longer than the stuck-start
-  // check, which must not read boat and mark the server stopped.
   await tick(t0 + 246 * SECOND);
   check("the cron waits for the delay", resumes() === 4, calls);
   check(
@@ -175,7 +164,6 @@ async function clientWaitsWhileServerStarts(template: HostedServerSummary) {
   );
   const reply = () => Effect.runPromise(wake(SERVER_ID));
 
-  // 10 minutes of a machine that starts: more than the 60 replies that ended the wait before.
   let machine = true;
   for (let index = 0; index < 120; index += 1) {
     machine &&= await reply();

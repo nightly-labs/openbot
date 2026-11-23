@@ -20,9 +20,6 @@ import { TEAM_PROTOCOL_V9_CAPABILITY_LIMIT } from "@openbot/contracts/team-proto
 import { Effect } from "effect";
 import { AttachmentFiles } from "../src/backend/attachment-files";
 
-// #4984: a file whose name has no known type is attached as an opaque file, and the agent gets its
-// path. A remote host without any-file-attachments still gets only the known types.
-
 const workspace = dirname(dirname(import.meta.filename));
 const artifactPath = join(workspace, ".openbot-build", "any-file-attachment-e2e", "report.json");
 
@@ -33,7 +30,6 @@ function digest(bytes: Uint8Array): string {
 const profile = new TextEncoder().encode("client\ndev tun\nproto udp\nremote vpn.example.com 1195\n");
 const binary = new Uint8Array([0x7f, 0x45, 0x4c, 0x46, 0x00, 0x01, 0xff, 0xfe, 0x00]);
 const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-/** The start of an `ftyp` box: its size, the type, the major brand, the minor version, then compatible brands. */
 function ftyp(...brands: string[]): Uint8Array {
   const [major = "", ...compatible] = brands;
   const box = Buffer.alloc(16 + compatible.length * 4);
@@ -54,8 +50,6 @@ async function run() {
     await Effect.runPromise(files.initialize());
     await mkdir(join(root, "sources"), { recursive: true });
 
-    // The user picks files with unknown types: text, binary, and a name with no extension. Each one
-    // is stored unchanged as an opaque file, so the agent gets its path.
     const picked = [
       { name: "FWSRV01-UDP4-1195-config.ovpn", bytes: profile },
       { name: "firmware.bin", bytes: binary },
@@ -88,13 +82,9 @@ async function run() {
       assert.equal(inbound.previewKind, "none");
       assert.equal(inbound.sha256, digest(file.bytes));
       assert.deepEqual(await readFile(inbound.path), Buffer.from(file.bytes));
-      // The desktop app shows an unknown file in the file manager and never opens it.
       assert.equal(isOpenableAttachmentName(file.name), false);
     }
 
-    // A browser or a remote member sends the bytes with its own MIME type. With an unknown name, the
-    // type is dropped: the sent message takes its type from the name, so the draft must match it, and
-    // a HEIC must not become an image block that a provider refuses. A known name keeps its type.
     const uploads = [
       { name: "IMG_0001.HEIC", mimeType: "image/heic", bytes: png, kind: "file", stored: "application/octet-stream" },
       {
@@ -104,11 +94,8 @@ async function run() {
         kind: "file",
         stored: "application/octet-stream",
       },
-      // #9880: OGG audio takes its type from the name, so the chat plays it.
       { name: "song.ogg", mimeType: "audio/ogg", bytes: binary, kind: "file", stored: "audio/ogg" },
       { name: "screenshot.png", mimeType: "image/png", bytes: png, kind: "image", stored: "image/png" },
-      // #9752: a HEIF photo with a JPEG name is a file, because no provider decodes HEIF. AVIF uses the
-      // same container and stays an image.
       { name: "IMG_0002.jpeg", mimeType: "image/jpeg", bytes: heif, kind: "file", stored: "application/octet-stream" },
       { name: "photo.avif", mimeType: "image/avif", bytes: avif, kind: "image", stored: "image/avif" },
       {
@@ -147,7 +134,6 @@ async function run() {
       assert.equal(sentUpload.previewKind, draft.previewKind, upload.name);
     }
 
-    // The voice recording keeps its audio type, so the message can replay it.
     const [voice] = await Effect.runPromise(
       files.prepareDrafts([], [{ name: "voice.webm", mimeType: "audio/webm", bytes: binary }], {
         voiceRecording: true,
@@ -155,7 +141,6 @@ async function run() {
     );
     assert.equal(voice?.mimeType, "audio/webm");
 
-    // The agent returns a file with an unknown type with attach_files_to_response.
     const agentFile = join(root, "sources", "main.tf");
     await writeFile(agentFile, profile);
     const handle = await open(agentFile, "r");
@@ -168,7 +153,6 @@ async function run() {
     assert.equal(outbound.kind, "file");
     assert.equal(outbound.mimeType, "application/octet-stream");
 
-    // A remote host without any-file-attachments refuses the name, with the message of before.
     const oldHost = { eml: true, media: true, zip: true, mp4: true, svg: true, anyFile: false };
     assert.equal(isSupportedAttachmentNameFor("office.ovpn", oldHost), false);
     assert.equal(isSupportedAttachmentNameFor("kubeconfig", oldHost), false);
@@ -177,9 +161,7 @@ async function run() {
     const newHost = { ...oldHost, anyFile: true };
     assert.equal(isSupportedAttachmentNameFor("office.ovpn", newHost), true);
     assert.equal(isSupportedAttachmentNameFor("kubeconfig", newHost), true);
-    // The other capabilities still decide their own types.
     assert.equal(isSupportedAttachmentNameFor("logo.svg", { ...newHost, svg: false }), false);
-    // Protocols 6 to 8 have full capability lists, so only a protocol 9 peer gets the capability.
     assert.equal(
       legacyTeamCapabilities(TEAM_CURRENT_CAPABILITIES).includes(TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY),
       false,

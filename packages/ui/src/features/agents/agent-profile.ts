@@ -1,10 +1,9 @@
 import type { ClientAgentSummary } from "@openbot/contracts/ipc";
-import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
+import { markdownImageNames, markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentProfile } from "../../data";
 import { currentText } from "../../text";
 
-/** The profile that the agent screens read, from the summary that the host sends. */
 export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
   return {
     id: stored.id,
@@ -21,6 +20,7 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
     ...(stored.allowAutomation === undefined ? {} : { allowAutomation: stored.allowAutomation }),
     ...(stored.allowNewChat === undefined ? {} : { allowNewChat: stored.allowNewChat }),
     ...(stored.quickAcknowledgement === undefined ? {} : { quickAcknowledgement: stored.quickAcknowledgement }),
+    ...(stored.memory === undefined ? {} : { memory: stored.memory }),
     ...(stored.fastMode === undefined ? {} : { fastMode: stored.fastMode }),
     ...(stored.ultrafast === undefined ? {} : { ultrafast: stored.ultrafast }),
     ...(stored.ownBrowserSession === undefined ? {} : { ownBrowserSession: stored.ownBrowserSession }),
@@ -47,12 +47,13 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
 }
 
 function cleanPreview(preview: string): string {
-  // The stored preview is the start of the message as written, Markdown and all.
-  const cleaned = markdownPreviewText(cleanAgentMessageText(preview))
+  if (!preview.trim()) return currentText().t("app.agent.noMessages");
+  const text = cleanAgentMessageText(preview);
+  const cleaned = markdownPreviewText(text)
     .replace(/\binbox\s+at\s+zero\b[:,]?\s*/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
-  return cleaned || currentText().t("app.agent.noMessages");
+  return cleaned || markdownImageNames(text).join(", ");
 }
 
 function formatTime(value: string): string {

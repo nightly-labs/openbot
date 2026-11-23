@@ -29,8 +29,6 @@ const REVEAL_TIMING = {
   easing: Easing.bezier(0.23, 1, 0.32, 1),
   reduceMotion: ReduceMotion.System,
 };
-// A nested text has no native view on Android, so each frame of a word's fade lays out and draws
-// its whole paragraph again, and the paragraph flickers. There each word shows at once.
 const WORD_FADE = !isAndroid;
 
 export function StreamRevealProvider({ children }: PropsWithChildren) {
@@ -56,11 +54,8 @@ function FadingWord({ text, type, style, onDone }: TextProps & { onDone: () => v
     );
     return () => cancelAnimation(progress);
   }, [onDone, progress]);
-  // Nested native text uses color; view opacity would break inline text layout.
   const revealStyle = useAnimatedStyle(() => ({
     color: interpolateColor(progress.get(), [0, 1], ["transparent", color]),
-    // A zero-offset text shadow supplies a small soft edge without wrapping
-    // inline text in views or blurring the already readable paragraph.
     textShadowColor: interpolateColor(progress.get(), [0, 0.2, 1], ["transparent", color, "transparent"]),
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 2 * (1 - progress.get()),
@@ -124,7 +119,6 @@ export function StreamingBlock({ children, enabled }: PropsWithChildren<{ enable
     return () => cancelAnimation(opacity);
   }, [phase, opacity, onDone]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
-  // Keep native scroll views mounted when the reveal finishes or streaming stops.
   return <Animated.View style={style}>{children}</Animated.View>;
 }
 

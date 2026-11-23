@@ -34,6 +34,7 @@ import {
   webReportsEnabled,
 } from "../../error-reports";
 import { StaticI18nProvider } from "../../i18n-context";
+import { startupLoadingScene } from "../../startup-animation-preference";
 import { AnalyticsConsentRow, ConsentNotice } from "../onboarding/AnalyticsConsent";
 import { createOnboardingTeam, onboardingSessionSeed } from "../onboarding/onboarding-avatars";
 import { deleteRemoteWorkspaceFrames } from "../servers/remote-workspace-frame";
@@ -42,6 +43,7 @@ import { keepCachedWorkflows } from "../workflows/workflow-cache";
 import { WebExtensionConnect } from "./WebExtensionConnect";
 import { WebLanguageStep } from "./WebLanguageStep";
 import { phoneAppScreenWanted, WebPhoneAppScreen } from "./WebPhoneAppScreen";
+import { WebSlowLoadNotice } from "./WebSlowLoadNotice";
 import type { WebWorkspace } from "./WebWorkspace";
 import { createWebAccountCalls } from "./web-account";
 import { deleteSavedAgentPictures } from "./web-agent-pictures";
@@ -53,14 +55,8 @@ import { extensionReturnUrl, forgetExtensionConnect, takeExtensionConnect } from
 import { takeHostingReturn } from "./web-hosted-servers";
 import { createWebLanguagePreference } from "./web-language-preference";
 
-// The site loads this before it mounts `WebApp` (`apps/auth-api/src/routes/app.lazy.tsx`).
 export { loadSavedLanguage } from "./web-language-preference";
 
-/**
- * The workspace is its own chunk, so the sign-in screen does not wait for it. Each session check
- * starts it beside the session request; a signed-in account waits for both. A failed import is
- * tried again on the next check.
- */
 let workspaceImport: Promise<typeof WebWorkspace> | null = null;
 function loadWorkspace(): Promise<typeof WebWorkspace> {
   if (!workspaceImport) {
@@ -72,33 +68,26 @@ function loadWorkspace(): Promise<typeof WebWorkspace> {
   return workspaceImport;
 }
 
-/** A sign-in refusal that the login form already shows. */
 class SignInIssueShown extends Error {
   constructor(readonly code: string) {
     super();
   }
 }
 
-/** The email signs in with the company's provider, not with an email code. */
 class CompanySignInRequired extends Error {}
 
-/** Longer than the time that the account service gives an email send, as on desktop. */
 const EMAIL_START_TIMEOUT_MS = 35_000;
 
-/** The life of a sign-in code. After it, the account service has no send to answer for. */
+const SESSION_CHECK_TIMEOUT_MS = 15_000;
+
 const EMAIL_START_KEY_LIFE_MS = 10 * 60_000;
 
-/** After these answers the email can still arrive, so the next request asks about the same send. */
 const UNCERTAIN_EMAIL_DELIVERY = new Set([
   "email_delivery_pending",
   "email_delivery_timeout",
   "email_delivery_unknown",
 ]);
 
-/**
- * The error code of a company sign-in that came back without a session, from
- * `/app?companySignInError=<code>`. The query is removed after it is read.
- */
 function takeCompanySignInError(): string | null {
   const url = new URL(window.location.href);
   const code = url.searchParams.get(WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM);
@@ -108,17 +97,12 @@ function takeCompanySignInError(): string | null {
   return code;
 }
 
-/** The email start answered that the company's provider signs this email in. */
 const COMPANY_SIGN_IN = Symbol("company sign-in");
 
 function companySignInIssue(code: string) {
   return { code, message: sourceText(companySignInErrorKey(code)) };
 }
 
-/**
- * The shared agent a `/app?agent=<id>` link names. The query is removed after it is read, so a reload
- * does not open the preview again.
- */
 function takeAgentTemplateLink(): string | null {
   const url = new URL(window.location.href);
   if (!url.searchParams.has(WEB_APP_AGENT_TEMPLATE_PARAM)) return null;
@@ -128,11 +112,6 @@ function takeAgentTemplateLink(): string | null {
   return id;
 }
 
-/**
- * The invitation a `/app?api=…&server=…&fingerprint=…&invite=…` link names, as the `/join` page
- * passes it on. The fields are removed after they are read, so the secret does not stay in the
- * address bar or the history, and a reload does not open the dialog again.
- */
 function takeInviteLink(): string | null {
   const url = new URL(window.location.href);
   if (!WEB_APP_INVITE_FIELDS.some((field) => url.searchParams.has(field))) return null;
@@ -142,7 +121,6 @@ function takeInviteLink(): string | null {
   return inviteUrl;
 }
 
-/** The plugin listing a `/app?plugin=<slug>` link names. The query is removed after it is read. */
 function takePluginLink(): string | null {
   const url = new URL(window.location.href);
   if (!url.searchParams.has(WEB_APP_PLUGIN_PARAM)) return null;
@@ -152,10 +130,6 @@ function takePluginLink(): string | null {
   return slug;
 }
 
-/**
- * The agent or skill a `/app?marketplaceAgent=<id>` or `/app?marketplaceSkill=<slug>` link names.
- * The query is removed after it is read.
- */
 function takeMarketplaceLink(): MarketplaceListingLink | null {
   const url = new URL(window.location.href);
   const params = [WEB_APP_MARKETPLACE_AGENT_PARAM, WEB_APP_MARKETPLACE_SKILL_PARAM];
@@ -168,11 +142,6 @@ function takeMarketplaceLink(): MarketplaceListingLink | null {
 
 type BillingReturn = DesktopAnalyticsProperties<"billing_return_viewed">;
 
-/**
- * A return from Stripe to Billing: `/app?billing=portal` from the Customer Portal, or
- * `/app?billing=license` from license Checkout, with `&cancelled=1` when the user went back. The
- * query is removed after it is read.
- */
 function takeBillingReturn(): BillingReturn | null {
   const url = new URL(window.location.href);
   const kind = url.searchParams.get(WEB_APP_BILLING_PARAM);
@@ -183,7 +152,6 @@ function takeBillingReturn(): BillingReturn | null {
   return kind === "license" || kind === "portal" ? { outcome, kind } : { outcome };
 }
 
-/** What a `/app?start=<server|license>` link from the pricing page opens. The query is removed after it is read. */
 function takeStartLink(): WebAppStart | null {
   const url = new URL(window.location.href);
   const start = takeWebAppStart(url);
@@ -191,7 +159,6 @@ function takeStartLink(): WebAppStart | null {
   return start;
 }
 
-/** The browser client. Its chat bubbles take the colors of the backdrop page that shows. */
 export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
   return (
     <WindowBackdropBubbles>
@@ -201,16 +168,17 @@ export function WebApp(props: { createRuntime?: WebRuntimeFactory } = {}) {
 }
 
 function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
-  // This component renders the text provider, so it reads the text of the last provider that rendered.
   const text = currentText();
   const [state, setState] = createStore<{
     account: CentralAuthUser | null;
     loaded: boolean;
+    retrying: boolean;
     login: CentralAuthState;
     resendAt: number;
   }>({
     account: null,
     loaded: false,
+    retrying: false,
     login: { status: "signed_out" },
     resendAt: 0,
   });
@@ -219,7 +187,6 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     ({ account, loaded }) => {
       if (!loaded) return;
       configureWebReports(account);
-      // Analytics is optional. A failed import changes nothing in the app.
       import("./web-analytics")
         .then((module) => {
           module.configureWebAnalytics(account);
@@ -230,14 +197,9 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
         .catch(() => undefined);
     },
   );
-  // Kept here, not in the workspace, so each link waits through sign-in.
-  // Before a session check, so a signed-out browser gets the saved answer or its regional default.
-  // A browser that agreed once keeps its answer: the sign-in screen does not show the box again.
   const [analyticsAgreed, setAnalyticsAgreed] = createSignal(webReportsAgreed());
   const [analyticsChoice, setAnalyticsChoice] = createSignal(webReportsEnabled());
-  // Only a box that the user changed is a choice for the account; a regional default is not.
   let analyticsTouched = false;
-  // After a sign-out, the sign-in screen starts again from the saved answer of this browser.
   function resetAnalyticsBox() {
     setAnalyticsAgreed(webReportsAgreed());
     setAnalyticsChoice(webReportsEnabled());
@@ -263,17 +225,10 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   const initialHostingReturn = takeHostingReturn();
   const [billingReturn, setBillingReturn] = createSignal(initialBillingReturn !== null);
   const [hostingReturn, setHostingReturn] = createSignal(initialHostingReturn);
-  /** Sent once, when analytics has the account. */
   let billingReturnEvent: BillingReturn | null =
     initialBillingReturn ??
     (initialHostingReturn ? { outcome: initialHostingReturn.paid ? "completed" : "cancelled", kind: "plan" } : null);
-  /** Shown after the first session check, because its 401 resets the login state. */
   let companySignInReturnError = takeCompanySignInError();
-  /**
-   * A link or a return in the address opens the web client directly. The address no longer holds
-   * it, so a phone screen in front of it would lose an invitation, and a return comes back from a
-   * flow that the user started in the browser.
-   */
   const addressHadLink =
     agentTemplateId() !== null ||
     inviteUrl() !== null ||
@@ -285,25 +240,18 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     initialHostingReturn !== null ||
     companySignInReturnError !== null;
   const [workspace, setWorkspace] = createSignal<typeof WebWorkspace>();
-  /** Sets the account when the workspace code is ready to show it. */
   async function showAccount(account: CentralAuthUser) {
     const view = await loadWorkspace();
     setWorkspace(() => view);
     return account;
   }
-  // The loading screen stays over the app until its exit ends.
   const [loadingShown, setLoadingShown] = createSignal(true);
   let channel: BroadcastChannel | null = null;
   let disposed = false;
   let sessionGeneration = 0;
-  /**
-   * The cookie's account session has ended. The server ended its remote sessions in the same write
-   * (`endAccountSession`), so the closing workspace does not end them again.
-   */
   let sessionEnded = false;
   function clearSession(ended = true) {
     sessionEnded = ended;
-    // The saved workspace frames name the agents of the account's servers.
     if (ended) {
       deleteRemoteWorkspaceFrames(null);
       void deleteSavedAgentPictures(null);
@@ -339,7 +287,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       | { email: string }
       | { challengeId: string | null; code: string; firstTouch?: FirstTouch; referralCode?: string }
       | Record<string, never>,
-    send?: { idempotencyKey: string; signal: AbortSignal },
+    send?: { idempotencyKey?: string; signal: AbortSignal },
   ) {
     const response = await accountFetch(`/api/browser/${path}`, {
       method: body ? "POST" : "GET",
@@ -349,7 +297,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
         ? {
             "Content-Type": "application/json",
             "X-OpenBot-Browser": "1",
-            ...(send ? { "Idempotency-Key": send.idempotencyKey } : {}),
+            ...(send?.idempotencyKey ? { "Idempotency-Key": send.idempotencyKey } : {}),
           }
         : {},
       ...(body ? { body: JSON.stringify(body) } : {}),
@@ -390,7 +338,6 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     }
     return value;
   }
-  /** Like the desktop login, a server refusal is shown as the login issue, not also as a thrown error. */
   async function signInRequest(path: "email/start" | "email/verify", body: Parameters<typeof request>[1]) {
     try {
       return await request(path, body);
@@ -416,11 +363,6 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       chatColor: isAvatarColor(value.user.chatColor) ? value.user.chatColor : null,
     };
   }
-  /**
-   * Keeps this browser and the account on the user's latest analytics answer. A choice that the
-   * account does not have yet goes to it; otherwise this browser follows the account's answer. An
-   * "off" from before the account kept answers does not follow an "on".
-   */
   async function followAccountAnalytics(answer: boolean | null | undefined) {
     const module = await import("./web-analytics");
     if (webAccountPending()) return module.sendWebAnalyticsChoice(accountCalls);
@@ -431,10 +373,18 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   }
   async function checkSession() {
     const generation = sessionGeneration;
-    // The workspace code loads beside the session check, not after it.
     void loadWorkspace().catch(() => undefined);
+    const screenWaits = !state.loaded || (!state.account && state.login.status === "error");
+    if (screenWaits && state.loaded)
+      setState((draft) => {
+        draft.retrying = true;
+      });
     try {
-      const session = await request("session");
+      const session = await request(
+        "session",
+        undefined,
+        screenWaits ? { signal: AbortSignal.timeout(SESSION_CHECK_TIMEOUT_MS) } : undefined,
+      );
       markRemoteSync("session");
       const account = await showAccount(accountFrom(session));
       markRemoteSync("workspace-code");
@@ -447,7 +397,6 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       }
     } catch (error) {
       if (!disposed && generation === sessionGeneration) {
-        // Signed in, the workspace stays usable. Signed out, the login screen offers a retry, as on desktop.
         if (state.account)
           toast.error(
             text.sourceText(error instanceof Error ? error.message : text.t("webClient.login.sessionFailed")),
@@ -457,7 +406,13 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
           setState((draft) => {
             draft.login = {
               status: "error",
-              issue: { code: "auth_api_unavailable", message: sourceText("error.auth.serviceUnavailable") },
+              issue: {
+                code: "auth_api_unavailable",
+                message:
+                  error instanceof DOMException && error.name === "TimeoutError"
+                    ? sourceText("error.auth.sessionTimeout")
+                    : sourceText("error.auth.serviceUnavailable"),
+              },
             };
           });
       }
@@ -467,19 +422,15 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       if (!disposed)
         setState((draft) => {
           draft.loaded = true;
+          draft.retrying = false;
           if (returnError !== null && !draft.account && draft.login.status === "signed_out")
             draft.login = { status: "error", issue: companySignInIssue(returnError) };
         });
     }
   }
-  /**
-   * The send whose result is not known yet. A request for the same email uses its key again, so the
-   * account service answers for that send and does not send a second code.
-   */
   let emailStart: { email: string; idempotencyKey: string; startedAt: number } | null = null;
   async function start(email: string) {
     if (Date.now() < state.resendAt) throw new Error(text.t("webClient.login.wait"));
-    // A request for a code answers the analytics box and accepts the Terms of Service.
     if (!analyticsAgreed()) {
       setWebReportsEnabled(analyticsChoice());
       if (analyticsTouched) setWebAccountPending(analyticsChoice());
@@ -490,10 +441,8 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
         ? emailStart
         : { email, idempotencyKey: crypto.randomUUID(), startedAt: Date.now() };
     emailStart = attempt;
-    // Without a time limit, a request that gets no answer keeps the form on "Sending code…".
     const limit = new AbortController();
     let timedOut = false;
-    // A refusal ends this send. An unknown result keeps its key for the next request.
     let uncertain = false;
     const timer = window.setTimeout(() => {
       timedOut = true;
@@ -540,10 +489,6 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       };
     });
   }
-  /**
-   * Goes to the company's sign-in page in this tab. The account service sends the browser back to
-   * `/app` with the session cookie, or with `companySignInError`.
-   */
   async function openCompanySignIn(email: string) {
     setState((draft) => {
       draft.login = { status: "company_sign_in", email };
@@ -568,12 +513,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       draft.login = { status: "company_sign_in", email, issue: companySignInIssue(code) };
     });
   }
-  /**
-   * `referralCode` comes from the invite field of the sign-in form, which the code of an opened invite link
-   * fills. The account server uses it only for a new account.
-   */
   async function verify(challengeId: string, code: string, referralCode?: string) {
-    // The first website visit of this browser, so that reports can name the source of a new account.
     const firstTouch = readFirstTouch(() => window.localStorage, Date.now());
     const value = await signInRequest("email/verify", {
       challengeId,
@@ -582,7 +522,6 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       ...(referralCode ? { referralCode } : {}),
     });
     if (value === null) return;
-    // The code was in the sign-in form. A later sign-in in this browser does not get it again.
     forgetReferralCode(() => window.localStorage);
     const account = accountFrom(value);
     sessionGeneration += 1;
@@ -591,7 +530,6 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
     try {
       await showAccount(account);
     } catch {
-      // The server has used the code and set the session, so the retry checks the session again.
       setState((draft) => {
         draft.login = {
           status: "error",
@@ -617,8 +555,6 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
       void checkSession();
     };
     void checkSession();
-    // A page restored from the back-forward cache still has its session; its connection ends normally.
-    // A browser also sends `pageshow` after a normal load, which can come after the session check.
     const restore = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
       clearSession(false);
@@ -635,11 +571,8 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   const consentAgents = createOnboardingTeam(onboardingSessionSeed(), 3);
   const languagePreference = createWebLanguagePreference();
   const appearancePreference = createWebAppearancePreference();
-  // The chat background of each scheme; leaving `/app` removes it.
   onSettled(() => syncWebChatBackground());
-  // The sign-in starts in the browser language; its language button opens the wheel to change it.
   const [languageWheelOpen, setLanguageWheelOpen] = createSignal(false);
-  // On a phone the web client first points to the phone app, unless the address opened a link.
   const [phoneAppShown, setPhoneAppShown] = createSignal(!addressHadLink && phoneAppScreenWanted());
   return (
     <StaticI18nProvider
@@ -765,12 +698,21 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
           </Show>
           <Show when={loadingShown()}>
             <AppLoadingScreen
+              label={text.t("app.loading")}
+              title={text.t("app.loading")}
+              scene={startupLoadingScene()}
               ready={state.loaded}
               onExited={() => {
                 setLoadingShown(false);
                 void loadWorkspace().catch(() => undefined);
               }}
             />
+          </Show>
+          <Show when={!state.loaded}>
+            <WebSlowLoadNotice />
+          </Show>
+          <Show when={state.retrying}>
+            <WebSlowLoadNotice startsWait />
           </Show>
         </div>
       </NotificationObserver>

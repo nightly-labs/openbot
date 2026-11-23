@@ -16,12 +16,10 @@ import {
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 
-/** True when the access gives the MCP server to `agentId`. */
 export function mcpAccessAllows(access: McpServerAccess, agentId: string): boolean {
   return access.agents === null || access.agents.includes(agentId);
 }
 
-/** The new access after the level of Everyone changes. A role keeps only a level above it. */
 export function withEveryoneLevel(access: McpServerAccess, level: McpAccessLevel): McpServerAccess {
   return {
     ...access,
@@ -32,23 +30,16 @@ export function withEveryoneLevel(access: McpServerAccess, level: McpAccessLevel
   };
 }
 
-/** The new access after the level of one role changes. The level of Everyone needs no entry. */
 export function withRoleLevel(access: McpServerAccess, roleId: string, level: McpAccessLevel): McpServerAccess {
   const roles = Object.fromEntries(Object.entries(access.roles).filter(([id]) => id !== roleId));
   return { ...access, roles: level === access.everyone ? roles : { ...roles, [roleId]: level } };
 }
 
-/** The level that a role gets: its own level, or the level of Everyone when that is higher. */
 export function mcpRoleLevel(access: McpServerAccess, roleId: string): McpAccessLevel {
   const own = access.roles[roleId] ?? "none";
   return mcpAccessRank(own) > mcpAccessRank(access.everyone) ? own : access.everyone;
 }
 
-/**
- * Who gets one MCP server of a host (`mcp-access-v1`), for an owner or admin: the agents and the level
- * of Everyone and of each role. Each change sends the whole entry with the revision that it read; the
- * host refuses a stale one, and the page reads the access again.
- */
 export function useMcpAccess(serverId: string, mcpServerId: string) {
   const available = useMobileWorkspaceSelector((workspace) => workspace.canManageMcpAccess(serverId));
   const { loadMcpAccess, setMcpAccess } = useMobileWorkspaceActions();
@@ -73,7 +64,6 @@ export function useMcpAccess(serverId: string, mcpServerId: string) {
     },
     onError: () => {
       void haptics.notification("error");
-      // Another admin saved first, or the host refused the change: show what it holds now.
       void snapshot.refetch();
     },
     onSettled: () => {
@@ -81,16 +71,13 @@ export function useMcpAccess(serverId: string, mcpServerId: string) {
     },
   });
   const data = snapshot.data;
-  // A server with no stored entry gives each agent and lets each member use it.
   const entry = data ? copyMcpServerAccess(data.servers?.[mcpServerId] ?? DEFAULT_MCP_SERVER_ACCESS) : undefined;
   return {
     available,
     snapshot,
     action,
     entry,
-    /** Runs one change at a time on a copy of the entry. Resolves true when it succeeds. */
     save(edit: (access: McpServerAccess) => McpServerAccess): Promise<boolean> {
-      // The cache, not this render: a change right after a save must name the newest revision.
       const held = queryClient.getQueryData<McpAccessSnapshot>(key);
       if (locked.current || !held) return Promise.resolve(false);
       locked.current = true;

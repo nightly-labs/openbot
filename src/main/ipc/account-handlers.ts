@@ -1,5 +1,3 @@
-// The cloud account: email sign-in, profile, and the mobile devices connected to it.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { LOCAL_SERVER_ID, type TestCompanySignInInput } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -14,11 +12,15 @@ import { isObject, requireString, stringPayload } from "./validation";
 
 export interface AccountIpcDependencies {
   centralAuth: CentralAuthManager;
+  refreshServers: () => void;
   host: Pick<HostService, "configure" | "getStatus" | "start" | "getMobileConnectHost" | "refreshRegistration">;
 }
 
-export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies): Pick<IpcGroupHandlers, "auth"> {
-  // The account service knows this computer's server by its host id, which is set once it is registered.
+export function accountIpcHandlers({
+  centralAuth,
+  host,
+  refreshServers,
+}: AccountIpcDependencies): Pick<IpcGroupHandlers, "auth"> {
   const hostId = (serverId: string): string => {
     if (serverId !== LOCAL_SERVER_ID) return serverId;
     const local = host.getStatus().serverId;
@@ -79,6 +81,15 @@ export function accountIpcHandlers({ centralAuth, host }: AccountIpcDependencies
       ),
       revokeCompanySignInScimToken: payloadHandler(stringPayload("serverId"), (serverId) =>
         runCauseEffect(centralAuth.revokeCompanySignInScimToken(hostId(serverId))),
+      ),
+      listOwnerTransfers: handler(() => runCauseEffect(centralAuth.incomingOwnerTransfers())),
+      acceptOwnerTransfer: payloadHandler(stringPayload("transferId", INPUT_LIMITS.identifier), async (transferId) => {
+        const accepted = await runCauseEffect(centralAuth.acceptOwnerTransfer(transferId));
+        refreshServers();
+        return accepted;
+      }),
+      declineOwnerTransfer: payloadHandler(stringPayload("transferId", INPUT_LIMITS.identifier), (transferId) =>
+        runCauseEffect(centralAuth.declineOwnerTransfer(transferId)),
       ),
     },
   };

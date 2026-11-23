@@ -46,67 +46,44 @@ import {
 } from "./files-view";
 
 export interface FileListProps {
-  /** Accessible name of the list, such as "Files in Chief". */
   label: string;
   files: readonly StoredFileRow[];
-  /** Names the agent on each row. Leave it out where the list already belongs to one agent. */
   agents?: readonly AgentProfile[] | undefined;
-  /** Show the chat each file belongs to. Off in the chat's own panel. */
   showConversation?: boolean;
-  /** Narrow layout for the chat side panel: filters scroll, rows drop the chat column. */
   compact?: boolean;
-  /** Day headings between rows. Applies to the "Newest" order only. */
   groupByDay?: boolean;
-  /** Level of the day headings: one below the nearest heading of the caller. Default 4. */
   groupHeadingLevel?: 3 | 4;
   loading?: boolean | undefined;
   error?: string | null | undefined;
   onRetry?: (() => void) | undefined;
   initialQuery?: Partial<FileQuery>;
-  /**
-   * The search, type and order that the caller owns, such as the Library page. The list then shows no
-   * search, filters or count of its own.
-   */
   query?: FileQuery | undefined;
-  /** The clock for day labels, so a story does not depend on the day it runs. */
   now?: Date | undefined;
   emptyTitle?: string;
   emptyDescription?: string;
-  /** The viewer can delete files. A row also needs `deletable`. Off for a member of a remote server. */
   canDelete?: boolean | undefined;
-  /** Lets the caller select rows, such as the Library for a delete of many files. */
   selection?: FileSelection | undefined;
-  /** The folder of a file, such as "Autumn campaign › Images". It shows on the row of a file that has one. */
   folderLabel?: ((file: StoredFileRow) => string | undefined) | undefined;
-  /** More items for the menu of a row, before Delete. */
   rowMenu?: ((file: StoredFileRow) => JSX.Element) | undefined;
-  /** The files are on the computer of the viewer: a row offers Open and Show in folder. The default is true. */
   opensFiles?: boolean | undefined;
+  pictureUrl?: ((file: StoredFileRow) => string | null) | undefined;
   onPreview: (file: StoredFileRow) => void;
   onAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
 }
 
-/** The selected files of a list that the caller owns. */
 export interface FileSelection {
-  /** A click selects the file instead of opening it, and each row shows its mark. */
   active: boolean;
   isSelected: (file: StoredFileRow) => boolean;
   canSelect: (file: StoredFileRow) => boolean;
-  /** A click on a row in selection mode, or a Command, Control or Shift click in any mode. */
   onToggle: (file: StoredFileRow, event: MouseEvent) => void;
 }
 
-/** Command, Control or Shift starts a selection, as in Finder and Explorer. */
 export function isSelectClick(event: MouseEvent): boolean {
   return event.metaKey || event.ctrlKey || event.shiftKey;
 }
 
 const LOADING_ROWS = [0, 1, 2, 3, 4];
 
-/**
- * The file browser every Files surface shares: Storage in Settings, an agent's Files, and a chat's
- * Files panel. It owns the search, type filter and order; the caller owns the data and every action.
- */
 export function FileList(props: FileListProps) {
   const { t, format } = useText();
   const [ownQuery, setQuery] = createStore<FileQuery>({
@@ -214,6 +191,7 @@ export function FileList(props: FileListProps) {
                         agentName={agentName(file.agentId)}
                         folderLabel={props.folderLabel}
                         rowMenu={props.rowMenu}
+                        pictureUrl={props.pictureUrl}
                         opensFiles={props.opensFiles !== false}
                         showConversation={props.showConversation !== false && !props.compact}
                         canDelete={props.canDelete === true && file.deletable}
@@ -250,7 +228,6 @@ export function FileList(props: FileListProps) {
   );
 }
 
-/** The search box of a file list. */
 export function FileSearch(props: { label: string; value: string; onChange: (value: string) => void; class?: string }) {
   return (
     <div class={props.class ? `file-list-search ${props.class}` : "file-list-search"}>
@@ -268,7 +245,6 @@ export function FileSearch(props: { label: string; value: string; onChange: (val
   );
 }
 
-/** One chip for each file type that has files, with its count. "All" always shows. */
 export function FileTypeFilters(props: {
   counts: Record<FileTypeFilter, number>;
   value: FileTypeFilter;
@@ -297,7 +273,6 @@ export function FileTypeFilters(props: {
   );
 }
 
-/** The message when no file matches the search and type. "Clear filters" shows only when a filter is set. */
 export function FileNoMatches(props: { filtered: boolean; onClear: () => void }) {
   const { t } = useText();
   return (
@@ -312,7 +287,6 @@ export function FileNoMatches(props: { filtered: boolean; onClear: () => void })
   );
 }
 
-/** The loading, error and empty states of a file list. The children show when there are files. */
 export function FileListStatus(props: {
   loading?: boolean | undefined;
   error?: string | null | undefined;
@@ -364,10 +338,6 @@ export function FileListStatus(props: {
   );
 }
 
-/**
- * Asks before a file is deleted, or before a file that is gone is removed from the list. The dialog
- * stays open with the error when the delete fails.
- */
 export function FileDeleteDialog(props: {
   file: StoredFileRow | null;
   onClose: () => void;
@@ -409,7 +379,6 @@ export function FileDeleteDialog(props: {
   );
 }
 
-/** The check mark of a selectable file. The control that selects the file has the state; the mark only shows it. */
 export function FileSelectionMark(props: { selected: boolean; class?: string }) {
   return (
     <span
@@ -427,6 +396,7 @@ function FileRow(props: {
   agentName: string | null;
   folderLabel: ((file: StoredFileRow) => string | undefined) | undefined;
   rowMenu: ((file: StoredFileRow) => JSX.Element) | undefined;
+  pictureUrl: ((file: StoredFileRow) => string | null) | undefined;
   opensFiles: boolean;
   showConversation: boolean;
   canDelete: boolean;
@@ -481,7 +451,7 @@ function FileRow(props: {
         <Show when={selecting()}>
           <FileSelectionMark selected={selected()} />
         </Show>
-        <FileVisual file={props.file} />
+        <FileVisual file={props.file} pictureUrl={props.pictureUrl} />
         <span class="file-row-copy">
           <span class="file-row-name" title={props.file.name}>
             {props.file.name}
@@ -515,7 +485,8 @@ function FileRow(props: {
   );
 }
 
-function FileVisual(props: { file: StoredFileRow }) {
+function FileVisual(props: { file: StoredFileRow; pictureUrl: ((file: StoredFileRow) => string | null) | undefined }) {
+  const source = () => (props.pictureUrl ? props.pictureUrl(props.file) : props.file.previewUrl);
   return (
     <Show
       when={props.file.previewKind === "image" && props.file.previewUrl && props.file.status === "available"}
@@ -531,7 +502,7 @@ function FileVisual(props: { file: StoredFileRow }) {
       }
     >
       <span class="files-file-visual files-file-thumbnail" aria-hidden="true">
-        <img src={props.file.previewUrl ?? ""} alt="" />
+        <img src={source() ?? ""} alt="" loading="lazy" decoding="async" />
       </span>
     </Show>
   );
@@ -557,15 +528,12 @@ function FileStatusBadge(props: { status: StoredFileRow["status"] }) {
   );
 }
 
-/** The actions of one file. The items depend on where the file is. */
 export function FileRowMenu(props: {
   file: StoredFileRow;
   canDelete: boolean;
-  /** Open and Show in folder need the file on this computer. The web client only downloads it. Default true. */
   opensFiles?: boolean | undefined;
   onAction: (action: StoredFileAction) => void;
   class?: string | undefined;
-  /** More items, such as "Move to". They come before Delete. */
   children?: JSX.Element;
 }) {
   const { t } = useText();
@@ -602,7 +570,6 @@ export function FileRowMenu(props: {
               {t("common.tryAgain")}
             </DropdownMenu.Item>
           </Show>
-          {/* A chat file has its conversation and its message. A channel file has only the channel message. */}
           <Show when={props.file.messageId}>
             <DropdownMenu.Item onSelect={() => props.onAction("show-in-chat")}>
               <MessageCircle aria-hidden="true" />

@@ -12,10 +12,8 @@ import { waitForPresentedFrame } from "./browser-smoke-frames";
 const ORIGIN = "https://authentication.openbot.test";
 const ID = "12345678-1234-1234-1234-123456789abc";
 const PASSWORD = "fixture-bitwarden-password";
-/** Eight digits, and the page does not say so: the saved code sets the length (#7920). */
 const CODE = "73918246";
 
-/** The page submits only if the browser received the expected fixture value. */
 export function bitwardenLoginFixture(kind: "password" | "authenticator"): Response {
   const expected = kind === "password" ? PASSWORD : CODE;
   return new Response(
@@ -26,14 +24,11 @@ export function bitwardenLoginFixture(kind: "password" | "authenticator"): Respo
   );
 }
 
-/** Real browser and vault router; the injected CLI contains only synthetic credentials. */
 export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<void> {
-  /** While true, each `bw` call fails, as with a session key that no longer works (#8777). */
   let cliFails = false;
-  /** The logins of the OpenBot Vault fixture for `ORIGIN`. */
   let vaultLogins: VaultLogin[] = [];
   const connector = new BitwardenConnectorService({
-    findCli: async () => "/fixture/bw",
+    findCli: () => Effect.succeed({ executable: "/fixture/bw" }),
     runCli: async (_executable, args) => {
       if (cliFails) throw new Error("Fixture bw failure.");
       if (args[0] === "sync") return "Sync complete.";
@@ -53,7 +48,6 @@ export async function runBitwardenBrowserSmoke(browser: BrowserHost): Promise<vo
           username: "fixture@example.test",
           password: PASSWORD,
           totp: "fixture-seed",
-          // A sibling host with no scheme and the default rule: Bitwarden matches the registrable domain.
           uris: [{ uri: "accounts.openbot.test", match: null }],
         },
       };
