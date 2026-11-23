@@ -26,7 +26,11 @@ export type CreditJobCheck =
   | { status: "running" }
   | { status: "completed"; charged?: number }
   | { status: "failed" | "canceled" };
-export type CreditJobChecker = (providerJobId: string, jobId: string) => Effect.Effect<CreditJobCheck, Failure>;
+export type CreditJobChecker = (
+  providerJobId: string,
+  jobId: string,
+  upstream: string | null,
+) => Effect.Effect<CreditJobCheck, Failure>;
 
 export interface CreditHoldInput {
   jobId: string;
@@ -47,6 +51,7 @@ export interface CreditHold {
   outcome: CreditHoldOutcome | null;
   charged: number | null;
   providerJobId: string | null;
+  upstream: string | null;
 }
 
 export interface CreditSweepResult {
@@ -90,11 +95,13 @@ interface HoldRow {
   outcome: string | null;
   charged_tenths: number | null;
   provider_job_id: string | null;
+  upstream: string | null;
 }
 
 interface DueRow {
   job_id: string;
   provider_job_id: string;
+  upstream: string | null;
   created_at: number;
   expires_at: number;
 }
@@ -142,6 +149,7 @@ function toHold(row: HoldRow): CreditHold {
     outcome: isOneOf(HOLD_OUTCOMES, row.outcome) ? row.outcome : null,
     charged: row.charged_tenths === null ? null : creditsFromTenths(row.charged_tenths),
     providerJobId: row.provider_job_id,
+    upstream: row.upstream,
   };
 }
 
@@ -256,14 +264,15 @@ export class CreditSpending {
     jobId: string,
     providerJobId: string,
     details: CreditMediaDetails = {},
+    upstream: string | null = null,
   ): Effect.fn.Return<CreditHold | null, Failure> {
     const started = yield* billingCall(() =>
       this.#database
         .prepare(
-          `UPDATE credit_holds SET provider_job_id = ?2 WHERE job_id = ?1 AND provider_job_id IS NULL
+          `UPDATE credit_holds SET provider_job_id = ?2, upstream = ?3 WHERE job_id = ?1 AND provider_job_id IS NULL
            ${TRACKED_HOLD_SQL}`,
         )
-        .bind(jobId, providerJobId)
+        .bind(jobId, providerJobId, upstream)
         .all<TrackedHoldRow>(),
     );
     for (const row of started.results) {
@@ -343,7 +352,7 @@ export class CreditSpending {
       this.#database
         .prepare(
           `SELECT job_id, user_id, server_id, actor_user_id, model_id, credits_tenths, status, outcome, charged_tenths,
-                  provider_job_id
+                  provider_job_id, upstream
              FROM credit_holds WHERE job_id = ?`,
         )
         .bind(jobId)
@@ -375,7 +384,7 @@ export class CreditSpending {
       const due = yield* billingCall(() =>
         this.#database
           .prepare(
-            `SELECT job_id, provider_job_id, created_at, expires_at FROM credit_holds
+            `SELECT job_id, provider_job_id, upstream, created_at, expires_at FROM credit_holds
               WHERE status = 'held' AND provider_job_id IS NOT NULL AND (check_at <= ?1 OR expires_at <= ?1)
               ORDER BY MIN(check_at, expires_at) LIMIT ?2`,
           )
@@ -383,7 +392,7 @@ export class CreditSpending {
           .all<DueRow>(),
       );
       for (const row of due.results) {
-        const check = yield* Effect.exit(checkJob(row.provider_job_id, row.job_id));
+        const check = yield* Effect.exit(checkJob(row.provider_job_id, row.job_id, row.upstream));
         const result = Exit.isSuccess(check) ? checkResult(check.value) : null;
         if (result) {
           yield* this.settle(row.job_id, result);

@@ -49,12 +49,16 @@ import {
   CreditSpending,
   type CreditWallet,
 } from "./credit-spending";
-import type {
-  MediaUpstream,
-  MediaUpstreamArtifact,
-  MediaUpstreamBody,
-  MediaUpstreamError,
-  MediaUpstreamValue,
+import {
+  type MediaGeneration,
+  type MediaGenerationInput,
+  type MediaUpstream,
+  type MediaUpstreamArtifact,
+  type MediaUpstreamBody,
+  type MediaUpstreamError,
+  type MediaUpstreams,
+  type MediaUpstreamValue,
+  ROUTER_MEDIA_UPSTREAM,
 } from "./media-upstream";
 
 type Failure = BillingError | BillingOperationError;
@@ -66,11 +70,7 @@ const NOT_ACCEPTED_STATUSES = new Set([401, 402, 403, 429]);
 
 export type CreditMediaPayer = { wallet: "personal"; userId: string } | { wallet: "server"; serverId: string };
 
-interface CreditMediaInput {
-  role: CreditMediaInputRole;
-  bytes: Uint8Array;
-  mimeType: string;
-}
+type CreditMediaInput = MediaGenerationInput;
 
 export interface CreditMediaSubmission {
   request: CreditMediaJobRequest;
@@ -79,13 +79,14 @@ export interface CreditMediaSubmission {
 
 export interface CreditMediaServiceOptions {
   database: D1Database;
-  upstream: MediaUpstream | null;
+  upstreams: MediaUpstreams;
   now: () => number;
   analytics?: AccountAnalytics;
 }
 
 interface ModelRow {
   model_id: string;
+  upstream: string;
   upstream_id: string;
   kind: string;
   name: string;
@@ -101,6 +102,7 @@ interface ModelRow {
 
 interface StoredModel {
   model: CreditMediaModel;
+  upstream: string;
   upstreamId: string;
   upstreamParams: MediaUpstreamBody;
 }
@@ -145,7 +147,14 @@ function storedModels(rows: readonly ModelRow[]): StoredModel[] {
       })),
     });
     return model
-      ? [{ model, upstreamId: first.upstream_id, upstreamParams: upstreamParams(first.upstream_params) }]
+      ? [
+          {
+            model,
+            upstream: first.upstream,
+            upstreamId: first.upstream_id,
+            upstreamParams: upstreamParams(first.upstream_params),
+          },
+        ]
       : [];
   });
 }
@@ -175,52 +184,20 @@ function outputsOf(artifacts: readonly MediaUpstreamArtifact[]): CreditMediaOutp
   }));
 }
 
-function base64(bytes: Uint8Array): string {
-  let binary = "";
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-  }
-  return btoa(binary);
-}
-
-function dataUri(input: CreditMediaInput): string {
-  return `data:${input.mimeType};base64,${base64(input.bytes)}`;
-}
-
-function present(entries: Record<string, MediaUpstreamValue | undefined>): MediaUpstreamBody {
-  const body: Record<string, MediaUpstreamValue> = {};
-  for (const [key, value] of Object.entries(entries)) {
-    if (value !== undefined && value !== null) body[key] = value;
-  }
-  return body;
-}
-
-function upstreamBody(stored: StoredModel, submission: CreditMediaSubmission): MediaUpstreamBody {
+function generationOf(stored: StoredModel, submission: CreditMediaSubmission): MediaGeneration {
   const { request, inputs } = submission;
-  const first = inputs.find((input) => input.role === "first");
-  const last = inputs.find((input) => input.role === "last");
-  const references = inputs.filter((input) => input.role === "reference").map(dataUri);
-  const shared = {
-    ...stored.upstreamParams,
+  return {
+    kind: stored.model.kind,
     model: stored.upstreamId,
+    params: stored.upstreamParams,
     prompt: request.prompt,
-    aspect_ratio: request.aspect ?? stored.model.defaultAspect,
+    aspect: request.aspect ?? stored.model.defaultAspect,
     resolution: request.resolution ?? stored.model.defaultResolution,
+    count: request.count,
+    duration: stored.model.kind === "video" ? (request.duration ?? stored.model.defaultDuration) : null,
+    audio: stored.model.audio ? request.audio : null,
+    inputs,
   };
-  if (stored.model.kind === "image")
-    return present({
-      ...shared,
-      num_images: request.count,
-      image_urls: references.length > 0 ? references : undefined,
-    });
-  return present({
-    ...shared,
-    duration: request.duration ?? stored.model.defaultDuration,
-    image_url: first ? dataUri(first) : undefined,
-    end_image_url: last ? dataUri(last) : undefined,
-    reference_image_urls: references.length > 0 ? references : undefined,
-    generate_audio: stored.model.audio ? request.audio : undefined,
-  });
 }
 
 function inputsProblem(model: CreditMediaModel, inputs: readonly CreditMediaInput[]): boolean {
@@ -297,13 +274,13 @@ export const readCreditMediaSubmission = Effect.fn("CreditMedia.readSubmission")
 
 export class CreditMediaService {
   readonly #database: D1Database;
-  readonly #upstream: MediaUpstream | null;
+  readonly #upstreams: MediaUpstreams;
   readonly #spending: CreditSpending;
   readonly #audit: CreditAudit;
 
   constructor(options: CreditMediaServiceOptions) {
     this.#database = options.database;
-    this.#upstream = options.upstream;
+    this.#upstreams = options.upstreams;
     this.#spending = new CreditSpending({
       database: options.database,
       now: options.now,
@@ -340,7 +317,7 @@ export class CreditMediaService {
     return billingCall(() =>
       this.#database
         .prepare(
-          `SELECT m.model_id, m.upstream_id, m.kind, m.name, m.maker, m.variant, m.specs, m.upstream_params,
+          `SELECT m.model_id, m.upstream, m.upstream_id, m.kind, m.name, m.maker, m.variant, m.specs, m.upstream_params,
                   p.resolution, p.unit, p.credits, p.silent_credits
              FROM credit_media_models m
              JOIN credit_media_prices p ON p.model_id = m.model_id
@@ -352,15 +329,16 @@ export class CreditMediaService {
     ).pipe(Effect.map((result) => storedModels(result.results)));
   }
 
-  #upstreamOrFail(): Effect.Effect<MediaUpstream, BillingError> {
-    return this.#upstream ? Effect.succeed(this.#upstream) : Effect.fail(unavailable());
+  #upstreamOrFail(name: string | null): Effect.Effect<MediaUpstream, BillingError> {
+    const upstream = this.#upstreams.get(name ?? ROUTER_MEDIA_UPSTREAM);
+    return upstream ? Effect.succeed(upstream) : Effect.fail(unavailable());
   }
 
   readonly catalog = Effect.fn("CreditMedia.catalog")(function* (
     this: CreditMediaService,
   ): Effect.fn.Return<CreditMediaCatalog, Failure> {
-    if (!this.#upstream) return { models: [] };
-    const models = yield* this.#models(null);
+    if (this.#upstreams.size === 0) return { models: [] };
+    const models = (yield* this.#models(null)).filter((stored) => this.#upstreams.has(stored.upstream));
     return {
       models: CREDIT_MEDIA_KINDS.flatMap((kind) =>
         models.filter((stored) => stored.model.kind === kind).map((stored) => stored.model),
@@ -437,11 +415,12 @@ export class CreditMediaService {
     trace: CreditAuditTrace,
     quote: { credits?: number },
   ): Effect.fn.Return<CreditMediaJob, Failure> {
-    const upstream = yield* this.#upstreamOrFail();
+    if (this.#upstreams.size === 0) return yield* unavailable();
     const { request } = submission;
     const stored = (yield* this.#models(request.model))[0];
     if (!stored)
       return yield* new BillingError(404, "media_model_unavailable", sourceText("error.billing.mediaModelUnavailable"));
+    const upstream = yield* this.#upstreamOrFail(stored.upstream);
     if (creditMediaRequestProblem(stored.model, request) || inputsProblem(stored.model, submission.inputs))
       return yield* invalidRequest();
     const credits = creditMediaCost(stored.model, request);
@@ -457,9 +436,7 @@ export class CreditMediaService {
     if (hold.status === "released") return this.#releasedView(hold);
     if (hold.status === "charged" || hold.providerJobId) return yield* this.#job(payer, hold.jobId, trace);
     yield* this.#spending.submitting(hold.jobId);
-    const submitted = yield* Effect.result(
-      upstream.submit(stored.model.kind, hold.jobId, upstreamBody(stored, submission)),
-    );
+    const submitted = yield* Effect.result(upstream.submit(hold.jobId, generationOf(stored, submission)));
     if (Result.isFailure(submitted)) {
       const error = submitted.failure;
       logUpstream("submit", error, trace);
@@ -480,7 +457,7 @@ export class CreditMediaService {
       count: request.count,
       audio: request.audio,
     };
-    const started = (yield* this.#spending.start(hold.jobId, job.id, details)) ?? hold;
+    const started = (yield* this.#spending.start(hold.jobId, job.id, details, stored.upstream)) ?? hold;
     return this.#view(started, job.status, job.pollAfterSeconds, []);
   }).bind(this);
 
@@ -509,7 +486,7 @@ export class CreditMediaService {
   ): Effect.fn.Return<CreditMediaJob, Failure> {
     const hold = yield* this.#owned(payer, jobId);
     if (hold.status === "released") return this.#releasedView(hold);
-    const upstream = yield* this.#upstreamOrFail();
+    const upstream = yield* this.#upstreamOrFail(hold.upstream);
     if (!hold.providerJobId) return this.#view(hold, "queued", QUEUED_POLL_SECONDS, []);
     if (hold.status === "charged") {
       const artifacts = yield* this.#artifacts(upstream, hold.providerJobId, trace);
@@ -546,7 +523,7 @@ export class CreditMediaService {
   ): Effect.fn.Return<Response, Failure> {
     const hold = yield* this.#owned(payer, jobId);
     if (hold.status !== "charged" || !hold.providerJobId) return yield* notFound();
-    const upstream = yield* this.#upstreamOrFail();
+    const upstream = yield* this.#upstreamOrFail(hold.upstream);
     const artifact = (yield* this.#artifacts(upstream, hold.providerJobId, trace))[index];
     if (!artifact) return yield* notFound();
     const response = yield* upstream.download(artifact.url).pipe(
@@ -567,10 +544,14 @@ export class CreditMediaService {
   }).bind(this);
 
   checker(): CreditJobChecker | null {
-    const upstream = this.#upstream;
-    if (!upstream) return null;
-    return (providerJobId, jobId) => {
+    if (this.#upstreams.size === 0) return null;
+    return (providerJobId, jobId, name) => {
       const trace = creditAuditTrace();
+      const upstream = this.#upstreams.get(name ?? ROUTER_MEDIA_UPSTREAM);
+      if (!upstream) {
+        console.error("media: upstream not configured", { upstream: name });
+        return Effect.fail(new BillingOperationError({}));
+      }
       return upstream.status(providerJobId).pipe(
         Effect.flatMap((state) => {
           if (state.status === "completed")

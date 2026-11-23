@@ -14,7 +14,14 @@ import {
   readCreditMediaSubmission,
 } from "../src/server/credit-media-service";
 import { CREDIT_HOLD_FIRST_CHECK_MS } from "../src/server/credit-spending";
-import { MediaUpstream, mediaUpstreamFromBindings } from "../src/server/media-upstream";
+import {
+  type MediaUpstream,
+  ROUTER_MEDIA_UPSTREAM,
+  RouterMediaUpstream,
+  TASKS_MEDIA_UPSTREAM,
+} from "../src/server/media-upstream";
+import { mediaUpstreamsFromBindings } from "../src/server/media-upstream-bindings";
+import { TasksMediaUpstream } from "../src/server/media-upstream-tasks";
 import { sqliteD1 } from "./sqlite-d1";
 
 const ROOT = resolve(import.meta.dirname, "../../..");
@@ -23,11 +30,15 @@ const MIGRATIONS = join(ROOT, "apps", "auth-api", "migrations");
 const UPSTREAM = "https://media.upstream.test";
 const ARTIFACTS = "https://cdn.upstream.test";
 const API_KEY = "media-key-e2e-secret";
+const TASKS_API = "https://api.tasks.test";
+const TASKS_FILES = "https://files.tasks.test";
+const TASKS_KEY = "tasks-key-e2e-secret";
 const OWNER = "owner";
 const OUTSIDER = "outsider";
 const SERVER_ID = "host-studio";
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 const LIVE = process.argv.includes("--live");
+const LIVE_TASKS = process.argv.includes("--live-tasks");
 const LIVE_POLL_LIMIT = 60;
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
@@ -229,7 +240,7 @@ async function fakeUpstreamFlow() {
   addModels(database);
   let clock = 1_000_000;
   const upstream = fakeUpstream();
-  const media = new MediaUpstream({ baseUrl: UPSTREAM, apiKey: API_KEY, fetch: upstream.fetch });
+  const media = new RouterMediaUpstream({ baseUrl: UPSTREAM, apiKey: API_KEY, fetch: upstream.fetch });
   const tracked: DynamicRecord[] = [];
   const sends: Promise<void>[] = [];
   const analytics = createAccountAnalytics({
@@ -245,11 +256,11 @@ async function fakeUpstreamFlow() {
   });
   const service = new CreditMediaService({
     database: sqliteD1(database),
-    upstream: media,
+    upstreams: new Map([["router", media]]),
     now: () => clock,
     analytics,
   });
-  const offline = new CreditMediaService({ database: sqliteD1(database), upstream: null, now: () => clock });
+  const offline = new CreditMediaService({ database: sqliteD1(database), upstreams: new Map(), now: () => clock });
   const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
   const outsider: CreditMediaPayer = { wallet: "personal", userId: OUTSIDER };
   const studio: CreditMediaPayer = { wallet: "server", serverId: SERVER_ID };
@@ -263,8 +274,8 @@ async function fakeUpstreamFlow() {
 
   check(
     "the media bindings give no upstream while a secret is missing",
-    mediaUpstreamFromBindings({ MEDIA_API_URL: UPSTREAM }) === null &&
-      mediaUpstreamFromBindings({ MEDIA_API_KEY: API_KEY }) === null,
+    mediaUpstreamsFromBindings({ MEDIA_API_URL: UPSTREAM, MEDIA_API_TASKS_KEY: API_KEY }).size === 0 &&
+      mediaUpstreamsFromBindings({ MEDIA_API_KEY: API_KEY, MEDIA_API_TASKS_URL: UPSTREAM }).size === 0,
   );
   const empty = await run(offline.catalog());
   check("the catalog is empty while no upstream is set", empty.models.length === 0, empty);
@@ -790,12 +801,393 @@ async function fakeUpstreamFlow() {
   );
 }
 
+interface FakeTask {
+  kind: string;
+  status: string;
+  urls: string[];
+}
+
+function fakeTasksUpstream() {
+  const tasks = new Map<string, FakeTask>();
+  const submits: { kind: string; body: DynamicRecord }[] = [];
+  const uploads: { name: string; type: string; size: number; retention: string | null }[] = [];
+  const downloads: { url: string; authorized: boolean }[] = [];
+  const polls: string[] = [];
+  let submitStatus = 200;
+  let sequence = 0;
+  const fetch = async (input: string, init?: RequestInit) => {
+    const url = new URL(input);
+    const headers = new Headers(init?.headers);
+    if (url.origin === TASKS_FILES) {
+      downloads.push({ url: input, authorized: headers.has("Authorization") });
+      return new Response(PNG, { headers: { "Content-Type": "application/octet-stream" } });
+    }
+    if (headers.get("Authorization") !== `Bearer ${TASKS_KEY}`)
+      return Response.json({ error: { code: 401, message: "bad key", type: "authentication_error" } }, { status: 401 });
+    if (url.pathname === "/v1/uploads/images" && init?.method === "POST" && init.body instanceof FormData) {
+      const file = init.body.get("file");
+      if (!(file instanceof File))
+        return Response.json({ error: { code: 400, type: "invalid_request" } }, { status: 400 });
+      uploads.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        retention: url.searchParams.get("retention_days"),
+      });
+      return Response.json({ url: `${TASKS_FILES}/uploads/${uploads.length}.png`, content_type: file.type });
+    }
+    const generate = url.pathname.match(/^\/v1\/(image|video)s\/generations$/);
+    if (generate && init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      submits.push({ kind: generate[1] ?? "", body: isDynamicRecord(body) ? body : {} });
+      if (submitStatus !== 200)
+        return Response.json({ error: { code: submitStatus, type: "upstream_said_no" } }, { status: submitStatus });
+      sequence += 1;
+      const id = `task_${sequence}`;
+      tasks.set(id, { kind: generate[1] ?? "", status: "pending", urls: [] });
+      return Response.json({ code: 200, data: [{ status: "submitted", task_id: id }] });
+    }
+    const task = url.pathname.match(/^\/v1\/tasks\/([^/]+)$/);
+    const stored = task ? tasks.get(decodeURIComponent(task[1] ?? "")) : undefined;
+    if (!task || !stored) return Response.json({ error: { code: 404, type: "not_found" } }, { status: 404 });
+    const id = decodeURIComponent(task[1] ?? "");
+    polls.push(id);
+    const files = stored.kind === "image" ? { images: [{ url: stored.urls }] } : { videos: [{ url: stored.urls }] };
+    return Response.json({
+      code: 200,
+      data: {
+        id,
+        status: stored.status,
+        progress: stored.status === "completed" ? 100 : 40,
+        ...(stored.status === "completed" ? { result: files } : {}),
+      },
+    });
+  };
+  const complete = (id: string, extensions: readonly string[]) => {
+    const task = tasks.get(id);
+    if (!task) throw new Error(`No fake task ${id}`);
+    task.status = "completed";
+    task.urls = extensions.map((extension, index) => `${TASKS_FILES}/results/${id}/${index}.${extension}`);
+  };
+  const setStatus = (id: string, status: string) => {
+    const task = tasks.get(id);
+    if (!task) throw new Error(`No fake task ${id}`);
+    task.status = status;
+  };
+  return {
+    submits,
+    uploads,
+    downloads,
+    polls,
+    fetch,
+    complete,
+    setStatus,
+    setSubmitStatus: (status: number) => {
+      submitStatus = status;
+    },
+    lastTaskId: () => `task_${sequence}`,
+  };
+}
+
+async function tasksUpstreamFlow() {
+  const database = migratedDatabase();
+  addModels(database);
+  let clock = 1_000_000;
+  const router = fakeUpstream();
+  const tasks = fakeTasksUpstream();
+  const routerUpstream = new RouterMediaUpstream({ baseUrl: UPSTREAM, apiKey: API_KEY, fetch: router.fetch });
+  const tasksUpstream = new TasksMediaUpstream({ baseUrl: TASKS_API, apiKey: TASKS_KEY, fetch: tasks.fetch });
+  const both = new CreditMediaService({
+    database: sqliteD1(database),
+    upstreams: new Map<string, MediaUpstream>([
+      [ROUTER_MEDIA_UPSTREAM, routerUpstream],
+      [TASKS_MEDIA_UPSTREAM, tasksUpstream],
+    ]),
+    now: () => clock,
+  });
+  const routerOnly = new CreditMediaService({
+    database: sqliteD1(database),
+    upstreams: new Map([[ROUTER_MEDIA_UPSTREAM, routerUpstream]]),
+    now: () => clock,
+  });
+  const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
+  const studio: CreditMediaPayer = { wallet: "server", serverId: SERVER_ID };
+  const holdUpstream = (jobId: string) =>
+    database.prepare("SELECT upstream FROM credit_holds WHERE job_id = ?").get(jobId)?.upstream ?? null;
+  const switchModel = (model: string, upstream: string, upstreamId: string) =>
+    database
+      .prepare(
+        "UPDATE credit_media_models SET upstream = ?2, upstream_id = ?3, upstream_params = '{}' WHERE model_id = ?1",
+      )
+      .run(model, upstream, upstreamId);
+  const configured = mediaUpstreamsFromBindings({
+    MEDIA_API_URL: UPSTREAM,
+    MEDIA_API_KEY: API_KEY,
+    MEDIA_API_TASKS_URL: TASKS_API,
+    MEDIA_API_TASKS_KEY: TASKS_KEY,
+  });
+  check(
+    "the bindings give one upstream for each complete pair of secrets",
+    [...configured.keys()].join(",") === "router,tasks" &&
+      [...mediaUpstreamsFromBindings({ MEDIA_API_TASKS_URL: TASKS_API, MEDIA_API_TASKS_KEY: TASKS_KEY }).keys()].join(
+        ",",
+      ) === "tasks",
+    [...configured.keys()],
+  );
+
+  const routerJob = await run(both.submit(owner, OWNER, submission("image-one")));
+  const routerProvider = router.lastJobId();
+  check(
+    "a model on the current upstream starts there, and its hold names that upstream",
+    router.submits.length === 1 && tasks.submits.length === 0 && holdUpstream(routerJob.jobId) === "router",
+    { routerJob, upstream: holdUpstream(routerJob.jobId) },
+  );
+
+  switchModel("image-one", TASKS_MEDIA_UPSTREAM, "tasks-image-1");
+  const hiddenCatalog = await run(routerOnly.catalog());
+  const fullCatalog = await run(both.catalog());
+  check(
+    "after a D1 switch, the catalog lists the model only where its upstream is set, with no upstream name or id",
+    !hiddenCatalog.models.some((model) => model.id === "image-one") &&
+      fullCatalog.models.map((model) => model.id).join(",") === "image-one,video-one,video-frames" &&
+      !JSON.stringify(fullCatalog).includes("tasks") &&
+      !JSON.stringify(fullCatalog).includes("router"),
+    { hidden: hiddenCatalog.models.map((model) => model.id), full: fullCatalog.models.map((model) => model.id) },
+  );
+  const unconfigured = await failure(routerOnly.submit(owner, OWNER, submission("image-one")));
+  check(
+    "a job for a model whose upstream is not set fails as unavailable",
+    unconfigured.code === "media_unavailable",
+    unconfigured,
+  );
+
+  const imageRequest = submission("image-one", { count: 2, aspect: "16:9" }, [
+    { role: "reference", bytes: PNG, mimeType: "image/png" },
+  ]);
+  const image = await run(both.submit(owner, OWNER, imageRequest));
+  const imageSubmit = tasks.submits.at(-1);
+  check(
+    "a switched model sends the next job to the new upstream, with uploaded inputs and no inline file data",
+    image.status === "queued" &&
+      image.credits === 3 &&
+      holdUpstream(image.jobId) === "tasks" &&
+      router.submits.length === 1 &&
+      tasks.uploads.length === 1 &&
+      tasks.uploads[0]?.type === "image/png" &&
+      tasks.uploads[0]?.size === PNG.length &&
+      tasks.uploads[0]?.retention === "1" &&
+      imageSubmit?.kind === "image" &&
+      imageSubmit.body.model === "tasks-image-1" &&
+      imageSubmit.body.n === 2 &&
+      imageSubmit.body.size === "16:9" &&
+      JSON.stringify(imageSubmit.body.image_urls) === JSON.stringify([`${TASKS_FILES}/uploads/1.png`]) &&
+      !JSON.stringify(imageSubmit.body).includes("data:"),
+    { image, body: imageSubmit?.body, uploads: tasks.uploads },
+  );
+
+  router.complete(routerProvider, 1);
+  const routerDone = await run(both.job(owner, routerJob.jobId));
+  check(
+    "a job that started before the switch finishes on its first upstream",
+    routerDone.status === "completed" && routerDone.outputs.length === 1 && !tasks.polls.includes(routerProvider),
+    routerDone,
+  );
+
+  const imageTask = tasks.lastTaskId();
+  const queued = await run(both.job(owner, image.jobId));
+  tasks.setStatus(imageTask, "processing");
+  const processing = await run(both.job(owner, image.jobId));
+  tasks.complete(imageTask, ["png", "webp"]);
+  const done = await run(both.job(owner, image.jobId));
+  check(
+    "the new upstream's pending, processing and completed states map to the job states, with typed outputs",
+    queued.status === "queued" &&
+      processing.status === "processing" &&
+      done.status === "completed" &&
+      done.credits === 3 &&
+      done.outputs.map((output) => output.mimeType).join(",") === "image/png,image/webp",
+    { queued, processing, done },
+  );
+  const output = await run(both.output(owner, image.jobId, 1));
+  const bytes = new Uint8Array(await output.arrayBuffer());
+  check(
+    "an output of the new upstream streams through the Worker without the API key",
+    output.status === 200 &&
+      output.headers.get("Content-Type") === "image/webp" &&
+      bytes.length === PNG.length &&
+      tasks.downloads.at(-1)?.url === `${TASKS_FILES}/results/${imageTask}/1.webp` &&
+      tasks.downloads.at(-1)?.authorized === false,
+    { headers: Object.fromEntries(output.headers), download: tasks.downloads.at(-1) },
+  );
+
+  switchModel("video-one", TASKS_MEDIA_UPSTREAM, "tasks-video-1");
+  const video = await run(
+    both.submit(
+      owner,
+      OWNER,
+      submission("video-one", { resolution: "1080p", duration: 10, audio: true }, [
+        { role: "first", bytes: PNG, mimeType: "image/png" },
+        { role: "last", bytes: PNG, mimeType: "image/webp" },
+      ]),
+    ),
+  );
+  const videoSubmit = tasks.submits.at(-1);
+  check(
+    "a video job on the new upstream sends duration, audio and both frames with their roles",
+    video.credits === 155 &&
+      videoSubmit?.kind === "video" &&
+      videoSubmit.body.model === "tasks-video-1" &&
+      videoSubmit.body.duration === 10 &&
+      videoSubmit.body.resolution === "1080p" &&
+      videoSubmit.body.size === "16:9" &&
+      videoSubmit.body.generate_audio === true &&
+      videoSubmit.body.image_urls === undefined &&
+      JSON.stringify(videoSubmit.body.image_with_roles) ===
+        JSON.stringify([
+          { url: `${TASKS_FILES}/uploads/2.png`, role: "first_frame" },
+          { url: `${TASKS_FILES}/uploads/3.png`, role: "last_frame" },
+        ]),
+    { video, body: videoSubmit?.body },
+  );
+  tasks.setStatus(tasks.lastTaskId(), "failed");
+  const failed = await run(both.job(owner, video.jobId));
+  check(
+    "a failed task on the new upstream frees its hold",
+    failed.status === "failed" && failed.credits === 0 && failed.failure === "failed",
+    failed,
+  );
+
+  const firstOnly = await run(
+    both.submit(
+      owner,
+      OWNER,
+      submission("video-frames", { duration: 5 }, [{ role: "first", bytes: PNG, mimeType: "image/png" }]),
+    ),
+  );
+  check(
+    "a video with one first frame stays on its current upstream until D1 switches it",
+    firstOnly.status === "queued" && holdUpstream(firstOnly.jobId) === "router",
+    firstOnly,
+  );
+  switchModel("video-frames", TASKS_MEDIA_UPSTREAM, "tasks-video-2");
+  await run(
+    both.submit(
+      owner,
+      OWNER,
+      submission("video-frames", { duration: 5 }, [{ role: "first", bytes: PNG, mimeType: "image/png" }]),
+    ),
+  );
+  check(
+    "a video with only a first frame on the new upstream sends it as an image URL",
+    JSON.stringify(tasks.submits.at(-1)?.body.image_urls) === JSON.stringify([`${TASKS_FILES}/uploads/4.png`]) &&
+      tasks.submits.at(-1)?.body.image_with_roles === undefined &&
+      tasks.submits.at(-1)?.body.generate_audio === undefined,
+    tasks.submits.at(-1)?.body,
+  );
+
+  tasks.setSubmitStatus(402);
+  const notAccepted = await failure(both.submit(owner, OWNER, submission("image-one")));
+  tasks.setSubmitStatus(200);
+  check(
+    "a payment refusal of the new upstream releases the hold and fails as unavailable",
+    notAccepted.code === "media_unavailable" &&
+      database.prepare("SELECT COUNT(*) AS count FROM credit_holds WHERE outcome = 'refused'").get()?.count === 1,
+    notAccepted,
+  );
+
+  const studioJob = await run(both.submit(studio, null, submission("image-one")));
+  const studioTask = tasks.lastTaskId();
+  const pendingJob = await run(both.submit(studio, null, submission("image-one")));
+  tasks.complete(studioTask, ["png"]);
+  clock += CREDIT_HOLD_FIRST_CHECK_MS;
+  const missing = await failure(routerOnly.job(studio, pendingJob.jobId));
+  const routerSweep = await run(routerOnly.sweep());
+  const stillHeld = database.prepare("SELECT status FROM credit_holds WHERE job_id = ?").get(studioJob.jobId)?.status;
+  clock += CREDIT_HOLD_FIRST_CHECK_MS;
+  const swept = await run(both.sweep());
+  const settled = await run(both.job(studio, studioJob.jobId));
+  check(
+    "the sweep checks each hold on its own upstream, and keeps a hold whose upstream is not set",
+    missing.code === "media_unavailable" &&
+      routerSweep.settled === 0 &&
+      stillHeld === "held" &&
+      swept.settled >= 1 &&
+      settled.status === "completed" &&
+      logs.some((line) => line.includes("media: upstream not configured")),
+    { missing, routerSweep, stillHeld, swept, settled },
+  );
+
+  check(
+    "logs never show the new upstream's key or address",
+    logs.every((line) => !line.includes(TASKS_KEY) && !line.includes("tasks.test")),
+    { logs: logs.length },
+  );
+}
+
+async function liveTasksFlow() {
+  const model = process.env.MEDIA_API_TASKS_MODEL;
+  const upstreams = mediaUpstreamsFromBindings({
+    MEDIA_API_TASKS_URL: process.env.MEDIA_API_TASKS_URL,
+    MEDIA_API_TASKS_KEY: process.env.MEDIA_API_TASKS_KEY,
+  });
+  if (!model || upstreams.size === 0) {
+    check("live tasks: MEDIA_API_TASKS_URL, MEDIA_API_TASKS_KEY and MEDIA_API_TASKS_MODEL are set", false);
+    return;
+  }
+  const database = migratedDatabase();
+  const specs = {
+    aspects: ["1:1"],
+    defaultAspect: "1:1",
+    resolutions: [],
+    defaultResolution: null,
+    durations: [],
+    defaultDuration: null,
+    frames: 0,
+    references: 1,
+    audio: false,
+    maxCount: 1,
+    promptRequired: true,
+  };
+  database
+    .prepare(
+      `INSERT INTO credit_media_models(model_id, upstream, upstream_id, kind, name, maker, variant, position, enabled, specs, upstream_params, updated_at)
+       VALUES ('live-image', 'tasks', ?1, 'image', 'Live Image', 'Maker', NULL, 1, 1, ?2, '{}', 1)`,
+    )
+    .run(model, JSON.stringify(specs));
+  database.exec(
+    "INSERT INTO credit_media_prices(model_id, resolution, unit, credits, updated_at) VALUES ('live-image', '', 'item', 0.5, 1)",
+  );
+  const service = new CreditMediaService({ database: sqliteD1(database), upstreams, now: () => Date.now() });
+  const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
+  const request = submission("live-image", { prompt: "A small blue paper boat on calm water, studio light" });
+  let job: CreditMediaJob = await run(service.submit(owner, OWNER, request));
+  check("live tasks: the upstream accepts one image job", job.status === "queued" || job.status === "processing", job);
+  for (let poll = 0; poll < LIVE_POLL_LIMIT && (job.status === "queued" || job.status === "processing"); poll += 1) {
+    await new Promise((resolvePoll) => setTimeout(resolvePoll, Math.max(1, job.pollAfterSeconds) * 1_000));
+    job = await run(service.job(owner, job.jobId));
+  }
+  check("live tasks: the job completes and lists one image", job.status === "completed" && job.outputs.length >= 1, {
+    status: job.status,
+    failure: job.failure,
+    outputs: job.outputs,
+  });
+  if (job.status !== "completed") return;
+  const output = await run(service.output(owner, job.jobId, 0));
+  const bytes = new Uint8Array(await output.arrayBuffer());
+  const type = output.headers.get("Content-Type") ?? "";
+  check("live tasks: the image streams through the Worker", type.startsWith("image/") && bytes.length > 1_000, {
+    type,
+    bytes: bytes.length,
+  });
+  await writeFile(join(OUT, `live-tasks-output.${type.split("/")[1] ?? "bin"}`), bytes);
+}
+
 async function liveFlow() {
-  const upstream = mediaUpstreamFromBindings({
+  const upstreams = mediaUpstreamsFromBindings({
     MEDIA_API_URL: process.env.MEDIA_API_URL,
     MEDIA_API_KEY: process.env.MEDIA_API_KEY,
   });
-  if (!upstream) {
+  if (upstreams.size === 0) {
     check("live: MEDIA_API_URL and MEDIA_API_KEY are set", false);
     return;
   }
@@ -822,7 +1214,7 @@ async function liveFlow() {
   database.exec(
     "INSERT INTO credit_media_prices(model_id, resolution, unit, credits, updated_at) VALUES ('z-image-turbo', '', 'item', 0.5, 1)",
   );
-  const service = new CreditMediaService({ database: sqliteD1(database), upstream, now: () => Date.now() });
+  const service = new CreditMediaService({ database: sqliteD1(database), upstreams, now: () => Date.now() });
   const owner: CreditMediaPayer = { wallet: "personal", userId: OWNER };
   const request = submission("z-image-turbo", { prompt: "A small blue paper boat on calm water, studio light" });
   let job: CreditMediaJob = await run(service.submit(owner, OWNER, request));
@@ -852,12 +1244,17 @@ let passed = false;
 try {
   await mkdir(OUT, { recursive: true });
   await fakeUpstreamFlow();
+  await tasksUpstreamFlow();
   if (LIVE) await liveFlow();
+  if (LIVE_TASKS) await liveTasksFlow();
   passed = checks.every((item) => item.passed);
 } finally {
   console.error = consoleError;
   await mkdir(OUT, { recursive: true });
-  await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed, live: LIVE, checks }, null, 2)}\n`);
+  await writeFile(
+    join(OUT, "report.json"),
+    `${JSON.stringify({ passed, live: LIVE, liveTasks: LIVE_TASKS, checks }, null, 2)}\n`,
+  );
 }
 for (const item of checks) console.log(`${item.passed ? "ok  " : "FAIL"} ${item.name}`);
 console.log(`Report: ${join(OUT, "report.json")}`);
