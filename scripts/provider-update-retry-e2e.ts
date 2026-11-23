@@ -16,13 +16,27 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/provider-update-retr
 const WAIT_MS = 30_000;
 const VERSION = "999.0.0";
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-update-retry-"));
-const store = join(root, "store");
-const downloads = join(root, "downloads");
+
+interface FailedTry {
+  phase: string;
+  version: string | null;
+  archiveRequests: number;
+  installKept: boolean;
+  archiveKept: boolean;
+}
+
+interface Retry {
+  phase: string;
+  version: string | null;
+  archiveRequests: number;
+  archiveKept: boolean;
+  starts: number;
+}
 
 interface Report {
   passed: boolean;
-  failedTry?: { phase: string; archiveRequests: number; installKept: boolean; archiveKept: boolean };
-  retry?: { phase: string; version: string | null; archiveRequests: number; archiveKept: boolean; starts: number };
+  withOlderCopy?: { failedTry: FailedTry; retry: Retry };
+  onlyCopy?: { failedTry: FailedTry; retry: Retry };
   error?: string;
 }
 
@@ -73,81 +87,107 @@ const fetchImpl = async (input: string | URL | Request): Promise<Response> => {
   return new Response("not found", { status: 404 });
 };
 
-let starts = 0;
-const manager = new ProviderRuntimeManager({
-  root: store,
-  downloadRoot: downloads,
-  platform: "linux",
-  architecture: "x64",
-  lock,
-  fetchImpl,
-  availableDiskBytes: async () => Number.MAX_SAFE_INTEGER,
-  updateRuntime: (_runtime, install) =>
-    install().pipe(
-      Effect.flatMap(() => {
-        starts += 1;
-        return starts === 1
-          ? Effect.fail(new ProviderRuntimeFailure({ cause: new Error("ChatGPT did not answer in time.") }))
-          : Effect.void;
-      }),
-    ),
-});
-
-function codexPhase(phase: string): Promise<ProviderRuntimeSnapshot> {
-  return new Promise((resolveWait, reject) => {
-    const timer = setTimeout(() => reject(new Error(`Timed out waiting for Codex to be ${phase}.`)), WAIT_MS);
-    const listener = (snapshot: ProviderRuntimeSnapshot) => {
-      if (snapshot.providers.codex.phase !== phase) return;
-      clearTimeout(timer);
-      manager.off("status", listener);
-      resolveWait(snapshot);
-    };
-    manager.on("status", listener);
-  });
-}
-
-const archiveKept = () => readdirSync(downloads).some((name) => name.startsWith("codex-") && name.includes(".partial"));
-const installRoot = join(store, "codex", "linux-x64", VERSION);
-
-try {
+async function runScenario(name: string, olderVersion: string | null) {
+  const store = join(root, name, "store");
+  const downloads = join(root, name, "downloads");
   mkdirSync(store, { recursive: true });
   mkdirSync(downloads, { recursive: true });
+  if (olderVersion) {
+    const olderBin = join(store, "codex", "linux-x64", olderVersion, "bin");
+    mkdirSync(olderBin, { recursive: true });
+    writeFileSync(join(olderBin, "codex"), `#!/bin/sh\necho "codex-cli ${olderVersion}"\n`);
+    await chmod(join(olderBin, "codex"), 0o755);
+  }
+  archiveRequests = 0;
+  let starts = 0;
+  const manager = new ProviderRuntimeManager({
+    root: store,
+    downloadRoot: downloads,
+    platform: "linux",
+    architecture: "x64",
+    lock,
+    fetchImpl,
+    availableDiskBytes: async () => Number.MAX_SAFE_INTEGER,
+    updateRuntime: (_runtime, install) =>
+      install().pipe(
+        Effect.flatMap(() => {
+          starts += 1;
+          return starts === 1
+            ? Effect.fail(new ProviderRuntimeFailure({ cause: new Error("ChatGPT did not answer in time.") }))
+            : Effect.void;
+        }),
+      ),
+  });
 
-  const failed = codexPhase("download-error");
-  await runCauseEffect(manager.download("codex"));
-  const failure = await failed;
-  report.failedTry = {
-    phase: failure.providers.codex.phase,
-    archiveRequests,
-    installKept: existsSync(installRoot),
-    archiveKept: archiveKept(),
-  };
+  const codexPhase = (phase: string): Promise<ProviderRuntimeSnapshot> =>
+    new Promise((resolveWait, reject) => {
+      const timer = setTimeout(() => reject(new Error(`Timed out waiting for Codex to be ${phase}.`)), WAIT_MS);
+      const listener = (snapshot: ProviderRuntimeSnapshot) => {
+        if (snapshot.providers.codex.phase !== phase) return;
+        clearTimeout(timer);
+        manager.off("status", listener);
+        resolveWait(snapshot);
+      };
+      manager.on("status", listener);
+    });
+  const archiveKept = () =>
+    readdirSync(downloads).some((entry) => entry.startsWith("codex-") && entry.includes(".partial"));
+  const installRoot = join(store, "codex", "linux-x64", VERSION);
 
-  writeFileSync(join(downloads, "codex-linux-x64-0.1.0.partial"), "old");
-  writeFileSync(join(downloads, "codex-linux-x64-0.1.0.partial.json"), "{}");
-  const ready = codexPhase("ready");
-  await runCauseEffect(manager.download("codex"));
-  const done = await ready;
-  report.retry = {
-    phase: done.providers.codex.phase,
-    version: done.providers.codex.version,
-    archiveRequests,
-    archiveKept: archiveKept(),
-    starts,
-  };
+  try {
+    const failed = codexPhase("download-error");
+    await runCauseEffect(manager.download("codex"));
+    const failure = await failed;
+    const failedTry: FailedTry = {
+      phase: failure.providers.codex.phase,
+      version: failure.providers.codex.version,
+      archiveRequests,
+      installKept: existsSync(join(installRoot, "bin", "codex")),
+      archiveKept: archiveKept(),
+    };
+
+    writeFileSync(join(downloads, "codex-linux-x64-0.1.0.partial"), "old");
+    writeFileSync(join(downloads, "codex-linux-x64-0.1.0.partial.json"), "{}");
+    const ready = codexPhase("ready");
+    await runCauseEffect(manager.download("codex"));
+    const done = await ready;
+    const retry: Retry = {
+      phase: done.providers.codex.phase,
+      version: done.providers.codex.version,
+      archiveRequests,
+      archiveKept: archiveKept(),
+      starts,
+    };
+    return { failedTry, retry };
+  } finally {
+    await runCauseEffect(manager.stop()).catch(() => undefined);
+  }
+}
+
+try {
+  const withOlderCopy = await runScenario("with-older-copy", "0.1.0");
+  report.withOlderCopy = withOlderCopy;
+  const onlyCopy = await runScenario("only-copy", null);
+  report.onlyCopy = onlyCopy;
 
   report.passed =
-    report.failedTry.archiveRequests === 1 &&
-    !report.failedTry.installKept &&
-    report.failedTry.archiveKept &&
-    report.retry.version === VERSION &&
-    report.retry.archiveRequests === 1 &&
-    !report.retry.archiveKept &&
-    report.retry.starts === 2;
+    withOlderCopy.failedTry.version === "0.1.0" &&
+    withOlderCopy.failedTry.archiveRequests === 1 &&
+    !withOlderCopy.failedTry.installKept &&
+    withOlderCopy.failedTry.archiveKept &&
+    withOlderCopy.retry.version === VERSION &&
+    withOlderCopy.retry.archiveRequests === 1 &&
+    !withOlderCopy.retry.archiveKept &&
+    withOlderCopy.retry.starts === 2 &&
+    onlyCopy.failedTry.archiveRequests === 1 &&
+    onlyCopy.failedTry.installKept &&
+    !onlyCopy.failedTry.archiveKept &&
+    onlyCopy.retry.version === VERSION &&
+    onlyCopy.retry.archiveRequests === 1 &&
+    onlyCopy.retry.starts === 2;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {
-  await runCauseEffect(manager.stop()).catch(() => undefined);
   mkdirSync(OUT, { recursive: true });
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });
