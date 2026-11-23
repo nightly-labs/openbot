@@ -2153,7 +2153,8 @@ export class AttentionRegistry {
         !takeover.detached &&
         !takeover.released
       ) {
-        this.#resolveBrowserTakeover(key, takeover, "cancel");
+        if (providerStoppedWaiting) this.#releaseBrowserTakeover(key, takeover);
+        else this.#resolveBrowserTakeover(key, takeover, "cancel");
       }
     }
     if (changed) this.#emitRuntimeSnapshot();
