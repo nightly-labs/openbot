@@ -50,6 +50,16 @@ export const OneFailed: Story = {
   },
 };
 
+export const AllFailed: Story = {
+  args: {
+    onDismiss: fn(),
+    items: [
+      { id: "reply-research", agent: research, name: research.name, state: "failed" },
+      { id: "reply-sales", agent: sales, name: sales.name, state: "failed" },
+    ],
+  },
+};
+
 export const AllReplied: Story = {
   args: {
     onDismiss: fn(),
