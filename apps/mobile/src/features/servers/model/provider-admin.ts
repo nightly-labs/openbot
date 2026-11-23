@@ -252,6 +252,11 @@ export interface ProviderRow {
   apiKey: boolean;
 }
 
+function runsSystemCli(agent: AgentProviderStatus, runtime: ProviderRuntimeStatus): boolean {
+  if (agent.cliSource !== undefined) return agent.cliSource === "system";
+  return runtime.phase === "not-downloaded" && agent.version !== null;
+}
+
 export function providerRows(
   status: AgentStatus | undefined,
   snapshot: ProviderRuntimeSnapshot | undefined,
@@ -272,7 +277,7 @@ export function providerRows(
         raw &&
         (raw.phase === "ready" || raw.phase === "not-downloaded") &&
         (agent?.state === "available" || agent?.state === "sign-in-required") &&
-        (agent.cliSource === "system" || (raw.phase === "not-downloaded" && !raw.availableVersion))
+        (runsSystemCli(agent, raw) || (raw.phase === "not-downloaded" && !raw.availableVersion))
           ? { ...raw, phase: "ready" as const, version: agent.version ?? null }
           : raw;
       const availableVersion = runtime?.availableVersion ?? null;
