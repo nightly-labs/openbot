@@ -3296,6 +3296,12 @@ export class MailboxStore {
     });
   }
 
+  hasQueuedDelivery(agentId: string): boolean {
+    return this.#state.deliveries.some(
+      (delivery) => delivery.recipientAgentId === agentId && delivery.status === "queued",
+    );
+  }
+
   hasStartedDelivery(agentId: string): boolean {
     return this.#state.deliveries.some(
       (delivery) =>

@@ -2321,10 +2321,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         break;
       }
     }
-    if (this.listAgents().some((agent) => this.#mailbox.hasUnfinishedDelivery(agent.id))) {
-      reasons.push("queued-delivery");
+    const agents = this.listAgents();
+    if (!reasons.includes("agent-turn") && agents.some((agent) => this.#mailbox.hasStartedDelivery(agent.id))) {
+      reasons.push("agent-turn");
     }
-    for (const agent of this.listAgents()) {
+    if (agents.some((agent) => this.#mailbox.hasQueuedDelivery(agent.id))) reasons.push("queued-delivery");
+    for (const agent of agents) {
       if (
         this.#drain.taskFor(agent.id) &&
         (this.#mailbox.hasUnfinishedDelivery(agent.id) || this.#conversation.anyWorkingSnapshot(agent.id)?.activeTurnId)
