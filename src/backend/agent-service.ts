@@ -1734,7 +1734,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                   .list()
                   .filter(
                     (agent) =>
-                      agent.usageLimitReturn && sameUsageLimit(this.#returnTarget(agent.usageLimitReturn), limit),
+                      agent.usageLimitReturn?.provider === limit.provider &&
+                      agent.usageLimitReturn.model === limit.model,
                   ),
                 (agent) => Effect.sync(() => this.#drain.scheduleDrain(agent.id)),
                 { discard: true },
@@ -4226,7 +4227,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #returnTarget(returnTo: AgentUsageLimitReturn): AgentUsageLimitReturn {
     if (this.#usageLimitReady(returnTo) || !this.#pooled(returnTo)) return returnTo;
-    const pick = this.#poolPick(returnTo.provider, returnTo.model, null);
+    this.#readPoolWhenStale(returnTo.provider);
+    const pick = this.#poolPick(returnTo.provider, returnTo.model, null, true);
     if (pick === null) return returnTo;
     const { providerAccountId: _savedAccount, ...choice } = returnTo;
     return pick === DEFAULT_PROVIDER_ACCOUNT_ID ? choice : { ...choice, providerAccountId: pick };
@@ -4329,8 +4331,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#providers.accountPool(choice.provider) !== null;
   }
 
-  #poolPick(provider: AgentProvider, model: string | null, current: string | null): string | null {
-    return pickPoolAccount(this.#readyPoolMembers(provider, model), current, Date.now() / 1000);
+  #poolPick(provider: AgentProvider, model: string | null, current: string | null, openOnly = false): string | null {
+    return pickPoolAccount(this.#readyPoolMembers(provider, model), current, Date.now() / 1000, openOnly);
   }
 
   #readyPoolMembers(provider: AgentProvider, model: string | null) {
@@ -7451,11 +7453,6 @@ function workspaceOnlyUnavailable(provider: AgentProvider): boolean {
 
 function usageLimitOf(choice: AgentModelChoice): UsageLimitKey {
   return { provider: choice.provider, accountId: agentProviderAccount(choice), model: choice.model };
-}
-
-function sameUsageLimit(choice: AgentModelChoice, limit: UsageLimitKey): boolean {
-  const own = usageLimitOf(choice);
-  return own.provider === limit.provider && own.accountId === limit.accountId && own.model === limit.model;
 }
 
 function lifecycleStep<A>(operation: string, run: () => A): Effect.Effect<A, AgentLifecycleFailed> {
