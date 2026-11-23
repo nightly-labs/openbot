@@ -109,13 +109,6 @@ async function presence(): Promise<ClientBrowserPresence> {
   };
 }
 
-async function currentWebTab(): Promise<chrome.tabs.Tab | null> {
-  const [active] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (active && isWebUrl(active.url)) return active;
-  const tabs = (await chrome.tabs.query({})).filter((tab) => isWebUrl(tab.url));
-  return tabs.sort((left, right) => (right.lastAccessed ?? 0) - (left.lastAccessed ?? 0))[0] ?? null;
-}
-
 async function addToGroup(tabId: number): Promise<number | null> {
   if (!(await readSharing())) return null;
   const tab = await chrome.tabs.get(tabId);
@@ -175,14 +168,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
   }
 
   async function startSharing(): Promise<void> {
-    const saved = await readSharing();
-    let groupId = await findGroup(saved?.groupId ?? null);
-    const tab = await currentWebTab();
-    if (tab?.id !== undefined && (groupId === null || tab.groupId !== groupId))
-      groupId = (await addToGroup(tab.id)) ?? groupId;
-    else if (groupId !== null)
-      await chrome.tabGroups.update(groupId, { title: OPENBOT_GROUP_TITLE, color: GROUP_COLOR });
-    await chrome.storage.local.set({ [SHARING_KEY]: { groupId } });
+    await chrome.storage.local.set({ [SHARING_KEY]: { groupId: await findGroup(null) } });
   }
 
   async function stopSharing(): Promise<void> {
