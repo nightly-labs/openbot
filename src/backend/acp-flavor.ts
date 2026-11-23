@@ -103,6 +103,7 @@ export interface AcpFlavor {
   configSetUnsaved?(error: RequestError): boolean;
   closeKeepsSession?: true;
   probeCloseDelayMs?: number;
+  sessionFiles?(argv: readonly string[], sessionId: string): readonly string[];
   effortCategories?: readonly string[];
   promptMediaBase64Bytes?: number;
   sessionProcesses?: true;
@@ -115,13 +116,14 @@ export interface AcpFlavor {
     emptyOutputFailure?: RegExp;
     textToolCall?: { starts: readonly string[]; whole: RegExp };
     turnFailure(text: string): string;
-    fallbackCause?(text: string): CauseCode | null;
+    fallbackCause?(text: string, reachedModel: boolean): CauseCode | null;
     accountLink?(text: string, argv: readonly string[], sessionId: string): string | null;
     accountVerification?: RegExp;
     quota(text: string): string | null;
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
     loggedFailure?(text: string, argv: readonly string[], sessionId: string): string | null;
+    silentFailure?(argv: readonly string[], sessionId: string, since: number): string | null;
     sessionLost?: RegExp;
   };
   cancelLocallyThenResume?: true;
@@ -132,6 +134,7 @@ export interface AcpFlavor {
   thoughtsInsideAnswer?: true;
   resumesAnswerAfterThought?: { report: RegExp };
   promptOpenForBackgroundTasks?: true;
+  silentTurnLimitMs?: number;
   unsentBackgroundTurns?: true;
   wakesAfterPromptEnds?: true;
   selfWakeTools?: RegExp;
@@ -168,6 +171,7 @@ export interface AcpFlavor {
   connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
   mcpCallInputNamesServer?: true;
+  bridgeToolsWithoutCard?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };

@@ -269,6 +269,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "أوقف Linux المزوّد لأن حد وقت المعالج في الوقت الحقيقي لدى OpenBot هو 0. يأتي هذا الحد من نظامك. ثبّت rtkit وشغّله (`rtkit-daemon`)، ثم نفّذ `systemctl --user restart xdg-desktop-portal`، ثم أعد تشغيل OpenBot. إعادة تشغيل xdg-desktop-portal وحدها لا تكفي ما دام rtkit غير مثبّت.",
   "error.provider.cpuUnsupported": "لا يمكن لمعالج هذا الكمبيوتر تشغيل هذا المزوّد. استخدم مزوّدًا آخر.",
+  "error.provider.largeMemoryPages":
+    "لا يمكن تشغيل هذا المزوّد على نواة Linux هذه، لأن النواة تستخدم صفحات ذاكرة أكبر من 4 KiB، كما في Raspberry Pi 5 أو Asahi Linux. استخدم نواة بصفحات 4 KiB أو مزوّدًا آخر.",
+  "error.provider.ipv6Missing":
+    "يحتاج هذا المزوّد إلى IPv6، وIPv6 متوقف على هذا الكمبيوتر. شغّل IPv6 ثم حاول مرة أخرى. في WSL، احذف ipv6.disable=1 من .wslconfig وشغّل wsl --shutdown.",
   "error.provider.windowsBlocked":
     "منعت إعدادات أمان Windows، مثل التحكم الذكي في التطبيقات، هذا المزوّد من البدء. استخدم مزوّدًا آخر.",
   "error.provider.opencodeDatabaseNewer":
@@ -419,8 +423,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "لم يعثر Claude Code على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.grokSignIn": "شغّل `grok login` أو عيّن XAI_API_KEY لاستخدام Grok.",
+  "error.provider.acpSignInNoStart": "لم يبدأ المزوّد، لذلك لم يبدأ تسجيل الدخول. حاول مرة أخرى، أو أعد تشغيل OpenBot.",
   "error.provider.acpSignInTimedOut": "انتهت مهلة تسجيل الدخول.",
   "error.provider.acpSignInStopped": "توقف تسجيل الدخول قبل اكتماله.",
+  "error.provider.geminiNoBrowserUseCode":
+    "لا يوجد متصفح على هذا الكمبيوتر لتسجيل الدخول إلى Google. اختر «تسجيل الدخول برمز»، وافتح الرابط على أي جهاز، ثم الصق الرمز.",
   "error.provider.geminiBrowserUnavailable":
     "تعذّر على Gemini فتح صفحة تسجيل الدخول. ثبّت متصفحًا وxdg-utils، ثم اتصل من جلسة سطح مكتب على هذا المضيف. لا يمكن لخادم بلا سطح مكتب إكمال تسجيل الدخول هذا.",
   "error.provider.geminiBrowserOpenFailed":

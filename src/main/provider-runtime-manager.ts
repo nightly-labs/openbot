@@ -45,7 +45,7 @@ import { createOpenBotLogger, type LogValue, redactText, toLogValue } from "@ope
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { reportsMissingProcessorFeature } from "../backend/agent-client";
+import { reportsMissingProcessorFeature, unsupportedKernelReason } from "../backend/agent-client";
 import {
   type BundledProviderExecutables,
   compareReleases,
@@ -1504,10 +1504,12 @@ function unsupportedProcessorFailure(
     isManagedToolRuntime(runtime) ||
     !(cause instanceof Error) ||
     !("stderr" in cause) ||
-    typeof cause.stderr !== "string" ||
-    !reportsMissingProcessorFeature(cause.stderr, "signal" in cause && cause.signal === "SIGILL")
+    typeof cause.stderr !== "string"
   )
     return failure;
+  const kernel = unsupportedKernelReason(cause.stderr);
+  if (kernel) return new ProviderRuntimeFailure({ cause: new Error(sourceText(kernel), { cause }) });
+  if (!reportsMissingProcessorFeature(cause.stderr, "signal" in cause && cause.signal === "SIGILL")) return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
 }
 

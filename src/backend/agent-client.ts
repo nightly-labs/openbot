@@ -154,6 +154,17 @@ export function reportsMissingProcessorFeature(output: string, illegalInstructio
   return BUN_PROCESSOR_FEATURE_MISSING.test(output) || (illegalInstruction && PROCESSOR_FEATURE_MISSING.test(output));
 }
 
+const LARGE_MEMORY_PAGES = /\bpage-size\.cc\b|\bCompile-time page size does not match\b/u;
+const IPV6_MISSING = /\b(?:AF_INET6|enforce_kernel_ipv6_support)\b/u;
+
+export function unsupportedKernelReason(
+  output: string,
+): "error.provider.largeMemoryPages" | "error.provider.ipv6Missing" | null {
+  if (LARGE_MEMORY_PAGES.test(output)) return "error.provider.largeMemoryPages";
+  if (IPV6_MISSING.test(output)) return "error.provider.ipv6Missing";
+  return null;
+}
+
 const EXIT_DETAIL_LIMIT = 300;
 
 export class AgentProcessExitError extends Error {

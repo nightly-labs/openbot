@@ -271,6 +271,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux עצר את הספק כי ל-OpenBot יש מגבלת מעבד בזמן אמת של 0. המגבלה מגיעה מהמערכת שלך. יש להתקין ולהפעיל את rtkit (`rtkit-daemon`), להריץ `systemctl --user restart xdg-desktop-portal`, ואז להפעיל מחדש את OpenBot. הפעלה מחדש של xdg-desktop-portal בלבד לא תעזור כל עוד rtkit חסר.",
   "error.provider.cpuUnsupported": "המעבד של המחשב הזה לא יכול להריץ את הספק הזה. השתמש בספק אחר.",
+  "error.provider.largeMemoryPages":
+    "הספק הזה לא יכול לרוץ על ליבת Linux הזו, כי הליבה משתמשת בדפי זיכרון גדולים מ-4 KiB, כמו ב-Raspberry Pi 5 או ב-Asahi Linux. השתמש בליבה עם דפים של 4 KiB או בספק אחר.",
+  "error.provider.ipv6Missing":
+    "הספק הזה צריך IPv6, ו-IPv6 כבוי במחשב הזה. הפעל IPv6 ונסה שוב. ב-WSL, הסר את ipv6.disable=1 מ-.wslconfig והרץ wsl --shutdown.",
   "error.provider.windowsBlocked":
     "הגדרות האבטחה של Windows, כמו Smart App Control, מנעו מהספק הזה להתחיל. השתמש בספק אחר.",
   "error.provider.opencodeDatabaseNewer":
@@ -421,8 +425,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code לא מצא את הסשן השמור של הצ'אט הזה. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.grokSignIn": "יש להריץ `grok login` או להגדיר XAI_API_KEY כדי להשתמש ב-Grok.",
+  "error.provider.acpSignInNoStart": "הספק לא הופעל, ולכן ההתחברות לא יכלה להתחיל. נסה שוב או הפעל מחדש את OpenBot.",
   "error.provider.acpSignInTimedOut": "זמן ההתחברות אזל.",
   "error.provider.acpSignInStopped": "ההתחברות נעצרה לפני שהושלמה.",
+  "error.provider.geminiNoBrowserUseCode":
+    "למחשב הזה אין דפדפן להתחברות ל-Google. בחר „התחברות עם קוד”, פתח את הקישור בכל מכשיר ואז הדבק את הקוד.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini לא הצליח לפתוח את דף ההתחברות. יש להתקין דפדפן ו-xdg-utils, ואז להתחבר מסשן שולחן עבודה במארח הזה. שרת בלי שולחן עבודה לא יכול להשלים את ההתחברות הזו.",
   "error.provider.geminiBrowserOpenFailed":
