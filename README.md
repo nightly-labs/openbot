@@ -274,12 +274,11 @@ their app supports Mistral.
 
 Kiro uses the Kiro CLI (`kiro-cli`) that you install yourself, with your own `~/.kiro`: its settings,
 steering files, agents and sign-in apply to OpenBot agents too. OpenBot does not download or update
-it. It starts `kiro-cli acp`, and from Kiro CLI 2.36 it names the V2 engine (`--agent-engine=v2`),
-because Kiro CLI 3 starts the V3 engine by default and OpenBot reads the V2 server. Set
+it. It needs Kiro CLI 2.36 or newer and starts `kiro-cli acp --agent-engine=v3`, the V3 engine of Kiro CLI. Set
 `OPENBOT_KIRO_PATH` to select an executable yourself. Connect on the Kiro row runs `kiro-cli login` and
 opens its page in your browser; a joined server shows a code to confirm on any device. For IAM Identity
 Center, run `kiro-cli login` in a terminal first. Kiro agents can run their chat, tasks and channel turns
-at the same time, and the subagents that a Kiro agent starts show as cards in the chat. Kiro reads
+at the same time, and the subagents that a Kiro agent starts show as tool cards. Kiro reads
 skills from `.kiro/skills` only, so OpenBot names the skills of your workspace's `.agents/skills` and of
 `~/.agents/skills` in the agent's instructions, and the agent reads them from there. Kiro reads
 `AGENTS.md` as steering. Kiro agents run on this computer. Team members see them when their app uses
