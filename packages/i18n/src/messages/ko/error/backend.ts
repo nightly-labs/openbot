@@ -239,6 +239,8 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot은 MCP 서버를 최대 {limit}개까지 유지해요.",
   "error.backend.mcpServerNameTaken": "{name}(이)라는 MCP 서버가 이미 있어요.",
   "error.backend.mcpServerInvalid": "OpenBot이 이 MCP 서버 설정을 저장할 수 없어요.",
+  "error.backend.mcpHeaderNameInvalid":
+    "헤더 이름에는 공백이나 : ( ) / 같은 기호를 쓸 수 없어요. Authorization 같은 이름을 쓰고 키나 토큰은 값에 넣어 주세요.",
   "error.backend.mcpServerNoAnswer": "서버가 {seconds}초 안에 응답하지 않았어요.",
   "error.backend.mcpSignInNotAccepted": "서버가 해당 로그인을 수락하지 않았어요.",
   "error.backend.mcpSignInGrantRefused":

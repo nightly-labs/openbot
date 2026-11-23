@@ -255,6 +255,8 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot bewaart maximaal {limit} MCP-servers.",
   "error.backend.mcpServerNameTaken": "Er bestaat al een MCP-server met de naam {name}.",
   "error.backend.mcpServerInvalid": "OpenBot kan deze MCP-serverconfiguratie niet opslaan.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Headernamen mogen geen spaties of tekens zoals : ( ) / bevatten. Gebruik een naam zoals Authorization en zet de sleutel of het token bij Waarde.",
   "error.backend.mcpServerNoAnswer": "De server reageerde niet binnen {seconds} seconden.",
   "error.backend.mcpSignInNotAccepted": "De server heeft die inlog niet geaccepteerd.",
   "error.backend.mcpSignInGrantRefused":

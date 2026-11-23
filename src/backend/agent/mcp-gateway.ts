@@ -273,7 +273,7 @@ export class McpGateway {
   ) {
     const config = normalizeMcpConfig(input.config);
     const errors = mcpConfigErrors(config);
-    const firstError = errors.name ?? errors.command ?? errors.url;
+    const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
     if (firstError) return yield* new McpGatewayFailed({ cause: new Error(firstError) });
     const stored = this.#oauth;
     const silent: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined =
