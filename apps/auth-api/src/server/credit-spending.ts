@@ -14,7 +14,7 @@ export const CREDIT_HOLD_START_GRACE_MS = 10 * 60 * 1_000;
 export const CREDIT_HOLD_FIRST_CHECK_MS = 15 * 60 * 1_000;
 const CREDIT_HOLD_MAX_CHECK_GAP_MS = 60 * 60 * 1_000;
 export const CREDIT_HOLD_LIMIT_MS = 24 * 60 * 60 * 1_000;
-export const CREDIT_HOLD_SUBMIT_LEASE_MS = 3 * 60 * 1_000;
+const CREDIT_HOLD_SUBMIT_LEASE_MS = 3 * 60 * 1_000;
 const SWEEP_BATCH = 50;
 
 export type CreditWallet = { userId: string } | { serverId: string };

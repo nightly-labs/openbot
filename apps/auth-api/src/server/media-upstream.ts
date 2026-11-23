@@ -92,7 +92,7 @@ function safeCode(value: unknown): string | null {
   return isString(value) && /^[a-z0-9_.-]{1,64}$/i.test(value) ? value : null;
 }
 
-export function errorCode(body: DynamicRecord | null): string {
+function errorCode(body: DynamicRecord | null): string {
   if (!body || !isDynamicRecord(body.error)) return "unknown";
   return safeCode(body.error.code) ?? safeCode(body.error.type) ?? "unknown";
 }
@@ -168,7 +168,7 @@ function base64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-export function dataUri(input: MediaGenerationInput): string {
+function dataUri(input: MediaGenerationInput): string {
   return `data:${input.mimeType};base64,${base64(input.bytes)}`;
 }
 
