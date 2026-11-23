@@ -518,13 +518,17 @@ function typesText(key: string): boolean {
 }
 
 function focusedField() {
-  const field = document.activeElement;
+  let field = document.activeElement;
+  while (field?.shadowRoot?.activeElement) field = field.shadowRoot.activeElement;
   const tokens = (field?.getAttribute("autocomplete") ?? "").split(/\s+/);
-  const frame =
-    field instanceof HTMLIFrameElement || field instanceof HTMLFrameElement || field instanceof HTMLObjectElement;
+  const opaque =
+    field instanceof HTMLIFrameElement ||
+    field instanceof HTMLFrameElement ||
+    field instanceof HTMLObjectElement ||
+    (field?.tagName.includes("-") === true && !field.shadowRoot);
   return {
     password: field instanceof HTMLInputElement && field.type === "password",
-    payment: frame || tokens.some((token) => token.startsWith("cc-")),
+    payment: opaque || tokens.some((token) => token.startsWith("cc-")),
   };
 }
 
@@ -826,12 +830,27 @@ function pageLocate(input: { target: ClientBrowserTarget; focus: boolean; intera
         }
       }
     }
-  } else element = document.elementFromPoint(target.x, target.y);
+  } else {
+    element = document.elementFromPoint(target.x, target.y);
+    while (element?.shadowRoot) {
+      const inner = element.shadowRoot.elementFromPoint(target.x, target.y);
+      if (!inner || inner === element) break;
+      element = inner;
+    }
+  }
   if (!element) return { found: false };
   const fields = "input, textarea, select, [contenteditable=''], [contenteditable=true]";
-  const field = element.matches(fields)
-    ? element
-    : (element.querySelector(fields) ?? element.closest(fields) ?? element);
+  let field = element.matches(fields) ? element : (element.querySelector(fields) ?? element.closest(fields) ?? element);
+  while (!field.matches(fields) && field.shadowRoot) {
+    const inner = field.shadowRoot.querySelector(fields);
+    if (!inner) break;
+    field = inner;
+  }
+  const opaque = (node: Element) =>
+    node instanceof HTMLIFrameElement ||
+    node instanceof HTMLFrameElement ||
+    node instanceof HTMLObjectElement ||
+    (node.tagName.includes("-") && !node.shadowRoot);
   const tokens = (field.getAttribute("autocomplete") ?? "").split(/\s+/);
   const link = element.closest("a[href]");
   let x = 0;
@@ -866,10 +885,6 @@ function pageLocate(input: { target: ClientBrowserTarget; focus: boolean; intera
     href: link instanceof HTMLAnchorElement ? link.href : "",
     download: link instanceof HTMLAnchorElement && link.hasAttribute("download"),
     password: field instanceof HTMLInputElement && field.type === "password",
-    payment:
-      [element, field].some(
-        (node) =>
-          node instanceof HTMLIFrameElement || node instanceof HTMLFrameElement || node instanceof HTMLObjectElement,
-      ) || tokens.some((token) => token.startsWith("cc-")),
+    payment: [element, field].some(opaque) || tokens.some((token) => token.startsWith("cc-")),
   };
 }
