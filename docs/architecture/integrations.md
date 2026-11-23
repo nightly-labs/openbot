@@ -795,13 +795,16 @@ The extension is a remote client, so no new data channel is necessary:
 
 ### The extension side
 
-The extension (`apps/browser-extension`) shares the tabs of one Chrome tab group, "OpenBot".
+The extension (`apps/browser-extension`) shares the user's open web tabs while the user is signed in,
+until the user stops sharing. A tab that an agent works in joins the Chrome tab group "OpenBot" of its
+window.
 
 - **Worker** (`src/client-browser-worker.ts`). Only the worker can use `chrome.debugger`, so it owns the
-  group, the approvals and the commands. "Share tabs with agents" (server menu of the side panel)
-  makes the group with the current web tab and stores `openbot.client-browser.sharing.v1`. The worker
-  answers the presence (the group's tabs), and tells the page with the connection when a tab joins,
-  leaves or changes. Stop sharing ungroups the tabs, denies the cards that wait and detaches.
+  group, the approvals and the commands. Sharing is on unless `openbot.client-browser.sharing.v1`
+  holds `{ off: true }`, which "Stop sharing" stores; "Share tabs with agents" clears it. The worker
+  answers the presence (the open web tabs, the active tab first, at most 50), and tells the page with
+  the connection when a tab opens, closes or changes. A command groups its tab on attach, unless the tab
+  is in another group. Stop sharing ungroups the tabs, denies the cards that wait and detaches.
 - **Connection** (`src/client-browser-link.ts`). The page that holds the server connection (the side
   panel, else the offscreen page) sends the presence when it changes, every 30 s and after a
   reconnection. It passes each `client-browser-command` event to the worker and posts the worker's
@@ -840,9 +843,9 @@ Chrome Web Store permission notes (for the store listing):
 
 | Permission | Justification |
 | --- | --- |
-| `debugger` | When the user shares tabs, the user's own agents read and use only the tabs of the "OpenBot" tab group (page text, screenshots, clicks and typing), after the user allows each site. Chrome shows its debugging bar while it is attached. |
-| `tabs` | Lists the address and title of the tabs in the "OpenBot" tab group for the user's agents, and opens or closes a tab there when an agent asks. |
-| `tabGroups` | Makes and finds the "OpenBot" tab group, the boundary of what the user shares with agents. |
+| `debugger` | When the user shares tabs, the user's own agents read and use the user's open tabs (page text, screenshots, clicks and typing), after the user allows each site. Chrome shows its debugging bar while it is attached. |
+| `tabs` | Lists the address and title of the user's open tabs for the user's agents, and opens or closes a tab when an agent asks. |
+| `tabGroups` | Puts the tabs that an agent works in into the "OpenBot" tab group, so the user sees them. |
 | `downloads` | Holds a download that starts on a site where the user's agent works until the user allows it in the side panel, and cancels it when the user denies it. The extension does not read, open or list the user's files. |
 
 The Team API E2E (`scripts/team-api-routes-e2e.ts`, "A member's shared Chrome tabs") checks the

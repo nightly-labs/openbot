@@ -121,7 +121,7 @@ declare namespace chrome {
     }
     type Color = "grey" | "blue" | "red" | "yellow" | "green" | "pink" | "purple" | "cyan" | "orange";
     function get(groupId: number): Promise<TabGroup>;
-    function query(filter: { title?: string }): Promise<TabGroup[]>;
+    function query(filter: { title?: string; windowId?: number }): Promise<TabGroup[]>;
     function update(groupId: number, properties: { title?: string; color?: Color }): Promise<TabGroup | undefined>;
   }
   namespace _debugger {

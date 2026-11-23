@@ -42,7 +42,7 @@ export function isClientBrowserCall(tool: string, args: unknown): boolean {
 }
 
 const NOTE =
-  'chromeTabs are tabs of the person\'s own Chrome, shared with you. They take snapshot, screenshot, navigate, click, type, press, scroll, wait_for and close_tab; open with browser: "chrome" opens one there. The person approves each new site; a denied action is final.';
+  'chromeTabs are the open tabs of the person\'s own Chrome; the first is the tab that the person looks at now. They take snapshot, screenshot, navigate, click, type, press, scroll, wait_for and close_tab; open with browser: "chrome" opens one there. The person approves each new site; a denied action is final.';
 
 export function withClientTabs(
   result: DynamicToolResult,

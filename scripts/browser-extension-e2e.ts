@@ -38,7 +38,7 @@ const folderName = `Extension folder ${run}`;
 const channelName = `Extension channel ${run}`;
 const newAgentName = `Extension agent ${run}`;
 const shareButton = `Mark clicked ${run}`;
-const shareText = `Use openbot_browser: call list_tabs, then snapshot the Chrome tab (its id starts with "chrome:"), then click the button labelled "${shareButton}". Reply with the single word done. Extension tabs ${run}.`;
+const shareText = `Use openbot_browser: call list_tabs, then snapshot the Chrome tab titled "Shared tab ${run}" (its id starts with "chrome:"), then click the button labelled "${shareButton}". Reply with the single word done. Extension tabs ${run}.`;
 const SHARE_FIXTURE = `<!doctype html><html><head><meta charset="utf-8"><title>Shared tab ${run}</title></head><body>
 <h1>Shared tab ${run}</h1>
 <button type="button" id="mark">${shareButton}</button>
@@ -135,6 +135,9 @@ interface Report {
     cleanedUp: boolean;
   };
   sharedTabs?: {
+    onWithoutSwitch: boolean;
+    ungroupedBeforeUse: boolean;
+    sharedAgain: boolean;
     inOpenBotGroup: boolean;
     presenceAccepted: boolean;
     askShown: boolean;
@@ -546,18 +549,18 @@ try {
     worker.evaluate<string>(
       `chrome.tabs.query({}).then(async (tabs) => { const tab = tabs.find((entry) => entry.url === ${JSON.stringify(shareUrl)}); if (!tab || tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return "null"; const group = await chrome.tabGroups.get(tab.groupId); return JSON.stringify({ id: group.id, title: group.title }); })`,
     );
-  await serverTitle.click();
-  await page.getByRole("menuitem", { name: english("extension.browser.share") }).click();
-  const sharingLine = page.getByText(english("extension.browser.line", { count: 1 }));
+  const sharingLine = page.getByText(english("extension.browser.line", { count: 2 }).split(" · ")[0] ?? "", {
+    exact: false,
+  });
   await sharingLine.waitFor({ timeout: UI_WAIT_MS });
-  const group = await waitFor(host.page, "the page is in the OpenBot group", fixtureGroup, (value) => value !== "null");
-  const inOpenBotGroup = JSON.parse(group).title === "OpenBot";
+  const onWithoutSwitch = await sharingLine.isVisible();
   await waitFor(
     host.page,
     "the server accepted the presence",
     () => readStored(presenceKey),
-    (value) => value.includes('"sharing":true') && value.includes('"tabs":1'),
+    (value) => value.includes('"sharing":true'),
   );
+  const ungroupedBeforeUse = (await fixtureGroup()) === "null";
   await shot(page, "6b-sharing-line");
   await toHome(page);
   await agentButton.click();
@@ -569,6 +572,8 @@ try {
   await shot(page, "6b-approval-card");
   await always.click();
   await shareFixture.waitForFunction(() => document.body.dataset.clicked !== undefined, null, { timeout: 180_000 });
+  const group = await waitFor(host.page, "the page is in the OpenBot group", fixtureGroup, (value) => value !== "null");
+  const inOpenBotGroup = JSON.parse(group).title === "OpenBot";
   const site = new URL(xBase).origin;
   const siteStored = JSON.parse(await readStored(sitesKey))?.[site] === "always";
   await waitFor(
@@ -596,7 +601,21 @@ try {
     () => readStored(presenceKey),
     (value) => value.includes('"sharing":false'),
   );
+  await serverTitle.click();
+  await page.getByRole("menuitem", { name: english("extension.browser.share") }).click();
+  await sharingLine.waitFor({ timeout: UI_WAIT_MS });
+  const sharedAgain = (
+    await waitFor(
+      host.page,
+      "the server accepted the presence again",
+      () => readStored(presenceKey),
+      (value) => value.includes('"sharing":true'),
+    )
+  ).includes('"sharing":true');
   report.sharedTabs = {
+    onWithoutSwitch,
+    ungroupedBeforeUse,
+    sharedAgain,
     inOpenBotGroup,
     presenceAccepted: true,
     askShown: true,
@@ -606,7 +625,9 @@ try {
     groupEnded,
     presenceEnded: true,
   };
-  assert.ok(inOpenBotGroup, "The shared page is not in the OpenBot group.");
+  assert.ok(ungroupedBeforeUse, "The page joined the OpenBot group before an agent used it.");
+  assert.ok(inOpenBotGroup, "The page that the agent used is not in the OpenBot group.");
+  assert.ok(sharedAgain, "Share tabs with agents did not turn sharing on again.");
   assert.ok(siteStored, "Always for this site did not store the site.");
   assert.ok(siteRevoked, "Remove did not forget the site.");
   await shareFixture.close();

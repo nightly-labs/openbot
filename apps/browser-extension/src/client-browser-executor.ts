@@ -38,6 +38,7 @@ interface Attached {
 
 const attached = new Map<number, Attached>();
 let workingLabel = "";
+let groupTab: (tabId: number) => Promise<void> = async () => undefined;
 const revisions = new Map<number, number>();
 
 export const isWebUrl = (url: string | undefined): url is string => Boolean(url && /^https?:\/\//iu.test(url));
@@ -90,6 +91,7 @@ async function send(tabId: number, method: string, params?: ProtocolParams): Pro
 }
 
 async function attach(tabId: number): Promise<Attached> {
+  await groupTab(tabId).catch(() => undefined);
   let entry = attached.get(tabId);
   if (!entry) {
     await chrome.debugger.attach({ tabId }, "1.3").catch((error: unknown) => {
@@ -168,12 +170,10 @@ async function waitForLoad(tabId: number): Promise<chrome.tabs.Tab> {
   }
 }
 
-async function sharedTab(tabId: string, groupId: number | null): Promise<{ id: number; tab: chrome.tabs.Tab }> {
+async function sharedTab(tabId: string): Promise<{ id: number; tab: chrome.tabs.Tab }> {
   const id = Number(tabId);
   const tab = Number.isSafeInteger(id) ? await chrome.tabs.get(id).catch(() => null) : null;
   if (!tab) throw new BrowserCommandError("not-found", "The tab is closed.");
-  if (groupId === null || tab.groupId !== groupId)
-    throw new BrowserCommandError("not-shared", "The tab is not in the OpenBot tab group.");
   if (!isWebUrl(tab.url)) throw new BrowserCommandError("failed", "Agents can use only web pages (http and https).");
   return { id, tab };
 }
@@ -192,7 +192,8 @@ function targetWords(target: ClientBrowserTarget): string {
 export async function runCommand(command: ClientBrowserCommand, context: CommandContext): Promise<ClientBrowserResult> {
   workingLabel = context.workingLabel;
   if (command.kind === "open") return openTab(command.url, context);
-  const { id, tab } = await sharedTab(command.tabId, context.groupId);
+  groupTab = context.addToGroup;
+  const { id, tab } = await sharedTab(command.tabId);
   const url = tab.url ?? "";
   try {
     switch (command.kind) {

@@ -74,7 +74,8 @@ function fromExtensionPage(sender: chrome.runtime.MessageSender): boolean {
 
 async function readSharing(): Promise<{ groupId: number | null } | null> {
   const value = (await chrome.storage.local.get(SHARING_KEY))[SHARING_KEY];
-  if (!isDynamicRecord(value)) return null;
+  if (!isDynamicRecord(value)) return { groupId: null };
+  if (value.off === true) return null;
   return { groupId: isNumber(value.groupId) ? value.groupId : null };
 }
 
@@ -96,11 +97,15 @@ async function sharedGroupId(): Promise<number | null> {
 
 async function presence(): Promise<ClientBrowserPresence> {
   if (!(await readSharing())) return { sharing: false, tabs: [] };
-  const groupId = await sharedGroupId();
-  const tabs = groupId === null ? [] : await chrome.tabs.query({ groupId });
+  const [current] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  const rank = (tab: chrome.tabs.Tab) => (tab.id === current?.id ? Number.MAX_SAFE_INTEGER : (tab.lastAccessed ?? 0));
+  const tabs = (await chrome.tabs.query({})).filter((tab) => isWebUrl(tab.url));
   return {
     sharing: true,
-    tabs: tabs.flatMap((tab) => clientTab(tab) ?? []).slice(0, CLIENT_BROWSER_LIMITS.tabs),
+    tabs: tabs
+      .sort((left, right) => rank(right) - rank(left))
+      .flatMap((tab) => clientTab(tab) ?? [])
+      .slice(0, CLIENT_BROWSER_LIMITS.tabs),
   };
 }
 
@@ -111,12 +116,13 @@ async function currentWebTab(): Promise<chrome.tabs.Tab | null> {
   return tabs.sort((left, right) => (right.lastAccessed ?? 0) - (left.lastAccessed ?? 0))[0] ?? null;
 }
 
-async function addToGroup(tabId: number, groupId: number | null): Promise<number> {
+async function addToGroup(tabId: number): Promise<number | null> {
   const tab = await chrome.tabs.get(tabId);
-  const next =
-    groupId === null
-      ? await chrome.tabs.group({ tabIds: [tabId], createProperties: { windowId: tab.windowId } })
-      : await chrome.tabs.group({ tabIds: [tabId], groupId });
+  if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return null;
+  const [inWindow] = await chrome.tabGroups.query({ title: OPENBOT_GROUP_TITLE, windowId: tab.windowId });
+  const next = inWindow
+    ? await chrome.tabs.group({ tabIds: [tabId], groupId: inWindow.id })
+    : await chrome.tabs.group({ tabIds: [tabId], createProperties: { windowId: tab.windowId } });
   await chrome.tabGroups.update(next, { title: OPENBOT_GROUP_TITLE, color: GROUP_COLOR });
   await chrome.storage.local.set({ [SHARING_KEY]: { groupId: next } });
   return next;
@@ -172,7 +178,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     let groupId = await findGroup(saved?.groupId ?? null);
     const tab = await currentWebTab();
     if (tab?.id !== undefined && (groupId === null || tab.groupId !== groupId))
-      groupId = await addToGroup(tab.id, groupId);
+      groupId = (await addToGroup(tab.id)) ?? groupId;
     else if (groupId !== null)
       await chrome.tabGroups.update(groupId, { title: OPENBOT_GROUP_TITLE, color: GROUP_COLOR });
     await chrome.storage.local.set({ [SHARING_KEY]: { groupId } });
@@ -180,7 +186,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
 
   async function stopSharing(): Promise<void> {
     const groupId = await sharedGroupId();
-    await chrome.storage.local.remove(SHARING_KEY);
+    await chrome.storage.local.set({ [SHARING_KEY]: { off: true } });
     downloadGuards.clear();
     for (const finish of [...waiting.values()]) finish("deny");
     await detachAll();
@@ -307,7 +313,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
         groupId: await sharedGroupId(),
         allow: (kind, url, detail) => allow(event, labels, kind, url, detail),
         addToGroup: async (tabId) => {
-          await addToGroup(tabId, await sharedGroupId());
+          await addToGroup(tabId);
         },
         watchDownloads: (url, allowed, action) => watchDownloads(event, labels, url, allowed, action),
         workingLabel: labels.working,
@@ -355,12 +361,8 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     return undefined;
   });
 
-  chrome.tabs.onUpdated.addListener((_tabId, change, tab) => {
-    if (
-      change.groupId !== undefined ||
-      (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && (change.url || change.title))
-    )
-      changed();
+  chrome.tabs.onUpdated.addListener((_tabId, change) => {
+    if (change.groupId !== undefined || change.url || change.title) changed();
   });
   chrome.tabs.onRemoved.addListener(() => changed());
   chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {

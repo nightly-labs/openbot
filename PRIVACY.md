@@ -1285,14 +1285,14 @@ earlier attempt may have reached the server); then it deletes the post and tells
 notification. Nothing goes to OpenBot,
 and nothing is sent when you do not click. To find the parts of the page, the extension
 asks openbot.run once an hour for the newest list of page selectors; that request carries only the hash
-of the list that it has. Except for shared tabs (below), the extension does not read your other tabs or
-the other pages you visit.
+of the list that it has. Except for shared tabs (below), the extension does not read your tabs or the
+pages you visit.
 
-Shared tabs are off until you press **Share tabs with agents** in the side panel. Then the extension
-makes a Chrome tab group named "OpenBot" with the current tab, and you can drag more tabs into it. Only
-the tabs of that group are shared, and only with your own agents, in the turns that you started. The
-extension tells your server the address, title and active state of each tab in the group, through the
-same encrypted connection, when it changes and every 30 seconds. When an agent acts on a site for the
+Shared tabs are on while you are signed in, until you press **Stop sharing** in the side panel. Your
+open tabs are shared only with your own agents, in the turns that you started. The extension tells
+your server the address, title and active state of your open web tabs (at most 50, the tab that you
+look at first), through the same encrypted connection, when they change and every 30 seconds. When an
+agent works in a tab, the tab joins a Chrome tab group named "OpenBot", unless it is in another group. When an agent acts on a site for the
 first time, the side panel asks you (Allow once, Always for this site, Deny); the sites that you allow
 always stay in the browser's extension storage until you remove them in the panel. The extension
 always asks again before an agent types into a password or payment field, downloads a file, or acts
@@ -1300,8 +1300,9 @@ on a page that signs in to an app or gives an app access. To read and use a tab,
 Chrome's debugger on that tab, and Chrome shows its own bar while it does. What an agent reads goes
 to your server: the page text and the list of its buttons, links and fields (not the values of
 password or payment fields), screenshots of the visible page, and addresses. Text that an agent types
-goes from your server to the page. Nothing goes to OpenBot. **Stop sharing** ends the group; your
-server forgets the shared tabs at once, or at the latest 75 seconds after the extension stops.
+goes from your server to the page. Nothing goes to OpenBot. **Stop sharing** ends the group and stops
+the reports; your server forgets the shared tabs at once, or at the latest 75 seconds after the
+extension stops. **Share tabs with agents** turns sharing on again.
 
 ## Other network connections
 
