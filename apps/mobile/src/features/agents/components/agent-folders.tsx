@@ -11,6 +11,7 @@ import {
   agentFolderParent,
   agentPermissionLevel,
   agentProviderDescriptor,
+  typedHostFolder,
 } from "@openbot/contracts/ipc";
 import { keepPreviousData, type UseQueryResult, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
@@ -39,6 +40,7 @@ import {
   useMobileWorkspaceActions,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
@@ -498,10 +500,18 @@ export function FolderBrowserListing({
   const folder = query.data;
   const moving = query.isPlaceholderData;
   const [places, setPlaces] = useState<Pick<AgentFolderBrowse, "home" | "volumes"> | null>(null);
+  const [typed, setTyped] = useState("");
   useEffect(() => {
-    if (query.data && !query.isPlaceholderData) setPlaces({ home: query.data.home, volumes: query.data.volumes });
+    if (!query.data || query.isPlaceholderData) return;
+    setPlaces({ home: query.data.home, volumes: query.data.volumes });
+    setTyped(query.data.path);
   }, [query.data, query.isPlaceholderData]);
   const current = path ?? places?.home;
+  function goTyped() {
+    if (!folder || moving) return;
+    const target = typedHostFolder(typed, folder);
+    if (target && target !== folder.path) onGo(target);
+  }
   return (
     <>
       {places ? (
@@ -537,6 +547,20 @@ export function FolderBrowserListing({
             <Button.Label>{t("mobile.agent.folders.retry")}</Button.Label>
           </Button>
         </View>
+      ) : null}
+      {folder ? (
+        <SheetFormField
+          label={t("mobile.agent.folders.path")}
+          hideLabel
+          appearance="soft"
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!busy}
+          returnKeyType="go"
+          value={typed}
+          onChangeText={setTyped}
+          onSubmitEditing={goTyped}
+        />
       ) : null}
       {folder ? (
         <View className="gap-5" accessibilityState={{ busy: moving }}>

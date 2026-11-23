@@ -48,6 +48,7 @@ export const messages = {
     other: "אפשר להוסיף {count} תיקיות לכל היותר",
   },
   "agentSettings.folders.browse.places": "מעבר אל",
+  "agentSettings.folders.browse.path": "נתיב התיקייה",
   "agentSettings.folders.browse.home": "תיקיית הבית",
   "agentSettings.folders.browse.parent": "למעלה אל {folder}",
   "agentSettings.folders.browse.failed": "לא ניתן לפתוח את התיקייה הזו.",

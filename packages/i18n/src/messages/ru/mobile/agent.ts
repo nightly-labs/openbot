@@ -759,6 +759,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Не исключать",
   "mobile.agent.folders.browseTitle": "Выбор папки",
   "mobile.agent.folders.places": "Перейти",
+  "mobile.agent.folders.path": "Путь к папке",
   "mobile.agent.folders.home": "Домашняя папка",
   "mobile.agent.folders.parent": "Вверх: {folder}",
   "mobile.agent.folders.browseFailed": "Не удалось открыть эту папку.",

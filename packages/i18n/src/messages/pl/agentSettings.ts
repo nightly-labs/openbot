@@ -61,6 +61,7 @@ export const messages = {
     other: "Możesz dodać maksymalnie {count} folderu",
   },
   "agentSettings.folders.browse.places": "Przejdź do",
+  "agentSettings.folders.browse.path": "Ścieżka folderu",
   "agentSettings.folders.browse.home": "Folder domowy",
   "agentSettings.folders.browse.parent": "W górę: {folder}",
   "agentSettings.folders.browse.failed": "Nie można otworzyć tego folderu.",

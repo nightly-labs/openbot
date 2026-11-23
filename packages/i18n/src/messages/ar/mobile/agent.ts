@@ -773,6 +773,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "إيقاف الاستبعاد",
   "mobile.agent.folders.browseTitle": "اختر مجلدًا",
   "mobile.agent.folders.places": "انتقال إلى",
+  "mobile.agent.folders.path": "مسار المجلد",
   "mobile.agent.folders.home": "المجلد الرئيسي",
   "mobile.agent.folders.parent": "صعودًا إلى {folder}",
   "mobile.agent.folders.browseFailed": "تعذّر فتح هذا المجلد.",

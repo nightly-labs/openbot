@@ -50,6 +50,7 @@ export const messages = {
     other: "En fazla {count} klasör ekleyebilirsiniz",
   },
   "agentSettings.folders.browse.places": "Git",
+  "agentSettings.folders.browse.path": "Klasör yolu",
   "agentSettings.folders.browse.home": "Ana klasör",
   "agentSettings.folders.browse.parent": "Yukarı: {folder}",
   "agentSettings.folders.browse.failed": "Bu klasör açılamadı.",

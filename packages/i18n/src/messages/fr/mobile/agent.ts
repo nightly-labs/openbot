@@ -706,6 +706,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Ne plus exclure",
   "mobile.agent.folders.browseTitle": "Choisir un dossier",
   "mobile.agent.folders.places": "Aller à",
+  "mobile.agent.folders.path": "Chemin du dossier",
   "mobile.agent.folders.home": "Dossier personnel",
   "mobile.agent.folders.parent": "Remonter à {folder}",
   "mobile.agent.folders.browseFailed": "Impossible d’ouvrir ce dossier.",

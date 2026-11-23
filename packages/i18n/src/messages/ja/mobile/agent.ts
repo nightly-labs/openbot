@@ -686,6 +686,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "除外を解除",
   "mobile.agent.folders.browseTitle": "フォルダを選択",
   "mobile.agent.folders.places": "移動",
+  "mobile.agent.folders.path": "フォルダのパス",
   "mobile.agent.folders.home": "ホームフォルダ",
   "mobile.agent.folders.parent": "上へ: {folder}",
   "mobile.agent.folders.browseFailed": "このフォルダを開けませんでした。",

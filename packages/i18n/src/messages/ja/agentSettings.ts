@@ -47,6 +47,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder} はこのコンピューター上のフォルダーではありません",
   "agentSettings.folders.limit": { other: "追加できるフォルダーは最大 {count} 個です" },
   "agentSettings.folders.browse.places": "移動",
+  "agentSettings.folders.browse.path": "フォルダのパス",
   "agentSettings.folders.browse.home": "ホームフォルダ",
   "agentSettings.folders.browse.parent": "上へ: {folder}",
   "agentSettings.folders.browse.failed": "このフォルダを開けませんでした。",

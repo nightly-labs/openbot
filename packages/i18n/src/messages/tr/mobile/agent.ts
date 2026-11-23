@@ -703,6 +703,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Hariç tutma",
   "mobile.agent.folders.browseTitle": "Klasör seç",
   "mobile.agent.folders.places": "Git",
+  "mobile.agent.folders.path": "Klasör yolu",
   "mobile.agent.folders.home": "Ana klasör",
   "mobile.agent.folders.parent": "Yukarı: {folder}",
   "mobile.agent.folders.browseFailed": "Bu klasör açılamadı.",

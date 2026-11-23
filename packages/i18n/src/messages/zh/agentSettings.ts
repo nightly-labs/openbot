@@ -45,6 +45,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder} 不是此电脑上的文件夹",
   "agentSettings.folders.limit": { one: "最多可添加 {count} 个文件夹", other: "最多可添加 {count} 个文件夹" },
   "agentSettings.folders.browse.places": "前往",
+  "agentSettings.folders.browse.path": "文件夹路径",
   "agentSettings.folders.browse.home": "主文件夹",
   "agentSettings.folders.browse.parent": "向上：{folder}",
   "agentSettings.folders.browse.failed": "无法打开此文件夹。",

@@ -50,6 +50,7 @@ export const messages = {
     other: "Du kannst höchstens {count} Ordner hinzufügen",
   },
   "agentSettings.folders.browse.places": "Gehe zu",
+  "agentSettings.folders.browse.path": "Ordnerpfad",
   "agentSettings.folders.browse.home": "Benutzerordner",
   "agentSettings.folders.browse.parent": "Nach oben: {folder}",
   "agentSettings.folders.browse.failed": "Dieser Ordner kann nicht geöffnet werden.",

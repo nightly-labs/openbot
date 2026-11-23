@@ -673,6 +673,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.folders.includeConfirm": "Stop excluding",
   "mobile.agent.folders.browseTitle": "Choose folder",
   "mobile.agent.folders.places": "Go to",
+  "mobile.agent.folders.path": "Folder path",
   "mobile.agent.folders.home": "Home folder",
   "mobile.agent.folders.parent": "Up to {folder}",
   "mobile.agent.folders.browseFailed": "Could not open this folder.",

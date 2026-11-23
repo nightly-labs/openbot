@@ -650,6 +650,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "不再排除",
   "mobile.agent.folders.browseTitle": "选择文件夹",
   "mobile.agent.folders.places": "前往",
+  "mobile.agent.folders.path": "文件夹路径",
   "mobile.agent.folders.home": "主文件夹",
   "mobile.agent.folders.parent": "向上：{folder}",
   "mobile.agent.folders.browseFailed": "无法打开此文件夹。",

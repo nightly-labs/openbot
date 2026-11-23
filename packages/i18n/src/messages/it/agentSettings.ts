@@ -48,6 +48,7 @@ export const messages = {
     other: "Puoi aggiungere al massimo {count} cartelle",
   },
   "agentSettings.folders.browse.places": "Vai a",
+  "agentSettings.folders.browse.path": "Percorso della cartella",
   "agentSettings.folders.browse.home": "Cartella Inizio",
   "agentSettings.folders.browse.parent": "Su a {folder}",
   "agentSettings.folders.browse.failed": "Impossibile aprire questa cartella.",

@@ -65,6 +65,7 @@ export const messages = {
     other: "يمكنك إضافة {count} مجلد على الأكثر",
   },
   "agentSettings.folders.browse.places": "انتقال إلى",
+  "agentSettings.folders.browse.path": "مسار المجلد",
   "agentSettings.folders.browse.home": "المجلد الرئيسي",
   "agentSettings.folders.browse.parent": "صعودًا إلى {folder}",
   "agentSettings.folders.browse.failed": "تعذّر فتح هذا المجلد.",

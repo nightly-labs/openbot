@@ -86,6 +86,20 @@ export function agentFolderParent(path: string): string {
   return end > 0 ? path.slice(0, end) : path;
 }
 
+function joinFolder(base: string, rest: string): string {
+  const separator = base.includes("\\") && !base.includes("/") ? "\\" : "/";
+  return /[\\/]$/.test(base) ? `${base}${rest}` : `${base}${separator}${rest}`;
+}
+
+export function typedHostFolder(typed: string, place: { path: string; home: string }): string | null {
+  const value = typed.trim();
+  if (!value) return null;
+  if (value === "~") return place.home;
+  if (/^~[\\/]/.test(value)) return joinFolder(place.home, value.slice(2));
+  if (/^([\\/]|[a-zA-Z]:([\\/]|$))/.test(value)) return value;
+  return joinFolder(place.path, value);
+}
+
 export function agentExclusionPlace(
   path: string,
   list: AgentFolderList,

@@ -693,6 +693,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Niet uitsluiten",
   "mobile.agent.folders.browseTitle": "Map kiezen",
   "mobile.agent.folders.places": "Ga naar",
+  "mobile.agent.folders.path": "Mappad",
   "mobile.agent.folders.home": "Thuismap",
   "mobile.agent.folders.parent": "Omhoog naar {folder}",
   "mobile.agent.folders.browseFailed": "Kan deze map niet openen.",

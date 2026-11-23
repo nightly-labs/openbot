@@ -50,6 +50,7 @@ export const messages = {
     other: "Je kunt maximaal {count} mappen toevoegen",
   },
   "agentSettings.folders.browse.places": "Ga naar",
+  "agentSettings.folders.browse.path": "Mappad",
   "agentSettings.folders.browse.home": "Thuismap",
   "agentSettings.folders.browse.parent": "Omhoog naar {folder}",
   "agentSettings.folders.browse.failed": "Kan deze map niet openen.",
