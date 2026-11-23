@@ -792,6 +792,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         confinement,
         withAccountEnvironment(context),
         context.history?.("grok"),
+        context.fitImage,
       ),
     createProfileClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
