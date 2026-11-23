@@ -78,7 +78,16 @@ export function isCodexRolloutPending(error: unknown): boolean {
 function isCodexMissingThreadError(error: unknown): boolean {
   return (
     error instanceof AppServerError &&
-    (/thread not found:/i.test(error.message) || /\bno rollout found\b/i.test(error.message))
+    (/thread not found:/i.test(error.message) ||
+      /\bno rollout found\b/i.test(error.message) ||
+      isCodexUnconfiguredThreadProvider(error))
+  );
+}
+
+function isCodexUnconfiguredThreadProvider(error: AppServerError): boolean {
+  return (
+    getString(error.data, "type") === "modelProviderNotConfigured" ||
+    /^This chat uses model provider .+, which is no longer configured\./.test(error.message)
   );
 }
 
