@@ -31,6 +31,8 @@ export const messages = {
   "error.voice.live.timedOut": "لم يبدأ صوت Codex المباشر في الوقت المحدد. حاول مرة أخرى.",
   "error.voice.live.failed": "توقف الصوت المباشر: {reason}",
   "error.voice.live.disconnected": "انقطع اتصال الصوت المباشر.",
+  "error.voice.live.startFailed":
+    "تعذّر بدء الصوت المباشر. حدّث Codex وسجّل الدخول باستخدام ChatGPT على الكمبيوتر الذي يشغّل الوكيل، ثم حاول مرة أخرى. السبب: {reason}",
   "error.voice.live.hostFailed":
     "لم يتمكن Codex على الخادم من بدء الصوت المباشر. اطلب من مالكه تحديث Codex على ذلك الكمبيوتر وتسجيل الدخول باستخدام ChatGPT، ثم حاول مرة أخرى.",
   "error.voice.live.signIn": "سجّل الدخول إلى Codex بحساب ChatGPT لاستخدام الصوت المباشر.",

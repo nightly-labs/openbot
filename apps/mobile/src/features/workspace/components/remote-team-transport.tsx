@@ -151,6 +151,12 @@ function liveVoiceErrorText(path: string, status: number, body: unknown): string
   return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
 }
 
+function liveVoiceHostFailure(path: string, reference: string | undefined): string | null {
+  return path === LIVE_VOICE_ROUTES.start && reference?.startsWith("host/5")
+    ? sourceText("error.voice.live.hostFailed")
+    : null;
+}
+
 const BRIDGE_DOM: DOMProps = {
   ...expoGoDomOptions,
   containerStyle: {
@@ -334,7 +340,12 @@ export const RemoteTeamTransport = memo(
               `${request} -> ${result.status ?? "no status"} ${time}`,
             );
           if (!result.ok)
-            throw referencedError(result.error ?? sourceText("error.remote.serverRequestFailed"), result.reference);
+            throw referencedError(
+              liveVoiceHostFailure(path, result.reference) ??
+                result.error ??
+                sourceText("error.remote.serverRequestFailed"),
+              result.reference,
+            );
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           if (
