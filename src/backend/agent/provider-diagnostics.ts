@@ -229,7 +229,9 @@ export function isImageTooLargeDiagnostic(message: string): boolean {
 }
 
 export function isImageUnreadableDiagnostic(message: string): boolean {
-  return /\bUnable to process input image\b/iu.test(message);
+  return /\bUnable to process input(?: image\b|: the file or media data is empty, corrupted, or malformed)/iu.test(
+    message,
+  );
 }
 
 export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b/iu;
