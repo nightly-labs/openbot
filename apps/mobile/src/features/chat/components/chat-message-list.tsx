@@ -1312,9 +1312,9 @@ function TurnFailure({ reason }: { reason: string | undefined }) {
 }
 
 function NoAnswerNotice({ text }: { text: string }) {
-  const { errorMessage } = useText();
+  const { sourceText } = useText();
   const [warning] = useCSSVariable(["--openbot-warning-text"]);
-  const notice = errorMessage(text, text);
+  const notice = sourceText(text);
   return (
     <View accessible accessibilityLabel={notice} className="flex-row items-start gap-1.5 self-start px-1">
       <TriangleAlert size={14} color={String(warning)} strokeWidth={2} style={{ marginTop: 2 }} />
