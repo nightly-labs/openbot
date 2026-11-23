@@ -3417,9 +3417,11 @@ export class ProviderRuntime implements ProviderPort {
               ? sourceText("error.provider.deepseekSignIn")
               : provider === "openrouter"
                 ? sourceText("error.provider.openrouterSignIn")
-                : provider === "hermes"
-                  ? sourceText("error.provider.hermesSignIn")
-                  : agentProviderDescriptor(provider).signInMessage)
+                : provider === "bf16"
+                  ? sourceText("error.provider.bf16SignIn")
+                  : provider === "hermes"
+                    ? sourceText("error.provider.hermesSignIn")
+                    : agentProviderDescriptor(provider).signInMessage)
     );
   }
 

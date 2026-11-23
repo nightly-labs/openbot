@@ -230,6 +230,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "احفظ مفتاح OpenRouter API على المضيف لاستخدام النماذج التي يقدمها OpenRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.openrouterKey.label": "مفتاح OpenRouter API",
+  "provider.bf16Key.title": "مفتاح bf16.ai API",
+  "provider.bf16Key.description":
+    "احفظ مفتاح bf16.ai API على هذا الحاسوب لاستخدام النماذج التي يقدمها bf16.ai. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.bf16Key.descriptionHost":
+    "احفظ مفتاح bf16.ai API على المضيف لاستخدام النماذج التي يقدمها bf16.ai. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.bf16Key.label": "مفتاح bf16.ai API",
   "provider.openCodeKey.title": "تسجيل الدخول إلى OpenCode Go",
   "provider.openCodeKey.description": "لا تحتاج النماذج المجانية إلى حساب. يفتح المفتاح نماذج Go المدفوعة.",
   "provider.openCodeKey.unreadable": "المفتاح المحفوظ غير قابل للقراءة. الصقه مرة أخرى، أو أزله.",

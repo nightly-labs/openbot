@@ -628,6 +628,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "Per continuare, aggiungi una chiave API di Inception.",
   "error.provider.deepseekSignIn": "Aggiungi una chiave API di DeepSeek per continuare.",
   "error.provider.openrouterSignIn": "Aggiungi una chiave API di OpenRouter per continuare.",
+  "error.provider.bf16SignIn": "Aggiungi una chiave API di bf16.ai per continuare.",
   "error.provider.terminalLoginFailed":
     "Impossibile aprire il terminale di accesso. Apri la CLI del provider su questo host e accedi da lì, poi aggiorna i provider.",
   "error.provider.nativeArchiveInvalid": "Il download del provider non contiene un'installazione valida.",

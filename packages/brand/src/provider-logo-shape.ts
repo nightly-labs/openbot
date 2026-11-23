@@ -64,6 +64,25 @@ const OPENBOT_PATH =
   "M35.93 122.88L36.48 108.04L43.55 93.61L64.69 81.41L79.67 83.11L91.58 90.74L97.66 98.76L100.43 105.4L101.97 112.04L101.83 122.52L94.14 140.23L73.01 152.43L55.08 149.51L46.9 143.83L42.44 138.88L38.9 132.69Z" +
   "M137.55 117.43L138.3 109.53L140.83 101.52L145.65 93.61L166.79 81.41L175.58 81.46L183.18 83.63L189.67 87.33L197.88 95.78L201.52 102.48L204.07 112.08L203.51 124.75L199.82 134.98L169.28 152.61L159.14 150.37L149.03 143.86L142.92 136.32L139.67 129.39Z";
 
+// Monochrome bf[16] mark derived from bf16.ai logo geometry on a 6 8 49 49 viewBox.
+const BF16_PATHS: readonly ProviderLogoPath[] = [
+  {
+    d: "M11.6 10H14.9A1.6 1.6 0 0 1 16.5 11.6V14.4A1.6 1.6 0 0 1 14.9 16H11.6A1.6 1.6 0 0 1 10 14.4V11.6A1.6 1.6 0 0 1 11.6 10ZM20.6 10H35.4A1.6 1.6 0 0 1 37 11.6V14.4A1.6 1.6 0 0 1 35.4 16H20.6A1.6 1.6 0 0 1 19 14.4V11.6A1.6 1.6 0 0 1 20.6 10ZM41.1 10H49.4A1.6 1.6 0 0 1 51 11.6V14.4A1.6 1.6 0 0 1 49.4 16H41.1A1.6 1.6 0 0 1 39.5 14.4V11.6A1.6 1.6 0 0 1 41.1 10Z",
+    opacity: 0.45,
+  },
+  {
+    d: "M9.5 21H14V30.2H16.2C18.8 30.2 20.6 32.0 20.6 34.6V44.6C20.6 47.2 18.8 49 16.2 49H9.5V21ZM14 34.2V45H15.8C16.3 45 16.6 44.7 16.6 44.2V35.0C16.6 34.5 16.3 34.2 15.8 34.2H14Z",
+    evenOdd: true,
+  },
+  {
+    d: "M23.2 25.4C23.2 22.6 25.0 21 27.8 21H29.6V24.8H28.1C27.5 24.8 27.3 25.1 27.3 25.8V30.2H29.5V34.0H27.3V49H23.2V34.0H21.4V30.2H23.2V25.4Z",
+  },
+  {
+    d: "M36.5 23H46A5.5 5.5 0 0 1 51.5 28.5V43.5A5.5 5.5 0 0 1 46 49H36.5A5.5 5.5 0 0 1 31 43.5V28.5A5.5 5.5 0 0 1 36.5 23ZM34.0 30.2L36.8 28.2H39.2V44.0H36.0V32.0L34.0 33.2V30.2ZM44.2 28.2H48.4V31.2H44.6C43.9 31.2 43.6 31.6 43.6 32.3V34.6H46.4C48.2 34.6 49.4 35.8 49.4 37.6V41.0C49.4 42.8 48.2 44.0 46.4 44.0H43.4C41.6 44.0 40.4 42.8 40.4 41.0V32.0C40.4 29.7 41.9 28.2 44.2 28.2ZM43.6 37.4V40.7C43.6 41.1 43.9 41.3 44.3 41.3H45.7C46.1 41.3 46.3 41.1 46.3 40.7V37.8C46.3 37.4 46.1 37.2 45.7 37.2H43.6Z",
+    evenOdd: true,
+  },
+];
+
 export type ProviderLogoVariant =
   | "codex"
   | "claude"
@@ -82,6 +101,7 @@ export type ProviderLogoVariant =
   | "inception"
   | "deepseek"
   | "openrouter"
+  | "bf16"
   | "hermes"
   | "sunra"
   | "higgsfield"
@@ -132,6 +152,8 @@ export function providerLogoShape(provider: ProviderLogoVariant): ProviderLogoSh
       return { viewBox: GRID_24, paths: [{ d: DEEPSEEK_PATH, evenOdd: true }] };
     case "openrouter":
       return { viewBox: GRID_24, paths: [{ d: OPENROUTER_PATH }] };
+    case "bf16":
+      return { viewBox: "6 8 49 49", paths: BF16_PATHS };
     case "hermes":
       return { viewBox: GRID_24, paths: HERMES_PATHS.map((d) => ({ d, evenOdd: true })) };
     case "sunra":

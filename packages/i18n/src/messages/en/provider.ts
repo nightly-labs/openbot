@@ -213,6 +213,12 @@ export const messages = defineMessages("provider", {
   "provider.openrouterKey.descriptionHost":
     "Save an OpenRouter API key on the host to use the models that OpenRouter serves. OpenBot runs them in the Pi CLI that it downloads.",
   "provider.openrouterKey.label": "OpenRouter API key",
+  "provider.bf16Key.title": "bf16.ai API key",
+  "provider.bf16Key.description":
+    "Save a bf16.ai API key on this computer to use the models that bf16.ai serves. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.bf16Key.descriptionHost":
+    "Save a bf16.ai API key on the host to use the models that bf16.ai serves. OpenBot runs them in the Pi CLI that it downloads.",
+  "provider.bf16Key.label": "bf16.ai API key",
 
   "provider.openCodeKey.title": "Sign in to OpenCode Go",
   "provider.openCodeKey.description": "Free models need no account. A key unlocks the paid Go models.",

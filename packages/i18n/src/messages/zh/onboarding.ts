@@ -47,6 +47,7 @@ export const messages = {
   "onboarding.provider.inceptionKey": "使用 Inception API 密钥的 Mercury 模型",
   "onboarding.provider.deepseekKey": "使用 DeepSeek API 密钥的 DeepSeek 模型",
   "onboarding.provider.openrouterKey": "使用 OpenRouter API 密钥的众多模型",
+  "onboarding.provider.bf16Key": "使用 bf16.ai API 密钥的无审查开源权重模型",
   "onboarding.provider.tryFree": "免费试用",
   "onboarding.provider.noSignIn": "无需登录",
   "onboarding.provider.more": "更多服务商",

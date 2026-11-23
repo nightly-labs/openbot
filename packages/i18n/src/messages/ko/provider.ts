@@ -209,6 +209,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "OpenRouter 모델을 사용하려면 호스트에 OpenRouter API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.openrouterKey.label": "OpenRouter API 키",
+  "provider.bf16Key.title": "bf16.ai API 키",
+  "provider.bf16Key.description":
+    "bf16.ai 모델을 사용하려면 이 컴퓨터에 bf16.ai API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.bf16Key.descriptionHost":
+    "bf16.ai 모델을 사용하려면 호스트에 bf16.ai API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.bf16Key.label": "bf16.ai API 키",
 
   "provider.openCodeKey.title": "OpenCode Go에 로그인",
   "provider.openCodeKey.description": "무료 모델은 계정이 필요 없어요. 키가 있으면 유료 Go 모델을 사용할 수 있어요.",

@@ -208,6 +208,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "Salva una chiave API di OpenRouter sull'host per usare i modelli di OpenRouter. OpenBot li esegue nella CLI di Pi che scarica.",
   "provider.openrouterKey.label": "Chiave API di OpenRouter",
+  "provider.bf16Key.title": "Chiave API di bf16.ai",
+  "provider.bf16Key.description":
+    "Salva una chiave API di bf16.ai su questo computer per usare i modelli di bf16.ai. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.bf16Key.descriptionHost":
+    "Salva una chiave API di bf16.ai sull'host per usare i modelli di bf16.ai. OpenBot li esegue nella CLI di Pi che scarica.",
+  "provider.bf16Key.label": "Chiave API di bf16.ai",
 
   "provider.openCodeKey.title": "Accedi a OpenCode Go",
   "provider.openCodeKey.description":

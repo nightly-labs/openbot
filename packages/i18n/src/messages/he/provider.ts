@@ -212,6 +212,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "אפשר לשמור מפתח OpenRouter API במארח כדי להשתמש במודלים ש-OpenRouter מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
   "provider.openrouterKey.label": "מפתח OpenRouter API",
+  "provider.bf16Key.title": "מפתח bf16.ai API",
+  "provider.bf16Key.description":
+    "אפשר לשמור מפתח bf16.ai API במחשב הזה כדי להשתמש במודלים ש-bf16.ai מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.bf16Key.descriptionHost":
+    "אפשר לשמור מפתח bf16.ai API במארח כדי להשתמש במודלים ש-bf16.ai מספקת. OpenBot מריץ אותם ב-Pi CLI שהוא מוריד.",
+  "provider.bf16Key.label": "מפתח bf16.ai API",
   "provider.openCodeKey.title": "התחברות ל-OpenCode Go",
   "provider.openCodeKey.description": "מודלים חינמיים לא דורשים חשבון. מפתח פותח את מודלי Go בתשלום.",
   "provider.openCodeKey.unreadable": "המפתח השמור אינו קריא. יש להדביק אותו שוב, או להסיר אותו.",

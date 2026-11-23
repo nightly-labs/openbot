@@ -211,6 +211,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "Enregistrez une clé d’API OpenRouter sur l’hôte pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.openrouterKey.label": "Clé d’API OpenRouter",
+  "provider.bf16Key.title": "Clé d’API bf16.ai",
+  "provider.bf16Key.description":
+    "Enregistrez une clé d’API bf16.ai sur cet ordinateur pour utiliser les modèles de bf16.ai. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.bf16Key.descriptionHost":
+    "Enregistrez une clé d’API bf16.ai sur l’hôte pour utiliser les modèles de bf16.ai. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.bf16Key.label": "Clé d’API bf16.ai",
   "provider.openCodeKey.title": "Se connecter à OpenCode Go",
   "provider.openCodeKey.description":
     "Les modèles gratuits ne demandent pas de compte. Une clé donne accès aux modèles Go payants.",
