@@ -8,7 +8,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { ElevenLabsError, testElevenLabsKey } from "../model/elevenlabs";
+import { defaultElevenLabsVoice, ElevenLabsError, testElevenLabsKey } from "../model/elevenlabs";
 import { useElevenLabsVoices } from "../model/elevenlabs-voices";
 import { saveElevenLabsKey, saveVoiceSettings, useVoiceSettings } from "../model/voice-settings";
 
@@ -43,7 +43,7 @@ export function ElevenLabsKeyScreen() {
       await saveElevenLabsKey(trimmed);
       useElevenLabsVoices.setState({ phase: "ready", voices, failure: null, reason: null });
       const chosen = useVoiceSettings.getState().elevenLabsVoice;
-      const kept = chosen && voices.some((voice) => voice.id === chosen.id) ? chosen : (voices[0] ?? null);
+      const kept = chosen && voices.some((voice) => voice.id === chosen.id) ? chosen : defaultElevenLabsVoice(voices);
       await saveVoiceSettings(
         use === "recognition"
           ? { recognition: "elevenlabs", elevenLabsVoice: kept }
