@@ -825,11 +825,14 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return true;
   }
 
-  function sendWaits(target: ConversationTarget): boolean {
+  function targetShown(target: ConversationTarget): boolean {
     const activeTarget = deps.currentTarget();
+    return activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
+  }
+
+  function sendWaits(target: ConversationTarget): boolean {
     return (
-      activeTarget?.agentId === target.agentId &&
-      activeTarget.serverId === target.serverId &&
+      targetShown(target) &&
       !deps.props.channel &&
       !hostSteers() &&
       (Boolean(deps.props.activeTurnId) ||
@@ -845,10 +848,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     voice?: VoiceSend,
     steer = false,
   ): void {
-    const onScreen = () => {
-      const activeTarget = deps.currentTarget();
-      return activeTarget?.agentId === target.agentId && activeTarget.serverId === target.serverId;
-    };
+    const onScreen = () => targetShown(target);
     if (onScreen()) deps.followSentMessage();
     const queued = sendWaits(target);
     const send = deps.props.onSendMessage;
@@ -983,7 +983,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
   }
 
   function sendCardReplyNow(body: string, target = deps.currentTarget()): boolean {
-    if (!target || sendWaits(target)) return false;
+    if (!target || !targetShown(target) || sendWaits(target)) return false;
     return sendCardMessage(body, target);
   }
 
