@@ -14975,12 +14975,13 @@ try {
       ...v10,
       json: { sharing: true, tabs: [tab] },
     });
-    const listed = withClientTabs({ success: true, contentItems: [] }, clientBrowser, [adaId, bobId]);
+    const listed = withClientTabs({ success: true, contentItems: [] }, clientBrowser, [bobId]);
+    const groupListed = withClientTabs({ success: true, contentItems: [] }, clientBrowser, [adaId, bobId]);
     const listedText = listed.contentItems[0]?.type === "inputText" ? listed.contentItems[0].text : "";
     const chromeTabs = list(field(parseJson(listedText), "chromeTabs"));
     const chromeTabId = field(chromeTabs[0] ?? null, "id");
     check(
-      "a member shares tabs, and list_tabs of a turn that the member requested shows them as chrome: tabs",
+      "a member shares tabs; list_tabs of a turn that only the member requested shows them as chrome: tabs, and a turn of many people shows none",
       bobSocket.ready &&
         bobOld.ready &&
         adaSocket.ready &&
@@ -14988,6 +14989,7 @@ try {
         isDeepStrictEqual(clientBrowser.tabs(bobId), [tab]) &&
         clientBrowser.tabs(adaId) === null &&
         chromeTabs.length === 1 &&
+        groupListed.contentItems.length === 0 &&
         typeof chromeTabId === "string" &&
         /^chrome:[0-9a-f]{8}:41$/u.test(chromeTabId),
       [summary(shared), listedText],
@@ -15058,17 +15060,20 @@ try {
     const script = await runTool([bobId], "run_script", { tabId: chromeTabId, script: "await snapshot()" });
     const role = await runTool([bobId], "click", { tabId: chromeTabId, target: { kind: "role", role: "button" } });
     const notRequester = await runTool([adaId], "snapshot", { tabId: chromeTabId });
+    const groupTurn = await runTool([adaId, bobId], "snapshot", { tabId: chromeTabId });
     const httpOnly = await runTool([bobId], "open", { url: "file:///etc/hosts", browser: "chrome" });
     check(
-      "a tool that Chrome tabs do not take, a role target, a person who did not request the turn, or a file URL sends no command",
+      "a tool that Chrome tabs do not take, a role target, a person who did not request the turn, a turn of many people, or a file URL sends no command",
       !script.success &&
         text(script).startsWith("On a Chrome tab, use only") &&
         !role.success &&
         !notRequester.success &&
         text(notRequester).startsWith("No person who requested this turn") &&
+        !groupTurn.success &&
+        text(groupTurn).startsWith("No person who requested this turn") &&
         !httpOnly.success &&
         bobSocket.events.length === 3,
-      [script, role, notRequester, httpOnly],
+      [script, role, notRequester, groupTurn, httpOnly],
     );
 
     const waiting = runTool([bobId], "snapshot", { tabId: chromeTabId });
