@@ -2475,8 +2475,11 @@ export class ProviderRuntime implements ProviderPort {
             );
         }).pipe(
           Effect.mapError((error) => {
-            if (previousExecutable === undefined) delete this.#bundledExecutables[provider];
-            else this.#bundledExecutables[provider] = previousExecutable;
+            const installedIsOnlyCopy = installed && firstInstall;
+            if (!installedIsOnlyCopy) {
+              if (previousExecutable === undefined) delete this.#bundledExecutables[provider];
+              else this.#bundledExecutables[provider] = previousExecutable;
+            }
             const cause = error.cause;
             const failure = new Error(
               sourceText("error.provider.cliUpdateFailed", {
