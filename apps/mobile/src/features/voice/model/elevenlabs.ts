@@ -10,7 +10,7 @@ const SPEECH_MODELS: Record<ElevenLabsSpeechModelId, string> = {
   "elevenlabs-v4": "eleven_v4",
 };
 export const ELEVENLABS_SAMPLE_RATE = 24_000;
-const BUILT_IN_VOICE_ID = "Xb7hH8MSUJpSbSDYk0k2";
+const ALICE: ElevenLabsVoice = { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice" };
 
 type ElevenLabsPermission = "voices_read" | "text_to_speech" | "speech_to_text";
 
@@ -113,14 +113,8 @@ export async function scribeToken(key: string, signal: AbortSignal): Promise<str
   return body.token;
 }
 
-export async function testElevenLabsKey(key: string): Promise<ElevenLabsVoice[]> {
-  const voices = await listElevenLabsVoices(key);
-  await elevenLabsSpeech(key, BUILT_IN_VOICE_ID, "elevenlabs-flash-v2.5", ".", new AbortController().signal);
-  return voices;
-}
-
-export function defaultElevenLabsVoice(voices: readonly ElevenLabsVoice[]): ElevenLabsVoice | null {
-  return voices.find((voice) => voice.id === BUILT_IN_VOICE_ID) ?? voices[0] ?? null;
+export function aliceElevenLabsVoice(voices: readonly ElevenLabsVoice[]): ElevenLabsVoice {
+  return voices.find((voice) => voice.id === ALICE.id) ?? ALICE;
 }
 
 export function elevenLabsVoiceParts(name: string): { title: string; description: string | null } {

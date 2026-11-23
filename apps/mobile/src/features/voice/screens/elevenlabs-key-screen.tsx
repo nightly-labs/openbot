@@ -8,9 +8,9 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
-import { defaultElevenLabsVoice, ElevenLabsError, testElevenLabsKey } from "../model/elevenlabs";
+import { aliceElevenLabsVoice, ElevenLabsError, listElevenLabsVoices } from "../model/elevenlabs";
 import { useElevenLabsVoices } from "../model/elevenlabs-voices";
-import { saveElevenLabsKey, saveVoiceSettings, useVoiceSettings } from "../model/voice-settings";
+import { saveElevenLabsKey, saveVoiceSettings } from "../model/voice-settings";
 
 const KEY_MAX_LENGTH = 512;
 const KEYS_PAGE = "https://elevenlabs.io/app/developers/api-keys";
@@ -39,15 +39,14 @@ export function ElevenLabsKeyScreen() {
   const save = async () => {
     setState({ phase: "saving", error: null });
     try {
-      const voices = await testElevenLabsKey(trimmed);
+      const voices = await listElevenLabsVoices(trimmed);
       await saveElevenLabsKey(trimmed);
       useElevenLabsVoices.setState({ phase: "ready", voices, failure: null, reason: null });
-      const chosen = useVoiceSettings.getState().elevenLabsVoice;
-      const kept = chosen && voices.some((voice) => voice.id === chosen.id) ? chosen : defaultElevenLabsVoice(voices);
+      const alice = aliceElevenLabsVoice(voices);
       await saveVoiceSettings(
         use === "recognition"
-          ? { recognition: "elevenlabs", elevenLabsVoice: kept }
-          : { engine: "elevenlabs", elevenLabsVoice: kept },
+          ? { recognition: "elevenlabs", elevenLabsVoice: alice }
+          : { engine: "elevenlabs", elevenLabsVoice: alice },
       );
       void haptics.notification("success");
       setState({ phase: "idle", error: null });
