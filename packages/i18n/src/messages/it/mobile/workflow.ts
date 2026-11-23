@@ -130,6 +130,8 @@ export const messages = {
     "Aggiorna OpenBot su questo server per creare immagini e video nei flussi di lavoro.",
   "mobile.workflow.media.settings": "Impostazioni",
   "mobile.workflow.media.automatic": "Automatico",
+  "mobile.workflow.media.modelUnavailable": "Modello non disponibile",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · non disponibile",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · Crediti {source}",
   "mobile.workflow.media.price": "Prezzo per esecuzione",

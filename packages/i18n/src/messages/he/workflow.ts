@@ -152,6 +152,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "יש לתאר את התמונה",
   "workflow.image.models": "מודלים לתמונות",
   "workflow.image.chooseModel": "בחירת מודל",
+  "workflow.image.modelUnavailable": "המודל לא זמין",
   "workflow.media.subscription": "מינוי {name}",
   "workflow.media.apiKey": "מפתח API של {name}",
   "workflow.media.credits": "קרדיטים של {name}",

@@ -15,6 +15,7 @@ import {
   type WorkflowMediaOption,
   type WorkflowMediaPrice,
   type WorkflowMediaPriceRequest,
+  type WorkflowMediaUnavailableModel,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
   type WorkflowStepSettings,
@@ -105,6 +106,8 @@ export interface WorkflowCatalogs {
   slack?: readonly WorkflowSlackWorkspace[] | undefined;
   channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
+  imageModelsReady?: boolean | undefined;
+  unavailableModels?: readonly WorkflowMediaUnavailableModel[] | undefined;
   mediaPrice?: ((request: WorkflowMediaPriceRequest) => Promise<WorkflowMediaPrice>) | undefined;
   creditBalance?: number | null | undefined;
   mediaSize?: boolean | undefined;

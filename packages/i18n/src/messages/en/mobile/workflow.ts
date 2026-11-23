@@ -125,6 +125,8 @@ export const messages = defineMessages("mobile.workflow", {
   "mobile.workflow.media.unsupported": "Update OpenBot on this server to make pictures and videos in workflows.",
   "mobile.workflow.media.settings": "Settings",
   "mobile.workflow.media.automatic": "Automatic",
+  "mobile.workflow.media.modelUnavailable": "Model not available",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · not available",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · {source} credits",
   "mobile.workflow.media.price": "Price per run",

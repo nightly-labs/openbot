@@ -23,6 +23,10 @@ import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/w
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import {
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-credit-media-unavailable-v1";
+import {
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
@@ -100,6 +104,7 @@ import {
   decodeRemoteWorkflowMediaCredits,
   decodeRemoteWorkflowMediaPrice,
   decodeRemoteWorkflowMediaProviders,
+  decodeRemoteWorkflowMediaUnavailable,
   decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
@@ -313,13 +318,21 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
         return { ...services, ...credit };
       },
       mediaCatalog: async () => {
-        const [credit, services] = await Promise.all([
+        const [credit, services, unavailable] = await Promise.all([
           has(WORKFLOWS_CREDIT_MEDIA_CAPABILITY)
             ? post(WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog, decodeRemoteWorkflowMediaCatalog, {})
             : { models: [] },
           serviceCatalog(),
+          has(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY)
+            ? post(WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES.list, decodeRemoteWorkflowMediaUnavailable, {}).catch(
+                () => [],
+              )
+            : [],
         ]);
-        return { models: [...credit.models, ...services.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX) };
+        return {
+          models: [...credit.models, ...services.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
+          ...(unavailable.length > 0 ? { unavailable } : {}),
+        };
       },
       mediaPrice: async (input) =>
         has(WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY)
