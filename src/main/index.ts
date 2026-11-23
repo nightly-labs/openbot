@@ -51,9 +51,9 @@ import {
 } from "./application-services";
 import { type BackgroundTray, createBackgroundTray } from "./background-tray";
 import { removeClaudeCodeSessionEnvironment } from "./claude-session-environment";
+import { guardConsoleOutput } from "./console-output";
 import { type DeepLink, findDeepLink, parseDeepLink } from "./deep-link-router";
 import { requestNotificationPermission, showRetainedNotification } from "./desktop-notifications";
-import { guardDevelopmentOutput } from "./development-output";
 import {
   developmentUserDataName,
   developmentWorktreeColor,
@@ -194,6 +194,9 @@ import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance"
 import { placeWindowButtons } from "./window-buttons";
 import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
+guardConsoleOutput([process.stdout, process.stderr], () => {
+  if (!app.isPackaged) app.quit();
+});
 const logger = createOpenBotLogger("main");
 
 let crashTrace: TraceFile | null = null;
@@ -416,7 +419,6 @@ configureLinuxGpu({
   server: hostedServer !== null || serverMode !== null,
 });
 const appVariant = readAppVariant(process.env.OPENBOT_APP_VARIANT, app.isPackaged);
-if (!app.isPackaged) guardDevelopmentOutput([process.stdout, process.stderr], () => app.quit());
 const appIconPath = resolveAppIconPath({
   variant: appVariant,
   platform: process.platform,
