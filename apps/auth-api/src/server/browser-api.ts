@@ -28,6 +28,7 @@ import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./
 import { withSuggestedCountry } from "./billing-tax";
 import { companySignInApiOrigin, inviteLinkOrigin } from "./canonical-redirect";
 import { CompanySignInError, type CompanySignInService, WEB_RETURN_PATH } from "./company-sign-in";
+import { whenCreditsEnabled } from "./credits-switch";
 import { randomToken, sha256 } from "./crypto";
 import type { CustomServerOffers } from "./custom-server-offers";
 import { runApiResponse } from "./effect-runtime";
@@ -526,7 +527,7 @@ const handleCredits = Effect.fn("BrowserApi.handleCredits")(function* (
   user: AuthUser,
   services: BrowserApiServices,
 ) {
-  const billing = services.billing();
+  const billing = whenCreditsEnabled(services.billing());
   if (path === "v1/me/credits" && request.method === "GET")
     return json(billing ? yield* billing.credits.getState(user.id) : CREDITS_UNAVAILABLE_STATE);
   if (path === "v1/me/credits/activity" && request.method === "GET")

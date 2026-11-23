@@ -1,6 +1,7 @@
 import { parseCreditTransferRequest } from "@openbot/contracts/credits";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
+import { whenCreditsEnabled } from "../../../../server/credits-switch";
 import { runApiResponse } from "../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../server/json-body";
 import {
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/v1/me/credits/transfer")({
           Effect.gen(function* () {
             const user = yield* requestUser(request);
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-            const billing = requestBillingService();
+            const billing = whenCreditsEnabled(requestBillingService());
             if (!billing) return apiError(503, "billing_unavailable", "Billing is not available.");
             const input = parseCreditTransferRequest(yield* readJsonObject(request));
             if (!input) return apiError(400, "invalid_billing_request", "The billing request is invalid.");

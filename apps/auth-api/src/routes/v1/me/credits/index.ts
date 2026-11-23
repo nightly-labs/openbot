@@ -1,6 +1,7 @@
 import { CREDITS_UNAVAILABLE_STATE } from "@openbot/contracts/credits";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
+import { whenCreditsEnabled } from "../../../../server/credits-switch";
 import { runApiResponse } from "../../../../server/effect-runtime";
 import {
   apiError,
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/v1/me/credits/")({
           Effect.gen(function* () {
             const user = yield* requestUser(request);
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
-            const billing = requestBillingService();
+            const billing = whenCreditsEnabled(requestBillingService());
             return json(billing ? yield* billing.credits.getState(user.id) : CREDITS_UNAVAILABLE_STATE);
           }),
           billingErrorResponse,
