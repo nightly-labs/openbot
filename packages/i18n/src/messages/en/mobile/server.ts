@@ -1185,7 +1185,7 @@ export const messages = defineMessages("mobile.server", {
     "Only your “Message yourself” chat and the people you allow can write. Other people get no reply. When it is off, OpenBot replies to unknown people with a code.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Working on it…” message",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. Turn off to post only the answer.",
+    "OpenBot posts it while the agent works, then replaces it with the answer. A request that waits for an earlier request gets a waiting message too. On a personal number, only your “Message yourself” chat gets these messages. Turn off to post only the answer.",
   "mobile.server.connectors.whatsapp.statusReactions": "Status reactions",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",

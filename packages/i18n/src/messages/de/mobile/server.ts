@@ -982,7 +982,7 @@ export const messages = {
     "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Andere bekommen keine Antwort. Wenn es aus ist, antwortet OpenBot unbekannten Personen mit einem Code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Nachricht „Wird bearbeitet…“",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Schalte sie aus, um nur die Antwort zu senden.",
+    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Bei einer privaten Nummer bekommt nur dein Chat „Nachricht an dich selbst“ diese Meldungen. Schalte sie aus, um nur die Antwort zu senden.",
   "mobile.server.connectors.whatsapp.statusReactions": "Status-Reaktionen",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reagiert mit 👀, wenn eine Nachricht ankommt, und mit ✅, wenn die Antwort fertig ist. Schalte sie aus, um keine Reaktionen zu senden.",

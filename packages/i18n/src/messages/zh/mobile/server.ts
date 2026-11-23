@@ -853,7 +853,7 @@ export const messages = {
     "只有你的“给自己发消息”聊天和你允许的人可以发消息。其他人不会收到回复。关闭后，OpenBot 会给陌生人回复一个代码。",
   "mobile.server.connectors.whatsapp.workingMessage": "“正在处理…”消息",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。关闭后只发送回答。",
+    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。使用个人号码时，只有你的“给自己发消息”聊天会收到这些消息。关闭后只发送回答。",
   "mobile.server.connectors.whatsapp.statusReactions": "状态表情回应",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
