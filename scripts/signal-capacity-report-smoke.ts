@@ -1,16 +1,3 @@
-// Smoke test of the Signal capacity reporter (`remote/api/src/capacity-report.ts`).
-//   bun scripts/signal-capacity-report-smoke.ts
-// Starts the real Signal server, opens two WebSockets to it, and serves a fake coturn metrics page and a
-// local OpenPanel capture server. Runs the real reporter against them and checks its first event: the
-// counts, the server client headers, and that no token or secret is in the event or the log. Then sends
-// generic webhook requests that Signal refuses (404, 415, 401, 503) and checks the second event: the
-// answers of that interval only, by status. It also gives the reporter its own `/proc/net/route` and
-// `/proc/net/dev` files, adds traffic to the public interface after the first event, and checks that the
-// second event has that traffic, and nothing of the Docker bridge. Then removes the counters for one
-// sample, which sends no traffic and keeps the base, so that the next event has the traffic of both
-// intervals. Then runs the reporter without the
-// OpenPanel client and checks that it stops and sends nothing.
-// Writes .openbot-build/signal-capacity-report/report.json.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { generateKeyPairSync, randomBytes } from "node:crypto";
@@ -37,7 +24,6 @@ const TURN_PAGE = [
   'turn_total_allocations{type="TLS/TCP"} 616',
 ].join("\n");
 
-// The default route is on eth0. docker0 has more traffic, which the reporter must not count.
 const ROUTE_PAGE = [
   "Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT",
   "docker0\t000011AC\t00000000\t0001\t0\t0\t0\t0000FFFF\t0\t0\t0",
@@ -99,7 +85,6 @@ function collect(child: ChildProcess) {
 
 const exitOf = (child: ChildProcess) => new Promise<number | null>((done) => child.on("exit", done));
 
-/** Polls the real Signal metrics until `check` accepts the page. */
 async function waitForMetrics(url: string, signal: ChildProcess, check: (page: string) => boolean) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
@@ -126,7 +111,6 @@ interface Capture {
 }
 const captures: Capture[] = [];
 const captureWaiters: { count: number; done: (capture: Capture) => void }[] = [];
-/** The `count`th event that the capture server received, from 1. */
 const captured = (count: number) =>
   new Promise<Capture>((done) => {
     const capture = captures[count - 1];
@@ -140,7 +124,6 @@ const captureServer = createServer(async (request, response) => {
   for (const waiter of captureWaiters.filter((item) => item.count === captures.length)) waiter.done(capture);
 });
 
-/** One generic webhook request to Signal. No host holds any route, so Signal answers every one. */
 async function webhookRequest(routeId: string, headers: Record<string, string>) {
   const response = await fetch(`http://127.0.0.1:${signalPort}/v1/webhooks/${routeId}`, {
     method: "POST",
@@ -163,7 +146,6 @@ const { publicKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
 const publicJwk = { ...(await exportJWK(publicKey)), kid: "capacity-smoke", alg: "ES256", use: "sig" };
 const signal = spawn("bun", [resolve(root, "remote/api/src/index.ts")], {
   cwd: resolve(root, "remote/api"),
-  // Only what Signal needs, so no developer or production secret reaches it.
   env: {
     PATH: process.env.PATH ?? "",
     HOME: process.env.HOME ?? "",
@@ -173,7 +155,6 @@ const signal = spawn("bun", [resolve(root, "remote/api/src/index.ts")], {
     REMOTE_HEALTH_PORT: String(healthPort),
     REMOTE_TLS_DISABLED: "true",
     REMOTE_TICKET_PUBLIC_KEYS: JSON.stringify({ keys: [publicJwk] }),
-    // The sockets never send `hello`, so Signal never calls the control plane.
     REMOTE_CONTROL_PLANE_URL: `http://127.0.0.1:${controlPlanePort}`,
     REMOTE_SESSION_SECRET: randomBytes(32).toString("base64url"),
     REMOTE_AUTH_WEBHOOK_SECRET: randomBytes(32).toString("base64url"),
@@ -219,13 +200,11 @@ try {
     throw new Error(`The reporter exited with ${code} before it sent its events: ${reporterOutput.text}`);
   });
   const capture = await Promise.race([captured(1), reporterFailed]);
-  // The first sample set the network base. The second sample comes after the interval.
   writeFileSync(
     networkDevicePath,
     devicePage(NETWORK_BASE.received + NETWORK_ADDED.received, NETWORK_BASE.sent + NETWORK_ADDED.sent),
   );
   const networkEvent = JSON.parse((await Promise.race([captured(2), reporterFailed])).text);
-  // The next sample cannot read the counters. The sample after it can, with more traffic.
   rmSync(networkDevicePath);
   const unreadEvent = JSON.parse((await Promise.race([captured(3), reporterFailed])).text);
   writeFileSync(
@@ -237,7 +216,6 @@ try {
   );
   const restoredEvent = JSON.parse((await Promise.race([captured(4), reporterFailed])).text);
 
-  // The first sample set the base. These requests come after the second event, in a later interval.
   const json = { "content-type": "application/json" };
   const signed = {
     ...json,
@@ -246,7 +224,6 @@ try {
     "x-openbot-signature": `sha256=${"0".repeat(64)}`,
   };
   const webhookStatuses = [
-    // One character over the route ID limit, so Signal, not the router, answers 404.
     await webhookRequest("a".repeat(129), json),
     await webhookRequest("smoke-route", { "content-type": "text/plain" }),
     await webhookRequest("smoke-route", json),
@@ -254,8 +231,6 @@ try {
     await webhookRequest("smoke-route", signed),
   ];
   assert.deepEqual(webhookStatuses, [404, 415, 401, 503, 503]);
-  // A sample can start while the requests run, so the event that counts all of them can be a later one.
-  // The reporter sends string and number properties only (`capacity-report.ts`).
   let webhookEvent: { payload: { properties: Record<string, string | number> } } | null = null;
   for (let count = 5; count <= 7 && !webhookEvent; count += 1) {
     const next = JSON.parse((await Promise.race([captured(count), reporterFailed])).text);
@@ -286,7 +261,6 @@ try {
       webhook_answers_415: 1,
       webhook_answers_429: 0,
       webhook_answers_503: 2,
-      // No host holds the route, so Signal passes no request on and waits for none.
       webhook_waits: 0,
       webhook_slow_waits: 0,
     },
@@ -321,7 +295,6 @@ try {
     "The log has no secret.",
   );
 
-  // Without the OpenPanel server client the reporter stops at once and reads and sends nothing.
   const turnRequestsBefore = turnRequests;
   const off = spawn("bun", [reporterPath], { cwd: root, env: reporterEnvironment, stdio: ["ignore", "pipe", "pipe"] });
   const offOutput = collect(off);

@@ -1,7 +1,3 @@
-// CRM payloads from a joined server, for the desktop app, the web client and the mobile app.
-// `crm-v1` carries activity kinds as open names, and the IPC guard already accepts any well-formed
-// kind, so a newer host can add one without a mapping here.
-
 import {
   isCrmActivityPage,
   isCrmApplyResult,

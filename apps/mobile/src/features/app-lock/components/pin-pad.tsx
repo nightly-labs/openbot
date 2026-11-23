@@ -60,7 +60,6 @@ function PadKey({
   );
 }
 
-/** A number pad. `leading` takes the empty place left of zero, such as a Face ID key. */
 export function PinPad({
   disabled,
   canDelete,

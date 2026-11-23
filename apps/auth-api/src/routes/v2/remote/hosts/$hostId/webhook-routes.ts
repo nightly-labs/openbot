@@ -10,8 +10,6 @@ import {
   requestRemoteControlPlane,
 } from "../../../../../server/request-auth";
 
-// Webhook routine creation and deletion on the host change only account routing metadata. The HMAC secret and
-// event data remain on the host.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/webhook-routes")({
   server: {
     handlers: {

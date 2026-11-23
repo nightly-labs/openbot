@@ -1,4 +1,3 @@
-// Frozen wire shape for the optional agent-analytics capability. Do not import current IPC types here.
 import { isDynamicRecord, isString } from "../runtime-values";
 import type { TeamProtocolV1JsonObject } from "./v1";
 

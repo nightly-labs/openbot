@@ -1,13 +1,3 @@
-// `bun run bench:tool-result-size`: measures what OpenBot's tools give the model, without a provider,
-// and writes `.openbot-build/tool-result-size/report.json`.
-//
-// - Browser: drives `BrowserHost.handleDynamicTool` in an owned hidden Electron process on loopback
-//   pages. It measures the screenshot pixel size against the CSS viewport, the image bytes and the
-//   estimated image tokens, the text size of large evaluate, run_script and snapshot results, and a
-//   click at a point read from the screenshot.
-// - GitHub MCP proxy: puts `GitHubMcpProxy` in front of a loopback MCP server whose tool returns a
-//   large text, and measures the text that an MCP client gets through the proxy.
-
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -32,7 +22,6 @@ const reportPath = join(projectRoot, ".openbot-build/tool-result-size/report.jso
 const runId = randomUUID();
 const measurementSchema = z.union([z.number(), z.boolean(), z.string()]);
 type Measurement = z.infer<typeof measurementSchema>;
-/** About 25k tokens of issue-list text: the size of a long GitHub list. */
 const UPSTREAM_TEXT = Array.from(
   { length: 1_000 },
   (_, index) => `#${index} Issue title number ${index}: lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
@@ -40,7 +29,6 @@ const UPSTREAM_TEXT = Array.from(
 
 try {
   await mkdir(dirname(reportPath), { recursive: true });
-  // The QuickJS sandbox loads its WebAssembly file next to its own module, so the entry sits in the project.
   const entry = join(dirname(reportPath), "tool-result-size.mjs");
   await run(process.execPath, [
     "build",
@@ -78,14 +66,12 @@ try {
   const failed = expectations(measurements);
   const full = { ...report, status: failed.length ? "failed" : "passed", failed, measurements };
   await writeFile(reportPath, `${JSON.stringify(full, null, 2)}\n`);
-  // Machine-readable summary.
   process.stdout.write(`${JSON.stringify({ status: full.status, report: reportPath, failed, ...measurements })}\n`);
   if (failed.length) process.exitCode = 1;
 } finally {
   await rm(buildRoot, { recursive: true, force: true });
 }
 
-/** The names of the measurements that do not meet the change's promise. */
 function expectations(measurements: Record<string, Measurement>): string[] {
   const under = (name: string, limit: number) => typeof measurements[name] === "number" && measurements[name] <= limit;
   const hits = (name: string) => typeof measurements[name] === "string" && measurements[name].endsWith(", hit");
@@ -95,13 +81,11 @@ function expectations(measurements: Record<string, Measurement>): string[] {
     emulatedLargerThanView: hits("emulatedLargerThanView"),
     emulatedScale3: hits("emulatedScale3"),
     emulatedMobilePreset: hits("emulatedMobilePreset"),
-    // The cap, plus the note.
     evaluateResultChars: under("evaluateResultChars", 16_500),
     evaluateOver64KbSaysHow: measurements.evaluateOver64KbSaysHow === true,
     runScriptResultChars: under("runScriptResultChars", 16_500),
     runScriptQuotedResultChars: under("runScriptQuotedResultChars", 16_500),
     runScriptStringNoteCountsString: measurements.runScriptStringNoteCountsString === true,
-    // The notes lead the agent through the whole value, with no part read twice or skipped.
     partCuts: typeof measurements.partCuts === "number" && measurements.partCuts > 0,
     partNotesCountTheSlice: measurements.partNotesCountTheSlice === true,
     partsJoinToValue: measurements.partsJoinToValue === true,
@@ -119,7 +103,6 @@ async function measureGitHubProxy(): Promise<Record<string, number>> {
       tools: [{ name: "list_issues", description: "Lists issues.", inputSchema: { type: "object" } }],
     }));
     mcp.setRequestHandler(CallToolRequestSchema, () => ({ content: [{ type: "text", text: UPSTREAM_TEXT }] }));
-    // No `sessionIdGenerator`: each POST is one stateless request, as in the proxy.
     const transport = new StreamableHTTPServerTransport({});
     response.once("close", () => {
       void transport.close();
@@ -209,10 +192,6 @@ async function output(command: string, args: string[]): Promise<string> {
   });
 }
 
-/**
- * The SDK transport classes declare their handlers and `sessionId` as `T | undefined`, which
- * `exactOptionalPropertyTypes` does not accept as a `Transport`. This one forwards to such a class.
- */
 function asTransport(inner: {
   start(): Promise<void>;
   send: Transport["send"];

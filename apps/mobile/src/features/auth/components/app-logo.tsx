@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { Pressable, View } from "react-native";
 import Animated from "react-native-reanimated";
 import Svg, { Polyline, Rect } from "react-native-svg";
@@ -37,6 +38,27 @@ export function AppLogo({ animation = "none", interactive = false, size = VIEWBO
     top: 0,
     width: size,
   };
+  const eye = (centerX: number, points: string, animatedStyle: ComponentProps<typeof Animated.View>["style"]) => (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        eyeLayerStyle,
+        { transformOrigin: [(centerX * size) / VIEWBOX_SIZE, (EYE_CENTER_Y * size) / VIEWBOX_SIZE, 0] },
+        animatedStyle,
+      ]}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}>
+        <Polyline
+          points={points}
+          fill="none"
+          stroke={eyeColor}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={9.5}
+        />
+      </Svg>
+    </Animated.View>
+  );
 
   const logo = (
     <View
@@ -48,45 +70,9 @@ export function AppLogo({ animation = "none", interactive = false, size = VIEWBO
         <Rect width={VIEWBOX_SIZE} height={VIEWBOX_SIZE} rx={50} ry={50} fill={backgroundColor} />
       </Svg>
 
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          eyeLayerStyle,
-          { transformOrigin: [(LEFT_EYE_CENTER_X * size) / VIEWBOX_SIZE, (EYE_CENTER_Y * size) / VIEWBOX_SIZE, 0] },
-          leftEyeAnimatedStyle,
-        ]}
-      >
-        <Svg width={size} height={size} viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}>
-          <Polyline
-            points={LEFT_EYE_POINTS}
-            fill="none"
-            stroke={eyeColor}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={9.5}
-          />
-        </Svg>
-      </Animated.View>
+      {eye(LEFT_EYE_CENTER_X, LEFT_EYE_POINTS, leftEyeAnimatedStyle)}
 
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          eyeLayerStyle,
-          { transformOrigin: [(RIGHT_EYE_CENTER_X * size) / VIEWBOX_SIZE, (EYE_CENTER_Y * size) / VIEWBOX_SIZE, 0] },
-          rightEyeAnimatedStyle,
-        ]}
-      >
-        <Svg width={size} height={size} viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`}>
-          <Polyline
-            points={RIGHT_EYE_POINTS}
-            fill="none"
-            stroke={eyeColor}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={9.5}
-          />
-        </Svg>
-      </Animated.View>
+      {eye(RIGHT_EYE_CENTER_X, RIGHT_EYE_POINTS, rightEyeAnimatedStyle)}
     </View>
   );
 

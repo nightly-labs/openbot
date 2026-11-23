@@ -1,14 +1,3 @@
-// Adds a second Cursor account from an API key end to end, on the real Cursor driver, `ProviderRuntime`,
-// account store and credential store, with a fake `cursor-agent` (`provider-fakes/agents/cursor-key-accounts.ts`)
-// and a local `node:http` fake of Cursor's key exchange (`CURSOR_API_ENDPOINT`). Checks that a refused
-// key and an unreachable Cursor each fail with plain text and leave no account, key or process; that an
-// accepted key gives a connected account whose processes get the key, the memory credential store and
-// an empty `CURSOR_AUTH_TOKEN`; that the processes of the own sign-in get none of these; that the
-// account lists its own models; that a browser sign-in for a Cursor account is refused; that a refused
-// new key keeps the last key; that the key is encrypted in the credential file and survives a restart;
-// that a key that Cursor refuses later shows the account as signed out; and that Remove deletes the
-// account and its key; and that an account key does not replace a credential file that cannot be read.
-// `bun run test:cursor-key-accounts`. Writes .openbot-build/cursor-key-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -43,14 +32,10 @@ const root = await mkdtemp(join(tmpdir(), "openbot-cursor-key-accounts-"));
 const log = join(root, "starts.jsonl");
 const executable = join(root, "cursor", "cursor-agent");
 const credentialPath = join(root, "profile", "provider-credentials.json");
-// A key or a token in the shell would reach every process. This run sets no token: a real Cursor CLI
-// saves `CURSOR_AUTH_TOKEN` as the sign-in of the computer user.
 delete process.env.CURSOR_API_KEY;
 delete process.env.CURSOR_AUTH_TOKEN;
-// Only the fake runs: without this, a Cursor CLI installed on this computer wins over the bundled one.
 process.env.OPENBOT_CURSOR_PATH = executable;
 
-/** Cursor's key exchange: the keys in `accepted` get tokens, each other key gets 401. */
 const accepted = new Set([GOOD_KEY, SECOND_GOOD_KEY]);
 let serverError = false;
 const exchanges: string[] = [];
@@ -71,7 +56,6 @@ const address = cursor.address();
 assert.ok(address && typeof address === "object", "the fake of Cursor did not get a port");
 process.env.CURSOR_API_ENDPOINT = `http://127.0.0.1:${address.port}`;
 
-/** A cipher that is not the identity, so the file shows whether the key is stored as written. */
 const cipher = {
   encrypt: (value: string) => Buffer.from([...Buffer.from(value, "utf8")].map((byte) => byte ^ 0x5a)),
   decrypt: (value: Buffer) => Buffer.from([...value].map((byte) => byte ^ 0x5a)).toString("utf8"),
@@ -129,7 +113,6 @@ async function stop(runtime: ProviderRuntime): Promise<void> {
   for (const client of await runCauseEffect(runtime.dispose())) await runCauseEffect(client.stop());
 }
 
-/** The text of a failed operation, as the client shows it. */
 async function failureOf(effect: Effect.Effect<unknown, { readonly cause: unknown }>): Promise<string | null> {
   const exit = await Effect.runPromiseExit(effect);
   if (Exit.isSuccess(exit)) return null;
@@ -138,7 +121,6 @@ async function failureOf(effect: Effect.Effect<unknown, { readonly cause: unknow
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-/** Waits until the account row has `state`: an account check runs in the background after a start. */
 async function rowState(runtime: ProviderRuntime, accountId: string, state: string): Promise<ProviderAccountStatus> {
   const deadline = Date.now() + 15_000;
   for (;;) {
@@ -191,7 +173,6 @@ try {
     "the own sign-in is the first account",
   );
 
-  // 1. A refused key: plain text, and no account, key or process.
   let seen = (await starts()).length;
   const refused = await failureOf(runtime.connectProviderAccountKey("cursor", null, BAD_KEY));
   report.refusedKey = {
@@ -204,7 +185,6 @@ try {
   assert.equal((await acpStarts(seen)).length, 0, "a refused key starts no Cursor process");
   assert.equal(rows(runtime)?.length, 1);
 
-  // 2. Cursor does not answer: plain text, and no account.
   serverError = true;
   const unreachable = await failureOf(runtime.connectProviderAccountKey("cursor", null, GOOD_KEY));
   serverError = false;
@@ -213,7 +193,6 @@ try {
   assert.equal(store.list("cursor").length, 0);
   assert.equal(credentials.accountKey("cursor", "a0000000000000000"), null);
 
-  // 3. An accepted key: a connected account, on a process that has the key and the memory store.
   seen = (await starts()).length;
   await runCauseEffect(runtime.connectProviderAccountKey("cursor", null, GOOD_KEY));
   const [account] = store.list("cursor");
@@ -235,7 +214,6 @@ try {
   );
   assert.equal(credentials.accountKey("cursor", account.id), GOOD_KEY);
 
-  // The key is encrypted in the file, and no key is in the account list.
   const credentialFile = await readFile(credentialPath, "utf8");
   const accountFile = await readFile(join(root, "profile", "accounts.json"), "utf8");
   report.storage = {
@@ -251,7 +229,6 @@ try {
     entry: [`cursor:${account.id}`],
   });
 
-  // The processes of the own sign-in never get a key or the memory store.
   const ownStarts = (await acpStarts()).filter((entry) => !accountStarts.includes(entry) && entry.key !== "good");
   report.ownSignIn = ownStarts;
   assert.ok(ownStarts.length > 0);
@@ -261,7 +238,6 @@ try {
     assert.equal(entry.authToken, "absent", "the own sign-in keeps the environment of the user");
   }
 
-  // 4. A browser sign-in is not a way to add or reconnect a Cursor account.
   const needsKey = sourceText("error.provider.accountNeedsKey", { provider: "Cursor" });
   const opened: string[] = [];
   const open = async (url: string) => void opened.push(url);
@@ -274,7 +250,6 @@ try {
   assert.deepEqual(report.browserSignIn, { add: needsKey, reconnect: needsKey, onHost: needsKey, opened: [] });
   assert.equal(store.list("cursor").length, 1);
 
-  // 5. A refused new key keeps the last key, and the account stays connected.
   const replaceRefused = await failureOf(runtime.connectProviderAccountKey("cursor", account.id, BAD_KEY));
   const kept = await rowState(runtime, account.id, "connected");
   report.replaceRefused = {
@@ -285,13 +260,11 @@ try {
   assert.equal(replaceRefused, sourceText("error.provider.accountKeyRefused", { provider: "Cursor" }));
   assert.equal(credentials.accountKey("cursor", account.id), GOOD_KEY);
 
-  // 6. A key for an account that does not exist is refused.
   const duplicate = await failureOf(runtime.connectProviderAccountKey("cursor", "a00000000000000ff", GOOD_KEY));
   assert.equal(duplicate, sourceText("error.provider.accountNotFound", { provider: "Cursor" }));
   await stop(runtime);
   runtime = undefined;
 
-  // 7. After a restart, the key is read from the file and the account connects again.
   const restartedStore = new ProviderAccountStore(
     join(root, "profile", "accounts.json"),
     join(root, "profile", "accounts"),
@@ -305,7 +278,6 @@ try {
   await stop(runtime);
   runtime = undefined;
 
-  // 8. Cursor refuses the key later: the account shows as signed out, with what to do.
   accepted.delete(GOOD_KEY);
   runtime = createRuntime(restartedStore, restartedCredentials);
   await runCauseEffect(runtime.ensureProvider("cursor"));
@@ -313,7 +285,6 @@ try {
   report.revoked = { state: signedOut.state, message: signedOut.message };
   assert.equal(signedOut.message, sourceText("error.provider.accountKeySignedOut", { provider: "Cursor" }));
 
-  // A new key connects it again, on the same account.
   seen = (await starts()).length;
   await installFakeAgent(executable, "cursor-key-accounts", { FAKE_LOG: log, FAKE_GOOD_KEY: SECOND_GOOD_KEY });
   await runCauseEffect(runtime.connectProviderAccountKey("cursor", account.id, SECOND_GOOD_KEY));
@@ -321,7 +292,6 @@ try {
   assert.equal(restartedCredentials.accountKey("cursor", account.id), SECOND_GOOD_KEY);
   assert.ok((await acpStarts(seen)).every((entry) => entry.key === "good" && entry.store === "memory"));
 
-  // 9. Remove deletes the account and its key.
   await runCauseEffect(runtime.removeProviderAccount("cursor", account.id));
   report.removed = {
     accounts: restartedStore.list("cursor").length,
@@ -330,8 +300,6 @@ try {
   };
   assert.deepEqual(report.removed, { accounts: 0, key: null, rows: ["default"] });
 
-  // 10. A credential file that cannot be read holds the keys of other providers. An account key does
-  // not replace it: the save fails, and the file stays as it was.
   const lockedPath = join(root, "profile", "locked-credentials.json");
   const lockedFile = `${JSON.stringify({ version: 1, credentials: { opencode: "bm90LWZvci10aGlzLWNpcGhlcg==" } })}\n`;
   await writeFile(lockedPath, lockedFile);
@@ -350,8 +318,6 @@ try {
     fileKept: true,
   });
 
-  // 11. A Cursor CLI before 2026.10.01 can save the tokens of a key as the own sign-in, so it offers
-  // no account after the first.
   await stop(runtime);
   await installFakeAgent(executable, "cursor-key-accounts", {
     FAKE_LOG: log,
@@ -372,7 +338,6 @@ try {
     keyProcesses: 0,
   });
 
-  // No request held a key that was not one of this run, and no error reached the user unasked.
   report.exchanges = exchanges;
   report.errors = errors;
   assert.deepEqual(errors, []);

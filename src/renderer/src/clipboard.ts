@@ -1,21 +1,12 @@
 import { currentText } from "@openbot/ui/text";
 
-/**
- * Writes text to the clipboard. When the async clipboard is missing or refuses the write, such as
- * when the document has no focus, a hidden text area and the copy command are used. Throws when
- * both fail.
- */
 export async function writeClipboardText(text: string): Promise<void> {
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
       return;
     }
-  } catch {
-    // The copy command below is the fallback.
-  }
-  // Inside the open dialog, if there is one: a modal traps the focus, and a text area outside it would
-  // make the trap pull the focus back, which moves the focus ring.
+  } catch {}
   const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const host = previous?.closest<HTMLElement>("[role='dialog']") ?? document.body;
   const input = document.createElement("textarea");

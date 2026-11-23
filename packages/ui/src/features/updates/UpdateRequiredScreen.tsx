@@ -11,25 +11,13 @@ import { presentUpdateStatus } from "./update-status";
 const PRODUCT_NAME = "OpenBot";
 
 export interface UpdateRequiredScreenProps {
-  /** A status with `requiredVersion`: this version is below the lowest supported one. */
   status: UpdateStatus;
   logoVariant: AppLogoVariant;
-  /** The next step of the updater for the phase: check, download, retry, or restart into the update. */
   onUpdate: () => Promise<void>;
-  /** Opens the download page, for an install that cannot update itself or whose update failed. */
   onOpenDownloadPage: () => void;
-  /**
-   * Closes the screen until the next start. Shown for an install that cannot update itself, such as
-   * a Linux package or Nix, and after an update failed, such as on a read-only disk: in both cases
-   * the user cannot install the update from here.
-   */
   onDismiss?: () => void;
 }
 
-/**
- * Shown in place of the app while this version is below the supported minimum. The update installs
- * when the agents are idle; the button skips the wait. It uses the sign-in screen layout.
- */
 export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
   const { t, format, errorMessage } = useText();
   const presentation = () => presentUpdateStatus(props.status, { t, format });
@@ -41,7 +29,6 @@ export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
       ? t("update.idleRestart.updateTitle")
       : `${t("update.idleRestart.updateTitle")}. ${t("update.idleRestart.waitingFor", { reasons: format.list(reasons) })}`;
   };
-  // The updater works by itself in these phases, so a bar takes the place of a disabled button.
   const working = () => presentation().busy && props.status.phase !== "ready";
   const progress = () => (props.status.phase === "downloading" ? props.status.progress : null);
   const [actionError, setActionError] = createSignal<string | null>(null);

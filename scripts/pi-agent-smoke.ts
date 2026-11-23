@@ -1,16 +1,3 @@
-// Runs one real Pi agent session through the real `inception` driver (`PiAgentClient`) on Mercury 3,
-// with the prompt settings of `src/backend/pi-mcp.ts`. It uses a temporary git workspace and an
-// isolated Pi agent folder (`PI_CODING_AGENT_DIR`), so the user's `~/.pi/agent` is not read or changed.
-// The session must use Pi's core tools (read, write, edit, bash), make a commit, and reach a tool that
-// Pi does not declare (`suggest_marketplace_app`) through OpenBot's `tool_search` and `tool_call`.
-// The script answers the OpenBot tool calls as the host does: `tool_search` with the real catalog,
-// `tool_call` with the real resolver, and a fixed result for the resolved tool.
-// A measuring extension checks each request: no Pi `<docs>` section, an `<mcp_servers>` section that
-// names the user's MCP server (a stdio server that never answers, so its tools stay deferred), `ask_ui`
-// declared, and `request_api_key` and `suggest_marketplace_app` not declared.
-// `INCEPTION_API_KEY=… bun run smoke:pi-agent`; `--model=<id>` replaces Mercury 3; `--budget=<tokens>`
-// stops before a turn when the tokens used so far reach it (default 120,000). One run used about
-// 69,000 Mercury tokens. Writes .openbot-build/pi-agent-smoke/report.json.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -32,7 +19,6 @@ import { stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/pi-agent-smoke");
 const SEARCH_ONLY = ["request_api_key", "suggest_marketplace_app"];
-// A guard for a turn that never ends, such as a stalled stream. Each turn of a run took under 2 minutes.
 const TURN_DEADLINE_MS = 10 * 60_000;
 
 const argument = (name: string) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(`--${name}=`.length);
@@ -45,9 +31,7 @@ delete process.env.INCEPTION_API_KEY;
 interface Turn {
   step: string;
   prompt: string;
-  /** Pi tools that must complete in this turn. */
   tools: string[];
-  /** OpenBot tools that the host must answer in this turn; `tool_call` is named by its resolved tool. */
   hostTools: string[];
 }
 
@@ -71,7 +55,6 @@ const TURNS: Turn[] = [
   },
 ];
 
-/** Records each request and each assistant message's usage, one JSON line each. */
 const MEASURE_EXTENSION = `import { appendFileSync } from "node:fs";
 export default function (pi) {
   const file = process.env.OPENBOT_SMOKE_MEASURE_FILE;
@@ -112,7 +95,6 @@ git(workspace, "commit", "-q", "-m", "Start");
 const measure = join(root, "measure.mjs");
 await writeFile(measure, MEASURE_EXTENSION);
 const cli = await runCauseEffect(resolvePiCli({ bundledExecutable: process.env.PI_CLI }));
-// The wrapper adds the measuring extension to the driver's RPC run only.
 const wrapper = join(root, "pi");
 await writeFile(
   wrapper,
@@ -121,7 +103,6 @@ await writeFile(
 await chmod(wrapper, 0o755);
 const smokeCli = await runCauseEffect(resolvePiCli({ bundledExecutable: wrapper }));
 process.env.PI_CODING_AGENT_DIR = agent;
-// Pi reads the file name once when it starts, so one file holds the session; each turn reads its new lines.
 const MEASURE_FILE = join(root, "measure.jsonl");
 process.env.OPENBOT_SMOKE_MEASURE_FILE = MEASURE_FILE;
 

@@ -1,8 +1,3 @@
-// Checks that a Codex `warning` with text that the user cannot read, such as a Windows path, shows
-// no "The agent could not continue. Try again." banner while the turn continues, and that a warning
-// with readable text still shows. Codex warnings have no turnId and do not end the turn. Runs the
-// real agent service on a temporary profile with a fake Codex app-server.
-// `bun scripts/codex-warning-banner-e2e.ts`. Writes .openbot-build/codex-warning-banner-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -21,13 +16,11 @@ const home = join(root, "home");
 const logPath = join(root, "protocol.jsonl");
 const controlPath = join(root, "control.json");
 const fakeCodex = join(root, "codex");
-// A Windows path makes the text technical: the renderer showed "could not continue" in its place.
 const TECHNICAL =
   "Failed to save the conversation transcript; Codex will continue to retry. Error: The process cannot access the file 'C:\\Users\\user\\.codex\\sessions\\2026\\11\\11\\rollout.jsonl' because it is being used by another process. (os error 32)";
 const READABLE =
   "Model metadata for `gpt-5.5` not found. Defaulting to fallback metadata; this can degrade performance.";
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -41,10 +34,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/**
- * A Codex app-server with the methods that the service calls. Each turn sends the warning that
- * `control.json` names after `turn/started`, as Codex does, and then completes.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -138,6 +127,7 @@ const report: { cases: CaseReport[]; passed: boolean; error?: string } = { cases
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -156,7 +146,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** The `turn/start` requests that OpenBot sent on a thread. */
 function turnStarts(threadId: string): number {
   return readFileSync(logPath, "utf8")
     .split("\n")
@@ -171,7 +160,6 @@ function turnStarts(threadId: string): number {
     ).length;
 }
 
-/** Waits for a state of the service or of the fake Codex. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -233,7 +221,6 @@ try {
       turnStarts: turnStarts(threadId),
       finalStatus: delivery.status,
       finalError: mailbox.getDelivery(delivery.id)?.delivery.error ?? null,
-      // A warning reaches the banner or a toast as `agent_warning`. Other events are not this check.
       errorEvents: errorEvents
         .slice(firstErrorEvent)
         .filter((event) => event.code === "agent_warning")

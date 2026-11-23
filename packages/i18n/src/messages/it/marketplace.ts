@@ -668,6 +668,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Installa {name} sul computer che esegue questi agenti: la sua app richiede un accesso dal browser.",
   "marketplace.error.appInvalid": "Impossibile aggiungere {name}: {reason}",
+  "marketplace.error.appNotConnected": "Impossibile connettere {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Seleziona un server locale per disinstallare un plugin.",
   "marketplace.error.uninstallPartial": "Non è stato possibile rimuovere alcune parti di {name}. {failures}",
   "marketplace.error.actionFailed": "Impossibile completare l'azione del Marketplace. Riprova.",

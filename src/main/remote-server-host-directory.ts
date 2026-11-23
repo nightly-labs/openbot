@@ -1,29 +1,3 @@
-// How the host list held by the account service reconciles with the servers stored on this
-// computer. The account service is the authority on *which* hosts exist for this user; the stored
-// entry is the authority on *which key* we already pinned for one. Merging them is the whole job
-// of this file, and it is a pure function so the merge can be read without a socket or a disk.
-//
-// Two rules are load-bearing and neither is obvious from the call site:
-//
-//   - **A pinned key survives a changed advertisement.** If a stored host already carries a
-//     `publicKey`, that key wins over whatever the directory advertises now. Otherwise the
-//     advertised key is accepted only when it agrees with the stored fingerprint, or when there is
-//     no stored fingerprint to disagree with. This is what makes an account-service compromise
-//     insufficient to silently re-key a host the user already trusts. The one exception is a
-//     signed handover chain from the pinned key to the advertised one (`followedHostKeyHandovers`):
-//     the account service relays it but has no key that can sign it. It holds for an entry the
-//     store could not decode as well -- those are absent from `servers`, so `preservedIdentities`
-//     carries their key and fingerprint here. Reading an entry and honouring its pin are separate
-//     questions, and the second one has to answer yes either way.
-//   - **The directory owns the list.** A stored WebRTC host missing from the directory is dropped,
-//     and so is every non-WebRTC server unless `keepOtherTransports` is set. That flag is on only
-//     in development builds, which is why a released build treats the account directory as the
-//     complete answer rather than a set of additions. The one exception is a local server of this
-//     computer (`local-servers/`): the account service never knows it.
-//
-// Order is preserved deliberately: surviving stored servers keep their positions, and hosts the
-// user has not seen before are appended in directory order. The user drags this list.
-
 import { verify } from "node:crypto";
 import { REMOTE_ACCOUNT_CHECK_INTERVAL_MS } from "@openbot/team-client";
 import {
@@ -38,7 +12,6 @@ import type { StoredRemoteServer } from "./remote-server-stored-shape";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 import { fingerprint } from "./team-store";
 
-/** Cross-device joins have no local transport event. Only poll while the user can see the app. */
 export function watchRemoteHostDirectory(options: {
   isActive(): boolean;
   refresh(): Effect.Effect<void, RemoteWorkflowError>;
@@ -50,23 +23,13 @@ export function watchRemoteHostDirectory(options: {
   return () => clearInterval(timer);
 }
 
-/** How often a server list is read again while an install command can still be used. */
 const SERVER_CLAIM_REFRESH_INTERVAL_MS = 5_000;
-/** A command works for 15 minutes. A clock that is behind the account service does not make the watch longer. */
 const SERVER_CLAIM_MAX_WATCH_MS = 15 * 60_000;
 
-/**
- * A server that signs in with an install command reaches this computer's list through Signal only
- * when this computer holds a Signal socket. Otherwise it waits for the next account check, and the
- * install card and dialog stay at waiting (#8545). While a command can still be used, this reads
- * the list again at short intervals, until a new server for each command shows or the last command
- * expires.
- */
-export function watchServerClaims(options: {
-  /** The ids of the remote servers in the list now. */
-  serverIds(): readonly string[];
-  refresh(): void;
-}): { add(expiresAt: number): void; stop(): void } {
+export function watchServerClaims(options: { serverIds(): readonly string[]; refresh(): void }): {
+  add(expiresAt: number): void;
+  stop(): void;
+} {
   let timer: ReturnType<typeof setInterval> | undefined;
   let known = new Set<string>();
   let claims = 0;
@@ -101,58 +64,31 @@ interface HostKeyPin {
 }
 
 export interface WebRtcHostReconciliation {
-  /** The complete replacement server list, in the order the user should see it. */
   readonly servers: StoredRemoteServer[];
-  /** Stored WebRTC hosts the directory no longer lists. The caller disconnects and forgets these. */
   readonly removedHostIds: readonly string[];
-  /**
-   * Stored non-WebRTC hosts this reconciliation stops keeping: replaced by a directory listing for
-   * the same id, or dropped because a released build lets the directory own the list. The caller
-   * forgets their connection state, and does not disconnect -- they were never on the WebRTC
-   * transport, and where the id survives the only thing a disconnect could name is the entry that
-   * just replaced them.
-   */
   readonly staleTransportHostIds: readonly string[];
-  /** Keys the caller should pin on the transport, in directory order. */
   readonly pinnedKeys: readonly HostKeyPin[];
 }
 
 export interface WebRtcHostReconciliationInput {
-  /** What the account service says this user's hosts are. */
   readonly hosts: readonly RemoteHostSummary[];
-  /** What is on disk today. */
   readonly servers: readonly StoredRemoteServerView[];
-  /** Identity from entries on disk that the store could not decode. They pin like any other. */
   readonly preservedIdentities: readonly PreservedHostIdentity[];
-  /** This computer's own host id, when it is also hosting. Never listed as a remote server. */
   readonly localHostId: string | null;
-  /** Hosts the user removed by hand. They stay out until an explicit rejoin unhides them. */
   readonly isHiddenHost: (hostId: string) => boolean;
-  /** The account email recorded on every host entry. */
   readonly username: string;
-  /** Development only: keep HTTPS servers that the account directory does not know about. */
   readonly keepOtherTransports: boolean;
-  /**
-   * The servers on this computer, and deleted ones that the account can still list. The account
-   * directory lists one while the desktop app has it registered, but this app keeps its loopback entry.
-   */
   readonly isThisComputer?: (serverId: string) => boolean;
   readonly isConnected: (hostId: string) => boolean;
-  /** Hosts whose advertised key a verified handover chain leads to, from `followedHostKeyHandovers`. */
   readonly followedHandovers?: ReadonlySet<string>;
 }
 
-/** The handover signature check of main, with `node:crypto` rather than the team client's verifier. */
 export const verifyHostKeySignature: HostKeySignatureCheck = (signature, message, publicKeyPem) =>
   Effect.try({
     try: () => verify(null, message, publicKeyPem, Buffer.from(signature, "base64url")),
     catch: () => false,
   }).pipe(Effect.orElseSucceed(() => false));
 
-/**
- * The listed hosts whose advertised key differs from the pinned one, and a handover chain signed by
- * each key in turn leads from the pinned key to the advertised one. Only these may replace a pin.
- */
 export const followedHostKeyHandovers = Effect.fn("RemoteHostDirectory.followedHostKeyHandovers")(function* (
   input: Pick<WebRtcHostReconciliationInput, "hosts" | "servers" | "preservedIdentities">,
 ) {
@@ -177,11 +113,6 @@ export const followedHostKeyHandovers = Effect.fn("RemoteHostDirectory.followedH
   return followed;
 });
 
-/**
- * When each host last changed its key: the handover to the key that this computer uses for it, with
- * both signatures checked. A host without such a handover has no entry. `trustedKey` gives the key
- * that this computer uses, or null for a host it does not use.
- */
 export const hostKeyChangeTimes = Effect.fn("RemoteHostDirectory.hostKeyChangeTimes")(function* (
   hosts: readonly RemoteHostSummary[],
   trustedKey: (host: RemoteHostSummary) => string | null | undefined,
@@ -231,6 +162,8 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
         ...(host.restartAvailable === undefined ? {} : { restartAvailable: host.restartAvailable }),
         ...(host.storageGb === undefined ? {} : { storageGb: host.storageGb }),
+        ...(host.paymentRequired ? { paymentRequired: true } : {}),
+        ...(host.customPlan ? { customPlan: host.customPlan } : {}),
         transport: "webrtc-v2",
       };
     });
@@ -240,15 +173,8 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
   const staleTransportHostIds: string[] = [];
   const servers = input.servers.flatMap((server) => {
     if (server.transport !== "webrtc-v2") {
-      // Development only, and only for a host the directory does not list. A listed one is this
-      // same host reached over WebRTC -- keeping the stored entry as well as appending the listing
-      // below would put one id in the list twice, and every lookup by id then answers whichever
-      // copy it reached first.
       if ((input.keepOtherTransports || input.isThisComputer?.(server.id)) && !listedById.has(server.id))
         return [{ ...server }];
-      // The entry goes, so whatever it opened has to go with it, and nothing else here says so:
-      // `removedHostIds` reports WebRTC ids, and a replaced id is still in `servers`, so a caller
-      // diffing the two lists sees this host as kept.
       staleTransportHostIds.push(server.id);
       return [];
     }
@@ -258,9 +184,6 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
     if (input.isConnected(server.id) && server.publicKey === refreshed.publicKey) {
       refreshed.remoteDesktopAvailable = server.remoteDesktopAvailable;
     }
-    // A connected host sends its look at connect and after each change, so that look is current.
-    // The account copy can be older: a local server child does not copy it, and a copy can fail.
-    // An account server from before `host-appearance-v1` lists none.
     if (server.appearance !== undefined && (refreshed.appearance === undefined || input.isConnected(server.id)))
       refreshed.appearance = server.appearance;
     return [refreshed];
@@ -281,11 +204,6 @@ export function reconcileWebRtcHosts(input: WebRtcHostReconciliationInput): WebR
   };
 }
 
-/**
- * What this computer already believes about a host, from a stored entry or from one it could not
- * read. A preserved entry is trusted for identity alone: it is on disk, so the user put it there,
- * and no field the reader rejected is consulted here.
- */
 function pinnedIdentity(
   input: Pick<WebRtcHostReconciliationInput, "servers" | "preservedIdentities">,
   hostId: string,
@@ -304,10 +222,6 @@ interface PinnedIdentity {
   readonly fingerprint: string;
 }
 
-/**
- * A key we already pinned is never replaced by an advertised one. An unpinned host accepts the
- * advertisement only when nothing on disk contradicts it.
- */
 function resolveHostKey(existing: PinnedIdentity | undefined, advertised: string | null): string | null {
   if (existing?.publicKey) return existing.publicKey;
   const pinned = pinnedFingerprint(existing);

@@ -2,8 +2,8 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/auth";
 
 export const messages = {
-  // Errors from the OpenBot account service.
   "error.auth.serviceUnavailable": "OpenBot 无法连接账号服务。请确认 API 正在运行后重试。",
+  "error.auth.sessionTimeout": "OpenBot 未及时响应。请检查网络连接，然后重试。",
   "error.auth.networkBlocked":
     "该网络中的防火墙或代理阻止了 OpenBot 访问 {host}。请让网络管理员放行 {host}，然后重试。",
   "error.auth.signInFirst": "请先登录 OpenBot。",

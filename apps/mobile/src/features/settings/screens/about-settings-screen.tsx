@@ -18,9 +18,7 @@ const PRODUCT_NAME = "OpenBot";
 export function AboutSettingsScreen() {
   const { t } = useText();
   const version = Constants.expoConfig?.version ?? t("mobile.settings.about.development");
-  // The build number of the installed app. EAS sets it at build time, so app.json does not have it.
   const build = nativeBuildVersion();
-  // An over-the-air update keeps the version and the build, so its short ID shows after them.
   const update = Updates.isEmbeddedLaunch ? null : Updates.updateId?.slice(0, 8);
   const versionLabel = [build ? `${version} (${build})` : version, ...(update ? [update] : [])].join(" · ");
   const [error, setError] = useState<string | null>(null);

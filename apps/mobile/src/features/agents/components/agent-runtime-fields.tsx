@@ -48,15 +48,6 @@ const EFFORT_LABELS = {
   ultra: "mobile.agent.runtime.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, MobileTextKey>;
 
-/**
- * A menu picker is as wide as the label it shows, and the row puts that label beside its title on
- * one line. A model name has no length the host promises to respect -- OpenCode states the vendor,
- * the model and the price tier in one string -- so an untruncated name pushed "Model" until it
- * wrapped mid-word. The cap is on the selected label only, which the row shows. The menu shows the
- * other names in full, so the user can tell them apart. The id that gets saved is untouched.
- * Android keeps the full name: its picker cuts the row label to one line, and its menu wraps long
- * names, so a cap only removes the part of a name that tells two models apart.
- */
 const MAX_PICKER_LABEL = 28;
 function shortLabel(text: string): string {
   const characters = Array.from(text);
@@ -66,28 +57,21 @@ function pickerLabel(text: string, selected: boolean): string {
   return Platform.OS === "android" || !selected ? text : shortLabel(text);
 }
 
-/**
- * The accounts of the host's providers, and the agents on an account after the first. Null for a
- * member, for a host without `provider-accounts-v1`, and until the host answers.
- */
 export function useProviderAccounts(agent: MobileAgent, enabled: boolean) {
   const workspace = useMobileWorkspaceActions();
   const queryScope = useQueryScope();
   const canManage = useMobileWorkspaceSelector((current) => current.canManageProviderAccounts(agent.serverId));
-  // Under "agent-info", so the host's agent events refresh it with the other agent records.
   const queryKey = queryKeys.agentProviderAccounts(queryScope, agent.serverId, agent.id);
   const accounts = useQuery({
     queryKey,
     queryFn: () => workspace.loadProviderAccounts(agent.serverId),
     enabled: enabled && canManage,
     retry: false,
-    // Another device can change the accounts at any time, so a reopened page reads the host again.
     staleTime: 0,
   });
   return { queryKey, accounts: canManage ? (accounts.data ?? null) : null };
 }
 
-/** The name of an account, as on desktop: the user's name for it, its email, "API key", or its place in the list. */
 export function useProviderAccountName() {
   const { t } = useText();
   return (account: ProviderAccountStatus, index: number) =>
@@ -117,29 +101,20 @@ export function AgentRuntimeFields({
   workspaceOnly = false,
 }: {
   serverId: string;
-  /** The model list page in the stack of this form. */
   modelPickerRoute: Href;
   available: boolean;
   saving: boolean;
   provider?: AgentProviderId;
-  /** The provider when this build does not know it. The choice shows it and stays disabled. */
   foreignProvider?: ForeignProviderId | undefined;
   model?: string;
   reasoningEffort?: AgentReasoningEffort;
-  /**
-   * A new agent: the provider list starts with the host's default, which sends no pair, so the host
-   * keeps its saved provider choice. The model rows show after the user picks a provider.
-   */
   hostDefault?: boolean;
   title?: string;
-  /** The accounts of the provider. The choice shows only when there are two or more. */
   accounts?: readonly ProviderAccountStatus[];
   accountId?: string;
   onChange: (value: Pick<UpdateAgentInput, "provider" | "model" | "reasoningEffort">) => void;
   onAccountChange?: (accountId: string) => void;
-  /** An existing agent. Its Speed choice shows when the chosen model has a fast tier. */
   fastMode?: AgentHostFieldsProps;
-  /** The agent has Workspace only access: a provider that the host refuses for it gets a note. */
   workspaceOnly?: boolean;
 }) {
   const { t } = useText();
@@ -159,7 +134,6 @@ export function AgentRuntimeFields({
   const enabled = available && !saving && options.length > 0;
   const showsModel = foreignProvider === undefined && (!hostDefault || provider !== undefined);
   const spentLimit = useSpentLimitText(serverId, showsModel ? provider : undefined, accountId, model);
-  // The host refuses to save such a provider for a Workspace only agent, so the form says why first.
   const workspaceOnlyNote =
     workspaceOnly && options.some((option) => option.workspaceOnlyUnavailable)
       ? t("mobile.agent.runtime.workspaceOnlyUnavailable")
@@ -213,7 +187,6 @@ export function AgentRuntimeFields({
                   onChange({ provider: undefined, model: undefined, reasoningEffort: undefined });
                   return;
                 }
-                // A model that an admin turned off (`kept`) is not a start for a provider change (#12582).
                 const next = models.data?.find((option) => option.provider === value && option.listing !== "kept");
                 if (next)
                   onChange({ provider: next.provider, model: next.id, reasoningEffort: next.defaultReasoningEffort });
@@ -248,7 +221,6 @@ export function AgentRuntimeFields({
           </SettingsRow>
         ) : null}
         {showsModel ? (
-          // A page, not a menu: a menu does not filter, and OpenRouter lists hundreds of models.
           <SettingsRow
             disabled={!enabled}
             value={shortLabel(selected?.name ?? model ?? t("mobile.agent.runtime.unavailable"))}
@@ -308,15 +280,8 @@ export function AgentRuntimeFields({
   );
 }
 
-/** The longest delay that `setTimeout` keeps. A longer one runs at once. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
-/**
- * The spent plan window that stops the chosen model, as the desktop model picker and composer show it:
- * the window and its reset time. It uses the reading of the Usage screen and asks the host for nothing
- * new. A window that ended gives the quota back, and its reading stays as it was until the next
- * reading, so the clock moves at the reset.
- */
 function useSpentLimitText(
   serverId: string,
   provider: AgentProviderId | undefined,
@@ -329,7 +294,6 @@ function useSpentLimitText(
   const spent = provider
     ? spentUsageWindow(usage?.limits, provider, accountId || DEFAULT_PROVIDER_ACCOUNT_ID, model, now)
     : null;
-  // An account on credits keeps working, so its model is not stopped.
   const spentWindow = spent?.covers && !spent.onCredits ? spent.window : null;
   const resetsAt = spentWindow?.resetsAt ?? null;
   useEffect(() => {

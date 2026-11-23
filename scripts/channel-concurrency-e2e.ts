@@ -1,14 +1,3 @@
-// Runs channel work end to end in this worktree's running dev app, with real provider turns. Start
-// the app with `bun run dev` (never `--shared`), then run
-// `bun scripts/channel-concurrency-e2e.ts --allow-mutations`. It needs four visible agents whose
-// provider is signed in and runs turns at the same time.
-//
-// It checks that the host advertises the channel capabilities, that a channel that was archived
-// stays archived and that restore opens it, that two agents work in two channels at the same time,
-// and that channel work runs in its own lane: the agent's own chat starts beside its channel turn
-// with no hold, another agent's chat runs, and the agent's task runs beside its channel turn. It
-// makes its own two channels and deletes them at the end.
-// Writes .openbot-build/channel-concurrency-e2e/report.json.
 import assert from "node:assert/strict";
 import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
 import type { AgentTask, ChannelPage, ChannelTask } from "@openbot/contracts/ipc";
@@ -28,6 +17,7 @@ interface Report {
   archivedAtStart?: string[];
   restore?: { archived: boolean; restored: boolean };
   parallel?: { first: { owner: string | null; state: string }; second: { owner: string | null; state: string } };
+  sameAgentInTwoChannels?: { agentId: string; first: string; third: string };
   ownChatBesideChannelTurn?: { busy: boolean; hold: unknown; channelTaskState: string };
   otherAgentRan?: { agentId: string; busy: boolean };
   taskBesideChannelTurn?: { state: string; channelTaskState: string };
@@ -44,14 +34,12 @@ const runningTask = (channel: ChannelPage, ownerAgentId: string): ChannelTask | 
   channel.tasks.find((task) => task.ownerAgentId === ownerAgentId && task.state === "running");
 
 try {
-  // 1. The host advertises channels again.
   report.capabilities = (await hostCapabilities(session.instance)).filter((capability) =>
     capability.startsWith("channel-"),
   );
   for (const capability of ["channel-chats-v1", "channel-delete-v1", "channel-attention-v1"])
     assert.ok(report.capabilities.includes(capability), `The host does not advertise ${capability}.`);
 
-  // 2. Archived channels stay archived; restore opens one again.
   report.archivedAtStart = (await client.list()).filter((channel) => channel.archived).map((channel) => channel.name);
   const agents = (await client.agents()).filter((agent) => agentProviderDescriptor(agent.provider).concurrentTurns);
   assert.ok(agents.length >= 4, "This check needs four visible agents whose provider runs turns at the same time.");
@@ -65,7 +53,6 @@ try {
   report.restore = { archived, restored };
   assert.ok(archived && restored);
 
-  // 3. Two agents work in two channels at the same time.
   const first = await client.create("E2E first", [a.id, b.id], a.id);
   const second = await client.create("E2E second", [c.id, d.id], c.id);
   await client.send(first.id, LONG_PROMPT, a.id);
@@ -84,7 +71,25 @@ try {
     second: { owner: secondTask.ownerAgentId, state: secondTask.state },
   };
 
-  // 4. The agent's own chat starts beside its channel turn, and names no hold (#4761).
+  const third = await client.create("E2E third", [a.id, d.id], a.id);
+  await client.send(third.id, LONG_PROMPT, a.id);
+  const [firstDuringThird, thirdPage] = await waitFor(
+    page,
+    "the same agent runs a task in a second channel",
+    () => Promise.all([client.read(first.id), client.read(third.id)]),
+    ([one, two]) => runningTask(two, a.id) !== undefined || runningTask(one, a.id) === undefined,
+  );
+  report.sameAgentInTwoChannels = {
+    agentId: a.id,
+    first: firstDuringThird.tasks.find((item) => item.id === firstTask.id)?.state ?? "missing",
+    third: runningTask(thirdPage, a.id)?.state ?? "not running",
+  };
+  assert.ok(
+    runningTask(firstDuringThird, a.id),
+    "The first channel turn ended before the second channel started; use a longer prompt.",
+  );
+  assert.ok(runningTask(thirdPage, a.id), "The agent did not start its task in the second channel.");
+
   await client.sendToAgent(a.id, SHORT_PROMPT);
   const [ownChat, duringOwnChat] = await waitFor(
     page,
@@ -103,7 +108,6 @@ try {
     "The channel turn ended before the own chat started; use a longer prompt.",
   );
 
-  // 5. Another agent's chat is not held by that channel work.
   const idle = agents.find((agent) => agent.id === b.id);
   assert.ok(idle);
   await client.sendToAgent(idle.id, SHORT_PROMPT);
@@ -117,7 +121,6 @@ try {
   assert.equal(other[0].hold ?? null, null, "Another agent's chat names a hold.");
   assert.ok(runningTask(other[1], a.id), "The channel turn ended before the check; use a longer prompt.");
 
-  // 6. The agent's task runs beside its channel turn.
   const task: AgentTask = await page.evaluate(
     (input) => window.openbot.agent.startTask({ ...input, clientMessageId: crypto.randomUUID() }),
     { agentId: a.id, text: SHORT_PROMPT },

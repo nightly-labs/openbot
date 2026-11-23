@@ -7,10 +7,8 @@ import { createSignal, createStore, onCleanup, reconcile } from "solid-js";
 import type { CrmHost } from "./crm-port";
 
 const LAYOUT_KEY = "openbot:crm-layout:";
-/** Agents can change many customers in a row. The page reads the CRM once after they stop. */
 const CHANGE_DELAY_MS = 200;
 
-/** The layout that this viewer keeps for the CRM of one server. Storage can be blocked, so each access has a guard. */
 function readLayout(serverId: string): CrmLayout {
   try {
     const saved = window.localStorage.getItem(LAYOUT_KEY + serverId);
@@ -23,12 +21,9 @@ function readLayout(serverId: string): CrmLayout {
 function writeLayout(serverId: string, layout: CrmLayout): void {
   try {
     window.localStorage.setItem(LAYOUT_KEY + serverId, JSON.stringify(layout));
-  } catch {
-    // The layout then stays only while the page is open.
-  }
+  } catch {}
 }
 
-/** Every page of a list. It stops when the host gives no next cursor, or the same cursor again. */
 async function allPages<Page, Item, Cursor>(
   read: (after: Cursor | undefined) => Promise<Page>,
   items: (page: Page) => readonly Item[],
@@ -47,11 +42,6 @@ async function allPages<Page, Item, Cursor>(
 
 const EMPTY: CrmData = { overview: null, customers: [], open: [], paid: [], paidLoaded: false };
 
-/**
- * The data and the actions of the CRM page of one server. It reads every customer and every open
- * payment, the paid payments when the page asks for them, and the activity of the customer in the
- * drawer. It reads again after each change and when the host says that the CRM changed.
- */
 export function createCrmController(host: CrmHost, serverId: string): Omit<CrmViewProps, "agents"> {
   const { t, errorMessage } = useText();
   const [data, setData] = createStore<{ value: CrmData }>({ value: EMPTY });
@@ -85,7 +75,6 @@ export function createCrmController(host: CrmHost, serverId: string): Omit<CrmVi
         wantPaid ? payments({ state: "paid" }) : Promise.resolve(null),
       ]);
       if (disposed || run !== loadRun) return;
-      // Reconciled by id, so each row that did not change keeps its object and its open menus.
       setData(reconcile({ value: { overview, customers, open, paid: paid ?? [], paidLoaded: paid !== null } }, "id"));
     } catch (error) {
       if (!disposed && run === loadRun) toast.error(errorMessage(error, t("crm.page.loadFailed")));
@@ -110,7 +99,6 @@ export function createCrmController(host: CrmHost, serverId: string): Omit<CrmVi
     }
   }
 
-  /** Reads the CRM again, and the drawer when it is open. The drawer keeps its data while it loads. */
   function reload(): void {
     void load();
     const customerId = selected();
@@ -128,7 +116,6 @@ export function createCrmController(host: CrmHost, serverId: string): Omit<CrmVi
   });
   void load();
 
-  /** A source action. The host checks the key, so its error text says what to fix. */
   async function sourceAction(action: () => Promise<CrmApplyResult>): Promise<boolean> {
     try {
       return (await action()).ok;

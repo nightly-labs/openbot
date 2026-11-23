@@ -14,7 +14,6 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-/** Pipes chunks through one process stream into the log, as the runtimes do, and reads the file. */
 async function logOf(chunks: Array<string | Buffer>): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "openbot-remote-diagnostics-"));
   roots.push(root);

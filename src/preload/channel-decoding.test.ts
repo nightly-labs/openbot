@@ -24,8 +24,6 @@ const save = (instructions: string) => ({
   draft: { name: "Renamed", title: "", instructions, members: [{ agentId: "agent-1" }], leadAgentId: "agent-1" },
 });
 
-// #5929: a database can hold channel instructions over the 2,000-character limit. A read that
-// refused them made the channel, and every save of it, fail with "Invalid channel response".
 describe("stored channel instructions over the limit", () => {
   const long = "y".repeat(INPUT_LIMITS.agentDescription + 66);
 
@@ -45,8 +43,6 @@ describe("stored channel instructions over the limit", () => {
   });
 });
 
-// #9141: a database can hold a channel whose lead is not a member. Startup reads every channel, so
-// refusing that row stopped every provider from starting.
 describe("stored channel lead that is not a member", () => {
   const members = [{ agentId: "agent-1" }, { agentId: "agent-3" }];
 

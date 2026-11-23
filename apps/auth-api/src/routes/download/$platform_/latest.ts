@@ -7,10 +7,6 @@ import {
   latestDownloadResponse,
 } from "../../../server/latest-download";
 
-// The installer itself. `/download/<platform>` is the page that describes it, and every download
-// button on the site links here. `?arch=x64` is the Intel Mac installer and `?arch=arm64` the Linux
-// arm64 AppImage. `android` is the APK for a phone with no Google Play; the iPhone app has only its
-// store page.
 export const Route = createFileRoute("/download/$platform_/latest")({
   server: {
     handlers: {

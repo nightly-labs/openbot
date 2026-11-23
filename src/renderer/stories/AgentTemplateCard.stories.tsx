@@ -4,10 +4,6 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { renderAgentTemplateCard } from "../src/features/agent-templates/agent-template-card";
 import { storyAgentTemplatePreview } from "../src/preview/agent-template-fixtures";
 
-/**
- * The PNG a publish uploads as the link preview of `openbot.run/agents/<id>`. The story draws it with
- * the same function the publish dialog uses and shows the result at its real size.
- */
 function CardPreview(props: { preview: () => Promise<AgentTemplatePreview> }) {
   const [url, setUrl] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
@@ -37,7 +33,6 @@ function CardPreview(props: { preview: () => Promise<AgentTemplatePreview> }) {
   );
 }
 
-/** A stand-in for a photo the owner uploaded: a PNG drawn on a canvas, so the story needs no asset. */
 async function samplePhoto(): Promise<AvatarImageInput> {
   const canvas = document.createElement("canvas");
   canvas.width = 256;

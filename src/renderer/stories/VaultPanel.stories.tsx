@@ -5,7 +5,6 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { MANY_AGENTS } from "./marketplace-story-support";
 
-/** The ids of the first agents of the server, for the items that only some agents can use. */
 const chosen = (count: number) => MANY_AGENTS.slice(0, count).map((agent) => agent.id);
 
 const ITEMS: VaultItemSummary[] = [
@@ -86,7 +85,6 @@ const ITEMS: VaultItemSummary[] = [
   { id: "key-stripe", kind: "apiKey", name: "STRIPE_SECRET_KEY", notes: "", hasKey: true, agents: chosen(1) },
 ];
 
-/** Demo keys. In the app, main makes the codes and the keys never come to the window. */
 const DEMO_KEYS: Readonly<Record<string, string>> = {
   "login-github": "JBSWY3DPEHPK3PXP",
   "login-linear": "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ",
@@ -131,28 +129,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Logins, cards, contact info and API keys, with the filter tabs, search, and the agents of each item. */
 export const Ready: Story = {};
 
-/** A server that does not keep the agents of an item: each item is for every agent, with no choice. */
 export const WithoutAgentChoice: Story = { args: { state: { status: "ready", items: ITEMS } } };
 
-/** Nothing is saved yet. */
 export const Empty: Story = { args: { state: { status: "ready", items: [] } } };
 
-/** Linux without a keyring: nothing can be saved. */
 export const Unavailable: Story = { args: { state: { status: "unavailable", items: [] } } };
 
-/** The file is there but cannot be decrypted. The user can reset it. */
 export const Unreadable: Story = { args: { state: { status: "unreadable", items: [] } } };
 
-/** A joined server, for its owner or admin: the New item menu has no CSV import. */
 export const JoinedServer: Story = { args: { onImportCsv: undefined } };
 
-/** A joined server without `vault-v3`: it cannot keep two-step keys, so logins show no code. */
 export const JoinedServerWithoutTwoStep: Story = { args: { onImportCsv: undefined, onCodes: undefined } };
 
-/** A joined server without `vault-v2`: it cannot keep API keys, so the kind and its tab are not offered. */
 export const OlderJoinedServer: Story = {
   args: {
     onImportCsv: undefined,

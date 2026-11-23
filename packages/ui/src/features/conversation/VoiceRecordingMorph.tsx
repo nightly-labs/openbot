@@ -8,25 +8,17 @@ import { prefersReducedMotion } from "../../utils";
 
 export type VoicePhase = "idle" | "preparing" | "requesting" | "recording" | "transcribing";
 
-/** The bar counts down the time left in this many last seconds of a recording. */
 export const VOICE_LIMIT_COUNTDOWN_SECONDS = 15;
-/** This many seconds before the limit, the countdown turns orange and a warning plays. */
 export const VOICE_LIMIT_WARNING_SECONDS = 10;
 
-/** The catalog key of the voice button's accessible name. */
-export function voiceButtonLabel(phase: VoicePhase): AppTextKey {
+export function voiceButtonLabel(phase: VoicePhase, modelProgress: number | null): AppTextKey {
   if (phase === "recording") return "composer.voice.stop";
-  if (phase === "preparing") return "composer.voice.preparing";
+  if (phase === "preparing") return modelProgress === null ? "composer.voice.starting" : "composer.voice.preparing";
   if (phase === "requesting") return "composer.voice.requesting";
   if (phase === "transcribing") return "composer.voice.transcribing";
   return "composer.voice.start";
 }
 
-/**
- * Enter sends a recording only when the focus is on the page itself. The microphone control goes
- * away when the recording starts, so the focus falls to the page; a field or a control that has the
- * focus keeps its own Enter, and the message box sends the recording itself.
- */
 function enterSendsRecording(event: KeyboardEvent): boolean {
   if (event.key !== "Enter" || event.defaultPrevented || event.isComposing || event.repeat) return false;
   if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return false;
@@ -39,7 +31,6 @@ function formatVoiceDuration(totalSeconds: number): string {
   return `${minutes}:${seconds}`;
 }
 
-/** The time left before the recording limit, and when the bar counts it down and warns. */
 function voiceLimit(elapsedSeconds: () => number) {
   const remainingSeconds = () => Math.max(0, VOICE_AUDIO_LIMITS.maximumSeconds - elapsedSeconds());
   return {
@@ -49,7 +40,6 @@ function voiceLimit(elapsedSeconds: () => number) {
   };
 }
 
-/** The time left in the last seconds of a recording, and the warning that screen readers announce. */
 function VoiceLimitNotice(props: { limit: ReturnType<typeof voiceLimit> }): JSX.Element {
   const { t } = useText();
   return (
@@ -59,7 +49,6 @@ function VoiceLimitNotice(props: { limit: ReturnType<typeof voiceLimit> }): JSX.
           {formatVoiceDuration(props.limit.remainingSeconds())}
         </span>
       </Show>
-      {/* Present from the start, so screen readers announce the text when it appears. */}
       <span class="sr-only" role="status">
         {props.limit.warning() ? t("composer.voice.limitSoon", { seconds: VOICE_LIMIT_WARNING_SECONDS }) : ""}
       </span>
@@ -67,26 +56,14 @@ function VoiceLimitNotice(props: { limit: ReturnType<typeof voiceLimit> }): JSX.
   );
 }
 
-/**
- * The microphone and send controls, which melt into a recording bar while you speak: the
- * microphone stretches into a waveform with Cancel, and Finish buds off the send button.
- *
- * The shapes under the controls go through one SVG "goo" filter (blur, then a hard alpha
- * threshold), so two shapes that come close join with a liquid neck instead of overlapping.
- * The controls themselves are drawn on top without the filter, so their icons stay sharp.
- */
 export function VoiceRecordingMorph(props: {
   recording: boolean;
-  /** Microphone loudness, 0 to 1, oldest first. */
   levels: readonly number[];
   elapsedSeconds: number;
   onCancel: () => void;
   onFinish: () => void;
-  /** Sends what was said, as the send control does. Enter does this while the focus is on the page. */
   onSend: () => void;
-  /** The microphone control, shown when not recording. */
   children: JSX.Element;
-  /** The send control. Finish buds off it. */
   send: JSX.Element;
 }): JSX.Element {
   const { t } = useText();
@@ -96,8 +73,6 @@ export function VoiceRecordingMorph(props: {
     () => props.recording,
     (recording) => {
       if (!recording) return;
-      // Enter on the page has no default action, so the key stays free for each mounted bar: the main
-      // chat shows a side thread's recording too, and only the bar that owns the recording sends it.
       const sendOnEnter = (event: KeyboardEvent) => {
         if (enterSendsRecording(event)) props.onSend();
       };
@@ -162,30 +137,22 @@ export function VoiceRecordingMorph(props: {
   );
 }
 
-/**
- * The dictation controls of a message box: the speech model progress while it is prepared, then the
- * microphone and the send control in one recording morph. The main chat and side threads share them.
- */
 export function ComposerVoiceControls(props: {
   phase: VoicePhase;
   levels: readonly number[];
   elapsedSeconds: number;
-  /** The download progress of the speech model, in percent, while it is prepared. */
   modelProgress: number | null;
-  /** The microphone cannot start a recording now. It is always disabled outside the idle phase. */
   blocked: boolean;
   onStart: () => void;
   onCancel: () => void;
   onFinish: () => void;
-  /** Sends what was said, as the send control does. */
   onSend: () => void;
-  /** The send control. Finish buds off it. */
   send: JSX.Element;
 }): JSX.Element {
   const { t } = useText();
   return (
     <>
-      <Show when={props.phase === "preparing"}>
+      <Show when={props.phase === "preparing" && props.modelProgress !== null}>
         <span class="voice-model-progress" role="status">
           {t("composer.voice.progress", { progress: props.modelProgress ?? 0 })}
         </span>
@@ -203,7 +170,7 @@ export function ComposerVoiceControls(props: {
           variant="ghost"
           type="button"
           class="dictation-button"
-          aria-label={t(voiceButtonLabel(props.phase))}
+          aria-label={t(voiceButtonLabel(props.phase, props.modelProgress))}
           disabled={props.blocked || props.phase !== "idle"}
           onClick={() => props.onStart()}
         >
@@ -216,20 +183,13 @@ export function ComposerVoiceControls(props: {
   );
 }
 
-/**
- * A recording whose message box a page covers, such as Usage or Settings. The microphone stays on
- * under the page, so this bar shows it, and Cancel and Finish stay in reach. Enter is not handled here:
- * the bar of the message box still owns it.
- */
 export function CoveredVoiceRecording(props: {
-  /** Microphone loudness, 0 to 1, oldest first. */
   levels: readonly number[];
   elapsedSeconds: number;
   onCancel: () => void;
   onFinish: () => void;
 }): JSX.Element {
   const { t } = useText();
-  // The message box under the page is inert, so its countdown and warning do not reach the user.
   const limit = voiceLimit(() => props.elapsedSeconds);
   return (
     <section
@@ -277,11 +237,6 @@ export function CoveredVoiceRecording(props: {
   );
 }
 
-/**
- * Each new level enters on the right and pushes the others one dot to the left. The dots keep their
- * places, so the track is moved back by one step and slides home over the time until the next level:
- * the waveform scrolls instead of jumping.
- */
 export function VoiceWaveform(props: { levels: readonly number[]; class?: string }): JSX.Element {
   let track: HTMLSpanElement | undefined;
   let lastUpdate = 0;

@@ -1,12 +1,3 @@
-// The Claude sign-in as the Claude CLI stores it, read without starting the CLI.
-//
-// `claude auth status` starts an OAuth refresh when the access token is near its expiry, and exits
-// after 2 s without saving the rotated tokens when the refresh is slower. The next Claude process
-// then gets `invalid_grant` and clears the sign-in, so the user must sign in again
-// (anthropics/claude-code#95822, #105645). A stored sign-in with a refresh token is read here instead,
-// and the agent process that uses it refreshes the token itself. The format is the CLI's own
-// (checked on 2.1.318): when it cannot be read, the caller asks `auth status` as before.
-
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -22,13 +13,9 @@ import type * as Koffi from "koffi";
 const logger = createOpenBotLogger("claude-stored-sign-in");
 
 const KEYCHAIN_TIMEOUT_MS = 3_000;
-/** `security` exits with this code when the Keychain has no such item. */
 const KEYCHAIN_ITEM_NOT_FOUND = 44;
-/** The name of the CLI's sign-in in Windows Credential Manager, the same for each Windows user. */
 const CREDENTIAL_MANAGER_NAME = "claude-code-user";
-/** wincred.h: CRED_TYPE_GENERIC. */
 const CRED_TYPE_GENERIC = 1;
-/** The most parts that the CLI splits a long sign-in into. */
 const CREDENTIAL_MANAGER_MAX_PARTS = 256;
 
 const execFileAsync = promisify(execFile);
@@ -38,10 +25,6 @@ class ClaudeStoredSignInFailed extends Schema.TaggedError<ClaudeStoredSignInFail
   cause: Schema.Defect(),
 }) {}
 
-/**
- * Variables that sign the CLI in from outside its store, send it to another API backend, or move or
- * rename the store. `auth status` reports these, so the stored sign-in alone would give a wrong answer.
- */
 const AUTH_OVERRIDE_VARIABLES = [
   "CLAUDE_CODE_OAUTH_TOKEN",
   "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
@@ -86,15 +69,12 @@ const StoredAccount = Schema.Struct({
   ),
 });
 
-/** The parts of a long sign-in in Credential Manager: `n` parts that hold `l` base64 characters together. */
 const CredentialManagerParts = Schema.Struct({ n: Schema.Int, l: Schema.Int });
 
-/** Reads one generic credential of Windows Credential Manager as UTF-8 text. Null when it does not exist. */
 type CredentialRead = (target: string) => string | null;
 
 let windowsCredentialRead: CredentialRead | undefined;
 
-/** `CredReadW` through koffi, loaded on first use, so that only a Windows computer loads the FFI. */
 function loadWindowsCredentialRead(): CredentialRead {
   if (windowsCredentialRead) return windowsCredentialRead;
   const koffi: typeof Koffi = requireModule("koffi");
@@ -119,12 +99,10 @@ function loadWindowsCredentialRead(): CredentialRead {
   const credFree: (buffer: bigint) => void = advapi32.func("void __stdcall CredFree(void *buffer)");
   windowsCredentialRead = (target) => {
     const credential: [bigint | null] = [null];
-    // A missing credential and a failed read both give null: the caller then reads the file.
     if (!credRead(target, CRED_TYPE_GENERIC, 0, credential) || !credential[0]) return null;
     try {
       const { CredentialBlob: blob, CredentialBlobSize: size } = koffi.decode(credential[0], credentialType);
       if (!blob || !size) return null;
-      // A copy: the view points into memory that `CredFree` releases.
       return Buffer.from(new Uint8Array(koffi.view(blob, size))).toString("utf8");
     } finally {
       credFree(credential[0]);
@@ -133,11 +111,6 @@ function loadWindowsCredentialRead(): CredentialRead {
   return windowsCredentialRead;
 }
 
-/**
- * The sign-in that the CLI keeps in Windows Credential Manager through Bun's secret store: the generic
- * credential `<service>/claude-code-user`. A sign-in longer than one credential is base64 in the parts
- * `#0`, `#1`, … that the part `#m` counts. Null when there is none, or when a part is missing.
- */
 function readCredentialManager(service: string, read: CredentialRead): string | null {
   const target = `${service}/${CREDENTIAL_MANAGER_NAME}`;
   const parts = Schema.decodeUnknownOption(Schema.fromJsonString(CredentialManagerParts))(read(`${target}#m`) ?? "");
@@ -154,7 +127,6 @@ const readText = (path: string) =>
     catch: (cause) => new ClaudeStoredSignInFailed({ cause }),
   }).pipe(Effect.option);
 
-/** The Keychain account name that the CLI uses. */
 function keychainAccount(environment: NodeJS.ProcessEnv): string {
   let name: string;
   try {
@@ -165,12 +137,6 @@ function keychainAccount(environment: NodeJS.ProcessEnv): string {
   return /^[a-zA-Z0-9._-]+$/.test(name) ? name : "claude-code-user";
 }
 
-/**
- * The stored credential text. On macOS the Keychain item wins when it exists; the file is the CLI's
- * fallback store there. On Windows, when the CLI's `tengu_windows_credman` flag is on, the CLI moves the
- * sign-in to Credential Manager at its next save and deletes the file (checked on the Windows build of
- * 2.1.309). The file is the only store on other platforms. None when no store can be read.
- */
 const readCredentialText = Effect.fn("ClaudeStoredSignIn.readCredentialText")(function* (
   environment: NodeJS.ProcessEnv,
   configDirectory: string,
@@ -192,11 +158,9 @@ const readCredentialText = Effect.fn("ClaudeStoredSignIn.readCredentialText")(fu
       ),
       Effect.option,
     );
-    // As the CLI does, the file is read when Credential Manager has no sign-in.
     if (Option.isSome(stored) && stored.value !== null) return Option.some(stored.value);
   }
   if (platform() === "darwin") {
-    // The CLI writes the item with `/usr/bin/security`, so reading it with the same tool asks nothing.
     const keychain = yield* Effect.tryPromise({
       try: () =>
         execFileAsync(
@@ -208,22 +172,16 @@ const readCredentialText = Effect.fn("ClaudeStoredSignIn.readCredentialText")(fu
     }).pipe(Effect.result);
     if (Result.isSuccess(keychain)) {
       const text = keychain.success.stdout.trim();
-      // `security -w` prints a value that is not plain text as hex.
       return Option.some(/^(?:[0-9a-f]{2})+$/iu.test(text) ? Buffer.from(text, "hex").toString("utf8") : text);
     }
     const cause = keychain.failure.cause;
     const missing =
       typeof cause === "object" && cause !== null && "code" in cause && cause.code === KEYCHAIN_ITEM_NOT_FOUND;
-    // A locked Keychain or a timeout does not say that the item is absent.
     if (!missing) return Option.none<string>();
   }
   return yield* readText(join(configDirectory, ".credentials.json"));
 });
 
-/**
- * The CLI's settings file, which holds the email, the organization and the cached feature flags. The
- * account and the flag are read apart, so that a field of one that this build cannot read keeps the other.
- */
 const readSettings = Effect.fn("ClaudeStoredSignIn.readSettings")(function* (
   environment: NodeJS.ProcessEnv,
   configDirectory: string,
@@ -243,11 +201,6 @@ const readSettings = Effect.fn("ClaudeStoredSignIn.readSettings")(function* (
   };
 });
 
-/**
- * Whether the user settings file of the CLI signs it in another way: an `apiKeyHelper`, or one of the
- * variables above in its `env`. The agents get both (`claudeSignInSettings`), and the CLI then uses an
- * API key in place of the claude.ai sign-in (checked on 2.1.322), so only `auth status` can tell (#10192).
- */
 const settingsSignIn = Effect.fn("ClaudeStoredSignIn.settingsSignIn")(function* (configDirectory: string) {
   const text = yield* readText(join(configDirectory, "settings.json"));
   const settings = Option.flatMap(text, Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown)));
@@ -259,12 +212,6 @@ const settingsSignIn = Effect.fn("ClaudeStoredSignIn.settingsSignIn")(function* 
   );
 });
 
-/**
- * A signed-in status in the shape of `claude auth status --json`, from the sign-in that the CLI stored
- * for the environment's `CLAUDE_CONFIG_DIR`. None when the environment or the user settings sign the CLI
- * in another way, when the store cannot be read, or when it has no usable refresh token: the caller then
- * asks the CLI. With no refresh token stored, `auth status` has no token to spend.
- */
 export const readClaudeStoredSignIn = Effect.fn("ClaudeStoredSignIn.read")(function* (environment: NodeJS.ProcessEnv) {
   if (AUTH_OVERRIDE_VARIABLES.some((name) => environment[name])) return Option.none<DynamicRecord>();
   const customConfigDirectory = Boolean(environment.CLAUDE_CONFIG_DIR);

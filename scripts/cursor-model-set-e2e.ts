@@ -1,10 +1,3 @@
-// Runs turns on the real Cursor driver against a fake `cursor-agent acp` whose model belongs to the
-// process, as Cursor 2026.10.22-27dcf5f's does. Each Cursor model set asks Cursor's server for the
-// model list, and a failed request reports "Invalid model value" (#3800). Checks that a turn on the
-// model the process already runs on sends no model set, that each turn still runs on its own model
-// after another thread changed it, that a set is sent again after a set failed, and that two sets
-// that overlap leave the model unknown, because they can apply in another order than they answer.
-// `bun run test:cursor-model-set`. Writes .openbot-build/cursor-model-set-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -116,12 +109,9 @@ try {
   assert.equal(retried.turn?.reply, `Model: ${HIGH}`, "The turn runs on its model.");
   assert.equal(retried.turn?.status, "completed", "The turn completes.");
 
-  // Thread 1's set applies first and answers last. A record of the last answer would name MEDIUM
-  // while the process runs on HIGH, and thread 1's next turn would run on HIGH.
   await writeFile(reorderFlag, "");
   const overlap = await step("overlapping turns on thread 1 and thread 2", async () => {
     const first1 = runTurn(client, first, { model: MEDIUM, text: "ping" });
-    // Thread 2's set goes out while thread 1's set waits for its answer.
     await new Promise<void>((resolveWait) => {
       const poll = setInterval(async () => {
         if ((await readJsonl<SetEntry>(log)).length > seen) {

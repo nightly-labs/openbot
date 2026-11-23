@@ -5,6 +5,7 @@ import {
   parseGetStorageUsageInput,
   STORAGE_CAPABILITY,
   type StorageUsage,
+  type StoredFileRow,
 } from "@openbot/contracts/ipc";
 import { isString } from "@openbot/contracts/runtime-values";
 import {
@@ -27,40 +28,25 @@ import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin, requireVisibleBodyAgent } from "./request-helpers";
 import { hiddenAuthor, requireVisibleChannel } from "./route-channels";
 
-/**
- * The disk use of the machine that runs this host, read from a joined server.
- *
- * Every member can read it: the answer carries sizes, chat titles and the names of files sent in
- * chats, never a path. A member reads the chats and files only of the agents that they can see
- * (`visibleStorage`); the category sizes count the whole host. Deleting a file and clearing caches or
- * logs change the host, so only an owner or an admin can. Both were decided deliberately and are
- * frozen by `storage-v1`; changing either needs a second capability string.
- */
 export async function routeStorage(
   context: TeamApiRequestContext,
   storage: TeamApiStorage | undefined,
   channels: Pick<ChannelService, "store"> | undefined,
-  /** The agents hidden from this member. As on the channel routes, they hide a channel only from a member. */
   hiddenAgentIds: ReadonlySet<string>,
-  /** The agents that the host has. A member does not get the files of a deleted agent. */
   agentIds: () => ReadonlySet<string>,
-  /** The Library folders of this host: a deleted file leaves its folder. */
+  workflowIds: () => Promise<ReadonlySet<string>>,
   libraryFolders?: Pick<TeamApiLibraryFolders, "removeFiles">,
 ): Promise<RouteOutcome> {
   const { method, url, capabilities, member, request, json } = context;
   if (method === "POST" && url.pathname === STORAGE_CHANNEL_ROUTES.files) {
     if (!storage || !channels || !capabilities.has(STORAGE_CHANNEL_CAPABILITY))
       throw new HttpError(400, sourceText("error.team.storageUnsupported"));
-    // `readJson` has already run the body through the storage-channel-v1 codec. Every member who can
-    // see the channel can read its files, as that contract says.
     const { channelId, force } = await readJson(request);
     if (!isString(channelId)) throw new HttpError(400, sourceText("error.team.storageUnsupported"));
     const body = parseGetStorageUsageInput({ scope: "channel", channelId, force });
     requireVisibleChannel(channels, channelId, canAdministerServer(member.role) ? new Set() : hiddenAgentIds);
     try {
       const usage = await runCauseEffect(storage.usage(body));
-      // As on the channel read route, a message of an agent hidden from this peer is not shown, and its
-      // files are not shown either.
       const hiddenMessages = new Set(
         hiddenAgentIds.size === 0
           ? []
@@ -83,14 +69,12 @@ export async function routeStorage(
   if (method === "POST" && url.pathname === STORAGE_DISK_ROUTES.disk) {
     if (!storage || !capabilities.has(STORAGE_DISK_CAPABILITY))
       throw new HttpError(400, sourceText("error.team.storageUnsupported"));
-    // `readJson` checks that the body is empty. Every member can read it, as `storage-disk-v1` says.
     await readJson(request);
     return json(200, await runCauseEffect(storage.disk()));
   }
   if (method === "POST" && url.pathname === STORAGE_USER_FILES_ROUTES.disk) {
     if (!storage || !capabilities.has(STORAGE_USER_FILES_CAPABILITY))
       throw new HttpError(400, sourceText("error.team.storageUnsupported"));
-    // `readJson` checks that the body is empty. Every member can read it, as `storage-user-files-v1` says.
     await readJson(request);
     return json(200, await runCauseEffect(storage.diskUse()));
   }
@@ -101,22 +85,22 @@ export async function routeStorage(
   if (!storage || !capabilities.has(STORAGE_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.storageUnsupported"));
   if (!usage) requireAdmin(member);
-  // `readJson` has already run the body through the storage wire codec.
   const body = await readJson(request);
   try {
     if (usage) {
       const input = parseGetStorageUsageInput(body);
       requireVisibleBodyAgent(body, hiddenAgentIds);
       const living = canAdministerServer(member.role) ? null : agentIds();
-      return json(200, visibleStorage(await runCauseEffect(storage.usage(input)), hiddenAgentIds, living));
+      return json(
+        200,
+        await visibleStorage(await runCauseEffect(storage.usage(input)), hiddenAgentIds, living, workflowIds),
+      );
     }
     if (deleteFile) {
       const { fileId } = parseDeleteStoredFileInput(body);
       await runCauseEffect(storage.deleteFile(fileId));
       if (libraryFolders) await runCauseEffect(libraryFolders.removeFiles([fileId]));
-    }
-    // Caches and logs hold no stored file, so the Library folders do not change.
-    else await runCauseEffect(storage.clear(parseClearStorageInput(body).category));
+    } else await runCauseEffect(storage.clear(parseClearStorageInput(body).category));
   } catch (error) {
     if (error instanceof StorageNotFoundError) throw new HttpError(404, error.message);
     throw error;
@@ -124,27 +108,29 @@ export async function routeStorage(
   return json(200, {});
 }
 
-/**
- * The storage that a peer with hidden agents reads: no chat and no file of a hidden agent. A file id
- * is enough to download the file, so a file that the host cannot place with an agent is left out too:
- * it can be a file of a hidden agent. The chat of a hidden agent answers as a chat with no files.
- *
- * `livingAgentIds` is null for an owner or an admin. A member also gets no file of an agent that the
- * host no longer has: the roles of a deleted agent are gone, so the host cannot tell whether the
- * member could see it.
- */
-function visibleStorage(
+async function visibleStorage(
   usage: StorageUsage,
   hiddenAgentIds: ReadonlySet<string>,
   livingAgentIds: ReadonlySet<string> | null,
-): StorageUsage {
-  if (hiddenAgentIds.size === 0 && livingAgentIds === null) return usage;
+  workflowIds: () => Promise<ReadonlySet<string>>,
+): Promise<StorageUsage> {
+  const filtersAgents = hiddenAgentIds.size > 0 || livingAgentIds !== null;
+  const tagged = usage.files.some((file) => file.workflow !== undefined);
+  if (!filtersAgents && !tagged) return usage;
+  const shownWorkflows = tagged ? await workflowIds() : new Set<string>();
   const visible = (agentId: string | null) =>
-    agentId !== null && !hiddenAgentIds.has(agentId) && (livingAgentIds === null || livingAgentIds.has(agentId));
+    !filtersAgents ||
+    (agentId !== null && !hiddenAgentIds.has(agentId) && (livingAgentIds === null || livingAgentIds.has(agentId)));
   return {
     ...usage,
     agents: usage.agents.filter((row) => visible(row.agentId)),
     conversations: usage.conversations.filter((row) => visible(row.agentId)),
-    files: usage.files.filter((file) => visible(file.agentId)),
+    files: usage.files.flatMap((file) => visibleFile(file, visible(file.agentId), shownWorkflows)),
   };
+}
+
+function visibleFile(file: StoredFileRow, agentVisible: boolean, shownWorkflows: ReadonlySet<string>): StoredFileRow[] {
+  const { workflow, ...untagged } = file;
+  if (workflow && shownWorkflows.has(workflow.id) && (file.agentId === null || agentVisible)) return [file];
+  return agentVisible ? [untagged] : [];
 }

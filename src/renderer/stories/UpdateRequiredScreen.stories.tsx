@@ -31,14 +31,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The update downloads by itself. */
 export const Downloading: Story = {};
 
 export const Checking: Story = {
   args: { status: { ...BELOW_MINIMUM, phase: "checking", availableVersion: null, progress: null } },
 };
 
-/** Downloaded: it installs when the agents are idle, or now with the button. */
 export const WaitingForAgents: Story = {
   args: {
     status: {
@@ -62,7 +60,6 @@ export const Failed: Story = {
   },
 };
 
-/** An install that cannot update itself, such as a Linux package or Nix: it can continue until the next start. */
 export const Unsupported: Story = {
   args: { status: { ...BELOW_MINIMUM, phase: "unsupported", availableVersion: null, progress: null } },
 };

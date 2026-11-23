@@ -10,28 +10,18 @@ export interface RoutineScheduleCardProps {
   routineName: string;
   action: "created" | "updated";
   schedule: RoutineScheduleDraft;
-  /** Without it the card is read-only. */
   onChange?: ((schedule: RoutineScheduleDraft) => void) | undefined;
-  /** One edit on the row is complete. A card that saves each edit saves here. */
   onEditEnd?: () => void;
   state?: RoutineScheduleCardState;
   errorText?: string | undefined;
-  /** For example "Thu, Sep 25 at 8:20 AM". */
   nextRunLabel?: string | undefined;
-  /** For example "Warsaw time". Give it only when the routine zone is not the viewer's zone. */
   timeZoneLabel?: string | undefined;
-  /** Why a paused routine is paused, for example "Paused by its 8:00 AM run". It shows when there is no next run. */
   pausedLabel?: string | undefined;
   onOpenRoutine?: () => void;
   today?: Date;
-  /** The frequencies the menu offers. Defaults to all of them. */
   kinds?: RoutineDraftKindOption[];
 }
 
-/**
- * The chat record of a routine an agent created or changed. Its schedule row is the same one
- * the settings panel uses, so the person can move the run without leaving the conversation.
- */
 export function RoutineScheduleCard(props: RoutineScheduleCardProps) {
   const { t } = useText();
   const state = () => props.state ?? "idle";

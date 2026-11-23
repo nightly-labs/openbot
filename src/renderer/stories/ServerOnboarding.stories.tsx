@@ -9,7 +9,6 @@ import type { HostProviderSettings } from "../src/features/settings/ProviderSett
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createFakeConnection } from "./provider-connection-fixture";
 
-/** A new hosted server: every CLI is on the host, and none is signed in. */
 const newHostStatus: AgentStatus = {
   ...STORY_AGENT_STATUS,
   phase: "blocked",
@@ -77,10 +76,8 @@ const meta = {
 export default meta;
 type StoryEntry = StoryObj<typeof meta>;
 
-/** Nothing is signed in on the host. Connect on the Claude row opens the paste sign-in. */
 export const NothingConnected: StoryEntry = {};
 
-/** The host is signed in to Claude, so Continue opens the agent form. */
 export const Connected: StoryEntry = {
   args: { agentStatus: connectedHostStatus },
 };

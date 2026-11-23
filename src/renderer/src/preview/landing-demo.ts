@@ -36,25 +36,20 @@ type Timer = ReturnType<typeof setTimeout>;
 interface SceneRun {
   runId: number;
   agentId: string;
-  /** False for the reply to a message that the visitor typed. */
   scripted: boolean;
   steps: LandingSceneStep[];
   turnId: string;
   turnActive: boolean;
   timers: Set<Timer>;
   touchedAgentIds: Set<string>;
-  /** The turn of each teammate that works on the lead's message. */
   backgroundTurns: Map<string, string>;
   exchangeId: string | null;
   subagentStarts: Map<string, string>;
   prompt: { requestId: string; resume: (answers: LandingPromptAnswers) => void } | null;
   answers: LandingPromptAnswers;
   answerId: string | null;
-  /** True when the steps run at once: with reduced motion, or after the visitor leaves the chat. */
   instant: boolean;
-  /** The index of the first step that has not started. */
   nextStep: number;
-  /** Ends the step that holds the scene now: answers the question or ends the stream. */
   settle: (() => void) | null;
 }
 
@@ -90,11 +85,6 @@ function isBarrier(step: LandingSceneStep): boolean {
   return step.kind === "prompt" || step.kind === "answer";
 }
 
-/**
- * Plays the home page demo on the preview mock. Each agent has one scene that plays the first time
- * the visitor opens it. Opening another conversation ends the scene at once, so the visitor finds it
- * complete on return. A message that the visitor types stops the scene and removes what it added.
- */
 export function createLandingDemoController(
   mock: MockOpenBotControls,
   options: LandingDemoControllerOptions,
@@ -148,7 +138,6 @@ export function createLandingDemoController(
     return `${runPrefix(run.runId)}${part}`;
   }
 
-  /** Adds the message, or replaces the one with the same id. */
   function putMessage(run: SceneRun, agentId: string, message: ConversationMessage): void {
     run.touchedAgentIds.add(agentId);
     mock.updateConversationSnapshot(agentId, (snapshot) => {
@@ -561,11 +550,9 @@ export function createLandingDemoController(
       }
     }
     activeRun = null;
-    // The snapshot replaces every running turn, so it goes out only when none is left.
     mock.setRuntimeSnapshot(landingRuntimeSnapshot(options.agents, contextTokens));
   }
 
-  /** Schedules the steps from `start` up to the next step that holds the scene. */
   function scheduleFrom(run: SceneRun, start: number, baseAt: number): void {
     for (let index = start; index < run.steps.length; index += 1) {
       const step = run.steps[index];
@@ -590,7 +577,6 @@ export function createLandingDemoController(
     scheduleFrom(run, 0, 0);
   }
 
-  /** Runs the rest of the active scene at once. */
   function settleActiveRun(): void {
     const run = activeRun;
     if (!run) return;
@@ -623,7 +609,6 @@ export function createLandingDemoController(
     };
   }
 
-  /** Stops the run and removes every message that it added. */
   function cancelActiveRun(): void {
     const run = activeRun;
     if (!run) return;
@@ -662,7 +647,6 @@ export function createLandingDemoController(
     const reply = LANDING_TYPED_REPLIES[sent.agentId];
     if (disposed || !reply) return false;
     if (activeRun) {
-      // A visitor who writes to the agent mid-scene has seen enough of it.
       if (activeRun.scripted && activeRun.agentId === sent.agentId) playedScenes.add(sent.agentId);
       cancelActiveRun();
       mock.updateConversationSnapshot(sent.agentId, (snapshot) => {
@@ -783,7 +767,6 @@ export function createLandingDemoController(
     if (selectedConversation?.kind === "agent" && selectedConversation.id === agentId) return;
     cancelActiveDirectRun();
     selectedConversation = { kind: "agent", id: agentId };
-    // The first read of the lead's chat comes after its scene starts.
     if (activeRun?.agentId === agentId) return;
     settleActiveRun();
     if (activated) startScene(agentId);

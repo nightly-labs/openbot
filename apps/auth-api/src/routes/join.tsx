@@ -12,7 +12,6 @@ const JOIN_SOCIAL_IMAGE: PageSocialImage = {
 export const Route = createFileRoute("/join")({
   loader: ({ context }) => loadPageText(context.locale, joinPageText),
   head: ({ match, loaderData }) => {
-    // Only the path: the query holds the invitation token, and a link preview must not copy it.
     const url = new URL("/join", match.context.siteUrl).toString();
     const text = loaderData?.text;
     if (!text) {

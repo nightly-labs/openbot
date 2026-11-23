@@ -14,7 +14,6 @@ import {
 
 type Option = ChatBackdropChoice | "none";
 
-/** A backdrop that the user added, as Settings lists it. */
 export interface ChatBackdropSelectCustom {
   id: string;
   name: string;
@@ -23,22 +22,17 @@ export interface ChatBackdropSelectCustom {
 export interface ChatBackdropSelectProps {
   value: ChatBackdropChoice | null;
   onChange: (value: ChatBackdropChoice | null) => void;
-  /** The backdrops that the user added on this device, oldest first. */
   custom: readonly ChatBackdropSelectCustom[];
-  /** The picture types that the upload accepts, as the file input `accept` value. */
   accept: string;
   onUpload: (file: File) => void;
   onRemove: (id: string) => void;
   busy?: boolean;
-  /** The dialog element the popover portals into, as the other Settings selects receive it. */
   mount?: HTMLElement | undefined;
 }
 
-/** The "Backdrop" row control in Settings, on the desktop and in the web client. */
 export function ChatBackdropSelect(props: ChatBackdropSelectProps): JSX.Element {
   const { t } = useText();
   let fileInput: HTMLInputElement | undefined;
-  // A new array on each change of the list only: Kobalte loops when it gets a new array on each read.
   const options = createMemo<Option[]>(() => [
     "none",
     ...CHAT_BACKDROP_SCENES,
@@ -50,7 +44,6 @@ export function ChatBackdropSelect(props: ChatBackdropSelectProps): JSX.Element 
     if (isChatBackdropScene(option)) return t(CHAT_BACKDROP_LABEL[option]);
     return names().get(customBackdropId(option) ?? "") ?? t("settings.chatBackdrop.none");
   };
-  // A saved choice whose backdrop is gone shows as None, which is what the window shows.
   const value = (): Option => {
     const current = props.value;
     return current !== null && options().includes(current) ? current : "none";
@@ -63,7 +56,6 @@ export function ChatBackdropSelect(props: ChatBackdropSelectProps): JSX.Element 
     <div class="settings-backdrop-control">
       <Input
         ref={(element: HTMLInputElement) => (fileInput = element)}
-        // Hidden, so the button below is the one "Upload image…" that a screen reader finds.
         hidden
         type="file"
         tabindex={-1}

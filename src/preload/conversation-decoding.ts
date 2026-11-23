@@ -1,9 +1,3 @@
-// What main answers for a conversation: its pages, search, read state, attachments, queue and file
-// previews.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
 import {
   type AgentApproval,
   type AgentTask,
@@ -12,6 +6,7 @@ import {
   type AgentTasksSnapshot,
   type AgentTaskWindow,
   type AgentWaitsSnapshot,
+  type ArchivedAgentTasksPage,
   type AttachmentDownloadProgress,
   type AttachmentImportProgress,
   type ConversationFileSearchPage,
@@ -30,6 +25,7 @@ import {
   isAgentTasksSnapshot,
   isAgentTaskWindow,
   isAgentWaitsSnapshot,
+  isArchivedAgentTasksPage,
   isAttachmentSummary,
   isConversationMessage,
   isConversationReadState,
@@ -81,7 +77,6 @@ export function decodeAttachmentImportProgress(value: unknown): AttachmentImport
   };
 }
 
-/** The address of a temporary page that main keeps, or null when its page store is full. */
 export function decodeOptionalFilePreviewPageUrl(value: unknown): string | null {
   if (value === null) return null;
   if (!isFilePreviewPageUrl(value)) throw new Error("Invalid file preview page URL response.");
@@ -250,6 +245,13 @@ export function decodeAgentTaskReadStates(value: unknown): AgentTaskReadState[] 
 export function decodeAgentTasks(value: unknown): AgentTasksSnapshot {
   if (!isAgentTasksSnapshot(value)) {
     throw new Error("Invalid task list response.");
+  }
+  return value;
+}
+
+export function decodeArchivedAgentTasks(value: unknown): ArchivedAgentTasksPage {
+  if (!isArchivedAgentTasksPage(value)) {
+    throw new Error("Invalid archived thread list response.");
   }
   return value;
 }

@@ -1,16 +1,3 @@
-// Frozen optional routine-flows-v1 wire contract. Keep IPC types and limits out of this file.
-//
-// What it grants, recorded here because freezing it makes it permanent: any member of a server can
-// read and change the routine canvas of an agent that the member can see. That is the canvas, its
-// node positions, and the links that hand a routine's answer from one agent to the next. A member
-// sees a routine only when every agent it touches is visible to the member: its own agent and both
-// agents of each of its links. The host answers a hidden or unknown agent, routine or link as
-// missing. A webhook trigger's URL goes only to an owner or admin; a member reads it as null, as
-// `events-v1` keeps it behind the admin role. Step input, output and error cross with at most 4,000
-// characters each, and the host empties the step texts of the routines with the oldest runs first
-// when a canvas would not fit one WebRTC frame. The optional event `routine-flows-changed` names
-// only the agent whose canvas changed, so the client reads it again. Widening any of it needs a
-// second capability string.
 import { isDynamicRecord, isString } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -38,12 +25,10 @@ export const ROUTINE_FLOWS_ROUTES = {
   updateLink: "/v1/routine-flows/links/update",
 } as const;
 
-/** The longest step input, output or error that crosses. */
 export const ROUTINE_FLOW_STEP_TEXT_LIMIT = 4_000;
 
 export type RoutineFlowsEvent = { type: "routine-flows-changed"; agentId: string };
 
-/** The routine flows event in `value`, or null for any other event. A malformed one throws. */
 export function routineFlowsEvent(value: unknown): RoutineFlowsEvent | null {
   if (!isDynamicRecord(value) || value.type !== "routine-flows-changed") return null;
   if (!isString(value.agentId) || !value.agentId.length || value.agentId.length > 128) {

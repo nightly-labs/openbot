@@ -12,10 +12,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/**
- * The environment variables of one provider of this server, read and set from a joined server. Frozen
- * by `provider-environment-v1`. No response carries a sensitive value.
- */
 export async function routeProviderEnvironment(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -30,7 +26,6 @@ export async function routeProviderEnvironment(
   if (!environment || !capabilities.has(PROVIDER_ENVIRONMENT_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.providerEnvironmentUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the provider-environment wire codec.
   const body = await readJson(request);
   const provider = body.provider;
   if (!isProviderEnvironmentProvider(provider)) throw new HttpError(400, "A provider is required.");
@@ -44,7 +39,6 @@ export async function routeProviderEnvironment(
   try {
     return json(200, await runCauseEffect(environment.set({ provider, variables })));
   } catch (error) {
-    // A refusal is the fault of the request, and its message is for the person who made the change.
     if (error instanceof ProviderEnvironmentRefused) throw new HttpError(400, error.message);
     throw error;
   }

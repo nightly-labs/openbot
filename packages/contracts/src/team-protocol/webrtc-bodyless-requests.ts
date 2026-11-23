@@ -3,18 +3,6 @@ import { isAgentAnalyticsRoute, isHostAnalyticsRoute } from "./current";
 import { decodeScopedUsageRequest, scopedUsageRoute } from "./current-adapter-routes";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "./webrtc-framing";
 
-/**
- * The WebRTC request frame of a route that has no request body: a GET, a DELETE, the routine test POST
- * and the remote viewer routes. Protocols 4 to 10 send this frame. Before plan 011 item 2 they called the
- * v3 WebRTC codec for it, so the rules here are the rules of that codec, and the bytes do not change:
- *
- * - The analytics, host analytics and model-scoped usage GETs carry an empty object.
- * - A remote viewer route carries its value as it is, and an empty value as `{}`.
- * - A route in the frozen no-body list carries `{}` when the value is empty.
- * - Each other value is refused with the v1 codec's error.
- *
- * Encoding and decoding give the same result, because the frame has no vocabulary to translate.
- */
 export function teamWebRtcBodylessRequest(method: string, path: string, value: unknown): TeamProtocolV2Json {
   if (isAgentAnalyticsRoute(method, path) || isHostAnalyticsRoute(method, path) || scopedUsageRoute(method, path))
     return wireJson(decodeScopedUsageRequest(value ?? {}));
@@ -24,12 +12,10 @@ export function teamWebRtcBodylessRequest(method: string, path: string, value: u
   throw new Error("Invalid Team protocol v1 HTTP request.");
 }
 
-/** The response of a remote viewer route goes on the wire as it is. */
 export function teamWebRtcRemoteViewerResponse(value: unknown): TeamProtocolV2Json {
   return wireJson(value === undefined ? null : value);
 }
 
-/** A route whose WebRTC request frame {@link teamWebRtcBodylessRequest} makes. */
 export function isTeamWebRtcBodylessRoute(method: string, path: string): boolean {
   return (
     method === "GET" || method === "DELETE" || isRoutineTestRequest(method, path) || isTeamWebRtcRemoteViewerRoute(path)
@@ -42,10 +28,6 @@ export function isTeamWebRtcRemoteViewerRoute(path: string): boolean {
   );
 }
 
-/**
- * The frozen no-body route list of protocol 2. A route added after it cannot join the list, because a
- * released host reads the list to accept a frame. A newer bodyless route has its own codec.
- */
 export function isTeamWebRtcNoBodyRoute(method: string, path: string): boolean {
   const pathname = new URL(path, "http://openbot.invalid").pathname;
   if (method === "GET") {

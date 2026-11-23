@@ -3,38 +3,28 @@ import { createSignal, createUniqueId, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { createTaskListPlayState, TaskListHeader, TaskMark, type TaskMarkState } from "./TaskList";
 
-/**
- * `waiting`: nothing woke the wait yet. `resuming`: a run woke it and continues the request.
- * `woken`: a run woke it and ended, and the agent did not close it.
- */
 export type OpenWaitState = "waiting" | "resuming" | "woken";
 
 export interface OpenWaitItem {
   id: string;
-  /** The agent's note: what it waits for and what it does next. */
   note: string;
-  /** The message that the wait continues. */
   request: string;
-  /** When the agent opened the wait, as an ISO time. */
   openedAt: string;
   state: OpenWaitState;
 }
 
 export interface OpenWaitsProps {
   items: readonly OpenWaitItem[];
-  /** Shows the message that the wait continues. Without it, the menu has no such item. */
   onShowRequest?: ((waitId: string) => void) | undefined;
   onCancel: (waitId: string) => void;
-  /** The list starts collapsed when this is false. */
   defaultOpen?: boolean;
-  /** The time that ages count from. The default is the time of the first render. */
   now?: Date;
 }
 
 const MARK_STATE: Record<OpenWaitState, TaskMarkState> = {
   waiting: "pending",
   resuming: "active",
-  woken: "failed",
+  woken: "pending",
 };
 
 const STATE_LABEL = {
@@ -43,11 +33,6 @@ const STATE_LABEL = {
   woken: "chat.waits.state.woken",
 } as const;
 
-/**
- * The work that an agent stopped because it waits for something outside its turn: one row for each
- * open wait, above the composer. It has the card of "Waiting for replies", and it renders nothing
- * when no wait is open.
- */
 export function OpenWaits(props: OpenWaitsProps) {
   return (
     <Show when={props.items.length > 0}>

@@ -14,15 +14,9 @@ import {
 } from "./hosted-site-contract";
 import { siteCall, siteDecode, siteFailure } from "./hosted-site-effects";
 
-/**
- * The stored rows of hosted sites and deployments, and the pure helpers that read, map and name them.
- * `HostedSiteService` owns every D1, KV and R2 call; nothing here touches storage.
- */
-
 export interface SiteRow {
   id: string;
   user_id: string;
-  /** Null for an unlinked site, and for every row that the Worker before `0024` wrote. */
   server_id: string | null;
   hostname: string;
   title: string;
@@ -59,7 +53,6 @@ export interface DeploymentRow {
   upload_bytes_claimed: number;
 }
 
-/** The desktop summary, plus `uploading`: an upload session reports it for a new site. */
 export interface HostedSiteSummary extends Omit<HostedSiteClientSummary, "status"> {
   status: SiteRow["status"];
 }
@@ -133,7 +126,6 @@ export function creationCount(value: unknown): number {
   return isDynamicRecord(value) && isNumber(value.count) ? value.count : 0;
 }
 
-// D1 returns one result for each batch statement, so a missing one is a driver fault.
 export function batchResult(result: D1Result<unknown> | undefined): D1Result<unknown> {
   if (!result) throw new Error("The database batch result is missing.");
   return result;
@@ -190,7 +182,6 @@ export function parseStoredSiteSummary(value: string): HostedSiteSummary {
     size: parsed.size,
     expiresAt: parsed.expiresAt,
     updatedAt: parsed.updatedAt,
-    // A receipt from before sites belonged to servers has no server.
     serverId: isString(parsed.serverId) ? parsed.serverId : null,
   };
 }

@@ -4,13 +4,6 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// A GritQL pattern that matches nothing fails silently: the rule is registered,
-// the check is green, and nothing is enforced. Twice already a rule has been
-// blind to a whole spelling of what it claims to reject - `new Promise<void>`
-// for the sleep rule, `querySelector<HTMLElement>` for the class-selector rule.
-// So every rule owns a fixture that proves both halves: the lines it must
-// reject, marked `// flag`, and the neighbouring correct code it must not.
-
 const repositoryRoot = resolve(import.meta.dirname, "..");
 const rulesDirectory = join(repositoryRoot, "tools/biome/anti-slop/rules");
 const fixturesDirectory = join(repositoryRoot, "tools/biome/anti-slop/fixtures");
@@ -40,10 +33,6 @@ function ruleNamesIn(plugins: readonly string[] | undefined): readonly string[] 
 const isTestFileOverride = (override: BiomeOverride) =>
   override.includes?.join() === ["**/*.test.ts", "**/*.test.tsx"].join();
 const overrides = biomeConfig.overrides ?? [];
-// The `// scope: global` line is the list the skill installer prints for other repositories. This
-// repository runs these global rules only on the code where their pattern can occur, through a
-// non-test override: `no-collections-in-stores` and `no-cleanup-in-effect-callbacks` on SolidJS code,
-// and `no-raw-sqlite-transaction` on the desktop main and backend code.
 const scopedGlobalRules: readonly string[] = [
   "no-collections-in-stores",
   "no-cleanup-in-effect-callbacks",
@@ -121,8 +110,6 @@ describe("anti-slop rules", () => {
   });
 
   it("keeps the skill's bundled copy identical to the rules in this repository", () => {
-    // The skill installs these into other repositories. A stale bundle would
-    // ship deleted rules and a plugin list pointing at files that do not exist.
     const bundleDirectory = join(repositoryRoot, ".agents/skills/biome-anti-slop/assets/anti-slop");
     const bundled = (directory: string) => readdirSync(join(bundleDirectory, directory)).sort();
 
@@ -138,8 +125,6 @@ describe("anti-slop rules", () => {
   });
 
   it("registers every rule in the list its own scope line names", () => {
-    // The rule states where it belongs, so neither biome.json nor the skill has
-    // to keep a second list that remembers it.
     const declaredScope = (rule: string) => /^\/\/ scope: (global|tests)$/m.exec(ruleSource(rule))?.[1];
     const misplaced = ruleNames.filter((rule) =>
       declaredScope(rule) === "tests" ? !testOnlyRules.includes(rule) : !globalRules.includes(rule),
@@ -155,8 +140,6 @@ describe("anti-slop rules", () => {
 
     const diagnostics = runRule(rule, source);
 
-    // A malformed pattern is reported as a diagnostic rather than a failure, so
-    // without this the rule reads as "matched nothing" instead of "is broken".
     expect(diagnostics.filter((diagnostic) => diagnostic.message.includes("errored"))).toEqual([]);
     const flagged = diagnostics.flatMap((diagnostic) => {
       const line = diagnostic.location?.start?.line;

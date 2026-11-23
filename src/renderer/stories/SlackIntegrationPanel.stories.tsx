@@ -60,7 +60,6 @@ const SECOND_ORCHESTRATOR: SlackIntegrationAgent = {
   avatarSeed: "slack-orchestrator-2",
 };
 
-/** The second workspace of a page. */
 const SECOND_WORKSPACE: Partial<MessagingConnection> = {
   workspaceId: "T0STORY2",
   workspaceName: "Acme Labs",
@@ -78,40 +77,32 @@ const args = (connections: MessagingConnection[], busy = false) => ({
   onAddOrchestrator: fn(),
 });
 
-/** No workspace yet: Connect Slack opens the dialog. */
 export const NotSetUp: Story = { args: args([]) };
 
-/** The workspace is connected, and the Slack Orchestrator answers. */
 export const Connected: Story = { args: args([workspace()]) };
 
-/** The workspace is connected, and no agent answers yet. */
 export const NoOrchestrator: Story = { args: args([workspace({ orchestratorAgentId: null })]) };
 
 export const Paused: Story = { args: args([workspace({ enabled: false, state: "paused" })]) };
 
 export const Uninstalled: Story = { args: args([workspace({ state: "invalid_token" })]) };
 
-/** Signal sends the workspace's events to a different server: Reconnect links it to this one. */
 export const NotLinked: Story = { args: args([workspace({ state: "not_linked" })]) };
 
 export const MissingPermissions: Story = {
   args: args([workspace({ state: "missing_scope", missingScopes: ["files:read"] })]),
 };
 
-/** Two workspaces. One orchestrator answers both, and Add workspace connects another. */
 export const TwoServers: Story = { args: args([workspace(), workspace(SECOND_WORKSPACE)]) };
 
-/** An earlier build gave each workspace its own orchestrator. The page shows both, and keeps them. */
 export const EarlierBuildTwoOrchestrators: Story = {
   args: args([workspace(), workspace({ ...SECOND_WORKSPACE, orchestratorAgentId: SECOND_ORCHESTRATOR.id })]),
 };
 
-/** The second workspace has no orchestrator yet: the header gives it the one that exists. */
 export const SecondServerNoOrchestrator: Story = {
   args: args([workspace(), workspace({ ...SECOND_WORKSPACE, orchestratorAgentId: null })]),
 };
 
-/** The page has the maximum number of workspaces, so Add workspace is off. */
 export const AtLimit: Story = {
   args: args(
     Array.from({ length: MESSAGING_LIMITS.connections }, (_, index) =>
@@ -132,19 +123,16 @@ const dialogArgs = (connection: MessagingConnection | null) => ({
   onClose: fn(),
 });
 
-/** Step 1: Slack's install page opens in the browser. */
 export const ConnectWorkspace: DialogStory = {
   render: (props) => <SlackConnectDialog {...props} />,
   args: dialogArgs(null),
 };
 
-/** Step 2: the workspace is connected, and the Slack Orchestrator is added next. */
 export const AddOrchestrator: DialogStory = {
   render: (props) => <SlackConnectDialog {...props} />,
   args: dialogArgs(workspace({ orchestratorAgentId: null })),
 };
 
-/** Done: the workspace has its Slack Orchestrator. */
 export const ConnectDone: DialogStory = {
   render: (props) => <SlackConnectDialog {...props} />,
   args: dialogArgs(workspace()),

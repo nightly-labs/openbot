@@ -707,6 +707,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Установите «{name}» на компьютере, где работают эти агенты: приложению нужен вход через браузер.",
   "marketplace.error.appInvalid": "Не удалось добавить «{name}»: {reason}",
+  "marketplace.error.appNotConnected": "Не удалось подключить «{name}»: {reason}",
   "marketplace.error.uninstallNoServer": "Выберите локальный сервер, чтобы удалить плагин.",
   "marketplace.error.uninstallPartial": "Часть «{name}» удалить не удалось. {failures}",
   "marketplace.error.actionFailed": "Не удалось выполнить действие в каталоге. Повторите попытку.",
