@@ -72,6 +72,8 @@ export const messages = {
   "workflow.node.place.choose": "Kies kanaal",
   "workflow.node.result.title": "Resultaat",
   "workflow.node.result.copy": "Resultaat kopiëren",
+  "workflow.node.result.yes": "Ja",
+  "workflow.node.result.no": "Nee",
   "workflow.node.result.list": "Resultaten",
   "workflow.node.result.previous": "Vorig resultaat",
   "workflow.node.result.next": "Volgend resultaat",

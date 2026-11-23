@@ -99,6 +99,8 @@ export const messages = {
   "workflow.node.place.choose": "اختيار قناة",
   "workflow.node.result.title": "النتيجة",
   "workflow.node.result.copy": "نسخ النتيجة",
+  "workflow.node.result.yes": "نعم",
+  "workflow.node.result.no": "لا",
   "workflow.node.result.list": "النتائج",
   "workflow.node.result.previous": "النتيجة السابقة",
   "workflow.node.result.next": "النتيجة التالية",

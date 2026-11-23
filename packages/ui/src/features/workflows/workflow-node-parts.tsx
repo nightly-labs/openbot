@@ -1,6 +1,6 @@
 import type { ProviderLogoVariant } from "@openbot/brand";
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import { isAgentProviderRef, WORKFLOW_STEP_NAME_FIELD } from "@openbot/contracts/ipc";
+import { isAgentProviderRef, WORKFLOW_ANSWER_FIELD, WORKFLOW_STEP_NAME_FIELD } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   Button,
@@ -584,6 +584,12 @@ export function ResultField(props: { id: string; running: boolean }) {
   const value = () => resultValue(board.shown(props.id)) ?? "";
   const failure = () => resultFailure(board, props.id);
   const live = () => (props.running ? board.progress(props.id) : undefined);
+  const answer = () => {
+    const text = value();
+    const spec = board.field(props.id, WORKFLOW_ANSWER_FIELD);
+    const givesAnswer = typeof spec === "string" && spec.trim();
+    return text && givesAnswer ? answerEntries(t, text) : undefined;
+  };
   return (
     <Show when={value() || failure() || props.running}>
       <Field class="wfn-field-result">
@@ -601,7 +607,20 @@ export function ResultField(props: { id: string; running: boolean }) {
         </div>
         <div class="wfn-result-body" data-running={props.running ? "" : undefined} data-live={live() ? "" : undefined}>
           <Show when={value() || failure()}>
-            <p data-failed={value() ? undefined : ""}>{value() || failure()}</p>
+            <p data-failed={value() ? undefined : ""}>
+              <Show when={answer()} fallback={value() || failure()}>
+                {(entries) => (
+                  <For each={entries()}>
+                    {(entry) => (
+                      <span class="wfn-result-answer">
+                        <span class="wfn-result-answer-name">{entry.name}</span>
+                        <span class="wfn-result-answer-value">{entry.text}</span>
+                      </span>
+                    )}
+                  </For>
+                )}
+              </Show>
+            </p>
           </Show>
           <Show when={props.running}>
             <ResultPending />
@@ -611,6 +630,31 @@ export function ResultField(props: { id: string; running: boolean }) {
       </Field>
     </Show>
   );
+}
+
+type AnswerEntry = { name: string; text: string };
+
+function answerEntries(t: AppTranslate, value: string): AnswerEntry[] | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+  const entries = Object.entries(parsed).flatMap(([name, item]) => {
+    const text = answerText(t, item);
+    return text ? [{ name, text }] : [];
+  });
+  return entries.length > 0 ? entries : undefined;
+}
+
+function answerText(t: AppTranslate, value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? t("workflow.node.result.yes") : t("workflow.node.result.no");
+  if (Array.isArray(value)) return value.map((item) => answerText(t, item)).join("\n");
+  return value === null || value === undefined ? "" : JSON.stringify(value);
 }
 
 function resultFailure(board: WfnBoard, id: string): string | undefined {
