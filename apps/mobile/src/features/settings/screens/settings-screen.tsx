@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Typography } from "heroui-native";
 import Bell from "lucide-react-native/icons/bell";
 import Bot from "lucide-react-native/icons/bot";
@@ -16,12 +16,15 @@ import Shield from "lucide-react-native/icons/shield";
 import SquareMenu from "lucide-react-native/icons/square-menu";
 import Vibrate from "lucide-react-native/icons/vibrate";
 import WandSparkles from "lucide-react-native/icons/wand-sparkles";
+import { useCallback } from "react";
 import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { CreditStar } from "@/features/settings/components/credit-star";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { agentDefaultsServers } from "@/features/settings/model/agent-defaults";
 import { useBillingState } from "@/features/settings/model/billing";
+import { useCreditsState } from "@/features/settings/model/credits";
 import { shortcutsSupported } from "@/features/shortcuts/shortcuts-native";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
@@ -30,7 +33,7 @@ import { useText } from "@/shared/lib/text";
 
 export function SettingsScreen() {
   const { session } = useMobileSession();
-  const { t } = useText();
+  const { t, format } = useText();
   const managesAgents = useMobileWorkspaceSelector((workspace) => agentDefaultsServers(workspace).length > 0);
   const displayName = session ? mobileUserName(session.user) : t("mobile.settings.home.profile");
   const apiUrl = session?.apiUrl ?? "";
@@ -38,6 +41,13 @@ export function SettingsScreen() {
   const billing = useBillingState(cloudServersOn);
   const showsBilling = cloudServersOn && billing.data?.available !== false;
   const planCount = billing.data?.servers.length;
+  const credits = useCreditsState();
+  const { refetch: refetchCredits } = credits;
+  useFocusEffect(
+    useCallback(() => {
+      void refetchCredits({ cancelRefetch: false });
+    }, [refetchCredits]),
+  );
   return (
     <SettingsContent>
       <SettingsSection>
@@ -71,6 +81,15 @@ export function SettingsScreen() {
               }
             >
               <Typography.Paragraph>{t("mobile.settings.billing.title")}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {session ? (
+            <SettingsRow
+              leading={<CreditStar />}
+              onPress={() => router.push("/settings/credits")}
+              value={credits.data?.available ? format.number(credits.data.balance) : undefined}
+            >
+              <Typography.Paragraph>{t("mobile.settings.credits.title")}</Typography.Paragraph>
             </SettingsRow>
           ) : null}
           {session ? (
