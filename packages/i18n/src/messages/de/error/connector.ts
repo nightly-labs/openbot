@@ -45,6 +45,10 @@ export const messages = {
     "Gib eine HTTPS-Serveradresse, client_id und client_secret des API-Schlüssels und das Master-Passwort ein.",
   "error.connector.bitwardenHostFailed":
     "Bitwarden konnte auf diesem Server nicht geöffnet werden. Prüfe die Serveradresse, den API-Schlüssel und das Master-Passwort und stelle sicher, dass ein Ordner Shared with OpenBot heißt. Verbinde dann erneut.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Die Anmeldung bei Bitwarden auf diesem Server ist fehlgeschlagen. Prüfe die Serveradresse und den API-Schlüssel und verbinde dann erneut.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Bitwarden konnte auf diesem Server nicht entsperrt werden. Prüfe das Master-Passwort und verbinde dann erneut.",
   "error.connector.bitwardenCliInstallFailed":
     "Die Bitwarden CLI konnte auf diesem Server nicht installiert werden. Prüfe seine Netzwerkverbindung und verbinde dann erneut.",
   "error.connector.bitwardenFileUnreadable": "Die Bitwarden-Verbindungsdatei ist nicht lesbar.",

@@ -45,6 +45,10 @@ export const messages = {
     "Voer een HTTPS-serveradres, de client_id en client_secret van de API-sleutel en het hoofdwachtwoord in.",
   "error.connector.bitwardenHostFailed":
     "Kan Bitwarden niet openen op deze server. Controleer het serveradres, de API-sleutel en het hoofdwachtwoord, en zorg dat één map de naam Shared with OpenBot heeft. Verbind daarna opnieuw.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Kan niet inloggen bij Bitwarden op deze server. Controleer het serveradres en de API-sleutel en verbind opnieuw.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Kan Bitwarden niet ontgrendelen op deze server. Controleer het hoofdwachtwoord en verbind opnieuw.",
   "error.connector.bitwardenCliInstallFailed":
     "Kan de Bitwarden-CLI niet installeren op deze server. Controleer de netwerkverbinding en verbind opnieuw.",
   "error.connector.bitwardenFileUnreadable": "Het verbindingsbestand van Bitwarden is onleesbaar.",

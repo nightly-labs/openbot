@@ -52,6 +52,10 @@ export const messages = {
     "أدخل عنوان خادم HTTPS، وclient_id وclient_secret لمفتاح API، وكلمة المرور الرئيسية.",
   "error.connector.bitwardenHostFailed":
     "تعذّر فتح Bitwarden على هذا الخادم. تحقق من عنوان الخادم ومفتاح API وكلمة المرور الرئيسية، وتأكد من وجود مجلد واحد باسم Shared with OpenBot. ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenHostSignInFailed":
+    "تعذّر تسجيل الدخول إلى Bitwarden على هذا الخادم. تحقق من عنوان الخادم ومفتاح API، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "تعذّر فتح قفل Bitwarden على هذا الخادم. تحقق من كلمة المرور الرئيسية، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenCliInstallFailed":
     "تعذّر تثبيت Bitwarden CLI على هذا الخادم. تحقق من اتصاله بالشبكة، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenFileUnreadable": "ملف اتصال Bitwarden غير قابل للقراءة.",
