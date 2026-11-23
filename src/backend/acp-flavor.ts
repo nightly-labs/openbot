@@ -168,7 +168,7 @@ export interface AcpFlavor {
   planApproval?: AcpUserRequest;
 }
 
-export interface AcpUserRequest {
+interface AcpUserRequest {
   method: string;
   questions?(params: DynamicRecord): DynamicRecord[];
   reply(
