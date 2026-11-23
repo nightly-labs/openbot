@@ -13,7 +13,6 @@
 @import "@openbot/ui/styles/reference-chip.css";
 @import "@openbot/ui/styles/chart.css";
 @import "@openbot/ui/features/conversation/conversation.css";
-@import "@openbot/ui/features/diagrams/diagrams.css";
 @import "@openbot/ui/features/agents/first-agent-setup.css";
 @import "@openbot/ui/features/channels/channel-avatar.css";
 @import "@openbot/ui/features/channels/channel-activity.css";
