@@ -799,6 +799,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - When an agent could not start a signed-in MCP server because its tool list took too long, a passing **Test connection** now gives the agent the server's tools again from the next message. Before, the tools stayed missing in that chat until you started a new chat.
 - "Turn on images" for a text-only custom model works again. Before, it showed "An object could not be cloned." and
   the model stayed text only.
+- When an agent asks you to complete a step on a web page, Open on the card in the agent dock now
+  opens that page in the main window, where you can type. Before, it only opened the agent's chat
+  with the same card, so you could not see the page.
 
 ### Security
 
