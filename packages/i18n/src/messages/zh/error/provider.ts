@@ -302,6 +302,8 @@ export const messages = {
     "{provider} 没有结束上一轮，因此没有接受这条消息。OpenBot 已带着聊天记录开启新的 {provider} 会话。请重新发送你的消息。",
   "error.provider.antigravityLocationUnsupported":
     "Google 不允许在运行此助手的电脑所在的网络位置使用 Gemini。请在其他电脑上使用 Gemini，或为此助手选择其他服务商。\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini 因出错而停止。请重新发送你的消息。如果再次停止，请选择其他模型或提供商。",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
   "error.provider.grokServiceFailure": "Grok 服务繁忙或出错。请过几分钟再试，或选择其他模型。",
   "error.provider.grokConnectionFailed": "Grok 无法连接到其服务。请检查网络连接，然后重新发送消息。",

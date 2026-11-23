@@ -357,6 +357,8 @@ export const messages = {
     "{provider} は前のターンを終了しなかったため、このメッセージを受け付けませんでした。OpenBot はチャット履歴を引き継いで新しい {provider} セッションを開始しました。メッセージをもう一度送信してください。",
   "error.provider.antigravityLocationUnsupported":
     "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini はエラーのため停止しました。メッセージをもう一度送信してください。再び停止する場合は、別のモデルまたはプロバイダーを選択してください。",
   "error.provider.antigravityConnectionLost":
     "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
   "error.provider.grokServiceFailure":

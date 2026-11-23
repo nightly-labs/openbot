@@ -347,6 +347,8 @@ export const messages = {
     "{provider} önceki turunu bitirmediği için bu mesajı kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Mesajınızı yeniden gönderin.",
   "error.provider.antigravityLocationUnsupported":
     "Google, bu ajanı çalıştıran bilgisayarın ağ konumundan Gemini'nin çalışmasına izin vermiyor. Gemini'yi başka bir bilgisayarda kullanın veya bu ajan için başka bir sağlayıcı seçin.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini bir hata nedeniyle durdu. Mesajınızı yeniden gönderin. Yine durursa başka bir model veya sağlayıcı seçin.",
   "error.provider.antigravityConnectionLost":
     "Gemini, aracısıyla bağlantısını kaybetti ve durdu. Devam etmek için bir mesaj gönderin.",
   "error.provider.grokServiceFailure":

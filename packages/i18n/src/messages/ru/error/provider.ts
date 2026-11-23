@@ -338,6 +338,8 @@ export const messages = {
     "{provider} не завершил предыдущий ход, поэтому не принял это сообщение. OpenBot начал новый сеанс {provider} с историей чата. Отправьте сообщение ещё раз.",
   "error.provider.antigravityLocationUnsupported":
     "Google не разрешает Gemini работать из сетевого местоположения компьютера, на котором работает этот агент. Используйте Gemini на другом компьютере или выберите другого провайдера для этого агента.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini остановился из-за ошибки. Отправьте сообщение ещё раз. Если он снова остановится, выберите другую модель или другого провайдера.",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
   "error.provider.grokServiceFailure":

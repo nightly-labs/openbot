@@ -322,6 +322,8 @@ export const messages = {
     "{provider} לא סיים את התור הקודם שלו, ולכן לא קיבל את ההודעה הזו. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. יש לשלוח את ההודעה שוב.",
   "error.provider.antigravityLocationUnsupported":
     "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini נעצר בגלל שגיאה. יש לשלוח את ההודעה שוב. אם הוא נעצר שוב, יש לבחור מודל או ספק אחר.",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
   "error.provider.grokServiceFailure":
     "השירות של Grok עמוס או שיש בו שגיאה. יש לנסות שוב בעוד כמה דקות, או לבחור מודל אחר.",

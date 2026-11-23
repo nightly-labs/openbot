@@ -320,6 +320,8 @@ export const messages = {
     "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "توقف Gemini بسبب خطأ. أرسل رسالتك مرة أخرى. إذا توقف مرة أخرى، فاختر نموذجًا أو مزودًا آخر.",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
   "error.provider.grokServiceFailure": "خدمة Grok مشغولة أو بها خطأ. أعد المحاولة بعد بضع دقائق، أو اختر نموذجًا آخر.",
   "error.provider.grokConnectionFailed":

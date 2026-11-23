@@ -361,6 +361,8 @@ export const messages = {
     "{provider} hat seinen vorherigen Durchgang nicht beendet und diese Nachricht deshalb nicht angenommen. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
   "error.provider.antigravityLocationUnsupported":
     "Google lässt Gemini am Netzwerkstandort des Computers, auf dem dieser Agent läuft, nicht arbeiten. Nutze Gemini auf einem anderen Computer oder wähle einen anderen Anbieter für diesen Agenten.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini wurde wegen eines Fehlers beendet. Sende deine Nachricht erneut. Wenn es wieder stoppt, wähle ein anderes Modell oder einen anderen Anbieter.",
   "error.provider.antigravityConnectionLost":
     "Gemini hat die Verbindung zu seinem Agenten verloren und wurde beendet. Sende eine Nachricht, um fortzufahren.",
   "error.provider.grokServiceFailure":

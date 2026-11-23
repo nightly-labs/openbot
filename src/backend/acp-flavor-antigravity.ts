@@ -117,7 +117,15 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityConnectionLost"), key: null };
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
-  return { message: key ? geminiRequestFailureText(key, text) : shownFailureDetail(text), key };
+  const logged = GEMINI_EXECUTOR_ERROR.test(text);
+  if (key) {
+    const shown =
+      logged && key !== "error.provider.antigravityNetwork" ? (GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text) : text;
+    return { message: geminiRequestFailureText(key, shown), key };
+  }
+  if (logged || GEMINI_TERMINATED_ANSWER.test(text))
+    return { message: sourceText("error.provider.antigravityTurnStopped"), key: null };
+  return { message: shownFailureDetail(text), key };
 }
 
 function geminiTurnFailureCause(answer: string): CauseCode | null {
@@ -174,6 +182,8 @@ function antigravityOwnMcpServerNames(cwd: string, argv: readonly string[]): str
 }
 
 const GEMINI_TERMINATED_ANSWER = /^\s*(?:\u26A0 )?Agent execution terminated due to error\.?\s*$/u;
+const GEMINI_EXECUTOR_ERROR = /\bagent executor error: [^\n]+/u;
+const GEMINI_API_ERROR_MESSAGE = /\bError \d{3}, Message: (.+?), Status: /u;
 const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
 const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
 const GOOGLE_REFUSED_FIELD =
@@ -246,6 +256,12 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
   if (log === null) return [];
   const named = Array.from(log.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
   return named.length > 0 ? named : googleRefusedMcpTools(log, schemas);
+}
+
+function antigravityLoggedFailure(text: string, argv: readonly string[], sessionId: string): string | null {
+  if (!GEMINI_TERMINATED_ANSWER.test(text)) return null;
+  const causes = antigravityLastPromptLog(argv, sessionId)?.match(new RegExp(GEMINI_EXECUTOR_ERROR.source, "gu"));
+  return causes?.at(-1)?.trim() ?? null;
 }
 
 function antigravityAccountLink(text: string, argv: readonly string[]): string | null {
@@ -368,6 +384,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     },
     mcpLoadFailure: geminiMcpLoadFailure,
     refusedMcpTools: antigravityRefusedMcpTools,
+    loggedFailure: antigravityLoggedFailure,
     sessionLost: GEMINI_CONNECTION_LOST_ANSWER,
   },
   cancelLocallyThenResume: true,

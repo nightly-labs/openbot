@@ -2649,7 +2649,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const failureAt = turn.sdkFailureAt ?? (sdkHarness.answerIsFailure.test(turn.text) ? 0 : null);
         const failure = failureAt === null ? "" : turn.text.slice(failureAt).trim();
         if (failureAt !== null) {
-          const detail = failure || turn.text.trim();
+          const answer = failure || turn.text.trim();
+          const logged = sdkHarness.loggedFailure?.(answer, this.options.argv, thread.id) ?? null;
+          if (logged) this.emit("diagnostic", this.#redact(logged));
+          const detail = logged ?? answer;
           turn.text = failure ? turn.text.slice(0, failureAt) : "";
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
             turn.accountLink = sdkHarness.accountLink?.(detail, this.options.argv, thread.id) ?? null;
