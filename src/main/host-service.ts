@@ -211,6 +211,7 @@ interface HostServiceOptions {
   peerMemberChanged?: (peerId: string, membershipId: string | null) => void;
   privateNetwork?: () => boolean;
   preferredSignalHome?: () => string | null;
+  signalHomeAnswers?: (home: string) => Effect.Effect<boolean>;
   registerRemoteHost?: (input: {
     hostId: string;
     name: string;
@@ -594,6 +595,7 @@ export class HostService extends EventEmitter<HostEvents> {
           ...(options.verifyRemoteSessionTicket ? { verifyClientTicket: options.verifyRemoteSessionTicket } : {}),
           ...(options.privateNetwork ? { privateNetwork: options.privateNetwork } : {}),
           ...(options.preferredSignalHome ? { preferredSignalHome: options.preferredSignalHome } : {}),
+          ...(options.signalHomeAnswers ? { signalHomeAnswers: options.signalHomeAnswers } : {}),
         })
       : null;
   }

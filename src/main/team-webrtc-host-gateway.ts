@@ -17,6 +17,7 @@ interface TeamWebRtcHostGatewayOptions extends TeamWebRtcHostPeerOptions {
   onSignalLost?: (lost: boolean) => void;
   privateNetwork?: () => boolean;
   preferredSignalHome?: () => string | null;
+  signalHomeAnswers?: (home: string) => Effect.Effect<boolean>;
 }
 
 const logger = createOpenBotLogger("team-webrtc-host");
@@ -223,15 +224,32 @@ export class TeamWebRtcHostGateway {
 
   readonly #followSignalHome = Effect.fn("HostGateway.followSignalHome")(function* (this: TeamWebRtcHostGateway) {
     const hostId = this.#hostId;
-    if (!hostId || this.#connecting || this.#signalRecovery || this.#signalRenewalRefused || !this.#options.renewSignal)
+    if (!hostId || this.#signalRenewalRefused || !this.#options.renewSignal) return;
+    if (this.#connecting || this.#signalRecovery) {
+      this.scheduleSignalHomeFollow();
       return;
+    }
+    const signalUrlBefore = this.#signalUrl;
     const fiber = this.#runtime.runFork(
       this.#recoverSignal(hostId, undefined, true).pipe(
         Effect.catch(({ cause }) =>
           Effect.sync(() => {
             if (this.#hostId !== hostId) return;
-            this.#noteRenewalRefused(cause);
-            logger.warn("Host Signal home change failed; the host keeps its Signal.");
+            const refused = this.#noteRenewalRefused(cause);
+            if (this.#signalEnded) {
+              this.#options.onSignalRecoveryFailure?.(
+                cause instanceof Error ? cause : new Error(sourceText("error.remote.signalRecoveryFailed")),
+                `home change ${refused ? "refused" : "failed"}`,
+              );
+              return;
+            }
+            if (this.#signalUrl === signalUrlBefore) {
+              logger.warn("Host Signal home change failed; the host keeps its Signal.");
+              return;
+            }
+            logger.warn("Host Signal home change failed; the host asks for another home.");
+            this.#scheduleSignalMove();
+            this.#scheduleSignalLostReport();
           }),
         ),
       ),
@@ -275,7 +293,12 @@ export class TeamWebRtcHostGateway {
   readonly #checkSignalHomeReturn = (): void => {
     const preferred = this.#options.preferredSignalHome?.() ?? null;
     if (preferred === null || preferred === this.#signalHome || this.#signalEnded || !this.#signalHomed) return;
-    this.#followSignalHomeNow();
+    const answers = this.#options.signalHomeAnswers?.(preferred) ?? Effect.succeed(true);
+    const fiber = this.#runtime.runFork(
+      answers.pipe(Effect.flatMap((answered) => (answered ? this.#followSignalHome() : Effect.void))),
+    );
+    this.#operations.add(fiber);
+    fiber.addObserver(() => this.#operations.delete(fiber));
   };
 
   readonly applyNetworkRoute = Effect.fn("HostGateway.applyNetworkRoute")(function* (this: TeamWebRtcHostGateway) {

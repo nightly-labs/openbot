@@ -3397,6 +3397,7 @@ export async function createApplicationServices({
         .issueRemoteHostTicket(hostId, home && { ...home, preferredSignalHome: hostSignalHome.preferred() })
         .pipe(toRemoteWorkflowError),
     preferredSignalHome: () => hostSignalHome.preferred(),
+    signalHomeAnswers: (home) => hostSignalHome.answers(home),
     ...(serverModeEnvironment && !hostedServer
       ? {
           requestTransferredOwnerSession: (hostId: string) =>

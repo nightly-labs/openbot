@@ -1206,12 +1206,15 @@ automatic) and does not go with an instance transfer, because the latency belong
 Each host ticket that asks for a home sends it as `preferredSignalHome`. The account service gives
 the chosen home when it answers, and the automatic home when it fails or does not answer. A change
 asks for a new ticket one second after the answer, so the answer reaches a remote admin first; when
-the URL changes, the host moves to the new Signal and its members connect again. While the host is on another home than the chosen one, it asks again every 15 minutes, so it
-goes back when the chosen home answers. The desktop app shows the row in Server settings > General
+the URL changes, the host moves to the new Signal and its members connect again. While the host is on another home than the chosen one, it checks every 15 minutes that the
+chosen home answers from its own network, and only then asks again, so it goes back when the chosen
+home answers. When a move fails after the host left its old Signal, the host asks for another home
+with the failed URL, as after a Signal failure. A change made while a Signal recovery runs waits
+for the recovery to end. The desktop app shows the row in Server settings > General
 only while the host is published and the account service lists two or more homes; the web client
 shows it for a joined server. Mobile shows a Signal server row in Server settings to each member when the
 host lists two or more homes, with the colored latency of the home in use (green under 100 ms, yellow
-under 200 ms, red above or with no answer). Only an owner or an admin can open the list and choose. Safe mode asks for the automatic home.
+under 200 ms, red above or with no answer). Only an owner or an admin can open the list and choose. Safe mode reads the saved choice and sends it too.
 
 `host-timezone-v1` reads and sets the server timezone (`openbot-server-timezone-v1.json`; `null` is
 automatic, the system zone of the host). When an agent creates a routine, the zone comes from the tool

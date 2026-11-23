@@ -2,7 +2,7 @@ import { type HostSignalHomeSettings, isSignalHomeId } from "@openbot/contracts/
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema } from "effect";
-import { PreferenceStore } from "./preference-file";
+import { PreferenceStore, readPreferenceFile } from "./preference-file";
 import { signalHttpOrigin } from "./telegram-files";
 
 export const SIGNAL_HOME_PREFERENCE_FILE = "openbot-signal-home-v1.json";
@@ -121,6 +121,12 @@ export class HostSignalHomeService {
     });
   }
 
+  readonly answers = Effect.fn("HostSignalHome.answers")(function* (this: HostSignalHomeService, home: string) {
+    const listed = yield* this.#options.listHomes().pipe(Effect.orElseSucceed(() => []));
+    const url = listed.find((entry) => entry.id === home)?.url;
+    return url !== undefined && (yield* this.#latency(url)) !== null;
+  }).bind(this);
+
   readonly set = Effect.fn("HostSignalHome.set")(function* (this: HostSignalHomeService, home: string | null) {
     if (home !== null && !(yield* this.#options.listHomes()).some((listed) => listed.id === home))
       return yield* new SignalHomeUnknownError({ cause: new Error(sourceText("error.host.signalHomeUnknown")) });
@@ -128,4 +134,11 @@ export class HostSignalHomeService {
     yield* this.#options.followHome();
     return yield* this.snapshot();
   }).bind(this);
+}
+
+export function readSignalHomeChoice(path: string): Effect.Effect<string | null> {
+  return readPreferenceFile(path, decodeSignalHomePreference).pipe(
+    Effect.map((preference) => preference?.home ?? null),
+    Effect.orElseSucceed(() => null),
+  );
 }
