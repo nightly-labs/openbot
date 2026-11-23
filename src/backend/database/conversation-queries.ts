@@ -72,9 +72,11 @@ export class ConversationQueries {
         this.#core.connection
           .prepare(
             `SELECT message_json FROM projection_thread_messages
-             WHERE thread_id = ? ORDER BY created_at, ordinal, message_id`,
+             WHERE thread_id = ?
+               AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+             ORDER BY created_at, ordinal, message_id`,
           )
-          .all(threadId),
+          .all(threadId, agentId),
       ),
     );
   }
@@ -87,9 +89,11 @@ export class ConversationQueries {
         this.#core.connection
           .prepare(
             `SELECT message_json FROM projection_thread_messages
-             WHERE thread_id = ? AND turn_id = ? ORDER BY created_at, ordinal, message_id`,
+             WHERE thread_id = ? AND turn_id = ?
+               AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+             ORDER BY created_at, ordinal, message_id`,
           )
-          .all(threadId, turnId),
+          .all(threadId, turnId, agentId),
       ),
     );
   }
@@ -325,7 +329,7 @@ export class ConversationQueries {
         )
         .get(threadId, agentId),
     );
-    const rows = this.#conversationPageRows(threadId, anchor, limit, options);
+    const rows = this.#conversationPageRows(agentId, threadId, anchor, limit, options);
     const messages = rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
     const messageIds = new Set(messages.map((message) => message.id));
     const referenceIdSet = new Set<string>();
@@ -342,9 +346,10 @@ export class ConversationQueries {
           .prepare(
             `SELECT message_id, message_json FROM projection_thread_messages
              WHERE thread_id = ? AND message_id IN (${placeholders})
+             AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
              ${conversationMarkerSqlFilter(options)}`,
           )
-          .all(threadId, ...referenceIds),
+          .all(threadId, ...referenceIds, agentId),
       );
       for (const row of referenceRows) {
         references[requiredStringColumn(row, "message_id")] = decodeConversationMessageJson(
@@ -354,7 +359,7 @@ export class ConversationQueries {
     }
     const first = rows[0];
     const older = first
-      ? this.#conversationRowsBefore(threadId, conversationRowCursor(first), options)
+      ? this.#conversationRowsBefore(threadId, conversationRowCursor(first), options, agentId)
       : { count: 0, oldestAt: null };
     const hasOlder = older.count > 0;
     return {
@@ -563,27 +568,30 @@ export class ConversationQueries {
   }
 
   #conversationPageRows(
+    agentId: string,
     threadId: string,
     anchor: ConversationPageAnchor,
     limit: number,
     exclusions: ConversationMarkerExclusions,
   ): DynamicRecord[] {
-    const rows = this.#conversationPageKeys(threadId, anchor, limit, exclusions);
+    const rows = this.#conversationPageKeys(agentId, threadId, anchor, limit, exclusions);
     if (rows.length === 0) return [];
     const json = new Map(
       databaseRows(
         this.#core.connection
           .prepare(
             `SELECT message_id, message_json FROM projection_thread_messages
-             WHERE thread_id = ? AND message_id IN (${rows.map(() => "?").join(", ")})`,
+             WHERE thread_id = ? AND message_id IN (${rows.map(() => "?").join(", ")})
+               AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)`,
           )
-          .all(threadId, ...rows.map((row) => requiredStringColumn(row, "message_id"))),
+          .all(threadId, ...rows.map((row) => requiredStringColumn(row, "message_id")), agentId),
       ).map((row) => [requiredStringColumn(row, "message_id"), requiredStringColumn(row, "message_json")]),
     );
     return rows.map((row) => ({ ...row, message_json: json.get(requiredStringColumn(row, "message_id")) }));
   }
 
   #conversationPageKeys(
+    agentId: string,
     threadId: string,
     anchor: ConversationPageAnchor,
     limit: number,
@@ -594,51 +602,51 @@ export class ConversationQueries {
       const rows = databaseRows(
         this.#core.connection
           .prepare(
-            `${ORDERED_THREAD_MESSAGES}
+            `${ORDERED_THREAD_MESSAGES_FOR_AGENT}
              SELECT ${ORDER_KEY_COLUMNS} FROM ordered
              WHERE 1 = 1 ${routineFilter}
              ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
           )
-          .all(threadId, PAGE_MESSAGE_LIMIT + 1),
+          .all(threadId, agentId, PAGE_MESSAGE_LIMIT + 1),
       );
       return wholeGroups(rows, limit, PAGE_MESSAGE_LIMIT).reverse();
     }
     if (anchor.type === "before") {
-      const cursor = this.#pageCursor(threadId, anchor.cursor);
+      const cursor = this.#pageCursor(agentId, threadId, anchor.cursor);
       const rows = databaseRows(
         this.#core.connection
           .prepare(
-            `${ORDERED_THREAD_MESSAGES}
+            `${ORDERED_THREAD_MESSAGES_FOR_AGENT}
              SELECT ${ORDER_KEY_COLUMNS} FROM ordered
              WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?, ?)
              ${routineFilter}
              ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
           )
-          .all(threadId, ...pageKeyValues(cursor), PAGE_MESSAGE_LIMIT + 1),
+          .all(threadId, agentId, ...pageKeyValues(cursor), PAGE_MESSAGE_LIMIT + 1),
       );
       return wholeGroups(rows, limit, PAGE_MESSAGE_LIMIT).reverse();
     }
     const anchorRow = databaseRow(
       this.#core.connection
         .prepare(
-          `${ORDERED_THREAD_MESSAGES}
+          `${ORDERED_THREAD_MESSAGES_FOR_AGENT}
            SELECT ${ORDER_KEY_COLUMNS} FROM ordered
            WHERE message_id = ? ${routineFilter}`,
         )
-        .get(threadId, anchor.messageId),
+        .get(threadId, agentId, anchor.messageId),
     );
     if (!anchorRow) return [];
     const anchorKey = pageKeyValues(conversationRowCursor(anchorRow));
     const newerRows = databaseRows(
       this.#core.connection
         .prepare(
-          `${ORDERED_THREAD_MESSAGES}
+          `${ORDERED_THREAD_MESSAGES_FOR_AGENT}
            SELECT ${ORDER_KEY_COLUMNS} FROM ordered
            WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)
            ${routineFilter}
            ORDER BY ${ORDER_KEY_COLUMNS} LIMIT ?`,
         )
-        .all(threadId, ...anchorKey, PAGE_MESSAGE_LIMIT + 1),
+        .all(threadId, agentId, ...anchorKey, PAGE_MESSAGE_LIMIT + 1),
     );
     const anchorGroupId = requiredStringColumn(anchorRow, "group_id");
     const rowsAfterInTurn = newerRows.findIndex((row) => requiredStringColumn(row, "group_id") !== anchorGroupId);
@@ -650,28 +658,28 @@ export class ConversationQueries {
     const olderRows = databaseRows(
       this.#core.connection
         .prepare(
-          `${ORDERED_THREAD_MESSAGES}
+          `${ORDERED_THREAD_MESSAGES_FOR_AGENT}
            SELECT ${ORDER_KEY_COLUMNS} FROM ordered
            WHERE (${ORDER_KEY_COLUMNS}) <= (?, ?, ?, ?, ?, ?, ?)
            ${routineFilter}
            ORDER BY ${ORDER_KEY_DESC} LIMIT ?`,
         )
-        .all(threadId, ...anchorKey, olderCap + 1),
+        .all(threadId, agentId, ...anchorKey, olderCap + 1),
     );
     const older = wholeGroups(olderRows, Math.floor(limit / 2) + 1, olderCap).reverse();
     return [...older, ...wholeGroups(newerRows, Math.max(limit - older.length, 1), PAGE_MESSAGE_LIMIT - older.length)];
   }
 
-  #pageCursor(threadId: string, value: string): ConversationPageCursor {
+  #pageCursor(agentId: string, threadId: string, value: string): ConversationPageCursor {
     const cursor = decodeConversationCursor(value);
     if (cursor.version === 2) return cursor;
     const row = databaseRow(
       this.#core.connection
         .prepare(
-          `${ORDERED_THREAD_MESSAGES}
+          `${ORDERED_THREAD_MESSAGES_FOR_AGENT}
            SELECT group_start, group_first, group_id, turn_rank FROM ordered WHERE message_id = ?`,
         )
-        .get(threadId, cursor.messageId),
+        .get(threadId, agentId, cursor.messageId),
     );
     return {
       ...cursor,
@@ -687,20 +695,30 @@ export class ConversationQueries {
     threadId: string,
     cursor: ConversationPageCursor,
     exclusions: ConversationMarkerExclusions,
+    agentId?: string,
   ): { count: number; oldestAt: string | null } {
     const routineFilter = conversationMarkerSqlFilter(exclusions);
+    const ordered = agentId ? ORDERED_THREAD_MESSAGES_FOR_AGENT : ORDERED_THREAD_MESSAGES;
+    const ownership = agentId ? "AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)" : "";
     const row = databaseRow(
       this.#core.connection
         .prepare(
-          `${ORDERED_THREAD_MESSAGES}
+          `${ordered}
            SELECT COUNT(*) AS older_count,
-             (SELECT created_at FROM projection_thread_messages WHERE thread_id = ? ${routineFilter}
+             (SELECT created_at FROM projection_thread_messages
+              WHERE thread_id = ?
+                ${ownership}
+                ${routineFilter}
               ORDER BY created_at, ordinal, message_id LIMIT 1) AS oldest_at
            FROM ordered
            WHERE (${ORDER_KEY_COLUMNS}) < (?, ?, ?, ?, ?, ?, ?)
            ${routineFilter}`,
         )
-        .get(threadId, threadId, ...pageKeyValues(cursor)),
+        .get(
+          ...(agentId
+            ? [threadId, agentId, threadId, agentId, ...pageKeyValues(cursor)]
+            : [threadId, threadId, ...pageKeyValues(cursor)]),
+        ),
     );
     return {
       count: row ? requiredNumberColumn(row, "older_count") : 0,
@@ -712,6 +730,12 @@ export class ConversationQueries {
 export const ORDERED_THREAD_MESSAGES = `WITH ordered AS (
   SELECT created_at, ordinal, message_id, author, item_type, group_start, group_first, group_id, turn_rank
   FROM projection_thread_messages WHERE thread_id = ?
+)`;
+const ORDERED_THREAD_MESSAGES_FOR_AGENT = `WITH ordered AS (
+  SELECT created_at, ordinal, message_id, author, item_type, group_start, group_first, group_id, turn_rank
+  FROM projection_thread_messages
+  WHERE thread_id = ?
+    AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
 )`;
 export const ORDER_KEY_COLUMNS = "group_start, group_first, group_id, turn_rank, created_at, ordinal, message_id";
 export const ORDER_KEY_DESC =
