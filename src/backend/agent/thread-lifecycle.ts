@@ -1185,7 +1185,10 @@ export class ThreadLifecycle {
               client.provider === "antigravity"
               ? mcpServers
                   .filter((config) => mcpFallbackRunsServer(config, agent))
-                  .map((config) => providerMcpServerName(config.name))
+                  .map(
+                    (config) =>
+                      client.sessionMcpServerName?.(config, agent.workspacePath) ?? providerMcpServerName(config.name),
+                  )
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
       ...(client.provider === "antigravity" ? { toolCatalog: toolCatalogNames(client.provider) } : {}),

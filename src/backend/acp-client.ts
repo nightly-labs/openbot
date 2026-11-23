@@ -472,6 +472,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
   readonly mcpToolsFixedAtStart = (): boolean => this.#flavor.mcpToolsFixedAtStart === true;
   readonly catalogAsMcpTools = (): boolean => this.#flavor.catalogAsMcpTools === true;
+  readonly sessionMcpServerName = (config: McpServerConfig, cwd: string): string =>
+    acpMcpServerName(config, this.#ownMcpServerNames(cwd), this.#flavor.mcpServerName);
   readonly imageInput = (): boolean => this.#initialization?.agentCapabilities?.promptCapabilities?.image === true;
   readonly turnContext = true;
   readonly #turnContext = new TurnContext();

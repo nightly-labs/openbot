@@ -35,6 +35,7 @@ export interface AgentClient {
   readonly deferredMcpTools?: (externalThreadId: string) => boolean;
   readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
   readonly catalogAsMcpTools?: (model: string) => boolean;
+  readonly sessionMcpServerName?: (config: McpServerConfig, cwd: string) => string;
   readonly imageInput?: (externalThreadId: string) => boolean;
   readonly structuredOutput?: boolean;
   readonly canReleaseProcess?: () => boolean;
