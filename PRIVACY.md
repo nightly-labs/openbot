@@ -2081,6 +2081,19 @@ when a session opens, Vibe asks Mistral (`api.mistral.ai`) for the models of you
 same API key, and keeps the list in `model_catalog_cache.json` in `~/.vibe`, or in `$VIBE_HOME`.
 Mistral's terms apply. Team members see the host's Mistral agents when their app supports Mistral.
 
+### Kiro
+
+OpenBot does not download Kiro CLI. It starts the `kiro-cli` that you installed, with `kiro-cli acp`,
+as a local process. Prompts, attachments, and tool results go to that process, and Kiro sends them
+to the Kiro service of AWS. Connect runs `kiro-cli login`, which opens the sign-in page of Kiro in your browser (or, on a joined
+server, prints a code that you confirm on any device). Kiro
+keeps its sign-in, history, settings, steering files, agents and sessions in `~/.kiro` and in its
+data folder (`~/Library/Application Support/kiro-cli` on macOS), and it can change them during a
+turn. OpenBot does not read, copy, or upload these files, and it does not change Kiro's own
+telemetry setting. Kiro can also use the network for its own tools and MCP servers, as you set them
+up in Kiro. The AWS terms and the Kiro terms apply. Team members see the host's Kiro agents, as for
+the other providers, when their app supports Kiro.
+
 ### Hermes
 
 OpenBot does not download Hermes Agent. It starts the `hermes` that you installed, with `hermes acp`,

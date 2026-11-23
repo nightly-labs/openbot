@@ -23,7 +23,7 @@ const NOT_COVERED = ["codex", "claude", "pi", "inception", "deepseek", "openrout
 interface DriverCase {
   provider: AgentProviderId;
   missing: "protocol" | "opencode" | "antigravity" | "cursor" | "cline" | "kimi" | "devin" | "hermes" | "mistral";
-  modelSet?: "kimi" | "mistral";
+  modelSet?: "kimi" | "mistral" | "kiro";
   noSignIn?: string;
 }
 
@@ -38,6 +38,7 @@ const DRIVERS: readonly DriverCase[] = [
   { provider: "mistral", missing: "mistral", modelSet: "mistral" },
   { provider: "grok", missing: "protocol" },
   { provider: "hermes", missing: "hermes" },
+  { provider: "kiro", missing: "protocol", modelSet: "kiro" },
   {
     provider: "acp",
     missing: "protocol",

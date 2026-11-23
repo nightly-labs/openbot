@@ -1492,6 +1492,102 @@ the model gets all tools: about 230 KB of schemas with 142 catalog tools. `bun r
 (`HERMES_REPO`, `HERMES_PYTHON`) gives the tools of the real bridge to the tool search of a Hermes
 checkout and writes `.openbot-build/hermes-catalog-tools-e2e/report.json`.
 
+### Kiro
+
+The Kiro provider (id `kiro`) starts the user's own Kiro CLI with `kiro-cli acp --agent-engine=v3`. OpenBot has no
+managed runtime for it: AWS updates the CLI itself, and the CLI keeps the sign-in in its own folders.
+`resolveKiroCli` looks for `kiro-cli` on `PATH` and in `~/.local/bin`, and reads the version from
+`kiro-cli X.Y.Z` in `kiro-cli --version`. `OPENBOT_KIRO_PATH` selects an executable. A missing CLI is
+`not-installed`, and the row opens the `kiro-install` guide.
+
+**Engine.** OpenBot starts `kiro-cli acp --agent-engine=v3` (`KIRO_ARGV`). V3 is the default engine of Kiro CLI 3, and
+Kiro CLI 2.36 is the first release with the flag. `resolveKiroCli` refuses an older release with
+`error.provider.kiroOutdated`. V3 refuses `--agent`, `--model`, `--effort`, `--trust-all-tools` and `--trust-tools`, so
+the model and the effort are set after `session/new`. The protocol version does not tell V2 from V3: both answer 1.
+The V2 engine (`_kiro.dev/*` notifications, `session/set_model`, the subagent roster) is not supported. A V2 session id
+that V3 loads opens with no history.
+
+**Sign in.** `kiro-cli login` with no terminal opens the page of a Builder ID, Google or GitHub sign-in in
+the system browser and waits for it ("Opening browser..."), so Connect runs it as a `cli-command`. With
+`--use-device-flow` it prints `Confirm the following code in the browser`, `Code: ABCD-EFGH` and `Open this
+URL: <page>`, which `parseCliCodePrompt` reads for a joined server (`codeSignIn`, `closeInput`). An IAM
+Identity Center sign-in needs `--license pro`, the portal address and a region, so the user runs it in a
+terminal and Connect reads the account again. A computer with no sign-in answers each ACP start with
+`error: You are not logged in, please log in with kiro-cli login` on stderr and exits with code 1: the
+account is `null`, and `hiddenWhenSignedOut` lists no models (run with an empty `HOME`, in
+`bun run test:kiro-live`). `initialize` of V3 lists the auth methods `aws-builder-id` and `aws-iam-identity-center`, which OpenBot does not use. Disconnect runs `kiro-cli logout`.
+A 2.37 CLI that is signed in later and fails a session with ACP's `-32000` is reported as signed out
+(`KIRO_ACP_FLAVOR.authRequiredSignsOut`, from the Kiro documentation, not reproduced).
+
+**Subagents.** V3 sends no roster and no update of a subagent's own session. The parent gets a `tool_call` titled
+`Sub-agent: <name>` (`_meta.kiro.kind` is `agent-subtask`) and a `session/request_permission` for it, so the chat shows
+an ordinary tool card and no subagent card. OpenBot does not build subagent cards for Kiro.
+
+**Models and effort.** `session/new` returns no `models`. `configOptions` has `mode`, `model`, `effortLevel` (category
+`thought_level`; `none`, `low`, `medium`, `high`, `xhigh`, `max`), `memoryReflection`, `autopilot` and
+`contentCollection`. Each `model` value has a description such as "... with 1M context window" and `_meta.kiro` with
+`effortLevels` and `rateMultiplier`. `KIRO_ACP_FLAVOR.modelConfigId` is `model`, the same as the custom agent
+`kiro-cli`, so OpenBot sets the model with `session/set_config_option`. `session/set_model` fails on V3 with `-32603`.
+The effort goes through `effortLevel`. The modes (the user's Kiro agents) are not used yet.
+
+**Context fill.** V3 sends `session/update` with `sessionUpdate` `session_info_update` and `_meta.kiro.kind`
+`context_usage` (`contextUsage.usagePercentage`, `summarizationThreshold`, `breakdown`). `KIRO_ACP_FLAVOR.contextPercentUpdate`
+turns the percentage into the `thread/tokenUsage/updated` that the context bar reads, with the size from the model
+description (`kiroContextWindow`). A description with no size shows no fill: the size is never guessed. The credits of a
+finished turn are in `turn_completion` (`promptTurnSummaries`). Credits are not shown: OpenBot reads tokens and US
+dollars, and a credit is neither.
+
+**Parallel turns.** `concurrentTurns` is `true`, so an agent on Kiro runs its own chat, its side threads and its
+channel turns at the same time, up to its task limit. Three checks back it:
+
+- `bun run test:kiro-parallel` runs the real agent service and scheduler over a fake `kiro-cli`. The chat and two
+  side threads of a Kiro agent run 3 turns at once in one process, each in a session of its own, and none waits with
+  the hold `one-turn`. A control agent on the generic `acp` provider runs the same messages one at a time, and a side
+  thread waits with `one-turn`.
+- `bun run test:kiro-live`, on a signed-in Kiro CLI 2.37.1 with `claude-haiku-5.5`: two sessions in two folders, and
+  two in one folder, overlap about 2.4 to 2.7 s, and the two turns end less than 0.4 s apart. About 0.2 credits.
+- The same run opens two sessions in one folder, each with the MCP server of OpenBot (`LocalMcpBridge`, one token for
+  each session), and has each one call a tool. Each call reached the chat that made it, so Kiro does not keep one MCP
+  server for a folder (`mcpServersPerDirectory` is not set, as it is for OpenCode).
+- The same run starts the CLI through a tracing proxy (`scripts/provider-fakes/agents/kiro-trace-proxy.ts`) that logs
+  the method names, the `session/set_config_option` values and the kinds of `session_info_update`. It shows the V3
+  arguments, `model` and `effortLevel` set with `session/set_config_option`, no call of `session/set_model`, and a
+  `context_usage` update for each turn.
+
+**Skills and instructions.** Kiro reads skills from `.kiro/skills` (workspace) and `~/.kiro/skills`
+only. A test with a skill in each of `.kiro/skills`, `.agents/skills` and `.claude/skills` showed only the
+first in `_kiro.dev/commands/available` (V2). So `skillFolders` is `[".kiro/skills"]`, and `homeSkills` is
+`instructions`: the developer instructions name the skills of `~/.agents/skills` by the path of each
+`SKILL.md`. The skills of the workspace's `.agents/skills`, where OpenBot installs its own and the
+marketplace's, are named the same way (`unreadWorkspaceSkills`, for a provider whose `homeSkills` is
+`instructions` and whose `skillFolders` lack `.agents/skills`). The agent reads the file when a task matches,
+which a Kiro agent did on the V2 engine for a secret that only the `SKILL.md` held. The V3 live check does not repeat it. A skill of
+the same name in `.kiro/skills` wins. Writing `.kiro/skills` too stays separate work: the installer, the
+instance transfer and the skill list write and skip two fixed folders (`MANAGED_SKILL_FOLDERS`). Kiro reads
+`AGENTS.md` as steering.
+
+**Confinement.** `kiroStatePaths` lets a confined process write `~/.kiro` and the data folder of the
+CLI (`data.sqlite3`, the runtime it downloads), and protects `settings`, `agents`, `steering`, `skills`,
+`powers`, `extensions`, `hooks`, `argv.json` and `kiro.env` in `~/.kiro`. The macOS data folder
+(`~/Library/Application Support/kiro-cli`) was read on a real install. Linux
+(`~/.local/share/kiro-cli`, or under `$XDG_DATA_HOME`) comes from the Docker documentation of Kiro. For
+Windows, two sources disagree between `%APPDATA%` and `%LOCALAPPDATA%`, and the code takes
+`%LOCALAPPDATA%` without a check on Windows. The process confinement runs on macOS only, so the
+folder matters there only when a Windows or Linux sandbox arrives. The AWS folders of an IAM Identity Center
+sign-in stay closed: whether the CLI writes them was not checked.
+
+**Confined start.** `bun run test:kiro-live` runs one turn with `{ writableRoots: [folder] }`, so the CLI starts under
+`sandbox-exec` with `~/.kiro/settings` read-only: it starts, lists models, completes the turn and sends
+`context_usage`. A signed-out V3 in an empty `HOME`, confined and not confined, writes `error: You are not logged
+in` and exits before it answers `initialize`, and in this check neither run wrote `settings/cli.json`. A signed-in
+V3 that must create `~/.kiro/settings/cli.json` under the confinement was not checked: that needs a sign-in in a
+folder that the check can reset.
+
+**Not done.** Subagent cards, the credits of a turn (`turn_completion`) and the plan usage (`reportsUsage` is `false`): a
+credit needs a field of its own in the contracts. The Windows data folder was not checked on Windows. The
+mobile app shows "one turn at a time" for the task limit of a Kiro agent until a capability tells it
+otherwise. A Kiro skill written to `.kiro/skills` by the installer is not done (see above).
+
 ### Custom agents
 
 The provider `acp` runs ACP programs that the user saves. The model id names the agent:

@@ -15,6 +15,7 @@ const DESCRIPTION_KEYS: Partial<Record<AgentProviderId, AppTextKey>> = {
   devin: "onboarding.provider.devinAccount",
   copilot: "onboarding.provider.copilotAccount",
   mistral: "onboarding.provider.mistralAccount",
+  kiro: "onboarding.provider.kiroAccount",
 };
 
 interface MoreProvidersStoryProps {

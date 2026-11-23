@@ -64,7 +64,18 @@ export const userSkillFolderNames = Effect.fn("HomeSkills.userFolderNames")(func
 });
 
 export const listHomeSkills = Effect.fn("HomeSkills.list")(function* () {
-  const root = homeSkillRoot();
+  return yield* listSkillsIn(homeSkillRoot());
+});
+
+/**
+ * The valid skills of a workspace folder, by slug: the user's, a marketplace's, and the ones that OpenBot
+ * writes in every workspace. A folder that an install has not finished starts with a dot and is left out.
+ */
+export const listWorkspaceSkills = Effect.fn("HomeSkills.listWorkspace")(function* (directory: string) {
+  return yield* listSkillsIn(directory);
+});
+
+const listSkillsIn = Effect.fn("HomeSkills.listIn")(function* (root: string) {
   const skills: HomeSkill[] = [];
   for (const slug of [...(yield* skillFolderNames(root))].slice(0, MAX_HOME_SKILLS)) {
     const directory = join(root, slug);

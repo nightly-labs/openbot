@@ -698,6 +698,7 @@ const SIGN_OUT_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "devin",
   "copilot",
   "mistral",
+  "kiro",
   "antigravity",
 ]);
 

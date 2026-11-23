@@ -105,6 +105,17 @@ export interface DeveloperInstructionOptions {
   computerUseNotReady?: boolean;
   sideThread?: boolean;
   homeSkills?: readonly HomeSkill[];
+  /**
+   * The user's skills in the workspace's `.agents/skills`, for a provider whose CLI does not read that
+   * folder (Kiro reads `.kiro/skills` only). Omitted or empty, the instructions name none.
+   */
+  unreadWorkspaceSkills?: readonly HomeSkill[];
+  /**
+   * The user's skill folders in the workspace's `.agents/skills`, for Codex. Codex lists a skill by a short
+   * root name (`r9/...`), and the user's `~/.agents/skills` root ends in the same folders, so a model
+   * read that folder and said that a workspace skill was missing (#5810). Only the folder in the
+   * instructions did not help in real turns; the names did. Omitted or empty, the instructions name none.
+   */
   workspaceSkills?: readonly string[];
   serverHost?: boolean;
   hostedStorageGb?: number | null;
@@ -513,7 +524,8 @@ export function developerInstructions(
           "This conversation is a side thread. Your other threads can work in the same working directory at the same time and change the same files. Read a file again just before you change it. Do not run git commands that change the branch, the index, or the history, such as checkout, switch, reset, stash, rebase, or commit, unless the user asks for it in this thread.",
         ]
       : []),
-    ...homeSkillInstructions(options.homeSkills ?? []),
+    ...homeSkillInstructions(options.homeSkills ?? [], "~/.agents/skills"),
+    ...homeSkillInstructions(options.unreadWorkspaceSkills ?? [], "the .agents/skills folder of your workspace"),
     agentComputerUseEnabled(agent) && options.computerUseNotReady
       ? `Computer Use is on for you, but it is not ready on this ${options.serverHost ? "server" : "computer"} now, so you have no ${COMPUTER_USE_MCP_SERVER_NAME} tools; do not search for them or use another desktop-control plugin. When a task needs a desktop application outside the embedded browser, say in one plain sentence that Computer Use is not ready${options.serverHost ? " on this server, so you cannot do that step" : ", and that the user can open Settings, then Computer Use, where OpenBot starts it or shows what is missing; it works from their next message"}.`
       : agentComputerUseEnabled(agent)
@@ -589,10 +601,11 @@ function automationInstructions(agentId: string, root: string): string {
 const MAX_HOME_SKILLS_IN_INSTRUCTIONS = 100;
 const MAX_HOME_SKILL_DESCRIPTION = 300;
 
-function homeSkillInstructions(skills: readonly HomeSkill[]): string[] {
+/** One line for each skill: the CLI does not load them, so the model reads a `SKILL.md` when a task matches. */
+export function homeSkillInstructions(skills: readonly HomeSkill[], where: string): string[] {
   if (skills.length === 0) return [];
   return [
-    "The user's own skills are in ~/.agents/skills, and your CLI does not load them. When a task matches the description of one, or the user names it, read its SKILL.md first and follow it:",
+    `The user's own skills are in ${where}, and your CLI does not load them. When a task matches the description of one, or the user names it, read its SKILL.md first and follow it:`,
     ...skills.slice(0, MAX_HOME_SKILLS_IN_INSTRUCTIONS).map((skill) => {
       const description = Array.from(redactText(skill.description).replace(/\s+/gu, " "));
       const short =

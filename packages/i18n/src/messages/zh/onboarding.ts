@@ -43,6 +43,7 @@ export const messages = {
   "onboarding.provider.devinAccount": "使用 Devin 账号的多种模型",
   "onboarding.provider.copilotAccount": "使用 Copilot 套餐的多种模型",
   "onboarding.provider.mistralAccount": "使用 Mistral 账户的 Mistral 模型",
+  "onboarding.provider.kiroAccount": "使用 Kiro 套餐访问 Claude 等模型",
   "onboarding.provider.hermesNous": "Nous Portal 套餐或你的 Hermes 设置",
   "onboarding.provider.inceptionKey": "使用 Inception API 密钥的 Mercury 模型",
   "onboarding.provider.deepseekKey": "使用 DeepSeek API 密钥的 DeepSeek 模型",

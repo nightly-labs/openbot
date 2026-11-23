@@ -23,6 +23,7 @@ export const AGENT_PROVIDERS = [
   "devin",
   "copilot",
   "mistral",
+  "kiro",
 ] as const;
 export type AgentProviderId = (typeof AGENT_PROVIDERS)[number];
 
@@ -462,6 +463,35 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
   },
+  // Kiro CLI (`kiro-cli acp`) from AWS, which the user installs, with the user's Kiro plan (credits).
+  // Sign-in is `kiro-cli login`: a browser page that calls back on 127.0.0.1, or with `--use-device-flow`,
+  // a code that the user enters on any device. An IAM Identity Center sign-in takes a terminal. Kiro CLI
+  // 2.37.1 reads skills from
+  // `.kiro/skills` only, so a skill in `.agents/skills` is not seen (checked with `session/new`); it
+  // reads `AGENTS.md` as steering. One `kiro-cli acp` process runs the turns of several sessions at once.
+  kiro: {
+    id: "kiro",
+    displayName: "Kiro",
+    cliName: "Kiro CLI",
+    onboardingDescription: "Claude and other models with your Kiro plan",
+    signInMessage: "Run `kiro-cli login` in a terminal to use Kiro, then connect again.",
+    installGuideLink: "kiro-install",
+    defaultModel: "",
+    legacyModelPrefix: null,
+    authKind: "kiro",
+    pickerOrder: 17,
+    localCodeSignIn: "device",
+    signInPageEnd: "callback",
+    skillFolders: [".kiro/skills"],
+    homeSkills: "instructions",
+    workspaceInstructionFiles: ["AGENTS.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "deferred",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
   hermes: {
     id: "hermes",
     displayName: "Hermes",
@@ -588,6 +618,7 @@ export const LOCAL_ONLY_PROVIDERS = [
   "deepseek",
   "openrouter",
   "hermes",
+  "kiro",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
 

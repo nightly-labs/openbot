@@ -25,6 +25,7 @@ import {
   DEVIN_ACP_FLAVOR,
   HERMES_ACP_FLAVOR,
   KIMI_ACP_FLAVOR,
+  KIRO_ACP_FLAVOR,
   MISTRAL_ACP_FLAVOR,
 } from "./acp-flavor";
 import {
@@ -63,6 +64,7 @@ import {
   resolveGrokCli,
   resolveHermesCli,
   resolveKimiCli,
+  resolveKiroCli,
   resolveMistralCli,
   resolveMuseCli,
   resolveOpencodeCli,
@@ -112,6 +114,7 @@ import {
   hermesStatePaths,
   kimiCodeStatePaths,
   kimiStatePaths,
+  kiroStatePaths,
   mistralHomeDirectory,
   mistralStatePaths,
   museStatePaths,
@@ -343,6 +346,11 @@ function confineClineTarget(target: SpawnTarget, confinement: ProcessConfinement
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
 }
+
+export const KIRO_ARGV: readonly string[] = ["acp", "--agent-engine=v3"];
+
+/** The sign-in of Kiro CLI. With no `--license`, it signs in a Builder ID, Google or GitHub account. */
+const KIRO_LOGIN: readonly string[] = ["login"];
 
 const HERMES_ARGV: readonly string[] = ["acp"];
 
@@ -1373,6 +1381,66 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "hermes", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "kiro",
+    // `kiro-cli login` with no terminal opens the page of a Builder ID, Google or GitHub sign-in in the
+    // system browser ("Opening browser...") and waits for the page to call back on 127.0.0.1. An IAM
+    // Identity Center sign-in needs `--license pro`, the portal address and a region: the user runs it in a
+    // terminal, and Connect reads the account again.
+    signIn: {
+      kind: "cli-command",
+      command: { argv: KIRO_LOGIN, env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
+    // With `--use-device-flow`, the CLI prints the page and the code ("Code: ABCD-EFGH"), and waits until the
+    // user approves it on any device.
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: {
+        argv: [...KIRO_LOGIN, "--use-device-flow"],
+        env: () => ({}),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+        closeInput: true,
+      },
+    },
+    // A signed-out Kiro CLI 2.37.1 writes "You are not logged in" and exits, so it has no client to list models.
+    catalog: { hiddenWhenSignedOut: true },
+    // `kiro-cli logout` ends the CLI's own sign-in.
+    signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
+    resolveCli: () => resolveKiroCli(),
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "kiro",
+        flavor: KIRO_ACP_FLAVOR,
+        argv: KIRO_ARGV,
+        env: {},
+        ...(confinement
+          ? {
+              confine: (target) => confineWithState(target, confinement, kiroStatePaths, context.agentEnvironment?.()),
+            }
+          : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.kiroSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("kiro"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "kiro",
+        flavor: KIRO_ACP_FLAVOR,
+        argv: KIRO_ARGV,
+        profileGeneration: true,
+        env: {},
+        signInMessage: sourceText("error.provider.kiroSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "kiro", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {

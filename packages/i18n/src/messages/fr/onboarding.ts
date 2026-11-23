@@ -47,6 +47,7 @@ export const messages = {
   "onboarding.provider.devinAccount": "De nombreux modèles avec un compte Devin",
   "onboarding.provider.copilotAccount": "De nombreux modèles avec un forfait Copilot",
   "onboarding.provider.mistralAccount": "Les modèles Mistral avec un compte Mistral",
+  "onboarding.provider.kiroAccount": "Claude et d’autres modèles avec votre forfait Kiro",
   "onboarding.provider.hermesNous": "Forfait Nous Portal ou votre configuration Hermes",
   "onboarding.provider.inceptionKey": "Modèles Mercury avec une clé d’API Inception",
   "onboarding.provider.deepseekKey": "Modèles DeepSeek avec une clé d’API DeepSeek",

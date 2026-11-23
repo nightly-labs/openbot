@@ -402,6 +402,13 @@ export const messages = {
     "GitHub Copilot を使うには GitHub でサインインするか、COPILOT_GITHUB_TOKEN を設定してください。",
   "error.provider.mistralSignIn":
     "Mistral を使うには、Mistral でサインインするか、MISTRAL_API_KEY を設定してください。",
+  "error.provider.kiroMissing": "Kiro CLI がインストールされていません。インストールしてからもう一度お試しください。",
+  "error.provider.kiroNotStarted":
+    "Kiro CLI を起動できませんでした。ターミナルで `kiro-cli --version` を実行してください。",
+  "error.provider.kiroVersionUnreadable": "Kiro CLI のバージョンを読み取れません。",
+  "error.provider.kiroOutdated": "Kiro CLI {version} は古すぎます。OpenBot には 2.36.0 以降が必要です。",
+  "error.provider.kiroSignIn":
+    "Kiro を使うには、ターミナルで `kiro-cli login` を実行してから、もう一度接続してください。",
   "error.provider.hermesMissing":
     "Hermes Agent がインストールされていません。インストールしてから、もう一度お試しください。",
   "error.provider.hermesNotStarted":

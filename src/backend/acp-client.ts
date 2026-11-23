@@ -879,6 +879,27 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  #contextFill(thread: AcpThread, used: number, size: number): void {
+    if (thread.contextUsed !== null && used < thread.contextUsed * ACP_COMPACTION_CONTEXT_RATIO)
+      this.#compacted(thread);
+    thread.contextUsed = used;
+    if (Number.isFinite(used) && used >= 0 && Number.isFinite(size) && size > 0)
+      this.emit("notification", {
+        method: "thread/tokenUsage/updated",
+        params: {
+          threadId: thread.id,
+          tokenUsage: { last: { totalTokens: used }, modelContextWindow: size },
+        },
+      });
+  }
+
+  #applyContextPercent(thread: AcpThread, percent: number): void {
+    const model = this.#models.find((candidate) => candidate.id === thread.currentModelId);
+    const size = model ? (this.#flavor.contextPercentUpdate?.window(model.description) ?? null) : null;
+    if (size === null) return;
+    this.#contextFill(thread, Math.round((Math.min(percent, 100) / 100) * size), size);
+  }
+
   #compacted(thread: AcpThread): void {
     if (thread.activeTurn) {
       thread.activeTurn.answered = true;
@@ -3200,20 +3221,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (update.sessionUpdate === "usage_update") {
-      if (thread.contextUsed !== null && update.used < thread.contextUsed * ACP_COMPACTION_CONTEXT_RATIO)
-        this.#compacted(thread);
-      thread.contextUsed = update.used;
       const cost = update.cost;
       if (thread.activeTurn && cost?.currency === "USD" && Number.isFinite(cost.amount) && cost.amount >= 0)
         thread.activeTurn.reportedCost = cost.amount;
-      if (Number.isFinite(update.used) && update.used >= 0 && Number.isFinite(update.size) && update.size > 0)
-        this.emit("notification", {
-          method: "thread/tokenUsage/updated",
-          params: {
-            threadId: thread.id,
-            tokenUsage: { last: { totalTokens: update.used }, modelContextWindow: update.size },
-          },
-        });
+      this.#contextFill(thread, update.used, update.size);
+      return;
+    }
+    const contextPercent = this.#flavor.contextPercentUpdate?.read(update) ?? null;
+    if (contextPercent !== null) {
+      this.#applyContextPercent(thread, contextPercent);
       return;
     }
     if (update.sessionUpdate === "compaction_update") {

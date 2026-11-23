@@ -136,6 +136,14 @@ export interface AcpFlavor {
   retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   turnStallMs?: number;
+  contextPercentUpdate?: {
+    read(update: SessionUpdate): number | null;
+    window(modelDescription: string): number | null;
+  };
+  /**
+   * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
+   * Each call shows as a subagent with its task, state, and report.
+   */
   subagentTools?: readonly string[];
   mcpServersPerDirectory?: true;
   mcpServersLoadWithSession?: true;
@@ -469,6 +477,28 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
     return typeof run === "string" ? run : undefined;
   },
 };
+
+export const KIRO_ACP_FLAVOR: AcpFlavor = {
+  authRequiredSignsOut: true,
+  mcpToolCallLimitMs: 120_000,
+  modelConfigId: "model",
+  contextPercentUpdate: { read: kiroContextPercent, window: kiroContextWindow },
+};
+
+function kiroContextPercent(update: SessionUpdate): number | null {
+  if (update.sessionUpdate !== "session_info_update") return null;
+  const kiro = isRecord(update._meta) ? update._meta.kiro : undefined;
+  if (!isRecord(kiro) || kiro.kind !== "context_usage" || !isRecord(kiro.contextUsage)) return null;
+  const percent = kiro.contextUsage.usagePercentage;
+  return typeof percent === "number" && Number.isFinite(percent) && percent >= 0 ? percent : null;
+}
+
+export function kiroContextWindow(description: string): number | null {
+  const match = /\b(\d+(?:\.\d+)?)\s*([KM])\s+context window\b/iu.exec(description);
+  if (!match?.[1] || !match[2]) return null;
+  const size = Number(match[1]) * (match[2].toUpperCase() === "M" ? 1_000_000 : 1_000);
+  return Number.isFinite(size) && size > 0 ? Math.round(size) : null;
+}
 
 export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error, sessionId) =>

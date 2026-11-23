@@ -18,6 +18,7 @@ const MINIMUM_CLAUDE_VERSION = [2, 1, 232] as const;
 const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
 const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
 const MINIMUM_KIMI_VERSION = [1, 52, 0] as const;
+const MINIMUM_KIRO_VERSION = [2, 36, 0] as const;
 
 interface ResolvedCli {
   executable: string;
@@ -62,6 +63,14 @@ export interface HermesCliInfo extends ResolvedCli {
   source?: "system" | "managed";
 }
 
+/**
+ * The user's own `kiro-cli` runs, with the user's own Kiro folders. OpenBot has no copy of its own:
+ * AWS publishes the CLI through its own installer and updates it itself.
+ */
+export interface KiroCliInfo extends ResolvedCli {
+  source?: "system" | "managed";
+}
+
 export type AgentCliInfo =
   | CodexCliInfo
   | ClaudeCliInfo
@@ -71,7 +80,8 @@ export type AgentCliInfo =
   | CursorCliInfo
   | ClineCliInfo
   | KimiCliInfo
-  | HermesCliInfo;
+  | HermesCliInfo
+  | KiroCliInfo;
 
 export class CodexCliError extends Error {
   constructor(
@@ -461,6 +471,51 @@ export const resolveHermesCli: (input?: {
 function parseHermesVersion(output: string): string {
   const version = output.match(/^(?:Hermes Agent v)?(\d+\.\d+\.\d+)\b/mu)?.[1];
   if (!version) throw new CodexCliError(sourceText("error.provider.hermesVersionUnreadable"), "invalid");
+  return version;
+}
+
+/**
+ * Finds the user's own Kiro CLI. OpenBot has no copy of its own: the CLI updates itself and keeps the
+ * user's sign-in in its own folders.
+ */
+export const resolveKiroCli: (input?: {
+  systemCandidates?: string[];
+}) => Effect.Effect<KiroCliInfo, ProviderClientOperationError> = Effect.fn("Cli.resolveKiroCli")(
+  function* (input: { systemCandidates?: string[] } = {}): Effect.fn.Return<KiroCliInfo, ProviderClientOperationError> {
+    const candidates = yield* cliCandidates("kiro", input.systemCandidates, null);
+    let found = false;
+    let outdated: CodexCliError | null = null;
+    for (const candidate of candidates) {
+      if (!(yield* isExecutable(candidate.executable))) continue;
+      found = true;
+      const attempt = yield* Effect.result(
+        Effect.gen(function* () {
+          const { stdout, launch } = yield* readCliVersion(candidate, "kiro");
+          const version = parseKiroVersion(stdout);
+          if (!isMinimumVersion(version, MINIMUM_KIRO_VERSION)) {
+            throw new CodexCliError(sourceText("error.provider.kiroOutdated", { version }), "outdated");
+          }
+          return { executable: candidate.executable, version, source: "system" as const, ...launch };
+        }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
+      );
+      if (Result.isSuccess(attempt)) return attempt.success;
+      const error = attempt.failure.cause;
+      if (isCliTimeout(error)) throw error;
+      if (error instanceof CodexCliError && error.code === "outdated") outdated ??= error;
+    }
+    if (outdated) throw outdated;
+    throw new CodexCliError(
+      found ? sourceText("error.provider.kiroNotStarted") : sourceText("error.provider.kiroMissing"),
+      found ? "invalid" : "missing",
+    );
+  },
+  Effect.catchDefect((cause) => Effect.fail(providerFailure(cause))),
+);
+
+/** `kiro-cli --version` prints `kiro-cli 2.37.1`. */
+function parseKiroVersion(output: string): string {
+  const version = output.match(/^kiro-cli[ \t]+v?(\d+\.\d+\.\d+)\b/mu)?.[1];
+  if (!version) throw new CodexCliError(sourceText("error.provider.kiroVersionUnreadable"), "invalid");
   return version;
 }
 
@@ -889,6 +944,7 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
 }
 
 function cliCommandName(provider: AgentProviderId): string {
+  if (provider === "kiro") return "kiro-cli";
   return provider === "cursor" ? "cursor-agent" : provider === "mistral" ? "vibe-acp" : provider;
 }
 

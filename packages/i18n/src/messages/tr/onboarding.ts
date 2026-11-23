@@ -48,6 +48,7 @@ export const messages = {
   "onboarding.provider.devinAccount": "Devin hesabıyla birçok model",
   "onboarding.provider.copilotAccount": "Copilot planıyla birçok model",
   "onboarding.provider.mistralAccount": "Mistral hesabıyla Mistral modelleri",
+  "onboarding.provider.kiroAccount": "Kiro planınızla Claude ve diğer modeller",
   "onboarding.provider.hermesNous": "Nous Portal planı veya Hermes kurulumunuz",
   "onboarding.provider.inceptionKey": "Inception API anahtarıyla Mercury modelleri",
   "onboarding.provider.deepseekKey": "DeepSeek API anahtarıyla DeepSeek modelleri",

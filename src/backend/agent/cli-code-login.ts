@@ -179,7 +179,7 @@ function terminalCommand(platform: NodeJS.Platform, argv: readonly string[]): { 
   throw new Error(sourceText("error.provider.codeLoginUnsupported"));
 }
 
-function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
+export function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
   const text = stripTerminalCodes(output);
   if (flow === "device") {
     const event = deviceCodeEvent(text);
@@ -213,9 +213,12 @@ function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCod
 
 function codeAfterConfirmLine(text: string): string | null {
   const lines = text.split("\n").map((line) => line.trim());
-  const confirm = lines.findIndex((line) => /confirm this code|enter this one-time code/i.test(line));
+  const confirm = lines.findIndex((line) => /confirm (?:this|the following) code|enter this one-time code/i.test(line));
   if (confirm < 0) return null;
-  const code = lines.slice(confirm + 1, -1).find(Boolean);
+  const code = lines
+    .slice(confirm + 1, -1)
+    .find(Boolean)
+    ?.replace(/^code:[ \t]*/i, "");
   return code && /^[A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*$/.test(code) ? code : null;
 }
 

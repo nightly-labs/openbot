@@ -68,6 +68,7 @@ const OWN_WEB_SEARCH_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "devin",
   "copilot",
   "mistral",
+  "kiro",
 ]);
 const OWN_WEB_SEARCH_CATALOG = BUILTIN_TOOL_CATALOG.filter(
   (tool) => tool.name !== `${OPENBOT_DYNAMIC_TOOLS.name}.web_search`,

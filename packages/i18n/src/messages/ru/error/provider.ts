@@ -381,6 +381,12 @@ export const messages = {
   "error.provider.copilotSignIn":
     "Войдите через GitHub или задайте COPILOT_GITHUB_TOKEN, чтобы использовать GitHub Copilot.",
   "error.provider.mistralSignIn": "Войдите через Mistral или задайте MISTRAL_API_KEY, чтобы использовать Mistral.",
+  "error.provider.kiroMissing": "Kiro CLI не установлен. Установите его и повторите попытку.",
+  "error.provider.kiroNotStarted": "Не удалось запустить Kiro CLI. Выполните `kiro-cli --version` в терминале.",
+  "error.provider.kiroVersionUnreadable": "Не удаётся прочитать версию Kiro CLI.",
+  "error.provider.kiroOutdated": "Kiro CLI {version} слишком старый. OpenBot требует версию 2.36.0 или новее.",
+  "error.provider.kiroSignIn":
+    "Выполните `kiro-cli login` в терминале, чтобы использовать Kiro, затем подключитесь снова.",
   "error.provider.hermesMissing": "Hermes Agent не установлен. Установите его и повторите попытку.",
   "error.provider.hermesNotStarted": "Не удалось запустить Hermes Agent. Выполните `hermes --version` в терминале.",
   "error.provider.hermesVersionUnreadable": "Не удаётся прочитать версию Hermes Agent.",

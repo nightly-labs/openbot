@@ -72,6 +72,7 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
   "opencode-auth": "https://opencode.ai/auth",
   "claude-install": "https://code.claude.com/docs",
   "hermes-install": "https://hermes-agent.nousresearch.com/docs/getting-started/installation",
+  "kiro-install": "https://kiro.dev/docs/getting-started/installation/",
   feedback: "https://x.com/intent/post?text=Feedback%20for%20OpenBot%20%40norbertbodziony%3A%20",
   "report-problem": () => bugReportFormUrl(feedbackFacts()),
   message: "https://x.com/norbertbodziony",

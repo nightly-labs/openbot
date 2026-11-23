@@ -433,6 +433,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     input !== "agent-setup" &&
     input !== "claude-install" &&
     input !== "hermes-install" &&
+    input !== "kiro-install" &&
     input !== "opencode-install" &&
     input !== "opencode-auth" &&
     input !== "feedback" &&

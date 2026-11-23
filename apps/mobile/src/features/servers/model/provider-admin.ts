@@ -221,6 +221,7 @@ const SIGN_OUT_PROVIDERS: readonly AgentProviderId[] = [
   "devin",
   "copilot",
   "mistral",
+  "kiro",
   "antigravity",
 ];
 

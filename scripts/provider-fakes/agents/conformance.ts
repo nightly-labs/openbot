@@ -58,6 +58,7 @@ const missingError = MISSING_ERRORS[process.env.FAKE_MISSING ?? "protocol"];
 const signedOut = process.env.FAKE_SIGNED_OUT === "1";
 const kimiModelSet = process.env.FAKE_MODEL_SET === "kimi";
 const mistralModelSet = process.env.FAKE_MODEL_SET === "mistral";
+const kiroModelSet = process.env.FAKE_MODEL_SET === "kiro";
 const models = new Map<string, string>();
 const waiting = new Map<string, () => void>();
 let count = 0;
@@ -79,7 +80,7 @@ function setup(sessionId: string) {
         options: MODELS.map((model) => ({ value: model.modelId, name: model.name })),
       },
     ],
-    models: state,
+    models: kiroModelSet ? undefined : state,
     modes: hermes ? { currentModeId: "default", availableModes: [{ id: "default", name: "Default" }] } : undefined,
   };
 }
@@ -152,6 +153,13 @@ serveFakeAcpAgent(
     "session/set_model": (request, peer) => {
       const { sessionId = "", modelId = "" } = request.params;
       logEntry({ event: "set_model", sessionId, value: modelId });
+      if (kiroModelSet) {
+        peer.fail(request, {
+          code: -32603,
+          message: '[PersistenceClassification] Ext method "session/set_model" has no persistence classification',
+        });
+        return;
+      }
       models.set(sessionId, modelId);
       if (!kimiModelSet) peer.reply(request, {});
       else

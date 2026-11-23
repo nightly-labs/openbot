@@ -51,6 +51,9 @@ export function providerAuthKind(agent: AgentSummary, facts: ProviderAuthFacts):
       return facts.account("copilot") ? "subscription" : "unknown";
     case "mistral":
       return "unknown";
+    case "kiro":
+      // Kiro runs only on a Kiro plan: a Builder ID, a social sign-in or IAM Identity Center.
+      return facts.account("kiro") ? "subscription" : "unknown";
     case "cline":
       return model.startsWith("cline-free/") ? "free" : "unknown";
     case "hermes":

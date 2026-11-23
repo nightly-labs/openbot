@@ -289,6 +289,8 @@
     "smoke:opencode-agent": "bun scripts/opencode-agent-smoke.ts",
     "test:muse-instructions-once": "bun scripts/muse-instructions-once-e2e.ts",
     "test:provider-conformance": "bun scripts/provider-conformance-e2e.ts",
+    "test:kiro-live": "bun scripts/kiro-live-e2e.ts",
+    "test:kiro-parallel": "bun scripts/kiro-parallel-e2e.ts",
     "test:provider-cli-canary": "bun scripts/provider-cli-canary.ts",
     "test:provider-live": "bun scripts/provider-live-e2e.ts",
     "test:hermes-catalog-tools": "bun scripts/hermes-catalog-tools-e2e.ts",

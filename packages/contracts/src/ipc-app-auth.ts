@@ -402,6 +402,7 @@ export type ExternalDestination =
   | "agent-setup"
   | "claude-install"
   | "hermes-install"
+  | "kiro-install"
   | "feedback"
   | "report-problem"
   | "message"

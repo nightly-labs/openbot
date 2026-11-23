@@ -389,6 +389,12 @@ export const messages = {
   "error.provider.devinSignIn": "Log in met Devin om Devin te gebruiken.",
   "error.provider.copilotSignIn": "Log in met GitHub of stel COPILOT_GITHUB_TOKEN in om GitHub Copilot te gebruiken.",
   "error.provider.mistralSignIn": "Log in met Mistral of stel MISTRAL_API_KEY in om Mistral te gebruiken.",
+  "error.provider.kiroMissing": "Kiro CLI is niet geïnstalleerd. Installeer het en probeer het opnieuw.",
+  "error.provider.kiroNotStarted": "Kiro CLI kon niet starten. Voer `kiro-cli --version` uit in een terminal.",
+  "error.provider.kiroVersionUnreadable": "De versie van Kiro CLI kan niet worden gelezen.",
+  "error.provider.kiroOutdated": "Kiro CLI {version} is te oud. OpenBot vereist 2.36.0 of nieuwer.",
+  "error.provider.kiroSignIn":
+    "Voer `kiro-cli login` uit in een terminal om Kiro te gebruiken en maak daarna opnieuw verbinding.",
   "error.provider.hermesMissing": "Hermes Agent is niet geïnstalleerd. Installeer het en probeer het opnieuw.",
   "error.provider.hermesNotStarted": "Hermes Agent kon niet starten. Voer `hermes --version` uit in een terminal.",
   "error.provider.hermesVersionUnreadable": "De versie van Hermes Agent kan niet worden gelezen.",
