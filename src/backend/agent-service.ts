@@ -499,6 +499,7 @@ export interface AgentServiceOptions {
 
 const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const LIVE_VOICE_RELAYED_LIMIT = 50;
+const FROM_CHROME_LIMIT = 200;
 
 function userSendKey(sender: ConversationMessageSender | undefined, agentId: string, clientMessageId: string): string {
   return `user-send:${createHash("sha256")
@@ -585,6 +586,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #sessionSettings: SessionSettings;
   readonly #liveVoice: LiveVoice;
   readonly #liveVoiceRelayed = new Map<string, LiveVoiceRelayed>();
+  readonly #fromChrome = new Set<string>();
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
   readonly #browserUploads: BrowserUploads;
@@ -1772,6 +1774,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         redactMcp: (text) => this.#mcp.redact(text),
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
         liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
+        fromChrome: (deliveryId) => this.#fromChrome.has(deliveryId),
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider, configRevision) => this.#endpoints.servesClient(model, provider, configRevision),
@@ -1890,6 +1893,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
         liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
+        fromChrome: (deliveryId) => this.#fromChrome.has(deliveryId),
       },
     });
     this.#turn = new TurnLifecycle({
@@ -2094,6 +2098,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       serverClaims: options.serverClaims ?? null,
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
       ...(options.clientBrowser === undefined ? {} : { clientBrowser: options.clientBrowser }),
+      fromChrome: (deliveryId) => this.#fromChrome.has(deliveryId),
       ...(options.crm === undefined ? {} : { crm: options.crm }),
       ...(options.crmAgentVisibleToMembers === undefined
         ? {}
@@ -6381,8 +6386,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: StartAgentTaskInput,
     sender?: ConversationMessageSender,
     timezone?: string,
+    fromChrome = false,
   ): Effect.fn.Return<AgentTask, AgentLifecycleFailed> {
-    if (!input.clientMessageId) return yield* this.#startTask(input, sender, timezone);
+    if (!input.clientMessageId) return yield* this.#startTask(input, sender, timezone, fromChrome);
     const key = userSendKey(sender, input.agentId, input.clientMessageId);
     const pending = this.#pendingTaskStarts.get(key);
     if (pending) return yield* Deferred.await(pending);
@@ -6392,7 +6398,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (startedTaskId) this.#mailbox.forgetIdempotencyKey(key);
     const start = Deferred.makeUnsafe<AgentTask, AgentLifecycleFailed>();
     this.#pendingTaskStarts.set(key, start);
-    return yield* this.#startTask(input, sender, timezone).pipe(
+    return yield* this.#startTask(input, sender, timezone, fromChrome).pipe(
       Effect.onExit((exit) => Deferred.done(start, exit)),
       Effect.ensuring(Effect.sync(() => this.#pendingTaskStarts.delete(key))),
     );
@@ -6403,6 +6409,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: StartAgentTaskInput,
     sender: ConversationMessageSender | undefined,
     timezone: string | undefined,
+    fromChrome: boolean,
   ): Effect.fn.Return<AgentTask, AgentLifecycleFailed> {
     const task = yield* lifecycleStep("start task", () => {
       if (!this.listAgents().some((agent) => agent.id === input.agentId))
@@ -6422,6 +6429,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       sender,
       timezone,
+      fromChrome,
     ).pipe(
       Effect.tapError(() =>
         Effect.sync(() => {
@@ -6756,6 +6764,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: SendMessageInput,
     sender?: ConversationMessageSender,
     timezone?: string,
+    fromChrome = false,
+  ): Effect.fn.Return<QueuedMessageReceipt, AgentLifecycleFailed> {
+    const receipt = yield* this.#sendMessageOnce(input, sender, timezone);
+    if (fromChrome) this.#noteFromChrome(receipt.deliveries.map((delivery) => delivery.id));
+    return receipt;
+  }).bind(this);
+
+  #noteFromChrome(deliveryIds: readonly string[]): void {
+    for (const deliveryId of deliveryIds) this.#fromChrome.add(deliveryId);
+    for (const deliveryId of this.#fromChrome) {
+      if (this.#fromChrome.size <= FROM_CHROME_LIMIT) break;
+      this.#fromChrome.delete(deliveryId);
+    }
+  }
+
+  readonly #sendMessageOnce = Effect.fn("AgentService.sendMessageOnce")(function* (
+    this: AgentService,
+    input: SendMessageInput,
+    sender: ConversationMessageSender | undefined,
+    timezone: string | undefined,
   ): Effect.fn.Return<QueuedMessageReceipt, AgentLifecycleFailed> {
     if (!input.clientMessageId) return yield* this.#sendUserMessage(input, sender, timezone);
     const idempotencyKey = userSendKey(sender, input.agentId, input.clientMessageId);

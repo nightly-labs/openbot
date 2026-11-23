@@ -507,6 +507,7 @@ export interface OpenBotToolRouterOptions {
   vaultItems?: VaultItems | null | undefined;
   codexSubagentParent?: ((childThreadId: string) => CodexSubagentParent | undefined) | undefined;
   clientBrowser?: ClientBrowser | null | undefined;
+  fromChrome?: ((deliveryId: string) => boolean) | undefined;
   hooks: OpenBotToolRouterHooks;
 }
 
@@ -521,6 +522,7 @@ export class OpenBotToolRouter {
   readonly #browser: AgentBrowserHost;
   readonly #browserUploads: BrowserUploads;
   readonly #clientBrowser: ClientBrowser | null;
+  readonly #fromChrome: (deliveryId: string) => boolean;
   readonly #attachments: AttachmentGateway;
   readonly #channels: ChannelService;
   readonly #messaging: MessagingThreads;
@@ -590,6 +592,7 @@ export class OpenBotToolRouter {
     this.#browser = options.browser;
     this.#browserUploads = options.browserUploads;
     this.#clientBrowser = options.clientBrowser ?? null;
+    this.#fromChrome = options.fromChrome ?? (() => false);
     this.#attachments = options.attachments;
     this.#channels = options.channels;
     this.#messaging = options.messaging;
@@ -859,7 +862,7 @@ export class OpenBotToolRouter {
               const agent = this.#conversation.requireKnownAgent(agentId);
               const result = yield* runClientBrowserTool(
                 this.#clientBrowser,
-                this.#turnRequesters(agentId, toolRequest.params.turnId),
+                this.#chromeRequesters(agentId, toolRequest.params.turnId),
                 { id: agentId, name: agent.name },
                 toolRequest.params.tool,
                 callArgs,
@@ -930,7 +933,7 @@ export class OpenBotToolRouter {
                     cardVault: linkVault ?? this.#attention.cardVault(client, toolRequest, params),
                   });
                   if (params.tool === "list_tabs")
-                    return withClientTabs(result, this.#clientBrowser, this.#turnRequesters(agentId, params.turnId));
+                    return withClientTabs(result, this.#clientBrowser, this.#chromeRequesters(agentId, params.turnId));
                   if (params.tool !== "screenshot") return result;
                   const workspacePath = () => this.#conversation.requireKnownAgent(agentId).workspacePath;
                   return yield* saveBrowserScreenshot(workspacePath, params.arguments, result);
@@ -3136,6 +3139,13 @@ export class OpenBotToolRouter {
       ids.add(this.#mailbox.senderMember(delivery.messageId)?.id ?? SIGNED_OUT_CHANNEL_MEMBER_ID);
     }
     return [...ids];
+  }
+
+  #chromeRequesters(agentId: string, turnId: string): string[] {
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    return deliveries.some(({ delivery }) => this.#fromChrome(delivery.id))
+      ? this.#turnRequesters(agentId, turnId)
+      : [];
   }
 
   #memberRequesters(agentId: string, turnId: string): string[] {

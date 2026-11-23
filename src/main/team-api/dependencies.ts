@@ -616,7 +616,10 @@ export interface TeamApiVoiceTranscription {
   transcribe(audio: Uint8Array): Effect.Effect<VoiceTranscriptionResult, VoiceOperationError>;
 }
 
-export type TeamApiClientBrowser = Pick<ClientBrowserHub, "setPresence" | "resolve" | "sessionEnded" | "subscribe">;
+export type TeamApiClientBrowser = Pick<
+  ClientBrowserHub,
+  "setPresence" | "resolve" | "sessionEnded" | "subscribe" | "shares"
+>;
 
 export type TeamApiAgentAccess = Pick<AgentAccessStore, "copyAgent" | "get" | "levels" | "set" | "subscribe">;
 export type TeamApiServerAudit = Pick<ServerAuditStore, "read">;

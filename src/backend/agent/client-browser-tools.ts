@@ -69,7 +69,7 @@ const UNSUPPORTED = `On a Chrome tab, use only ${TOOLS}.`;
 const PERSON_TYPES_SECRETS =
   "On a Chrome tab, the person types passwords and other secrets. Ask the person to type it in that tab, then go on.";
 const NOT_SHARED =
-  "No person who requested this turn shares Chrome tabs now. Use the OpenBot browser, or ask the person to share tabs with the OpenBot Chrome extension.";
+  "No Chrome tabs are shared in this turn. Only a message that one person sends from their own Chrome, with the OpenBot extension, shares that Chrome. Use the OpenBot browser.";
 
 function onlyRequester(requesters: readonly string[]): readonly string[] {
   return requesters.length === 1 ? requesters : [];

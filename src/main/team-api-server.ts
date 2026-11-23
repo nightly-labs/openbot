@@ -3016,6 +3016,7 @@ export class TeamApiServer {
       token,
       sessionId: authenticated.sessionId,
       sessionExpiresAt: authenticated.sessionExpiresAt,
+      fromChrome: this.#options.clientBrowser?.shares(authenticated.sessionId) === true,
       agentLevel: (agentId) => this.agentLevel(authenticated.member, agentId),
       json: (status, value) => this.#json(response, status, value),
       empty: (status) => this.#empty(response, status),

@@ -89,7 +89,7 @@ export const messages = defineMessages("extension", {
   "extension.browser.manage": "Manage",
   "extension.browser.title": "Shared tabs",
   "extension.browser.about":
-    "Your agents can read and use your open tabs, only in chats that you start. A tab joins the OpenBot group when an agent works in it.",
+    "Your agents read and use your open tabs only for what you ask in this side panel. In the OpenBot app, they use their own browser. A tab joins the OpenBot group when an agent works in it.",
   "extension.browser.alwaysAsk":
     "Agents always ask before they type into a password or payment field, download a file, or sign in to a site.",
   "extension.browser.sites": "Allowed sites",

@@ -71,6 +71,10 @@ export class ClientBrowserHub implements ClientBrowser {
       }
   }
 
+  shares(sessionId: string): boolean {
+    return this.#presence.has(sessionId);
+  }
+
   tabs(memberId: string): SharedChrome[] | null {
     const chromes = this.#sessions(memberId).map(({ sessionId, presence }) => ({
       chrome: chromeKey(sessionId),

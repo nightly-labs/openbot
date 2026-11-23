@@ -803,10 +803,14 @@ The extension is a remote client, so no new data channel is necessary:
 - **Tools** (`src/backend/agent/client-browser-tools.ts`). A shared tab has the id
   `chrome:<member key>:<Chrome key>:<tab id>`; the member key is a short hash of the member id, and the
   Chrome key a short hash of the session that shares the tab, so a command reaches only the Chrome that
-  listed the tab (else `not-found`). `list_tabs` adds the shared tabs of each Chrome of the one person
-  who requested the turn (`#turnRequesters`), with a short note on what they take. `open` with
-  `browser: "chrome"` opens a tab in that person's newest shared Chrome. A turn
-  that no person requested, such as a routine run or a message from another agent, reaches no Chrome.
+  listed the tab (else `not-found`). Only a turn with a message from a session that shares Chrome tabs
+  reaches a Chrome: the Team API request context sets `fromChrome` from the hub, the routes pass it to
+  `sendMessage` and `startTask`, and the agent service keeps those delivery ids in memory (the newest
+  200; a message that waits through a host restart counts as an app message). Such a turn gets a note
+  in its prompt to work in that Chrome, and `list_tabs` adds the shared tabs of each Chrome of the one
+  person who requested it (`#turnRequesters`). `open` with `browser: "chrome"` opens a tab in that
+  person's newest shared Chrome. A message from the OpenBot app or the web app, a routine run, or a
+  message from another agent reaches no Chrome, and the agent instructions do not mention Chrome.
   On a Chrome tab, only `snapshot`, `screenshot`, `navigate`, `click`, `type`, `press`, `scroll`,
   `wait_for` and `close_tab` run; each other tool (Vault, secrets, takeover, uploads, `evaluate`,
   `run_script`) gets a refusal, and so do a role target and `nth`.

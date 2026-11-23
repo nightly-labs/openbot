@@ -2041,9 +2041,10 @@ const fakeAgentTasks: TeamApiAgentTasks = {
       closedAt: null,
     });
   },
-  sendMessage: (input, sender) =>
+  sendMessage: (input, sender, _timezone, fromChrome) =>
     Effect.sync(() => {
       record("sendTaskMessage", input, sender);
+      if (fromChrome) record("taskMessageFromChrome", input.agentId);
       return {
         messageId: "message-reply",
         deliveries: [{ id: "delivery-reply", recipientAgentId: input.agentId, status: "queued", position: 1 }],
@@ -15259,6 +15260,27 @@ try {
       [summary(shared), listedText],
     );
     assert.ok(typeof chromeTabId === "string", "The shared tab is not listed.");
+    const fromChrome = await call("POST", AGENT_THREAD_REPLIES_ROUTES.send, {
+      token: bobToken,
+      capabilities: [AGENT_HIDDEN_CAPABILITY, AGENT_THREAD_REPLIES_CAPABILITY],
+      json: {
+        agentId: "agent-ada",
+        taskId: "task-1",
+        text: "From my Chrome",
+        attachmentDraftIds: [],
+        replyToMessageId: "message-7",
+        clientMessageId: "client-chrome",
+      },
+    });
+    check(
+      "a message from a session that shares Chrome tabs reaches the agent as from Chrome, and the earlier ones did not",
+      fromChrome.status === 202 &&
+        isDeepStrictEqual(
+          callsOf("taskMessageFromChrome").map((args) => args[0]),
+          ["agent-ada"],
+        ),
+      [summary(fromChrome), callsOf("taskMessageFromChrome")],
+    );
 
     const agent = { id: "agent-ada", name: "Ada" };
     const runTool = (requesters: string[], tool: string, args: unknown) =>
@@ -15335,9 +15357,9 @@ try {
         text(script).startsWith("On a Chrome tab, use only") &&
         !role.success &&
         !notRequester.success &&
-        text(notRequester).startsWith("No person who requested this turn") &&
+        text(notRequester).startsWith("No Chrome tabs are shared in this turn") &&
         !groupTurn.success &&
-        text(groupTurn).startsWith("No person who requested this turn") &&
+        text(groupTurn).startsWith("No Chrome tabs are shared in this turn") &&
         !otherChrome.success &&
         text(otherChrome).startsWith("The tab is not shared now") &&
         !httpOnly.success &&
@@ -15357,7 +15379,7 @@ try {
       "a member who stops sharing ends the waiting command, and the tabs go away",
       stopped.status === 200 &&
         !stoppedResult.success &&
-        text(stoppedResult).startsWith("No person who requested this turn") &&
+        text(stoppedResult).startsWith("No Chrome tabs are shared in this turn") &&
         clientBrowser.tabs(bobId) === null,
       [summary(stopped), stoppedResult],
     );

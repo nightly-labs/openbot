@@ -1289,7 +1289,8 @@ of the list that it has. Except for shared tabs (below), the extension does not 
 pages you visit.
 
 Shared tabs are on while you are signed in, until you press **Stop sharing** in the side panel. Your
-open tabs are shared only with your own agents, in the turns that you started. The extension tells
+open tabs are shared only with your own agents, and an agent uses them only for a message that you
+send from the side panel; for a message in the OpenBot app, it uses its own browser. The extension tells
 your server the address, title and active state of your open web tabs (at most 50, the tab that you
 look at first), through the same encrypted connection, when they change and every 30 seconds. When an
 agent works in a tab, the tab joins a Chrome tab group named "OpenBot", unless it is in another group. When an agent acts on a site for the
