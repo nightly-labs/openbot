@@ -253,6 +253,7 @@ import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "./whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_CAPABILITY } from "./workflow-folders-v1";
@@ -834,6 +835,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [HOST_SIGNAL_HOME_CAPABILITY, V10],
   [WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY, V10],
   [ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY, V10],
+  [WHATSAPP_READ_ONLY_CAPABILITY, V10],
   [VOICE_TRANSCRIPTION_CAPABILITY, V10],
   [CLIENT_BROWSER_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];

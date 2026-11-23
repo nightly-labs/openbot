@@ -49,7 +49,7 @@ import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show, snapshot } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
 import { readableAgentError } from "../agents/agent-error-text";
@@ -338,7 +338,7 @@ export function ConversationComposer() {
         id: endpoint.id,
         name: endpoint.name,
         baseUrl: endpoint.baseUrl,
-        models: endpoint.models.map((item) =>
+        models: snapshot(endpoint.models).map((item) =>
           item.id === model.id
             ? {
                 ...item,

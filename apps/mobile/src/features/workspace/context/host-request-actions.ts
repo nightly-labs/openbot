@@ -43,6 +43,7 @@ import {
   withFastServiceTiers,
   withKeptModels,
   withSteeringModels,
+  withWhatsAppReadOnly,
   withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
   withWorkspaceOnlyLimit,
@@ -210,6 +211,7 @@ import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
@@ -352,10 +354,12 @@ import {
   whatsappConnectorGroups,
   whatsappConnectorLinkState,
   whatsappConnectorOverview,
+  whatsappConnectorReadOnly,
   whatsappConnectorReconnect,
   whatsappConnectorRemoveSender,
   whatsappConnectorSetEnabled,
   whatsappConnectorSetOwnNumber,
+  whatsappConnectorSetSenderReadOnly,
   whatsappConnectorSetStatusReactions,
   whatsappConnectorSetWorkingMessage,
   whatsappConnectorStartLink,
@@ -614,6 +618,7 @@ type HostRequestActions = Pick<
   | "setWhatsAppOwnNumber"
   | "setWhatsAppWorkingMessage"
   | "setWhatsAppStatusReactions"
+  | "setWhatsAppSenderReadOnly"
   | "loadServerUpdate"
   | "checkServerUpdate"
   | "startServerUpdate"
@@ -1049,11 +1054,15 @@ export function createHostRequestActions({
             has(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY)
               ? whatsappConnectorStatusReactions(api)
               : Effect.succeed(null),
+            has(serverId, WHATSAPP_READ_ONLY_CAPABILITY) ? whatsappConnectorReadOnly(api) : Effect.succeed(null),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.map(([overview, workingMessages, statusReactions]) =>
-            withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+          Effect.map(([overview, workingMessages, statusReactions, readOnly]) =>
+            withWhatsAppReadOnly(
+              withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+              readOnly,
+            ),
           ),
         ),
       );
@@ -1091,6 +1100,13 @@ export function createHostRequestActions({
       runTeamRequest(
         whatsappConnectorSetStatusReactions(
           capabilityApi(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY, "mobile.server.connectors.unsupported"),
+          input,
+        ),
+      ),
+    setWhatsAppSenderReadOnly: async (input, serverId) =>
+      runTeamRequest(
+        whatsappConnectorSetSenderReadOnly(
+          capabilityApi(serverId, WHATSAPP_READ_ONLY_CAPABILITY, "mobile.server.connectors.unsupported"),
           input,
         ),
       ),

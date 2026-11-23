@@ -199,6 +199,7 @@
     "./team-protocol/discord-access-v1": "./src/team-protocol/discord-access-v1.ts",
     "./team-protocol/whatsapp-working-message-v1": "./src/team-protocol/whatsapp-working-message-v1.ts",
     "./team-protocol/whatsapp-status-reactions-v1": "./src/team-protocol/whatsapp-status-reactions-v1.ts",
+    "./team-protocol/whatsapp-read-only-v1": "./src/team-protocol/whatsapp-read-only-v1.ts",
     "./team-protocol/agent-import-v1": "./src/team-protocol/agent-import-v1.ts",
     "./team-protocol/agent-import-v2": "./src/team-protocol/agent-import-v2.ts",
     "./team-protocol/instance-transfer-v1": "./src/team-protocol/instance-transfer-v1.ts",

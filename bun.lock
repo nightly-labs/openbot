@@ -476,6 +476,7 @@
     "@react-native-masked-view/masked-view@0.3.2": "patches/@react-native-masked-view%2Fmasked-view@0.3.2.patch",
     "expo-splash-screen@58.0.14": "patches/expo-splash-screen@58.0.14.patch",
     "expo-widgets@58.0.28": "patches/expo-widgets@58.0.28.patch",
+    "@expo/cli@58.1.20": "patches/@expo%2Fcli@58.1.20.patch",
     "cuelume@0.2.8": "patches/cuelume@0.2.8.patch",
     "expo-image@58.0.18": "patches/expo-image@58.0.18.patch",
     "@expo/ui@58.0.28": "patches/@expo%2Fui@58.0.28.patch",

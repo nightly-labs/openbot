@@ -129,8 +129,8 @@
     "dev:all": "bun scripts/dev-services.ts all",
     "dev:slack": "bun scripts/dev-services.ts app --slack",
     "mobile": "bun run --cwd apps/mobile start",
-    "mobile:go": "bun run --cwd apps/mobile start:go",
-    "mobile:go:tunnel": "bun run --cwd apps/mobile start:go:tunnel",
+    "mobile:go": "bun scripts/mobile-go.ts",
+    "mobile:go:tunnel": "bun scripts/mobile-go.ts --tunnel",
     "mobile:android": "bun run --cwd apps/mobile android",
     "mobile:android:build:local": "bun run --cwd apps/mobile android:build:local",
     "mobile:android:release:play": "bun run --cwd apps/mobile android:release:play",
@@ -674,7 +674,8 @@
     "@expo/ui@58.0.28": "patches/@expo%2Fui@58.0.28.patch",
     "expo-image@58.0.18": "patches/expo-image@58.0.18.patch",
     "@openpanel/react-native@1.4.4": "patches/@openpanel%2Freact-native@1.4.4.patch",
-    "solid-sonner@1.0.0": "patches/solid-sonner@1.0.0.patch"
+    "solid-sonner@1.0.0": "patches/solid-sonner@1.0.0.patch",
+    "@expo/cli@58.1.20": "patches/@expo%2Fcli@58.1.20.patch"
   },
   "trustedDependencies": [
     "electron-winstaller",

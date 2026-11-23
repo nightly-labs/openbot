@@ -259,6 +259,7 @@ export interface TeamApiConnectors {
     | "setWhatsAppOwnNumber"
     | "setWhatsAppWorkingMessage"
     | "setWhatsAppStatusReactions"
+    | "setWhatsAppSenderReadOnly"
   >;
 }
 
