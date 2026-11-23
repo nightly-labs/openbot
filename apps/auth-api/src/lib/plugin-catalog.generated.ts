@@ -1420,7 +1420,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "treg",
       version: "1.0.0",
       featured: false,
-      detailSha256: "398f171c19540f9b18083c76ad2e99d593687916c862f8035b54b8f77c4a28d3",
+      detailSha256: "2b70534e9fa216b4bb65fb4d8d405bff7578368693c270b98c662b2760179332",
     },
     {
       slug: "truthifi",
@@ -10008,7 +10008,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       "Give your agent one connection to 4,200+ tools across 137 providers, plus your team's own APIs. Search by task, check prices, and call tools while Treg handles the provider keys.",
     category: "automation",
     creatorName: "Treg",
-    iconUrl: "https://treg.to/media/brand/logo.png",
+    iconUrl: "https://openbot.run/plugins/icon/treg",
     version: "1.0.0",
     prompts: [
       { id: "prompt-keywords", text: "Find a tool for monthly keyword search volume. What does one lookup cost?" },
@@ -10021,7 +10021,7 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
         name: "Treg",
         description:
           "Choose a Treg team to use its connected tools and the Treg catalog. Paid calls use that team's credits.",
-        iconUrl: "https://treg.to/media/brand/logo.png",
+        iconUrl: "https://openbot.run/plugins/icon/treg",
         server: {
           name: "treg",
           transport: "http",
