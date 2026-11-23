@@ -45,7 +45,14 @@ export interface MessagingAnswerFile {
 type MessagingTurnStatus = "completed" | "failed" | "interrupted";
 
 export type MessagingActivity =
-  | { type: "started"; link: MessagingLink; turnId: string; origin: MessagingOrigin | null; followUp: boolean }
+  | {
+      type: "started";
+      link: MessagingLink;
+      turnId: string;
+      origin: MessagingOrigin | null;
+      followUp: boolean;
+      teammateRequest: boolean;
+    }
   | {
       type: "finished";
       link: MessagingLink;
@@ -53,6 +60,7 @@ export type MessagingActivity =
       status: MessagingTurnStatus;
       origin: MessagingOrigin | null;
       followUp: boolean;
+      teammateRequest: boolean;
       answer: string | null;
       files: MessagingAnswerFile[];
       reason?: string | null;
@@ -105,6 +113,7 @@ interface MessagingPostPing {
 }
 
 export interface MessagingOutbound {
+  keysUnreadable(connectionId: string): boolean;
   places(connectionId: string): Effect.Effect<{ places: MessagingPlace[]; note?: string } | { error: string }>;
   history(
     connectionId: string,
@@ -246,7 +255,7 @@ export class MessagingThreads {
   readonly #admissions = new Map<string, Deferred.Deferred<void>>();
   readonly #turnOrigins = new Map<
     string,
-    { deliveryIds: readonly string[]; origin: MessagingOrigin | null; followUp: boolean }
+    { deliveryIds: readonly string[]; origin: MessagingOrigin | null; followUp: boolean; teammateRequest: boolean }
   >();
   readonly #lastOrigins = new Map<string, MessagingOrigin>();
   readonly #stopsBeforeStart = new Set<string>();
@@ -321,6 +330,10 @@ export class MessagingThreads {
 
   setOutbound(outbound: MessagingOutbound | null): void {
     this.#outbound = outbound;
+  }
+
+  keysUnreadable(connectionId: string): boolean {
+    return this.#outbound?.keysUnreadable(connectionId) === true;
   }
 
   setMentionHandler(
@@ -766,8 +779,9 @@ export class MessagingThreads {
           followUp = origin !== null;
         }
         const deliveryIds = active.map((context) => context.delivery.id);
-        this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp });
-        this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp });
+        const teammateRequest = active.length > 0 && active.every(({ delivery }) => isTeammateMessage(delivery));
+        this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp, teammateRequest });
+        this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp, teammateRequest });
         let stopped = false;
         for (const deliveryId of deliveryIds) if (this.#stopsBeforeStart.delete(deliveryId)) stopped = true;
         if (stopped)
@@ -781,7 +795,12 @@ export class MessagingThreads {
       case "turn-completed": {
         const link = this.store.linkForThread(event.threadId);
         if (!link) return false;
-        const started = this.#turnOrigins.get(event.turnId) ?? { deliveryIds: [], origin: null, followUp: false };
+        const started = this.#turnOrigins.get(event.turnId) ?? {
+          deliveryIds: [],
+          origin: null,
+          followUp: false,
+          teammateRequest: false,
+        };
         this.#turnOrigins.delete(event.turnId);
         this.#progress.delete(event.turnId);
         if (
@@ -807,7 +826,7 @@ export class MessagingThreads {
               )
             : null;
         Effect.runFork(
-          this.#finished(link, event.turnId, event.status, started.origin, started.followUp, reason).pipe(
+          this.#finished(link, event.turnId, event.status, started, reason).pipe(
             Effect.uninterruptible,
             Effect.forkIn(scope, { startImmediately: true }),
           ),
@@ -887,6 +906,7 @@ export class MessagingThreads {
       status,
       origin,
       followUp: delivery?.sender.kind === "agent",
+      teammateRequest: delivery !== undefined && isTeammateMessage(delivery),
       answer,
       files: [],
       reason,
@@ -957,11 +977,11 @@ export class MessagingThreads {
   readonly deleteForAgent = Effect.fn("MessagingThreads.deleteForAgent")(function* (
     this: MessagingThreads,
     agentId: string,
-  ): Effect.fn.Return<void, MessagingThreadFailed> {
+  ): Effect.fn.Return<string[], MessagingThreadFailed> {
     for (const threadId of this.store.threadIdsForAgent(agentId))
       yield* this.#hooks.forgetThread(threadId).pipe(toMessagingThreadFailed);
     for (const link of this.store.links(agentId)) this.#lastOrigins.delete(link.linkId);
-    yield* threadsStep(() => this.store.deleteForAgent(agentId));
+    return yield* threadsStep(() => this.store.deleteForAgent(agentId));
   });
 
   readonly #finished = Effect.fn("MessagingThreads.finished")(function* (
@@ -969,8 +989,11 @@ export class MessagingThreads {
     link: MessagingLink,
     turnId: string,
     status: string,
-    origin: MessagingOrigin | null,
-    followUp: boolean,
+    {
+      origin,
+      followUp,
+      teammateRequest,
+    }: { origin: MessagingOrigin | null; followUp: boolean; teammateRequest: boolean },
     reason: string | null,
   ): Effect.fn.Return<void, MessagingThreadFailed> {
     const messages = yield* threadsStep(() => this.#turnMessages(link, turnId));
@@ -990,6 +1013,7 @@ export class MessagingThreads {
       status: status === "completed" ? "completed" : status === "interrupted" ? "interrupted" : "failed",
       origin,
       followUp,
+      teammateRequest,
       answer,
       files,
       reason,
@@ -1005,6 +1029,14 @@ export class MessagingThreads {
   #publish(activity: MessagingActivity): void {
     for (const listener of this.#listeners) listener(activity);
   }
+}
+
+function isTeammateMessage(delivery: DeliveryContext["delivery"]): boolean {
+  return (
+    delivery.sender.kind === "agent" &&
+    delivery.sender.agentId !== delivery.recipientAgentId &&
+    !delivery.replyToMessageId
+  );
 }
 
 export function isAnswer(message: ConversationMessage): boolean {

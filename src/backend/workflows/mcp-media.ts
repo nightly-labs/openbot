@@ -38,6 +38,7 @@ export const mediaFailed = () => mediaFail(sourceText("error.workflow.mediaFaile
 export const resolveMediaInputs = Effect.fnUntraced(function* <Role>(
   dependencies: McpMediaDependencies,
   images: readonly { role: Role; attachmentId: string }[],
+  takesClip: (role: Role) => boolean = () => false,
 ) {
   const files: { role: Role; path: string; mimeType: string }[] = [];
   for (const image of images) {
@@ -45,7 +46,11 @@ export const resolveMediaInputs = Effect.fnUntraced(function* <Role>(
       .resolveAttachment(image.attachmentId)
       .pipe(Effect.mapError(() => mediaFail(sourceText("error.workflow.mediaInputMissing"))));
     if (!file) return yield* mediaFail(sourceText("error.workflow.mediaInputMissing"));
-    if (!file.mimeType.startsWith("image/")) return yield* mediaFail(sourceText("error.workflow.mediaInputNotImage"));
+    if (takesClip(image.role)) {
+      if (!/^(?:video|audio)\//u.test(file.mimeType))
+        return yield* mediaFail(sourceText("error.workflow.mediaInputNotClip"));
+    } else if (!file.mimeType.startsWith("image/"))
+      return yield* mediaFail(sourceText("error.workflow.mediaInputNotImage"));
     files.push({ role: image.role, ...file });
   }
   return files;
@@ -209,7 +214,18 @@ const MEDIA_TYPES: Record<string, string> = {
   "video/quicktime": "mov",
 };
 
-export const pictureExtension = (mimeType: string) => MEDIA_TYPES[mimeType] ?? mimeType.split("/")[1] ?? "png";
+const AUDIO_TYPES: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/ogg": "ogg",
+};
+
+export const pictureExtension = (mimeType: string) =>
+  MEDIA_TYPES[mimeType] ?? AUDIO_TYPES[mimeType] ?? mimeType.split("/")[1] ?? "png";
 
 export const downloadMedia = Effect.fnUntraced(function* (
   url: string,

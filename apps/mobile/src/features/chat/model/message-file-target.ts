@@ -11,7 +11,7 @@ export interface MessageFileDirectory {
 export function webLink(href: string): string | null {
   try {
     const url = new URL(href);
-    return ["https:", "http:", "mailto:"].includes(url.protocol) ? url.href : null;
+    return ["https:", "http:", "mailto:", "tel:"].includes(url.protocol) ? url.href : null;
   } catch {
     return null;
   }

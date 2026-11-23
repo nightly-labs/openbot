@@ -16,11 +16,13 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="invite" options={{ title: t("mobile.server.route.invite") }} />
       <Stack.Screen name="member" options={{ title: t("mobile.server.route.member") }} />
       <Stack.Screen name="member-roles" options={{ title: t("mobile.server.roles.title") }} />
+      <Stack.Screen name="owner-transfer" options={{ title: t("mobile.server.route.ownerTransfer") }} />
       <Stack.Screen name="roles" options={{ title: t("mobile.server.route.roles") }} />
       <Stack.Screen name="role" options={{ title: t("mobile.server.route.role") }} />
       <Stack.Screen name="audit" options={{ title: t("mobile.server.route.audit") }} />
       <Stack.Screen name="timezone" options={{ title: t("mobile.server.route.timezone") }} />
       <Stack.Screen name="agents" options={{ title: t("mobile.server.route.agents") }} />
+      <Stack.Screen name="voice-model" options={{ title: t("mobile.server.route.voiceModel") }} />
       <Stack.Screen name="connector" options={{ title: t("mobile.server.route.connectors") }} />
       <Stack.Screen
         name="github-repositories"

@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises";
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { WorkflowMediaCreditBalance, WorkflowMediaKind, WorkflowMediaSpecs } from "@openbot/contracts/ipc";
+import {
+  WORKFLOW_MEDIA_MODE_OPTION,
+  type WorkflowMediaCreditBalance,
+  type WorkflowMediaInput,
+  type WorkflowMediaKind,
+  type WorkflowMediaSpecs,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Duration, Effect } from "effect";
@@ -23,7 +29,7 @@ import {
   resolveMediaInputs,
   uploadToService,
 } from "./mcp-media";
-import type { MediaImageRole } from "./workflow-walk";
+import type { MediaImageRole, MediaPictureRole } from "./workflow-walk";
 
 export const HIGGSFIELD_MCP_HOST = "mcp.higgsfield.ai";
 
@@ -99,7 +105,10 @@ function isHiggsfieldMedia(value: string): boolean {
 
 const firstRecord = (value: unknown) => (Array.isArray(value) ? value.find(isDynamicRecord) : undefined) ?? null;
 
-const uploadPicture = Effect.fnUntraced(function* (
+const mediaType = (mimeType: string) =>
+  mimeType.startsWith("video/") ? "video" : mimeType.startsWith("audio/") ? "audio" : "image";
+
+const uploadMedia = Effect.fnUntraced(function* (
   client: Client,
   file: { path: string; mimeType: string },
   index: number,
@@ -123,15 +132,40 @@ const uploadPicture = Effect.fnUntraced(function* (
     HIGGSFIELD_TRANSFER_DEADLINE.upload,
     timedOut,
   );
-  const confirmed = yield* callTool(client, "media_confirm", { type: "image", media_id: media });
+  const confirmed = yield* callTool(client, "media_confirm", { type: mediaType(file.mimeType), media_id: media });
   const results = Array.isArray(confirmed.results) ? confirmed.results.filter(isDynamicRecord) : [];
   if (!results.some((result) => result.media_id === media)) return yield* mediaFailed();
   return media;
 });
 
+function chosenMode(specs: WorkflowMediaSpecs, plan: HiggsfieldPlan): string | null {
+  const value = specs.options.find((option) => option.name === WORKFLOW_MEDIA_MODE_OPTION)?.value;
+  return value !== undefined && plan.modes && Object.hasOwn(plan.modes, value) ? value : null;
+}
+
 function requestMedias(
   plan: HiggsfieldPlan,
-  media: (role: MediaImageRole) => string[],
+  pictures: (role: MediaPictureRole) => string[],
+  clips: (input: "videos" | "audios") => string[],
+  inputs: readonly WorkflowMediaInput[] | null,
+): { value: string; role: string }[] {
+  const takes = (input: WorkflowMediaInput) => inputs === null || inputs.includes(input);
+  const media = (role: MediaPictureRole) =>
+    takes(role === "reference" ? "references" : "frames") ? pictures(role) : [];
+  const clip = (input: "videos" | "audios") => {
+    const target = input === "videos" ? plan.videos : plan.audios;
+    return target && takes(input)
+      ? clips(input)
+          .slice(0, target.max)
+          .map((value) => ({ value, role: target.role }))
+      : [];
+  };
+  return [...requestPictures(plan, media), ...clip("videos"), ...clip("audios")];
+}
+
+function requestPictures(
+  plan: HiggsfieldPlan,
+  media: (role: MediaPictureRole) => string[],
 ): { value: string; role: string }[] {
   const asFrames = (plan.start || plan.end) && plan.referenceRole === null ? media("reference") : [];
   const first = plan.start ? (media("first")[0] ?? asFrames.shift()) : undefined;
@@ -159,6 +193,20 @@ function requestMode(plan: HiggsfieldPlan, medias: readonly { role: string }[]):
   return medias.length > 0 ? (plan.mode.references ?? plan.mode.text) : plan.mode.text;
 }
 
+function requestOptions(specs: WorkflowMediaSpecs, plan: HiggsfieldPlan): McpToolArguments {
+  const sent: Record<string, string | boolean> = {};
+  const chosen = new Set(specs.options.map((entry) => entry.name));
+  const unchosen = Object.entries(plan.defaults ?? {})
+    .filter(([name]) => !chosen.has(name))
+    .map(([name, value]) => ({ name, value }));
+  for (const { name, value } of [...specs.options, ...unchosen]) {
+    const values = plan.options && Object.hasOwn(plan.options, name) ? plan.options[name] : undefined;
+    const param = values && Object.hasOwn(values, value) ? values[value] : undefined;
+    if (param !== undefined) sent[name] = param;
+  }
+  return sent;
+}
+
 function requestChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan: HiggsfieldPlan): McpToolArguments {
   const resolution = specs.resolution
     ? plan.resolution
@@ -178,6 +226,7 @@ function requestChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan
             ? { background: "opaque" }
             : {};
   return {
+    ...requestOptions(specs, plan),
     aspect_ratio: specs.aspect,
     ...resolution,
     ...(kind === "video" ? { duration: specs.duration } : {}),
@@ -231,19 +280,26 @@ export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(func
 ) {
   const signIn = dependencies.signIn();
   if (!signIn) return yield* notSignedIn();
-  const files = yield* resolveMediaInputs(dependencies, request.images);
+  const files = yield* resolveMediaInputs(dependencies, request.images, (role) => role === "file");
   const made = yield* Effect.scoped(
     Effect.gen(function* () {
       const client = yield* connectSignedIn(signIn, notSignedIn);
-      const sent = requestMedias(request.plan, (role) =>
-        files.filter((file) => file.role === role).map((file) => file.path),
+      const mode = chosenMode(request.specs, request.plan);
+      const sent = requestMedias(
+        request.plan,
+        (role) => files.filter((file) => file.role === role).map((file) => file.path),
+        (input) =>
+          files
+            .filter((file) => file.role === "file" && (mediaType(file.mimeType) === "audio") === (input === "audios"))
+            .map((file) => file.path),
+        mode ? (request.plan.modes?.[mode] ?? null) : null,
       );
       const uploaded = new Map<string, string>();
       for (const { value: path } of sent) {
         if (uploaded.has(path)) continue;
         const file = files.find((candidate) => candidate.path === path);
         if (!file) return yield* mediaFailed();
-        uploaded.set(path, yield* uploadPicture(client, file, uploaded.size));
+        uploaded.set(path, yield* uploadMedia(client, file, uploaded.size));
       }
       const medias = sent.flatMap((media) => {
         const value = uploaded.get(media.value);
@@ -255,7 +311,7 @@ export const generateHiggsfieldMedia = Effect.fn("generateHiggsfieldMedia")(func
         count: 1,
         use_unlim: false,
         ...requestChoices(request.kind, request.specs, request.plan),
-        mode: requestMode(request.plan, medias),
+        ...(request.plan.mode ? { mode: mode ?? requestMode(request.plan, medias) } : {}),
         ...(medias.length > 0 ? { medias } : {}),
       };
       const answer = yield* callTool(client, request.kind === "video" ? "generate_video" : "generate_image", {
@@ -360,7 +416,7 @@ export const readHiggsfieldPrice = Effect.fn("readHiggsfieldPrice")(function* (
           count: 1,
           use_unlim: false,
           ...requestChoices(request.kind, request.specs, request.plan),
-          mode: request.plan.mode?.text,
+          ...(request.plan.mode ? { mode: chosenMode(request.specs, request.plan) ?? request.plan.mode.text } : {}),
           get_cost: true,
         },
       });

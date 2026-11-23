@@ -6,6 +6,7 @@ import {
   redactSecrets,
   redactText,
   redactValue,
+  registerPublicValues,
   registerSecretValue,
   resolveLogLevel,
   toLogValue,
@@ -166,18 +167,18 @@ describe("redactText", () => {
     expect(redactSecrets('{"jan@example.com":"Bearer abcdef123456"}')).toBe('{"jan@example.com":"[redacted]"}');
   });
 
-  it("keeps emails and redacts secrets in a chat app post", () => {
-    expect(redactPostText("Write to jan@example.com, password=hunter2")).toBe(
-      "Write to jan@example.com, password=[redacted]",
+  it("masks only key formats in a chat app post", () => {
+    expect(redactPostText("Write to jan@example.com, password=hunter2, key sk-ant-api03-abcdefgh")).toBe(
+      "Write to jan@example.com, password=hunter2, key [redacted]",
     );
     expect(redactPostText("postgres://admin:s3cretpw@db.example.com/app")).toBe(
       "postgres://admin:[redacted]@db.example.com/app",
     );
     expect(redactText("https://user:s3cretpw@db.example.com/x")).toBe("https://user:[redacted]@db.example.com/x");
     expect(redactSecrets("redis://:s3cretpw@cache:6379")).toBe("redis://:[redacted]@cache:6379");
-    expect(redactPostText(`${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant-secret"}}`)).toContain(
-      "[redacted-unscanned]",
-    );
+    const code = `${"{} ".repeat(16)}{"headers":{"X-Tenant":"tenant"}}`;
+    expect(redactPostText(code)).toBe(code);
+    expect(redactPostText("Authorization: Bearer abcdef123456")).toBe("Authorization: [redacted]");
   });
 
   it("redacts secrets inside a payload that arrives as one string", () => {
@@ -385,6 +386,70 @@ describe("registerSecretValue", () => {
     expect(redactText("https://user:acmeshop@db.example.com/x")).not.toContain("acmeshop");
     expect(redactText("myapp://acmeshop/callback")).not.toContain("acmeshop");
     expect(redactText("sign in with acmeshop")).toBe("sign in with [redacted]");
+  });
+
+  it("keeps a public model id that contains a short saved value, and masks the value elsewhere", () => {
+    registerSecretValue("claude", { allowShort: true });
+    registerPublicValues(["claude-opus-5-5", "claude-sonnet-5-5", "claude"]);
+
+    const models = '{"defaultModel":"claude-opus-5-5","models":[{"id":"claude-sonnet-5-5","name":"Claude Opus 5.5"}]}';
+    expect(redactText(models)).toBe(models);
+    expect(redactText("Available models: claude-opus-5-5, claude-sonnet-5-5, …")).toBe(
+      "Available models: claude-opus-5-5, claude-sonnet-5-5, …",
+    );
+    expect(redactText("The model is claude-opus-5-5.")).toBe("The model is claude-opus-5-5.");
+    expect(redactText('{"provider":"claude"}')).not.toContain("claude");
+    for (const text of [
+      "claude-opus-5-6",
+      "sshpass -pclaude ssh h",
+      'out="typed:\\nclaude\\n"',
+      "next=%2Flogin%3Fpw%3Dclaude%26x",
+      "my password is claude.Then",
+      "pw=claude-1",
+      "pw: claude_",
+      "https://user:claude@db.example.com/x",
+    ]) {
+      expect(redactText(text)).not.toContain("claude");
+    }
+  });
+
+  it("masks a saved value that ends where a public id ends", () => {
+    registerSecretValue("sonnet-5-5.", { allowShort: true });
+    registerPublicValues(["claude-sonnet-5-5"]);
+
+    expect(redactText("pw=claude-sonnet-5-5.")).not.toContain("sonnet-5-5");
+  });
+
+  it("masks a saved value in a chat app post only when it is a whole token", () => {
+    registerSecretValue("acmeshop", { allowShort: true });
+
+    expect(
+      redactPostText(
+        "Code: acmeshop. Write to biuro@acmeshop.pl, see https://acmeshop.pl/kontakt, acmeshopping, zażółćacmeshop",
+      ),
+    ).toBe(
+      "Code: [redacted]. Write to biuro@acmeshop.pl, see https://acmeshop.pl/kontakt, acmeshopping, zażółćacmeshop",
+    );
+  });
+
+  it("masks an internal token with no key format in a chat app post", () => {
+    registerSecretValue("mt4f9a2c7e1b3d5f60");
+
+    expect(redactPostText("Token: `mt4f9a2c7e1b3d5f60` and http://127.0.0.1:4100/mcp/mt4f9a2c7e1b3d5f60")).toBe(
+      "Token: `[redacted]` and http://127.0.0.1:4100/mcp/[redacted]",
+    );
+    expect(redactPostText("https://x.example/cb?next=%2Fa%3Ftoken%3Dmt4f9a2c7e1b3d5f60%26b%3D1")).toBe(
+      "https://x.example/cb?next=%2Fa%3Ftoken%3D[redacted]%26b%3D1",
+    );
+    expect(redactPostText("git clone https://mt4f9a2c7e1b3d5f60@git.example.com/repo.git")).toBe(
+      "git clone https://[redacted]@git.example.com/repo.git",
+    );
+    expect(redactPostText("https://mt4f9a2c7e1b3d5f60:pw12345@git.example.com")).toBe(
+      "https://[redacted]:[redacted]@git.example.com",
+    );
+    expect(redactPostText("https://hooks.slack.com/services/mt4f9a2c7e1b3d5f60/B000/XXXXXXXX")).toBe(
+      "https://hooks.slack.com/services/[redacted]",
+    );
   });
 
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {

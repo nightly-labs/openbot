@@ -9,6 +9,7 @@ import { waitForPresentedFrame } from "./browser-smoke-frames";
 
 const FRAME_HOSTS = ["login.openbot.test", "login.other-site.test"];
 const FRAME_PASSWORD = "fixture-frame-password-201938";
+const HIDDEN_PASSWORD = "fixture-hidden-password-480317";
 
 async function runFrameScenario(browser: BrowserHost): Promise<void> {
   const report: {
@@ -95,6 +96,165 @@ async function runFrameScenario(browser: BrowserHost): Promise<void> {
   if (!passed) throw new Error(`Secure fill in a frame is wrong: ${JSON.stringify(report)}`);
 }
 
+async function failedFillEndsView(browser: BrowserHost): Promise<string | null> {
+  const tab = await runCauseEffect(
+    browser.open("https://authentication.openbot.test/long-form", "secret-thread", "secret-agent"),
+  );
+  try {
+    const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
+    if (!contents) throw new Error("Missing failed fill live view fixture.");
+    let ended: (reason: string) => void = () => {};
+    const viewEnded = new Promise<string | null>((resolve) => {
+      const timer = setTimeout(() => resolve(null), 20_000);
+      ended = (reason) => {
+        clearTimeout(timer);
+        resolve(reason);
+      };
+    });
+    const stopView = await runCauseEffect(
+      browser.startView(
+        tab.id,
+        () => {},
+        (reason) => ended(reason),
+      ),
+    );
+    try {
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "live-view-failed-fill",
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "on_input",
+          },
+        }),
+      );
+      await contents.executeJavaScript("document.querySelector('#password').id = 'rendered-again'", true);
+      await runCauseEffect(handoff.submit("fixture-password-337120", false)).catch(() => undefined);
+      return await viewEnded;
+    } finally {
+      await runCauseEffect(stopView());
+    }
+  } finally {
+    await runCauseEffect(browser.close(tab.id));
+  }
+}
+
+async function runLiveViewScenario(browser: BrowserHost): Promise<void> {
+  const tab = await runCauseEffect(
+    browser.open("https://authentication.openbot.test/long-form", "secret-thread", "secret-agent"),
+  );
+  let frameWaiter: (() => void) | undefined;
+  let endedReason: string | null = null;
+  const nextFrame = (label: string) =>
+    new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        frameWaiter = undefined;
+        reject(new Error(`No live view frame ${label}.`));
+      }, 10_000);
+      frameWaiter = () => {
+        clearTimeout(timer);
+        frameWaiter = undefined;
+        resolve();
+      };
+    });
+  const stopView = await runCauseEffect(
+    browser.startView(
+      tab.id,
+      () => frameWaiter?.(),
+      (reason) => {
+        endedReason = reason;
+      },
+    ),
+  );
+  try {
+    const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
+    if (!contents) throw new Error("Missing live view fixture.");
+    const scrollY = async () => Number(await contents.executeJavaScript("window.scrollY", true));
+    const scroll = async (label: string) => {
+      const before = await scrollY();
+      let frame = nextFrame(label);
+      await runCauseEffect(
+        browser.dispatchViewInput(tab.id, {
+          type: "pointer",
+          action: "wheel",
+          x: 100,
+          y: 100,
+          button: "left",
+          clickCount: 1,
+          deltaX: 0,
+          deltaY: 800,
+          modifiers: 0,
+        }),
+      );
+      for (let frames = 0; frames < 20; frames += 1) {
+        await frame;
+        if ((await scrollY()) > before) return true;
+        frame = nextFrame(label);
+      }
+      return false;
+    };
+    await nextFrame("before the card");
+    const handoff = await runCauseEffect(
+      browser.prepareSecret({
+        namespace: "openbot_browser",
+        tool: "submit_secret",
+        threadId: "secret-thread",
+        ownerAgentId: "secret-agent",
+        turnId: "secret-turn",
+        callId: "live-view",
+        arguments: {
+          tabId: tab.id,
+          method: "password",
+          targets: [{ kind: "css", selector: "#password" }],
+          submission: "on_input",
+        },
+      }),
+    );
+    const scrolledWithCard = await scroll("while the card is open").catch(() => false);
+    const secret = "fixture-password-905126";
+    const submission = await runCauseEffect(handoff.submit(secret, false)).catch(() => "failed" as const);
+    const scrolledAfterSubmit = await scroll("after the card").catch(() => false);
+    const page = String(
+      await contents.executeJavaScript(
+        "JSON.stringify([document.title, document.querySelector('#password')?.value ?? null, document.body.innerText])",
+        true,
+      ),
+    );
+    const failedFillViewEnded = await failedFillEndsView(browser);
+    const report = {
+      status:
+        submission === "submitted" &&
+        scrolledWithCard &&
+        scrolledAfterSubmit &&
+        endedReason === null &&
+        !page.includes(secret) &&
+        failedFillViewEnded !== null
+          ? "passed"
+          : "issues_found",
+      submission,
+      scrolledWithCard,
+      scrolledAfterSubmit,
+      viewEnded: endedReason,
+      secretInPage: page.includes(secret),
+      failedFillViewEnded,
+    };
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(".openbot-build/browser-secret-live-view.json", JSON.stringify(report, null, 2));
+    if (report.status !== "passed")
+      throw new Error(`The live view did not stay usable around a password card: ${JSON.stringify(report)}`);
+  } finally {
+    await runCauseEffect(stopView());
+    await runCauseEffect(browser.close(tab.id));
+  }
+}
+
 export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin: string): Promise<void> {
   const seed = await runCauseEffect(browser.open(localOrigin, "secret-thread", "secret-agent"));
   const seedContents = webContents.getAllWebContents().find((contents) => contents.getURL() === seed.url);
@@ -132,6 +292,24 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         headers: { "Content-Type": "text/html" },
       });
     }
+    if (url.pathname === "/long-form")
+      return new Response(
+        `<!doctype html><body style="margin:0">
+        <div style="height:1500px"></div>
+        <label>Password<input id="password" type="password"></label>
+        <div style="height:1500px"></div>
+        <button id="save" onclick="document.title = 'Saved'">Save</button></body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
+    if (url.pathname === "/hidden-password")
+      return new Response(
+        `<!doctype html><body><form onsubmit="event.preventDefault(); location.href = [...document.querySelector('#real-password').value].reverse().join('') === '${[...HIDDEN_PASSWORD].reverse().join("")}' ? '/complete' : '/wrong'">
+        <label>User<input id="user" type="text" value="someone"></label>
+        <label>Password<input id="masked-visible" class="mask" type="text" oninput="document.querySelector('#real-password').value = this.value"></label>
+        <input id="real-password" name="password" type="password" style="display:none">
+        <button id="hidden-submit">Sign in</button></form></body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
     if (url.pathname === "/modal") {
       modalPageLoads += 1;
       return new Response(
@@ -267,6 +445,60 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         const snapshot = await runCauseEffect(browser.snapshot(tab.id));
         if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
         if (!snapshot.url.endsWith("/complete")) throw new Error("Authentication fixture did not complete.");
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
+      }
+    }
+    for (const { selector, submission, vault } of [
+      { selector: "#real-password", submission: "enter", vault: true },
+      { selector: "#real-password", submission: "click", vault: true },
+      { selector: "#masked-visible", submission: "click", vault: true },
+      { selector: "#masked-visible", submission: "click", vault: false },
+    ] as const) {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/hidden-password", "secret-thread", "secret-agent"),
+      );
+      try {
+        const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+        if (!contents) throw new Error("Missing hidden password fixture.");
+        await waitForPresentedFrame(contents);
+        const label = `${selector} with submission=${submission} and vault=${vault}`;
+        const prepared = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `secret-hidden-${selector}-${submission}-${vault}`,
+            arguments: {
+              tabId: tab.id,
+              method: "password",
+              targets: [{ kind: "css", selector }],
+              submission,
+              ...(submission === "click" ? { submitTarget: { kind: "css", selector: "#hidden-submit" } } : {}),
+            },
+          }),
+        ).then(
+          (handoff) => ({ handoff, error: null }),
+          (error: unknown) => ({ handoff: null, error: error instanceof Error ? error.message : String(error) }),
+        );
+        if (submission === "enter") {
+          prepared.handoff?.cancel();
+          if (!prepared.error?.includes("password field is hidden"))
+            throw new Error("Enter submission was accepted for a hidden password field.");
+          continue;
+        }
+        if (!prepared.handoff) throw new Error(`The hidden password form was refused for ${label}: ${prepared.error}`);
+        if (!prepared.handoff.vaultFillable)
+          throw new Error(`The hidden password form was not vault-fillable for ${label}.`);
+        if ((await runCauseEffect(prepared.handoff.submit(HIDDEN_PASSWORD, vault))) !== "submitted")
+          throw new Error(`The password was not entered for ${label}.`);
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        if (JSON.stringify(snapshot).includes(HIDDEN_PASSWORD))
+          throw new Error(`A hidden password value reached a snapshot for ${label}.`);
+        if (!snapshot.url.endsWith("/complete"))
+          throw new Error(`The hidden password form did not get the password for ${label}.`);
       } finally {
         await runCauseEffect(browser.close(tab.id));
       }
@@ -974,6 +1206,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
     await writeFile(".openbot-build/browser-secret-ended-fill.json", JSON.stringify(lostReport, null, 2));
     if (lostReport.status !== "passed")
       throw new Error(`A tab stayed locked after its saved login ended: ${JSON.stringify(lostReport)}`);
+    await runLiveViewScenario(browser);
     await runFrameScenario(browser);
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {

@@ -67,6 +67,7 @@ export const messages = {
   "composer.voice.stop": "Sprachaufnahme stoppen",
   "composer.voice.cancel": "Sprachaufnahme abbrechen",
   "composer.voice.preparing": "Sprachmodell wird heruntergeladen",
+  "composer.voice.starting": "Sprachaufnahme wird gestartet",
   "composer.voice.requesting": "Mikrofonzugriff wird angefordert",
   "composer.voice.transcribing": "Sprachanweisung wird transkribiert",
   "composer.voice.start": "Anweisung per Sprache erstellen",
@@ -105,7 +106,7 @@ export const messages = {
   "composer.voice.recording": "Sprachaufnahme",
   "composer.voice.limitSoon": "Die Aufnahme endet in {seconds} Sekunden.",
   "composer.voice.limitReached":
-    "Die Aufnahme wurde beim Limit von 2 Minuten beendet. Das Gesagte steht in der Nachricht.",
+    "Die Aufnahme wurde beim Limit von 10 Minuten beendet. Das Gesagte steht in der Nachricht.",
   "composer.send.saveQueued": "Nachricht in der Warteschlange speichern",
   "composer.send.voice": "Sprachnachricht senden",
   "composer.send.message": "Nachricht senden",

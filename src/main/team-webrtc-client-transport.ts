@@ -62,6 +62,7 @@ const CONNECT_RETRY_LIMIT_MILLISECONDS = 30_000;
 
 const CONNECT_LIMIT_MILLISECONDS = 30_000;
 const HOST_WAIT_LIMIT_MILLISECONDS = 60_000;
+const SIGNAL_HOLD_LIMIT_MILLISECONDS = 70_000;
 
 interface TeamWebRtcClientTransportEvents {
   connected: [hostId: string];
@@ -499,6 +500,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                       channelIsolation: true,
                       channelPicture: true,
                       channelBrowser: true,
+                      providerManyAccounts: true,
                     })
                   : encodeTeamProtocolV9WebRtcHttpRequest(method, path, init.body, {
                       ...(init.preserveSemanticTags === undefined
@@ -557,7 +559,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelSeenSubtasks: true,
                     channelTaskWaits: true,
                     mcpManyServers: true,
+                    providerManyAccounts: true,
                     routineResultsWhatsApp: true,
+                    storageWorkflowFiles: true,
                   })
                 : decodeTeamProtocolV10WebRtcHttpResponse(method, path, status, envelope.body),
             ).pipe(
@@ -949,7 +953,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     if (startedNewSession) this.#lastEventSequence.delete(hostId);
     const connectedSessionId = active.sessionId;
     this.#signalUrl = bootstrap.signalUrl;
-    if (this.#options.sessionCache && this.#active.get(hostId) === active && !active.cancelled)
+    const stillCurrent = this.#active.get(hostId) === active && !active.cancelled;
+    if (stillCurrent) connectTrace?.signalHome(hostId, bootstrap.ticket);
+    if (this.#options.sessionCache && stillCurrent)
       yield* this.#options.sessionCache.set(
         active.principalId,
         hostId,
@@ -973,6 +979,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.off("error", onError);
         bridge.off("hostWaiting", onHostWaiting);
         bridge.off("signalReady", onSignalReady);
+        bridge.off("signalHeld", onSignalHeld);
       };
       cleanupConnectionWait = cleanup;
       active.cancelConnectionWait = (cause = new Error(sourceText("error.remote.connectionCancelled"))) => {
@@ -986,7 +993,13 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         reject(
           new TeamWebRtcConnectError(
             `connect_timeout_${stage}`,
-            sourceText(stage === "ice" ? "error.remote.iceFailed" : "error.remote.hostDidNotConnect"),
+            sourceText(
+              stage === "ice"
+                ? "error.remote.iceFailed"
+                : stage === "auth"
+                  ? "error.remote.serverAnswerTimeout"
+                  : "error.remote.connectionServiceUnreachable",
+            ),
           ),
         );
       };
@@ -1000,6 +1013,12 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
           () => this.#onError(hostId, "host_unavailable", sourceText("error.remote.hostOffline")),
           HOST_WAIT_LIMIT_MILLISECONDS,
         );
+      };
+      const onSignalHeld = (heldHostId: string, retryInMs: number) => {
+        if (heldHostId !== hostId) return;
+        hostWaited = false;
+        clearTimeout(timer);
+        timer = setTimeout(timeOut, Math.min(retryInMs, SIGNAL_HOLD_LIMIT_MILLISECONDS) + CONNECT_LIMIT_MILLISECONDS);
       };
       const onSignalReady = (readyHostId: string) => {
         if (readyHostId !== hostId) return;
@@ -1022,6 +1041,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       this.on("connected", onConnected);
       this.on("error", onError);
       bridge.on("signalReady", onSignalReady);
+      bridge.on("signalHeld", onSignalHeld);
       if (waitForHost) bridge.on("hostWaiting", onHostWaiting);
     }
     active.authentication = {

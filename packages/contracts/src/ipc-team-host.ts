@@ -1,3 +1,4 @@
+import type { CustomServerPlan } from "./custom-server-plans";
 import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
@@ -83,6 +84,8 @@ export interface ServerSummary {
   hosted?: boolean;
   restartAvailable?: boolean;
   storageGb?: number;
+  paymentRequired?: true;
+  customPlan?: CustomServerPlan;
   keyChangedAt?: number;
   thisComputer?: true;
   compatibility?: ServerCompatibility | null;
@@ -97,7 +100,7 @@ export interface ServerSummary {
 
 export type HostedServerIssue = "plan_ended" | "wake_failed" | "start_timeout";
 
-export type HostedServerStartStep = "machine" | "openbot" | "provider_limit";
+export type HostedServerStartStep = "machine" | "restore" | "openbot" | "provider_limit";
 
 export interface HostedServerStart {
   step: HostedServerStartStep;
@@ -142,6 +145,7 @@ export interface HostStatus {
   apiOnline: boolean;
   remoteDesktopReady: boolean;
   remoteDesktopScreenRecordingDenied: boolean;
+  remoteDesktopNeedsX11Session: boolean;
   remoteDesktopUnattended: boolean;
   remoteDesktopActiveSessions: number;
   remoteDesktopMaxSessions: number;

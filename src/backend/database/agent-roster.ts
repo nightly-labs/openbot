@@ -33,7 +33,7 @@ export class AgentRoster {
 
   getAgent(agentId: string): AgentSummary | undefined {
     const row = databaseRow(
-      this.#core.connection.prepare("SELECT agent_json FROM projection_agents WHERE agent_id = ?").get(agentId),
+      this.#core.statement("SELECT agent_json FROM projection_agents WHERE agent_id = ?").get(agentId),
     );
     return row ? JSON.parse(requiredStringColumn(row, "agent_json")) : undefined;
   }

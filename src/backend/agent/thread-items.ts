@@ -1,4 +1,5 @@
 import { RequestError } from "@agentclientprotocol/sdk";
+import { isKeyOnlyProvider } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentStepActivity,
@@ -10,6 +11,7 @@ import {
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
+import { classifyFailure } from "@openbot/telemetry";
 import {
   type AgentProvider,
   MissingClaudeSessionError,
@@ -43,6 +45,7 @@ import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 export function isNonActionableCodexWarning(message: string): boolean {
   return (
     message.startsWith("Skill descriptions were shortened to fit") ||
+    message.startsWith("Exceeded skills context budget") ||
     message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
     message.startsWith("Under-development features enabled:") ||
     message.startsWith("Configured service tier ") ||
@@ -57,7 +60,9 @@ export function isArchivedThreadError(error: unknown): boolean {
 }
 
 export function isCodexMissingRollout(error: unknown): boolean {
-  return error instanceof AppServerError && error.code === -32600 && error.message.startsWith("thread not loaded:");
+  if (!(error instanceof AppServerError)) return false;
+  if (/^invalid paginated history lineage for \S+: missing source rollout$/.test(error.message)) return true;
+  return error.code === -32600 && error.message.startsWith("thread not loaded:");
 }
 
 export function isCodexRolloutPending(error: unknown): boolean {
@@ -91,7 +96,12 @@ export function isCodexThreadInUse(error: unknown): boolean {
 }
 
 function isForeignReasoningError(message: string): boolean {
-  return /\bencrypted_content\b.*\bnot issued to this caller\b/i.test(message);
+  return (
+    /\bencrypted_content\b.*\bnot issued to this caller\b/i.test(message) ||
+    /\binvalid_encrypted_content\b/.test(message) ||
+    /\bencrypted[ _]content\b.*\bcould not be (?:verified|decrypted)\b/i.test(message) ||
+    /\bcould not decrypt the provided encrypted_content\b/i.test(message)
+  );
 }
 
 function isBlankHistoryText(message: string): boolean {
@@ -120,6 +130,10 @@ function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): bo
   );
 }
 
+function isRefusedOpenCodeInput(provider: AgentProvider, message: string): boolean {
+  return provider === "opencode" && /\bInternal error: Invalid input\s*$/.test(message);
+}
+
 function isRejectedAntigravityRequest(provider: AgentProvider, message: string): boolean {
   return provider === "antigravity" && GEMINI_INVALID_ARGUMENT.test(message);
 }
@@ -128,6 +142,14 @@ function isClearedAntigravityHistory(provider: AgentProvider, message: string): 
   return (
     provider === "antigravity" && /\bno renderable messages\b|\ball steps in trajectory are cleared\b/i.test(message)
   );
+}
+
+function isUnencodableAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && /\bcontains invalid UTF-8\b/.test(message);
+}
+
+function isStuckAcpTurn(provider: AgentProvider, message: string): boolean {
+  return (provider === "mistral" || provider === "acp") && /\bA turn is already running\b/.test(message);
 }
 
 function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): boolean {
@@ -158,7 +180,23 @@ function isClaudeContextOverflow(provider: AgentProvider, message: string): bool
   return provider === "claude" && /^Prompt is too long\b/.test(message);
 }
 
-export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
+function isPiContextOverflow(provider: AgentProvider, message: string): boolean {
+  return (provider === "pi" || isKeyOnlyProvider(provider)) && classifyFailure(message) === "context_too_long";
+}
+
+const SMALL_CONTEXT_WINDOW = 64_000;
+
+function openCodeCompactionFailure(contextWindow: number | null): string {
+  return contextWindow !== null && contextWindow < SMALL_CONTEXT_WINDOW
+    ? sourceText("error.provider.opencodeContextTooSmall")
+    : sourceText("error.provider.opencodeCompactionFailed");
+}
+
+export function refusedSessionFailure(
+  provider: AgentProvider,
+  message: string,
+  contextWindow: number | null = null,
+): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
   if (isBlankHistoryText(message))
@@ -180,12 +218,18 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
   if (provider === "opencode" && isUnreadableContentDiagnostic(message))
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
+  if (isRefusedOpenCodeInput(provider, message)) return sourceText("error.provider.opencodeInputRefused");
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
-  if (isClearedAntigravityHistory(provider, message)) return sourceText("error.provider.antigravityHistoryUnreadable");
-  if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
+  if (isClearedAntigravityHistory(provider, message) || isUnencodableAntigravityHistory(provider, message))
+    return sourceText("error.provider.antigravityHistoryUnreadable");
+  if (isStuckAcpTurn(provider, message))
+    return sourceText("error.provider.acpTurnStuck", { provider: providerLabel(provider) });
+  if (isFailedOpenCodeCompaction(provider, message)) return openCodeCompactionFailure(contextWindow);
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
   if (isClaudeContextOverflow(provider, message)) return sourceText("error.provider.claudeContextFull");
+  if (isPiContextOverflow(provider, message))
+    return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });
   return null;
 }
 
@@ -451,7 +495,22 @@ function isShellCommand(item: ThreadItem): boolean {
 }
 
 export function toolFailureText(item: ThreadItem, redact: (text: string) => string): string | null {
-  if (getString(item, "status") !== "failed") return null;
+  return getString(item, "status") === "failed" ? boundedResultText(item, redact) : null;
+}
+
+export function toolResultText(item: ThreadItem, redact: (text: string) => string): string | null {
+  return toolFailed(item) ? null : boundedResultText(item, redact);
+}
+
+export function toolCallName(item: ThreadItem): string | null {
+  const bridged = bridgedToolName(item);
+  if (bridged) return bridged;
+  const usage = toolUsage(item);
+  if (usage?.server && usage.tool) return `${usage.server}.${usage.tool}`;
+  return getString(item, "tool") ?? getString(item, "name");
+}
+
+function boundedResultText(item: ThreadItem, redact: (text: string) => string): string | null {
   const raw = resultText(item);
   if (!raw) return null;
   const tail = isShellCommand(item);
@@ -490,6 +549,9 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   const openBot = openBotTool(item);
   if (openBot === "search_memories" || openBot === "list_memories") {
     return completed ? null : sourceText("status.agent.memoriesSearching");
+  }
+  if (openBot === "history_search" || openBot === "history_read") {
+    return completed ? null : sourceText("status.agent.chatsSearching");
   }
   if (openBot === "remember" || openBot === "forget_memory" || openBot === "set_memory_inclusion") {
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");

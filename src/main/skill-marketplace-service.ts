@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { MANAGED_SKILL_FOLDERS } from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentSummary,
@@ -40,13 +41,15 @@ import { toArrayBuffer } from "./agent-marketplace-service";
 import type { CentralAuthManager } from "./central-auth-manager";
 import type { GithubSkillSourceReader } from "./github-skill-source";
 import { type LocalSkillLibrary, quotedSkillMarkdown } from "./local-skill-library";
-import { listManagedSkillsForChat, MANAGED_SKILL_FOLDERS, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
+import { listManagedSkillsForChat, MANAGED_SKILL_SLUGS } from "./managed-skill-service";
 import { listFolderSkills, listHomeFolderSkills } from "./skill-folder-discovery";
 import {
   archiveDirectory,
   FINDER_METADATA_FILE,
   inspectArchive,
   inspectSkillMarkdown,
+  isRuntimeCacheFile,
+  isRuntimeCacheFolder,
   normalizedFiles,
   readSkillArchive,
 } from "./skill-package";
@@ -847,8 +850,9 @@ const readSkillFiles = Effect.fn("SkillMarketplace.readFiles")(function* (root: 
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink())
           return yield* new SkillMarketplaceFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
-        if (entry.isDirectory()) yield* visit(path);
-        else if (entry.isFile()) {
+        if (entry.isDirectory()) {
+          if (!isRuntimeCacheFolder(entry.name)) yield* visit(path);
+        } else if (entry.isFile()) {
           const name = relative(root, path).replaceAll("\\", "/");
           files[name] = new Uint8Array(yield* skillIO(() => readFile(path)));
           if ((yield* skillIO(() => lstat(path))).mode & 0o111) executable.add(name);
@@ -955,6 +959,7 @@ const hasUnexpectedSkillFiles = Effect.fn("SkillMarketplace.checkFiles")(functio
         const name = relative(root, path).replaceAll("\\", "/");
         if (entry.isSymbolicLink()) return true;
         if (entry.isDirectory()) {
+          if (isRuntimeCacheFolder(entry.name)) continue;
           if (!paths.some((expectedPath) => expectedPath.startsWith(`${name}/`)) || (yield* visit(path))) return true;
         } else if (!entry.isFile() || (!(name in expected) && entry.name !== FINDER_METADATA_FILE)) return true;
       }
@@ -1007,6 +1012,7 @@ const copyHas = Effect.fn("SkillMarketplace.copyHas")(function* (
   const unexpected = yield* Effect.result(hasUnexpectedSkillFiles(target, files));
   if (Result.isFailure(unexpected) || unexpected.success) return false;
   for (const [name, hash] of Object.entries(files)) {
+    if (isRuntimeCacheFile(name)) continue;
     const content = yield* Effect.result(skillIO(() => readFile(join(target, name))));
     if (Result.isFailure(content)) return false;
     const bytes = new Uint8Array(content.success);
@@ -1033,6 +1039,7 @@ const installedFolderState = Effect.fn("SkillMarketplace.installedFolderState")(
     const unexpected = yield* Effect.result(hasUnexpectedSkillFiles(target, files));
     if (Result.isFailure(unexpected) || unexpected.success) return "modified";
     for (const [name, hash] of Object.entries(files)) {
+      if (isRuntimeCacheFile(name)) continue;
       const content = yield* Effect.result(skillIO(() => readFile(join(target, name))));
       if (Result.isSuccess(content)) {
         if (sha256(new Uint8Array(content.success)) !== hash) return "modified";

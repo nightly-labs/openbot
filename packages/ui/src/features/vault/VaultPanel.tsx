@@ -215,7 +215,8 @@ function draftOf(kind: VaultItemKind, item: VaultItemSummary | null): Draft {
           expiry: vaultExpiryText(item.expMonth, item.expYear),
           securityCode: "",
           billingContactId: item.billingContactId ?? "",
-          fillSites: item.fillSites,
+          // The item can come from a store, and IPC cannot clone a store proxy, so the list is copied.
+          fillSites: [...item.fillSites],
         }
       : {
           kind,
@@ -1067,9 +1068,7 @@ function ItemDialog(props: {
   agents?: readonly VaultAgentChoice[] | undefined;
   savedCode?: LiveTwoStepCode | undefined;
   onCopyCode?: ((code: string) => void) | undefined;
-  scope?: VaultRequestScope | undefined;
-  keyPlaceholder?: string | undefined;
-  onSave: (input: VaultSaveInput, scope?: string) => Promise<void>;
+  onSave: (input: VaultSaveInput) => Promise<void>;
   onReveal: (request: VaultSecretRequest) => Promise<string>;
   onClose: () => void;
 }) {
@@ -1080,7 +1079,6 @@ function ItemDialog(props: {
   const [saving, setSaving] = createSignal(false);
   const [failure, setFailure] = createSignal<UserErrorDetails | null>(null);
   const [scope, setScope] = createSignal<VaultAgentScope>(untrack(() => props.item?.agents ?? null));
-  const [requestScope, setRequestScope] = createSignal(untrack(() => props.scope?.value ?? ""));
   const set = <T extends Draft>(current: T, patch: Partial<T>) => setDraft((): Draft => ({ ...current, ...patch }));
   const loginDraft = () => {
     const current = draft();
@@ -1158,10 +1156,7 @@ function ItemDialog(props: {
     setSaving(true);
     setFailure(null);
     try {
-      await props.onSave(
-        saveInput(draft(), props.item?.id ?? null, props.agents ? scope() : undefined),
-        props.scope ? requestScope() : undefined,
-      );
+      await props.onSave(saveInput(draft(), props.item?.id ?? null, props.agents ? scope() : undefined));
       props.onClose();
     } catch (error) {
       setFailure(errorDetails(error, t("vault.failed")));
@@ -1169,20 +1164,6 @@ function ItemDialog(props: {
       setSaving(false);
     }
   }
-
-  const keyLabel = (apiKey: ApiKeyDraft) => (props.fromChat ? apiKey.name : t("vault.field.apiKey"));
-
-  const requestScopeField = () => (
-    <Show when={props.scope}>
-      {(choice) => (
-        <Field label={choice().label} class="vault-wide">
-          <NativeSelect value={requestScope()} onChange={(event) => setRequestScope(event.currentTarget.value)}>
-            <For each={choice().options}>{(option) => <option value={option}>{option}</option>}</For>
-          </NativeSelect>
-        </Field>
-      )}
-    </Show>
-  );
 
   const agentsField = () => (
     <Show when={props.agents}>
@@ -1427,44 +1408,38 @@ function ItemDialog(props: {
       <Match when={apiKeyDraft()}>
         {(apiKey) => (
           <div class="vault-fields">
-            <Show when={!props.fromChat}>
-              <Field label={t("vault.field.variableName")} description={t("vault.variableNameHint")} class="vault-wide">
-                <Input
-                  placeholder={t("vault.placeholder.variableName")}
-                  autocomplete="off"
-                  spellcheck={false}
-                  maxlength={64}
-                  value={apiKey().name}
-                  onInput={(event) => {
-                    const input = event.currentTarget;
-                    const { selectionStart, selectionEnd } = input;
-                    input.value = input.value.toUpperCase();
-                    input.setSelectionRange(selectionStart, selectionEnd);
-                    set(apiKey(), { name: input.value });
-                  }}
-                />
-              </Field>
-            </Show>
-            <Field label={keyLabel(apiKey())} class="vault-wide">
+            <Field label={t("vault.field.variableName")} description={t("vault.variableNameHint")} class="vault-wide">
+              <Input
+                placeholder={t("vault.placeholder.variableName")}
+                autocomplete="off"
+                spellcheck={false}
+                maxlength={64}
+                value={apiKey().name}
+                onInput={(event) => {
+                  const input = event.currentTarget;
+                  const { selectionStart, selectionEnd } = input;
+                  input.value = input.value.toUpperCase();
+                  input.setSelectionRange(selectionStart, selectionEnd);
+                  set(apiKey(), { name: input.value });
+                }}
+              />
+            </Field>
+            <Field label={t("vault.field.apiKey")} class="vault-wide">
               <SecretInput
                 {...secretProps("key")}
-                placeholder={props.keyPlaceholder}
                 maxlength={VAULT_API_KEY_LIMIT}
                 value={apiKey().key}
                 onChange={(key) => set(apiKey(), { key })}
               />
             </Field>
-            <Show when={!props.fromChat}>
-              <Field label={t("vault.field.notes")} class="vault-wide">
-                <Textarea
-                  rows={2}
-                  maxlength={VAULT_NOTES_LIMIT}
-                  value={apiKey().notes}
-                  onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
-                />
-              </Field>
-            </Show>
-            {requestScopeField()}
+            <Field label={t("vault.field.notes")} class="vault-wide">
+              <Textarea
+                rows={2}
+                maxlength={VAULT_NOTES_LIMIT}
+                value={apiKey().notes}
+                onInput={(event) => set(apiKey(), { notes: event.currentTarget.value })}
+              />
+            </Field>
             {agentsField()}
           </div>
         )}
@@ -1571,9 +1546,7 @@ export function VaultRequestDialog(props: {
   kind: VaultItemKind;
   title: string;
   prefill: Readonly<Record<string, string>>;
-  scope?: VaultRequestScope | undefined;
-  keyPlaceholder?: string | undefined;
-  onSave: (input: VaultSaveInput, scope?: string) => Promise<void>;
+  onSave: (input: VaultSaveInput) => Promise<void>;
   onClose: () => void;
 }) {
   const { countries } = useCountries();
@@ -1587,8 +1560,6 @@ export function VaultRequestDialog(props: {
       contactLine={() => ""}
       prefill={props.prefill}
       fromChat
-      scope={props.scope}
-      keyPlaceholder={props.keyPlaceholder}
       onSave={props.onSave}
       onReveal={() => Promise.resolve("")}
       onClose={props.onClose}
@@ -1600,5 +1571,6 @@ export {
   BRAND_NAME as VAULT_BRAND_NAME,
   CardLogo as VaultCardLogo,
   ContactLogo as VaultContactLogo,
+  SecretInput as VaultSecretInput,
   SiteLogo as VaultSiteLogo,
 };

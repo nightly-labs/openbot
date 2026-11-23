@@ -21,6 +21,7 @@ ENV NODE_ENV=production
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --from=dependencies /app/remote/api/node_modules ./remote/api/node_modules
 COPY packages/contracts ./packages/contracts
+COPY packages/i18n ./packages/i18n
 COPY remote/api ./remote/api
 USER bun
 WORKDIR /app/remote/api

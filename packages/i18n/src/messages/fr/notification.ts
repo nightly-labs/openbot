@@ -5,6 +5,7 @@ export const messages = {
   "notification.needsInput": "Nécessite votre réponse.",
   "notification.needsApproval": "Nécessite votre approbation.",
   "notification.needsBrowserStep": "Vous devez terminer une étape dans le navigateur.",
+  "notification.waitsForSignIn": "Attend la connexion à {provider}.",
   "notification.needsApprovalFor": "Nécessite votre approbation : {action}",
   "notification.finished": "Travail terminé.",
   "notification.workflowApproval": "Une étape attend votre approbation.",

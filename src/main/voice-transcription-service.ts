@@ -56,6 +56,7 @@ import type {
 const logger = createOpenBotLogger("voice-transcription-service");
 
 const TRANSCRIPTION_TIMEOUT_MS = 180_000;
+const TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS = 1_500;
 const GROQ_API_ADDRESS = "https://api.groq.com/openai/v1";
 const GROQ_MODELS: Record<GroqVoiceModelId, string> = {
   "groq-whisper-large-v3-turbo": "whisper-large-v3-turbo",
@@ -475,7 +476,10 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
       });
     }).pipe(
       Effect.timeoutOrElse({
-        duration: TRANSCRIPTION_TIMEOUT_MS,
+        duration: Math.max(
+          TRANSCRIPTION_TIMEOUT_MS,
+          (pcm.byteLength / BYTES_PER_SECOND) * TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS,
+        ),
         orElse: () =>
           Effect.fail(new VoiceOperationError({ cause: new Error(sourceText("error.voice.transcriptionTimedOut")) })),
       }),

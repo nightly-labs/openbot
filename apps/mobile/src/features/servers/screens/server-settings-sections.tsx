@@ -20,6 +20,7 @@ import RotateCcwKey from "lucide-react-native/icons/rotate-ccw-key";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import UserRound from "lucide-react-native/icons/user-round";
+import UserRoundCog from "lucide-react-native/icons/user-round-cog";
 import UsersRound from "lucide-react-native/icons/users-round";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -33,9 +34,10 @@ import {
   ServerPersonalityRow,
   ServerSkillLearningRow,
 } from "@/features/servers/components/server-learning-rows";
+import { ServerVoiceModelRow } from "@/features/servers/components/server-voice-model-row";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
-import { canRestartServer } from "@/features/servers/model/server-settings-access";
+import { canRestartServer, useOwnerHostedServerIds } from "@/features/servers/model/server-settings-access";
 import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
@@ -74,6 +76,7 @@ interface LinkRowProps {
   icon: LucideIcon;
   pathname:
     | "/server-settings/members"
+    | "/server-settings/owner-transfer"
     | "/server-settings/roles"
     | "/server-settings/audit"
     | "/server-settings/vault"
@@ -91,6 +94,8 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
   const row = useServerRows(server.id);
   const roles = row((checks) => checks.canManageServerRoles(server.id));
   const audit = row((checks) => checks.canReadServerAudit(server.id));
+  const ownerTransfer = row((checks) => checks.canTransferOwnership(server.id));
+  const hostedServerIds = useOwnerHostedServerIds(server);
   const memberCount = memberCountByServer[server.id];
   return (
     <SettingsSection title={t("mobile.server.settings.peopleSection")}>
@@ -137,6 +142,15 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
           pathname="/server-settings/audit"
           serverId={server.id}
           disabled={audit === "disabled"}
+        />
+      )}
+      {ownerTransfer === "hidden" || hostedServerIds?.has(server.id) ? null : (
+        <LinkRow
+          label={t("mobile.server.route.ownerTransfer")}
+          icon={UserRoundCog}
+          pathname="/server-settings/owner-transfer"
+          serverId={server.id}
+          disabled={ownerTransfer === "disabled"}
         />
       )}
     </SettingsSection>
@@ -306,7 +320,8 @@ function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
     checks.canManageAgentMemoryLimit(serverId) ||
     checks.canManageMemoryReview(serverId) ||
     checks.canManageSkillLearning(serverId) ||
-    checks.canManageBrowsingMemory(serverId)
+    checks.canManageBrowsingMemory(serverId) ||
+    checks.canManageServerVoiceModel(serverId)
   );
 }
 
@@ -373,6 +388,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
     canManageMemoryReview,
     canManageSkillLearning,
     canManageBrowsingMemory,
+    canManageServerVoiceModel,
   } = useMobileWorkspace();
   return (
     <>
@@ -381,6 +397,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
       {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
       {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
       {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+      {canManageServerVoiceModel(serverId) ? <ServerVoiceModelRow serverId={serverId} /> : null}
     </>
   );
 }

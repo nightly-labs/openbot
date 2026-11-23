@@ -100,7 +100,7 @@ import {
 import { SplitPaneLayers, useSplitLayout } from "@/shared/components/adaptive-split";
 import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
-import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
+import { LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
 import { haptics } from "@/shared/lib/haptics";
@@ -115,7 +115,8 @@ const ONBOARDING_EXIT = FadeOut.duration(220).easing(EASE_OUT);
 const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const CARD_MOVE = { duration: 240, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
-const LIST_WINDOW_SIZE = 7;
+const LIST_WINDOW_SIZE = 3;
+const LIST_DRAG_WINDOW_SIZE = 21;
 const LIST_BATCH = 10;
 
 interface ChatRowTarget {
@@ -531,7 +532,6 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     router.push("/add-agent");
   };
   const sceneShows = listReady && showAgentsScene;
-  const statusShows = hasSelectedServer && !activeServer.initialConnectionPending && !activeServerOnline;
   const searchShows = listReady && hasSelectedServer && !onboarding.active && !sceneShows;
   const appUpdate = useAppUpdate();
   const updateHeader = useAppUpdateHeader(searchShows ? appUpdate : null);
@@ -930,19 +930,11 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 renderItem={renderItem}
                 initialNumToRender={LIST_BATCH}
                 maxToRenderPerBatch={LIST_BATCH}
-                windowSize={dragging ? LIST_WINDOW_SIZE * 3 : LIST_WINDOW_SIZE}
+                windowSize={dragging ? LIST_DRAG_WINDOW_SIZE : LIST_WINDOW_SIZE}
                 ListHeaderComponent={
                   <View onLayout={(event) => layoutStage(event.nativeEvent.layout.height)}>
                     <AgentListRowReveal index={0} reveal={listReveal}>
-                      {hasSelectedServer ? (
-                        <LargeTitle
-                          scroll={scroll}
-                          title={activeServer.name}
-                          above={<AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} />}
-                          accessibilityLabel={t("mobile.agent.home.serverTitle", { name: activeServer.name })}
-                          onPress={openDrawer}
-                        />
-                      ) : null}
+                      {hasSelectedServer ? <AppUpdateSpacer header={updateHeader} headerHeight={headerHeight} /> : null}
                       {sidebar?.error ? (
                         <View className="gap-2 px-4">
                           <Typography.Paragraph className="text-danger-text">
@@ -1058,13 +1050,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       </AndroidBlurTarget>
 
       {onboarding.active ? null : (
-        <LargeTitleBar
-          scroll={scroll}
-          title={activeServer.name}
-          blurTarget={barBlurTarget}
-          androidSurfaceWithTitle={homeCard}
-          hidden={!searchShows || statusShows || search.open}
-        >
+        <LargeTitleBar scroll={scroll} blurTarget={barBlurTarget} androidSurfaceOnScroll={homeCard}>
           <AppUpdateBlock header={updateHeader} scroll={scroll} hidden={search.open} />
         </LargeTitleBar>
       )}

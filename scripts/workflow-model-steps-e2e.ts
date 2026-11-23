@@ -3,10 +3,12 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { type AgentModelOption, analyticsRange, isAgentModel, WORKFLOWS_USAGE_ID } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { ProfileClients } from "../src/backend/agent/profile-clients";
 import { workflowUsageObserver } from "../src/backend/agent/usage-collection";
 import { WarmGenerations } from "../src/backend/agent/warm-generations";
+import { workflowGenerationError } from "../src/backend/agent/workflow-generation-error";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -27,10 +29,14 @@ let sessions = 0;
 function handle(message) {
   if (message.method) fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify({
     pid: process.pid, method: message.method, sessionId: message.params && message.params.sessionId,
+    images: message.method === "session/prompt"
+      ? message.params.prompt.filter((block) => block.type === "image").map((block) => ({ mimeType: block.mimeType, data: block.data }))
+      : undefined,
   }) + NL);
   if (message.id === undefined) return;
   if (message.method === "initialize") {
-    write({ id: message.id, result: { protocolVersion: 1, agentCapabilities: {}, authMethods: [] } });
+    const promptCapabilities = { image: fs.existsSync(process.env.FAKE_AGY_LOG + ".image") };
+    write({ id: message.id, result: { protocolVersion: 1, agentCapabilities: { promptCapabilities }, authMethods: [] } });
     return;
   }
   if (message.method === "session/new") {
@@ -75,6 +81,7 @@ interface LogEntry {
   pid: number;
   method: string;
   sessionId?: string;
+  images?: { mimeType: string; data: string }[];
 }
 
 interface Report {
@@ -221,6 +228,55 @@ try {
     "the model row names the provider and the model",
     all.models.length === 1 && all.models[0]?.provider === "antigravity" && all.models[0]?.model === modelId,
     all.models,
+  );
+
+  const picture = join(root, "picture.png");
+  const pictureBytes = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  await writeFile(picture, pictureBytes);
+  const pictureStep = async (prompt: string) => {
+    const pictures = new WarmGenerations({
+      ownerFor: () => owner,
+      createClient: () => {
+        const client = (driver.createProfileClient ?? driver.createClient)(cli, 10_000, NO_PROVIDER_CREDENTIALS);
+        clients.push(client);
+        return client;
+      },
+      profileClients,
+    });
+    try {
+      return await runCauseEffect(pictures.generate("antigravity", model, prompt, undefined, [picture])).then(
+        (text) => ({ text, error: null }),
+        (cause: unknown) => ({ text: null, error: workflowGenerationError(cause, "antigravity") }),
+      );
+    } finally {
+      await runCauseEffect(pictures.dispose());
+    }
+  };
+  const sentPictures = async () => (await readLog()).flatMap((entry) => entry.images ?? []);
+
+  const refused = await pictureStep("Describe the picture.");
+  check(
+    "a model that cannot read pictures fails the step with a clear reason",
+    refused.error === sourceText("error.workflow.modelImageUnsupported"),
+    refused,
+  );
+  check("a model that cannot read pictures gets no prompt", (await sentPictures()).length === 0);
+
+  await writeFile(`${log}.image`, "");
+  const seen = await pictureStep("Describe the picture.");
+  check("a model that can read pictures answers", seen.text === "ok", seen);
+  const sent = await sentPictures();
+  check(
+    "the model gets the picture as an image block",
+    sent.length === 1 && sent[0]?.mimeType === "image/png" && sent[0]?.data === pictureBytes.toString("base64"),
+    sent.map((image) => image.mimeType),
+  );
+  check(
+    "a step with no picture still runs on a model that can read pictures",
+    (await step("Say ok.")) === "ok" && (await sentPictures()).length === 1,
   );
 
   report.passed = true;

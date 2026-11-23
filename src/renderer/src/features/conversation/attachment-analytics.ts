@@ -15,6 +15,7 @@ function attachmentKind(attachment: DraftAttachment): AttachmentKind {
     case "spreadsheet":
       return "spreadsheet";
     case "pdf":
+    case "document":
     case "text":
     case "markdown":
       return "document";

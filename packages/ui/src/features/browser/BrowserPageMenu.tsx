@@ -70,6 +70,13 @@ export function BrowserPageMenu(props: { view: BrowserFullViewProps; narrow: boo
               {t("browser.pip.open")}
             </DropdownMenu.Item>
           </Show>
+          <Show when={props.view.canOpenWindow === true && props.view.onOpenWindow}>
+            {(openWindow) => (
+              <DropdownMenu.Item disabled={!tab()} onSelect={openWindow()}>
+                {t("browser.window.open")}
+              </DropdownMenu.Item>
+            )}
+          </Show>
           <Show when={props.view.onSignInLocally}>
             {(signIn) => (
               <DropdownMenu.Item
@@ -84,7 +91,9 @@ export function BrowserPageMenu(props: { view: BrowserFullViewProps; narrow: boo
             )}
           </Show>
           <DropdownMenu.Separator />
-          <DropdownMenu.Item onSelect={props.view.onBack}>{t("browser.backToChat")}</DropdownMenu.Item>
+          <DropdownMenu.Item onSelect={props.view.onBack}>
+            {props.view.detached ? t("browser.pip.reattachTitle") : t("browser.backToChat")}
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

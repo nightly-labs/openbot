@@ -181,11 +181,11 @@ export function createRoutineTimezonePrompt(targets: () => RoutineZoneTarget[]):
       const { t } = currentText();
       const answer = (move: boolean) => {
         shown.delete(target.id);
-        if (move) {
+        if (move && deviceZone() === zone) {
           void runMove(target, source, zone);
           return;
         }
-        writeAnswer(target.id, zone, source);
+        if (!move) writeAnswer(target.id, zone, source);
         void check(target);
       };
       toast(t("routine.timezoneMove.title", { zone: zoneLabel(zone) }), {

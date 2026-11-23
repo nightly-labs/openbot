@@ -1,5 +1,5 @@
 import type { OpenBotDesktopApi, VoiceLiveEvent } from "@openbot/contracts/ipc";
-import type { VoicePhase } from "@openbot/ui/features/conversation/VoicePill";
+import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
 import { createStore, onCleanup } from "solid-js";
 import { SPEECH_LEVEL_COUNT } from "../../speech/speech-playback";
@@ -21,6 +21,7 @@ type LiveStep = "starting" | "listening" | "thinking" | "speaking";
 interface LiveState {
   step: LiveStep;
   muted: boolean;
+  talking: boolean;
   error: string | null;
   levels: number[];
 }
@@ -43,6 +44,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   const [state, setState] = createStore<LiveState>({
     step: "starting",
     muted: false,
+    talking: false,
     error: null,
     levels: quietLevels(),
   });
@@ -62,9 +64,12 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   reply.autoplay = true;
   let step: LiveStep = "starting";
   let muted = false;
+  let pushToTalk = false;
+  let talking = false;
   let currentReply: unknown = null;
   let silencedTurn: unknown = null;
   let silenceNextReply = false;
+  let holding = false;
 
   function setStep(next: LiveStep): void {
     step = next;
@@ -117,6 +122,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     if (typeof turn !== "object" || turn === null || !("id" in turn) || !("role" in turn)) return;
     if (event.type === "turn.created" && turn.role === "user") {
       silenceNextReply = false;
+      holding = false;
       if (silencedTurn === null) reply.muted = false;
       setStep("listening");
     } else if (event.type === "turn.done" && turn.role === "user") {
@@ -142,7 +148,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   function startMeter(): void {
     const samples = new Float32Array(512);
     meterTimer = setInterval(() => {
-      const analyser = step === "speaking" ? replyMeter : microphoneMeter;
+      const analyser = step === "speaking" && !holding ? replyMeter : microphoneMeter;
       const level = analyser && !(step !== "speaking" && muted) ? loudness(analyser, samples) : 0;
       setState((draft) => {
         draft.levels = [...draft.levels.slice(1), level];
@@ -163,6 +169,7 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
     currentReply = null;
     silencedTurn = null;
     silenceNextReply = false;
+    holding = false;
     reply.muted = false;
     try {
       microphone = await navigator.mediaDevices.getUserMedia({
@@ -239,7 +246,61 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   }
 
   function toggleMute(): void {
-    muted = !muted;
+    applyMute(!muted);
+  }
+
+  function setTalkMode(mode: VoiceTalkMode): void {
+    const push = mode === "push";
+    if (push === pushToTalk) return;
+    pushToTalk = push;
+    setTalking(false);
+    endHold(false);
+    if (push !== muted) applyMute(push);
+  }
+
+  function startTalking(): void {
+    if (!pushToTalk || talking) return;
+    setTalking(true);
+    holdReply();
+    if (muted) applyMute(false);
+  }
+
+  function stopTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    endHold(true);
+    if (!muted) applyMute(true);
+  }
+
+  function cancelTalking(): void {
+    if (!pushToTalk || !talking) return;
+    setTalking(false);
+    endHold(false);
+    if (!muted) applyMute(true);
+  }
+
+  function holdReply(): void {
+    if (step !== "speaking" && step !== "thinking") return;
+    holding = true;
+    reply.muted = true;
+  }
+
+  function endHold(stopReply: boolean): void {
+    if (!holding) return;
+    holding = false;
+    if (stopReply) interrupt();
+    if (silencedTurn === null && !silenceNextReply) reply.muted = false;
+  }
+
+  function setTalking(next: boolean): void {
+    talking = next;
+    setState((draft) => {
+      draft.talking = next;
+    });
+  }
+
+  function applyMute(next: boolean): void {
+    muted = next;
     for (const track of microphone?.getAudioTracks() ?? []) track.enabled = !muted;
     setState((draft) => {
       draft.muted = muted;
@@ -276,9 +337,15 @@ export function createCodexLiveConversation(deps: { agentId: string; serverId: s
   return {
     phase,
     muted: () => state.muted,
+    talking: () => state.talking,
     error: () => state.error,
+    downloadProgress: () => null,
     levels: () => state.levels,
     toggleMute,
+    setTalkMode,
+    startTalking,
+    stopTalking,
+    cancelTalking,
     interrupt,
   };
 }

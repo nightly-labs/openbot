@@ -93,17 +93,15 @@ export function importProviderHistory(
   input: ProviderHistoryImportInput,
 ): Effect.Effect<ProviderHistoryImportResult, ProviderClientOperationError> {
   return Effect.gen(function* () {
-    const resumeKey = yield* providerSync(() =>
-      importResumeKey(
-        input,
-        input.database.ensureProviderHistoryImport({
-          sessionId: input.sessionId,
-          threadId: input.publicThreadId,
-          provider: input.provider,
-          externalSessionId: input.externalSessionId,
-        }),
-      ),
+    const current = yield* providerSync(() =>
+      input.database.ensureProviderHistoryImport({
+        sessionId: input.sessionId,
+        threadId: input.publicThreadId,
+        provider: input.provider,
+        externalSessionId: input.externalSessionId,
+      }),
     );
+    const resumeKey = yield* providerSync(() => importResumeKey(input, current));
     let turns = 0;
     let messages = 0;
     let providerCovered = false;
@@ -173,7 +171,7 @@ export function importProviderHistory(
           }),
         ),
       );
-    if (providerCovered)
+    if (providerCovered || current.state === "complete")
       yield* providerSync(() =>
         input.database.markProviderHistoryImportState(input.sessionId, turnWaits ? "active" : "complete"),
       );
@@ -381,7 +379,7 @@ function routineTurnAnswers(
     if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
-    if (requestsOnly) return imageGenerated || storedTurnReport(input, turnId) ? "answered" : "quiet";
+    if (requestsOnly) return imageGenerated || reported || storedTurnReport(input, turnId) ? "answered" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";
   });
 }

@@ -5,9 +5,11 @@ import { Effect, Fiber, Option, Result, Schema } from "effect";
 import {
   type ContactMessageEmailInput,
   type LicenseEmailInput,
+  type OwnerTransferEmailInput,
   type RenderedEmail,
   renderContactMessageEmail,
   renderLicenseEmail,
+  renderOwnerTransferEmail,
   renderSignInCodeEmail,
   renderTeamInviteEmail,
   renderWelcomeEmail,
@@ -40,6 +42,8 @@ export interface SmtpTeamInviteMessage {
   inviteUrl: string;
   role: "admin" | "member";
 }
+
+export type SmtpOwnerTransferMessage = OwnerTransferEmailInput & { email: string };
 
 export type SmtpContactMessage = ContactMessageEmailInput;
 
@@ -152,6 +156,33 @@ export const prepareTeamInvite = Effect.fn("Email.prepareTeamInvite")(function* 
       serverName: message.serverName,
       inviteUrl: message.inviteUrl,
       role: message.role,
+    }),
+  };
+});
+
+export const prepareOwnerTransferEmail = Effect.fn("Email.prepareOwnerTransfer")(function* (
+  message: SmtpOwnerTransferMessage,
+): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
+  yield* smtpValidate(() => {
+    validateEmail(message.email, "recipient");
+    validateEmail(message.fromEmail, "inviter");
+    if (
+      !message.serverName.trim() ||
+      message.serverName.length > INPUT_LIMITS.serverName ||
+      hasHeaderBreak(message.serverName)
+    ) {
+      throw new Error("smtp_invalid_server_name");
+    }
+    if (!/^https:\/\/[^\s]+$/u.test(message.appUrl) && !/^http:\/\/localhost(:\d+)?\/[^\s]*$/u.test(message.appUrl)) {
+      throw new Error("smtp_invalid_invite_url");
+    }
+  });
+  return {
+    email: message.email,
+    content: renderOwnerTransferEmail({
+      fromEmail: message.fromEmail,
+      serverName: message.serverName,
+      appUrl: message.appUrl,
     }),
   };
 });

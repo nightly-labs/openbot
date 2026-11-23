@@ -1,6 +1,13 @@
-import type { AgentProviderId, AgentSessionSettingsSnapshot, AgentSessionSettingValue } from "@openbot/contracts/ipc";
+import type {
+  AgentProviderId,
+  AgentSessionSettingsSnapshot,
+  AgentSessionSettingValue,
+  McpServerConfig,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
+import type { McpToolArguments } from "./mcp-probe";
+import type { RelayedMcpToolOutcome } from "./mcp-stdio-relay";
 import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder, RpcError } from "./protocol";
 import type { ProviderClientOperationError } from "./provider-client-effects";
 import type { ReadProviderHistory } from "./provider-history";
@@ -15,6 +22,9 @@ export interface DiagnosticOrigin {
 export interface AgentClient {
   readonly provider: AgentProvider;
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
+  readonly compactsOnDemand?: boolean;
+  promptCacheTtlMs?(externalThreadId: string): number | null;
+  contextWindow?(externalThreadId: string): number | null;
   readonly compactsItself?: boolean;
   readonly provisionalAnswers?: boolean;
   readonly turnContext?: boolean;
@@ -25,16 +35,29 @@ export interface AgentClient {
   readonly deferredMcpTools?: (externalThreadId: string) => boolean;
   readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
   readonly catalogAsMcpTools?: (model: string) => boolean;
+  readonly imageInput?: (externalThreadId: string) => boolean;
+  readonly structuredOutput?: boolean;
   readonly canReleaseProcess?: () => boolean;
+  readonly runsBackgroundWork?: () => boolean;
   readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
+  markTurnsStoppedForShutdown?(): void;
   releaseThread?(externalThreadId: string, resumes?: boolean): Effect.Effect<void, ProviderClientOperationError>;
+  callRelayedMcpTool?(
+    externalThreadId: string,
+    config: McpServerConfig,
+    tool: string,
+    args: McpToolArguments,
+  ): Effect.Effect<RelayedMcpToolOutcome | null>;
+  relaysMcpServer?(externalThreadId: string, config: McpServerConfig): boolean;
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   wakesAfterBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
+  newestTurnId?(externalThreadId: string): Effect.Effect<string | null, ProviderClientOperationError>;
   nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;
   releaseIdleThreads?(): Effect.Effect<void, ProviderClientOperationError>;
+  releaseFolderProcesses?(folder: string): Effect.Effect<boolean | null>;
   releaseQuietBackgroundThreads?(): Effect.Effect<void, ProviderClientOperationError>;
   readSessionSettings?(
     externalThreadId: string,
@@ -116,7 +139,12 @@ export class MissingPiSessionError extends Error {
   }
 }
 
-export const PROCESSOR_FEATURE_MISSING = /\bcompiled with \S+ enabled, but this feature is not available\b/iu;
+const PROCESSOR_FEATURE_MISSING = /\bcompiled with \S+ enabled, but this feature is not available\b/iu;
+const BUN_PROCESSOR_FEATURE_MISSING = /\bthis CPU is missing \S+ support,? (?:which|that) Bun requires\b/iu;
+
+export function reportsMissingProcessorFeature(output: string, illegalInstruction: boolean): boolean {
+  return BUN_PROCESSOR_FEATURE_MISSING.test(output) || (illegalInstruction && PROCESSOR_FEATURE_MISSING.test(output));
+}
 
 const EXIT_DETAIL_LIMIT = 300;
 

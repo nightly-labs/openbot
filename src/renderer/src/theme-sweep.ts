@@ -1,4 +1,3 @@
-import { documentColorScheme } from "@openbot/ui/document-color-scheme";
 import { prefersReducedMotion } from "@openbot/ui/utils";
 
 const SWEEP_TYPE = "theme-sweep";
@@ -469,10 +468,6 @@ const RING_PUSH = 44;
 const RING_IMAGE = 256;
 const EDGE_BAND = 64;
 const EDGE_BEND = 20;
-const LINE_RUN = 10;
-const LINE_GAIN = 20;
-const LINE_FLOOR = 0.3;
-const LINE_ALPHA = 0.7;
 const MAP_NEUTRAL = 128 / 255;
 
 type RingDirection = "in" | "out";
@@ -487,9 +482,7 @@ function ringStill(direction: RingDirection): number {
 
 const FILTER_PAD = Math.ceil(RING_PUSH * Math.max(ringReach("in"), ringReach("out")) * (1 + CHANNEL_SPREAD)) + 2;
 
-const LINE_LEAD = 2.2;
-
-type RingImages = [across: string, down: string, blur: string, lead: string];
+type RingImages = [across: string, down: string, band: string];
 
 function ringImages(direction: RingDirection): RingImages {
   const reach = ringReach(direction);
@@ -497,11 +490,11 @@ function ringImages(direction: RingDirection): RingImages {
   canvas.width = RING_IMAGE;
   canvas.height = RING_IMAGE;
   const context = canvas.getContext("2d");
-  if (!context) return ["", "", "", ""];
+  if (!context) return ["", "", ""];
   const half = RING_IMAGE / 2;
-  const images = [0, 1, 2, 3].map(() => context.createImageData(RING_IMAGE, RING_IMAGE));
-  const [across, down, blur, lead] = images.map((image) => image.data);
-  if (!across || !down || !blur || !lead) return ["", "", "", ""];
+  const images = [0, 1, 2].map(() => context.createImageData(RING_IMAGE, RING_IMAGE));
+  const [across, down, band] = images.map((image) => image.data);
+  if (!across || !down || !band) return ["", "", ""];
   for (let row = 0; row < RING_IMAGE; row++) {
     for (let column = 0; column < RING_IMAGE; column++) {
       const radius = (Math.hypot(column + 0.5 - half, row + 0.5 - half) / half) * reach;
@@ -511,15 +504,14 @@ function ringImages(direction: RingDirection): RingImages {
       across[alpha] = Math.round((0.5 + (0.5 * move * (column + 0.5 - half)) / half) * 255);
       down[alpha] = Math.round((0.5 + (0.5 * move * (row + 0.5 - half)) / half) * 255);
       if (radius > reach) continue;
-      blur[alpha] = Math.round(Math.min(1, rippleBlur(u)) * 255);
-      lead[alpha] = Math.round(Math.exp(-(((u - LINE_LEAD) / 0.6) ** 2)) * 255);
+      band[alpha] = Math.round(Math.min(1, rippleBlur(u)) * 255);
     }
   }
   const urls = images.map((image) => {
     context.putImageData(image, 0, 0);
     return canvas.toDataURL("image/png");
   });
-  return [urls[0] ?? "", urls[1] ?? "", urls[2] ?? "", urls[3] ?? ""];
+  return [urls[0] ?? "", urls[1] ?? "", urls[2] ?? ""];
 }
 
 const ringImageCache = new Map<RingDirection, RingImages>();
@@ -571,12 +563,7 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     return primitive;
   };
   const image = (href: string, result: string) => svgElement("feImage", { href, preserveAspectRatio: "none", result });
-  const round = [
-    image(images[0], "acrossRipple"),
-    image(images[1], "downRipple"),
-    image(images[2], "blurBand"),
-    image(images[3], "leadBand"),
-  ];
+  const round = [image(images[0], "acrossRipple"), image(images[1], "downRipple"), image(images[2], "band")];
   const width = window.innerWidth;
   const height = window.innerHeight;
   const edgeAcross = image(edgeImage(false, width), "edgeAcrossStrip");
@@ -594,7 +581,7 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     step(
       svgElement("feComposite", {
         in: input,
-        in2: "blurBand",
+        in2: "band",
         operator: "arithmetic",
         k4: String(MAP_NEUTRAL),
         result: `${input}Bend`,
@@ -615,9 +602,8 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     ),
     step(colorMatrix(`${result}Raw`, "0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0", result)),
   ];
-  const blurred = step(svgElement("feGaussianBlur", { in: "SourceGraphic", result: "blurred" }));
   const moves = ["movedRed", "moved", "movedBlue"].map((result) => {
-    const shiftDown = svgElement("feOffset", { in: "softSource", result: `${result}SourceShifted` });
+    const shiftDown = svgElement("feOffset", { in: "SourceGraphic", result: `${result}SourceShifted` });
     const movedDown = step(
       svgElement("feDisplacementMap", {
         in: `${result}SourceShifted`,
@@ -640,34 +626,8 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     return { shiftDown, movedDown, shiftAcross, movedAcross, page: step(onSource(result, `${result}Page`)) };
   });
 
-  const lighter = documentColorScheme() !== "light";
-  const kernel = lighter ? "-1 2 -1" : "1 -2 1";
-  const lines = (name: string, order: string, run: string) => [
-    step(
-      svgElement("feConvolveMatrix", {
-        in: "brightness",
-        order,
-        kernelMatrix: kernel,
-        divisor: "1",
-        preserveAlpha: "true",
-        edgeMode: "duplicate",
-        result: `${name}Edges`,
-      }),
-    ),
-    step(colorMatrix(`${name}Edges`, `0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ${LINE_GAIN} 0 0 0 -${LINE_FLOOR}`, `${name}Mask`)),
-    step(svgElement("feMorphology", { in: `${name}Mask`, operator: "erode", radius: run, result: `${name}Long` })),
-    step(svgElement("feMorphology", { in: `${name}Long`, operator: "dilate", radius: run, result: name })),
-  ];
-  const light = step(
-    svgElement("feFlood", {
-      "flood-color": getComputedStyle(document.documentElement).getPropertyValue("--openbot-text-primary").trim(),
-      "flood-opacity": "0",
-      result: "lightColor",
-    }),
-  );
-
   const merge = svgElement("feMerge", {});
-  merge.append(...["outside", "split", "lineLight"].map((input) => svgElement("feMergeNode", { in: input })));
+  merge.append(...["outside", "split"].map((input) => svgElement("feMergeNode", { in: input })));
   filter.append(
     ...round,
     edgeAcross,
@@ -677,9 +637,6 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
     ...bends,
     ...map("acrossRipple", "edgeAcrossBend", "mapAcross"),
     ...map("downRipple", "edgeDownBend", "mapDown"),
-    blurred,
-    step(svgElement("feComposite", { in: "blurred", in2: "blurBand", operator: "in", result: "blurredRing" })),
-    step(onSource("blurredRing", "softSource")),
     ...moves.flatMap(({ shiftDown, movedDown, shiftAcross, movedAcross, page }) => [
       shiftDown,
       movedDown,
@@ -688,28 +645,6 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
       page,
     ]),
     ...splitChannels("movedRedPage", "movedPage", "movedBluePage", "split").map(step),
-    step(
-      colorMatrix(
-        "SourceGraphic",
-        "0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 0 1",
-        "brightness",
-      ),
-    ),
-    ...lines("rows", "1 3", `${LINE_RUN} 0`),
-    ...lines("columns", "3 1", `0 ${LINE_RUN}`),
-    step(
-      svgElement("feComposite", {
-        in: "rows",
-        in2: "columns",
-        operator: "arithmetic",
-        k2: "1",
-        k3: "1",
-        result: "lines",
-      }),
-    ),
-    step(svgElement("feComposite", { in: "lines", in2: "leadBand", operator: "in", result: "leadLines" })),
-    light,
-    step(svgElement("feComposite", { in: "lightColor", in2: "leadLines", operator: "in", result: "lineLight" })),
     step(svgElement("feFlood", { "flood-opacity": "1", result: "area" })),
     svgElement("feComposite", { in: "SourceGraphic", in2: "area", operator: "out", result: "outside" }),
     merge,
@@ -763,8 +698,6 @@ function createRingRipple(direction: RingDirection, x: number, y: number): RingR
         element.setAttribute("k1", String(2 * bend));
         element.setAttribute("k3", String(-bend));
       }
-      blurred.setAttribute("stdDeviation", (BLUR * strength).toFixed(2));
-      light.setAttribute("flood-opacity", (LINE_ALPHA * strength).toFixed(2));
     },
   };
 }

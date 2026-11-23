@@ -52,8 +52,12 @@ export function encodeTeamProtocolV8WebRtcHttpResponse(
     promptMultiSelect?: boolean;
     videoGeneration?: boolean;
     usageTertiary?: boolean;
+    usageGroups?: boolean;
+    usageReadFailed?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
+    queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ) {
   if (status === 204) return {};
@@ -82,8 +86,12 @@ export function createTeamProtocolV8Event(
     contextUsage?: boolean;
     backgroundWork?: boolean;
     usageTertiary?: boolean;
+    usageGroups?: boolean;
+    usageReadFailed?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
+    queueHold?: boolean;
+    queueHoldSignIn?: boolean;
   } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV8BaseCurrentEvent(value);

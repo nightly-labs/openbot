@@ -14,12 +14,13 @@ import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { isNewerRelease } from "@openbot/contracts/release-version";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from "effect";
+import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
 import { writeUpdateHandover, writeUpdateInstallRecord } from "./update-install-guard";
 import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
+import { verifyWindowsUpdateSignature } from "./windows-update-signature";
 
 const logger = createOpenBotLogger("update");
 
@@ -66,6 +67,11 @@ export async function loadElectronUpdater(): Promise<UpdateAdapter | null> {
   try {
     const updaterModule = await import("electron-updater");
     const adapter = updaterModule.autoUpdater ?? updaterModule.default?.autoUpdater ?? updaterModule.default;
+    const NsisUpdater = updaterModule.NsisUpdater ?? updaterModule.default?.NsisUpdater;
+    if (NsisUpdater && adapter instanceof NsisUpdater) {
+      adapter.verifyUpdateCodeSignature = (publisherNames, file) =>
+        Effect.runPromise(verifyWindowsUpdateSignature(publisherNames, file));
+    }
     if (adapter) return adapter;
     logger.warn("OpenBot updates are disabled: electron-updater did not export autoUpdater");
   } catch {
@@ -100,6 +106,7 @@ interface UpdateServiceOptions {
   currentUid?: number | undefined;
   platform?: NodeJS.Platform;
   appBundlePath?: string | undefined;
+  restartFromInstalledCopy?: ((bundlePath: string) => Effect.Effect<boolean>) | undefined;
   appImagePath?: string | undefined;
   logDirectory?: string;
   shipItDirectory?: string | undefined;
@@ -156,6 +163,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     Pick<
       UpdateServiceOptions,
       | "appBundlePath"
+      | "restartFromInstalledCopy"
       | "appImagePath"
       | "beforeInstall"
       | "checkSiblingInstances"
@@ -177,6 +185,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #installStarted = false;
   #pendingInstallRequests = 0;
   #installHandedOver = false;
+  #installedCopyRestart: Deferred.Deferred<boolean> | null = null;
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   readonly #logLock = Semaphore.makeUnsafe(1);
@@ -277,7 +286,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       }
       if (this.#operation === "download" && this.#isDownloadLive()) {
         this.#activeDownload = null;
-        this.#setError("download_failed");
+        this.#setError("download_failed", downloadFailureMessage(error));
       }
     });
     if (this.#options.platform === "darwin" && this.#options.shipItDirectory) {
@@ -510,7 +519,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         if (Result.isFailure(result) && this.#downloadGeneration === generation) {
           logUpdateFailure("OpenBot update download failed.", result.failure.cause);
           this.#activeDownload = null;
-          this.#setError("download_failed");
+          this.#setError("download_failed", downloadFailureMessage(result.failure.cause));
         }
       }).pipe(
         Effect.ensuring(
@@ -532,6 +541,26 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     });
   }
 
+  #restartFromInstalledCopy(bundle: string): Effect.Effect<boolean> {
+    return Effect.gen({ self: this }, function* () {
+      const { restartFromInstalledCopy } = this.#options;
+      if (!restartFromInstalledCopy) return false;
+      if (this.#installedCopyRestart) return yield* Deferred.await(this.#installedCopyRestart);
+      const result = Deferred.makeUnsafe<boolean>();
+      this.#installedCopyRestart = result;
+      return yield* restartFromInstalledCopy(bundle).pipe(
+        Effect.catchDefect(() => Effect.succeed(false)),
+        Effect.onExit((exit) =>
+          Effect.gen({ self: this }, function* () {
+            const restarted = Exit.isSuccess(exit) && exit.value;
+            if (!restarted) this.#installedCopyRestart = null;
+            yield* Deferred.succeed(result, restarted);
+          }),
+        ),
+      );
+    });
+  }
+
   #install(): Effect.Effect<void, UpdateOperationFailure> {
     return Effect.gen({ self: this }, function* () {
       this.#pendingInstallRequests += 1;
@@ -549,6 +578,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         return yield* new UpdateOperationFailure({ cause: new Error(this.#siblingSessionMessage(siblings)) });
       const bundle = this.#options.platform === "darwin" ? this.#options.appBundlePath : undefined;
       if (bundle && (yield* isOnReadOnlyVolume(bundle))) {
+        if (yield* this.#restartFromInstalledCopy(bundle)) return;
         logger.warn("OpenBot update install refused: the application runs from a read-only volume.");
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.readOnlyLocation")) });
       }
@@ -888,6 +918,12 @@ function findAppImageInstallProblem(appImagePath: string): Effect.Effect<"missin
 function isMissingPathError(cause: unknown): boolean {
   const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
   return code === "ENOENT" || code === "ENOTDIR";
+}
+
+/** The download finished, but the Windows signature check did not accept the installer (`NsisUpdater`). */
+function downloadFailureMessage(error: unknown): string | undefined {
+  const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+  return code === "ERR_UPDATER_INVALID_SIGNATURE" ? sourceText("error.update.signatureNotConfirmed") : undefined;
 }
 
 function errorMessage(code: UpdateFailureCode) {

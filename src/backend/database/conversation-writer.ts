@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { ConversationMessage, ConversationSnapshot, ImageGenerationInfo } from "@openbot/contracts/ipc";
 import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { perfTimed } from "../perf-probe-hooks";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
 import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
@@ -44,6 +45,7 @@ export interface ConversationWriterOptions {
 export class ConversationWriter {
   readonly #core: DatabaseCore;
   readonly #roster: AgentRoster;
+  readonly #streamedEvents = new StreamedEventSequences();
 
   constructor(options: ConversationWriterOptions) {
     this.#core = options.core;
@@ -201,12 +203,9 @@ export class ConversationWriter {
     if (threadId && isDeletedThreadMessage(this.#core.connection, threadId, messageId)) {
       return this.#threadRevision(threadId);
     }
-    const ordinal = threadId ? snapshot.messages.findIndex((message) => message.id === messageId) : -1;
-    if (!threadId || ordinal < 0) {
-      return this.persistConversation(snapshot, input.eventType, input.detail ?? {}, input.commandId).revision;
-    }
-    const message = snapshot.messages[ordinal];
-    if (!message) throw new Error(`Streamed message is missing from the snapshot: ${messageId}`);
+    if (!threadId) return snapshot.revision;
+    const message = snapshot.messages.find((candidate) => candidate.id === messageId);
+    if (!message) return this.#threadRevision(threadId);
     return this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       [
@@ -226,8 +225,13 @@ export class ConversationWriter {
         const agent = this.#roster.getAgent(snapshot.agentId);
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
-        supersedeStreamedMessageEvents(db, this.#core, threadId, messageId, input.eventType, sequence);
+        const streamedEvent = { threadId, messageId, eventType: input.eventType };
+        perfTimed("db.supersedeStreamed", () =>
+          supersedeStreamedMessageEvents(this.#core, streamedEvent, sequence, this.#streamedEvents.get(streamedEvent)),
+        );
+        this.#streamedEvents.set(streamedEvent, sequence);
         const orderBefore = readOrderInputs(db, threadId, [message.id]);
+        const ordinal = storedOrNextOrdinal(db, threadId, message.id);
         this.#core
           .statement(`
           INSERT INTO projection_thread_messages (
@@ -830,6 +834,21 @@ export function keptUnsavedImage(
   };
 }
 
+function storedOrNextOrdinal(db: DatabaseSync, threadId: string, messageId: string): number {
+  const stored = databaseRow(
+    db
+      .prepare("SELECT ordinal FROM projection_thread_messages WHERE thread_id = ? AND message_id = ?")
+      .get(threadId, messageId),
+  );
+  if (stored) return requiredNumberColumn(stored, "ordinal");
+  const next = databaseRow(
+    db
+      .prepare("SELECT COALESCE(MAX(ordinal), -1) + 1 AS ordinal FROM projection_thread_messages WHERE thread_id = ?")
+      .get(threadId),
+  );
+  return next ? requiredNumberColumn(next, "ordinal") : 0;
+}
+
 function mergeImportedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {
   const attachments = mergeValues(existing.attachments, imported.attachments, (attachment) => attachment.id);
   const reactions = mergeValues(existing.reactions, imported.reactions, (reaction) => JSON.stringify(reaction));
@@ -902,47 +921,67 @@ function conversationRecoveryState(
   return { turnProviderSessionIds };
 }
 
+interface StreamedEvent {
+  threadId: string;
+  messageId: string;
+  eventType: string;
+}
+
+const REMEMBERED_STREAMED_EVENTS = 1024;
+
+class StreamedEventSequences {
+  readonly #sequences = new Map<string, number>();
+
+  get(event: StreamedEvent): number | undefined {
+    return this.#sequences.get(streamedEventKey(event));
+  }
+
+  set(event: StreamedEvent, sequence: number): void {
+    const key = streamedEventKey(event);
+    this.#sequences.delete(key);
+    this.#sequences.set(key, sequence);
+    if (this.#sequences.size <= REMEMBERED_STREAMED_EVENTS) return;
+    const oldest = this.#sequences.keys().next().value;
+    if (oldest !== undefined) this.#sequences.delete(oldest);
+  }
+}
+
+function streamedEventKey(event: StreamedEvent): string {
+  return JSON.stringify([event.threadId, event.eventType, event.messageId]);
+}
+
 function supersedeStreamedMessageEvents(
-  db: DatabaseSync,
   core: DatabaseCore,
-  threadId: string,
-  messageId: string,
-  eventType: string,
+  event: StreamedEvent,
   retainedSequence: number,
+  rememberedSequence: number | undefined,
 ): void {
-  const previous = databaseRow(
-    core
-      .statement(
-        `SELECT e.sequence, e.command_id FROM projection_thread_messages m
+  const { threadId, messageId, eventType } = event;
+  const previous =
+    databaseRow(
+      core
+        .statement(
+          `SELECT e.sequence, e.command_id FROM projection_thread_messages m
          JOIN orchestration_events e ON e.sequence = m.last_event_sequence
          WHERE m.thread_id = ? AND m.message_id = ? AND e.aggregate_type = 'thread' AND e.aggregate_id = ?
            AND e.event_type = ? AND e.sequence < ? AND json_extract(e.payload_json, '$.streamedMessage.id') = ?`,
-      )
-      .get(threadId, messageId, threadId, eventType, retainedSequence, messageId),
-  );
-  if (previous) {
-    core
-      .statement("DELETE FROM orchestration_events WHERE sequence = ?")
-      .run(requiredNumberColumn(previous, "sequence"));
-    deleteReceiptsOf(db, [requiredStringColumn(previous, "command_id")]);
-    return;
-  }
-  const matchSuperseded = `
-    aggregate_type = 'thread' AND aggregate_id = ? AND event_type = ? AND sequence < ?
-      AND json_extract(payload_json, '$.streamedMessage.id') = ?`;
-  const supersededCommandIds = databaseRows(
-    db
-      .prepare(`SELECT command_id FROM orchestration_events WHERE ${matchSuperseded}`)
-      .all(threadId, eventType, retainedSequence, messageId),
-  ).map((row) => requiredStringColumn(row, "command_id"));
-  if (supersededCommandIds.length === 0) return;
-  db.prepare(`DELETE FROM orchestration_events WHERE ${matchSuperseded}`).run(
-    threadId,
-    eventType,
-    retainedSequence,
-    messageId,
-  );
-  deleteReceiptsOf(db, supersededCommandIds);
+        )
+        .get(threadId, messageId, threadId, eventType, retainedSequence, messageId),
+    ) ??
+    (rememberedSequence === undefined
+      ? undefined
+      : databaseRow(
+          core
+            .statement(
+              `SELECT sequence, command_id FROM orchestration_events
+               WHERE sequence = ? AND aggregate_type = 'thread' AND aggregate_id = ? AND event_type = ?
+                 AND sequence < ? AND json_extract(payload_json, '$.streamedMessage.id') = ?`,
+            )
+            .get(rememberedSequence, threadId, eventType, retainedSequence, messageId),
+        ));
+  if (!previous) return;
+  core.statement("DELETE FROM orchestration_events WHERE sequence = ?").run(requiredNumberColumn(previous, "sequence"));
+  deleteReceiptsOf(core.connection, [requiredStringColumn(previous, "command_id")]);
 }
 
 const CONVERSATION_UPDATED = "conversation.snapshot-updated";

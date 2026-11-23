@@ -12,7 +12,7 @@ const ACCOUNTS_PER_PROVIDER = 10;
 export const PROVIDER_ACCOUNT_MODELS_LIMIT = 1_000;
 
 const effort = string(32);
-const model = fields(
+export const providerAccountModelWire = fields(
   {
     id: string(160),
     name: string(160),
@@ -33,7 +33,10 @@ export const PROVIDER_ACCOUNT_MODELS_CODECS: ReadonlyMap<string, OptionalRouteCo
           fields({
             provider: string(PROVIDER_LIMIT),
             accounts: list(
-              fields({ accountId: PROVIDER_ACCOUNT_ID, models: list(model, PROVIDER_ACCOUNT_MODELS_LIMIT) }),
+              fields({
+                accountId: PROVIDER_ACCOUNT_ID,
+                models: list(providerAccountModelWire, PROVIDER_ACCOUNT_MODELS_LIMIT),
+              }),
               ACCOUNTS_PER_PROVIDER,
             ),
           }),

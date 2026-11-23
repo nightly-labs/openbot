@@ -25,7 +25,7 @@ function check(name: string, passed: boolean, detail?: unknown) {
   checks.push({ name, passed, ...(detail === undefined ? {} : { detail }) });
 }
 
-type Health = "up" | "down" | "fail-once" | "stopped";
+type Health = "up" | "down" | "fail-once" | "fail-twice" | "stopped";
 const health: Record<"a" | "b", Health> = { a: "up", b: "up" };
 function serveSignal(id: "a" | "b", port = 0) {
   return Bun.serve({
@@ -34,6 +34,7 @@ function serveSignal(id: "a" | "b", port = 0) {
     fetch: (request) => {
       const state = health[id];
       if (state === "fail-once") health[id] = "up";
+      if (state === "fail-twice") health[id] = "fail-once";
       return new URL(request.url).pathname === "/health/ready" && state === "up"
         ? Response.json({ status: "ready" })
         : new Response(null, { status: 503 });
@@ -148,7 +149,7 @@ try {
   await setHealth("a", "stopped");
   const moved = await run();
   check(
-    "When the entry machine does not answer two times, the record gets the address of the other machine",
+    "When the entry machine does not answer three times, the record gets the address of the other machine",
     Result.isSuccess(moved) &&
       moved.success.status === "moved" &&
       moved.success.from === "a" &&
@@ -187,6 +188,19 @@ try {
       recovered.success.entry === "a" &&
       patches().length === 0,
     recovered,
+  );
+
+  resetDns(ADDRESS.a);
+  await setHealth("a", "fail-twice");
+  const recoveredLate = await run();
+  check(
+    "A machine that fails two times and answers at the third check keeps the entry",
+    Result.isSuccess(recoveredLate) &&
+      recoveredLate.success.status === "healthy" &&
+      recoveredLate.success.entry === "a" &&
+      patches().length === 0 &&
+      entryAddress() === ADDRESS.a,
+    recoveredLate,
   );
 
   resetDns(ADDRESS.a);

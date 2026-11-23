@@ -6,10 +6,13 @@ import type {
   MobileConnectLink,
   OpenBotDesktopApi,
 } from "@openbot/contracts/ipc";
+import type { OwnerTransfer } from "@openbot/contracts/owner-transfer";
+import { sourceText } from "@openbot/i18n/source";
 import { clone, type Listener, type MockRuntime } from "./mock-support";
 
 export interface MockAuthOptions {
   authState?: CentralAuthState;
+  incomingOwnerTransfers?: OwnerTransfer[];
 }
 
 export function createMockAuth(options: MockAuthOptions, { emit }: MockRuntime) {
@@ -66,6 +69,7 @@ export function createMockAuth(options: MockAuthOptions, { emit }: MockRuntime) 
     domainCheck: false,
     connection: null,
   };
+  let incomingOwnerTransfers = clone(options.incomingOwnerTransfers ?? []);
   const authListeners = new Set<Listener<CentralAuthState>>();
   function emitAuthState(state: CentralAuthState): void {
     authState = clone(state);
@@ -203,10 +207,21 @@ export function createMockAuth(options: MockAuthOptions, { emit }: MockRuntime) 
       }
       return clone(companySignIn);
     },
+    listOwnerTransfers: async () => clone(incomingOwnerTransfers),
+    acceptOwnerTransfer: async (transferId) => {
+      const transfer = incomingOwnerTransfers.find((candidate) => candidate.transferId === transferId);
+      if (!transfer) throw new Error(sourceText("error.remote.ownerTransferInvalid"));
+      incomingOwnerTransfers = incomingOwnerTransfers.filter((candidate) => candidate.transferId !== transferId);
+      return { hostId: transfer.hostId, hostName: transfer.hostName };
+    },
+    declineOwnerTransfer: async (transferId) => {
+      incomingOwnerTransfers = incomingOwnerTransfers.filter((candidate) => candidate.transferId !== transferId);
+    },
     onEvent: (listener) => {
       authListeners.add(listener);
       return () => authListeners.delete(listener);
     },
+    onOwnerTransfersChanged: () => () => undefined,
   };
 
   return {

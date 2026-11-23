@@ -29,7 +29,7 @@ import { usePlatform } from "./platform";
 const FILE_SEARCH_LIMIT = 50;
 
 export function useGlobalSearchSources(open: () => boolean) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const platform = usePlatform();
   const channels = useChannels();
   const { agentList, agentSetupOpen, creatingAgent, openAgentSetup, setSettingsRequest } = useAgents();
@@ -48,7 +48,7 @@ export function useGlobalSearchSources(open: () => boolean) {
   };
 
   const searchChannels = createMemo(
-    () => (channels.supported() ? globalSearchChannels(channels.state.channels) : undefined),
+    () => (channels.supported() ? globalSearchChannels(channels.state.channels, sourceText) : undefined),
     { lazy: true },
   );
 

@@ -1,6 +1,6 @@
 import { AGENT_PROVIDERS, type AgentProviderId } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
-import type { AgentReasoningEffort } from "./ipc-agent-identity";
+import { type AgentReasoningEffort, isAgentModel } from "./ipc-agent-identity";
 import { isBoundedString } from "./ipc-bounded-values";
 import { isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
@@ -64,6 +64,10 @@ export type CustomProviderReasoningEffort = (typeof CUSTOM_PROVIDER_REASONING_EF
 
 export function isCustomProviderReasoningEfforts(value: unknown): value is CustomProviderReasoningEffort[] {
   return isOrderedSubset(CUSTOM_PROVIDER_REASONING_EFFORTS, value);
+}
+
+export function isCustomProviderModelEfforts(value: unknown): value is CustomProviderReasoningEffort[] {
+  return (Array.isArray(value) && value.length === 0) || isCustomProviderReasoningEfforts(value);
 }
 
 function isOrderedSubset(known: readonly unknown[], value: unknown): boolean {
@@ -193,7 +197,7 @@ function isCustomProviderModel(value: unknown): value is CustomProviderModel {
     isBoundedString(value.name, INPUT_LIMITS.modelName) &&
     (value.contextWindow === undefined || isCustomProviderContextWindow(value.contextWindow)) &&
     (value.maxOutput === undefined || isCustomProviderMaxOutput(value.maxOutput)) &&
-    (value.reasoningEfforts === undefined || isCustomProviderReasoningEfforts(value.reasoningEfforts)) &&
+    (value.reasoningEfforts === undefined || isCustomProviderModelEfforts(value.reasoningEfforts)) &&
     (value.inputs === undefined || isCustomProviderInputs(value.inputs))
   );
 }
@@ -207,8 +211,46 @@ export function isCustomProviderResult(value: unknown): value is CustomProviderR
   );
 }
 
+const ESCAPED_MODEL_CHARACTERS = /[!#$%&()*+;<>?@^{|}~=]/g;
+const ESCAPABLE_MODEL_ID = /^[A-Za-z0-9._:/[\],!#$%&()*+;<>?@^{|}~=-]*$/;
+
+function escapedModelCharacter(character: string): string {
+  return `=${character.charCodeAt(0).toString(16).toUpperCase()}`;
+}
+
 export function composedCustomModelId(providerId: string, modelId: string): string {
-  return `${providerId}/${modelId}`;
+  const plain = `${providerId}/${modelId}`;
+  if (isAgentModel(plain) || !ESCAPABLE_MODEL_ID.test(modelId)) return plain;
+  return `${providerId}/${modelId.replace(ESCAPED_MODEL_CHARACTERS, escapedModelCharacter)}`;
+}
+
+export function customModelKey(providerId: string, modelId: string): string {
+  return composedCustomModelId(providerId, modelId).slice(providerId.length + 1);
+}
+
+const ENCODED_MODEL = "b64:";
+
+function base64Url(value: string): string {
+  let binary = "";
+  for (const byte of new TextEncoder().encode(value)) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+
+export function encodedModelId(prefix: string, value: string): string {
+  const plain = `${prefix}${value}`;
+  return isAgentModel(plain) && !value.startsWith(ENCODED_MODEL)
+    ? plain
+    : `${prefix}${ENCODED_MODEL}${base64Url(value)}`;
+}
+
+export function savedCustomModelId(
+  endpointId: string,
+  harness: CustomProviderHarness | undefined,
+  modelId: string,
+): string {
+  return (harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS) === "pi"
+    ? encodedModelId(`${endpointId}/`, modelId)
+    : composedCustomModelId(endpointId, modelId);
 }
 
 export function isCustomProviderModelId(modelId: string, providerIds: ReadonlySet<string>): boolean {

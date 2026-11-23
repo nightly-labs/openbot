@@ -218,11 +218,15 @@ export class AttachmentFiles {
           );
           yield* attachmentCall(() => copyFile(source.path, targetPath)).pipe(Effect.uninterruptible);
           const copied = yield* attachmentCall(() => stat(targetPath));
-          if (copied.size > MAX_FILE_BYTES) {
+          if (copied.size === 0 || copied.size > MAX_FILE_BYTES) {
             yield* attachmentCall(() => rm(targetDirectory, { recursive: true, force: true })).pipe(
               Effect.uninterruptible,
             );
-            throw new Error(sourceText("error.attachment.namedFileTooLarge", { name }));
+            throw new Error(
+              copied.size === 0
+                ? sourceText("error.attachment.emptyFile", { name })
+                : sourceText("error.attachment.namedFileTooLarge", { name }),
+            );
           }
           total += copied.size;
           if (total > MAX_TOTAL_BYTES) {
@@ -245,6 +249,8 @@ export class AttachmentFiles {
         }
         for (const item of data) {
           const bytes = normalizeBytes(item.bytes);
+          const name = sanitizeName(item.name || "pasted-image.png");
+          if (bytes.byteLength === 0) throw new Error(sourceText("error.attachment.emptyFile", { name }));
           if (bytes.byteLength > MAX_FILE_BYTES) {
             throw new Error(sourceText("error.attachment.namedFileTooLarge", { name: item.name }));
           }
@@ -253,7 +259,6 @@ export class AttachmentFiles {
           const id = randomUUID();
           const targetDirectory = join(this.#draftsRoot, id);
           preparedRoots.push(targetDirectory);
-          const name = sanitizeName(item.name || "pasted-image.png");
           const mimeType = heifSafeMimeType(
             name,
             bytes,
@@ -654,7 +659,7 @@ const inspectSourceEffect = Effect.fn("Attachments.inspectSource")(function* (
 
 function sanitizeName(path: string): string {
   const value = basename(path)
-    .replace(/[^\p{L}\p{N}._ -]+/gu, "-")
+    .replace(/[^\p{L}\p{M}\p{N}._ -]+/gu, "-")
     .replace(/^\.+/, "")
     .trim();
   if (!value) return "attachment";
@@ -667,7 +672,7 @@ function sanitizeName(path: string): string {
 function safeArchiveSegment(value: string): string {
   return (
     basename(value)
-      .replace(/[^\p{L}\p{N}._ -]+/gu, "-")
+      .replace(/[^\p{L}\p{M}\p{N}._ -]+/gu, "-")
       .replace(/^\.+/, "")
       .slice(0, 120) || "item"
   );

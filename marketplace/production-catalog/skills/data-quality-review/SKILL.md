@@ -13,8 +13,8 @@ description: "Check a dataset before analysis: row counts, duplicates, missing v
 
 ## Inputs
 
-1. **The data.** Tool path: a shared table (`openbot.list_tables`, then `openbot.query_data`), an installed plugin
-   found with `tool_search` (Airtable, Supabase, PostHog), or a signed-in tab in `openbot_browser`. Paste path: a CSV
+1. **The data.** Tool path: a shared table (`openbot.list_tables`, then `openbot.query_data`), the tools of an
+   installed plugin (Airtable, Supabase, PostHog), which `openbot.tool_search` does not list, or a signed-in tab in `openbot_browser`. Paste path: a CSV
    or spreadsheet that the user uploads.
 2. **The intended use.** The calculation the data must support decides what blocks. If it is missing, ask once
    with `ask_user`: "What will you calculate from this data?"

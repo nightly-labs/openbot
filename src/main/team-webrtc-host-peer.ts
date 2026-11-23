@@ -31,12 +31,16 @@ import {
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
+import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-whatsapp-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
@@ -44,6 +48,7 @@ import {
   SKILL_LEARNING_CAPABILITY,
   withSkillSuggestionNames,
 } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-workflow-files-v1";
 import {
   addUiBlockAutoAnswers,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
@@ -129,6 +134,8 @@ const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
 const MAXIMUM_BUFFERED_EVENT_CHARACTERS = 32 * 1024 * 1024;
+const MAXIMUM_KEPT_RESPONSES = 1_000;
+const MAXIMUM_KEPT_RESPONSE_CHARACTERS = 4 * 1024 * 1024;
 const MAXIMUM_DESKTOP_STREAMS = 6;
 
 export interface TeamWebRtcHostPeerOptions {
@@ -181,6 +188,7 @@ export class TeamWebRtcHostPeer {
     | ((ticket: string) => Effect.Effect<VerifiedRemoteSessionTicket, RemoteWorkflowError>)
     | null;
   readonly #responses = new Map<string, string>();
+  #responseCharacters = 0;
   readonly #responsesInFlight = new Map<string, Fiber.Fiber<string, RemoteWorkflowError>>();
   readonly #events = new Map<number, string>();
   #eventCharacters = 0;
@@ -285,6 +293,7 @@ export class TeamWebRtcHostPeer {
     this.#bridge.off("pathLost", this.#onPathLost);
     this.#bridge.off("pathRestored", this.#onPathRestored);
     yield* this.#closeLocalSession(false);
+    this.#forgetResponses();
     this.#peerId = null;
     this.#pendingConnection = null;
     this.#peerBinding = null;
@@ -344,7 +353,7 @@ export class TeamWebRtcHostPeer {
     if (connection.sessionId === this.#localSessionId && this.#localSessionToken) return;
     this.#events.clear();
     this.#eventCharacters = 0;
-    this.#responses.clear();
+    this.#forgetResponses();
     this.#nextEventSequence = 1;
     this.#eventsSentThrough = 0;
     this.#eventResetPending = false;
@@ -573,10 +582,8 @@ export class TeamWebRtcHostPeer {
           Effect.map(encodeRpcResponse),
           Effect.tap((response) =>
             Effect.sync(() => {
-              if (this.#localSessionId === sessionId) {
-                this.#responses.set(request.requestId, response);
-                while (this.#responses.size > 1_000) deleteOldest(this.#responses);
-              }
+              if (this.#localSessionId === sessionId && !isReadRequest(request))
+                this.#keepResponse(request.requestId, response);
             }),
           ),
         ),
@@ -593,6 +600,32 @@ export class TeamWebRtcHostPeer {
     if (this.#peerId !== peerId || this.#localSessionId !== sessionId) return;
     yield* HostPeerTransport.use((transport) => transport.send(peerId, "rpc", response));
   });
+
+  #keepResponse(requestId: string, response: string): void {
+    this.#forgetResponse(requestId);
+    this.#responses.set(requestId, response);
+    this.#responseCharacters += response.length;
+    for (const oldest of this.#responses.keys()) {
+      if (
+        oldest === requestId ||
+        (this.#responses.size <= MAXIMUM_KEPT_RESPONSES && this.#responseCharacters <= MAXIMUM_KEPT_RESPONSE_CHARACTERS)
+      )
+        return;
+      this.#forgetResponse(oldest);
+    }
+  }
+
+  #forgetResponse(requestId: string): void {
+    const response = this.#responses.get(requestId);
+    if (response === undefined) return;
+    this.#responses.delete(requestId);
+    this.#responseCharacters -= response.length;
+  }
+
+  #forgetResponses(): void {
+    this.#responses.clear();
+    this.#responseCharacters = 0;
+  }
 
   readonly #createRpcResponse = Effect.fn("TeamHostPeer.createRpcResponse")(function* (
     this: TeamWebRtcHostPeer,
@@ -726,6 +759,7 @@ export class TeamWebRtcHostPeer {
                       channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
                       channelPicture: peerCapabilities.has(CHANNEL_PICTURE_CAPABILITY),
                       channelBrowser: peerCapabilities.has(CHANNEL_BROWSER_CAPABILITY),
+                      providerManyAccounts: peerCapabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY),
                     }),
                   );
                 const decoded = decodeRequest(input.method, input.path, input.body, {
@@ -804,7 +838,9 @@ export class TeamWebRtcHostPeer {
             channelSeenSubtasks: peerCapabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
             channelTaskWaits: peerCapabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
             mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
+            providerManyAccounts: peerCapabilities.has(PROVIDER_MANY_ACCOUNTS_CAPABILITY),
             routineResultsWhatsApp: peerCapabilities.has(ROUTINE_RESULTS_WHATSAPP_CAPABILITY),
+            storageWorkflowFiles: peerCapabilities.has(STORAGE_WORKFLOW_FILES_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
@@ -812,7 +848,11 @@ export class TeamWebRtcHostPeer {
             videoGeneration: peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
             memoryChanges: peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
             usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+            usageGroups: peerCapabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
+            usageReadFailed: peerCapabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY),
             agentPendingRuntime: peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
+            queueHold: peerCapabilities.has(QUEUE_HOLD_CAPABILITY),
+            queueHoldSignIn: peerCapabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
           };
           return yield* remoteDecode(() => ({
             status: response.status,
@@ -884,7 +924,11 @@ export class TeamWebRtcHostPeer {
                 contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
                 backgroundWork: this.#peerCapabilities.has(AGENT_BACKGROUND_WORK_CAPABILITY),
                 usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+                usageGroups: this.#peerCapabilities.has(TEAM_USAGE_GROUPS_CAPABILITY),
+                usageReadFailed: this.#peerCapabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY),
                 agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
+                queueHold: this.#peerCapabilities.has(QUEUE_HOLD_CAPABILITY),
+                queueHoldSignIn: this.#peerCapabilities.has(QUEUE_HOLD_SIGN_IN_CAPABILITY),
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
@@ -1178,6 +1222,10 @@ function webRtcResponseEncoder(protocol: number) {
   return encodeTeamProtocolV4WebRtcHttpResponse;
 }
 
+function isReadRequest(request: Extract<TeamProtocolV2RpcFrame, { type: "request" }>): boolean {
+  return request.operation === "http.request" && isHttpRequest(request.payload) && request.payload.method === "GET";
+}
+
 function isCompatibilityRead(method: string, path: string, status: number): boolean {
   return method === "GET" && path === TEAM_API_ROUTES.compatibility && status === 200;
 }
@@ -1229,11 +1277,6 @@ function encodeRpcResponse(response: TeamProtocolV2RpcFrame): string {
       },
     });
   }
-}
-
-function deleteOldest<Key, Value>(values: Map<Key, Value>): void {
-  const oldest = values.keys().next();
-  if (!oldest.done) values.delete(oldest.value);
 }
 
 function authenticationFrame(data: string): TeamProtocolV2AuthFrame | null {

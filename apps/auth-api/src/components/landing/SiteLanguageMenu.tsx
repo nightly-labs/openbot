@@ -146,8 +146,159 @@ function LanguageFlag(props: { locale: SiteLocale }) {
         <Match when={props.locale === "pt"}>
           <BrazilFlag />
         </Match>
+        <Match when={STRIPED_FLAGS[props.locale]}>{(bands) => <StripedFlag bands={bands()} />}</Match>
+        <Match when={props.locale === "ja"}>
+          <svg viewBox="0 0 20 14" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <rect width="20" height="14" fill="#fff" />
+            <circle cx="10" cy="7" r="4.2" fill="#bc002d" />
+          </svg>
+        </Match>
+        <Match when={props.locale === "ko"}>
+          <KoreaFlag />
+        </Match>
+        <Match when={props.locale === "tr"}>
+          <svg viewBox="0 0 20 14" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <rect width="20" height="14" fill="#e30a17" />
+            <circle cx="7.5" cy="7" r="3.5" fill="#fff" />
+            <circle cx="8.4" cy="7" r="2.8" fill="#e30a17" />
+            <polygon points={starPoints(12.6, 7, 1.6)} fill="#fff" />
+          </svg>
+        </Match>
+        <Match when={props.locale === "zh"}>
+          <svg viewBox="0 0 20 14" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <rect width="20" height="14" fill="#ee1c25" />
+            <polygon points={starPoints(3.6, 3.6, 2.2)} fill="#ffde00" />
+            <For each={CHINA_SMALL_STARS}>
+              {(star) => <polygon points={starPoints(star.x, star.y, 0.75)} fill="#ffde00" />}
+            </For>
+          </svg>
+        </Match>
+        <Match when={props.locale === "he"}>
+          <svg viewBox="0 0 20 14" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <rect width="20" height="14" fill="#fff" />
+            <rect y="1.3" width="20" height="2" fill="#0038b8" />
+            <rect y="10.7" width="20" height="2" fill="#0038b8" />
+            <polygon points="10,4.4 12.2,8.2 7.8,8.2" fill="none" stroke="#0038b8" stroke-width="0.6" />
+            <polygon points="10,9.6 12.2,5.8 7.8,5.8" fill="none" stroke="#0038b8" stroke-width="0.6" />
+          </svg>
+        </Match>
+        <Match when={props.locale === "ar"}>
+          <LandingIcon name="globe" />
+        </Match>
       </Switch>
     </span>
+  );
+}
+
+interface FlagBand {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+}
+
+function stripedFlag(
+  direction: "horizontal" | "vertical",
+  stripes: readonly (readonly [string, number])[],
+): FlagBand[] {
+  const total = stripes.reduce((sum, [, size]) => sum + size, 0);
+  let start = 0;
+  return stripes.map(([color, size]) => {
+    const offset = start / total;
+    const length = size / total;
+    start += size;
+    return direction === "horizontal"
+      ? { x: 0, y: offset, width: 1, height: length, color }
+      : { x: offset, y: 0, width: length, height: 1, color };
+  });
+}
+
+const STRIPED_FLAGS: Partial<Record<SiteLocale, FlagBand[]>> = {
+  de: stripedFlag("horizontal", [
+    ["#000", 1],
+    ["#dd0000", 1],
+    ["#ffce00", 1],
+  ]),
+  es: stripedFlag("horizontal", [
+    ["#aa151b", 1],
+    ["#f1bf00", 2],
+    ["#aa151b", 1],
+  ]),
+  fr: stripedFlag("vertical", [
+    ["#0055a4", 1],
+    ["#fff", 1],
+    ["#ef4135", 1],
+  ]),
+  it: stripedFlag("vertical", [
+    ["#009246", 1],
+    ["#fff", 1],
+    ["#ce2b37", 1],
+  ]),
+  nl: stripedFlag("horizontal", [
+    ["#ae1c28", 1],
+    ["#fff", 1],
+    ["#21468b", 1],
+  ]),
+  ru: stripedFlag("horizontal", [
+    ["#fff", 1],
+    ["#0039a6", 1],
+    ["#d52b1e", 1],
+  ]),
+};
+
+function StripedFlag(props: { bands: FlagBand[] }) {
+  return (
+    <svg viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
+      <For each={props.bands}>
+        {(band) => <rect x={band.x} y={band.y} width={band.width} height={band.height} fill={band.color} />}
+      </For>
+    </svg>
+  );
+}
+
+function starPoints(cx: number, cy: number, radius: number): string {
+  return Array.from({ length: 10 }, (_, index) => {
+    const angle = -Math.PI / 2 + (index * Math.PI) / 5;
+    const distance = index % 2 === 0 ? radius : radius * 0.4;
+    return `${(cx + distance * Math.cos(angle)).toFixed(2)},${(cy + distance * Math.sin(angle)).toFixed(2)}`;
+  }).join(" ");
+}
+
+const CHINA_SMALL_STARS = [
+  { x: 6.6, y: 1.4 },
+  { x: 7.8, y: 2.8 },
+  { x: 7.8, y: 4.6 },
+  { x: 6.6, y: 5.9 },
+];
+
+const KOREA_TRIGRAMS = [
+  { x: 4.2, y: 3.2, rotate: -56 },
+  { x: 15.8, y: 3.2, rotate: 56 },
+  { x: 4.2, y: 10.8, rotate: 56 },
+  { x: 15.8, y: 10.8, rotate: -56 },
+];
+
+function KoreaFlag() {
+  return (
+    <svg viewBox="0 0 20 14" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <rect width="20" height="14" fill="#fff" />
+      <g transform="rotate(34 10 7)">
+        <path d="M6.6 7 A3.4 3.4 0 0 1 13.4 7 Z" fill="#cd2e3a" />
+        <path d="M6.6 7 A3.4 3.4 0 0 0 13.4 7 Z" fill="#0047a0" />
+        <circle cx="8.3" cy="7" r="1.7" fill="#cd2e3a" />
+        <circle cx="11.7" cy="7" r="1.7" fill="#0047a0" />
+      </g>
+      <For each={KOREA_TRIGRAMS}>
+        {(trigram) => (
+          <g transform={`rotate(${trigram.rotate} ${trigram.x} ${trigram.y})`} fill="#000">
+            <rect x={trigram.x - 1.2} y={trigram.y - 1.1} width="2.4" height="0.5" />
+            <rect x={trigram.x - 1.2} y={trigram.y - 0.25} width="2.4" height="0.5" />
+            <rect x={trigram.x - 1.2} y={trigram.y + 0.6} width="2.4" height="0.5" />
+          </g>
+        )}
+      </For>
+    </svg>
   );
 }
 

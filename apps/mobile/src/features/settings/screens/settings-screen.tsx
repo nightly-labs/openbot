@@ -3,6 +3,7 @@ import { Typography } from "heroui-native";
 import Bell from "lucide-react-native/icons/bell";
 import Bot from "lucide-react-native/icons/bot";
 import CreditCard from "lucide-react-native/icons/credit-card";
+import Gift from "lucide-react-native/icons/gift";
 import Info from "lucide-react-native/icons/info";
 import Languages from "lucide-react-native/icons/languages";
 import Layers2 from "lucide-react-native/icons/layers-2";
@@ -55,21 +56,28 @@ export function SettingsScreen() {
           <Typography.Paragraph>{displayName}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
-      {showsBilling ? (
+      {showsBilling || session ? (
         <SettingsSection title={t("mobile.settings.home.account")}>
-          <SettingsRow
-            leading={<RowIcon icon={CreditCard} />}
-            onPress={() => router.push("/settings/billing")}
-            supportingText={
-              planCount === undefined
-                ? undefined
-                : planCount === 0
-                  ? t("mobile.settings.billing.noPlans")
-                  : t("mobile.settings.billing.planCount", { count: planCount })
-            }
-          >
-            <Typography.Paragraph>{t("mobile.settings.billing.title")}</Typography.Paragraph>
-          </SettingsRow>
+          {showsBilling ? (
+            <SettingsRow
+              leading={<RowIcon icon={CreditCard} />}
+              onPress={() => router.push("/settings/billing")}
+              supportingText={
+                planCount === undefined
+                  ? undefined
+                  : planCount === 0
+                    ? t("mobile.settings.billing.noPlans")
+                    : t("mobile.settings.billing.planCount", { count: planCount })
+              }
+            >
+              <Typography.Paragraph>{t("mobile.settings.billing.title")}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
+          {session ? (
+            <SettingsRow leading={<RowIcon icon={Gift} />} onPress={() => router.push("/settings/invite")}>
+              <Typography.Paragraph>{t("mobile.settings.invite.title")}</Typography.Paragraph>
+            </SettingsRow>
+          ) : null}
         </SettingsSection>
       ) : null}
       <SettingsSection title={t("mobile.settings.home.preferences")}>

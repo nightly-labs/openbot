@@ -4,7 +4,13 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, type AgentEvent, type ChannelMessage } from "@openbot/contracts/ipc";
+import {
+  AGENT_PROVIDERS,
+  type AgentEvent,
+  type ChannelMessage,
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import type { boundedHistoryPage, historyMessagePart } from "../src/backend/channel-history";
@@ -93,7 +99,11 @@ const answer = (message) => {
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
-    case "thread/start": return write({ id: message.id, result: { thread: { id: "thread-" + (++threads), turns: [] } } });
+    case "thread/start": {
+      const id = "thread-" + (++threads);
+      log({ method: "thread/start", threadId: id, text: "", instructions: params.developerInstructions || "", mcpServers: Object.entries((params.config && params.config.mcp_servers) || {}).filter(([, server]) => server.enabled !== false).map(([name]) => name) });
+      return write({ id: message.id, result: { thread: { id, turns: [] } } });
+    }
     case "thread/resume": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "thread/unsubscribe": return write({ id: message.id, result: { status: "Unsubscribed" } });
     case "thread/turns/list":
@@ -204,6 +214,8 @@ interface TurnLog {
   turnId?: string;
   method?: string;
   text: string;
+  instructions?: string;
+  mcpServers?: string[];
 }
 
 interface PacketReport {
@@ -236,6 +248,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -343,6 +356,19 @@ const agents = new AgentService({
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   timezone: () => "UTC",
+  computerUseMcpServer: () => ({
+    id: COMPUTER_USE_MCP_SERVER_ID,
+    name: COMPUTER_USE_MCP_SERVER_NAME,
+    transport: "stdio",
+    enabled: true,
+    command: fakeCodex,
+    args: [],
+    env: [],
+    envPassthrough: [],
+    workingDirectory: "",
+    url: "",
+    headers: [],
+  }),
 });
 const channels = () => agents.channels;
 const events: { code: string; agentId?: string; message: string }[] = [];
@@ -518,6 +544,16 @@ try {
       "The complete packet has the channel rules and facts",
       first.includes(CHANNEL_RULE) && Boolean(firstFacts.channel),
     );
+    const channelThread = packets().find((entry) => entry.text === first)?.threadId;
+    const channelStart = turnLogs().find(
+      (entry) => entry.method === "thread/start" && entry.threadId === channelThread,
+    );
+    pass(
+      "A channel turn gets Computer Use",
+      channelStart?.mcpServers?.includes(COMPUTER_USE_MCP_SERVER_NAME) === true &&
+        channelStart.instructions?.includes(`Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task`) === true,
+      JSON.stringify(channelStart?.mcpServers),
+    );
 
     const request = messages(channelId).find((message) => message.message.text === "Plan the release checklist.");
     assert.ok(request, "The first request is not stored.");
@@ -555,11 +591,11 @@ try {
     );
 
     const remembered = "The release needs a signed build.";
-    channels().memories.saveFromTool(channelId, remembered, randomUUID(), randomUUID());
+    const memory = channels().memories.saveFromTool(channelId, remembered, randomUUID(), randomUUID());
     const withMemory = await send(channelId, lead.id, "Read the saved memory.");
     pass(
-      "A delta after a new memory gives the memories",
-      withMemory.includes(`<channel_memories>\n${remembered}\n</channel_memories>`),
+      "A delta after a new memory gives the memories, each after its id",
+      withMemory.includes(`<channel_memories>\n[${memory.id}] ${remembered}\n</channel_memories>`),
       blocks(withMemory).find((entry) => entry.includes("channel memories")),
     );
     const sameMemory = await send(channelId, lead.id, "Check the build again.");

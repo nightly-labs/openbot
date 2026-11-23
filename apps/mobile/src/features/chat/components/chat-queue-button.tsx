@@ -1,3 +1,4 @@
+import { providerDisplayName } from "@openbot/contracts/agent-providers";
 import type { QueueDelivery } from "@openbot/contracts/ipc";
 import { GlassView } from "expo-glass-effect";
 import { router } from "expo-router";
@@ -123,9 +124,15 @@ function ChatQueueCard({
   const locks = next ? queuedMessageLocks(next, { busy: queue.busy, online: queue.online, held }) : null;
   const locked = locks?.locked ?? true;
   const editedElsewhere = locks?.editedElsewhere ?? false;
-  const more = rest > 0 || waiting;
+  const holdLabel = queue.restartingProvider
+    ? t("mobile.chat.queue.providerRestart", { provider: providerDisplayName(queue.restartingProvider) })
+    : queue.signInProvider
+      ? t("mobile.chat.queue.signIn", { provider: providerDisplayName(queue.signInProvider) })
+      : null;
+  const more = rest > 0 || waiting || holdLabel !== null;
   const moreLabel =
-    rest > 0 ? t("mobile.chat.queue.more", { count: rest }) : waiting ? t("mobile.chat.queue.repliesTitle") : null;
+    holdLabel ??
+    (rest > 0 ? t("mobile.chat.queue.more", { count: rest }) : waiting ? t("mobile.chat.queue.repliesTitle") : null);
   const [shownMoreLabel, setShownMoreLabel] = useState(moreLabel);
   if (moreLabel && moreLabel !== shownMoreLabel) setShownMoreLabel(moreLabel);
   const finish = (action: Promise<boolean>) => {
@@ -248,7 +255,8 @@ function ChatQueueCard({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              rest > 0 ? t("mobile.chat.queue.buttonLabel", { count: rest + 1 }) : (shownMoreLabel ?? undefined)
+              holdLabel ??
+              (rest > 0 ? t("mobile.chat.queue.buttonLabel", { count: rest + 1 }) : (shownMoreLabel ?? undefined))
             }
             className="flex-1 flex-row items-center justify-center gap-1.5 border-separator border-t"
             style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}

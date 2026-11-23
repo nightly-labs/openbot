@@ -24,10 +24,16 @@ export const messages = {
     "Der Host hat OpenBot keine Bildschirmaufnahme erlaubt. Erlaube die Bildschirmaufnahme auf dem Host und versuche es erneut.",
   "error.remote.windowsSessionDisconnected":
     "Die Windows-Sitzung auf dem Host ist getrennt und hat keinen Bildschirm zum Teilen. Melde dich am Bildschirm des Hosts bei Windows an und versuche es erneut.",
+  "error.remote.windowsCaptureDenied":
+    "Windows auf dem Host lässt OpenBot den Bildschirm nicht aufzeichnen. Entsperre Windows am Bildschirm des Hosts, schließe alle Administrator-Abfragen und versuche es erneut. Wenn das Problem bleibt, starte den Host neu.",
+  "error.remote.macScreenLocked":
+    "Der Mac ist gesperrt und kann seinen Bildschirm nicht teilen. Entsperre den Mac an seinem Bildschirm und versuche es erneut.",
   "error.remote.streamTooSlowLowerQuality":
     "Die Verbindung zum Host ist zu langsam für das Bild. Versuche es erneut: Die nächste Verbindung nutzt eine niedrigere Qualität.",
   "error.remote.streamTooSlow":
     "Die Verbindung zum Host ist zu langsam für das Bild. Nutze ein schnelleres Netzwerk und versuche es erneut.",
+  "error.remote.noPictureSwitchEncoder":
+    "Der Host hat kein Bild gesendet. Versuche es erneut: Die nächste Verbindung nutzt eine Videoeinstellung, die auf mehr Computern funktioniert.",
   "error.remote.teamSessionExpired": "Die Teamsitzung ist abgelaufen.",
   "error.remote.finishTestBeforeSwitch": "Beende den Remote-Desktop-Test, bevor du den Bildschirm wechselst.",
   "error.remote.displayNotFound": "Remote-Bildschirm nicht gefunden.",
@@ -90,7 +96,10 @@ export const messages = {
     "OpenBot kann diesen Server nicht prüfen, weil sein Sicherheitsschlüssel fehlt oder sich geändert hat. Bitte den Serverbesitzer, den Server zu prüfen.",
   "error.remote.connectionNotStarted":
     "OpenBot konnte die Verbindung zu diesem Server nicht starten. Wenn das weiter passiert, beende OpenBot und öffne es erneut.",
-  "error.remote.hostDidNotConnect": "Der WebRTC-Host hat sich nicht verbunden.",
+  "error.remote.connectionServiceUnreachable":
+    "Dieser Computer erreicht den Verbindungsdienst von OpenBot nicht. Prüfe seine Internetverbindung. OpenBot verbindet sich automatisch wieder.",
+  "error.remote.serverAnswerTimeout":
+    "Der Server hat nicht rechtzeitig geantwortet. OpenBot verbindet sich automatisch wieder.",
   "error.remote.connectionCancelled": "Die entfernte Verbindung wurde abgebrochen.",
   "error.remote.hostDisconnected":
     "Die Verbindung zum Server wurde unterbrochen. Prüfe, ob die Aktion abgeschlossen wurde, und versuche es dann erneut.",
@@ -215,6 +224,11 @@ export const messages = {
   "error.remote.formUnavailable": "Dieses Formular ist nicht mehr verfügbar.",
   "error.remote.hostedServerRemoval": "Lösche einen gehosteten Server unter „Abrechnung“.",
   "error.remote.hostRemoved": "Der Eigentümer hat diesen Server aus dem Konto entfernt.",
+  "error.remote.ownerTransferSelf":
+    "Dieser Server gehört bereits dir. Gib die E-Mail-Adresse des neuen Eigentümers ein.",
+  "error.remote.ownerTransferHosted": "Ein Server, den OpenBot hostet, kann den Eigentümer nicht wechseln.",
+  "error.remote.ownerTransferInvalid":
+    "Diese Eigentumsübertragung ist nicht mehr verfügbar. Bitte den Eigentümer, sie erneut zu senden.",
   "error.remote.channelsUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu verwenden.",
   "error.remote.channelDeleteUnsupported": "Aktualisiere diesen Desktop-Server, um Kanäle zu löschen.",
   "error.remote.historyRefreshFailed":

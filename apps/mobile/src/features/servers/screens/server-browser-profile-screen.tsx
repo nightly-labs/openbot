@@ -247,6 +247,11 @@ export function ServerBrowserProfileScreen() {
           })}
         </View>
       </SettingsSection>
+      {!profile && assignTo ? (
+        <Typography.Paragraph type="body-xs" className="px-4 text-warning-text">
+          {t("mobile.agent.browserProfile.movedNote")}
+        </Typography.Paragraph>
+      ) : null}
       {profile ? (
         <>
           {proxies.available ? (

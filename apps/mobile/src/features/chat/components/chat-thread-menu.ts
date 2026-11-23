@@ -27,6 +27,8 @@ export interface ChatThreadMenu {
   onPressAction: (id: string) => void;
   attention: number;
   color: string;
+  inThread: boolean;
+  threadCount: number;
 }
 
 export function useChatThreadMenu(
@@ -105,6 +107,6 @@ export function useChatThreadMenu(
       }
     };
     const attention = tasks.filter((task) => task.id !== activeId && unread(task.id)).length;
-    return { actions, onPressAction, attention, color: agentColor };
+    return { actions, onPressAction, attention, color: agentColor, inThread, threadCount: tasks.length };
   }, [supported, tasks, reads, agentColor, activeId, agent.id, agent.serverId, t]);
 }

@@ -46,6 +46,7 @@ import {
   MESSAGING_LANE,
   type UsageLimitContinuation,
 } from "../mailbox-store";
+import { perfCount } from "../perf-probe-hooks";
 import {
   type AppServerNotification,
   type DynamicToolCallParams,
@@ -64,6 +65,7 @@ import type { AttentionBrowserHost, AttentionRegistry, CodexSubagentParent } fro
 import type { BrowserUploadTarget } from "./browser-uploads";
 import { type ContextCompaction, compactsOnRequest } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
+import { HANDOFF_START } from "./delivery-content";
 import type { DeltaBuffer } from "./delta-buffer";
 import type { FailureContext, FailureSignal } from "./failure-signal";
 import {
@@ -80,7 +82,7 @@ import { markIncompleteMediaGeneration } from "./image-generation";
 import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
-import { type FinishCheckMode, type PlanContinuation, waitsForUser } from "./plan-continuation";
+import { type FinishCheckMode, type PlanContinuation, promisesWork, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import {
   GEMINI_INVALID_CREDENTIALS,
@@ -93,12 +95,14 @@ import type { ProviderRuntime } from "./provider-runtime";
 import {
   answeredRequestId,
   isNoUpdateAnswer,
+  isNoUpdateToolCall,
+  quietRunStepsMessage,
   quietTeammateDelivery,
   quietTeammateTurnDelivery,
   settleQuietChannelTurn,
   settleQuietRoutineTurn,
   teammateRequest,
-  textAnswersOnly,
+  writesNoAnswer,
 } from "./routine-quiet-runs";
 import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
@@ -117,14 +121,16 @@ import {
   refusedSessionFailure,
   type ToolUsageSignal,
   toolActivity,
+  toolCallName,
   toolFailed,
   toolFailureText,
   toolProgressText,
+  toolResultText,
   toolTraceDetail,
   toolUsage,
   toThreadItem,
 } from "./thread-items";
-import { TurnTraces, traceMessage } from "./turn-traces";
+import { type ToolOutcome, TurnTraces, traceMessage } from "./turn-traces";
 import { collectProviderUsage } from "./usage-collection";
 import { USAGE_LIMIT_METHOD, type UsageLimitGate } from "./usage-limit-gate";
 
@@ -137,6 +143,8 @@ function modelAtCapacity(error: DynamicRecord | null, details: string | null): b
   return error?.codexErrorInfo === "serverOverloaded" || (details !== null && MODEL_AT_CAPACITY.test(details));
 }
 const ENDED_TURN_LIMIT = 256;
+const SELF_STARTED_ORIGIN_LIMIT = 4096;
+const REQUEST_SEARCH_TURN_LIMIT = 64;
 
 function keepNewest(turns: Set<string>, turnId: string): void {
   turns.add(turnId);
@@ -160,15 +168,52 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "timeout",
   "empty_answer",
   "model_not_found",
+  "invalid_request",
 ]);
+
+const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
+const SAFETY_BLOCK_REVERT_TIMEOUT_MS = 10_000;
+
+function carriesHandoff(item: DynamicRecord): boolean {
+  return getArray(item, "content").some(
+    (part) => isRecord(part) && isString(part.text) && part.text.startsWith(HANDOFF_START),
+  );
+}
+
+function safetyBlockText(reason: string, dropped: boolean): string {
+  const provider = agentProviderName("codex");
+  return dropped
+    ? sourceText("error.provider.codexSafetyBlocked", { provider, reason })
+    : sourceText("error.provider.codexSafetyBlockedKept", { provider, reason });
+}
 
 function isRefusedGeminiToken(provider: string | undefined, message: string): boolean {
   return provider === "antigravity" && GEMINI_INVALID_CREDENTIALS.test(message);
 }
 
-const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable", "rate_limit"]);
+const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "authentication",
+  "provider_unavailable",
+  "rate_limit",
+  "network",
+  "timeout",
+]);
+const POOL_PASS_OVER_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "usage_limit",
+  "provider_unavailable",
+  "authentication",
+]);
 
 const COMPACTION_RETRY_CAUSES: ReadonlySet<CauseCode> = new Set(["network", "timeout"]);
+
+const TEMPORARY_REQUEST_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "stalled",
+  "timeout",
+  "network",
+  "provider_unavailable",
+  "rate_limit",
+  "empty_answer",
+]);
 
 interface HeldProviderError {
   message: string;
@@ -217,14 +262,19 @@ export interface TurnHooks {
   emitToolUsage(usage: ToolUsageSignal): void;
   turnModel(agentId: string, turnId: string): string | null;
   mayFailOver(agentId: string): boolean;
+  backupReadyAt(agentId: string): number | null;
+  backupsAtLimit(agentId: string): boolean;
   poolHasOtherAccount(agentId: string): boolean;
   mayContinueOnBackup(agentId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
+  keepChannelDelivery(deliveryId: string): Effect.Effect<boolean>;
   quietRoutineDelivery(deliveryId: string): boolean;
   taskForThread(threadId: string): string | null;
   inMessagingLane(agentId: string, threadId: string): boolean;
   isRoutineThread(threadId: string): boolean;
   taskOpen(taskId: string): boolean;
+  taskBackgroundLost(taskId: string): void;
+  taskReporting(taskId: string): boolean;
   taskFailed(taskId: string, message: string): void;
   conversationTurnEnded(
     agentId: string,
@@ -320,6 +370,7 @@ export class TurnLifecycle {
   #scope = Scope.makeUnsafe();
   readonly #turnAssociations = new Map<string, Deferred.Deferred<void, TurnOperationFailed>>();
   readonly #turnErrors = new Map<string, string>();
+  readonly #turnCauses = new Map<string, CauseCode>();
   readonly #turnRetries = new Map<string, number>();
   readonly #capacityNotices = new Set<string>();
   readonly #runningTurns = new Map<
@@ -334,9 +385,13 @@ export class TurnLifecycle {
       firstOutputAt: number | null;
       produced: boolean;
       acted: boolean;
+      carriedHistory: boolean;
       workedBesidesReaction: boolean;
       compacted: boolean;
+      startedBackgroundWork: boolean;
       narration: string | null;
+      narrationStepKnown: boolean;
+      narrationOpenTools: ReadonlySet<string>;
       openTools: Set<string>;
       failureReports: Set<string>;
       lastEventAt: number;
@@ -346,6 +401,7 @@ export class TurnLifecycle {
     }
   >();
   readonly #unreadReports = new Map<string, Map<string, string>>();
+  readonly #selfStartedOrigins = new Map<string, readonly string[]>();
   readonly #lastResults = new Map<string, { turnIds: readonly string[]; requests: readonly DeliveryContext[] }>();
   readonly #deliveryStarts = new Map<string, DeliveryStart>();
   readonly #turnTimings = new Map<string, TurnTiming>();
@@ -355,8 +411,11 @@ export class TurnLifecycle {
   readonly #compactionDeadlines = new Map<string, NodeJS.Timeout>();
   readonly #failoverRetries = new Map<string, Set<string>>();
   readonly #refusedRetries = new Set<string>();
+  readonly #safetyBlockedTurns = new Set<string>();
   readonly #sessionFailures = new Map<string, number>();
   readonly #noUpdateTurns = new Set<string>();
+  readonly #taskStartTurns = new Set<string>();
+  readonly #noUpdateSteps = new Map<string, Set<string>>();
   readonly #quietTurns = new Set<string>();
   readonly #followUpTurns = new Set<string>();
   readonly #quietChannelTurns = new Set<string>();
@@ -366,6 +425,7 @@ export class TurnLifecycle {
   readonly #quietRepeats = new Set<string>();
   readonly #reportedFailures = new Map<string, string>();
   readonly #endedTurns = new Set<string>();
+  readonly #channelResultNotes = new Map<string, Set<string>>();
   readonly #completingTurns = new Set<string>();
   readonly #lastEventAt = new Map<string, number>();
   readonly #codexChildren = new Map<string, CodexSubagentParent>();
@@ -390,6 +450,7 @@ export class TurnLifecycle {
     this.#usageLimits = options.usageLimits;
     this.#planContinuation = options.planContinuation;
     this.#hooks = options.hooks;
+    this.#mailbox.useTaskRunsInProvider((agentId, taskId) => this.#taskRunsInProvider(agentId, taskId));
   }
 
   failedTurns(): ReadonlyMap<string, string> {
@@ -457,6 +518,10 @@ export class TurnLifecycle {
     return this.#runningTurns.get(turnId)?.startedAt ?? null;
   }
 
+  startedTask(turnId: string): void {
+    if (this.#runningTurns.has(turnId)) this.#taskStartTurns.add(turnId);
+  }
+
   earliestRunningTurnStartedAt(): number | null {
     let earliest: number | null = null;
     for (const turn of this.#runningTurns.values()) earliest = Math.min(earliest ?? turn.startedAt, turn.startedAt);
@@ -497,10 +562,12 @@ export class TurnLifecycle {
     this.#failedTurns.clear();
     this.#turnAssociations.clear();
     this.#turnErrors.clear();
+    this.#turnCauses.clear();
     this.#turnRetries.clear();
     this.#capacityNotices.clear();
     this.#limitedTurns.clear();
     this.#unreadReports.clear();
+    this.#selfStartedOrigins.clear();
     this.#lastResults.clear();
     this.#quietTurns.clear();
     this.#followUpTurns.clear();
@@ -508,6 +575,7 @@ export class TurnLifecycle {
     this.#failoverRetries.clear();
     this.#runningTurns.clear();
     this.#noUpdateTurns.clear();
+    this.#taskStartTurns.clear();
     this.#quietChannelTurns.clear();
     this.#quietEmptyAnswers.clear();
     for (const timer of this.#quietEndTimers.values()) clearTimeout(timer);
@@ -516,7 +584,9 @@ export class TurnLifecycle {
     this.#quietRepeats.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
+    this.#channelResultNotes.clear();
     this.#refusedRetries.clear();
+    this.#safetyBlockedTurns.clear();
     this.#sessionFailures.clear();
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
@@ -524,6 +594,7 @@ export class TurnLifecycle {
     this.#waitingThreads.clear();
     this.#itemTurns.clear();
     this.#traces.clear();
+    this.#noUpdateSteps.clear();
     this.#observedCompactions.clear();
     this.#compactionFailures.clear();
     for (const timer of this.#compactionDeadlines.values()) clearTimeout(timer);
@@ -541,10 +612,9 @@ export class TurnLifecycle {
         this.#codexChildTurns.delete(threadId);
         endedChildren.push(threadId);
       }
-    let backgroundEnded = false;
-    for (const [threadId, work] of this.#waitingThreads)
-      if (work.client === client) backgroundEnded = this.#waitingThreads.delete(threadId);
-    if (backgroundEnded) this.#hooks.emitRuntimeSnapshot();
+    const lostThreads = [...this.#waitingThreads].filter(([, work]) => work.client === client);
+    for (const [threadId, work] of lostThreads) this.#loseBackgroundWork(threadId, work.agentId);
+    if (lostThreads.length > 0) this.#hooks.emitRuntimeSnapshot();
     for (const [turnId, turn] of this.#runningTurns) {
       if (turn.client !== client) continue;
       this.#runningTurns.delete(turnId);
@@ -562,12 +632,14 @@ export class TurnLifecycle {
           .some(({ delivery }) => delivery.status === "starting" || delivery.status === "running")
       ) {
         this.#traces.drop(turnId);
+        this.#noUpdateSteps.delete(turnId);
         this.#instructions.dropTurn(turn.agentId, turnId);
         this.#browser.endControl(this.#conversation.publicThreadId(turn.agentId, turn.threadId), turnId);
         const failover = this.#failoverTurns.get(turnId);
         this.#failoverTurns.delete(turnId);
         if (failover) this.#showFailoverError(turn.agentId, turn.threadId, failover);
         else if (compactionFailure) this.#showFailoverError(turn.agentId, turn.threadId, compactionFailure);
+        this.#showKeptSafetyBlock(turn.agentId, turnId);
         continue;
       }
       this.#attention.clearForTurn(turn.threadId, turnId, false);
@@ -603,6 +675,22 @@ export class TurnLifecycle {
   #taskForThread(agentId: string, externalThreadId: string): string | null {
     const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
     return this.#conversation.isTaskThread(threadId) ? this.#hooks.taskForThread(threadId) : null;
+  }
+
+  #loseBackgroundWork(threadId: string, agentId: string): void {
+    this.#waitingThreads.delete(threadId);
+    const taskId = this.#taskForThread(agentId, threadId);
+    if (taskId !== null && this.#hooks.taskOpen(taskId)) this.#hooks.taskBackgroundLost(taskId);
+  }
+
+  #taskRunsInProvider(agentId: string, taskId: string): boolean {
+    if (!this.#hooks.taskOpen(taskId)) return false;
+    if (this.#hooks.taskReporting(taskId)) return true;
+    const threadIds = [
+      ...[...this.#waitingThreads].flatMap(([threadId, work]) => (work.agentId === agentId ? [threadId] : [])),
+      ...[...this.#runningTurns.values()].flatMap((turn) => (turn.agentId === agentId ? [turn.threadId] : [])),
+    ];
+    return threadIds.some((threadId) => this.#taskForThread(agentId, threadId) === taskId);
   }
 
   #laneForThread(agentId: string, externalThreadId: string): string | null {
@@ -660,6 +748,7 @@ export class TurnLifecycle {
     snapshot: ConversationSnapshot,
     deliveries: readonly DeliveryContext[],
     steps: readonly ConversationTraceStep[],
+    outcomes: ReadonlyMap<string, ToolOutcome>,
     plan: ConversationPlan | null,
     answer: string,
     continuations: number,
@@ -684,12 +773,17 @@ export class TurnLifecycle {
     const input: FinishCheckInput = {
       request,
       context,
-      steps: steps.map((step) => ({
-        ...step,
-        ...(step.text === undefined ? {} : { text: redact(step.text) }),
-        ...(step.command === undefined ? {} : { command: redact(step.command) }),
-        ...(step.error === undefined ? {} : { error: redact(step.error) }),
-      })),
+      steps: steps.map((step) => {
+        const outcome = outcomes.get(step.id);
+        return {
+          ...step,
+          ...(step.text === undefined ? {} : { text: redact(step.text) }),
+          ...(step.command === undefined ? {} : { command: redact(step.command) }),
+          ...(step.error === undefined ? {} : { error: redact(step.error) }),
+          ...(outcome?.tool ? { tool: outcome.tool } : {}),
+          ...(outcome?.result ? { result: redact(outcome.result) } : {}),
+        };
+      }),
       plan: plan && { ...plan, steps: plan.steps.map((step) => ({ ...step, text: redact(step.text) })) },
       answer: redact(answer),
       continuations,
@@ -795,11 +889,12 @@ export class TurnLifecycle {
       ...(loop ? { loop: true as const } : {}),
     });
     this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, context.causeCode);
   }
 
-  #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
+  #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError, showQuiet = false): void {
     const taskId = this.#taskForThread(agentId, threadId);
-    if (taskId === null && !failover.quiet) {
+    if (taskId === null && (!failover.quiet || showQuiet)) {
       this.#hooks.emitError("agent_error", failover.message, agentId, failover.context, failover.link);
       return;
     }
@@ -807,11 +902,19 @@ export class TurnLifecycle {
     if (taskId !== null) this.#hooks.taskFailed(taskId, failover.message);
   }
 
-  #holdCodexNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
+  #showsRefusedCredential(agentId: string, threadId: string, failover: HeldProviderError): boolean {
+    return (
+      failover.context.causeCode === "authentication" &&
+      !failover.quiet &&
+      this.#taskForThread(agentId, threadId) === null
+    );
+  }
+
+  #holdNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
-      source.provider !== "codex" ||
       running === undefined ||
+      (running.startedBackgroundWork && this.#waitingThreads.has(threadId)) ||
       running.compacted ||
       this.#turnErrors.has(turnId) ||
       this.#failoverTurns.has(turnId) ||
@@ -844,6 +947,23 @@ export class TurnLifecycle {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
       return false;
     }
+    if (source.provider !== "codex" && source.provider !== "claude") return false;
+    if (deliveries.every(({ delivery }) => this.#mailbox.answersHandledRequest(delivery.id))) {
+      logger.info("A turn for another teammate result to a handled request ended quietly.", {
+        agentId,
+        turnId,
+        provider: source.provider,
+      });
+      return false;
+    }
+    if (deliveries.every(replaysStartedResult)) {
+      logger.info("A turn for a teammate result that a restart gave again ended quietly.", {
+        agentId,
+        turnId,
+        provider: source.provider,
+      });
+      return false;
+    }
     if (running.acted) {
       this.#noteNoAnswerAfterSteps(
         agentId,
@@ -857,7 +977,8 @@ export class TurnLifecycle {
       return false;
     }
     if (deliveries.every(({ delivery }) => this.#mailbox.isAgentSetupDelivery(delivery.id))) return false;
-    const message = sourceText("error.provider.acpNoAnswer", {
+    const channelTask = this.#channelTask(snapshot.threadId, deliveries);
+    const message = sourceText(channelTask ? "error.provider.channelNoAnswer" : "error.provider.acpNoAnswer", {
       provider: agentProviderDescriptor(source.provider).displayName,
     });
     const context = {
@@ -869,8 +990,16 @@ export class TurnLifecycle {
     };
     logger.info("A turn ended with no answer.", { agentId, turnId, provider: source.provider });
     this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, context.causeCode);
     this.#failoverTurns.set(turnId, { message, context });
     return true;
+  }
+
+  #channelTask(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
+    return (
+      this.#conversation.channelForThread(threadId) !== null ||
+      deliveries.some(({ channelId }) => channelId !== undefined)
+    );
   }
 
   #noteNoAnswerAfterSteps(
@@ -959,23 +1088,56 @@ export class TurnLifecycle {
     }
     const deliveries: DeliveryContext[] = [];
     const continuations = new Map<string, UsageLimitContinuation>();
-    for (const [earlier, lines] of reports)
-      for (const context of this.#mailbox.completedDeliveriesOfTurn(agentId, earlier)) {
+    for (const [earlier, lines] of reports) {
+      const { requests, turns } = this.#requestsBehindTurn(agentId, earlier);
+      for (const context of requests) {
         if (context.channelId !== undefined || context.delivery.sender.kind === "routine") continue;
-        deliveries.push(context);
+        const known = continuations.get(context.delivery.id);
+        if (!known) deliveries.push(context);
         continuations.set(context.delivery.id, {
-          turnId: earlier,
-          previousTurnIds: [earlier, turnId],
-          workSteps: lines.join("\n\n").slice(-6000),
+          turnId: known?.turnId ?? earlier,
+          previousTurnIds: [
+            ...new Set([...(known?.previousTurnIds ?? [context.delivery.turnId ?? earlier]), ...turns, turnId]),
+          ],
+          workSteps: [known?.workSteps, ...lines].filter(Boolean).join("\n\n").slice(-6000),
         });
       }
+    }
     return deliveries.length > 0 ? { deliveries, continuations } : null;
+  }
+
+  #requestsBehindTurn(agentId: string, turnId: string): { requests: DeliveryContext[]; turns: string[] } {
+    const requests: DeliveryContext[] = [];
+    const turns = new Set<string>();
+    let pending = [turnId];
+    while (pending.length > 0 && turns.size < REQUEST_SEARCH_TURN_LIMIT) {
+      const origins: string[] = [];
+      for (const candidate of pending) {
+        if (turns.has(candidate)) continue;
+        turns.add(candidate);
+        const found = this.#mailbox.completedDeliveriesOfTurn(agentId, candidate);
+        if (found.length > 0) requests.push(...found);
+        else origins.push(...(this.#selfStartedOrigins.get(candidate) ?? []));
+      }
+      pending = origins;
+    }
+    return { requests, turns: [...turns] };
+  }
+
+  #noteSelfStartedOrigins(turnId: string, origins: readonly string[]): void {
+    this.#selfStartedOrigins.delete(turnId);
+    if (origins.length === 0) return;
+    this.#selfStartedOrigins.set(turnId, origins);
+    for (const oldest of this.#selfStartedOrigins.keys()) {
+      if (this.#selfStartedOrigins.size <= SELF_STARTED_ORIGIN_LIMIT) break;
+      this.#selfStartedOrigins.delete(oldest);
+    }
   }
 
   #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
     const resetDelayMs = providerResetDelayMs(failover.message);
     const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
-    this.#usageLimits.failed(agentId, model, resetDelayMs, spent);
+    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, failover.context.causeCode === "authentication");
   }
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {
@@ -988,13 +1150,14 @@ export class TurnLifecycle {
   }
 
   handleStreamingDelta(notification: AppServerNotification): void {
+    perfCount("turn.streamingDelta");
     const params = notification.params;
     const { threadId, agentId } = this.#noteEvent(params);
     if (!threadId || !agentId) return;
     const turnId = getString(params, "turnId");
     const itemId = getString(params, "itemId");
     const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
-    if (!turnId || !itemId || delta === null) return;
+    if (!turnId || !itemId || delta === null || this.#compaction.isCompactionTurn(threadId, turnId)) return;
     this.#itemTurns.set(itemId, turnId);
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
@@ -1099,9 +1262,13 @@ export class TurnLifecycle {
           firstOutputAt: null,
           produced: false,
           acted: false,
+          carriedHistory: false,
           workedBesidesReaction: false,
           compacted: false,
+          startedBackgroundWork: false,
           narration: null,
+          narrationStepKnown: false,
+          narrationOpenTools: new Set(),
           openTools: new Set(),
           failureReports: new Set(),
           lastEventAt: Date.now(),
@@ -1117,6 +1284,7 @@ export class TurnLifecycle {
         this.#unreadReports.delete(reportsKey);
         const started = this.#runningTurns.get(turnId);
         if (started && reports && unprompted) started.reports = reports;
+        if (started?.unprompted) this.#noteSelfStartedOrigins(turnId, started.continues);
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
         if (laneId === null || laneId === MESSAGING_LANE) this.#failedTurns.delete(agentId);
@@ -1169,9 +1337,19 @@ export class TurnLifecycle {
         if (itemId) this.#itemTurns.set(itemId, turnId);
         if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
         const running = this.#runningTurns.get(turnId);
+        if (running && item.type === "userMessage" && carriesHandoff(item)) running.carriedHistory = true;
         if (item.type !== "userMessage" && (notification.method !== "item/completed" || !isEmptyAnswer(item))) {
           const acted = isRepeatedWork(item);
           this.#markProduced(turnId, acted, acted, acted && isUserReactionCall(item));
+        }
+        if (
+          running?.narration &&
+          !running.narrationStepKnown &&
+          !(itemId !== null && running.narrationOpenTools.has(itemId))
+        ) {
+          const step = channelNoteStep(item);
+          if (step === "result") this.#keepChannelResultNote(turnId, running.narration);
+          if (step !== null) running.narrationStepKnown = true;
         }
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
           if (
@@ -1180,9 +1358,13 @@ export class TurnLifecycle {
             isNarrationItemId(itemId, source.provider) &&
             isString(item.text) &&
             item.text.trim()
-          )
+          ) {
             running.narration = itemId;
-        } else if (running && isRepeatedWork(item)) running.narration = null;
+            running.narrationStepKnown = false;
+            running.narrationOpenTools = new Set(running.openTools);
+          }
+        } else if (running && isRepeatedWork(item) && !keepsNarration(item, notification.method === "item/completed"))
+          running.narration = null;
         if (item.type === "contextCompaction") {
           if (running) running.compacted = true;
           if (this.#conversation.openClientFor(threadId) !== source) return;
@@ -1208,6 +1390,7 @@ export class TurnLifecycle {
           }
           return;
         }
+        if (this.#compaction.isCompactionTurn(threadId, turnId)) return;
         if (notification.method === "item/completed" && itemId) {
           this.#deltas.flush(`${threadId}:${turnId}:${itemId}`);
           const loads = skillLoads(item, getArray(params, "filePaths"));
@@ -1259,7 +1442,7 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         const reported = getString(turn, "status") ?? "completed";
-        const noAnswer = reported === "completed" && this.#holdCodexNoAnswer(agentId, threadId, turnId, source);
+        const noAnswer = reported === "completed" && this.#holdNoAnswer(agentId, threadId, turnId, source);
         const status =
           ((reported === "failed" && this.#quietEmptyAnswers.has(turnId)) ||
             (reported === "interrupted" && this.#quietStops.has(turnId))) &&
@@ -1292,6 +1475,7 @@ export class TurnLifecycle {
           this.#compaction.finish(agentId, threadId, status);
           return;
         }
+        this.#compaction.threadIdle(agentId, threadId, source);
         yield* this.#completeTurn(agentId, threadId, turnId, status).pipe(
           Effect.catchCause((cause) =>
             reportOriginalFailure(cause, (failure) =>
@@ -1320,16 +1504,24 @@ export class TurnLifecycle {
         return;
       }
       case "openbot/turn-continues": {
-        const running = this.#runningTurns.get(getString(params, "turnId") ?? "");
+        const turnId = getString(params, "turnId") ?? "";
+        const running = this.#runningTurns.get(turnId);
         if (!running) return;
         const origin = isRecord(params) && isString(params.continues) ? params.continues : null;
         running.continues = origin !== null && running.continues.length > 0 ? [...running.continues, origin] : [];
+        if (origin !== null)
+          this.#noteSelfStartedOrigins(turnId, [...(this.#selfStartedOrigins.get(turnId) ?? []), origin]);
         return;
       }
       case "openbot/background-work": {
         if (!threadId || !agentId) return;
         const runs = isRecord(params) && params.running === true;
-        if (runs === this.#waitingThreads.has(threadId)) return;
+        if (runs)
+          for (const turn of this.#runningTurns.values())
+            if (turn.threadId === threadId && turn.client === source) turn.startedBackgroundWork = true;
+        const waited = this.#waitingThreads.has(threadId);
+        if (!runs && isRecord(params) && params.closed === true) this.#loseBackgroundWork(threadId, agentId);
+        if (runs === waited) return;
         if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
         else this.#waitingThreads.delete(threadId);
         this.#hooks.emitRuntimeSnapshot();
@@ -1339,6 +1531,7 @@ export class TurnLifecycle {
         if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
         if (status !== "running" && status !== "completed" && status !== "failed") return;
+        if (source.compactsOnDemand === true && this.#compaction.requested(threadId)) return;
         this.#compaction.observeCompaction(threadId, status, "none");
         return;
       }
@@ -1407,7 +1600,24 @@ export class TurnLifecycle {
         }
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, message);
+          this.#turnCauses.set(errorTurnId, causeCode);
           if (refusedSessionFailure(source.provider, message) !== null) return;
+          const errorInfo = error?.codexErrorInfo;
+          if (source.provider === "codex" && typeof errorInfo === "string" && CODEX_SAFETY_BLOCKS.has(errorInfo)) {
+            this.#safetyBlockedTurns.add(errorTurnId);
+            return;
+          }
+        }
+        if (
+          notification.method === "error" &&
+          causeCode === "rate_limit" &&
+          agentId &&
+          errorTurnId !== null &&
+          this.#runningTurns.has(errorTurnId) &&
+          !this.#limitedTurns.has(errorTurnId)
+        ) {
+          const backupReadyAt = this.#hooks.backupReadyAt(agentId);
+          if (backupReadyAt !== null) this.#limitedTurns.set(errorTurnId, backupReadyAt);
         }
         if (
           error?.codexErrorInfo === "usageLimitExceeded" ||
@@ -1447,15 +1657,27 @@ export class TurnLifecycle {
             !this.#limitedTurns.has(errorTurnId) &&
             this.#mayHoldError(agentId, errorTurnId, causeCode)
           ) {
-            this.#failoverTurns.set(errorTurnId, { message, context, quiet: true });
+            const link = accountLink(params);
+            this.#failoverTurns.set(errorTurnId, { message, context, quiet: true, ...(link ? { link } : {}) });
             return;
           }
-          this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId !== undefined ? { agentId } : {}), ...context });
           const held = planLimit || (errorTurnId !== null && this.#limitedTurns.has(errorTurnId));
           const taskId =
             !held && notification.method === "error" && agentId && threadId
               ? this.#taskForThread(agentId, threadId)
               : null;
+          if (
+            taskId === null &&
+            !held &&
+            notification.method === "error" &&
+            agentId &&
+            errorTurnId !== null &&
+            this.#runningTurns.has(errorTurnId)
+          ) {
+            this.#hooks.emitError("agent_error", message, agentId, context, accountLink(params));
+            return;
+          }
+          this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId !== undefined ? { agentId } : {}), ...context });
           if (taskId !== null) this.#hooks.taskFailed(taskId, message);
           return;
         }
@@ -1504,7 +1726,8 @@ export class TurnLifecycle {
           agentId &&
           errorTurnId !== null &&
           this.#runningTurns.has(errorTurnId) &&
-          (context.causeCode === "usage_limit" || context.causeCode === "provider_unavailable") &&
+          POOL_PASS_OVER_CAUSES.has(context.causeCode) &&
+          !isRefusedGeminiToken(source.provider, message) &&
           this.#hooks.poolHasOtherAccount(agentId)
         )
           this.#markFailed(agentId, context.model, { message, context });
@@ -1532,10 +1755,23 @@ export class TurnLifecycle {
         }
         const taskId =
           notification.method === "error" && agentId && threadId ? this.#taskForThread(agentId, threadId) : null;
+        const backupsAtLimit =
+          notification.method === "error" &&
+          context.causeCode === "usage_limit" &&
+          agentId !== undefined &&
+          this.#hooks.backupsAtLimit(agentId);
+        if (backupsAtLimit)
+          logger.warn("A usage limit stopped an agent, and no backup model can take over.", {
+            agentId,
+            provider: source.provider,
+            model: context.model,
+            message: this.#hooks.redactMcp(message),
+          });
+        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : message;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
-          this.#hooks.taskFailed(taskId, message);
-        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context, link);
+          this.#hooks.taskFailed(taskId, shown);
+        } else this.#hooks.emitError(`agent_${notification.method}`, shown, agentId, context, link);
       }
     }
   }).bind(this);
@@ -1705,6 +1941,26 @@ export class TurnLifecycle {
     return this.#quietChannelTurns.has(turnId) && !this.#reportedFailures.has(turnId);
   }
 
+  channelNote(turnId: string, messageId: string): "result" | "pending" | "running" | null {
+    if (this.#channelResultNotes.get(turnId)?.has(messageId)) return "result";
+    const running = this.#runningTurns.get(turnId);
+    if (!running) return null;
+    return running.narration === messageId && !running.narrationStepKnown ? "pending" : "running";
+  }
+
+  #keepChannelResultNote(turnId: string, messageId: string): void {
+    const notes = this.#channelResultNotes.get(turnId);
+    if (notes) {
+      notes.add(messageId);
+      return;
+    }
+    this.#channelResultNotes.set(turnId, new Set([messageId]));
+    if (this.#channelResultNotes.size > ENDED_TURN_LIMIT) {
+      const [oldest] = this.#channelResultNotes.keys();
+      if (oldest !== undefined) this.#channelResultNotes.delete(oldest);
+    }
+  }
+
   keepChannelTurnAnswers(turnId: string): void {
     this.#quietChannelTurns.delete(turnId);
   }
@@ -1754,8 +2010,12 @@ export class TurnLifecycle {
       this.#runningTurns.delete(turnId);
       this.#markEnded(turnId);
       this.#completingTurns.add(turnId);
+      const toolOutcomes = this.#traces.toolOutcomes(turnId);
       const trace = this.#traces.take(turnId, new Date().toISOString());
+      const noUpdateSteps = this.#noUpdateSteps.get(turnId);
+      this.#noUpdateSteps.delete(turnId);
       const noUpdateCalled = this.#noUpdateTurns.delete(turnId);
+      const taskStarted = this.#taskStartTurns.delete(turnId);
       const quietChannelRun = this.#quietChannelTurns.has(turnId);
       this.#quietEmptyAnswers.delete(turnId);
       this.#clearQuietEnd(turnId);
@@ -1774,13 +2034,27 @@ export class TurnLifecycle {
       }
       const reportedError = this.#turnErrors.get(turnId);
       this.#turnErrors.delete(turnId);
+      const failureCause = this.#turnCauses.get(turnId);
+      this.#turnCauses.delete(turnId);
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
-          ? refusedSessionFailure(running.client.provider, reportedError)
+          ? refusedSessionFailure(
+              running.client.provider,
+              reportedError,
+              running.client.contextWindow?.(threadId) ?? null,
+            )
           : null;
       const refused = running !== undefined && refusedFailure !== null;
+      const safetyBlock = this.#safetyBlockedTurns.delete(turnId)
+        ? yield* this.#dropSafetyBlockedTurn(
+            running?.acted === false && !running.carriedHistory ? running.client : null,
+            threadId,
+            turnId,
+            reportedError ?? "",
+          )
+        : null;
       const limited = status === "failed" && this.#limitedTurns.has(turnId);
       const resetsAt = this.#limitedTurns.get(turnId) ?? null;
       this.#limitedTurns.delete(turnId);
@@ -1798,6 +2072,7 @@ export class TurnLifecycle {
       const routineSession = this.#conversation.isRoutineSession(threadId);
       const failedOnProvider = failover !== undefined && !limited && status === "failed" && running !== undefined;
       const mayRunAgain = failedOnProvider && !running.acted;
+      const tokenRefused = failover !== undefined && isRefusedGeminiToken(failover.context.provider, failover.message);
       const stoppedAfterWork = failedOnProvider && this.#carriesWork(agentId, turnId, running);
       const spentAfterWork = stoppedAfterWork && failover.context.causeCode === "usage_limit";
       const failedAfterWork = stoppedAfterWork && CONTINUE_CAUSES.has(failover.context.causeCode);
@@ -1883,9 +2158,7 @@ export class TurnLifecycle {
           : null;
       const model = this.#hooks.turnModel(agentId, turnId);
       const failedKey = this.#usageLimits.failureKey(agentId, model);
-      const channelTask =
-        this.#conversation.channelForThread(snapshot.threadId) !== null ||
-        deliveries.some(({ channelId }) => channelId !== undefined);
+      const channelTask = this.#channelTask(snapshot.threadId, deliveries);
       const backupTakes = () =>
         ((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
         (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId));
@@ -1896,18 +2169,29 @@ export class TurnLifecycle {
         !channelTask &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
         backupTakes();
-      const runsAgainHere =
+      const mayRunHere =
         !failedOver &&
-        mayRunAgain &&
+        (mayRunAgain || (failedOnProvider && tokenRefused)) &&
         failedKey !== null &&
         deliveries.length > 0 &&
-        this.#conversation.channelForThread(snapshot.threadId) === null &&
-        deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
-        (isRefusedGeminiToken(failover.context.provider, failover.message) ||
-          (failover.context.causeCode === "empty_answer" &&
-            deliveries.every(
-              ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
-            )));
+        deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey));
+      const [onlyDelivery] = deliveries;
+      const channelRunsAgain =
+        mayRunHere &&
+        channelTask &&
+        deliveries.length === 1 &&
+        onlyDelivery !== undefined &&
+        failover.context.causeCode === "empty_answer" &&
+        (yield* this.#hooks.keepChannelDelivery(onlyDelivery.delivery.id));
+      const runsAgainHere =
+        channelRunsAgain ||
+        (mayRunHere &&
+          this.#conversation.channelForThread(snapshot.threadId) === null &&
+          (tokenRefused ||
+            (failover.context.causeCode === "empty_answer" &&
+              deliveries.every(
+                ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
+              ))));
       const continuedWork = Effect.gen({ self: this }, function* () {
         const workSteps = running
           ? yield* readCapturedSteps(running.client, threadId, turnId).pipe(
@@ -1989,7 +2273,9 @@ export class TurnLifecycle {
         return;
       }
       if (failover && (failedOver || runsAgainHere) && failedKey !== null) {
-        this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
+        if (failedOver && this.#showsRefusedCredential(agentId, threadId, failover))
+          this.#hooks.emitError("agent_error", failover.message, agentId, failover.context, failover.link);
+        else this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
         for (const { delivery } of deliveries) {
           const failed = this.#failoverRetries.get(delivery.id) ?? new Set<string>();
           this.#failoverRetries.set(delivery.id, failed.add(failedKey));
@@ -2000,10 +2286,10 @@ export class TurnLifecycle {
           turnId,
           snapshot,
           deliveries,
-          failedOver && mayContinue ? yield* continuedWork : undefined,
+          (failedOver && mayContinue) || (runsAgainHere && !mayRunAgain) ? yield* continuedWork : undefined,
           running?.failureReports,
         );
-        if (failedOver) this.#markFailed(agentId, model, failover);
+        if (failedOver || (channelRunsAgain && backupTakes())) this.#markFailed(agentId, model, failover);
         if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
         this.#hooks.scheduleDrain(agentId);
         return;
@@ -2014,7 +2300,7 @@ export class TurnLifecycle {
         ((mayRunAgain && taskTurn && this.#hooks.mayFailOver(agentId)) || (channelTask && backupTakes()))
       )
         this.#markFailed(agentId, model, failover);
-      if (failover) this.#showFailoverError(agentId, threadId, failover);
+      if (failover) this.#showFailoverError(agentId, threadId, failover, status === "failed" && !limited);
       if (compactionFailure && compactionContinuation)
         this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...compactionFailure.context });
       else if (compactionFailure && status === "failed" && !failover)
@@ -2031,13 +2317,17 @@ export class TurnLifecycle {
       const ownLane = !taskTurn && this.#conversation.channelForThread(snapshot.threadId) === null;
       if (ownLane && outcome === "failed") this.#failedTurns.set(agentId, turnId);
       else if (ownLane) this.#failedTurns.delete(agentId);
-      const failure = refusedFailure ?? reportedError;
-      if (refused) {
-        yield* this.#hooks.dropRefusedSession(agentId, threadId);
+      const failure = refusedFailure ?? safetyBlock ?? reportedError;
+      if (refused) yield* this.#hooks.dropRefusedSession(agentId, threadId);
+      if (refused || safetyBlock !== null) {
+        const context =
+          safetyBlock === null
+            ? undefined
+            : { causeCode: "content_blocked" as const, provider: "codex" as const, model, turnId };
         if (laneTaskId !== null && failure !== undefined) {
-          this.#hooks.emitFailure?.({ code: "agent_error", agentId, causeCode: classifyFailure(failure) });
+          this.#hooks.emitFailure?.({ code: "agent_error", agentId, causeCode: classifyFailure(failure), ...context });
           this.#hooks.taskFailed(laneTaskId, failure);
-        } else this.#hooks.emitError("agent_error", failure, agentId);
+        } else this.#hooks.emitError("agent_error", failure, agentId, context);
       }
       if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
@@ -2080,20 +2370,35 @@ export class TurnLifecycle {
         running !== undefined &&
         !channelTurn &&
         !routineSession &&
-        (!taskTurn || laneTaskId !== null)
+        (!taskTurn || laneTaskId !== null) &&
+        !this.#mailbox.awaitsTeammate(
+          agentId,
+          laneTaskId,
+          new Set([
+            turnId,
+            ...deliveries.flatMap(({ resumeAfterUsageLimit, planContinuation }) => [
+              ...(resumeAfterUsageLimit?.previousTurnIds ?? []),
+              ...(planContinuation?.turnIds ?? []),
+            ]),
+          ]),
+        )
           ? this.#planContinues(agentId, laneTaskId, turnId, deliveries, latestAssistant?.text)
           : "no";
       const continueMode: FinishCheckMode =
         planMode !== "no" &&
-        (yield* (running?.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
-          Effect.orElseSucceed(() => false),
-        ))
+        (taskStarted ||
+          (running?.startedBackgroundWork === true &&
+            (yield* (running.client.wakesAfterBackgroundWork?.(threadId) ?? Effect.succeed(false)).pipe(
+              Effect.orElseSucceed(() => false),
+            ))))
           ? "no"
           : planMode;
       const turnPlan = snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null;
       const toolSteps = trace?.steps.filter((step) => step.kind === "tool") ?? [];
       const finishCheck: FinishCheckMode =
-        latestAssistant === undefined || this.#hooks.checkFinish === undefined || toolSteps.length === 0
+        latestAssistant === undefined ||
+        this.#hooks.checkFinish === undefined ||
+        (toolSteps.length === 0 && !promisesWork(latestAssistant.text))
           ? "no"
           : continueMode;
       const proposed =
@@ -2120,6 +2425,7 @@ export class TurnLifecycle {
           snapshot,
           deliveries,
           toolSteps,
+          toolOutcomes,
           turnPlan,
           latestAssistant.text,
           proposed.continuations,
@@ -2166,11 +2472,25 @@ export class TurnLifecycle {
           for (const delivery of deliveries)
             if (yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, resultText, noResult))
               resulted.push(delivery);
+          yield* this.#relayTaskResults(agentId, turnId, deliveries, resultText ?? noResult);
         }
         if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, { turnIds: [turnId], requests: resulted });
         else this.#lastResults.delete(resultsKey);
         if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
-          for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id);
+          const temporary =
+            !refused &&
+            !limited &&
+            (tokenRefused || (failureCause !== undefined && TEMPORARY_REQUEST_CAUSES.has(failureCause)));
+          for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id, temporary);
+          yield* this.#relayTaskResults(
+            agentId,
+            turnId,
+            deliveries,
+            endedTaskReportNote(
+              terminal === "failed" && failure ? this.#hooks.redactMcp(failure) : null,
+              terminal === "failed" ? "The provider gave no reason." : "The turn was stopped.",
+            ),
+          );
         }
         for (const { delivery } of deliveries) {
           if (delivery.sender.kind === "agent") this.#hooks.scheduleDrain(delivery.sender.agentId);
@@ -2200,35 +2520,41 @@ export class TurnLifecycle {
         const paths = answerFilePaths(latestAssistant.text);
         if (paths.length > 0) yield* this.#hooks.attachAnswerFiles(agentId, snapshot, latestAssistant, paths);
       }
+      const quietRunSteps =
+        trace &&
+        quiet &&
+        quietTurn &&
+        deliveries.some(({ delivery }) => delivery.sender.kind === "routine") &&
+        traceMessage(snapshot.messages, turnId) === undefined
+          ? quietRunStepsMessage(turnId, trace, noUpdateSteps)
+          : null;
+      if (quietRunSteps) snapshot.messages.push(quietRunSteps);
       if (trace) this.#attachTrace(snapshot.messages, agentId, turnId, trace);
       const memoryLine = memoryChangesMessage(turnId, memoryChanges, (text) => this.#hooks.redactMcp(text));
       if (memoryLine) snapshot.messages.push(memoryLine);
       if (instructionsChange) snapshot.messages.push(instructionsChangeMessage(turnId, instructionsChange));
       if (continuation) {
-        snapshot.messages.push({
-          id: `${turnId}:plan-continuation`,
-          author: "system",
-          source: "system",
-          status: "completed",
-          createdAt: new Date().toISOString(),
-          itemType: PLAN_CONTINUATION_ITEM_TYPE,
-          text:
-            continuation.kind === "compaction"
-              ? sourceText("status.agent.compactionContinues")
-              : continuation.kind === "providerExit"
-                ? sourceText("status.agent.providerExitContinues")
-                : sourceText(
-                    continuation.kind === "plan"
-                      ? "status.agent.planContinues"
-                      : continuation.kind === "finishCheck"
-                        ? "status.agent.finishCheckContinues"
-                        : "status.agent.nextStepContinues",
-                    {
-                      current: continuation.current,
-                      limit: continuation.limit,
-                    },
-                  ),
-        });
+        if (continuation.kind !== "finishCheck")
+          snapshot.messages.push({
+            id: `${turnId}:plan-continuation`,
+            author: "system",
+            source: "system",
+            status: "completed",
+            createdAt: new Date().toISOString(),
+            itemType: PLAN_CONTINUATION_ITEM_TYPE,
+            text:
+              continuation.kind === "compaction"
+                ? sourceText("status.agent.compactionContinues")
+                : continuation.kind === "providerExit"
+                  ? sourceText("status.agent.providerExitContinues")
+                  : sourceText(
+                      continuation.kind === "plan" ? "status.agent.planContinues" : "status.agent.nextStepContinues",
+                      {
+                        current: continuation.current,
+                        limit: continuation.limit,
+                      },
+                    ),
+          });
       } else if (planStopped) {
         snapshot.messages.push({
           id: `${turnId}:plan-stopped`,
@@ -2325,6 +2651,7 @@ export class TurnLifecycle {
     const running = this.#runningTurns.get(turnId);
     const runningThreadId = running?.threadId ?? threadId;
     if (running) this.#keepTurnTiming(turnId, running);
+    this.#showKeptSafetyBlock(agentId, turnId);
     this.#runningTurns.delete(turnId);
     this.#turnRetries.delete(turnId);
     this.#capacityNotices.delete(turnId);
@@ -2334,6 +2661,7 @@ export class TurnLifecycle {
     this.#markEnded(turnId);
     this.#instructions.dropTurn(agentId, turnId);
     const trace = this.#traces.take(turnId, new Date().toISOString());
+    this.#noUpdateSteps.delete(turnId);
     const deliveries = yield* turnStep(() => this.#mailbox.findDeliveriesByTurn(agentId, turnId)).pipe(
       Effect.catchCause((cause) => report(cause).pipe(Effect.as([]))),
     );
@@ -2445,6 +2773,44 @@ export class TurnLifecycle {
     }
   }
 
+  readonly #dropSafetyBlockedTurn = Effect.fn("TurnLifecycle.dropSafetyBlockedTurn")(function* (
+    this: TurnLifecycle,
+    client: AgentClient | null,
+    threadId: string,
+    turnId: string,
+    reason: string,
+  ) {
+    const dropped =
+      client !== null &&
+      (yield* client
+        .request(
+          "thread/revert",
+          { threadId, beforeTurnId: turnId },
+          decodeRecordResponse,
+          SAFETY_BLOCK_REVERT_TIMEOUT_MS,
+        )
+        .pipe(
+          Effect.as(true),
+          Effect.catch((error) => {
+            logger.warn("Codex kept a turn that its safety check blocked.", {
+              provider: client.provider,
+              error: this.#hooks.redactMcp(error.message),
+            });
+            return Effect.succeed(false);
+          }),
+        ));
+    return safetyBlockText(reason, dropped);
+  });
+
+  #showKeptSafetyBlock(agentId: string, turnId: string): void {
+    if (!this.#safetyBlockedTurns.delete(turnId)) return;
+    this.#hooks.emitError("agent_error", safetyBlockText(this.#turnErrors.get(turnId) ?? "", false), agentId, {
+      causeCode: "content_blocked",
+      provider: "codex",
+      turnId,
+    });
+  }
+
   readonly #retryRefusedTurn = Effect.fn("TurnLifecycle.retryRefusedTurn")(function* (
     this: TurnLifecycle,
     agentId: string,
@@ -2554,12 +2920,14 @@ export class TurnLifecycle {
     );
   }, Effect.uninterruptible);
 
-  #answerFailedRequest(agentId: string, deliveryId: string): Effect.Effect<void> {
+  #answerFailedRequest(agentId: string, deliveryId: string, temporary: boolean): Effect.Effect<void> {
     return this.#mailbox
       .answerFailedRequest(
         deliveryId,
         (taskId) => this.#hooks.taskOpen(taskId),
         (id) => this.#store.has(id),
+        false,
+        temporary,
       )
       .pipe(
         Effect.match({
@@ -2598,6 +2966,7 @@ export class TurnLifecycle {
       originAgentId === agentId ||
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
+      this.#mailbox.heldByTask(agentId, messageId) ||
       this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
       (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId)) ||
       this.#mailbox.steeredIntoOtherWork(delivery.id)
@@ -2614,7 +2983,14 @@ export class TurnLifecycle {
     noResult: string,
   ) {
     if (!this.#sendsResult(agentId, turnId, delivery.delivery, turnDeliveries, text)) return false;
-    yield* this.#sendResult(agentId, turnId, delivery.delivery, text ?? noResult);
+    if (delivery.delivery.sender.kind !== "agent") return false;
+    yield* this.#sendResult(
+      agentId,
+      turnId,
+      delivery.delivery.messageId,
+      delivery.delivery.sender.agentId,
+      text ?? noResult,
+    );
     return true;
   });
 
@@ -2627,25 +3003,57 @@ export class TurnLifecycle {
   ) {
     if (delivery.sender.kind !== "agent" || !this.#store.has(delivery.sender.agentId)) return false;
     if (this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, delivery.sender.agentId, new Set())) return false;
-    yield* this.#sendResult(agentId, turnId, delivery, text);
+    yield* this.#sendResult(agentId, turnId, delivery.messageId, delivery.sender.agentId, text);
     return true;
+  });
+
+  readonly #relayTaskResults = Effect.fn("TurnLifecycle.relayTaskResults")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    deliveries: readonly DeliveryContext[],
+    text: string,
+  ) {
+    const reportedTaskIds = new Set(
+      deliveries.flatMap(({ delivery, senderTaskId }) =>
+        senderTaskId && delivery.sender.kind === "agent" && delivery.sender.agentId === agentId ? [senderTaskId] : [],
+      ),
+    );
+    const finishedTaskIds = new Set(
+      [...reportedTaskIds].filter((taskId) => !this.#mailbox.taskStillWorks(agentId, taskId)),
+    );
+    const requestIds = new Set(
+      [...finishedTaskIds].flatMap((taskId) => this.#mailbox.requestsHeldByTask(agentId, taskId)),
+    );
+    const turnRequestIds = new Set(deliveries.map(({ delivery }) => delivery.messageId));
+    for (const requestId of requestIds) {
+      const requesterId = this.#mailbox.requestSenderAgentId(requestId);
+      if (
+        !requesterId ||
+        !this.#store.has(requesterId) ||
+        this.#mailbox.hasReplyFrom(agentId, requestId) ||
+        this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, requesterId, turnRequestIds) ||
+        this.#mailbox.heldByTask(agentId, requestId, finishedTaskIds)
+      )
+        continue;
+      yield* this.#sendResult(agentId, turnId, requestId, requesterId, text);
+    }
   });
 
   readonly #sendResult = Effect.fn("TurnLifecycle.sendResult")(function* (
     this: TurnLifecycle,
     agentId: string,
     turnId: string,
-    delivery: QueueDelivery,
+    messageId: string,
+    recipientAgentId: string,
     text: string,
   ) {
-    if (delivery.sender.kind !== "agent") return;
-    const messageId = delivery.messageId;
-    const recipientAgentId = delivery.sender.agentId;
     const answerTaskId = this.#mailbox.answerTaskId(agentId, messageId, [recipientAgentId]);
     const taskId = answerTaskId && this.#hooks.taskOpen(answerTaskId) ? answerTaskId : undefined;
     const receipt = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId },
+        requesterIds: this.#mailbox.requesterIds(messageId),
         recipientAgentIds: [recipientAgentId],
         text,
         replyToMessageId: messageId,
@@ -2965,6 +3373,8 @@ export class TurnLifecycle {
   ): void {
     if (!isString(item.id)) return;
     if (isToolItem(item)) {
+      if (isNoUpdateToolCall(item))
+        this.#noUpdateSteps.set(turnId, (this.#noUpdateSteps.get(turnId) ?? new Set()).add(item.id));
       const failed = completed && toolFailed(item);
       this.#traces.observe(turnId, item.id, "tool", {
         completed,
@@ -2972,6 +3382,12 @@ export class TurnLifecycle {
         text: toolProgress,
         error: failure,
         ...toolTraceDetail(item),
+        ...(this.#hooks.checkFinish === undefined
+          ? {}
+          : {
+              tool: toolCallName(item),
+              result: completed ? toolResultText(item, (text) => redactText(this.#hooks.redactMcp(text))) : null,
+            }),
       });
     } else if (item.type === "agentMessage")
       this.#traces.observe(turnId, item.id, item.phase === "commentary" ? "reasoning" : "message", { completed });
@@ -3026,7 +3442,7 @@ function answeredRequestTurn(
   return (
     deliveries.length > 0 &&
     deliveries.every(({ delivery }) => teammateRequest(delivery)) &&
-    textAnswersOnly(snapshot, turnId)
+    writesNoAnswer(snapshot, turnId)
   );
 }
 
@@ -3124,6 +3540,58 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown;
   return item.phase !== "commentary" && hasText(item);
 }
 
+const NARRATION_KEEPING_TOOLS = new Set([
+  "messaging_history",
+  "messaging_list_places",
+  "messaging_remember",
+  "messaging_forget_memory",
+  "remember",
+  "forget_memory",
+  "search_memories",
+  "history_read",
+  "history_search",
+  "react_to_user_message",
+]);
+
+function keepsNarration(item: DynamicRecord, completed: boolean): boolean {
+  const threadItem = toThreadItem(item);
+  if (threadItem === null) return false;
+  const tool = openBotTool(threadItem);
+  if (tool !== null) return NARRATION_KEEPING_TOOLS.has(tool);
+  if (threadItem.type !== "toolCall" || getString(threadItem, "name") !== "execute") return false;
+  if (!completed) return true;
+  const calls = getArray(getRecord(getRecord(threadItem, "result"), "metadata"), "toolCalls");
+  return calls.length > 0 && calls.every((call) => NARRATION_KEEPING_TOOLS.has(codeModeOpenBotTool(call) ?? ""));
+}
+
+const CHANNEL_RESULT_NAME = /(?:^|[._])channel_result$/u;
+const BRIDGE_TOOL = /(?:^|[._])(?:tool_call|use_tool)$/u;
+const CODE_CHANNEL_RESULT_CALL = /\bchannel_result\s*\(|["'`]openbot\.channel_result["'`]/u;
+
+function channelNoteStep(item: DynamicRecord): "result" | "other" | null {
+  const threadItem = toThreadItem(item);
+  if (threadItem === null || !isToolItem(threadItem)) return null;
+  if (openBotTool(threadItem) === "channel_result") return "result";
+  if (threadItem.type !== "toolCall") return "other";
+  const name = getString(threadItem, "name") ?? "";
+  if (name === "execute") {
+    const code = getString(getRecord(threadItem, "arguments"), "code");
+    if (!code) return null;
+    return CODE_CHANNEL_RESULT_CALL.test(code) ? "result" : "other";
+  }
+  if (!BRIDGE_TOOL.test(name)) return CHANNEL_RESULT_NAME.test(name) ? "result" : "other";
+  const args = threadItem.arguments;
+  const called = getString(args, "name") ?? getString(args, "tool") ?? getString(args, "tool_name");
+  if (called === null) return null;
+  return CHANNEL_RESULT_NAME.test(called) ? "result" : "other";
+}
+
+function codeModeOpenBotTool(call: unknown): string | null {
+  const tool = getString(call, "tool");
+  const name = tool === "openbot.tool_call" ? getString(getRecord(call, "input"), "name") : tool;
+  return name?.startsWith("openbot.") ? name.slice("openbot.".length) : null;
+}
+
 function isUserReactionCall(item: DynamicRecord): boolean {
   const threadItem = toThreadItem(item);
   return threadItem !== null && openBotTool(threadItem) === "react_to_user_message";
@@ -3135,6 +3603,10 @@ function isEmptyAnswer(item: { type?: unknown; phase?: unknown; text?: unknown }
 
 function hasText(item: { text?: unknown }): boolean {
   return isString(item.text) && item.text.trim() !== "";
+}
+
+function replaysStartedResult({ delivery, restartedResult, restartedTurnId }: DeliveryContext): boolean {
+  return restartedResult === true && restartedTurnId !== undefined && answeredRequestId(delivery) !== null;
 }
 
 function showsOutput(message: ConversationMessage): boolean {
@@ -3152,4 +3624,15 @@ function showsOutput(message: ConversationMessage): boolean {
 
 function subagentStates(subagents: readonly ConversationSubagent[]): string {
   return subagents.map((subagent) => `${subagent.id}:${subagent.status}`).join("\n");
+}
+
+const ENDED_TASK_REPORT_REASON_LIMIT = 2_000;
+
+function endedTaskReportNote(reason: string | null, fallback: string): string {
+  return [
+    "Status: blocked",
+    `Result: OpenBot note, not written by this teammate: the task for this request ended, but the teammate's turn that read its result ended before the teammate answered. ${(reason ?? fallback).slice(0, ENDED_TASK_REPORT_REASON_LIMIT)}`,
+    "Evidence: none",
+    "Unblock: The teammate's chat has the task result. Send the request again if you still need the answer.",
+  ].join("\n");
 }

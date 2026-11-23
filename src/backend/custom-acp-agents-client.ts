@@ -6,7 +6,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
-import type { AcpHistoryPersistence } from "./acp-client";
+import { type AcpHistoryPersistence, withStartModels } from "./acp-client";
 import { type AcpFlavor, customAgentFlavor } from "./acp-flavor";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
@@ -97,6 +97,11 @@ function childKey(agentId: string, folder: string | null): string {
   return `${agentId}\0${folder ?? ""}`;
 }
 
+function folderOfChildKey(key: string): string | null {
+  const folder = key.slice(key.indexOf("\0") + 1);
+  return folder === "" ? null : folder;
+}
+
 function requiredCwd(params: unknown): string {
   const cwd = getString(params, "cwd");
   if (!cwd) throw new Error("cwd is required.");
@@ -138,9 +143,16 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     return this.#running;
   }
 
+  #sessionChildren(): Set<AgentClient> {
+    return new Set([...this.#sessions.values()].map(({ child }) => child));
+  }
+
   canReleaseProcess(): boolean {
-    const children = new Set([...this.#sessions.values()].map(({ child }) => child));
-    return [...children].every((child) => child.canReleaseProcess?.() !== false);
+    return [...this.#sessionChildren()].every((child) => child.canReleaseProcess?.() !== false);
+  }
+
+  runsBackgroundWork(): boolean {
+    return [...this.#sessionChildren()].some((child) => child.runsBackgroundWork?.() === true);
   }
 
   readonly readHistory = Effect.fn("CustomAcp.readHistory")(function* (
@@ -193,6 +205,10 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     this.#running = true;
   }
 
+  markTurnsStoppedForShutdown(): void {
+    for (const child of this.#sessionChildren()) child.markTurnsStoppedForShutdown?.();
+  }
+
   readonly stop = Effect.fn("CustomAcp.stop")(function* (this: CustomAcpAgentsClient) {
     this.#running = false;
     const children = [...this.#children.values()];
@@ -210,8 +226,37 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     );
   });
 
+  readonly releaseFolderProcesses = Effect.fn("CustomAcp.releaseFolderProcesses")(function* (
+    this: CustomAcpAgentsClient,
+    folder: string,
+  ) {
+    let matched = false;
+    let kept = false;
+    for (const [key, pending] of [...this.#children]) {
+      if (folderOfChildKey(key) !== folder) continue;
+      matched = true;
+      const started = yield* Effect.exit(Deferred.await(pending));
+      if (Exit.isFailure(started) || this.#children.get(key) !== pending) continue;
+      const child = started.value;
+      if (child.canReleaseProcess?.() === false) {
+        kept = true;
+        continue;
+      }
+      this.#children.delete(key);
+      for (const [threadId, held] of this.#sessions) if (held.child === child) this.#sessions.delete(threadId);
+      for (const [id, request] of this.#requests) if (request.child === child) this.#requests.delete(id);
+      yield* child.stop().pipe(Effect.ignore);
+    }
+    return matched ? kept : null;
+  }, Effect.uninterruptible);
+
   readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean =>
     this.#flavorOf(sessionAgent(externalThreadId))?.mcpToolsFixedAtStart === true;
+
+  readonly imageInput = (externalThreadId: string): boolean => {
+    const held = this.#sessions.get(externalThreadId);
+    return held?.child.imageInput?.(held.sessionId) === true;
+  };
 
   readonly catalogAsMcpTools = (model: string): boolean =>
     this.#flavorOf(customAgentIdOfModel(model))?.catalogAsMcpTools === true;
@@ -594,6 +639,15 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       : redacted;
   }
 
+  readonly #discoveryChild = Effect.fn("CustomAcp.discoveryChild")(function* (
+    this: CustomAcpAgentsClient,
+    agentId: string,
+  ) {
+    const started = !this.#children.has(childKey(agentId, null));
+    const child = yield* this.#child(agentId, null);
+    return { child, started };
+  });
+
   readonly #listModels = Effect.fn("CustomAcp.listModels")(function* (
     this: CustomAcpAgentsClient,
     params: unknown,
@@ -603,12 +657,12 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     const lists = yield* Effect.forEach(
       configs,
       (config) =>
-        this.#child(config.id, null)
+        this.#discoveryChild(config.id)
           .pipe(toProviderClientOperationError)
           .pipe(
-            Effect.flatMap((child) =>
+            Effect.flatMap(({ child, started }) =>
               child
-                .request("model/list", params, decodeModelListResponse, timeoutMs)
+                .request("model/list", started ? withStartModels(params) : params, decodeModelListResponse, timeoutMs)
                 .pipe(toProviderClientOperationError),
             ),
             Effect.timeoutOrElse({

@@ -4,6 +4,7 @@ import { slot } from "../../lib/text-slots";
 
 function splitLastWord(text: string) {
   const space = text.lastIndexOf(" ");
+  if (space < 0) return { lead: "", last: text };
   return { lead: text.slice(0, space), last: text.slice(space + 1) };
 }
 
@@ -87,21 +88,27 @@ export function teamsPageText(t: AppTranslate) {
       ],
     },
     closing: {
-      words: [
-        ...words(closingBefore, false),
-        ...words(t("sitePage.teams.closing.accent"), true),
-        ...words(closingAfter, false),
-      ],
+      words: headingWords([
+        { text: closingBefore, accent: false },
+        { text: t("sitePage.teams.closing.accent"), accent: true },
+        { text: closingAfter, accent: false },
+      ]),
       action: t("sitePage.teams.closing.action"),
     },
   };
 }
 
-function words(text: string, accent: boolean) {
-  return text
-    .split(" ")
-    .filter((word) => word.length > 0)
-    .map((word) => ({ word, accent }));
+function headingWords(parts: readonly { text: string; accent: boolean }[]) {
+  const full = parts.map((part) => part.text).join("");
+  let offset = 0;
+  return parts.flatMap((part) => {
+    const start = offset;
+    offset += part.text.length;
+    return [...part.text.matchAll(/\S+/gu)].map((match) => {
+      const next = full.charAt(start + match.index + match[0].length);
+      return { word: match[0], accent: part.accent, spaceAfter: /\s/u.test(next) };
+    });
+  });
 }
 
 export type TeamsPageText = ReturnType<typeof teamsPageText>;

@@ -6,7 +6,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Effect, Schema } from "effect";
-import { type AgentProvider, RequestTimeoutError } from "../agent-client";
+import { type AgentProvider, MissingPiSessionError, RequestTimeoutError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { mergeConversationSnapshots } from "../conversation-snapshots";
 import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
@@ -47,6 +47,7 @@ export interface BootRecoveryHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   turnFailed?(agentId: string, turnId: string): void;
   continuesAfterProviderExit?(agentId: string, turnId: string, deliveryIds: readonly string[]): boolean;
+  retriesAfterRestart?(deliveryId: string): boolean;
 }
 
 export interface BootRecoveryOptions {
@@ -121,8 +122,26 @@ export class BootRecovery {
     }
   }
 
+  hasOrphanedOwnChatDelivery(agentId: string): boolean {
+    for (const id of this.#orphanedDeliveryIds) {
+      const delivery = this.#mailbox.getDelivery(id)?.delivery;
+      if (
+        delivery &&
+        (delivery.status === "starting" || delivery.status === "running") &&
+        this.#inOwnChatOf(delivery, agentId)
+      )
+        return true;
+    }
+    return false;
+  }
+
+  #inOwnChatOf(delivery: UnresolvedDelivery, agentId: string): boolean {
+    return delivery.recipientAgentId === agentId && this.#mailbox.laneIdForDelivery(delivery.id) === null;
+  }
+
   readonly reconcileUnresolvedDeliveries = Effect.fn("BootRecovery.reconcileUnresolvedDeliveries")(function* (
     this: BootRecovery,
+    ownChatAgentId?: string,
   ) {
     const unresolved = yield* recoveryStep(() => this.#mailbox.unresolvedDeliveries());
     const unresolvedIds = new Set(unresolved.map(({ delivery }) => delivery.id));
@@ -138,6 +157,7 @@ export class BootRecovery {
       unconfirmedStarts.set(laneOf(delivery), ids.add(delivery.id));
     }
     for (const { delivery } of unresolved) {
+      if (ownChatAgentId !== undefined && !this.#inOwnChatOf(delivery, ownChatAgentId)) continue;
       if (!this.#orphanedDeliveryIds.delete(delivery.id)) continue;
       const batchIds = delivery.turnId ? null : (unconfirmedStarts.get(laneOf(delivery)) ?? null);
       yield* this.#reconcileOrphanedDelivery(delivery, batchIds).pipe(
@@ -266,6 +286,9 @@ export class BootRecovery {
       cut && !continuation
         ? { terminal: "failed" as const, reason: sourceText("error.agent.answerCutOff") }
         : recovered;
+    const routineRetries = yield* recoveryStep(
+      () => new Set(deliveryIds.filter((id) => this.#hooks.retriesAfterRestart?.(id) === true)),
+    );
     const requeued = new Set<string>();
     for (const id of deliveryIds) {
       if (continuation && ownChat?.turnId)
@@ -273,7 +296,7 @@ export class BootRecovery {
       else if (
         terminal === "interrupted" &&
         target !== null &&
-        (yield* this.#mailbox.requeueResultAfterRestart(id).pipe(toBootRecoveryFailed))
+        (yield* this.#mailbox.requeueAfterRestart(id, routineRetries.has(id)).pipe(toBootRecoveryFailed))
       )
         requeued.add(id);
       else yield* this.#mailbox.markTerminal(id, terminal, reason).pipe(toBootRecoveryFailed);
@@ -451,7 +474,7 @@ export class BootRecovery {
                 logger.warn("A provider history read timed out.", { provider: session.provider, agentId: agent.id });
                 return;
               }
-              if (!containsCause(failure, (cause) => isCodexMissingRollout(cause) || isCodexRolloutPending(cause)))
+              if (!containsCause(failure, (cause) => missingHistory(cause) || isCodexRolloutPending(cause)))
                 this.#hooks.emitError("provider_history_backfill_pending", failure.cause, agent.id);
             }),
           ),
@@ -523,7 +546,11 @@ class BootRecoveryFailed extends Schema.TaggedError<BootRecoveryFailed>()("BootR
 const { sync: recoveryStep, rewrap: toBootRecoveryFailed } = causeHelpers(BootRecoveryFailed);
 
 function unreadableHistory(failure: unknown): boolean {
-  return containsCause(failure, (cause) => cause instanceof LineTooLongError || isCodexMissingRollout(cause));
+  return containsCause(failure, (cause) => cause instanceof LineTooLongError || missingHistory(cause));
+}
+
+function missingHistory(cause: unknown): boolean {
+  return isCodexMissingRollout(cause) || cause instanceof MissingPiSessionError;
 }
 
 function containsCause(value: unknown, matches: (cause: unknown) => boolean): boolean {

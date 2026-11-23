@@ -6,6 +6,7 @@ import {
   type AgentAuthState,
   type AgentModelOption,
   type AgentProviderId,
+  composedCustomModelId,
   customProviderOfModel,
   DEFAULT_PROMPT_CACHE_TTL,
   type KeyOnlyProviderId,
@@ -41,11 +42,12 @@ import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields
 import type { TurnContext } from "./agent/turn-context";
 import type { AgentClient } from "./agent-client";
 import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-token-import";
-import { readAntigravityEmail, readAntigravityQuota } from "./antigravity-usage";
+import { readAntigravityEmail, readAntigravityQuota, readAntigravityValidationLink } from "./antigravity-usage";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
 import {
   type AgentCliInfo,
+  ANTIGRAVITY_UPDATE_ENV,
   antigravityTakesStateFolders,
   COPILOT_ENV,
   cliPathEnvironment,
@@ -104,8 +106,10 @@ import {
   customAgentStatePaths,
   devinDataDirectory,
   devinStatePaths,
+  grokHomeDirectory,
   hermesHome,
   hermesStatePaths,
+  kimiCodeStatePaths,
   kimiStatePaths,
   mistralHomeDirectory,
   mistralStatePaths,
@@ -137,6 +141,7 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
     | ((cli: AgentCliInfo, region: SignInRegion) => Effect.Effect<readonly string[], ProviderClientOperationError>);
   readonly env: (cli: AgentCliInfo, region: SignInRegion) => Record<string, string>;
   readonly savedSignIn?: (cli: AgentCliInfo, env: NodeJS.ProcessEnv) => Effect.Effect<string | null>;
+  readonly pipedInput?: true;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -223,6 +228,14 @@ type ProviderCodeSignIn =
   | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand }
   | (Omit<AcpAuthenticateSignIn, "kind"> & { readonly kind: "acp-delegated" });
 
+function antigravityTokenFile(context: ProviderClientContext): string {
+  return join(antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }), ANTIGRAVITY_TOKEN_FILE);
+}
+
+function antigravityUsesSavedKey(context: ProviderClientContext): boolean {
+  return Boolean(context.apiKey("antigravity")) && !context.accountEnvironment;
+}
+
 function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment: boolean) {
   const account = context.accountEnvironment;
   const variables = () => context.providerEnvironment?.("antigravity") ?? {};
@@ -270,7 +283,7 @@ function antigravitySettingsUnreadable(appDataDir: string): boolean {
   }
 }
 
-const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot" };
+const ANTIGRAVITY_ENV = { WSL_DISTRO_NAME: "OpenBot", ...ANTIGRAVITY_UPDATE_ENV };
 
 const ANTIGRAVITY_APP_DATA = "antigravity-acp";
 
@@ -308,6 +321,13 @@ const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
   argv: antigravityArgv,
   env: ANTIGRAVITY_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+};
+
+const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
+  argv: () => Effect.succeed([...antigravityArgv({ ...process.env, ...ANTIGRAVITY_ENV }), "--login"]),
+  env: () => ({ ...ANTIGRAVITY_ENV }),
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  pipedInput: true,
 };
 
 const CLINE_ARGV: readonly string[] = ["--acp"];
@@ -490,6 +510,10 @@ interface ProviderModelCatalog {
   ): Effect.Effect<{ source: ProviderModelSource | null; startSettings: string | null }, unknown>;
 }
 
+function steeringFields(model: ModelListResponse["data"][number]): Pick<AgentModelOption, "steersTurns"> {
+  return model.steersTurns ? { steersTurns: true } : {};
+}
+
 export interface BuiltInProviderDriver {
   id: AgentProviderId;
   signIn: ProviderSignIn;
@@ -538,7 +562,7 @@ function piClient(
           },
         }
       : {}),
-    extraEnv: () => ({ ...context.agentEnvironment?.() }),
+    extraEnv: () => ({ ...piCacheEnvironment(context), ...context.agentEnvironment?.() }),
     ...piKeyProvider(provider, context),
     ...(context.providerStateDirectory ? { providerStateDirectory: context.providerStateDirectory } : {}),
     mcpServers: context.mcpServers,
@@ -547,6 +571,10 @@ function piClient(
     ...(context.mcpEndpoint ? { mcpEndpoint: context.mcpEndpoint } : {}),
     ...(history ? { history } : {}),
   });
+}
+
+function piCacheEnvironment(context: ProviderClientContext): Readonly<Record<string, string>> {
+  return (context.promptCacheTtl?.() ?? DEFAULT_PROMPT_CACHE_TTL.ttl) === "1h" ? { PI_CACHE_RETENTION: "long" } : {};
 }
 
 function piKeyProvider(provider: "pi" | KeyOnlyProviderId, context: ProviderClientContext) {
@@ -747,6 +775,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
       codeSignIn: { flow: "device", command: GROK_CODE_SIGN_IN },
     },
+    signInFiles: () => [join(grokHomeDirectory(), "auth.json")],
     signOut: { argv: ["--no-auto-update", "logout"], env: () => ({}), timeoutMs: 30_000 },
     resolveCli: resolveGrokCli,
     createClient: (cli, requestTimeoutMs, context, confinement) =>
@@ -797,6 +826,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       hiddenWhenSignedOut: true,
       partialListAtStart: true,
       relistAfterStart: true,
+      modelFields: steeringFields,
       fallback: modelsAfterOpenCodeDiscoveryFailure,
     },
     resolveCli: resolveOpencodeCli,
@@ -825,11 +855,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         modelName: (id, name) => openCodeModelName(id, name, openCodeEndpoints(context)),
         customEndpoint: (modelId) => {
           const endpoint = customProviderOfModel(modelId, openCodeEndpoints(context)());
+          const contextWindow = endpoint?.models.find(
+            (model) => composedCustomModelId(endpoint.id, model.id) === modelId,
+          )?.contextWindow;
           return endpoint
             ? {
                 name: endpoint.name,
                 hasCredentials: Boolean(endpoint.apiKey) || endpoint.headers.length > 0,
                 stallMs: CUSTOM_ENDPOINT_SILENCE_MS,
+                ...(contextWindow === undefined ? {} : { contextWindow }),
               }
             : null;
         },
@@ -873,6 +907,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "antigravity",
     signIn: ANTIGRAVITY_SIGN_IN,
+    codeSignIn: { kind: "cli", flow: "paste", command: ANTIGRAVITY_CODE_SIGN_IN },
     accounts: {
       homeVariable: "GEMINI_HOME",
       signIn: ANTIGRAVITY_SIGN_IN,
@@ -885,7 +920,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       timeoutMs: 30_000,
       acpLogout: true,
     },
-    catalog: { slowList: true, ownOrder: true },
+    catalog: { slowList: true, ownOrder: true, relistWhileRunning: true },
     resolveCli: resolveAntigravityCli,
     createClient: (cli, timeout, context, confinement) =>
       new AcpAgentClient(cli, timeout, {
@@ -907,21 +942,23 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         mcpEndpoint: context.mcpEndpoint,
         history: context.history?.("antigravity"),
         readAccount: () =>
-          context.apiKey("antigravity") && !context.accountEnvironment
+          antigravityUsesSavedKey(context)
             ? Effect.succeed({ email: null })
-            : readAntigravityEmail(
-                join(antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }), ANTIGRAVITY_TOKEN_FILE),
-              ).pipe(Effect.map((email) => ({ email }))),
+            : readAntigravityEmail(antigravityTokenFile(context)).pipe(Effect.map((email) => ({ email }))),
         readRateLimits: (_connection, model) =>
-          context.apiKey("antigravity") && !context.accountEnvironment
+          antigravityUsesSavedKey(context)
             ? Effect.succeed({ rateLimits: null, rateLimitsByLimitId: null })
             : readAntigravityQuota({
-                tokenFile: join(
-                  antigravityAppDataDir({ ...process.env, ...context.accountEnvironment }),
-                  ANTIGRAVITY_TOKEN_FILE,
-                ),
+                tokenFile: antigravityTokenFile(context),
                 model,
                 ...(context.systemProxyFetch ? { fetch: context.systemProxyFetch } : {}),
+              }),
+        readVerificationLink: () =>
+          antigravityUsesSavedKey(context)
+            ? Effect.succeed(null)
+            : readAntigravityValidationLink({
+                tokenFile: antigravityTokenFile(context),
+                fetch: context.systemProxyFetch,
               }),
       }),
     createProfileClient: (cli, timeout, context) =>
@@ -1019,6 +1056,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         ...(confinement ? { confine: (target) => confineClineTarget(target, confinement) } : {}),
         extraEnv: () => ({ ...context.agentEnvironment?.() }),
         additionalModels: clineFreeModels(),
+        encodesModelIds: true,
         signInMessage: sourceText("error.provider.clineSignIn"),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
@@ -1035,6 +1073,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         profileGeneration: true,
         env: { ...CLINE_ENV },
         additionalModels: clineFreeModels(),
+        encodesModelIds: true,
         signInMessage: sourceText("error.provider.clineSignIn"),
         servesModel: context.servesModel,
       }),
@@ -1072,7 +1111,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         argv: ["acp"],
         env: { ...KIMI_ENV },
         ...(confinement
-          ? { confine: (target) => confineWithState(target, confinement, kimiStatePaths, context.agentEnvironment?.()) }
+          ? {
+              confine: (target) =>
+                confineWithState(
+                  target,
+                  confinement,
+                  isPythonKimiCli(cli) ? kimiStatePaths : kimiCodeStatePaths,
+                  context.agentEnvironment?.(),
+                ),
+            }
           : {}),
         extraEnv: () => kimiProcessEnv(cli, context.agentEnvironment?.()),
         signInMessage: sourceText("error.provider.kimiSignIn"),
@@ -1323,7 +1370,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       slowList: true,
       partialListAtStart: true,
       relistAfterStart: true,
-      modelFields: (model) => (model.steersTurns ? { steersTurns: true } : {}),
+      modelFields: steeringFields,
     },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>

@@ -350,7 +350,8 @@ export const messages = {
   "connector.whatsapp.numbersTitle": "מספרים",
   "connector.whatsapp.linkNumber": "קישור מספר",
   "connector.whatsapp.ownNumberNote": "הצ'אט ״הודעה לעצמך״ והאנשים שאישרת יכולים להגיע ל-OpenBot.",
-  "connector.whatsapp.dedicatedNote": "האנשים שאישרת יכולים להגיע ל-OpenBot. אנשים אחרים מקבלים קוד שיש למסור לך.",
+  "connector.whatsapp.dedicatedNote":
+    "הצ'אט ״הודעה לעצמך״ והאנשים שאישרת יכולים להגיע ל-OpenBot. אנשים אחרים מקבלים קוד שיש למסור לך.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp הסיר את המחשב הזה מהמכשירים המקושרים. יש לקשר את המספר שוב.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp הסיר את השרת הזה מהמכשירים המקושרים. יש לקשר את המספר שוב.",
   "connector.whatsapp.helpError": "OpenBot לא מצליח להגיע ל-WhatsApp במספר הזה. יש לחבר מחדש או לנתק את המספר.",

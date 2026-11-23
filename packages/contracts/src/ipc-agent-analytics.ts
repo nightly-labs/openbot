@@ -83,8 +83,30 @@ export function analyticsDate(date: Date, timeZone: string): string {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+function isUsableTimeZone(timeZone: string | undefined): timeZone is string {
+  if (!timeZone) return false;
+  try {
+    dateFormatter(timeZone);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function utcOffsetTimeZone(now: Date): string {
+  const offsetMinutes = now.getTimezoneOffset();
+  if (offsetMinutes === 0 || offsetMinutes % 60 !== 0) return "UTC";
+  const zone = `Etc/GMT${offsetMinutes > 0 ? "+" : "-"}${Math.abs(offsetMinutes / 60)}`;
+  return isUsableTimeZone(zone) ? zone : "UTC";
+}
+
+function deviceTimeZone(now: Date): string {
+  const timeZone: string | undefined = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return isUsableTimeZone(timeZone) ? timeZone : utcOffsetTimeZone(now);
+}
+
 export function analyticsRange(agentId: string, days = 30, now = new Date()): AgentAnalyticsInput {
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeZone = deviceTimeZone(now);
   const endDate = analyticsDate(now, timeZone);
   const start = new Date(`${endDate}T12:00:00Z`);
   start.setUTCDate(start.getUTCDate() - days + 1);

@@ -44,14 +44,14 @@ export const OPENBOT_PLANS: readonly OpenBotPlan[] = [
   { provider: "muse", name: "Muse Code", plan: "Your Meta account, or a Meta API key." },
   { provider: "pi", name: "Pi", plan: "Included with OpenBot. Sign in to a provider with /login in Pi." },
   { provider: "inception", name: "Inception", plan: "Mercury models, with an Inception API key." },
-  { provider: "acp", name: "Custom agent", plan: "Any ACP agent, such as Goose, Qwen Code or GitHub Copilot." },
+  { provider: "acp", name: "Custom agent", plan: "Any ACP agent, such as Goose, Qwen Code or Oh My Pi." },
   { provider: "custom", name: "Your own model", plan: "Any OpenAI-compatible server, also one on your computer." },
 ];
 
 export const OPENBOT_LANGUAGE_COUNT = APP_LANGUAGES.filter((language) => language !== "system").length;
 
 const OPENBOT_PLANS_TEXT =
-  "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, Cursor CLI with your Cursor plan or a Cursor API key, Cline with your Cline account, and Muse Code with your Meta account or a Meta API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. Pi runs the providers you sign in to with /login, and Inception's Mercury models run with an Inception API key. Any agent that speaks the Agent Client Protocol, such as Goose, Qwen Code or GitHub Copilot, runs as a custom agent. You choose the provider, the model and the reasoning effort for each agent.";
+  "OpenBot runs the provider tools you already use, with the plans you already pay for: Codex with your ChatGPT plan, Claude Code with your Claude plan, Gemini with your Google AI Pro or Ultra plan, Grok CLI with your Grok account or an xAI API key, Cursor CLI with your Cursor plan or a Cursor API key, Cline with your Cline account, and Muse Code with your Meta account or a Meta API key. OpenCode runs free models, or your own model on any OpenAI-compatible server, also one on your computer. Pi runs the providers you sign in to with /login, and Inception's Mercury models run with an Inception API key. Any agent that speaks the Agent Client Protocol, such as Goose, Qwen Code or Oh My Pi, runs as a custom agent. You choose the provider, the model and the reasoning effort for each agent.";
 
 export const OPENBOT_TEXT = {
   models:

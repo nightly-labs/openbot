@@ -9,6 +9,7 @@ import {
   latestTurnAnswer,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type RoutineRun,
+  routineQuietStepsItemId,
   routineRunConversationEvent,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -158,6 +159,16 @@ const answer = (message) => {
         for (const [id, noteText] of [["msg_" + hex, ${JSON.stringify(NOTICE_TEXT)}], ["rs_" + hex, "Thinking about the check."]])
           write({ method: "item/completed", params: { threadId: params.threadId, turnId, item: { type: "agentMessage", id, text: noteText, phase: "commentary" } } });
       }
+      if (task.includes("RUN-STEP")) {
+        const command = { type: "commandExecution", id: "command-" + turnId, command: "ls", cwd: "/tmp", status: "inProgress" };
+        write({ method: "item/started", params: { threadId: params.threadId, turnId, item: command } });
+        write({ method: "item/completed", params: { threadId: params.threadId, turnId, item: { ...command, status: "completed", aggregatedOutput: "", exitCode: 0 } } });
+      }
+      if (task.includes("NO-UPDATE-ITEM")) {
+        const call = { type: "dynamicToolCall", id: "no-update-" + turnId, namespace: "openbot", tool: "routine_no_update", arguments: {}, status: "inProgress" };
+        write({ method: "item/started", params: { threadId: params.threadId, turnId, item: call } });
+        write({ method: "item/completed", params: { threadId: params.threadId, turnId, item: { ...call, status: "completed", success: true, contentItems: [] } } });
+      }
       const reply = next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : textOnly ? "The result went to the teammate." : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
       return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL"), silentFail: task.includes("SILENT-FAIL"), emptyAnswer: task.includes("EMPTY-ANSWER"), quietHang: task.includes("QUIET-HANG"), quietLoop: task.includes("QUIET-LOOP"), noFinal: task.includes("NO-FINAL"), loops: 0 });
     }
@@ -216,6 +227,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -397,6 +409,16 @@ try {
   const quietEmpty = createRoutine(checker.id, "Quiet empty", `Check quietly. EMPTY-ANSWER ${calls(noUpdate)}`);
   const quietHang = createRoutine(checker.id, "Quiet hang", `Check quietly. QUIET-HANG ${calls(noUpdate)}`);
   const quietLoop = createRoutine(checker.id, "Quiet loop", "Check quietly. QUIET-LOOP");
+  const quietSteps = createRoutine(
+    checker.id,
+    "Quiet steps",
+    `Check quietly. RUN-STEP NO-UPDATE-ITEM NO-FINAL ${calls(noUpdate)}`,
+  );
+  const quietMarker = createRoutine(
+    checker.id,
+    "Quiet marker",
+    `Check quietly. NO-UPDATE-ITEM NO-FINAL ${calls(noUpdate)}`,
+  );
   const empty = createRoutine(checker.id, "Empty check", "Check the logs. EMPTY-ANSWER");
   const failedThenQuiet = createRoutine(
     checker.id,
@@ -544,14 +566,13 @@ try {
   };
   const textRequest = await requestTurnOf("Check the docs build. TEAMMATE-REQUEST-TEXT");
   pass(
-    "An answered teammate request ends quiet without the no-update tool",
+    "An answered teammate request keeps the agent's text answer in the chat without the no-update tool",
     toolResults(textRequest.turn.turnId, "send_message")[0]?.result?.success === true &&
       toolResults(textRequest.turn.turnId, "routine_no_update").length === 0 &&
       textRequest.event.type === "turn-completed" &&
-      textRequest.event.quiet === true &&
-      textRequest.answers.some((message) => message.text === "The result went to the teammate.") &&
-      textRequest.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
-      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId) === undefined,
+      textRequest.event.quiet !== true &&
+      textRequest.answers.every((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(textRequest.answers, textRequest.turn.turnId)?.text === "The result went to the teammate.",
     textRequest,
   );
   const noticeRequest = await requestTurnOf("Check the notice build. TEAMMATE-REQUEST-TEXT NOTICE NO-FINAL");
@@ -583,12 +604,11 @@ try {
   });
   const unansweredDelivery = mailbox.completedDeliveriesOfTurn(checker.id, unanswered.turn.turnId)[0]?.delivery;
   pass(
-    "A teammate request with no reply ends quiet after OpenBot sent its answer to the teammate",
+    "A teammate request with no reply keeps its answer in the chat after OpenBot sent it to the teammate",
     unanswered.event.type === "turn-completed" &&
-      unanswered.event.quiet === true &&
-      unanswered.answers.some((message) => message.text === "All good.") &&
-      unanswered.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
-      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId) === undefined &&
+      unanswered.event.quiet !== true &&
+      unanswered.answers.every((message) => message.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId)?.text === "All good." &&
       sentResults.length === 1 &&
       sentResults[0]?.text.includes("All good.") === true &&
       unansweredDelivery !== undefined &&
@@ -853,8 +873,57 @@ try {
         message.id.startsWith("msg_") &&
         message.text === NOTICE_TEXT &&
         message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE,
-    ) && quietOkNotes.every((message) => !message.id.startsWith("rs_")),
+    ) &&
+      quietOkNotes.every(
+        (message) =>
+          !message.id.startsWith("rs_") && message.id !== routineQuietStepsItemId(quietOkRun.delivery.turnId ?? ""),
+      ),
     quietOkNotes,
+  );
+  const quietStepsRun = await settledRun(
+    "Quiet steps",
+    await runCauseEffect(
+      agents.runRoutineFromAutomation({ agentId: checker.id, routineId: quietSteps.id, payload: "" }),
+    ),
+  );
+  const quietStepsThread = routineThreadOf(quietSteps.id);
+  const quietStepsTurn = quietStepsRun.delivery.turnId;
+  const quietStepsRows = quietStepsThread
+    ? agents
+        .readTask(checker.id, quietStepsThread.id)
+        .messages.filter((message) => message.turnId === quietStepsTurn && message.author === "assistant")
+    : [];
+  const quietStepsCarrier = quietStepsRows[0];
+  pass(
+    "A quiet script run with no text keeps the steps of its run in one empty row",
+    quietStepsRun.run.status === "succeeded" &&
+      quietStepsTurn !== null &&
+      quietStepsRows.length === 1 &&
+      quietStepsCarrier?.id === routineQuietStepsItemId(quietStepsTurn) &&
+      quietStepsCarrier.itemType === "commentary" &&
+      quietStepsCarrier.text === "" &&
+      quietStepsCarrier.trace?.steps.some((step) => step.kind === "tool" && step.command === "ls") === true &&
+      latestTurnAnswer(quietStepsRows, quietStepsTurn) === undefined,
+    { run: quietStepsRun.run, rows: quietStepsRows },
+  );
+  const quietMarkerRun = await settledRun(
+    "Quiet marker",
+    await runCauseEffect(
+      agents.runRoutineFromAutomation({ agentId: checker.id, routineId: quietMarker.id, payload: "" }),
+    ),
+  );
+  const quietMarkerThread = routineThreadOf(quietMarker.id);
+  const quietMarkerRows = quietMarkerThread
+    ? agents
+        .readTask(checker.id, quietMarkerThread.id)
+        .messages.filter(
+          (message) => message.turnId === quietMarkerRun.delivery.turnId && message.author === "assistant",
+        )
+    : null;
+  pass(
+    "A quiet script run whose only step is routine_no_update keeps no steps row",
+    quietMarkerRun.run.status === "succeeded" && quietMarkerRows !== null && quietMarkerRows.length === 0,
+    { run: quietMarkerRun.run, rows: quietMarkerRows },
   );
   const routineTurns = (turnId: string | null) =>
     events.filter((event) => event.type === "thread-turn-completed" && event.routine && event.turn.turnId === turnId);
@@ -951,6 +1020,47 @@ try {
       !linkedPrompt.includes(`routineId "${relayed.id}"`),
     linkedPrompt,
   );
+  pass(
+    "A linked step of a Test run reads as a Test run",
+    linkedPrompt?.includes("Run type: manual Test run") === true,
+    linkedPrompt,
+  );
+
+  const quietRelay = createRoutine(
+    relay.id,
+    "Quiet relay",
+    `Report and hand on. <<NEXT${JSON.stringify([noUpdate])}NEXT>>`,
+  );
+  await connect(quietRelay.id, relay.id, responder.id);
+  await connect(quietRelay.id, responder.id, finisher.id);
+  await runCauseEffect(agents.updateAgent({ agentId: relay.id, allowAutomation: true }));
+  const quietRelayRun = await settledRun(
+    "Quiet relay",
+    await runCauseEffect(agents.runRoutineFromAutomation({ agentId: relay.id, routineId: quietRelay.id, payload: "" })),
+  );
+  const quietRelaySteps = await steps("Quiet relay", quietRelayRun.run.id, 3);
+  const quietLinked = quietRelaySteps.find((step) => step.agentId === responder.id);
+  const quietLinkedTurnId = quietLinked?.deliveryId
+    ? (mailbox.getDelivery(quietLinked.deliveryId)?.delivery.turnId ?? null)
+    : null;
+  const quietLinkedResult = toolResults(quietLinkedTurnId, "routine_no_update")[0]?.result;
+  const quietLinkedAnswers = quietLinkedTurnId
+    ? store.database.readTurnAssistantMessages(responder.id, quietLinkedTurnId)
+    : [];
+  pass(
+    "A linked step of a script run ends quiet after routine_no_update (#14510)",
+    quietLinked?.status === "succeeded" &&
+      quietLinkedResult?.success === true &&
+      quietLinkedResult.contentItems.some((item) => item.text.includes('"quiet"')) &&
+      quietLinkedAnswers.length > 0 &&
+      quietLinkedAnswers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE),
+    { steps: report.flowSteps["Quiet relay"], quietLinkedResult, quietLinkedAnswers },
+  );
+  pass(
+    "The agent after a quiet linked step is skipped",
+    quietRelaySteps.find((step) => step.agentId === finisher.id)?.status === "skipped",
+    report.flowSteps["Quiet relay"],
+  );
 
   const selfPausing = async (name: string, routineCalls: (routineId: string) => FakeCall[]) => {
     const routine = createRoutine(checker.id, name, "Check the folders.");
@@ -1027,7 +1137,51 @@ try {
     stopPrompt?.includes("is not a stop condition: keep this routine on") === true,
     stopPrompt,
   );
-  for (const name of ["Paused then failed", "Failed then paused"]) {
+  const pausedThenQuiet = await selfPausing("Paused then quiet", (id) => [pauseRoutine(id), noUpdate]);
+  const quietResumedResult = toolResults(pausedThenQuiet.turnId, "routine_no_update")[0]?.result;
+  pass(
+    "A run that pauses its own routine and then has nothing to report turns the routine on again, and does not end quiet (#14038)",
+    pausedThenQuiet.active === true &&
+      pausedThenQuiet.ran.run.status === "succeeded" &&
+      quietResumedResult?.success === false &&
+      quietResumedResult.contentItems.some((item) => item.text.includes("this routine is on again")),
+    { active: pausedThenQuiet.active, run: pausedThenQuiet.ran.run.status, quietResumedResult },
+  );
+  const stopsWithReport = await selfPausing("Stops with a report", (id) => [
+    pauseRoutine(id),
+    noUpdate,
+    pauseRoutine(id),
+  ]);
+  const secondPause = toolResults(stopsWithReport.turnId, "update_routine")[1]?.result;
+  pass(
+    "A run that pauses its own routine again after the refused quiet end stops the routine (#14038)",
+    stopsWithReport.active === false && stopsWithReport.ran.run.status === "succeeded" && secondPause?.success === true,
+    { active: stopsWithReport.active, run: stopsWithReport.ran.run.status, secondPause },
+  );
+  const quietThenPaused = await selfPausing("Quiet then paused", (id) => [noUpdate, pauseRoutine(id)]);
+  const refusedQuietPause = toolResults(quietThenPaused.turnId, "update_routine")[0]?.result;
+  pass(
+    "A run that ended with nothing to report cannot pause its own routine (#14038)",
+    quietThenPaused.active === true &&
+      quietThenPaused.ran.run.status === "succeeded" &&
+      refusedQuietPause?.success === false &&
+      refusedQuietPause.contentItems.some((item) => item.text.includes("not a stop condition")),
+    { active: quietThenPaused.active, run: quietThenPaused.ran.run.status, refusedQuietPause },
+  );
+  pass(
+    "The run prompt says that nothing to report is not a stop condition (#14038)",
+    stopPrompt?.includes(
+      "Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report",
+    ) === true,
+    stopPrompt,
+  );
+  for (const name of [
+    "Paused then failed",
+    "Failed then paused",
+    "Paused then quiet",
+    "Stops with a report",
+    "Quiet then paused",
+  ]) {
     const routine = agents.listRoutines(checker.id).find((entry) => entry.name === name);
     if (routine) agents.updateRoutine({ agentId: checker.id, routineId: routine.id, active: false });
   }

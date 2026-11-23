@@ -110,8 +110,10 @@ export const messages = {
   "mobile.server.hosted.soldOut": "품절",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · {date} 종료",
+  "mobile.server.hosted.serverDataKept": "{plan} · 데이터 보관: {date}까지",
   "mobile.server.hosted.state.payment": "결제 대기 중",
   "mobile.server.hosted.state.setup": "설정 중",
+  "mobile.server.hosted.state.restoring": "데이터 복원 중",
   "mobile.server.hosted.state.starting": "시작 중",
   "mobile.server.hosted.state.running": "실행 중",
   "mobile.server.hosted.state.stopped": "중지됨",
@@ -220,6 +222,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "대기 중이에요. 호스트는 메모리가 허용하는 만큼만 턴을 실행해요.",
   "mobile.server.threads.hold.agentBusy": "이 에이전트의 다른 작업이 끝나기를 기다리는 중이에요.",
   "mobile.server.threads.hold.oneTurn": "대기 중이에요. 이 에이전트의 제공자는 한 번에 한 턴만 실행해요.",
+  "mobile.server.threads.hold.signIn": "대기 중이에요. 이 에이전트의 제공자에 로그인해야 해요.",
   "mobile.server.threads.offline": "이 서버에 연결하면 스레드를 볼 수 있어요.",
   "mobile.server.threads.loading": "스레드 불러오는 중…",
   "mobile.server.threads.loadFailed": "일부 에이전트의 스레드를 불러올 수 없어요.",
@@ -323,6 +326,7 @@ export const messages = {
   "mobile.server.route.timezone": "시간대",
   "mobile.server.route.personality": "에이전트 성격",
   "mobile.server.route.agents": "에이전트",
+  "mobile.server.route.voiceModel": "음성 인식",
   "mobile.server.settings.storage": "저장 공간",
   "mobile.server.route.storage": "저장 공간",
   "mobile.server.route.storageFiles": "모든 파일",
@@ -444,6 +448,19 @@ export const messages = {
   "mobile.server.settings.timezoneSaveFailed": "시간대를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.timezoneUnavailable": "시간대를 변경하려면 소유자나 관리자로 이 서버에 연결하세요.",
   "mobile.server.settings.timezoneUnsupported": "여기에서 시간대를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.voiceModelDescription":
+    "이 서버의 에이전트는 자막이 없는 동영상의 소리를 이 모델로 받아 적어요.",
+  "mobile.server.settings.voiceModelLoading": "음성 인식을 불러오는 중…",
+  "mobile.server.settings.voiceModelLoadFailed": "서버의 음성 인식 모델을 불러오지 못했어요.",
+  "mobile.server.settings.voiceModelSaveFailed": "음성 인식 모델을 변경하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "여기에서 음성 인식을 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.voiceModelReady": "준비됨",
+  "mobile.server.settings.voiceModelDownloading": "다운로드 중: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} 다운로드",
+  "mobile.server.settings.voiceModelDownload": "다운로드",
+  "mobile.server.settings.voiceModelCancel": "다운로드 중지",
+  "mobile.server.settings.voiceModelRemove": "제거",
   "mobile.server.settings.keySection": "서버 키",
   "mobile.server.settings.keyChanged": "마지막 변경",
   "mobile.server.settings.keyChange": "키 변경",
@@ -520,6 +537,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "에이전트 추가",
   "mobile.server.browserProfiles.agentsHint":
     "탭하면 에이전트에게 이 프로필을 주거나 공유 프로필로 되돌립니다. 변경하면 에이전트의 열린 탭이 닫힙니다.",
+  "mobile.server.browserProfiles.movedNote":
+    "사이트 로그인 정보는 이전 프로필에 남습니다. 옮긴 에이전트는 이 사이트에 다시 로그인해야 합니다.",
   "mobile.server.browserProfiles.clear": "데이터 지우기",
   "mobile.server.browserProfiles.clearTitle": "{name}의 데이터를 지울까요?",
   "mobile.server.browserProfiles.clearBody":
@@ -853,7 +872,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들이 OpenBot에 연락할 수 있어요. 다른 사람은 나에게 알려 줄 코드를 받아요.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -1087,10 +1106,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "모델을 변경할 수 없습니다. 다시 시도하세요.",
   "mobile.server.providers.promptCache": "프롬프트 캐시",
   "mobile.server.providers.promptCacheHint":
-    "턴 사이에 Claude가 에이전트의 컨텍스트를 캐시에 보관하는 시간입니다. 변경 사항은 Claude가 다시 시작할 때 적용됩니다.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code 기본값",
+    "턴 사이에 Claude와 Pi가 에이전트의 컨텍스트를 캐시에 보관하는 시간이에요. 변경 사항은 공급자가 다시 시작할 때 적용돼요.",
+  "mobile.server.providers.promptCacheDefault": "공급자 기본값",
   "mobile.server.providers.promptCacheHour": "1시간",
   "mobile.server.providers.promptCacheLoadFailed": "이 서버의 프롬프트 캐시 시간을 불러올 수 없습니다.",
+  "mobile.server.providers.cacheExpiryCompaction": "캐시가 만료되기 전에 압축",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "컨텍스트가 20만 토큰 이상인 채팅이 1시간 캐시로 유휴 상태이면, 에이전트가 캐시가 만료되기 전에 컨텍스트를 압축해요. 그러면 다음 메시지가 캐시 없이 전체 컨텍스트를 다시 읽지 않아요.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "이 서버의 압축 설정을 불러올 수 없어요.",
   "mobile.server.providers.compactWindow": "채팅 압축 크기",
   "mobile.server.providers.compactWindowHint":
     "채팅이 이 크기에 도달하면 Claude Code가 이전 턴을 요약해요. 낮으면 턴이 빠르고 저렴해요. 높으면 더 많은 세부 정보가 남아요. 창이 더 작은 모델은 자체 한도에서 압축해요.",
@@ -1145,6 +1168,7 @@ export const messages = {
     "ChatGPT는 ChatGPT 요금제가 아니라 이 키를 사용해요. OpenAI는 요청마다 키에 요금을 청구해요. 요금제 사용량은 표시되지 않아요.",
   "mobile.server.providers.codexKeyAlternative":
     "또는 OpenAI API 키로 로그인하세요. OpenAI는 요청마다 키에 요금을 청구해요.",
+  "mobile.server.providers.museKeyInUse": "Muse는 로그인이 아닌 이 키를 사용해요. 로그인을 사용하려면 키를 제거하세요.",
   "mobile.server.providers.sectionUse": "사용",
   "mobile.server.providers.unused": "사용하는 에이전트 없음",
   "mobile.server.providers.usedByCount": { other: "에이전트 {count}개가 사용 중" },
@@ -1207,6 +1231,8 @@ export const messages = {
   "mobile.server.mcp.connected": { other: "연결됨 · 도구 {count}개" },
   "mobile.server.mcp.signInOnComputer":
     "이 MCP 서버는 로그인이 필요해요. 컴퓨터의 OpenBot에서 로그인한 다음 다시 테스트하세요.",
+  "mobile.server.mcp.signIn": "로그인",
+  "mobile.server.mcp.signInHere": "이 MCP 서버는 로그인을 요청합니다. 로그인을 탭한 다음 다시 테스트하세요.",
   "mobile.server.mcp.signedInDescription": "{server}이(가) 이 MCP 서버에 로그인되어 있어요.",
   "mobile.server.mcp.signOut": "로그아웃",
   "mobile.server.mcp.saveFailed": "변경 사항을 저장하지 못했어요. 다시 시도해 주세요.",
@@ -1257,6 +1283,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5시간",
   "mobile.server.planLimits.window.hours": { other: "{count}시간" },
   "mobile.server.planLimits.window.minutes": "{minutes}분",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "업데이트",
   "mobile.server.settings.updateAvailable": "업데이트 가능",
   "mobile.server.route.updates": "업데이트",
@@ -1306,7 +1333,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons}을(를) 기다리는 중이에요.",
   "mobile.server.update.disabledTitle": "원격 업데이트가 꺼져 있어요",
   "mobile.server.update.disabledDescription":
-    "{name} 사용자가 서버 멤버의 업데이트를 껐어요. OpenBot을 업데이트하거나 설정을 켜 달라고 요청하세요.",
+    "{name} 사용자가 서버 멤버의 업데이트를 껐어요. OpenBot을 업데이트하거나, 그 컴퓨터에서 설정 > 업데이트를 열고 ‘서버 멤버의 업데이트 허용’을 켜 달라고 요청하세요.",
   "mobile.server.update.managedTitle": "Host Manager가 업데이트를 관리해요",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager가 {name}을(를) 업데이트해요. 호스트 관리자에게 문의하세요.",
@@ -1582,4 +1609,41 @@ export const messages = {
   "mobile.server.transfer.copyAgents": "복사할 에이전트",
   "mobile.server.transfer.copyNext": "복사한 에이전트는 {server}의 승인 규칙을 사용해요.",
   "mobile.server.transfer.copyNoServer": "에이전트를 복사하려면 소유자나 관리자로 다른 서버에 연결하세요.",
+  "mobile.server.route.ownerTransfer": "소유권 이전",
+  "mobile.server.ownerTransfer.unavailable": "소유권을 이전하려면 소유자로 이 서버에 연결하세요.",
+  "mobile.server.ownerTransfer.hosted": "이 서버는 OpenBot이 호스팅하므로 소유자를 바꿀 수 없어요.",
+  "mobile.server.ownerTransfer.lede":
+    "새 소유자는 이메일을 받고, 그 이메일로 로그인한 상태에서 수락해야 해요. 그 후 이 서버에서 제거돼요.",
+  "mobile.server.ownerTransfer.email": "새 소유자 이메일",
+  "mobile.server.ownerTransfer.send": "보내기",
+  "mobile.server.ownerTransfer.sending": "보내는 중…",
+  "mobile.server.ownerTransfer.stays":
+    "에이전트, 채팅, 루틴, 제공자 로그인, 저장된 키, Vault 로그인, 브라우저 로그인, 연결된 앱은 서버에 그대로 남아요. 새 소유자가 사용할 수 있어요.",
+  "mobile.server.ownerTransfer.expiry": "요청은 7일 후에 만료돼요.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email}을(를) 소유자로 지정할까요?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "{email}이(가) 수락하면 {server}의 소유자가 되고, 나는 접근 권한을 잃어요. 데이터는 서버에 남아요. 요청은 7일 후에 만료돼요.",
+  "mobile.server.ownerTransfer.confirm": "이전",
+  "mobile.server.ownerTransfer.sendFailed": "요청을 보내지 못했어요.",
+  "mobile.server.ownerTransfer.loadFailed": "대기 중인 이전을 불러오지 못했어요.",
+  "mobile.server.ownerTransfer.pending": "새 소유자 대기 중",
+  "mobile.server.ownerTransfer.expires": "{date}에 만료",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email}은(는) 이 이메일로 로그인한 상태에서 수락해야 해요. 그때까지는 내가 소유자예요.",
+  "mobile.server.ownerTransfer.cancel": "이전 취소",
+  "mobile.server.ownerTransfer.cancelTitle": "이전을 취소할까요?",
+  "mobile.server.ownerTransfer.cancelBody": "{email}은(는) 더 이상 수락할 수 없어요.",
+  "mobile.server.ownerTransfer.keep": "유지",
+  "mobile.server.ownerTransfer.cancelFailed": "이전을 취소하지 못했어요.",
+  "mobile.server.ownerTransfer.incomingTitle": "{server}의 소유자가 될까요?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name}님이 나를 {server}의 소유자로 지정하려고 해요. 서버를 완전히 관리할 수 있고, 에이전트, 채팅, 루틴, 저장된 로그인은 그대로 남아요. {name}님은 접근 권한을 잃어요. 서버를 실행하는 컴퓨터에 아직 로그인할 수 있는 사람은 회원님의 OpenBot 계정을 사용할 수 있어요. 그 컴퓨터의 비밀번호와 SSH 키를 바꾸세요.",
+  "mobile.server.ownerTransfer.accept": "수락",
+  "mobile.server.ownerTransfer.decline": "거절",
+  "mobile.server.ownerTransfer.accepted": "이제 {server}의 소유자예요.",
+  "mobile.server.ownerTransfer.acceptFailed": "이전을 수락하지 못했어요",
+  "mobile.server.ownerTransfer.declineFailed": "이전을 거절하지 못했어요",
+  "mobile.server.ownerTransfer.tryAgain": "나중에 다시 시도해 주세요.",
+  "mobile.server.providers.updateAll": "모두 업데이트",
+  "mobile.server.providers.updateAllFailed": "일부 업데이트를 시작하지 못했습니다. 다시 시도하세요.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,5 +1,6 @@
 import { readdir, readFile, readlink, writeFile } from "node:fs/promises";
 import { getPriority, setPriority } from "node:os";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { Deferred, Effect, Schema } from "effect";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { HostMemory, HostMemoryLevel } from "../backend/host-memory";
@@ -10,6 +11,8 @@ const GIB = 1024 * MIB;
 const TURN_RESERVE_BYTES = 300 * MIB;
 const TURN_RESERVE_MS = 60_000;
 const RECOVER_MARGIN_BYTES = 256 * MIB;
+const SMALL_HOSTED_SERVER_BYTES = 7 * GIB;
+const SMALL_HOSTED_SERVER_BROWSER_TABS = 5;
 const CHILD_OOM_SCORE_ADJ = 500;
 const PROC_READ_CONCURRENCY = 16;
 export const AGENT_PROCESS_VARIABLE = "OPENBOT_AGENT_PROCESS";
@@ -95,6 +98,13 @@ export class ServerMemory implements HostMemory {
     if (total <= 5 * GIB) return 2;
     if (total <= 10 * GIB) return 8;
     return 16;
+  }
+
+  browserTabLimit(): typeof SMALL_HOSTED_SERVER_BROWSER_TABS | typeof INPUT_LIMITS.browserTabs {
+    const total = this.#sample?.total;
+    return this.hostedPlan && total !== undefined && total < SMALL_HOSTED_SERVER_BYTES
+      ? SMALL_HOSTED_SERVER_BROWSER_TABS
+      : INPUT_LIMITS.browserTabs;
   }
 
   reserveTurn(): () => void {

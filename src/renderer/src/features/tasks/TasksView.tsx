@@ -13,6 +13,7 @@ import type {
   AttachmentSummary,
   ConversationSnapshot,
   DraftAttachment,
+  ResponseStyle,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { plainTaskTitle, taskApproval } from "@openbot/team-client/agent-tasks";
@@ -47,8 +48,10 @@ import { appendVoiceTranscript } from "../../voice-recording";
 import { readAgentSelection, writeAgentSelection } from "../agents/agent-selection";
 import { insertAtSelection, insertPastedText, rowAttachments } from "../conversation/composer-draft";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
+import { naturalThreadRows } from "../conversation/narration-rows";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
+import { createTurnStreamHold } from "../conversation/turn-stream-hold";
 import { useTurnTrace } from "../conversation/turn-trace";
 import { createPageHeaderFrame } from "../window/page-header-frame";
 import type { TaskEvent, TasksSource } from "./tasks-port";
@@ -85,6 +88,7 @@ export type TasksVoiceAdapter = TasksVoice & {
 interface TasksViewProps {
   serverId: string;
   hostName: string;
+  failureText?: ((error: string) => string) | undefined;
   onBack?: (() => void) | undefined;
   source: TasksSource;
   agents: AgentProfile[];
@@ -100,6 +104,7 @@ interface TasksViewProps {
   waitsForAnswer?: ((task: AgentTask) => boolean) | undefined;
   onOpenInChat?: ((task: AgentTask) => void) | undefined;
   sendShortcut?: SendShortcut | undefined;
+  responseStyle?: ResponseStyle | undefined;
 }
 
 interface PendingStart {
@@ -709,6 +714,12 @@ export function TasksView(props: TasksViewProps) {
       [],
       { key: "id" },
     );
+    const streamHeld = createTurnStreamHold(() => hosted()?.activeTurnId);
+    const shownMessages = createMemo(() =>
+      props.responseStyle === "natural"
+        ? naturalThreadRows(messages, (owner() ?? props.agents[0])?.provider, streamHeld)
+        : messages,
+    );
     const turnSteps = createTurnSteps({
       messages: () => messages,
       lines: () => undefined,
@@ -784,11 +795,13 @@ export function TasksView(props: TasksViewProps) {
               limit={state.snapshots[task()?.agentId ?? ""]?.limit ?? 1}
               agent={agent()}
               bubbleStyle={bubbleStyle()}
+              responseStyle={props.responseStyle}
               agents={props.agents}
-              messages={messages}
+              messages={shownMessages()}
               draft={state.drafts[taskId] ?? ""}
               draftAttachments={filesOf(taskId)}
               rowAttachments={rowFilesOf(taskId)}
+              failureText={props.failureText}
               pendingImages={pendingImagesOf(taskId)}
               onRemoveAttachment={filesAccepted() ? (attachment) => removeFile(taskId, attachment) : undefined}
               onPasteFiles={

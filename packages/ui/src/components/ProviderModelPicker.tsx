@@ -235,8 +235,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   let shownProvider = untrack(activeProvider);
 
   function railModelOptions(rail: RailId): ClientAgentModelOption[] {
-    if (rail === CUSTOM_RAIL) return props.modelOptions.filter((option) => isCustomModel(option, customIds()));
-    return props.modelOptions.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
+    const options = props.modelOptions.filter(
+      (option) => option.listing !== "kept" || (option.provider === props.provider && option.id === props.value),
+    );
+    if (rail === CUSTOM_RAIL) return options.filter((option) => isCustomModel(option, customIds()));
+    return options.filter((option) => option.provider === rail && !isCustomModel(option, customIds()));
   }
 
   const agentCount = () => {
@@ -270,6 +273,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const harnesses = new Set<string>(customIds().values());
     const rows = props.agentStatus.providers?.filter((row) => harnesses.has(row.id)) ?? [];
     return rows.length > 0 && rows.every((row) => row.endpointsPending === false);
+  };
+  const endpointsWaiting = (): boolean => {
+    if (!props.customProviders?.length) return false;
+    const harnesses = new Set<string>(customIds().values());
+    return props.agentStatus.providers?.some((row) => harnesses.has(row.id) && row.endpointsPending === true) ?? false;
   };
   const railStatus = (rail: RailId): AgentProviderStatus => {
     if (rail !== CUSTOM_RAIL) return providerAvailability(props.agentStatus, props.modelOptions, rail, t);
@@ -1084,6 +1092,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                         {t("provider.picker.workspaceOnlyUnavailable")}
                       </div>
                     </Show>
+                    <Show when={provider === CUSTOM_RAIL && groups().length > 0 && endpointsWaiting()}>
+                      <div class="provider-model-empty" role="status">
+                        {t("provider.picker.customPending")}
+                      </div>
+                    </Show>
                     <Input
                       class="provider-model-search"
                       aria-label={t("provider.picker.search")}
@@ -1098,13 +1111,15 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                           <Show when={available()}>
                             <div class="provider-model-empty" role="status">
                               <Show
-                                when={provider === CUSTOM_RAIL && !search().trim()}
+                                when={provider === CUSTOM_RAIL && (!search().trim() || endpointsWaiting())}
                                 fallback={
                                   <Show
                                     when={!search().trim() && endpointModelsElsewhere()}
                                     fallback={
                                       search().trim()
-                                        ? t("provider.picker.noMatches")
+                                        ? provider === "openrouter"
+                                          ? t("provider.picker.openrouterNoMatches")
+                                          : t("provider.picker.noMatches")
                                         : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
                                           provider === "muse"
                                           ? t("provider.picker.museNoModels")

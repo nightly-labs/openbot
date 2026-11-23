@@ -129,7 +129,7 @@ export class WhatsAppTransport implements MessagingTransport {
 
   async #read(message: WAMessage, live: boolean, historyOnly: boolean): Promise<void> {
     const dedupKey = whatsAppDedupKey(message);
-    if (!dedupKey) return;
+    if (!dedupKey || message.messageStubType === proto.WebMessageInfo.StubType.CIPHERTEXT) return;
     if (historyOnly ? this.#seen.has(dedupKey) : this.#remember(dedupKey)) return;
     const { session, store, chats } = this.#handle;
     let event: WhatsAppEvent | null;

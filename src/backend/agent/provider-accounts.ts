@@ -99,6 +99,7 @@ export interface ProviderAccountsHost {
   consumeUsageReset(client: AgentClient): Effect.Effect<ProviderUsageResetOutcome, ProviderAccountFailed>;
   changed(): void;
   modelsListed?(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
+  signedIn?(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
   usageChanged(limit: AccountUsageLimit): void;
   redact(text: string): string;
 }
@@ -283,7 +284,7 @@ export class ProviderAccounts {
             timeoutMs: command.timeoutMs,
             ...(added ? {} : { logout: true }),
             privateTemp: this.#host.signInTemp(provider),
-            ...(googleSignInByOpenBot(onHost) ? { openGoogleSignIn: openExternal } : {}),
+            ...(googleSignInByOpenBot(onHost) ? { openSignInPage: { site: "google", open: openExternal } } : {}),
           });
           return yield* login.done;
         }
@@ -314,6 +315,7 @@ export class ProviderAccounts {
       }),
     ).pipe(
       Effect.andThen(this.#check(account, true)),
+      Effect.andThen(this.#host.signedIn?.(provider, account.id) ?? Effect.void),
       Effect.onError((cause) =>
         Cause.hasInterruptsOnly(cause)
           ? Effect.void
@@ -460,6 +462,7 @@ export class ProviderAccounts {
       }),
       Effect.mapError((error) => accountFailure(this.#message(provider, signInCause(error) ?? error))),
     );
+    yield* this.#host.signedIn?.(provider, account.id) ?? Effect.void;
     return account.id;
   }).bind(this);
 
@@ -518,6 +521,32 @@ export class ProviderAccounts {
     const known = new Set([DEFAULT_PROVIDER_ACCOUNT_ID, ...this.#store.list(provider).map((account) => account.id)]);
     yield* this.#store
       .setPool(provider, enabled ? { leftOut: leftOut.filter((accountId) => known.has(accountId)) } : null)
+      .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
+    this.#host.changed();
+  }).bind(this);
+
+  liveVoiceAccount(): string | null {
+    if (!this.#support("codex")) return null;
+    const accountId = this.#store.liveVoiceAccount();
+    if (accountId === DEFAULT_PROVIDER_ACCOUNT_ID) return accountId;
+    return accountId && this.#store.get("codex", accountId) ? accountId : null;
+  }
+
+  readonly setLiveVoiceAccount = Effect.fn("ProviderAccounts.setLiveVoiceAccount")(function* (
+    this: ProviderAccounts,
+    accountId: string | null,
+  ) {
+    const name = providerLabel("codex");
+    if (!this.#support("codex"))
+      return yield* accountFailure(sourceText("error.provider.accountsUnsupported", { provider: name }));
+    const stored =
+      accountId === null || accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? null : this.#store.get("codex", accountId);
+    if (accountId !== null && accountId !== DEFAULT_PROVIDER_ACCOUNT_ID && !stored)
+      return yield* accountFailure(sourceText("error.provider.accountNotFound", { provider: name }));
+    if (stored && isKeyAccount(stored))
+      return yield* accountFailure(sourceText("error.provider.accountUsesKey", { provider: name }));
+    yield* this.#store
+      .setLiveVoiceAccount(accountId)
       .pipe(Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })));
     this.#host.changed();
   }).bind(this);
@@ -779,7 +808,7 @@ export class ProviderAccounts {
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
           const organization = signedIn.organization ?? null;
-          if (email && this.#loginTaken(provider, account.id, { email, organization })) {
+          if (afterSignIn && email && this.#loginTaken(provider, account.id, { email, organization })) {
             this.#usage.delete(account.id);
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
@@ -790,19 +819,20 @@ export class ProviderAccounts {
             .pipe(Effect.flatMap((usage) => this.#storeUsage(account, client, usage)));
           const limit =
             agentProviderDescriptor(provider).reportsUsage && !isKeyAccount(account)
-              ? yield* afterSignIn
-                  ? reading.pipe(
-                      Effect.catch((error) =>
-                        Effect.sync(() => {
-                          logger.warn("A provider account usage reading failed after its sign-in.", {
-                            provider,
-                            message: this.#message(provider, error),
-                          });
-                          return null;
-                        }),
-                      ),
-                    )
-                  : reading
+              ? yield* reading.pipe(
+                  Effect.catchIf(
+                    (error) => afterSignIn || !isSignInError(error),
+                    (error) =>
+                      Effect.sync(() => {
+                        logger.warn("A provider account usage reading failed.", {
+                          provider,
+                          afterSignIn,
+                          message: this.#message(provider, error),
+                        });
+                        return null;
+                      }),
+                  ),
+                )
               : null;
           this.#setState(account.id, { state: "connected", email, organization, message: ownApiKeyNotice(signedIn) });
           if (limit) this.#host.usageChanged(limit);

@@ -146,9 +146,13 @@ systemctl enable --quiet openbot-egress-firewall.service
 "$HELPER"
 systemctl start openbot-egress-firewall.service
 
-if ! dpkg-query -W -f='${Status}' unattended-upgrades 2>/dev/null | grep -q '^install ok installed$'; then
+missing_packages=()
+for package in unattended-upgrades age; do
+  dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q '^install ok installed$' || missing_packages+=("$package")
+done
+if [ "${#missing_packages[@]}" -gt 0 ]; then
   apt-get -o DPkg::Lock::Timeout=600 update
-  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends unattended-upgrades
+  apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends "${missing_packages[@]}"
 fi
 write_file 0644 /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
 APT::Periodic::Update-Package-Lists "1";

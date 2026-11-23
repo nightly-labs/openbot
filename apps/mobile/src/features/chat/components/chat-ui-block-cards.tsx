@@ -25,6 +25,7 @@ import X from "lucide-react-native/icons/x";
 import { type ReactNode, useEffect, useState } from "react";
 import { AccessibilityInfo, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
 import { ChatMarkdown } from "@/features/chat/components/chat-markdown";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { storeCodePreview } from "@/features/chat/model/code-preview-store";
@@ -287,13 +288,18 @@ export function ChatConfirmPrompt({
   canEditPreview?: boolean;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const muted = useThemeColor("muted");
   const { disabled, submit } = controller;
   const autoAnswer = uiBlock?.state.autoAnswer?.done ? undefined : uiBlock?.state.autoAnswer;
   const secondsLeft = useSecondsUntil(autoAnswer?.at ? Date.parse(autoAnswer.at) : 0);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<UiAction>();
-  const [draft, setDraft] = useState<string>();
+  const [draft, setPreviewDraft] = useState<string>();
+  const setDraft = (text: string) => {
+    setPreviewDraft(text);
+    controller.setUnsentPreview(text.trim() && text !== spec.preview ? text : undefined);
+  };
   const blankDraft = draft !== undefined && !draft.trim();
   const opensEditor = (action: UiAction) =>
     canEditPreview && uiConfirmPreviewEditable(spec) && action.id === UI_CONFIRM_EDIT_ACTION_ID;
@@ -309,7 +315,7 @@ export function ChatConfirmPrompt({
     if (disabled || blankDraft) return;
     setConfirming(undefined);
     if (opensEditor(action)) {
-      setDraft(spec.preview);
+      setPreviewDraft(spec.preview);
       return;
     }
     const values: Record<string, string> = {};
@@ -323,8 +329,8 @@ export function ChatConfirmPrompt({
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View
-        className="max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] bg-control/60 px-4 py-3"
-        style={{ borderCurve: "circular" }}
+        className={`max-w-[92%] flex-row items-start gap-2 self-start rounded-[20px] ${card.fillClass} px-4 py-3`}
+        style={card.style}
       >
         <View className="min-w-0 flex-1 pt-1">
           <ConfirmBody
@@ -451,6 +457,7 @@ export function ChatChoicePrompt({
   canSend: boolean;
 }) {
   const { t } = useText();
+  const card = useChatCardSurface();
   const [muted, accent] = useThemeColor(["muted", "accent"]);
   const { disabled, submit } = controller;
   const [picked, setPicked] = useState<string[]>(() =>
@@ -466,8 +473,8 @@ export function ChatChoicePrompt({
 
   return (
     <View
-      className="w-full max-w-[92%] self-start gap-1 rounded-[20px] bg-control/60 px-4 py-3"
-      style={{ borderCurve: "circular" }}
+      className={`w-full max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`}
+      style={card.style}
       accessibilityLabel={t("mobile.chat.question.form")}
     >
       <View className="flex-row items-center gap-2">

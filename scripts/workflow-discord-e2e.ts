@@ -195,6 +195,14 @@ try {
     sends.every((send) => send.action === "react" || !send.text.includes(EXTERNAL_EVENT_START)),
   );
 
+  await runCauseEffect(workflows.setPaused({ workflowId: deploy, paused: true }));
+  check(
+    "a mention for a paused workflow stays with the agents",
+    (await runCauseEffect(workflows.receiveDiscord(mentionOf("deploy while paused")))) === "none" &&
+      (await runCauseEffect(workflows.runs({ workflowId: deploy, limit: 10 }))).runs.length === 1,
+  );
+  await runCauseEffect(workflows.setPaused({ workflowId: deploy, paused: false }));
+
   answer = "hang";
   const repeated = mentionOf("deploy again");
   check("a second mention starts a run", (await runCauseEffect(workflows.receiveDiscord(repeated))) === "started");

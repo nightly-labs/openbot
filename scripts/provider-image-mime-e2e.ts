@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { EXPECTED_SCHEMA_FINGERPRINT } from "@muse-code/sdk";
+import { sourceText } from "@openbot/i18n/source";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { MuseAgentClient } from "../src/backend/muse-client";
@@ -40,7 +41,7 @@ const childSource = String.raw`
 const fs = require("node:fs");
 const crypto = require("node:crypto");
 const readline = require("node:readline");
-const [mode, logPath, sessionFile, fingerprint] = process.argv.slice(2);
+const [mode, logPath, sessionFile, fingerprint, modelInput] = process.argv.slice(2);
 const log = (entry) => fs.appendFileSync(logPath, JSON.stringify({ pid: process.pid, ...entry }) + "\n");
 const send = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
 const notify = (method, params) => send({ jsonrpc: "2.0", method, params });
@@ -110,7 +111,8 @@ lines.on("line", (line) => {
       history: { mode: "inline", items: museItems, snapshot: null },
       pendingRequests: [], viewCursor: String(museItems.length) });
   }
-  if (mode === "pi" && method === "get_state") return reply({ sessionFile });
+  if (mode === "pi" && method === "get_state")
+    return reply({ sessionFile, ...(modelInput ? { model: { input: modelInput.split(",") } } : {}) });
   if (mode === "pi" && method === "get_session_stats") return reply({
     tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } });
   if (mode === "pi" && ["switch_session", "set_model"].includes(method)) return reply({});
@@ -137,6 +139,11 @@ interface ConsumerResult {
   traffic: object[];
   cleanup: { pid: number; stopped: boolean }[];
 }
+interface RefusalResult {
+  passed: boolean;
+  error: string | null;
+  prompts: number;
+}
 interface Report {
   passed: boolean;
   defect: string;
@@ -144,6 +151,7 @@ interface Report {
   sourceHashes: Record<string, string>;
   fixtureChildSha256: string;
   consumers: Record<Consumer, ConsumerResult>;
+  piTextModelRefusal: RefusalResult | null;
   errors: string[];
 }
 function notRun(): ConsumerResult {
@@ -156,6 +164,7 @@ const report: Report = {
   sourceHashes: {},
   fixtureChildSha256: hash(Buffer.from(childSource)),
   consumers: { acp: notRun(), muse: notRun(), pi: notRun() },
+  piTextModelRefusal: null,
   errors: [],
 };
 
@@ -235,6 +244,60 @@ async function turn(client: AgentClient, threadId: string, path: string, model?:
     client.off("notification", listener);
     client.off("exit", exited);
   }
+}
+
+async function piTextModelRefusal(): Promise<RefusalResult> {
+  const log = join(root, "pi-text.jsonl");
+  const executable = join(root, "pi-text-fixture");
+  const args = [
+    process.execPath,
+    join(root, "fixture.cjs"),
+    "pi",
+    log,
+    join(root, "pi-text-session.jsonl"),
+    EXPECTED_SCHEMA_FINGERPRINT,
+    "text",
+  ];
+  await writeFile(executable, `#!/bin/sh\nexec ${args.map(shellQuote).join(" ")}\n`);
+  await chmod(executable, 0o700);
+  const client = new PiAgentClient(
+    { executable, version: "fixture" },
+    { requestTimeoutMs: 15_000, providerStateDirectory: root, profileGeneration: true },
+  );
+  client.start();
+  let error: string | null = null;
+  try {
+    const opened = await runCauseEffect(client.request("thread/start", { cwd: root }, (value) => value));
+    const threadId = isRecord(opened) ? getString(opened.thread, "id") : null;
+    assert.ok(threadId, "thread/start must return an id.");
+    const path = join(root, "text-model.png");
+    await writeFile(path, Buffer.from(fixtures[0]?.data ?? "", "base64"));
+    try {
+      await runCauseEffect(
+        client.request(
+          "turn/start",
+          {
+            threadId,
+            input: [
+              { type: "text", text: "Inspect this local fixture." },
+              { type: "localImage", path },
+            ],
+          },
+          (value) => value,
+        ),
+      );
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : String(cause);
+    }
+  } finally {
+    await runCauseEffect(client.stop());
+  }
+  const prompts = (await entries(log)).filter((entry) => getString(entry, "event") === "prompt").length;
+  return {
+    passed: error?.includes(sourceText("error.workflow.modelImageUnsupported")) === true && prompts === 0,
+    error,
+    prompts,
+  };
 }
 
 try {
@@ -376,11 +439,14 @@ try {
       }
     }
   }
+  report.piTextModelRefusal = await piTextModelRefusal();
 } catch (error) {
   report.errors.push(error instanceof Error ? error.message : String(error));
 } finally {
   report.passed =
-    report.errors.length === 0 && consumers.every((consumer) => report.consumers[consumer].status === "PASS");
+    report.errors.length === 0 &&
+    report.piTextModelRefusal?.passed === true &&
+    consumers.every((consumer) => report.consumers[consumer].status === "PASS");
   if (consumers.every((consumer) => report.consumers[consumer].cleanup.every((child) => child.stopped))) {
     await rm(root, { recursive: true, force: true });
   }
@@ -391,6 +457,7 @@ try {
       passed: report.passed,
       report: join(out, "report.json"),
       consumers: Object.fromEntries(consumers.map((consumer) => [consumer, report.consumers[consumer].status])),
+      piTextModelRefusal: report.piTextModelRefusal?.passed ?? false,
     })}\n`,
   );
   process.exitCode = report.passed

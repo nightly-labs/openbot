@@ -13,6 +13,9 @@ const outcome = {
   failure_code: ["operation_failed", "connection_failed", "permission_denied", "pairing_failed", "load_failed"],
 };
 const seconds = (value: unknown) => isNumber(value) && Number.isFinite(value) && value >= 0 && value <= 86_400;
+const candidate = "(?:host|srflx|prflx|relay|unknown)/(?:udp|tcp|tls|unknown)";
+const ICE_ROUTE = new RegExp(`^${candidate} -> ${candidate}$`, "u");
+const iceRoute = (value: unknown): value is string => isString(value) && ICE_ROUTE.test(value);
 const voice = { server_kind: ["remote"], transcription: ["local", "cloud"] } as const;
 
 export const MOBILE_EVENTS = {
@@ -26,6 +29,12 @@ export const MOBILE_EVENTS = {
     action: ["connect", "reconnect", "lost"],
     ...outcome,
     stage: ["preferences", "connection", "compatibility", "agents", "reads"],
+    signal_socket_ms: duration,
+    signal_ms: duration,
+    channels_ms: duration,
+    auth_ms: duration,
+    route: iceRoute,
+    vpn: ["off", "on", "proxy", "unknown"],
   },
   conversation_opened: { ...outcome, ...agent },
   message_send: {

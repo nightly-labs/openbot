@@ -57,6 +57,7 @@ export const messages = {
   "agent.dock.closeOnLeave": "外をクリックしたら閉じる",
   "agent.dock.openInMain": "メインウィンドウで開く",
   "agent.dock.openWindow": "新しいウインドウで開く",
+  "agent.dock.openPage": "{title} を開く",
   "agent.dock.remove": "ドックから削除",
   "agent.dock.send": "送信",
   "agent.dock.working": "作業中…",

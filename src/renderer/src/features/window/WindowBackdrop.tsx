@@ -39,13 +39,23 @@ export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
   const [custom, setCustom] = createSignal<ShownBackdrop | null>(null);
 
   let shownPage: string | undefined;
-  const showCustom = (next: ShownBackdrop | null, page?: string) => {
-    setCustom(next);
-    const old = shownPage;
-    shownPage = page;
-    if (old !== page) releaseFilePreviewPage(old);
+  let shownVideo: string | undefined;
+  const releaseVideo = (url: string | undefined) => {
+    if (url !== undefined) URL.revokeObjectURL(url);
   };
-  onCleanup(() => releaseFilePreviewPage(shownPage));
+  const showCustom = (next: ShownBackdrop | null, page?: string, video?: string) => {
+    setCustom(next);
+    const oldPage = shownPage;
+    shownPage = page;
+    if (oldPage !== page) releaseFilePreviewPage(oldPage);
+    const oldVideo = shownVideo;
+    shownVideo = video;
+    if (oldVideo !== video) releaseVideo(oldVideo);
+  };
+  onCleanup(() => {
+    releaseFilePreviewPage(shownPage);
+    releaseVideo(shownVideo);
+  });
   let shownVersion: string | null = null;
 
   createEffect(customVersion, (version) => {
@@ -66,6 +76,12 @@ export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
         return;
       }
       const loaded = `${id}\0${backdrop.createdAt}`;
+      if (backdrop.kind === "video") {
+        const url = URL.createObjectURL(backdrop.blob);
+        shownVersion = loaded;
+        showCustom({ source: { kind: "video", url }, name: backdrop.name, bubbles: null }, undefined, url);
+        return;
+      }
       if (backdrop.kind === "image") {
         const url = await dataUrl(backdrop);
         if (cancelled) return;

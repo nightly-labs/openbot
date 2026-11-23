@@ -7,7 +7,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { iceServerErrorDetail, knownIceCandidateRoute } from "@openbot/team-client/ice-diagnostics";
 import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
-import { BrowserWindow, MessageChannelMain, type MessagePortMain } from "electron";
+import { BrowserWindow, MessageChannelMain, type MessagePortMain, webContents } from "electron";
 import { z } from "zod";
 import { RemoteWorkflowError, remoteCall, remoteDecode } from "./remote-service-effects";
 
@@ -19,6 +19,7 @@ interface TeamWebRtcBridgeEvents {
   signalReady: [peerId: string];
   signalOpen: [peerId: string];
   hostWaiting: [peerId: string];
+  signalHeld: [peerId: string, retryInMs: number];
   signalClosed: [peerId: string, code: string, terminal: boolean];
   incoming: [
     peerId: string,
@@ -90,6 +91,7 @@ const bridgeMessageSchema = z
     localFingerprint: z.string().min(1).max(256).optional(),
     remoteFingerprint: z.string().min(1).max(256).optional(),
     iceServers: z.array(iceServerSchema).optional(),
+    retryInMs: z.number().nonnegative().optional(),
   })
   .loose();
 type BridgeMessage = z.infer<typeof bridgeMessageSchema>;
@@ -115,7 +117,8 @@ type BridgeCommand =
         | "renew-host-signal"
         | "close"
         | "open-egress"
-        | "close-egress";
+        | "close-egress"
+        | "ping";
       peerId: string;
     }
   | { type: "send-egress"; peerId: string; data: string | ArrayBuffer }
@@ -123,6 +126,8 @@ type BridgeCommand =
 
 const COMMAND_TIMEOUT_MS = 15_000;
 const SEND_COMMAND_TIMEOUT_MS = 75_000;
+const LIVENESS_INTERVAL_MS = 30_000;
+const LIVENESS_MISSES = 2;
 
 const logger = createOpenBotLogger("team-webrtc-bridge");
 
@@ -341,6 +346,44 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
         Exit.isFailure(exit) ? remoteDecode(() => port1.off("message", listener)).pipe(Effect.orDie) : Effect.void,
       ),
     );
+    yield* Effect.forkIn(this.#watch(window, port1).pipe(Effect.ignore), this.#scope);
+  });
+
+  readonly #watch = Effect.fn("TeamWebRtcBridge.watch")(function* (
+    this: TeamWebRtcBridge,
+    window: BrowserWindow,
+    port: MessagePortMain,
+  ) {
+    let misses = 0;
+    while (this.#port === port) {
+      yield* Effect.sleep(LIVENESS_INTERVAL_MS);
+      if (this.#port !== port) return;
+      const answered = yield* this.#command({ type: "ping", peerId: "all" }).pipe(
+        Effect.as(true),
+        Effect.orElseSucceed(() => false),
+      );
+      if (this.#port !== port) return;
+      misses = answered ? 0 : misses + 1;
+      if (misses < LIVENESS_MISSES) continue;
+      const stopped = yield* remoteDecode(() => {
+        if (this.#port !== port || window.webContents.isDestroyed()) return true;
+        const processId = window.webContents.getOSProcessId();
+        const shared = webContents
+          .getAllWebContents()
+          .some(
+            (other) => other !== window.webContents && !other.isDestroyed() && other.getOSProcessId() === processId,
+          );
+        if (shared) return false;
+        logger.warn(
+          `The Team WebRTC bridge did not answer ${LIVENESS_MISSES} checks. It stops, and the next connection starts it again.`,
+        );
+        window.webContents.forcefullyCrashRenderer();
+        return true;
+      });
+      if (stopped) return;
+      if (misses === LIVENESS_MISSES)
+        logger.warn("The Team WebRTC bridge does not answer. It shares its process with another window, so it stays.");
+    }
   });
 
   readonly #command = Effect.fn("TeamWebRtcBridge.command")(function* (this: TeamWebRtcBridge, command: BridgeCommand) {
@@ -420,6 +463,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "signal-ready") this.emit("signalReady", message.peerId);
     else if (message.type === "signal-open") this.emit("signalOpen", message.peerId);
     else if (message.type === "host-waiting") this.emit("hostWaiting", message.peerId);
+    else if (message.type === "signal-held" && message.retryInMs !== undefined)
+      this.emit("signalHeld", message.peerId, message.retryInMs);
     else if (message.type === "signal-closed" && message.code)
       this.emit("signalClosed", message.peerId, message.code, message.terminal === true);
     else if (message.type === "peer-connected" && message.localFingerprint && message.remoteFingerprint)

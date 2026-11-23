@@ -17,6 +17,16 @@ import {
 } from "@openbot/contracts/billing";
 import { VAT_TAX_RATE } from "@openbot/contracts/billing-details";
 import {
+  CREDIT_LOOKUP_KEYS,
+  CREDIT_METADATA,
+  CREDIT_METADATA_KIND,
+  CREDIT_PRODUCT_ID,
+  type CreditStop,
+  creditLookupKey,
+  creditStopPrice,
+  creditStops,
+} from "@openbot/contracts/credits";
+import {
   LICENSE_LOOKUP_KEYS,
   LICENSE_METADATA,
   LICENSE_METADATA_KIND,
@@ -48,6 +58,8 @@ export const BILLING_WEBHOOK_EVENTS = [
   "invoice.paid",
   "invoice.payment_failed",
   "checkout.session.expired",
+  "checkout.session.async_payment_succeeded",
+  "checkout.session.async_payment_failed",
   "refund.created",
   "refund.updated",
   "refund.failed",
@@ -341,6 +353,64 @@ async function ensurePrice(
   return created.id;
 }
 
+async function ensureCreditProduct(stripe: StripeAdmin): Promise<void> {
+  const body = new URLSearchParams({
+    name: "OpenBot credits",
+    active: "true",
+    [`metadata[${CREDIT_METADATA.kind}]`]: CREDIT_METADATA_KIND,
+  });
+  if (await stripe.findProduct(CREDIT_PRODUCT_ID)) {
+    await stripe.request("POST", `/v1/products/${CREDIT_PRODUCT_ID}`, body, productSchema);
+    logger.info(`Product ${CREDIT_PRODUCT_ID} is up to date.`);
+    return;
+  }
+  body.set("id", CREDIT_PRODUCT_ID);
+  await stripe.request("POST", "/v1/products", body, productSchema);
+  logger.info(`Created product ${CREDIT_PRODUCT_ID}.`);
+}
+
+async function ensureCreditPrice(
+  stripe: StripeAdmin,
+  existing: readonly Price[],
+  stop: CreditStop,
+  optional: readonly BillingOptionalCurrency[],
+): Promise<string> {
+  const lookupKey = creditLookupKey(stop);
+  const current = existing.find((price) => price.lookup_key === lookupKey);
+  const currencies = optionalCurrenciesOf(current, optional);
+  const amount = (currency: BillingCurrency) => creditStopPrice(stop, currency);
+  if (
+    current &&
+    current.active !== false &&
+    !includesTax(current) &&
+    current.product === CREDIT_PRODUCT_ID &&
+    current.recurring === null &&
+    current.currency === "eur" &&
+    current.unit_amount === amount("eur") &&
+    current.currency_options?.usd?.unit_amount === amount("usd") &&
+    current.currency_options?.pln?.unit_amount === amount("pln") &&
+    currencies.every((currency) => current.currency_options?.[currency]?.unit_amount === amount(currency))
+  ) {
+    await ensureExclusiveTax(stripe, current);
+    logger.info(`Price ${lookupKey} is up to date.`);
+    return current.id;
+  }
+  const body = new URLSearchParams({
+    product: CREDIT_PRODUCT_ID,
+    currency: "eur",
+    unit_amount: String(amount("eur")),
+    lookup_key: lookupKey,
+    transfer_lookup_key: "true",
+    "currency_options[usd][unit_amount]": String(amount("usd")),
+    "currency_options[pln][unit_amount]": String(amount("pln")),
+    [`metadata[${CREDIT_METADATA.kind}]`]: CREDIT_METADATA_KIND,
+  });
+  for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amount(currency)));
+  const created = await stripe.request("POST", "/v1/prices", withExclusiveTax(body), priceSchema);
+  logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
+  return created.id;
+}
+
 function licensePriceSignature(prices: Readonly<Record<string, LicensePrice>>, included: number): string {
   const amounts = Object.entries(prices)
     .map(([currency, price]) => `${currency}:${price.base}+${price.extraUser}`)
@@ -578,6 +648,7 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
       ),
     ),
     ...LICENSE_LOOKUP_KEYS,
+    ...CREDIT_LOOKUP_KEYS,
   ];
   const existing: Price[] = [];
   for (let start = 0; start < lookupKeys.length; start += 10) {
@@ -609,6 +680,10 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
   await ensureLicenseProduct(stripe);
   for (const plan of LICENSE_PLANS)
     logger.info(`Price ${licenseLookupKey(plan)}: ${await ensureLicensePrice(stripe, existing, plan, optional)}`);
+
+  await ensureCreditProduct(stripe);
+  for (const stop of creditStops("eur"))
+    logger.info(`Price ${creditLookupKey(stop)}: ${await ensureCreditPrice(stripe, existing, stop, optional)}`);
 
   logger.info(`Tax rate of Polish VAT: ${await ensureVatTaxRate(stripe)}`);
   await updatePortalConfiguration(stripe);

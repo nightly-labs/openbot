@@ -6,9 +6,10 @@ const RECOVERED_FRAMES = 30;
 const LOWER_QUALITY_MS = 24 * 60 * 60 * 1000;
 const LOWER_QUALITY = { bitrate: 3_000, fps: 30 };
 
-export function remoteDesktopStreamWatchScript(serverId: string): string {
+export function remoteDesktopStreamWatchScript(serverId: string, switchesEncoder: boolean): string {
   const tooSlowLowered = sourceText("error.remote.streamTooSlowLowerQuality");
   const tooSlow = sourceText("error.remote.streamTooSlow");
+  const noPictureText = sourceText("error.remote.noPictureSwitchEncoder");
   return `{
 const QUALITY_KEY = ${JSON.stringify(`openbot-remote-quality:${serverId}`)};
 const sessionId = /\\/sessions\\/([A-Za-z0-9-]+)\\/moonlight(?:\\/|$)/.exec(location.pathname)?.[1];
@@ -36,8 +37,8 @@ window.fetch = (input, init) => {
   } catch {}
   return nativeFetch(input, init);
 };
-const report = (state, message) => {
-  const payload = { source: "openbot-moonlight", type: "viewer-state", sessionId, state, ...(message ? { message } : {}) };
+const report = (state, message, noPicture) => {
+  const payload = { source: "openbot-moonlight", type: "viewer-state", sessionId, state, ...(message ? { message } : {}), ...(noPicture ? { noPicture: true } : {}) };
   window.parent.postMessage(payload, "*");
   nativeFetch("../viewer-state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).catch(() => {});
 };
@@ -93,7 +94,8 @@ const check = async () => {
       lower = true;
     } catch {}
   }
-  report("error", lower ? ${JSON.stringify(tooSlowLowered)} : ${JSON.stringify(tooSlow)});
+  const noPicture = !started && ${switchesEncoder};
+  report("error", noPicture ? ${JSON.stringify(noPictureText)} : lower ? ${JSON.stringify(tooSlowLowered)} : ${JSON.stringify(tooSlow)}, noPicture);
 };
 if (sessionId && window.RTCPeerConnection) {
   const Native = window.RTCPeerConnection;

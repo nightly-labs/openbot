@@ -6,6 +6,7 @@ import { createServer as createTcpServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { composedCustomModelId, isAgentModel } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import type { AgentClient } from "../src/backend/agent-client";
@@ -29,9 +30,11 @@ const WIDE_MODEL = "wide-model";
 const GUESSED_MODEL = "guessed-model";
 const EFFORT_MODEL = "effort-model";
 const SAVED_EFFORTS = ["low", "high", "max"] as const;
+const NO_EFFORT_MODEL = "no-effort-model";
 const PLAIN_MODEL = "plain-model";
 const VISION_MODEL = "vision-model";
 const TEXT_MODEL = "text-model";
+const VENDOR_MODEL = "@cf/openai/gpt-oss-120b";
 const READ_PDF = "Read report.pdf.";
 const PDF = Buffer.from(
   "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
@@ -240,9 +243,11 @@ try {
       { id: WIDE_MODEL, name: "Wide model", contextWindow: 131_072 },
       { id: GUESSED_MODEL, name: "Guessed model", contextWindow: 16_384 },
       { id: EFFORT_MODEL, name: "Effort model", reasoningEfforts: [...SAVED_EFFORTS] },
+      { id: NO_EFFORT_MODEL, name: "No effort model", reasoningEfforts: [] },
       { id: VISION_MODEL, name: "Vision model", inputs: ["image", "pdf"] },
       { id: TEXT_MODEL, name: "Text model", inputs: [] },
       { id: PLAIN_MODEL, name: "Plain model" },
+      { id: VENDOR_MODEL, name: VENDOR_MODEL },
     ],
   };
   const reasoning = createModelReasoningSupport(() => [endpoint]);
@@ -283,6 +288,9 @@ try {
   const listed = await runCauseEffect(client.request("model/list", {}, (value) => value));
   report.models = getArray(listed, "data").flatMap((model) => getString(model, "model") ?? []);
   assert.ok(report.models.includes(`${ENDPOINT}/${AGENT_MODEL}`), "OpenCode must list the agent's model.");
+  const vendorModel = composedCustomModelId(ENDPOINT, VENDOR_MODEL);
+  assert.ok(isAgentModel(vendorModel), `${vendorModel} must be a valid model id.`);
+  assert.ok(report.models.includes(vendorModel), `OpenCode must list ${VENDOR_MODEL} as ${vendorModel}.`);
   report.efforts = Object.fromEntries(
     getArray(listed, "data").map((model) => [
       getString(model, "model") ?? "",
@@ -314,6 +322,17 @@ try {
     assert.equal(turn.error, null, `The turn failed: ${turn.error}`);
   }
 
+  const vendorStart = report.requests.length;
+  const vendorThread = await startThread(client, { cwd: workspace, model: vendorModel });
+  const vendorTurn = await runTurn(client, vendorThread, { text: "Say one word.", timeoutMs: 120_000 });
+  report.turns.push(vendorTurn);
+  assert.equal(vendorTurn.error, null, `The turn on ${vendorModel} failed: ${vendorTurn.error}`);
+  const vendorRequests = report.requests.slice(vendorStart).filter((request) => request.stream);
+  assert.ok(vendorRequests.length > 0, `The endpoint got no request for ${vendorModel}.`);
+  for (const request of vendorRequests) {
+    assert.equal(request.model, VENDOR_MODEL, "A turn must send the vendor's own model id.");
+  }
+
   const budgets: ReadonlyArray<readonly [string, number]> = [
     [CAPPED_MODEL, 16_384],
     [WIDE_MODEL, 16_384],
@@ -343,6 +362,27 @@ try {
   assert.ok(effortRequests.length > 0, `The endpoint got no request for ${EFFORT_MODEL}.`);
   for (const request of effortRequests) {
     assert.equal(request.reasoningEffort, "max", `${EFFORT_MODEL} must send the effort of the turn.`);
+  }
+
+  const noEffortModel = getArray(listed, "data").find(
+    (model) => getString(model, "model") === `${ENDPOINT}/${NO_EFFORT_MODEL}`,
+  );
+  assert.ok(
+    isRecord(noEffortModel) && noEffortModel.reasoningEffortConfigurable === false,
+    "A model saved with no efforts must offer no effort.",
+  );
+  const noEffortThread = await startThread(client, { cwd: workspace, model: `${ENDPOINT}/${NO_EFFORT_MODEL}` });
+  const noEffortTurn = await runTurn(client, noEffortThread, {
+    effort: "high",
+    text: "Say one word.",
+    timeoutMs: 120_000,
+  });
+  report.turns.push(noEffortTurn);
+  assert.equal(noEffortTurn.error, null, `The turn on ${NO_EFFORT_MODEL} failed: ${noEffortTurn.error}`);
+  const noEffortRequests = report.requests.filter((request) => request.model === NO_EFFORT_MODEL);
+  assert.ok(noEffortRequests.length > 0, `The endpoint got no request for ${NO_EFFORT_MODEL}.`);
+  for (const request of noEffortRequests) {
+    assert.equal(request.reasoningEffort, null, `${NO_EFFORT_MODEL} must send no effort.`);
   }
 
   const image = join(workspace, "pixel.png");
@@ -398,9 +438,11 @@ try {
   const known = new Set([
     AGENT_MODEL,
     EFFORT_MODEL,
+    NO_EFFORT_MODEL,
     PLAIN_MODEL,
     VISION_MODEL,
     TEXT_MODEL,
+    VENDOR_MODEL,
     ...budgets.map(([model]) => model),
   ]);
   const others = report.requests.filter(

@@ -6,7 +6,7 @@ import {
   agentStepActivity,
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
-import type { AgentProfile } from "@openbot/ui/data";
+import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
 import { type AgentActivityLabel, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import {
   agentActivityExitDelay,
@@ -40,7 +40,8 @@ export interface TurnRuntime {
 
 export interface ActivityStoreDeps {
   props: ConversationProps;
-  activeDeliveries: () => Array<{ id: string }>;
+  activeDeliveries: () => Array<{ id: string; turnId?: string | null }>;
+  shownMessages: () => readonly AgentMessage[];
   agentActivityLabels: Map<string, { activityId: string; label: AgentActivityLabel }>;
   turnRuntimes: Map<string, TurnRuntime>;
 }
@@ -58,7 +59,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   });
   const heldByOwnChannelWork = createMemo(() => {
     const hold = deps.props.queue?.hold;
-    if (!hold || hold.agentId !== deps.props.agent?.id) return null;
+    if (hold?.reason !== "channel-task" || hold.agentId !== deps.props.agent?.id) return null;
     return deps.props.activeTurnId ? null : hold;
   });
   const activeActivityId = createMemo(() => {
@@ -77,6 +78,27 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     if (current?.agent?.id === agentId) return current.activityId;
     return `${agentId}:message:${streamingMessage.id}`;
   });
+  const turnOutputShown = () => {
+    if (deps.props.activityDetail?.trim()) return true;
+    const turnId = deps.activeDeliveries()[0]?.turnId ?? deps.props.activeTurnId;
+    if (!turnId) return false;
+    const rows = deps.shownMessages();
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      if (row?.turnId === turnId && row.author === "agent" && row.kind !== "thinking") return true;
+    }
+    return false;
+  };
+  const activityOutput = createMemo<{ activityId: string | null; shown: boolean }>(
+    (previous) => {
+      const activityId = activeActivityId();
+      if (!activityId) return previous ?? { activityId: null, shown: false };
+      if (previous?.activityId === activityId && previous.shown) return previous;
+      return { activityId, shown: turnOutputShown() };
+    },
+    { lazy: true },
+  );
+  const activeTurnOutputShown = () => activityOutput().shown;
   const latestActiveCommentary = createMemo(() => {
     const activeTurnId = deps.props.activeTurnId;
     if (!activeTurnId) return null;
@@ -252,10 +274,20 @@ export function createActivityStore(deps: ActivityStoreDeps) {
       !deps.props.approval &&
       !deps.props.browserTakeover,
   );
+  const compactionRunning = () => {
+    const state = deps.props.contextState;
+    const agent = deps.props.agent;
+    return state?.compaction?.status === "running" && state.agentId === agent?.id && state.threadId === agent?.threadId;
+  };
   const turnUpdate = () => {
     const turnId = deps.props.activeTurnId;
     if (!turnId) return null;
-    const parts: unknown[] = [turnId, deps.props.activityDetail, deps.props.turnStepLines?.[turnId]?.at(-1)?.id];
+    const parts: unknown[] = [
+      turnId,
+      deps.props.activityDetail,
+      deps.props.turnStepLines?.[turnId]?.at(-1)?.id,
+      compactionRunning(),
+    ];
     for (let index = deps.props.messages.length - 1; index >= 0; index -= 1) {
       const message = deps.props.messages[index];
       if (message?.author !== "agent") continue;
@@ -284,7 +316,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
   window.addEventListener("online", updateOnline);
   window.addEventListener("offline", updateOnline);
   const providerSilentMinutes = createMemo(() => {
-    if (!waitsForProvider() || deps.props.activityRunning) return null;
+    if (!waitsForProvider() || deps.props.activityRunning || compactionRunning()) return null;
     const minutes = Math.floor((clock() - lastTurnUpdateAt()) / PROVIDER_SILENT_AFTER_MS);
     return minutes >= 1 ? minutes : null;
   });
@@ -308,6 +340,7 @@ export function createActivityStore(deps: ActivityStoreDeps) {
     activeActivityId,
     activeActivityDetail,
     activeStepActivity,
+    activeTurnOutputShown,
     agentActivity,
     activityLabel,
     runningTurnRuntime,

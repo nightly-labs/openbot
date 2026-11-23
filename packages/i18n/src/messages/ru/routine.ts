@@ -373,7 +373,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "Передать",
   "routine.webhook.giveSecretFailed": "Не удалось передать секрет подписи агенту {name}.",
   "routine.webhook.secretGiven": "У агента {name} теперь новый секрет подписи.",
-  "routine.webhook.statusFailed": "Не удалось проверить, подключён ли хост к ретранслятору.",
 
   "routine.settings.instruction": "Инструкция",
   "routine.settings.instructionPlaceholderAgent": "Опишите, что должен делать этот агент.",

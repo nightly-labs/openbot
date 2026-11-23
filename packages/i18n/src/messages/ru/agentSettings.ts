@@ -199,13 +199,15 @@ export const messages = {
     "Этот выбор действует только для вас, на всех ваших устройствах. Если у сервера отключены уведомления или выбрано «Ничего», этот агент тоже молчит.",
 
   "agentSettings.newChat.title": "Новый чат",
-  "agentSettings.newChat.description": "Агент забудет этот чат. Настройки сохранятся.",
+  "agentSettings.newChat.description":
+    "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Настройки сохранятся.",
   "agentSettings.newChat.button": "Начать",
   "agentSettings.newChat.confirmTitle": "Начать новый чат с {name}?",
   "agentSettings.newChat.confirmDescription":
-    "Агент забудет этот чат. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
+    "Агент начнёт заново, но при необходимости найдёт сообщения этого чата. Сообщения останутся видны над разделителем. Инструкции, модель, инструменты, память, рабочее пространство и браузер не изменятся.",
   "agentSettings.newChat.confirm": "Начать новый чат",
   "agentSettings.newChat.failed": "Не удалось начать новый чат.",
+  "agentSettings.newChat.busy": "Агент работает. Чтобы начать новый чат, дождитесь окончания или остановите агента.",
   "agentSettings.deleteHistory.title": "Удалить историю",
   "agentSettings.deleteHistory.description":
     "Сообщения этого чата удаляются, и агент их забывает. Его настройки остаются.",
@@ -275,6 +277,9 @@ export const messages = {
     "Агент может начать новый чат, когда его чат становится длинным. Сначала он сохраняет заметки.",
   "agentSettings.quickAcknowledgement.title": "Показывать план перед долгими задачами",
   "agentSettings.quickAcknowledgement.description": "Перед долгой задачей агент показывает свой план.",
+  "agentSettings.builtinMemory.title": "Память OpenBot",
+  "agentSettings.builtinMemory.description":
+    "Агент сохраняет и читает свою память. Выключите, чтобы использовать только приложение памяти, например Mem0. Сохранённая память остаётся.",
   "agentSettings.browserProfile.label": "Профиль браузера",
   "agentSettings.browserProfile.shared": "Общий",
   "agentSettings.browserProfile.agent": "Только этот агент",
@@ -284,6 +289,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Каждый профиль хранит свои входы в аккаунты и cookie. Изменение закрывает открытые вкладки агента.",
   "agentSettings.browserProfile.manage": "Настроить",
+  "agentSettings.browserProfile.movedNote":
+    "Входы на сайты остаются в старом профиле. Агенту нужно снова войти на эти сайты.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Весь процесс {provider} работает в песочнице, поэтому запись за пределами рабочего пространства не удастся. Доступно только в macOS.",
 } as const satisfies PartialTranslation<typeof source>;

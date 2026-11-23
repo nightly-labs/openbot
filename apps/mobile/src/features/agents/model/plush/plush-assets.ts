@@ -25,6 +25,9 @@ const BODIES: Readonly<Record<ShapeId, number>> = {
   carre: require("@norbert_bodziony/bloub/assets/forme-carre.webp"),
   losange: require("@norbert_bodziony/bloub/assets/forme-losange.webp"),
   pentagone: require("@norbert_bodziony/bloub/assets/forme-pentagone.webp"),
+  fantome: require("@norbert_bodziony/bloub/assets/forme-fantome.webp"),
+  meduse: require("@norbert_bodziony/bloub/assets/forme-meduse.webp"),
+  poulpe: require("@norbert_bodziony/bloub/assets/forme-poulpe.webp"),
 };
 const PAD_X = require("@norbert_bodziony/bloub/assets/fred-oeil0-x.webp");
 const PAD_Y = require("@norbert_bodziony/bloub/assets/fred-oeil0-y.webp");

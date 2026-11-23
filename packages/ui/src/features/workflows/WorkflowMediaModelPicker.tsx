@@ -21,8 +21,10 @@ import {
 import { createSignal, For, Show } from "solid-js";
 import { isApiKeyAccount, providerAccountName } from "../../components/provider-accounts";
 import { useText } from "../../text";
+import { creditModelMakerNamed, MakerLogo } from "../credits/MakerLogo";
 import { createPickerFades, type PickerChip, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
 import { Hint } from "./workflow-board";
+import { resolutionsBySize } from "./workflow-media-step";
 import type { WorkflowImageModel } from "./workflow-model";
 
 interface PayerEntry {
@@ -37,10 +39,19 @@ const ALL = "all";
 const entryKey = (provider: string, accountId: string | null) => (accountId ? `${provider}:${accountId}` : provider);
 const rowValue = (entry: string, model: string) => `${entry}|${model}`;
 
-const sizeOf = (value: string) => Number.parseFloat(value) * (value.endsWith("K") ? 1000 : 1);
+function ModelLogo(props: { model: WorkflowImageModel }) {
+  return (
+    <Show
+      when={props.model.provider === "openbot" && creditModelMakerNamed(props.model.maker)}
+      fallback={<ProviderLogo provider={props.model.provider} class="wfn-model-logo" />}
+    >
+      {(maker) => <MakerLogo maker={maker()} mono />}
+    </Show>
+  );
+}
 
 function span(values: readonly string[]): string | undefined {
-  const sorted = [...values].sort((left, right) => sizeOf(left) - sizeOf(right));
+  const sorted = resolutionsBySize(values);
   const first = sorted[0];
   const last = sorted.at(-1);
   if (!first || !last) return undefined;
@@ -128,7 +139,7 @@ export function MediaModelPicker(props: {
           .map((model) => ({
             value: rowValue(entry.key, model.id),
             label: model.name,
-            tile: () => <ProviderLogo provider={model.provider} class="wfn-model-logo" />,
+            tile: () => <ModelLogo model={model} />,
             chips: [
               ...specChips(model),
               ...(key === ALL

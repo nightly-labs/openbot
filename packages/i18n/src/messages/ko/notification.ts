@@ -5,6 +5,7 @@ export const messages = {
   "notification.needsInput": "입력이 필요해요.",
   "notification.needsApproval": "승인이 필요해요.",
   "notification.needsBrowserStep": "브라우저에서 직접 마무리할 단계가 있어요.",
+  "notification.waitsForSignIn": "{provider} 로그인을 기다리는 중입니다.",
   "notification.needsApprovalFor": "승인이 필요해요: {action}",
   "notification.finished": "작업을 마쳤어요.",
   "notification.failed": "오류로 중단됐어요.",

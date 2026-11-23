@@ -13,20 +13,38 @@ export function isMcpSessionClosingDiagnostic(message: string): boolean {
   return /\bsession is closing \(process scope already reclaimed\)/u.test(message);
 }
 
-export type McpProviderFailureKind = "sign_in" | "timeout" | "failed";
+export type McpProviderFailureKind = "sign_in" | "timeout" | "unavailable" | "unreachable" | "failed";
 
 export function mcpProviderFailureKind(message: string): McpProviderFailureKind {
-  return isMcpSignInDiagnostic(message) ? "sign_in" : isMcpTimeoutDiagnostic(message) ? "timeout" : "failed";
+  if (isMcpSignInDiagnostic(message)) return "sign_in";
+  if (isMcpTimeoutDiagnostic(message)) return "timeout";
+  if (isMcpUnavailableDiagnostic(message)) return "unavailable";
+  return isMcpUnreachableDiagnostic(message) ? "unreachable" : "failed";
 }
 
 export const MCP_PROVIDER_FAILURE_TEXT = {
   sign_in: "error.backend.mcpServerSignInForProvider",
   timeout: "error.backend.mcpServerTimedOutInProvider",
+  unavailable: "error.backend.mcpServerUnavailableInProvider",
+  unreachable: "error.backend.mcpServerUnreachableInProvider",
   failed: "error.backend.mcpServerFailedInProvider",
 } as const;
 
 function isMcpTimeoutDiagnostic(message: string): boolean {
   return /\btimed out\b|\bdeadline has elapsed\b/i.test(message);
+}
+
+function isMcpUnavailableDiagnostic(message: string): boolean {
+  return (
+    /\bHTTP\W{0,3}5\d\d\b/.test(message) ||
+    /\bstatus(?:\s+code)?\W{0,3}5\d\d\b|\bservice unavailable\b|\bbad gateway\b|\bgateway time-?out\b/i.test(message)
+  );
+}
+
+function isMcpUnreachableDiagnostic(message: string): boolean {
+  return /\berror sending request\b|\bconnection (?:refused|reset)\b|\bECONNREFUSED\b|\bECONNRESET\b|\bENOTFOUND\b|\bEAI_AGAIN\b|\bEHOSTUNREACH\b|\bENETUNREACH\b|\bdns error\b|\bfailed to lookup address\b|\bno route to host\b|\bnetwork is unreachable\b/i.test(
+    message,
+  );
 }
 
 export function isTelemetryExportDiagnostic(message: string): boolean {
@@ -126,6 +144,19 @@ export function isRustLogBelowErrorDiagnostic(message: string): boolean {
   return RUST_LOG_RECORD.test(message);
 }
 
+const PI_WARNING_RECORD = /^Warning: /u;
+
+export function isPiWarningDiagnostic(message: string): boolean {
+  return PI_WARNING_RECORD.test(message);
+}
+
+const CONTEXT_TOO_SMALL =
+  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bnothing to compact \(session too small\)|\bgreater than the context length\b|\blonger than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
+
+export function isContextTooSmallFailure(message: string): boolean {
+  return CONTEXT_TOO_SMALL.test(message);
+}
+
 export const LOG_TIMESTAMP_PREFIX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+/;
 
 export function isUsageLimitDiagnostic(message: string): boolean {
@@ -143,9 +174,9 @@ export function isUsageLimitDiagnostic(message: string): boolean {
 }
 
 export function isPlanLimitDiagnostic(message: string): boolean {
-  if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
+  if (isBalanceDiagnostic(message) && !/\b(?:try again at|limit · resets)\b/iu.test(message)) return false;
   return (
-    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|\d+-hour) )*limit\b/iu.test(message) ||
+    /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|fable|\d+-hour) )*limit\b/iu.test(message) ||
     /\b(?:hit|reached) your (?:session|weekly|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit\b/iu.test(
       message,
     ) ||
@@ -177,6 +208,10 @@ export function providerResetDelayMs(message: string): number | null {
 
 export function isBalanceDiagnostic(message: string): boolean {
   return /\b(?:credits?|balance|quota|billing)\b/iu.test(message);
+}
+
+export function isSpentBalanceDiagnostic(message: string): boolean {
+  return isBalanceDiagnostic(message) && !isPlanLimitDiagnostic(message);
 }
 
 export function isImageTooSmallDiagnostic(message: string): boolean {
@@ -220,7 +255,7 @@ export function isRequestBodyLimitDiagnostic(message: string): boolean {
 }
 
 export function isUnreadableContentDiagnostic(message: string): boolean {
-  return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
+  return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bmultimodal processing is not enabled\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
     message,
   );
 }

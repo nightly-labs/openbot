@@ -44,8 +44,26 @@ export class ChannelMemoryStore extends MemoryStore {
   deleteByText(channelId: string, text: string): boolean {
     const target = text.trim();
     const entries = this.list(channelId);
-    const exact = entries.find((entry) => entry.text === target);
-    const memory = exact ?? entries.find((entry) => entry.text.toLowerCase() === target.toLowerCase());
+    const memory =
+      entries.find((entry) => entry.text === target) ??
+      entries.find((entry) => entry.text.toLowerCase() === target.toLowerCase()) ??
+      onlySimilar(entries, target);
     return memory ? this.delete(channelId, memory.id) : false;
   }
+}
+
+function onlySimilar(entries: ChannelMemory[], target: string): ChannelMemory | undefined {
+  const folded = foldMemoryText(target);
+  const similar = entries.filter((entry) => foldMemoryText(entry.text) === folded);
+  return similar.length === 1 ? similar[0] : undefined;
+}
+
+function foldMemoryText(text: string): string {
+  return text
+    .normalize("NFKC")
+    .replace(/[\u2018-\u201f"`]/gu, "'")
+    .replace(/[\u2010-\u2015\u2212]/gu, "-")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .toLowerCase();
 }

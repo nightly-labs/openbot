@@ -19,6 +19,7 @@ import type { BrowserWindow, Display, Rectangle } from "electron";
 import { causeHelpers } from "../backend/effect-boundary";
 import type { CriticalAction } from "./dynamic-island-actions";
 import { readDynamicIslandPreference, writeDynamicIslandPreference } from "./dynamic-island-preference-store";
+import { forceActivateX11Window } from "./linux-x11-activation";
 import { letPointerThrough, type PointerForwardingGate } from "./pointer-forwarding-gate";
 import { sendToRenderer } from "./renderer-ipc";
 import type { WindowsTopmostKeeper } from "./windows-topmost-keeper";
@@ -96,6 +97,10 @@ export class DynamicIslandWindowController {
 
   get preference(): DynamicIslandPreference {
     return { ...this.#preference };
+  }
+
+  get available(): boolean {
+    return this.#options.windowKind !== null;
   }
 
   get presentation(): DynamicIslandPresentation {
@@ -183,7 +188,10 @@ export class DynamicIslandWindowController {
     const keyboardReturn = interactive ? undefined : this.#keyboardReturn.get(displayId);
     if (!interactive) this.#keyboardReturn.delete(displayId);
     window.setFocusable(wantsKeyboard);
-    if (wantsKeyboard && !window.isFocused()) window.focus();
+    if (wantsKeyboard && !window.isFocused()) {
+      window.focus();
+      if (this.#options.windowKind === "x11") forceActivateX11Window(window);
+    }
     if (!interactive && bounds) this.#scheduleCollapse(displayId, window);
     if (
       keyboardReturn &&

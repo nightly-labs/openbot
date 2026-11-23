@@ -56,7 +56,7 @@ import { replyVoiceReady } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
-import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
+import { useTurnStepLinesOf } from "@/features/workspace/components/use-agent-activity";
 import { useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import {
@@ -193,6 +193,19 @@ function outboxRow(outbox: OutboxStore, message: OutboxMessage): ChatBubbleMessa
 }
 
 const OPEN_TRANSITION_DEADLINE_MS = 700;
+
+const NO_TURN_IDS: readonly string[] = [];
+
+function finishedTurnIdsOf(messages: readonly ConversationMessage[], activeTurnId: string | null): string[] {
+  const ids = new Set<string>();
+  for (const message of messages) if (message.turnId && message.turnId !== activeTurnId) ids.add(message.turnId);
+  return [...ids];
+}
+
+function keptTurnIds(next: readonly string[], previous: readonly string[]): readonly string[] {
+  if (next.length === 0) return NO_TURN_IDS;
+  return next.length === previous.length && next.every((id, index) => id === previous[index]) ? previous : next;
+}
 
 export function useRowsAfterOpenTransition(): boolean {
   const navigation = useNavigation<NativeStackNavigationProp<ParamListBase>>();
@@ -407,9 +420,17 @@ export function ChatView({
   );
   const queueCount = queueRows.length + (queuePending ? 1 : 0);
   usePublishedQueuedChat(queue?.chatId ?? `${target.serverId}:${target.id}`, queue ?? null, queuePending);
-  const turnLines = useTurnStepLines(target.serverId);
   const conversationMessages = conversation?.messages;
   const conversationTurnId = conversation?.activeTurnId ?? null;
+  const lastFinishedTurnIds = useRef<readonly string[]>(NO_TURN_IDS);
+  const finishedTurnIds = useMemo(() => {
+    lastFinishedTurnIds.current =
+      conversationMessages && target.kind === "agent"
+        ? keptTurnIds(finishedTurnIdsOf(conversationMessages, conversationTurnId), lastFinishedTurnIds.current)
+        : NO_TURN_IDS;
+    return lastFinishedTurnIds.current;
+  }, [conversationMessages, conversationTurnId, target.kind]);
+  const turnLines = useTurnStepLinesOf(target.serverId, finishedTurnIds);
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
   const agentTurnSummaries = useMemo(() => {
     lastTurnSummaries.current =
@@ -896,7 +917,7 @@ export function ChatView({
       Keyboard.dismiss();
       void haptics.impact();
       setDraft("");
-      questionForm.answer([mentionDraft(body).text]);
+      questionForm.answerText(mentionDraft(body).text);
       for (const id of takeEditedMessages()) void outbox.cancel(id);
       return;
     }

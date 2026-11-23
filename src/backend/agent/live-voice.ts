@@ -46,7 +46,8 @@ const SUMMARY_RULES =
   "Write plain sentences without links, lists, formatting or code. " +
   "End with one sentence that says that the full answer is in the chat. ";
 const RELAY_INSTRUCTIONS =
-  "You relay requests. For every user request, call ask_agent exactly once with the request verbatim. " +
+  "You relay requests. For every user request, call ask_agent exactly once with the user's complete request " +
+  "in the user's own words, as the transcript gives them. Do not shorten or summarize it, and add no question of your own. " +
   "Never answer on your own. The tool result is the agent's answer, and a voice says your reply aloud. " +
   `If the first line of the result is ${LONG_ANSWER_MARK}, the answer is too long for the voice: reply with ` +
   SUMMARY_RULES +
@@ -58,14 +59,17 @@ const relayVoiceRule = (name: string) =>
     ? `You are the voice of my agent "${name}". When I ask who you are, you are ${name}. ` +
       "Never say that you are ChatGPT, Codex or another OpenAI assistant. "
     : "") +
-  "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
+  "From now on, give every request of mine to the agent, even simple questions and small talk. " +
+  "You and the agent are one: speak as the agent. Never say that you pass, forward or hand over a request, " +
+  "or that someone else answers it. " +
   "When I stop in the middle of a sentence to think, wait silently for the rest, " +
   "and then give the complete request to the agent in one piece. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
   "Say only what the result says, and add no facts of your own. " +
-  "Always speak the language that I speak, also for your own short words such as greetings and acknowledgments. " +
+  "Always speak the language that I speak, also for your own short words such as greetings. " +
   "Keep that language when a short or unclear phrase sounds like a different one. " +
-  "If I ask you to speak a different language, use it. " +
+  "Also use the same regional variety of the language as I do, for example European or Brazilian Portuguese. " +
+  "If I ask you to speak a different language or variety, use it. " +
   "Do not reply to this message.";
 const QUEUED_NOTICE =
   "Your request is in the queue. The agent is still working on an earlier request. " +
@@ -85,6 +89,9 @@ function relayRequest(text: string): string {
     .trim();
   return input || text;
 }
+
+const HEARD_LINE_LIMIT = 20;
+const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -115,12 +122,23 @@ export interface LiveVoiceOwner {
   readonly sender: ConversationMessageSender | undefined;
 }
 
+interface LiveVoiceLine {
+  readonly role: "user" | "assistant";
+  readonly text: string;
+}
+
+export interface LiveVoiceRelayed {
+  readonly shown: string;
+  readonly request: string;
+  readonly heard: readonly LiveVoiceLine[];
+}
+
 export interface LiveVoiceHooks {
   agent(agentId: string): AgentSummary;
   relay(agent: AgentSummary): Effect.Effect<LiveVoiceRelay, { readonly cause: unknown }>;
   send(
     agentId: string,
-    text: string,
+    relayed: LiveVoiceRelayed,
     sender: ConversationMessageSender | undefined,
   ): Effect.Effect<string, { readonly cause: unknown }>;
   reply(agentId: string, deliveryId: string): LiveVoiceReply | null;
@@ -129,6 +147,7 @@ export interface LiveVoiceHooks {
   summarize(agentId: string, prompt: string): Effect.Effect<string, { readonly cause: unknown }>;
   emit(event: VoiceLiveEvent, memberId: string | null): void;
   redact(text: string): string;
+  otherAccounts(agentId: string): boolean;
 }
 
 interface LiveSession {
@@ -138,6 +157,8 @@ interface LiveSession {
   readonly client: AgentClient;
   readonly cwd: string;
   threadId: string | null;
+  readonly rule: string;
+  readonly heard: LiveVoiceLine[];
   readonly answer: Deferred.Deferred<string, LiveVoiceFailed>;
   readonly onNotification: (notification: AppServerNotification) => void;
   readonly onRequest: (request: AppServerRequest) => void;
@@ -189,6 +210,8 @@ export class LiveVoice {
       client: relay.client,
       cwd,
       threadId: null,
+      rule: oneLine(relayVoiceRule(name)),
+      heard: [],
       answer: Deferred.makeUnsafe<string, LiveVoiceFailed>(),
       onNotification: (notification) => this.#notification(session, notification),
       onRequest: (request) => this.#request(session, request),
@@ -261,6 +284,7 @@ export class LiveVoice {
             transport: { type: "webrtc", sdp: input.sdp },
             version: "v3",
             includeStartupContext: false,
+            delegationAckFiller: false,
             ...(voice ? { voice } : {}),
           },
           decodeRecordResponse,
@@ -277,7 +301,7 @@ export class LiveVoice {
         .pipe(toLiveVoiceFailed);
       return answer;
     }).pipe(
-      Effect.mapError((failure) => this.#startFailure(failure)),
+      Effect.mapError((failure) => this.#startFailure(failure, session.agentId)),
       Effect.onError(() => Effect.sync(() => this.#end(session, null, false))),
     );
     return { sessionId: session.id, sdp } satisfies VoiceLiveSession;
@@ -320,12 +344,12 @@ export class LiveVoice {
         return;
       }
       case "thread/realtime/error": {
-        this.#end(session, this.#reason(getString(params, "message")));
+        this.#end(session, this.#reason(getString(params, "message"), session.agentId));
         return;
       }
       case "thread/realtime/closed": {
         const reason = getString(params, "reason");
-        this.#end(session, reason ? this.#reason(reason) : null);
+        this.#end(session, reason ? this.#reason(reason, session.agentId) : null);
         return;
       }
       case "thread/realtime/transcript/delta":
@@ -339,6 +363,11 @@ export class LiveVoice {
             { type: "transcript", sessionId: session.id, role, text, final },
             session.owner?.memberId ?? null,
           );
+        const line = final ? text?.trim() : undefined;
+        if (line && !(role === "user" && oneLine(line) === session.rule)) {
+          session.heard.push({ role, text: line });
+          if (session.heard.length > HEARD_LINE_LIMIT) session.heard.shift();
+        }
         return;
       }
     }
@@ -362,14 +391,19 @@ export class LiveVoice {
       return;
     }
     const waits = this.#hooks.busy(session.agentId);
+    const heard = session.heard.splice(0);
+    const said = heard.flatMap((line) => (line.role === "user" ? [line.text] : [])).join("\n");
     Effect.runFork(
-      this.#hooks.send(session.agentId, text, session.owner?.sender).pipe(
+      this.#hooks.send(session.agentId, { shown: said || text, request: text, heard }, session.owner?.sender).pipe(
         Effect.match({
-          onFailure: (failure) =>
+          onFailure: (failure) => {
+            session.heard.unshift(...heard);
+            session.heard.splice(0, session.heard.length - HEARD_LINE_LIMIT);
             this.#respond(session, request.id, {
               success: false,
               text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
-            }),
+            });
+          },
           onSuccess: (deliveryId) => {
             if (!this.#sessions.has(session.id)) return;
             const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };
@@ -441,22 +475,25 @@ export class LiveVoice {
     fiber.addObserver(() => session.speaking.delete(fiber));
   }
 
-  #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
+  #startFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
     const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
-    const text = this.#plainText(message);
+    const text = this.#plainText(message, agentId);
     return text ? liveFailure(text) : failure;
   }
 
-  #reason(message: string | null): string {
+  #reason(message: string | null, agentId: string): string {
     if (!message) return sourceText("error.voice.live.disconnected");
     return (
-      this.#plainText(message) ??
+      this.#plainText(message, agentId) ??
       sourceText("error.voice.live.failed", { reason: this.#hooks.redact(message).slice(0, REASON_LIMIT) })
     );
   }
 
-  #plainText(message: string): string | null {
-    if (UNAUTHORIZED.test(message)) return sourceText("error.voice.live.signIn");
+  #plainText(message: string, agentId: string): string | null {
+    if (UNAUTHORIZED.test(message))
+      return sourceText(
+        this.#hooks.otherAccounts(agentId) ? "error.voice.live.chooseAccount" : "error.voice.live.signIn",
+      );
     const key = CALL_NOT_FOUND.test(message)
       ? "error.voice.live.unavailable"
       : FORBIDDEN.test(message)

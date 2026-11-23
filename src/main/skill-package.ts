@@ -22,6 +22,14 @@ export function skillZippable(files: Record<string, Uint8Array>, executable: Rea
   );
 }
 
+const RUNTIME_CACHE_FOLDERS = new Set(["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"]);
+export function isRuntimeCacheFolder(name: string): boolean {
+  return RUNTIME_CACHE_FOLDERS.has(name);
+}
+export function isRuntimeCacheFile(path: string): boolean {
+  return path.split("/").slice(0, -1).some(isRuntimeCacheFolder);
+}
+
 export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(function* (root: string) {
   const files: Record<string, Uint8Array> = {};
   const executable = new Set<string>();
@@ -33,8 +41,9 @@ export const archiveDirectory = Effect.fn("SkillPackage.archiveDirectory")(funct
         const path = join(directory, entry.name);
         if (entry.isSymbolicLink())
           return yield* new SkillArchiveFailure({ cause: new Error(sourceText("error.skill.symlinks")) });
-        if (entry.isDirectory()) yield* visit(path);
-        else if (entry.isFile()) {
+        if (entry.isDirectory()) {
+          if (!isRuntimeCacheFolder(entry.name)) yield* visit(path);
+        } else if (entry.isFile()) {
           const name = relative(root, path).replaceAll("\\", "/");
           const stats = yield* archiveIO(() => lstat(path));
           expandedSize += stats.size;

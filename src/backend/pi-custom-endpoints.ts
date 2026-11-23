@@ -25,6 +25,7 @@ interface EndpointPayload {
 interface PiCompat {
   readonly supportsStore: false;
   readonly supportsDeveloperRole: false;
+  readonly supportsLongCacheRetention: false;
 }
 
 function keepsPiCompat(baseUrl: string): boolean {
@@ -43,7 +44,9 @@ function piEndpoint(baseUrl: string): Pick<EndpointPayload, "api" | "baseUrl" | 
   return {
     api: "openai-completions",
     baseUrl,
-    ...(keepsPiCompat(baseUrl) ? {} : { compat: { supportsStore: false, supportsDeveloperRole: false } }),
+    ...(keepsPiCompat(baseUrl)
+      ? {}
+      : { compat: { supportsStore: false, supportsDeveloperRole: false, supportsLongCacheRetention: false } }),
   };
 }
 
@@ -118,7 +121,7 @@ function payload(endpoint: CustomProviderConfig): EndpointPayload {
         name: model.name,
         contextWindow,
         maxTokens: customModelOutputLimit(model, contextWindow),
-        ...(model.reasoningEfforts ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
+        ...(model.reasoningEfforts?.length ? { thinkingLevelMap: thinkingLevelMap(model.reasoningEfforts) } : {}),
         input: model.inputs?.includes("image") ? ["text", "image"] : ["text"],
       };
     }),

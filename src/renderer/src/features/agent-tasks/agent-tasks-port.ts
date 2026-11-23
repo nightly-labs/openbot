@@ -24,6 +24,7 @@ export interface AgentTasksPort
     },
   ): Promise<unknown>;
   runQueuedMessageAsTask?: OpenBotDesktopApi["agent"]["runQueuedMessageAsTask"];
+  listArchivedTasks?: OpenBotDesktopApi["agent"]["listArchivedTasks"];
   readTaskPage?: OpenBotDesktopApi["agent"]["readTaskPage"];
   readTaskAround?: OpenBotDesktopApi["agent"]["readTaskAround"];
   branchTask?: OpenBotDesktopApi["agent"]["branchTask"];
@@ -35,6 +36,7 @@ export function agentTasksPort(server: string): AgentTasksPort {
   const { agent } = window.openbot;
   return {
     listTasks: (agentId) => agent.listTasks(agentId, server),
+    listArchivedTasks: (input) => agent.listArchivedTasks(input, server),
     readTask: (input) => agent.readTask(input, server),
     readTaskPage: (input) => agent.readTaskPage(input, server),
     readTaskAround: (input) => agent.readTaskAround(input, server),
