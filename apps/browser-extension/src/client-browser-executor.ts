@@ -629,11 +629,9 @@ async function pageOverlay(input: {
     Object.assign(glow.style, {
       position: "fixed",
       inset: "0",
-      boxShadow: [
-        `inset 0 0 0 4px rgb(${EDGE})`,
-        `inset 0 0 18px 6px rgb(${EDGE} / 0.75)`,
-        `inset 0 0 90px 30px rgb(${ACCENT} / 0.45)`,
-      ].join(", "),
+      backgroundImage: ["to right", "to left", "to bottom", "to top"]
+        .map((side) => `linear-gradient(${side}, rgb(${EDGE} / 0.42), rgb(${ACCENT} / 0.14) 28px, transparent 72px)`)
+        .join(", "),
     });
     if (!reduced)
       glow.animate([{ opacity: 1 }, { opacity: 0.7 }, { opacity: 1 }], {
