@@ -16,7 +16,6 @@ import { type ClientBrowserLink, createClientBrowserLink } from "./client-browse
 import {
   clearSession,
   type ExtensionSession,
-  OPEN_CHAT_KEY,
   readServerId,
   readSession,
   saveServerId,
@@ -32,6 +31,7 @@ import { createWorkspace, type Workspace } from "./workspace";
 import { type XTarget, xSend, xStatus } from "./x-agent";
 import {
   decodeXRequest,
+  OPEN_X_CHAT_MESSAGE,
   OUTBOX_FLUSH_MESSAGE,
   PANEL_PORT,
   X_PANEL_MESSAGE,
@@ -281,6 +281,9 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
     const holdPort = () => {
       if (closed) return;
       port = chrome.runtime.connect({ name: PANEL_PORT });
+      port.onMessage.addListener((message: unknown) => {
+        if (message === OPEN_X_CHAT_MESSAGE && view.status === "ready") void openChatFromX();
+      });
       port.onDisconnect.addListener(() => window.setTimeout(holdPort, 1_000));
     };
     holdPort();
@@ -310,14 +313,9 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
       return true;
     };
     chrome.runtime.onMessage.addListener(fromX);
-    const changed = (changes: { [key: string]: chrome.storage.StorageChange }) => {
-      if (changes[OPEN_CHAT_KEY]?.newValue !== undefined && view.status === "ready") void openChatFromX();
-    };
-    chrome.storage.onChanged.addListener(changed);
     const leave = () => void connection?.dispose();
     window.addEventListener("pagehide", leave);
     return () => {
-      chrome.storage.onChanged.removeListener(changed);
       chrome.runtime.onMessage.removeListener(fromX);
       closed = true;
       port?.disconnect();

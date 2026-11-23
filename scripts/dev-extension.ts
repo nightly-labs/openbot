@@ -14,6 +14,7 @@ const PROFILE = resolve(ROOT, ".openbot-build/dev-extension-chrome");
 const WAIT_MS = 60_000;
 const english = translateFor("en");
 const email = argument("email") ?? "openbot-dev-host@example.com";
+const signedOut = process.argv.includes("--signed-out");
 
 const stack = readDevStackRecords().find((record) => resolve(record.projectRoot) === ROOT);
 const apiPort = stack?.ports.find((port) => port.name === "api")?.port;
@@ -150,7 +151,7 @@ try {
   const serverMenu = panel.getByRole("button", { name: english("extension.home.serverMenu") });
   const signInButton = panel.getByRole("button", { name: english("extension.signIn.withWeb") });
   await Promise.race([serverMenu.waitFor({ timeout: WAIT_MS }), signInButton.waitFor({ timeout: WAIT_MS })]);
-  if (await signInButton.isVisible()) {
+  if (!signedOut && (await signInButton.isVisible())) {
     const web = await context.newPage();
     await web.goto(`${authApi}/app`);
     const emailField = web.getByRole("textbox", { name: english("account.login.email") });
@@ -185,7 +186,9 @@ try {
   process.stdout.write(
     [
       "",
-      `Chrome is open with OpenBot (Dev), signed in as ${email} to ${authApi}.`,
+      signedOut
+        ? `Chrome is open with OpenBot (Dev) for ${authApi}. The side panel is not signed in.`
+        : `Chrome is open with OpenBot (Dev), signed in as ${email} to ${authApi}.`,
       `The side panel page is open in a tab. Click the OpenBot icon to open it in the side panel.`,
       `Profile: ${PROFILE} (--fresh starts over). Downloads go to ${downloads}.`,
       "After an extension change, run this again: it rebuilds and reloads the extension in this Chrome.",

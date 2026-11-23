@@ -1274,7 +1274,7 @@ set up there). The server keeps no recording. The text goes into your draft, and
 you press Send. The extension never sends the recording to OpenBot or to a speech service itself.
 
 On X (x.com and twitter.com), the extension runs a script on the page. It reads only the reply that
-you write. When the reply mentions @OpenBot_ and your server has the X Desk agent, the reply button
+you write. When the reply mentions @OpenBot_ and your server has the X agent, the reply button
 changes. When you click it, the script reads the post that you answer, the posts above it in the
 conversation and the rest of the author's thread (names, @handles, times, addresses, text and picture
 addresses), but not the replies of other people. X posts your reply at once, and the extension sends

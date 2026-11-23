@@ -41,6 +41,8 @@ declare namespace chrome {
       name: string;
       sender?: MessageSender;
       disconnect(): void;
+      postMessage(message: string): void;
+      onMessage: { addListener(listener: (message: unknown) => void): void };
       onDisconnect: { addListener(listener: (port: Port) => void): void };
     }
     function connect(info: { name: string }): Port;

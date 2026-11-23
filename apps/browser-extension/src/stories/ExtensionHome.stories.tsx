@@ -136,7 +136,7 @@ export const ManyPostsFromXWait: Story = {
         waitingPost(
           String(index + 10),
           handle,
-          `Post ${index + 1}: a claim about the launch numbers that X Desk should check before I answer.`,
+          `Post ${index + 1}: a claim about the launch numbers that the X agent should check before I answer.`,
           (index + 1) * 95,
         ),
       ),

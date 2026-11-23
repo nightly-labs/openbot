@@ -10,6 +10,7 @@ export const X_MESSAGE = "openbot-x";
 export const X_OFFSCREEN_MESSAGE = "openbot-x-offscreen";
 export const X_PANEL_MESSAGE = "openbot-x-panel";
 export const PANEL_PORT = "openbot-panel";
+export const OPEN_X_CHAT_MESSAGE = "openbot-open-x-chat";
 export const OUTBOX_FLUSH_MESSAGE = "openbot-x-outbox-flush";
 export const X_IDLE_MESSAGE = "openbot-x-idle";
 export const STORAGE_MESSAGE = "openbot-storage";

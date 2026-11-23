@@ -122,6 +122,7 @@ interface Report {
     otherReplyLeftOut: boolean;
     postedAtOnce: boolean;
     queueEmptyAfterSend: boolean;
+    panelStayed?: boolean;
   };
   create?: {
     folderOnHost: boolean;
@@ -650,7 +651,7 @@ try {
     await xPage.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
     unchangedWithoutAgent = ready !== true && (await reply.getAttribute("data-openbot-x")) === null;
     await shot(xPage, "6-x-without-agent");
-    assert.ok(unchangedWithoutAgent, "The reply button changed with no X Desk agent on the host.");
+    assert.ok(unchangedWithoutAgent, "The reply button changed with no X agent on the host.");
     const seeded = spawnSync("bun", ["run", "marketplace:seed:local"], {
       cwd: resolve(EXTENSION, "../.."),
       stdio: "ignore",
@@ -663,7 +664,7 @@ try {
     );
   }
   const xAgentId = await xAgent();
-  assert.ok(xAgentId, "X Desk is not on the host.");
+  assert.ok(xAgentId, "The X agent is not on the host.");
   const tasksBefore = new Set(
     (await host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId)).tasks.map((entry) => entry.id),
   );
@@ -688,15 +689,15 @@ try {
   await shot(xPage, "8-x-posted");
   const xTasks = await waitFor(
     host.page,
-    "X Desk has a new thread",
+    "The X agent has a new thread",
     (): Promise<AgentTasksSnapshot> => host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId),
     (snapshot) => snapshot.tasks.some((entry) => !tasksBefore.has(entry.id)),
   );
   const xTask = xTasks.tasks.find((entry) => !tasksBefore.has(entry.id));
-  assert.ok(xTask, "X Desk has no thread for the post.");
+  assert.ok(xTask, "The X agent has no thread for the post.");
   const xThread = await waitFor(
     host.page,
-    "the X Desk thread has the post",
+    "the X agent thread has the post",
     (): Promise<ConversationSnapshot> =>
       host.page.evaluate((value) => window.openbot.agent.readTask(value), { agentId: xAgentId, taskId: xTask.id }),
     (snapshot) => snapshot.messages.some((entry) => entry.author === "user" && entry.text.includes(xQuestion)),
@@ -729,12 +730,14 @@ try {
     postedAtOnce,
     queueEmptyAfterSend: true,
   };
-  assert.ok(messageHasPostThreadAndWords, `The X Desk message is not complete: ${sent.text}`);
-  assert.ok(otherReplyLeftOut, "The X Desk message has the reply of another person.");
+  assert.ok(messageHasPostThreadAndWords, `The X agent message is not complete: ${sent.text}`);
+  assert.ok(otherReplyLeftOut, "The X agent message has the reply of another person.");
   assert.ok(postedAtOnce, "The page did not post the reply at once.");
   await xPage.close();
 
-  await page.getByRole("button", { name: english("common.back"), exact: true }).click();
+  const panelStayed = await page.getByRole("button", { name: english("extension.home.serverMenu") }).isVisible();
+  report.x = { ...report.x, panelStayed };
+  assert.ok(panelStayed, "The panel left the home screen when the reply was posted on X.");
   const offline = page.getByText(english("extension.connection.offline", { server: hostName }));
   await offline.waitFor({ state: "hidden", timeout: 45_000 }).catch(async (error: unknown) => {
     await shot(page, "x-panel-offline");
@@ -782,7 +785,7 @@ try {
   await waitingLine.waitFor({ state: "hidden", timeout: 60_000 });
   const queuedTasks = await waitFor(
     host.page,
-    "X Desk has a thread for the queued post",
+    "The X agent has a thread for the queued post",
     (): Promise<AgentTasksSnapshot> => host.page.evaluate((id) => window.openbot.agent.listTasks(id), xAgentId),
     (snapshot) => snapshot.tasks.some((entry) => !queuedBefore.has(entry.id)),
   );
@@ -836,7 +839,7 @@ try {
   let deliveredBy: "start" | "panel" = "start";
   let restartTasks = await waitFor(
     host.page,
-    "X Desk has the post after the start",
+    "The X agent has the post after the start",
     listXTasks,
     restartArrived,
     20_000,
@@ -849,7 +852,7 @@ try {
     deliveredBy = "panel";
     restartTasks = await waitFor(
       host.page,
-      "X Desk has the post after the panel opened",
+      "The X agent has the post after the panel opened",
       listXTasks,
       restartArrived,
       120_000,

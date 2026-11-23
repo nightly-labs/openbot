@@ -1,5 +1,6 @@
 import type { ClientAgentSummary } from "@openbot/contracts/ipc";
 import { ArrowLeft, Check, ChevronDown, Plus, Settings } from "@openbot/ui";
+import { QuestionPromptBubble } from "@openbot/ui/components/QuestionPromptBubble";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { toAgentProfile } from "@openbot/ui/features/agents/agent-profile";
 import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
@@ -13,6 +14,9 @@ import { ChatComposer } from "./ChatComposer";
 import { createMenuPresence } from "./menu-presence";
 import { stickToBottom } from "./stick-to-bottom";
 import { isChatMessage, type OpenChat, type Workspace } from "./workspace";
+
+const SLIDE_MS = 340;
+const ROWS_WHILE_SLIDING = 12;
 
 interface ChatScreenProps {
   workspace: Workspace;
@@ -40,6 +44,11 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
   const state = () => props.workspace.state;
   const color = () => state().colors[props.agent.id];
   const messages = createMemo(() => props.chat.messages.filter(isChatMessage));
+  const prompts = createMemo(() =>
+    state().prompts.filter((prompt) => prompt.agentId === props.agent.id && prompt.threadId === props.chat.threadId),
+  );
+  const [slid, setSlid] = createSignal(false);
+  const shownMessages = createMemo(() => (slid() ? messages() : messages().slice(-ROWS_WHILE_SLIDING)));
   const threads = createMemo(() =>
     (state().threads[props.agent.id] ?? []).filter((task) => task.state !== "closed").slice(0, 6),
   );
@@ -77,6 +86,10 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
     },
   );
   onSettled(() => (list ? stickToBottom(list) : undefined));
+  onSettled(() => {
+    const timer = setTimeout(() => setSlid(true), SLIDE_MS);
+    return () => clearTimeout(timer);
+  });
   onSettled(() => {
     const close = (event: PointerEvent) => {
       if (!(event.target instanceof Element) || !event.target.closest(".ext-chat-menu, .ch-title")) setMenuOpen(false);
@@ -204,7 +217,7 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
             </div>
           }
         >
-          <For each={messages()} keyed={(message) => message.id}>
+          <For each={shownMessages()} keyed={(message) => message.id}>
             {(message) => (
               <>
                 <Show when={message().attachments?.length ? message().attachments : undefined}>
@@ -247,6 +260,15 @@ function ChatView(props: ChatScreenProps & { chat: OpenChat; agent: ClientAgentS
         <Show when={answering()}>
           <AgentActivityIndicator agent={profile()} label={activityLabel()} />
         </Show>
+        <For each={prompts()} keyed={(prompt) => String(prompt.requestId)}>
+          {(prompt) => (
+            <QuestionPromptBubble
+              questions={prompt().questions}
+              onSubmit={(answers) => props.workspace.answerPrompt(prompt().requestId, answers)}
+              onOpenLink={openLink}
+            />
+          )}
+        </For>
       </div>
       <ChatComposer
         placeholder={t("extension.chat.ask", { name: props.agent.name })}

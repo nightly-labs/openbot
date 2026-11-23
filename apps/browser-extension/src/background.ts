@@ -13,6 +13,7 @@ import {
   decodeXRequest,
   decodeXSendResult,
   decodeXStatus,
+  OPEN_X_CHAT_MESSAGE,
   OUTBOX_FLUSH_MESSAGE,
   PANEL_PORT,
   type StorageRequest,
@@ -133,7 +134,7 @@ async function notify(id: string, title: string, body: string, post: QueuedPost)
       type: "basic",
       iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
       title,
-      message: line ? `${body}\n${line}` : body,
+      message: [body, line].filter(Boolean).join("\n"),
     })
     .catch(() => undefined);
 }
@@ -160,8 +161,8 @@ function flushOutbox(force = false): Promise<void> {
           decodeXSendResult,
         ).catch(() => null);
         if (answer?.ok) {
-          if (post.attempts > 0 && labels)
-            await notify(`openbot-x-sent-${post.id}`, labels.sentTitle, labels.sentBody, post);
+          if (labels)
+            await notify(`openbot-x-sent-${post.id}`, labels.sentTitle, post.attempts > 0 ? labels.sentBody : "", post);
           continue;
         }
         const attempts = post.attempts + 1;
@@ -209,8 +210,10 @@ chrome.runtime.onStartup.addListener(() => void flushOutbox(true));
 chrome.runtime.onInstalled.addListener(() => void flushOutbox(true));
 void flushOutbox();
 chrome.notifications.onClicked.addListener((id) => {
-  if (id.startsWith("openbot-x-sent-"))
+  if (id.startsWith("openbot-x-sent-")) {
     void chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT }).catch(() => undefined);
+    for (const port of panels) port.postMessage(OPEN_X_CHAT_MESSAGE);
+  }
   void chrome.notifications.clear(id).catch(() => undefined);
 });
 
@@ -253,8 +256,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     );
     return true;
   }
-  if (!panels.size && sender.tab.id !== undefined)
-    void chrome.sidePanel.open({ tabId: sender.tab.id }).catch(() => undefined);
   void queuePost(request.payload).catch(() => undefined);
   sendResponse({ queued: true });
   return undefined;

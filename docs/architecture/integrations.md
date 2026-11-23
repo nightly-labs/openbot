@@ -730,7 +730,7 @@ Use `bun run dev:automation` for snapshots and screenshots. Do not drive another
 
 ## The browser extension on X
 
-The extension (`apps/browser-extension`) sends a post from X to the user's X Desk agent
+The extension (`apps/browser-extension`) sends a post from X to the user's X agent
 (`X_AGENT_LISTING_ID` in `packages/contracts/src/browser-extension-x.ts`, a Marketplace Agent in
 `marketplace/production-catalog`). There are three parts:
 

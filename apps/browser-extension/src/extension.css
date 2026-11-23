@@ -235,18 +235,29 @@ textarea:focus-visible {
   position: absolute;
   inset: 0;
   background: var(--ext-canvas);
-  transition:
-    transform 320ms var(--ext-ease-push),
-    box-shadow 320ms var(--ext-ease-push);
+  transition: transform 320ms var(--ext-ease-push);
 }
 
 .ext-chat-layer {
   transform: translateX(100%);
 }
 
+.ext-chat-layer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 320ms var(--ext-ease-push);
+}
+
 .ext-stack[data-pushed] .ext-chat-layer {
   transform: none;
-  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.28);
+}
+
+.ext-stack[data-pushed] .ext-chat-layer::before {
+  opacity: 1;
 }
 
 .ext-stack[data-pushed] .ext-home {
@@ -954,6 +965,7 @@ textarea:focus-visible {
   }
 
   .ext-layer,
+  .ext-chat-layer::before,
   .ext-menu-item,
   .ext-menu-chevron,
   .ext-field,

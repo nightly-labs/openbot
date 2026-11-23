@@ -54,7 +54,7 @@ export const STORY_AGENTS: ClientAgentSummary[] = [
   }),
   agent({
     id: "x-desk",
-    name: "X Desk",
+    name: "X",
     title: "Posts from X",
     description: "Checks the posts that you send from X.",
     preview: "The claim is not supported by the study it names.",

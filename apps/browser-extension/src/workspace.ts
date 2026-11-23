@@ -1,4 +1,5 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import type { AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import {
   type AgentStatus,
   type AgentTask,
@@ -97,6 +98,8 @@ interface WorkspaceFolder {
   depth: number;
 }
 
+export type PendingPrompt = AgentRuntimeSnapshot["pendingPrompts"][number];
+
 export interface WorkspaceState {
   status: "loading" | "ready" | "failed";
   error: string | null;
@@ -111,6 +114,7 @@ export interface WorkspaceState {
   channel: OpenChannel | null;
   memberId: string | null;
   chat: OpenChat | null;
+  prompts: PendingPrompt[];
 }
 
 export const decodeAgents = guardedListDecoder(isClientAgentSummary, "agents");
@@ -153,6 +157,7 @@ export function createWorkspace(
     channel: null,
     memberId: null,
     chat: null,
+    prompts: [],
   });
   const has = (capability: string) => capabilities.includes(capability);
   const raw = (method: string, path: string, body?: TeamProtocolV2Json) =>
@@ -682,6 +687,18 @@ export function createWorkspace(
     return !stale;
   }
 
+  async function answerPrompt(requestId: string | number, answers: Record<string, string[]>): Promise<boolean> {
+    try {
+      await raw("POST", TEAM_API_ROUTES.respond.prompt, { requestId, answers });
+    } catch {
+      return false;
+    }
+    setState((draft) => {
+      draft.prompts = draft.prompts.filter((prompt) => prompt.requestId !== requestId);
+    });
+    return true;
+  }
+
   function handleEvent(event: RemoteTeamEvent): void {
     const chat = state.chat;
     const mainChatOf = (agentId: string) =>
@@ -740,6 +757,24 @@ export function createWorkspace(
         if (chat && chat.agentId === event.agentId) void reloadChat();
         refreshReadsSoon();
         return;
+      case "runtime-snapshot":
+        setState((draft) => {
+          draft.prompts = event.snapshot.pendingPrompts;
+        });
+        return;
+      case "prompt": {
+        const { type: _type, ...prompt } = event;
+        setState((draft) => {
+          draft.prompts = [...draft.prompts.filter((entry) => entry.requestId !== prompt.requestId), prompt];
+        });
+        return;
+      }
+      case "agent-input-resolved":
+        if (event.kind === "prompt")
+          setState((draft) => {
+            draft.prompts = draft.prompts.filter((entry) => String(entry.requestId) !== String(event.requestId));
+          });
+        return;
       default:
         return;
     }
@@ -773,6 +808,7 @@ export function createWorkspace(
       }),
     handleEvent,
     reloadChat,
+    answerPrompt,
     threadsAvailable: () => has(AGENT_TASKS_CAPABILITY),
     transcribe: has(VOICE_TRANSCRIPTION_CAPABILITY) ? transcribe : null,
     media,

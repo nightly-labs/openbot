@@ -5,7 +5,7 @@
 ```text
 apps/
   auth-api/          Public web and /app browser entry, accounts, memberships, connection tickets, and billing
-  browser-extension/ Chrome side panel (Manifest V3) that chats with the agents of a joined server, as the phone app does, and sends X posts to X Desk
+  browser-extension/ Chrome side panel (Manifest V3) that chats with the agents of a joined server, as the phone app does, and sends X posts to the X agent
   discord-app/       Developer Portal settings of the OpenBot Discord app (no code)
   mobile/            Expo React Native client for remote team hosts
   mobile-updates/    Cloudflare Worker that gives the mobile app its over-the-air updates from private R2 storage
