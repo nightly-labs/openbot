@@ -406,6 +406,7 @@ interface PeerState {
 
 const CHANNELS: ChannelKind[] = ["rpc", "events", "files", "desktop"];
 const DISCONNECT_GRACE_MS = 15_000;
+const CHANNEL_DRAIN_IDLE_MS = 60_000;
 const ICE_RESTART_DELAY_MS = 2_000;
 const ICE_RESTART_PROBE_MS = 6_000;
 const SIGNAL_RENEW_DELAY_MS = 8_000;
@@ -2028,17 +2029,16 @@ export function createRemoteTeamPeer(
         const onAbort = () =>
           resume(Effect.fail(new RemotePeerError({ message: sourceText("error.remote.serverDisconnected") })));
         state.abort.signal.addEventListener("abort", onAbort, { once: true });
-        const timer = setTimeout(
-          () =>
-            resume(
-              Effect.fail(
-                new RemotePeerError({
-                  message: sourceText("error.remote.channelBackpressure"),
-                }),
-              ),
-            ),
-          60_000,
-        );
+        let lowestBuffered = channel.bufferedAmount;
+        const checkDrain = () => {
+          if (channel.bufferedAmount >= lowestBuffered) {
+            resume(Effect.fail(new RemotePeerError({ message: sourceText("error.remote.channelBackpressure") })));
+            return;
+          }
+          lowestBuffered = channel.bufferedAmount;
+          timer = setTimeout(checkDrain, CHANNEL_DRAIN_IDLE_MS);
+        };
+        let timer = setTimeout(checkDrain, CHANNEL_DRAIN_IDLE_MS);
         channel.addEventListener("bufferedamountlow", onLow);
         if (channel.bufferedAmount <= channel.bufferedAmountLowThreshold) onLow();
         return Effect.sync(() => {
