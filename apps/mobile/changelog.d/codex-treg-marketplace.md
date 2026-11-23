@@ -1,3 +1,3 @@
 ### Added
 
-- Find Treg in Marketplace > Apps on your phone. Connect your Treg team so agents can look up web data, generate media, and check tool prices.
+- Connect Treg from Marketplace > Apps on your phone. Give your agents access to Treg's catalog and your team's own tools.

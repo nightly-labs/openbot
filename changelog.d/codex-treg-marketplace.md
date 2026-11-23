@@ -1,3 +1,3 @@
 ### Added
 
-- Connect Treg from Marketplace > Apps to find tools for web data and media generation, check their prices, and use them with your Treg team.
+- Connect Treg from Marketplace > Apps. Your agent can search the catalog by task, check prices, and use your team's own tools.

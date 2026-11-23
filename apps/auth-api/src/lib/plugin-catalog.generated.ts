@@ -1420,7 +1420,7 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       slug: "treg",
       version: "1.0.0",
       featured: false,
-      detailSha256: "2049b4c6a77af2f5108ae0cc46f40fd44c7770ccec0ffe6e06cd09d752b1a408",
+      detailSha256: "faaaa080c6cf2ea76606ff4ecb7578ebf9738ee00cd37d1755ad0c31ef78b6e6",
     },
     {
       slug: "truthifi",
@@ -10003,9 +10003,9 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
   treg: {
     slug: "treg",
     name: "Treg",
-    tagline: "Web research and media generation",
+    tagline: "OpenRouter for agent tools",
     description:
-      "Find keyword search volumes, look up companies, or generate images and video. Sign in and choose a Treg team to use its connected tools. You can check a tool's price before a paid call uses team credits.",
+      "Give your agent one connection to thousands of tools and your team's own APIs. It can search by task, check prices, and call tools while Treg handles the provider keys.",
     category: "research",
     creatorName: "Treg",
     iconUrl: "https://treg.to/media/brand/logo.png",
@@ -10019,7 +10019,8 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
       {
         id: "app-treg-mcp",
         name: "Treg",
-        description: "Search the Treg catalog, check prices, and call tools with your team's account.",
+        description:
+          "Choose a Treg team to use its connected tools and the Treg catalog. Paid calls use that team's credits.",
         iconUrl: "https://treg.to/media/brand/logo.png",
         server: {
           name: "treg",

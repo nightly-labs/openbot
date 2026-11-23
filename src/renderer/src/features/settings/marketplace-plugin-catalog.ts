@@ -9770,9 +9770,9 @@ const TREG: MarketplacePluginDetail = {
   id: "plugin-treg",
   slug: "treg",
   name: "Treg",
-  tagline: "Web research and media generation",
+  tagline: "OpenRouter for agent tools",
   description:
-    "Find keyword search volumes, look up companies, or generate images and video. Sign in and choose a Treg team to use its connected tools. You can check a tool's price before a paid call uses team credits.",
+    "Give your agent one connection to thousands of tools and your team's own APIs. It can search by task, check prices, and call tools while Treg handles the provider keys.",
   category: "research",
   creatorName: "Treg",
   iconUrl: "https://treg.to/media/brand/logo.png",
@@ -9786,7 +9786,8 @@ const TREG: MarketplacePluginDetail = {
     {
       id: "app-treg-mcp",
       name: "Treg",
-      description: "Search the Treg catalog, check prices, and call tools with your team's account.",
+      description:
+        "Choose a Treg team to use its connected tools and the Treg catalog. Paid calls use that team's credits.",
       iconUrl: "https://treg.to/media/brand/logo.png",
       server: {
         name: "treg",
