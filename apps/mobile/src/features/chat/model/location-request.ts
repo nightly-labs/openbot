@@ -18,11 +18,15 @@ export function isLocationRequest(block: ConversationUiBlock | undefined): boole
   return block?.location === true && block.spec.type === "form";
 }
 
+const TURN_STARTER_KINDS: ReadonlySet<ChatMessage["kind"]> = new Set(["routine", "exchange", "channel-routing"]);
+
+function startsTurn(message: ChatMessage): boolean {
+  return (message.kind === "message" && message.author === "user") || TURN_STARTER_KINDS.has(message.kind);
+}
+
 export function promptAskedByThisPerson(messages: readonly ChatMessage[], promptId: string | undefined): boolean {
   const index = promptId ? messages.findIndex((message) => message.id === promptId) : -1;
-  const request = messages
-    .slice(0, Math.max(index, 0))
-    .findLast((message) => message.kind === "message" && message.author === "user");
+  const request = messages.slice(0, Math.max(index, 0)).findLast(startsTurn);
   return request?.kind === "message" && !request.sender;
 }
 
