@@ -43,7 +43,7 @@ export interface LocalMcpSession {
   setThreadId(threadId: string): void;
   reached(): boolean;
   dropped(sentAt: number, limitMs: number): boolean;
-  listedWithin(from: number, limitMs: number): boolean;
+  listedWithin(from: number, limitMs: number, namespace?: string): boolean;
   renew(): LocalMcpSession["servers"];
   close(): void;
 }
@@ -188,8 +188,12 @@ export class LocalMcpBridge {
         }
         return dropped;
       },
-      listedWithin: (from, limitMs) =>
-        routes.some((route) => route.listedTimes.some((at) => at >= from && at - from <= limitMs)),
+      listedWithin: (from, limitMs, namespace) =>
+        routes.some(
+          (route) =>
+            (namespace === undefined || route.namespace.name === namespace) &&
+            route.listedTimes.some((at) => at >= from && at - from <= limitMs),
+        ),
       renew: () => {
         for (const route of routes) if (route.dropped) this.#renewToken(route, member);
         current.splice(0, current.length, ...servers());

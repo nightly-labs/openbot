@@ -14,11 +14,13 @@ const home = join(root, "home");
 const install = join(root, "antigravity");
 const fakeAgy = join(install, "1.5.4", "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
+const mcpFailureFlag = join(root, "fail-mcp-preload");
 
 process.env.HOME = home;
 process.env.GEMINI_HOME = join(home, ".gemini");
 process.env.OPENBOT_ANTIGRAVITY_PATH = fakeAgy;
 process.env.FAKE_AGY_LOG = logPath;
+process.env.FAKE_AGY_MCP_FAILURE = mcpFailureFlag;
 mkdirSync(home, { recursive: true });
 
 const { AgentService } = await import("../src/backend/agent-service");
@@ -29,6 +31,7 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
+const { dirname } = require("node:path");
 const NL = String.fromCharCode(10);
 if (process.argv[2] === "--version") {
   process.stdout.write("1.5.4" + NL);
@@ -44,7 +47,15 @@ function handle(message) {
   if (message.id === undefined) return;
   if (message.method === "initialize")
     return write({ id: message.id, result: { protocolVersion: 1, authMethods: [], agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } } } });
-  if (message.method === "session/new") return write({ id: message.id, result: { sessionId: "agy-" + process.pid + "-" + ++sessions, models } });
+  if (message.method === "session/new") {
+    if (params.mcpServers?.length && fs.existsSync(process.env.FAKE_AGY_MCP_FAILURE)) {
+      const argument = process.argv.find((arg) => arg.startsWith("--log-file="));
+      const file = argument.slice("--log-file=".length);
+      fs.mkdirSync(dirname(file), { recursive: true });
+      fs.appendFileSync(file, "session_handlers.go:396] Failed to preload the session's MCP servers: context deadline exceeded" + NL);
+    }
+    return write({ id: message.id, result: { sessionId: "agy-" + process.pid + "-" + ++sessions, models } });
+  }
   if (message.method === "session/resume" || message.method === "session/load") return write({ id: message.id, result: { sessionId: params.sessionId, models } });
   if (message.method === "session/prompt") {
     const text = params.prompt.map((block) => block.text ?? "").join("");
@@ -208,6 +219,27 @@ try {
   assert.ok(next && next !== first, "The next message runs on a new session.");
   const handoff = prompts().find((prompt) => prompt.sessionId === next)?.text ?? "";
   assert.ok(handoff.includes("PELICAN"), "The new session gets the conversation so far.");
+
+  const routine = agents.createRoutine({
+    agentId: agent.id,
+    name: "Test readiness",
+    instruction: "Check readiness and report.",
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "09:00" },
+    runIn: "thread",
+  });
+  await writeFile(mcpFailureFlag, "");
+  const before = prompts().length;
+  const run = await runCauseEffect(agents.testRoutine({ agentId: agent.id, routineId: routine.id }));
+  const failed = await waitFor("the failed routine record", () =>
+    agents
+      .listRoutineRuns({ agentId: agent.id, routineId: routine.id })
+      .find((candidate) => candidate.id === run.id && candidate.status === "failed"),
+  );
+  assert.match(failed.error ?? "", /stopped before running this message because its tools did not load/u);
+  assert.equal(prompts().length, before, "A routine with a failed preload never sends a prompt.");
+  assert.equal(mailbox.getDelivery(run.deliveryId ?? "")?.delivery.status, "failed");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

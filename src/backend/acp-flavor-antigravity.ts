@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -194,8 +195,8 @@ const GOOGLE_FIELD_STEP = /\.(\w+)(?:\[([^\]]*)\])?/gu;
 const GEMINI_LOG_RECENT_MS = 10 * 60_000;
 const GEMINI_LOG_TAIL_BYTES = 256 * 1024;
 
-function logTail(file: string, size: number): string {
-  const length = Math.min(size, GEMINI_LOG_TAIL_BYTES);
+function logTail(file: string, size: number, from = 0): string {
+  const length = Math.min(Math.max(0, size - from), GEMINI_LOG_TAIL_BYTES);
   const buffer = Buffer.alloc(length);
   const fd = openSync(file, "r");
   try {
@@ -203,6 +204,29 @@ function logTail(file: string, size: number): string {
   } finally {
     closeSync(fd);
   }
+}
+
+function antigravityMcpStartupCheck(argv: readonly string[]) {
+  const home = flagValue(argv, GEMINI_DIR_FLAG);
+  const appData = flagValue(argv, APP_DATA_DIR_FLAG);
+  if (!home || !appData) return;
+  const file = join(home, appData, "log", `acp-server-openbot-${randomUUID()}.log`);
+  let checked = 0;
+  return {
+    argv: [...argv, `--log-file=${file}`],
+    failed: () => {
+      try {
+        const size = statSync(file).size;
+        const failed = /\bsession_handlers\.go:\d+\] Failed to preload the session's MCP servers\b/u.test(
+          logTail(file, size, checked),
+        );
+        checked = size;
+        return failed;
+      } catch {
+        return false;
+      }
+    },
+  };
 }
 
 function* antigravityRecentLogs(argv: readonly string[]): Generator<string> {
@@ -351,6 +375,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   relayStdioMcpServers: "unconfined",
   mcpToolCallLimitMs: 180_000,
   mcpListLimit: { ms: 5_000, since: "1.5.11" },
+  mcpStartupCheck: antigravityMcpStartupCheck,
   sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
   approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,
   mcpCallInputNamesServer: true,
