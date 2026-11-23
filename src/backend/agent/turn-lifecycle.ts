@@ -22,6 +22,7 @@ import {
   isAgentAnswer,
   isAgentContextCategories,
   latestTurnAnswer,
+  NO_ANSWER_NOTICE_ITEM_TYPE,
   PLAN_CONTINUATION_ITEM_TYPE,
   type QueueDelivery,
   SIGN_IN_FAILURE_ITEM_TYPE_PREFIX,
@@ -1022,7 +1023,7 @@ export class TurnLifecycle {
     turnId: string,
     source: AgentClient,
     deliveries: readonly DeliveryContext[],
-    messages: readonly ConversationMessage[],
+    messages: ConversationMessage[],
     workedBesidesReaction: boolean,
   ): void {
     if (
@@ -1036,20 +1037,25 @@ export class TurnLifecycle {
     )
       return;
     logger.info("A turn ended with no answer after its steps.", { agentId, turnId, provider: source.provider });
-    this.#hooks.emitError(
-      "agent_error",
-      sourceText("error.provider.noAnswerAfterSteps", {
-        provider: agentProviderDescriptor(source.provider).displayName,
-      }),
-      agentId,
-      {
-        causeCode: "empty_answer",
-        provider: source.provider,
-        model: this.#hooks.turnModel(agentId, turnId),
-        turnId,
-        severity: "warning",
-      },
-    );
+    const notice = sourceText("error.provider.noAnswerAfterSteps", {
+      provider: agentProviderDescriptor(source.provider).displayName,
+    });
+    messages.push({
+      id: `${turnId}:no-answer`,
+      author: "system",
+      source: "system",
+      status: "completed",
+      createdAt: new Date().toISOString(),
+      itemType: NO_ANSWER_NOTICE_ITEM_TYPE,
+      text: notice,
+    });
+    this.#hooks.emitError("agent_error", notice, agentId, {
+      causeCode: "empty_answer",
+      provider: source.provider,
+      model: this.#hooks.turnModel(agentId, turnId),
+      turnId,
+      severity: "warning",
+    });
   }
 
   #answerWithNarration(messages: ConversationMessage[], turnId: string, narrationId: string | null): boolean {

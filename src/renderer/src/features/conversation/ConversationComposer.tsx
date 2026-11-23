@@ -263,7 +263,9 @@ export function ConversationComposer() {
   };
   const errorInChat = (error: string) => {
     const marker = props.messages.at(-1)?.actionMarker;
-    return marker?.kind === "sign-in-failure" && readableAgentError(marker.text) === error;
+    return (
+      (marker?.kind === "sign-in-failure" || marker?.kind === "no-answer") && readableAgentError(marker.text) === error
+    );
   };
   const errorBannerAction = () => {
     const updateKey = updateOpenCodeKey();
