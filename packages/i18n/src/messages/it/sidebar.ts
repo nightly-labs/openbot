@@ -165,6 +165,10 @@ export const messages = {
   "sidebar.storage.fullBody":
     "{used} di {total} in uso su {server}. Gli agenti potrebbero non riuscire a salvare i file.",
   "sidebar.storage.meterLabel": "Spazio in uso su {server}",
+  "sidebar.storage.bodyThisComputer": "{used} di {total} in uso su questo computer.",
+  "sidebar.storage.fullBodyThisComputer":
+    "{used} di {total} in uso su questo computer. Gli agenti potrebbero non riuscire a salvare i file.",
+  "sidebar.storage.meterLabelThisComputer": "Spazio in uso su questo computer",
   "sidebar.storage.used": "{percent} in uso",
   "sidebar.storage.freeUpSpace": "Libera spazio",
   "sidebar.storage.dismiss": "Nascondi finché lo spazio non è esaurito",

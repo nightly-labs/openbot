@@ -162,6 +162,10 @@ export const messages = {
   "sidebar.storage.fullBody":
     "{server} で {total} 中 {used} を使用中です。エージェントがファイルを保存できない場合があります。",
   "sidebar.storage.meterLabel": "{server} のストレージ使用量",
+  "sidebar.storage.bodyThisComputer": "このコンピューターで {total} 中 {used} を使用中です。",
+  "sidebar.storage.fullBodyThisComputer":
+    "このコンピューターで {total} 中 {used} を使用中です。エージェントがファイルを保存できない場合があります。",
+  "sidebar.storage.meterLabelThisComputer": "このコンピューターのストレージ使用量",
   "sidebar.storage.used": "{percent} 使用中",
   "sidebar.storage.freeUpSpace": "空き容量を増やす",
   "sidebar.storage.dismiss": "いっぱいになるまで非表示",

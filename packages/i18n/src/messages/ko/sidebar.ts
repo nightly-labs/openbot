@@ -162,6 +162,10 @@ export const messages = {
   "sidebar.storage.fullBody":
     "{server}에서 {total} 중 {used}를 사용 중이에요. 에이전트가 파일을 저장하지 못할 수 있어요.",
   "sidebar.storage.meterLabel": "{server}의 사용 중인 저장 공간",
+  "sidebar.storage.bodyThisComputer": "이 컴퓨터에서 {total} 중 {used}를 사용 중이에요.",
+  "sidebar.storage.fullBodyThisComputer":
+    "이 컴퓨터에서 {total} 중 {used}를 사용 중이에요. 에이전트가 파일을 저장하지 못할 수 있어요.",
+  "sidebar.storage.meterLabelThisComputer": "이 컴퓨터의 사용 중인 저장 공간",
   "sidebar.storage.used": "{percent} 사용 중",
   "sidebar.storage.freeUpSpace": "공간 확보",
   "sidebar.storage.dismiss": "저장 공간이 가득 찰 때까지 숨기기",
