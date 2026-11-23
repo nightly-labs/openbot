@@ -754,7 +754,7 @@ export class DrainScheduler {
           deliveryTaskId === null
             ? this.#conversation.loadedSnapshot(agentId)
             : taskThreadId
-              ? this.#conversation.loadedExecutionSnapshot(taskThreadId)
+              ? this.#conversation.executionSnapshot(taskThreadId)
               : undefined;
         if (!snapshot) continue;
         this.#mailboxSync.syncDeliveryMessage(snapshot, deliveryId);

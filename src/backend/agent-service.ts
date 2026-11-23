@@ -4933,7 +4933,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #deleteChannelThreadHistory(agentId: string, threadId: string): void {
     const revision = this.#store.database.deleteThreadHistory({ agentId, threadId });
     this.#conversation.forgetDeletedHistory(threadId);
-    const loaded = this.#conversation.loadedExecutionSnapshot(threadId);
+    const loaded = this.#conversation.executionSnapshot(threadId);
     if (!loaded) return;
     const snapshot = { ...loaded, messages: [], revision };
     this.#conversation.setSnapshot(agentId, snapshot);
