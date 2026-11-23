@@ -469,11 +469,24 @@ export class DrainScheduler {
     return this.#heldBy(lane) ?? this.#providerHold(agentId) ?? (heldByMachine ? "machine" : null);
   }
 
-  #providerHold(agentId: string): "providers-not-ready" | "provider-cli-replaced" | null {
+  #providerHold(agentId: string): "providers-not-ready" | "provider-cli-replaced" | "endpoint-reload" | null {
     if (!this.#providers.isReady()) return "providers-not-ready";
     if (this.#deliveryProviders(agentId).some((provider) => this.#providers.isReplacingCli(provider)))
       return "provider-cli-replaced";
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (agent && this.#awaitsEndpointReload(agent)) return "endpoint-reload";
     return null;
+  }
+
+  #awaitsEndpointReload(agent: AgentSummary): boolean {
+    const provider = providerForAgent(agent);
+    if (!this.#providers.reloadPending(provider)) return false;
+    const client = this.#providers.runningAgentClient(agent);
+    return (
+      client !== null &&
+      this.#hooks.servesModel(agent.model, provider, null) &&
+      !this.#hooks.servesModel(agent.model, provider, this.#providers.configRevision(client))
+    );
   }
 
   scheduleDrain(agentId: string, followUsageLimit = true): void {
