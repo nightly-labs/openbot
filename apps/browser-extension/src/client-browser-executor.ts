@@ -269,6 +269,7 @@ async function navigate(
   context: CommandContext,
 ): Promise<ClientBrowserResult> {
   if ("url" in command) {
+    await context.allow("site", url, command.url);
     await context.allow("site", command.url, command.url);
     if (looksLikeGrant(command.url)) await context.allow("sign-in", command.url, command.url);
     await chrome.tabs.update(id, { url: command.url });
