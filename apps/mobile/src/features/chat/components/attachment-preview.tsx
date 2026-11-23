@@ -27,7 +27,7 @@ import {
 } from "../model/large-files";
 import { shareTypeOptions } from "../model/share-file-type";
 import { shareFilesNative } from "../model/share-files-native";
-import { fileWanted, mediaFile, requestFile, writeMediaFile } from "./use-media-file";
+import { fileWantedOrDropped, mediaFile, requestFile, writeMediaFile } from "./use-media-file";
 
 const dimensionCache = createImageDimensionCache({
   read: () => {
@@ -237,7 +237,7 @@ function attachmentFileQuery(
         attachment.id,
         largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
         undefined,
-        fileWanted(client, queryKey),
+        fileWantedOrDropped(client, queryKey),
       );
       if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
       const fileUri =

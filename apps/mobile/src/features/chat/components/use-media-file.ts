@@ -73,10 +73,14 @@ export async function requestFile<T>(queryKey: QueryKey, fetch: () => Promise<T>
   }
 }
 
-export function fileWanted(client: QueryClient, queryKey: QueryKey): () => boolean {
-  return () =>
-    requestedFiles.has(hashKey(queryKey)) ||
-    (client.getQueryCache().find({ queryKey, exact: true })?.getObserversCount() ?? 0) > 0;
+export function fileWantedOrDropped(client: QueryClient, queryKey: QueryKey): () => boolean {
+  return () => {
+    const cache = client.getQueryCache();
+    const query = cache.find({ queryKey, exact: true });
+    if (requestedFiles.has(hashKey(queryKey)) || (query?.getObserversCount() ?? 0) > 0) return true;
+    if (query) cache.remove(query);
+    return false;
+  };
 }
 
 const useDownloadedBytes = create<{ bytes: ReadonlyMap<string, number> }>(() => ({ bytes: new Map() }));
@@ -134,7 +138,7 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
           attachment.id,
           largeDownloadOf(attachment, file.uri),
           progress,
-          fileWanted(client, queryKey),
+          fileWantedOrDropped(client, queryKey),
         );
         const handedOver = Date.now();
         if (!data.file) await writeMediaFile(file, data.base64);
