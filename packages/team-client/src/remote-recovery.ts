@@ -89,6 +89,7 @@ const SAFE_CONNECTION_ERRORS = new Set(
       "error.remote.iceFailed",
       "error.remote.connectionServiceUnreachable",
       "error.remote.serverAnswerTimeout",
+      "error.remote.signInConnectionClosed",
       "error.remote.iceDisconnected",
       "error.remote.directoryUnreachable",
       "error.remote.directoryTimeout",

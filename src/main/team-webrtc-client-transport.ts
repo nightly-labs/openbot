@@ -1477,8 +1477,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.emit("path", hostId, path);
   };
   readonly #onError = (hostId: string, code: string, message: string): void => {
-    if (!this.#active.has(hostId)) return;
-    this.emit("error", hostId, code, message);
+    const active = this.#active.get(hostId);
+    if (!active) return;
+    if (code === "data_channel_error" && !active.connected && active.authentication?.started)
+      this.emit("error", hostId, "sign_in_closed", sourceText("error.remote.signInConnectionClosed"));
+    else this.emit("error", hostId, code, message);
   };
 
   #sendRecoverable(hostId: string, channel: "events", data: string): void {
