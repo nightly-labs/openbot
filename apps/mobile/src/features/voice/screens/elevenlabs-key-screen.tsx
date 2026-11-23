@@ -10,7 +10,7 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { aliceElevenLabsVoice, ElevenLabsError, listElevenLabsVoices } from "../model/elevenlabs";
 import { useElevenLabsVoices } from "../model/elevenlabs-voices";
-import { saveElevenLabsKey, saveVoiceSettings } from "../model/voice-settings";
+import { saveElevenLabsKey, saveVoiceSettings, useVoiceSettings } from "../model/voice-settings";
 
 const KEY_MAX_LENGTH = 512;
 const KEYS_PAGE = "https://elevenlabs.io/app/developers/api-keys";
@@ -42,11 +42,12 @@ export function ElevenLabsKeyScreen() {
       const voices = await listElevenLabsVoices(trimmed);
       await saveElevenLabsKey(trimmed);
       useElevenLabsVoices.setState({ phase: "ready", voices, failure: null, reason: null });
-      const alice = aliceElevenLabsVoice(voices);
+      const chosen = useVoiceSettings.getState().elevenLabsVoice;
+      const kept = chosen && voices.some((voice) => voice.id === chosen.id) ? chosen : aliceElevenLabsVoice(voices);
       await saveVoiceSettings(
         use === "recognition"
-          ? { recognition: "elevenlabs", elevenLabsVoice: alice }
-          : { engine: "elevenlabs", elevenLabsVoice: alice },
+          ? { recognition: "elevenlabs", elevenLabsVoice: kept }
+          : { engine: "elevenlabs", elevenLabsVoice: kept },
       );
       void haptics.notification("success");
       setState({ phase: "idle", error: null });
