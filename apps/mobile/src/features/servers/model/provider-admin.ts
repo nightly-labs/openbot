@@ -46,6 +46,7 @@ import {
   type SignInRelayStatus,
   type UpdateCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import { compareReleaseVersions, parseReleaseVersion } from "@openbot/contracts/release-version";
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY, ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
@@ -254,7 +255,17 @@ export interface ProviderRow {
 
 function runsSystemCli(agent: AgentProviderStatus, runtime: ProviderRuntimeStatus): boolean {
   if (agent.cliSource !== undefined) return agent.cliSource === "system";
-  return runtime.phase === "not-downloaded" && agent.version !== null;
+  return (
+    runtime.phase === "not-downloaded" &&
+    agent.version !== null &&
+    olderThanOffer(agent.version, runtime.availableVersion ?? null)
+  );
+}
+
+function olderThanOffer(version: string, offer: string | null): boolean {
+  const installed = parseReleaseVersion(version);
+  const offered = offer === null ? null : parseReleaseVersion(offer);
+  return installed !== null && offered !== null && compareReleaseVersions(installed, offered) < 0;
 }
 
 export function providerRows(
