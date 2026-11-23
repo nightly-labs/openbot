@@ -80,7 +80,7 @@ function commandLabel(line: string): string | null {
     while (words.length > 0 && (PREFIX_WORDS.has(words[0] ?? "") || /^[A-Za-z_][A-Za-z0-9_]*=/u.test(words[0] ?? "")))
       words.shift();
     const first = words[0] ?? "";
-    if (first.startsWith("$") || first.startsWith("{")) continue;
+    if (/^\$[\w:]+(?:=|$)/u.test(first) || first.startsWith("{")) continue;
     const program = basename(first.replace(/['"]/gu, ""));
     if (!program || SETUP_PROGRAMS.has(program.toLowerCase())) continue;
     return programLabel(program, words.slice(1));
