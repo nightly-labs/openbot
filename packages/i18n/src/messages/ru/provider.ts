@@ -161,6 +161,7 @@ export const messages = {
   "provider.picker.effort": "Усилие",
   "provider.picker.effortLabel": "Уровень усилий агента",
   "provider.picker.effortFixed": "{effort}, задаёт {provider}",
+  "provider.picker.effortLimited": "Настройки Claude или ваша организация ограничивают уровень до «{effort}».",
   "provider.picker.fast": "Быстро",
   "provider.picker.fastText": "Более быстрые ответы, больший расход",
   "provider.picker.speed": "Скорость",

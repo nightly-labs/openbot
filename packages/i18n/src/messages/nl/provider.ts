@@ -139,6 +139,7 @@ export const messages = {
   "provider.picker.effort": "Denkniveau",
   "provider.picker.effortLabel": "Redeneerniveau van de agent",
   "provider.picker.effortFixed": "{effort}, vastgezet door {provider}",
+  "provider.picker.effortLimited": "Je Claude-instellingen of je organisatie beperken de inspanning tot {effort}.",
   "provider.picker.fast": "Snel",
   "provider.picker.fastText": "Snellere antwoorden, meer verbruik",
   "provider.picker.speed": "Snelheid",

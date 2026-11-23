@@ -143,6 +143,7 @@ export const messages = {
   "provider.picker.effort": "强度",
   "provider.picker.effortLabel": "助手推理强度",
   "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",
+  "provider.picker.effortLimited": "你的 Claude 设置或组织将推理强度限制为 {effort}。",
   "provider.picker.fast": "快速",
   "provider.picker.fastText": "响应更快，用量更多",
   "provider.picker.speed": "速度",
