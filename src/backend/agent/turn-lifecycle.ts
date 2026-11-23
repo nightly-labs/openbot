@@ -2461,7 +2461,7 @@ export class TurnLifecycle {
                 )?.plan ?? null,
               answer: latestAssistant?.text,
               finishCheck,
-              nextStep: !awaitsEarlierRequest,
+              nextStep: !awaitsEarlierRequest || finishCheck === "no",
             });
       let considered = proposed?.kind === "check" ? null : proposed;
       if (proposed?.kind === "check" && latestAssistant) {
