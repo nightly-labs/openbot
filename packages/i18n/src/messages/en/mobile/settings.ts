@@ -118,7 +118,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.credits.move.from": "From",
   "mobile.settings.credits.move.to": "To",
   "mobile.settings.credits.move.swap": "Change direction",
-  "mobile.settings.credits.move.footer": "The move is instant. You can move the credits back at any time.",
+  "mobile.settings.credits.move.footer": "The move is instant. You can move unused credits back at any time.",
   "mobile.settings.credits.move.failed": "Could not move the credits.",
   "mobile.settings.credits.move.ownerOnly": "You can move credits only on a server that you own.",
   "mobile.settings.support.help": "Get help",

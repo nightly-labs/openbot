@@ -30,6 +30,7 @@ import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const MAX_MOVE_CREDITS = 9_999_999;
+const PLAIN_NUMBER = { useGrouping: false } as const satisfies Intl.NumberFormatOptions;
 const STEP_CREDITS = 100;
 const PRESET_SHARES = [0.1, 0.5] as const;
 const MAX_AMOUNT_LENGTH = 12;
@@ -99,7 +100,8 @@ function asciiDigits(value: string, localDigits: readonly string[]): string {
 }
 
 function amountFromText(value: string, decimal: string, localDigits: readonly string[]): number {
-  const [whole = "", ...fraction] = asciiDigits(value, localDigits).split(decimal);
+  const normalized = asciiDigits(value, localDigits).replaceAll(decimal, ".").replace(/[,٫]/g, ".");
+  const [whole = "", ...fraction] = normalized.split(".");
   const wholeDigits = whole.replace(/\D/g, "");
   const tenth = fraction.join("").replace(/\D/g, "").slice(0, 1);
   const tenths = Number(wholeDigits || "0") * 10 + Number(tenth || "0");
@@ -146,6 +148,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
   const tween = useRef<number | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const chunks = useRef<number[]>([]);
+  const submitting = useRef(false);
   const before = useRef({ personal, server: wallet.balance });
   const showHighlight = useCreditMoveHighlight((state) => state.show);
   const layouts = useRef<Record<RouteSlot, TileLayout>>({
@@ -200,7 +203,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
     const startTenths = creditTenths(amount);
     const endTenths = creditTenths(Math.min(Math.max(target, 0), MAX_MOVE_CREDITS));
     if (reducedMotion || startTenths === endTenths) {
-      setText(endTenths === 0 ? "" : format.number(creditsFromTenths(endTenths)));
+      setText(endTenths === 0 ? "" : format.number(creditsFromTenths(endTenths), PLAIN_NUMBER));
       return;
     }
     const startedAt = performance.now();
@@ -208,7 +211,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
       const progress = Math.min(1, (performance.now() - startedAt) / AMOUNT_TWEEN_MS);
       const eased = 1 - (1 - progress) ** 3;
       const tenths = progress < 1 ? Math.round((startTenths + (endTenths - startTenths) * eased) / 10) * 10 : endTenths;
-      setText(tenths === 0 && progress === 1 ? "" : format.number(creditsFromTenths(tenths)));
+      setText(tenths === 0 && progress === 1 ? "" : format.number(creditsFromTenths(tenths), PLAIN_NUMBER));
       tween.current = progress < 1 ? requestAnimationFrame(step) : null;
     };
     tween.current = requestAnimationFrame(step);
@@ -217,7 +220,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
     stopTween();
     const typed = value.slice(0, MAX_AMOUNT_LENGTH);
     if (amountFromText(typed, decimal, localDigits) > MAX_MOVE_CREDITS) {
-      setText(format.number(MAX_MOVE_CREDITS));
+      setText(format.number(MAX_MOVE_CREDITS, PLAIN_NUMBER));
       return;
     }
     setText(typed);
@@ -270,7 +273,8 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
     });
   };
   const submit = () => {
-    if (!ready || pending) return;
+    if (!ready || pending || submitting.current) return;
+    submitting.current = true;
     stopTween();
     const amountTenths = creditTenths(amount);
     before.current = { personal, server: wallet.balance };
@@ -292,6 +296,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
           playTransfer(amountTenths);
         },
         onError: (error) => {
+          submitting.current = false;
           fromMotion.charge(false);
           setTransfer(null);
           void haptics.notification("error");

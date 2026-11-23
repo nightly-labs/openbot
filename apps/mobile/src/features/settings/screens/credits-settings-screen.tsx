@@ -43,6 +43,7 @@ const STEPS = [
 const LONG_DATE = { dateStyle: "long" } as const satisfies Intl.DateTimeFormatOptions;
 const ROW_AVATAR_SIZE = 20;
 const RECENT_ACTIVITY = 3;
+const HIGHLIGHT_MAX_AGE_MS = 5000;
 const HERO_STAR_SIZE = 34;
 const BALANCE_TEXT: TextStyle = { fontSize: 48, lineHeight: 56, letterSpacing: -1.4, fontVariant: ["tabular-nums"] };
 
@@ -50,8 +51,18 @@ export function CreditsSettingsScreen() {
   const { t, errorMessage } = useText();
   const signedIn = useMobileSession().session !== null;
   const credits = useCreditsState();
-  const highlight = useCreditMoveHighlight((state) => state.highlight);
+  const storedHighlight = useCreditMoveHighlight((state) => state.highlight);
   const clearHighlight = useCreditMoveHighlight((state) => state.clear);
+  const highlight = storedHighlight && Date.now() - storedHighlight.at < HIGHLIGHT_MAX_AGE_MS ? storedHighlight : null;
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        const current = useCreditMoveHighlight.getState().highlight;
+        if (current) clearHighlight(current.id);
+      },
+      [clearHighlight],
+    ),
+  );
   const available = credits.data?.available === true;
   const activity = useCreditActivity(available);
   const { refetch: refetchCredits } = credits;
