@@ -146,13 +146,21 @@ export interface AccountRateLimitGroupResult {
   secondary: AccountRateLimitWindowResult | null;
 }
 
+export interface RateLimitResetCreditResult {
+  id: string;
+  grantedAt: number;
+  expiresAt: number | null;
+  title?: string | null | undefined;
+  description?: string | null | undefined;
+}
+
 export interface AccountRateLimitsReadResult {
   rateLimits?: AccountRateLimitResult | null | undefined;
   groups?: AccountRateLimitGroupResult[] | undefined;
   tertiary?: AccountRateLimitWindowResult | undefined;
   sharedQuotaWith?: AgentProviderId | undefined;
   rateLimitsByLimitId?: Record<string, AccountRateLimitResult | undefined> | null | undefined;
-  rateLimitResetCredits?: { availableCount: number } | null | undefined;
+  rateLimitResetCredits?: { availableCount: number; credits?: RateLimitResetCreditResult[] | null } | null | undefined;
 }
 
 export interface ThreadItem {
@@ -483,10 +491,35 @@ function decodeRateLimitWindow(value: unknown): AccountRateLimitWindowResult | n
 
 function decodeRateLimitResetCredits(value: unknown): AccountRateLimitsReadResult["rateLimitResetCredits"] {
   if (value === undefined) return value;
-  const availableCount = isDynamicRecord(value) ? value.availableCount : undefined;
-  return typeof availableCount === "number" && Number.isSafeInteger(availableCount) && availableCount >= 0
-    ? { availableCount }
+  if (!isDynamicRecord(value)) return null;
+  const availableCount = value.availableCount;
+  if (typeof availableCount !== "number" || !Number.isSafeInteger(availableCount) || availableCount < 0) return null;
+  const rawCredits = Array.isArray(value.credits) ? value.credits : null;
+  const credits = rawCredits
+    ? rawCredits.flatMap((entry): RateLimitResetCreditResult[] => {
+        if (!isDynamicRecord(entry)) return [];
+        const id = optionalString(entry, "id");
+        const grantedAt = optionalNumber(entry, "grantedAt");
+        const expiresAtRaw = entry.expiresAt;
+        const expiresAt =
+          expiresAtRaw === null || (typeof expiresAtRaw === "number" && Number.isFinite(expiresAtRaw))
+            ? expiresAtRaw
+            : undefined;
+        if (!id || grantedAt === undefined || grantedAt === null || expiresAt === undefined) return [];
+        const title = optionalString(entry, "title");
+        const description = optionalString(entry, "description");
+        return [
+          {
+            id,
+            grantedAt,
+            expiresAt,
+            ...(title === undefined ? {} : { title }),
+            ...(description === undefined ? {} : { description }),
+          },
+        ];
+      })
     : null;
+  return { availableCount, ...(credits === null ? {} : { credits }) };
 }
 
 function decodeRateLimitsById(value: unknown): AccountRateLimitsReadResult["rateLimitsByLimitId"] {

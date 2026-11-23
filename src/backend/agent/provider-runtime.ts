@@ -21,6 +21,7 @@ import type {
   ProviderAccountPool,
   ProviderAccountStatus,
   ProviderCodeLoginStart,
+  ProviderUsageResetCredit,
   ProviderUsageResetOutcome,
   ProviderUsageResets,
 } from "@openbot/contracts/ipc";
@@ -381,8 +382,8 @@ export class ProviderRuntime implements ProviderPort {
   readonly #reportedMcpFailures = new Set<string>();
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
   readonly #poolInUse = new Map<AgentProvider, string | null>();
-  readonly #resetCredits = new WeakMap<AgentClient, number | null>();
-  readonly #ownResetCredits = new Map<AgentProvider, number | null>();
+  readonly #resetCredits = new WeakMap<AgentClient, { available: number; credits?: readonly ProviderUsageResetCredit[] } | null>();
+  readonly #ownResetCredits = new Map<AgentProvider, { available: number; credits?: readonly ProviderUsageResetCredit[] } | null>();
   readonly #creditsAvailable = new WeakMap<AgentClient, boolean>();
   readonly #codexRoutesToOpenai = new WeakMap<AgentClient, boolean>();
   readonly #usageUnreported = new Set<AgentProvider>();
@@ -1254,7 +1255,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#logUsageFailure(provider),
       );
     const own = this.#ownResetCredits.get(provider);
-    if (typeof own === "number") resets.push({ provider, accountId: DEFAULT_PROVIDER_ACCOUNT_ID, available: own });
+    if (own) resets.push({ provider, accountId: DEFAULT_PROVIDER_ACCOUNT_ID, ...own });
     if (this.#providerAccounts && ProviderAccounts.support(provider))
       resets.push(...(yield* this.#providerAccounts.usageResets(provider, defaultUsageModel(provider))));
     return resets;
@@ -4525,9 +4526,14 @@ export class ProviderRuntime implements ProviderPort {
       )
       .pipe(toProviderOperationFailed);
     if (rateLimits.rateLimitResetCredits !== undefined) {
-      const available = rateLimits.rateLimitResetCredits?.availableCount ?? null;
-      this.#resetCredits.set(client, available);
-      if (this.#clients.get(client.provider) === client) this.#ownResetCredits.set(client.provider, available);
+      const summary = rateLimits.rateLimitResetCredits
+        ? {
+            available: rateLimits.rateLimitResetCredits.availableCount,
+            ...(rateLimits.rateLimitResetCredits.credits ? { credits: rateLimits.rateLimitResetCredits.credits } : {}),
+          }
+        : null;
+      this.#resetCredits.set(client, summary);
+      if (this.#clients.get(client.provider) === client) this.#ownResetCredits.set(client.provider, summary);
     }
     const usage = normalizeAccountUsage(rateLimits, client.provider === "codex" ? model : undefined);
     this.#noteCredits(

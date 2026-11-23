@@ -391,10 +391,19 @@ export interface ResetProviderUsageInput {
   accountId: string;
 }
 
+export interface ProviderUsageResetCredit {
+  id: string;
+  grantedAt: number;
+  expiresAt: number | null;
+  title?: string | null;
+  description?: string | null;
+}
+
 export interface ProviderUsageResets {
   provider: AgentProviderId;
   accountId: string;
   available: number;
+  credits?: readonly ProviderUsageResetCredit[];
 }
 
 export const PROVIDER_USAGE_RESET_OUTCOMES = ["reset", "nothingToReset", "noCredit", "alreadyRedeemed"] as const;

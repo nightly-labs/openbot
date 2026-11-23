@@ -11,6 +11,7 @@ import {
   type ProviderAccountCodeLoginStatus,
   type ProviderAccountState,
   type ProviderAccountStatus,
+  type ProviderUsageResetCredit,
   type ProviderUsageResetOutcome,
   type ProviderUsageResets,
   usageQuotaForModel,
@@ -95,7 +96,7 @@ export interface ProviderAccountsHost {
   stopAgentClients(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
   readUsage(client: AgentClient, model?: string): Effect.Effect<AccountUsage, ProviderAccountFailed>;
   readModels(client: AgentClient): Effect.Effect<AgentModelOption[] | null>;
-  resetCredits(client: AgentClient): number | null | undefined;
+  resetCredits(client: AgentClient): { available: number; credits?: readonly ProviderUsageResetCredit[] } | null | undefined;
   consumeUsageReset(client: AgentClient): Effect.Effect<ProviderUsageResetOutcome, ProviderAccountFailed>;
   changed(): void;
   modelsListed?(provider: AgentProviderId, accountId: string): Effect.Effect<void>;
@@ -114,7 +115,13 @@ export class ProviderAccounts {
   readonly #codeSignIns = new Set<string>();
   readonly #pasteLogins = new Map<string, CliCodeLogin>();
   readonly #checks = new Map<string, Fiber.Fiber<void>>();
-  readonly #usage = new Map<string, { limit: AccountUsageLimit; resetCredits: number | null | undefined }>();
+  readonly #usage = new Map<
+    string,
+    {
+      limit: AccountUsageLimit;
+      resetCredits: { available: number; credits?: readonly ProviderUsageResetCredit[] } | null | undefined;
+    }
+  >();
   readonly #usageGates = new Map<string, UsageReadGate>();
   readonly #models = new Map<string, AgentModelOption[]>();
 
@@ -734,8 +741,8 @@ export class ProviderAccounts {
     yield* this.usage(provider, model);
     return this.#store.list(provider).flatMap((account): ProviderUsageResets[] => {
       if (this.#states.get(account.id)?.state !== "connected") return [];
-      const available = this.#usage.get(account.id)?.resetCredits;
-      return typeof available === "number" ? [{ provider, accountId: account.id, available }] : [];
+      const reset = this.#usage.get(account.id)?.resetCredits;
+      return reset ? [{ provider, accountId: account.id, ...reset }] : [];
     });
   }).bind(this);
 
