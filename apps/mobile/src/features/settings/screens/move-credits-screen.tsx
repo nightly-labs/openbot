@@ -3,18 +3,29 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import ArrowUpDown from "lucide-react-native/icons/arrow-up-down";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Pressable, TextInput, type TextStyle, View } from "react-native";
+import { type LayoutRectangle, Pressable, TextInput, type TextStyle, View } from "react-native";
 import Animated, { cubicBezier } from "react-native-reanimated";
 import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { ServerAvatar } from "@/features/servers/components/server-avatar";
 import { CreditStar } from "@/features/settings/components/credit-star";
+import {
+  CreditBurst,
+  CreditSpark,
+  type CreditSparkPath,
+  type CreditTileMotion,
+  creditSparkDirection,
+  type MotionPoint,
+  useCreditTileMotion,
+} from "@/features/settings/components/credit-transfer-motion";
 import { SettingsContent } from "@/features/settings/components/settings-content";
+import { useCreditMoveHighlight } from "@/features/settings/model/credit-move-highlight";
 import { useCreditsState, useMoveCredits } from "@/features/settings/model/credits";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
@@ -34,6 +45,44 @@ const SWAP_RING = 4;
 const ROUTE_LABEL_WIDTH = 36;
 const ROUTE_DIVIDER_INSET = 16 + ROUTE_LABEL_WIDTH + 12;
 const ROUTE_BUTTON_SPACE = 16 + SWAP_SIZE + 12;
+const TRANSFER_STARS = 8;
+const LAUNCH_GAP_MS = 85;
+const SETTLE_MS = 650;
+const MINOR_KNOCK = 0.55;
+const STAR_SIZE = 15;
+const LAST_STAR_SIZE = 20;
+const RING_INSET = -6;
+
+type RouteSlot = "from" | "to";
+
+interface TileLayout {
+  rowY: number;
+  tile: LayoutRectangle;
+}
+
+interface TransferValues {
+  fromTenths: number;
+  toTenths: number;
+  amountTenths: number;
+}
+
+interface SparkSpec extends CreditSparkPath {
+  id: number;
+  size: number;
+}
+
+function sparkSpec(index: number): SparkSpec {
+  return {
+    id: index,
+    bend: (index % 2 === 0 ? 1 : -0.35) * (40 + (index % 3) * 16),
+    lift: index % 2 === 0 ? -6 : 6,
+    size: index === TRANSFER_STARS - 1 ? LAST_STAR_SIZE : STAR_SIZE,
+  };
+}
+
+function tileCenter(layout: TileLayout): MotionPoint {
+  return { x: layout.tile.x + layout.tile.width / 2, y: layout.rowY + layout.tile.y + layout.tile.height / 2 };
+}
 
 function amountFontSize(length: number) {
   if (length > 10) return 30;
@@ -79,19 +128,34 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
   const move = useMoveCredits();
   const reducedMotion = useReducedMotion();
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === wallet.serverId));
-  const [foreground, muted, danger, grouped] = useCSSVariable([
+  const [foreground, muted, danger, grouped, starFill] = useCSSVariable([
     "--openbot-text-primary",
     "--openbot-text-grouped-secondary",
     "--openbot-danger-text",
     "--openbot-bg-grouped",
+    "--openbot-credit-star-fill",
   ]);
   const [toServer, setToServer] = useState(() => personal > 0 || wallet.balance <= 0);
   const [turns, setTurns] = useState(0);
   const [text, setText] = useState("");
+  const [transfer, setTransfer] = useState<TransferValues | null>(null);
+  const [sparks, setSparks] = useState<SparkSpec[]>([]);
+  const [burstAt, setBurstAt] = useState<MotionPoint | null>(null);
+  const fromMotion = useCreditTileMotion();
+  const toMotion = useCreditTileMotion();
   const tween = useRef<number | null>(null);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const chunks = useRef<number[]>([]);
+  const before = useRef({ personal, server: wallet.balance });
+  const showHighlight = useCreditMoveHighlight((state) => state.show);
+  const layouts = useRef<Record<RouteSlot, TileLayout>>({
+    from: { rowY: 0, tile: { x: 0, y: 0, width: 0, height: 0 } },
+    to: { rowY: 0, tile: { x: 0, y: 0, width: 0, height: 0 } },
+  });
   useEffect(
     () => () => {
       if (tween.current !== null) cancelAnimationFrame(tween.current);
+      for (const timer of timers.current) clearTimeout(timer);
     },
     [],
   );
@@ -99,7 +163,12 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
   const decimal = sample.length === 3 ? (sample[1] ?? ".") : ".";
   const localDigits = Array.from({ length: 10 }, (_, digit) => format.number(digit));
   const amount = amountFromText(text, decimal, localDigits);
-  const amountFont = amountFontSize(text.length);
+  const shownText = transfer
+    ? transfer.amountTenths > 0
+      ? format.number(creditsFromTenths(transfer.amountTenths))
+      : ""
+    : text;
+  const amountFont = amountFontSize(shownText.length);
   const amountStyle: TextStyle = {
     fontSize: amountFont,
     lineHeight: Math.round(amountFont * AMOUNT_LINE_HEIGHT),
@@ -107,10 +176,13 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
   };
   const source = toServer ? personal : wallet.balance;
   const limit = Math.min(source, MAX_MOVE_CREDITS);
-  const tooMuch = creditTenths(amount) > creditTenths(source);
+  const tooMuch = !transfer && creditTenths(amount) > creditTenths(source);
   const ready = amount > 0 && !tooMuch;
-  const pending = move.isPending;
-  const sourceText = format.number(source);
+  const amountColor = String(tooMuch ? danger : foreground);
+  const pending = move.isPending || transfer !== null;
+  const personalShown = transfer ? creditsFromTenths(toServer ? transfer.fromTenths : transfer.toTenths) : personal;
+  const serverShown = transfer ? creditsFromTenths(toServer ? transfer.toTenths : transfer.fromTenths) : wallet.balance;
+  const sourceText = format.number(toServer ? personalShown : serverShown);
   const status = tooMuch
     ? toServer
       ? t("mobile.settings.credits.move.youHave", { count: source, amount: sourceText })
@@ -150,17 +222,78 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
     }
     setText(typed);
   };
+  const later = (delay: number, run: () => void) => {
+    timers.current.push(setTimeout(run, delay));
+  };
+  const finish = () => {
+    void haptics.notification("success");
+    showHighlight({
+      serverId: wallet.serverId,
+      personalFrom: before.current.personal,
+      serverFrom: before.current.server,
+    });
+    router.back();
+  };
+  const land = (spark: SparkSpec) => {
+    const last = spark.id === TRANSFER_STARS - 1;
+    const from = tileCenter(layouts.current.from);
+    const to = tileCenter(layouts.current.to);
+    setSparks((current) => current.filter((item) => item.id !== spark.id));
+    setTransfer((current) => current && { ...current, toTenths: current.toTenths + (chunks.current[spark.id] ?? 0) });
+    toMotion.knock(creditSparkDirection(from, to, spark), last ? 1 : MINOR_KNOCK);
+    if (!last) {
+      void haptics.impact("light");
+      return;
+    }
+    toMotion.ring();
+    setBurstAt(to);
+    later(SETTLE_MS, finish);
+  };
+  const playTransfer = (amountTenths: number) => {
+    const share = Math.floor(amountTenths / TRANSFER_STARS);
+    chunks.current = Array.from({ length: TRANSFER_STARS }, (_, index) =>
+      index === TRANSFER_STARS - 1 ? amountTenths - share * (TRANSFER_STARS - 1) : share,
+    );
+    chunks.current.forEach((value, index) => {
+      later(index * LAUNCH_GAP_MS, () => {
+        setTransfer(
+          (current) =>
+            current && {
+              ...current,
+              fromTenths: current.fromTenths - value,
+              amountTenths: current.amountTenths - value,
+            },
+        );
+        fromMotion.recoil();
+        setSparks((current) => [...current, sparkSpec(index)]);
+      });
+    });
+  };
   const submit = () => {
     if (!ready || pending) return;
     stopTween();
+    const amountTenths = creditTenths(amount);
+    before.current = { personal, server: wallet.balance };
+    setTransfer({
+      fromTenths: creditTenths(source),
+      toTenths: creditTenths(toServer ? wallet.balance : personal),
+      amountTenths,
+    });
+    if (!reducedMotion) fromMotion.charge(true);
     move.mutate(
       { serverId: wallet.serverId, direction: toServer ? "to_server" : "to_personal", credits: amount },
       {
         onSuccess: () => {
-          void haptics.notification("success");
-          router.back();
+          fromMotion.charge(false);
+          if (reducedMotion) {
+            finish();
+            return;
+          }
+          playTransfer(amountTenths);
         },
         onError: (error) => {
+          fromMotion.charge(false);
+          setTransfer(null);
           void haptics.notification("error");
           showFailureAlert(
             error,
@@ -183,7 +316,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
       </View>
     ),
     name: t("mobile.settings.credits.yours"),
-    balance: t("mobile.settings.credits.amount", { count: personal, amount: format.number(personal) }),
+    balance: t("mobile.settings.credits.amount", { count: personalShown, amount: format.number(personalShown) }),
   };
   const theirs = {
     tile: server ? (
@@ -192,7 +325,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
       <View className="rounded-[10px] bg-control" style={{ height: TILE_SIZE, width: TILE_SIZE }} />
     ),
     name: wallet.name,
-    balance: t("mobile.settings.credits.amount", { count: wallet.balance, amount: format.number(wallet.balance) }),
+    balance: t("mobile.settings.credits.amount", { count: serverShown, amount: format.number(serverShown) }),
   };
   const from = toServer ? yours : theirs;
   const to = toServer ? theirs : yours;
@@ -200,7 +333,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
   return (
     <>
       <SheetSaveAction
-        dirty={amount > 0}
+        dirty={amount > 0 || pending}
         canSave={ready}
         pending={pending}
         label={t("mobile.settings.credits.move.action")}
@@ -228,13 +361,16 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
                 <Typography
                   numberOfLines={1}
                   className="font-sans font-bold"
-                  style={[amountStyle, { color: String(text === "" ? muted : tooMuch ? danger : foreground) }]}
+                  style={[
+                    amountStyle,
+                    { color: shownText === "" ? String(muted) : isAndroid ? "transparent" : amountColor },
+                  ]}
                 >
-                  {text || format.number(0)}
+                  {shownText || format.number(0)}
                 </Typography>
               </View>
               <TextInput
-                value={text}
+                value={shownText}
                 onChangeText={changeText}
                 onSubmitEditing={submit}
                 accessibilityLabel={t("mobile.settings.credits.move.amount")}
@@ -247,7 +383,7 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
                 style={[
                   amountStyle,
                   {
-                    color: "transparent",
+                    color: isAndroid ? amountColor : "transparent",
                     paddingVertical: 4,
                     paddingLeft: AMOUNT_STAR_SIZE + AMOUNT_STAR_GAP,
                     paddingRight: 0,
@@ -290,9 +426,24 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
             {t("mobile.settings.credits.move.route")}
           </Typography>
           <View className="rounded-grouped bg-grouped">
-            <RouteRow label={t("mobile.settings.credits.move.from")} {...from} />
+            <RouteRow
+              label={t("mobile.settings.credits.move.from")}
+              {...from}
+              tileStyle={fromMotion.style}
+              onLayout={(rowY, tile) => {
+                layouts.current.from = { rowY, tile };
+              }}
+            />
             <View className="h-px bg-grouped-border" style={{ marginLeft: ROUTE_DIVIDER_INSET }} />
-            <RouteRow label={t("mobile.settings.credits.move.to")} {...to} />
+            <RouteRow
+              label={t("mobile.settings.credits.move.to")}
+              {...to}
+              tileStyle={toMotion.style}
+              ring={{ style: toMotion.ringStyle, color: String(starFill) }}
+              onLayout={(rowY, tile) => {
+                layouts.current.to = { rowY, tile };
+              }}
+            />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("mobile.settings.credits.move.swap")}
@@ -326,6 +477,19 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
                 <ArrowUpDown color={String(foreground)} size={18} strokeWidth={1.9} />
               </Animated.View>
             </Pressable>
+            <View pointerEvents="none" className="absolute inset-0">
+              {sparks.map((spark) => (
+                <CreditSpark
+                  key={spark.id}
+                  from={tileCenter(layouts.current.from)}
+                  to={tileCenter(layouts.current.to)}
+                  path={spark}
+                  size={spark.size}
+                  onLand={() => land(spark)}
+                />
+              ))}
+              {burstAt ? <CreditBurst center={burstAt} color={String(starFill)} /> : null}
+            </View>
           </View>
           <Typography.Paragraph type="body-xs" className="px-4 text-grouped-secondary">
             {t("mobile.settings.credits.move.footer")}
@@ -336,18 +500,58 @@ function MoveCreditsForm({ personal, wallet }: { personal: number; wallet: Credi
   );
 }
 
-function RouteRow({ label, tile, name, balance }: { label: string; tile: ReactNode; name: string; balance: string }) {
+function RouteRow({
+  label,
+  tile,
+  name,
+  balance,
+  tileStyle,
+  ring,
+  onLayout,
+}: {
+  label: string;
+  tile: ReactNode;
+  name: string;
+  balance: string;
+  tileStyle: CreditTileMotion["style"];
+  ring?: { style: CreditTileMotion["ringStyle"]; color: string };
+  onLayout: (rowY: number, tile: LayoutRectangle) => void;
+}) {
+  const rowY = useRef(0);
+  const tileFrame = useRef<LayoutRectangle>({ x: 0, y: 0, width: 0, height: 0 });
   return (
     <View
       accessible
       accessibilityLabel={`${label}: ${name}, ${balance}`}
       className="min-h-16 flex-row items-center gap-3 py-3 pl-4"
       style={{ paddingRight: ROUTE_BUTTON_SPACE }}
+      onLayout={(event) => {
+        rowY.current = event.nativeEvent.layout.y;
+        onLayout(rowY.current, tileFrame.current);
+      }}
     >
       <Typography type="body-xs" className="text-grouped-secondary" style={{ width: ROUTE_LABEL_WIDTH }}>
         {label}
       </Typography>
-      {tile}
+      <Animated.View
+        style={tileStyle}
+        onLayout={(event) => {
+          tileFrame.current = event.nativeEvent.layout;
+          onLayout(rowY.current, tileFrame.current);
+        }}
+      >
+        {tile}
+        {ring ? (
+          <Animated.View
+            pointerEvents="none"
+            className="absolute rounded-[14px] border-2"
+            style={[
+              { top: RING_INSET, left: RING_INSET, right: RING_INSET, bottom: RING_INSET, borderColor: ring.color },
+              ring.style,
+            ]}
+          />
+        ) : null}
+      </Animated.View>
       <View className="min-w-0 flex-1">
         <Typography.Paragraph numberOfLines={1}>{name}</Typography.Paragraph>
         <Typography.Paragraph type="body-xs" numberOfLines={1} className="text-grouped-secondary">

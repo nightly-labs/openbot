@@ -3915,6 +3915,22 @@
     "tr",
     "zh"
   ],
+  "mobile.settings.credits.activity.empty": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "mobile.settings.credits.activity.expired": [
     "ar",
     "de",
@@ -4091,6 +4107,22 @@
     "tr",
     "zh"
   ],
+  "mobile.settings.credits.activity.movesWeek": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "mobile.settings.credits.activity.openbot": [
     "ar",
     "de",
@@ -4139,6 +4171,22 @@
     "tr",
     "zh"
   ],
+  "mobile.settings.credits.activity.recent": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
   "mobile.settings.credits.activity.refund": [
     "ar",
     "de",
@@ -4156,6 +4204,22 @@
     "zh"
   ],
   "mobile.settings.credits.activity.running": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
+  "mobile.settings.credits.activity.seeAll": [
     "ar",
     "de",
     "es",
@@ -4204,6 +4268,22 @@
     "zh"
   ],
   "mobile.settings.credits.activity.today": [
+    "ar",
+    "de",
+    "es",
+    "fr",
+    "he",
+    "it",
+    "ja",
+    "ko",
+    "nl",
+    "pl",
+    "pt",
+    "ru",
+    "tr",
+    "zh"
+  ],
+  "mobile.settings.credits.activity.usedWeek": [
     "ar",
     "de",
     "es",

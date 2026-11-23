@@ -13,10 +13,11 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const MOCK_DELAY_MS = 500;
-const PERSONAL_BALANCE = 1240;
-const FIRST_OWNED_BALANCE = 380;
+const PERSONAL_BALANCE = 1236.4;
+const FIRST_OWNED_BALANCE = 380.7;
+const OTHER_OWNED_BALANCE = 12.3;
 const MEMBER_BALANCE = 52.5;
-const EXPIRING_CREDITS = 300;
+const EXPIRING_CREDITS = 299.5;
 const EXPIRING_IN_DAYS = 8;
 
 interface CreditLedger {
@@ -53,7 +54,7 @@ function entryId(book: CreditLedger): string {
 
 function seedBalance(wallet: CreditServerWallet, ownedBefore: number) {
   if (wallet.role !== "owner") return MEMBER_BALANCE;
-  return ownedBefore === 0 ? FIRST_OWNED_BALANCE : 0;
+  return ownedBefore === 0 ? FIRST_OWNED_BALANCE : OTHER_OWNED_BALANCE;
 }
 
 export function mockCreditsState(userId: string, real: CreditsState): CreditsState {
@@ -92,7 +93,7 @@ function seedEntries(book: CreditLedger): void {
       id: entryId(book),
       kind: "generation",
       at: now - 20 * MINUTE_MS,
-      credits: -12,
+      credits: -12.5,
       actor: "you",
       modelName: "Nano Banana Pro",
     },
@@ -102,7 +103,7 @@ function seedEntries(book: CreditLedger): void {
       id: entryId(book),
       kind: "generation",
       at: now - 3 * HOUR_MS,
-      credits: -40,
+      credits: -40.2,
       actor: "member",
       actorName: "Ada",
       serverId: owned.serverId,
@@ -110,9 +111,9 @@ function seedEntries(book: CreditLedger): void {
       status: "running",
     });
   entries.push(
-    { id: entryId(book), kind: "purchase", at: now - DAY_MS, credits: 1000, actor: "you" },
-    { id: entryId(book), kind: "free", at: now - 3 * DAY_MS, credits: 100, actor: "openbot" },
-    { id: entryId(book), kind: "expired", at: now - 10 * DAY_MS, credits: -50, actor: "openbot" },
+    { id: entryId(book), kind: "purchase", at: now - DAY_MS, credits: 999.9, actor: "you" },
+    { id: entryId(book), kind: "free", at: now - 3 * DAY_MS, credits: 100.5, actor: "openbot" },
+    { id: entryId(book), kind: "expired", at: now - 10 * DAY_MS, credits: -49.8, actor: "openbot" },
   );
   book.entries.push(...entries);
 }

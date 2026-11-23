@@ -4,3 +4,6 @@
 - The server drawer has aligned edges: the server list and your name line up with the tools, and the buttons line up with the tool values.
 - The Credits screen shows your credits as a large number at the top, with the credits that expire next. Servers with no credits are in one row that you can open. The activity is grouped by day. When you have no activity, the screen tells you how credits work.
 - On the Credits screen, tap a server that you own to move credits between your credits and that server, in either direction.
+- When you move credits, stars fly from one wallet to the other, and the receiving wallet reacts to each one.
+- After a move, the changed balances on the Credits screen turn pink and count to their new values.
+- On the Credits screen, the last 3 activity entries show under Recent activity. See all activity opens the full history, with the credits used and the moves of the last 7 days.
