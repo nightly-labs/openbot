@@ -2,13 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
-  "status.agent.planApprovalHeader": "Утверждение плана",
-  "status.agent.planApprovalEmpty": "Агент не написал план.",
-  "status.agent.planApprovalDetail":
-    "Утвердите план, чтобы агент его выполнил. Чтобы изменить план, напишите, что изменить.",
-  "status.agent.planApproveDetail": "Агент начинает выполнять план.",
-  "status.agent.planStop": "Остановить планирование",
-  "status.agent.planStopDetail": "Режим плана выключается, и агент ждёт вашего следующего сообщения.",
   "status.agent.claudeWriteOutside":
     "Запись в {path} — за пределами рабочего пространства агента, общей папки и временных папок.",
   "status.agent.contextCleared": "Контекст очищен. Здесь начинается новый чат.",

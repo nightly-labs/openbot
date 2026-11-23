@@ -2,13 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
-  "status.agent.planApprovalHeader": "Plan onayı",
-  "status.agent.planApprovalEmpty": "Ajan bir plan yazmadı.",
-  "status.agent.planApprovalDetail":
-    "Ajanın planı uygulaması için planı onaylayın. Değiştirmek için neyin değişeceğini yazın.",
-  "status.agent.planApproveDetail": "Ajan planı uygulamaya başlar.",
-  "status.agent.planStop": "Planlamayı durdur",
-  "status.agent.planStopDetail": "Plan modu kapanır ve ajan bir sonraki mesajınızı bekler.",
   "status.agent.claudeWriteOutside":
     "Ajanın çalışma alanı, paylaşılan klasör ve geçici klasörler dışındaki {path} konumuna yaz.",
   "status.agent.contextCleared": "Bağlam temizlendi. Yeni bir sohbet burada başlıyor.",

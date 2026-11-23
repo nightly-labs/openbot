@@ -2,12 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
-  "status.agent.planApprovalHeader": "الموافقة على الخطة",
-  "status.agent.planApprovalEmpty": "لم يكتب الوكيل خطة.",
-  "status.agent.planApprovalDetail": "وافق على الخطة ليبدأ الوكيل في تنفيذها. لتغييرها، اكتب ما تريد تغييره.",
-  "status.agent.planApproveDetail": "يبدأ الوكيل في تنفيذ الخطة.",
-  "status.agent.planStop": "إيقاف التخطيط",
-  "status.agent.planStopDetail": "يتوقف وضع التخطيط، وينتظر الوكيل رسالتك التالية.",
   "status.agent.claudeWriteOutside": "الكتابة إلى {path}، خارج مساحة عمل الوكيل والمجلد المشترك والمجلدات المؤقتة.",
   "status.agent.contextCleared": "تم مسح السياق. تبدأ دردشة جديدة هنا.",
   "status.agent.instructionsChanged": "حدّث تعليماته",

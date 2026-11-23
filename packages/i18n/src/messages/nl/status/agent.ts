@@ -2,13 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
-  "status.agent.planApprovalHeader": "Plangoedkeuring",
-  "status.agent.planApprovalEmpty": "De agent heeft geen plan geschreven.",
-  "status.agent.planApprovalDetail":
-    "Keur het plan goed om de agent het te laten uitvoeren. Schrijf wat er anders moet om het te wijzigen.",
-  "status.agent.planApproveDetail": "De agent begint het plan uit te voeren.",
-  "status.agent.planStop": "Stop met plannen",
-  "status.agent.planStopDetail": "De planmodus gaat uit en de agent wacht op je volgende bericht.",
   "status.agent.claudeWriteOutside":
     "{path} schrijven, buiten de werkruimte van de agent, de gedeelde map en de tijdelijke mappen.",
   "status.agent.contextCleared": "Context gewist. Hier begint een nieuwe chat.",

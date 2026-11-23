@@ -2,13 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
-  "status.agent.planApprovalHeader": "Plan-Freigabe",
-  "status.agent.planApprovalEmpty": "Der Agent hat keinen Plan geschrieben.",
-  "status.agent.planApprovalDetail":
-    "Gib den Plan frei, damit der Agent ihn umsetzt. Um ihn zu ändern, schreib, was sich ändern soll.",
-  "status.agent.planApproveDetail": "Der Agent beginnt, den Plan umzusetzen.",
-  "status.agent.planStop": "Planung beenden",
-  "status.agent.planStopDetail": "Der Planmodus endet, und der Agent wartet auf deine nächste Nachricht.",
   "status.agent.claudeWriteOutside":
     "In {path} schreiben, außerhalb des Agentenarbeitsbereichs, des geteilten Ordners und der temporären Ordner.",
   "status.agent.contextCleared": "Kontext geleert. Hier beginnt ein neuer Chat.",
