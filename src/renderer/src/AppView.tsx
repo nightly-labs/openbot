@@ -56,7 +56,10 @@ export function AppAccessGate() {
   const languageLoaded = createMemo<boolean>((was) => was === true || i18n.ready());
   const started = () => setup.setupLoaded() && platform.appInfo() !== null && languageLoaded();
   const [splashShown, setSplashShown] = createSignal(!platform.landingPreview && !startsAfterRestart());
-  const splashPlaysThrough = !startupSplashPlayed && platform.chatWindow === null;
+  const splashExit = () => {
+    if (platform.chatWindow !== null) return undefined;
+    return !startupSplashPlayed && setup.setupState()?.completed !== true ? "playToEnd" : "fade";
+  };
   const [splashOpen, setSplashOpen] = createSignal(false);
   const splashMoving = () => splashShown() && !splashOpen();
   const [workspaceReady, setWorkspaceReady] = createSignal(false);
@@ -207,7 +210,7 @@ export function AppAccessGate() {
           title={t("app.loading")}
           scene={startupLoadingScene()}
           ready={splashReady()}
-          quickExit={!splashPlaysThrough}
+          exit={splashExit()}
           onMountViews={() => setSplashOpen(true)}
           onExited={() => {
             startupSplashPlayed = true;
