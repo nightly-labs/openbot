@@ -224,7 +224,7 @@ export class BootRecovery {
           .pipe(
             Effect.tapError((failure) =>
               Effect.sync(() => {
-                if (session.state === "inactive" || unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);
+                if (unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);
               }),
             ),
             toBootRecoveryFailed,
@@ -465,7 +465,7 @@ export class BootRecovery {
         }).pipe(
           Effect.catch((failure) =>
             Effect.sync(() => {
-              if (unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);
+              if (session.state === "inactive" || unreadableHistory(failure)) this.#unreadableHistory.add(historyKey);
               try {
                 this.#refreshBackfilledConversation(agent.id, publicThreadId);
               } catch (refreshFailure) {

@@ -119,8 +119,9 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly #confined: boolean;
   readonly #children = new Map<string, Deferred.Deferred<AgentClient, ProviderClientOperationError>>();
   readonly #sessions = new Map<string, HeldSession>();
-  readonly #sessionHosts = new WeakSet<AgentClient>();
+  readonly #sessionKeys = new Set<string>();
   readonly #historyReaders = new Map<AgentClient, number>();
+  readonly #importChildren = new WeakSet<AgentClient>();
   readonly #requests = new Map<RequestId, { child: AgentClient; id: RequestId }>();
   #nextRequestId = 0;
   readonly #lastModels = new Map<string, ModelEntry[]>();
@@ -198,6 +199,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     const key = childKey(agentId, request.cwd);
     const startedForImport = request.providerOnly === true && !this.#children.has(key);
     const child = yield* this.#child(agentId, request.cwd).pipe(toProviderClientOperationError);
+    if (startedForImport) this.#importChildren.add(child);
     this.#historyReaders.set(child, (this.#historyReaders.get(child) ?? 0) + 1);
     const endRead = Effect.suspend(() => {
       const left = (this.#historyReaders.get(child) ?? 1) - 1;
@@ -206,7 +208,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         return Effect.void;
       }
       this.#historyReaders.delete(child);
-      return startedForImport ? this.#releaseHistoryChild(key, child) : Effect.void;
+      return this.#importChildren.has(child) ? this.#releaseHistoryChild(key, child) : Effect.void;
     });
     if (!child.readHistory) return yield* endRead;
     const sessionId = ownSessionId(request.threadId, agentId, request.cwd);
@@ -221,11 +223,10 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     child: AgentClient,
   ) {
     const pending = this.#children.get(key);
-    if (!pending || this.#sessionHosts.has(child)) return;
+    if (!pending || this.#sessionKeys.has(key)) return;
     const started = yield* Effect.exit(Deferred.await(pending));
     if (Exit.isFailure(started) || started.value !== child || this.#children.get(key) !== pending) return;
-    if (this.#sessionHosts.has(child) || this.#historyReaders.has(child) || child.canReleaseProcess?.() === false)
-      return;
+    if (this.#sessionKeys.has(key) || this.#historyReaders.has(child) || child.canReleaseProcess?.() === false) return;
     this.#children.delete(key);
     this.#dropRequestsOf(child);
     yield* child.stop().pipe(Effect.ignore);
@@ -247,6 +248,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     this.#running = false;
     const children = [...this.#children.values()];
     this.#children.clear();
+    this.#sessionKeys.clear();
     this.#sessions.clear();
     this.#requests.clear();
     yield* Effect.forEach(
@@ -277,6 +279,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         continue;
       }
       this.#children.delete(key);
+      this.#sessionKeys.delete(key);
       for (const [threadId, held] of this.#sessions) if (held.child === child) this.#sessions.delete(threadId);
       this.#dropRequestsOf(child);
       yield* child.stop().pipe(Effect.ignore);
@@ -381,8 +384,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         case "thread/start": {
           const agentId = yield* customStep(() => this.#modelAgent(params));
           const cwd = yield* customStep(() => requiredCwd(params));
+          this.#sessionKeys.add(childKey(agentId, cwd));
           const child = yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError);
-          this.#sessionHosts.add(child);
           const response = yield* child
             .request(method, forChild(params, null), decodeRecordResponse, timeoutMs)
             .pipe(toProviderClientOperationError);
@@ -400,8 +403,8 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
           const threadId = getString(params, "threadId") ?? "";
           const agentId = yield* customStep(() => this.#routedAgent(params));
           const cwd = yield* customStep(() => requiredCwd(params));
+          this.#sessionKeys.add(childKey(agentId, cwd));
           const child = yield* this.#child(agentId, cwd).pipe(toProviderClientOperationError);
-          this.#sessionHosts.add(child);
           const held = { child, sessionId: ownSessionId(threadId, agentId, cwd) };
           this.#sessions.set(threadId, held);
           return yield* child.request(method, forChild(params, held.sessionId), decodeRecordResponse, timeoutMs).pipe(
@@ -625,7 +628,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         Effect.tap((current) =>
           Effect.sync(() => {
             if (current !== child || !this.#running) return;
-            if (folder === null || !this.#sessionHosts.has(child)) {
+            if (folder === null || !this.#sessionKeys.has(key)) {
               if (this.#children.get(key) === pending) this.#children.delete(key);
               this.#dropRequestsOf(child);
               return;
