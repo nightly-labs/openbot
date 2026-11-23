@@ -244,19 +244,48 @@
   overflow: hidden;
   width: fit-content;
   max-width: min(360px, 100%);
-  height: auto;
   box-sizing: border-box;
+  gap: 0;
+  inset-inline: 0;
+  margin-inline: auto;
+  transition-property: none;
+}
+
+.browser-dock .browser-dock-tab:has(:focus-visible) {
+  box-shadow: var(--openbot-focus-ring);
+}
+
+.browser-dock .browser-dock-tab-open {
+  min-width: 0;
+  height: auto;
   justify-content: flex-start;
   padding-block: var(--openbot-space-1);
   padding-inline: var(--openbot-space-2) var(--openbot-space-3);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
   color: var(--openbot-text-primary);
   font-size: var(--openbot-text-sm);
   font-weight: inherit;
   gap: var(--openbot-space-2);
-  inset-inline: 0;
   line-height: 1;
-  margin-inline: auto;
   white-space: nowrap;
+}
+
+.browser-dock .browser-dock-tab-open:hover {
+  background: transparent;
+}
+
+.browser-dock .browser-dock-tab-open:not(:last-child) {
+  padding-inline-end: var(--openbot-space-2);
+}
+
+.browser-dock .browser-dock-tab-done {
+  flex: none;
+  border-radius: var(--openbot-radius-pill);
+  box-shadow: none;
+  margin-inline-end: var(--openbot-space-1);
 }
 
 .browser-dock:is([data-tucked], [data-phase="showing"]) > :not(.browser-dock-tab, .browser-dock-tuck-glass) {
@@ -265,10 +294,6 @@
 
 .browser-dock:not([data-tucked]) > .browser-dock-tab {
   visibility: hidden;
-}
-
-.browser-dock .browser-dock-glass.browser-dock-tab:hover {
-  background: var(--openbot-bg-glass);
 }
 
 .browser-dock-tab-avatar {

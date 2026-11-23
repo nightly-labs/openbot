@@ -150,13 +150,6 @@ export const AgentActing: Story = {
   },
 };
 
-export const AgentNeedsYou: Story = {
-  args: {
-    onCompleteStep: fn(async () => true),
-    dock: <StoryDock island={{ kind: "activity", control: "request" }} working={false} />,
-  },
-};
-
 export const AgentAsks: Story = {
   args: {
     dock: (

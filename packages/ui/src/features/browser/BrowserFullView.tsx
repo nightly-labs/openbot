@@ -39,7 +39,6 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
   const live = () => props.liveViewTabId !== null;
   const canClose = () => props.canCloseTabs !== false;
   const recording = () => typeof props.teach?.startedAt === "number";
-  const [completingStep, setCompletingStep] = createSignal(false);
   let hideButton: HTMLButtonElement | undefined;
   let view: HTMLElement | undefined;
   let surfaceElement: HTMLDivElement | undefined;
@@ -172,16 +171,6 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
     </Button>
   );
 
-  async function completeStep(complete: () => Promise<unknown>) {
-    if (completingStep()) return;
-    setCompletingStep(true);
-    try {
-      await complete();
-    } finally {
-      setCompletingStep(false);
-    }
-  }
-
   return (
     <Tabs.Root
       as="section"
@@ -230,18 +219,6 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
           </Show>
         </BrowserPageCover>
         <div class="browser-full-top-spacer" />
-        <Show when={props.onCompleteStep}>
-          {(complete) => (
-            <Button
-              size="sm"
-              class="no-drag browser-full-done"
-              loading={completingStep()}
-              onClick={() => void completeStep(complete())}
-            >
-              {t("prompt.browser.done")}
-            </Button>
-          )}
-        </Show>
         {hideBrowserButton()}
       </div>
       <div class="browser-full-card">

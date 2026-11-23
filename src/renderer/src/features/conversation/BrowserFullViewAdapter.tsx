@@ -52,7 +52,6 @@ export default function BrowserFullViewAdapter() {
     stopBrowserTeach,
     sendCardFile,
     addPageText,
-    respondToBrowserTakeover,
   } = useConversationViewScope();
   const { t } = useText();
   const serverId = () => props.server?.id ?? "";
@@ -139,14 +138,6 @@ export default function BrowserFullViewAdapter() {
     };
   });
 
-  const completeStep = () => {
-    const request = props.browserTakeover;
-    const tab = activeBrowserTab();
-    if (!request || request.secret || !tab || request.tabId !== tab.id) return undefined;
-    if (request.reason === "sign-in-blocked" && localSignIn.canStart(tab)) return undefined;
-    return () => respondToBrowserTakeover("complete");
-  };
-
   onCleanup(localSignIn.cancel);
 
   return (
@@ -190,7 +181,6 @@ export default function BrowserFullViewAdapter() {
       liveViewRuntime={props.browserRuntime ?? conversationPort().browser}
       liveViewClipboard={serverSupportsCapability(props.server, "browser-view-clipboard")}
       onBack={() => setActiveRightPanel("browser")}
-      onCompleteStep={completeStep()}
       onEnterPip={props.runtime ? () => undefined : showBrowserPip}
       onSignInLocally={localSignIn.canStart(activeBrowserTab()) ? localSignIn.start : undefined}
       teach={teach()}
