@@ -9,6 +9,8 @@ import {
   type MediaUpstream,
   type MediaUpstreamArtifact,
   MediaUpstreamError,
+  type MediaUpstreamField,
+  type MediaUpstreamFields,
   MediaUpstreamHttp,
   type MediaUpstreamJob,
   type MediaUpstreamOptions,
@@ -23,7 +25,7 @@ import {
   validJobId,
 } from "./media-upstream";
 
-const UPLOAD_RETENTION_DAYS = 1;
+const UPLOAD_RETENTION_DAYS = 3;
 const REFUSED_IN_BODY = "refused";
 const INPUT_ROLES: Readonly<Record<CreditMediaInputRole, string>> = {
   first: "first_frame",
@@ -127,7 +129,64 @@ function fileName(input: MediaGenerationInput, index: number): string {
   return `${input.role}-${index}.${extension}`;
 }
 
+function isRoleImages(value: TasksValue): value is readonly RoleImage[] {
+  return Array.isArray(value) && value.every((item) => isDynamicRecord(item));
+}
+
+function renamedRoles(field: MediaUpstreamField, images: readonly RoleImage[]): RoleImage[] {
+  return images.map((image) => {
+    const role = field.values[image.role];
+    return { url: image.url, role: isString(role) ? role : image.role };
+  });
+}
+
+function mappedValue(field: MediaUpstreamField, value: TasksValue): TasksValue {
+  if (isRoleImages(value)) return renamedRoles(field, value);
+  const mapped = field.values[String(value)] ?? value;
+  if (field.role !== null && Array.isArray(mapped)) {
+    const role = field.role;
+    return mapped.map((url) => ({ url, role }));
+  }
+  if (!field.single || !Array.isArray(mapped)) return mapped;
+  return mapped[0] ?? null;
+}
+
+function roleFields(field: MediaUpstreamField, images: readonly RoleImage[]): Record<string, TasksValue> {
+  const named = new Map<string, { urls: string[]; list: boolean }>();
+  for (const image of images) {
+    const name = field.roles[image.role];
+    if (!name) continue;
+    const entry = named.get(name) ?? { urls: [], list: false };
+    entry.urls.push(image.url);
+    entry.list ||= image.role === INPUT_ROLES.reference || entry.urls.length > 1;
+    named.set(name, entry);
+  }
+  return Object.fromEntries([...named].map(([name, { urls, list }]) => [name, list ? urls : (urls[0] ?? null)]));
+}
+
+function withFields(
+  body: Readonly<Record<string, TasksValue>>,
+  fields: MediaUpstreamFields,
+): Readonly<Record<string, TasksValue>> {
+  const mapped: Record<string, TasksValue> = {};
+  for (const [key, value] of Object.entries(body)) {
+    const field = fields[key];
+    if (!field) mapped[key] = value;
+    else if (isRoleImages(value) && Object.keys(field.roles).length > 0)
+      Object.assign(mapped, roleFields(field, value));
+    else if (field.name !== null) mapped[field.name] = mappedValue(field, value);
+  }
+  return present<TasksValue>(mapped);
+}
+
 function generationBody(
+  generation: MediaGeneration,
+  urls: ReadonlyMap<MediaGenerationInput, string>,
+): Readonly<Record<string, TasksValue>> {
+  return withFields(defaultBody(generation, urls), generation.fields);
+}
+
+function defaultBody(
   generation: MediaGeneration,
   urls: ReadonlyMap<MediaGenerationInput, string>,
 ): Readonly<Record<string, TasksValue>> {

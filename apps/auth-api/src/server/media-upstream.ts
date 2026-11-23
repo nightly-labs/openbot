@@ -52,10 +52,21 @@ export interface MediaGenerationInput {
   mimeType: string;
 }
 
+export interface MediaUpstreamField {
+  name: string | null;
+  values: Readonly<Record<string, MediaUpstreamValue>>;
+  single: boolean;
+  role: string | null;
+  roles: Readonly<Record<string, string>>;
+}
+
+export type MediaUpstreamFields = Readonly<Record<string, MediaUpstreamField>>;
+
 export interface MediaGeneration {
   kind: CreditMediaGenerationKind;
   model: string;
   params: MediaUpstreamBody;
+  fields: MediaUpstreamFields;
   prompt: string;
   aspect: string | null;
   resolution: string | null;
@@ -178,6 +189,40 @@ export function present<Value>(entries: Record<string, Value | undefined | null>
     if (value !== undefined && value !== null) body[key] = value;
   }
   return body;
+}
+
+function isFieldValue(value: unknown): value is MediaUpstreamValue {
+  if (Array.isArray(value)) return value.every(isString);
+  return value === null || isString(value) || isNumber(value) || typeof value === "boolean";
+}
+
+function stringRecord(value: unknown): Record<string, string> {
+  if (!isDynamicRecord(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => isString(entry[1])));
+}
+
+function mediaUpstreamField(key: string, rule: DynamicRecord): MediaUpstreamField {
+  const values = isDynamicRecord(rule.values)
+    ? Object.fromEntries(
+        Object.entries(rule.values).filter((entry): entry is [string, MediaUpstreamValue] => isFieldValue(entry[1])),
+      )
+    : {};
+  return {
+    name: rule.name === null ? null : isString(rule.name) && rule.name.length > 0 ? rule.name : key,
+    values,
+    single: rule.single === true,
+    role: isString(rule.role) && rule.role.length > 0 ? rule.role : null,
+    roles: stringRecord(rule.roles),
+  };
+}
+
+export function mediaUpstreamFields(value: DynamicRecord | null): MediaUpstreamFields {
+  if (!value) return {};
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, rule]) =>
+      isDynamicRecord(rule) ? [[key, mediaUpstreamField(key, rule)] as const] : [],
+    ),
+  );
 }
 
 export function inputsOf(generation: MediaGeneration, role: CreditMediaInputRole): MediaGenerationInput[] {
