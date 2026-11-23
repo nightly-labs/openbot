@@ -2262,7 +2262,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             ((Boolean(snapshot.activeTurnId) && item.turnId === snapshot.activeTurnId) ||
               hostAwaitsQuestion(waits, agentId, item.turnId, input.requestId)),
         );
-        if (agent?.serverId !== activeServer.id || !showsOnline(activeServer) || !message?.questionPrompt) {
+        const hostWaits = waits.some(
+          (wait) =>
+            wait.reason === "question" &&
+            wait.agentId === agentId &&
+            String(wait.requestId) === String(input.requestId),
+        );
+        if (
+          agent?.serverId !== activeServer.id ||
+          !showsOnline(activeServer) ||
+          (!message?.questionPrompt && !hostWaits)
+        ) {
           throw new Error(currentText().t("mobile.workspace.error.formUnavailable"));
         }
         await request("POST", TEAM_API_ROUTES.respond.prompt, ignoreResponse, {
