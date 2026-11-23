@@ -363,26 +363,26 @@ export function WhatsAppIntegrationPanel(props: WhatsAppIntegrationPanelProps) {
             onAddAgent={() => openDialog("agent")}
           />
 
-          <For each={linked()}>
+          <For each={linked()} keyed={(entry) => entry.connection.workspaceId}>
             {(entry) => (
               <>
                 <SendersSection
-                  connection={entry.connection}
-                  account={entry.account}
+                  connection={entry().connection}
+                  account={entry().account}
                   busy={props.busy}
-                  onAddContact={() => setAddingContact(entry.connection.workspaceId)}
-                  onAddGroup={() => setAddingGroup(entry.connection.workspaceId)}
-                  onRemove={(senderId) => props.onRemoveSender(entry.connection.workspaceId, senderId)}
+                  onAddContact={() => setAddingContact(entry().connection.workspaceId)}
+                  onAddGroup={() => setAddingGroup(entry().connection.workspaceId)}
+                  onRemove={(senderId) => props.onRemoveSender(entry().connection.workspaceId, senderId)}
                   onSetReadOnly={(senderId, readOnly) =>
-                    props.onSetSenderReadOnly(entry.connection.workspaceId, senderId, readOnly)
+                    props.onSetSenderReadOnly(entry().connection.workspaceId, senderId, readOnly)
                   }
                 />
-                <Show when={!entry.account.ownNumber || entry.account.pendingRequests.length > 0}>
+                <Show when={!entry().account.ownNumber || entry().account.pendingRequests.length > 0}>
                   <RequestsSection
-                    connection={entry.connection}
-                    requests={entry.account.pendingRequests}
+                    connection={entry().connection}
+                    requests={entry().account.pendingRequests}
                     busy={props.busy}
-                    onAnswer={(code, approve) => props.onAnswerRequest(entry.connection.workspaceId, code, approve)}
+                    onAnswer={(code, approve) => props.onAnswerRequest(entry().connection.workspaceId, code, approve)}
                   />
                 </Show>
               </>
@@ -480,28 +480,28 @@ function SendersSection(props: {
       }
     >
       <ItemGroup class="settings-modal-card">
-        <For each={senders()}>
+        <For each={senders()} keyed={(sender) => sender.id}>
           {(sender) => (
             <Item class="settings-modal-row">
               <ItemMedia>
                 <LogoTile>
-                  <Show when={sender.kind === "group"} fallback={<UserRound aria-hidden="true" />}>
+                  <Show when={sender().kind === "group"} fallback={<UserRound aria-hidden="true" />}>
                     <UsersRound aria-hidden="true" />
                   </Show>
                 </LogoTile>
               </ItemMedia>
               <ItemContent>
-                <ItemTitle>{sender.name}</ItemTitle>
+                <ItemTitle>{sender().name}</ItemTitle>
                 <ItemDescription>
-                  {sender.kind === "group" ? t("connector.whatsapp.senderGroup") : phoneNumber(sender.id)}
+                  {sender().kind === "group" ? t("connector.whatsapp.senderGroup") : phoneNumber(sender().id)}
                 </ItemDescription>
               </ItemContent>
               <ItemActions>
-                <Show when={sender.readOnly !== undefined}>
+                <Show when={sender().readOnly !== undefined}>
                   <SenderAccessSelect
-                    sender={sender}
+                    sender={sender()}
                     busy={props.busy}
-                    onChange={(readOnly) => props.onSetReadOnly(sender.id, readOnly)}
+                    onChange={(readOnly) => props.onSetReadOnly(sender().id, readOnly)}
                   />
                 </Show>
                 <Button
@@ -511,9 +511,9 @@ function SendersSection(props: {
                   disabled={props.busy}
                   aria-label={t("connector.whatsapp.rowAction", {
                     action: t("connector.whatsapp.removeSender"),
-                    name: sender.name,
+                    name: sender().name,
                   })}
-                  onClick={() => props.onRemove(sender.id)}
+                  onClick={() => props.onRemove(sender().id)}
                 >
                   {t("connector.whatsapp.removeSender")}
                 </Button>
