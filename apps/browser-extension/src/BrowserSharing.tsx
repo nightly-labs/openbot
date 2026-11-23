@@ -163,7 +163,7 @@ function askTitle(ask: BrowserAsk, t: ReturnType<typeof useText>["t"]): string {
   }
 }
 
-export function AskCard(props: { ask: BrowserAsk; onAnswer: (choice: AskChoice) => void }) {
+function AskCard(props: { ask: BrowserAsk; onAnswer: (choice: AskChoice) => void }) {
   const { t } = useText();
   const sensitive = () => props.ask.kind !== "site";
   return (

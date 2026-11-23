@@ -2,8 +2,8 @@ import { decodeXReplyPayload, type XReplyPayload } from "@openbot/contracts/brow
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 
 export const OUTBOX_KEY = "openbot.x-outbox.v1";
-export const OUTBOX_LIFE_MS = 7 * 24 * 60 * 60 * 1_000;
-export const REPEAT_SAFE_MS = 23 * 60 * 60 * 1_000;
+const OUTBOX_LIFE_MS = 7 * 24 * 60 * 60 * 1_000;
+const REPEAT_SAFE_MS = 23 * 60 * 60 * 1_000;
 
 export interface QueuedPost {
   id: string;
@@ -36,7 +36,7 @@ function decodeQueuedPost(value: unknown): QueuedPost | null {
   };
 }
 
-export function decodeOutbox(value: unknown): QueuedPost[] {
+function decodeOutbox(value: unknown): QueuedPost[] {
   return Array.isArray(value) ? value.flatMap((entry) => decodeQueuedPost(entry) ?? []) : [];
 }
 

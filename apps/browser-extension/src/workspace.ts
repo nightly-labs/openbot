@@ -76,7 +76,7 @@ export interface OpenChat {
   error: string | null;
 }
 
-export interface SidebarPin {
+interface SidebarPin {
   kind: "agent" | "channel";
   id: string;
 }
@@ -91,7 +91,7 @@ export interface OpenChannel {
   error: string | null;
 }
 
-export interface WorkspaceFolder {
+interface WorkspaceFolder {
   id: string;
   name: string;
   depth: number;

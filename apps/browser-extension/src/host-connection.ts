@@ -32,9 +32,9 @@ import { type ExtensionSession, hostKeys, readHostProtocols, saveHostProtocol } 
 const FILE_DOWNLOAD: RemoteLargeDownload = { maxBytes: TEAM_PROTOCOL_V2_MAX_FILE_BYTES };
 const TRANSCRIPTION_TIMEOUT_MS = 125_000;
 
-export type HostProblem = "identity_changed" | "update_required" | "unavailable";
+type HostProblem = "identity_changed" | "update_required" | "unavailable";
 
-export class HostConnectionError extends Error {
+class HostConnectionError extends Error {
   constructor(
     readonly problem: HostProblem,
     message: string,

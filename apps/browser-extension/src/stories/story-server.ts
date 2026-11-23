@@ -87,7 +87,7 @@ export const STORY_AGENTS: ClientAgentSummary[] = [
   }),
 ];
 
-export const STORY_MODELS: ClientAgentModelOption[] = [
+const STORY_MODELS: ClientAgentModelOption[] = [
   {
     provider: "claude",
     id: "claude-haiku-5-5",
@@ -114,7 +114,7 @@ export const STORY_MODELS: ClientAgentModelOption[] = [
   },
 ];
 
-export const STORY_STATUS: AgentStatus = {
+const STORY_STATUS: AgentStatus = {
   phase: "ready",
   cliVersion: "2.1.231",
   auth: { kind: "chatgpt", email: "person@example.com" },
@@ -176,7 +176,7 @@ export const STORY_CHIEF_MESSAGES: ConversationMessage[] = [
   }),
 ];
 
-export const STORY_LAYOUT: SidebarLayoutSnapshot = {
+const STORY_LAYOUT: SidebarLayoutSnapshot = {
   revision: 1,
   sections: [
     { id: "folder-work", name: "Work" },
@@ -221,7 +221,7 @@ export function channelMessage(sequence: number, author: ChannelMessage["author"
   };
 }
 
-export const STORY_CHANNEL_MESSAGES: ChannelMessage[] = [
+const STORY_CHANNEL_MESSAGES: ChannelMessage[] = [
   channelMessage(
     1,
     { kind: "member", id: MEMBER_ID, name: "You" },

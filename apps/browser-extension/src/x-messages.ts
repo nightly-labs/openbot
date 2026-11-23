@@ -22,7 +22,7 @@ export type StorageRequest =
 const isKeys = (value: unknown): value is string | string[] =>
   isString(value) || (Array.isArray(value) && value.every(isString));
 
-export function isStoredValue(value: unknown): value is chrome.storage.StoredValue {
+function isStoredValue(value: unknown): value is chrome.storage.StoredValue {
   if (value === null || isString(value) || typeof value === "number" || typeof value === "boolean") return true;
   if (Array.isArray(value)) return value.every(isStoredValue);
   return isDynamicRecord(value) && Object.values(value).every(isStoredValue);
@@ -62,12 +62,7 @@ export interface XStatus {
   reason: string;
 }
 
-export type XNotReadyReason =
-  | "signed-out"
-  | "no-x-agent"
-  | "panel-connecting"
-  | "server-failed"
-  | `server-failed (${string})`;
+type XNotReadyReason = "signed-out" | "no-x-agent" | "panel-connecting" | "server-failed" | `server-failed (${string})`;
 
 export type XStatusAnswer = { ready: true; labels: XLabels } | { ready: false; reason: XNotReadyReason };
 

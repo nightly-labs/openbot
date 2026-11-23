@@ -5,7 +5,7 @@ import { createSignal, onCleanup } from "solid-js";
 
 export type DictationPhase = "idle" | "starting" | "recording" | "transcribing";
 
-export const MICROPHONE_PAGE = "microphone.html";
+const MICROPHONE_PAGE = "microphone.html";
 
 export function createDictation(options: {
   transcribe: (wav: Uint8Array) => Promise<string>;

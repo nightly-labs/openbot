@@ -42,7 +42,7 @@ const revisions = new Map<number, number>();
 
 export const isWebUrl = (url: string | undefined): url is string => Boolean(url && /^https?:\/\//iu.test(url));
 
-export function looksLikeGrant(url: string | undefined): boolean {
+function looksLikeGrant(url: string | undefined): boolean {
   if (!url || !URL.canParse(url)) return false;
   const parsed = new URL(url);
   return /authori[sz]e|oauth/iu.test(parsed.pathname) && parsed.searchParams.has("client_id");
