@@ -95,7 +95,9 @@ export const messages = {
     "Güvenlik anahtarı eksik olduğu veya değiştiği için OpenBot bu sunucuyu doğrulayamıyor. Sunucu sahibinden sunucuyu kontrol etmesini isteyin.",
   "error.remote.connectionNotStarted":
     "OpenBot bu sunucuyla bağlantıyı başlatamadı. Sorun devam ederse OpenBot'tan çıkın ve yeniden açın.",
-  "error.remote.hostDidNotConnect": "WebRTC ana makinesi bağlanmadı.",
+  "error.remote.connectionServiceUnreachable":
+    "Bu bilgisayar OpenBot bağlantı hizmetine ulaşamıyor. İnternet bağlantısını kontrol edin. OpenBot otomatik olarak yeniden bağlanır.",
+  "error.remote.serverAnswerTimeout": "Sunucu zamanında yanıt vermedi. OpenBot otomatik olarak yeniden bağlanır.",
   "error.remote.connectionCancelled": "Uzak bağlantı iptal edildi.",
   "error.remote.hostDisconnected":
     "Sunucuyla bağlantı kesildi. Eylemin tamamlanıp tamamlanmadığını kontrol edin, ardından tekrar deneyin.",

@@ -96,7 +96,10 @@ export const messages = {
     "OpenBot kann diesen Server nicht prüfen, weil sein Sicherheitsschlüssel fehlt oder sich geändert hat. Bitte den Serverbesitzer, den Server zu prüfen.",
   "error.remote.connectionNotStarted":
     "OpenBot konnte die Verbindung zu diesem Server nicht starten. Wenn das weiter passiert, beende OpenBot und öffne es erneut.",
-  "error.remote.hostDidNotConnect": "Der WebRTC-Host hat sich nicht verbunden.",
+  "error.remote.connectionServiceUnreachable":
+    "Dieser Computer erreicht den Verbindungsdienst von OpenBot nicht. Prüfe seine Internetverbindung. OpenBot verbindet sich automatisch wieder.",
+  "error.remote.serverAnswerTimeout":
+    "Der Server hat nicht rechtzeitig geantwortet. OpenBot verbindet sich automatisch wieder.",
   "error.remote.connectionCancelled": "Die entfernte Verbindung wurde abgebrochen.",
   "error.remote.hostDisconnected":
     "Die Verbindung zum Server wurde unterbrochen. Prüfe, ob die Aktion abgeschlossen wurde, und versuche es dann erneut.",

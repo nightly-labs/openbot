@@ -98,7 +98,9 @@ export const messages = {
     "OpenBot kan deze server niet controleren, omdat de beveiligingssleutel ontbreekt of is gewijzigd. Vraag de eigenaar van de server om de server te controleren.",
   "error.remote.connectionNotStarted":
     "OpenBot kon de verbinding met deze server niet starten. Als dit blijft gebeuren, sluit OpenBot af en open het opnieuw.",
-  "error.remote.hostDidNotConnect": "De WebRTC-host heeft geen verbinding gemaakt.",
+  "error.remote.connectionServiceUnreachable":
+    "Deze computer kan de verbindingsdienst van OpenBot niet bereiken. Controleer de internetverbinding. OpenBot verbindt automatisch opnieuw.",
+  "error.remote.serverAnswerTimeout": "De server heeft niet op tijd geantwoord. OpenBot verbindt automatisch opnieuw.",
   "error.remote.connectionCancelled": "De externe verbinding is geannuleerd.",
   "error.remote.hostDisconnected":
     "De verbinding met de server is verbroken. Controleer of de actie is voltooid en probeer het dan opnieuw.",
