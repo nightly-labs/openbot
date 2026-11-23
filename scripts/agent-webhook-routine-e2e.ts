@@ -154,7 +154,9 @@ interface WebhookToolArgs {
 interface WebhookToolBody {
   error?: string;
   deleted?: boolean;
-  webhookRoutines?: { routineId: string; eventType: string | null; filters: unknown[] }[];
+  webhookRoutines?: { routineId: string; eventType: string | null; filters: unknown[]; instruction?: string }[];
+  routines?: { id: string; instruction: string; instructionTruncated?: boolean; instructionLength?: number }[];
+  truncatedInstructions?: string;
   eventType?: string | null;
   filters?: { pointer: string; value: string }[];
   routineId?: string;
@@ -197,6 +199,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -489,6 +492,46 @@ try {
       (item) => item.routineId === result.routineId && item.eventType === "build.failed" && item.filters.length === 1,
     ) === true,
   );
+  const readByTool = await callTool("read webhook", agent.id, { __tool: "list_routines", routineId: result.routineId });
+  pass(
+    "list_routines with a routineId gives only that webhook routine with its full instruction",
+    readByTool.body?.routines?.length === 0 &&
+      readByTool.body.webhookRoutines?.length === 1 &&
+      readByTool.body.webhookRoutines[0]?.instruction === "Read the failed build and tell me which test failed.",
+    readByTool.text,
+  );
+  const longInstruction = `Check the nightly report and list each failed job. ${"Keep this rule. ".repeat(200)}End.`;
+  const longRoutine = agents.createRoutine({
+    agentId: agent.id,
+    name: "Long nightly check",
+    instruction: longInstruction,
+    active: false,
+    timezone: "UTC",
+    schedule: { kind: "daily", time: "08:00" },
+  });
+  const listedAll = (await callTool("list long", agent.id, { __tool: "list_routines" })).body;
+  const listedLong = listedAll?.routines?.find((item) => item.id === longRoutine.id);
+  pass(
+    "list_routines cuts a long instruction and marks it",
+    Boolean(listedAll?.truncatedInstructions) &&
+      listedLong?.instructionTruncated === true &&
+      listedLong.instructionLength === longInstruction.length &&
+      listedLong.instruction.length < longInstruction.length &&
+      longInstruction.startsWith(listedLong.instruction),
+  );
+  const readLong = await callTool("read long", agent.id, { __tool: "list_routines", routineId: longRoutine.id });
+  pass(
+    "list_routines with a routineId gives the full long instruction",
+    readLong.body?.routines?.length === 1 &&
+      readLong.body.routines[0]?.instruction === longInstruction &&
+      readLong.body.routines[0].instructionTruncated === undefined &&
+      readLong.body.truncatedInstructions === undefined &&
+      readLong.body.webhookRoutines?.length === 0,
+    readLong.text,
+  );
+  const unknownRead = await callTool("read unknown", agent.id, { __tool: "list_routines", routineId: "missing" });
+  pass("list_routines with an unknown routineId fails", unknownRead.entry.result?.success === false, unknownRead.text);
+  await runCauseEffect(agents.deleteRoutine({ agentId: agent.id, routineId: longRoutine.id }));
   const updated = await callTool("update", agent.id, {
     __tool: "update_webhook_routine",
     routineId: result.routineId,

@@ -41,9 +41,11 @@ export function pickPoolAccount(
   candidates: readonly PoolCandidate[],
   current: string | null,
   nowSeconds: number,
+  openOnly = false,
 ): string | null {
   if (candidates.length === 0) return null;
   const open = candidates.filter((candidate) => usable(candidate, nowSeconds));
+  if (open.length === 0 && openOnly) return null;
   if (open.length === 0) {
     const mostLeft = (candidate: PoolCandidate) =>
       Math.max(0, ...windowsOf(candidate).map((window) => usedNow(window, nowSeconds)));

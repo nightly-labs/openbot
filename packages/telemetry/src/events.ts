@@ -90,7 +90,7 @@ export const ANALYTICS_GENERATIONS = {
   desktop_host: 21,
   desktop: 13,
   web: 2,
-  mobile: 4,
+  mobile: 5,
 } as const satisfies Record<Report["surface"], number>;
 
 const FAILURE_CODES = new Set([
@@ -270,7 +270,7 @@ export function classifyFailure(error: unknown): CauseCode {
   if (/\b(?:content[ _-]?filter(?:ed)?|requires moderation|was flagged|safety (?:filter|block))\b/iu.test(message))
     return "content_blocked";
   if (
-    /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b[^.,;:\n]{0,60}\b(?:not found|does not exist|is not supported))\b/iu.test(
+    /\b(?:model[ _]not[ _]found|unknown model|no such model|not a valid model|no endpoints found|model\b(?![.:]\S)(?:[^.,;:\n]|[.:](?=\S)){0,60}\b(?:not found|does not exist|is not supported))\b/iu.test(
       message,
     ) ||
     /\bmodels\/\S+ is not found\b|\bmodel\b(?:\s+\S+)?\s+(?:(?:was|is|has been) retired|is no longer (?:available|supported))\b/iu.test(

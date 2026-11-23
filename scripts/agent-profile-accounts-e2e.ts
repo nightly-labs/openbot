@@ -191,6 +191,7 @@ const report: {
   stored?: Pick<AgentSummary, "providerAccountId" | "backupModels">;
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
   pool?: { second: string | null; default: string | null; null: string | null };
+  liveVoice?: { saved: string | null; afterRemove: string | null; automatic: string | null };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -199,6 +200,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -654,6 +656,26 @@ try {
     pooledAgain.text,
   );
   await runCauseEffect(accounts.setPool("codex", null));
+
+  await runCauseEffect(accounts.setLiveVoiceAccount(second.id));
+  const reloaded = new ProviderAccountStore(join(userData, "openbot-provider-accounts-v1.json"), accountsRoot);
+  await runCauseEffect(reloaded.load());
+  const saved = reloaded.liveVoiceAccount();
+  const removable = await runCauseEffect(accounts.create("codex"));
+  assert.ok(removable, "live voice: no account to remove");
+  await runCauseEffect(accounts.setLiveVoiceAccount(removable.id));
+  await runCauseEffect(accounts.remove(removable));
+  const afterRemove = accounts.liveVoiceAccount();
+  await runCauseEffect(accounts.setLiveVoiceAccount(second.id));
+  await runCauseEffect(accounts.setLiveVoiceAccount(null));
+  report.liveVoice = { saved, afterRemove, automatic: accounts.liveVoiceAccount() };
+  pass(
+    "The live voice account is saved, a removed account is no longer the choice, and null goes back to automatic",
+    saved === second.id &&
+      afterRemove === null &&
+      report.liveVoice.automatic === null &&
+      reloaded.list("codex").length > 0,
+  );
 
   const photoSource = join(root, "photo.png");
   await copyFile(resolve(import.meta.dirname, "../apps/auth-api/public/apple-touch-icon.png"), photoSource);

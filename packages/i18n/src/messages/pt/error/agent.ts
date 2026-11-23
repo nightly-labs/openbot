@@ -55,6 +55,12 @@ export const messages = {
   "error.agent.modelUnavailable": "O modelo selecionado para o agente está indisponível.",
   "error.agent.modelProviderNotConnected":
     'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não está conectado.',
+  "error.agent.modelProviderSignInRequired":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} precisa de login. Entre no {provider} e tente de novo.',
+  "error.agent.modelProviderNotInstalled":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não está instalado.',
+  "error.agent.modelProviderOutdated":
+    'O modelo selecionado para o agente, "{model}", está indisponível: {provider} precisa de uma atualização.',
   "error.agent.modelListEmpty":
     'O modelo selecionado para o agente, "{model}", está indisponível: {provider} não listou nenhum modelo. Último erro: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -129,6 +135,8 @@ export const messages = {
     "Não foi possível remover todos os dados do agente. Tente excluir o agente novamente.",
   "error.agent.deleteFolderInUse":
     "O trabalho de outro agente ainda usa a pasta deste agente. Exclua este agente de novo quando esse trabalho terminar ou depois de reiniciar o OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Outro programa ainda usa a pasta deste agente, por exemplo um programa que o agente iniciou. Feche esse programa ou reinicie o computador em que este agente roda e exclua o agente novamente.",
   "error.agent.deleteWhenFolderFree":
     "O trabalho de outro agente ainda usa a pasta deste agente. O OpenBot exclui este agente quando esse trabalho terminar.",
   "error.agent.duplicationBusy": "Este agente já está sendo duplicado.",
@@ -153,6 +161,8 @@ export const messages = {
     "O que as mensagens fazem enquanto o agente trabalha só pode ser definido no computador que executa o agente.",
   "error.agent.backupModelsLocalOnly":
     "Os modelos de reserva só podem ser definidos no computador que executa o agente.",
+  "error.agent.backupModelsAtLimit":
+    "Nenhum modelo reserva pode assumir agora: cada um atingiu o limite de uso ou falhou há pouco. Os modelos de uma conta podem dividir um limite. Para continuar agora, adicione um modelo reserva de outro provedor ou de outra conta, ou espere o limite ser renovado.",
   "error.agent.taskLimitLocalOnly": "O limite de tarefas só pode ser definido no computador que executa o agente.",
   "error.agent.localScriptsOff": "Este agente não permite scripts locais.",
   "error.agent.localScriptsRateLimited":

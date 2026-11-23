@@ -299,6 +299,20 @@ try {
 
   const unwatched = await send(comment("acme/other", 1, "ana").body);
   check("an event of a repository that no trigger watches gets 404", unwatched.status === 404, unwatched);
+  await run(workflows.setPaused({ workflowId: chain.summary.id, paused: true }));
+  check(
+    "a paused workflow's repository is no longer watched",
+    !(watched.at(-1) ?? []).includes("acme/chain") && (watched.at(-1) ?? []).includes("acme/app"),
+    watched.at(-1),
+  );
+  const pausedEvent = await send(comment("acme/chain", 1, "ana").body);
+  check("an event for a paused workflow gets 404", pausedEvent.status === 404, pausedEvent);
+  await run(workflows.setPaused({ workflowId: chain.summary.id, paused: false }));
+  check(
+    "a resumed workflow's repository is watched again",
+    (watched.at(-1) ?? []).includes("acme/chain"),
+    watched.at(-1),
+  );
   const invalid = await send("{");
   check("a body that is not JSON gets 400", invalid.status === 400, invalid);
 

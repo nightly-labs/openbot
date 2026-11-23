@@ -96,7 +96,7 @@ export function isAvatarHue(value: unknown): value is AvatarHue {
   return isOneOf(AVATAR_HUES, value);
 }
 
-export const AGENT_MODEL_LISTINGS = ["new", "older"] as const;
+export const AGENT_MODEL_LISTINGS = ["new", "older", "kept"] as const;
 export type AgentModelListing = (typeof AGENT_MODEL_LISTINGS)[number];
 
 export interface AgentModelOption {

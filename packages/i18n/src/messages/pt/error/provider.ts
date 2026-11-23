@@ -19,6 +19,8 @@ export const messages = {
     "O {provider} informa que seu plano se esgotou. Escolha outro modelo ou faça upgrade do seu plano do {provider}.",
   "error.provider.acpMcpNotLoaded":
     "O {provider} não carregou as ferramentas do OpenBot, então este agente não pode usá-las nem falar com os colegas. Uma política de equipe do {provider} pode bloquear servidores MCP locais. Peça ao administrador da sua equipe para permiti-los e tente de novo.",
+  "error.provider.acpToolsNotLoaded":
+    "O {provider} executou esta mensagem sem as ferramentas do OpenBot, então o agente não pôde falar com os colegas, usar o navegador nem anexar arquivos. Tente de novo.",
   "error.provider.acpOwnMcpServerFailed":
     "O {provider} não conseguiu iniciar o servidor MCP {name}, então a resposta parou. Este servidor está nas suas próprias configurações do {provider}, não no OpenBot. Remova ou repare o servidor lá e depois inicie um novo chat.",
   "error.provider.endpointsReadOnly":
@@ -146,6 +148,7 @@ export const messages = {
     "A chave do provedor contém um espaço ou um caractere que uma chave não pode conter.",
   "error.provider.noModel": "O provedor selecionado não tem nenhum modelo disponível.",
   "error.provider.noModelNamed": "{provider} não tem nenhum modelo disponível.",
+  "error.provider.acpModelsNotLoaded": "O {provider} não conseguiu carregar os modelos. Envie sua mensagem de novo.",
   "error.provider.acpNoModels":
     "A CLI ACP não anunciou nenhum modelo ACP. O OpenBot não vai escolher um modelo alternativo por suposição.",
   "error.provider.endpointRemoveBusy": "Aguarde o turno ativo e a fila terminarem antes de remover este endpoint.",
@@ -184,6 +187,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "{provider} parou antes de esta mensagem começar. Envie a mensagem de novo.",
   "error.provider.sessionStartTimedOut":
     "{provider} não abriu um novo chat a tempo, então esta mensagem não começou. No computador que executa o OpenBot, abra Provedores, selecione {provider} e clique em Reiniciar. Depois tente de novo.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} não abriu este chat a tempo, então esta mensagem não começou. No computador que executa o OpenBot, abra Provedores, selecione {provider} e clique em Reiniciar. Depois tente de novo.",
   "error.provider.serviceUnreachable":
     "{provider} não consegue se conectar ao serviço dele. Verifique sua conexão com a internet. O OpenBot tentará de novo.",
   "error.provider.serviceUnreachableRefresh":
@@ -248,6 +253,7 @@ export const messages = {
     "O OpenCode Go recusou a solicitação. Uma nova chave de API não resolve isso. Seu plano do OpenCode Go pode não estar ativo, ou o OpenCode Go pode bloquear sua rede: alguns serviços bloqueiam VPNs, proxies ou alguns países. Verifique se o seu plano está ativo no OpenCode Console ou desative a VPN e tente novamente. Você também pode escolher outro modelo.",
   "error.provider.opencodeServiceFailure":
     "O OpenCode não conseguiu concluir este turno porque seu serviço local falhou. Tente novamente. Se o erro continuar, reconecte o OpenCode em Configurações.",
+  "error.provider.opencodeStillStarting": "O OpenCode não terminou de carregar a tempo. O OpenBot vai tentar de novo.",
   "error.provider.opencodeRateLimited":
     "O provedor do modelo recusou a solicitação por causa do limite de requisições. Aguarde alguns minutos ou escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.opencodeBilling":
@@ -276,6 +282,8 @@ export const messages = {
     "O OpenCode não conseguiu ler o raciocínio deste modelo com este esforço. Selecione um esforço menor ou outro modelo e envie sua mensagem de novo.",
   "error.provider.opencodeModelNotServed":
     "O provedor do modelo não oferece este modelo para a sua conta agora. Escolha outro modelo e envie sua mensagem de novo.",
+  "error.provider.opencodeSafetyBlocked":
+    "O provedor do modelo bloqueou esta mensagem por causa das regras de segurança dele. Envie sua solicitação de novo com outras palavras. Se ele também bloquear suas próximas mensagens, inicie um novo chat ou escolha outro modelo.",
   "error.provider.opencodeNetwork":
     "O OpenCode não conseguiu se conectar ao provedor do modelo. Verifique a conexão de rede do computador que executa o OpenBot e tente novamente.\n{detail}",
   "error.provider.codexStateBusy":
@@ -286,8 +294,12 @@ export const messages = {
     "O Linux parou o provedor porque o OpenBot tem um limite de CPU em tempo real igual a 0. O limite vem do seu sistema. Instale e inicie o rtkit (`rtkit-daemon`), execute `systemctl --user restart xdg-desktop-portal` e depois reinicie o OpenBot. Reiniciar apenas o xdg-desktop-portal não resolve enquanto o rtkit estiver ausente.",
   "error.provider.cpuUnsupported":
     "O processador deste computador não consegue executar este provedor. Use outro provedor.",
+  "error.provider.windowsBlocked":
+    "As configurações de segurança do Windows, como o Controle Inteligente de Aplicativos, impediram que este provedor iniciasse. Use outro provedor.",
   "error.provider.opencodeDatabaseNewer":
     "O OpenCode não conseguiu abrir o banco de dados porque uma versão mais recente do OpenCode o alterou. Atualize o OpenCode para a versão 2 ou posterior e tente novamente.",
+  "error.provider.grokDefaultModelNotAllowed":
+    "O Grok não iniciou porque a configuração allowed_models dele não inclui o modelo padrão. Adicione o modelo padrão a allowed_models, ou remova allowed_models, e tente de novo.",
   "error.provider.opencodeNoAnswer":
     "O modelo do OpenCode encerrou o turno sem resposta. Tente novamente ou escolha outro modelo.",
   "error.provider.opencodeReasoningWithoutAnswer":
@@ -299,6 +311,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} parou sem resposta. Envie a mensagem novamente.",
   "error.provider.channelNoAnswer":
     "{provider} encerrou o turno sem resposta. No canal, clique em Continuar para executar a tarefa novamente, ou em Reatribuir para passá-la a outro membro.",
+  "error.provider.acpProcessStopped": "{provider} parou antes de responder. Envie a mensagem novamente.",
   "error.provider.chatgptPageFailed": "O OpenBot não conseguiu abrir a página de conexão do ChatGPT.",
   "error.provider.noneReady": "Nenhum provedor de agentes está pronto.",
   "error.provider.claudeTurnActive": "Aguarde o turno ativo do Claude terminar antes de atualizar seu contexto.",
@@ -334,8 +347,12 @@ export const messages = {
     "O Gemini recusou esta solicitação e não informou a causa. Um item do histórico do chat pode causar isso, como uma imagem que o agente abriu. O OpenBot iniciou uma nova sessão do Gemini com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo.",
   "error.provider.antigravityHistoryUnreadable":
     "O Gemini não conseguiu ler o histórico salvo deste chat. O OpenBot iniciou uma nova sessão do Gemini com o histórico do chat. Envie sua mensagem novamente.",
+  "error.provider.acpTurnStuck":
+    "{provider} não terminou o turno anterior, então não aceitou esta mensagem. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Envie sua mensagem novamente.",
   "error.provider.antigravityLocationUnsupported":
     "O Google não permite que o Gemini funcione a partir da localização de rede do computador que executa este agente. Use o Gemini em outro computador ou escolha outro provedor para este agente.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "O Gemini parou por causa de um erro. Envie sua mensagem de novo. Se ele parar de novo, escolha outro modelo ou provedor.",
   "error.provider.antigravityConnectionLost":
     "O Gemini perdeu a conexão com seu agente e parou. Envie uma mensagem para continuar.",
   "error.provider.grokServiceFailure":
@@ -407,6 +424,10 @@ export const messages = {
     "O Codex não pôde continuar este chat porque falta um item no histórico salvo. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Tente novamente.",
   "error.provider.codexRequestRefused":
     "O {provider} recusou a solicitação deste chat e não informou a causa. Isso pode acontecer em um chat longo com muitas imagens. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
+  "error.provider.codexSafetyBlocked":
+    "O {provider} bloqueou esta mensagem por causa das regras de segurança dele: {reason} O agente não vê mais esta mensagem, então ela não impede suas próximas mensagens. Envie sua solicitação de novo com outras palavras.",
+  "error.provider.codexSafetyBlockedKept":
+    "O {provider} bloqueou esta mensagem por causa das regras de segurança dele: {reason} Se o {provider} também bloquear suas próximas mensagens, inicie um novo chat.",
   "error.provider.codexAudioRefused":
     "Este modelo não consegue ouvir áudio, por isso não aceitou o som deste chat. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Para continuar, envie sua solicitação de novo e peça ao agente para trabalhar sem o som. Para verificar o som, selecione no menu de modelos do agente um modelo que consiga ouvir áudio.",
   "error.provider.imageTooSmall":
@@ -421,6 +442,8 @@ export const messages = {
     "Este chat ficou grande demais para ser enviado ao modelo. As imagens do chat costumam causar isso. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":
     "O OpenCode recusou a solicitação e não informou a causa. Isso pode acontecer em um chat longo ou depois de trocar de modelo. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo ou um esforço menor.",
+  "error.provider.opencodeInputRefused":
+    "O modelo recusou o conteúdo deste chat e não informou a causa. Um arquivo no chat, como um PDF ou uma imagem, pode causar isso. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Envie sua mensagem de novo sem o arquivo ou escolha outro modelo.",
   "error.provider.opencodeCompactionFailed":
     "O modelo não conseguiu resumir este chat longo para liberar espaço na janela de contexto. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha um modelo mais potente.",
   "error.provider.museMcpStartupFault":
@@ -529,6 +552,7 @@ export const messages = {
   "error.provider.sessionSettingUnavailable": "Esta configuração não está disponível na sessão atual do provedor.",
   "error.provider.sessionSettingInvalid": "Este valor não está disponível para a configuração.",
   "error.provider.sessionSettingsBusy": "Aguarde o turno atual terminar antes de mudar uma configuração de sessão.",
+  "error.provider.sessionSettingsTimedOut": "A sessão do agente não respondeu a tempo. Tente novamente.",
   "error.provider.piOutdated":
     "O Pi {version} é antigo demais. Instale o Pi 1.1.0 ou mais recente para suporte a RPC e MCP nativos.",
   "error.provider.nativeMissing": "A CLI do {provider} não está instalada. Baixe-a em Configurações.",
@@ -537,6 +561,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Aguarde o turno atual do Pi terminar.",
   "error.provider.acpSessionBusy":
     "{provider} ainda está terminando um turno interrompido. Tente novamente em instantes.",
+  "error.provider.acpSessionStale":
+    "{provider} não conseguiu carregar a versão mais recente desta conversa. Envie sua mensagem novamente.",
   "error.provider.acpModelNotOffered":
     "{provider} não oferece {model} agora. Escolha outro modelo para este agente e tente novamente.",
   "error.provider.piStopped": "O Pi não está rodando. Conecte o Pi e tente de novo.",
@@ -581,6 +607,8 @@ export const messages = {
   "error.provider.museTurnFailed": "O turno do Muse falhou.",
   "error.provider.museModelUnavailable":
     "O Muse não pode usar este modelo. O Muse pode não estar disponível no país onde este agente é executado, ou esta conta não tem acesso ao modelo. Escolha outro modelo e tente novamente.\n{detail}",
+  "error.provider.museSavedKeyFailed":
+    "O Muse não conseguiu concluir esta solicitação. O Muse usa a chave de API da Meta salva, não o seu login. Substitua a chave ou remova-a nas Configurações para usar o seu login.\n{detail}",
   "error.provider.museProfileUnsupported":
     "O Muse não consegue gerar um perfil sem acesso a ferramentas externas. Use outro provedor para gerar o perfil e depois selecione o Muse para o agente.",
   "error.provider.museAuthUnverified":

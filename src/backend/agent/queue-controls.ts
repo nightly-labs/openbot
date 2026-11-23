@@ -25,6 +25,7 @@ import { type DrainScheduler, REMOVED_ENDPOINT_MESSAGE } from "./drain-scheduler
 import type { LiveVoiceRelayed } from "./live-voice";
 import type { MailboxSync } from "./mailbox-sync";
 import type { ProviderRuntime } from "./provider-runtime";
+import { quietTeammateTurnDelivery } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { providerForAgent } from "./thread-items";
 
@@ -263,7 +264,8 @@ export class QueueControls {
           throw new Error(sourceText("error.backend.steerQueuedOnly"));
         const turnId = snapshot.activeTurnId;
         const turnModel = this.#drain.modelForTurn(agent.id, turnId) ?? agent.model;
-        if (!this.#endpoints.serves(turnModel, client.provider)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+        if (!this.#endpoints.servesClient(turnModel, client.provider, this.#providers.configRevision(client)))
+          throw new Error(REMOVED_ENDPOINT_MESSAGE);
         return { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel };
       },
     );
@@ -283,6 +285,16 @@ export class QueueControls {
     yield* this.#mailbox.markSteering(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     this.#mailboxSync.emitQueue(agent.id);
     const note = steerNoteFor(providerForAgent(agent), context.delivery.sender, context.delivery.text);
+    const routineRun =
+      context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null;
+    const turnDeliveries = this.#mailbox
+      .findDeliveriesByTurn(agent.id, turnId)
+      .filter(({ delivery }) => delivery.id !== input.deliveryId);
+    const steersQuietTurn =
+      turnDeliveries.length > 0 &&
+      turnDeliveries.every(({ delivery }) =>
+        quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id)),
+      );
     yield* client
       .request(
         "turn/steer",
@@ -295,19 +307,24 @@ export class QueueControls {
             ...deliveryPromptInput(context, {
               agentNames: agentNamesById(this.#store.list()),
               snapshot,
-              routineRun:
-                context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
+              routineRun: routineRun ?? this.#routines.linkedRunForDelivery(input.deliveryId),
+              skippedRoutineRuns: routineRun ? this.#routines.skippedBefore(routineRun) : null,
               workflowRunSource:
                 context.delivery.sender.kind === "routine" ? this.#routines.workflowRunSource(input.deliveryId) : null,
               wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
+              continuesWait:
+                context.delivery.sender.kind === "routine" && this.#routines.continuesWait(input.deliveryId),
               routineTimezone:
                 context.delivery.sender.kind === "routine"
                   ? this.#routines.timezoneForDelivery(input.deliveryId)
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
+              taskReport: this.#drain.taskReport(context),
+              taskReportWaiting: this.#drain.taskReportWaiting(context),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
               liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
               steerFramedAsUser: providerForAgent(agent) === "claude",
+              steersQuietTurn,
             }),
           ],
         },
@@ -328,10 +345,13 @@ export class QueueControls {
           ),
         ),
       );
-    yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
+    const steering = this.#mailbox.getDelivery(input.deliveryId)?.delivery;
+    const joinedTurn = steering?.status === "starting" && steering.turnId === turnId;
+    if (joinedTurn) yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     yield* queueStep(() => {
       const current = liveSnapshot();
       if (
+        joinedTurn &&
         this.#conversation.isExecutionThread(current.threadId) &&
         !current.messages.some((message) => message.id === input.deliveryId)
       ) {
@@ -340,7 +360,9 @@ export class QueueControls {
       }
       this.#mailboxSync.syncMailboxMessages(current);
       this.#mailboxSync.emitQueue(agent.id);
-      this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
+      if (joinedTurn)
+        this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
+      else this.#conversation.emitConversation(current);
     });
   }, Effect.uninterruptible);
 }

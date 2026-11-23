@@ -8,6 +8,7 @@ import ChevronRight from "lucide-react-native/icons/chevron-right";
 import X from "lucide-react-native/icons/x";
 import { View } from "react-native";
 import { useChatCardSurface } from "@/features/chat/components/chat-bubble-fill";
+import { ChatLocationRequest } from "@/features/chat/components/chat-location-request";
 import {
   answeredSelect,
   ChatChoicePrompt,
@@ -20,6 +21,7 @@ import {
 } from "@/features/chat/components/chat-ui-block-cards";
 import { ChatVaultRequest } from "@/features/chat/components/chat-vault-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
+import { isLocationRequest } from "@/features/chat/model/location-request";
 import { promptAnswerLabel } from "@/features/chat/model/question-prompt";
 import { vaultRequestOf } from "@/features/chat/model/vault-request";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
@@ -54,6 +56,17 @@ export function ChatQuestionPrompt({
         prompt={prompt}
         uiBlock={uiBlock}
         request={vaultRequest}
+        controller={controller}
+        canSend={canSend}
+        onActivate={onActivate}
+      />
+    );
+  if (uiBlock && isLocationRequest(uiBlock))
+    return (
+      <ChatLocationRequest
+        serverId={serverId}
+        prompt={prompt}
+        uiBlock={uiBlock}
         controller={controller}
         canSend={canSend}
         onActivate={onActivate}
@@ -130,7 +143,8 @@ export function ChatQuestionPrompt({
       />
     );
   if (choice) return <ChatChoicePrompt spec={choice} controller={controller} canSend={canSend} />;
-  const { question, index, disabled, setIndex, answer, submit, replyInChat, setReplyInChat } = controller;
+  const { question, index, disabled, setIndex, answer, submit, replyInChat, setReplyInChat, picked, togglePick } =
+    controller;
 
   const described = question.options?.filter((option) => option.description) ?? [];
 
@@ -203,23 +217,29 @@ export function ChatQuestionPrompt({
       </View>
 
       <View className="flex-row flex-wrap gap-2">
-        {question.options?.map((option) => (
-          <Button
-            key={option.label}
-            size="sm"
-            variant="tertiary"
-            className="h-auto min-h-10 max-w-full rounded-full py-2"
-            isDisabled={disabled}
-            accessibilityLabel={option.label}
-            accessibilityHint={option.description}
-            onPress={() => {
-              void haptics.selection();
-              answer([option.label]);
-            }}
-          >
-            <Button.Label className="shrink text-center font-sans font-semibold">{option.label}</Button.Label>
-          </Button>
-        ))}
+        {question.options?.map((option) => {
+          const checked = picked.includes(option.label);
+          return (
+            <Button
+              key={option.label}
+              size="sm"
+              variant={checked ? "primary" : "tertiary"}
+              className="h-auto min-h-10 max-w-full rounded-full py-2"
+              isDisabled={disabled}
+              accessibilityRole={question.multiSelect ? "checkbox" : "button"}
+              accessibilityLabel={option.label}
+              accessibilityHint={option.description}
+              accessibilityState={question.multiSelect ? { checked, disabled } : { disabled }}
+              onPress={() => {
+                if (question.multiSelect) return togglePick(option.label);
+                void haptics.selection();
+                answer([option.label]);
+              }}
+            >
+              <Button.Label className="shrink text-center font-sans font-semibold">{option.label}</Button.Label>
+            </Button>
+          );
+        })}
         {question.isSecret ? null : (
           <Button
             size="sm"
@@ -246,6 +266,20 @@ export function ChatQuestionPrompt({
         >
           <Button.Label className="font-sans font-semibold">{t("mobile.chat.question.skip")}</Button.Label>
         </Button>
+        {question.multiSelect ? (
+          <Button
+            size="sm"
+            variant="primary"
+            className="rounded-full"
+            isDisabled={disabled || picked.length === 0}
+            onPress={() => {
+              void haptics.selection();
+              answer(picked);
+            }}
+          >
+            <Button.Label className="font-sans font-semibold">{t("common.done")}</Button.Label>
+          </Button>
+        ) : null}
       </View>
       {replyInChat ? (
         <Typography type="body-xs" className="text-text-secondary">

@@ -1,6 +1,7 @@
 import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
+import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { feedbackApproval } from "@openbot/team-client/feedback-approval";
@@ -168,6 +169,7 @@ export function ConversationTimeline() {
     toggleAgentMessage,
     updateAnswers,
     timelineIndexById,
+    keepPageDrawn,
     unreadBoundaryMessageId,
     moveChatSearch,
     openExternalMessageUrl,
@@ -232,7 +234,7 @@ export function ConversationTimeline() {
   const readAloudAction = (message: AgentMessage) => {
     const agentId = props.agent?.id;
     if (props.runtime || !agentId || message.author !== "agent" || message.streaming || !message.body.trim()) return;
-    if (!speechModelReady()) return;
+    if (!speechModelReady() || !speechTextFromMarkdown(message.body)) return;
     return {
       reading: speechReading()?.messageId === message.id,
       onToggle: () =>
@@ -660,6 +662,38 @@ export function ConversationTimeline() {
   });
   const showAgentSteps = useShowAgentSteps();
   const compactActions = useCompactMessageActions();
+  const rowDayMarker = (current: AgentMessage, previous: AgentMessage | undefined) => {
+    if (current.createdAt)
+      return dayMarkerLabel(previous?.createdAt, current.createdAt, {
+        t,
+        format,
+        ...(channel || !compactActions() ? {} : { gapMs: CHAT_TIME_GAP_MS }),
+      });
+    return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
+  };
+  const rowContinuesRun = (current: AgentMessage, previous: AgentMessage | undefined, startsDay: boolean) => {
+    if (current.id === unreadBoundaryMessageId() || current.actionMarker) return false;
+    return continuesSenderRun(previous && senderRunRow(previous), senderRunRow(current), {
+      previousDrawsTime: previous !== undefined && rowDrawsTime(previous),
+      startsDay,
+    });
+  };
+  const nextRowGroupedEntry = (current: AgentMessage, next: AgentMessage): "agent" | "user" | undefined => {
+    if (next.actionMarker || next.questionPrompt || next.id === compactionBefore()) return undefined;
+    if (
+      next.kind === "plan" ||
+      next.kind === "subagents" ||
+      next.kind === "memory-changes" ||
+      next.kind === "thinking" ||
+      shownVisualReply(next, runtime.visualPage)
+    )
+      return undefined;
+    if (!rowContinuesRun(next, current, rowDayMarker(next, current) !== null)) return undefined;
+    const agentEntry = next.author !== "you";
+    const stepsInRow = agentEntry && (Boolean(channel) || !showAgentSteps());
+    if (!stepsInRow && turnSteps.stepsAbove(next.id)) return undefined;
+    return agentEntry ? "agent" : "user";
+  };
   const bubbleStyle = useChatBubbleStyle();
   const turnTrace = useTurnTrace({ turnSteps, agentName: () => props.agent?.name, agents: () => props.agents });
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
@@ -847,25 +881,17 @@ export function ConversationTimeline() {
                     : arrives;
                 const dayMarker = createMemo(() => {
                   const current = message();
-                  if (!current) return null;
-                  const previous = previousMessage();
-                  if (current.createdAt)
-                    return dayMarkerLabel(previous?.createdAt, current.createdAt, {
-                      t,
-                      format,
-                      ...(channel || !compactActions() ? {} : { gapMs: CHAT_TIME_GAP_MS }),
-                    });
-                  return previous === undefined ? (current.time ?? t("chat.day.now")) : null;
+                  return current ? rowDayMarker(current, previousMessage()) : null;
                 });
                 const continuesRun = createMemo(() => {
                   const current = message();
-                  if (!current) return false;
-                  if (current.id === unreadBoundaryMessageId() || current.actionMarker) return false;
-                  const previous = previousMessage();
-                  return continuesSenderRun(previous && senderRunRow(previous), senderRunRow(current), {
-                    previousDrawsTime: previous !== undefined && rowDrawsTime(previous),
-                    startsDay: dayMarker() !== null,
-                  });
+                  return current ? rowContinuesRun(current, previousMessage(), dayMarker() !== null) : false;
+                });
+                const nextGroupedEntry = createMemo(() => {
+                  const current = message();
+                  const currentIndex = index();
+                  const next = currentIndex === undefined ? undefined : timelineMessages()[currentIndex + 1];
+                  return current && next ? nextRowGroupedEntry(current, next) : undefined;
                 });
                 const author = createMemo((): ChatMessageAuthor => {
                   const current = message();
@@ -1344,6 +1370,7 @@ export function ConversationTimeline() {
                             initial={initialVisual}
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
+                            onUse={() => keepPageDrawn((message() ?? initialMessage).id)}
                             onQuote={quoteSelection}
                           />
                         </article>
@@ -1422,6 +1449,7 @@ export function ConversationTimeline() {
                   <div
                     data-index={virtualRow.index}
                     data-grouped={groupedWithMarker() ? "marker" : continuesRun() ? "sender" : undefined}
+                    data-next-grouped={nextGroupedEntry()}
                     ref={messageVirtualizer.measureElement}
                     class="virtual-chat-row"
                     style={{

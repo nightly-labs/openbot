@@ -20,6 +20,7 @@ export interface AppInfo {
   softwareRendering?: boolean;
   hourCycle?: HourCycle;
   aboveAppsSupport?: AboveAppsSupport;
+  dynamicIslandUnavailable?: boolean;
 }
 
 export const UPDATE_PHASES = [

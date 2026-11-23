@@ -19,6 +19,13 @@ import {
   storageTierOf,
 } from "@openbot/contracts/billing";
 import { type BillingDetailsRequest, VAT_TAX_RATE } from "@openbot/contracts/billing-details";
+import {
+  CREDIT_METADATA,
+  CREDIT_METADATA_KIND,
+  type CreditCheckoutRequest,
+  creditLookupKey,
+  creditStops,
+} from "@openbot/contracts/credits";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import {
   LICENSE_INCLUDED_USERS,
@@ -40,6 +47,7 @@ import {
   licensePlanPrice,
   ORDER_METADATA,
 } from "@openbot/contracts/license";
+import { referralShare } from "@openbot/contracts/referral";
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
 import { readLocalRuntimeVars } from "../apps/auth-api/src/server/runtime-env";
@@ -87,6 +95,8 @@ const SCENARIOS = [
   "order-trial",
   "promotion-link",
   "vat",
+  "credits",
+  "invite",
 ] as const;
 type Scenario = (typeof SCENARIOS)[number];
 const DAY = 86_400;
@@ -300,6 +310,7 @@ type BrowserApiBody =
   | LicenseRenewalRequest
   | { role: "member"; reactivate?: true }
   | { token: string }
+  | CreditCheckoutRequest
   | Record<string, never>;
 
 function print(line: string) {
@@ -544,10 +555,15 @@ class Account {
     );
   }
 
-  async pay(serverId: string) {
+  async pay(serverId: string, startedDaysAgo?: number) {
     const session = this.row(serverId)?.checkout_session_id;
     if (session) await stripe("POST", `/v1/checkout/sessions/${session}/expire`, idSchema).catch(() => null);
+    const clock =
+      startedDaysAgo === undefined
+        ? null
+        : await stripe("GET", `/v1/test_helpers/test_clocks/${this.clock}`, clockSchema);
     const subscription = await stripe("POST", "/v1/subscriptions", idSchema, {
+      ...(clock ? { backdate_start_date: String(clock.frozen_time - (startedDaysAgo ?? 0) * 86_400) } : {}),
       customer: this.customer,
       "items[0][price]": await priceId("standard", "month"),
       currency: "eur",
@@ -729,7 +745,18 @@ const browser = () => {
   return chrome;
 };
 
-async function payCheckout(url: string, returnOrigin: string, screenshot: string) {
+const CHECKOUT_ADDRESSES = {
+  PL: { line1: "Marszalkowska 1", zip: "00-001", city: "Warszawa" },
+  DE: { line1: "Unter den Linden 1", zip: "10117", city: "Berlin" },
+} as const;
+
+async function payCheckout(
+  url: string,
+  returnOrigin: string,
+  screenshot: string,
+  country: keyof typeof CHECKOUT_ADDRESSES = "PL",
+) {
+  const address = CHECKOUT_ADDRESSES[country];
   const context = await (await browser()).newContext();
   try {
     const page = await context.newPage();
@@ -778,13 +805,13 @@ async function payCheckout(url: string, returnOrigin: string, screenshot: string
     await form.locator(id.number).fill("4242424242424242");
     await form.locator(id.expiry).fill("12 / 34");
     await form.locator(id.cvc).fill("123");
-    const country = form.locator(id.country).first();
-    if (await country.count()) await country.selectOption("PL");
+    const countryField = form.locator(id.country).first();
+    if (await countryField.count()) await countryField.selectOption(country);
     for (const [field, value] of [
       [id.name, "Stripe E2E"],
-      [id.line1, "Marszalkowska 1"],
-      [id.zip, "00-001"],
-      [id.city, "Warszawa"],
+      [id.line1, address.line1],
+      [id.zip, address.zip],
+      [id.city, address.city],
     ] as const) {
       const input = form.locator(field).first();
       if ((await input.count()) && (await input.isVisible())) await input.fill(value);
@@ -1006,6 +1033,62 @@ async function waitFor<T>(label: string, check: () => Promise<T | null | undefin
   throw new Error(`Timed out: ${label} (last: ${last})`);
 }
 
+const INVITE_COUPON = "openbot-invite-10-first";
+const inviteSessionSchema = z.object({
+  discounts: z.array(z.object({ coupon: z.union([z.string(), z.object({ id: z.string() })]).nullable() })).nullable(),
+});
+const discountsSchema = z.object({ discounts: z.array(z.unknown()) });
+const invoiceDiscountSchema = z.object({
+  amount_paid: z.number(),
+  subtotal: z.number(),
+  discounts: z.array(z.unknown()),
+  billing_reason: z.string().nullable(),
+});
+const balanceSchema = z.object({ balance: z.number() });
+const partSchema = z.object({
+  invoice_id: z.string(),
+  source_amount: z.number(),
+  amount: z.number(),
+  reversed_amount: z.number(),
+  ready_at: z.number().nullable(),
+  released_at: z.number().nullable(),
+  balance_transaction_id: z.string().nullable(),
+});
+const partReversalSchema = z.object({
+  reversal_id: z.string(),
+  invoice_id: z.string(),
+  amount: z.number(),
+  source_amount: z.number().nullable(),
+  balance_transaction_id: z.string().nullable(),
+});
+
+function sessionCoupons(session: z.infer<typeof inviteSessionSchema>) {
+  return (session.discounts ?? []).map((entry) =>
+    typeof entry.coupon === "string" ? entry.coupon : (entry.coupon?.id ?? null),
+  );
+}
+
+function inviteParts(friend: string) {
+  return d1(
+    `SELECT invoice_id, source_amount, amount, reversed_amount, ready_at, released_at, balance_transaction_id
+     FROM referral_credits WHERE referred_user_id = ${quote(friend)} ORDER BY ready_at, invoice_id`,
+    partSchema,
+  );
+}
+
+function inviteReversals(refundId: string) {
+  return d1(
+    `SELECT reversal_id, invoice_id, amount, source_amount, balance_transaction_id FROM referral_reversals
+     WHERE reversal_id LIKE ${quote(`${refundId}|%`)} ORDER BY reversal_id`,
+    partReversalSchema,
+  );
+}
+
+async function tickCron(api: string) {
+  const response = await fetch(`${api}/cdn-cgi/handler/scheduled?cron=*+*+*+*+*`);
+  if (!response.ok) throw new Error(`The scheduled handler returned ${response.status}.`);
+}
+
 function record(scenario: Scenario, step: string, pass: boolean, evidence: unknown) {
   steps.push({ scenario, step, result: pass ? "pass" : "fail", evidence });
   print(`${pass ? "PASS" : "FAIL"} [${scenario}] ${step}`);
@@ -1219,6 +1302,28 @@ function addsPolishVat(session: CheckoutView | null) {
 function addsNoVat(session: CheckoutView | null, treatment: "reverse" | "none") {
   const view = vatView(session);
   return view?.treatment === treatment && view.tax === 0;
+}
+
+const creditSessionSchema = checkoutLinesSchema.extend({
+  invoice: z.string().nullable(),
+  invoice_creation: z.object({ enabled: z.boolean() }).nullable(),
+});
+const creditInvoiceSchema = z.object({
+  id: z.string(),
+  status: z.string().nullable(),
+  currency: z.string(),
+  total: z.number(),
+  total_excluding_tax: z.number().nullable(),
+  invoice_pdf: z.string().nullable(),
+  metadata: z.record(z.string(), z.string()),
+  customer_address: z.object({ country: z.string().nullable() }).nullable(),
+});
+
+function creditSession(url: string) {
+  return stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(url)}`, creditSessionSchema, {
+    "expand[0]": "line_items",
+    "expand[1]": "line_items.data.price",
+  });
 }
 
 function licenseSession(url: string) {
@@ -1886,13 +1991,59 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       return list.data[0] ?? null;
     });
     await applied("charge.dispute.created", disputed.id);
-    const ended = await rowWhere(account, server.serverId, "plan ended", (row) => row.desired_state === "stopped");
+    const removed = await rowWhere(
+      account,
+      server.serverId,
+      "server deleted",
+      (row) => row.desired_state === "deleted",
+    );
     const stripeSub = await subscription(sub);
     record(
       "dispute",
-      "a dispute cancels the plan now; the server stops with plan_ended and is kept",
-      stripeSub.status === "canceled" && ended.observed_error === "plan_ended" && ended.deleted_at === null,
-      { dispute: disputed.status, stripeStatus: stripeSub.status, row: ended },
+      "a dispute in the first 30 days of the subscription cancels the plan and deletes the server",
+      stripeSub.status === "canceled" && removed.desired_state === "deleted",
+      { dispute: disputed.status, stripeStatus: stripeSub.status, row: removed },
+    );
+    const old = await account.createServer("Dispute after 30 days");
+    const oldSub = await account.pay(old.server.serverId, 40);
+    const oldPaid = await paymentIntent(oldSub);
+    const oldDisputed = await waitFor("dispute", async () => {
+      const list = await stripe("GET", "/v1/disputes", disputeListSchema, { payment_intent: oldPaid.intent });
+      return list.data[0] ?? null;
+    });
+    await applied("charge.dispute.created", oldDisputed.id);
+    const ended = await rowWhere(account, old.server.serverId, "plan ended", (row) => row.desired_state === "stopped");
+    const oldStripeSub = await subscription(oldSub);
+    record(
+      "dispute",
+      "a dispute of a subscription older than 30 days cancels the plan; the server stops with plan_ended and is kept",
+      oldStripeSub.status === "canceled" && ended.observed_error === "plan_ended" && ended.deleted_at === null,
+      { dispute: oldDisputed.status, stripeStatus: oldStripeSub.status, row: ended },
+    );
+    const inquiry = await account.createServer("Dispute inquiry");
+    await account.useCard("pm_card_createDisputeInquiry");
+    const inquirySub = await account.pay(inquiry.server.serverId);
+    const inquiryPaid = await paymentIntent(inquirySub);
+    const inquiryDispute = await waitFor("inquiry", async () => {
+      const list = await stripe("GET", "/v1/disputes", disputeListSchema, { payment_intent: inquiryPaid.intent });
+      return list.data[0] ?? null;
+    });
+    await applied("charge.dispute.created", inquiryDispute.id);
+    const inquiryEnded = await rowWhere(
+      account,
+      inquiry.server.serverId,
+      "plan ended after an inquiry",
+      (row) => row.desired_state === "stopped",
+    );
+    const inquiryStripeSub = await subscription(inquirySub);
+    record(
+      "dispute",
+      "an inquiry in the first 30 days cancels the plan; the server stops with plan_ended and is kept",
+      inquiryDispute.status.startsWith("warning_") &&
+        inquiryStripeSub.status === "canceled" &&
+        inquiryEnded.observed_error === "plan_ended" &&
+        inquiryEnded.deleted_at === null,
+      { dispute: inquiryDispute.status, stripeStatus: inquiryStripeSub.status, row: inquiryEnded },
     );
     await stripe("POST", `/v1/disputes/${disputed.id}`, idSchema, {
       "evidence[uncategorized_text]": "losing_evidence",
@@ -3132,6 +3283,223 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     }
   },
 
+  async invite(account) {
+    const referrers = quote(`${account.id}-referrer%`);
+    const referrer = `${account.id}-referrer-${randomBytes(4).toString("hex")}`;
+    const friend = quote(account.id);
+    const now = Date.now();
+    const leftCustomers = d1(
+      `SELECT stripe_customer_id FROM billing_customers WHERE user_id LIKE ${referrers}`,
+      z.object({ stripe_customer_id: z.string() }),
+    );
+    for (const row of leftCustomers)
+      await stripe("DELETE", `/v1/customers/${row.stripe_customer_id}`, idSchema).catch(() => null);
+    d1(
+      [
+        `DELETE FROM referral_reversals WHERE invoice_id IN (
+           SELECT invoice_id FROM referral_credits WHERE referred_user_id = ${friend})`,
+        `DELETE FROM referral_credits WHERE referred_user_id = ${friend}`,
+        `DELETE FROM referrals WHERE referred_user_id = ${friend}`,
+        `DELETE FROM referral_codes WHERE user_id LIKE ${referrers}`,
+        `DELETE FROM billing_customers WHERE user_id LIKE ${referrers}`,
+        `DELETE FROM users WHERE id LIKE ${referrers}`,
+        `INSERT OR IGNORE INTO users(id, identity_key, email, name, created_at, updated_at)
+         VALUES (${quote(referrer)}, ${quote(`e2e:${referrer}`)}, ${quote(`${referrer}@example.com`)},
+                 'Stripe e2e referrer', ${now}, ${now})`,
+        `INSERT INTO referral_codes(user_id, code, created_at)
+         VALUES (${quote(referrer)}, ${quote(randomBytes(6).toString("hex").slice(0, 8))}, ${now})`,
+        `INSERT INTO referrals(referred_user_id, referrer_user_id, created_at) VALUES (${friend}, ${quote(referrer)}, ${now})`,
+      ].join("; "),
+      z.unknown(),
+    );
+    const referrerCustomer = () =>
+      d1(
+        `SELECT stripe_customer_id FROM billing_customers WHERE user_id = ${quote(referrer)}`,
+        z.object({ stripe_customer_id: z.string() }),
+      )[0]?.stripe_customer_id ?? null;
+    const referrerBalance = async () => {
+      const id = referrerCustomer();
+      return id ? (await stripe("GET", `/v1/customers/${id}`, balanceSchema)).balance : 0;
+    };
+    try {
+      const opened = await account.request("POST", "v1/me/license/checkout", { users: 7, currency: "eur" });
+      const url = licenseCheckoutSchema.safeParse(opened.body).data?.url ?? "";
+      const first = url
+        ? await stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(url)}`, inviteSessionSchema)
+        : null;
+      record(
+        "invite",
+        "the first checkout of an invited friend has the first-payment invite coupon",
+        opened.status === 200 && first !== null && sessionCoupons(first).includes(INVITE_COUPON),
+        { status: opened.status, code: opened.code, coupons: first && sessionCoupons(first) },
+      );
+      if (url) await expireCheckout(url);
+
+      const sub = await stripe("POST", "/v1/subscriptions", idSchema, {
+        customer: account.customer,
+        "items[0][price]": await licensePriceId(TEAM_YEAR),
+        "items[0][quantity]": "7",
+        currency: "eur",
+        "discounts[0][coupon]": INVITE_COUPON,
+        "metadata[openbot_user_id]": account.id,
+        [`metadata[${LICENSE_METADATA.kind}]`]: LICENSE_METADATA_KIND,
+        [`metadata[${LICENSE_METADATA.tier}]`]: TEAM_YEAR.tier,
+        [`metadata[${LICENSE_METADATA.interval}]`]: TEAM_YEAR.interval,
+        [`metadata[${LICENSE_METADATA.bundle}]`]: String(TEAM_YEAR.bundle),
+        payment_behavior: "error_if_incomplete",
+      });
+      const invoiceId = (await subscription(sub.id)).latest_invoice ?? "";
+      await applied("invoice.paid", invoiceId);
+      const invoice = await stripe("GET", `/v1/invoices/${invoiceId}`, invoiceDiscountSchema);
+      record(
+        "invite",
+        "the first yearly invoice has 10% off",
+        invoice.discounts.length > 0 && invoice.amount_paid === Math.round(invoice.subtotal * 0.9),
+        invoice,
+      );
+      const ended = await waitFor(
+        "the subscription has no invite discount",
+        async () => {
+          const value = await stripe("GET", `/v1/subscriptions/${sub.id}`, discountsSchema);
+          return value.discounts.length === 0 ? value : null;
+        },
+        30_000,
+      ).catch(() => null);
+      record("invite", "after the first payment the subscription has no invite discount", ended !== null, ended);
+
+      const parts = inviteParts(account.id);
+      const share = referralShare(invoice.amount_paid);
+      const gaps = parts.slice(1).map((part, index) => (part.ready_at ?? 0) - (parts[index]?.ready_at ?? 0));
+      record(
+        "invite",
+        "the yearly credit is 12 parts, 30 days apart, that add up to 10% of the payment, and none is released",
+        parts.length === 12 &&
+          parts.reduce((sum, part) => sum + part.source_amount, 0) === share &&
+          gaps.every((gap) => gap === 30 * DAY * 1_000) &&
+          (parts[0]?.ready_at ?? 0) - now >= 29 * DAY * 1_000 &&
+          parts.every((part) => part.released_at === null),
+        { share, parts },
+      );
+
+      d1(
+        `UPDATE referral_credits SET ready_at = ${Date.now() - 1_000} WHERE invoice_id = ${quote(invoiceId)}`,
+        z.unknown(),
+      );
+      await tickCron(account.api);
+      const afterFirst = await waitFor("part 1 released", async () => {
+        const rows = inviteParts(account.id);
+        return rows[0]?.released_at !== null ? rows : null;
+      });
+      record(
+        "invite",
+        "the cron releases the due part 1 and keeps part 2; part 1 is under the minimum and stays unsent",
+        afterFirst[0]?.released_at !== null &&
+          afterFirst.slice(1).every((part) => part.released_at === null) &&
+          afterFirst[0]?.balance_transaction_id === null &&
+          (await referrerBalance()) === 0,
+        afterFirst.slice(0, 2),
+      );
+
+      const server = await account.orderServer("Invite second order", "standard");
+      const created = createdSchema.safeParse(server.body).data;
+      const secondSession = created?.checkoutUrl
+        ? await stripe("GET", `/v1/checkout/sessions/${checkoutSessionId(created.checkoutUrl)}`, inviteSessionSchema)
+        : null;
+      record(
+        "invite",
+        "a second purchase of the same friend has no invite coupon",
+        server.status === 201 && secondSession !== null && sessionCoupons(secondSession).length === 0,
+        { status: server.status, code: server.code, coupons: secondSession && sessionCoupons(secondSession) },
+      );
+      if (created?.checkoutUrl) await expireCheckout(created.checkoutUrl);
+
+      const paid = await paymentIntent(sub.id);
+      const firstRefund = await stripe("POST", "/v1/refunds", refundSchema, {
+        payment_intent: paid.intent,
+        amount: String(Math.floor(invoice.amount_paid / 5)),
+      });
+      await applied("refund.created", firstRefund.id);
+      const unsentReversals = inviteReversals(firstRefund.id);
+      const unsentShare = referralShare(Math.floor(invoice.amount_paid / 5));
+      const newest = [...parts]
+        .reverse()
+        .slice(0, unsentReversals.length)
+        .map((part) => part.invoice_id);
+      record(
+        "invite",
+        "a refund before the parts are sent takes the newest unsent parts and does not touch the referrer balance",
+        unsentReversals.reduce((sum, row) => sum + (row.source_amount ?? 0), 0) === unsentShare &&
+          unsentReversals.every((row) => row.balance_transaction_id === "") &&
+          unsentReversals
+            .map((row) => row.invoice_id)
+            .sort()
+            .join() === [...newest].sort().join() &&
+          (await referrerBalance()) === 0,
+        { unsentShare, unsentReversals },
+      );
+
+      d1(
+        `UPDATE referral_credits SET ready_at = ${Date.now() - 1_000} WHERE source_invoice_id = ${quote(invoiceId)}`,
+        z.unknown(),
+      );
+      await tickCron(account.api);
+      const sent = await waitFor("all parts sent", async () => {
+        const rows = inviteParts(account.id);
+        return rows.every((part) => part.balance_transaction_id !== null) ? rows : null;
+      });
+      const owed = sent.reduce((sum, part) => sum + part.amount - part.reversed_amount, 0);
+      const balanceSent = await referrerBalance();
+      record(
+        "invite",
+        "when all parts are due the cron sends them, and the referrer gets the credit less the refund",
+        owed === share - unsentShare && balanceSent === -owed,
+        { owed, balance: balanceSent },
+      );
+
+      const secondRefund = await stripe("POST", "/v1/refunds", refundSchema, {
+        payment_intent: paid.intent,
+        amount: String(Math.floor(invoice.amount_paid / 10)),
+      });
+      await applied("refund.created", secondRefund.id);
+      const sentReversals = inviteReversals(secondRefund.id);
+      const sentShare = referralShare(Math.floor(invoice.amount_paid / 10));
+      const balanceAfter = await referrerBalance();
+      record(
+        "invite",
+        "a refund after the parts are sent takes the credit back from the referrer balance",
+        sentReversals.reduce((sum, row) => sum + (row.source_amount ?? 0), 0) === sentShare &&
+          sentReversals.every((row) => (row.balance_transaction_id ?? "").startsWith("cbtxn_")) &&
+          balanceAfter === balanceSent + sentShare,
+        { sentShare, sentReversals, before: balanceSent, after: balanceAfter },
+      );
+
+      await account.advance(366);
+      const renewal = await waitFor(
+        "renewal invoice",
+        async () => {
+          const list = await invoices(sub.id);
+          return list.find((entry) => entry.reason === "subscription_cycle" && entry.status === "paid") ?? null;
+        },
+        180_000,
+      );
+      await applied("invoice.paid", renewal.id);
+      const renewed = await stripe("GET", `/v1/invoices/${renewal.id}`, invoiceDiscountSchema);
+      const renewalParts = d1(
+        `SELECT COUNT(*) AS parts FROM referral_credits WHERE source_invoice_id = ${quote(renewal.id)}`,
+        z.object({ parts: z.number() }),
+      )[0]?.parts;
+      record(
+        "invite",
+        "the second yearly invoice has no discount and gives 12 new credit parts",
+        renewed.discounts.length === 0 && renewed.amount_paid === renewed.subtotal && renewalParts === 12,
+        { renewed, renewalParts },
+      );
+    } finally {
+      const id = referrerCustomer();
+      if (id) await stripe("DELETE", `/v1/customers/${id}`, idSchema).catch(() => null);
+    }
+  },
+
   async "license-upgrade"(account) {
     const sub = await account.buyLicense(1, "eur", STARTER_MONTH);
     await licenseWhere(account, "license active", (state) => state.license?.status === "active");
@@ -3881,6 +4249,121 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         invoice.total > counted.amount_eur,
       { counted, invoice },
     );
+  },
+
+  async credits(account) {
+    const [stop] = creditStops("eur");
+    if (!stop) throw new Error("No credit packs");
+    const creditStateSchema = z.object({ balance: z.number() });
+    const balance = async () =>
+      creditStateSchema.safeParse((await account.request("GET", "v1/me/credits")).body).data?.balance ?? null;
+    const save = (body: BillingDetailsRequest) => account.request("PUT", "v1/me/billing/details", body);
+    const open = async () => {
+      const opened = await account.request("POST", "v1/me/credits/checkout", {
+        credits: stop.credits,
+        currency: "eur",
+      });
+      const url = licenseCheckoutSchema.safeParse(opened.body).data?.url ?? "";
+      return { opened, url, session: url ? await creditSession(url) : null };
+    };
+    const paidInvoice = async (url: string) => {
+      const session = await waitFor("credit invoice", async () => {
+        const read = await creditSession(url);
+        return read.invoice ? read : null;
+      });
+      const invoice = await stripe("GET", `/v1/invoices/${session.invoice}`, creditInvoiceSchema);
+      return { session, invoice };
+    };
+    const ossRow = (invoiceId: string) =>
+      waitFor("credit OSS sale", async () => {
+        const rows = d1(
+          `SELECT country, amount_eur FROM billing_vat_oss_sales WHERE invoice_id = ${quote(invoiceId)}`,
+          z.object({ country: z.string(), amount_eur: z.number() }),
+        );
+        return rows[0] ?? null;
+      });
+
+    const before = await balance();
+    const domestic = await open();
+    const line = domestic.session?.line_items.data[0];
+    record(
+      "credits",
+      "the Worker gives a checkout.stripe.com page for the smallest credit pack in EUR, with an invoice and 23% Polish VAT on top for a buyer in Poland",
+      domestic.opened.status === 200 &&
+        new URL(domestic.url).host === "checkout.stripe.com" &&
+        line?.quantity === 1 &&
+        line.price.lookup_key === creditLookupKey(stop) &&
+        line.price.tax_behavior === "exclusive" &&
+        domestic.session?.currency === "eur" &&
+        domestic.session.invoice_creation?.enabled === true &&
+        domestic.session.metadata?.[CREDIT_METADATA.kind] === CREDIT_METADATA_KIND &&
+        domestic.session.metadata?.[CREDIT_METADATA.credits] === String(stop.credits) &&
+        addsPolishVat(domestic.session),
+      { status: domestic.opened.status, code: domestic.opened.code, line, vat: vatView(domestic.session) },
+    );
+
+    if (REAL_CHECKOUT) {
+      await payCheckout(domestic.url, account.api, "credits-e2e-checkout.png");
+      const { session, invoice } = await paidInvoice(domestic.url);
+      const after = await waitFor("credits granted", async () => {
+        const value = await balance();
+        return value !== null && before !== null && value >= before + stop.credits ? value : null;
+      });
+      record(
+        "credits",
+        "the paid credit pack adds its credits, and its invoice is paid, in EUR, with the net price, 23% Polish VAT, the VAT and credit metadata and a PDF",
+        before !== null &&
+          after === before + stop.credits &&
+          invoice.status === "paid" &&
+          invoice.currency === "eur" &&
+          invoice.total_excluding_tax === session.amount_subtotal &&
+          invoice.total - (invoice.total_excluding_tax ?? 0) ===
+            Math.round(((invoice.total_excluding_tax ?? 0) * VAT_TAX_RATE.percentage) / 100) &&
+          invoice.metadata[VAT_METADATA.treatment] === "standard" &&
+          invoice.metadata[VAT_METADATA.country] === "PL" &&
+          invoice.metadata[CREDIT_METADATA.kind] === CREDIT_METADATA_KIND &&
+          invoice.customer_address?.country === "PL" &&
+          typeof invoice.invoice_pdf === "string" &&
+          invoice.invoice_pdf.length > 0,
+        { before, after, invoice },
+      );
+    } else {
+      await expireCheckout(domestic.url);
+    }
+
+    const consumer = await save({ country: "DE" });
+    const german = await open();
+    record(
+      "credits",
+      "a consumer in Germany with no VAT ID gets Polish VAT on a credit pack",
+      consumer.status === 200 && addsPolishVat(german.session) && vatView(german.session)?.country === "DE",
+      { status: consumer.status, vat: vatView(german.session) },
+    );
+    if (REAL_CHECKOUT) {
+      await payCheckout(german.url, account.api, "credits-e2e-checkout-de.png", "DE");
+      const { invoice } = await paidInvoice(german.url);
+      const counted = await ossRow(invoice.id);
+      record(
+        "credits",
+        "a paid credit invoice of a consumer in Germany adds its net amount, not the VAT, to the One Stop Shop count",
+        counted.country === "DE" &&
+          counted.amount_eur === invoice.total_excluding_tax &&
+          invoice.total > counted.amount_eur,
+        { counted, invoice },
+      );
+    } else {
+      await expireCheckout(german.url);
+    }
+
+    const outside = await save({ country: "US" });
+    const american = await open();
+    record(
+      "credits",
+      "a buyer in the United States pays no VAT on a credit pack",
+      outside.status === 200 && addsNoVat(american.session, "none"),
+      { status: outside.status, vat: vatView(american.session) },
+    );
+    await expireCheckout(american.url);
   },
 };
 

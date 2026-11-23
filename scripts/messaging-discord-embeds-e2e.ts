@@ -77,6 +77,7 @@ async function step(name: string, run: () => Promise<unknown>): Promise<void> {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -186,6 +187,7 @@ async function boot<T>(use: (threads: MessagingThreads) => Promise<T>): Promise<
     agents: {
       listAgents: () => agents.listAgents(),
       respondToApproval: (input) => agents.respondToApproval(input),
+      approvalExecutionThreadId: (requestId) => agents.approvalExecutionThreadId(requestId),
       onEvent: () => () => {},
       createAgentProfile: (input) => agents.createAgentProfile(input),
       createMemory: (input) => agents.createMemory(input),
@@ -318,7 +320,7 @@ try {
       const long = Array.from({ length: 60 }, (_, index) => `Line ${index} ${"x".repeat(60)}`).join("\n");
       const sent = await post(threads, connection, {
         text: long,
-        embeds: [{ title: "Report", url: `https://openbot.run/${SECRET}` }],
+        embeds: [{ title: "Report", url: `https://${SECRET}/report` }],
       });
       assert.equal(sent.success, false, "A post with a broken link was accepted.");
       assert.equal(sent.requests.length, 1);

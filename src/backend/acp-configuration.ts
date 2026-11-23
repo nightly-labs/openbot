@@ -8,7 +8,7 @@ import {
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Exit, Fiber, type Scope, Semaphore } from "effect";
+import { Effect, Exit, Fiber, Schedule, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
 import { type AgentProvider, ProviderModelNotOfferedError } from "./agent-client";
 import { isRecord } from "./protocol";
@@ -28,6 +28,8 @@ const MODEL_REASONING_PROBE_TIMEOUT_MS = 1_000;
 const MODEL_REASONING_CLEANUP_MS = 1_000;
 
 const MODEL_DISCOVERY_RETURN_MS = 250;
+
+const PROBE_START_RETRY_MS = 1_000;
 
 export interface AcpModel {
   id: string;
@@ -64,6 +66,7 @@ export interface AcpConfigurationOptions {
   probeCloseDelayMs?: number | undefined;
   effortCategories?: readonly string[] | undefined;
   deletesSessions?: () => boolean;
+  stillStarting?: ((error: unknown) => boolean) | undefined;
 }
 
 const EFFORT_CATEGORIES: readonly string[] = ["thought_level"];
@@ -81,6 +84,7 @@ export class AcpConfiguration {
   #modelSetsOverlapped = false;
   #modelSetTimedOut: ClientSideConnection | null = null;
   readonly #unconfirmedSets = new WeakMap<AcpConfigurationState, Set<string>>();
+  readonly #modelConfigMissing = new WeakSet<ClientSideConnection>();
   #probe: { connection: ClientSideConnection; sessionId: string } | null = null;
   readonly #probeLock = Semaphore.makeUnsafe(1);
   #answeredEfforts: {
@@ -103,7 +107,7 @@ export class AcpConfiguration {
     const connection = yield* providerSync(() => this.options.connection());
     const deadline = Date.now() + requestTimeoutMs - MODEL_DISCOVERY_RETURN_MS;
     const sweep = Effect.acquireUseRelease(
-      this.#openProbe(connection),
+      this.#openProbe(connection, deadline),
       (probe) =>
         this.#modelReasoningEffortsEffect(
           connection,
@@ -159,9 +163,27 @@ export class AcpConfiguration {
 
   #openProbe(
     connection: ClientSideConnection,
+    deadline: number,
   ): Effect.Effect<SessionSetupResponse & { sessionId: string }, ProviderClientOperationError> {
     const cwd = this.options.discoveryCwd?.() ?? process.cwd();
-    const opened = providerCall(() => connection.newSession({ cwd, mcpServers: [] }));
+    const stillStarting = this.options.stillStarting;
+    const opened = Effect.suspend(() => {
+      let attemptStartedAt = 0;
+      let longestAttemptMs = 0;
+      return Effect.suspend(() => {
+        attemptStartedAt = Date.now();
+        return providerCall(() => connection.newSession({ cwd, mcpServers: [] }));
+      }).pipe(
+        Effect.retry({
+          while: (failure) => {
+            const now = Date.now();
+            longestAttemptMs = Math.max(longestAttemptMs, now - attemptStartedAt);
+            return stillStarting?.(failure.cause) === true && now + longestAttemptMs + PROBE_START_RETRY_MS < deadline;
+          },
+          schedule: Schedule.spaced(PROBE_START_RETRY_MS),
+        }),
+      );
+    });
     const kept = this.#probe?.connection === connection ? this.#probe.sessionId : null;
     if (!kept || !this.options.keepProbeSession?.()) return opened;
     this.#probe = null;
@@ -312,32 +334,29 @@ export class AcpConfiguration {
       if (modelConfigId) {
         const configId = option?.id ?? modelConfigId;
         if ((option?.currentValue ?? thread.currentModelId) !== value) {
-          const response = yield* this.#setConfigOption(thread, configId, value, () =>
-            this.#connection(thread).setSessionConfigOption({ sessionId: thread.id, configId, value }),
-          );
-          thread.configOptions = response.configOptions;
+          const connection = yield* providerSync(() => this.#connection(thread));
+          const response = this.#modelConfigMissing.has(connection)
+            ? null
+            : yield* this.#setConfigOption(thread, configId, value, () =>
+                connection.setSessionConfigOption({ sessionId: thread.id, configId, value }),
+              ).pipe(
+                Effect.catch((failure) =>
+                  !option && isMethodNotFound(failure.cause) ? Effect.succeed(null) : Effect.fail(failure),
+                ),
+              );
+          if (response) {
+            thread.configOptions = response.configOptions;
+          } else {
+            this.#modelConfigMissing.add(connection);
+            yield* this.#setModel(thread, value);
+          }
         }
         thread.currentModelId = value;
         continue;
       }
       if (!option) {
         if (category === "model" && thread.currentModelId !== value) {
-          this.#processModel = null;
-          yield* this.#timed("session/set_model", () =>
-            this.#connection(thread).request("session/set_model", {
-              sessionId: thread.id,
-              modelId: value,
-            }),
-          ).pipe(
-            Effect.catch((failure) => {
-              const unsaved = this.options.modelSetUnsaved;
-              if (!(failure.cause instanceof RequestError && unsaved?.(failure.cause))) return Effect.fail(failure);
-              logger.warn("An agent changed the session model but did not save it as its default.", {
-                provider: this.options.provider,
-              });
-              return Effect.void;
-            }),
-          );
+          yield* this.#setModel(thread, value);
           thread.currentModelId = value;
         }
         continue;
@@ -460,6 +479,26 @@ export class AcpConfiguration {
     return this.sessionSettings(thread.configOptions);
   });
 
+  #setModel(thread: AcpConfigurationState, value: string): Effect.Effect<void, ProviderClientOperationError> {
+    this.#processModel = null;
+    return this.#timed("session/set_model", () =>
+      this.#connection(thread).request("session/set_model", {
+        sessionId: thread.id,
+        modelId: value,
+      }),
+    ).pipe(
+      Effect.asVoid,
+      Effect.catch((failure) => {
+        const unsaved = this.options.modelSetUnsaved;
+        if (!(failure.cause instanceof RequestError && unsaved?.(failure.cause))) return Effect.fail(failure);
+        logger.warn("An agent changed the session model but did not save it as its default.", {
+          provider: this.options.provider,
+        });
+        return Effect.void;
+      }),
+    );
+  }
+
   #confirmingSet<A, E>(thread: AcpConfigurationState, configId: string, set: Effect.Effect<A, E>): Effect.Effect<A, E> {
     if (!this.options.setsConfigOnlyOnChange) return set;
     return set.pipe(
@@ -508,6 +547,12 @@ export class AcpConfiguration {
       }),
     );
   }
+}
+
+const METHOD_NOT_FOUND = -32601;
+
+function isMethodNotFound(error: unknown): boolean {
+  return error instanceof RequestError && error.code === METHOD_NOT_FOUND;
 }
 
 function closeLater<A, E>(close: Effect.Effect<A, E>, delayMs: number | undefined): Effect.Effect<A, E> {
@@ -787,7 +832,7 @@ function normalizeEffort(value: string): string | null {
   const normalized = value.toLowerCase().replaceAll("-", "_");
   if (isReasoningEffort(normalized)) return normalized;
   if (normalized === "off") return "none";
-  if (normalized === "thinking") return "high";
+  if (normalized === "thinking" || normalized === "on") return "high";
   if (["extra_high", "very_high"].includes(normalized)) return "xhigh";
   return null;
 }

@@ -2,10 +2,12 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_ACTIVE_QUEUES_ROUTES } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/agent-admin-v1";
 import { AGENT_BACKUP_MODELS_ROUTES } from "@openbot/contracts/team-protocol/agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/agent-builtin-memory-v1";
 import { AGENT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import { AGENT_DEFAULTS_ROUTES } from "@openbot/contracts/team-protocol/agent-defaults-v1";
 import { AGENT_FAST_MODE_ROUTES } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/agent-folders-v1";
+import { AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import { AGENT_HOST_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/agent-host-settings-v1";
 import {
   AGENT_MEMORIES_PAGE_ROUTE,
@@ -18,10 +20,20 @@ import { AGENT_PLAN_CARD_ROUTES } from "@openbot/contracts/team-protocol/agent-p
 import { AGENT_PUBLISH_ROUTES } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { AGENT_TASK_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
+import { AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
+import { AGENT_THREAD_BRANCHES_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-branches-v1";
+import { AGENT_THREAD_QUEUE_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
+import { AGENT_THREAD_READS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
+import { AGENT_THREAD_REQUESTS_ROUTES } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
+import { AGENT_USAGE_LIMIT_ROUTES } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
 import { AGENT_WAITS_ROUTES } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { BACKGROUND_PROCESSES_ROUTES } from "@openbot/contracts/team-protocol/background-processes-v1";
+import { BROWSER_PAGE_STATE_ROUTES } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import { BROWSER_PROFILES_ROUTES } from "@openbot/contracts/team-protocol/browser-profiles-v1";
+import { BROWSER_USER_CONTROL_ROUTES } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { BROWSING_MEMORY_ROUTES } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import { CACHE_EXPIRY_COMPACTION_ROUTES } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import { CHANNEL_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_COLORS_ROUTES } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CLAUDE_COMPACT_WINDOW_ROUTES } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
@@ -35,17 +47,21 @@ import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1"
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_ROUTES } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_SIGNAL_HOME_ROUTES } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
+import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { LIBRARY_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_ROUTES } from "@openbot/contracts/team-protocol/live-activity-push-v1";
+import { LIVE_VOICE_ACCOUNT_ROUTES } from "@openbot/contracts/team-protocol/live-voice-account-v1";
 import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -67,6 +83,7 @@ import { ROUTINE_RUN_PLACE_ROUTES } from "@openbot/contracts/team-protocol/routi
 import { ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { SERVER_AUDIT_ROUTES } from "@openbot/contracts/team-protocol/server-audit-v1";
 import { SHARED_TABLES_ROUTES } from "@openbot/contracts/team-protocol/shared-tables-v1";
+import { SIDEBAR_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
@@ -82,10 +99,12 @@ import { VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { WHATSAPP_STATUS_REACTIONS_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
+import { WORKFLOW_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/workflow-folders-v1";
 import { WORKFLOWS_HIGGSFIELD_ROUTES } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_CATALOG_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_CATALOG_V2_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-catalog-v2";
 import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES } from "@openbot/contracts/team-protocol/workflows-media-service-account-v1";
+import { WORKFLOWS_STEP_SETTINGS_ROUTES } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import { WORKFLOWS_SUNRA_ROUTES } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 
 const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
@@ -107,6 +126,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   HOST_RELEASE_ROUTES.status,
   HOST_MEMBER_UPDATE_ROUTES.status,
   HOST_TIMEZONE_ROUTES.settings,
+  HOST_VOICE_MODEL_ROUTES.settings,
+  HOST_SIGNAL_HOME_ROUTES.settings,
   HOST_TURN_LIMITS_ROUTES.settings,
   HOST_PERSONALITY_ROUTES.settings,
   AGENT_MEMORY_LIMIT_ROUTES.settings,
@@ -115,13 +136,16 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   BROWSING_MEMORY_ROUTES.settings,
   PROMPT_CACHE_TTL_ROUTES.settings,
   CLAUDE_COMPACT_WINDOW_ROUTES.settings,
+  CACHE_EXPIRY_COMPACTION_ROUTES.settings,
   PROVIDER_ENVIRONMENT_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
+  MODEL_VISIBILITY_KEPT_ROUTES.list,
   MODEL_STEERING_ROUTES.list,
   PROVIDER_MODEL_SOURCE_ROUTES.list,
   PROVIDER_ACCOUNT_MODELS_ROUTES.list,
   PROVIDER_ACCOUNT_POOL_ROUTES.list,
+  LIVE_VOICE_ACCOUNT_ROUTES.settings,
   PROVIDER_DEFAULT_ROUTES.settings,
   PROVIDER_USE_ROUTES.list,
   LOCAL_SERVERS_ROUTES.list,
@@ -159,6 +183,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_TASK_LIMIT_ROUTES.settings,
   AGENT_NEW_CHAT_ROUTES.settings,
   AGENT_PLAN_CARD_ROUTES.settings,
+  AGENT_BUILTIN_MEMORY_ROUTES.settings,
   AGENT_DEFAULTS_ROUTES.settings,
   AGENT_FAST_MODE_ROUTES.settings,
   AGENT_FAST_MODE_ROUTES.models,
@@ -174,8 +199,12 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   WORKFLOWS_MEDIA_CATALOG_V2_ROUTES.price,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.accounts,
   WORKFLOWS_MEDIA_SERVICE_ACCOUNT_ROUTES.credits,
+  WORKFLOWS_STEP_SETTINGS_ROUTES.read,
+  WORKFLOW_FOLDERS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.browse,
+  CHANNEL_FOLDERS_ROUTES.read,
+  CHANNEL_FOLDERS_ROUTES.browse,
   BROWSER_PROFILES_ROUTES.list,
   BROWSER_PROFILES_ROUTES.agent,
   BROWSER_PROFILES_ROUTES.tabs,
@@ -202,6 +231,18 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   USAGE_CREDITS_ROUTES.list,
   FOCUS_USE_ROUTES.ping,
   COMPUTER_ACTIVITY_ROUTES.report,
+  AGENT_USAGE_LIMIT_ROUTES.list,
+  AGENT_HIDDEN_ROUTES.read,
+  SIDEBAR_FOLDERS_ROUTES.read,
+  AGENT_TASKS_ROUTES.list,
+  AGENT_TASKS_ROUTES.read,
+  AGENT_THREAD_READS_ROUTES.list,
+  AGENT_THREAD_READS_ROUTES.mark,
+  AGENT_THREAD_BRANCHES_ROUTES.list,
+  AGENT_THREAD_REQUESTS_ROUTES.list,
+  AGENT_THREAD_QUEUE_ROUTES.list,
+  BROWSER_USER_CONTROL_ROUTES.state,
+  BROWSER_PAGE_STATE_ROUTES.state,
 ]);
 
 const PASSIVE_PATTERNS: readonly RegExp[] = [

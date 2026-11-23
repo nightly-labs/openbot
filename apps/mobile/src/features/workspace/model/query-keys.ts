@@ -13,6 +13,7 @@ type AgentRecordPart =
   | "task-limit"
   | "new-chat"
   | "plan-card"
+  | "builtin-memory"
   | "fast-mode"
   | "instructions"
   | "publish"
@@ -26,6 +27,7 @@ export const AGENT_SETTINGS_PARTS: readonly string[] = [
   "task-limit",
   "new-chat",
   "plan-card",
+  "builtin-memory",
   "fast-mode",
   "session-settings",
   "provider-accounts",
@@ -38,6 +40,9 @@ export const queryKeys = {
   accountSessions: (...scope: [QueryScope] | []) => ["account-sessions", ...(scope[0] ?? [])],
   hostedServerPlans: (...scope: [QueryScope] | []) => ["hosted-server-plans", ...(scope[0] ?? [])],
   billing: (...scope: [QueryScope] | []) => ["billing", ...(scope[0] ?? [])],
+  credits: (...scope: [QueryScope] | []) => ["credits", ...(scope[0] ?? [])],
+  creditActivity: (...scope: [QueryScope] | []) => ["credit-activity", ...(scope[0] ?? [])],
+  referrals: (...scope: [QueryScope] | []) => ["referrals", ...(scope[0] ?? [])],
   ownerHostedServerIds: (scope: QueryScope) => ["owner-hosted-server-ids", ...scope],
   agentTemplate: (apiUrl: string | null, templateId: string | null) => ["agent-template", apiUrl, templateId],
   marketplace: (apiUrl: string | null, ...parts: (string | null)[]) => ["marketplace", apiUrl, ...parts],
@@ -94,16 +99,22 @@ export const queryKeys = {
     agentId,
     path,
   ],
-  agentDefaults: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "agent-defaults"],
-  backgroundProcesses: (scope: QueryScope, serverId: string) => ["background-processes", ...scope, serverId],
-  sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
-  channelInfo: (scope: QueryScope, serverId: string, channelId: string, ...part: [] | ["memories" | "routines"]) => [
-    "channel-info",
+  channelFolderBrowse: (scope: QueryScope, serverId: string, channelId: string, path: string | null) => [
+    "channel-folder-browse",
     ...scope,
     serverId,
     channelId,
-    ...part,
+    path,
   ],
+  agentDefaults: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "agent-defaults"],
+  backgroundProcesses: (scope: QueryScope, serverId: string) => ["background-processes", ...scope, serverId],
+  sharedTables: (scope: QueryScope, serverId: string) => [...queryKeys.agentInfo(scope, serverId), "tables"],
+  channelInfo: (
+    scope: QueryScope,
+    serverId: string,
+    channelId: string,
+    ...part: [] | ["memories" | "routines" | "folders"]
+  ) => ["channel-info", ...scope, serverId, channelId, ...part],
   agentAvatar: (
     scope: QueryScope,
     serverId: string | undefined,
@@ -118,7 +129,10 @@ export const queryKeys = {
 
   serverMembers: (scope: QueryScope, serverId: string) => ["server-members", ...scope, serverId],
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
+  ownerTransfer: (scope: QueryScope, serverId: string) => ["owner-transfer", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  serverVoiceModel: (scope: QueryScope, serverId: string) => ["server-voice-model", ...scope, serverId],
+  serverSignalHome: (scope: QueryScope, serverId: string) => ["server-signal-home", ...scope, serverId],
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
   agentMemoryLimit: (scope: QueryScope, serverId: string) => ["agent-memory-limit", ...scope, serverId],
   memoryReview: (scope: QueryScope, serverId: string) => ["memory-review", ...scope, serverId],
@@ -159,6 +173,11 @@ export const queryKeys = {
     ...provider,
   ],
   providerPromptCache: (scope: QueryScope, serverId: string) => ["provider-prompt-cache", ...scope, serverId],
+  providerCacheExpiryCompaction: (scope: QueryScope, serverId: string) => [
+    "provider-cache-expiry-compaction",
+    ...scope,
+    serverId,
+  ],
   providerCompactWindow: (scope: QueryScope, serverId: string) => ["provider-compact-window", ...scope, serverId],
   providerEnvironment: (scope: QueryScope, serverId: string, provider: string) => [
     "provider-environment",

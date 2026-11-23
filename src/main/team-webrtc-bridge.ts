@@ -19,6 +19,7 @@ interface TeamWebRtcBridgeEvents {
   signalReady: [peerId: string];
   signalOpen: [peerId: string];
   hostWaiting: [peerId: string];
+  signalHeld: [peerId: string, retryInMs: number];
   signalClosed: [peerId: string, code: string, terminal: boolean];
   incoming: [
     peerId: string,
@@ -90,6 +91,7 @@ const bridgeMessageSchema = z
     localFingerprint: z.string().min(1).max(256).optional(),
     remoteFingerprint: z.string().min(1).max(256).optional(),
     iceServers: z.array(iceServerSchema).optional(),
+    retryInMs: z.number().nonnegative().optional(),
   })
   .loose();
 type BridgeMessage = z.infer<typeof bridgeMessageSchema>;
@@ -461,6 +463,8 @@ export class TeamWebRtcBridge extends EventEmitter<TeamWebRtcBridgeEvents> {
     else if (message.type === "signal-ready") this.emit("signalReady", message.peerId);
     else if (message.type === "signal-open") this.emit("signalOpen", message.peerId);
     else if (message.type === "host-waiting") this.emit("hostWaiting", message.peerId);
+    else if (message.type === "signal-held" && message.retryInMs !== undefined)
+      this.emit("signalHeld", message.peerId, message.retryInMs);
     else if (message.type === "signal-closed" && message.code)
       this.emit("signalClosed", message.peerId, message.code, message.terminal === true);
     else if (message.type === "peer-connected" && message.localFingerprint && message.remoteFingerprint)

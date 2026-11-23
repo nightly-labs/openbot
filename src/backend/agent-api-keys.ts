@@ -3,7 +3,7 @@ import { lstat, readdir, readFile, readlink, rename, rm, symlink } from "node:fs
 import { join } from "node:path";
 import { API_KEY_NAME_PATTERN } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { registerSecretValue } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Result, Schema, Semaphore } from "effect";
 import { writeFileAtomically } from "./atomic-json-file";
 import { isMissingFileError } from "./file-errors";
@@ -25,7 +25,23 @@ export class AgentApiKeyFailed extends Schema.TaggedError<AgentApiKeyFailed>()("
   cause: Schema.Defect(),
 }) {}
 
-const failed = () => new AgentApiKeyFailed({ cause: new Error(sourceText("error.backend.apiKeySaveFailed")) });
+const failed = (cause?: unknown) =>
+  new AgentApiKeyFailed({ cause: new Error(sourceText("error.backend.apiKeySaveFailed"), { cause }) });
+
+export function apiKeyFailureLog(failure: AgentApiKeyFailed): LogValue {
+  const { cause } = failure;
+  return toLogValue(cause instanceof Error && cause.cause !== undefined ? cause.cause : cause);
+}
+
+const logger = createOpenBotLogger("agent-api-keys");
+
+const skipSync = (step: string) => (failure: AgentApiKeyFailed) =>
+  Effect.sync(() =>
+    logger.warn("A saved API key could not be updated while listing keys", {
+      step,
+      error: apiKeyFailureLog(failure),
+    }),
+  );
 
 export type AgentApiKeyVault = Pick<
   VaultItems,
@@ -85,9 +101,13 @@ export class AgentApiKeys {
     const folder = yield* this.#agentFolder(agentId);
     return yield* this.#files.withPermit(
       Effect.gen({ self: this }, function* () {
-        yield* this.#moveIntoVault(agentId);
+        yield* this.#moveIntoVault(agentId).pipe(Effect.catch(skipSync("move")));
         const own = yield* this.#plainKeys(agentId);
-        const vault = yield* this.#writeAgent(folder, agentId);
+        const vault = yield* this.#writeAgent(folder, agentId).pipe(
+          Effect.catch((failure) =>
+            skipSync("vault copies")(failure).pipe(Effect.andThen(this.#readableVaultKeys(folder, agentId))),
+          ),
+        );
         yield* this.#writeShared().pipe(Effect.ignore);
         yield* this.#linkOwnKeys(agentId);
         const shown = vault.filter((key) => !own.some((entry) => entry.name === key.name));
@@ -208,6 +228,19 @@ export class AgentApiKeys {
         written.push({ name, path, ...(own ? {} : { source: "vault" as const }) });
       }
       return written;
+    });
+  }
+
+  #readableVaultKeys(folder: string, agentId: string): Effect.Effect<SavedApiKey[]> {
+    const keys = (this.#readyVault()?.apiKeys(agentId) ?? []).filter(({ name }) => API_KEY_NAME_PATTERN.test(name));
+    return Effect.promise(async () => {
+      const readable: SavedApiKey[] = [];
+      for (const { name, value, own } of keys) {
+        const path = join(folder, name);
+        if ((await readFile(path, "utf8").catch(() => null)) === value)
+          readable.push({ name, path, ...(own ? {} : { source: "vault" as const }) });
+      }
+      return readable;
     });
   }
 

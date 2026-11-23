@@ -39,6 +39,7 @@ import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contract
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import { addUiBlockLocationRequests } from "@openbot/contracts/team-protocol/ui-block-location-v1";
 import { addUiBlockVaultRequests } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
@@ -81,7 +82,7 @@ const peerDecode = <A>(operation: () => A) => Effect.try({ try: operation, catch
 const deviceFileError = () => new FileTransferError({ message: sourceText("error.remote.attachmentChanged") });
 
 import { createRemoteFileReceiver } from "./file-download";
-import { createRemoteFileSender, FileTransferError, type RemoteFileUpload } from "./file-upload";
+import { createRemoteFileSender, FileTransferError, fileTransferError, type RemoteFileUpload } from "./file-upload";
 import { markRemoteSync, type RemoteRequestProfile, startRemoteRequest } from "./sync-profile";
 
 export type { RemoteFileUpload } from "./file-upload";
@@ -104,6 +105,7 @@ export type RemoteTeamEvent = AgentEvent | TeamRealtimeEvent | LiveVoiceEvent;
 export type RemoteLargeDownload = {
   maxBytes: number;
   mimeType?: string | undefined;
+  file?: string | undefined;
 };
 
 export type RemoteTeamCommand =
@@ -195,8 +197,13 @@ function decodeRemoteFileUpload(value: unknown): RemoteFileUpload | null {
 
 function decodeRemoteLargeDownload(value: unknown): RemoteLargeDownload | null {
   if (!isDynamicRecord(value) || !isNumber(value.maxBytes)) return null;
-  if (value.mimeType === undefined) return { maxBytes: value.maxBytes };
-  return isString(value.mimeType) ? { maxBytes: value.maxBytes, mimeType: value.mimeType } : null;
+  if (!(value.mimeType === undefined || isString(value.mimeType))) return null;
+  if (!(value.file === undefined || (isString(value.file) && value.file.length > 0))) return null;
+  return {
+    maxBytes: value.maxBytes,
+    ...(value.mimeType === undefined ? {} : { mimeType: value.mimeType }),
+    ...(value.file === undefined ? {} : { file: value.file }),
+  };
 }
 
 export function decodeRemoteTeamCommand(value: unknown): {
@@ -317,6 +324,7 @@ export interface RemoteTeamPeerActions {
   onTeamEvent: (hostId: string, event: RemoteTeamEvent) => Promise<void>;
   digestUploadFile?: (ref: string) => Promise<string>;
   readUploadFile?: (part: { ref: string; offset: number; length: number }) => Promise<string>;
+  writeDownloadFile?: (part: { ref: string; base64: string; append: boolean }) => Promise<void>;
 }
 interface ActionsRef {
   current: RemoteTeamPeerActions;
@@ -512,6 +520,15 @@ export function createRemoteTeamPeer(
         ),
     },
   );
+  const downloadTarget = (ref: string | undefined) => {
+    const write = actions.current.writeDownloadFile;
+    if (ref === undefined || !write) return undefined;
+    return {
+      ref,
+      write: (base64: string, append: boolean) =>
+        peerCall(() => write({ ref, base64, append })).pipe(Effect.mapError(fileTransferError)),
+    };
+  };
   const downloads = createRemoteFileReceiver((data) =>
     Effect.suspend(() => {
       const state = peer;
@@ -607,6 +624,11 @@ export function createRemoteTeamPeer(
       if (active && state && !state.closed && (state.authenticated || state.waitingForHost))
         renewSignal(state, actions);
       void runPeerEffect(peerCall(() => actions.current.onNetworkRestored?.())).catch(() => undefined);
+    },
+    eventsFailed() {
+      const state = peer;
+      if (state && !state.closed)
+        failPeer(state, referenced(sourceText("error.remote.connectionDropped"), "events/failed"), actions);
     },
     networkMoved() {
       const state = peer;
@@ -1606,7 +1628,9 @@ export function createRemoteTeamPeer(
                     channelSeenSubtasks: true,
                     channelTaskWaits: true,
                     mcpManyServers: true,
+                    providerManyAccounts: true,
                     routineResultsWhatsApp: true,
+                    storageWorkflowFiles: true,
                   }),
                 )
               : yield* peerDecode(() =>
@@ -1659,6 +1683,7 @@ export function createRemoteTeamPeer(
         if (sendsBlockExtensions(state)) {
           addUiBlockAutoAnswers(decoded.event, frame.payload);
           addUiBlockVaultRequests(decoded.event, frame.payload);
+          addUiBlockLocationRequests(decoded.event, frame.payload);
           addSkillSuggestionNames(decoded.event, frame.payload);
         }
         yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
@@ -1755,7 +1780,11 @@ export function createRemoteTeamPeer(
       const releaseDownload =
         largeDownload === undefined
           ? null
-          : downloads.allow(Math.min(largeDownload.maxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES), largeDownload.mimeType);
+          : downloads.allow(
+              Math.min(largeDownload.maxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES),
+              largeDownload.mimeType,
+              downloadTarget(largeDownload.file),
+            );
       const stopDownloadWatch = download ? downloads.watch(download.size, download.onProgress) : null;
       return yield* Effect.gen(function* () {
         const bodyTransferId = upload ? yield* files.upload(upload, delivery?.queued) : null;
@@ -1766,7 +1795,12 @@ export function createRemoteTeamPeer(
           ? null
           : sideRoute
             ? yield* peerDecode(() =>
-                sideRoute.request(path, body, { channelIsolation: true, channelPicture: true, channelBrowser: true }),
+                sideRoute.request(path, body, {
+                  channelIsolation: true,
+                  channelPicture: true,
+                  channelBrowser: true,
+                  providerManyAccounts: true,
+                }),
               )
             : // A caller names a provider and model on agent creation only when the host advertises
               yield* peerDecode(() =>
@@ -2358,6 +2392,7 @@ function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown)
   if (sendsBlockExtensions(state)) {
     addUiBlockAutoAnswers(decoded, wire);
     addUiBlockVaultRequests(decoded, wire);
+    addUiBlockLocationRequests(decoded, wire);
     addSkillSuggestionNames(decoded, wire);
   }
   return decoded;

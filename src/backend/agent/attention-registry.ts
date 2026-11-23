@@ -101,14 +101,19 @@ import {
   apiKeyPromptResult,
   approvalPermissions,
   browserTakeoverError,
+  browserTakeoverExpiredResult,
+  browserTakeoverLateNotes,
+  browserTakeoverReleasedResult,
   browserTakeoverResult,
   browserTakeoverWaitingResult,
   commandText,
   declinedMcpElicitationText,
   detachedPromptResult,
   dynamicPromptResult,
+  editedPreviewQuestions,
   expiredPromptResult,
   lateAnswerText,
+  locationPromptResult,
   MCP_TOOL_CONSENT_ALLOW_ONCE,
   mcpElicitationQuestions,
   mcpElicitationResult,
@@ -144,6 +149,7 @@ interface PendingPrompt {
   autoAnswer?: { state: UiBlockAutoAnswer; timer: ReturnType<typeof setTimeout> };
   detach?: { target: LateAnswerTarget; timer?: ReturnType<typeof setTimeout> };
   detached?: LateAnswerTarget;
+  expireTimer?: ReturnType<typeof setTimeout>;
   subagent?: true;
 }
 
@@ -162,6 +168,7 @@ export interface SurfacedUiBlock {
   spec: UiBlockSpec;
   apiKey?: { name: string; vault?: boolean };
   vault?: { kind: UiVaultRequestKind };
+  location?: true;
 }
 
 export interface PromptResponder {
@@ -183,6 +190,7 @@ interface PendingApproval {
   method: string;
   params: unknown;
   approval: AgentApproval;
+  executionThreadId: string;
   hostedSiteMutation?: HostedSiteMutationContext;
   decide?: (decision: ToolApprovalDecision, phone?: FeedbackPhone) => void;
   alwaysAsk?: boolean;
@@ -205,7 +213,8 @@ const MCP_TOOL_CONSENT_UNANSWERABLE = {
 
 const TAKEOVER_TAB_ID_MISSING = "Give tabId: the id of the tab, from open or list_tabs.";
 const TAKEOVER_TAB_OF_OTHER_CHAT =
-  "Only the chat that opened this tab can hand it to the user. Open the page in this chat with open, then call this tool with the new tabId.";
+  "This chat cannot use this tab. Open the page in this chat with open, then call this tool with the new tabId.";
+const USER_ANSWER_LIMIT_MS = 10 * 60_000;
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
 const NO_LOGIN_FOR_SITE =
@@ -393,11 +402,18 @@ interface PendingBrowserTakeover {
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
+  releaseAt: number;
   detached?: true;
+  released?: LateAnswerTarget;
   subagent?: true;
 }
 
+function heldTakeoverKey(tabId: string, threadId: string): string {
+  return JSON.stringify([tabId, threadId]);
+}
+
 interface HeldTakeoverResult {
+  tabId: string;
   threadId: string;
   turnId: string;
   result: DynamicToolResult;
@@ -433,6 +449,7 @@ export interface RoutineAttention {
 export interface AttentionBrowserHost {
   prepareSecret?(params: DynamicToolCallParams): Effect.Effect<PreparedBrowserSecret, BrowserOperationError>;
   listTabs(): BrowserTab[];
+  toolCanUseTab(params: DynamicToolCallParams, tabId: string): boolean;
   beginTakeover(tabId: string): Effect.Effect<void, BrowserOperationError>;
   endTakeover(tabId: string, completed?: boolean): void;
   takeoverSignInArrived?(tabId: string): boolean;
@@ -453,6 +470,7 @@ export interface AttentionRegistryOptions {
   confinedWritesAllowed?(agentId: string, paths: readonly string[]): boolean;
   messagingThread?(threadId: string): boolean;
   messagingRequestTurn?(agentId: string, turnId: string): boolean;
+  approvalChatThread?(agentId: string, threadId: string): string;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
   emitRuntimeSnapshot(): void;
@@ -470,6 +488,7 @@ export interface AttentionRegistryOptions {
     text: string,
     sender: ConversationMessageSender | undefined,
   ): void;
+  userAnswerLimitMs?: number;
 }
 
 export interface CodexSubagentParent {
@@ -498,6 +517,7 @@ export class AttentionRegistry {
   readonly #confinedWritesAllowed: (agentId: string, paths: readonly string[]) => boolean;
   readonly #messagingThread: (threadId: string) => boolean;
   readonly #messagingRequestTurn: (agentId: string, turnId: string) => boolean;
+  readonly #approvalChatThread: (agentId: string, threadId: string) => string;
   readonly #emit: (event: AgentEvent) => void;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
   readonly #emitRuntimeSnapshot: () => void;
@@ -510,6 +530,7 @@ export class AttentionRegistry {
   readonly #codexSubagentParent: (childThreadId: string) => CodexSubagentParent | undefined;
   readonly #lateAnswerTarget: (agentId: string, publicThreadId: string) => LateAnswerTarget | null;
   readonly #sendLateAnswer: NonNullable<AttentionRegistryOptions["sendLateAnswer"]>;
+  readonly #userAnswerLimitMs: number;
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
@@ -525,6 +546,7 @@ export class AttentionRegistry {
     this.#confinedWritesAllowed = options.confinedWritesAllowed ?? (() => false);
     this.#messagingThread = options.messagingThread ?? (() => false);
     this.#messagingRequestTurn = options.messagingRequestTurn ?? (() => false);
+    this.#approvalChatThread = options.approvalChatThread ?? ((_agentId, threadId) => threadId);
     this.#emit = options.emit;
     this.#emitError = options.emitError;
     this.#emitRuntimeSnapshot = options.emitRuntimeSnapshot;
@@ -536,6 +558,7 @@ export class AttentionRegistry {
     this.#apiKeys = options.apiKeys ?? null;
     this.#lateAnswerTarget = options.lateAnswerTarget ?? (() => null);
     this.#sendLateAnswer = options.sendLateAnswer ?? (() => undefined);
+    this.#userAnswerLimitMs = options.userAnswerLimitMs ?? USER_ANSWER_LIMIT_MS;
     this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
   }
 
@@ -577,7 +600,9 @@ export class AttentionRegistry {
     return (
       [...this.#prompts.values()].some(
         (pending) =>
-          getString(pending.params, "threadId") === threadId && getString(pending.params, "turnId") === turnId,
+          !pending.detached &&
+          getString(pending.params, "threadId") === threadId &&
+          getString(pending.params, "turnId") === turnId,
       ) ||
       [...this.#approvals.values()].some(
         (pending) =>
@@ -585,7 +610,7 @@ export class AttentionRegistry {
           (getString(pending.params, "turnId") ?? turnId) === turnId,
       ) ||
       [...this.#takeovers.values()].some(
-        (pending) => pending.params.threadId === threadId && pending.params.turnId === turnId,
+        (pending) => !pending.released && pending.params.threadId === threadId && pending.params.turnId === turnId,
       )
     );
   }
@@ -622,7 +647,7 @@ export class AttentionRegistry {
           throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
         });
       }
-      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers });
+      return yield* this.respondToPrompt({ requestId: pending.id, answers: input.answers }, { privileged: false });
     }
     const pending = [...this.#approvals.values()].find(
       (entry) => entry.approval.agentId === agentId && this.#localHandles.get(entry) === input.requestId,
@@ -643,11 +668,8 @@ export class AttentionRegistry {
     return handle;
   }
 
-  runtimeAttention(): RuntimeAttention {
-    const attentionComplete =
-      this.#prompts.size + this.#approvals.size + this.#takeovers.size <= AGENT_RUNTIME_ATTENTION_LIMIT;
-    let remainingAttention = AGENT_RUNTIME_ATTENTION_LIMIT;
-    const pendingPrompts = [...this.#prompts.values()].slice(0, remainingAttention).map((pending) => ({
+  pendingPrompts(): RuntimeAttention["pendingPrompts"] {
+    return [...this.#prompts.values()].map((pending) => ({
       requestId: pending.id,
       agentId: pending.agentId,
       threadId: pending.publicThreadId,
@@ -655,6 +677,13 @@ export class AttentionRegistry {
       questions: pending.questions.map(compactRuntimeQuestion),
       ...(outlivesTurn(pending) ? { detached: true as const } : {}),
     }));
+  }
+
+  runtimeAttention(): RuntimeAttention {
+    const attentionComplete =
+      this.#prompts.size + this.#approvals.size + this.#takeovers.size <= AGENT_RUNTIME_ATTENTION_LIMIT;
+    let remainingAttention = AGENT_RUNTIME_ATTENTION_LIMIT;
+    const pendingPrompts = this.pendingPrompts().slice(0, remainingAttention);
     remainingAttention -= pendingPrompts.length;
     const pendingApprovals = [...this.#approvals.values()]
       .slice(0, remainingAttention)
@@ -695,25 +724,28 @@ export class AttentionRegistry {
         ? apiKeyPromptResult(pending.uiBlock.blockId, saved?.key ?? null)
         : pending.uiBlock?.vault
           ? vaultPromptResult(pending.uiBlock.blockId, savedItem?.item ?? null)
-          : pending.uiBlock
-            ? uiBlockPromptResult(
-                uiBlockResponse
-                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
-                  : { status: "skipped", blockId: pending.uiBlock.blockId },
-              )
-            : pending.responseKind === "dynamic-tool"
-              ? dynamicPromptResult(answers)
-              : pending.responseKind === "mcp-elicitation"
-                ? mcpElicitationResult(pending.params, answers)
-                : {
-                    answers: Object.fromEntries(
-                      Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
-                    ),
-                  };
+          : pending.uiBlock?.location
+            ? locationPromptResult(pending.uiBlock.blockId, uiBlockResponse)
+            : pending.uiBlock
+              ? uiBlockPromptResult(
+                  uiBlockResponse
+                    ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
+                    : { status: "skipped", blockId: pending.uiBlock.blockId },
+                )
+              : pending.responseKind === "dynamic-tool"
+                ? dynamicPromptResult(answers)
+                : pending.responseKind === "mcp-elicitation"
+                  ? mcpElicitationResult(pending.params, answers)
+                  : {
+                      answers: Object.fromEntries(
+                        Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
+                      ),
+                    };
       if (!pending.detached) pending.client.respond(pending.id, result);
       this.#prompts.delete(input.requestId);
       clearTimeout(pending.autoAnswer?.timer);
       clearTimeout(pending.detach?.timer);
+      clearTimeout(pending.expireTimer);
       this.#emitInputResolved("prompt", input.requestId, pending.agentId);
       try {
         if (pending.uiBlock) {
@@ -728,6 +760,8 @@ export class AttentionRegistry {
             state.outcome = sourceText("status.agent.vaultAdded", {
               name: savedItem.item.name || (pending.uiBlock.spec.title ?? ""),
             }).slice(0, UI_BLOCK_LIMITS.outcome);
+          else if (pending.uiBlock.location && uiBlockResponse)
+            state.outcome = sourceText("status.agent.location.shared").slice(0, UI_BLOCK_LIMITS.outcome);
           else if (saved && saved.created !== null)
             state.outcome = sourceText(saved.created ? "status.agent.vaultAdded" : "status.agent.vaultUpdated", {
               name: saved.key.name,
@@ -751,7 +785,7 @@ export class AttentionRegistry {
         ? ""
         : pending.uiBlock?.vault
           ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
-          : lateAnswerText(pending.questions, answers);
+          : lateAnswerText(editedPreviewQuestions(pending.questions, pending.uiBlock?.spec, preview), answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -923,8 +957,9 @@ export class AttentionRegistry {
   ) {
     const { pending, secret } = yield* attentionStep(() => {
       const value = this.#takeovers.get(input.requestId);
-      if (!value?.secret || value.request.agentId !== input.agentId || value.submitting)
-        throw new Error(sourceText("error.backend.authRequestInactive"));
+      if (!value?.secret || value.request.agentId !== input.agentId)
+        throw new InactiveAttentionRequest(sourceText("error.backend.authRequestInactive"));
+      if (value.submitting) throw new Error(sourceText("error.backend.authSubmitting"));
       return { pending: value, secret: value.secret };
     });
     if (input.decision === "cancel") {
@@ -1019,6 +1054,21 @@ export class AttentionRegistry {
     }
   }
 
+  #holdApproval(pending: Omit<PendingApproval, "executionThreadId">): void {
+    const executionThreadId = pending.approval.threadId;
+    const approval = {
+      ...pending.approval,
+      threadId: this.#approvalChatThread(pending.approval.agentId, executionThreadId),
+    };
+    this.#approvals.set(pending.id, { ...pending, approval, executionThreadId });
+    this.#routines.markNeedsAttention(approval.turnId);
+    this.#emit({ type: "approval", approval });
+  }
+
+  approvalExecutionThreadId(requestId: RequestId): string | undefined {
+    return this.#approvals.get(requestId)?.executionThreadId;
+  }
+
   surfaceApproval(client: AgentClient, request: AppServerRequest, kind: AgentApprovalKind): void {
     const threadId = getString(request.params, "threadId");
     const turnId = getString(request.params, "turnId") ?? (kind === "file-change" ? String(request.id) : null);
@@ -1041,15 +1091,7 @@ export class AttentionRegistry {
       permissions: kind === "permissions" ? approvalPermissions(request.params) : null,
     };
     if (this.#answerWithoutAsking(client, request, approval)) return;
-    this.#approvals.set(request.id, {
-      client,
-      id: request.id,
-      method: request.method,
-      params: request.params,
-      approval,
-    });
-    this.#routines.markNeedsAttention(turnId);
-    this.#emit({ type: "approval", approval });
+    this.#holdApproval({ client, id: request.id, method: request.method, params: request.params, approval });
   }
 
   readonly awaitToolApproval = Effect.fn("AttentionRegistry.awaitToolApproval")(function* (
@@ -1082,7 +1124,7 @@ export class AttentionRegistry {
     const alwaysAsk = options.alwaysAsk || options.ownerOnly;
     if (!alwaysAsk && this.#answersForAgent(approval.agentId)) return { decision: "accept" } as const;
     const answer = Deferred.makeUnsafe<{ decision: ToolApprovalDecision; phone?: FeedbackPhone }>();
-    this.#approvals.set(request.id, {
+    this.#holdApproval({
       client,
       id: request.id,
       method: TOOL_APPROVAL_METHOD,
@@ -1094,8 +1136,6 @@ export class AttentionRegistry {
       ...(options.ownerOnly ? { ownerOnly: true } : {}),
       ...(options.needsPhone ? { needsPhone: true } : {}),
     });
-    this.#routines.markNeedsAttention(approval.turnId);
-    this.#emit({ type: "approval", approval });
     return yield* Deferred.await(answer);
   }).bind(this);
 
@@ -1116,7 +1156,7 @@ export class AttentionRegistry {
         .pipe(toAttentionOperationFailed);
       return;
     }
-    this.#approvals.set(request.id, {
+    this.#holdApproval({
       client,
       id: request.id,
       method: HOSTED_SITE_APPROVAL_METHOD,
@@ -1124,8 +1164,6 @@ export class AttentionRegistry {
       approval: prepared.approval,
       hostedSiteMutation: prepared.mutation,
     });
-    this.#routines.markNeedsAttention(prepared.approval.turnId);
-    this.#emit({ type: "approval", approval: prepared.approval });
   }, Effect.uninterruptible).bind(this);
 
   surfaceLegacyApproval(client: AgentClient, request: AppServerRequest): void {
@@ -1150,15 +1188,7 @@ export class AttentionRegistry {
       permissions: null,
     };
     if (this.#answerWithoutAsking(client, request, approval)) return;
-    this.#approvals.set(request.id, {
-      client,
-      id: request.id,
-      method: request.method,
-      params: request.params,
-      approval,
-    });
-    this.#routines.markNeedsAttention(approval.turnId);
-    this.#emit({ type: "approval", approval });
+    this.#holdApproval({ client, id: request.id, method: request.method, params: request.params, approval });
   }
 
   readonly surfaceBrowserTakeover = Effect.fn("AttentionRegistry.surfaceBrowserTakeover")(function* (
@@ -1178,16 +1208,33 @@ export class AttentionRegistry {
     const tab = this.#browser.listTabs().find((candidate) => candidate.id === tabId);
     if (!tab || (tab.ownerAgentId !== agentId && tab.ownerThreadId !== publicThreadId))
       return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
-    if (tab.ownerThreadId !== publicThreadId || tab.ownerAgentId !== agentId)
+    if (!this.#browser.toolCanUseTab({ ...params, threadId: publicThreadId, ownerAgentId: agentId }, tabId))
       return browserTakeoverError(TAKEOVER_TAB_OF_OTHER_CHAT);
-    const held = this.#heldTakeoverResults.get(tabId);
+    const heldKey = heldTakeoverKey(tabId, threadId);
+    const held = this.#heldTakeoverResults.get(heldKey);
     if (held) {
-      this.#heldTakeoverResults.delete(tabId);
-      if (held.threadId === threadId && held.turnId === turnId) return held.result;
+      this.#heldTakeoverResults.delete(heldKey);
+      if (held.turnId === turnId) return held.result;
     }
     const waiting = [...this.#takeovers].find(([, pending]) => pending.request.tabId === tabId);
     if (waiting) {
       const [waitingId, pending] = waiting;
+      if (pending.released && pending.request.threadId === publicThreadId && pending.params.tool === params.tool) {
+        if (pending.params.turnId === turnId) return browserTakeoverReleasedResult(params.tool, tabId);
+        const call = takeoverCall();
+        delete pending.released;
+        pending.client = client;
+        pending.providerRequestId = request.id;
+        pending.params = params;
+        pending.request.turnId = turnId;
+        pending.releaseAt = Date.now() + this.#userAnswerLimitMs;
+        pending.resolve = call.resolve;
+        if (request.subagent) pending.subagent = true;
+        else delete pending.subagent;
+        this.#routines.markNeedsAttention(turnId);
+        this.#emitRuntimeSnapshot();
+        return yield* this.#awaitBrowserTakeover(waitingId, pending, request, call.completion, Effect.void);
+      }
       if (
         !pending.detached ||
         pending.params.threadId !== threadId ||
@@ -1222,6 +1269,7 @@ export class AttentionRegistry {
       params,
       request: takeover,
       resolve: call.resolve,
+      releaseAt: Date.now() + this.#userAnswerLimitMs,
       ...(request.subagent ? { subagent: true as const } : {}),
     };
     this.#takeovers.set(requestId, pending);
@@ -1270,6 +1318,13 @@ export class AttentionRegistry {
               ),
             );
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.request.vaultSkip === "agent-script") {
+            pending.resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped} When OpenBot still does not fill the saved login, call submit_secret without loginId so that the user types the password, or use request_takeover.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else {
             this.#routines.markNeedsAttention(turnId);
             this.#emit({ type: "browser-takeover-requested", request: takeover });
@@ -1303,20 +1358,41 @@ export class AttentionRegistry {
       request.answerBeforeMs === undefined
         ? undefined
         : setTimeout(() => this.#detachBrowserTakeover(requestId, pending), request.answerBeforeMs);
+    const release = setTimeout(
+      () => this.#releaseBrowserTakeover(requestId, pending),
+      Math.max(0, pending.releaseAt - Date.now()),
+    );
     return show.pipe(
       Effect.andThen(Deferred.await(completion)),
       Effect.ensuring(
         Effect.sync(() => {
           clearTimeout(detach);
-          if (this.#takeovers.get(requestId) === pending && !pending.detached)
+          clearTimeout(release);
+          if (this.#takeovers.get(requestId) === pending && !pending.detached && !pending.released)
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
         }),
       ),
     );
   }
 
+  #releaseBrowserTakeover(requestId: RequestId, pending: PendingBrowserTakeover): void {
+    if (this.#takeovers.get(requestId) !== pending || pending.detached || pending.released) return;
+    const answerCall = pending.resolve;
+    const target = this.#lateAnswerTarget(pending.request.agentId, pending.request.threadId);
+    if (!target) {
+      pending.resolve = () => answerCall(browserTakeoverExpiredResult());
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+      return;
+    }
+    pending.released = target;
+    pending.resolve = () => undefined;
+    this.#routines.markRunningForTurn(pending.request.turnId);
+    this.#emitRuntimeSnapshot();
+    answerCall(browserTakeoverReleasedResult(pending.params.tool, pending.request.tabId));
+  }
+
   #detachBrowserTakeover(requestId: RequestId, pending: PendingBrowserTakeover): void {
-    if (this.#takeovers.get(requestId) !== pending || pending.detached) return;
+    if (this.#takeovers.get(requestId) !== pending || pending.detached || pending.released) return;
     const answerCall = pending.resolve;
     const { threadId, turnId, tool } = pending.params;
     const { tabId } = pending.request;
@@ -1325,7 +1401,7 @@ export class AttentionRegistry {
     pending.resolve = (result) => {
       if (held) return;
       held = true;
-      this.#heldTakeoverResults.set(tabId, { threadId, turnId, result });
+      this.#heldTakeoverResults.set(heldTakeoverKey(tabId, threadId), { tabId, threadId, turnId, result });
     };
     answerCall(browserTakeoverWaitingResult(tool, tabId));
   }
@@ -1639,7 +1715,7 @@ export class AttentionRegistry {
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid login list request.") });
     const { tabId } = call.args;
     const tab = this.#browser.listTabs().find((candidate) => candidate.id === tabId);
-    if (!tab || tab.ownerAgentId !== params.ownerAgentId || tab.ownerThreadId !== params.threadId)
+    if (!tab || tab.ownerAgentId !== params.ownerAgentId || !this.#browser.toolCanUseTab(params, tabId))
       return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
     const listed = yield* Effect.result(
       this.#passwordVault
@@ -1723,7 +1799,7 @@ export class AttentionRegistry {
       questions,
       ...(request.subagent ? { subagent: true as const } : {}),
     };
-    if (!questions.some((question) => question.isSecret)) this.#scheduleDetach(request, pending);
+    this.#limitQuestion(request, pending);
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
@@ -1759,6 +1835,7 @@ export class AttentionRegistry {
       state: auto ? { status: "pending", autoAnswer: auto } : { status: "pending" },
       ...(block.vault ? { vault: { kind: block.vault.kind } } : {}),
       ...(block.apiKey?.vault ? { apiKey: true } : {}),
+      ...(block.location ? { location: true } : {}),
     });
     if (!threadId || !turnId || !agentId || !publicThreadId || !uiBlock || !validPromptQuestions(questions)) {
       client.respond(request.id, {
@@ -1853,7 +1930,7 @@ export class AttentionRegistry {
     }
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
     this.#expireDetachedInChat(agentId, publicThreadId);
-    this.#prompts.set(request.id, {
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "user-input",
@@ -1863,7 +1940,9 @@ export class AttentionRegistry {
       turnId,
       messageId,
       questions,
-    });
+    };
+    if (client.userInputNote) this.#limitQuestion(request, pending);
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -1962,11 +2041,11 @@ export class AttentionRegistry {
     }
     for (const [requestId, pending] of this.#takeovers) {
       if (pending.params.threadId !== threadId || pending.params.turnId !== turnId) continue;
-      if (completed && pending.subagent && !pending.detached) continue;
+      if (completed && (pending.released || (pending.subagent && !pending.detached))) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
-    for (const [tabId, held] of this.#heldTakeoverResults) {
-      if (held.threadId === threadId && held.turnId === turnId) this.#heldTakeoverResults.delete(tabId);
+    for (const [key, held] of this.#heldTakeoverResults) {
+      if (held.threadId === threadId && held.turnId === turnId) this.#heldTakeoverResults.delete(key);
     }
   }
 
@@ -1991,6 +2070,11 @@ export class AttentionRegistry {
       if (this.#closeForUserMessage(requestId, pending)) changed = true;
     }
     if (changed) this.#emitRuntimeSnapshot();
+    for (const [requestId, pending] of this.#takeovers) {
+      if (!pending.released || pending.submitting) continue;
+      if (pending.request.agentId !== agentId || pending.request.threadId !== publicThreadId) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+    }
   }
 
   #closeForUserMessage(requestId: RequestId, pending: PendingPrompt): boolean {
@@ -2031,7 +2115,7 @@ export class AttentionRegistry {
     }
     if (changed) this.#emitRuntimeSnapshot();
     for (const [requestId, pending] of this.#takeovers) {
-      if (!pending.subagent) continue;
+      if (!pending.subagent && !pending.released) continue;
       if (agentId !== null && pending.request.agentId !== agentId) continue;
       if (publicThreadId !== null && pending.request.threadId !== publicThreadId) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
@@ -2045,12 +2129,14 @@ export class AttentionRegistry {
     }
   }
 
-  cancelRequest(client: AgentClient, requestId: RequestId): void {
+  cancelRequest(client: AgentClient, requestId: RequestId, providerStoppedWaiting = false): void {
     let changed = false;
     const prompt = this.#prompts.get(requestId);
     if (prompt?.client === client && !prompt.detached) {
-      this.#routines.markRunningForTurn(prompt.turnId);
-      this.#expirePrompt(requestId, prompt);
+      if (!providerStoppedWaiting || !this.#detachForLateAnswer(requestId, prompt)) {
+        this.#routines.markRunningForTurn(prompt.turnId);
+        this.#expirePrompt(requestId, prompt);
+      }
       changed = true;
     }
     const approval = this.#approvals.get(requestId);
@@ -2061,8 +2147,14 @@ export class AttentionRegistry {
       changed = true;
     }
     for (const [key, takeover] of this.#takeovers) {
-      if (takeover.client === client && takeover.providerRequestId === requestId && !takeover.detached) {
-        this.#resolveBrowserTakeover(key, takeover, "cancel");
+      if (
+        takeover.client === client &&
+        takeover.providerRequestId === requestId &&
+        !takeover.detached &&
+        !takeover.released
+      ) {
+        if (providerStoppedWaiting) this.#releaseBrowserTakeover(key, takeover);
+        else this.#resolveBrowserTakeover(key, takeover, "cancel");
       }
     }
     if (changed) this.#emitRuntimeSnapshot();
@@ -2072,10 +2164,23 @@ export class AttentionRegistry {
     const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
     if (!target) return;
     const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
-    pending.detach =
-      deadlines.length === 0
-        ? { target }
-        : { target, timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)) };
+    pending.detach = {
+      target,
+      timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(this.#userAnswerLimitMs, ...deadlines)),
+    };
+  }
+
+  #limitQuestion(request: AppServerRequest, pending: PendingPrompt): void {
+    if (!pending.questions.some((question) => question.isSecret)) this.#scheduleDetach(request, pending);
+    if (pending.detach) return;
+    pending.expireTimer = setTimeout(() => this.#expireUnanswered(request.id, pending), this.#userAnswerLimitMs);
+  }
+
+  #expireUnanswered(requestId: RequestId, pending: PendingPrompt): void {
+    if (this.#prompts.get(requestId) !== pending || pending.saving) return;
+    this.#routines.markRunningForTurn(pending.turnId);
+    this.#expirePrompt(requestId, pending);
+    this.#emitRuntimeSnapshot();
   }
 
   detachPromptsOf(provider: AgentProvider): void {
@@ -2084,21 +2189,27 @@ export class AttentionRegistry {
         this.#detachPrompt(requestId, pending);
   }
 
-  #detachPrompt(requestId: RequestId, pending: PendingPrompt): void {
-    const target = pending.detach?.target;
-    if (this.#prompts.get(requestId) !== pending || !target) return;
+  #detachForLateAnswer(requestId: RequestId, pending: PendingPrompt): boolean {
+    if (pending.saving || pending.questions.some((question) => question.isSecret)) return false;
+    const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
+    return target !== null && this.#detachPrompt(requestId, pending, target);
+  }
+
+  #detachPrompt(requestId: RequestId, pending: PendingPrompt, target = pending.detach?.target): boolean {
+    if (this.#prompts.get(requestId) !== pending || !target) return false;
     clearTimeout(pending.detach?.timer);
     delete pending.detach;
     pending.detached = target;
     this.#routines.markRunningForTurn(pending.turnId);
     if (pending.client.running) {
       try {
-        pending.client.respond(pending.id, detachedPromptResult());
+        pending.client.respond(pending.id, detachedPromptResult(pending.responseKind));
       } catch (error) {
         logger.warn("Unable to answer a detached prompt", { error: toLogValue(error) });
       }
     }
     this.#emitRuntimeSnapshot();
+    return true;
   }
 
   #expirePrompt(requestId: RequestId, pending: PendingPrompt): void {
@@ -2123,6 +2234,7 @@ export class AttentionRegistry {
     this.#prompts.delete(requestId);
     clearTimeout(pending.autoAnswer?.timer);
     clearTimeout(pending.detach?.timer);
+    clearTimeout(pending.expireTimer);
     this.#emitInputResolved("prompt", requestId, pending.agentId);
     if (pending.client.running && !pending.detached) {
       try {
@@ -2140,7 +2252,7 @@ export class AttentionRegistry {
 
   clearBrowserTakeovers(client?: AgentClient): void {
     for (const [requestId, pending] of this.#takeovers) {
-      if (client && pending.client !== client) continue;
+      if (client && (pending.client !== client || pending.released)) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
   }
@@ -2191,8 +2303,8 @@ export class AttentionRegistry {
         this.#resolveBrowserTakeover(requestId, pending, "cancel");
       }
     }
-    for (const tabId of this.#heldTakeoverResults.keys()) {
-      if (!tabs.some((tab) => tab.id === tabId)) this.#heldTakeoverResults.delete(tabId);
+    for (const [key, held] of this.#heldTakeoverResults) {
+      if (!tabs.some((tab) => tab.id === held.tabId)) this.#heldTakeoverResults.delete(key);
     }
   }
 
@@ -2232,7 +2344,7 @@ export class AttentionRegistry {
     if (pending.secret?.agentScriptedOrigin !== false)
       return skip(
         "agent-scripted-origin",
-        "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another chat or agent can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
+        "a script that you ran with evaluate can still run in this page or in another open page of this site. First close or navigate each other tab of this site, also a popup or opener tab where you did not run evaluate. A tab of another agent or a channel can also block the fill, and list_tabs does not show it: when no other tab of this site is in list_tabs, ask the user to close the other tabs of this site. Then reload this page with navigate direction=reload, not with evaluate or by opening its address again, and call submit_secret again.",
         namedCard("agent-script"),
       );
     const withCode = pending.secret.withCode;
@@ -2356,10 +2468,29 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
+    const vaultNote = vault ?? (pending.vaultNotSaved ? TYPED_PASSWORD_NOT_SAVED : undefined);
+    if (pending.released && (decision === "complete" || pending.personCancelled)) {
+      const lateText = sourceText(
+        decision === "complete" ? "status.agent.takeoverLateCompleted" : "status.agent.takeoverLateCancelled",
+        { tabId: pending.request.tabId },
+      );
+      const lateNotes = browserTakeoverLateNotes(
+        vaultNote,
+        pending.vaultSkipped,
+        signInMissing,
+        pending.secureInputFailed,
+      );
+      this.#sendLateAnswer(
+        pending.request.agentId,
+        pending.released,
+        lateNotes ? `${lateText}\n${lateNotes}` : lateText,
+        undefined,
+      );
+    }
     pending.resolve(
       browserTakeoverResult(
         decision,
-        vault ?? (pending.vaultNotSaved ? TYPED_PASSWORD_NOT_SAVED : undefined),
+        vaultNote,
         pending.vaultSkipped,
         signInMissing,
         pending.personCancelled === true,

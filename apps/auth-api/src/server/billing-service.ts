@@ -27,12 +27,15 @@ import {
 } from "@openbot/contracts/billing";
 import type { BillingDetails, BillingDetailsRequest } from "@openbot/contracts/billing-details";
 import {
-  type HostedServerCatalog,
-  type HostedServerCatalogPlan,
-  type HostedServerEntryPoint,
-  type HostedServerPlanPrices,
-  type HostedServerSize,
-  hostedServerStorageGb,
+  CUSTOM_SERVER_METADATA_KIND,
+  CUSTOM_SERVER_PAID_STATUSES,
+  type CustomServerPlan,
+} from "@openbot/contracts/custom-server-plans";
+import type {
+  HostedServerCatalog,
+  HostedServerCatalogPlan,
+  HostedServerEntryPoint,
+  HostedServerPlanPrices,
 } from "@openbot/contracts/hosted-servers";
 import {
   LICENSE_METADATA,
@@ -45,7 +48,7 @@ import {
 import type { ReferralMoney } from "@openbot/contracts/referral";
 import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Exit, Layer } from "effect";
 import { SOLD_OUT_PLANS } from "../lib/pricing-page";
 import {
   type AccountAnalytics,
@@ -54,6 +57,7 @@ import {
   type PlanChangeDirection,
   type PlanEndReason,
 } from "./account-analytics";
+import { subscriptionPaysForOwnerSql } from "./billing-entitlement";
 import {
   BillingError,
   BillingOperationError,
@@ -65,8 +69,16 @@ import {
 import type { BillingOss } from "./billing-oss";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import { BillingReferral } from "./billing-referral";
-import { type BillingSales, type BillingSalesSynced, paymentReversal, withoutTax } from "./billing-sales";
+import {
+  type BillingSales,
+  type BillingSalesSynced,
+  isDisputeInquiry,
+  paymentReversal,
+  withoutTax,
+} from "./billing-sales";
 import { billingDetailsOf, checkoutCountryMismatch, checkoutTax, setCustomerBillingDetails } from "./billing-tax";
+import { CreditGrants } from "./credit-grants";
+import { CreditService, isCreditCheckoutEvent, isCreditInvoiceEvent } from "./credit-service";
 import type { HostedFailure } from "./hosted-server-service";
 import {
   type FailedLicenseInvoice,
@@ -96,6 +108,7 @@ import {
   subscriptionPaymentMethodId,
   subscriptionPeriodEnd,
   subscriptionServerItem,
+  subscriptionStartedAt,
   subscriptionStorageItem,
   subscriptionStorageTier,
   verifyStripeSignature,
@@ -105,6 +118,7 @@ import { ViesClient } from "./vies-client";
 const WEBHOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
 const WELCOME_EMAIL_CLAIM_PREFIX = "openbot_welcome_email:";
 const SERVER_ID_PATTERN = /^[A-Za-z0-9:_-]{1,128}$/u;
+const DISPUTE_DELETES_SERVER_MS = 30 * 24 * 60 * 60 * 1000;
 const LAPSED_PLAN_GRACE_MS = 24 * 60 * 60 * 1000;
 const LAPSED_PLAN_READ_INTERVAL_MS = 60 * 60 * 1000;
 const LAPSED_PLAN_BATCH_SIZE = 20;
@@ -131,7 +145,6 @@ interface ServerPlanRow {
   current_period_end: number | null;
   cancel_at_period_end: number;
   on_operator_host: number;
-  server_size: HostedServerSize | null;
   storage_tier: number;
 }
 
@@ -155,6 +168,7 @@ export interface BillingServiceOptions {
   fetch: StripeFetch;
   now?: () => number;
   onSubscriptionSynced?: (sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>;
+  onCustomServerChanged?: (hostId: string) => Effect.Effect<void, RemoteFailure>;
   onServerRefunded?: (refund: ServerRefund) => Effect.Effect<void, HostedFailure>;
   onLicenseChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
   analytics?: AccountAnalytics;
@@ -202,6 +216,20 @@ interface SyncedSubscription {
   latestInvoiceId: string | null;
   serverId: string | null;
   ended: boolean;
+  startedAt: number | null;
+}
+
+interface CustomServerSync {
+  kind: "custom_server";
+}
+
+export interface CustomServerCheckoutRequest {
+  user: { id: string; email: string };
+  serverId: string;
+  plan: CustomServerPlan;
+  target: BillingReturnTarget;
+  origin: string;
+  earlyStartAt?: number;
 }
 
 export interface CheckoutRequest {
@@ -225,6 +253,7 @@ class BillingDependencies extends Context.Service<
     stripe: StripeClient;
     now: () => number;
     onSubscriptionSynced: ((sync: SubscriptionSync) => Effect.Effect<void, HostedFailure | RemoteFailure>) | null;
+    onCustomServerChanged: ((hostId: string) => Effect.Effect<void, RemoteFailure>) | null;
     onServerRefunded: ((refund: ServerRefund) => Effect.Effect<void, HostedFailure>) | null;
     analytics: AccountAnalytics;
   }
@@ -245,6 +274,7 @@ export class BillingService {
   readonly #referral: BillingReferral;
   readonly #countryRequired: boolean;
   readonly license: LicenseService;
+  readonly credits: CreditService;
 
   constructor(options: BillingServiceOptions) {
     const database = options.database;
@@ -266,6 +296,7 @@ export class BillingService {
       stripe,
       now,
       onSubscriptionSynced,
+      onCustomServerChanged: options.onCustomServerChanged ?? null,
       onServerRefunded: options.onServerRefunded ?? null,
       analytics: this.#analytics,
     });
@@ -276,6 +307,15 @@ export class BillingService {
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
     });
+    this.credits = new CreditService({
+      database,
+      stripe,
+      secretKey: options.secretKey,
+      countryRequired: this.#countryRequired,
+      now,
+      ensureCustomer: (user) => this.ensureCustomer(user),
+      analytics: this.#analytics,
+    });
     this.license = new LicenseService({
       database,
       stripe,
@@ -285,6 +325,7 @@ export class BillingService {
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
       referralCoupon: (userId) => this.#referral.couponFor(userId),
+      keptReferralCoupon: (subscriptionId) => this.#referral.keptCoupon(subscriptionId),
       analytics: this.#analytics,
       sales: this.#sales,
       ...(options.onLicenseChanged ? { onLicenseChanged: options.onLicenseChanged } : {}),
@@ -315,7 +356,7 @@ export class BillingService {
         }
         const entry: HostedServerCatalogPlan = {
           id: plan.id,
-          diskGb: plan.storageGb,
+          diskGb: storageTierGb(plan.id, 0),
           memberLimit: plan.memberLimit,
           relativeSpeed: plan.relativeSpeed,
           prices: planPrices,
@@ -331,6 +372,9 @@ export class BillingService {
 
   readonly referralCredit = (userId: string): Effect.Effect<ReferralMoney[], BillingError | BillingOperationError> =>
     this.#referral.credit(userId);
+
+  readonly releaseReferralCredit = (): Effect.Effect<number, BillingError | BillingOperationError> =>
+    this.#referral.releaseDue();
 
   readonly ensureCustomer = Effect.fn("BillingService.ensureCustomer")(
     function* (
@@ -530,6 +574,44 @@ export class BillingService {
             amount: licenseAmount,
           });
       }
+      return { sessionId: session.id, url: session.url };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  readonly createCustomServerCheckout = Effect.fn("BillingService.createCustomServerCheckout")(
+    function* (
+      this: BillingService,
+      request: CustomServerCheckoutRequest,
+    ): Effect.fn.Return<{ sessionId: string; url: string }, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      yield* this.license.assertCurrency(request.user.id, request.plan.currency);
+      const customerId = yield* this.ensureCustomer(request.user);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
+      const returnUrl = customServerReturnUrl(request.origin, request.target);
+      const session = yield* this.#stripeCall(() =>
+        dependencies.stripe.createCheckoutSession({
+          customerId,
+          inlinePrice: {
+            productName: `OpenBot ${request.plan.name}`,
+            amount: request.plan.amount,
+            interval: request.plan.interval,
+          },
+          currency: request.plan.currency,
+          userId: request.user.id,
+          serverId: request.serverId,
+          tax,
+          metadata: {
+            [LICENSE_METADATA.kind]: CUSTOM_SERVER_METADATA_KIND,
+            ...(request.earlyStartAt === undefined
+              ? {}
+              : { [EARLY_START_METADATA]: new Date(request.earlyStartAt).toISOString() }),
+          },
+          successUrl: returnUrl,
+          cancelUrl: `${returnUrl}${returnUrl.includes("?") ? "&" : "?"}cancelled=1`,
+          nowSeconds: Math.floor(dependencies.now() / 1_000),
+        }),
+      );
       return { sessionId: session.id, url: session.url };
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
@@ -778,10 +860,9 @@ export class BillingService {
                 `SELECT s.stripe_subscription_id, s.server_id, h.name AS server_name, s.plan, s.interval, s.currency,
                   s.amount, s.status, s.current_period_end, s.cancel_at_period_end,
                   hs.operator_host IS NOT NULL AS on_operator_host,
-                  CASE WHEN hs.provider_template IS NULL THEN NULL ELSE COALESCE(hs.pending_size, hs.size) END AS server_size,
                   COALESCE(hs.storage_tier, 0) AS storage_tier
            FROM billing_subscriptions s
-           LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND h.owner_user_id = s.user_id
+           LEFT JOIN remote_hosts h ON h.host_id = s.server_id AND ${subscriptionPaysForOwnerSql("s", "h.owner_user_id")}
            LEFT JOIN hosted_servers hs ON hs.server_id = s.server_id AND hs.owner_user_id = s.user_id
            WHERE s.user_id = ? AND s.status IN ${OPEN_STATUSES_SQL}
            ORDER BY h.name IS NULL, h.name COLLATE NOCASE, s.updated_at DESC`,
@@ -942,20 +1023,30 @@ export class BillingService {
           .first<{ seen: number }>(),
       );
       if (seen) return;
+      yield* this.credits.webhook(event);
+      if (isCreditCheckoutEvent(event)) return yield* this.#recordEvent(event, now);
+      if (isCreditInvoiceEvent(event)) {
+        if (this.#oss) yield* this.#oss.record(event);
+        return yield* this.#recordEvent(event, now);
+      }
       const reversal = paymentReversal(event);
       const payment = reversal
         ? yield* this.#stripeCall(() => dependencies.stripe.getPaymentInvoice(reversal.paymentIntentId))
         : null;
       const subscriptionId = eventSubscriptionId(event) ?? payment?.subscriptionId ?? null;
-      const synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
+      let synced = subscriptionId ? yield* this.#syncSubscription(subscriptionId) : null;
       if (reversal?.type === "payment_disputed" && payment && synced) {
         yield* this.cancelSubscription(payment.subscriptionId);
-        yield* this.#syncSubscription(payment.subscriptionId);
+        synced = yield* this.#syncSubscription(payment.subscriptionId);
       }
       if (synced?.kind === "plan" && synced.ended && synced.serverId && dependencies.onServerRefunded) {
         const invoiceId = synced.latestInvoiceId;
         const refunded =
           reversal?.type === "payment_refunded" ||
+          (reversal?.type === "payment_disputed" &&
+            !isDisputeInquiry(event) &&
+            synced.startedAt !== null &&
+            event.created * 1_000 - synced.startedAt < DISPUTE_DELETES_SERVER_MS) ||
           (event.type === "customer.subscription.deleted" &&
             invoiceId !== null &&
             (yield* this.#stripeCall(() => dependencies.stripe.isInvoiceRefunded(invoiceId))));
@@ -975,23 +1066,16 @@ export class BillingService {
               interval: synced.interval,
               currency: synced.currency,
             }
-          : synced;
+          : synced?.kind === "plan"
+            ? synced
+            : null;
       if (this.#sales) {
         yield* this.#sales.webhook(event, sold, payment).pipe(Effect.mapError(() => new BillingOperationError({})));
       }
       if (this.#oss) yield* this.#oss.record(event);
       yield* this.#referral.record(event, payment, sold?.userId ?? null);
-      yield* billingCall(() =>
-        dependencies.database.batch([
-          dependencies.database
-            .prepare("INSERT OR IGNORE INTO billing_webhook_events(event_id, type, received_at) VALUES (?, ?, ?)")
-            .bind(event.id, event.type, now),
-          dependencies.database
-            .prepare("DELETE FROM billing_webhook_events WHERE received_at < ?")
-            .bind(now - WEBHOOK_EVENT_RETENTION_MS),
-        ]),
-      );
-      if (!this.#sales) yield* this.#trackEvent(event, synced);
+      yield* this.#recordEvent(event, now);
+      if (!this.#sales) yield* this.#trackEvent(event, synced?.kind === "custom_server" ? null : synced);
       const mismatch = event.type === "checkout.session.completed" ? checkoutCountryMismatch(event.data.object) : null;
       if (mismatch) {
         console.warn(`billing: ${mismatch}`);
@@ -1000,6 +1084,23 @@ export class BillingService {
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
+
+  readonly #recordEvent = Effect.fn("BillingService.recordEvent")(function* (
+    event: StripeEvent,
+    now: number,
+  ): Effect.fn.Return<void, BillingError | BillingOperationError, BillingDependencies> {
+    const dependencies = yield* BillingDependencies;
+    yield* billingCall(() =>
+      dependencies.database.batch([
+        dependencies.database
+          .prepare("INSERT OR IGNORE INTO billing_webhook_events(event_id, type, received_at) VALUES (?, ?, ?)")
+          .bind(event.id, event.type, now),
+        dependencies.database
+          .prepare("DELETE FROM billing_webhook_events WHERE received_at < ?")
+          .bind(now - WEBHOOK_EVENT_RETENTION_MS),
+      ]),
+    );
+  });
 
   readonly #trackEvent = Effect.fn("BillingService.trackEvent")(function* (
     this: BillingService,
@@ -1045,18 +1146,32 @@ export class BillingService {
     this: BillingService,
     subscriptionId: string,
   ): Effect.fn.Return<
-    SyncedSubscription | LicenseSync | null,
+    SyncedSubscription | LicenseSync | CustomServerSync | null,
     BillingError | BillingOperationError,
     BillingDependencies
   > {
     const dependencies = yield* BillingDependencies;
     const readAt = dependencies.now();
     const subscription = yield* this.#stripeCall(() => dependencies.stripe.getSubscription(subscriptionId));
+    if (subscription.metadata[LICENSE_METADATA.kind] === CUSTOM_SERVER_METADATA_KIND) {
+      yield* this.#syncCustomServer(subscription, readAt);
+      return { kind: "custom_server" };
+    }
     const customerId = subscriptionCustomerId(subscription);
     const price = subscriptionServerItem(subscription)?.price;
     if (!price && subscriptionLicenseItem(subscription)) {
       const ownerId = yield* this.#subscriptionOwner(subscription, customerId);
-      return ownerId ? yield* this.license.sync(subscription, ownerId, readAt) : null;
+      if (!ownerId) return null;
+      const synced = yield* this.license.sync(subscription, ownerId, readAt);
+      const granted = yield* Effect.exit(
+        new CreditGrants({
+          database: dependencies.database,
+          now: dependencies.now,
+          analytics: dependencies.analytics,
+        }).issue(subscription.id),
+      );
+      if (Exit.isFailure(granted)) console.warn("billing: license credits wait for the next sweep", { subscriptionId });
+      return synced;
     }
     const key = price ? planLookupKey(price) : null;
     const currency = subscription.currency.toLowerCase();
@@ -1122,6 +1237,7 @@ export class BillingService {
       latestInvoiceId: subscriptionLatestInvoiceId(subscription),
       serverId,
       ended: subscription.status === "canceled",
+      startedAt: subscriptionStartedAt(subscription),
     };
     const finish = Effect.andThen(
       ordersLicense(subscription) ? this.license.splitOrder(subscription, ownerId) : Effect.void,
@@ -1187,6 +1303,49 @@ export class BillingService {
     }
     yield* finish;
     return synced;
+  });
+
+  readonly #syncCustomServer = Effect.fn("BillingService.syncCustomServer")(function* (
+    subscription: StripeSubscription,
+    readAt: number,
+  ): Effect.fn.Return<void, BillingError | BillingOperationError, BillingDependencies> {
+    const dependencies = yield* BillingDependencies;
+    const metadataServerId = subscription.metadata[BILLING_METADATA.serverId];
+    const serverId = metadataServerId && SERVER_ID_PATTERN.test(metadataServerId) ? metadataServerId : null;
+    if (!serverId) {
+      console.warn("billing: custom server subscription has no server", { subscriptionId: subscription.id });
+      return;
+    }
+    const paid = CUSTOM_SERVER_PAID_STATUSES.map(() => "?").join(", ");
+    const stored = yield* billingCall(() =>
+      dependencies.database
+        .prepare(
+          `UPDATE custom_server_offers
+              SET stripe_subscription_id = ?, subscription_status = ?, checkout_session_id = NULL, updated_at = ?
+            WHERE host_id = ?
+              AND (stripe_subscription_id IS NULL OR stripe_subscription_id = ?
+                OR subscription_status IS NULL OR subscription_status NOT IN (${paid}))
+              AND (stripe_subscription_id IS NOT ? OR subscription_status IS NOT ?)`,
+        )
+        .bind(
+          subscription.id,
+          subscription.status,
+          readAt,
+          serverId,
+          subscription.id,
+          ...CUSTOM_SERVER_PAID_STATUSES,
+          subscription.id,
+          subscription.status,
+        )
+        .run(),
+    );
+    if (stored.meta.changes !== 1) return;
+    const changed = dependencies.onCustomServerChanged;
+    if (changed) {
+      yield* changed(serverId).pipe(
+        Effect.mapError((error) => (error instanceof BillingError ? error : new BillingOperationError({}))),
+      );
+    }
   });
 
   readonly #firstPlanStarted = Effect.fn("BillingService.firstPlanStarted")(
@@ -1411,7 +1570,7 @@ function serverPlan(row: ServerPlanRow, prices: ReadonlyMap<string, StripePrice>
     status: row.status,
     currentPeriodEnd: row.current_period_end,
     cancelAtPeriodEnd: row.cancel_at_period_end === 1,
-    storageGb: hostedServerStorageGb(row.plan, row.on_operator_host === 1, row.server_size, storageTier),
+    storageGb: storageTierGb(row.plan, storageTier),
     ...(canBuyStorage(row)
       ? { storageUpgrades: storageUpgrades(row.plan, row.interval, row.currency, storageTier, row.amount, prices) }
       : {}),
@@ -1455,6 +1614,11 @@ function plansUnavailable(): BillingError {
 
 function checkoutReturnUrl(origin: string, target: BillingReturnTarget, serverId: string): string {
   if (target === "web") return `${origin}/app?hosting=checkout&hosted_server=${encodeURIComponent(serverId)}`;
+  return `${origin}/billing/return?kind=plan`;
+}
+
+function customServerReturnUrl(origin: string, target: BillingReturnTarget): string {
+  if (target === "web") return `${origin}/app?hosting=custom`;
   return `${origin}/billing/return?kind=plan`;
 }
 

@@ -6,18 +6,16 @@ import {
   Client as ModernClient,
   StreamableHTTPClientTransport as ModernHttpTransport,
 } from "@modelcontextprotocol/client";
+import { getDefaultEnvironment } from "@modelcontextprotocol/client/stdio";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import {
-  getDefaultEnvironment,
-  StdioClientTransport,
-  type StdioServerParameters,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioClientTransport, type StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   AccessDeniedError,
   InvalidClientError,
   InvalidClientMetadataError,
+  InvalidGrantError,
   UnauthorizedClientError,
 } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
@@ -120,7 +118,7 @@ export const inspectMcpServer = Effect.fnUntraced(function* (
   );
 });
 
-const MCP_TOOL_CALL_TIMEOUT_MS = 5 * 60_000;
+export const MCP_TOOL_CALL_TIMEOUT_MS = 5 * 60_000;
 
 export type McpToolCallResult = Awaited<ReturnType<Client["callTool"]>>;
 export type McpToolArguments = NonNullable<CallToolRequest["params"]["arguments"]>;
@@ -265,12 +263,16 @@ function describeProbeFailure(
   accountRefused: boolean,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
+  const otherAddress = signIn?.otherAddress();
+  if (otherAddress) return sourceText("error.backend.mcpSignInOtherAddress", { url: otherAddress });
   if (signIn?.signInServerMissing()) return BEARER_KEY;
   if (signIn && isRegistrationRefusal(error, signIn))
     return signIn.registrationUnsupported() ? REGISTRATION_UNAVAILABLE : REGISTRATION_REFUSED;
   if (accountRefused) return sourceText("error.backend.mcpSignInAccountRefused");
   const status = httpStatus(error);
   if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
+  if (signIn?.exchangeFailed() && error instanceof InvalidGrantError)
+    return sourceText("error.backend.mcpSignInGrantRefused");
   if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
     return sourceText("error.backend.mcpSignInNotAccepted");
   if (challenge?.status === 401 && challenge.bearer && (challenge.keyOnly || authorizationWithoutScheme(config)))
@@ -487,7 +489,7 @@ const countToolsEffect = Effect.fnUntraced(function* (client: ProbeClient) {
   }
 });
 
-function boundedError(text: string): string {
+export function boundedError(text: string): string {
   if (text.length <= INPUT_LIMITS.mcpErrorText) return text;
   return `${text.slice(0, INPUT_LIMITS.mcpErrorText - 1)}…`;
 }

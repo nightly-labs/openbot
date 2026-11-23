@@ -22,6 +22,7 @@ import {
   agentAutomationAllowed,
   agentBrowserProfile,
   agentComputerUseEnabled,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentNextProviderAccountId,
   agentPermissionLevel,
@@ -66,6 +67,7 @@ import {
   SlidingTabs,
   Switch,
   Text,
+  toast,
 } from "@openbot/ui";
 import { normalizeAvatarFile } from "@openbot/ui/avatar-image";
 import {
@@ -154,6 +156,7 @@ export interface AgentSettingsPanelProps {
   automationEditable?: boolean;
   newChatEditable?: boolean;
   quickAcknowledgementEditable?: boolean;
+  builtinMemoryEditable?: boolean;
   fastMode?: boolean | undefined;
   ultrafast?: boolean | undefined;
   onFastModeChange?: ((fastMode: boolean, ultrafast: boolean) => void) | undefined;
@@ -244,7 +247,9 @@ interface AgentSettingsDraft {
   allowAutomation: boolean;
   allowNewChat: boolean;
   quickAcknowledgement: boolean;
+  memory: boolean;
   browserProfile: BrowserProfileChoice;
+  browserProfileMoved: boolean;
   busyMessage: BusyMessageChoice;
   backupModels: AgentBackupModels | null;
   confirmingPermission: AgentPermissionLevel | null;
@@ -280,7 +285,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     allowAutomation: false,
     allowNewChat: false,
     quickAcknowledgement: false,
+    memory: true,
     browserProfile: "shared",
+    browserProfileMoved: false,
     busyMessage: "default",
     backupModels: null,
     confirmingPermission: null,
@@ -436,6 +443,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           String(agentAutomationAllowed(agent, agentDefaults())),
           String(agentNewChatAllowed(agent, agentDefaults())),
           String(agentQuickAcknowledgementEnabled(agent, agentDefaults())),
+          String(agentMemoryEnabled(agent)),
           browserProfile,
           agent.busyMessageMode ?? "default",
           JSON.stringify(agent.backupModels ?? null),
@@ -478,7 +486,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.allowAutomation = agentAutomationAllowed(agent, agentDefaults());
           state.allowNewChat = agentNewChatAllowed(agent, agentDefaults());
           state.quickAcknowledgement = agentQuickAcknowledgementEnabled(agent, agentDefaults());
+          state.memory = agentMemoryEnabled(agent);
           state.browserProfile = browserProfile;
+          if (agentChanged) state.browserProfileMoved = false;
           state.busyMessage = agent.busyMessageMode ?? "default";
           state.backupModels = agent.backupModels ?? null;
           if (agentChanged) state.confirmingPermission = null;
@@ -933,6 +943,19 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
+  async function saveMemory(next: boolean): Promise<void> {
+    const agentId = props.agent.id;
+    setDraft((state) => {
+      state.memory = next;
+    });
+    if (await saveAgentPatch({ memory: next }, agentId)) return;
+    if (!disposed && props.agent.id === agentId && draft.memory === next) {
+      setDraft((state) => {
+        state.memory = !next;
+      });
+    }
+  }
+
   async function saveBrowserProfile(options: AgentBrowserProfileOptions, next: BrowserProfileChoice): Promise<void> {
     const agentId = props.agent.id;
     const previous = draft.browserProfile;
@@ -942,6 +965,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     setSaveError(null);
     try {
       await options.onChange(agentId, choiceBrowserProfile(next));
+      if (!disposed && props.agent.id === agentId && next !== previous)
+        setDraft((state) => {
+          state.browserProfileMoved = true;
+        });
     } catch (error) {
       if (disposed || props.agent.id !== agentId) return;
       setSaveError(errorMessage(error, t("agentSettings.saveFailed")), error);
@@ -1523,6 +1550,11 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   </span>
                 </div>
               </SettingsLinkGroup>
+              <Show when={props.browserProfiles && draft.browserProfileMoved}>
+                <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="warning" role="status">
+                  {t("agentSettings.browserProfile.movedNote")}
+                </Text>
+              </Show>
               <Show when={props.busyMessageModeEditable && steerUnsupported()}>
                 <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
                   {t("agentSettings.busyMessage.steerUnsupported", {
@@ -1541,8 +1573,13 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     type="button"
                     aria-label={t("agentSettings.newChat.confirm")}
                     aria-haspopup="dialog"
-                    disabled={props.working}
-                    onClick={() => setNewChatOpen(true)}
+                    onClick={() => {
+                      if (props.working) {
+                        toast.info(t("agentSettings.newChat.busy"), { id: "agent-new-chat-busy" });
+                        return;
+                      }
+                      setNewChatOpen(true);
+                    }}
                   >
                     {t("agentSettings.newChat.button")}
                   </Button>
@@ -1591,6 +1628,20 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     aria-label={t("agentSettings.quickAcknowledgement.title")}
                     checked={draft.quickAcknowledgement}
                     onChange={(next) => void saveQuickAcknowledgement(next)}
+                  />
+                </div>
+              </Show>
+              <Show when={props.builtinMemoryEditable}>
+                <div class="agent-settings-notifications">
+                  <div>
+                    <strong>{t("agentSettings.builtinMemory.title")}</strong>
+                    <span>{t("agentSettings.builtinMemory.description")}</span>
+                  </div>
+                  <Switch
+                    size="sm"
+                    aria-label={t("agentSettings.builtinMemory.title")}
+                    checked={draft.memory}
+                    onChange={(next) => void saveMemory(next)}
                   />
                 </div>
               </Show>

@@ -9,6 +9,7 @@ import { Effect } from "effect";
 import { parse as parseToml } from "smol-toml";
 import { AcpAgentClient, type AcpHistoryPersistence } from "./acp-client";
 import { GROK_ACP_FLAVOR } from "./acp-flavor";
+import type { ImageFitter } from "./agent/image-reader";
 import type { GrokCliInfo } from "./cli";
 import { isMissingFileError } from "./file-errors";
 import { MCP_STDIO_PROBE_TIMEOUT_MS } from "./mcp-probe";
@@ -29,6 +30,7 @@ export class GrokAgentClient extends AcpAgentClient {
     confinement?: ProcessConfinement,
     agentEnvironment?: () => Readonly<Record<string, string>>,
     history?: AcpHistoryPersistence,
+    fitImage?: ImageFitter | null,
   ) {
     super(cli, requestTimeoutMs, {
       provider: "grok",
@@ -45,6 +47,7 @@ export class GrokAgentClient extends AcpAgentClient {
       reportMcpDrops,
       mcpToolRuntimes,
       mcpEndpoint,
+      fitImage,
       argv: [
         "--no-auto-update",
         ...(profileGeneration === "media"

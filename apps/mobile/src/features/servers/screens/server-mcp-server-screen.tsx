@@ -3,6 +3,7 @@ import type { McpServerConfig, McpTestResult, McpTransport } from "@openbot/cont
 import { matchingSourceKeys } from "@openbot/i18n/source";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
+import LogIn from "lucide-react-native/icons/log-in";
 import LogOut from "lucide-react-native/icons/log-out";
 import PlugZap from "lucide-react-native/icons/plug-zap";
 import Trash2 from "lucide-react-native/icons/trash";
@@ -18,6 +19,7 @@ import {
   mcpServerDraftChanged,
   mcpServerDraftErrors,
 } from "@/features/servers/model/mcp-server-draft";
+import { RELAY_PASTE_PLACEHOLDER, useMcpSignInRelay } from "@/features/servers/model/use-mcp-sign-in-relay";
 import { useServerMcp } from "@/features/servers/model/use-server-mcp";
 import {
   SettingsContent,
@@ -27,7 +29,10 @@ import {
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
-import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
@@ -38,6 +43,7 @@ const SIGN_IN_ERRORS = new Set([
   "error.backend.mcpSignInRequired",
   "error.backend.mcpSignInOnHost",
   "error.backend.mcpSignInTimedOut",
+  "error.backend.mcpSignInRefused",
   "error.mcp.signInOnHost",
 ]);
 
@@ -47,9 +53,18 @@ const URL_PLACEHOLDER = "https://mcp.example.com/mcp";
 
 type TestState = { status: "testing" } | { status: "done"; result: McpTestResult };
 
+function isSignInError(error: string | null | undefined): boolean {
+  const key = error ? matchingSourceKeys(error)[0] : undefined;
+  return Boolean(key && SIGN_IN_ERRORS.has(key));
+}
+
 export function ServerMcpServerScreen() {
   const { t } = useText();
-  const { serverId, mcpServerId } = useLocalSearchParams<{ serverId: string; mcpServerId?: string }>();
+  const { serverId, mcpServerId, signIn } = useLocalSearchParams<{
+    serverId: string;
+    mcpServerId?: string;
+    signIn?: string;
+  }>();
   const mcp = useServerMcp(serverId);
   const saved = mcpServerId ? mcp.list.data?.find((config) => config.id === mcpServerId) : undefined;
   if (!mcp.server || !mcp.canManage || (mcpServerId && !saved))
@@ -66,23 +81,37 @@ export function ServerMcpServerScreen() {
         </SettingsNote>
       </SettingsContent>
     );
-  return <McpServerForm key={saved?.id ?? "new"} serverId={serverId} saved={saved} mcp={mcp} />;
+  return (
+    <McpServerForm
+      key={saved?.id ?? "new"}
+      serverId={serverId}
+      saved={saved}
+      mcp={mcp}
+      signInRequested={signIn === "1"}
+    />
+  );
 }
 
 function McpServerForm({
   serverId,
   saved,
   mcp,
+  signInRequested,
 }: {
   serverId: string;
   saved: McpServerConfig | undefined;
   mcp: ReturnType<typeof useServerMcp>;
+  signInRequested: boolean;
 }) {
   const { t, sourceText, errorMessage } = useText();
   const { theme } = useUniwind();
   const { saveMcpServer, removeMcpServer, setMcpServerEnabled, testMcpServer, signOutMcpServer } =
     useMobileWorkspaceActions();
   const { action, perform, setList, setSignIns } = mcp;
+  const canRelay = useMobileWorkspaceSelector((workspace) => workspace.canRelayMcpSignIn(serverId));
+  const relay = useMcpSignInRelay(serverId);
+  const [signingIn, setSigningIn] = useState(false);
+  const [address, setAddress] = useState("");
   const [draft, setDraft] = useState<McpServerDraft>(() => mcpServerDraft(saved));
   const [newEnabled, setNewEnabled] = useState(true);
   const [test, setTest] = useState<TestState | null>(null);
@@ -101,12 +130,15 @@ function McpServerForm({
   const enabled = saved?.enabled ?? newEnabled;
   const config = mcpServerConfig(draft, saved?.id ?? "", enabled);
   const errors = mcpServerDraftErrors(config);
-  const valid = !errors.name && !errors.command && !errors.url;
+  const valid = !errors.name && !errors.command && !errors.url && !errors.headers;
   const dirty = mcpServerDraftChanged(draft, saved);
   const signedIn =
     saved?.transport === "http" &&
     Boolean(mcp.signIns.data?.some((state) => state.mcpServerId === saved.id && state.signedIn));
-  const busy = action.isPending || test?.status === "testing";
+  const testAsksSignIn = test?.status === "done" && isSignInError(test.result.error);
+  const showSignIn =
+    canRelay && saved?.transport === "http" && !dirty && !signedIn && (signInRequested || testAsksSignIn || signingIn);
+  const busy = action.isPending || test?.status === "testing" || signingIn;
 
   useDiscardGuard((dirty || action.isPending) && !leaving, { busy: () => action.isPending, warn: true });
 
@@ -145,15 +177,43 @@ function McpServerForm({
       });
   }
 
+  function startSignIn() {
+    if (!saved || busy) return;
+    setSigningIn(true);
+    setAddress("");
+    relay
+      .signIn(saved)
+      .then(async () => {
+        if (!relay.mounted.current) return;
+        void haptics.notification("success");
+        testRun.current += 1;
+        setTest(null);
+        await mcp.signIns.refetch();
+      })
+      .catch((cause: unknown) => {
+        if (!relay.mounted.current) return;
+        void haptics.notification("error");
+        relay.setError(errorMessage(cause, t("mobile.marketplace.app.connectFailed")));
+      })
+      .finally(() => {
+        if (relay.mounted.current) setSigningIn(false);
+      });
+  }
+
   function testMessage(state: TestState): string {
     if (state.status === "testing") return t("mobile.server.mcp.testing");
     const { error, toolCount } = state.result;
     if (!error) return t("mobile.server.mcp.connected", { count: toolCount });
-    const key = matchingSourceKeys(error)[0];
-    return key && SIGN_IN_ERRORS.has(key) ? t("mobile.server.mcp.signInOnComputer") : sourceText(error);
+    if (!isSignInError(error)) return sourceText(error);
+    if (showSignIn) return t("mobile.server.mcp.signInHere");
+    return matchingSourceKeys(error)[0] === "error.backend.mcpSignInRefused"
+      ? sourceText(error)
+      : t("mobile.server.mcp.signInOnComputer");
   }
 
-  const locked = action.isPending;
+  const relayPage = relay.state.phase === "signIn" ? relay.state : null;
+
+  const locked = action.isPending || signingIn;
   return (
     <SettingsContent>
       <Stack.Screen options={{ title: saved ? saved.name : t("mobile.server.mcp.addTitle") }} />
@@ -298,7 +358,7 @@ function McpServerForm({
           />
           <PairField
             title={t("mobile.server.mcp.headers")}
-            footer={t("mobile.server.mcp.headersHint")}
+            footer={errors.headers ? sourceText(errors.headers) : t("mobile.server.mcp.headersHint")}
             items={draft.headers}
             maxItems={INPUT_LIMITS.mcpHeaders}
             maxKeyLength={INPUT_LIMITS.mcpEnvName}
@@ -346,6 +406,51 @@ function McpServerForm({
           </Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
+      {showSignIn ? (
+        <View className="gap-3">
+          <SettingsSection footer={relay.error ?? t("mobile.marketplace.app.signInIntro")}>
+            <SettingsRow
+              disclosure={false}
+              disabled={relayPage ? false : busy}
+              leading={<RowIcon icon={LogIn} tone="accent" />}
+              onPress={relayPage ? relay.reopen : startSignIn}
+            >
+              <Typography.Paragraph className="text-accent">
+                {relayPage
+                  ? t("mobile.marketplace.app.openAgain")
+                  : signingIn
+                    ? t("mobile.marketplace.app.waiting")
+                    : t("mobile.server.mcp.signIn")}
+              </Typography.Paragraph>
+            </SettingsRow>
+          </SettingsSection>
+          {relayPage?.paste ? (
+            <View className="gap-3">
+              <SheetFormField
+                label={t("mobile.marketplace.app.pasteLabel")}
+                hint={t("mobile.marketplace.app.pasteHint")}
+                placeholder={RELAY_PASTE_PLACEHOLDER}
+                value={address}
+                autoCapitalize="none"
+                autoCorrect={false}
+                inputMode="url"
+                onChangeText={setAddress}
+              />
+              <SettingsSection>
+                <SettingsRow
+                  disclosure={false}
+                  disabled={!address.trim() || relay.pasting}
+                  onPress={() => void relay.paste(address)}
+                >
+                  <Typography.Paragraph className="text-accent">
+                    {t("mobile.marketplace.app.finishSignIn")}
+                  </Typography.Paragraph>
+                </SettingsRow>
+              </SettingsSection>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       {signedIn && saved ? (
         <SettingsSection footer={t("mobile.server.mcp.signedInDescription", { server: mcp.server?.name ?? "" })}>
           <SettingsRow

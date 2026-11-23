@@ -4,7 +4,7 @@ import { basename } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { canAdministerServer } from "@openbot/contracts/ipc";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -152,9 +152,10 @@ export async function routeFiles(
     if (!workspacePath || workspacePath.length > INPUT_LIMITS.path) {
       throw new HttpError(400, "A valid workspace file path is required.");
     }
+    const exactPath = url.searchParams.get(WORKSPACE_FILE_EXACT_PATH_QUERY) === "1";
     const workspaceFile = await runCauseEffect(
       canAdministerServer(member.role)
-        ? agents.resolveLocalWorkspaceFile(agentId, workspacePath)
+        ? agents.resolveLocalWorkspaceFile(agentId, workspacePath, { exactPath })
         : agents.resolveWorkspaceFile(agentId, workspacePath),
     ).catch(rethrowWorkspacePathError);
     if (workspaceFile.size > ATTACHMENT_LIMITS.fileBytes) {

@@ -23,11 +23,15 @@ export const messages = {
     "لم يسمح المضيف لـ OpenBot بتسجيل شاشته. امنح إذن تسجيل الشاشة على المضيف، ثم أعد المحاولة.",
   "error.remote.windowsSessionDisconnected":
     "جلسة Windows على المضيف غير متصلة، لذلك لا توجد شاشة لمشاركتها. سجّل الدخول إلى Windows على شاشة المضيف، ثم أعد المحاولة.",
+  "error.remote.windowsCaptureDenied":
+    "لا يسمح Windows على المضيف لـ OpenBot بتسجيل شاشته. افتح قفل Windows على شاشة المضيف وأغلق أي طلب إذن من المسؤول، ثم أعد المحاولة. إذا استمرت المشكلة، فأعد تشغيل المضيف.",
   "error.remote.macScreenLocked":
     "جهاز Mac مقفل، لذلك لا يمكنه مشاركة شاشته. افتح قفل جهاز Mac من شاشته، ثم أعد المحاولة.",
   "error.remote.streamTooSlowLowerQuality":
     "الاتصال بالمضيف بطيء جدًا لعرض الصورة. أعد المحاولة: سيستخدم الاتصال التالي جودة أقل.",
   "error.remote.streamTooSlow": "الاتصال بالمضيف بطيء جدًا لعرض الصورة. استخدم شبكة أسرع، ثم أعد المحاولة.",
+  "error.remote.noPictureSwitchEncoder":
+    "لم يرسل المضيف أي صورة. أعد المحاولة: يستخدم الاتصال التالي إعداد فيديو يعمل على أجهزة كمبيوتر أكثر.",
   "error.remote.teamSessionExpired": "انتهت صلاحية جلسة الفريق.",
   "error.remote.finishTestBeforeSwitch": "أنهِ اختبار سطح المكتب البعيد قبل تبديل الشاشات.",
   "error.remote.displayNotFound": "الشاشة البعيدة غير موجودة.",
@@ -88,7 +92,9 @@ export const messages = {
     "لا يمكن لـ OpenBot التحقق من هذا الخادم لأن مفتاح الأمان الخاص به مفقود أو تغيّر. اطلب من مالك الخادم فحص الخادم.",
   "error.remote.connectionNotStarted":
     "تعذّر على OpenBot بدء الاتصال بهذا الخادم. إذا استمرت المشكلة، فأغلق OpenBot ثم افتحه مرة أخرى.",
-  "error.remote.hostDidNotConnect": "لم يتصل مضيف WebRTC.",
+  "error.remote.connectionServiceUnreachable":
+    "لا يستطيع هذا الكمبيوتر الوصول إلى خدمة اتصال OpenBot. تحقّق من اتصاله بالإنترنت. يعيد OpenBot الاتصال تلقائيًا.",
+  "error.remote.serverAnswerTimeout": "لم يستجب الخادم في الوقت المحدد. يعيد OpenBot الاتصال تلقائيًا.",
   "error.remote.connectionCancelled": "أُلغي الاتصال البعيد.",
   "error.remote.hostDisconnected": "انقطع الاتصال بالخادم. تحقق مما إذا اكتمل الإجراء، ثم أعد المحاولة.",
   "error.remote.eventGap": "يوجد انقطاع في تسلسل أحداث المضيف.",
@@ -202,6 +208,9 @@ export const messages = {
   "error.remote.formUnavailable": "هذا النموذج لم يعد متاحًا.",
   "error.remote.hostedServerRemoval": "استخدم «الفوترة» لحذف خادم مستضاف.",
   "error.remote.hostRemoved": "أزال المالك هذا الخادم من الحساب.",
+  "error.remote.ownerTransferSelf": "أنت بالفعل مالك هذا الخادم. أدخل البريد الإلكتروني للمالك الجديد.",
+  "error.remote.ownerTransferHosted": "لا يمكن تغيير مالك خادم تستضيفه OpenBot.",
+  "error.remote.ownerTransferInvalid": "طلب نقل الملكية هذا لم يعد متاحًا. اطلب من المالك إرساله مرة أخرى.",
   "error.remote.channelsUnsupported": "حدّث خادم الحاسوب المكتبي هذا لاستخدام القنوات.",
   "error.remote.channelDeleteUnsupported": "حدّث خادم الحاسوب المكتبي هذا لحذف القنوات.",
   "error.remote.historyRefreshFailed": "أُرسلت الرسالة، لكن تعذّر تحديث سجل الدردشة.",

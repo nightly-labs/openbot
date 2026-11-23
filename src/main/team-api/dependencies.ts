@@ -52,6 +52,8 @@ import type { BitwardenConnectorService } from "../bitwarden-connector-service";
 import type { BrowserProfileService } from "../browser-profile-service";
 import type { BrowserViewGateway } from "../browser-view-gateway";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { CacheExpiryCompactionControl } from "../cache-expiry-compaction-preference-store";
+import type { ChannelFolders } from "../channel-folders";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { CustomAgentChanges } from "../custom-agent-changes";
@@ -63,7 +65,9 @@ import type { HostEventsApi } from "../host-events-api";
 import type { HostEventsService } from "../host-events-service";
 import type { HostReleaseService } from "../host-release-service";
 import type { HostService } from "../host-service";
+import type { HostSignalHomeService } from "../host-signal-home";
 import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
+import type { HostVoiceModelService } from "../host-voice-model";
 import type { HostedSiteDesktopService } from "../hosted-site-service";
 import type { InstanceTransferService } from "../instance-transfer-service";
 import type { McpToolRuntimePreparation } from "../ipc/mcp-server-handlers";
@@ -98,6 +102,8 @@ import type { SkillLearningPreferenceStore } from "../skill-learning-preference-
 import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import type { TeamStore } from "../team-store";
 import type { VaultService } from "../vault-service";
+import type { WorkflowFileExporter } from "../workflow-file-export";
+import type { WorkflowFoldersService } from "../workflow-folders-service";
 
 type TeamApiAgentMethods = Pick<
   AgentService,
@@ -187,6 +193,7 @@ type TeamApiAgentMethods = Pick<
   | "compactTaskContext"
   | "agentIdForRequest"
   | "pendingApproval"
+  | "pendingPrompts"
   | "respondToPrompt"
   | "respondToApproval"
   | "respondToBrowserSecret"
@@ -265,6 +272,8 @@ export type TeamApiProviderAccounts = Pick<
   | "models"
   | "pools"
   | "setPool"
+  | "liveVoiceAccount"
+  | "setLiveVoiceAccount"
   | "usage"
   | "startSignIn"
   | "signInStatus"
@@ -284,7 +293,11 @@ export type TeamApiProviderUsageResets = Pick<AgentService, "providerUsageResets
 export type TeamApiProviderSignOut = Pick<AgentService, "signOutProvider">;
 
 export type TeamApiStorage = Pick<StorageUsageService, "usage" | "deleteFile" | "clear" | "disk" | "diskUse">;
-export type TeamApiLibraryFolders = Pick<LibraryFoldersService, "snapshot" | "change" | "removeAgent" | "removeFiles">;
+export type TeamApiLibraryFolders = Pick<
+  LibraryFoldersService,
+  "snapshot" | "change" | "removeAgent" | "removeFiles" | "workflowFiles"
+>;
+export type TeamApiWorkflowFolders = Pick<WorkflowFoldersService, "read" | "change">;
 export type TeamApiMachine = Pick<
   MachineAlertMonitor,
   "metrics" | "alerts" | "setAlerts" | "canBeResponsible" | "pending" | "subscribe"
@@ -325,6 +338,7 @@ export type TeamApiAgentTasks = Pick<
   AgentService,
   | "listAgents"
   | "listTasks"
+  | "listArchivedTasks"
   | "readTask"
   | "readTaskPage"
   | "readTaskAround"
@@ -369,6 +383,7 @@ export type TeamApiWorkflows = Pick<
   | "get"
   | "create"
   | "rename"
+  | "setPaused"
   | "remove"
   | "saveGraph"
   | "versions"
@@ -382,6 +397,7 @@ export type TeamApiWorkflows = Pick<
   | "decide"
   | "runs"
   | "run"
+  | "stepSettings"
   | "workflowOf"
   | "githubHistory"
   | "githubLastEvent"
@@ -393,6 +409,7 @@ export type TeamApiWorkflows = Pick<
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     github?: WorkflowGitHubDirectory;
+    files?: Pick<WorkflowFileExporter, "source">;
   };
 
 export type TeamApiCrm = CrmPeopleOperations;
@@ -430,6 +447,7 @@ export interface TeamApiAdmin {
   agentHost?: AgentHostSettingsService;
   agentDefaults?: AgentDefaultsSettingsService;
   folders?: Omit<AgentFolders, "requireAgent">;
+  channelFolders?: Pick<ChannelFolders, "hasChannel" | "list" | "add" | "remove" | "browse">;
   instructions?: Pick<AgentInstructionsFiles, "listAgents" | "read" | "save">;
   sessionSettings?: Pick<
     AgentService,
@@ -443,7 +461,10 @@ export interface TeamApiAdmin {
   identity?: TeamApiHostIdentity;
   update?: Pick<RequestedUpdate, "snapshot" | "check" | "start" | "requestWhenIdle" | "cancel" | "changeSettings">;
   restart?: { request(memberId: string): void };
+  ownerTransfer?: true;
   timezone?: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  voiceModel?: Pick<HostVoiceModelService, "snapshot" | "change">;
+  signalHome?: Pick<HostSignalHomeService, "snapshot" | "set">;
   turnLimits?: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   personality?: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   hostKey?: { rotate(): Effect.Effect<{ publicKey: string }, RemoteWorkflowError> };
@@ -458,13 +479,14 @@ export interface TeamApiAdmin {
   browsingMemory?: BrowsingMemoryPreferenceStore;
   promptCacheTtl?: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup?: ClaudeUserSetupControl;
+  cacheExpiryCompaction?: CacheExpiryCompactionControl;
   claudeCompactWindow?: ClaudeCompactWindowControl;
   providerEnvironment?: Pick<ProviderEnvironmentControl, "get" | "set">;
   providerDetection?: {
     detection: Pick<ProviderDetection, "scanModelServers" | "scanAgents" | "discoverModels">;
     settings: Pick<ProviderDetectionSettingsStore, "get" | "set">;
   };
-  modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings">;
+  modelVisibility?: Pick<ModelVisibility, "settings" | "set" | "picker" | "listings" | "kept">;
   defaultProvider?: TeamApiDefaultProvider;
   routineResults?: TeamApiRoutineResults;
   routineRunCommand?: Pick<AgentService, "listAgents" | "automationRunCommand">;
@@ -609,6 +631,7 @@ export interface TeamApiOptions {
   mcpToolRuntimePreparation?: McpToolRuntimePreparation;
   storage?: TeamApiStorage;
   libraryFolders?: TeamApiLibraryFolders;
+  workflowFolders?: TeamApiWorkflowFolders;
   machine?: TeamApiMachine;
   backgroundProcesses?: TeamApiBackgroundProcesses;
   liveVoice?: TeamApiLiveVoice;

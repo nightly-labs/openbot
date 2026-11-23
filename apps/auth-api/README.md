@@ -42,6 +42,12 @@ has no plan change (`subscription_update` is off); it cancels plans and updates 
 `POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
 `{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
 [Hosted servers](../../docs/hosted-servers.md#storage-tiers).
+The bootstrap also creates the `openbot_credits` Product and one Price for each credit amount
+(`openbot_credits_<n>`). `GET /v1/me/credits` returns the balance of the account and of its servers,
+`POST /v1/me/credits/checkout` with `{credits, currency, serverId?}` opens a Checkout, and
+`POST /v1/me/credits/transfer` with `{serverId, direction, credits}` moves credits between the account
+and a server that it owns. The web client uses the same routes under `/api/browser`.
+`bun run test:credits` checks them.
 
 The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
 `PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
@@ -71,7 +77,9 @@ failed renewal, cancel at the period end, plan change, renew, delete, another ac
 deleted customer, a refund, a dispute, the welcome email of a first plan, and the storage tiers
 (`storage-tier`, which needs the storage Prices of the bootstrap). The `license-*`
 scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
-renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
+renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. The `credits`
+scenario buys the smallest credit pack and checks the invoice: Polish VAT for PL and DE, the OSS amount for DE, and no VAT
+for US. Each scenario uses a Stripe
 test clock and deletes it at the end. Start the Worker
 with `HOSTED_SERVERS_ENABLED=true`, `HOSTED_SERVERS_ALLOWED_USER_IDS` set to the output of
 `bun scripts/stripe-flows-e2e.ts --print-user-ids`, `HOSTED_SERVER_TEMPLATE=e2e-template`, and
@@ -89,6 +97,12 @@ Checkout pages of a discount link (`?promo=CODE`): an active code is applied, an
 fit the order or does not exist gives the code field. A copy of the Brazil partner code (BRL server plans only)
 gives a discount on a BRL server page and the code field on a EUR server page and a license page. It deletes the
 coupons and turns off the codes at the end.
+
+The `invite` scenario checks the invite rewards: a referred friend gets the first-payment coupon only on the
+first purchase, the coupon goes after the first paid invoice, a yearly payment gives 12 credit parts 30 days
+apart, the cron (`/cdn-cgi/handler/scheduled`) sends the due parts, and a refund takes the newest unsent parts
+first and then the sent credit. The scenario moves `ready_at` in D1, because the parts use the Worker clock,
+not the Stripe test clock.
 
 The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
 that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
@@ -373,7 +387,11 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   `remote_hosts.signal_home` keeps, and a ticket with the `signal` claim. The host keeps its home
   until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
   home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
-  `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+  `REMOTE_SIGNAL_URL`, which stays the entry Signal. A host ticket request with `signalHome: true` can
+  also send `preferredSignalHome`, the ID of the home that an owner or admin chose. The host gets that
+  home when it is not the `failedSignalUrl` and its `/health/ready` answers in 2 seconds; otherwise the
+  rules below choose. An ID that is not a home is ignored. `POST /v2/remote/hosts/:hostId/signal-homes`
+  with the machine token lists the homes (`{ homes: [{ id, url }] }`).
 - `REMOTE_SIGNAL_HOME_LOCATIONS`: the place of each home, as `id=latitude:longitude,...`, for example
   `a=60.17:24.94,us=37.34:-121.89`. Empty means no places. Otherwise it must name each home of
   `REMOTE_SIGNAL_HOMES` one time, or each ticket request fails with `503 remote_not_configured`. With

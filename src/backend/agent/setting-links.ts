@@ -1,4 +1,9 @@
-import { SETTING_LINK_IDS, type SettingLinkId } from "@openbot/contracts/ipc";
+import {
+  AGENT_PERMISSION_LEVELS,
+  type AgentPermissionLevel,
+  SETTING_LINK_IDS,
+  type SettingLinkId,
+} from "@openbot/contracts/ipc";
 
 interface SettingLinkEntry {
   title: string;
@@ -122,8 +127,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "voice.dictation": {
     title: "Dictation",
     place: `${APP} > Voice`,
-    about: "Speak a message instead of typing it, and the shortcut that starts dictation.",
-    words: "speech to text voice input microphone talk transcribe whisper hotkey",
+    about: "Speak a message instead of typing it.",
+    words: "speech to text voice input microphone talk transcribe transcription whisper cloud elevenlabs groq api key",
   },
   "voice.dictation-language": {
     title: "Dictation language",
@@ -135,7 +140,7 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
     title: "Read replies aloud",
     place: `${APP} > Voice`,
     about: "When the user dictates a message, OpenBot reads the agent's reply aloud.",
-    words: "text to speech tts speak voice output read aloud audio say",
+    words: "text to speech tts speak voice output read aloud audio say cloud elevenlabs xai api key",
   },
   "voice.speech-voice": {
     title: "Voice",
@@ -148,6 +153,20 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
     place: `${APP} > Voice`,
     about: "How fast replies are read aloud.",
     words: "tts rate faster slower",
+  },
+  "voice.codex-live": {
+    title: "Codex live voice",
+    place: `${APP} > Voice`,
+    about:
+      "Voice conversations with any agent use OpenAI live voice with a Codex sign-in (a ChatGPT account). The voice, the requests and the replies go to OpenAI.",
+    words: "realtime live conversation talk openai chatgpt cloud speech to speech",
+  },
+  "voice.server": {
+    title: "Voice server",
+    place: `${APP} > Voice`,
+    about:
+      "Use your own OpenAI-compatible voice server for dictation, spoken replies or both, with its address and an optional API key.",
+    words: "openai compatible self hosted local whisper endpoint url address api key cloud transcription tts stt",
   },
   "phones.devices": {
     title: "Your phones",
@@ -266,7 +285,8 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
   "agent.access": {
     title: "Access",
     place: `${AGENT} > Permissions`,
-    about: "What the agent can do without approval: ask first, workspace only, or full access.",
+    about:
+      "What the agent can do without approval: Workspace only, Ask first or Full access. The choices depend on the provider: read_agent gives them in permissionLevels.",
     words: "permissions approvals sandbox full access ask workspace security",
   },
   "agent.computer-use": {
@@ -317,6 +337,13 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
     about: "Before a long task, the agent shows its plan.",
     words: "plan card confirm before start",
   },
+  "agent.builtin-memory": {
+    title: "OpenBot memory",
+    place: `${AGENT} > Advanced`,
+    about:
+      "Turn off OpenBot memory to use only a memory app that you connect, such as Mem0. The agent then does not read or save OpenBot memories. Saved memories stay.",
+    words: "memory mem0 openviking provider external remember disable off",
+  },
 };
 
 export interface SettingLinkSummary {
@@ -329,6 +356,24 @@ export interface SettingLinkSummary {
 export function settingLinkSummary(id: SettingLinkId): SettingLinkSummary {
   const { title, place, about } = SETTING_LINKS[id];
   return { id, title, place, about };
+}
+
+const ACCESS_LEVEL_NAMES: Record<AgentPermissionLevel, string> = {
+  workspace: "Workspace only",
+  ask: "Ask first",
+  full: "Full access",
+};
+
+export function agentAccessSummary(
+  summary: SettingLinkSummary,
+  levels: readonly AgentPermissionLevel[],
+): SettingLinkSummary {
+  if (summary.id !== "agent.access" || levels.length === AGENT_PERMISSION_LEVELS.length) return summary;
+  const choices = levels.map((level) => ACCESS_LEVEL_NAMES[level]).join(", ");
+  return {
+    ...summary,
+    about: `What the agent can do without approval. Your choices are: ${choices}. For another agent, read_agent gives its choices in permissionLevels.`,
+  };
 }
 
 const terms = (text: string) =>
@@ -404,6 +449,25 @@ const SERVER_PLACES: readonly SettingLinkEntry[] = [
     words: "move migrate migration copy new",
   },
 ];
+
+const CHAT_PLACES: readonly SettingLinkEntry[] = [
+  {
+    title: "Threads",
+    place:
+      "In the agent's chat, the chat header: + (New thread) starts a thread, and the thread menu shows the thread tabs, New thread and All threads. On a message: Branch in new thread. On the phone app: touch the agent's name at the top of the chat for Main chat, New thread and All threads.",
+    about:
+      "More conversations with the same agent beside its main chat, for example for parallel work. Each thread has its own conversation and context: it does not see the messages of the main chat or of other threads, except the messages that a branch copies. All threads share the agent's memories, skills, settings and working directory.",
+    words: "parallel side tab tabs branch fork session sessions",
+  },
+];
+
+export function searchChatPlaces(query: string, limit = 1): ServerPlace[] {
+  return rank(CHAT_PLACES, (entry) => entry, terms(query), limit, false).map(({ title, place, about }) => ({
+    title,
+    place,
+    about,
+  }));
+}
 
 const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc"];
 

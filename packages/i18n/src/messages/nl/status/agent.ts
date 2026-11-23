@@ -151,7 +151,6 @@ export const messages = {
   "status.agent.vaultField.country": "Landcode",
   "status.agent.vaultField.phone": "Telefoon",
   "status.agent.vaultField.email": "E-mailadres",
-  "status.agent.finishCheckContinues": "Het verzoek is nog niet klaar. De agent gaat verder ({current} van {limit}).",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
   "status.agent.planStopped": "De agent is gestopt met open stappen in het plan. Stuur een bericht om verder te gaan.",
@@ -159,4 +158,8 @@ export const messages = {
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.providerExitContinues": "De agent stopte voordat zijn antwoord klaar was. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
+  "status.agent.location.field": "Je locatie",
+  "status.agent.location.placeholder": "Stad, adres of plaats",
+  "status.agent.location.submit": "Delen",
+  "status.agent.location.shared": "Locatie gedeeld",
 } as const satisfies PartialTranslation<typeof source>;

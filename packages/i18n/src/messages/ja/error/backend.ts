@@ -55,6 +55,8 @@ export const messages = {
     "このリモートホストは、ブラウザーのタブの操作の引き継ぎに対応していません。",
   "error.backend.browserSignInUnsupported": "このリモートホストはこのコンピューターからのサインインを受け取れません。",
   "error.backend.browserSignInOpenFailed": "OpenBot はサインインウィンドウを開けませんでした。",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot はサインインウィンドウでページを読み込めませんでした。インターネット接続を確認してから、サインインウィンドウをもう一度開いてください。",
   "error.backend.browserSignInReadFailed": "OpenBot はウィンドウからサインインを読み取れませんでした。",
   "error.backend.browserStopUnsupported": "このリモートホストはページの読み込みを停止できません。",
   "error.backend.sharedDataLocalOnly": "共有データは、これらのエージェントを実行しているコンピューターで管理されます。",
@@ -91,6 +93,8 @@ export const messages = {
     "このチャンネルのメンバーには、まだ圧縮する会話がありません。メンバーがチャンネルで回答した後に圧縮してください。",
   "error.backend.channelCompactNotSupported":
     "このチャンネルのどのメンバーも、要求に応じて圧縮できません。対応しているメンバーは、コンテキストがほぼいっぱいになると自動で圧縮します。",
+  "error.backend.channelCompactProviderUnavailable":
+    "チャンネルメンバーのプロバイダーが現在動作していません。プロバイダーを更新してから、もう一度チャンネルを圧縮してください。",
   "error.backend.channelArchived":
     "メッセージを送信したりタスクを変更したりする前に、このチャンネルを復元してください。",
   "error.backend.channelArchiveRunning": "このチャンネルで実行中の作業を停止してから削除してください。",
@@ -134,6 +138,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "実行はエラーで停止しましたが、理由は届いていません。実行を開いて、エージェントが何をしたかを確認してください。",
   "error.backend.turnNotStarted": "プロバイダーはこのターンを開始しませんでした。",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} はこのメッセージを開始したことを時間内に確認しませんでした。作業が二重に実行されないように、OpenBot はメッセージを再送信しません。OpenBot はエージェントが開始するまで最大 5 分待ちます。",
+  "error.backend.turnStartAbandoned":
+    "エージェントは 5 分以内にこのメッセージを開始しませんでした。メッセージをもう一度送信してください。",
   "error.backend.routineResultConnectionOff":
     "このメッセージ接続はオフか削除されています。別の送信先を選んでください。",
   "error.backend.routineResultNoDelivery": "この実行には再送信できる回答がありません。",
@@ -237,7 +245,7 @@ export const messages = {
   "error.backend.agentWaitGone": "この待機は開いていません。エージェントが閉じたか、誰かがキャンセルしました。",
   "error.backend.agentWaitNoRequest": "待機を続行するにはメッセージが必要です。このターンにはメッセージがありません。",
   "error.backend.agentWaitOwnChatOnly":
-    "待機は自分のチャットでのみ開いてください。チャンネルやメッセージングのタスクは待機できません。",
+    "待機は自分のチャットかサイドスレッドで開いてください。チャンネルやメッセージングの会話は待機できません。",
   "error.backend.agentWaitNoteRequired": "待機の目的を示す短いメモを入力してください。",
   "error.backend.agentWaitRoutineGone": "このエージェントにはこの ID のルーティンがありません。",
   "error.backend.agentWaitNoRoutine":
@@ -255,8 +263,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
   "error.backend.mcpServerInvalid": "OpenBot はこの MCP サーバーの設定を保存できません。",
+  "error.backend.mcpHeaderNameInvalid":
+    "ヘッダー名にはスペースや : ( ) / などの記号を使えません。Authorization のような名前を使い、キーまたはトークンは「値」に入力してください。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
+  "error.backend.mcpSignInGrantRefused":
+    "サーバーがサインインを受け付けませんでした。もう一度サインインしてください。問題が続く場合は、アカウントがこのアプリと同じサイトまたはリージョンにあることを確認してください。",
   "error.backend.mcpSignInAccountRefused":
     "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
@@ -281,6 +293,8 @@ export const messages = {
     "このサーバーはサインインを求めています。ホストコンピューターの OpenBot でサインインしてください。",
   "error.backend.mcpSignInNeedsHttps":
     "このサーバーはサインインを求めていますが、OpenBot は https でのみサインインします。URL を {url} に変更してください。",
+  "error.backend.mcpSignInOtherAddress":
+    "このサーバーは {url} でのみサインインできます。URL をこのアドレスに変更してから、もう一度サインインしてください。",
   "error.backend.mcpSignInCancelled": "サインインはキャンセルされました。",
   "error.backend.mcpSignInTimedOut": "ブラウザーでサインインが完了しませんでした。",
   "error.backend.mcpSignInRefused": "サインインページでアクセスが拒否されました。もう一度サインインしてください。",
@@ -300,6 +314,8 @@ export const messages = {
     "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。マーケットプレイス、アプリで {name} を開いて「サインイン」を選択してください。",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがキーを求めています。マーケットプレイス、アプリで {name} を開き、「編集」を選択して、「ヘッダー」に正しいキーを入力してください。",
   "error.backend.mcpServerFailedForProvider":
     "{provider} は MCP サーバー {name} を起動できませんでした。マーケットプレイス、アプリで {name} を開いて「接続をテスト」を選択すると、原因を確認できます。",
   "error.backend.mcpServerFailedInProvider":
@@ -310,6 +326,8 @@ export const messages = {
     "サーバーが現在利用できないため、{provider} は MCP サーバー {name} を起動できませんでした。数分待ってから新しいチャットを開始して、もう一度お試しください。",
   "error.backend.mcpServerUnreachableInProvider":
     "{provider} は MCP サーバー {name} に接続できませんでした。マーケットプレイス、アプリで {name} を開き、アドレスが正しいことと、サーバーが動作していることを確認してください。その後、新しいチャットを開始して、もう一度お試しください。",
+  "error.backend.githubToolsNotStarted":
+    "GitHub が応答しなかったため、{provider} は GitHub のツールを取得できませんでした。マーケットプレイス、アプリで GitHub を開き、求められた場合はもう一度接続してください。その後、新しいチャットを開始して、もう一度お試しください。",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot はこのサーバーのローカルサインイン接続を開始できませんでした。OpenBot を再起動してから、もう一度お試しください。",
   "error.backend.mcpOAuthSignInNeeded":
@@ -347,6 +365,8 @@ export const messages = {
   "error.backend.libraryFolderGone": "フォルダーが存在しないか、すでに削除されています。",
   "error.backend.libraryFolderOtherAgent": "ファイルは、そのエージェントのフォルダーにのみ入れられます。",
   "error.backend.libraryFolderMoveInvalid": "このフォルダーはそこへ移動できません。",
+  "error.backend.workflowFolderLimit": "1 つのサーバーに置けるワークフローのフォルダーは {limit} 個までです。",
+  "error.backend.workflowFolderPlacementLimit": "フォルダー内のワークフローが多すぎます。",
   "error.backend.sectionNameDuplicate": "セクション名は重複しないようにしてください。",
   "error.backend.directMessageRequired": "先にメッセージを入力してください。",
   "error.backend.directMessageTooLong": "ダイレクトメッセージは {limit} 文字までです。",
@@ -379,6 +399,7 @@ export const messages = {
     "このレポートを送信できるのは OpenBot のスマートフォンアプリだけです。スマートフォンのバージョンとサポートログを追加するためです。スマートフォンでこのチャットを開いてください。そこでもこのメッセージが表示される場合は、スマートフォンアプリを更新してください。",
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
+  "error.backend.apiKeyListFailed": "保存された API キーを読み込めませんでした。",
   "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",
   "error.backend.apiKeySaving": "API キーはすでに保存中です。",
   "error.backend.apiKeyAnswerUnreadable":
@@ -465,6 +486,7 @@ export const messages = {
     "新しいスレッドで実行できるのは、このエージェントだけに送信したメッセージのみです。",
   "error.backend.taskTitleRequired": "タスクに短いタイトルを付けてください。",
   "error.backend.taskToolInvalid": "タスクには 120 文字以内のタイトルと、何をするかを説明する指示を付けてください。",
+  "error.backend.taskControlInvalid": "開始したタスクの taskId を指定してください。メッセージにはテキストも必要です。",
   "error.backend.taskOwnChatOnly":
     "タスクは自分のチャットからのみ開始してください。チャンネル、メッセージングの会話、別のタスクからは開始できません。",
   "error.backend.taskUnfinishedLimit":
@@ -472,5 +494,6 @@ export const messages = {
   "error.backend.taskOpenLimitReached":
     "このエージェントには {count} 件の開いているタスクがあります。タスクを閉じてから、別のタスクを開始するか開いてください。",
   "error.backend.taskRemoteUnsupported": "タスクは、このコンピューター上のエージェントでのみ利用できます。",
+  "error.backend.taskMessageFailed": "OpenBot はタスクにメッセージを送信できませんでした。後でもう一度お試しください。",
   "error.backend.taskStartFailed": "OpenBot はタスクを開始できませんでした。代わりにこのターンで作業してください。",
 } as const satisfies PartialTranslation<typeof source>;

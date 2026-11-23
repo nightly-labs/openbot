@@ -179,6 +179,8 @@ export const messages = {
     "El agente empieza de cero y puede consultar este chat cuando lo necesite. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.newChat.confirm": "Iniciar nuevo chat",
   "agentSettings.newChat.failed": "No se pudo iniciar un nuevo chat.",
+  "agentSettings.newChat.busy":
+    "El agente está trabajando. Para iniciar un nuevo chat, espera a que termine o detenlo.",
   "agentSettings.deleteHistory.title": "Eliminar historial",
   "agentSettings.deleteHistory.description":
     "Los mensajes de este chat se eliminan y el agente los olvida. Su configuración se mantiene.",
@@ -237,6 +239,9 @@ export const messages = {
     "Permite que el agente inicie un chat nuevo cuando su chat sea largo. Antes guarda notas.",
   "agentSettings.quickAcknowledgement.title": "Mostrar el plan antes de tareas largas",
   "agentSettings.quickAcknowledgement.description": "Antes de una tarea larga, el agente muestra su plan.",
+  "agentSettings.builtinMemory.title": "Memoria de OpenBot",
+  "agentSettings.builtinMemory.description":
+    "El agente guarda y lee sus propios recuerdos. Desactívala para usar solo una app de memoria, como Mem0. Los recuerdos guardados se mantienen.",
   "agentSettings.browserProfile.label": "Perfil del navegador",
   "agentSettings.browserProfile.shared": "Compartido",
   "agentSettings.browserProfile.agent": "Solo este agente",
@@ -246,6 +251,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Cada perfil guarda sus propios inicios de sesión y cookies. Un cambio cierra las pestañas abiertas del agente.",
   "agentSettings.browserProfile.manage": "Gestionar",
+  "agentSettings.browserProfile.movedNote":
+    "Los inicios de sesión en sitios se quedan en el perfil anterior. El agente debe iniciar sesión de nuevo en esos sitios.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Todo el proceso de {provider} se ejecuta en un entorno aislado, por lo que la escritura fuera falla. Solo disponible en macOS.",
 } as const satisfies PartialTranslation<typeof source>;

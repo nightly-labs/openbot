@@ -110,7 +110,6 @@ export const messages = {
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
   "status.agent.mcpToolCall": "MCP サーバー {name} のツール {tool} を実行します。",
   "status.agent.uiBlockClosedByMessage": "新しいメッセージで閉じられました",
-  "status.agent.finishCheckContinues": "依頼はまだ終わっていません。エージェントが続けます（{current}/{limit}）。",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
   "status.agent.planStopped":
@@ -119,4 +118,8 @@ export const messages = {
     "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
   "status.agent.providerExitContinues": "エージェントは回答を終える前に停止しました。エージェントは続行します。",
   "status.agent.branchTitle": "分岐したチャット",
+  "status.agent.location.field": "現在地",
+  "status.agent.location.placeholder": "市区町村、住所、場所",
+  "status.agent.location.submit": "共有",
+  "status.agent.location.shared": "位置情報を共有しました",
 } as const satisfies PartialTranslation<typeof source>;

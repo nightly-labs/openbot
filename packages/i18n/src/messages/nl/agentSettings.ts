@@ -180,6 +180,7 @@ export const messages = {
     "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
+  "agentSettings.newChat.busy": "De agent is bezig. Wacht tot hij klaar is of stop hem om een nieuwe chat te starten.",
   "agentSettings.deleteHistory.title": "Geschiedenis wissen",
   "agentSettings.deleteHistory.description":
     "De berichten van deze chat worden gewist en de agent vergeet ze. De instellingen blijven.",
@@ -226,6 +227,9 @@ export const messages = {
     "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "agentSettings.quickAcknowledgement.title": "Plan tonen vóór lange taken",
   "agentSettings.quickAcknowledgement.description": "Vóór een lange taak toont de agent zijn plan.",
+  "agentSettings.builtinMemory.title": "OpenBot-geheugen",
+  "agentSettings.builtinMemory.description":
+    "De agent bewaart en leest zijn eigen herinneringen. Zet dit uit om alleen een geheugen-app zoals Mem0 te gebruiken. Bewaarde herinneringen blijven.",
   "agentSettings.browserProfile.label": "Browserprofiel",
   "agentSettings.browserProfile.shared": "Gedeeld",
   "agentSettings.browserProfile.agent": "Alleen deze agent",
@@ -235,6 +239,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Elk profiel bewaart eigen logins en cookies. Een wijziging sluit de open tabbladen van de agent.",
   "agentSettings.browserProfile.manage": "Beheren",
+  "agentSettings.browserProfile.movedNote":
+    "Logins bij sites blijven in het oude profiel. De agent moet opnieuw inloggen op deze sites.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Het hele proces van {provider} draait in een sandbox, dus schrijven buiten mislukt. Alleen beschikbaar op macOS.",
 } as const satisfies PartialTranslation<typeof source>;

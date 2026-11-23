@@ -73,6 +73,10 @@ export const STEP_STATUS_LABEL = {
   skipped: "mobile.workflow.status.skipped",
 } as const satisfies Record<WorkflowStepStatus, MobileTextKey>;
 
+export function stepStatusLabel(step: WorkflowStep): MobileTextKey {
+  return step.status === "running" && step.waiting ? "mobile.workflow.status.waiting" : STEP_STATUS_LABEL[step.status];
+}
+
 const REPEAT_LABEL = {
   once: "mobile.agent.record.repeat.once",
   hourly: "mobile.agent.record.repeat.hourly",

@@ -3,6 +3,7 @@ import {
   type McpTestResult,
   type OpenBotDesktopApi,
   relayableSignInLink,
+  withOpenBotSource,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import type { TeamApiRequest } from "@openbot/team-client/team-api-requests";
@@ -14,6 +15,10 @@ export type WebMessageLinks = Pick<
   "openMessageLink" | "pasteMessageLink" | "cancelMessageLink"
 >;
 
+export function openWebMessageLink(url: string): Promise<void> {
+  return openWebLink(withOpenBotSource(url));
+}
+
 export function webMessageLinks(request: () => TeamApiRequest, enabled: () => boolean): WebMessageLinks {
   const shown = new Map<string, (page: McpSignInRelayPage | null) => void>();
   const running = new Map<string, Promise<McpTestResult>>();
@@ -23,7 +28,7 @@ export function webMessageLinks(request: () => TeamApiRequest, enabled: () => bo
 
   return {
     openMessageLink: async ({ agentId, url }) => {
-      await openWebLink(url);
+      await openWebMessageLink(url);
       const page = relayableSignInLink(url);
       if (!page || !enabled()) return null;
       relay.cancel(page);

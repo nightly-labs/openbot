@@ -17,8 +17,9 @@ const CONTEXT_USAGE_V1_CATEGORIES = [
 const STATE_KEYS = ["botId", "threadId", "usage", "compaction"] as const;
 const USAGE_KEYS = ["usedTokens", "windowTokens", "autoCompactAt", "nativeManaged", "estimated"] as const;
 const CATEGORY_KEYS = ["category", "tokens"] as const;
-const COMPACTION_KEYS = ["id", "startedAt", "status", "beforeTokens", "afterTokens", "expectedMs"] as const;
+const COMPACTION_KEYS = ["id", "startedAt", "status", "beforeTokens", "afterTokens", "expectedMs", "reason"] as const;
 const COMPACTION_V1_STATUSES = ["running", "completed", "failed"] as const;
+const COMPACTION_V1_REASONS = ["cacheExpiry"] as const;
 
 function isJsonObject(value: TeamProtocolV8BaseJsonValue | undefined): value is TeamProtocolV8BaseJsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -49,6 +50,13 @@ function v1Usage(usage: TeamProtocolV8BaseJsonValue): TeamProtocolV8BaseJsonValu
         )
         .map((row) => pick(row, CATEGORY_KEYS))
     : categories;
+  return picked;
+}
+
+function v1Compaction(compaction: TeamProtocolV8BaseJsonValue): TeamProtocolV8BaseJsonValue {
+  if (!isJsonObject(compaction)) return compaction;
+  const picked = pickKeys(compaction, COMPACTION_KEYS);
+  if (picked.reason !== undefined && !isOneOf(COMPACTION_V1_REASONS, picked.reason)) delete picked.reason;
   return picked;
 }
 
@@ -98,7 +106,7 @@ function v1ContextStates(states: unknown, sending: boolean): TeamProtocolV8BaseJ
     if (!isJsonObject(state)) return state;
     const picked = pickKeys(state, STATE_KEYS);
     if (state.usage !== undefined) picked.usage = v1Usage(state.usage);
-    if (state.compaction !== undefined) picked.compaction = pick(state.compaction, COMPACTION_KEYS);
+    if (state.compaction !== undefined) picked.compaction = v1Compaction(state.compaction);
     return picked;
   });
   return sending ? projected.filter(isV1ContextState) : projected;

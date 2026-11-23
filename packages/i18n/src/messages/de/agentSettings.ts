@@ -180,6 +180,8 @@ export const messages = {
     "Der Agent beginnt neu und kann diesen Chat bei Bedarf noch durchsuchen. Die Nachrichten bleiben über einer Trennlinie sichtbar. Anweisungen, Modell, Werkzeuge, Erinnerungen, Arbeitsbereich und Browser bleiben unverändert.",
   "agentSettings.newChat.confirm": "Neuen Chat starten",
   "agentSettings.newChat.failed": "Ein neuer Chat konnte nicht gestartet werden.",
+  "agentSettings.newChat.busy":
+    "Der Agent arbeitet gerade. Warte, bis er fertig ist, oder stoppe ihn, um einen neuen Chat zu starten.",
   "agentSettings.deleteHistory.title": "Verlauf löschen",
   "agentSettings.deleteHistory.description":
     "Die Nachrichten dieses Chats werden gelöscht, und der Agent vergisst sie. Seine Einrichtung bleibt.",
@@ -238,6 +240,9 @@ export const messages = {
     "Der Agent darf einen neuen Chat starten, wenn sein Chat lang wird. Er speichert vorher Notizen.",
   "agentSettings.quickAcknowledgement.title": "Plan vor langen Aufgaben zeigen",
   "agentSettings.quickAcknowledgement.description": "Vor einer langen Aufgabe zeigt der Agent seinen Plan.",
+  "agentSettings.builtinMemory.title": "OpenBot-Erinnerungen",
+  "agentSettings.builtinMemory.description":
+    "Der Agent speichert und liest eigene Erinnerungen. Schalte dies aus, um nur eine Gedächtnis-App wie Mem0 zu nutzen. Gespeicherte Erinnerungen bleiben.",
   "agentSettings.browserProfile.label": "Browser-Profil",
   "agentSettings.browserProfile.shared": "Gemeinsam",
   "agentSettings.browserProfile.agent": "Nur dieser Agent",
@@ -247,6 +252,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Jedes Profil behält eigene Anmeldungen und Cookies. Eine Änderung schließt die offenen Tabs des Agenten.",
   "agentSettings.browserProfile.manage": "Verwalten",
+  "agentSettings.browserProfile.movedNote":
+    "Anmeldungen bei Websites bleiben im alten Profil. Der Agent muss sich bei diesen Websites erneut anmelden.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Der gesamte Prozess von {provider} läuft in einer Sandbox, daher schlagen Schreibzugriffe außerhalb fehl. Nur unter macOS verfügbar.",
 } as const satisfies PartialTranslation<typeof source>;

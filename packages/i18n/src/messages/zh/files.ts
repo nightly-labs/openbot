@@ -66,6 +66,8 @@ export const messages = {
   "files.library.agents": "智能体",
   "files.library.allAgents": { one: "{count} 个智能体", other: "全部 {count} 个智能体" },
   "files.library.folders": "文件夹",
+  "files.library.workflows": "工作流",
+  "files.library.workflowsOf": "{name} 中的工作流",
   "files.library.favorite": "收藏 {name}",
   "files.folder.new": "新建文件夹",
   "files.folder.name": "文件夹名称",
@@ -188,6 +190,8 @@ export const messages = {
   "files.conversation.title": "文件",
   "files.conversation.summary": "{files} · 对话 {size}",
   "files.conversation.close": "关闭文件",
+  "files.conversation.workspace": "工作区文件夹",
+  "files.conversation.workspaces": "工作区文件夹",
   "files.conversation.emptyTitle": "该对话中没有文件",
   "files.conversation.emptyDescription": "你附加的文件和助手生成的文件会显示在这里。",
 } as const satisfies PartialTranslation<typeof source>;

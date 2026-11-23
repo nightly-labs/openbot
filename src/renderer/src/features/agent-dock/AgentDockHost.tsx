@@ -22,7 +22,9 @@ import {
   type ChannelPage,
   type ChannelSummary,
   isAttachmentSummary,
+  LOCAL_SERVER_ID,
   sameAgentModelChoice,
+  withOpenBotSource,
 } from "@openbot/contracts/ipc";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
@@ -35,7 +37,7 @@ import {
   type AgentDockSeat as AgentDockUiSeat,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
-import { isDockMessage } from "@openbot/ui/features/agent-dock/AgentDockChat";
+import { isDockMessage, isDockVisualReply } from "@openbot/ui/features/agent-dock/AgentDockChat";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { sidebarAgentOrder } from "@openbot/ui/features/sidebar/sidebar-agent-order";
@@ -177,7 +179,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const auth = useAuth();
   const { activeServer } = useServers();
   const { browserTabs } = useBrowserTabs();
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const preference = useAgentDockPreference();
   const seatRefs = createMemo(
     () =>
@@ -352,7 +354,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     const page = channelId ? channelPage(channelId) : null;
     if (!page) return [];
     return withStepAnswers(
-      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks).map(asOwn),
+      channelConversationRows(page.messages.filter(channelMessageHasContent), page.tasks, sourceText).map(asOwn),
       new Set(channelWorkingTurns(page, new Set())),
       (row) => agentList().find((agent) => agent.id === row.senderAgentId)?.provider,
     );
@@ -716,6 +718,7 @@ function WindowAgentDock(props: { serverId: string }) {
     prompt: (prompt, values) => dock.answerPrompt(prompt.agentId, prompt.threadId, prompt.requestId, values),
     takeover: ({ request }, decision) =>
       dock.respondToTakeover(request.agentId, request.threadId, request.requestId, decision),
+    takeoverDone: ({ request }) => props.serverId === LOCAL_SERVER_ID || request.reason !== "sign-in-blocked",
     secret: (_takeover, input) => agentDockPort().agent.respondToBrowserSecret(input, props.serverId),
     usageLimitSend: (limit, option, remember) => dock.sendOnBackup(limit.agentId, option.key, remember),
     usageLimitWait: (limit) => dock.waitForReset(limit.agentId),
@@ -744,7 +747,7 @@ function WindowAgentDock(props: { serverId: string }) {
       voice={voice}
       agents={dock.agents()}
       onSelectAgent={(agentId) => selectAgent(agentId)}
-      onOpenLink={(url) => void appPort().openUrl(url)}
+      onOpenLink={(url) => void appPort().openUrl(withOpenBotSource(url))}
       onOpenSettings={() => openAppSettings(null, "agent-dock")}
       onHide={() => setAgentDockPreference({ shown: false })}
       results={dock.results()}
@@ -824,7 +827,7 @@ function ScreenAgentDock(props: { serverId: string }) {
   onSettled(() => {
     const unsubscribe = agentDockPort().agentDock.onAction((action) => {
       if (action.type === "open-link") {
-        void appPort().openUrl(action.url);
+        void appPort().openUrl(withOpenBotSource(action.url));
         return;
       }
       if (action.type === "open-settings") {
@@ -1007,6 +1010,18 @@ function dockApproval(current: { approval: AgentApproval; attempt: number }): Ag
 }
 
 function dockMessage(message: AgentMessage): AgentDockMessage {
+  const attachments = (message.attachments ?? [])
+    .filter(isAttachmentSummary)
+    .slice(0, INPUT_LIMITS.attachments)
+    .map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      size: attachment.size,
+      kind: attachment.kind,
+      mimeType: attachment.mimeType,
+      previewKind: attachment.previewKind,
+      previewUrl: attachment.previewUrl,
+    }));
   return {
     id: message.id.slice(0, INPUT_LIMITS.identifier),
     author: message.author,
@@ -1014,18 +1029,8 @@ function dockMessage(message: AgentMessage): AgentDockMessage {
     senderMember: message.senderMember ? { id: message.senderMember.id, name: message.senderMember.name } : null,
     kind: message.kind === "error" ? "error" : "text",
     body: message.body.slice(0, INPUT_LIMITS.messageText),
-    attachments: (message.attachments ?? [])
-      .filter(isAttachmentSummary)
-      .slice(0, INPUT_LIMITS.attachments)
-      .map((attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-        size: attachment.size,
-        kind: attachment.kind,
-        mimeType: attachment.mimeType,
-        previewKind: attachment.previewKind,
-        previewUrl: attachment.previewUrl,
-      })),
+    attachments,
+    ...(isDockVisualReply({ ...message, attachments }) ? { visual: true } : {}),
   };
 }
 

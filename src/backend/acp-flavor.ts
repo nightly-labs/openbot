@@ -7,6 +7,7 @@ import {
   type SessionUpdate,
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { type CauseCode, classifyFailure } from "@openbot/telemetry";
@@ -34,6 +35,7 @@ export interface AcpCustomEndpoint {
   readonly name: string;
   readonly hasCredentials: boolean;
   readonly stallMs?: number;
+  readonly contextWindow?: number;
 }
 
 export interface AcpMcpServerFailure {
@@ -69,6 +71,7 @@ export interface AcpFlavor {
     refusalStatus: () => number | null,
   ): string;
   failureCause?(error: unknown, answer: string): CauseCode | null;
+  unexplainedFailureVerification?(error: unknown, detail: string, message: string): string | null;
   failureReport?: RegExp;
   emptyAnswerFailure?(
     turn: { reasoned: boolean; answered: boolean; showedPlanOrCompaction: boolean },
@@ -79,11 +82,13 @@ export interface AcpFlavor {
     error: unknown,
     method: "load" | "resume",
   ): "wait-for-start" | "list-sessions" | "confirm-missing" | null;
+  stillStarting?(error: unknown): boolean;
   lostTurns?: { refusal: RegExp; unsent: RegExp; discard(sessionId: string): readonly string[] };
   refusesUntilRestart?(error: unknown): boolean;
   lostServerUntilRestart?(error: unknown): boolean;
   serverLost?(error: unknown): boolean;
   sessionBusy?(error: unknown): boolean;
+  staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
@@ -93,7 +98,10 @@ export interface AcpFlavor {
   closeKeepsSession?: true;
   probeCloseDelayMs?: number;
   effortCategories?: readonly string[];
+  promptMediaBase64Bytes?: number;
   sessionProcesses?: true;
+  modelsLoadWithSession?: true;
+  sessionProcessesBefore?: string;
   sdkHarness?: {
     failedSession(stderrLine: string): string | undefined;
     answerIsFailure: RegExp;
@@ -107,6 +115,7 @@ export interface AcpFlavor {
     quota(text: string): string | null;
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
+    loggedFailure?(text: string, argv: readonly string[], sessionId: string): string | null;
     sessionLost?: RegExp;
   };
   cancelLocallyThenResume?: true;
@@ -150,7 +159,8 @@ export interface AcpFlavor {
   mcpServersPerDirectory?: true;
   mcpServersLoadWithSession?: true;
   mcpConnectLimitMs?: number;
-  relayStdioMcpServers?: true;
+  mcpListLimit?: { ms: number; since: string };
+  relayStdioMcpServers?: true | "unconfined";
   mcpServerFailure?(method: string, params: DynamicRecord): AcpMcpServerFailure | null;
   mcpServerName?(name: string): string;
   ownMcpServerNames?(cwd: string, argv: readonly string[]): readonly string[];
@@ -166,19 +176,25 @@ export interface AcpFlavor {
   signInLostChunk?: RegExp;
   signInUnusable?(error: RequestError): string | null;
   planUsedUpChunk?: RegExp;
+  connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
+  mcpCallInputNamesServer?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
   promptUsage?(response: PromptResponse): DynamicRecord | null;
   promptRun?(response: PromptResponse): string | undefined;
-  userQuestions?: {
-    method: string;
-    reply(
-      questions: readonly { id: string; question: string }[],
-      answers: Readonly<Record<string, readonly string[]>>,
-    ): DynamicRecord;
-  };
+  userQuestions?: AcpUserRequest;
+  planApproval?: AcpUserRequest;
+}
+
+interface AcpUserRequest {
+  method: string;
+  questions?(params: DynamicRecord): DynamicRecord[];
+  reply(
+    questions: readonly { id: string; question: string }[],
+    answers: Readonly<Record<string, readonly string[]>>,
+  ): DynamicRecord;
 }
 
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
@@ -237,6 +253,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpServerFailure: grokMcpServerFailure,
   mcpServerName: grokMcpServerName,
+  relayStdioMcpServers: "unconfined",
   restoreFailure: (error) =>
     error instanceof RequestError && error.code === -32603 && isRecord(error.data) && error.data.code === "FS_NOT_FOUND"
       ? "confirm-missing"
@@ -254,10 +271,45 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
         : { outcome: "cancelled" };
     },
   },
+  planApproval: {
+    method: "x.ai/exit_plan_mode",
+    questions: (params) => [grokPlanQuestion(params)],
+    reply: (questions, answers) => grokPlanReply(answers[questions[0]?.id ?? ""]?.[0]?.trim()),
+  },
   retryNotice: grokRetryNotice,
   turnStallMs: 12 * 60_000,
   turnFailure: grokTurnFailure,
 };
+
+const GROK_PLAN_APPROVE = sourceText("status.messaging.approve");
+const GROK_PLAN_STOP = sourceText("status.agent.planStop");
+const GROK_PLAN_UNANSWERED =
+  "The user did not answer the plan approval, so plan mode is off. Do not edit files yet. Show the plan to the user and wait for their reply.";
+
+function grokPlanQuestion(params: DynamicRecord): DynamicRecord {
+  const plan = typeof params.planContent === "string" ? params.planContent.trim() : "";
+  const limit = INPUT_LIMITS.promptQuestion;
+  return {
+    header: sourceText("status.agent.planApprovalHeader"),
+    question: !plan
+      ? sourceText("status.agent.planApprovalEmpty")
+      : plan.length > limit
+        ? `${plan.slice(0, limit - 1)}…`
+        : plan,
+    detail: sourceText("status.agent.planApprovalDetail"),
+    options: [
+      { label: GROK_PLAN_APPROVE, description: sourceText("status.agent.planApproveDetail") },
+      { label: GROK_PLAN_STOP, description: sourceText("status.agent.planStopDetail") },
+    ],
+  };
+}
+
+function grokPlanReply(answer: string | undefined): DynamicRecord {
+  if (!answer) return { outcome: "abandoned", feedback: GROK_PLAN_UNANSWERED };
+  if (answer === GROK_PLAN_APPROVE) return { outcome: "approved" };
+  if (answer === GROK_PLAN_STOP) return { outcome: "abandoned" };
+  return { outcome: "request_changes", feedback: answer };
+}
 
 function grokTurnFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
@@ -316,6 +368,15 @@ function hermesRefusal(error: unknown): boolean {
   );
 }
 
+function kimiStaleSession(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32600 &&
+    isRecord(error.data) &&
+    error.data.code === "session.stale"
+  );
+}
+
 function hermesSessionBusy(error: unknown): boolean {
   return (
     error instanceof RequestError &&
@@ -354,6 +415,8 @@ function hermesSessionNotFound(error: RequestError): boolean | null {
 
 const HERMES_MCP_SERVER_LIMIT = 16;
 
+const HERMES_SESSION_MCP_SINCE = "0.22.1";
+
 export const HERMES_ACP_FLAVOR: AcpFlavor = {
   loadInsteadOfResume: { missing: (response) => response.modes == null },
   sessionNotFound: hermesSessionNotFound,
@@ -362,6 +425,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   lostServerUntilRestart: hermesGatewayLost,
   sessionBusy: hermesSessionBusy,
   mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
+  sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
   setsConfigOnlyOnChange: true,
   resendsAnswer: true,
   subagentTools: ["delegate_task"],
@@ -370,6 +434,14 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   failureReport: HERMES_FAILURE_SUMMARY,
   catalogAsMcpTools: true,
 };
+
+const CURSOR_STREAM_FAILURE = /\bRetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] /u;
+
+function cursorTurnFailure(error: unknown, detail: string): string {
+  return CURSOR_STREAM_FAILURE.test(errorText(error))
+    ? sourceText("error.provider.acpServerLost", { provider: agentProviderName("cursor") })
+    : detail;
+}
 
 export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error, sessionId) =>
@@ -382,6 +454,9 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
       ? sourceText("error.provider.cursorSignInUnusable")
       : null,
   planUsedUpChunk: /^(?:\n\nUpgrade your plan to continue|\s*Add a payment method to continue\.?\s*)$/u,
+  connectionLostChunk: /^\s*Error: RetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] [^\n]*\s*$/u,
+  turnFailure: cursorTurnFailure,
+  failureCause: (error) => (CURSOR_STREAM_FAILURE.test(errorText(error)) ? "network" : null),
   processWideModel: true,
   mcpServersLoadWithSession: true,
   enableMcpServers: enableCursorMcpServers,
@@ -399,12 +474,15 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   authRequiredSignsOut: true,
   emptyAnswerFailure: noAnswerUnlessPlanOrCompaction,
   mcpToolsFixedAtStart: true,
+  turnStallMs: 12 * 60_000,
+  staleSession: kimiStaleSession,
 };
 
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
   steerByPromptCapability: "cognition.ai/midTurnPrompts",
+  emptyAnswerError: /\bThe model ended its turn without a response\b/u,
   promptRun: (response) => {
     const run = isRecord(response._meta) ? response._meta["cognition.ai/userMessageId"] : undefined;
     return typeof run === "string" ? run : undefined;
@@ -455,6 +533,16 @@ function ompSessionNotFound(error: RequestError, sessionId: string): boolean | n
     : null;
 }
 
+function geminiCliSessionNotFound(error: RequestError, sessionId: string): true | null {
+  if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
+  const details = error.code === -32603 && isRecord(error.data) ? error.data.details : undefined;
+  return typeof details === "string" && details.startsWith(`Invalid session identifier "${sessionId}"`) ? true : null;
+}
+
+function customSessionNotFound(error: RequestError, sessionId: string): boolean | null {
+  return geminiCliSessionNotFound(error, sessionId) ?? ompSessionNotFound(error, sessionId);
+}
+
 function customEmptyAnswerFailure({ answered }: { answered: boolean }, label: string): string | null {
   return answered ? null : sourceText("error.provider.acpNoAnswer", { provider: label });
 }
@@ -487,7 +575,7 @@ const OMP_ACP_FLAVOR: AcpFlavor = {
 };
 
 const CUSTOM_ACP_FLAVOR: AcpFlavor = {
-  sessionNotFound: ompSessionNotFound,
+  sessionNotFound: customSessionNotFound,
   emptyAnswerFailure: customEmptyAnswerFailure,
   turnFailure: customTurnFailure,
   failureCause: customFailureCause,
@@ -503,6 +591,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     lostServerUntilRestart: hermesGatewayLost,
     sessionBusy: hermesSessionBusy,
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
+    sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
     turnFailure: (error, detail, _redact, _log, _model, _endpoint, _savedKey, _providerKeyStored, label) =>
@@ -511,7 +600,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     failureReport: HERMES_FAILURE_SUMMARY,
     catalogAsMcpTools: true,
   },
-  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true },
+  kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true, staleSession: kimiStaleSession },
   "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
 };
 

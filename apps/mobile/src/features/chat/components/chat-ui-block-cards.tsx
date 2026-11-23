@@ -295,7 +295,11 @@ export function ChatConfirmPrompt({
   const secondsLeft = useSecondsUntil(autoAnswer?.at ? Date.parse(autoAnswer.at) : 0);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [confirming, setConfirming] = useState<UiAction>();
-  const [draft, setDraft] = useState<string>();
+  const [draft, setPreviewDraft] = useState<string>();
+  const setDraft = (text: string) => {
+    setPreviewDraft(text);
+    controller.setUnsentPreview(text.trim() && text !== spec.preview ? text : undefined);
+  };
   const blankDraft = draft !== undefined && !draft.trim();
   const opensEditor = (action: UiAction) =>
     canEditPreview && uiConfirmPreviewEditable(spec) && action.id === UI_CONFIRM_EDIT_ACTION_ID;
@@ -311,7 +315,7 @@ export function ChatConfirmPrompt({
     if (disabled || blankDraft) return;
     setConfirming(undefined);
     if (opensEditor(action)) {
-      setDraft(spec.preview);
+      setPreviewDraft(spec.preview);
       return;
     }
     const values: Record<string, string> = {};

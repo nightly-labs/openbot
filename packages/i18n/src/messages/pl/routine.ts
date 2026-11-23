@@ -373,7 +373,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "Przekaż",
   "routine.webhook.giveSecretFailed": "Nie udało się przekazać sekretu podpisu agentowi {name}.",
   "routine.webhook.secretGiven": "Agent {name} ma nowy sekret podpisu.",
-  "routine.webhook.statusFailed": "Nie udało się sprawdzić, czy host jest połączony z przekaźnikiem.",
 
   "routine.settings.instruction": "Instrukcja",
   "routine.settings.instructionPlaceholderAgent": "Opisz, co ten agent ma robić.",

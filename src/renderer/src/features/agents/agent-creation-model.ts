@@ -24,10 +24,11 @@ export interface DevelopmentCreation {
 
 export function resolveCreationModel(
   setup: CreationPreference | null,
-  modelOptions: ClientAgentModelOption[],
+  listedOptions: ClientAgentModelOption[],
   status: AgentStatus | null | undefined,
   development: DevelopmentCreation | null = null,
 ): CreationModelChoice | null {
+  const modelOptions = listedOptions.filter((option) => option.listing !== "kept");
   const preferred = setup?.preferredProvider ?? null;
   const developmentStart = development !== null && (preferred ?? "codex") === "codex" && !setup?.preferredModel;
   const start = developmentStartingModel({

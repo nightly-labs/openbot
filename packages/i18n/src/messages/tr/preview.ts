@@ -24,4 +24,7 @@ export const messages = {
   "preview.tooLarge.description": "Önizleme 100 MB'a kadar çalışır. Bu dosyayı varsayılan uygulamasında açabilirsiniz.",
   "preview.spreadsheet.readFailed": "Bu elektronik tablo okunamadı.",
   "preview.spreadsheet.truncated": "Önizleme ilk {rows} satır ve {columns} sütunla sınırlandırıldı.",
+  "preview.document.readFailed": "Bu belge okunamadı.",
+  "preview.document.empty": "Bu belgede gösterilecek metin yok.",
+  "preview.document.truncated": "Önizleme belgenin ilk bölümüyle sınırlandırıldı.",
 } as const satisfies PartialTranslation<typeof source>;

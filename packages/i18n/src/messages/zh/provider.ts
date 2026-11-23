@@ -117,11 +117,14 @@ export const messages = {
   "provider.picker.download": "{name} 下载",
   "provider.picker.search": "搜索模型",
   "provider.picker.noMatches": "没有匹配的模型。",
+  "provider.picker.openrouterNoMatches":
+    "没有匹配的模型。你在 openrouter.ai 上的隐私、提供商和防护设置可能会在此列表中隐藏部分模型。",
   "provider.picker.workspaceOnlyUnavailable":
     "在 Windows 和 Linux 上，这些模型无法以“仅工作区”运行。要使用它们，请在助手设置中更改“权限”。",
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
-  "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.noModels":
+    "这里没有显示 {name} 模型。如果它们已关闭，管理员可以在“服务器设置 > 服务商 > {name} > 模型”中开启它们。",
   "provider.picker.endpointModelsInCustom": "{name} 运行你的自定义端点。它们的模型在“自定义”标签页中。",
   "provider.picker.showCustomModels": "查看模型",
   "provider.picker.museNoModels":
@@ -140,6 +143,7 @@ export const messages = {
   "provider.picker.effort": "强度",
   "provider.picker.effortLabel": "助手推理强度",
   "provider.picker.effortFixed": "{effort}（由 {provider} 固定）",
+  "provider.picker.effortLimited": "你的 Claude 设置或组织将推理强度限制为 {effort}。",
   "provider.picker.fast": "快速",
   "provider.picker.fastText": "响应更快，用量更多",
   "provider.picker.speed": "速度",
@@ -287,6 +291,7 @@ export const messages = {
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
   "provider.settings.geminiKeyReplacesAccount":
     "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
+  "provider.settings.museKeyInUse": "Muse 使用此密钥，而不是你的登录。要使用你的登录，请移除该密钥。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",
@@ -304,10 +309,14 @@ export const messages = {
   "provider.settings.diagnostics": "诊断",
   "provider.settings.cache": "缓存",
   "provider.settings.promptCache": "提示缓存",
-  "provider.settings.promptCacheDescription": "Claude 在两轮对话之间把助手的上下文保留在缓存中的时长。",
+  "provider.settings.promptCacheDescription": "Claude 和 Pi 在两轮之间将智能体上下文保留在缓存中的时间。",
   "provider.settings.promptCacheHour": "1 小时",
-  "provider.settings.promptCacheDefault": "Claude Code 默认",
+  "provider.settings.promptCacheDefault": "提供商默认值",
   "provider.settings.promptCacheLoadFailed": "无法加载该服务器的提示缓存时长。",
+  "provider.settings.cacheExpiryCompaction": "在缓存过期前压缩",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "当上下文达到 20 万个令牌或更多的聊天在 1 小时缓存下处于空闲状态时，智能体会在缓存过期前压缩上下文。这样下一条消息就不会在没有缓存的情况下重新读取完整上下文。",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "无法加载此服务器的压缩设置。",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "使用我的 Claude Code 配置",
   "provider.settings.claudeUserSetupDescription":
@@ -372,4 +381,5 @@ export const messages = {
   "provider.settings.endpointModels": { other: "{url} · {count} 个模型" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot 会在这台电脑上退出 {provider}。终端中的 {provider} CLI 保持自己的登录。",
+  "provider.settings.updateAll": "全部更新",
 } as const satisfies PartialTranslation<typeof source>;

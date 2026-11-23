@@ -180,6 +180,8 @@ export const messages = {
     "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.newChat.confirm": "新しいチャットを開始",
   "agentSettings.newChat.failed": "新しいチャットを始められませんでした。",
+  "agentSettings.newChat.busy":
+    "エージェントが作業中です。新しいチャットを始めるには、終わるまで待つか、停止してください。",
   "agentSettings.deleteHistory.title": "履歴を削除",
   "agentSettings.deleteHistory.description":
     "このチャットのメッセージを削除し、エージェントも忘れます。設定は残ります。",
@@ -228,6 +230,9 @@ export const messages = {
     "チャットが長くなったときに、エージェントが新しいチャットを開始できます。開始前にメモを保存します。",
   "agentSettings.quickAcknowledgement.title": "長いタスクの前に計画を表示",
   "agentSettings.quickAcknowledgement.description": "長いタスクの前に、エージェントが計画を表示します。",
+  "agentSettings.builtinMemory.title": "OpenBot のメモリー",
+  "agentSettings.builtinMemory.description":
+    "エージェントが自分のメモリーを保存して読み込みます。Mem0 などのメモリーアプリだけを使うにはオフにします。保存済みのメモリーは残ります。",
   "agentSettings.browserProfile.label": "ブラウザープロファイル",
   "agentSettings.browserProfile.shared": "共有",
   "agentSettings.browserProfile.agent": "このエージェントのみ",
@@ -237,6 +242,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "各プロファイルは専用のサインインと Cookie を保持します。変更すると、エージェントの開いているタブが閉じます。",
   "agentSettings.browserProfile.manage": "管理",
+  "agentSettings.browserProfile.movedNote":
+    "サイトへのサインインは古いプロファイルに残ります。エージェントはこれらのサイトに再度サインインする必要があります。",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "{provider} のプロセス全体がサンドボックス内で実行されるため、外部への書き込みは失敗します。macOS でのみ利用できます。",
 } as const satisfies PartialTranslation<typeof source>;

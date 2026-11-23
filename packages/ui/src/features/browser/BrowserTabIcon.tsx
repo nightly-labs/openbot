@@ -1,6 +1,5 @@
-import type { BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserTab, BrowserTabAgent } from "@openbot/contracts/ipc";
 import { Globe2, LoaderCircle } from "@openbot/ui";
-import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
@@ -8,7 +7,7 @@ import type { BrowserFullViewProps } from "./browser-full-view-types";
 import { browserDisplayUrl } from "./browser-suggestions";
 import { type BrowserShortcutName, browserShortcutGlyph } from "./browser-view-shortcuts";
 
-export function BrowserOwnerIcon(props: { agent: AgentProfile | undefined; acting?: boolean }) {
+export function BrowserOwnerIcon(props: { agent: BrowserTabAgent | undefined; acting?: boolean }) {
   return (
     <Show when={props.agent} fallback={<Globe2 class="browser-full-owner-globe" aria-hidden="true" />}>
       {(agent) => (

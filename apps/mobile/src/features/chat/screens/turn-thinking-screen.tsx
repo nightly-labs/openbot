@@ -19,7 +19,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
+import { useTurnStepLinesOf } from "@/features/workspace/components/use-agent-activity";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
@@ -212,7 +212,8 @@ export function TurnThinkingScreen() {
   const serverId = serverParam ?? agent?.serverId ?? "";
   const { messages, activeTurnId, hasOlder, olderLoading, olderError } = useTurnConversation(agentId, serverId, taskId);
   const loadOlderMessages = useMobileWorkspaceSelector((current) => current.loadOlderMessages);
-  const lines = useTurnStepLines(serverId)[turnId];
+  const shownTurnIds = useMemo(() => [turnId], [turnId]);
+  const lines = useTurnStepLinesOf(serverId, shownTurnIds)[turnId];
   const steps = useMemo(() => turnThinkingSteps(messages, turnId, lines), [messages, turnId, lines]);
   const times = useMemo(() => turnTimes(messages, turnId), [messages, turnId]);
   const running = activeTurnId === turnId;

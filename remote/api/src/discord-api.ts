@@ -134,6 +134,7 @@ const discordApiRequestSchema = z.discriminatedUnion("op", [
     channelId: snowflakeSchema,
     replyTo: snowflakeSchema.nullable(),
     filename: z.string().regex(/^[^/\\\p{Cc}]{1,200}$/u),
+    content: contentSchema.optional(),
   }),
 ]) satisfies z.ZodType<DiscordApiRequest>;
 
@@ -517,7 +518,11 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
         const created = yield* send({
           method: "POST",
           route: `/channels/${request.channelId}/messages`,
-          body: { allowed_mentions: NO_MENTIONS, ...messageReference(request.replyTo) },
+          body: {
+            ...(request.content ? { content: request.content } : {}),
+            allowed_mentions: request.content ? USER_MENTIONS : NO_MENTIONS,
+            ...messageReference(request.replyTo),
+          },
           files: [{ ...file, name: request.filename }],
         }).pipe(Effect.flatMap((value) => decode(createdMessageSchema, value)));
         return { messageId: created.id };

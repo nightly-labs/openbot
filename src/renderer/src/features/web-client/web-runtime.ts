@@ -10,6 +10,7 @@ import type {
   AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
+  AgentRuntimePrompt,
   AgentStatus,
   AgentWaitsSnapshot,
   AttachmentSummary,
@@ -44,8 +45,6 @@ import type {
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
-  Routine,
-  RoutineRun,
   ServerNotificationLevel,
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
@@ -60,10 +59,8 @@ import type {
   TeamInviteSummary,
   TeamMemberSummary,
   TeamRealtimeEvent,
-  TestRoutineInput,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
-  UpdateRoutineInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
@@ -88,6 +85,7 @@ import {
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
   withModelSources,
   withSteeringModels,
@@ -95,8 +93,9 @@ import {
   withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
+import type { AcceptedOwnerTransfer, OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ACTIVE_QUEUES_ROUTES,
   type AgentActiveQueues,
@@ -175,6 +174,10 @@ import {
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
@@ -183,16 +186,16 @@ import {
   PENDING_APPROVAL_CAPABILITY,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  decodePendingPromptsResponse,
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import {
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   PROVIDER_MODEL_SOURCE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-model-source-v1";
-import {
-  ROUTINE_FLOW_STOP_CAPABILITY,
-  ROUTINE_FLOW_STOP_ROUTES,
-} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
-import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
   decodeServerSafeModeReason,
@@ -265,10 +268,7 @@ import {
   steerQueuedMessage,
   type TeamApiRequest,
   type TeamChannelsApi,
-  type TeamRoutineFlowsApi,
-  teamAgentRoutinesApi,
   teamChannelsApi,
-  teamRoutineFlowsApi,
   updateQueuedMessage,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
@@ -324,6 +324,15 @@ type WebMessageDelete =
 
 type WebHistoryDelete = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
 
+interface WebOwnerTransfers {
+  pending(hostId: string): Promise<OwnerTransfer | null>;
+  start(hostId: string, email: string): Promise<OwnerTransfer>;
+  cancel(hostId: string): Promise<void>;
+  incoming(): Promise<OwnerTransfer[]>;
+  accept(transferId: string): Promise<AcceptedOwnerTransfer>;
+  decline(transferId: string): Promise<void>;
+}
+
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
   hosts?: WebHostConnections;
@@ -351,6 +360,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
   connect(host: RemoteTeamHost, options?: WebConnectOptions): Promise<string[]>;
@@ -371,6 +381,7 @@ export interface WebWorkspaceRuntime {
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
   readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
+  listPendingPrompts?: () => Promise<AgentRuntimePrompt[]>;
   focusUse(): Promise<void>;
   send(
     agentId: string,
@@ -396,11 +407,8 @@ export interface WebWorkspaceRuntime {
   download(attachmentId: string): Promise<WebFile>;
   downloadPreview(attachmentId: string): Promise<WebFile>;
   sharedFile(path: string): Promise<WebFile>;
-  workspaceFile(agentId: string, path: string): Promise<WebFile>;
+  workspaceFile(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<WebFile>;
   workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
-  routineFlows?: TeamRoutineFlowsApi;
-  updateRoutine?: (input: UpdateRoutineInput) => Promise<Routine>;
-  testRoutine?: (input: TestRoutineInput) => Promise<RoutineRun>;
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
   listAgentColors?: () => Promise<AgentColors>;
@@ -447,6 +455,7 @@ export interface WebRuntimeEvents {
   accessDenied?(hostId: string, error: WebHostConnectionError): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
+  serversChanged?(): Promise<void>;
   hostState?(hostId: string, state: WebHostState): void;
   hostSessionRevoked?(): void;
   hostTaken?(hostId: string): void;
@@ -601,6 +610,7 @@ export function createWebWorkspaceRuntime(
     onHostStreamData: (data) => browserView.receive(data),
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
+    onAccountServersChanged: async () => events.serversChanged?.(),
   };
   const hostProtocols = {
     get: (id: string) => savedHostProtocol(accountId, id),
@@ -960,20 +970,6 @@ export function createWebWorkspaceRuntime(
       });
     return listed;
   }
-  async function routineFlowsRequest<T>(
-    method: string,
-    path: string,
-    decode: (value: unknown) => T,
-    body?: TeamProtocolV2Json,
-  ): Promise<T> {
-    if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
-    if (path === ROUTINE_FLOW_STOP_ROUTES.stopRun && !capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowStopUnsupported"));
-    return teamApi(method, path, decode, body);
-  }
-  const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
-  const agentRoutines = teamAgentRoutinesApi(teamApi, undefined, routinesOnce);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -1291,6 +1287,14 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    ownerTransfers: {
+      pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
+      start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
+      cancel: (hostId) => runTeamEffect(directory.cancelOwnerTransfer(hostId)),
+      incoming: () => runTeamEffect(directory.incomingOwnerTransfers()),
+      accept: (transferId) => runTeamEffect(directory.acceptOwnerTransfer(transferId)),
+      decline: (transferId) => runTeamEffect(directory.declineOwnerTransfer(transferId)),
+    },
     async removeOwnedHost(hostId) {
       const response = await accountFetch(`/api/browser/v2/remote/hosts/${encodeURIComponent(hostId)}`, {
         method: "DELETE",
@@ -1430,6 +1434,10 @@ export function createWebWorkspaceRuntime(
     async readPendingApproval(input) {
       if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
       return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
+    },
+    async listPendingPrompts() {
+      if (!capabilities.includes(PENDING_PROMPTS_CAPABILITY)) return [];
+      return decodePendingPromptsResponse(await request("POST", PENDING_PROMPTS_ROUTES.list, {}));
     },
     async cancelWait(agentId, waitId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
@@ -1574,8 +1582,9 @@ export function createWebWorkspaceRuntime(
         await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
       );
     },
-    async workspaceFile(agentId, path) {
+    async workspaceFile(agentId, path, options) {
       const query = new URLSearchParams({ botId: agentId, path });
+      if (options?.exactPath) query.set(WORKSPACE_FILE_EXACT_PATH_QUERY, "1");
       return decodeWebFile(
         await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
       );
@@ -1585,9 +1594,6 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
-    routineFlows,
-    updateRoutine: agentRoutines.updateRoutine,
-    testRoutine: agentRoutines.testRoutine,
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
@@ -1650,7 +1656,7 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      const [fast, listings, steering] = await Promise.all([
+      const [fast, listings, steering, kept] = await Promise.all([
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
           : capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
@@ -1662,9 +1668,15 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_STEERING_CAPABILITY)
           ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
           : [],
+        capabilities.includes(MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering),
+        withSteeringModels(
+          withKeptModels(withModelListings(withFastServiceTiers(models, fast), listings), kept),
+          steering,
+        ),
         capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );
     },

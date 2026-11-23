@@ -1,10 +1,12 @@
 import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort } from "@openbot/contracts/ipc";
-import { Button, Play, Sparkles, Textarea } from "@openbot/ui";
+import { Button, Play, Sparkles } from "@openbot/ui";
 import { untrack } from "solid-js";
 import { useText } from "../../text";
+import { AnswerAction, AnswerProblems } from "./workflow-answer-parts";
 import { useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
+import { NameField } from "./workflow-name-field";
 import {
   asProvider,
   asString,
@@ -19,6 +21,7 @@ import {
   useTextField,
   type WfProvider,
 } from "./workflow-node-parts";
+import { StepSettingsAction } from "./workflow-step-settings";
 
 export function LlmNode(props: { id: string; prompt?: string; system?: string }) {
   const board = useBoard();
@@ -66,10 +69,16 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
       kind="llm"
       inputs={["text", "image", "file"]}
       output="text"
-      toolbar={<NodeToolbar id={props.id} name={t("workflow.llm.name")} locked={locked()} onLock={setLocked} />}
+      toolbar={
+        <NodeToolbar id={props.id} name={t("workflow.llm.name")} locked={locked()} onLock={setLocked}>
+          <AnswerAction id={props.id} field="answer" locked={locked()} />
+          <StepSettingsAction id={props.id} kind="llm" />
+        </NodeToolbar>
+      }
     >
       <Field class="wfn-field-task">
-        <Textarea
+        <NameField
+          node={props.id}
           class="wfn-input"
           aria-label={t("workflow.prompt.title")}
           placeholder={t("workflow.prompt.placeholder")}
@@ -101,7 +110,8 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
         </div>
       </Field>
       <Field class="wfn-field-system">
-        <Textarea
+        <NameField
+          node={props.id}
           class="wfn-input"
           aria-label={t("workflow.llm.system")}
           placeholder={t("workflow.llm.systemPlaceholder")}
@@ -110,6 +120,7 @@ export function LlmNode(props: { id: string; prompt?: string; system?: string })
           onValueChange={setSystem}
         />
       </Field>
+      <AnswerProblems id={props.id} />
       <ResultField id={props.id} running={run.running()} />
     </NodeShell>
   );

@@ -1,27 +1,37 @@
-import type { WorkflowMediaInput } from "@openbot/contracts/ipc";
+import { type WorkflowMediaInput, workflowCatalogSource } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { Button, Download, Film, Image, Maximize2, Mic, Square, Textarea } from "@openbot/ui";
+import { Button, Download, Film, Image, Maximize2, Mic, RotateCcw, Square, Textarea, TriangleAlert } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show, untrack } from "solid-js";
+import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { MediaGenerationCanvas } from "../conversation/media-generation-frame";
 import { VideoPlayer } from "../conversation/VideoPlayer";
+import { CreditIcon } from "../credits/CreditIcon";
 import { usePictureShape } from "./picture-shape";
 import { MediaModelPicker } from "./WorkflowMediaModelPicker";
-import { resultValue, useBoard } from "./workflow-board";
+import { makingTake, resultValue, useBoard, type WfnResult } from "./workflow-board";
 import {
   type Aspect,
   BACKGROUND_TEXT,
-  clock,
   KIND_TEXT,
+  type MediaStep,
   RunContent,
   resolutionName,
-  useElapsed,
   useMediaStep,
 } from "./workflow-media-step";
-import { download, NodeShell, NodeToolbar, ToolAction, type WfnInputPort } from "./workflow-node-parts";
+import {
+  clock,
+  downloadMedia,
+  NodeShell,
+  NodeToolbar,
+  ToolAction,
+  useElapsed,
+  useSince,
+  type WfnInputPort,
+} from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
+import { StepSettingsAction } from "./workflow-step-settings";
 
 function aspectRatio(aspect: Aspect): string {
   return aspect.replace(":", " / ");
@@ -35,6 +45,7 @@ function clipLabel(t: AppTranslate, inputs: readonly WorkflowMediaInput[]) {
 function videoPorts(
   t: AppTranslate,
   inputs: readonly WorkflowMediaInput[],
+  frameCount: number | undefined,
   connected: (type: "image" | "file", branch?: string) => boolean,
 ): readonly WfnInputPort[] {
   const shows = (input: WorkflowMediaInput, type: "image" | "file", branch?: string) =>
@@ -45,7 +56,7 @@ function videoPorts(
     ...(shows("frames", "image", "firstFrame")
       ? [{ type: "image" as const, branch: "firstFrame", label: t("workflow.video.role.first") }]
       : []),
-    ...(shows("frames", "image", "lastFrame")
+    ...((frameCount !== 1 && inputs.includes("frames")) || connected("image", "lastFrame")
       ? [{ type: "image" as const, branch: "lastFrame", label: t("workflow.video.role.last") }]
       : []),
     ...(shows("references", "image") ? [{ type: "image" as const, label: t("workflow.video.role.reference") }] : []),
@@ -57,6 +68,41 @@ function videoPorts(
 
 function cardWidth(ratio: number) {
   return ratio < 0.7 ? "240px" : "380px";
+}
+
+function FailedTake(props: { id: string; result: WfnResult; step: MediaStep }) {
+  const board = useBoard();
+  const { t, format } = useText();
+  return (
+    <div class="wfn-media-failed" role="alert">
+      <TriangleAlert class="wfn-media-failed-icon" aria-hidden="true" />
+      <span>{t(props.step.kind() === "video" ? "workflow.video.failed" : "workflow.image.failed")}</span>
+      <Show when={props.result.value}>{(reason) => <span class="wfn-media-failed-reason">{reason()}</span>}</Show>
+      <Show when={board.retryResult}>
+        {(retry) => (
+          <Button
+            variant="secondary"
+            size="sm"
+            class="wfn-media-retry"
+            aria-label={props.step.retryLabel()}
+            disabled={props.step.locked() || props.step.retryShort()}
+            onClick={() => retry()(props.id, props.result.id)}
+          >
+            <RotateCcw aria-hidden="true" />
+            {t("workflow.node.retry")}
+            <Show when={props.step.price()}>
+              {(credits) => (
+                <span class="wfn-media-retry-price">
+                  <CreditIcon class="wfn-run-credits-icon" />
+                  {format.number(credits())}
+                </span>
+              )}
+            </Show>
+          </Button>
+        )}
+      </Show>
+    </div>
+  );
 }
 
 function SpecChip(props: { text: string; icon?: JSX.Element }) {
@@ -76,6 +122,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     untrack(() => ({ prompt: props.prompt, aspect: props.aspect })),
   );
   const { kind, prompt, specs, model, run } = step;
+  createEffect(step.short, (short) => {
+    board.markCreditsShort(props.id, short);
+    return () => board.markCreditsShort(props.id, false);
+  });
   const text = (key: keyof (typeof KIND_TEXT)["image"]) => t(KIND_TEXT[kind()][key]);
   const frameRatio = () => {
     const size = specs().size;
@@ -86,7 +136,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const [w = 1, h = 1] = specs().aspect.split(":").map(Number);
     return { css: aspectRatio(specs().aspect), value: w / h };
   };
-  const seconds = useElapsed(run.running);
+  const elapsed = useElapsed(step.busy);
+  const takeSeconds = useSince(() => makingTake(board, props.id)?.at);
+  const seconds = () => takeSeconds() ?? elapsed();
   const urlOf = (value: string | undefined) => {
     if (value === undefined) return undefined;
     return step.orFile(board.catalogs().media?.(value, kind()), value);
@@ -106,6 +158,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const backgroundText = () => t(BACKGROUND_TEXT[specs().transparent ? "transparent" : "solid"]);
   const fileName = () => (kind() === "video" ? "video.mp4" : "image.png");
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
+  const [videoReady, setVideoReady] = createSignal<string>();
   let media: HTMLElement | undefined;
   const openViewer = () => {
     const shown = board.shown(props.id);
@@ -128,7 +181,14 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     const index = images.findIndex((entry) => entry.id === shown?.id);
     setViewer({ images, index: Math.max(0, index), origin: media });
   };
-  const making = () => run.running();
+  const making = () =>
+    board.pending(props.id).length === 0 ? run.running() : makingTake(board, props.id) !== undefined;
+  const failedTake = () => {
+    const shown = board.shown(props.id);
+    return shown?.failed ? shown : undefined;
+  };
+  const paidWithCredits = () => workflowCatalogSource(model()?.id ?? "") === "openbot";
+  const stoppable = () => !paidWithCredits() && run.stop();
   const durationText = (value: number) => t("workflow.video.seconds", { value: String(value) });
   const frameText = () => {
     const size = specs().size;
@@ -148,13 +208,16 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
         inputs={["text", "image"]}
         inputPorts={
           kind() === "video"
-            ? videoPorts(t, step.mediaInputs(), (type, branch) => board.connected(props.id, "in", type, branch))
+            ? videoPorts(t, step.mediaInputs(), step.frameCount(), (type, branch) =>
+                board.connected(props.id, "in", type, branch),
+              )
             : undefined
         }
         output={kind() === "video" ? "file" : "image"}
         style={{ "--wfn-aspect": frameRatio().css, "--wfn-width": cardWidth(frameRatio().value) }}
         toolbar={
           <NodeToolbar id={props.id} name={text("name")} locked={step.locked()} onLock={step.setLocked}>
+            <StepSettingsAction id={props.id} kind="image" />
             <Show when={kind() === "image" && shownUrl()}>
               <ToolAction
                 text={t("workflow.node.toolbar.view")}
@@ -169,7 +232,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                   text={t("workflow.node.toolbar.download")}
                   label={text("download")}
                   icon={<Download />}
-                  onClick={() => download(url(), fileName())}
+                  onClick={() => {
+                    const value = shownValue();
+                    if (value) downloadMedia(board, value, url(), fileName());
+                  }}
                 />
               )}
             </Show>
@@ -193,48 +259,54 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
             </div>
           }
         >
-          <Show
-            when={shownPicture()}
-            fallback={
-              <Show
-                when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
-                fallback={<CardPictureLoading />}
-              >
-                <span class="wfn-media-empty" aria-hidden="true">
-                  <Show when={kind() === "video"} fallback={<Image />}>
-                    <Film />
-                  </Show>
-                </span>
-              </Show>
-            }
-          >
-            {(url) => (
-              <Show
-                when={kind() === "video"}
-                fallback={
-                  <CardPicture
+          <Show when={failedTake()}>{(result) => <FailedTake id={props.id} result={result()} step={step} />}</Show>
+          <Show when={!failedTake()}>
+            <Show
+              when={shownPicture()}
+              fallback={
+                <Show
+                  when={shownValue() === undefined || shownPicture() === null || !board.catalogs().media}
+                  fallback={<CardPictureLoading />}
+                >
+                  <span class="wfn-media-empty" aria-hidden="true">
+                    <Show when={kind() === "video"} fallback={<Image />}>
+                      <Film />
+                    </Show>
+                  </span>
+                </Show>
+              }
+            >
+              {(url) => (
+                <Show
+                  when={kind() === "video"}
+                  fallback={
+                    <CardPicture
+                      ref={(element) => {
+                        media = element;
+                      }}
+                      src={url()}
+                      alt={prompt() || text("description")}
+                    />
+                  }
+                >
+                  <VideoPlayer
+                    src={url()}
+                    label={prompt() || text("description")}
+                    durationSeconds={specs().duration}
+                    fullControls
+                    loading={videoReady() !== url()}
+                    onMetadata={() => setVideoReady(url())}
+                    onError={() => setVideoReady(url())}
                     ref={(element) => {
                       media = element;
                     }}
-                    src={url()}
-                    alt={prompt() || text("description")}
                   />
-                }
-              >
-                <VideoPlayer
-                  src={url()}
-                  label={prompt() || text("description")}
-                  durationSeconds={specs().duration}
-                  fullControls
-                  ref={(element) => {
-                    media = element;
-                  }}
-                />
-                <span class="wfn-clip-length" aria-hidden="true">
-                  {clock(specs().duration)}
-                </span>
-              </Show>
-            )}
+                  <span class="wfn-clip-length" aria-hidden="true">
+                    {clock(specs().duration)}
+                  </span>
+                </Show>
+              )}
+            </Show>
           </Show>
         </Show>
         <div class="wfn-overlay wfn-media-overlay" inert>
@@ -278,16 +350,16 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                 onChange={() => undefined}
               />
               <Show
-                when={run.stop()}
+                when={stoppable()}
                 fallback={
                   <Button
                     size="xs"
                     class="wfn-run-pill"
-                    loading={making()}
-                    disabled={!step.runnable() || step.locked() || !model()}
+                    loading={step.busy()}
+                    disabled={!step.runnable() || step.locked() || step.short() || !model()}
                     aria-label={step.runLabel()}
                   >
-                    <RunContent credits={step.price()} />
+                    <RunContent credits={step.total()} takes={step.batch()} />
                   </Button>
                 }
               >
@@ -305,7 +377,8 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
           <ImageLightbox
             opening={opening()}
             onDownload={(attachment) => {
-              if (attachment.previewUrl) download(attachment.previewUrl, attachment.name);
+              const value = resultValue(board.results(props.id).find((result) => result.id === attachment.id));
+              if (value && attachment.previewUrl) downloadMedia(board, value, attachment.previewUrl, attachment.name);
             }}
             onClose={() => setViewer(undefined)}
           />

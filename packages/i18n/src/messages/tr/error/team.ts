@@ -92,6 +92,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Bu bağlantı bir rutin çalıştırmasını durduramaz.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.libraryFoldersUnsupported": "Kitaplık klasörleri bu bağlantı tarafından desteklenmiyor.",
+  "error.team.workflowFoldersUnsupported": "Bu bağlantı iş akışı klasörlerini desteklemiyor.",
   "error.team.agentNotificationLevelsUnsupported":
     "Bu sunucu her ajan için kendi bildirim düzeyinizi saklayamıyor. Sunucuyu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
   "error.team.sidebarPinsUnsupported":
@@ -124,12 +125,16 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Sunucu kimliği değişiklikleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostUpdateUnsupported": "Ana makine güncellemeleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.hostTimezoneUnsupported": "Bu bağlantı sunucunun saat dilimini desteklemiyor.",
+  "error.team.hostSignalHomeUnsupported": "Bu bağlantı Signal sunucusu seçimini desteklemiyor.",
+  "error.team.hostVoiceModelUnsupported": "Bu bağlantı sunucunun konuşma tanıma modelini desteklemiyor.",
   "error.team.hostRestartUnsupported": "Bu bağlantı sunucuyu yeniden başlatmayı desteklemiyor.",
+  "error.team.ownerTransferUnsupported": "Bu sunucu sahiplik devrini desteklemiyor.",
   "error.team.hostKeyRotationUnsupported": "Bu bağlantı sunucu anahtarı değişikliğini desteklemiyor.",
   "error.team.localServersUnsupported": "Bu bağlantı bu bilgisayardaki sunucuları desteklemiyor.",
   "error.team.routineResultsUnsupported": "Bu bağlantı rutin hedeflerini desteklemiyor.",
   "error.team.agentMemoryLimitUnsupported": "Bu bağlantı ajanların bellek sınırını desteklemiyor.",
   "error.team.agentFoldersUnsupported": "Bu bağlantı ajanların klasörlerini desteklemiyor.",
+  "error.team.channelFoldersUnsupported": "Bu bağlantı kanalların klasörlerini desteklemiyor.",
   "error.team.folderUnavailable": "Bu klasör ana bilgisayarda kullanılamıyor.",
   "error.team.memoryReviewUnsupported": "Bu bağlantı bellek incelemesini desteklemiyor.",
   "error.team.skillLearningUnsupported": "Bu bağlantı beceri öğrenmeyi desteklemiyor.",
@@ -137,6 +142,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Bu bağlantı istem önbelleği süresini desteklemiyor.",
   "error.team.claudeUserSetupUnsupported": "Bu bağlantı Claude Code kurulumu anahtarını desteklemiyor.",
   "error.team.claudeCompactWindowUnsupported": "Bu bağlantı Claude sıkıştırma boyutunu desteklemiyor.",
+  "error.team.cacheExpiryCompactionUnsupported": "Bu bağlantı önbelleğin süresi dolmadan sıkıştırmayı desteklemiyor.",
   "error.team.providerEnvironmentUnsupported": "Bu bağlantı sağlayıcı değişkenlerini desteklemiyor.",
   "error.team.modelVisibilityUnsupported": "Bu bağlantı model listesini desteklemiyor.",
   "error.team.providerDefaultUnsupported": "Bu bağlantı varsayılan sağlayıcıyı desteklemiyor.",
@@ -149,6 +155,8 @@ export const messages = {
   "error.team.mcpUnsupported": "MCP sunucuları bu bağlantı tarafından desteklenmiyor.",
   "error.team.mcpServerListNeedsUpdate":
     "Bu sunucuda {limit} sayısından fazla MCP sunucusu kullanmak için bu cihazdaki OpenBot'u güncelleyin.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Bu sunucuda bir sağlayıcının {limit} sayısından fazla hesabını kullanmak için bu cihazdaki OpenBot'u güncelleyin.",
   "error.team.storageUnsupported": "Depolama bu bağlantı tarafından desteklenmiyor.",
   "error.team.machineResourcesUnsupported": "Makine kullanımı bu bağlantı tarafından desteklenmiyor.",
   "error.team.machineAlertMemberInvalid": "Makine uyarılarını yalnızca bu sunucunun sahibi veya yöneticisi alabilir.",
@@ -189,6 +197,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Bu bağlantı sunucu kişiliğini desteklemiyor.",
   "error.team.agentWaitsUnsupported": "Bu bağlantı açık beklemeleri desteklemiyor.",
   "error.team.pendingApprovalUnsupported": "Bu bağlantı onay isteğinin tamamını okumayı desteklemiyor.",
+  "error.team.pendingPromptsUnsupported": "Bu bağlantı açık soruları okumayı desteklemiyor.",
   "error.team.phoneFeedbackUnsupported": "Bu bağlantı telefon uygulamasından rapor göndermeyi desteklemiyor.",
   "error.team.messagePinsUnsupported": "Bu bağlantı sabitlenen mesajları desteklemiyor.",
   "error.team.queuedMessageThreadUnsupported":

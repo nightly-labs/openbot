@@ -344,7 +344,8 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.numbersTitle": "Numbers",
   "connector.whatsapp.linkNumber": "Link a number",
   "connector.whatsapp.ownNumberNote": "Your “Message yourself” chat and the people you allow reach OpenBot.",
-  "connector.whatsapp.dedicatedNote": "The people you allow reach OpenBot. Other people get a code to give you.",
+  "connector.whatsapp.dedicatedNote":
+    "Your “Message yourself” chat and the people you allow reach OpenBot. Other people get a code to give you.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp removed this computer from the linked devices. Link the number again.",
   "connector.whatsapp.helpLoggedOutHost":
     "WhatsApp removed this server from the linked devices. Link the number again.",

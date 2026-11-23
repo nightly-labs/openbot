@@ -386,6 +386,8 @@ export const messages = {
   "mobile.chat.audio.unplayable": "Diese Audiodatei kann nicht abgespielt werden.",
   "mobile.chat.browserSecret.password": "Passwort",
   "mobile.chat.browserSecret.authenticatorCode": "Authentifizierungscode",
+  "mobile.chat.browserSecret.ended":
+    "Diese Anmeldeanfrage ist beendet. Bitte den Agenten, es noch einmal zu versuchen.",
   "mobile.chat.browserSecret.oneTimeCode": "Einmalcode",
   "mobile.chat.browserSecret.takeoverTitle": "Browserübernahme",
   "mobile.chat.browserSecret.takeoverBody":
@@ -540,6 +542,10 @@ export const messages = {
   "mobile.chat.queue.waitingTitle": "Warten auf den Agenten",
   "mobile.chat.queue.repliesTitle": "Warten auf Antworten",
   "mobile.chat.queue.providerRestart": "Wartet auf den Neustart von {provider}",
+  "mobile.chat.queue.signIn": "Wartet auf die Anmeldung bei {provider}",
+  "mobile.chat.providerSignIn.title": "{provider} ist nicht angemeldet",
+  "mobile.chat.providerSignIn.action": "Anmelden",
+  "mobile.chat.providerSignIn.open": "{label}. Anbietereinstellungen öffnen",
   "mobile.chat.queue.replyState.asked": "Angefragt",
   "mobile.chat.queue.replyState.working": "In Arbeit",
   "mobile.chat.queue.replyState.replied": "Beantwortet",
@@ -645,6 +651,8 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Rückgängig",
   "mobile.chat.appSuggestion.notAllowed": "Nur der Serverbesitzer oder ein Admin kann {name} verbinden.",
   "mobile.chat.appSuggestion.unavailable": "Dieser Server kann {name} nicht verbinden.",
+  "mobile.chat.mcpSignIn.signInNamed": "Bei {name} anmelden",
+  "mobile.chat.mcpSignIn.signedIn": "Angemeldet",
   "mobile.chat.context.label": "Kontext zu {percent} voll",
   "mobile.chat.context.labelEstimated": "Kontext zu etwa {percent} voll",
   "mobile.chat.context.labelCompacting": "Kontext wird komprimiert",
@@ -666,4 +674,20 @@ export const messages = {
   "mobile.chat.context.noAuto": "Dieser Agent komprimiert seinen Kontext nicht.",
   "mobile.chat.context.lastCompaction": "Letzte Komprimierung: {before} → {after} Tokens",
   "mobile.chat.context.unavailable": "Dieser Chat meldet seinen Kontext gerade nicht.",
+  "mobile.chat.locationRequest.share": "Einmal teilen",
+  "mobile.chat.locationRequest.decline": "Nicht teilen",
+  "mobile.chat.locationRequest.alwaysAllow": "Immer erlauben",
+  "mobile.chat.locationRequest.alwaysAllowed":
+    "Dieser Agent bekommt deinen Standort ohne Nachfrage, während du die App nutzt.",
+  "mobile.chat.locationRequest.askEveryTime": "Jedes Mal fragen",
+  "mobile.chat.locationRequest.locating": "Standort wird ermittelt …",
+  "mobile.chat.locationRequest.private": "Der aktuelle Standort deines Telefons geht einmal an diesen Agenten.",
+  "mobile.chat.locationRequest.shared": "Standort geteilt",
+  "mobile.chat.locationRequest.declined": "Nicht geteilt",
+  "mobile.chat.locationRequest.unavailable":
+    "Dein Telefon konnte deinen Standort nicht finden. Versuche es noch einmal.",
+  "mobile.chat.locationRequest.deniedTitle": "Standortzugriff ist aus",
+  "mobile.chat.locationRequest.denied":
+    "Erlaube OpenBot in den Einstellungen den Standortzugriff, um deinen Standort zu teilen.",
+  "mobile.chat.locationRequest.openSettings": "Einstellungen öffnen",
 } as const satisfies PartialTranslation<typeof source>;

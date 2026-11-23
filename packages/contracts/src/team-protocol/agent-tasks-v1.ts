@@ -62,7 +62,9 @@ const task = fields({
   title: string(120),
   state: oneOf("running", "queued", "idle", "closed"),
   outcome: nullable(oneOf("completed", "failed", "interrupted")),
-  hold: nullable(oneOf("task-limit", "agent-restarting", "usage-limit", "server-busy", "agent-busy", "one-turn")),
+  hold: nullable(
+    oneOf("task-limit", "agent-restarting", "usage-limit", "server-busy", "agent-busy", "one-turn", "sign-in"),
+  ),
   activeTurnId: nullable(identifier),
   progress: nullable(string(500)),
   error: nullable(string(2_000)),
