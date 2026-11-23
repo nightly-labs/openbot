@@ -178,20 +178,12 @@ function acpStepKind(kind: unknown): ConversationSubagentStepKind {
   }
 }
 
-/**
- * Applies an `opencode/session/child_update` notification. `turnId` is the parent session's
- * running turn: a new child session belongs to it. A child of a child shows its steps in its top
- * subagent. Text and thinking stream; the list is sent when a step starts or the state changes, not
- * for each chunk. With `lateSteps`, an update of a subagent that already ended still adds its step: Kiro's
- * roster can overtake a session update that the subagent sent before its end.
- */
 export function foldOpenCodeChildUpdate(
   state: SubagentState,
   launches: OpenCodeLaunches,
   turnId: string | null,
   params: unknown,
   now: string,
-  lateSteps = false,
 ): SubagentChange | null {
   if (!isRecord(params) || !isString(params.childSessionId)) return null;
   const childId = params.childSessionId;
@@ -242,8 +234,7 @@ export function foldOpenCodeChildUpdate(
             : false;
     return ended ? subagentChange(state, state.turnOf.get(id)) : null;
   }
-  if (params.type !== "update" || !subagent || !isRecord(params.update)) return null;
-  if (subagent.status !== "running" && !lateSteps) return null;
+  if (params.type !== "update" || !subagent || subagent.status !== "running" || !isRecord(params.update)) return null;
   const update = params.update;
   if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
     if (!isString(update.toolCallId)) return null;
@@ -283,71 +274,6 @@ export function foldOpenCodeChildUpdate(
   return pushed && started ? subagentChange(state, state.turnOf.get(id)) : null;
 }
 
-const KIRO_TITLE_LIMIT = 120;
-
-/** The first line of the task that the parent gave a Kiro subagent, cut to the length of a card title. */
-function kiroSubagentTitle(entry: DynamicRecord): string {
-  const firstLine = isString(entry.initialQuery)
-    ? (entry.initialQuery
-        .split(/\r?\n/u)
-        .find((line) => line.trim())
-        ?.trim() ?? "")
-    : "";
-  const text = firstLine || (isString(entry.sessionName) ? entry.sessionName : "");
-  return text.length > KIRO_TITLE_LIMIT ? `${text.slice(0, KIRO_TITLE_LIMIT - 1)}…` : text;
-}
-
-/**
- * Applies `_kiro.dev/subagent/list_update` of Kiro CLI 2.37 (engine V2): the whole roster of the
- * subagents of the process, sent at each change, with no parent session. `turnId` is the turn that
- * started them, which only a new subagent needs. A listed subagent that is `working` shows as
- * running, one that is `terminated` ends, and a running subagent that the roster no longer lists
- * ended too: Kiro takes it off the list after `terminated`. The steps of a subagent come from the
- * updates of its own session. One change for each turn that the roster touched.
- */
-export function foldKiroSubagentRoster(
-  state: SubagentState,
-  turnId: string | null,
-  params: unknown,
-  now: string,
-): SubagentChange[] {
-  if (!isRecord(params) || !Array.isArray(params.subagents)) return [];
-  const touched = new Set<string>();
-  const listed = new Set<string>();
-  for (const entry of params.subagents) {
-    if (!isRecord(entry) || !isString(entry.sessionId) || !entry.sessionId) continue;
-    const id = entry.sessionId;
-    listed.add(id);
-    const type = isRecord(entry.status) ? entry.status.type : undefined;
-    const known = subagentFor(state, id);
-    if (known) {
-      if (type === "terminated" && endSubagent(known, "completed", now)) touched.add(state.turnOf.get(id) ?? "");
-      continue;
-    }
-    if (type !== "working" || !turnId) continue;
-    startSubagent(state, turnId, {
-      id,
-      title: kiroSubagentTitle(entry),
-      agentType: isString(entry.agentName) ? entry.agentName : null,
-      prompt: isString(entry.initialQuery) ? entry.initialQuery : null,
-      status: "running",
-      startedAt: now,
-      endedAt: null,
-      steps: [],
-      error: null,
-    });
-    touched.add(turnId);
-  }
-  for (const [id, owner] of [...state.turnOf]) {
-    if (listed.has(id)) continue;
-    const subagent = subagentFor(state, id);
-    if (subagent && endSubagent(subagent, "completed", now)) touched.add(owner);
-  }
-  touched.delete("");
-  return [...touched].flatMap((turn) => subagentChange(state, turn) ?? []);
-}
-
-/** The launch whose description is the child session's title, which it then leaves the list. */
 function takeLaunch(launches: OpenCodeLaunches, title: string): OpenCodeLaunch | undefined {
   for (const [callId, launch] of launches)
     if (launch.title === title) {

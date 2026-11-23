@@ -43,7 +43,6 @@ import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
 import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpRetryCause } from "./acp-flavor";
 import {
   foldAcpSubagentTool,
-  foldKiroSubagentRoster,
   foldOpenCodeChildUpdate,
   markOpenCodeBackground,
   noteOpenCodeLaunch,
@@ -73,7 +72,6 @@ import {
   SUBAGENTS_UPDATED_METHOD,
   type SubagentChange,
   stopSubagents,
-  subagentFor,
 } from "./agent/subagent-updates";
 import { visibleDynamicTools, withCatalogTools, withChannelTools } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
@@ -197,17 +195,6 @@ const ACP_THROWAWAY_DELETE_MS = 3_000;
 
 const ACP_BACKGROUND_POLL_MS = 2_000;
 
-/** How many sessions, and how many updates of each, wait for a roster entry. */
-const ACP_UNCLAIMED_SUBAGENT_SESSIONS = 16;
-const ACP_UNCLAIMED_SUBAGENT_UPDATES = 60;
-
-/**
- * How long after its call of the subagent tool a session can claim the roster of a new subagent, when
- * several sessions run turns (`AcpFlavor.subagentRoster`). The roster follows the call within a second.
- */
-const ACP_SUBAGENT_CLAIM_MS = 15_000;
-
-/** How long OpenBot watches a session after a background task starts or the session last changes. */
 const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
 
 const ACP_WORK_HOLD_POLL_MS = 60_000;
@@ -318,9 +305,6 @@ interface AcpThread {
   dynamicTools: DynamicToolNamespace[];
   workspaceRoots: string[];
   computerUse: boolean;
-  /** When the session last called the tool that starts subagents (`AcpFlavor.subagentRoster`), as `Date.now()`. */
-  lastSubagentCallAt?: number;
-  /** The agent whose session this is, named to the MCP servers that OpenBot signed in to. */
   agentId: string | null;
   idleRelease: ReturnType<typeof setTimeout> | null;
   idleSince: number;
@@ -575,12 +559,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #lastTurnStartedAt = 0;
   #signedIn = false;
   readonly #subagents = newSubagentState();
-  /**
-   * Updates of a subagent's own session that came before its roster entry (`AcpFlavor.subagentRoster`):
-   * the SDK hands an extension notification over later than a session update. They show once the roster names it.
-   */
-  readonly #unclaimedSubagentUpdates = new Map<string, SessionNotification["update"][]>();
-  /** The thread of each turn in `#subagents`. A background subagent reports after its turn and session ended. */
   readonly #subagentThreads = new Map<string, string>();
   readonly #openCodeLaunches: OpenCodeLaunches = new Map();
   readonly #selfWakes = new WeakMap<AcpThread, { left: number; until: number }>();
@@ -901,7 +879,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
-  /** The session's context fill: a large drop is a compaction, and the chat shows the fill when the size is known. */
   #contextFill(thread: AcpThread, used: number, size: number): void {
     if (thread.contextUsed !== null && used < thread.contextUsed * ACP_COMPACTION_CONTEXT_RATIO)
       this.#compacted(thread);
@@ -916,10 +893,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       });
   }
 
-  /**
-   * The agent compacted the session by itself. The summary replaced the prompt that carried the
-   * instructions, and the channel messages that the session read, so the next turn sends both again.
-   */
+  #applyContextPercent(thread: AcpThread, percent: number): void {
+    const model = this.#models.find((candidate) => candidate.id === thread.currentModelId);
+    const size = model ? (this.#flavor.contextPercentUpdate?.window(model.description) ?? null) : null;
+    if (size === null) return;
+    this.#contextFill(thread, Math.round((Math.min(percent, 100) / 100) * size), size);
+  }
+
   #compacted(thread: AcpThread): void {
     if (thread.activeTurn) {
       thread.activeTurn.answered = true;
@@ -3226,10 +3206,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     const thread = this.#threads.get(notification.sessionId);
-    if (!thread) {
-      this.#subagentSessionUpdate(notification);
-      return;
-    }
+    if (!thread) return;
     const update = notification.update;
     const active = thread.activeTurn;
     if (active && !this.#flavor.modelRetryUpdate?.(update)) {
@@ -3248,6 +3225,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (thread.activeTurn && cost?.currency === "USD" && Number.isFinite(cost.amount) && cost.amount >= 0)
         thread.activeTurn.reportedCost = cost.amount;
       this.#contextFill(thread, update.used, update.size);
+      return;
+    }
+    const contextPercent = this.#flavor.contextPercentUpdate?.read(update) ?? null;
+    if (contextPercent !== null) {
+      this.#applyContextPercent(thread, contextPercent);
       return;
     }
     if (update.sessionUpdate === "compaction_update") {
@@ -3973,8 +3955,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       rawOutput: item.result,
       content,
     };
-    const roster = this.#flavor.subagentRoster;
-    if (roster?.tools.some((tool) => call.name.toLowerCase().startsWith(tool))) thread.lastSubagentCallAt = Date.now();
     const subagentTools = this.#flavor.subagentTools;
     if (subagentTools) {
       this.#subagentThreads.set(turn.id, thread.id);
@@ -4027,16 +4007,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       ].slice(-UNCLAIMED_MCP_FAILURE_LIMIT);
       return;
     }
-    const context = this.#flavor.contextPercentNotice;
-    if (context && method.replace(/^_/, "") === context.method) {
-      this.#applyContextPercent(context.window, params);
-      return;
-    }
-    const roster = this.#flavor.subagentRoster;
-    if (roster && method.replace(/^_/, "") === roster.method) {
-      this.#applySubagentRoster(params);
-      return;
-    }
     if (method.replace(/^_/, "") !== OPENCODE_CHILD_UPDATE_METHOD || !this.#flavor.childSessionUpdates) return;
     const thread = isString(params.rootSessionId) ? this.#threads.get(params.rootSessionId) : undefined;
     const turn = thread?.activeTurn ?? null;
@@ -4057,90 +4027,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
-  /**
-   * The context fill of a session that the agent reports as a percentage (`AcpFlavor.contextPercentNotice`).
-   * The size comes from the description of the session's model; with no size, the fill is not shown. A
-   * session that is not open here, such as a subagent's, is not this client's to show.
-   */
-  #applyContextPercent(window: (modelDescription: string) => number | null, params: DynamicRecord): void {
-    const thread = isString(params.sessionId) ? this.#threads.get(params.sessionId) : undefined;
-    const percent = params.contextUsagePercentage;
-    if (!thread || typeof percent !== "number" || !Number.isFinite(percent) || percent < 0) return;
-    const model = this.#models.find((candidate) => candidate.id === thread.currentModelId);
-    const size = model ? window(model.description) : null;
-    if (size === null) return;
-    this.#contextFill(thread, Math.round((Math.min(percent, 100) / 100) * size), size);
-  }
-
-  /**
-   * The roster of the agent's subagents (`AcpFlavor.subagentRoster`). It names no parent session, so a
-   * new subagent belongs to the one session that runs a turn. With several, it belongs to the session
-   * that called the subagent tool last, and a roster that no session can claim shows no new subagent.
-   */
-  #applySubagentRoster(params: DynamicRecord): void {
-    const running = [...this.#threads.ids()].flatMap((id) => {
-      const thread = this.#threads.get(id);
-      // A turn that completes still takes a roster that was sent before its end (see `#completeTurn`).
-      return thread?.activeTurn && !thread.activeTurn.stopped ? [thread] : [];
-    });
-    const now = Date.now();
-    const owner =
-      running.length === 1
-        ? running[0]
-        : running
-            .filter((thread) => now - (thread.lastSubagentCallAt ?? 0) < ACP_SUBAGENT_CLAIM_MS)
-            .sort((left, right) => (right.lastSubagentCallAt ?? 0) - (left.lastSubagentCallAt ?? 0))[0];
-    const turn = owner?.activeTurn ?? null;
-    if (owner && turn) {
-      turn.lastActivityAt = now;
-      this.#subagentThreads.set(turn.id, owner.id);
-    }
-    for (const change of foldKiroSubagentRoster(this.#subagents, turn?.id ?? null, params, new Date().toISOString()))
-      this.#emitSubagents(change);
-    for (const [id, updates] of [...this.#unclaimedSubagentUpdates]) {
-      if (!subagentFor(this.#subagents, id)) continue;
-      this.#unclaimedSubagentUpdates.delete(id);
-      for (const update of updates) this.#foldSubagentUpdate(id, update);
-    }
-  }
-
-  /**
-   * An update of a subagent's own session (`AcpFlavor.subagentRoster`). It shows as a step of the
-   * subagent, and it keeps the parent's turn from ending as stalled while the subagent works.
-   */
-  #subagentSessionUpdate(notification: SessionNotification): void {
-    if (!this.#flavor.subagentRoster) return;
-    if (subagentFor(this.#subagents, notification.sessionId)) {
-      this.#foldSubagentUpdate(notification.sessionId, notification.update);
-      return;
-    }
-    // The roster can come later: keep the first updates of a few sessions until it names this one.
-    const held = this.#unclaimedSubagentUpdates.get(notification.sessionId) ?? [];
-    if (held.length < ACP_UNCLAIMED_SUBAGENT_UPDATES) held.push(notification.update);
-    this.#unclaimedSubagentUpdates.set(notification.sessionId, held);
-    for (const id of this.#unclaimedSubagentUpdates.keys()) {
-      if (this.#unclaimedSubagentUpdates.size <= ACP_UNCLAIMED_SUBAGENT_SESSIONS) break;
-      this.#unclaimedSubagentUpdates.delete(id);
-    }
-  }
-
-  #foldSubagentUpdate(sessionId: string, update: SessionNotification["update"]): void {
-    const turnId = this.#subagents.turnOf.get(sessionId);
-    const parent = turnId ? this.#threads.get(this.#subagentThreads.get(turnId) ?? "") : undefined;
-    if (parent?.activeTurn) parent.activeTurn.lastActivityAt = Date.now();
-    this.#emitSubagents(
-      foldOpenCodeChildUpdate(
-        this.#subagents,
-        new Map(),
-        null,
-        { type: "update", childSessionId: sessionId, update },
-        new Date().toISOString(),
-        true,
-      ),
-    );
-  }
-
-  /** Sends a turn's subagents. Not tied to the active turn: a background subagent reports after its turn ended. */
   #emitSubagents(change: SubagentChange | null): void {
     if (!change) return;
     const threadId = this.#subagentThreads.get(change.turnId);
@@ -4153,7 +4039,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #stopSubagents(): void {
-    this.#unclaimedSubagentUpdates.clear();
     for (const change of stopSubagents(this.#subagents, new Date().toISOString())) this.#emitSubagents(change);
     this.#openCodeLaunches.clear();
   }
@@ -4176,12 +4061,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (thread.activeTurn !== turn || turn.completing) return;
     this.#releaseBeforeWakeEcho(thread, turn);
     turn.completing = true;
-    // The ACP SDK sends an extension notification through more handlers than `session/update`, so
-    // OpenCode's child updates and the roster of Kiro's subagents that came before the prompt's result can
-    // still be on their way.
-    if (this.#flavor.childSessionUpdates || this.#flavor.subagentRoster)
-      yield* Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
-    // The agent may not have kept a prompt that failed.
+    if (this.#flavor.childSessionUpdates) yield* Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
     if (status === "failed") {
       thread.instructionsSent = null;
       this.#turnContext.resend(thread.id);

@@ -366,6 +366,7 @@ export const messages = {
   "error.provider.kiroMissing": "Kiro CLI לא מותקן. התקן אותו ונסה שוב.",
   "error.provider.kiroNotStarted": "לא ניתן להפעיל את Kiro CLI. הרץ `kiro-cli --version` בטרמינל.",
   "error.provider.kiroVersionUnreadable": "לא ניתן לקרוא את גרסת Kiro CLI.",
+  "error.provider.kiroOutdated": "Kiro CLI {version} ישן מדי. OpenBot דורש גרסה 2.36.0 ומעלה.",
   "error.provider.kiroSignIn": "הרץ `kiro-cli login` בטרמינל כדי להשתמש ב-Kiro, ואז התחבר שוב.",
   "error.provider.hermesMissing": "Hermes Agent אינו מותקן. יש להתקין אותו ואז לנסות שוב.",
   "error.provider.hermesNotStarted": "Hermes Agent לא הצליח לפעול. יש להריץ `hermes --version` בטרמינל.",

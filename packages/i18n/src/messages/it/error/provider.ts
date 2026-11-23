@@ -398,6 +398,8 @@ export const messages = {
   "error.provider.kiroMissing": "Kiro CLI non è installato. Installalo e riprova.",
   "error.provider.kiroNotStarted": "Impossibile avviare Kiro CLI. Esegui `kiro-cli --version` in un terminale.",
   "error.provider.kiroVersionUnreadable": "Impossibile leggere la versione di Kiro CLI.",
+  "error.provider.kiroOutdated":
+    "La CLI di Kiro {version} è troppo vecchia. OpenBot richiede la versione 2.36.0 o successiva.",
   "error.provider.kiroSignIn": "Esegui `kiro-cli login` in un terminale per usare Kiro, poi collegati di nuovo.",
   "error.provider.hermesMissing": "Hermes Agent non è installato. Installalo e riprova.",
   "error.provider.hermesNotStarted": "Impossibile avviare Hermes Agent. Esegui `hermes --version` in un terminale.",

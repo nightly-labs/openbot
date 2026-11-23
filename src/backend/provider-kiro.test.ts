@@ -10,20 +10,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { customAgentFlavor, KIRO_ACP_FLAVOR, kiroContextWindow } from "./acp-flavor";
 import { resolveKiroCli } from "./cli";
 import { kiroDataDirectory, kiroHomeDirectory, kiroStatePaths } from "./process-confinement";
-import { BUILT_IN_PROVIDER_DRIVERS, kiroArgv, requireProviderDriver } from "./provider-drivers";
+import { BUILT_IN_PROVIDER_DRIVERS, KIRO_ARGV, requireProviderDriver } from "./provider-drivers";
 
-describe("kiroArgv", () => {
-  it("names the V2 engine from Kiro CLI 2.36", () => {
-    for (const version of ["2.36.0", "2.37.1", "3.0.0", "3.2.4", "10.0.0"])
-      expect(kiroArgv(version)).toEqual(["acp", "--agent-engine=v2"]);
-  });
-
-  it("does not send the flag to a release that refuses it", () => {
-    for (const version of ["2.35.9", "2.0.0", "1.9.0"]) expect(kiroArgv(version)).toEqual(["acp"]);
-  });
-
-  it("starts without the flag when the version is not a number", () => {
-    expect(kiroArgv("")).toEqual(["acp"]);
+describe("KIRO_ARGV", () => {
+  it("names the V3 engine, which takes no agent, model or effort flag", () => {
+    expect(KIRO_ARGV).toEqual(["acp", "--agent-engine=v3"]);
   });
 });
 
@@ -61,9 +52,21 @@ describe("Kiro state folders", () => {
 });
 
 describe("KIRO_ACP_FLAVOR", () => {
-  it("has the 120 s MCP call limit of Kiro CLI, as the custom agent kiro-cli has", () => {
+  it("has the 120 s MCP call limit and the model option of the custom agent kiro-cli", () => {
     expect(KIRO_ACP_FLAVOR.mcpToolCallLimitMs).toBe(120_000);
+    expect(KIRO_ACP_FLAVOR.modelConfigId).toBe("model");
     expect(customAgentFlavor("kiro-cli").mcpToolCallLimitMs).toBe(KIRO_ACP_FLAVOR.mcpToolCallLimitMs);
+    expect(customAgentFlavor("kiro-cli").modelConfigId).toBe(KIRO_ACP_FLAVOR.modelConfigId);
+  });
+
+  it("reads the context percentage from the context_usage update of the V3 engine and no other update", () => {
+    const read = KIRO_ACP_FLAVOR.contextPercentUpdate?.read;
+    const info = (kiro: unknown) => ({ sessionUpdate: "session_info_update" as const, _meta: { kiro } });
+    expect(read?.(info({ kind: "context_usage", contextUsage: { usagePercentage: 12.5 } }))).toBe(12.5);
+    expect(read?.(info({ kind: "turn_start" }))).toBeNull();
+    expect(read?.(info({ kind: "context_usage", contextUsage: { usagePercentage: "12" } }))).toBeNull();
+    expect(read?.(info({ kind: "context_usage", contextUsage: { usagePercentage: -1 } }))).toBeNull();
+    expect(read?.({ sessionUpdate: "session_info_update" })).toBeNull();
   });
 });
 
@@ -139,6 +142,14 @@ describe("resolveKiroCli", () => {
     const executable = await script("kiro-cli", 'echo "kiro-cli 2.37.1"');
     const cli = await Effect.runPromise(resolveKiroCli({ systemCandidates: [executable] }));
     expect(cli).toMatchObject({ executable, version: "2.37.1", source: "system" });
+  });
+
+  it("refuses a release before Kiro CLI 2.36, which has no V3 engine, and takes 2.36 and later", async () => {
+    expect(await failureText(await script("kiro-cli", 'echo "kiro-cli 2.35.9"'))).toMatch(/2\.35\.9.*2\.36\.0/u);
+    for (const version of ["2.36.0", "3.0.0"]) {
+      const executable = await script(`kiro-cli-${version}`, `echo "kiro-cli ${version}"`);
+      expect(await failureText(executable)).toBeNull();
+    }
   });
 
   it("says that Kiro CLI is missing when no candidate exists", async () => {

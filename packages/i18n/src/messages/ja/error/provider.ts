@@ -406,6 +406,7 @@ export const messages = {
   "error.provider.kiroNotStarted":
     "Kiro CLI を起動できませんでした。ターミナルで `kiro-cli --version` を実行してください。",
   "error.provider.kiroVersionUnreadable": "Kiro CLI のバージョンを読み取れません。",
+  "error.provider.kiroOutdated": "Kiro CLI {version} は古すぎます。OpenBot には 2.36.0 以降が必要です。",
   "error.provider.kiroSignIn":
     "Kiro を使うには、ターミナルで `kiro-cli login` を実行してから、もう一度接続してください。",
   "error.provider.hermesMissing":

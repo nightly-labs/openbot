@@ -344,6 +344,7 @@ export const messages = {
   "error.provider.kiroMissing": "未安装 Kiro CLI。请安装后重试。",
   "error.provider.kiroNotStarted": "Kiro CLI 无法启动。请在终端中运行 `kiro-cli --version`。",
   "error.provider.kiroVersionUnreadable": "无法读取 Kiro CLI 的版本。",
+  "error.provider.kiroOutdated": "Kiro CLI {version} 版本过低。OpenBot 需要 2.36.0 或更高版本。",
   "error.provider.kiroSignIn": "请在终端中运行 `kiro-cli login` 以使用 Kiro，然后重新连接。",
   "error.provider.hermesMissing": "未安装 Hermes Agent。请安装后重试。",
   "error.provider.hermesNotStarted": "无法启动 Hermes Agent。请在终端中运行 `hermes --version`。",

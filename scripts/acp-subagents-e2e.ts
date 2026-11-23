@@ -1,24 +1,15 @@
-// Runs turns on the real ACP client against a fake agent that reports subagents as the pinned agents
-// do (`provider-fakes/agents/subagents.ts`). Checks the `turn/subagents/updated` notifications that
-// the chat's subagent card shows:
-// - OpenCode: the client asks for child session updates; a child's steps, thinking, nested child,
-//   failure and a background child that ends after its turn.
-// - Kiro: the roster of its subagents gives the cards, and the updates of each subagent's session give its steps.
-// - Kimi, Cline, Hermes: a subagent tool call gives a card with its task and its report or error.
-//   Kimi's background call is not shown. A turn that the person stops stops its subagent.
-// `bun run test:acp-subagents`. Writes .openbot-build/acp-subagents-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ConversationSubagent } from "@openbot/contracts/ipc";
 import { AcpAgentClient } from "../src/backend/acp-client";
-import { CLINE_ACP_FLAVOR, HERMES_ACP_FLAVOR, KIMI_ACP_FLAVOR, KIRO_ACP_FLAVOR } from "../src/backend/acp-flavor";
+import { CLINE_ACP_FLAVOR, HERMES_ACP_FLAVOR, KIMI_ACP_FLAVOR } from "../src/backend/acp-flavor";
 import { SUBAGENTS_UPDATED_METHOD, subagentsFromNotification } from "../src/backend/agent/subagent-updates";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
-import { type AppServerNotification, getRecord, getString } from "../src/backend/protocol";
+import { type AppServerNotification, getString } from "../src/backend/protocol";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients } from "./provider-fakes/host";
 
@@ -40,8 +31,6 @@ interface Report {
   cards: Record<string, Card[]>;
   notifications: Record<string, number>;
   openCodeAskedForChildUpdates: boolean | null;
-  /** The context fills that the Kiro case showed. */
-  contextFills?: number;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-acp-subagents-e2e-"));
@@ -106,9 +95,8 @@ async function fakeCli(name: string, style: string, log: string): Promise<AgentC
   return { executable, version: "1.0.0", source: "managed" };
 }
 
-/** A client with an agent's flavor and no driver: the Cline driver fetches free models from the network. */
-async function flavoredClient(style: "kimi" | "cline" | "hermes" | "kiro"): Promise<AgentClient> {
-  const flavors = { kimi: KIMI_ACP_FLAVOR, cline: CLINE_ACP_FLAVOR, hermes: HERMES_ACP_FLAVOR, kiro: KIRO_ACP_FLAVOR };
+async function flavoredClient(style: "kimi" | "cline" | "hermes"): Promise<AgentClient> {
+  const flavors = { kimi: KIMI_ACP_FLAVOR, cline: CLINE_ACP_FLAVOR, hermes: HERMES_ACP_FLAVOR };
   const cli = await fakeCli(style, style, join(root, `${style}.jsonl`));
   const client = new AcpAgentClient(cli, 10_000, {
     provider: style,
@@ -258,56 +246,6 @@ try {
         error: null,
         background: false,
         steps: ["text: The logs show three restarts."],
-      },
-    ]);
-  }
-
-  // Kiro: the roster names no parent, so the one running turn owns it. A subagent ends when the roster
-  // says `terminated`, or when the roster no longer lists it. Its steps come from its own session.
-  {
-    const client = await flavoredClient("kiro");
-    const thread = await startThread(client, { cwd: workspace, model: "fake/model" });
-    const work = watch(client, thread);
-    // `_kiro.dev/metadata` gives the context fill as a percentage, and the model description the size.
-    const fills: { threadId: string | null; tokens: unknown; window: unknown }[] = [];
-    client.on("notification", (notification: AppServerNotification) => {
-      if (notification.method !== "thread/tokenUsage/updated") return;
-      const usage = getRecord(notification.params, "tokenUsage");
-      fills.push({
-        threadId: getString(notification.params, "threadId") ?? null,
-        tokens: getRecord(usage, "last")?.totalTokens,
-        window: usage?.modelContextWindow,
-      });
-    });
-    assert.equal((await runTurn(client, thread, { text: "work" })).status, "completed");
-    assert.deepEqual(
-      fills,
-      [
-        { threadId: thread, tokens: 15_000, window: 1_000_000 },
-        { threadId: thread, tokens: 25_000, window: 1_000_000 },
-      ],
-      "The context fill of the session shows, and the fill of a session that is not open is left out.",
-    );
-    report.contextFills = fills.length;
-    await work.until("both subagents to end", (list) => list.length === 2 && list.every((s) => s.status !== "running"));
-    assert.deepEqual(save("kiro/work", work.lists), [
-      {
-        title: "Find the tests.",
-        agentType: "worker-lite",
-        prompt: "Find the tests.\nList the files.",
-        status: "completed",
-        error: null,
-        background: false,
-        steps: ["search: *.test.ts", "text: 12 test files."],
-      },
-      {
-        title: "Fix it.",
-        agentType: "worker-lite",
-        prompt: "Fix it.",
-        status: "completed",
-        error: null,
-        background: false,
-        steps: [],
       },
     ]);
   }

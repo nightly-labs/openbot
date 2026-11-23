@@ -23,7 +23,7 @@ const NOT_COVERED = ["codex", "claude", "pi", "inception", "deepseek", "openrout
 interface DriverCase {
   provider: AgentProviderId;
   missing: "protocol" | "opencode" | "antigravity" | "cursor" | "cline" | "kimi" | "devin" | "hermes" | "mistral";
-  modelSet?: "kimi" | "mistral";
+  modelSet?: "kimi" | "mistral" | "kiro";
   noSignIn?: string;
 }
 
@@ -38,9 +38,7 @@ const DRIVERS: readonly DriverCase[] = [
   { provider: "mistral", missing: "mistral", modelSet: "mistral" },
   { provider: "grok", missing: "protocol" },
   { provider: "hermes", missing: "hermes" },
-  // Kiro CLI 2.37.1 refuses a signed-out session with ACP's `-32000` (documented, not run signed out). Its
-  // missing-session error is not confirmed: the fake gives the protocol's `-32002`.
-  { provider: "kiro", missing: "protocol" },
+  { provider: "kiro", missing: "protocol", modelSet: "kiro" },
   {
     provider: "acp",
     missing: "protocol",

@@ -18,6 +18,7 @@ const MINIMUM_CLAUDE_VERSION = [2, 1, 232] as const;
 const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
 const MINIMUM_CLINE_VERSION = [3, 0, 68] as const;
 const MINIMUM_KIMI_VERSION = [1, 52, 0] as const;
+const MINIMUM_KIRO_VERSION = [2, 36, 0] as const;
 
 interface ResolvedCli {
   executable: string;
@@ -483,24 +484,26 @@ export const resolveKiroCli: (input?: {
   function* (input: { systemCandidates?: string[] } = {}): Effect.fn.Return<KiroCliInfo, ProviderClientOperationError> {
     const candidates = yield* cliCandidates("kiro", input.systemCandidates, null);
     let found = false;
+    let outdated: CodexCliError | null = null;
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
       found = true;
       const attempt = yield* Effect.result(
         Effect.gen(function* () {
           const { stdout, launch } = yield* readCliVersion(candidate, "kiro");
-          return {
-            executable: candidate.executable,
-            version: parseKiroVersion(stdout),
-            source: "system" as const,
-            ...launch,
-          };
+          const version = parseKiroVersion(stdout);
+          if (!isMinimumVersion(version, MINIMUM_KIRO_VERSION)) {
+            throw new CodexCliError(sourceText("error.provider.kiroOutdated", { version }), "outdated");
+          }
+          return { executable: candidate.executable, version, source: "system" as const, ...launch };
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
       if (Result.isSuccess(attempt)) return attempt.success;
-      if (isCliTimeout(attempt.failure.cause)) throw attempt.failure.cause;
-      /* Try the remaining installed candidates. */
+      const error = attempt.failure.cause;
+      if (isCliTimeout(error)) throw error;
+      if (error instanceof CodexCliError && error.code === "outdated") outdated ??= error;
     }
+    if (outdated) throw outdated;
     throw new CodexCliError(
       found ? sourceText("error.provider.kiroNotStarted") : sourceText("error.provider.kiroMissing"),
       found ? "invalid" : "missing",

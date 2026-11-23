@@ -347,16 +347,7 @@ function confineClineTarget(target: SpawnTarget, confinement: ProcessConfinement
   return confineSpawnTarget(target, confinement, state);
 }
 
-/**
- * `kiro-cli acp` serves the Agent Client Protocol on stdio. Kiro CLI 3 starts the V3 engine by default,
- * which has other methods and no `--agent`, `--model` or `--effort` flags. OpenBot reads the V2 server
- * (`_kiro.dev/*`, `session/set_model`), so it names the engine from Kiro CLI 2.36, the first release
- * with `--agent-engine`. Kiro CLI 2.37.1 starts V2 by default, and a release before 2.36 refuses the flag.
- */
-export function kiroArgv(version: string): readonly string[] {
-  const [major = 0, minor = 0] = version.split(".").map((part) => Number.parseInt(part, 10));
-  return major > 2 || (major === 2 && minor >= 36) ? ["acp", "--agent-engine=v2"] : ["acp"];
-}
+export const KIRO_ARGV: readonly string[] = ["acp", "--agent-engine=v3"];
 
 /** The sign-in of Kiro CLI. With no `--license`, it signs in a Builder ID, Google or GitHub account. */
 const KIRO_LOGIN: readonly string[] = ["login"];
@@ -1423,7 +1414,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       new AcpAgentClient(cli, timeout, {
         provider: "kiro",
         flavor: KIRO_ACP_FLAVOR,
-        argv: kiroArgv(cli.version),
+        argv: KIRO_ARGV,
         env: {},
         ...(confinement
           ? {
@@ -1443,7 +1434,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       new AcpAgentClient(cli, timeout, {
         provider: "kiro",
         flavor: KIRO_ACP_FLAVOR,
-        argv: kiroArgv(cli.version),
+        argv: KIRO_ARGV,
         profileGeneration: true,
         env: {},
         signInMessage: sourceText("error.provider.kiroSignIn"),

@@ -363,6 +363,7 @@ export const messages = {
   "error.provider.kiroMissing": "Kiro CLI غير مثبّت. ثبّته ثم حاول مرة أخرى.",
   "error.provider.kiroNotStarted": "تعذّر تشغيل Kiro CLI. شغّل `kiro-cli --version` في الطرفية.",
   "error.provider.kiroVersionUnreadable": "تعذّر قراءة إصدار Kiro CLI.",
+  "error.provider.kiroOutdated": "إصدار Kiro CLI {version} قديم جدًا. يتطلب OpenBot الإصدار 2.36.0 أو أحدث.",
   "error.provider.kiroSignIn": "شغّل `kiro-cli login` في الطرفية لاستخدام Kiro، ثم اتصل مرة أخرى.",
   "error.provider.hermesMissing": "Hermes Agent غير مثبت. ثبّته، ثم أعد المحاولة.",
   "error.provider.hermesNotStarted": "تعذّر تشغيل Hermes Agent. شغّل `hermes --version` في نافذة طرفية.",

@@ -13,7 +13,7 @@ import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
-import { installFakeAgent, readJsonl } from "./provider-fakes/host";
+import { installFakeAgent, readJsonl, runTurn, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/kiro-parallel-e2e");
 const root = await mkdtemp(join(tmpdir(), "openbot-kiro-parallel-"));
@@ -34,7 +34,8 @@ const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
-const { NO_PROVIDER_CREDENTIALS } = await import("../src/backend/provider-drivers");
+const { NO_PROVIDER_CREDENTIALS, requireProviderDriver } = await import("../src/backend/provider-drivers");
+const { getRecord, isRecord } = await import("../src/backend/protocol");
 
 const PERSON = { id: "local", name: "Alex" };
 
@@ -45,6 +46,9 @@ interface LogEntry {
   active?: number;
   message?: string;
   argv?: string[];
+  model?: string;
+  configId?: string;
+  value?: string;
 }
 
 interface Outcome {
@@ -60,6 +64,7 @@ let running: { stop: () => Effect.Effect<void, { readonly cause: unknown }> } | 
 const report: {
   passed: boolean;
   kiro?: Outcome & { argv: string[] | undefined };
+  kiroContext?: { tokens: number; window: number } | null;
   control?: Outcome;
   error?: string;
 } = { passed: false };
@@ -162,6 +167,28 @@ try {
     };
   }
 
+  async function contextFill(): Promise<{ tokens: number; window: number } | null> {
+    const driver = requireProviderDriver("kiro");
+    const cli = await runCauseEffect(driver.resolveCli());
+    const client = driver.createClient(cli, 30_000, NO_PROVIDER_CREDENTIALS);
+    const fills: { tokens: number; window: number }[] = [];
+    client.on("notification", (notification) => {
+      if (notification.method !== "thread/tokenUsage/updated" || !isRecord(notification.params)) return;
+      const usage = getRecord(notification.params, "tokenUsage");
+      const window = usage?.modelContextWindow;
+      const tokens = getRecord(usage, "last")?.totalTokens;
+      if (typeof window === "number" && typeof tokens === "number") fills.push({ tokens, window });
+    });
+    client.start();
+    try {
+      const thread = await startThread(client, { cwd: root, model: "fake-model" });
+      await runTurn(client, thread, { model: "fake-model", text: "context", timeoutMs: 30_000 });
+    } finally {
+      await stopClients([client]);
+    }
+    return fills.at(-1) ?? null;
+  }
+
   const create = (name: string, provider: "kiro" | "acp", model: string) =>
     runCauseEffect(
       agents.createAgent({
@@ -182,11 +209,32 @@ try {
   const kiro = await scenario("kiro", kiroAgent.id, logs.kiro);
   const initialize = readJsonlSync(logs.kiro).find((entry) => entry.event === "initialize");
   report.kiro = { ...kiro, argv: initialize?.argv };
-  assert.deepEqual(initialize?.argv, ["acp", "--agent-engine=v2"], "Kiro starts with the V2 engine.");
+  assert.deepEqual(initialize?.argv, ["acp", "--agent-engine=v3"], "Kiro starts with the V3 engine.");
   assert.ok(kiro.prompts >= 3, `A Kiro agent got ${kiro.prompts} prompts, not the chat and two threads.`);
   assert.ok(kiro.maxActive >= 3, `The turns of a Kiro agent overlap at most ${kiro.maxActive} at a time, not 3.`);
   assert.equal(kiro.sessions, kiro.prompts, "Each turn of a Kiro agent runs in a session of its own.");
   assert.ok(!kiro.holds.includes("one-turn"), "A side thread of a Kiro agent waits for the one-turn limit.");
+  const kiroEntries = readJsonlSync(logs.kiro);
+  assert.ok(
+    kiroEntries.some(
+      (entry) => entry.event === "set-config" && entry.configId === "model" && entry.value === "fake-model",
+    ),
+    "The model of a Kiro turn is not set with session/set_config_option.",
+  );
+  assert.ok(
+    !kiroEntries.some((entry) => entry.event === "set-model"),
+    "A Kiro turn calls session/set_model, which the V3 engine does not have.",
+  );
+  assert.ok(
+    kiroEntries.filter((entry) => entry.event === "prompt-start").every((entry) => entry.model === "fake-model"),
+    "A Kiro turn started before its model was set.",
+  );
+  report.kiroContext = await contextFill();
+  assert.deepEqual(
+    report.kiroContext,
+    { tokens: 25_000, window: 1_000_000 },
+    "The context percentage of V3 does not show as a fill of the model's window.",
+  );
 
   // The control: a custom ACP agent with another command still runs one turn at a time.
   const control = await scenario("control", controlAgent.id, logs.control);
