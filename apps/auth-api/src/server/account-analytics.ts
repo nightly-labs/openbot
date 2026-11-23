@@ -7,6 +7,14 @@ import {
   type BillingPlanId,
   isBillingAmount,
 } from "@openbot/contracts/billing";
+import {
+  CREDIT_MEDIA_KINDS,
+  CREDIT_MEDIA_WALLETS,
+  type CreditMediaGenerationKind,
+  type CreditMediaWallet,
+  isCreditMediaModelId,
+} from "@openbot/contracts/credit-media";
+import type { CreditTransferDirection } from "@openbot/contracts/credits";
 import { FIRST_TOUCH_CAMPAIGN_FIELDS, type FirstTouch, parseFirstTouch } from "@openbot/contracts/first-touch";
 import {
   HOSTED_SERVER_ENTRY_POINTS,
@@ -22,7 +30,7 @@ import { Effect, Schema } from "effect";
 import type { HostedPoolGroup } from "./hosted-pool-snapshot";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 17;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 18;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -80,10 +88,50 @@ export type AccountSurface = (typeof ACCOUNT_SURFACES)[number];
 const ATTRIBUTION_SOURCES = ["sign_in", "checkout"] as const;
 export type AttributionSource = (typeof ATTRIBUTION_SOURCES)[number];
 
-const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license"] as const;
+const EMAIL_KINDS = ["sign_in_code", "team_invite", "contact", "welcome", "license", "owner_transfer"] as const;
 export type EmailKind = (typeof EMAIL_KINDS)[number];
 const EMAIL_RESULTS = ["accepted", "rate_limited", "unknown", "failed"] as const;
 export type EmailResult = (typeof EMAIL_RESULTS)[number];
+
+const CREDIT_ACTIONS = [
+  "checkout_started",
+  "purchased",
+  "checkout_expired",
+  "reversed",
+  "moved",
+  "granted",
+  "grant_expired",
+  "media_started",
+  "media_charged",
+  "media_released",
+] as const;
+type CreditAction = (typeof CREDIT_ACTIONS)[number];
+const CREDIT_MOVE_DIRECTIONS = ["to_server", "to_personal"] as const satisfies readonly CreditTransferDirection[];
+const CREDIT_HOLD_OUTCOMES = ["completed", "failed", "canceled", "refused", "abandoned", "expired"] as const;
+type CreditHoldAnalyticsOutcome = (typeof CREDIT_HOLD_OUTCOMES)[number];
+const MAX_ANALYTICS_CREDITS = 10_000_000;
+const MAX_ANALYTICS_MEDIA_SECONDS = 3_600;
+const MAX_ANALYTICS_MEDIA_COUNT = 16;
+const MEDIA_RESOLUTION_PATTERN = /^[A-Za-z0-9._:x-]{1,16}$/u;
+
+export interface CreditActionEvent {
+  name: "credit_action";
+  action: CreditAction;
+  wallet: CreditMediaWallet;
+  credits: number;
+  creditsHeld?: number;
+  currency?: BillingCurrency;
+  amount?: number | null;
+  direction?: CreditTransferDirection;
+  earlyStart?: boolean;
+  modelId?: string;
+  kind?: CreditMediaGenerationKind | null;
+  outcome?: CreditHoldAnalyticsOutcome | null;
+  resolution?: string | null;
+  duration?: number | null;
+  count?: number;
+  audio?: boolean;
+}
 
 type AnalyticsProperties = Record<string, string | number | boolean>;
 
@@ -116,7 +164,8 @@ export type AccountAnalyticsEvent =
       machine?: (typeof HOSTED_MACHINES)[number];
     }
   | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
-  | { name: "hosted_pool_snapshot"; group: HostedPoolGroup };
+  | { name: "hosted_pool_snapshot"; group: HostedPoolGroup }
+  | CreditActionEvent;
 
 export interface AccountAnalytics {
   track(accountId: string | null, event: AccountAnalyticsEvent): void;
@@ -186,7 +235,10 @@ export function createAccountAnalytics(options: AccountAnalyticsOptions): Accoun
         type: "track",
         payload: { name: event.name, ...(accountId === null ? {} : { profileId: accountId }), properties },
       }).pipe(Effect.catch(() => Effect.sync(() => console.warn("Account analytics send failed."))));
-      const paid = accountId !== null && event.name === "billing_action" && isOneOf(PAID_BILLING_ACTIONS, event.action);
+      const paid =
+        accountId !== null &&
+        ((event.name === "billing_action" && isOneOf(PAID_BILLING_ACTIONS, event.action)) ||
+          (event.name === "credit_action" && event.action === "purchased"));
       options.schedule(
         paid
           ? Effect.all(
@@ -247,6 +299,7 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
     return { ...properties, kind: event.kind, result: event.result };
   }
   if (event.name === "hosted_pool_snapshot") return hostedPoolProperties(properties, event.group);
+  if (event.name === "credit_action") return creditActionProperties(properties, event);
   if (event.name !== "hosted_server_action" || !isOneOf(HOSTED_SERVER_ACTIONS, event.action)) return null;
   properties.action = event.action;
   if (isOneOf(BILLING_PLAN_IDS, event.plan)) properties.plan = event.plan;
@@ -264,6 +317,46 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   )
     properties.duration_ms = duration;
   return properties;
+}
+
+function isAnalyticsCredits(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= MAX_ANALYTICS_CREDITS;
+}
+
+function analyticsCredits(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function isWholeInRange(value: unknown, max: number): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= max;
+}
+
+function creditActionProperties(properties: AnalyticsProperties, event: CreditActionEvent): AnalyticsProperties | null {
+  if (!isOneOf(CREDIT_ACTIONS, event.action) || !isOneOf(CREDIT_MEDIA_WALLETS, event.wallet)) return null;
+  if (!isAnalyticsCredits(event.credits)) return null;
+  const result: AnalyticsProperties = {
+    ...properties,
+    action: event.action,
+    wallet: event.wallet,
+    credits: analyticsCredits(event.credits),
+  };
+  if (isAnalyticsCredits(event.creditsHeld)) result.credits_held = analyticsCredits(event.creditsHeld);
+  if (isOneOf(BILLING_CURRENCIES, event.currency)) {
+    result.currency = event.currency;
+    if (isBillingAmount(event.amount)) result.amount = event.amount;
+  }
+  if (event.action === "moved" && isOneOf(CREDIT_MOVE_DIRECTIONS, event.direction)) result.direction = event.direction;
+  if (event.action === "checkout_started" && typeof event.earlyStart === "boolean")
+    result.early_start = event.earlyStart;
+  if (isCreditMediaModelId(event.modelId)) result.model_id = event.modelId;
+  if (isOneOf(CREDIT_MEDIA_KINDS, event.kind)) result.kind = event.kind;
+  if (isOneOf(CREDIT_HOLD_OUTCOMES, event.outcome)) result.outcome = event.outcome;
+  if (typeof event.resolution === "string" && MEDIA_RESOLUTION_PATTERN.test(event.resolution))
+    result.resolution = event.resolution;
+  if (isWholeInRange(event.duration, MAX_ANALYTICS_MEDIA_SECONDS)) result.duration_seconds = event.duration;
+  if (isWholeInRange(event.count, MAX_ANALYTICS_MEDIA_COUNT)) result.count = event.count;
+  if (typeof event.audio === "boolean") result.audio = event.audio;
+  return result;
 }
 
 const POOL_LOCATION_PATTERN = /^(?:[A-Z]{3}-\d{2}|all|unknown)$/u;

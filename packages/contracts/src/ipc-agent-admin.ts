@@ -239,6 +239,26 @@ export function parseUpdateAgentPlanCardInput(value: unknown): UpdateAgentPlanCa
   return { agentId: value.agentId, quickAcknowledgement: value.quickAcknowledgement };
 }
 
+export interface AgentBuiltinMemorySettings {
+  memory: boolean;
+}
+
+export interface UpdateAgentBuiltinMemoryInput {
+  agentId: string;
+  memory: boolean;
+}
+
+export function decodeAgentBuiltinMemorySettings(value: unknown): AgentBuiltinMemorySettings {
+  if (!isDynamicRecord(value) || !isBoolean(value.memory)) throw new Error("Invalid memory setting.");
+  return { memory: value.memory };
+}
+
+export function parseUpdateAgentBuiltinMemoryInput(value: unknown): UpdateAgentBuiltinMemoryInput {
+  if (!isDynamicRecord(value) || !isIdentifier(value.agentId) || !isBoolean(value.memory))
+    throw new Error("Invalid memory setting.");
+  return { agentId: value.agentId, memory: value.memory };
+}
+
 export interface AgentFastModeSettings {
   fastMode: boolean | null;
   ultrafast?: boolean;

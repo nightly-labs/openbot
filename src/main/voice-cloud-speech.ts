@@ -8,13 +8,17 @@ import {
   type XaiSpeechVoice,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Option, Schema } from "effect";
 import { readLimitedBody } from "../backend/limited-body";
 import { VoiceOperationError } from "./voice-model-service";
 
+const logger = createOpenBotLogger("voice-cloud-speech");
+
 const SPEECH_TIMEOUT_MS = 60_000;
 const SPEECH_BODY_LIMIT = 16 * 1024 * 1024;
 const ERROR_BODY_LIMIT = 16 * 1024;
+const REASON_MAX_LENGTH = 300;
 const SAMPLE_RATE = 24_000;
 
 const ELEVENLABS_MODELS: Partial<Record<CloudSpeechModelId, { modelId: string; languageCode: boolean }>> = {
@@ -66,8 +70,15 @@ interface ElevenLabsSpeechBody {
   language_code?: SpeechLanguage;
 }
 
-const decodeErrorStatus = Schema.decodeUnknownOption(
-  Schema.fromJsonString(Schema.Struct({ detail: Schema.Struct({ status: Schema.String }) })),
+const decodeErrorDetail = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({
+      detail: Schema.Union([
+        Schema.String,
+        Schema.Struct({ status: Schema.optionalKey(Schema.String), message: Schema.optionalKey(Schema.String) }),
+      ]),
+    }),
+  ),
 );
 const decodeJsonAudio = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ audio: Schema.String })));
 
@@ -77,7 +88,7 @@ export interface CloudSpeechRequest {
   model: CloudSpeechModelInfo;
   key: string;
   text: string;
-  language: SpeechLanguage;
+  language: SpeechLanguage | null;
   elevenLabsVoice: ElevenLabsSpeechVoice;
   xaiVoice: XaiSpeechVoice;
 }
@@ -87,7 +98,7 @@ export function speakInCloud(
   request: CloudSpeechRequest,
 ): Effect.Effect<SpeechAudio, VoiceOperationError> {
   if (request.model.provider === "xai") {
-    const language = XAI_LANGUAGES[request.language] ?? "auto";
+    const language = (request.language && XAI_LANGUAGES[request.language]) ?? "auto";
     return exchange(fetcher, request, "https://api.x.ai/v1/tts", {
       headers: { Authorization: `Bearer ${request.key}` },
       body: {
@@ -110,7 +121,7 @@ export function speakInCloud(
       body: {
         text: request.text,
         model_id: model.modelId,
-        ...(model.languageCode && !ELEVENLABS_UNLISTED_LANGUAGES.has(request.language)
+        ...(model.languageCode && request.language && !ELEVENLABS_UNLISTED_LANGUAGES.has(request.language)
           ? { language_code: request.language }
           : {}),
       },
@@ -140,7 +151,7 @@ function exchange(
             }),
           catch: () => fail("error.voice.speech.providerUnreachable"),
         });
-        if (!response.ok) return yield* errorAnswer(response, fail);
+        if (!response.ok) return yield* errorAnswer(response, request, fail);
         const body = yield* readLimitedBody(response, SPEECH_BODY_LIMIT, () =>
           fail("error.voice.speech.providerFailed"),
         );
@@ -172,23 +183,40 @@ type CloudSpeechErrorKey =
 
 function errorAnswer(
   response: Response,
+  request: CloudSpeechRequest,
   fail: (key: CloudSpeechErrorKey) => VoiceOperationError,
 ): Effect.Effect<never, VoiceOperationError> {
   return readLimitedBody(response, ERROR_BODY_LIMIT, () => fail("error.voice.speech.providerFailed")).pipe(
     Effect.orElseSucceed(() => Buffer.alloc(0)),
     Effect.flatMap((body) => {
-      if (errorStatus(body) === "quota_exceeded") return Effect.fail(fail("error.voice.cloud.quotaExceeded"));
+      const { status, reason } = errorDetail(body, request.key);
+      logger.warn(
+        `${request.model.provider} refused speech with HTTP ${response.status}${status ? ` (${status})` : ""}.`,
+      );
+      if (status === "quota_exceeded") return Effect.fail(fail("error.voice.cloud.quotaExceeded"));
       if (response.status === 401 || response.status === 403) return Effect.fail(fail("error.voice.cloud.keyRejected"));
       if (response.status === 429) return Effect.fail(fail("error.voice.cloud.rateLimited"));
+      if (reason) return Effect.fail(refused(request, reason));
       return Effect.fail(fail("error.voice.speech.providerFailed"));
     }),
   );
 }
 
-function errorStatus(body: Buffer): string | null {
-  return Option.match(decodeErrorStatus(body.toString("utf8")), {
-    onNone: () => null,
-    onSome: (answer) => answer.detail.status,
+function refused(request: CloudSpeechRequest, reason: string): VoiceOperationError {
+  const provider = VOICE_KEY_PROVIDER_NAMES[request.model.provider];
+  return new VoiceOperationError({
+    cause: new Error(sourceText("error.voice.speech.providerRefused", { provider, reason })),
+  });
+}
+
+function errorDetail(body: Buffer, key: string): { status: string | null; reason: string | null } {
+  return Option.match(decodeErrorDetail(body.toString("utf8")), {
+    onNone: () => ({ status: null, reason: null }),
+    onSome: ({ detail }) => {
+      const message = typeof detail === "string" ? detail : (detail.message ?? "");
+      const reason = (key ? message.replaceAll(key, "…") : message).trim().slice(0, REASON_MAX_LENGTH);
+      return { status: typeof detail === "string" ? null : (detail.status ?? null), reason: reason || null };
+    },
   });
 }
 

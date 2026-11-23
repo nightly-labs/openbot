@@ -147,6 +147,16 @@ export function licenseMaxUsers(tier: LicenseTier) {
   return tier === "team" ? LICENSE_MAX_USERS : 1;
 }
 
+export const LICENSE_MONTHLY_CREDITS: Readonly<Record<LicenseTier, { base: number; extraUser: number }>> = {
+  starter: { base: 50, extraUser: 0 },
+  team: { base: 100, extraUser: 50 },
+};
+
+export function licenseMonthlyCredits(tier: LicenseTier, users: number): number {
+  const credits = LICENSE_MONTHLY_CREDITS[tier];
+  return credits.base + Math.max(0, users - 1) * credits.extraUser;
+}
+
 export function licensePlanPrice(plan: LicensePlan, currency: BillingCurrency): LicensePrice {
   return LICENSE_PLAN_PRICES[licensePlanKey(plan)][currency];
 }

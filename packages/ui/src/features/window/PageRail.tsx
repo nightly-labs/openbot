@@ -20,13 +20,13 @@ import {
   Sparkles,
   Store,
   Waypoints,
-  Workflow,
 } from "@openbot/ui";
 import { AccountUsageDetails, AccountUsageWindowList } from "@openbot/ui/features/account/AccountUsageDetails";
 import { type AccountUsageProviderRow, accountUsageRowKey } from "@openbot/ui/features/account/account-usage-view";
 import { useText } from "@openbot/ui/text";
 import { Dynamic, type JSX } from "@solidjs/web";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
+import { CreditIcon } from "../credits/CreditIcon";
 
 interface RailMenuItem {
   label: string;
@@ -163,16 +163,19 @@ function UsageRings(props: {
   const { t, format } = useText();
   const rows = () => [props.row, ...props.shared];
   const label = () =>
-    t("app.rail.usageRings", {
-      name: format.list(rows().map((row) => row.name)),
-      windows: rows()
-        .flatMap((row) => row.windows)
-        .map((window) => t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }))
-        .join(", "),
-    });
+    unavailable()
+      ? t("app.rail.usageUnavailable", { name: format.list(rows().map((row) => row.name)) })
+      : t("app.rail.usageRings", {
+          name: format.list(rows().map((row) => row.name)),
+          windows: rows()
+            .flatMap((row) => row.windows)
+            .map((window) => t("account.usage.row.window", { window: window.label, percent: window.remainingPercent }))
+            .join(", "),
+        });
   const ringRow = () =>
     rows().reduce((lowest, row) => ((row.remainingPercent ?? 100) < (lowest.remainingPercent ?? 100) ? row : lowest));
   const windows = () => [...ringRow().ringWindows].reverse().slice(0, 2);
+  const unavailable = () => props.row.readFailed && windows().length === 0;
   const outerRadius = (RING.size - RING.stroke) / 2;
   return (
     <RailButton
@@ -208,6 +211,17 @@ function UsageRings(props: {
             </g>
           )}
         </For>
+        <Show when={unavailable()}>
+          <circle
+            class="window-rail-usage-track"
+            cx={RING.size / 2}
+            cy={RING.size / 2}
+            r={outerRadius}
+            stroke-width={RING.stroke}
+            pathLength={100}
+            stroke-dasharray="4 6"
+          />
+        </Show>
       </svg>
       <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
     </RailButton>
@@ -259,7 +273,7 @@ function MoreUsageRings(props: { rings: readonly UsageRing[]; onOpen: (button: H
   );
 }
 
-const MAX_RING_PLACES = 5;
+const START_RING_PLACES = 5;
 const RAIL_MIN_FREE = 12;
 
 export interface CustomAgentUsageRailRow {
@@ -304,6 +318,36 @@ function mediaCreditsPercent(row: MediaCreditsRailRow): number {
 function mediaCreditsTone(row: MediaCreditsRailRow) {
   if (row.quota !== null) return usageTone(mediaCreditsPercent(row));
   return row.available > 0 ? "neutral" : "critical";
+}
+
+const EXACT_CREDITS_LIMIT = 10_000;
+
+function CreditsRailButton(props: { balance: number | undefined; current: boolean; onOpen: () => void }) {
+  const { t, format } = useText();
+  const amount = (credits: number) =>
+    credits < EXACT_CREDITS_LIMIT
+      ? format.number(credits, { maximumFractionDigits: 0, roundingMode: "trunc" })
+      : format.number(credits, { notation: "compact", maximumFractionDigits: 1, roundingMode: "trunc" });
+  const balance = () => props.balance;
+  const label = () => {
+    const credits = balance();
+    return credits === undefined
+      ? t("app.rail.credits")
+      : t("app.rail.creditsBalance", { count: credits, amount: format.number(credits) });
+  };
+  const layout = () => (balance() === undefined ? "credit-rail-icon" : "credit-rail-icon window-rail-credits");
+  return (
+    <RailButton label={label()} class={layout()} current={props.current} onClick={props.onOpen}>
+      <span class="credit-rail-tile">
+        <CreditIcon />
+      </span>
+      <Show when={balance() !== undefined}>
+        <span class="window-rail-credits-count" data-empty={(balance() ?? 0) <= 0 ? "" : undefined} aria-hidden="true">
+          {amount(balance() ?? 0)}
+        </span>
+      </Show>
+    </RailButton>
+  );
 }
 
 function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
@@ -376,7 +420,6 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
 
 export type PageRailPage =
   | "agents"
-  | "routines"
   | "workflows"
   | "tasks"
   | "schedule"
@@ -385,10 +428,10 @@ export type PageRailPage =
   | "providers"
   | "crm"
   | "marketplace"
+  | "credits"
   | "settings";
 
 export const PAGE_RAIL_PINNABLE_PAGES = [
-  "routines",
   "workflows",
   "tasks",
   "schedule",
@@ -409,7 +452,6 @@ export interface PageRailProps {
   mediaCredits?: readonly MediaCreditsRailRow[] | undefined;
   onMediaCredits?: ((provider: MediaCreditsRailRow["provider"]) => void) | undefined;
   onAgents: () => void;
-  onRoutines?: (() => void) | undefined;
   onWorkflows?: (() => void) | undefined;
   onPreloadWorkflows?: (() => void) | undefined;
   onTasks?: ((button: HTMLElement) => void) | undefined;
@@ -420,6 +462,8 @@ export interface PageRailProps {
   onCrm?: ((button: HTMLElement) => void) | undefined;
   onCrmConnectors?: ((button: HTMLElement) => void) | undefined;
   onMarketplace?: (() => void) | undefined;
+  onCredits?: (() => void) | undefined;
+  creditBalance?: number | undefined;
   onSettings: (button: HTMLElement) => void;
   settingsNotice?: string | undefined;
   help: JSX.Element;
@@ -528,14 +572,14 @@ function RailLogo(props: { variant: AppLogoVariant; href: string | undefined }) 
 export function PageRail(props: PageRailProps) {
   const { t } = useText();
   const rings = createMemo((): UsageRing[] => {
-    const rows = props.usageRows.filter((row) => row.reportsUsage && row.windows.length > 0);
+    const rows = props.usageRows.filter((row) => row.reportsUsage && (row.windows.length > 0 || row.readFailed));
     const owner = (row: AccountUsageProviderRow) =>
       rows.find((other) => other.accountId === null && other.provider === row.sharedQuotaWith);
     return rows
       .filter((row) => !owner(row))
       .map((row) => ({ row, shared: rows.filter((other) => owner(other) === row) }));
   });
-  const [ringSlots, setRingSlots] = createSignal(MAX_RING_PLACES);
+  const [ringSlots, setRingSlots] = createSignal(START_RING_PLACES);
   const ringLayout = createMemo(() => {
     if (rings().length <= ringSlots()) return { shown: rings(), more: [] };
     const all = providerRings(rings());
@@ -562,7 +606,7 @@ export function PageRail(props: PageRailProps) {
         pagesBox.getBoundingClientRect().bottom -
         endWithoutRings -
         RAIL_MIN_FREE;
-      setRingSlots(Math.max(1, Math.min(MAX_RING_PLACES, Math.floor(free / slot))));
+      setRingSlots(Math.max(1, Math.floor(free / slot)));
     };
     let frame = 0;
     const observer = new ResizeObserver(() => {
@@ -577,15 +621,7 @@ export function PageRail(props: PageRailProps) {
   });
   const pages = createMemo((): RailPage[] => {
     const list: RailPage[] = [];
-    const { onRoutines, onWorkflows, onTasks, onSchedule } = props;
-    if (onRoutines) {
-      list.push({
-        id: "routines",
-        label: t("sidebar.view.routines"),
-        icon: Workflow,
-        open: () => onRoutines(),
-      });
-    }
+    const { onWorkflows, onTasks, onSchedule } = props;
     if (onWorkflows) {
       list.push({
         id: "workflows",
@@ -689,6 +725,15 @@ export function PageRail(props: PageRailProps) {
           <For each={props.mediaCredits ?? []} keyed={(row) => row.key}>
             {(row) => <MediaCreditsButton row={row()} onOpen={() => props.onMediaCredits?.(row().provider)} />}
           </For>
+          <Show when={props.onCredits}>
+            {(onCredits) => (
+              <CreditsRailButton
+                balance={props.creditBalance}
+                current={props.current === "credits"}
+                onOpen={() => onCredits()()}
+              />
+            )}
+          </Show>
           <Show when={props.onMarketplace}>
             {(onMarketplace) => (
               <RailButton

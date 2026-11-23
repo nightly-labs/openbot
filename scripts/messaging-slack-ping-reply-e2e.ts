@@ -73,6 +73,7 @@ async function waitFor<T>(what: string, read: () => T | null | undefined, timeou
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -207,6 +208,7 @@ const messaging = new MessagingService({
   agents: {
     listAgents: () => agents.listAgents(),
     respondToApproval: (input) => agents.respondToApproval(input),
+    approvalExecutionThreadId: (requestId) => agents.approvalExecutionThreadId(requestId),
     onEvent: () => () => {},
     createAgentProfile: (input) => agents.createAgentProfile(input),
     createMemory: (input) => agents.createMemory(input),

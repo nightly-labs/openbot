@@ -46,15 +46,21 @@ export interface ConversationRuntime {
   > &
     Partial<Pick<OpenBotDesktopApi["agent"], "openMessageLink" | "pasteMessageLink" | "cancelMessageLink">> &
     Partial<Pick<OpenBotDesktopApi["agent"], "stopAttachmentDownload" | "onAttachmentDownload">> &
-    Partial<Pick<OpenBotDesktopApi["agent"], "retryAttachmentImport" | "discardAttachmentImport">>;
+    Partial<Pick<OpenBotDesktopApi["agent"], "retryAttachmentImport" | "discardAttachmentImport">> &
+    Partial<Pick<OpenBotDesktopApi["agent"], "testMcpServer">>;
   browser: Pick<
     OpenBotDesktopApi["browser"],
     | "capturePreview"
     | "closePictureInPicture"
+    | "closeWindow"
+    | "focusWindow"
     | "navigate"
     | "onPictureInPictureEvent"
+    | "onWindowEvent"
     | "open"
     | "openPictureInPicture"
+    | "openWindow"
+    | "publishWindowModel"
     | "reload"
     | "stop"
     | "releaseControl"
@@ -78,6 +84,7 @@ export interface ConversationRuntime {
   >;
   openUrl: OpenBotDesktopApi["openUrl"];
   askSideQuestion?: ((input: AskSideQuestionInput) => Promise<string>) | undefined;
+  sideQuestionThreads?: boolean | undefined;
   liveVoice?: CodexLivePort | undefined;
   skillCatalog?: SkillCatalogCalls | undefined;
   withdrawFeedback?: ((input: { agentId: string; messageId: string }) => Promise<WithdrawFeedbackResult>) | undefined;

@@ -243,6 +243,20 @@ export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
   };
 }
 
+export function kimiCodeHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
+  return env.KIMI_CODE_HOME?.trim() || join(home, ".kimi-code");
+}
+
+export function kimiCodeStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const kimiCodeHome = kimiCodeHomeDirectory(env, home);
+  return {
+    writable: [kimiCodeHome],
+    protected: ["config.toml", "mcp.json", "AGENTS.md", "agents", "plugins", "skills", "bin", "tui.toml", "themes"].map(
+      (name) => join(kimiCodeHome, name),
+    ),
+  };
+}
+
 export function mistralHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return env.VIBE_HOME?.trim() || join(home, ".vibe");
 }
@@ -408,6 +422,7 @@ const PROJECT_SETTINGS = [
   ".cline",
   ".clinerules",
   ".kimi",
+  ".kimi-code",
   ".vibe",
   ".devin",
   ".windsurf",

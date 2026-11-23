@@ -103,7 +103,13 @@ async function startRuntime() {
   const waits = new AgentWaits({
     store: new AgentWaitStore({ database }),
     mailbox,
-    hooks: { emit: () => {}, ownsRoutine: () => true, hasRoutine: () => true, requireKnownAgent: () => {} },
+    hooks: {
+      emit: () => {},
+      ownsRoutine: () => true,
+      hasRoutine: () => true,
+      requireKnownAgent: () => {},
+      isSideThread: () => false,
+    },
   });
   const routines = new RoutineScheduler({
     store,
@@ -125,6 +131,8 @@ async function startRuntime() {
       isRunning: () => false,
       usageLimited: () => false,
       routineThread: () => null,
+      waitThread: () => null,
+      queueHold: () => null,
       routineDeleted: () => Effect.void,
     },
   });

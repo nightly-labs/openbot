@@ -33,9 +33,12 @@ export const messages = {
   "status.messaging.integrationsSection": "שילובים",
   "status.messaging.signInReceived": "OpenBot קיבל את התקנת Slack. אפשר לסגור את הלשונית הזו.",
   "status.messaging.signInUnknown": "OpenBot לא התחיל את התקנת Slack הזו. יש להתחיל אותה שוב ב-OpenBot.",
-  "status.messaging.telegramNoAgent": "עדיין אין סוכן שיכול לענות כאן. יש להוסיף את Telegram Orchestrator ב-OpenBot.",
+  "status.messaging.telegramNoAgent":
+    "עדיין אין סוכן שיכול לענות כאן. ב-OpenBot, יש לפתוח את חנות > אפליקציות > Telegram וללחוץ על הוספת סוכן.",
   "status.messaging.telegramLinked":
     "OpenBot מחובר לצ'אט הזה. אפשר לתייג את {bot} או להשיב להודעה של OpenBot כדי לשאול את הסוכנים.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot לא מחובר לצ'אט הזה. כדי לחבר אותו, יש לפתוח את אפליקציית OpenBot, לעבור אל חנות ← אפליקציות ← Telegram ולבחור „הוספה לקבוצה” או „פתיחת צ'אט ישיר”.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "עונה ב-Telegram ושואל את הצוות",
   "status.messaging.whatsappNoAgent": "עדיין אין סוכן שיכול לענות כאן. יש להוסיף את WhatsApp Orchestrator ב-OpenBot.",

@@ -8,6 +8,7 @@ import { countCrashDumps } from "./run-marker";
 
 const GPU_START_FILE = "gpu-start.json";
 const GPU_CRASH_FILE = "gpu-crash.json";
+const GPU_RECORD_VERSION = 2;
 const DEFAULT_START_CONFIRM_MS = 30_000;
 const GPU_FAILURE_REASONS: ReadonlySet<Details["reason"]> = new Set([
   "crashed",
@@ -175,7 +176,8 @@ function readGpuFailure(path: string): GpuFailureRecord | undefined {
   }
   try {
     const parsed = JSON.parse(text);
-    if (!isDynamicRecord(parsed) || parsed.version !== 1 || !isString(parsed.chromium)) return undefined;
+    if (!isDynamicRecord(parsed) || parsed.version !== GPU_RECORD_VERSION || !isString(parsed.chromium))
+      return undefined;
     return { chromium: parsed.chromium, retried: parsed.retried === true };
   } catch {
     return undefined;
@@ -197,7 +199,10 @@ function readUnfinishedStart(path: string): UnfinishedStart | undefined {
 function writeGpuFailure(path: string, chromiumMajor: string, retried = false): void {
   try {
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-    writeFileSync(path, JSON.stringify({ version: 1, chromium: chromiumMajor, ...(retried ? { retried } : {}) }));
+    writeFileSync(
+      path,
+      JSON.stringify({ version: GPU_RECORD_VERSION, chromium: chromiumMajor, ...(retried ? { retried } : {}) }),
+    );
   } catch (error) {
     logger.warn(`Unable to write ${path}:`, toLogValue(error));
   }

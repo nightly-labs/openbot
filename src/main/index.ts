@@ -35,9 +35,11 @@ import {
   systemPreferences,
 } from "electron";
 import { localTimezone } from "../backend/agent/routine-tools";
+import { replaceInvalidLinuxSystemLanguages } from "../backend/browser-policy";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { LATEST_SCHEMA_VERSION, NewerDatabaseError } from "../backend/openbot-database-schema";
+import { perfTime } from "../backend/perf-probe-hooks";
 import { OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { watchAppArchive } from "./app-archive-watch";
 import { readAppVariant, resolveAppIconPath, resolveLogoColorIconPath, resolveMenuBarIconPath } from "./app-icon";
@@ -83,9 +85,11 @@ import { billingIpcHandlers } from "./ipc/billing-handlers";
 import { bitwardenConnectorIpcHandlers } from "./ipc/bitwarden-connector-handlers";
 import { browserDockIpcHandlers } from "./ipc/browser-dock-handlers";
 import { browserIpcHandlers } from "./ipc/browser-handlers";
+import { channelFolderIpcHandlers } from "./ipc/channel-folder-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { creditsIpcHandlers } from "./ipc/credits-handlers";
 import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
@@ -115,7 +119,6 @@ import { providerDetectionIpcHandlers } from "./ipc/provider-detection-handlers"
 import { providerIpcHandlers } from "./ipc/provider-handlers";
 import { referralIpcHandlers } from "./ipc/referral-handlers";
 import { routineFeedIpcHandlers } from "./ipc/routine-feed-handlers";
-import { routineFlowIpcHandlers } from "./ipc/routine-flow-handlers";
 import { routineIpcHandlers } from "./ipc/routine-handlers";
 import { routineResultIpcHandlers } from "./ipc/routine-result-handlers";
 import { sharedTableIpcHandlers } from "./ipc/shared-table-handlers";
@@ -151,7 +154,7 @@ import {
   showMainWindow,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
-import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
+import { MessageLinkRelay, openMessageLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
 import { removeOrcaPaneEnvironment } from "./orca-pane-environment";
 import { flushMainLog, startMainLog } from "./provider-log";
@@ -176,6 +179,7 @@ import {
 import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-timezone-preference-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
+import { singleInstanceExitMessage, singleInstanceOwnerPid } from "./single-instance-owner";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
 import { compatiblePreviousRelease, readDatabaseSchemaVersion } from "./start-recovery-release";
 import { openStartRecoveryWindow, type StartRecovery } from "./start-recovery-window";
@@ -537,9 +541,11 @@ const {
   forwardAttachmentDownload,
   forwardAttachmentImportProgress,
   forwardInstanceTransferUploadProgress,
+  forwardOwnerTransfersChanged,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   getChatWindows: () => windows.getChatWindows(),
+  chatWindowTarget: (window) => windows.chatWindowTarget(window),
   getAgentService: () => services?.service ?? null,
   getHostService: () => services?.host ?? null,
   getHostAnalytics: () => services?.analytics ?? null,
@@ -704,6 +710,7 @@ function registerIpcHandlers({
   mailbox,
   browser,
   browserPictureInPicture,
+  detachedBrowserWindow,
   localSignIn,
   browserDock,
   browserView,
@@ -720,6 +727,7 @@ function registerIpcHandlers({
   agentHostSettings,
   agentDefaultsSettings,
   agentFolders,
+  channelFolders,
   agentInstructions,
   browserProfiles,
   language,
@@ -742,6 +750,7 @@ function registerIpcHandlers({
   serverPersonality,
   promptCacheTtl,
   claudeUserSetup,
+  cacheExpiryCompaction,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -770,6 +779,7 @@ function registerIpcHandlers({
   billing,
   referral,
   license,
+  credits,
   hostedServers,
   localServers,
   routineFeed,
@@ -785,6 +795,7 @@ function registerIpcHandlers({
   hermesImport,
   instanceTransfer,
   voice,
+  hostVoiceModel,
   speech,
   voiceServer,
   dynamicIsland,
@@ -793,11 +804,12 @@ function registerIpcHandlers({
   computerUsePermissionHelp,
   storageUsage,
   libraryFoldersService,
+  workflowFoldersService,
+  workflowFiles,
   machineAlerts,
   trace,
   resourceMonitor,
   startup,
-  routineFlows,
   workflows,
   workflowGitHub,
   crm,
@@ -833,6 +845,7 @@ function registerIpcHandlers({
       appVariant,
       analyticsCaptureUrl,
       analyticsInstallId,
+      dynamicIslandAvailable: dynamicIsland.available,
       getMainWindow: getDialogParent,
       isMainWindow: (sender) => {
         const window = windowHolder.current;
@@ -880,10 +893,16 @@ function registerIpcHandlers({
       remoteServers,
       forwardLiveEvent: forwardVoiceLiveEvent,
     }),
-    ...accountIpcHandlers({ centralAuth, host }),
+    ...accountIpcHandlers({ centralAuth, host, refreshServers: () => remoteServers.requestDirectoryRefresh() }),
     ...skillIpcHandlers({ skills, getMainWindow: getDialogParent, translate: language.translate }),
     ...agentFolderIpcHandlers({
       folders: agentFolders,
+      remoteServers,
+      getMainWindow: getDialogParent,
+      translate: language.translate,
+    }),
+    ...channelFolderIpcHandlers({
+      folders: channelFolders,
       remoteServers,
       getMainWindow: getDialogParent,
       translate: language.translate,
@@ -904,6 +923,7 @@ function registerIpcHandlers({
     ...billingIpcHandlers({ billing }),
     ...referralIpcHandlers({ referral }),
     ...licenseIpcHandlers({ license }),
+    ...creditsIpcHandlers({ credits }),
     ...routineFeedIpcHandlers({ routineFeed }),
     ...eventsIpcHandlers({ events, remoteServers }),
     ...hostedServerIpcHandlers({ hostedServers }),
@@ -954,6 +974,7 @@ function registerIpcHandlers({
     ...teamIpcHandlers({
       host,
       localServers,
+      ownerTransfers: centralAuth,
       remoteDesktop,
       remoteServers,
       takePendingInvite: () => takePendingDeepLink("invite")?.url ?? null,
@@ -967,8 +988,16 @@ function registerIpcHandlers({
     ...memoryIpcHandlers({ service, remoteServers }),
     ...sharedTableIpcHandlers({ service, remoteServers }),
     ...routineIpcHandlers({ service, remoteServers }),
-    ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
-    ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
+    ...workflowIpcHandlers({
+      workflows,
+      events,
+      github: workflowGitHub,
+      workflowFolders: workflowFoldersService,
+      remoteServers,
+      workflowFiles,
+      getMainWindow: getDialogParent,
+      translate: language.translate,
+    }),
     ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
@@ -987,6 +1016,7 @@ function registerIpcHandlers({
       host,
       remoteServers,
       serverTimezone,
+      voiceModel: hostVoiceModel,
       hostTurnLimits,
       serverPersonality,
       agentMemoryLimit,
@@ -996,6 +1026,7 @@ function registerIpcHandlers({
       machineAlerts,
       promptCacheTtl,
       claudeUserSetup,
+      cacheExpiryCompaction,
       claudeCompactWindow,
       providerEnvironment,
       modelVisibility,
@@ -1066,13 +1097,20 @@ function registerIpcHandlers({
       messageLinks: new MessageLinkRelay({
         remoteServers,
         relay: signInRelayClient,
-        openUrl: (url) => openHttpLink(url, openLink),
+        openUrl: (url) => openMessageLink(url, openLink),
       }),
       openExternal: openLink,
       modelVisibility,
       closeChatNotifications,
     }),
-    ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
+    ...browserIpcHandlers({
+      browserPictureInPicture,
+      detachedBrowserWindow,
+      browser,
+      remoteServers,
+      browserView,
+      localSignIn,
+    }),
   });
 }
 
@@ -1373,6 +1411,7 @@ app.on("continue-activity", (event, type, _userInfo, details) => {
 });
 
 if (!hasSingleInstanceLock) {
+  logger.warn(singleInstanceExitMessage(singleInstanceOwnerPid(app.getPath("userData"))));
   process.exit(0);
 } else {
   app.on("second-instance", (_event, argv) => {
@@ -1401,6 +1440,7 @@ if (!hasSingleInstanceLock) {
     .whenReady()
     .then(async () => {
       performance.mark("openbot:when-ready");
+      replaceInvalidLinuxSystemLanguages();
       powerMonitor.on("suspend", () => runMarker?.suspend());
       powerMonitor.on("resume", () => runMarker?.resume());
       powerMonitor.on("shutdown", () => {
@@ -1504,7 +1544,10 @@ if (!hasSingleInstanceLock) {
       } = built;
 
       crashTrace = trace;
-      setIpcCallObserver((call) => trace.record({ kind: "ipc", ...call }));
+      setIpcCallObserver((call) => {
+        trace.record({ kind: "ipc", ...call });
+        perfTime(`ipc.invoke ${call.name}`, call.durationMs);
+      });
       service.on("event", (event) => trace.observeAgentEvent(event));
       service.on("event", (event) => forwardAgentEvent("local", event));
       let webhookAgentIds = new Set(service.listAgents().map((agent) => agent.id));
@@ -1583,6 +1626,7 @@ if (!hasSingleInstanceLock) {
       built.passwordManagers.onChanged(forwardPasswordManagerStatus);
       built.vault.onChanged(forwardVaultState);
       remoteServers.on("changed", forwardServers);
+      remoteServers.on("directoryInvalidated", forwardOwnerTransfersChanged);
       remoteServers.on("agent", (serverId, event, bufferedLive) => {
         forwardAgentEvent(serverId, event, bufferedLive);
       });
@@ -1723,9 +1767,7 @@ if (!hasSingleInstanceLock) {
         }
       });
       interfaceSize.subscribe((preference) => {
-        windows.getMainWindow()?.webContents.setZoomFactor(interfaceSize.zoomFactor);
-        for (const chatWindow of windows.getChatWindows())
-          chatWindow.webContents.setZoomFactor(interfaceSize.zoomFactor);
+        windows.applyInterfaceSize(interfaceSize.zoomFactor);
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appInterfaceSizePreference, preference);
         }

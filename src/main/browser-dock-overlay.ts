@@ -12,6 +12,7 @@ import { Effect, Schema, Semaphore } from "effect";
 import { type BrowserWindow, type Input, type Rectangle, View, type WebContents, WebContentsView } from "electron";
 import type { BrowserMainPage } from "../backend/browser-host";
 import { causeHelpers } from "../backend/effect-boundary";
+import { onTilingLinuxDesktop } from "./linux-tiling-desktop";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 
@@ -195,6 +196,7 @@ export class BrowserDockOverlay {
     view.setBackgroundColor("#00000000");
     view.setVisible(false);
     const contents = view.webContents;
+    if (onTilingLinuxDesktop) contents.setZoomMode("isolated");
     contents.setWindowOpenHandler(() => ({ action: "deny" }));
     contents.on("will-navigate", (event, targetUrl) => {
       if (!isTrustedRendererUrl(targetUrl)) event.preventDefault();

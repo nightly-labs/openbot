@@ -52,6 +52,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Не удалось настроить агента, а неполного агента удалить не получилось.",
   "error.agent.modelUnavailable": "Выбранная модель агента недоступна.",
   "error.agent.modelProviderNotConnected": "Выбранная модель агента «{model}» недоступна: {provider} не подключён.",
+  "error.agent.modelProviderSignInRequired":
+    "Выбранная модель агента «{model}» недоступна: нужно войти в {provider}. Войдите в {provider} и повторите попытку.",
+  "error.agent.modelProviderNotInstalled": "Выбранная модель агента «{model}» недоступна: {provider} не установлен.",
+  "error.agent.modelProviderOutdated": "Выбранная модель агента «{model}» недоступна: {provider} нужно обновить.",
   "error.agent.modelListEmpty":
     "Выбранная модель агента «{model}» недоступна: {provider} не вернул ни одной модели. Последняя ошибка: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -153,6 +157,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Поведение сообщений, пока агент работает, можно задать только на компьютере, где он работает.",
   "error.agent.backupModelsLocalOnly": "Резервные модели можно задать только на компьютере, где работает агент.",
+  "error.agent.backupModelsAtLimit":
+    "Сейчас ни одна резервная модель не может продолжить: каждая достигла лимита использования или недавно завершилась с ошибкой. Модели одного аккаунта могут делить один лимит. Чтобы продолжить сейчас, добавьте резервную модель другого провайдера или другого аккаунта либо дождитесь сброса лимита.",
   "error.agent.taskLimitLocalOnly": "Лимит задач можно задать только на компьютере, где работает агент.",
   "error.agent.localScriptsOff": "Этот агент не разрешает локальные скрипты.",
   "error.agent.localScriptsRateLimited":

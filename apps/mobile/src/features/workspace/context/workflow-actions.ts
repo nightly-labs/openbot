@@ -4,6 +4,10 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import {
   decodeRemoteWorkflowDetail,
@@ -34,6 +38,7 @@ type WorkflowActions = Pick<
   | "loadWorkflow"
   | "createWorkflow"
   | "renameWorkflow"
+  | "setWorkflowPaused"
   | "deleteWorkflow"
   | "saveWorkflowGraph"
   | "loadWorkflowRuns"
@@ -83,6 +88,13 @@ export function createWorkflowActions({
         workflowId: input.workflowId,
         title: input.title,
       }),
+    setWorkflowPaused: (input, serverId) => {
+      requireCapability(capabilities, serverId, WORKFLOWS_PAUSE_CAPABILITY, "mobile.workflow.pause.unsupported");
+      return send(serverId, WORKFLOWS_PAUSE_ROUTES.pause, decodeRemoteWorkflowSummary, {
+        workflowId: input.workflowId,
+        paused: input.paused,
+      });
+    },
     deleteWorkflow: (workflowId, serverId) => send(serverId, WORKFLOWS_ROUTES.delete, ignoreResponse, { workflowId }),
     saveWorkflowGraph: (input, serverId) =>
       send(serverId, WORKFLOWS_ROUTES.saveGraph, decodeRemoteWorkflowSaveResult, {

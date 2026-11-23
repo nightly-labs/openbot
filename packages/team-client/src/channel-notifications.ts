@@ -5,7 +5,7 @@ import type {
   ServerNotificationLevel,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
-import { type AgentNotificationChannel, plainPreview } from "./agent-notifications";
+import { type AgentNotificationChannel, agentNotificationLevel, plainPreview } from "./agent-notifications";
 
 export interface ChannelNotificationContent {
   title: string;
@@ -18,6 +18,7 @@ export interface ChannelNotificationOptions {
   agents: readonly ClientAgentSummary[];
   translate: AppTranslate;
   level: ServerNotificationLevel;
+  agentLevels: ReadonlyMap<string, ServerNotificationLevel> | null;
   redact: ((text: string) => string) | null;
 }
 
@@ -55,7 +56,8 @@ export function channelReplyNotifications(
   return newChannelReplies(previous, next).flatMap(({ channel, reply }) => {
     const agentId = reply.author.id;
     const agent = options.agents.find((candidate) => candidate.id === agentId);
-    if (!agent?.notifications) return [];
+    if (!agent?.notifications || agentNotificationLevel(options.level, options.agentLevels, agentId) !== "all")
+      return [];
     const body =
       reply.status === "failed"
         ? options.translate("notification.failed")

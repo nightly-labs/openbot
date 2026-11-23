@@ -4,6 +4,7 @@ import type {
   AgentDockDisplayInfo,
   AgentDockDragPhase,
   AgentDockEdge,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
@@ -60,6 +61,9 @@ interface DockWindow {
   rendererId: number;
   displayId: number;
   shape?: AgentDockInputRect[];
+  extent?: AgentDockExtent | null;
+  reportedExtent?: AgentDockExtent | null;
+  interactive?: boolean;
   keyboard?: boolean;
 }
 
@@ -169,8 +173,8 @@ export class AgentDockWindowController {
     const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
     if (!entry) return;
     const { window } = entry;
-    if (this.#options.windowKind !== "x11")
-      letPointerThrough(this.#options.pointerForwarding, window, !input.interactive);
+    entry.interactive = input.interactive;
+    if (this.#options.windowKind !== "x11") this.#letPointerThrough(entry);
     const keyboard = input.keyboard === true;
     window.setFocusable(keyboard);
     if (keyboard && !entry.keyboard && !window.isFocused()) {
@@ -187,11 +191,36 @@ export class AgentDockWindowController {
     this.#applyShape(entry);
   }
 
+  setExtent(rendererId: number, extent: AgentDockExtent | null): void {
+    if (this.#options.windowKind !== "panel") return;
+    const entry = this.#liveWindows().find((item) => item.rendererId === rendererId);
+    if (!entry) return;
+    entry.reportedExtent = extent;
+    if (extent === null && this.#drag?.rendererId === rendererId) return;
+    this.#fit(entry, extent);
+  }
+
+  #fit(entry: DockWindow, extent: AgentDockExtent | null): void {
+    entry.extent = extent;
+    const display = this.#displayOf(entry);
+    if (!display) return;
+    const bounds = this.#placedBounds(entry, display);
+    if (!isDeepStrictEqual(entry.window.getBounds(), bounds)) entry.window.setBounds(bounds, false);
+  }
+
   #applyShape(entry: DockWindow): void {
     if (!entry.shape) return;
     const rects = entry.shape.map((rect) => zoomedRect(rect, this.#zoom()));
     if (this.#options.windowKind === "x11") entry.window.setShape(rects);
-    else this.#options.pointerForwarding?.setZone(entry.window, rects);
+    if (this.#options.windowKind !== "tool") return;
+    if (rects.length > 0) entry.window.setShape(rects);
+    this.#letPointerThrough(entry);
+    if (rects.length === 0) entry.window.setShape([]);
+  }
+
+  #letPointerThrough(entry: DockWindow): void {
+    const fixedRegion = this.#options.windowKind === "tool" && (entry.shape?.length ?? 0) > 0;
+    letPointerThrough(this.#options.pointerForwarding, entry.window, !fixedRegion && entry.interactive !== true);
   }
 
   drag(rendererId: number, phase: AgentDockDragPhase): void {
@@ -199,7 +228,9 @@ export class AgentDockWindowController {
     if (!entry) return;
     const pointerY = this.#options.screen.getCursorScreenPoint().y;
     if (phase === "start") {
-      this.#drag = { rendererId, pointerY, windowY: entry.window.getBounds().y };
+      const start = this.#displayOf(entry);
+      const windowY = start ? this.#boundsFor(start).y : entry.window.getBounds().y;
+      this.#drag = { rendererId, pointerY, windowY };
       return;
     }
     const drag = this.#drag;
@@ -211,11 +242,14 @@ export class AgentDockWindowController {
       const y = drag.windowY + pointerY - drag.pointerY;
       const offset = room > 0 ? Math.min(1, Math.max(0, (y - area.y) / room)) : 0.5;
       this.#offsets.set(entry.displayId, offset);
-      const bounds = this.#boundsFor(display);
+      const bounds = this.#placedBounds(entry, display);
       if (!isDeepStrictEqual(entry.window.getBounds(), bounds)) entry.window.setBounds(bounds, false);
     }
     if (phase !== "end") return;
     this.#drag = null;
+    if (entry.reportedExtent !== undefined && entry.reportedExtent !== entry.extent) {
+      this.#fit(entry, entry.reportedExtent);
+    }
     const offset = this.#offsets.get(entry.displayId);
     const main = this.#options.getMainWindow();
     if (offset !== undefined && main && !main.isDestroyed()) {
@@ -239,6 +273,12 @@ export class AgentDockWindowController {
 
   #boundsFor(display: Display): Rectangle {
     return agentDockWindowBounds(display, this.#presentation?.edge ?? "right", this.#offsetFor(display), this.#zoom());
+  }
+
+  #placedBounds(entry: DockWindow, display: Display): Rectangle {
+    const bounds = this.#boundsFor(display);
+    if (this.#options.windowKind !== "panel" || !entry.extent) return bounds;
+    return fittedAgentDockBounds(bounds, this.#presentation?.edge ?? "right", entry.extent, this.#zoom());
   }
 
   #offsetFor(display: Display): number {
@@ -344,7 +384,7 @@ export class AgentDockWindowController {
             }
             current.displayId = display.id;
             this.#applyZoom(current);
-            const bounds = this.#boundsFor(display);
+            const bounds = this.#placedBounds(current, display);
             if (!isDeepStrictEqual(current.window.getBounds(), bounds)) current.window.setBounds(bounds, false);
             if (!current.window.isVisible()) this.#show(current.window);
           }
@@ -391,6 +431,8 @@ export class AgentDockWindowController {
         window.webContents.on("did-finish-load", () => {
           if (!owned()) return;
           this.#release(entry);
+          entry.reportedExtent = null;
+          this.#fit(entry, null);
           sendToRenderer(window, IPC_ENDPOINTS.agentDock.presentation, this.#presentation);
         });
         window.webContents.on("render-process-gone", () => {
@@ -406,7 +448,7 @@ export class AgentDockWindowController {
           if (!owned()) return;
           const display = this.#displayOf(entry);
           if (!display) return;
-          const expected = this.#boundsFor(display);
+          const expected = this.#placedBounds(entry, display);
           const { x, y } = window.getBounds();
           if (x !== expected.x || y !== expected.y) window.setBounds(expected, false);
         });
@@ -491,6 +533,18 @@ function agentDockWindowBounds(
     y: Math.round(area.y + (area.height - height) * offset),
     width,
     height,
+  };
+}
+
+function fittedAgentDockBounds(full: Rectangle, edge: AgentDockEdge, extent: AgentDockExtent, zoom: number): Rectangle {
+  const width = Math.min(full.width, Math.max(1, Math.ceil(extent.inward * zoom)));
+  const half = Math.max(1, Math.ceil(Math.max(extent.above, extent.below) * zoom));
+  const trim = Math.floor(Math.max(0, full.height - half * 2) / 2);
+  return {
+    x: edge === "left" ? full.x : full.x + full.width - width,
+    y: full.y + trim,
+    width,
+    height: full.height - trim * 2,
   };
 }
 

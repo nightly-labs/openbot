@@ -1,5 +1,9 @@
 import { ProviderLogo } from "@openbot/brand";
-import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import {
+  isInstallerProvider,
+  isManagedRuntimeProvider,
+  type ManagedProviderId,
+} from "@openbot/contracts/agent-providers";
 import {
   type AgentModelId,
   type AgentProviderId,
@@ -114,9 +118,18 @@ export type ProviderDefaultChoice = AgentProviderId | "custom";
 
 export interface ProviderPromptCache {
   value: PromptCacheTtl | null;
+  appliesToPi: boolean;
   pending: boolean;
   error: string | null;
   onChange: (ttl: PromptCacheTtl) => void;
+  compaction?: ProviderCacheExpiryCompaction | undefined;
+}
+
+export interface ProviderCacheExpiryCompaction {
+  value: boolean | null;
+  pending: boolean;
+  error: string | null;
+  onChange: (enabled: boolean) => void;
 }
 
 export interface ProviderClaudeCompactWindow {
@@ -223,6 +236,46 @@ function isConnected(option: ProviderPickerOption): boolean {
   return !option.off && (option.state === "available" || option.connectionState === "connecting");
 }
 
+function updateOffered(option: ProviderPickerOption): boolean {
+  const runtime = option.runtimeStatus;
+  return (
+    !option.off &&
+    !isInstallerProvider(option.id) &&
+    runtime !== undefined &&
+    providerUpdateAvailable(runtime, option.availableVersion ?? null)
+  );
+}
+
+function UpdateAllButton(props: ProviderSettingsPageProps) {
+  const { t } = useText();
+  const [starting, setStarting] = createSignal(false);
+  const updates = () => props.options.filter(updateOffered);
+  const offered = () => Boolean(props.onUpdateProvider) && updates().length > 0;
+  const updateAll = async () => {
+    const update = props.onUpdateProvider;
+    if (!update) return;
+    setStarting(true);
+    try {
+      await Promise.allSettled(updates().map(async (option) => await update(option.id)));
+    } finally {
+      setStarting(false);
+    }
+  };
+  return (
+    <Show when={offered()}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={props.disabled || starting()}
+        onClick={() => void updateAll()}
+      >
+        {t("provider.settings.updateAll")}
+      </Button>
+    </Show>
+  );
+}
+
 function waitingAccounts(option: ProviderPickerOption): number {
   return (option.accounts ?? []).filter((account) => account.state === "signed-out" || account.state === "error")
     .length;
@@ -281,17 +334,20 @@ function ProviderList(props: ProviderSettingsPageProps & { onOpen: (id: PageId) 
       <SettingsSection
         title={t("provider.settings.connected")}
         actions={
-          <label class="server-settings-search">
-            <Search aria-hidden="true" />
-            <span class="sr-only">{t("provider.settings.search")}</span>
-            <Input
-              size="sm"
-              type="search"
-              placeholder={t("provider.settings.search")}
-              value={query()}
-              onValueChange={setQuery}
-            />
-          </label>
+          <>
+            <UpdateAllButton {...props} />
+            <label class="server-settings-search">
+              <Search aria-hidden="true" />
+              <span class="sr-only">{t("provider.settings.search")}</span>
+              <Input
+                size="sm"
+                type="search"
+                placeholder={t("provider.settings.search")}
+                value={query()}
+                onValueChange={setQuery}
+              />
+            </label>
+          </>
         }
       >
         <ItemGroup class="settings-modal-card">
@@ -557,7 +613,12 @@ function ProviderPage(props: PageProps) {
           <ApiKeySection {...props} row={row} />
         </Show>
         <RuntimeSection {...props} row={row} />
-        <Show when={props.option.id === "claude" && props.promptCache}>
+        <Show
+          when={
+            (props.option.id === "claude" || (props.option.id === "pi" && props.promptCache?.appliesToPi)) &&
+            props.promptCache
+          }
+        >
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
         </Show>
         <Show when={props.option.id === "claude" && props.claudeCompactWindow}>
@@ -755,6 +816,7 @@ function AccountsSection(props: SectionProps) {
   const planAccounts = () => accounts().filter((account) => !isApiKeyAccount(account.id, props.option.id));
   const poolOffered = () => Boolean(props.accountActions?.setPool) && (planAccounts().length > 1 || Boolean(pool()));
   const poolLabelId = `provider-settings-${props.option.id}-pool-label`;
+  const maxAccounts = () => props.accountActions?.maxAccounts ?? MAX_PROVIDER_ACCOUNTS;
   const setPool = (enabled: boolean, leftOut: readonly string[]) =>
     run(props.option.name, () => props.accountActions?.setPool?.(props.option.id, enabled, leftOut));
   const removeDescription = (account: ProviderPickerAccount | null) => {
@@ -773,7 +835,7 @@ function AccountsSection(props: SectionProps) {
       title={t("provider.settings.accounts")}
       description={t(pool() ? "provider.settings.accountsPooledDescription" : "provider.settings.accountsDescription", {
         count: accounts().length,
-        max: MAX_PROVIDER_ACCOUNTS,
+        max: maxAccounts(),
       })}
       actions={
         <Show when={!hasKeyAccounts(props.option.id) || keyOffered()}>
@@ -782,9 +844,7 @@ function AccountsSection(props: SectionProps) {
             variant="outline"
             size="sm"
             aria-label={t("provider.account.addLabel", { name: props.option.name })}
-            disabled={
-              props.disabled || !props.row.accountsOffered() || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()
-            }
+            disabled={props.disabled || !props.row.accountsOffered() || accounts().length >= maxAccounts() || adding()}
             onClick={() => (keyOffered() ? setKeyTarget(null) : props.row.addAccount())}
           >
             <UserRoundPlus aria-hidden="true" />
@@ -794,7 +854,7 @@ function AccountsSection(props: SectionProps) {
             <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
               <MenuTrigger
                 label={t("provider.account.moreActions", { name: t("provider.account.add") })}
-                disabled={props.disabled || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()}
+                disabled={props.disabled || accounts().length >= maxAccounts() || adding()}
               />
               <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
                 <DropdownMenu.Content>
@@ -1499,7 +1559,9 @@ function ApiKeySection(props: SectionProps) {
                       ? saved()
                         ? t("provider.settings.codexKeyInUse")
                         : t("provider.settings.codexKeyAlternative")
-                      : t("provider.settings.keyAlternative", { name: props.option.name })}
+                      : props.option.id === "muse" && saved()
+                        ? t("provider.settings.museKeyInUse")
+                        : t("provider.settings.keyAlternative", { name: props.option.name })}
             </ItemDescription>
           </ItemContent>
           <ItemActions>
@@ -1769,8 +1831,45 @@ function PromptCacheSection(props: {
             )}
           </Show>
         </Item>
+        <Show when={props.cache.compaction}>
+          {(compaction) => <CacheExpiryCompactionRow compaction={compaction()} disabled={props.disabled} />}
+        </Show>
       </ItemGroup>
     </SettingsSection>
+  );
+}
+
+function CacheExpiryCompactionRow(props: { compaction: ProviderCacheExpiryCompaction; disabled: boolean | undefined }) {
+  const { t } = useText();
+  return (
+    <Item class="settings-modal-row">
+      <ItemContent>
+        <ItemTitle id="provider-settings-cache-expiry-compaction-label">
+          {t("provider.settings.cacheExpiryCompaction")}
+        </ItemTitle>
+        <Show
+          when={props.compaction.error}
+          fallback={<ItemDescription>{t("provider.settings.cacheExpiryCompactionDescription")}</ItemDescription>}
+        >
+          {(message) => (
+            <ItemDescription class="provider-settings-error" role="alert">
+              {message()}
+            </ItemDescription>
+          )}
+        </Show>
+      </ItemContent>
+      <Show when={props.compaction.value !== null}>
+        <ItemActions>
+          <Switch
+            checked={props.compaction.value === true}
+            disabled={Boolean(props.disabled || props.compaction.pending)}
+            aria-busy={props.compaction.pending ? "true" : "false"}
+            aria-labelledby="provider-settings-cache-expiry-compaction-label"
+            onChange={(enabled: boolean) => props.compaction.onChange(enabled)}
+          />
+        </ItemActions>
+      </Show>
+    </Item>
   );
 }
 

@@ -17,7 +17,7 @@ import {
   onSettled,
   untrack,
 } from "solid-js";
-import { isGlobalSearchShortcut } from "../../global-search-shortcut";
+import { matchesShortcut } from "../../keyboard-shortcut-preference";
 import { useNavigation } from "../../navigation";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
@@ -303,7 +303,7 @@ const ServerScope = createSimpleContext({
     onSettled(() => {
       const handleGlobalSearchShortcut = (event: KeyboardEvent) => {
         if (
-          !isGlobalSearchShortcut(event) ||
+          !matchesShortcut(event, "globalSearch") ||
           centralAuth().status !== "signed_in" ||
           setupState()?.completed !== true
         ) {

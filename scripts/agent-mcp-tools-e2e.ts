@@ -6,11 +6,17 @@ import { join, resolve } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { GITHUB_CONNECTOR_MCP_SERVER_ID, type McpServerConfig } from "@openbot/contracts/ipc";
+import {
+  COMPUTER_USE_MCP_SERVER_ID,
+  COMPUTER_USE_MCP_SERVER_NAME,
+  GITHUB_CONNECTOR_MCP_SERVER_ID,
+  type McpServerConfig,
+} from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
 import {
+  agentFallbackMcpServers,
   findAgentMcpTool,
   handleMcpServerTool,
   type MarketplaceAppServer,
@@ -171,6 +177,8 @@ interface Call {
   result: ToolAnswer;
   approvals: string[];
   signInCards: string[];
+  added: string[];
+  removed: string[];
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-agent-mcp-tools-"));
@@ -218,6 +226,8 @@ try {
   const call = async (name: string, tool: McpServerToolName, args: unknown, approved = true, using = tools) => {
     const approvals: string[] = [];
     const signInCards: string[] = [];
+    const added: string[] = [];
+    const removed: string[] = [];
     const response = await runCauseEffect(
       handleMcpServerTool(using, {
         tool,
@@ -233,6 +243,14 @@ try {
           Effect.sync(() => {
             signInCards.push(config.id);
           }),
+        added: (config) =>
+          Effect.sync(() => {
+            added.push(config.id);
+          }),
+        removed: (mcpServerId) =>
+          Effect.sync(() => {
+            removed.push(mcpServerId);
+          }),
       }),
     );
     const text = response.contentItems[0]?.type === "inputText" ? response.contentItems[0].text : "{}";
@@ -245,6 +263,8 @@ try {
       result: JSON.parse(text),
       approvals,
       signInCards,
+      added,
+      removed,
     };
     calls.push(entry);
     return entry;
@@ -268,6 +288,8 @@ try {
       result: JSON.parse(text),
       approvals: [],
       signInCards,
+      added: [],
+      removed: [],
     };
     calls.push(entry);
     return entry;
@@ -305,6 +327,7 @@ try {
   });
   assert.equal(signIn.result.status, "needs_sign_in");
   assert.deepEqual(signIn.signInCards, [row("calendar")?.id]);
+  assert.deepEqual(signIn.added, [row("calendar")?.id], "a new server names the person who added it");
 
   const key = await call("add a server that needs a key", "save_mcp_server", { name: "crm", url: servers.key.url });
   assert.equal(key.result.status, "needs_key");
@@ -400,6 +423,7 @@ try {
   });
   assert.equal(edited.result.status, "ready");
   assert.match(edited.approvals[0] ?? "", /^Change the MCP server crm/u);
+  assert.deepEqual(edited.added, [], "a change to a server does not change who added it");
   assert.deepEqual(row("crm")?.headers, keys);
   const movedWithKeys = await call("new keys go with a new address", "save_mcp_server", {
     name: "crm",
@@ -481,9 +505,11 @@ try {
   const unknown = await call("an unknown name", "test_mcp_server", { name: "nothing" });
   assert.equal(unknown.success, false);
 
+  const calendarId = row("calendar")?.id;
   const removed = await call("remove a server", "remove_mcp_server", { name: "calendar" });
   assert.equal(removed.success, true);
   assert.equal(row("calendar"), undefined);
+  assert.deepEqual(removed.removed, [calendarId], "a removed server drops who added it");
 
   const githubGateway = new McpGateway({
     servers: store,
@@ -646,6 +672,33 @@ process.stdin.on("data", (chunk) => {
     success: true,
     contentItems: [{ type: "inputText", text: "get_messages key=true" }],
   });
+
+  const computerUse: McpServerConfig = {
+    ...stdioRow,
+    id: COMPUTER_USE_MCP_SERVER_ID,
+    name: COMPUTER_USE_MCP_SERVER_NAME,
+  };
+  const unsaved: McpServerConfig = { ...stdioRow, id: "not-saved", name: "not_saved" };
+  const fallbackFor = (agent: { access: "full" | "workspace"; computerUse?: boolean }) =>
+    agentFallbackMcpServers([computerUse, stdioRow, unsaved], new Set([stdioRow.id]), agent);
+  const hidden = findAgentMcpTool(fallbackFor({ access: "full" }), "computer_use.list_windows");
+  assert.equal(hidden?.config.id, COMPUTER_USE_MCP_SERVER_ID, "Computer Use for a Full access agent");
+  assert.equal(hidden?.tool, "list_windows");
+  assert.equal(
+    findAgentMcpTool(fallbackFor({ access: "full", computerUse: false }), "computer_use.list_windows"),
+    null,
+    "no Computer Use when it is off for the agent",
+  );
+  assert.deepEqual(
+    fallbackFor({ access: "workspace" }).map((config) => config.id),
+    [],
+    "no stdio server, Computer Use included, for Workspace only",
+  );
+  assert.deepEqual(
+    fallbackFor({ access: "full" }).map((config) => config.id),
+    [COMPUTER_USE_MCP_SERVER_ID, stdioRow.id],
+    "an unsaved row stays out",
+  );
   store.remove(stdioRow.id);
 
   const statefulProgram = join(root, "stateful-mcp-server.js");

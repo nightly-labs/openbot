@@ -7,6 +7,7 @@ import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
+import { appendComposerDraft } from "@/features/chat/model/composer-drafts";
 import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
@@ -30,7 +31,7 @@ export function ChannelChatScreen() {
 }
 
 function ChannelChat({ channelId, serverId }: { channelId: string; serverId: string }) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const leaveChat = useLeaveChat();
   const agents = useMobileWorkspaceSelector((current) => current.agents, sameAgentsApartFromMessage);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === serverId));
@@ -48,8 +49,14 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   const progressUpdates = useProgressUpdates(serverId, serverAgents);
   const messages = useMemo(
     () =>
-      projectChannelMessages(page?.messages ?? [], page?.tasks ?? [], server?.membershipId ?? null, progressUpdates),
-    [page?.messages, page?.tasks, server?.membershipId, progressUpdates],
+      projectChannelMessages(
+        page?.messages ?? [],
+        page?.tasks ?? [],
+        server?.membershipId ?? null,
+        sourceText,
+        progressUpdates,
+      ),
+    [page?.messages, page?.tasks, server?.membershipId, sourceText, progressUpdates],
   );
   const threadIds = useMemo(
     () => (summary?.threads?.length ? new Set(summary.threads.map((thread) => thread.threadId)) : null),
@@ -244,11 +251,16 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     (agentId: string, input: RespondToPromptInput) => store.respondToPrompt(serverId, channelId, agentId, input),
     [store, serverId, channelId],
   );
+  const returnUnsentPreview = useCallback(
+    (text: string) => appendComposerDraft({ kind: "channel", serverId, id: channelId }, text),
+    [serverId, channelId],
+  );
   const questionForm = useQuestionPrompt(
     promptAgentId,
     activePrompt?.kind === "question" ? activePrompt : undefined,
     showsOnline(server) && canSend,
     respondToPrompt,
+    returnUnsentPreview,
   );
   const liveChannel = useMemo(
     () => ({ messages: page?.messages ?? [], tasks: page?.tasks ?? [], leadAgentId: channel?.leadAgentId ?? null }),

@@ -1,4 +1,9 @@
 import {
+  type CustomServerCheckout,
+  type CustomServerCheckoutRequest,
+  parseCustomServerCheckout,
+} from "@openbot/contracts/custom-server-plans";
+import {
   type CreateHostedServerInput,
   type DeleteHostedServerInput,
   HOSTING_DEVELOPER_KEY_HEADER,
@@ -169,6 +174,25 @@ export class HostedServerDesktopService {
     }).pipe(Effect.provide(this.#platform));
   }
 
+  readonly openCustomCheckout = Effect.fn("HostedServer.openCustomCheckout")(
+    function* (input: CustomServerCheckoutRequest) {
+      const platform = yield* AccountServicePlatform;
+      const checkout = yield* platform.request(
+        `/v2/remote/hosts/${encodeURIComponent(input.serverId)}/checkout`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input.earlyStart ? { earlyStart: true } : {}),
+        },
+        decodeCustomCheckout,
+        30_000,
+      );
+      if (checkout.checkoutUrl) yield* platform.openPage(checkout.checkoutUrl);
+      return { opened: checkout.checkoutUrl !== null };
+    },
+    (operation) => operation.pipe(Effect.provide(this.#platform)),
+  );
+
   readonly lifecycle = Effect.fn("HostedServer.lifecycle")(
     function* (this: HostedServerDesktopService, input: HostedServerLifecycleInput) {
       const platform = yield* AccountServicePlatform;
@@ -303,6 +327,12 @@ function decodeStatus(value: unknown): HostedServerStatus {
   const status = parseHostedServerStatus(value);
   if (!status) throw new Error(sourceText("error.auth.invalidHostedServer"));
   return status;
+}
+
+function decodeCustomCheckout(value: unknown): CustomServerCheckout {
+  const checkout = parseCustomServerCheckout(value);
+  if (!checkout) throw new Error(sourceText("error.billing.invalidResponse"));
+  return checkout;
 }
 
 function decodeCheckout(value: unknown): HostedServerCheckout {

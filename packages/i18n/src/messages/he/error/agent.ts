@@ -49,6 +49,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "הגדרת הסוכן נכשלה ולא ניתן היה להסיר את הסוכן החלקי.",
   "error.agent.modelUnavailable": "מודל הסוכן שנבחר אינו זמין.",
   "error.agent.modelProviderNotConnected": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} אינו מחובר.',
+  "error.agent.modelProviderSignInRequired":
+    'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} דורש התחברות. התחבר ל-{provider} ונסה שוב.',
+  "error.agent.modelProviderNotInstalled": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} אינו מותקן.',
+  "error.agent.modelProviderOutdated": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} דורש עדכון.',
   "error.agent.modelListEmpty":
     'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} לא פרסם מודלים. השגיאה האחרונה: {detail}',
   "error.agent.modelListEmptyNoError": 'מודל הסוכן שנבחר "{model}" אינו זמין: {provider} לא פרסם מודלים.',
@@ -139,6 +143,8 @@ export const messages = {
   "error.agent.webSearchFailed": "החיפוש באינטרנט לא הסתיים. נסו שוב.",
   "error.agent.busyMessageModeLocalOnly": "אפשר להגדיר מה קורה להודעות בזמן שהסוכן עובד רק במחשב שמריץ את הסוכן.",
   "error.agent.backupModelsLocalOnly": "אפשר להגדיר מודלי גיבוי רק במחשב שמריץ את הסוכן.",
+  "error.agent.backupModelsAtLimit":
+    "אף מודל גיבוי לא יכול להמשיך עכשיו: כל אחד מהם הגיע למגבלת השימוש או נכשל לפני זמן קצר. מודלים של חשבון אחד יכולים לחלוק מגבלה אחת. כדי להמשיך עכשיו, הוסיפו מודל גיבוי מספק אחר או מחשבון אחר, או חכו לאיפוס המגבלה.",
   "error.agent.taskLimitLocalOnly": "אפשר להגדיר את מגבלת המשימות רק במחשב שמריץ את הסוכן.",
   "error.agent.localScriptsOff": "הסוכן הזה אינו מאפשר סקריפטים מקומיים.",
   "error.agent.localScriptsRateLimited":

@@ -25,4 +25,7 @@ export const messages = {
     "L'aperçu s'arrête à 100 Mo. Vous pouvez ouvrir ce fichier dans son application par défaut.",
   "preview.spreadsheet.readFailed": "Impossible de lire cette feuille de calcul.",
   "preview.spreadsheet.truncated": "Aperçu limité aux {rows} premières lignes et aux {columns} premières colonnes.",
+  "preview.document.readFailed": "Impossible de lire ce document.",
+  "preview.document.empty": "Ce document ne contient aucun texte à afficher.",
+  "preview.document.truncated": "Aperçu limité à la première partie du document.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -16,7 +16,7 @@ export interface AgentDatabaseSupervisorOptions {
   queueWaitMs?: number;
   hostStartRetryDelayMs?: number;
   onHostStartFailed?: (failure: AgentDatabaseHostStartFailure) => void;
-  onStatementSettled?: (durationMs: number) => void;
+  onStatementSettled?: (durationMs: number, request: string) => void;
 }
 
 export interface AgentDatabaseHostStartFailure {
@@ -54,7 +54,7 @@ export class AgentDatabaseSupervisor {
   readonly #statementDeadlineMs: number;
   readonly #hostStartDeadlineMs: number;
   readonly #queueWaitMs: number;
-  readonly #onStatementSettled: ((durationMs: number) => void) | undefined;
+  readonly #onStatementSettled: ((durationMs: number, request: string) => void) | undefined;
   readonly #hostStartRetryDelayMs: number;
   readonly #onHostStartFailed: ((failure: AgentDatabaseHostStartFailure) => void) | undefined;
   readonly #queue: PendingRequest[] = [];
@@ -188,7 +188,7 @@ export class AgentDatabaseSupervisor {
     this.#clearDeadline();
     this.#inFlight = null;
     pending.settle(response);
-    this.#reportSettled();
+    this.#reportSettled(pending.request);
     this.#pump();
   }
 
@@ -200,7 +200,7 @@ export class AgentDatabaseSupervisor {
     this.#inFlight = null;
     if (pending) {
       pending.settle(failed("internal", message));
-      this.#reportSettled();
+      this.#reportSettled(pending.request);
     }
     this.#pump();
   }
@@ -236,8 +236,11 @@ export class AgentDatabaseSupervisor {
     this.#hostReady = false;
   }
 
-  #reportSettled(): void {
-    this.#onStatementSettled?.(performance.now() - this.#sentAt);
+  #reportSettled(request: AgentDatabaseRequest): void {
+    this.#onStatementSettled?.(
+      performance.now() - this.#sentAt,
+      request.kind === "statement" ? `${request.kind}.${request.mode}` : request.kind,
+    );
   }
 
   #clearDeadline(): void {

@@ -1,3 +1,4 @@
+import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type {
   AgentApproval,
   AgentDockBackupModel,
@@ -64,6 +65,7 @@ export interface AgentDockChatAnswers {
   approval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
   prompt: (prompt: AgentDockPrompt, answers: Record<string, string[]>) => Promise<boolean>;
   takeover: (takeover: AgentDockTakeover, decision: "complete" | "cancel") => Promise<boolean>;
+  takeoverDone?: ((takeover: AgentDockTakeover) => boolean) | undefined;
   secret: (takeover: AgentDockTakeover, input: LocalBrowserSecretResponse) => Promise<void>;
   usageLimitSend: (limit: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) => Promise<void>;
   usageLimitWait: (limit: AgentDockUsageLimit) => void;
@@ -93,6 +95,10 @@ export function isDockMessage(message: AgentMessage): boolean {
   if (message.author !== "you" && message.author !== "agent") return false;
   if (message.kind !== undefined && message.kind !== "text" && message.kind !== "error") return false;
   return message.body.trim().length > 0;
+}
+
+export function isDockVisualReply(message: AgentMessage): boolean {
+  return chatVisualReply(message) !== null;
 }
 
 function isOwn(message: AgentMessage): boolean {
@@ -426,16 +432,33 @@ export function AgentDockChat(props: {
                         <Show when={author(message)}>
                           {(shown) => <span class="agent-dock-author">{shown()}</span>}
                         </Show>
-                        <div class="agent-dock-markdown message-markdown">
-                          <MarkdownMessageText
-                            body={message.body}
-                            agents={props.agents}
-                            attachments={message.attachments}
-                            onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
-                            onOpenAttachment={() => props.onOpenInMain()}
-                            onOpenLink={(url) => props.onOpenLink?.(url)}
-                          />
-                        </div>
+                        <Show
+                          when={isDockVisualReply(message)}
+                          fallback={
+                            <div class="agent-dock-markdown message-markdown">
+                              <MarkdownMessageText
+                                body={message.body}
+                                agents={props.agents}
+                                attachments={message.attachments}
+                                onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
+                                onOpenAttachment={() => props.onOpenInMain()}
+                                onOpenLink={(url) => props.onOpenLink?.(url)}
+                              />
+                            </div>
+                          }
+                        >
+                          <div class="agent-dock-visual">
+                            <p class="agent-dock-text">{message.body}</p>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              aria-label={t("agent.dock.openPage", { title: message.body })}
+                              onClick={() => props.onOpenInMain()}
+                            >
+                              {t("common.open")}
+                            </Button>
+                          </div>
+                        </Show>
                       </BubbleContent>
                     </Bubble>
                   );
@@ -483,7 +506,11 @@ export function AgentDockChat(props: {
                         preview={null}
                         previewStatus="idle"
                         onOpen={() => props.onOpenInMain()}
-                        onComplete={() => respondTakeover(current(), "complete")}
+                        onComplete={
+                          props.answers?.takeoverDone?.(current()) === false
+                            ? undefined
+                            : () => respondTakeover(current(), "complete")
+                        }
                         onCancel={() => respondTakeover(current(), "cancel")}
                         browserSecret={takeoverSecret(current())}
                       />

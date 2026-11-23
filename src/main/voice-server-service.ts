@@ -35,6 +35,8 @@ const logger = createOpenBotLogger("voice-server-service");
 
 const PROBE_TIMEOUT_MS = 8_000;
 const TRANSCRIPTION_TIMEOUT_MS = 120_000;
+const TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS = 1_000;
+const WAV_BYTES_PER_SECOND = 32_000;
 const SPEECH_TIMEOUT_MS = 120_000;
 const LIST_BODY_LIMIT = 1024 * 1024;
 const SPEECH_BODY_LIMIT = 32 * 1024 * 1024;
@@ -219,7 +221,10 @@ export function transcribeRecording(
     target,
     "audio/transcriptions",
     { method: "POST", body: form },
-    TRANSCRIPTION_TIMEOUT_MS,
+    Math.max(
+      TRANSCRIPTION_TIMEOUT_MS,
+      (wav.byteLength / WAV_BYTES_PER_SECOND) * TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS,
+    ),
     (response, host) => readJson(response, host, LIST_BODY_LIMIT),
     caller.refused,
   ).pipe(

@@ -25,6 +25,7 @@ import { SettingsField, SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/c
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { InstructionsLimit, instructionsTooLong } from "@openbot/ui/features/agents/InstructionsLimit";
 import { ChannelContextActions } from "@openbot/ui/features/channels/ChannelContextActions";
+import { type ChannelFolders, ChannelFoldersRow } from "@openbot/ui/features/channels/ChannelFolders";
 import { ChannelMemberRow } from "@openbot/ui/features/channels/ChannelMemberRow";
 import { ChannelPictureEditor } from "@openbot/ui/features/channels/ChannelPictureEditor";
 import { ContentExitMotion } from "@openbot/ui/menu-motion";
@@ -38,6 +39,8 @@ interface ChannelEditorProps {
   routineCount: number;
   onOpenMemories: () => void;
   onOpenRoutines: () => void;
+  folders?: ChannelFolders | undefined;
+  onOpenFolders: () => void;
 }
 
 export function ChannelEditor(props: ChannelEditorProps) {
@@ -388,6 +391,9 @@ export function ChannelEditor(props: ChannelEditorProps) {
           value={t("channel.settings.routineCount", { count: props.routineCount })}
           onClick={props.onOpenRoutines}
         />
+        <Show when={props.folders}>
+          {(folders) => <ChannelFoldersRow folders={folders()} onOpen={props.onOpenFolders} />}
+        </Show>
       </SettingsLinkGroup>
       <Show when={channels.contextActionsSupported() && !channel()?.archived && channel()}>
         {(current) => (

@@ -1,3 +1,4 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import * as Crypto from "expo-crypto";
@@ -259,7 +260,7 @@ export const ChannelListRow = memo(function ChannelListRow({
   leftInset?: number;
   rightInset?: number;
 }) {
-  const { t, format } = useText();
+  const { t, format, sourceText } = useText();
   const [background, accent] = useThemeColor(["background", "accent"]);
   const rowBackground = useChatRowBackground(channel.id);
   const { toggleChannelPinAnimated } = useAgentPinTransition();
@@ -287,8 +288,11 @@ export const ChannelListRow = memo(function ChannelListRow({
   }));
   const holdMenu = useHoldMenu(drag, () => setMenuKey((key) => key + 1));
   const previewLine = useMemo(
-    () => (channel.lastMessage ? markdownPreviewText(channel.lastMessage.text) : t("mobile.channel.list.noMessages")),
-    [channel.lastMessage, t],
+    () =>
+      channel.lastMessage
+        ? markdownPreviewText(coordinatorText(channel.lastMessage.author, channel.lastMessage.text, sourceText))
+        : t("mobile.channel.list.noMessages"),
+    [channel.lastMessage, t, sourceText],
   );
   const title = channel.title.trim();
   const unread = channel.unreadCount > 0;

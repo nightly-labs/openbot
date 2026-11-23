@@ -135,6 +135,14 @@ export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadPro
     });
 }
 
+export const CLAUDE_NO_RESPONSE_TEXT = "No response requested.";
+
+export function isClaudeNoResponsePlaceholder(message: unknown): boolean {
+  if (!isRecord(message) || message.model !== "<synthetic>" || !Array.isArray(message.content)) return false;
+  const [block, ...rest] = message.content;
+  return rest.length === 0 && isRecord(block) && block.type === "text" && block.text === CLAUDE_NO_RESPONSE_TEXT;
+}
+
 export function claudeTaskTurnId(sessionId: string, taskId: string, runId: string): string {
   const hex = createHash("sha256").update(`claude-task-turn\n${sessionId}\n${taskId}\n${runId}`).digest("hex");
   const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
@@ -559,7 +567,7 @@ async function findFinalAnswer(
     if (signal.aborted) throw signal.reason;
     const row = decodeTranscriptRow(raw);
     const message = await readMessage(file, row);
-    if (message?.type !== "assistant") continue;
+    if (message?.type !== "assistant" || isClaudeNoResponsePlaceholder(message.message)) continue;
     const text = messageText(message.message);
     const thinking = messageThinking(message.message);
     const endsStep = messageToolCalls(message.message).length > 0;
@@ -772,7 +780,7 @@ async function emitTurnFragments(
           break;
         continue;
       }
-      if (message.type !== "assistant") continue;
+      if (message.type !== "assistant" || isClaudeNoResponsePlaceholder(message.message)) continue;
       const thinking = messageThinking(message.message);
       const endsStep = messageToolCalls(message.message).length > 0;
       if (!thinking && !text && !endsStep) continue;
@@ -923,7 +931,7 @@ function historyFragments(messages: readonly ClaudeSessionMessage[], includeItem
         });
       continue;
     }
-    if (message.type !== "assistant" || skippingCompaction) continue;
+    if (message.type !== "assistant" || skippingCompaction || isClaudeNoResponsePlaceholder(message.message)) continue;
     const thinking = messageThinking(message.message);
     const endsStep = messageToolCalls(message.message).length > 0;
     if (!thinking && !text && !endsStep) continue;

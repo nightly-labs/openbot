@@ -651,6 +651,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.error.installOnHost":
     "Install {name} on the computer that runs these agents: its app needs a browser sign-in.",
   "marketplace.error.appInvalid": "{name} cannot be added: {reason}",
+  "marketplace.error.appNotConnected": "Could not connect {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Select a local server to uninstall a plugin.",
   "marketplace.error.uninstallPartial": "Some of {name} could not be removed. {failures}",
   "marketplace.error.actionFailed": "Could not complete the marketplace action. Try again.",

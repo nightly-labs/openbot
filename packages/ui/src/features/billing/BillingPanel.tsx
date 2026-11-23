@@ -74,6 +74,7 @@ export interface BillingPanelProps {
   onAddServer?: (() => void) | undefined;
   available: boolean;
   license?: JSX.Element;
+  credits?: JSX.Element;
 }
 
 export function BillingPanel(props: BillingPanelProps): JSX.Element {
@@ -97,6 +98,7 @@ export function BillingPanel(props: BillingPanelProps): JSX.Element {
   return (
     <div class="billing-panel" aria-busy={props.store.state.loading ? "true" : undefined}>
       {props.license}
+      {props.credits}
       <Show when={!unavailable() && billing()}>
         <Show when={props.store.state.error}>
           {(message) => <BillingError message={message()} store={props.store} />}

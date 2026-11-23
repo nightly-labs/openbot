@@ -52,6 +52,11 @@ export const messages = defineMessages("error.agent", {
   "error.agent.modelUnavailable": "The selected agent model is unavailable.",
   "error.agent.modelProviderNotConnected":
     'The selected agent model "{model}" is unavailable: {provider} is not connected.',
+  "error.agent.modelProviderSignInRequired":
+    'The selected agent model "{model}" is unavailable: {provider} needs sign-in. Sign in to {provider}, then try again.',
+  "error.agent.modelProviderNotInstalled":
+    'The selected agent model "{model}" is unavailable: {provider} is not installed.',
+  "error.agent.modelProviderOutdated": 'The selected agent model "{model}" is unavailable: {provider} needs an update.',
   "error.agent.modelListEmpty":
     'The selected agent model "{model}" is unavailable: {provider} listed no models. Last error: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -148,6 +153,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.busyMessageModeLocalOnly":
     "What messages do while the agent works can only be set on the computer that runs the agent.",
   "error.agent.backupModelsLocalOnly": "Backup models can only be set on the computer that runs the agent.",
+  "error.agent.backupModelsAtLimit":
+    "No backup model can take over now: each one reached its usage limit or failed a short time ago. Models of one account can share one limit. To continue now, add a backup model from another provider or another account, or wait for the reset.",
   "error.agent.taskLimitLocalOnly": "The task limit can only be set on the computer that runs the agent.",
   "error.agent.localScriptsOff": "This agent does not allow local scripts.",
   "error.agent.localScriptsRateLimited":

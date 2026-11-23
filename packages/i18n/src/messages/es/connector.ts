@@ -363,7 +363,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Tu chat «Envíate un mensaje» y las personas que permitas pueden contactar con OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Las personas que permitas pueden contactar con OpenBot. Las demás reciben un código para dártelo.",
+    "Tu chat «Envíate un mensaje» y las personas que permitas pueden contactar con OpenBot. Las demás reciben un código para dártelo.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp quitó este equipo de los dispositivos vinculados. Vuelve a vincular el número.",
   "connector.whatsapp.helpLoggedOutHost":
