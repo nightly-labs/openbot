@@ -263,18 +263,20 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
   ) {
     const message = failure.cause instanceof Error ? failure.cause.message : "";
     const noOp = isPiCompactionNoOp(message);
-    if (!noOp && !isContextTooSmallFailure(message)) return yield* failure;
-    const full = yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
+    const tooSmall = isContextTooSmallFailure(message);
+    if (!noOp && !tooSmall) return yield* failure;
+    const usedShare = yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
       Effect.map((stats) =>
-        Option.exists(
+        Option.map(
           Schema.decodeUnknownOption(PiContextUsage)(getRecord(stats, "contextUsage")),
-          (usage) => usage.tokens / usage.contextWindow >= CONTEXT_COMPACTION_THRESHOLD,
+          (usage) => usage.tokens / usage.contextWindow,
         ),
       ),
-      Effect.orElseSucceed(() => false),
+      Effect.orElseSucceed(() => Option.none<number>()),
     );
-    if (full) return yield* providerFailure(new Error(this.#contextTooSmall(message)));
-    if (!noOp) return yield* failure;
+    const full = Option.exists(usedShare, (share) => share >= CONTEXT_COMPACTION_THRESHOLD);
+    if (full && tooSmall) return yield* providerFailure(new Error(this.#contextTooSmall(message)));
+    if (!noOp || full || Option.isNone(usedShare)) return yield* failure;
     logger.info("Pi has nothing to compact, so the session is already compact.", { provider: this.provider });
   });
 
