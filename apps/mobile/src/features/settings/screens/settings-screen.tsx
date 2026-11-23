@@ -31,6 +31,8 @@ import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { useRefreshedMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
 
+const CREDITS_FRESH_MS = 30_000;
+
 export function SettingsScreen() {
   const { session } = useMobileSession();
   const { t, format } = useText();
@@ -42,11 +44,12 @@ export function SettingsScreen() {
   const showsBilling = cloudServersOn && billing.data?.available !== false;
   const planCount = billing.data?.servers.length;
   const credits = useCreditsState();
-  const { refetch: refetchCredits } = credits;
+  const { refetch: refetchCredits, dataUpdatedAt: creditsUpdatedAt } = credits;
+  const signedIn = session !== null;
   useFocusEffect(
     useCallback(() => {
-      void refetchCredits({ cancelRefetch: false });
-    }, [refetchCredits]),
+      if (signedIn && Date.now() - creditsUpdatedAt > CREDITS_FRESH_MS) void refetchCredits({ cancelRefetch: false });
+    }, [creditsUpdatedAt, refetchCredits, signedIn]),
   );
   return (
     <SettingsContent>
@@ -83,7 +86,7 @@ export function SettingsScreen() {
               <Typography.Paragraph>{t("mobile.settings.billing.title")}</Typography.Paragraph>
             </SettingsRow>
           ) : null}
-          {session ? (
+          {session && credits.data?.available !== false ? (
             <SettingsRow
               leading={<CreditStar />}
               onPress={() => router.push("/settings/credits")}

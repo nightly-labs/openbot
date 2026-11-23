@@ -13,6 +13,7 @@ import Server from "lucide-react-native/icons/server";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import { useCallback } from "react";
 import { View } from "react-native";
+import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { CreditStar } from "@/features/settings/components/credit-star";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
@@ -42,6 +43,7 @@ const OTHER_DAY_TIME = {
 
 export function CreditsSettingsScreen() {
   const { t, format, errorMessage } = useText();
+  const signedIn = useMobileSession().session !== null;
   const credits = useCreditsState();
   const available = credits.data?.available === true;
   const activity = useCreditActivity(available);
@@ -49,9 +51,13 @@ export function CreditsSettingsScreen() {
   const { refetch: refetchActivity } = activity;
   useFocusEffect(
     useCallback(() => {
-      void refetchCredits({ cancelRefetch: false });
-      if (available) void refetchActivity({ cancelRefetch: false });
-    }, [available, refetchActivity, refetchCredits]),
+      if (signedIn) void refetchCredits({ cancelRefetch: false });
+    }, [refetchCredits, signedIn]),
+  );
+  useFocusEffect(
+    useCallback(() => {
+      if (signedIn && available) void refetchActivity({ cancelRefetch: false });
+    }, [available, refetchActivity, signedIn]),
   );
 
   if (credits.data?.available === false) {
