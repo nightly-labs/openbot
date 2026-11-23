@@ -87,9 +87,14 @@ export class McpOAuthProxy {
     const bearer = routeBearer(secret, path);
     registerSecretValue(bearer);
     let attempt = this.#attempts.get(path) ?? 0;
-    if (this.#failedStarts.delete(path)) this.#attempts.set(path, ++attempt);
+    if (this.#failedStarts.delete(path)) attempt += 1;
+    this.#attempts.set(path, attempt);
     return { url: `http://127.0.0.1:${port}/mcp/${path}${attempt > 0 ? `?attempt=${attempt}` : ""}`, bearer };
   });
+
+  recordFailedStart(route: string): void {
+    for (const path of this.#attempts.keys()) if (onRoute(path, route)) this.#failedStarts.set(path, false);
+  }
 
   failedStart(route: string): boolean {
     for (const [path, reported] of this.#failedStarts) if (!reported && onRoute(path, route)) return true;

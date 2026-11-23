@@ -184,6 +184,10 @@ export class McpGateway {
       .sort();
   }
 
+  recordFailedStart(config: McpServerConfig): void {
+    if (this.#proxied(config)) this.#proxy.recordFailedStart(mcpOAuthProxyRoute(config.id, config.url));
+  }
+
   readonly close = Effect.fnUntraced(function* (this: McpGateway) {
     yield* Scope.close(this.#scope, Exit.void);
     yield* this.#proxy.close();

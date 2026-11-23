@@ -16,6 +16,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  McpServerConfig,
   ProviderAccountCodeLoginStatus,
   ProviderAccountPool,
   ProviderAccountStatus,
@@ -344,6 +345,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #mcpHandoff: McpHandoffLog;
   readonly #redactMcp: (text: string) => string;
   readonly #reportMcpSignIn: ((provider: AgentProvider, server: string, signInText: string) => void) | null;
+  readonly #recordMcpStartFailure: ((config: McpServerConfig) => void) | null;
   readonly #configRevisions = new WeakMap<AgentClient, number>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   readonly #cliSources = new Map<AgentProvider, Pick<AgentCliInfo, "source" | "incomplete">>();
@@ -440,6 +442,7 @@ export class ProviderRuntime implements ProviderPort {
     mcpHandoff?: McpHandoffLog;
     redactMcp: (text: string) => string;
     reportMcpSignIn?: (provider: AgentProvider, server: string, signInText: string) => void;
+    recordMcpStartFailure?: (config: McpServerConfig) => void;
     accounts?: ProviderAccountStore;
   }) {
     this.#off = new Set(options.offProviders);
@@ -460,6 +463,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#mcpHandoff = options.mcpHandoff ?? new McpHandoffLog();
     this.#redactMcp = options.redactMcp;
     this.#reportMcpSignIn = options.reportMcpSignIn ?? null;
+    this.#recordMcpStartFailure = options.recordMcpStartFailure ?? null;
     this.#codexLogin = new CodexLoginFlow({
       bundledExecutable: () => this.#bundledExecutables.codex,
       installedChosen: () => this.#installedChosen.has("codex") || this.#installedFallback.has("codex"),
@@ -4065,7 +4069,8 @@ export class ProviderRuntime implements ProviderPort {
       client.provider === "codex" ? `openbot_${providerMcpServerName(config?.name ?? "")}` : config?.name;
     if (config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID && key === githubKey)
       this.#reportGitHubToolsFailure(client.provider);
-    if (!server) return;
+    if (!config || !server) return;
+    this.#recordMcpStartFailure?.(config);
     const signIn = getString(params, "failureReason") === "reauthenticationRequired" || isMcpSignInDiagnostic(message);
     this.#reportMcpServerFailure(client.provider, server, message, signIn);
   }
