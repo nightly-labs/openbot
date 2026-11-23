@@ -659,7 +659,8 @@ export const messages = {
     "{name} 会在助手空闲时重启并应用已下载的更新。成员会短暂断开，随后自动重新连接。",
   "server.update.waitingFor": "正在等待{reasons}。",
   "server.update.disabledTitle": "远程更新已关闭",
-  "server.update.disabledDescription": "{name} 的用户已关闭来自服务器成员的更新。请联系其更新 OpenBot 或开启该设置。",
+  "server.update.disabledDescription":
+    "{name} 的用户已关闭来自服务器成员的更新。请联系其更新 OpenBot，或在那台电脑上打开“设置 > 更新”，开启“允许服务器成员触发更新”。",
   "server.update.managedTitle": "更新由 Host Manager 控制",
   "server.update.managedDescription": "OpenBot Host Manager 负责更新 {name}。请联系主机管理员。",
   "server.update.unsupportedTitle": "{name} 无法自我更新",
