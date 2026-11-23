@@ -301,9 +301,12 @@ export const ChatComposer = memo(function ChatComposer({
     const didHide = Keyboard.addListener("keyboardDidHide", () => {
       keyboardShown = false;
     });
+    let opened = false;
     const stopListening = navigation.addListener("transitionEnd", (event) => {
+      if (event.data.closing || opened) return;
+      opened = true;
       const input = inputRef.current;
-      if (event.data.closing || keyboardShown || !keyboardFieldUsable.current || !input?.isFocused()) return;
+      if (keyboardShown || !keyboardFieldUsable.current || !input?.isFocused()) return;
       input.blur();
       input.focus();
     });
@@ -640,18 +643,22 @@ export const ChatComposer = memo(function ChatComposer({
   const accentGlyph =
     dark && (voiceAccent?.lightGlyph ?? true) ? String(foreground) : (voiceAccent?.glyph ?? String(actionForeground));
 
-  function requestSend(): void {
-    if (disabled || preparing) return;
+  function sendAndCloseField(text: string): void {
     const input = inputRef.current;
     const fieldFocused = input?.isFocused() ?? false;
     if (!sendGate.submit(fieldFocused)) return;
-    onSend(latestTextRef.current);
+    onSend(text);
     if (fieldFocused) input?.blur();
+  }
+
+  function requestSend(): void {
+    if (disabled || preparing) return;
+    sendAndCloseField(latestTextRef.current);
   }
 
   function submitKey(text: string): void {
     if (control.mode !== "send" || !controlReady || voiceOpen) return;
-    if (sendGate.submit(inputRef.current?.isFocused() ?? false)) onSend(editMentionDraft(latestTextRef.current, text));
+    sendAndCloseField(editMentionDraft(latestTextRef.current, text));
   }
 
   function pressControl(): void {
@@ -998,8 +1005,7 @@ export const ChatComposer = memo(function ChatComposer({
                         onChangeDraft(next);
                       }}
                       onSubmitEditing={({ nativeEvent }) => {
-                        if (!disabled && sendGate.submit(true))
-                          onSend(editMentionDraft(latestTextRef.current, nativeEvent.text));
+                        if (!disabled) sendAndCloseField(editMentionDraft(latestTextRef.current, nativeEvent.text));
                       }}
                       onEndEditing={({ nativeEvent: { text } }) => {
                         if (sendGate.endEditing()) return;
