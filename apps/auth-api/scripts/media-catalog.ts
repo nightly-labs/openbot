@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -35,7 +35,19 @@ interface Options {
   resolution: string | null;
   silent: number | "none" | null;
   persistTo: string | null;
+  params: string | null;
+  fields: string | null;
+  specs: string | null;
+  file: string | null;
   positional: string[];
+}
+
+interface RouteEntry {
+  modelId: string;
+  upstreamId: string;
+  params: string;
+  fields: string;
+  specs: string;
 }
 
 interface UpstreamModel {
@@ -80,6 +92,11 @@ function usage(): never {
       "                                        Set one price (credits per image or per second); --silent is the",
       "                                        lower price with audio off",
       "  enable <model>... | disable <model>...",
+      "  route <model> <upstream> <upstream model> [--params <json>] [--fields <json>] [--specs <json>]",
+      "                                        Set how one processor runs a model; --specs narrows the options",
+      '  routes <upstream> --file <json>       Set many routes: {"<model>": {"id", "params"?, "fields"?, "specs"?}}',
+      "  unroute <model> <upstream>            Remove a route; the model is unavailable on that processor",
+      "  switch <upstream>                     Run all models on one processor; models without a route are unavailable",
       "Targets: --local [--persist-to <dir>] (default), --test, --production --confirm-production",
       "Changes run only with --apply. seed reads MEDIA_API_URL and MEDIA_API_KEY.",
       "",
@@ -96,6 +113,10 @@ function readOptions(args: string[]): Options {
     resolution: null,
     silent: null,
     persistTo: null,
+    params: null,
+    fields: null,
+    specs: null,
+    file: null,
     positional: [],
   };
   let confirmed = false;
@@ -113,6 +134,13 @@ function readOptions(args: string[]): Options {
     } else if (arg === "--silent") {
       const value = args[index + 1] ?? "";
       options.silent = value === "none" ? "none" : Number(value);
+      index += 1;
+    } else if (arg === "--params" || arg === "--fields" || arg === "--specs" || arg === "--file") {
+      const value = args[index + 1] ?? null;
+      if (arg === "--params") options.params = value;
+      else if (arg === "--fields") options.fields = value;
+      else if (arg === "--specs") options.specs = value;
+      else options.file = value ? resolve(value) : null;
       index += 1;
     } else if (arg === "--persist-to") {
       options.persistTo = args[index + 1] ? resolve(args[index + 1] ?? "") : null;
@@ -179,10 +207,19 @@ async function execute(options: Options, statements: string[], summary: string):
   }
 }
 
+async function activeUpstream(options: Options): Promise<string> {
+  const [row] = await query(options, "SELECT upstream FROM credit_media_settings WHERE id = 1");
+  return isString(row?.upstream) ? row.upstream : ROUTER_MEDIA_UPSTREAM;
+}
+
 async function list(options: Options): Promise<void> {
+  const active = await activeUpstream(options);
   const rows = await query(
     options,
-    `SELECT m.model_id, m.kind, m.enabled, m.position, group_concat(
+    `SELECT m.model_id, m.kind, m.enabled, m.position, (
+            SELECT group_concat(CASE WHEN r.upstream = ${sql(active)} THEN '*' ELSE '' END || r.upstream || '=' || r.upstream_id, ' ')
+              FROM credit_media_routes r WHERE r.model_id = m.model_id) AS routes,
+            group_concat(
             CASE p.resolution WHEN '' THEN '*' ELSE p.resolution END || '=' || p.credits ||
             CASE WHEN p.silent_credits IS NULL THEN '' ELSE ' (' || p.silent_credits || ' silent)' END || '/' || p.unit,
             ' ') AS prices
@@ -192,10 +229,11 @@ async function list(options: Options): Promise<void> {
   for (const row of rows) {
     const enabled = row.enabled === 1 ? "on " : "off";
     process.stdout.write(
-      `${enabled} ${String(row.kind).padEnd(5)} ${String(row.model_id).padEnd(32)} ${row.prices ?? ""}\n`,
+      `${enabled} ${String(row.kind).padEnd(5)} ${String(row.model_id).padEnd(32)} ${row.prices ?? ""}\n` +
+        `      routes: ${row.routes ?? "none"}\n`,
     );
   }
-  process.stdout.write(`${rows.length} models on ${options.target}.\n`);
+  process.stdout.write(`${rows.length} models on ${options.target}. Active processor: ${active} (* in routes).\n`);
 }
 
 function normalizedName(name: string): string {
@@ -427,6 +465,14 @@ function routerOnly(column: "upstream_id" | "upstream_params"): string {
   return `CASE WHEN credit_media_models.upstream = ${sql(ROUTER_MEDIA_UPSTREAM)} THEN excluded.${column} ELSE credit_media_models.${column} END`;
 }
 
+function routeStatement(upstream: string, route: RouteEntry, now: number): string {
+  return `INSERT INTO credit_media_routes(model_id, upstream, upstream_id, upstream_params, upstream_fields, specs, updated_at)
+       VALUES (${sql(route.modelId)}, ${sql(upstream)}, ${sql(route.upstreamId)}, ${sql(route.params)}, ${sql(route.fields)}, ${sql(route.specs)}, ${now})
+       ON CONFLICT(model_id, upstream) DO UPDATE SET upstream_id = excluded.upstream_id,
+         upstream_params = excluded.upstream_params, upstream_fields = excluded.upstream_fields, specs = excluded.specs,
+         updated_at = excluded.updated_at;`;
+}
+
 function seedStatements(models: readonly SeedModel[], reprice: boolean, now: number): string[] {
   return models.flatMap((model) => {
     const unit = model.kind === "image" ? "item" : "second";
@@ -439,6 +485,10 @@ function seedStatements(models: readonly SeedModel[], reprice: boolean, now: num
        ON CONFLICT(model_id) DO UPDATE SET upstream_id = ${routerOnly("upstream_id")}, kind = excluded.kind, name = excluded.name,
          maker = excluded.maker, variant = excluded.variant, position = excluded.position, specs = excluded.specs,
          upstream_params = ${routerOnly("upstream_params")}, updated_at = excluded.updated_at;`,
+      `INSERT INTO credit_media_routes(model_id, upstream, upstream_id, upstream_params, updated_at)
+       VALUES (${sql(model.id)}, ${sql(ROUTER_MEDIA_UPSTREAM)}, ${sql(model.upstreamId)}, ${sql(JSON.stringify(model.params))}, ${now})
+       ON CONFLICT(model_id, upstream) DO UPDATE SET upstream_id = excluded.upstream_id,
+         upstream_params = excluded.upstream_params, updated_at = excluded.updated_at;`,
       ...(reprice ? [`DELETE FROM credit_media_prices WHERE model_id = ${sql(model.id)};`] : []),
       ...model.prices.map(
         (price) =>
@@ -509,6 +559,97 @@ async function setEnabled(options: Options, enabled: boolean): Promise<void> {
   );
 }
 
+function jsonText(text: string | null, label: string): string {
+  if (text === null) return "{}";
+  const value = JSON.parse(text);
+  if (!isDynamicRecord(value)) throw new Error(`${label} must be a JSON object.`);
+  return JSON.stringify(value);
+}
+
+function isUpstreamName(value: string | undefined): value is string {
+  return value !== undefined && /^[a-z][a-z0-9-]{0,39}$/.test(value);
+}
+
+async function setRoute(options: Options): Promise<void> {
+  const [modelId, upstream, upstreamId] = options.positional;
+  if (!isCreditMediaModelId(modelId) || !isUpstreamName(upstream) || !upstreamId || upstreamId.length > 200) usage();
+  const route = {
+    modelId,
+    upstreamId,
+    params: jsonText(options.params, "--params"),
+    fields: jsonText(options.fields, "--fields"),
+    specs: jsonText(options.specs, "--specs"),
+  };
+  await execute(options, [routeStatement(upstream, route, Date.now())], `${modelId} on ${upstream} = ${upstreamId}`);
+}
+
+function routeEntries(value: unknown): RouteEntry[] {
+  if (!isDynamicRecord(value)) throw new Error("The routes file must be a JSON object.");
+  return Object.entries(value).map(([modelId, entry]) => {
+    if (!isCreditMediaModelId(modelId) || !isDynamicRecord(entry) || !isString(entry.id))
+      throw new Error(`The route of ${modelId} needs an "id".`);
+    const params = entry.params ?? {};
+    const fields = entry.fields ?? {};
+    const specs = entry.specs ?? {};
+    if (!isDynamicRecord(params) || !isDynamicRecord(fields) || !isDynamicRecord(specs))
+      throw new Error(`The params, fields and specs of ${modelId} must be JSON objects.`);
+    return {
+      modelId,
+      upstreamId: entry.id,
+      params: JSON.stringify(params),
+      fields: JSON.stringify(fields),
+      specs: JSON.stringify(specs),
+    };
+  });
+}
+
+async function setRoutes(options: Options): Promise<void> {
+  const [upstream] = options.positional;
+  if (!isUpstreamName(upstream) || options.file === null) usage();
+  const routes = routeEntries(JSON.parse(await readFile(options.file, "utf8")));
+  const now = Date.now();
+  for (const route of routes) process.stdout.write(`${route.modelId.padEnd(32)} ${upstream}=${route.upstreamId}\n`);
+  await execute(
+    options,
+    routes.map((route) => routeStatement(upstream, route, now)),
+    `${routes.length} routes on ${upstream}`,
+  );
+}
+
+async function removeRoute(options: Options): Promise<void> {
+  const [modelId, upstream] = options.positional;
+  if (!isCreditMediaModelId(modelId) || !isUpstreamName(upstream)) usage();
+  await execute(
+    options,
+    [`DELETE FROM credit_media_routes WHERE model_id = ${sql(modelId)} AND upstream = ${sql(upstream)};`],
+    `remove the ${upstream} route of ${modelId}`,
+  );
+}
+
+async function switchUpstream(options: Options): Promise<void> {
+  const [upstream] = options.positional;
+  if (!isUpstreamName(upstream)) usage();
+  const missing = await query(
+    options,
+    `SELECT m.model_id FROM credit_media_models m
+      WHERE m.enabled = 1 AND NOT EXISTS (
+        SELECT 1 FROM credit_media_routes r WHERE r.model_id = m.model_id AND r.upstream = ${sql(upstream)})
+      ORDER BY m.kind, m.position, m.model_id`,
+  );
+  if (missing.length > 0)
+    process.stdout.write(
+      `Unavailable after the switch (no ${upstream} route): ${missing.map((row) => String(row.model_id)).join(", ")}\n`,
+    );
+  await execute(
+    options,
+    [
+      `INSERT INTO credit_media_settings(id, upstream, updated_at) VALUES (1, ${sql(upstream)}, ${Date.now()})
+       ON CONFLICT(id) DO UPDATE SET upstream = excluded.upstream, updated_at = excluded.updated_at;`,
+    ],
+    `run all models on ${upstream}; ${missing.length} enabled models become unavailable`,
+  );
+}
+
 async function main(): Promise<void> {
   const [command, ...rest] = process.argv.slice(2);
   const options = readOptions(rest);
@@ -517,6 +658,10 @@ async function main(): Promise<void> {
   if (command === "price") return setPrice(options);
   if (command === "enable") return setEnabled(options, true);
   if (command === "disable") return setEnabled(options, false);
+  if (command === "route") return setRoute(options);
+  if (command === "routes") return setRoutes(options);
+  if (command === "unroute") return removeRoute(options);
+  if (command === "switch") return switchUpstream(options);
   usage();
 }
 

@@ -1588,7 +1588,7 @@ account, the credits of that account pay; a server pays with its own credits. Th
 prompt, the model, the size settings and the input pictures to the account service
 (`openbot.run`). The account service holds the credits, sends the same values to a media generation
 processor, and returns the result file to the computer, which keeps it. A processor can keep the
-input pictures for up to one day so that it can read them. The account service passes
+input pictures for up to three days so that it can read them. The account service passes
 the prompt, the pictures and the file through in transit only: it does not store or log them. It
 keeps only the hold record above. A failed or refused generation spends no credits. A stop does not
 cancel a generation that was sent: when the run stops or the app closes, the job continues, and the
