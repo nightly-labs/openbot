@@ -281,6 +281,10 @@ export const messages = defineMessages("error.provider", {
   "error.provider.realtimeLimitZero":
     "Linux stopped the provider because OpenBot has a real-time CPU limit of 0. The limit comes from your system. Install and start rtkit (`rtkit-daemon`), run `systemctl --user restart xdg-desktop-portal`, then restart OpenBot. Restarting xdg-desktop-portal alone does not help while rtkit is missing.",
   "error.provider.cpuUnsupported": "The processor of this computer cannot run this provider. Use a different provider.",
+  "error.provider.largeMemoryPages":
+    "This provider cannot run on this Linux kernel, because the kernel uses memory pages larger than 4 KiB, as on Raspberry Pi 5 or Asahi Linux. Use a kernel with 4 KiB pages or a different provider.",
+  "error.provider.ipv6Missing":
+    "This provider needs IPv6, and IPv6 is off on this computer. Turn on IPv6, then try again. On WSL, remove ipv6.disable=1 from .wslconfig and run wsl --shutdown.",
   "error.provider.windowsBlocked":
     "Windows security settings, such as Smart App Control, stopped this provider from starting. Use a different provider.",
   "error.provider.opencodeDatabaseNewer":
@@ -388,6 +392,8 @@ export const messages = defineMessages("error.provider", {
     "Hermes lost its connection during this message, so it does not know if the work finished. Check what the agent did before you send the message again.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot could not use this model: the model did not accept its thinking setting. Select a different model for this agent, then send your message again.",
+  "error.provider.copilotAnswerIncomplete":
+    "The model stopped before its answer was complete. Send your message again, or select a different model for this agent.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",
   "error.provider.claudeContextFull":
     "This chat became too long for Claude. OpenBot started a new Claude Code session with the chat history. Try again.",
@@ -432,8 +438,12 @@ export const messages = defineMessages("error.provider", {
   "error.provider.claudeSessionMissing":
     "Claude Code could not find the saved session of this chat. OpenBot started a new Claude Code session with the chat history. Try again.",
   "error.provider.grokSignIn": "Run `grok login` or set XAI_API_KEY to use Grok.",
+  "error.provider.acpSignInNoStart":
+    "The provider did not start, so the sign-in could not begin. Try again, or restart OpenBot.",
   "error.provider.acpSignInTimedOut": "The sign-in timed out.",
   "error.provider.acpSignInStopped": "The sign-in stopped before it was complete.",
+  "error.provider.geminiNoBrowserUseCode":
+    "This computer has no browser for the Google sign-in. Choose Log in with code, open the link on any device, then paste the code.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini could not open the sign-in page. Install a browser and xdg-utils, then connect from a desktop session on this host. A server with no desktop cannot complete this sign-in.",
   "error.provider.geminiBrowserOpenFailed":

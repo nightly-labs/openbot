@@ -307,6 +307,10 @@ export const messages = {
     "Linux a arrêté le fournisseur, car OpenBot a une limite de CPU en temps réel de 0. Cette limite vient de votre système. Installez et démarrez rtkit (`rtkit-daemon`), exécutez `systemctl --user restart xdg-desktop-portal`, puis redémarrez OpenBot. Redémarrer seulement xdg-desktop-portal ne suffit pas tant que rtkit est absent.",
   "error.provider.cpuUnsupported":
     "Le processeur de cet ordinateur ne peut pas exécuter ce fournisseur. Utilisez un autre fournisseur.",
+  "error.provider.largeMemoryPages":
+    "Ce fournisseur ne peut pas s’exécuter sur ce noyau Linux, car le noyau utilise des pages mémoire de plus de 4 Kio, comme sur Raspberry Pi 5 ou Asahi Linux. Utilisez un noyau avec des pages de 4 Kio ou un autre fournisseur.",
+  "error.provider.ipv6Missing":
+    "Ce fournisseur a besoin d’IPv6, et IPv6 est désactivé sur cet ordinateur. Activez IPv6, puis réessayez. Sous WSL, supprimez ipv6.disable=1 de .wslconfig et exécutez wsl --shutdown.",
   "error.provider.windowsBlocked":
     "Les paramètres de sécurité de Windows, comme le Contrôle intelligent des applications, ont empêché ce fournisseur de démarrer. Utilisez un autre fournisseur.",
   "error.provider.opencodeDatabaseNewer":
@@ -421,6 +425,8 @@ export const messages = {
     "Hermes a perdu sa connexion pendant ce message, il ne sait donc pas si le travail est terminé. Vérifiez ce que l’agent a fait avant de renvoyer le message.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot n’a pas pu utiliser ce modèle : le modèle n’a pas accepté son réglage de réflexion. Sélectionnez un autre modèle pour cet agent, puis renvoyez votre message.",
+  "error.provider.copilotAnswerIncomplete":
+    "Le modèle s’est arrêté avant la fin de sa réponse. Renvoyez votre message ou sélectionnez un autre modèle pour cet agent.",
   "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",
   "error.provider.claudeContextFull":
     "Cette conversation est devenue trop longue pour Claude. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
@@ -465,8 +471,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code n’a pas trouvé la session enregistrée de cette conversation. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
   "error.provider.grokSignIn": "Exécutez `grok login` ou définissez XAI_API_KEY pour utiliser Grok.",
+  "error.provider.acpSignInNoStart":
+    "Le fournisseur n’a pas démarré, donc la connexion n’a pas pu commencer. Réessayez ou redémarrez OpenBot.",
   "error.provider.acpSignInTimedOut": "La connexion a expiré.",
   "error.provider.acpSignInStopped": "La connexion s’est arrêtée avant la fin.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Cet ordinateur n’a pas de navigateur pour la connexion à Google. Choisissez « Connexion par code », ouvrez le lien sur n’importe quel appareil, puis collez le code.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini n’a pas pu ouvrir la page de connexion. Installez un navigateur et xdg-utils, puis connectez-vous depuis une session de bureau sur cet hôte. Un serveur sans bureau ne peut pas terminer cette connexion.",
   "error.provider.geminiBrowserOpenFailed":

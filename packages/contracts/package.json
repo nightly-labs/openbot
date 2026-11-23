@@ -161,6 +161,7 @@
     "./team-protocol/claude-api-key-v1": "./src/team-protocol/claude-api-key-v1.ts",
     "./team-protocol/codex-api-key-v1": "./src/team-protocol/codex-api-key-v1.ts",
     "./team-protocol/mistral-code-sign-in-v1": "./src/team-protocol/mistral-code-sign-in-v1.ts",
+    "./team-protocol/antigravity-code-sign-in-v1": "./src/team-protocol/antigravity-code-sign-in-v1.ts",
     "./team-protocol/optional-events": "./src/team-protocol/optional-events.ts",
     "./team-protocol/quiet-turn-v1": "./src/team-protocol/quiet-turn-v1.ts",
     "./team-protocol/mcp-v1": "./src/team-protocol/mcp-v1.ts",

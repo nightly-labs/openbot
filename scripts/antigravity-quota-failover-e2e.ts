@@ -30,6 +30,7 @@ const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { providerResetDelayMs } = await import("../src/backend/agent/provider-diagnostics");
 
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -40,7 +41,7 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-quota-e", "gemini-spent", "gemini-rate", "gemini-rate-b", "gemini-net", "gemini-gone", "gemini-gone-b", "gemini-gone-c", "gemini-gone-d", "gemini-credits-a", "gemini-credits-b", "gemini-lost", "gemini-reset", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -65,7 +66,18 @@ function handle(message) {
     const net = model === "gemini-net" && text.includes("NET-NOW");
     const gone = model.startsWith("gemini-gone") && text.includes("GONE-NOW");
     const credits = model.startsWith("gemini-credits-") && text.includes("CREDITS-NOW");
-    log({ model, quota: quota || credits, rate: rate || net || gone, text });
+    const lost = model === "gemini-lost" && text.includes("LOST-NOW");
+    const reset = model === "gemini-reset" && text.includes("RESET-NOW");
+    log({ model, quota: quota || credits || reset, rate: rate || net || gone || lost, text });
+    if (lost || reset) {
+      if (text.includes("ACT-FIRST"))
+        update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
+      const failure = lost
+        ? "\u26A0 Agent execution error: agent executor error: Error 404, Message: Requested entity was not found., Status: NOT_FOUND, Details: []"
+        : "\u26A0 Agent execution error: agent executor error: Error 429, Message: Quota exhausted for this model., Status: RESOURCE_EXHAUSTED, Details: [map[@type:type.googleapis.com/google.rpc.RetryInfo retryDelay:42s] map[@type:type.googleapis.com/google.rpc.ErrorInfo domain:cloudcode-pa.googleapis.com metadata:map[model:gemini-reset quotaResetDelay:1h0m0s] reason:QUOTA_EXHAUSTED]]";
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + failure } });
+      return write({ id: message.id, result: { stopReason: "end_turn" } });
+    }
     if (credits) {
       if (text.includes("ACT-FIRST"))
         update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
@@ -330,6 +342,48 @@ try {
     "The backup continues the work that a rate limit stopped.",
   );
   rateAfter.passed = true;
+
+  const lostAfter = await runCase("404 after work", "gemini-lost", true, "ACT-FIRST LOST-NOW");
+  assert.deepEqual(
+    lostAfter.prompts.map((prompt) => [prompt.model, prompt.continuation, prompt.workSteps]),
+    [
+      ["gemini-lost", false, false],
+      [BACKUP, true, true],
+    ],
+    "The backup continues the work that a 404 after the first answer stopped.",
+  );
+  lostAfter.passed = true;
+
+  {
+    const name = "quota with a Google reset delay, no backup";
+    const agent = await runCauseEffect(
+      agents.createAgent({
+        name,
+        description: "Checks a Google reset delay.",
+        avatarSeed: "gemini-reset",
+        avatarHue: null,
+        provider: "antigravity",
+        model: "gemini-reset",
+        initialMessage: "Hello.",
+      }),
+    );
+    await waitFor(`${name}: the first turn`, () => idle(agent.id));
+    const receipt = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "RESET-NOW" }));
+    const deliveryId = receipt.deliveries[0]?.id;
+    assert.ok(deliveryId, `${name}: the message has a delivery`);
+    const error = await waitFor(`${name}: the error`, () => mailbox.getDelivery(deliveryId)?.delivery.error);
+    const resetDelayMs = providerResetDelayMs(error);
+    report.cases.push({
+      name,
+      status: mailbox.getDelivery(deliveryId)?.delivery.status ?? "unknown",
+      model: "gemini-reset",
+      prompts: [],
+      errors: 0,
+      passed: resetDelayMs === 3_600_000,
+    });
+    assert.ok(error.includes("quotaResetDelay:1h0m0s"), `${name}: the error keeps Google's reset delay: ${error}`);
+    assert.equal(resetDelayMs, 3_600_000, `${name}: the hold uses quotaResetDelay, not retryDelay`);
+  }
 
   for (const [name, model, text] of [
     ["dropped connection before work", "gemini-net", "NET-NOW"],

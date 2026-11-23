@@ -46,6 +46,7 @@ const INVALID = "INVALID_ARGUMENT (code 400): Request contains an invalid argume
 const OVERSIZED = "FAILED_PRECONDITION (code 400): The message size exceeds 30.000MB limit";
 const UNENCODABLE = "Agent execution error: agent executor error: generating and executing: proto: field google.protobuf.Value.string_value contains invalid UTF-8";
 const MEDIA = "INVALID_ARGUMENT (code 400): Unable to process input: the file or media data is empty, corrupted, or malformed";
+const UNSIGNED = 'Error 400, Message: {"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0.thinking.signature: Field required"}}, Status: INVALID_ARGUMENT, Details: []';
 const answer = (failure) => (failure.startsWith("Agent execution error: ") ? failure : NL + "\\u26A0 " + failure);
 let sessions = 0;
 let tools = 0;
@@ -62,6 +63,7 @@ function handle(message) {
     if (prompt.includes("OVERSIZE") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, OVERSIZED);
     if (prompt.includes("UNENCODABLE") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, UNENCODABLE);
     if (prompt.includes("MEDIA") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, MEDIA);
+    if (prompt.includes("UNSIGNED") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, UNSIGNED);
     const refused = poisoned.has(params.sessionId);
     const tool = refused && prompt.includes("TOOL") && !prompt.includes("PELICAN");
     log({ sessionId: params.sessionId, refused, tool, text: prompt });
@@ -286,6 +288,19 @@ try {
     mediaTool.prompts[0]?.sessionId,
     "The next message runs on a new session.",
   );
+
+  const unsigned = await send(agent.id, "UNSIGNED thinking in this session.");
+  assert.equal(
+    unsigned.status,
+    "completed",
+    `A history with an unsigned thinking block runs again and answers: ${unsigned.error ?? ""}`,
+  );
+  assert.deepEqual(
+    unsigned.prompts.map(({ refused }) => refused),
+    [true, false],
+    "The message ran two times: refused on the old session, then answered.",
+  );
+  assert.notEqual(unsigned.prompts[0]?.sessionId, unsigned.prompts[1]?.sessionId, "It ran on a new session.");
 
   const unencodable = await send(agent.id, "UNENCODABLE text in this session.");
   assert.equal(

@@ -545,6 +545,8 @@ const SAFE_FAILURE_CODES = new Set([
   "checksum_failed",
   "version_mismatch",
   "cpu_unsupported",
+  "large_memory_pages",
+  "ipv6_missing",
   "windows_blocked",
   "cli_update_failed",
   "cli_activate_failed",
