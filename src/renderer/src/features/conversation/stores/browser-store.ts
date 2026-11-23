@@ -53,6 +53,20 @@ function webHost(url: string | undefined): string | null {
   }
 }
 
+const LOOPBACK_HOST = /^(?:localhost|.+\.localhost|127(?:\.\d{1,3}){3}|\[::1\])$/iu;
+
+function returnsToBrowserComputer(redirect: string): boolean {
+  if (!URL.canParse(redirect)) return false;
+  const { protocol, hostname } = new URL(redirect);
+  return !/^https?:$/iu.test(protocol) || LOOPBACK_HOST.test(hostname);
+}
+
+function isLoopbackOAuthPage(url: string): boolean {
+  if (!URL.canParse(url)) return false;
+  const redirect = new URL(url).searchParams.get("redirect_uri");
+  return redirect !== null && returnsToBrowserComputer(redirect);
+}
+
 function canonicalBrowserUrl(url: string): string {
   try {
     return new URL(url).toString();
@@ -306,15 +320,19 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
   };
 
   const [localSignIn, setLocalSignIn] = createSignal<LocalSignIn | null>(null);
-  const canSignInLocally = (tab: BrowserTab | undefined) =>
+  const canSendLocalSignIn = (tab: BrowserTab | undefined) =>
     !deps.props.runtime &&
     deps.props.server?.kind === "remote" &&
     serverSupportsCapability(deps.props.server, "browser-sign-in") &&
     webHost(tab?.url) !== null;
 
+  const canSignInLocally = (tab: BrowserTab | undefined) =>
+    canSendLocalSignIn(tab) && !isLoopbackOAuthPage(tab?.url ?? "");
+
   const canSignInTakeoverLocally = () => {
     const tab = browserTakeoverTab();
-    return tab !== undefined && browserTabs().some((entry) => entry.id === tab.id) && canSignInLocally(tab);
+    if (tab === undefined || !browserTabs().some((entry) => entry.id === tab.id)) return false;
+    return deps.props.browserTakeover?.reason === "sign-in-blocked" ? canSendLocalSignIn(tab) : canSignInLocally(tab);
   };
 
   const takeoverNeedsDesktopSignIn = () =>
