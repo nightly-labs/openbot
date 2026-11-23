@@ -125,4 +125,8 @@ export const messages = {
     "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
   "status.agent.providerExitContinues": "L'agente si è fermato prima di finire la risposta. L'agente continua.",
   "status.agent.branchTitle": "Chat ramificata",
+  "status.agent.location.field": "La tua posizione",
+  "status.agent.location.placeholder": "Città, indirizzo o luogo",
+  "status.agent.location.submit": "Condividi",
+  "status.agent.location.shared": "Posizione condivisa",
 } as const satisfies PartialTranslation<typeof source>;

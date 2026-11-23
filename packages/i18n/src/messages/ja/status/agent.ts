@@ -118,4 +118,8 @@ export const messages = {
     "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
   "status.agent.providerExitContinues": "エージェントは回答を終える前に停止しました。エージェントは続行します。",
   "status.agent.branchTitle": "分岐したチャット",
+  "status.agent.location.field": "現在地",
+  "status.agent.location.placeholder": "市区町村、住所、場所",
+  "status.agent.location.submit": "共有",
+  "status.agent.location.shared": "位置情報を共有しました",
 } as const satisfies PartialTranslation<typeof source>;

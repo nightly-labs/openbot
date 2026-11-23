@@ -158,4 +158,8 @@ export const messages = {
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
   "status.agent.providerExitContinues": "De agent stopte voordat zijn antwoord klaar was. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
+  "status.agent.location.field": "Je locatie",
+  "status.agent.location.placeholder": "Stad, adres of plaats",
+  "status.agent.location.submit": "Delen",
+  "status.agent.location.shared": "Locatie gedeeld",
 } as const satisfies PartialTranslation<typeof source>;
