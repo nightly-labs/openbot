@@ -13,11 +13,12 @@ const GEMINI_SDK_FAILURE = /\bAntigravity SDK error processing prompt for sessio
 const GEMINI_EXECUTION_ERROR_ANSWER = /^\s*Agent execution error: /u;
 const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could not be re-established: /u;
 const GEMINI_VERIFICATION_ANSWER =
-  /(?:^|\n)[^\n]*:\s+(https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
-const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
-const GEMINI_VERIFICATION_LINK = /https:\/\/accounts\.google\.com\/signin\/continue\?[^\s<>"'`)\]}\\]*/u;
+  /(?:^|\n)[^\n]*:\s+(https:\/\/accounts\.google\.com\/(?:v\d+\/)?signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
+const GEMINI_ACCOUNT_LINK =
+  /https:\/\/accounts\.google\.com\/(?:v\d+\/)?signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
+const GEMINI_VERIFICATION_LINK = /https:\/\/accounts\.google\.com\/(?:v\d+\/)?signin\/continue\?[^\s<>"'`)\]}\\]*/u;
 const GEMINI_LOG_ACCOUNT_LINK =
-  /https:\/\/accounts\.google\.com\/signin\/(?:continue\?|[^\s<>"'`)\]}\\]*auth_success_gemini)[^\s<>"'`)\]}\\]*/gu;
+  /https:\/\/accounts\.google\.com\/(?:v\d+\/)?signin\/(?:continue\?|[^\s<>"'`)\]}\\]*auth_success_gemini)[^\s<>"'`)\]}\\]*/gu;
 const GEMINI_VERIFICATION_PROMPT =
   /Verification required\. Please complete verification in your browser\b|Please verify your account in your browser to continue\b|Verify your account to continue\./u;
 const GEMINI_VERIFICATION_REQUIRED_ANSWER = /^\s*(?:\u26A0\uFE0F?\s*)?Verification Required\b/u;
