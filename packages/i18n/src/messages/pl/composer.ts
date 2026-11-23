@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "Edytujesz wiadomość z kolejki. Zapisz lub anuluj edycję, aby mogła zostać wysłana.",
   "composer.queueEdit.cancel": "Anuluj edycję",
+  "composer.feedbackFix.body":
+    "Poprawiasz zgłoszenie #{number}. Wyślij prośbę albo anuluj, aby zostawić zgłoszenie bez zmian.",
+  "composer.feedbackFix.cancel": "Anuluj",
   "composer.providerWait.offlineTitle": "Brak połączenia z internetem",
   "composer.providerWait.offline": "{provider} nie może odpowiedzieć, dopóki ten komputer nie wróci do sieci.",
   "composer.providerWait.silent": "Czas bez aktualizacji od {provider}: {duration}.",
@@ -19,6 +22,15 @@ export const messages = {
   "composer.update.manual": "Zaktualizuj {provider} na komputerze, na którym działa, aby kontynuować.",
   "composer.update.pending": "Aktualizowanie…",
   "composer.update.action": "Zaktualizuj",
+  "composer.imageInput.body":
+    "{model} dostaje tylko tekst, więc nie widzi załączonych obrazów. Jeśli ten model umie czytać obrazy, włącz dla niego obrazy.",
+  "composer.imageInput.label": "Włącz obrazy dla {model}",
+  "composer.imageInput.pending": "Włączanie…",
+  "composer.imageInput.action": "Włącz obrazy",
+  "composer.usageLimit.credits": "Wykorzystano cały limit planu {provider}. Agenci używają teraz Twoich kredytów.",
+  "composer.usageLimit.creditsResets":
+    "Wykorzystano cały limit planu {provider}. Agenci używają Twoich kredytów do odnowienia: {reset}.",
+  "composer.usageLimit.creditsTitle": "Używane są kredyty",
   "composer.usageLimit.resets": "Wykorzystano cały limit {provider}. Odnowienie: {reset}.",
   "composer.usageLimit.selectModel": "Wykorzystano cały limit {provider}. Wybierz inny model, aby kontynuować.",
   "composer.usageLimit.title": "Osiągnięto limit użycia",
@@ -40,6 +52,7 @@ export const messages = {
   "composer.picker.noSkills": "Ten agent nie ma umiejętności.",
   "composer.picker.noSkillMatch": "Żadna umiejętność nie pasuje do „{query}”.",
   "composer.picker.skillsLoadFailed": "Nie udało się wczytać umiejętności.",
+  "composer.picker.skillProblem": "Umiejętność {name} jest niedostępna. {problem} Poproś agenta o naprawę.",
   "composer.token.attachment": "Otwórz załączony plik {name}",
   "composer.token.agent": "Agent {name}",
   "composer.token.skill": "Umiejętność {name}",
@@ -51,6 +64,7 @@ export const messages = {
   "composer.voice.stop": "Zatrzymaj nagrywanie głosu",
   "composer.voice.cancel": "Anuluj nagrywanie głosu",
   "composer.voice.preparing": "Pobieranie modelu głosowego",
+  "composer.voice.starting": "Uruchamianie nagrywania głosu",
   "composer.voice.requesting": "Prośba o dostęp do mikrofonu",
   "composer.voice.transcribing": "Transkrypcja promptu głosowego",
   "composer.voice.start": "Utwórz prompt głosem",
@@ -58,6 +72,8 @@ export const messages = {
     "Dostęp do mikrofonu jest zablokowany. Pozwól OpenBot używać mikrofonu w ustawieniach systemowych.",
   "composer.voice.noMicrophone": "Brak dostępnego mikrofonu.",
   "composer.voice.startFailed": "OpenBot nie mógł rozpocząć nagrywania głosu.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot nie mógł otworzyć mikrofonu. Zamknij inne aplikacje, które go używają, sprawdź, czy jest podłączony i dozwolony w ustawieniach systemowych, a potem spróbuj ponownie.",
   "composer.voice.transcribeFailed": "OpenBot nie mógł przetranskrybować tego nagrania.",
   "composer.reply.toYou": "Odpowiedź na twoją wiadomość",
   "composer.reply.toAgent": "Odpowiedź na wiadomość agenta",
@@ -87,7 +103,7 @@ export const messages = {
   "composer.voice.recording": "Nagrywanie głosu",
   "composer.voice.limitSoon": "Nagrywanie zatrzyma się za {seconds} sekund.",
   "composer.voice.limitReached":
-    "Nagrywanie zatrzymało się po osiągnięciu limitu 2 minut. Nagrana treść jest w wiadomości.",
+    "Nagrywanie zatrzymało się po osiągnięciu limitu 10 minut. Nagrana treść jest w wiadomości.",
   "composer.send.saveQueued": "Zapisz wiadomość z kolejki",
   "composer.send.voice": "Wyślij wiadomość głosową",
   "composer.send.message": "Wyślij wiadomość",
@@ -108,10 +124,18 @@ export const messages = {
   "composer.error.holdQueued": "Nie udało się wstrzymać wiadomości z kolejki do edycji.",
   "composer.error.cancelEdit": "Nie udało się anulować edycji w kolejce. Spróbuj ponownie.",
   "composer.error.updateQueued": "Nie udało się zaktualizować wiadomości z kolejki. Spróbuj ponownie.",
+  "composer.queueEdit.received": "Agent już otrzymał tę wiadomość, więc edycja została zakończona.",
+  "composer.queueEdit.receivedKept":
+    "Agent już otrzymał tę wiadomość, więc edycja została zakończona. Twoje zmiany nadal są w polu wiadomości.",
+  "composer.queueEdit.deletedKept":
+    "Ta wiadomość została usunięta, więc edycja została zakończona. Twoje zmiany nadal są w polu wiadomości.",
+  "composer.queueEdit.endedKept": "Ta edycja zakończyła się przed zapisaniem. Twoje zmiany nadal są w polu wiadomości.",
   "composer.voice.prepareFailed": "Nie udało się przygotować modelu głosowego. Spróbuj ponownie.",
   "composer.voice.noSpeechRecorded": "Nie nagrano mowy.",
   "composer.voice.noSpeechDetected": "Nie wykryto mowy.",
   "composer.voice.readFailed": "Nie udało się przeczytać odpowiedzi na głos.",
+  "composer.voice.languageUnsupported":
+    "Nie udało się przeczytać odpowiedzi na głos. Ten język nie jest jeszcze dostępny.",
   "composer.error.saveEditTryAgain": "Nie udało się zapisać tej edycji na tym komputerze. Spróbuj ponownie.",
   "composer.error.saveUnconfirmed": "Zapis nie jest potwierdzony. Ponów zapis, aby sprawdzić wynik.",
   "composer.error.changeModel": "Nie udało się zmienić modelu. Spróbuj ponownie.",
@@ -152,6 +176,7 @@ export const messages = {
   "composer.picker.section.files": "Pliki",
   "composer.picker.section.tabs": "Karty przeglądarki",
   "composer.picker.section.threads": "Wątki",
+  "composer.picker.section.messages": "W wiadomościach",
   "composer.token.tab": "Karta przeglądarki {name}",
   "composer.token.thread": "Wątek {name}",
   "composer.token.unavailableTab": "Zamknięta karta przeglądarki {name}",

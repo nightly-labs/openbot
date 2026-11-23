@@ -21,11 +21,9 @@ interface RoutineTimeFieldProps {
   value: RoutineClock;
   onChange: (value: RoutineClock) => void;
   disabled?: boolean | undefined;
-  /** The popover closed, so the edit is complete. */
   onClose?: () => void;
 }
 
-/** A chip that shows the time and opens an hour and minute editor, with AM/PM on a 12-hour clock. */
 export function RoutineTimeField(props: RoutineTimeFieldProps) {
   const text = useText();
   const anchor = createStableChipAnchor(() => props.onClose?.());
@@ -64,11 +62,6 @@ const MERIDIEM_LABEL = {
   PM: "routine.clock.pm",
 } as const satisfies Record<RoutineMeridiem, AppTextKey>;
 
-/**
- * Hour and minute boxes take any typed value and commit it on Enter or blur. The arrow keys
- * step and commit at once, so holding one scrolls the time the way a native picker does.
- * The hour box uses the clock of the date locale: 1 to 12 with AM/PM, or 00 to 23.
- */
 function RoutineClockInput(props: { label: string; value: RoutineClock; onChange: (value: RoutineClock) => void }) {
   const { t, format } = useText();
   const parts = () => splitClock(props.value);
@@ -80,7 +73,6 @@ function RoutineClockInput(props: { label: string; value: RoutineClock; onChange
   const commit = (next: Partial<RoutineClockParts>) => {
     const value = joinClock({ ...parts(), ...next });
     if (value !== props.value) props.onChange(value);
-    // A typed value that does not change the clock ("9" to "09") still has to be redrawn.
     setHourText(shownHour(value));
     setMinuteText(String(splitClock(value).minute).padStart(2, "0"));
   };

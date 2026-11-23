@@ -97,9 +97,31 @@ There is no configuration for a developer or for a packaged build:
   form at `/authorize` and at `/token`.
 - A firewall can refuse an authorization page that names `127.0.0.1`, in the browser, where the
   app cannot see it (#6149). So when a sign-in opened the browser and no grant came back (a timeout
-  or a cancel), the next sign-in of that server registers the other name of the same listener.
-  The record is kept in memory, for one attempt. A refusal of that name at registration gets the
-  first name again. Sign-in apps and the client metadata document keep `127.0.0.1`.
+  or a cancel), or its page is still open when the user presses Sign in again, the next sign-in of
+  that server registers the other name of the same listener. The record is kept in memory, for one
+  attempt. A refusal of that name at registration gets the first name again. Sign-in apps and the
+  client metadata document keep `127.0.0.1`.
+- A second press of Sign in does not end the first sign-in (#10323). Both pages stay open, and the
+  user finishes whichever page they see. Each attempt keeps its own `state`, PKCE verifier and
+  client: the client that its page named, also when the other attempt registered another client
+  since then. Its exchange sends that client and the address of its page, and its tokens are saved
+  with that client. The first attempt that signs in ends the others as signed in. Cancel ends them
+  all. An attempt that is still before its page when another one signs in opens no page. On a
+  joined server, each relay flow follows its own attempt, and a cancel of the flow cancels only
+  that attempt, by its `state`. The client keeps the earlier page until its run ends, so its
+  callback and a pasted address still reach the host. Runs that return to the same port share one
+  listener, which closes when the last of them ends.
+- Some firewalls block both loopback names (TradingView, #7230). After `localhost` gets no grant
+  back, a sign-in in this computer's browser registers `openbot://mcp-auth`, and the next one after
+  that starts again at `127.0.0.1`. A refusal of the deep link at registration gets `127.0.0.1`,
+  and then `localhost`.
+  A sign-in that an in-app tab shows keeps the two loopback names: the deep link opens only in a
+  browser of a computer that runs OpenBot, and only while the operating system opens `openbot://`
+  in that app (`app.isDefaultProtocolClient`). A relayed sign-in does the same, except when the
+  client starts it with `sign-in-relay-deep-link-v1`: its computer opens the link, and passes the
+  callback to the relay by `state` (#9209). The web client and the phone do not. The deep link is sent only in the
+  attempt that registered it, because builds before the loopback listener registered it too and
+  Canva refuses it at `/authorize`.
 
 ## Remote services and released protocols
 

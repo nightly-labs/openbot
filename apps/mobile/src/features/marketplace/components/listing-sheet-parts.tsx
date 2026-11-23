@@ -19,10 +19,6 @@ import type { MarketplaceListing } from "../model/marketplace-listings";
 import { ListingGradient } from "./listing-gradient";
 import { ListingIcon, useListingSubtitle } from "./marketplace-parts";
 
-/**
- * The add action of a listing sheet, in the native header: `+` to install, or the arrows of an update.
- * A skill or an app that needs a key opens the next page of the sheet from it.
- */
 export function ListingHeaderAction({
   kind,
   hidden,
@@ -68,11 +64,6 @@ export function ListingHeaderAction({
   );
 }
 
-/**
- * The top of a listing's sheet: one card on the listing's gradient, as on the desktop page, with its
- * icon, name, creator, kind and category, and what it does under them - an example request for a skill
- * or an app, or the skills an agent brings. A dark scrim keeps the white text readable on every palette.
- */
 export function ListingHeader({ listing, children }: { listing: MarketplaceListing; children?: ReactNode }) {
   const { t } = useText();
   const subtitle = useListingSubtitle()(listing, true);
@@ -101,17 +92,11 @@ export function ListingHeader({ listing, children }: { listing: MarketplaceListi
   );
 }
 
-/** The agents a Try can open, and what it does. No agents turns it off. */
 export interface TryTargets {
   agents: readonly { id: string; name: string }[];
   onTry: (agentId: string) => void;
 }
 
-/**
- * Opens a Try: one agent opens its chat at once, and more agents ask which one, in a native menu. The
- * child is the control the user presses. The menu covers the child, so a row of text keeps its React
- * Native width and wraps.
- */
 export function TryPressable({
   targets,
   label,
@@ -152,10 +137,6 @@ export function TryPressable({
   );
 }
 
-/**
- * An example request, as the chat field writes it: the listing's chip, then the words. With `targets`
- * it has the Try arrow of the desktop card, which puts the request in an agent's message field.
- */
 export function HeroRequest({
   listing,
   text,
@@ -165,7 +146,6 @@ export function HeroRequest({
   listing: MarketplaceListing;
   text: string;
   targets?: TryTargets;
-  /** Why the arrow is off, such as a skill that no agent has yet. */
   caption?: string | null;
 }) {
   const { t } = useText();
@@ -209,7 +189,6 @@ export function HeroRequest({
   );
 }
 
-/** Short words on the gradient, such as the skills of an agent. */
 export function HeroChips({ items }: { items: readonly string[] }) {
   return (
     <View className="flex-row flex-wrap justify-center gap-2">
@@ -224,10 +203,6 @@ export function HeroChips({ items }: { items: readonly string[] }) {
   );
 }
 
-/**
- * The properties of a listing in a grid of two columns, with hairlines between the cells and the rows:
- * a small label over each value. An odd last property takes the whole row, centred.
- */
 export function ListingFacts({ facts }: { facts: readonly { label: string; value: string }[] }) {
   const rows: (typeof facts)[] = [];
   for (let index = 0; index < facts.length; index += 2) rows.push(facts.slice(index, index + 2));
@@ -261,7 +236,6 @@ export function ListingFacts({ facts }: { facts: readonly { label: string; value
   );
 }
 
-/** A heading over a block of a listing sheet. */
 export function ListingBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View className="gap-2.5">

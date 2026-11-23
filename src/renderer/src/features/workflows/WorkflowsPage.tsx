@@ -1,17 +1,17 @@
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
+import { Spinner } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
+import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
+import { useUsage } from "../usage/usage-context";
 import { WorkflowsCanvas } from "./WorkflowsCanvas";
+import { workflowAgentProgress } from "./workflow-agent-progress";
 import { desktopWorkflowHost, type WorkflowHost } from "./workflows-port";
 
-/**
- * The workflows of one server on a page that covers the agent list. A joined server whose OpenBot
- * does not serve `workflows-v1` shows a notice.
- */
 export function WorkflowsPage(props: { serverId: string }) {
   const { t } = useText();
   const { servers } = useServers();
@@ -20,7 +20,6 @@ export function WorkflowsPage(props: { serverId: string }) {
     const entry = server();
     return !entry || entry.kind === "local" || serverSupportsCapability(entry, WORKFLOWS_CAPABILITY);
   };
-  /** A joined server that has not answered the compatibility check yet is not an older host. */
   const checking = () => {
     const entry = server();
     return entry?.kind === "remote" && !entry.compatibility?.hostAppVersion;
@@ -30,8 +29,8 @@ export function WorkflowsPage(props: { serverId: string }) {
       when={supported() ? props.serverId : null}
       keyed
       fallback={
-        <main class="window-page diagram-view diagram-flows-notice">
-          <Show when={!checking()}>
+        <main class="window-page workflows-notice">
+          <Show when={!checking()} fallback={<Spinner size="lg" label={t("common.loading")} />}>
             <p>{t("error.workflow.serverTooOld")}</p>
           </Show>
         </main>
@@ -39,6 +38,7 @@ export function WorkflowsPage(props: { serverId: string }) {
     >
       {(serverId) => (
         <DesktopWorkflowsCanvas
+          serverId={serverId}
           host={desktopWorkflowHost(serverId, server)}
           admin={serverRoleCanAdminister(server())}
         />
@@ -47,18 +47,29 @@ export function WorkflowsPage(props: { serverId: string }) {
   );
 }
 
-/** The canvas with the agents, models and account of the desktop app. */
-function DesktopWorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
+function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; admin: boolean }) {
   const { agentList, agentStatus, modelOptions } = useAgents();
   const { signedInAccount } = useAuth();
+  const { turnProgress, turnStepLines } = useTurns();
+  const usage = useUsage();
+  const request = {
+    workflowId: () => {
+      const requested = usage.workflowRequest();
+      return requested?.serverId === props.serverId ? requested.workflowId : undefined;
+    },
+    taken: usage.takeWorkflowRequest,
+  };
   return (
     <WorkflowsCanvas
       host={props.host}
+      serverId={props.serverId}
       admin={props.admin}
       agents={agentList()}
       models={modelOptions()}
       status={agentStatus()}
       self={signedInAccount()?.name ?? undefined}
+      request={request}
+      agentProgress={(agentId) => workflowAgentProgress(agentId, turnProgress()[agentId], turnStepLines())}
     />
   );
 }

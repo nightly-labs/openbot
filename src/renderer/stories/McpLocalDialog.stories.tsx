@@ -1,11 +1,3 @@
-/**
- * The connect step for a server another app on this computer runs: the steps that turn it on in
- * that app, what the server can do, and one connect that proves it answers.
- *
- * The story reads the real Figma listing, so the steps and the note under review are the ones users
- * see. "unreachable" is the answer when the server is not on yet.
- */
-
 import type { McpLocalFlow } from "@openbot/contracts/mcp-connect-flows";
 import { McpLocalDialog } from "@openbot/ui/features/settings/McpLocalDialog";
 import { fn } from "storybook/test";
@@ -32,9 +24,7 @@ function figmaListing() {
 const { subject: FIGMA_SUBJECT, flow: FIGMA_FLOW } = figmaListing();
 
 interface LocalPlaygroundProps {
-  /** What the server answers once the dialog connects. */
   outcome: ConnectOutcome;
-  /** The listing names the app's setup page, and the caller can open it. */
   showsTheSetupPage: boolean;
 }
 

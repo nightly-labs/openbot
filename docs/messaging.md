@@ -136,6 +136,10 @@ this computer never has it.
    every Telegram chat. It goes in the **Integrations** section of the sidebar.
 4. In the group, mention the bot (`@<bot> …`), or reply to one of its messages.
 
+A group that adds the bot in Telegram itself, without the link from OpenBot, is not linked. When a
+person mentions the bot there, or writes to it in a direct chat, the bot answers once a day that the
+chat is not linked and how to link it.
+
 A chat answers to one OpenBot server. Another account cannot link a chat that your server answers
 until you disconnect it. **Disconnect** makes the bot leave the chat and unlinks it. When it is the
 last linked chat, it also deletes the Telegram Orchestrator with its conversations, as for Slack.
@@ -281,8 +285,14 @@ chat each morning. It reads only a place that the list shows. A turn that answer
 or a teammate's turn on a request from it, cannot read a different place: a person there is not the
 OpenBot user. Slack can limit it to one read a minute; it
 then fails at once, and the agent can try again. Discord gives the text only of messages that
-mention OpenBot, and of bot posts. Discord messages name their files. Telegram and WhatsApp give
-what this computer saw since it started; WhatsApp keeps the newest 200 messages of all its chats.
+mention OpenBot, and of bot posts. Discord messages name their files. Telegram gives what this
+computer saw since it started. WhatsApp keeps the messages of the allowed chats for 90 days, also
+after a restart and also those that do not mention the number. It downloads their files when they
+arrive, and the agent gets the path of each copy. The copies of one number use at most 2 GB: the
+oldest go first, and their messages keep only the file names. A message that its author deletes for
+everyone goes, and a changed message keeps the new text. `query` keeps the messages whose text or author has
+each of its words, and `before` (an ISO time) reads earlier messages. WhatsApp searches all its saved
+messages; the other platforms search only the newest messages that they give.
 
 ## Posts that an agent sends
 
@@ -355,8 +365,8 @@ while this computer has no Signal connection is lost, except for a hosted server
   and a protocol change of WhatsApp can stop the connection until OpenBot updates. Use a number only
   for OpenBot when you can.
 - WhatsApp removes a linked device after about 14 days without a connection. Link the number again.
-- WhatsApp gives a new linked device no history, so the agent sees only what this computer saw since
-  it started. A hosted server does not start for a WhatsApp message: WhatsApp keeps it until the
+- WhatsApp gives a new linked device no history, so the agent sees only what this computer saw after
+  the link, for 90 days. Disconnect deletes the saved messages and their files. A hosted server does not start for a WhatsApp message: WhatsApp keeps it until the
   server connects. A message older than one day gets no answer.
 - WhatsApp has one session per linked device. A second OpenBot profile that opens the same store
   stops with "locked"; link it as its own device.
@@ -382,7 +392,7 @@ core changes:
 | Slack | The Events API through Signal | `thread_ts`, or the message `ts` that starts a thread | Implemented. |
 | Discord | The Gateway in Signal (`@discordjs/ws`), which passes mentions to the host; calls go through Signal | The id of the first message of a reply chain | Implemented. No privileged intent. |
 | Telegram | The webhook of the one OpenBot bot through Signal, which holds the token | `message_thread_id`, the topic in a forum, `dm` in a direct chat | Implemented. No history API: the host keeps what the bot sees, in memory. |
-| WhatsApp | A linked device: this computer's own socket to WhatsApp (vendored Baileys, `packages/whatsapp`) | `dm` in a direct chat; in a group, the id of the message that mentioned the number | Implemented. No history: the host keeps what it saw, in memory. Sender rules in `whatsapp-senders.ts`. |
+| WhatsApp | A linked device: this computer's own socket to WhatsApp (vendored Baileys, `packages/whatsapp`) | `dm` in a direct chat; in a group, the id of the message that mentioned the number | Implemented. No history: the host saves what it saw for 90 days (`projection_messaging_history`). Sender rules in `whatsapp-senders.ts`. |
 
 Then add the platform to `MESSAGING_PLATFORMS`, a page in Marketplace → Apps, and its i18n
 keys. The database needs no migration: `platform` has no `CHECK`.

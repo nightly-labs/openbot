@@ -10,7 +10,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { readJson, requireAdmin } from "./request-helpers";
 
-/** Whether this computer learns from what people do in agent tabs they hold, read and set from a joined server. Frozen by `browsing-memory-v1`. */
 export async function routeBrowsingMemory(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,

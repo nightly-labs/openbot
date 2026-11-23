@@ -1,9 +1,13 @@
-/**
- * The chat in the agent dock's panel: a header, the recent text messages and a compact composer.
- * Tool steps, plans and other timeline items stay in the main window, which opens from the ⋯ menu.
- * A channel seat shows the same chat, with the author's name over each message from someone else.
- */
-
+import { chatVisualReply } from "@openbot/contracts/chat-visual";
+import type {
+  AgentApproval,
+  AgentDockBackupModel,
+  AgentDockPrompt,
+  AgentDockTakeover,
+  AgentDockUsageLimit,
+  BrowserTab,
+  LocalBrowserSecretResponse,
+} from "@openbot/contracts/ipc";
 import {
   AppWindow,
   ArrowUp,
@@ -15,16 +19,23 @@ import {
   IconButton,
   Maximize2,
   PanelRight,
+  Pin,
+  PinOff,
+  Plus,
   X,
 } from "@openbot/ui";
 import { createMemo, For, onCleanup, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { QuestionPromptBubble } from "../../components/QuestionPromptBubble";
 import { TypingDots } from "../../components/TypingDots";
 import type { AgentMessage, ComposerAgent } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ChannelAvatar } from "../channels/ChannelAvatar";
+import { chatBubbleColor } from "../conversation/BackdropBubbles";
+import { UsageLimitAskCard } from "../conversation/BackupModels";
 import { ComposerEditor } from "../conversation/ComposerEditor";
+import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
 import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
@@ -33,73 +44,68 @@ import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_TITLE } from "../sidebar/sidebar-filt
 import type { SidebarWaitReason } from "../sidebar/sidebar-types";
 import type { AgentDockSeat } from "./AgentDock";
 
-/** The panel shows the newest messages only; the main window has the full history. */
 const VISIBLE_MESSAGES = 60;
-/** Closer than this to the end, a new message scrolls the log down. */
 const STICK_TO_END_PX = 80;
-/** The space between the scroll thumb and the top and bottom of the log. */
 const THUMB_INSET_PX = 6;
-/** The shortest scroll thumb, so that a long log keeps a thumb that the eye finds. */
 const THUMB_MIN_PX = 24;
-/** How long the scroll thumb stays after the last scroll when the pointer is not on the log. */
 const THUMB_HIDE_MS = 900;
-/** How long after the reader's wheel, touch or pointer input a scroll counts as theirs. */
 const SCROLL_INPUT_MS = 1000;
 
 export interface AgentDockChatModel {
-  /** The loaded messages of the agent or channel, oldest first. The panel shows the text ones. */
   messages: readonly AgentMessage[];
-  /** True while the agent works on a turn. */
   working: boolean;
-  /** Set while the agent waits for the user. The user answers in the main window. */
   wait: SidebarWaitReason | null;
+  approval?: { approval: AgentApproval; attempt: number } | null | undefined;
+  prompt?: AgentDockPrompt | null | undefined;
+  takeover?: AgentDockTakeover | null | undefined;
+  usageLimit?: AgentDockUsageLimit | null | undefined;
 }
 
-/** A message the user sent from the panel, until the host's copy is in `messages`. */
+export interface AgentDockChatAnswers {
+  approval: (approval: AgentApproval, decision: "accept" | "decline") => Promise<boolean>;
+  prompt: (prompt: AgentDockPrompt, answers: Record<string, string[]>) => Promise<boolean>;
+  takeover: (takeover: AgentDockTakeover, decision: "complete" | "cancel") => Promise<boolean>;
+  takeoverDone?: ((takeover: AgentDockTakeover) => boolean) | undefined;
+  secret: (takeover: AgentDockTakeover, input: LocalBrowserSecretResponse) => Promise<void>;
+  usageLimitSend: (limit: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) => Promise<void>;
+  usageLimitWait: (limit: AgentDockUsageLimit) => void;
+}
+
 export interface AgentDockPendingMessage {
   key: number;
   text: string;
   messageId: string | null;
-  /** The last message of the chat when the user sent it: the host's copy comes after it. */
   after: string | null;
 }
 
-/** The microphone of one chat in the panel. */
 export interface AgentDockChatVoice {
   phase: VoicePhase;
   levels: readonly number[];
   elapsedSeconds: number;
-  /** The words the recording heard so far. */
   liveText: string;
-  /** The download progress of the speech model, in percent, while it is prepared. */
   modelProgress: number | null;
-  /** Another chat records or transcribes, so this microphone cannot start. */
   blocked: boolean;
   onStart: () => void;
   onCancel: () => void;
-  /** Stops the recording. The words go into the draft. */
   onFinish: () => void;
-  /** Stops the recording and sends the draft with the words. */
   onSend: () => void;
 }
 
-/** The messages that the panel shows: the text of the people and of the agents. */
 export function isDockMessage(message: AgentMessage): boolean {
   if (message.author !== "you" && message.author !== "agent") return false;
   if (message.kind !== undefined && message.kind !== "text" && message.kind !== "error") return false;
   return message.body.trim().length > 0;
 }
 
-/** A message of the reader. In a channel, a message of another person carries its author. */
+export function isDockVisualReply(message: AgentMessage): boolean {
+  return chatVisualReply(message) !== null;
+}
+
 function isOwn(message: AgentMessage): boolean {
   return message.author === "you" && !message.senderMember;
 }
 
-/**
- * True when the host's copy of a pending message has arrived. An earlier message with the same text is
- * not the copy. When the mark is no longer in the list, all the messages are later.
- */
-function delivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
+export function pendingMessageDelivered(pending: AgentDockPendingMessage, messages: readonly AgentMessage[]): boolean {
   if (pending.messageId !== null && messages.some((message) => message.id === pending.messageId)) return true;
   const start = pending.after === null ? 0 : messages.findIndex((message) => message.id === pending.after) + 1;
   return messages.slice(start).some((message) => isOwn(message) && message.body.trim() === pending.text);
@@ -116,24 +122,26 @@ export function AgentDockChat(props: {
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onClose: () => void;
+  pinned?: boolean | undefined;
+  onPinChange?: ((pinned: boolean) => void) | undefined;
   onRemove: () => void;
+  onAdd: () => void;
   onOpenInMain: () => void;
-  /** The ⋯ menu shows "Open in new window" only when it is set. */
   onOpenWindow?: (() => void) | undefined;
-  /** The composer shows a microphone only when it is set. */
   voice?: AgentDockChatVoice | undefined;
-  /** The agents that mentions in the messages and the composer name. */
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  answers?: AgentDockChatAnswers | undefined;
 }) {
   const { t } = useText();
   let log: HTMLDivElement | undefined;
-  /* An edge with more messages behind it fades out. */
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
   const messages = createMemo(() => props.chat.messages.filter(isDockMessage).slice(-VISIBLE_MESSAGES));
-  const pending = createMemo(() => props.pending.filter((message) => !delivered(message, props.chat.messages)));
+  const pending = createMemo(() =>
+    props.pending.filter((message) => !pendingMessageDelivered(message, props.chat.messages)),
+  );
   const agentSeat = () => (props.seat.kind === "agent" ? props.seat : undefined);
   const channel = () => (props.seat.kind === "channel" ? props.seat.channel : undefined);
   const name = () => (props.seat.kind === "agent" ? props.seat.agent.name : props.seat.channel.name);
@@ -142,33 +150,81 @@ export function AgentDockChat(props: {
     if (props.chat.working) return t("agent.dock.working");
     return props.seat.kind === "agent" ? props.seat.agent.title : props.seat.channel.title;
   };
-  /** The author shown over a message in a channel. The reader's own messages have no name. */
   const author = (message: AgentMessage): string | undefined => {
     if (!channel() || isOwn(message)) return undefined;
     if (message.senderMember) return message.senderMember.name;
     return props.agents.find((agent) => agent.id === message.senderAgentId)?.name;
   };
-  const waitReason = () => props.chat.wait;
+  const agentTint = (message: AgentMessage) => {
+    if (message.author !== "agent" || message.kind === "error") return undefined;
+    const seated = agentSeat()?.agent;
+    const senderId = message.exchange?.senderAgentId ?? message.senderAgentId;
+    const agent =
+      senderId === undefined || senderId === seated?.id
+        ? seated
+        : props.agents.find((candidate) => candidate.id === senderId);
+    return chatBubbleColor(null, { kind: "agent", agent });
+  };
+  const approval = () => (props.answers ? (props.chat.approval ?? undefined) : undefined);
+  const approvalKey = () => {
+    const current = approval();
+    return current ? `${current.approval.agentId}:${current.approval.requestId}:${current.attempt}` : undefined;
+  };
+  const prompt = () => (props.answers ? (props.chat.prompt ?? undefined) : undefined);
+  const promptKey = () => {
+    const current = prompt();
+    return current ? `${current.agentId}:${current.requestId}:${current.attempt}` : undefined;
+  };
+  const takeover = () => (props.answers ? (props.chat.takeover ?? undefined) : undefined);
+  const takeoverKey = () => {
+    const current = takeover();
+    return current ? `${current.request.agentId}:${current.request.requestId}:${current.attempt}` : undefined;
+  };
+  const usageLimit = () => (props.answers ? (props.chat.usageLimit ?? undefined) : undefined);
+  const usageLimitKey = () => {
+    const current = usageLimit();
+    return current ? `${current.agentId}:${current.resetsAt ?? ""}:${current.attempt}` : undefined;
+  };
+  const answering = () => Boolean(approval() || prompt() || takeover() || usageLimit());
+  const waitReason = () => (answering() ? null : props.chat.wait);
   const voicePhase = (): VoicePhase => props.voice?.phase ?? "idle";
   const recording = () => voicePhase() === "recording";
   const transcribing = () => voicePhase() === "transcribing";
-  /** A send while the microphone records sends the draft with the words. */
+  const respond = (current: AgentApproval, decision: "accept" | "decline") =>
+    props.answers ? props.answers.approval(current, decision) : Promise.resolve(false);
+  const answerPrompt = (current: AgentDockPrompt, answers: Record<string, string[]>) =>
+    props.answers ? props.answers.prompt(current, answers) : Promise.resolve(false);
+  const respondTakeover = (current: AgentDockTakeover, decision: "complete" | "cancel") =>
+    props.answers ? props.answers.takeover(current, decision) : Promise.resolve(false);
+  const takeoverTab = (current: AgentDockTakeover): BrowserTab | undefined => {
+    const page = current.page;
+    if (!page) return undefined;
+    return {
+      id: current.request.tabId,
+      title: page.title,
+      url: page.origin,
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId: null,
+    };
+  };
+  const takeoverSecret = (current: AgentDockTakeover) => ({
+    vault: current.vault ?? undefined,
+    onRespond: (input: LocalBrowserSecretResponse) =>
+      props.answers ? props.answers.secret(current, input) : Promise.resolve(),
+  });
+  const sendOnBackup = (current: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) =>
+    props.answers ? props.answers.usageLimitSend(current, option, remember) : Promise.resolve();
+  const usageLimitModel = (current: AgentDockUsageLimit) => current.model ?? undefined;
+  const usageLimitAgent = (current: AgentDockUsageLimit) => current.agentName ?? undefined;
   function submit(): void {
     if (recording()) props.voice?.onSend();
     else if (!transcribing()) props.onSend();
   }
 
-  /* The log holds its end while the reader is there: when the chat opens, when a message comes, while
-     an answer streams in and when the typing dots show. A scroll up lets go; a scroll back down to the
-     end holds again. Growth of the content, not a change of the data, moves the log, because Markdown
-     and chips reach their full height after the data changes. */
   let thumb: HTMLDivElement | undefined;
   let holdEnd = true;
   let lastTop = 0;
-  /**
-   * When the reader last used the wheel, a touch or the pointer on the log. Only a scroll soon after
-   * shows the thumb: content that loads late also moves the position, and that is not the reader.
-   */
   let inputAt = Number.NEGATIVE_INFINITY;
   let pointerIn = false;
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
@@ -276,6 +332,20 @@ export function AgentDockChat(props: {
           <strong>{name()}</strong>
           <span>{subtitle()}</span>
         </div>
+        <Show when={props.onPinChange}>
+          {(change) => (
+            <IconButton
+              label={props.pinned ? t("agent.dock.closeOnLeave") : t("agent.dock.keepOpen")}
+              variant="ghost"
+              class="agent-dock-icon"
+              onClick={() => change()(!props.pinned)}
+            >
+              <Show when={props.pinned} fallback={<Pin aria-hidden="true" />}>
+                <PinOff aria-hidden="true" />
+              </Show>
+            </IconButton>
+          )}
+        </Show>
         <DropdownMenu.Root placement="bottom-end" gutter={4}>
           <DropdownMenu.Trigger class="agent-dock-icon" aria-label={t("agent.dock.more")}>
             <Ellipsis aria-hidden="true" />
@@ -295,10 +365,20 @@ export function AgentDockChat(props: {
                 )}
               </Show>
               <DropdownMenu.Separator />
-              <DropdownMenu.Item onSelectAfterClose={() => props.onRemove()}>
-                <PanelRight aria-hidden="true" />
-                {t("agent.dock.remove")}
-              </DropdownMenu.Item>
+              <Show
+                when={props.seat.temporary}
+                fallback={
+                  <DropdownMenu.Item onSelectAfterClose={() => props.onRemove()}>
+                    <PanelRight aria-hidden="true" />
+                    {t("agent.dock.remove")}
+                  </DropdownMenu.Item>
+                }
+              >
+                <DropdownMenu.Item onSelectAfterClose={() => props.onAdd()}>
+                  <Plus aria-hidden="true" />
+                  {t("agent.dock.add")}
+                </DropdownMenu.Item>
+              </Show>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -338,29 +418,51 @@ export function AgentDockChat(props: {
               fallback={<p class="agent-dock-empty">{t("agent.dock.empty", { name: name() })}</p>}
             >
               <For each={messages()}>
-                {(message) => (
-                  <Bubble
-                    align={isOwn(message) ? "end" : "start"}
-                    variant={isOwn(message) ? "secondary" : "muted"}
-                    class="agent-dock-bubble"
-                    data-error={message.kind === "error" ? "" : undefined}
-                  >
-                    <BubbleContent>
-                      <Show when={author(message)}>{(shown) => <span class="agent-dock-author">{shown()}</span>}</Show>
-                      {/* Markdown with mention chips, as in the main chat. */}
-                      <div class="agent-dock-markdown message-markdown">
-                        <MarkdownMessageText
-                          body={message.body}
-                          agents={props.agents}
-                          attachments={message.attachments}
-                          onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
-                          onOpenAttachment={() => props.onOpenInMain()}
-                          onOpenLink={(url) => props.onOpenLink?.(url)}
-                        />
-                      </div>
-                    </BubbleContent>
-                  </Bubble>
-                )}
+                {(message) => {
+                  const tint = createMemo(() => agentTint(message));
+                  return (
+                    <Bubble
+                      align={isOwn(message) ? "end" : "start"}
+                      variant={isOwn(message) ? "secondary" : "muted"}
+                      class={["agent-dock-bubble", { "message-bubble-colored": tint() !== undefined }]}
+                      style={tint() === undefined ? undefined : `--message-chat-color: ${tint()}`}
+                      data-error={message.kind === "error" ? "" : undefined}
+                    >
+                      <BubbleContent>
+                        <Show when={author(message)}>
+                          {(shown) => <span class="agent-dock-author">{shown()}</span>}
+                        </Show>
+                        <Show
+                          when={isDockVisualReply(message)}
+                          fallback={
+                            <div class="agent-dock-markdown message-markdown">
+                              <MarkdownMessageText
+                                body={message.body}
+                                agents={props.agents}
+                                attachments={message.attachments}
+                                onSelectAgent={(agentId) => props.onSelectAgent?.(agentId)}
+                                onOpenAttachment={() => props.onOpenInMain()}
+                                onOpenLink={(url) => props.onOpenLink?.(url)}
+                              />
+                            </div>
+                          }
+                        >
+                          <div class="agent-dock-visual">
+                            <p class="agent-dock-text">{message.body}</p>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              aria-label={t("agent.dock.openPage", { title: message.body })}
+                              onClick={() => props.onOpenInMain()}
+                            >
+                              {t("common.open")}
+                            </Button>
+                          </div>
+                        </Show>
+                      </BubbleContent>
+                    </Bubble>
+                  );
+                }}
               </For>
               <For each={pending()}>
                 {(message) => (
@@ -371,6 +473,81 @@ export function AgentDockChat(props: {
                   </Bubble>
                 )}
               </For>
+            </Show>
+            <Show when={usageLimitKey()} keyed>
+              {(_key) => (
+                <Show when={usageLimit()}>
+                  {(current) => (
+                    <div class="agent-dock-card">
+                      <UsageLimitAskCard
+                        provider={current().provider}
+                        model={usageLimitModel(current())}
+                        agentName={usageLimitAgent(current())}
+                        resetsAt={current().resetsAt}
+                        options={current().options}
+                        rememberable={current().rememberable}
+                        onSend={(option, remember) => sendOnBackup(current(), option, remember)}
+                        onWait={() => props.answers?.usageLimitWait(current())}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
+            </Show>
+            <Show when={takeoverKey()} keyed>
+              {(_key) => (
+                <Show when={takeover()}>
+                  {(current) => (
+                    <div class="agent-dock-card">
+                      <BrowserTakeoverCard
+                        request={current().request}
+                        agentName={current().agentName}
+                        tab={takeoverTab(current())}
+                        preview={null}
+                        previewStatus="idle"
+                        onOpen={() => props.onOpenInMain()}
+                        onComplete={
+                          props.answers?.takeoverDone?.(current()) === false
+                            ? undefined
+                            : () => respondTakeover(current(), "complete")
+                        }
+                        onCancel={() => respondTakeover(current(), "cancel")}
+                        browserSecret={takeoverSecret(current())}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
+            </Show>
+            <Show when={promptKey()} keyed>
+              {(_key) => (
+                <Show when={prompt()}>
+                  {(current) => (
+                    <div class="agent-dock-card">
+                      <QuestionPromptBubble
+                        questions={current().questions}
+                        onSubmit={(answers) => answerPrompt(current(), answers)}
+                        onOpenLink={(url) => props.onOpenLink?.(url)}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
+            </Show>
+            <Show when={approvalKey()} keyed>
+              {(_key) => (
+                <Show when={approval()}>
+                  {(current) => (
+                    <div class="agent-dock-card">
+                      <ApprovalCard
+                        approval={current().approval}
+                        onApprove={() => respond(current().approval, "accept")}
+                        onReject={() => respond(current().approval, "decline")}
+                      />
+                    </div>
+                  )}
+                </Show>
+              )}
             </Show>
             <Show when={props.chat.working && !props.chat.wait}>
               <Bubble align="start" variant="muted" class="agent-dock-bubble">
@@ -386,7 +563,6 @@ export function AgentDockChat(props: {
             </Show>
           </div>
         </div>
-        {/* Where the reader is in the log. It shows while the reader scrolls or points at the log. */}
         <div class="agent-dock-scroll-thumb" aria-hidden="true" ref={(element) => (thumb = element)} />
       </div>
 
@@ -406,7 +582,6 @@ export function AgentDockChat(props: {
 
       <Show when={props.error}>{(error) => <p class="agent-dock-error">{error()}</p>}</Show>
 
-      {/* The mention picker hangs from the composer inside its `.composer-wrap`. */}
       <div class="composer-wrap agent-dock-composer-wrap">
         <form
           ref={draftRows.form}
@@ -444,6 +619,7 @@ export function AgentDockChat(props: {
                   onStart={() => voice().onStart()}
                   onCancel={() => voice().onCancel()}
                   onFinish={() => voice().onFinish()}
+                  onSend={submit}
                   send={sendButton()}
                 />
               )}

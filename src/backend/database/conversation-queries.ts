@@ -12,12 +12,14 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   AGENT_WELCOME_ITEM_TYPE,
+  CHANNEL_RESUME_ITEM_TYPE,
   HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX,
   isAttachmentSummary,
   MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -36,39 +38,26 @@ export interface ConversationQueriesOptions {
   core: DatabaseCore;
 }
 
-/** The message kinds that a Team API client cannot show, left out of its pages and read state. */
 export interface ConversationMarkerExclusions {
   excludeRoutineEvents?: boolean;
   excludeRoutineRunEvents?: boolean;
   excludeHostedSiteEvents?: boolean;
   excludeRoutineQuietAnswers?: boolean;
+  excludeSettingLinks?: boolean;
 }
 
-/**
- * A channel gives each of its members a thread of its own, and a side thread has one too, under the same
- * agent id as the normal chat. A search result carries an agent id and a message, and opening one
- * shows the normal conversation of that agent, where a channel or task message does not exist. These
- * threads stay out of the search until a result can name the channel or task it belongs to. A message
- * search that asks for side threads names the thread of each result.
- */
 const CHANNEL_THREAD_EXCLUSION = "AND message.thread_id NOT IN (SELECT thread_id FROM projection_channel_contexts)";
 const SIDE_THREAD_EXCLUSION = `${CHANNEL_THREAD_EXCLUSION}
              AND message.thread_id NOT IN (SELECT thread_id FROM projection_agent_threads)`;
-/** An archived side thread does not show, so its messages stay out of the search. */
 const ARCHIVED_SIDE_THREAD_EXCLUSION = `${CHANNEL_THREAD_EXCLUSION}
              AND message.thread_id NOT IN (SELECT thread_id FROM projection_agent_threads WHERE archived_at IS NOT NULL)`;
 
-/**
- * Every read of a thread's messages: the whole snapshot, one anchored page, a page's supported
- * cursor, and a text search across the thread.
- *
- * Owns the read side of `projection_thread_messages` and the opaque base64url cursors that page it,
- * including the marker filters that hide routine and hosted-site events from a page whose caller
- * did not ask for them. Reads only — nothing here dispatches an event or opens a transaction. The
- * class never imports the facade.
- */
 export class ConversationQueries {
   readonly #core: DatabaseCore;
+  readonly #latestReplies = new Map<
+    string,
+    { agentId: string; revision: number; message: ConversationMessage | null }
+  >();
 
   constructor(options: ConversationQueriesOptions) {
     this.#core = options.core;
@@ -76,6 +65,50 @@ export class ConversationQueries {
 
   readConversation(agentId: string, threadId: string | null): ConversationSnapshot {
     if (!threadId) return { agentId, threadId: null, activeTurnId: null, revision: 0, messages: [] };
+    return this.#snapshot(
+      agentId,
+      threadId,
+      databaseRows(
+        this.#core.connection
+          .prepare(
+            `SELECT message_json FROM projection_thread_messages
+             WHERE thread_id = ? ORDER BY created_at, ordinal, message_id`,
+          )
+          .all(threadId),
+      ),
+    );
+  }
+
+  readTurnConversation(agentId: string, threadId: string, turnId: string): ConversationSnapshot {
+    return this.#snapshot(
+      agentId,
+      threadId,
+      databaseRows(
+        this.#core.connection
+          .prepare(
+            `SELECT message_json FROM projection_thread_messages
+             WHERE thread_id = ? AND turn_id = ? ORDER BY created_at, ordinal, message_id`,
+          )
+          .all(threadId, turnId),
+      ),
+    );
+  }
+
+  readLatestTurnId(turnIds: string[]): string | null {
+    if (turnIds.length === 0) return null;
+    const row = databaseRow(
+      this.#core.connection
+        .prepare(
+          `SELECT turn_id FROM projection_turns
+           WHERE turn_id IN (SELECT value FROM json_each(?))
+           ORDER BY started_at DESC, last_event_sequence DESC LIMIT 1`,
+        )
+        .get(JSON.stringify(turnIds)),
+    );
+    return row ? requiredStringColumn(row, "turn_id") : null;
+  }
+
+  #snapshot(agentId: string, threadId: string, rows: DynamicRecord[]): ConversationSnapshot {
     const thread = decodeConversationThreadRow(
       this.#core.connection
         .prepare(
@@ -83,14 +116,6 @@ export class ConversationQueries {
            FROM projection_threads WHERE thread_id = ? AND agent_id = ?`,
         )
         .get(threadId, agentId),
-    );
-    const rows = databaseRows(
-      this.#core.connection
-        .prepare(
-          `SELECT message_json FROM projection_thread_messages
-           WHERE thread_id = ? ORDER BY created_at, ordinal, message_id`,
-        )
-        .all(threadId),
     );
     return {
       agentId,
@@ -101,19 +126,13 @@ export class ConversationQueries {
     };
   }
 
-  /**
-   * The assistant messages of one turn, in order. A routine flow reads only the answer of a turn,
-   * so it does not load and parse the whole history of the thread for it. The turn row names the
-   * thread that ran the turn: the agent's chat or a side thread, such as a routine thread. A branch
-   * keeps the turn ids of the rows it copied, but the turn row stays with the source thread.
-   */
   readTurnAssistantMessages(agentId: string, turnId: string): ConversationMessage[] {
     const rows = databaseRows(
       this.#core.connection
         .prepare(
           `SELECT message.message_json FROM projection_turns AS turn
            JOIN projection_threads AS thread ON thread.thread_id = turn.thread_id
-           JOIN projection_thread_messages AS message
+           JOIN projection_thread_messages AS message INDEXED BY thread_messages_turn
              ON message.thread_id = turn.thread_id AND message.turn_id = turn.turn_id
            WHERE turn.turn_id = ? AND thread.agent_id = ? AND message.author = 'assistant'
            ORDER BY message.created_at, message.ordinal, message.message_id`,
@@ -123,13 +142,6 @@ export class ConversationQueries {
     return rows.map((row) => JSON.parse(requiredStringColumn(row, "message_json")));
   }
 
-  /**
-   * The turn that runs on one thread, read from the thread row alone.
-   *
-   * `readConversation` answers this as well, but it loads and parses every message of the thread to
-   * do it. The callers here ask only "is this thread busy" - a refresh after an MCP or tool change
-   * asks it of every thread of every agent - so a whole history would be read and thrown away.
-   */
   readActiveTurnId(agentId: string, threadId: string | null): string | null {
     if (!threadId) return null;
     const row = databaseRow(
@@ -140,12 +152,6 @@ export class ConversationQueries {
     return row ? optionalStringColumn(row, "active_turn_id") : null;
   }
 
-  /**
-   * The turns that the store still shows as running, by thread. A running turn that is not the
-   * thread's active turn has no writer left: its end was never stored. Restart recovery reads this
-   * once to close such rows (#2214); `projection_turns` has no thread index, so one scan serves
-   * every thread.
-   */
   readRunningTurnIds(): Map<string, string[]> {
     const turns = new Map<string, string[]>();
     for (const row of databaseRows(
@@ -157,11 +163,6 @@ export class ConversationQueries {
     return turns;
   }
 
-  /**
-   * The first time and the number of the messages that a person wrote to an agent on this computer.
-   * A routine run is also a `user` message, with the `routine` item type; it does not count.
-   * One scan of the table: the columns come before the message JSON, so it reads no overflow page.
-   */
   readSentMessageStats(): SentMessageStats {
     const row = databaseRow(
       this.#core.connection
@@ -192,13 +193,30 @@ export class ConversationQueries {
     threadId: string | null,
   ): { activeTurnId: string | null; latestMessage: ConversationMessage | null } {
     if (!threadId) return { activeTurnId: null, latestMessage: null };
+    const thread = databaseRow(
+      this.#core
+        .statement(
+          "SELECT active_turn_id, last_event_sequence FROM projection_threads WHERE thread_id = ? AND agent_id = ?",
+        )
+        .get(threadId, agentId),
+    );
+    if (!thread) {
+      this.#latestReplies.delete(threadId);
+      return { activeTurnId: null, latestMessage: null };
+    }
+    const activeTurnId = optionalStringColumn(thread, "active_turn_id");
+    const revision = requiredNumberColumn(thread, "last_event_sequence");
+    const cached = !this.#core.connection.isTransaction;
+    const known = cached ? this.#latestReplies.get(threadId) : undefined;
+    if (known?.agentId === agentId && known.revision === revision) {
+      return { activeTurnId, latestMessage: known.message };
+    }
     const row = databaseRow(
       this.#core.connection
         .prepare(
-          `SELECT thread.active_turn_id,
-                  (SELECT message.message_json
+          `SELECT message.message_json AS latest_message_json
                    FROM projection_thread_messages message
-                   WHERE message.thread_id = thread.thread_id
+                   WHERE message.thread_id = ?
                      AND json_extract(message.message_json, '$.author') IN ('assistant', 'agent')
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'commentary'
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != 'question_prompt'
@@ -209,21 +227,16 @@ export class ConversationQueries {
                      AND COALESCE(json_extract(message.message_json, '$.itemType'), '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'
                      AND json_extract(message.message_json, '$.senderAgentId') IS NULL
                    ORDER BY message.created_at DESC, message.ordinal DESC, message.message_id DESC
-                   LIMIT 1) AS latest_message_json
-           FROM projection_threads thread
-           WHERE thread.thread_id = ? AND thread.agent_id = ?`,
+                   LIMIT 1`,
         )
-        .get(threadId, agentId),
+        .get(threadId),
     );
-    if (!row) return { activeTurnId: null, latestMessage: null };
-    const latestMessage = optionalStringColumn(row, "latest_message_json");
-    return {
-      activeTurnId: optionalStringColumn(row, "active_turn_id"),
-      latestMessage: latestMessage ? decodeConversationMessageJson(latestMessage) : null,
-    };
+    const latestJson = row ? optionalStringColumn(row, "latest_message_json") : null;
+    const latestMessage = latestJson ? decodeConversationMessageJson(latestJson) : null;
+    if (cached) this.#latestReplies.set(threadId, { agentId, revision, message: latestMessage });
+    return { activeTurnId, latestMessage };
   }
 
-  /** Reads only named messages for a row-level conversation update. */
   readConversationMessages(
     agentId: string,
     threadId: string | null,
@@ -243,7 +256,19 @@ export class ConversationQueries {
     ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
   }
 
-  /** Reads only messages that restart recovery can change. */
+  readConversationMessagesOfItemType(agentId: string, threadId: string, itemType: string): ConversationMessage[] {
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ? AND item_type = ?
+           AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+           ORDER BY created_at, ordinal, message_id`,
+        )
+        .all(threadId, itemType, agentId),
+    ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+  }
+
   readConversationRecoveryMessages(
     agentId: string,
     threadId: string | null,
@@ -301,8 +326,6 @@ export class ConversationQueries {
         .get(threadId, agentId),
     );
     const rows = this.#conversationPageRows(threadId, anchor, limit, options);
-    // The rows come in the shown order, which a cursor follows. A page of a split turn is not sorted
-    // again: it does not hold the turn's first input, which the shared order needs to find a steer.
     const messages = rows.map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
     const messageIds = new Set(messages.map((message) => message.id));
     const referenceIdSet = new Set<string>();
@@ -350,16 +373,31 @@ export class ConversationQueries {
     };
   }
 
-  /** The cursor of the page before a message of the thread, or null when the thread does not hold it. */
   conversationCursorAt(threadId: string, messageId: string): string | null {
     const row = this.#messageOrderRow(threadId, messageId);
     return row ? encodePageCursor(conversationRowCursor(row)) : null;
   }
 
-  /** How many messages the reader can see before a message of the thread. 0 when the thread does not hold it. */
   conversationCountBefore(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): number {
     const row = this.#messageOrderRow(threadId, messageId);
     return row ? this.#conversationRowsBefore(threadId, conversationRowCursor(row), options).count : 0;
+  }
+
+  conversationHasAfter(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): boolean {
+    const row = this.#messageOrderRow(threadId, messageId);
+    if (!row) return false;
+    const next = databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT 1 AS found FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)
+           ${conversationMarkerSqlFilter(options)}
+           LIMIT 1`,
+        )
+        .get(threadId, ...pageKeyValues(conversationRowCursor(row))),
+    );
+    return next !== null;
   }
 
   #messageOrderRow(threadId: string, messageId: string): DynamicRecord | null {
@@ -418,8 +456,6 @@ export class ConversationQueries {
     const storedText = "json_extract(message.message_json, '$.text')";
     const textMatch = `LOWER(${storedText}) LIKE ? ESCAPE '\\'`;
     const terms = normalized.split(" ");
-    // A query with a space can match across a line break. Only the rows that contain its longest
-    // term pay for the whitespace call.
     const longestTerm = terms.reduce((longest, term) => (term.length > longest.length ? term : longest));
     const textFilter =
       terms.length > 1
@@ -428,9 +464,6 @@ export class ConversationQueries {
     const textParameters = terms.length > 1 ? [`%${escapeLike(longestTerm)}%`, pattern] : [pattern];
     const filter = agentId ? "AND thread.agent_id = ?" : "";
     const parameters = agentId ? [...textParameters, agentId] : textParameters;
-    // The text filter reads every stored message, so it runs one time: the matches keep only their
-    // keys, the total counts them, and only the page's rows read their message (#2279). The left
-    // join gives the total also for a cursor past the last page.
     const rows = databaseRows(
       this.#core.connection
         .prepare(
@@ -440,11 +473,12 @@ export class ConversationQueries {
              JOIN projection_threads thread ON thread.thread_id = message.thread_id
              WHERE ${textFilter}
                AND COALESCE(json_extract(message.message_json, '$.delivery.status'), '') NOT IN ('queued', 'cancelled')
-               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}', '${AGENT_WELCOME_ITEM_TYPE}')
+               AND COALESCE(message.item_type, '') NOT IN ('commentary', '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}', '${AGENT_WELCOME_ITEM_TYPE}', '${CHANNEL_RESUME_ITEM_TYPE}')
                AND COALESCE(message.item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'
+               AND COALESCE(message.item_type, '') NOT LIKE '${SETTING_LINK_ITEM_TYPE_PREFIX}%'
                AND json_extract(message.message_json, '$.routine') IS NULL
                ${includeSideThreads ? ARCHIVED_SIDE_THREAD_EXCLUSION : SIDE_THREAD_EXCLUSION}
                ${filter}
@@ -464,7 +498,6 @@ export class ConversationQueries {
         .all(...parameters, limit, offset),
     );
     const total = rows[0] ? requiredNumberColumn(rows[0], "count") : 0;
-    // An empty page is one row with the count only.
     const results = rows.flatMap((row) => {
       const messageJson = optionalStringColumn(row, "message_json");
       if (messageJson === null) return [];
@@ -485,11 +518,6 @@ export class ConversationQueries {
     };
   }
 
-  /**
-   * The files of agent chat messages whose name contains the query, newest first. The owner of a
-   * chat attachment is `${threadId}:${messageId}`, and a thread id has no colon. Channel threads
-   * stay out for the same reason as in the message search.
-   */
   searchConversationFiles(query: string, cursor?: string, requestedLimit = 50): ConversationFileSearchPage {
     const normalized = query.trim().replace(/\s+/g, " ").toLocaleLowerCase();
     const limit = pageLimit(requestedLimit);
@@ -516,7 +544,6 @@ export class ConversationQueries {
            ORDER BY attachment.created_at DESC, attachment.attachment_id DESC
            LIMIT ? OFFSET ?`,
         )
-        // One row more than the page tells if another page follows.
         .all(...parameters, limit + 1, offset),
     );
     const hasMore = rows.length > limit;
@@ -543,7 +570,6 @@ export class ConversationQueries {
   ): DynamicRecord[] {
     const rows = this.#conversationPageKeys(threadId, anchor, limit, exclusions);
     if (rows.length === 0) return [];
-    // The order index carries only the keys. The page's messages are read after it is chosen.
     const json = new Map(
       databaseRows(
         this.#core.connection
@@ -614,8 +640,6 @@ export class ConversationQueries {
         )
         .all(threadId, ...anchorKey, PAGE_MESSAGE_LIMIT + 1),
     );
-    // An around page has no newer cursor, so it keeps room for the rest of the anchor's turn when that
-    // fits on a page, and for at least half the limit when the turn is larger.
     const anchorGroupId = requiredStringColumn(anchorRow, "group_id");
     const rowsAfterInTurn = newerRows.findIndex((row) => requiredStringColumn(row, "group_id") !== anchorGroupId);
     const reserved = Math.max(
@@ -638,7 +662,6 @@ export class ConversationQueries {
     return [...older, ...wholeGroups(newerRows, Math.max(limit - older.length, 1), PAGE_MESSAGE_LIMIT - older.length)];
   }
 
-  /** A page cursor from a client. A version 1 cursor, from before pages kept turns whole, gets its row's group. */
   #pageCursor(threadId: string, value: string): ConversationPageCursor {
     const cursor = decodeConversationCursor(value);
     if (cursor.version === 2) return cursor;
@@ -660,14 +683,12 @@ export class ConversationQueries {
     };
   }
 
-  /** How many rows are older than the page, and when the oldest was written: the chat's unloaded length. */
   #conversationRowsBefore(
     threadId: string,
     cursor: ConversationPageCursor,
     exclusions: ConversationMarkerExclusions,
   ): { count: number; oldestAt: string | null } {
     const routineFilter = conversationMarkerSqlFilter(exclusions);
-    // The oldest time is the first row in the time index, not a minimum over every older row.
     const row = databaseRow(
       this.#core.connection
         .prepare(
@@ -688,12 +709,6 @@ export class ConversationQueries {
   }
 }
 
-/**
- * A thread's messages with their stored shown-order keys, which `database/thread-message-order.ts`
- * computes and documents. The order index serves a filter or sort on `ORDER_KEY_COLUMNS`, so a page
- * reads only its range. Pages, cursors and read state use this one order. The one parameter is the
- * thread id.
- */
 export const ORDERED_THREAD_MESSAGES = `WITH ordered AS (
   SELECT created_at, ordinal, message_id, author, item_type, group_start, group_first, group_id, turn_rank
   FROM projection_thread_messages WHERE thread_id = ?
@@ -702,14 +717,8 @@ export const ORDER_KEY_COLUMNS = "group_start, group_first, group_id, turn_rank,
 export const ORDER_KEY_DESC =
   "group_start DESC, group_first DESC, group_id DESC, turn_rank DESC, created_at DESC, ordinal DESC, message_id DESC";
 
-/** Page decoders on IPC and every Team API version reject a conversation page of more than 100 messages. */
 const PAGE_MESSAGE_LIMIT = 100;
 
-/**
- * The first whole groups of `rows`, until there are `target` rows. `rows` holds up to `cap + 1`
- * rows, so a group that reaches the end may be cut. A group that does not fit waits for the next
- * page, unless it is the first: a turn larger than `cap` is split rather than never shown.
- */
 function wholeGroups(rows: readonly DynamicRecord[], target: number, cap: number): DynamicRecord[] {
   const taken: DynamicRecord[] = [];
   let start = 0;
@@ -775,10 +784,9 @@ function pageKeyValues(cursor: ConversationPageCursor): [string, number, string,
   ];
 }
 
-/** A new agent's setup message (`agent-welcome-v1`) is for the agent only, so no page or read state has it. */
 function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): string {
   return [
-    `AND COALESCE(item_type, '') != '${AGENT_WELCOME_ITEM_TYPE}'`,
+    `AND COALESCE(item_type, '') NOT IN ('${AGENT_WELCOME_ITEM_TYPE}', '${CHANNEL_RESUME_ITEM_TYPE}')`,
     exclusions.excludeRoutineEvents
       ? `AND COALESCE(item_type, '') NOT LIKE '${SKILL_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${ROUTINE_EVENT_ITEM_TYPE_PREFIX}%' AND COALESCE(item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'`
       : "",
@@ -789,6 +797,7 @@ function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): 
       ? `AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'`
       : "",
     exclusions.excludeRoutineQuietAnswers ? `AND COALESCE(item_type, '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'` : "",
+    exclusions.excludeSettingLinks ? `AND COALESCE(item_type, '') NOT LIKE '${SETTING_LINK_ITEM_TYPE_PREFIX}%'` : "",
   ]
     .filter(Boolean)
     .join("\n");

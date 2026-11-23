@@ -9,6 +9,7 @@ export const messages = {
   "usage.period.days90": "90 ימים",
   "usage.period.year": "שנה",
   "usage.unavailable": "לא זמין",
+  "usage.noCostEstimate": "אין הערכת עלות",
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} אסימונים",
   "usage.chart.costDescription":

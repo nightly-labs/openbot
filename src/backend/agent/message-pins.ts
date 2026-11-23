@@ -1,0 +1,191 @@
+import {
+  type ConversationMessage,
+  MESSAGE_PIN_TEXT_LIMIT,
+  MESSAGE_PIN_THREAD_TITLE_LIMIT,
+  MESSAGE_PINS_LIMIT,
+  MESSAGE_PINS_LIST_LIMIT,
+  type MessagePinner,
+  type PinnedMessage,
+  type PinnedMessagesSnapshot,
+  type SetMessagePinnedInput,
+} from "@openbot/contracts/ipc";
+import { Effect } from "effect";
+import type { AgentStore } from "../agent-store";
+import type { AgentTasks } from "../agent-tasks/agent-tasks";
+import type { PinnedThreadMessage } from "../database/pinned-thread-messages";
+import { MessagePinRefused } from "../message-pins";
+import { type StoredStateFailure, storedSync } from "../stored-state-effects";
+
+export interface MessagePinsOptions {
+  store: AgentStore;
+  tasks: AgentTasks;
+  changed: (agentId: string) => void;
+}
+
+export type AgentPinRefusal = MessagePinRefused["reason"] | "pinned-by-person" | "not-pinnable-chat";
+
+const QUOTE_MATCH_LIMIT = 20;
+
+export class MessagePins {
+  readonly #store: AgentStore;
+  readonly #tasks: AgentTasks;
+  readonly #changed: (agentId: string) => void;
+
+  constructor(options: MessagePinsOptions) {
+    this.#store = options.store;
+    this.#tasks = options.tasks;
+    this.#changed = options.changed;
+  }
+
+  list(agentId: string): PinnedMessagesSnapshot {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return { agentId, pins: [] };
+    const threadIds = [...(agent.threadId ? [agent.threadId] : []), ...this.#tasks.threadIdsForAgent(agentId)];
+    const pins = this.#store.database
+      .pinnedThreadMessages(threadIds, MESSAGE_PINS_LIST_LIMIT)
+      .filter(({ message }) => canPin(message));
+    const threads = new Map<string, { taskId: string; title: string } | null>();
+    const thread = (threadId: string) => {
+      if (threadId === agent.threadId) return null;
+      if (!threads.has(threadId)) {
+        const taskId = this.#tasks.taskForThread(threadId);
+        threads.set(
+          threadId,
+          taskId && this.#tasks.has(agentId, taskId)
+            ? { taskId, title: this.#tasks.require(agentId, taskId).title }
+            : null,
+        );
+      }
+      return threads.get(threadId) ?? null;
+    };
+    return { agentId, pins: pins.map((pin) => pinnedMessage(pin, thread(pin.threadId))) };
+  }
+
+  readonly set = Effect.fn("MessagePins.set")(function* (
+    this: MessagePins,
+    input: SetMessagePinnedInput,
+    pinner: Extract<MessagePinner, { kind: "person" }>,
+  ): Effect.fn.Return<PinnedMessagesSnapshot, MessagePinRefused | StoredStateFailure> {
+    const refusal = yield* storedSync(() => {
+      const threadId = this.#threadId(input.agentId, input.taskId);
+      return threadId ? this.#write(input.agentId, threadId, input.messageId, input.pinned, pinner) : "not-found";
+    });
+    if (refusal === "pinned-by-person" || refusal === "not-pinnable-chat")
+      return yield* new MessagePinRefused({ reason: "not-found" });
+    if (refusal) return yield* new MessagePinRefused({ reason: refusal });
+    return yield* storedSync(() => this.list(input.agentId));
+  }, Effect.uninterruptible);
+
+  findByQuote(
+    agentId: string,
+    threadId: string,
+    quote: string,
+    options: { exclude: ReadonlySet<string>; pinned: boolean },
+  ): ConversationMessage | null {
+    if (!this.#pinnableThread(agentId, threadId)) return null;
+    const database = this.#store.database;
+    return (
+      database
+        .threadMessagesContaining(threadId, quote, QUOTE_MATCH_LIMIT)
+        .find(
+          (message) =>
+            canPin(message) &&
+            !options.exclude.has(message.id) &&
+            (options.pinned || database.threadMessagePinner(threadId, message.id) !== null),
+        ) ?? null
+    );
+  }
+
+  readonly setByAgent = Effect.fn("MessagePins.setByAgent")(function* (
+    this: MessagePins,
+    input: { agentId: string; threadId: string; messageId: string; pinned: boolean },
+  ): Effect.fn.Return<
+    { refused: AgentPinRefusal } | { refused: null; snapshot: PinnedMessagesSnapshot },
+    StoredStateFailure
+  > {
+    const refused = yield* storedSync(() =>
+      this.#pinnableThread(input.agentId, input.threadId)
+        ? this.#write(input.agentId, input.threadId, input.messageId, input.pinned, {
+            kind: "agent",
+            agentId: input.agentId,
+          })
+        : "not-pinnable-chat",
+    );
+    if (refused) return { refused };
+    return { refused: null, snapshot: yield* storedSync(() => this.list(input.agentId)) };
+  }, Effect.uninterruptible);
+
+  messagesDeleted(agentId: string): void {
+    this.#changed(agentId);
+  }
+
+  #write(
+    agentId: string,
+    threadId: string,
+    messageId: string,
+    pinned: boolean,
+    pinner: MessagePinner,
+  ): AgentPinRefusal | null {
+    const database = this.#store.database;
+    const current = database.threadMessagePinner(threadId, messageId);
+    if (!pinned) {
+      if (!current) return null;
+      if (pinner.kind === "agent" && current.kind === "person") return "pinned-by-person";
+      database.unpinThreadMessage(threadId, messageId);
+      this.#changed(agentId);
+      return null;
+    }
+    const [message] = database.readConversationMessages(agentId, threadId, [messageId]);
+    if (!message || !canPin(message)) return "not-found";
+    if (current) return null;
+    if (database.pinnedThreadMessageCount(threadId) >= MESSAGE_PINS_LIMIT) return "limit";
+    database.pinThreadMessage(threadId, message.id, new Date().toISOString(), pinner);
+    this.#changed(agentId);
+    return null;
+  }
+
+  #threadId(agentId: string, taskId: string | undefined): string | null {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return null;
+    if (taskId === undefined) return agent.threadId ?? null;
+    return this.#tasks.has(agent.id, taskId) ? this.#tasks.require(agent.id, taskId).threadId : null;
+  }
+
+  #pinnableThread(agentId: string, threadId: string): boolean {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return false;
+    if (agent.threadId === threadId) return true;
+    const taskId = this.#tasks.taskForThread(threadId);
+    return taskId !== null && this.#tasks.has(agentId, taskId);
+  }
+}
+
+function canPin(message: ConversationMessage): boolean {
+  return message.author !== "system" && message.status !== "streaming";
+}
+
+function pinnedMessage(
+  { message, pinnedAt, pinnedBy }: PinnedThreadMessage,
+  thread: { taskId: string; title: string } | null,
+): PinnedMessage {
+  const fromPerson = message.author === "user" && message.senderAgentId === undefined;
+  const text = message.text.trim() || (message.attachments ?? []).map((attachment) => attachment.name).join(", ");
+  return {
+    messageId: message.id,
+    taskId: thread?.taskId ?? null,
+    threadTitle: thread ? thread.title.slice(0, MESSAGE_PIN_THREAD_TITLE_LIMIT) : null,
+    pinnedAt,
+    pinnedBy:
+      pinnedBy.kind === "person" && pinnedBy.sender
+        ? { kind: "person", sender: { id: pinnedBy.sender.id, name: pinnedBy.sender.name.slice(0, 120) } }
+        : pinnedBy,
+    author: message.author === "user" ? "user" : "agent",
+    sender:
+      fromPerson && message.senderMember
+        ? { id: message.senderMember.id, name: message.senderMember.name.slice(0, 120) }
+        : null,
+    senderAgentId: message.senderAgentId ?? null,
+    createdAt: message.createdAt,
+    text: text.slice(0, MESSAGE_PIN_TEXT_LIMIT),
+  };
+}

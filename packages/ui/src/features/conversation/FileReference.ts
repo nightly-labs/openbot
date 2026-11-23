@@ -188,11 +188,6 @@ function rangesOverlap(left: TextRange, right: TextRange): boolean {
   return left.start < right.end && right.start < left.end;
 }
 
-/**
- * `occupied` grows with every reference found, and the scan above probes it
- * once per candidate. A linear scan makes this quadratic on long messages;
- * the ranges are insert-sorted by start so only neighbors can overlap.
- */
 function isOccupied(occupied: TextRange[], range: TextRange): boolean {
   let low = 0;
   let high = occupied.length;

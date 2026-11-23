@@ -1,6 +1,5 @@
 import { createSignal, onCleanup } from "solid-js";
 
-/** A rectangle in the coordinates of the scrolled content, so it stays on the files while the page scrolls. */
 export interface MarqueeBox {
   left: number;
   top: number;
@@ -26,38 +25,24 @@ interface Drag {
   originY: number;
   additive: boolean;
   started: boolean;
-  /** The height of the scrolled content when the drag started. The rectangle stops there, so it does not make the page longer. */
   contentHeight: number;
   items: ItemBox[];
   frame: number;
 }
 
-/** How far the pointer moves before a press becomes a drag. A shorter move stays a click. */
 const DRAG_THRESHOLD = 6;
-/** Near the top or bottom edge, by this distance, the page scrolls while the pointer drags. */
 const SCROLL_EDGE = 48;
-/** The most pixels the page scrolls in one frame at the edge. */
 const SCROLL_SPEED = 18;
-/** A press on these does not start a drag: they have their own pointer behavior. */
 const NO_DRAG =
-  'input, textarea, select, a, label, [contenteditable="true"], [role="menu"], .library-pill, button:not(.library-file-card, .library-picture, .file-row-main)';
+  'input, textarea, select, a, label, [contenteditable="true"], [role="menu"], .library-pill, button:not(.library-file-card, .library-picture, .library-folder-tile-main, .file-row-main)';
 
 export interface MarqueeSelectionOptions {
-  /** A press can start a drag now. */
   enabled: () => boolean;
-  /** A drag starts. With Shift, Command or Control it adds to the selection; otherwise it replaces it. */
   onStart: (additive: boolean) => void;
-  /** The ids of the `[data-file-id]` elements that the rectangle touches. */
   onChange: (ids: ReadonlySet<string>) => void;
-  /** Escape stops the drag. The selection goes back to what it was before the drag. */
   onCancel: () => void;
 }
 
-/**
- * Selects files with a rectangle that the pointer drags over the page. The drag can start on a file
- * or on the space between files; a short move stays a click. Near the top or bottom edge, the page
- * scrolls. Touch scrolls the page, so only a mouse or a pen drags.
- */
 export function createMarqueeSelection(options: MarqueeSelectionOptions) {
   const [box, setBox] = createSignal<MarqueeBox | null>(null);
   let scroller: HTMLElement | undefined;
@@ -100,7 +85,6 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
     options.onChange(ids);
   }
 
-  // While the pointer is near an edge, each frame scrolls the page and grows the rectangle with it.
   function scrollStep(): void {
     const current = drag;
     if (!current || !scroller) return;
@@ -112,8 +96,6 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
       const before = scroller.scrollTop;
       scroller.scrollTop += (depth / SCROLL_EDGE) * SCROLL_SPEED;
       if (scroller.scrollTop !== before) {
-        // Files that come into view can load and change the layout, so measure them again. The
-        // rectangle is never below the content, so the content alone sets the new height.
         current.contentHeight = scroller.scrollHeight;
         current.items = measureItems();
         update(current);
@@ -133,7 +115,6 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
     current.frame = requestAnimationFrame(scrollStep);
   }
 
-  /** The release after a drag must not also click the file under the pointer. */
   function swallowNextClick(): void {
     const swallow = (event: MouseEvent) => {
       event.preventDefault();
@@ -143,7 +124,6 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
     setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
   }
 
-  /** After Escape the button is still down, and the click comes with the release. */
   function swallowAfterRelease(pointerId: number): void {
     const onRelease = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return;
@@ -155,7 +135,6 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
     window.addEventListener("pointercancel", onRelease, true);
   }
 
-  /** Ends the drag. `released` is false when Escape ends it while the button is still down. */
   function finish(cancelled: boolean, released = true): void {
     const current = drag;
     if (!current) return;
@@ -195,7 +174,6 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
 
   function onKeyDown(event: KeyboardEvent): void {
     if (event.key !== "Escape" || !drag?.started) return;
-    // The page's Escape would end the selection too; this Escape only stops the drag.
     event.preventDefault();
     event.stopPropagation();
     finish(true, false);
@@ -232,9 +210,7 @@ export function createMarqueeSelection(options: MarqueeSelectionOptions) {
   });
 
   return {
-    /** The rectangle while a drag is on, in the coordinates of the scrolled content. */
     box,
-    /** The scrolled element that holds the files. A native listener, so a press in a portal does not reach it. */
     attach(element: HTMLElement): void {
       scroller?.removeEventListener("pointerdown", onPointerDown);
       scroller = element;

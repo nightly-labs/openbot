@@ -72,7 +72,6 @@ export function FaqSection() {
                 return (
                   <li style={{ "--landing-index": index() }}>
                     <Link ref={card} to="/compare/$slug" params={{ slug: comparison.slug }}>
-                      {/* The gradient of the comparison's own card, so the two pages match. */}
                       <span class="landing-compare-art" aria-hidden="true">
                         <ArticleGradient
                           title={comparison.title}

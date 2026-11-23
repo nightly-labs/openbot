@@ -126,16 +126,13 @@ export const STORY_AGENTS: AgentProfile[] = STORY_AGENT_SUMMARIES.map((agent, in
   preview: agent.preview,
 }));
 
-/** Returns a fixture item that a story reads by index. A missing item means a fixture edit broke the story. */
 export function requireFixture<T>(value: T | undefined, name: string): T {
   if (value === undefined) throw new Error(`${name} is missing from the story fixtures.`);
   return value;
 }
 
-/** The agent that single-agent stories show. */
 export const STORY_AGENT: AgentProfile = requireFixture(STORY_AGENTS[0], "Story agent");
 
-/** The runtime settings of a story agent. A story agent uses a provider that this build knows. */
 export function storyRuntimeSettings(agent: AgentProfile): AgentRuntimeSettings {
   if (!isKnownAgentProvider(agent.provider)) throw new Error(`Story agent ${agent.id} has an unknown provider.`);
   return { provider: agent.provider, model: agent.model, reasoningEffort: agent.reasoningEffort };
@@ -292,10 +289,6 @@ export const STORY_AGENT_STATUS: AgentStatus = {
   fullAccess: true,
 };
 
-/**
- * A Team API v8 host can run a provider that this build does not know. The preview's team server
- * has one such agent, its model and its status row, so the pickers show the update hint.
- */
 export const STORY_FOREIGN_SERVER_ID = "team";
 
 function requireForeignProvider(id: string): ForeignProviderId {
@@ -323,7 +316,6 @@ export const STORY_FOREIGN_MODEL: ClientAgentModelOption = {
   supportedReasoningEfforts: ["medium"],
 };
 
-/** `status` with the foreign provider's row, as a v8 host sends it. */
 export function withStoryForeignProvider(status: AgentStatus): AgentStatus {
   const value = {
     ...status,
@@ -332,7 +324,6 @@ export function withStoryForeignProvider(status: AgentStatus): AgentStatus {
       { id: "omp", displayName: "Oh My Pi", state: "available", version: "18.8.4", message: null, email: null },
     ],
   };
-  // The status decoder keeps a row whose id this build does not know, as it does for a host's status.
   if (!isAgentStatus(value)) throw new Error("The foreign story status is not valid.");
   return value;
 }
@@ -383,7 +374,6 @@ export const STORY_ATTACHMENTS: AttachmentSummary[] = [
   },
 ];
 
-/** The plan Chief kept while it wrote the launch plan. */
 const STORY_PLAN: ConversationPlan = {
   explanation: null,
   steps: [
@@ -464,10 +454,6 @@ export const STORY_CONVERSATION_MESSAGES: ConversationMessage[] = [
   },
 ];
 
-/**
- * Research answered Chief's question while Chief was busy, so the answer waits in Chief's queue.
- * The waiting block above the composer shows it, next to Sales, which still works.
- */
 export const STORY_QUEUES: Record<string, QueueDelivery[]> = {
   chief: [
     {
@@ -488,7 +474,6 @@ export const STORY_QUEUES: Record<string, QueueDelivery[]> = {
   ],
 };
 
-/** A chat where several team members write to one agent. Each human message names its sender. */
 const STORY_TEAM_CONVERSATION_MESSAGES: ConversationMessage[] = [
   {
     id: "team-message-self",
@@ -669,7 +654,6 @@ export const STORY_SERVERS: [ServerSummary, ...ServerSummary[]] = [
     role: "owner",
     active: false,
   },
-  // The stopped hosted server in `mock-hosted-servers.ts`, so the rail shows the sleep indicator.
   {
     id: "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f",
     name: "Research server",
@@ -697,9 +681,6 @@ export const STORY_BROWSER_TABS: BrowserTab[] = [
     loading: false,
     ownerThreadId: "thread-chief",
     ownerAgentId: "chief",
-    // The three toolbar chips each read one of these. Left unset, the preview and every story render a
-    // toolbar with no chips at all, which is the one arrangement the product never shows for a tab an
-    // agent is actually driving.
     environment: {
       viewport: { mode: "custom", width: 390, height: 844, deviceScaleFactor: 3, preset: "mobile" },
       colorScheme: "dark",
@@ -719,8 +700,6 @@ export const STORY_BROWSER_CONTROL: BrowserControlState = {
       callId: "call-1",
       tabId: "browser-tab-docs",
       action: "snapshot",
-      // `snapshot` is the coarse action the Team API v1 wire carries; the detail is what the tooltip
-      // shows, and it is the field the v1 projection strips.
       detailAction: "select-option",
       phase: "waiting",
       startedAt: STORY_NOW,
@@ -735,10 +714,12 @@ export const STORY_HOST_STATUS: HostStatus = {
   serverId: "team",
   serverName: "OpenBot team",
   logoUrl: null,
+  appearance: null,
   apiUrl: "https://team.example.com",
   apiOnline: true,
   remoteDesktopReady: true,
   remoteDesktopScreenRecordingDenied: false,
+  remoteDesktopNeedsX11Session: false,
   remoteDesktopUnattended: true,
   remoteDesktopActiveSessions: 1,
   remoteDesktopMaxSessions: 4,
@@ -764,10 +745,6 @@ const FINANCE = { id: "role-finance", name: "Finance" };
 const RESEARCH = { id: "research", name: "Research" };
 const SALES = { id: "sales", name: "Sales Outbound" };
 
-/**
- * The access changes of the story server, newest first: Legal chats with Research, Finance manages
- * Sales Outbound, and every member no longer manages Research or Sales Outbound.
- */
 export const STORY_SERVER_AUDIT_ENTRIES: ServerAuditEntry[] = [
   {
     id: "audit-14",
@@ -909,12 +886,6 @@ export const STORY_APP_INFO = {
   variant: "production" as const,
 };
 
-/**
- * The marketplace surfaces. Storybook and the preview both reach the modal through
- * `mock-openbot.ts`, so an empty list here reads as "the marketplace is empty" rather than "the
- * preview never wired this up" — which is what the three stubs it replaced looked like.
- */
-// Self-contained sample artwork keeps preview icons available without network requests.
 function skillPreviewIcon(symbol: string, background: string): string {
   return `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" rx="18" fill="${background}"/><text x="40" y="43" text-anchor="middle" dominant-baseline="middle" font-size="42">${symbol}</text></svg>`,
@@ -1644,12 +1615,6 @@ export const STORY_MARKETPLACE_AGENT_DETAILS: Record<string, MarketplaceAgentDet
   ]),
 );
 
-/**
- * The plugin listing, while plugins are still being designed. A plugin is one developer's bundle:
- * the MCP server it publishes, shown as an app, and the skills that drive it. The example follows a
- * real server (`mcp.aave.com`) so the page is reviewed against the lengths a published listing
- * really has, rather than against text written to fit the layout.
- */
 const STORY_MARKETPLACE_PLUGIN_AAVE: MarketplacePluginDetail = {
   id: "plugin-aave",
   slug: "aave",
@@ -1728,10 +1693,6 @@ const STORY_MARKETPLACE_PLUGIN_AAVE: MarketplacePluginDetail = {
   termsUrl: "https://aave.com/terms",
 };
 
-/**
- * The rest of the listing, so the catalog is reviewed as a list: several categories, publishers of
- * different name lengths, and a plugin that publishes no app.
- */
 export const STORY_MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   STORY_MARKETPLACE_PLUGIN_AAVE,
   {
@@ -2074,7 +2035,6 @@ export const STORY_HOSTED_SITES: HostedSiteSummary[] = [
     size: 512_000,
     expiresAt: "2026-09-18T18:30:00.000Z",
     updatedAt: "2026-08-14T12:00:00.000Z",
-    // Published before this computer was a registered server.
     serverId: null,
   },
 ];

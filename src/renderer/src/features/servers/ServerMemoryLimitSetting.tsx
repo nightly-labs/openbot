@@ -14,24 +14,14 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 
-/** The memory limit calls of one server's host. The desktop reaches them through main. */
 export type HostMemoryLimitCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getAgentMemoryLimit" | "setAgentMemoryLimit">;
 
 export interface ServerMemoryLimitOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostMemoryLimitCalls;
 }
 
-/**
- * The last value that this window read for each server. The row shows it at once when the settings
- * open again, so the row does not change its size when the host answers.
- */
 const lastSettings = new Map<string, HostAgentMemoryLimit>();
 
-/**
- * Server Settings > General: how many memories each agent of this computer or a joined server can
- * keep (`agent-memory-limit-v1`). The values come from the host. The host checks the role again.
- */
 export function ServerMemoryLimitSetting(
   props: ServerMemoryLimitOptions & {
     serverId: string;
@@ -44,7 +34,6 @@ export function ServerMemoryLimitSetting(
   const calls = (): HostMemoryLimitCalls => props.calls ?? window.openbot.hostAdmin;
   const [settings, setSettings] = createSignal<HostAgentMemoryLimit | null>(null);
   const [loadError, setLoadError] = createSignal<string | null>(null);
-  /** Bumped for each server and each change, so an earlier answer is dropped. */
   let generation = 0;
 
   createEffect(
@@ -94,7 +83,7 @@ export function ServerMemoryLimitSetting(
         {(current) => (
           <ItemActions>
             <Select<number>
-              // A host that no longer permits its stored value still shows it.
+              class="settings-modal-select"
               options={
                 current().choices.includes(current().limit)
                   ? current().choices

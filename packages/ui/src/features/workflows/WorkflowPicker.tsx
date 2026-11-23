@@ -1,13 +1,7 @@
-/**
- * The one list style of every menu on the workflow canvas, as the Higgsfield model picker has it: an
- * optional search field, groups with a heading, and rows with an icon tile, the name, and small chips
- * with facts about the row. A choice list has a check on the chosen row; an action list does a thing.
- * Each trigger keeps its own root and puts this list in its `DropdownMenu.Portal`.
- */
-
 import { Check, DropdownMenu, Input, Search } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, onCleanup, Show } from "solid-js";
+import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 
 export interface PickerChip {
@@ -18,33 +12,25 @@ export interface PickerChip {
 export interface PickerOption<T extends string> {
   value: T;
   label: string;
-  /** A list that names its group elsewhere, such as the model list beside its provider rail, has no tiles. */
   tile?: () => JSX.Element;
-  /** A node kind gives the tile the colour of that kind. */
   kind?: string;
   chips?: readonly PickerChip[];
-  /** More text that the search finds, such as the full name of a repository whose row shows its short name. */
   searchText?: string;
-  /** An action that removes something, such as Delete. */
   danger?: boolean;
-  /** An action that moves the focus, such as Rename, runs after the menu closes. */
   afterClose?: boolean;
 }
 
 export interface PickerGroup<T extends string> {
-  /** A list with one group has no heading. */
   label?: string;
   icon?: () => JSX.Element;
   options: readonly PickerOption<T>[];
 }
 
-/** True when the name or a chip of the option holds the query, which is lower case. */
 export const pickerMatches = (option: PickerOption<string>, query: string) =>
   [option.label, option.searchText ?? "", ...(option.chips ?? []).map((chip) => chip.text)].some((text) =>
     text.toLowerCase().includes(query),
   );
 
-/** The heading of a group. The group has its own label, so screen readers skip this one. */
 export function PickerHeading(props: { group: Pick<PickerGroup<string>, "label" | "icon"> }) {
   return (
     <Show when={props.group.label}>
@@ -56,7 +42,6 @@ export function PickerHeading(props: { group: Pick<PickerGroup<string>, "label" 
   );
 }
 
-/** The tile, the name and the chips of a row, and a check when the row is the choice. */
 export function PickerRow(props: { option: PickerOption<string>; checked?: boolean }) {
   return (
     <>
@@ -87,11 +72,25 @@ export function PickerRow(props: { option: PickerOption<string>; checked?: boole
   );
 }
 
-/**
- * The panel, the search field and the filter. With `search`, the field takes focus when the menu
- * opens, typing filters the rows by name and chip text, and the down arrow moves to the first row.
- * With `loading`, a line under the rows tells that more rows come.
- */
+export function createPickerFades() {
+  const fades = createScrollFades();
+  let rows: MutationObserver | undefined;
+  onCleanup(() => {
+    fades.stop();
+    rows?.disconnect();
+  });
+  return {
+    bind(element: HTMLElement) {
+      fades.bind(element);
+      rows?.disconnect();
+      rows = new MutationObserver(fades.remeasure);
+      rows.observe(element, { childList: true, subtree: true });
+    },
+    classes: fades.classes,
+    measure: fades.measure,
+  };
+}
+
 function PickerShell<T extends string>(props: {
   label: string;
   groups: readonly PickerGroup<T>[];
@@ -104,6 +103,7 @@ function PickerShell<T extends string>(props: {
   let field: HTMLInputElement | undefined;
   let list: HTMLDivElement | undefined;
   let opening = true;
+  const fades = createPickerFades();
   const shown = createMemo(() => {
     const text = query().trim().toLowerCase();
     if (!text) return props.groups;
@@ -118,8 +118,6 @@ function PickerShell<T extends string>(props: {
       data-wfn-portal=""
       aria-label={props.label}
       onFocusIn={(event: FocusEvent) => {
-        // The menu focuses its panel once it opens. Then the chosen row scrolls into view, and the
-        // search field takes the focus.
         if (!opening || event.target !== event.currentTarget) return;
         opening = false;
         list?.querySelector("[data-checked]")?.scrollIntoView({ block: "nearest" });
@@ -141,13 +139,11 @@ function PickerShell<T extends string>(props: {
               onValueChange={setQuery}
               onKeyDown={(event: KeyboardEvent) => {
                 if (event.key === "Escape" || event.key === "Tab") return;
-                // The menu reads letters as a jump to a row; here they belong to the field.
                 event.stopPropagation();
                 if (event.key !== "ArrowDown" && event.key !== "Enter") return;
                 event.preventDefault();
                 const row = firstRow();
                 row?.focus();
-                // Enter takes the first match, as in the menu that a dropped connection opens.
                 if (event.key === "Enter")
                   row?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
               }}
@@ -158,13 +154,12 @@ function PickerShell<T extends string>(props: {
       <div
         ref={(element: HTMLDivElement) => {
           list = element;
-          // A letter typed while a row has focus goes back to the field, so typing always searches.
+          fades.bind(element);
           element.addEventListener(
             "keydown",
             (event) => {
               if (!field || event.target === field) return;
               if (event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey) return;
-              // Space turns a check row on or off.
               const checkRow = event.target instanceof HTMLElement && event.target.role === "menuitemcheckbox";
               if (event.key === " " && checkRow) return;
               event.stopPropagation();
@@ -173,7 +168,8 @@ function PickerShell<T extends string>(props: {
             true,
           );
         }}
-        class="wfn-picker-list"
+        class={["wfn-picker-list", fades.classes()]}
+        onScroll={fades.measure}
       >
         <For each={shown()} fallback={<p class="wfn-picker-empty">{t("workflow.picker.noMatches")}</p>}>
           {(group) => props.children(group)}
@@ -186,15 +182,12 @@ function PickerShell<T extends string>(props: {
   );
 }
 
-/** A choice menu: one row is the value, and it has a check. */
 export function PickerMenu<T extends string>(props: {
   label: string;
   groups: readonly PickerGroup<T>[];
   value: T | undefined;
   onSelect: (value: T) => void;
-  /** The placeholder of the search field. Without it, the list has no search. */
   search?: string | undefined;
-  /** More rows come, such as the labels of a repository that the host still reads. */
   loading?: boolean | undefined;
 }) {
   const choose = (value: string) => {
@@ -226,13 +219,11 @@ export function PickerMenu<T extends string>(props: {
   );
 }
 
-/** A check menu: each row turns one value on or off, and the menu stays open. */
 export function PickerChecks<T extends string>(props: {
   label: string;
   groups: readonly PickerGroup<T>[];
   values: readonly T[];
   onChange: (values: readonly T[]) => void;
-  /** The placeholder of the search field. Without it, the list has no search. */
   search?: string | undefined;
 }) {
   const checked = (value: T) => props.values.includes(value);
@@ -261,10 +252,6 @@ export function PickerChecks<T extends string>(props: {
   );
 }
 
-/**
- * An action menu: each row does a thing. With `current`, one row is the thing on view, such as the open
- * workflow in the workflow switcher, and it has a check.
- */
 export function PickerActions<T extends string>(props: {
   label: string;
   groups: readonly PickerGroup<T>[];

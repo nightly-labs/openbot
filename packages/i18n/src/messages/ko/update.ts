@@ -42,6 +42,10 @@ export const messages = {
   "update.idleRestart.description": "새 루틴 실행은 다시 시작될 때까지 대기해요.",
   "update.idleRestart.waitingFor": "{reasons}을(를) 기다리는 중이에요.",
   "update.idleRestart.cancel": "다시 시작 취소",
+  "update.idleRestart.restartNow": "지금 다시 시작",
+  "update.idleRestart.restartNowTitle": "지금 OpenBot을 다시 시작할까요?",
+  "update.idleRestart.restartNowDescription": "끝나지 않은 에이전트 턴과 루틴 실행이 지금 중지돼요.",
+  "update.idleRestart.keepWaiting": "계속 기다리기",
   "update.idleRestart.cancelFailed": "다시 시작을 취소하지 못했어요.",
   "update.idleRestart.requestFailed": "다시 시작을 예약하지 못했어요.",
   "update.idleRestart.failedTitle": "OpenBot이 다시 시작되지 않았어요",
@@ -65,4 +69,10 @@ export const messages = {
   "update.whatsNew.changelog": "전체 변경 내역",
   "update.whatsNew.changelogFailed": "OpenBot에서 변경 내역을 열지 못했어요.",
   "update.whatsNew.done": "확인",
+  "update.required.title": "업데이트 필요",
+  "update.required.description":
+    "OpenBot {version}은(는) 더 이상 지원되지 않습니다. 계속하려면 {minimum} 이상으로 업데이트하세요.",
+  "update.required.download": "OpenBot 다운로드",
+  "update.required.continue": "업데이트 없이 계속",
+  "update.required.failed": "업데이트를 완료하지 못했습니다.",
 } as const satisfies PartialTranslation<typeof source>;

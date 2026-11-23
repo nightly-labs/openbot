@@ -42,6 +42,10 @@ export const messages = {
   "update.idleRestart.description": "Nieuwe routineruns wachten tot de herstart.",
   "update.idleRestart.waitingFor": "Wachten op {reasons}.",
   "update.idleRestart.cancel": "Herstart annuleren",
+  "update.idleRestart.restartNow": "Nu herstarten",
+  "update.idleRestart.restartNowTitle": "OpenBot nu herstarten?",
+  "update.idleRestart.restartNowDescription": "Beurten van agents en routineruns die niet klaar zijn, stoppen nu.",
+  "update.idleRestart.keepWaiting": "Blijven wachten",
   "update.idleRestart.cancelFailed": "Kan de herstart niet annuleren.",
   "update.idleRestart.requestFailed": "Kan de herstart niet plannen.",
   "update.idleRestart.failedTitle": "OpenBot is niet herstart",
@@ -65,4 +69,10 @@ export const messages = {
   "update.whatsNew.changelog": "Volledige changelog",
   "update.whatsNew.changelogFailed": "OpenBot kan de changelog niet openen.",
   "update.whatsNew.done": "Begrepen",
+  "update.required.title": "Update vereist",
+  "update.required.description":
+    "OpenBot {version} wordt niet meer ondersteund. Werk bij naar {minimum} of nieuwer om door te gaan.",
+  "update.required.download": "OpenBot downloaden",
+  "update.required.continue": "Doorgaan zonder update",
+  "update.required.failed": "De update is niet voltooid.",
 } as const satisfies PartialTranslation<typeof source>;

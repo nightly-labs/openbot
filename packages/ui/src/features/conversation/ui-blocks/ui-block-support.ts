@@ -5,23 +5,13 @@ import {
   validateUiBlockResponse,
 } from "@openbot/contracts/ui-blocks";
 
-/**
- * What every blocking block takes. The components know nothing about IPC: the host owns the stored
- * `state` and hands the answer to `onRespond`.
- */
 export interface UiBlockProps<Spec extends UiBlockSpec> {
   spec: Spec;
-  /** Absent means the block is open (`pending`). */
   state?: UiBlockState | undefined;
-  /** Gets a response that `validateUiBlockResponse` accepted for `spec`. */
   onRespond: (response: UiBlockResponse) => void;
-  /** The person may not answer, for example a member without the right. */
   disabled?: boolean | undefined;
-  /** An answer is on its way; controls wait for it. */
   busy?: boolean | undefined;
-  /** Why the last answer did not go through, shown in the open block. */
   error?: string | undefined;
-  /** Closes the open block without an answer. Without it the block has no skip button. */
   onSkip?: (() => void) | undefined;
   class?: string | undefined;
   elementRef?: ((element: HTMLElement) => void) | undefined;
@@ -33,7 +23,6 @@ export function uiBlockState(props: { state?: UiBlockState | undefined }): UiBlo
   return props.state ?? PENDING_UI_BLOCK_STATE;
 }
 
-/** Checks the response against the spec and gives it to the host. False when the spec refuses it. */
 export function sendUiBlockResponse(
   spec: UiBlockSpec,
   response: UiBlockResponse,
@@ -45,12 +34,10 @@ export function sendUiBlockResponse(
   return true;
 }
 
-/** The key letter of the option at `index`: A, B, C... */
 export function optionLetter(index: number): string {
   return String.fromCharCode(65 + index);
 }
 
-/** The option index for a letter key, or -1. */
 export function optionIndexForKey(key: string): number {
   return key.length === 1 && /^[a-z]$/iu.test(key) ? key.toUpperCase().charCodeAt(0) - 65 : -1;
 }

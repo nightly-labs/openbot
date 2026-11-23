@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "{name} を閉じる",
   "browser.tab.closeUnnamed": "ブラウザーのタブを閉じる",
   "browser.newTab": "新しいブラウザーのタブ",
-  "browser.hide": "ブラウザーを隠す",
+  "browser.backToChat": "チャットに戻る",
   "browser.goBack": "戻る",
   "browser.goForward": "進む",
   "browser.reload": "ページを再読み込み",
@@ -57,6 +57,8 @@ export const messages = {
   "browser.pip.close": "ブラウザーのポップアップを閉じる",
   "browser.pip.reattachFailed": "OpenBot はブラウザーをサイドバーに戻せませんでした。",
   "browser.pip.closeFailed": "OpenBot はブラウザーのポップアップを閉じられませんでした。",
+  "browser.window.open": "ブラウザーを新しいウィンドウで開く",
+  "browser.window.openFailed": "OpenBot はブラウザーのウィンドウを開けませんでした。",
   "browser.popupBlocked.title": "ポップアップがブロックされました",
   "browser.popupBlocked.dismiss": "ポップアップのメッセージを閉じる",
   "browser.liveView.label": "サーバー上のページのライブビュー",
@@ -66,6 +68,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "このテキストは長すぎて貼り付けできません。100,000 文字未満にしてください。",
   "browser.liveView.copyTooLarge": "選択範囲が長すぎてコピーできません。選択するテキストを減らしてください。",
   "browser.liveView.copyFailed": "テキストをコピーできませんでした。ページをクリックしてもう一度お試しください。",
+  "browser.liveView.pageCopied": "ページがテキストをコピーしました。［コピー］を選ぶとクリップボードに入ります。",
   "browser.previews.label": "ブラウザーのプレビュー",
   "browser.previews.resize": "右のパネルのサイズを変更",
   "browser.previews.empty": "ブラウザーのタブはありません",
@@ -90,6 +93,19 @@ export const messages = {
   "browser.secret.submitting": "送信しています…",
   "browser.secret.takeOver": "操作を引き継ぐ",
   "browser.secret.failed": "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
+  "browser.secret.ended": "このサインインのリクエストは終了しました。エージェントにもう一度試すよう依頼してください。",
+  "browser.secret.vaultSkip.agentScript":
+    "エージェントがこのページでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
+  "browser.secret.vaultSkip.fieldKind":
+    "エージェントがページ上の違う欄を選んだため、OpenBot は保存したログイン情報を使いませんでした。",
+  "browser.secret.vaultSkip.loginChoice":
+    "エージェントがこのサイトの保存済みログイン情報を選ばなかったため、OpenBot は保存したログイン情報を使いませんでした。どのアカウントを使うかエージェントに伝えてください。",
+  "browser.secret.vaultSkip.noPassword":
+    "このサイトのパスワードがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "認証アプリのキーがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "パスワードマネージャーを読み取れなかったため、OpenBot は保存したログイン情報を使いませんでした。",
   "browser.error.openAddress": "このタブでアドレスを開けませんでした。",
   "browser.error.channelNoBrowserMember": "このチャンネルでは、新しいタブを開けるメンバーがいません。",
   "browser.error.closeTab": "ブラウザーのタブを閉じられませんでした。",

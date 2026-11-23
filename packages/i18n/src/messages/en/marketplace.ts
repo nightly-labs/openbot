@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("marketplace", {
-  // The listing: categories, rows, and the words for each kind of listing.
   "marketplace.category.coding": "Coding",
   "marketplace.category.design": "Design",
   "marketplace.category.dataAnalytics": "Data & Analytics",
@@ -18,7 +17,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.loadMore": "Load more",
   "marketplace.version": "Version {version}",
 
-  // The dialog frame: title, close and tabs.
   "marketplace.title": "Marketplace",
   "marketplace.kinds": "Marketplace content types",
   "marketplace.tab.agents": "Agents",
@@ -27,10 +25,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.description.agents": "Ready-made agents with their own instructions and skills.",
   "marketplace.description.skills": "Instructions that teach an agent a task or a tool.",
 
-  // A plugin link.
   "marketplace.plugins.missing": "This plugin is not in the OpenBot catalog.",
 
-  // The agent page.
   "marketplace.agents.loadingDetail": "Loading agent details…",
   "marketplace.agents.skills": "Skills",
   "marketplace.agents.routines": "Routines",
@@ -48,7 +44,6 @@ export const messages = defineMessages("marketplace", {
     "Shared by its creator before OpenBot reviewed it. It can act on your behalf once added.",
   "marketplace.agents.source.pending": "Not reviewed yet",
 
-  // The skill page, and why Try is off.
   "marketplace.skill.loading": "Loading skill",
   "marketplace.try.readFailed": "OpenBot could not read this agent's skills. Try again.",
   "marketplace.try.enable": "Enable this skill in agent settings to try it.",
@@ -56,7 +51,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.try.update": "Update this skill to try this version.",
   "marketplace.try.composerUnavailable": "The agent composer is unavailable.",
 
-  // The Marketplace window. {name} is an agent, app or skill name. {count} is a number.
   "marketplace.open": "Open {name}",
   "marketplace.tab.apps": "Apps",
   "marketplace.crumbs.label": "Location",
@@ -78,7 +72,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.properties.updated": "Updated",
   "marketplace.properties.installs": "Installs",
 
-  // Agents.
   "marketplace.agent.add": "Add",
   "marketplace.agent.addNamed": "Add {name}",
   "marketplace.agent.addAgent": "Add agent",
@@ -87,7 +80,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.agent.update": "Update",
   "marketplace.agent.openChat": "Open chat",
 
-  // The question before an agent update that meets skills with local changes.
   "marketplace.agentUpdate.title": "Update {name}?",
   "marketplace.agentUpdate.body": {
     one: "{count} skill has local changes. It stays as it is unless you choose Replace.",
@@ -105,17 +97,16 @@ export const messages = defineMessages("marketplace", {
   },
   "marketplace.agentUpdate.confirm": "Update agent",
 
-  // Apps.
   "marketplace.app.connect": "Connect",
   "marketplace.app.reconnect": "Reconnect",
   "marketplace.app.connectNamed": "Connect {name}",
   "marketplace.app.reconnectNamed": "Reconnect {name}",
   "marketplace.app.connected": "Connected",
   "marketplace.app.attention": "Needs attention",
-  // The plugin page alert when only some of its apps or skills are installed. {name} is the plugin name.
   "marketplace.app.partialTitle": "{name} is not complete",
   "marketplace.app.partialDescription": "Some of its apps or skills are not installed. Reconnect installs them.",
   "marketplace.app.notConnected": "Not connected",
+  "marketplace.app.paused": "Paused",
   "marketplace.app.custom": "MCP server",
   "marketplace.app.githubTagline": "Repositories, issues and pull requests",
   "marketplace.app.onePasswordTagline": "Sign in to sites with logins you share",
@@ -125,7 +116,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.whatsappTagline": "Your own chat and the people you allow in WhatsApp",
   "marketplace.app.bitwardenTagline": "Sign in to sites with logins from a shared folder",
   "marketplace.app.protonPassTagline": "Sign in to sites with logins from a shared vault",
-  // The category row in the information of a password manager page: 1Password, Bitwarden and Proton Pass.
   "marketplace.app.onePasswordCategory": "Login and Credential Management",
   "marketplace.app.yourApps": "Your apps",
   "marketplace.app.addCustom": "Add custom",
@@ -141,13 +131,19 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.remove.action": "Remove",
   "marketplace.app.remove.confirmTitle": "Remove {name}?",
   "marketplace.app.remove.keep": "Keep",
-  // The plugin page section with one row for each app, and the row text by how the app connects.
-  // {name} is the app name, {field} the label of its key field, {host} "this computer" or a server name.
+  "marketplace.app.replace.title": "Replace {server}?",
+  "marketplace.app.replace.description":
+    "You already have a server named {server}, but it is not {name}. Replace it with {name}? Its address and saved keys are deleted.",
+  "marketplace.app.replace.action": "Replace",
   "marketplace.app.connection": "Connection",
+  "marketplace.app.access.use": "Can use",
+  "marketplace.app.access.noAgents": "No agents",
+  "marketplace.app.access.agentsOf": "Agents that can use {name}",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Choose agents",
+  "marketplace.app.access.level": "Access of {role} to {name}",
   "marketplace.app.setup.account": "Sign in with your {name} account in the browser.",
   "marketplace.app.setup.key": "Needs an API key from your {name} account.",
   "marketplace.app.setup.keySaved": "{field} saved on {host}.",
-  // {host} is "this computer" or a server name.
   "marketplace.app.account.removeDescription": "OpenBot deletes the sign-in of this account on {host}.",
   "marketplace.app.setup.desktop": "Runs in the {name} desktop app at {address}.",
   "marketplace.app.setup.desktopConnected": "Connected to {address}.",
@@ -156,6 +152,7 @@ export const messages = defineMessages("marketplace", {
     "{host} runs an older OpenBot version that cannot connect apps. Update OpenBot on {host}, or ask its owner to update it.",
   "marketplace.app.blocked.member":
     "Only an owner or admin of {host} can connect apps there. Ask one of them to connect {name}, or to update OpenBot on {host} so that members can connect apps.",
+  "marketplace.app.blocked.mac": "{name} works only on a Mac that runs OpenBot.",
   "marketplace.app.connectAgain": "Connect again",
   "marketplace.app.automation.askOnInstall": "Ask macOS for access at install",
   "marketplace.app.automation.title": "Access to Apple apps",
@@ -173,14 +170,10 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.automation.app.reminders": "Reminders",
   "marketplace.app.automation.app.messages": "Messages",
   "marketplace.app.automation.app.safari": "Safari",
-  // The plugin page alert when the server refused an app's saved sign-in.
   "marketplace.app.signInTitle": "Sign in to {name} again",
   "marketplace.app.signInDescription":
     "{name} refused the saved sign-in. Your agents cannot use it until you sign in again.",
 
-  // The catalog apps' listing text, by slug. Each English text is the catalog's own text, byte for
-  // byte: a key whose English no longer matches the catalog is not used. The prompts are requests that
-  // the user sends to an agent.
   "marketplace.plugin.aave.tagline": "Aave data and transactions",
   "marketplace.plugin.aave.description":
     "Aave helps users explore live Aave V3 and V4 markets, review wallet positions and DAO governance, simulate lending actions, and prepare non-custodial transactions. Every transaction is returned unsigned: the plugin reads the markets and writes the call, and the wallet stays with the user.",
@@ -270,6 +263,15 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Make a Higgsfield product photo of a ceramic mug on a wooden table.",
   "marketplace.plugin.higgsfield.prompt.clip": "Make a 5-second Higgsfield video of waves at sunset.",
+  "marketplace.plugin.sunra.tagline": "AI images, videos, audio and 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra lets agents make images, videos, audio and 3D models with models such as GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling and Veo, check the credit balance, and read the results. Results go to a project in the user's Sunra account. Each user signs in to their own Sunra account through the browser. Sunra first quotes the cost of each generation, and spends credits of that account only after it is confirmed.",
+  "marketplace.plugin.sunra.app":
+    "Image, video, audio and 3D generation, credits and results, over Sunra's MCP server with browser sign-in.",
+  "marketplace.plugin.sunra.prompt.balance": "How many Sunra credits do I have?",
+  "marketplace.plugin.sunra.prompt.poster": "Make a Sunra poster of a night market in the rain, in portrait format.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first.",
   "marketplace.plugin.elevenlabs.tagline": "Speech, voices and voice agents",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",
@@ -396,8 +398,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.obsidian.prompt.recall": "What do my notes say about the decisions on this project?",
   "marketplace.plugin.obsidian.prompt.save": "Save this decision as a new note in my vault.",
   "marketplace.plugin.obsidian.prompt.log": "Add a summary of today's work to my Work log note.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "In Obsidian, open Settings > Local REST API and copy the API key.",
   "marketplace.plugin.resend.tagline": "Transactional email",
   "marketplace.plugin.resend.description":
     "Resend lets agents send transactional email and check delivery through one API. An API key from the Resend dashboard is passed to the local server as one environment variable.",
@@ -407,15 +408,16 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.resend.prompt.template": "Draft a password-reset email for the new flow.",
   "marketplace.plugin.omnisend.tagline": "Email and SMS marketing",
   "marketplace.plugin.omnisend.description":
-    "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user signs in to their own Omnisend account through the browser and selects the access level on the consent screen. With write access, agents can also send campaigns and delete data. Select read-only access when agents only need reports.",
+    "Omnisend lets agents read campaign and form reports, find contacts and segments, and create and edit campaigns, automations, email templates, forms and products. Each user connects with an API key from their own Omnisend account. Agents can do what the key allows, which can include sending campaigns and deleting data.",
   "marketplace.plugin.omnisend.app":
-    "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with browser sign-in.",
+    "Campaigns, automations, contacts, segments, forms and reports, over Omnisend's MCP server with an API key.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "How did last week's campaigns perform compared to the week before?",
   "marketplace.plugin.omnisend.prompt.segment":
     "How many contacts are in the VIP segment, and how did it change this month?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Draft a campaign for the new collection, but do not send it.",
   "marketplace.plugin.postiz.tagline": "Social media scheduling",
+  "marketplace.plugin.omnisend.hint.apiKey": "In Omnisend, open Store settings > API keys and create a key.",
   "marketplace.plugin.postiz.description":
     "Postiz lets agents list your social media channels, and draft, schedule and publish posts on more than 30 networks, such as X, LinkedIn, Instagram and TikTok. Agents can also upload media and make AI images and videos. Sign in to your Postiz account through the browser, or paste the API key from Settings › Developers in Postiz. All Postiz cloud plans include API access. Agents can publish a post immediately, so review each post before you approve it.",
   "marketplace.plugin.postiz.app":
@@ -423,6 +425,14 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.postiz.prompt.channels": "Which social media channels are connected to Postiz?",
   "marketplace.plugin.postiz.prompt.week": "Which posts are scheduled for next week?",
   "marketplace.plugin.postiz.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
+  "marketplace.plugin.trypost.tagline": "Social media scheduling",
+  "marketplace.plugin.trypost.description":
+    "TryPost lets agents list your connected channels, and draft, schedule, queue and publish posts on X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest and more. Agents can also read analytics, manage ideas and approvals, and set posting times. Sign in to your TryPost account through the browser and choose a workspace. Agents can publish a post immediately, so review each post before you approve it.",
+  "marketplace.plugin.trypost.app":
+    "Channels, posts, queue, ideas and analytics, over TryPost's MCP server with browser sign-in.",
+  "marketplace.plugin.trypost.prompt.week": "Which posts are scheduled for this week?",
+  "marketplace.plugin.trypost.prompt.draft": "Draft a LinkedIn post about our new release, but do not schedule it.",
+  "marketplace.plugin.trypost.prompt.analytics": "Which of my posts from last month had the most engagement?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub and 1,000+ more apps",
   "marketplace.plugin.composio.description":
     "Composio connects your agents to Gmail, Slack, GitHub and more than 1,000 other apps through one MCP server. Sign in with your Composio account. When an agent needs an app, it asks you to connect that app.",
@@ -431,7 +441,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.composio.prompt.inbox": "Summarize my unread email and draft replies to the urgent ones.",
   "marketplace.plugin.composio.prompt.handoff": "Post a summary of this pull request to our team channel.",
   "marketplace.plugin.composio.prompt.apps": "Which apps and actions can you use through Composio?",
-  // The connect form text of the catalog listings. Each English text is the catalog's own text, byte for byte.
   "marketplace.plugin.composio.hint.apiKey": "Find it in your Composio account, in Settings > Sessions & API Key.",
   "marketplace.plugin.neon.tagline": "Postgres projects, branches and migrations",
   "marketplace.plugin.neon.description":
@@ -543,12 +552,9 @@ export const messages = defineMessages("marketplace", {
   "marketplace.auth.personalApiKey": "Personal API key",
   "marketplace.auth.createKey": "Create a key",
 
-  // Skills.
   "marketplace.skill.doc": "SKILL.md",
   "marketplace.try.in": "Try in {name}",
 
-  // The Skills tab. {name} is a skill, a group or a sort name. {agents} is a list of agent names,
-  // "all agents" or "4 agents". {agent} is one agent name. {state} is one or more states.
   "marketplace.skills.yours": "Your skills",
   "marketplace.skills.seeAll": "See all",
   "marketplace.skills.seeAllName": "See all: {name}",
@@ -579,6 +585,13 @@ export const messages = defineMessages("marketplace", {
   "marketplace.skills.origin.local": "Made on this computer",
   "marketplace.skills.origin.workspace": "In this agent's folder",
   "marketplace.skills.origin.marketplace": "From the Marketplace · version {version}",
+  "marketplace.skills.origin.github": "From GitHub · {repository}",
+  "marketplace.skills.github.search": "Search, or paste a GitHub link",
+  "marketplace.skills.github.reading": "Looking for skills in the repository",
+  "marketplace.skills.github.trust": "OpenBot did not review skills from GitHub. Read a skill before you add it.",
+  "marketplace.skills.github.source": "GitHub · {repository} at {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Open {repository} on GitHub",
   "marketplace.skills.status.notAdded": "Not added",
   "marketplace.skills.status.on": "On {agents}",
   "marketplace.skills.agentCount": { one: "{count} agent", other: "{count} agents" },
@@ -613,7 +626,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.skills.dialog.unread": "Skills not read",
   "marketplace.skills.local.gone": "No agent has this skill now.",
 
-  // Results that a screen reader hears. {agents} is a list of agent names.
   "marketplace.notice.agentAdded": "{name} added.",
   "marketplace.notice.agentUpdated": "{name} updated.",
   "marketplace.notice.appConnected": "{name} connected.",
@@ -629,7 +641,6 @@ export const messages = defineMessages("marketplace", {
   },
   "marketplace.error.skillPartial": "{name} did not change on these agents: {agents}. {reason}",
 
-  // Errors. {reason} is an error message. {failures} is a list of error messages.
   "marketplace.error.openLink": "Could not open the link.",
   "marketplace.error.copyLink": "Could not copy the link.",
   "marketplace.error.connectNoServer": "Select a local server to connect this app.",
@@ -640,6 +651,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.error.installOnHost":
     "Install {name} on the computer that runs these agents: its app needs a browser sign-in.",
   "marketplace.error.appInvalid": "{name} cannot be added: {reason}",
+  "marketplace.error.appNotConnected": "Could not connect {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Select a local server to uninstall a plugin.",
   "marketplace.error.uninstallPartial": "Some of {name} could not be removed. {failures}",
   "marketplace.error.actionFailed": "Could not complete the marketplace action. Try again.",

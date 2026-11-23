@@ -1,8 +1,3 @@
-import { Effect } from "effect";
-// The routine calendar: every routine of a host, of agents and channels, with its runs in a range.
-// A past run comes from the run history, a later one from the schedule. The local host, a remote
-// one and the phone give the same source, so every calendar places runs with the same schedule code.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   ROUTINE_MINIMUM_INTERVAL_MINUTES,
@@ -12,15 +7,14 @@ import {
   type RoutineFields,
   type RoutineRunFields,
 } from "@openbot/contracts/ipc";
+import { Effect } from "effect";
 import { nextValidRoutineOccurrence, validateStoredRoutineSchedule } from "./routine-schedule";
 
-/** A remote host gets one request for each owner and each routine; this many run at the same time. */
 const PARALLEL_REQUESTS = 8;
 
 export interface RoutineCalendarSource<E> {
   owners(): Effect.Effect<RoutineCalendarOwner[], E>;
   routines(owner: RoutineCalendarOwner): Effect.Effect<RoutineFields[], E>;
-  /** The newest runs of one routine, newest first. */
   runs(owner: RoutineCalendarOwner, routineId: string, limit: number): Effect.Effect<RoutineRunFields[], E>;
 }
 
@@ -40,12 +34,10 @@ export const buildRoutineCalendar = Effect.fn("RoutineCalendar.build")(function*
     routines,
     ({ owner, routine }) =>
       Effect.gen(function* () {
-        // History reaches back from now, so a range that ends before the oldest run kept here has no history.
         const history =
           range.from.getTime() < now.getTime()
             ? yield* source.runs(owner, routine.id, INPUT_LIMITS.routineRunsPage)
             : [];
-        // Planning does not wait, so the event loop gets a turn between routines.
         yield* Effect.callback<void>((resume) => {
           const timer = setTimeout(() => resume(Effect.void), 0);
           return Effect.sync(() => clearTimeout(timer));
@@ -81,14 +73,11 @@ function routineRuns(
     made.add(at);
     runs.push({ id: run.id, routineId: routine.id, at: new Date(at).toISOString(), status: run.status });
   }
-  // A paused routine keeps its place: the calendar shows the runs it would make if it resumed.
   try {
     validateStoredRoutineSchedule(routine.trigger.schedule, routine.timezone);
   } catch {
-    // A stored schedule that no longer validates fires nothing either; its past runs still show.
     return runs;
   }
-  // Valid runs are at least the minimum interval apart, so the range holds no more than this.
   const maxRuns =
     Math.ceil((range.to.getTime() - range.from.getTime()) / (ROUTINE_MINIMUM_INTERVAL_MINUTES * 60_000)) + 1;
   let cursor = new Date(Math.max(range.from.getTime() - 1, now.getTime()));
@@ -97,7 +86,6 @@ function routineRuns(
     try {
       next = nextValidRoutineOccurrence(routine.trigger.schedule, routine.timezone, cursor);
     } catch {
-      // An interval with an anchor that does not parse validates, but has no next run.
       break;
     }
     if (next.getTime() >= range.to.getTime()) break;

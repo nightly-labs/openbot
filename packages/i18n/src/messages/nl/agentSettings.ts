@@ -149,8 +149,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Toegang van agent",
   "agentSettings.runtime.busyMessage": "Tijdens werk",
   "agentSettings.runtime.busyMessageLabel": "Berichten terwijl de agent werkt",
-  "agentSettings.runtime.taskLimit": "Parallelle threads",
-  "agentSettings.runtime.taskLimitLabel": "Threads die tegelijk draaien",
   "agentSettings.runtime.workingDirectory": "Werkmap",
   "agentSettings.runtime.notAvailable": "Nog niet beschikbaar",
   "agentSettings.runtime.fullAccessNote":
@@ -169,21 +167,20 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Bijsturen",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} kan een lopende beurt niet bijsturen. Berichten die je stuurt terwijl hij werkt, wachten in de wachtrij.",
-  "agentSettings.taskLimit.default": "Standaard ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} voert één beurt tegelijk uit. De threads van deze agent wachten op elkaar.",
   "agentSettings.notificationLevel.title": "Meld mij",
   "agentSettings.notificationLevel.server": "Serverstandaard ({level})",
   "agentSettings.notificationLevel.note":
     "Deze keuze geldt alleen voor jou, op al je apparaten. Is de server gedempt of op ‘Niets’ gezet, dan blijft ook deze agent stil.",
   "agentSettings.newChat.title": "Nieuwe chat",
-  "agentSettings.newChat.description": "De agent vergeet deze chat. De instellingen blijven.",
+  "agentSettings.newChat.description":
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De instellingen blijven.",
   "agentSettings.newChat.button": "Starten",
   "agentSettings.newChat.confirmTitle": "Nieuwe chat met {name} starten?",
   "agentSettings.newChat.confirmDescription":
-    "De agent vergeet deze chat. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, het geheugen, de werkruimte en de browser veranderen niet.",
   "agentSettings.newChat.confirm": "Nieuwe chat starten",
   "agentSettings.newChat.failed": "Kan geen nieuwe chat starten.",
+  "agentSettings.newChat.busy": "De agent is bezig. Wacht tot hij klaar is of stop hem om een nieuwe chat te starten.",
   "agentSettings.deleteHistory.title": "Geschiedenis wissen",
   "agentSettings.deleteHistory.description":
     "De berichten van deze chat worden gewist en de agent vergeet ze. De instellingen blijven.",
@@ -202,6 +199,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Volledige toegang toestaan",
   "agentSettings.fullAccess.askConfirm": "Eerst vragen gebruiken",
   "agentSettings.links.usage": "Gebruik",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Alle agents",
   "agentSettings.links.memories": "Herinneringen",
   "agentSettings.links.memoriesCount": { one: "{count} opgeslagen", other: "{count} opgeslagen" },
   "agentSettings.links.skills": "Vaardigheden",
@@ -228,6 +227,9 @@ export const messages = {
     "Laat de agent een nieuwe chat starten als de chat lang wordt. Hij slaat eerst notities op.",
   "agentSettings.quickAcknowledgement.title": "Plan tonen vóór lange taken",
   "agentSettings.quickAcknowledgement.description": "Vóór een lange taak toont de agent zijn plan.",
+  "agentSettings.builtinMemory.title": "OpenBot-geheugen",
+  "agentSettings.builtinMemory.description":
+    "De agent bewaart en leest zijn eigen herinneringen. Zet dit uit om alleen een geheugen-app zoals Mem0 te gebruiken. Bewaarde herinneringen blijven.",
   "agentSettings.browserProfile.label": "Browserprofiel",
   "agentSettings.browserProfile.shared": "Gedeeld",
   "agentSettings.browserProfile.agent": "Alleen deze agent",
@@ -237,6 +239,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Elk profiel bewaart eigen logins en cookies. Een wijziging sluit de open tabbladen van de agent.",
   "agentSettings.browserProfile.manage": "Beheren",
+  "agentSettings.browserProfile.movedNote":
+    "Logins bij sites blijven in het oude profiel. De agent moet opnieuw inloggen op deze sites.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Het hele proces van {provider} draait in een sandbox, dus schrijven buiten mislukt. Alleen beschikbaar op macOS.",
 } as const satisfies PartialTranslation<typeof source>;

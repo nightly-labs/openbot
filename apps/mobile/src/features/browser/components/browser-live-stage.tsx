@@ -29,17 +29,13 @@ import {
 } from "../model/live-view-gestures";
 import { BrowserCursor } from "./browser-cursor";
 
-/** How close to the stage edge, in points, the trackpad pointer may come before the zoomed page follows it. */
 const POINTER_MARGIN = 32;
 const CENTER: Point = { x: 0.5, y: 0.5 };
 const EMPTY_RECT: Rect = { x: 0, y: 0, width: 0, height: 0 };
-// The frame is drawn smooth when it is scaled, as a photo is.
 const SAMPLING = { filter: FilterMode.Linear, mipmap: MipmapMode.None };
 
 export interface BrowserLiveStageHandle {
-  /** Puts the pointer in the middle of the part of the page that shows. */
   recenterPointer(): void;
-  /** Where the pointer is on the stage, in points. Null before a frame shows. */
   pointerPosition(): Point | null;
 }
 
@@ -48,11 +44,6 @@ function touch(data: TouchData) {
   return { id: data.id, x: data.x, y: data.y };
 }
 
-/**
- * The host's page on the phone: the newest frame, the page's cursor at the pointer, and the
- * touches that become the page's mouse. The whole stage takes touches, the bars around the page
- * too, so a finger can move the trackpad pointer from anywhere.
- */
 export function BrowserLiveStage({
   ref,
   image,
@@ -65,11 +56,9 @@ export function BrowserLiveStage({
 }: {
   ref?: Ref<BrowserLiveStageHandle>;
   image: SharedValue<SkImage | null>;
-  /** The size of the page in the newest frame. Null until a frame shows. */
   frame: Size | null;
   cursor: BrowserViewCursor;
   mode: LiveViewMode;
-  /** The frame on screen, which a point on the page belongs to. */
   drawnSequence: () => number | null;
   send: (input: BrowserViewInput) => void;
   accessibilityLabel: string;
@@ -78,9 +67,7 @@ export function BrowserLiveStage({
   const fitted = useSharedValue<Rect>(EMPTY_RECT);
   const zoom = useSharedValue<Zoom>(NO_ZOOM);
   const pointer = useSharedValue<Point>(CENTER);
-  // While two fingers zoom or pan the picture, the UI thread moves it from the touches.
   const pinch = useSharedValue<LiveViewPinch | null>(null);
-  // The gestures run on the JS thread and read these; the shared values are what the UI thread draws.
   const current = useRef({
     stage,
     frame,
@@ -100,7 +87,6 @@ export function BrowserLiveStage({
   const setZoom = useCallback(
     (next: Zoom) => {
       current.current.zoom = next;
-      // A pinch computes the same zoom from the same touches on the UI thread, a frame sooner.
       if (!current.current.pinching) zoom.value = next;
     },
     [zoom],
@@ -109,8 +95,6 @@ export function BrowserLiveStage({
     (start: LiveViewPinch | null) => {
       current.current.pinching = start !== null;
       pinch.value = start;
-      // The JS thread saw every touch of the pinch, so its zoom is the last one drawn, or a newer one
-      // when the stage changed size during the pinch.
       if (!start) zoom.value = current.current.zoom;
     },
     [pinch, zoom],
@@ -129,7 +113,6 @@ export function BrowserLiveStage({
   const rect = useMemo(() => fittedRect(stage, frame ?? { width: 0, height: 0 }), [stage, frame]);
   useEffect(() => {
     fitted.value = rect;
-    // A new page size or a new stage, such as with the keyboard open, keeps the zoom inside the page.
     if (frame) setZoom(clampZoom(stage, frame, current.current.zoom));
   }, [fitted, rect, frame, stage, setZoom]);
 
@@ -204,10 +187,6 @@ export function BrowserLiveStage({
   );
 
   const touches = useMemo(() => {
-    // The callbacks run on the UI thread, where the gesture's state can change: a call to the state
-    // manager from the JS thread only logs a warning. The touches go to the gestures on the JS thread.
-    // A pinch moves the picture here, so it follows the fingers at the display rate while the JS
-    // thread decodes frames.
     const { down, move, up, cancel } = gestures;
     return Gesture.Manual()
       .onTouchesDown((event, manager) => {
@@ -228,7 +207,6 @@ export function BrowserLiveStage({
       .onTouchesUp((event, manager) => {
         "worklet";
         const lifted = event.changedTouches.map(touch);
-        // The gesture ends with the last finger, which the UI thread knows without the JS thread.
         const remaining = event.allTouches.filter((held) => !lifted.some((finger) => finger.id === held.id));
         if (remaining.length === 0) manager.end();
         scheduleOnRN(up, lifted, Date.now());

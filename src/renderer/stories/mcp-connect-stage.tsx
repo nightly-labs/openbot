@@ -1,15 +1,3 @@
-/**
- * The stage both connect dialogs are reviewed on.
- *
- * One story each, driven by controls, rather than a story per state: the dialog's states are what a
- * server answers with, so answering differently is the whole difference between them. The connection
- * reads the configuration it is given - a wrong key fails, no key passes where none is asked for -
- * so the header and environment writes are under review here as much as the layout.
- *
- * A sign-in has no separate answer to give here. The browser round trip belongs to the bridge the
- * listing installs, behind the same connect attempt, so "never answers" is what waiting looks like.
- */
-
 import type { McpServerConfig, McpTestResult } from "@openbot/contracts/ipc";
 import type { McpKeyFlow } from "@openbot/contracts/mcp-connect-flows";
 import { Button, Text } from "@openbot/ui";
@@ -28,35 +16,26 @@ function app(slug: string): MarketplacePluginApp {
   return found;
 }
 
-/** Resend asks for a key; Linear signs in and also issues keys; Aave asks for nothing. */
 export const RESEND = app("resend");
 export const LINEAR = app("linear");
 export const AAVE = app("aave");
 
-/** The subject the plugin page hands over: the listing's app, as the configuration it installs as. */
 export function subjectFor(entry: MarketplacePluginApp): McpConnectSubject {
   return { name: entry.name, iconUrl: entry.iconUrl, config: createPluginAppConfig(entry) };
 }
 
-/** The key flow the listing declares, which the caller picked before opening the key dialog. */
 export function keyFlowFor(entry: MarketplacePluginApp): McpKeyFlow {
   const found = (entry.server.auth ?? []).find((one): one is McpKeyFlow => one.kind === "key");
   if (!found) throw new Error(`${entry.name} must declare a key flow.`);
   return found;
 }
 
-/** The key the story server accepts. Anything else is a key the server refuses. */
 const GOOD_KEY = "good-key";
 
-/** What the server does with this attempt. Every state of the dialog is one of these answers. */
 export type ConnectOutcome = "connects" | "refuses" | "unreachable" | "never answers";
 
 export const CONNECT_OUTCOMES: ConnectOutcome[] = ["connects", "refuses", "unreachable", "never answers"];
 
-/**
- * A server that reads the credential it was sent, and answers the way the control says. The key goes
- * into a header over http and into the environment over a command, so both are read back here.
- */
 export function connectAs(outcome: ConnectOutcome, name: string) {
   return async (config: McpServerConfig): Promise<McpTestResult> => {
     if (outcome === "never answers") return new Promise<McpTestResult>(() => {});
@@ -81,19 +60,12 @@ export const CONNECT_PARAMETERS = {
 
 export const CONNECT_GLOBALS = { viewport: { value: "connectDesktop", isRotated: false } } as const;
 
-/**
- * What the dialog opens over and closes back to: the marketplace surface it really sits on, with the
- * page's own report of the connection. A connection that works closes the dialog and is read here,
- * which is the whole reason the dialog says nothing about it.
- */
 export function ConnectStage(props: {
-  /** What the page reports once a connection worked, or null while there is none. */
   connected: string | null;
   openLabel: string;
   onOpen: () => void;
   children: JSX.Element;
 }) {
-  // The dialogs stand above the stage as they do above the Marketplace page.
   onCleanup(holdFlag(document.body, "skills-marketplace"));
   return (
     <main class="foundation-story skills-marketplace">
@@ -112,7 +84,6 @@ export function ConnectStage(props: {
   );
 }
 
-/** Holds what the page knows, so a story only says how the server answers. */
 export function createConnectStage() {
   const [open, setOpen] = createSignal(true);
   const [connected, setConnected] = createSignal<string | null>(null);

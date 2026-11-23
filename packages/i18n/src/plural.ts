@@ -1,22 +1,11 @@
-/**
- * The plural category of a count in a locale.
- *
- * `Intl.PluralRules` is used where the runtime has it. The mobile app runs on Hermes, which may not
- * ship it (not confirmed on a device), so each translated language also has its CLDR rule written
- * out here. A new language adds its rule to `BUILT_IN_RULES`; see docs/i18n.md.
- */
-
 type PluralCategory = "zero" | "one" | "two" | "few" | "many" | "other";
 
 type PluralRule = (count: number) => PluralCategory;
 
-// CLDR: one is the integer 1 with no visible fraction digits.
 const english: PluralRule = (count) => (count === 1 ? "one" : "other");
 
 const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
   en: english,
-  // CLDR Arabic: zero for 0; one for 1; two for 2; few for n % 100 in 3–10; many for n % 100 in
-  // 11–99; other for 100–102, 200–202… and for fractions.
   ar: (count) => {
     const absolute = Math.abs(count);
     if (!Number.isInteger(absolute)) return "other";
@@ -29,33 +18,25 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
     return "other";
   },
   de: (count) => (Math.abs(count) === 1 ? "one" : "other"),
-  // CLDR Spanish: one for 1; many for nonzero integer multiples of one million.
   es: (count) => {
     const absolute = Math.abs(count);
     if (absolute === 1) return "one";
     return absolute !== 0 && Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
   },
-  // CLDR: one is every number from 0 up to, but not including, 2.
   fr: (count) => (count >= 0 && count < 2 ? "one" : "other"),
-  // CLDR Hebrew: one for 1 and for fractions below 1; two for 2; other for every other number.
   he: (count) => {
     const absolute = Math.abs(count);
     if (absolute === 1 || (absolute > 0 && absolute < 1)) return "one";
     return absolute === 2 ? "two" : "other";
   },
-  // CLDR Italian: one for 1; many for nonzero integer multiples of one million.
   it: (count) => {
     const absolute = Math.abs(count);
     if (absolute === 1) return "one";
     return absolute !== 0 && Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
   },
-  // Japanese has one form for every count.
   ja: () => "other",
-  // Korean has one form for every count.
   ko: () => "other",
-  // CLDR Dutch: one is the integer 1 with no visible fraction digits.
   nl: (count) => (Math.abs(count) === 1 ? "one" : "other"),
-  // CLDR Polish: one for 1; few for 2–4, 22–24…; many for 0, 5–21, 25–31…; other for fractions.
   pl: (count) => {
     const absolute = Math.abs(count);
     if (!Number.isInteger(absolute)) return "other";
@@ -65,13 +46,11 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
     if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14)) return "few";
     return "many";
   },
-  // CLDR Portuguese: one for integer parts 0 and 1; many for nonzero multiples of one million.
   pt: (count) => {
     const absolute = Math.abs(count);
     if (absolute < 2) return "one";
     return Number.isInteger(absolute) && absolute % 1_000_000 === 0 ? "many" : "other";
   },
-  // CLDR Russian: one for 1, 21, 31…; few for 2–4, 22–24…; many for 0, 5–20, 25–30…; other for fractions.
   ru: (count) => {
     const absolute = Math.abs(count);
     if (!Number.isInteger(absolute)) return "other";
@@ -81,9 +60,7 @@ const BUILT_IN_RULES: Readonly<Record<string, PluralRule>> = {
     if (lastDigit >= 2 && lastDigit <= 4 && (lastTwo < 12 || lastTwo > 14)) return "few";
     return "many";
   },
-  // CLDR: one is the integer 1.
   tr: (count) => (count === 1 ? "one" : "other"),
-  // CLDR Chinese has one form for every count, like Japanese.
   zh: () => "other",
 };
 
@@ -93,8 +70,6 @@ function intlRules(locale: string): Intl.PluralRules | undefined {
   if (typeof Intl === "undefined" || typeof Intl.PluralRules !== "function") return undefined;
   const cached = rulesByLocale.get(locale);
   if (cached) return cached;
-  // An unknown tag throws rather than falling back, and a bad stored preference must not blank the
-  // interface. English rules are wrong for that language but still render a readable sentence.
   let rules: Intl.PluralRules;
   try {
     rules = new Intl.PluralRules(locale);

@@ -6,11 +6,6 @@ import { useSetup } from "./onboarding-context";
 
 const PRODUCT_NAME = "OpenBot";
 
-/**
- * Shown in place of first-run setup when the saved setup could not be read. A configured user
- * retries; "Set up again" opens first-run setup with no saved state. The screen uses the layout of
- * the sign-in screen when the account service is unreachable.
- */
 export function SetupReadError() {
   const { t } = useText();
   const platform = usePlatform();

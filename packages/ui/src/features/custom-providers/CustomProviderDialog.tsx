@@ -20,7 +20,6 @@ import {
   ArrowLeft,
   Button,
   buttonVariants,
-  Checkbox,
   Dialog,
   Download,
   Field,
@@ -38,18 +37,7 @@ import {
   Text,
   X,
 } from "@openbot/ui";
-import {
-  createEffect,
-  createSignal,
-  createStore,
-  createUniqueId,
-  For,
-  Match,
-  onSettled,
-  Show,
-  Switch,
-  untrack,
-} from "solid-js";
+import { createEffect, createSignal, createStore, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { REASONING_LABEL } from "../../components/ProviderModelPicker";
 import { useText } from "../../text";
@@ -67,12 +55,15 @@ import {
   holdsFoundValues,
   keepsHeaderValue,
   type ModelDiscovery,
+  tokenCountEditText,
+  tokenCountRestText,
+  tokenCountText,
   validateCustomProvider,
 } from "./custom-provider-form";
 import { FoundModelPicker } from "./FoundModelPicker";
-import { type RepeatableColumn, RepeatableRows } from "./RepeatableRows";
+import { ModelChoiceMenu } from "./ModelChoiceMenu";
+import { type RepeatableColumn, RepeatableRows, type RepeatableTable } from "./RepeatableRows";
 
-// Examples of identifiers and addresses. They are not words, so they are the same in each language.
 const PROVIDER_ID_PLACEHOLDER = "my-provider";
 const BASE_URL_PLACEHOLDER = "http://127.0.0.1:11434/v1";
 const MODEL_ID_PLACEHOLDER = "model-id";
@@ -83,21 +74,17 @@ const INPUT_KIND_LABEL = {
   pdf: "customProvider.model.inputPdf",
 } as const satisfies Record<CustomProviderInputKind, AppTextKey>;
 
-/** A provider that can run the endpoint, and whether it can run it now. */
 export interface CustomProviderHarnessChoice {
   id: CustomProviderHarness;
   ready: boolean;
-  /** The download of a provider that is not ready, when OpenBot downloads it. */
   runtime?: ProviderRuntimeStatus | undefined;
 }
 
-/** Where the download of a provider that cannot run the endpoint yet is. */
 function harnessDownload(choice: CustomProviderHarnessChoice): ProviderRuntimeStatus["phase"] | null {
   const phase = choice.ready ? null : choice.runtime?.phase;
   return phase && phase !== "ready" ? phase : null;
 }
 
-/** A download that waits for the user: the first one, or one that failed. */
 function startsDownload(phase: ProviderRuntimeStatus["phase"] | null): boolean {
   return phase === "not-downloaded" || phase === "download-error";
 }
@@ -105,10 +92,6 @@ function startsDownload(phase: ProviderRuntimeStatus["phase"] | null): boolean {
 type ModelRow = CustomProviderDraft["models"][number];
 type HeaderRow = CustomProviderDraft["headers"][number];
 
-/**
- * Storybook and Solid both hand this object over as a proxy, and `structuredClone` refuses a proxy
- * with a `DataCloneError`, so the two nested lists are copied by hand.
- */
 function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
   return {
     ...draft,
@@ -123,42 +106,17 @@ function cloneDraft(draft: CustomProviderDraft): CustomProviderDraft {
 
 interface CustomProviderDialogProps {
   open: boolean;
-  /** Prefilled fields, for editing a provider or for a story. Defaults to a blank form. */
   draft?: CustomProviderDraft | undefined;
-  /** Set by a story to show the messages without typing into every field first. */
   showErrors?: boolean | undefined;
   busy?: boolean | undefined;
   submitError?: string | null | undefined;
-  /**
-   * The provider IDs already saved. A duplicate is a field error before a round trip; main refuses
-   * one as well, because this list is only as fresh as the last list the renderer was given.
-   */
   takenProviderIds?: readonly string[] | undefined;
-  /** Edit of a saved endpoint: the ID names it, so it cannot change. */
   providerIdLocked?: boolean | undefined;
-  /** Main holds a key for this endpoint. A blank key field keeps it. */
   apiKeyKept?: boolean | undefined;
-  /**
-   * Shows the context window, max output and efforts of each model. This computer only: a joined
-   * server's host takes the model fields of the Team API, which has none of them.
-   */
   contextWindows?: boolean | undefined;
-  /**
-   * Shows "Runs on", the provider that runs the endpoint. This computer only: the Team API saves an
-   * endpoint without one, and the host runs it on OpenCode.
-   */
   harnesses?: readonly CustomProviderHarnessChoice[] | undefined;
-  /**
-   * Downloads a provider of "Runs on" that is not ready. Without it, the list shows only the
-   * providers that can run the endpoint now.
-   */
   onDownloadHarness?: ((harness: CustomProviderHarness) => void) | undefined;
-  /** Why the last download of "Runs on" failed. The host's own alert is behind the dialog. */
   harnessError?: string | undefined;
-  /**
-   * The last model list request. The host owns it because the request leaves the renderer. Without
-   * `onDiscoverModels` the dialog has no find control and only the typed rows.
-   */
   discovery?: ModelDiscovery | undefined;
   onDiscoverModels?: ((endpoint: CustomProviderEndpoint) => void) | undefined;
   onSubmit: (value: SaveCustomProviderInput) => void;
@@ -168,28 +126,17 @@ interface CustomProviderDialogProps {
 
 export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const { t, format } = useText();
-  // The form owns its state from here on: the incoming draft is read once, as a snapshot, so later
-  // edits by the caller do not reach in and overwrite what the user is typing.
   const [draft, setDraft] = createStore<CustomProviderDraft>(
     untrack(() => (props.draft ? cloneDraft(props.draft) : emptyCustomProviderDraft())),
   );
-  // Nothing is red until the user has asked OpenBot to accept the form, so a blank form does not
-  // open covered in messages about fields nobody has reached yet.
   const [submitted, setSubmitted] = createSignal(untrack(() => Boolean(props.showErrors)));
 
-  // Set by a Find click: the list that it gets fills the empty fields of the rows (#3946).
   let fillNextList = false;
 
-  /**
-   * Both hosts keep this dialog mounted after a close, and the draft above is a snapshot, so without
-   * this a second "Add provider" reopens the form still holding the last endpoint - including its API
-   * key. Re-snapshot on the false-to-true edge only, never while the dialog is open.
-   */
   createEffect(
     () => props.open,
     (open, previous) => {
       if (!open || previous) return;
-      // A snapshot: a later change of the draft prop must not reach the open form.
       const next = untrack(() => props.draft);
       setDraft(() => (next ? cloneDraft(next) : emptyCustomProviderDraft()));
       setSubmitted(untrack(() => Boolean(props.showErrors)));
@@ -203,12 +150,10 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const busy = () => Boolean(props.busy);
   const discovery = (): ModelDiscovery => props.discovery ?? { status: "idle" };
   const [mount, setMount] = createSignal<HTMLElement | undefined>(undefined);
-  /** The saved choice, or the first provider that can run the endpoint now. */
   const harness = (): CustomProviderHarness =>
     draft.harness ?? props.harnesses?.find((choice) => choice.ready)?.id ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
   const choiceOf = (id: CustomProviderHarness): CustomProviderHarnessChoice =>
     props.harnesses?.find((choice) => choice.id === id) ?? { id, ready: true };
-  /** The phase of the chosen provider's download while it runs, for the closed field. */
   const downloading = (id: CustomProviderHarness): ProviderRuntimeStatus["phase"] | null => {
     const phase = harnessDownload(choiceOf(id));
     return phase === "downloading" || phase === "finishing" ? phase : null;
@@ -221,8 +166,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     return t("common.download");
   }
 
-  // The form itself scrolls, and its own box keeps the same size when a row is added, so the
-  // helper's ResizeObserver never fires for new content. Remeasure on what changes the height.
   const fades = createScrollFades();
   onSettled(() => fades.stop);
   createEffect(
@@ -264,11 +207,12 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   const contextWindowColumn: RepeatableColumn<ModelRow> = {
     label: (number) => t("customProvider.model.contextWindow", { number }),
     placeholder: () => t("customProvider.model.contextWindowPlaceholder"),
-    // `100,000,000` with its separators.
     maxlength: 16,
     identifier: true,
     numeric: true,
     read: (row) => row.contextWindow ?? "",
+    editText: tokenCountEditText,
+    restText: (value) => tokenCountRestText(value, format),
     write: (index, value) =>
       setDraft((state) => {
         const model = state.models[index];
@@ -282,60 +226,47 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     identifier: true,
     numeric: true,
     read: (row) => row.maxOutput ?? "",
+    editText: tokenCountEditText,
+    restText: (value) => tokenCountRestText(value, format),
     write: (index, value) =>
       setDraft((state) => {
         const model = state.models[index];
         if (model) model.maxOutput = value;
       }),
   };
-  const modelColumns = ():
-    | typeof modelNameColumns
-    | readonly [
-        RepeatableColumn<ModelRow>,
-        RepeatableColumn<ModelRow>,
-        RepeatableColumn<ModelRow>,
-        RepeatableColumn<ModelRow>,
-      ] =>
-    props.contextWindows
-      ? [modelNameColumns[0], modelNameColumns[1], contextWindowColumn, maxOutputColumn]
-      : modelNameColumns;
+  const tableColumns: readonly RepeatableColumn<ModelRow>[] = [
+    { ...modelNameColumns[0], mono: true },
+    modelNameColumns[1],
+    contextWindowColumn,
+    maxOutputColumn,
+  ];
+  const modelColumns = () => (props.contextWindows ? tableColumns : modelNameColumns);
 
   function setEffort(index: number, effort: CustomProviderReasoningEffort, checked: boolean): void {
     setDraft((state) => {
       const model = state.models[index];
       if (!model) return;
-      // In place: the store tracks each item, so a new array would re-run every reader of the row.
       model.reasoningEfforts ??= [];
       const at = model.reasoningEfforts.indexOf(effort);
       if (checked && at < 0) model.reasoningEfforts.push(effort);
       if (!checked && at >= 0) model.reasoningEfforts.splice(at, 1);
+      if (model.reasoningEfforts.length === 0) delete model.reasoningEfforts;
     });
   }
 
-  /** The efforts of one model row. None checked keeps the efforts of the provider that runs it. */
-  const effortsId = createUniqueId();
-  const effortsRow = (row: ModelRow, index: () => number) => (
-    <fieldset class="custom-provider-efforts" aria-label={t("customProvider.model.efforts", { number: index() + 1 })}>
-      <Text tone="muted" variant="caption" aria-hidden="true">
-        {t("customProvider.model.effortsLabel")}
-      </Text>
-      <For each={CUSTOM_PROVIDER_REASONING_EFFORTS}>
-        {(effort) => (
-          <label class="custom-provider-effort" for={`${effortsId}-${index()}-${effort}`}>
-            <Checkbox
-              id={`${effortsId}-${index()}-${effort}`}
-              checked={row.reasoningEfforts?.includes(effort) ?? false}
-              disabled={busy()}
-              onChange={(event) => setEffort(index(), effort, event.currentTarget.checked)}
-            />
-            <Text variant="body-sm">{t(REASONING_LABEL[effort])}</Text>
-          </label>
-        )}
-      </For>
-    </fieldset>
-  );
+  function setNoEffort(index: number, on: boolean): void {
+    setDraft((state) => {
+      const model = state.models[index];
+      if (!model) return;
+      if (on) model.reasoningEfforts = [];
+      else delete model.reasoningEfforts;
+    });
+  }
 
-  /** What the model accepts beside text: the saved kinds, or the default of the harness that runs it. */
+  const modelEfforts = (row: ModelRow): readonly CustomProviderReasoningEffort[] => row.reasoningEfforts ?? [];
+  const noEfforts = () =>
+    harness() === "pi" ? t("customProvider.model.effortsNone") : t("customProvider.model.effortsDefault");
+
   const modelInputs = (row: ModelRow): readonly CustomProviderInputKind[] =>
     row.inputs ?? CUSTOM_PROVIDER_DEFAULT_INPUTS[harness()];
 
@@ -343,8 +274,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     setDraft((state) => {
       const model = state.models[index];
       if (!model) return;
-      // The first change saves the default that the boxes showed, so the other kinds stay as shown.
-      // In place after that, as for the efforts.
       model.inputs ??= [...CUSTOM_PROVIDER_DEFAULT_INPUTS[harness()]];
       const at = model.inputs.indexOf(kind);
       if (checked && at < 0) model.inputs.push(kind);
@@ -352,38 +281,48 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     });
   }
 
-  /**
-   * The input kinds of one model row beside text, as the harness will use them. Only the kinds that
-   * the harness can send show; a hidden kind stays saved, so a change of harness and back keeps it.
-   */
-  const inputsId = createUniqueId();
-  const inputsRow = (row: ModelRow, index: () => number) => (
-    <fieldset class="custom-provider-efforts" aria-label={t("customProvider.model.inputs", { number: index() + 1 })}>
-      <Text tone="muted" variant="caption" aria-hidden="true">
-        {t("customProvider.model.inputsLabel")}
-      </Text>
-      <For each={CUSTOM_PROVIDER_HARNESS_INPUT_KINDS[harness()]}>
-        {(kind) => (
-          <label class="custom-provider-effort" for={`${inputsId}-${index()}-${kind}`}>
-            <Checkbox
-              id={`${inputsId}-${index()}-${kind}`}
-              checked={modelInputs(row).includes(kind)}
-              disabled={busy()}
-              onChange={(event) => setInput(index(), kind, event.currentTarget.checked)}
-            />
-            <Text variant="body-sm">{t(INPUT_KIND_LABEL[kind])}</Text>
-          </label>
-        )}
-      </For>
-    </fieldset>
-  );
-
-  const modelDetails = (row: ModelRow, index: () => number) => (
-    <>
-      {effortsRow(row, index)}
-      {inputsRow(row, index)}
-    </>
-  );
+  const modelTable: RepeatableTable<ModelRow> = {
+    get header() {
+      return [
+        t("customProvider.model.idColumn"),
+        t("customProvider.field.displayName"),
+        t("customProvider.model.contextWindowColumn"),
+        t("customProvider.model.maxOutputColumn"),
+        t("customProvider.model.effortsLabel"),
+        t("customProvider.model.inputsLabel"),
+      ];
+    },
+    cells: (row, index) => (
+      <>
+        <ModelChoiceMenu
+          label={t("customProvider.model.efforts", { number: index() + 1 })}
+          empty={noEfforts()}
+          none={harness() === "pi" ? undefined : t("customProvider.model.effortsNone")}
+          noneChosen={row.reasoningEfforts?.length === 0}
+          onNone={(on) => setNoEffort(index(), on)}
+          choices={CUSTOM_PROVIDER_REASONING_EFFORTS}
+          name={(effort) => t(REASONING_LABEL[effort])}
+          chosen={modelEfforts(row)}
+          busy={busy()}
+          mount={mount()}
+          onToggle={(effort, on) => setEffort(index(), effort, on)}
+        />
+        <ModelChoiceMenu
+          label={t("customProvider.model.inputs", { number: index() + 1 })}
+          empty={t("customProvider.model.inputsNone")}
+          choices={CUSTOM_PROVIDER_HARNESS_INPUT_KINDS[harness()]}
+          name={(kind) => t(INPUT_KIND_LABEL[kind])}
+          chosen={modelInputs(row)}
+          busy={busy()}
+          mount={mount()}
+          onToggle={(kind, on) => setInput(index(), kind, on)}
+        />
+      </>
+    ),
+  };
+  const modelsTable = () => (props.contextWindows ? modelTable : undefined);
+  const dialogClass = () =>
+    props.contextWindows ? "custom-provider-dialog custom-provider-dialog-wide" : "custom-provider-dialog";
 
   const headerColumns: readonly [RepeatableColumn<HeaderRow>, RepeatableColumn<HeaderRow>] = [
     {
@@ -425,44 +364,35 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
   };
   const listed = (id: string) => draft.models.some((model) => model.id.trim() === id);
 
-  /**
-   * The list that a Find click gets fills the empty fields of the rows that it names, such as the rows
-   * of a saved endpoint. A list that the dialog opens with does not: an empty saved field there is the
-   * harness default that the user kept.
-   */
   createEffect(discovery, (list) => {
     if (list.status === "loading") return;
     const fill = fillNextList;
     fillNextList = false;
     if (!fill || list.status !== "found") return;
     const models = list.models;
-    // The user asked for the list, so the list opens.
     if (models.length > 0) setPicking(true);
     if (!untrack(() => props.contextWindows)) return;
     setDraft((state) => {
       for (const row of state.models) {
         const found = models.find((model) => model.id === row.id.trim());
-        if (found) fillFoundValues(row, found);
+        if (found) fillFoundValues(row, found, format);
       }
     });
   });
 
   const [picking, setPicking] = createSignal(false);
-  /** The form holds as many models as one endpoint can have. */
   const full = () => draft.models.filter((row) => !blankModel(row)).length >= CUSTOM_PROVIDER_LIMITS.models;
 
-  /** A found model is a row in the same list the user types into, so submit has one source. */
   function addRow(state: CustomProviderDraft, model: DiscoveredModel): void {
     if (state.models.some((row) => row.id.trim() === model.id)) return;
     const row = {
       id: model.id,
       name: model.name ?? model.id,
-      contextWindow: model.contextWindow?.toString() ?? "",
-      maxOutput: model.maxOutput?.toString() ?? "",
+      contextWindow: model.contextWindow === undefined ? "" : tokenCountText(model.contextWindow, format),
+      maxOutput: model.maxOutput === undefined ? "" : tokenCountText(model.maxOutput, format),
       ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
       ...(model.inputs ? { inputs: [...model.inputs] } : {}),
     };
-    // The blank row that a new form opens with is a placeholder, not a model the user added.
     const blank = state.models.findIndex(blankModel);
     if (blank >= 0) state.models[blank] = row;
     else state.models.push(row);
@@ -481,7 +411,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     });
   }
 
-  /** Adds or removes each model that the search shows. An endpoint holds a limited number of models. */
   function toggleModels(models: readonly DiscoveredModel[], checked: boolean): void {
     setDraft((state) => {
       for (const model of models) {
@@ -507,12 +436,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
     <Dialog.Root open={props.open} onOpenChange={(open) => !open && props.onCancel()}>
       <Dialog.Portal>
         <Dialog.Overlay class="custom-provider-backdrop">
-          <Dialog.Content
-            as="section"
-            class="custom-provider-dialog"
-            aria-busy={busy() ? "true" : undefined}
-            ref={setMount}
-          >
+          <Dialog.Content as="section" class={dialogClass()} aria-busy={busy() ? "true" : undefined} ref={setMount}>
             <Dialog.Title class="sr-only">
               {props.providerIdLocked ? t("customProvider.form.editTitle") : t("customProvider.form.title")}
             </Dialog.Title>
@@ -552,11 +476,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
               </IconButton>
             </header>
 
-            {/*
-             * The fields scroll inside the form rather than the form scrolling itself, so the footer
-             * below stays reachable and outside the scroll fade. Submit is a `type="submit"` button,
-             * which needs the form as an ancestor - hence the wrapper rather than a sibling footer.
-             */}
             <form
               class="custom-provider-body"
               onSubmit={(event) => {
@@ -565,167 +484,165 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
               }}
             >
               <div class={["custom-provider-form", fades.classes()]} ref={fades.bind} onScroll={fades.measure}>
-                <Field
-                  label={t("customProvider.field.providerId")}
-                  description={t("customProvider.field.providerIdHint")}
-                  error={shown()?.providerId}
-                  required
-                >
-                  <Input
-                    value={draft.providerId}
-                    onValueChange={(value) =>
-                      setDraft((state) => {
-                        state.providerId = value;
-                      })
-                    }
-                    placeholder={PROVIDER_ID_PLACEHOLDER}
-                    autocomplete="off"
-                    spellcheck={false}
-                    maxlength={INPUT_LIMITS.identifier}
-                    disabled={busy() || Boolean(props.providerIdLocked)}
-                  />
-                </Field>
+                <div class="custom-provider-fields">
+                  <Field
+                    label={t("customProvider.field.providerId")}
+                    description={t("customProvider.field.providerIdHint")}
+                    error={shown()?.providerId}
+                    required
+                  >
+                    <Input
+                      value={draft.providerId}
+                      onValueChange={(value) =>
+                        setDraft((state) => {
+                          state.providerId = value;
+                        })
+                      }
+                      placeholder={PROVIDER_ID_PLACEHOLDER}
+                      autocomplete="off"
+                      spellcheck={false}
+                      maxlength={INPUT_LIMITS.identifier}
+                      disabled={busy() || Boolean(props.providerIdLocked)}
+                    />
+                  </Field>
 
-                <Field label={t("customProvider.field.displayName")} error={shown()?.displayName} required>
-                  <Input
-                    value={draft.displayName}
-                    onValueChange={(value) =>
-                      setDraft((state) => {
-                        state.displayName = value;
-                      })
-                    }
-                    placeholder={t("customProvider.field.displayNamePlaceholder")}
-                    maxlength={INPUT_LIMITS.agentName}
-                    disabled={busy()}
-                  />
-                </Field>
+                  <Field label={t("customProvider.field.displayName")} error={shown()?.displayName} required>
+                    <Input
+                      value={draft.displayName}
+                      onValueChange={(value) =>
+                        setDraft((state) => {
+                          state.displayName = value;
+                        })
+                      }
+                      placeholder={t("customProvider.field.displayNamePlaceholder")}
+                      maxlength={INPUT_LIMITS.agentName}
+                      disabled={busy()}
+                    />
+                  </Field>
 
-                <Field label={t("customProvider.field.baseUrl")} error={shown()?.baseUrl} required>
-                  <Input
-                    value={draft.baseUrl}
-                    onValueChange={(value) =>
-                      setDraft((state) => {
-                        state.baseUrl = value;
-                      })
-                    }
-                    placeholder={BASE_URL_PLACEHOLDER}
-                    inputmode="url"
-                    autocomplete="off"
-                    spellcheck={false}
-                    maxlength={CUSTOM_PROVIDER_LIMITS.baseUrl}
-                    disabled={busy()}
-                  />
-                </Field>
+                  <Field label={t("customProvider.field.baseUrl")} error={shown()?.baseUrl} required>
+                    <Input
+                      value={draft.baseUrl}
+                      onValueChange={(value) =>
+                        setDraft((state) => {
+                          state.baseUrl = value;
+                        })
+                      }
+                      placeholder={BASE_URL_PLACEHOLDER}
+                      inputmode="url"
+                      autocomplete="off"
+                      spellcheck={false}
+                      maxlength={CUSTOM_PROVIDER_LIMITS.baseUrl}
+                      disabled={busy()}
+                    />
+                  </Field>
 
-                <Show when={props.harnesses}>
-                  {(choices) => (
-                    <Field
-                      label={t("customProvider.field.harness")}
-                      description={t("customProvider.field.harnessHint")}
-                      error={props.harnessError || undefined}
-                    >
-                      <Select<CustomProviderHarness>
-                        // The providers that can run the endpoint now, the saved one, and the ones to
-                        // download, as the default provider select does, so the list stays one control.
-                        options={choices()
-                          .filter(
-                            (choice) =>
-                              choice.ready ||
-                              choice.id === harness() ||
-                              (props.onDownloadHarness && harnessDownload(choice)),
-                          )
-                          .map((choice) => choice.id)}
-                        value={harness()}
-                        onChange={(next) => {
-                          // A click on the chosen item clears the choice; on a failed download it retries.
-                          const chosen = next ?? harness();
-                          setDraft((state) => {
-                            state.harness = chosen;
-                          });
-                          if (startsDownload(harnessDownload(choiceOf(chosen)))) props.onDownloadHarness?.(chosen);
-                        }}
-                        disabled={busy()}
-                        placement="bottom-start"
-                        itemComponent={(itemProps) => (
-                          <SelectItem
-                            item={itemProps.item}
-                            class="custom-provider-harness-item"
-                            data-action={harnessDownload(choiceOf(itemProps.item.rawValue)) ? "" : undefined}
-                          >
-                            <HarnessLabel harness={itemProps.item.rawValue} />
-                            <Show when={harnessDownload(choiceOf(itemProps.item.rawValue))}>
-                              {(phase) => (
-                                <Show
-                                  when={startsDownload(phase())}
-                                  fallback={
-                                    <Text tone="muted" variant="caption" class="custom-provider-harness-action">
-                                      {downloadText(phase(), choiceOf(itemProps.item.rawValue).runtime?.progress)}
-                                    </Text>
-                                  }
-                                >
-                                  {/* The item is the control; the button shape shows what a choice of it does. */}
-                                  <span
-                                    class={buttonVariants({
-                                      variant: "default",
-                                      size: "xs",
-                                      class: "custom-provider-harness-action custom-provider-harness-button",
-                                    })}
-                                  >
-                                    <Show when={phase() === "not-downloaded"}>
-                                      <Download aria-hidden="true" />
-                                    </Show>
-                                    {downloadText(phase(), null)}
-                                  </span>
-                                </Show>
-                              )}
-                            </Show>
-                          </SelectItem>
-                        )}
+                  <Show when={props.harnesses}>
+                    {(choices) => (
+                      <Field
+                        label={t("customProvider.field.harness")}
+                        description={t("customProvider.field.harnessHint")}
+                        error={props.harnessError || undefined}
                       >
-                        <SelectTrigger size="sm" aria-label={t("customProvider.field.harness")}>
-                          <SelectValue<CustomProviderHarness> class="custom-provider-harness-value">
-                            {(state) => (
-                              <>
-                                <HarnessLabel harness={state.selectedOption()} />
-                                <Show when={downloading(state.selectedOption())}>
-                                  {(phase) => (
-                                    <span class="custom-provider-harness-progress">
-                                      <Spinner size="sm" />
-                                      {downloadText(phase(), choiceOf(state.selectedOption()).runtime?.progress)}
+                        <Select<CustomProviderHarness>
+                          options={choices()
+                            .filter(
+                              (choice) =>
+                                choice.ready ||
+                                choice.id === harness() ||
+                                (props.onDownloadHarness && harnessDownload(choice)),
+                            )
+                            .map((choice) => choice.id)}
+                          value={harness()}
+                          onChange={(next) => {
+                            const chosen = next ?? harness();
+                            setDraft((state) => {
+                              state.harness = chosen;
+                            });
+                            if (startsDownload(harnessDownload(choiceOf(chosen)))) props.onDownloadHarness?.(chosen);
+                          }}
+                          disabled={busy()}
+                          placement="bottom-start"
+                          itemComponent={(itemProps) => (
+                            <SelectItem
+                              item={itemProps.item}
+                              class="custom-provider-harness-item"
+                              data-action={harnessDownload(choiceOf(itemProps.item.rawValue)) ? "" : undefined}
+                            >
+                              <HarnessLabel harness={itemProps.item.rawValue} />
+                              <Show when={harnessDownload(choiceOf(itemProps.item.rawValue))}>
+                                {(phase) => (
+                                  <Show
+                                    when={startsDownload(phase())}
+                                    fallback={
+                                      <Text tone="muted" variant="caption" class="custom-provider-harness-action">
+                                        {downloadText(phase(), choiceOf(itemProps.item.rawValue).runtime?.progress)}
+                                      </Text>
+                                    }
+                                  >
+                                    <span
+                                      class={buttonVariants({
+                                        variant: "default",
+                                        size: "xs",
+                                        class: "custom-provider-harness-action custom-provider-harness-button",
+                                      })}
+                                    >
+                                      <Show when={phase() === "not-downloaded"}>
+                                        <Download aria-hidden="true" />
+                                      </Show>
+                                      {downloadText(phase(), null)}
                                     </span>
-                                  )}
-                                </Show>
-                              </>
-                            )}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent mount={mount()} />
-                      </Select>
-                    </Field>
-                  )}
-                </Show>
+                                  </Show>
+                                )}
+                              </Show>
+                            </SelectItem>
+                          )}
+                        >
+                          <SelectTrigger size="sm" aria-label={t("customProvider.field.harness")}>
+                            <SelectValue<CustomProviderHarness> class="custom-provider-harness-value">
+                              {(state) => (
+                                <>
+                                  <HarnessLabel harness={state.selectedOption()} />
+                                  <Show when={downloading(state.selectedOption())}>
+                                    {(phase) => (
+                                      <span class="custom-provider-harness-progress">
+                                        <Spinner size="sm" />
+                                        {downloadText(phase(), choiceOf(state.selectedOption()).runtime?.progress)}
+                                      </span>
+                                    )}
+                                  </Show>
+                                </>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent mount={mount()} />
+                        </Select>
+                      </Field>
+                    )}
+                  </Show>
 
-                <Field
-                  label={t("customProvider.field.apiKey")}
-                  description={
-                    props.apiKeyKept ? t("customProvider.field.apiKeyKeptHint") : t("customProvider.field.apiKeyHint")
-                  }
-                  error={shown()?.apiKey}
-                >
-                  <Input
-                    type="password"
-                    value={draft.apiKey}
-                    onValueChange={(value) =>
-                      setDraft((state) => {
-                        state.apiKey = value;
-                      })
+                  <Field
+                    label={t("customProvider.field.apiKey")}
+                    description={
+                      props.apiKeyKept ? t("customProvider.field.apiKeyKeptHint") : t("customProvider.field.apiKeyHint")
                     }
-                    autocomplete="off"
-                    spellcheck={false}
-                    maxlength={CUSTOM_PROVIDER_LIMITS.apiKey}
-                    disabled={busy()}
-                  />
-                </Field>
+                    error={shown()?.apiKey}
+                  >
+                    <Input
+                      type="password"
+                      value={draft.apiKey}
+                      onValueChange={(value) =>
+                        setDraft((state) => {
+                          state.apiKey = value;
+                        })
+                      }
+                      autocomplete="off"
+                      spellcheck={false}
+                      maxlength={CUSTOM_PROVIDER_LIMITS.apiKey}
+                      disabled={busy()}
+                    />
+                  </Field>
+                </div>
 
                 <RepeatableRows
                   label={t("customProvider.models")}
@@ -737,7 +654,7 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                   busy={busy()}
                   sectionError={shown()?.models}
                   rowError={(index) => shown()?.modelRows[index]}
-                  rowDetails={props.contextWindows ? modelDetails : undefined}
+                  table={modelsTable()}
                   onAdd={() =>
                     setDraft((state) => {
                       state.models.push({ id: "", name: "" });
@@ -771,16 +688,6 @@ export function CustomProviderDialog(props: CustomProviderDialogProps) {
                     </Show>
                   }
                 >
-                  <Show when={props.contextWindows}>
-                    <Text tone="muted" variant="caption">
-                      {harness() === "pi"
-                        ? t("customProvider.model.effortsHintPi")
-                        : t("customProvider.model.effortsHintOpenCode")}
-                    </Text>
-                    <Text tone="muted" variant="caption">
-                      {t("customProvider.model.inputsHint")}
-                    </Text>
-                  </Show>
                   <Switch>
                     <Match when={discovery().status === "loading"}>
                       <div class="custom-provider-discovery-status" role="status">

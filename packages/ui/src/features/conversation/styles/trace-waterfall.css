@@ -1,15 +1,10 @@
-/* The trace of an agent run: the totals, then one timeline row for each span. */
-
 .trace {
   --trace-surface: var(--openbot-bg-surface);
-  /* `cqw` resolves where these are used, inside the scroll body, so a narrow trace keeps its timeline. */
   --trace-name-width: min(260px, 45cqw);
-  /* Room on the right of the timeline for the label after the last bar. */
   --trace-label-room: min(150px, 25cqw);
   --trace-lane-pad: var(--openbot-space-3);
   --trace-row-height: 36px;
   --trace-bar-height: 16px;
-  /* The colour of the agent that did a span. The top agent and its own calls stay neutral. */
   --trace-hue: var(--openbot-text-muted);
   display: flex;
   min-width: 0;
@@ -43,7 +38,6 @@
   line-height: var(--openbot-leading-md);
 }
 
-/* The speed menu is compact: it holds one short value. */
 .ui-select.trace-select {
   width: auto;
   flex: 0 0 auto;
@@ -77,14 +71,12 @@
   padding-inline: calc(var(--openbot-space-2) * 2 + var(--openbot-icon-xs)) var(--openbot-space-8);
 }
 
-/* A focused field gets a neutral border only, as the other fields of the app. */
 .trace-search .trace-search-input:focus-visible {
   border-color: var(--openbot-text-muted);
   box-shadow: none;
   outline: none;
 }
 
-/* The browser's own clear button would sit under the shortcut hint. */
 .trace-search-input::-webkit-search-cancel-button {
   display: none;
 }
@@ -101,7 +93,6 @@
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
-  /* The last total in each line puts its end border outside the trace, where it is clipped. */
   margin-block: 0;
   margin-inline: 0 -1px;
 }
@@ -123,7 +114,6 @@
   white-space: nowrap;
 }
 
-/* The same roll as the task list: the digits that change lift in and sharpen. */
 .trace-total-value {
   --digit-dur: var(--openbot-duration-overlay);
   --digit-distance: var(--openbot-space-1);
@@ -138,7 +128,6 @@
 
 .trace-body {
   --trace-fade: var(--openbot-space-6);
-  /* No edge is faded until the list scrolls: one opaque layer for each edge. */
   --trace-mask-top: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
   --trace-mask-bottom: linear-gradient(var(--openbot-text-primary), var(--openbot-text-primary));
   min-height: 0;
@@ -146,7 +135,6 @@
   overflow: auto;
   container-type: inline-size;
   scrollbar-width: none;
-  /* A time axis: the name column, the lanes and the bars keep their LTR places in RTL too. */
   direction: ltr;
 }
 
@@ -160,7 +148,6 @@
   mask-composite: intersect;
 }
 
-/* The rows fade in under the rows that stay at the top. */
 .trace-body.scroll-fade-top {
   --trace-mask-top: linear-gradient(
     to bottom,
@@ -197,8 +184,6 @@
   border-bottom: 1px solid var(--openbot-border);
 }
 
-/* The rows under a parent slide closed when it folds and open when it unfolds. `clip`, not `hidden`:
- * a scroll container here would stop the parent rows inside from staying at the top. */
 .trace-branch-children {
   display: grid;
   grid-template-rows: 0fr;
@@ -220,7 +205,6 @@
   opacity: 1;
 }
 
-/* A row that a search or a replay adds fades in. */
 .trace-row {
   transition: opacity var(--openbot-duration-slow) var(--openbot-ease-out);
 }
@@ -231,8 +215,6 @@
   }
 }
 
-/* A parent row stays under the rows above it while its own rows scroll. Its item ends with its last
- * row, so the next parent row takes its place. */
 .trace-row[data-parent] {
   position: sticky;
   top: calc((var(--trace-depth) + 1) * var(--trace-row-height));
@@ -240,7 +222,6 @@
   background: var(--trace-surface);
 }
 
-/* Five agent colours. The calls of an agent take its colour through `--trace-hue`. */
 .trace-row[data-hue="1"],
 .trace-handoff[data-hue="1"] {
   --trace-hue: var(--openbot-chart-storage-downloads);
@@ -278,8 +259,7 @@
   --trace-guide-at: calc(var(--openbot-control-xs) / 2);
   padding-inline: calc(var(--openbot-space-2) + var(--trace-depth, 0) * var(--trace-indent)) var(--openbot-space-2);
   border-right: 1px solid var(--openbot-border);
-  /* The tint of a row under the pointer, then one guide line for each tree level above the row,
-   * under the chevron of that level. */
+
   background:
     linear-gradient(var(--trace-row-tint), var(--trace-row-tint)),
     repeating-linear-gradient(
@@ -292,8 +272,6 @@
     var(--trace-surface);
 }
 
-/* The row under the pointer or the keyboard lights up, and so does the piece of its parent's lane
- * that stands for it. A piece under the pointer lights up its row. */
 .trace-row {
   --trace-row-tint: transparent;
 }
@@ -309,7 +287,6 @@
   outline-offset: 1px;
 }
 
-/* The name of a row is its keyboard stop, and a click on it shows the step in the chat. */
 .trace-name .trace-name-button.ui-button {
   height: auto;
   min-width: 0;
@@ -330,7 +307,6 @@
   cursor: pointer;
 }
 
-/* The row's tint shows the keyboard stop, so the name gets a thin neutral ring and no halo. */
 .trace-name .trace-name-button.ui-button:focus-visible {
   box-shadow: none;
   outline: 1px solid var(--openbot-text-muted);
@@ -348,7 +324,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* An open row is not a lit toggle, so the chevron has no fill. */
 .trace-name .trace-toggle[aria-expanded="true"]:not(:hover) {
   background: transparent;
 }
@@ -375,7 +350,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The icon of a row sits on a quiet tile. An agent's icon has the agent's colour. */
 .trace-glyph {
   display: grid;
   width: 22px;
@@ -430,7 +404,6 @@
   color: var(--openbot-danger-text);
 }
 
-/* The error of a failed tool row, under the row. It covers the lines of the timeline behind it. */
 .trace-span-error-row {
   position: relative;
   z-index: 2;
@@ -456,8 +429,6 @@
   overflow-wrap: anywhere;
 }
 
-/* A light moves along the name of a running step. It repaints the text on each frame, so only the
- * few running rows have it. */
 .trace-row[data-running] .trace-span-name {
   background:
     linear-gradient(
@@ -487,7 +458,6 @@
 }
 
 .trace-span-detail {
-  /* The detail takes only the room after the name, so the name stays readable. */
   flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
@@ -496,8 +466,6 @@
   white-space: nowrap;
 }
 
-/* The timeline of a row. Each time sits at `--trace-at`, from 0 to 1, between the left pad and the
- * label room. The overlay of grid lines uses the same scale. */
 .trace-lane {
   --trace-scale: calc(100% - var(--trace-lane-pad) - var(--trace-label-room));
   position: relative;
@@ -561,8 +529,6 @@
   translate: -3px 50%;
 }
 
-/* A new bar grows from its start. A replay moves bars on each frame, so their position has no
- * transition. */
 .trace-bar {
   transform-origin: left center;
   transition: scale var(--openbot-duration-overlay) var(--openbot-ease-out);
@@ -586,7 +552,6 @@
   translate: 0 -50%;
 }
 
-/* A model call has the full agent colour and a tool call a dim one. */
 .trace-bar[data-kind="model"],
 .trace-swatch[data-kind="model"] {
   background-color: var(--trace-hue);
@@ -623,7 +588,6 @@
   background: color-mix(in srgb, var(--trace-hue) 16%, transparent);
 }
 
-/* A light moves along a bar that still runs. */
 .trace-bar[data-running]:not([data-kind="waiting"]) {
   background-image: linear-gradient(
     90deg,
@@ -652,21 +616,16 @@
   color: var(--openbot-text-on-accent);
 }
 
-/* The line from a parent row down to its subagents' bars. It starts under the parent's lane and ends
- * at the top of the last subagent's row. A line has the colour of the agent that hands off, so the
- * rows that draw parts of it do not give it their own colour. */
 .trace-handoff {
   --trace-elbow: var(--openbot-space-2);
   --trace-line-top: calc((var(--trace-from) + 1.5) * var(--trace-row-height) + var(--trace-bar-height) / 2);
   --trace-line-rows: calc(var(--trace-to) - var(--trace-from) - 0.5);
-  /* An open error moves the rows under it, so the line moves and grows by the errors along it. */
   top: calc(var(--trace-line-top) + var(--trace-from-shift, 0px));
   width: var(--trace-elbow);
   height: calc(var(--trace-line-rows) * var(--trace-row-height) - var(--trace-bar-height) / 2 + var(--trace-grow, 0px));
   box-sizing: border-box;
   border-left: 2px dotted var(--trace-hue);
   translate: calc(-1 * var(--trace-elbow)) 0;
-  /* The rows slide when a parent folds, so the line follows them at the same pace. */
   transition:
     top var(--openbot-duration-slow) var(--openbot-ease-out),
     height var(--openbot-duration-slow) var(--openbot-ease-out);
@@ -676,8 +635,6 @@
   --trace-hue: var(--openbot-text-muted);
 }
 
-/* The branch into a subagent's bar. The line goes on past it to the next subagent, and turns into the
- * bar of the last one. */
 .trace-handoff.trace-handoff-end {
   top: 0;
   height: 50%;
@@ -690,7 +647,6 @@
   border-bottom-left-radius: var(--openbot-radius-xs);
 }
 
-/* A parent row is opaque while it stays at the top, so it draws the part of a line that passes it. */
 .trace-handoff.trace-handoff-pass {
   top: 0;
   height: 100%;
@@ -739,8 +695,6 @@
   border-top: 1px solid var(--openbot-border);
 }
 
-/* Each key is a small bar in the shape of the bars above it. The top agent's neutral colour is too dim here,
- * so the keys use the secondary text colour. */
 .trace-legend {
   --trace-hue: var(--openbot-text-secondary);
   display: flex;
@@ -766,7 +720,6 @@
   border-radius: var(--openbot-radius-xs);
 }
 
-/* The handoff key is a piece of the dotted line that goes down to a subagent. */
 .trace-swatch[data-kind="handoff"] {
   height: 2px;
   border-top: 2px dotted var(--trace-hue);

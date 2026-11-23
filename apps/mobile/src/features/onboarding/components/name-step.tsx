@@ -25,15 +25,9 @@ const NAME_IDEAS = [
   "mobile.onboarding.name.idea3",
   "mobile.onboarding.name.idea4",
 ] as const;
-// The ideas come in right after the step, quickly one after another.
 const NAME_IDEA_STAGGER_MS = 40;
-// The keyboard opens when the step has stopped moving.
 const FOCUS_DELAY_MS = 380;
 
-/**
- * The agent asks for its name and says it back while the user types it. The name is large, centred
- * text with no box around it; the cursor wears the agent's colour.
- */
 export function NameStep({
   motion,
   color,
@@ -42,11 +36,9 @@ export function NameStep({
   onContinue,
 }: {
   motion: OnboardingMotion;
-  /** The colour of the agent. */
   color: string;
   name: string;
   onNameChange: (name: string) => void;
-  /** The return key goes on, as the main action does. */
   onContinue: () => void;
 }) {
   const { t } = useText();
@@ -55,7 +47,6 @@ export function NameStep({
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   const input = useRef<TextInputInstance>(null);
   const trimmed = name.trim();
-  // Small phones keep the field and the ideas above the keyboard.
   const heroSize = height < 760 ? 100 : 132;
 
   useEffect(() => {
