@@ -115,7 +115,7 @@ import {
 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { type Cause, Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
 import type * as Ws from "ws";
 import { reportOriginalFailure } from "../backend/effect-boundary";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
@@ -1052,11 +1052,13 @@ export class TeamWebRtcHostPeer {
     step: TeamProtocolV2AuthFrame["type"],
     cause: Cause.Cause<RemoteWorkflowError>,
   ) {
-    yield* reportOriginalFailure(cause, (failure) =>
-      logger.warn(
-        `A remote client did not pass the ${step} sign-in step (${authenticationFailureReason(failure)}). The server closed the connection.`,
-      ),
-    );
+    if (peerId !== this.#peerId) return;
+    if (!Cause.hasInterruptsOnly(cause))
+      yield* reportOriginalFailure(cause, (failure) =>
+        logger.warn(
+          `A remote client did not pass the ${step} sign-in step (${authenticationFailureReason(failure)}). The server closed the connection.`,
+        ),
+      );
     yield* this.#failProtocol(peerId);
   });
 
@@ -1303,7 +1305,7 @@ function encodeRpcResponse(response: TeamProtocolV2RpcFrame): string {
 function authenticationFailureReason(failure: unknown): string {
   let error = failure;
   for (let depth = 0; depth < 4 && isDynamicRecord(error); depth += 1) {
-    if (isString(error.code) && /^ERR_[A-Z_]+$/u.test(error.code))
+    if (isString(error.code) && /^[A-Z][A-Z0-9_]{2,}$/u.test(error.code))
       return isString(error.claim) ? `${error.code} ${error.claim}` : error.code;
     error = error.cause;
   }
