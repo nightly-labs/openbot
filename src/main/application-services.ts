@@ -845,7 +845,12 @@ async function createMessagingServices({
     issueGitHubRoute,
     queueKey: () => loadIngressQueueKey(join(app.getPath("userData"), INGRESS_QUEUE_KEY_FILE), secretCipher),
     resolveProxy: (url) =>
-      Effect.tryPromise(() => session.defaultSession.resolveProxy(url)).pipe(Effect.orElseSucceed(() => "DIRECT")),
+      Effect.tryPromise(() => session.defaultSession.resolveProxy(url)).pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => logger.warn("OpenBot could not read the proxy settings. Signal connects directly.")),
+        ),
+        Effect.orElseSucceed(() => "DIRECT"),
+      ),
   });
   teardown.push(TEARDOWN_ORDER.signalIngress, "the Signal ingress socket", () =>
     Effect.runPromise(signalIngress.dispose()),

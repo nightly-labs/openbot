@@ -90,10 +90,13 @@ export interface SignalIngressOptions {
 const CHROMIUM_PROXY_RULE = /^(PROXY|HTTPS)\s+(\S+)$/u;
 
 function proxyUrlFromRules(rules: string): string | null {
-  const match = CHROMIUM_PROXY_RULE.exec(rules.split(";")[0]?.trim() ?? "");
-  if (!match) return null;
-  const url = `${match[1] === "HTTPS" ? "https" : "http"}://${match[2]}`;
-  return URL.canParse(url) ? url : null;
+  for (const rule of rules.split(";").map((entry) => entry.trim())) {
+    if (rule === "DIRECT") return null;
+    const match = CHROMIUM_PROXY_RULE.exec(rule);
+    const url = match ? `${match[1] === "HTTPS" ? "https" : "http"}://${match[2]}` : null;
+    if (url && URL.canParse(url)) return url;
+  }
+  return null;
 }
 
 class SignalIngressAccount extends Context.Service<
@@ -520,7 +523,9 @@ export class SignalIngress implements MessagingIngress {
     }, READY_TIMEOUT_MS);
     this.#apiUrl = discordApiUrl(bootstrap.signalUrl);
     this.#signalOrigin = signalHttpOrigin(bootstrap.signalUrl);
+    let opened = false;
     socket.on("open", () => {
+      opened = true;
       const hello: SignalClientMessage = {
         type: "hello",
         version: SIGNAL_PROTOCOL_VERSION,
@@ -537,7 +542,7 @@ export class SignalIngress implements MessagingIngress {
     socket.on("close", () => {
       if (socket !== this.#socket) return;
       this.#socket = null;
-      this.#directNext = proxyUrl !== null && this.#state !== "online";
+      this.#directNext = proxyUrl !== null && !opened;
       this.#discordSession = null;
       this.#discordGuilds = null;
       this.#linkedRoutes = { slack: null, telegram: null };
