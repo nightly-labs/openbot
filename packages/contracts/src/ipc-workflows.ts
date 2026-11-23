@@ -655,6 +655,7 @@ export interface WorkflowSummary {
   steps: number;
   updatedAt: string;
   lastRun: { status: WorkflowRunStatus; at: string } | null;
+  paused?: true;
 }
 
 export interface WorkflowTriggerState {
@@ -735,11 +736,17 @@ export interface WorkflowRunPage {
 export interface CreateWorkflowInput {
   title: string;
   graph?: WorkflowGraph;
+  paused?: true;
 }
 
 export interface RenameWorkflowInput {
   workflowId: string;
   title: string;
+}
+
+export interface SetWorkflowPausedInput {
+  workflowId: string;
+  paused: boolean;
 }
 
 export interface SaveWorkflowGraphInput {
@@ -917,7 +924,8 @@ export function isWorkflowSummary(value: unknown): value is WorkflowSummary {
     (value.lastRun === null ||
       (isDynamicRecord(value.lastRun) &&
         isOneOf(WORKFLOW_RUN_STATUSES, value.lastRun.status) &&
-        isString(value.lastRun.at)))
+        isString(value.lastRun.at))) &&
+    (value.paused === undefined || value.paused === true)
   );
 }
 
@@ -1037,11 +1045,20 @@ export function isWorkflowRunPage(value: unknown): value is WorkflowRunPage {
 }
 
 export function isCreateWorkflowInput(value: unknown): value is CreateWorkflowInput {
-  return isDynamicRecord(value) && isTitle(value.title) && (value.graph === undefined || isWorkflowGraph(value.graph));
+  return (
+    isDynamicRecord(value) &&
+    isTitle(value.title) &&
+    (value.graph === undefined || isWorkflowGraph(value.graph)) &&
+    (value.paused === undefined || value.paused === true)
+  );
 }
 
 export function isRenameWorkflowInput(value: unknown): value is RenameWorkflowInput {
   return isDynamicRecord(value) && isIdentifier(value.workflowId) && isTitle(value.title);
+}
+
+export function isSetWorkflowPausedInput(value: unknown): value is SetWorkflowPausedInput {
+  return isDynamicRecord(value) && isIdentifier(value.workflowId) && isBoolean(value.paused);
 }
 
 export function isSaveWorkflowGraphInput(value: unknown): value is SaveWorkflowGraphInput {

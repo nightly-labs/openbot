@@ -804,6 +804,19 @@ export function createWorkflowsController(
     onRename: (workflowId, title) => {
       tracked("rename", () => host.workflows.rename({ workflowId, title })).catch(report);
     },
+    get onSetPaused() {
+      if (!host.pauseSupported()) return undefined;
+      return (workflowId: string, paused: boolean) => {
+        host.workflows.setPaused({ workflowId, paused }).catch(report);
+      };
+    },
+    get onExport() {
+      if (!host.portableSupported()) return undefined;
+      return (workflowId: string) => {
+        flush();
+        return queued(() => host.workflows.exportFile(workflowId));
+      };
+    },
     onDelete: (workflowId) => {
       flush();
       return queued(async () => {

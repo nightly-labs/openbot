@@ -8,6 +8,7 @@ import {
   isRetryWorkflowStepInput,
   isRunWorkflowStepInput,
   isSaveWorkflowGraphInput,
+  isSetWorkflowPausedInput,
   isStartWorkflowRunInput,
   isWorkflowGitHubLastEventInput,
   isWorkflowGitHubRepositoryInput,
@@ -19,6 +20,7 @@ import {
   type RetryWorkflowStepInput,
   type RunWorkflowStepInput,
   type SaveWorkflowGraphInput,
+  type SetWorkflowPausedInput,
   type StartWorkflowRunInput,
   type WorkflowEdge,
   type WorkflowGitHubLastEventInput,
@@ -102,12 +104,21 @@ export function parseWorkflowRunId(value: unknown): string {
 
 export function parseCreateWorkflow(value: unknown): CreateWorkflowInput {
   if (!isCreateWorkflowInput(value)) throw new Error("Invalid workflow.");
-  return { title: value.title, ...(value.graph === undefined ? {} : { graph: knownGraph(value.graph) }) };
+  return {
+    title: value.title,
+    ...(value.graph === undefined ? {} : { graph: knownGraph(value.graph) }),
+    ...(value.paused ? { paused: true } : {}),
+  };
 }
 
 export function parseRenameWorkflow(value: unknown): RenameWorkflowInput {
   if (!isRenameWorkflowInput(value)) throw new Error("Invalid workflow title.");
   return { workflowId: value.workflowId, title: value.title };
+}
+
+export function parseSetWorkflowPaused(value: unknown): SetWorkflowPausedInput {
+  if (!isSetWorkflowPausedInput(value)) throw new Error("Invalid workflow.");
+  return { workflowId: value.workflowId, paused: value.paused };
 }
 
 export function parseSaveWorkflowGraph(value: unknown): SaveWorkflowGraphInput {

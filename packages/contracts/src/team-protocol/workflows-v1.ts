@@ -126,13 +126,21 @@ const stroke = fields({
 });
 const graph = fields({ nodes: list(node, 200), edges: list(edge, 400), strokes: list(stroke, 500) });
 const runStatus = token;
-const summary = fields({
-  id: identifier,
-  title,
-  steps: count,
-  updatedAt: timestamp,
-  lastRun: nullable(fields({ status: runStatus, at: timestamp })),
-});
+const paused: AdminDecoder = (value) => {
+  if (value !== true) throw new Error("Invalid workflow paused flag.");
+  return value;
+};
+export const workflowSummaryCodec = fields(
+  {
+    id: identifier,
+    title,
+    steps: count,
+    updatedAt: timestamp,
+    lastRun: nullable(fields({ status: runStatus, at: timestamp })),
+  },
+  { paused },
+);
+const summary = workflowSummaryCodec;
 const trigger = fields({
   nodeId: identifier,
   type: token,
@@ -192,7 +200,7 @@ const secret: AdminDecoder = (value) => {
 export const WORKFLOWS_CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   [WORKFLOWS_ROUTES.list, adminRoute(empty, fields({ workflows: list(summary, 10_000) }))],
   [WORKFLOWS_ROUTES.get, adminRoute(workflowRef, detail)],
-  [WORKFLOWS_ROUTES.create, adminRoute(fields({ title }, { graph }), detail)],
+  [WORKFLOWS_ROUTES.create, adminRoute(fields({ title }, { graph, paused }), detail)],
   [WORKFLOWS_ROUTES.rename, adminRoute(fields({ workflowId: identifier, title }), summary)],
   [WORKFLOWS_ROUTES.delete, adminRoute(workflowRef, empty)],
   [WORKFLOWS_ROUTES.saveGraph, adminRoute(fields({ workflowId: identifier, baseRevision: count, graph }), saveResult)],

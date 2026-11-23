@@ -175,6 +175,8 @@ import { WORKFLOWS_MEDIA_CATALOG_CODECS } from "./workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_CATALOG_V2_CODECS } from "./workflows-media-catalog-v2";
 import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CODECS } from "./workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_CODECS } from "./workflows-media-v1";
+import { WORKFLOWS_PAUSE_CODECS } from "./workflows-pause-v1";
+import { WORKFLOWS_PORTABLE_CODECS } from "./workflows-portable-v1";
 import { WORKFLOWS_STEP_SETTINGS_CODECS } from "./workflows-step-settings-v1";
 import { WORKFLOWS_SUNRA_CODECS } from "./workflows-sunra-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
@@ -352,6 +354,8 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_MEDIA_CATALOG_V2_CODECS,
   ...WORKFLOWS_CREDIT_MEDIA_CODECS,
   ...WORKFLOWS_STEP_SETTINGS_CODECS,
+  ...WORKFLOWS_PAUSE_CODECS,
+  ...WORKFLOWS_PORTABLE_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
   ...LIBRARY_FOLDERS_CODECS,
   ...WORKFLOW_FOLDERS_CODECS,

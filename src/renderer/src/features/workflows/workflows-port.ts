@@ -19,6 +19,8 @@ import { WORKFLOWS_ANSWERS_CAPABILITY } from "@openbot/contracts/team-protocol/w
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
+import { WORKFLOWS_PAUSE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import { WORKFLOWS_PORTABLE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-portable-v1";
 import { WORKFLOWS_STEP_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-step-settings-v1";
 import type {
   WorkflowChannel,
@@ -60,6 +62,8 @@ export interface WorkflowHost {
   agentFilesSupported(): boolean;
   answersSupported(): boolean;
   stepSettingsSupported(): boolean;
+  pauseSupported(): boolean;
+  portableSupported(): boolean;
   foldersSupported(): boolean;
   folders(): Promise<WorkflowFoldersSnapshot>;
   folderAction(action: WorkflowFolderAction): Promise<WorkflowFoldersSnapshot>;
@@ -147,6 +151,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       get: (workflowId) => api().get(workflowId, serverId),
       create: (input) => api().create(input, serverId),
       rename: (input) => api().rename(input, serverId),
+      setPaused: (input) => api().setPaused(input, serverId),
+      exportFile: (workflowId) => api().exportFile(workflowId, serverId),
       delete: (workflowId) => api().delete(workflowId, serverId),
       saveGraph: (input) => api().saveGraph(input, serverId),
       versions: (workflowId) => api().versions(workflowId, serverId),
@@ -289,6 +295,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     agentFilesSupported,
     answersSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_ANSWERS_CAPABILITY),
     stepSettingsSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_STEP_SETTINGS_CAPABILITY),
+    pauseSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_PAUSE_CAPABILITY),
+    portableSupported: () => local() || serverSupportsCapability(server(), WORKFLOWS_PORTABLE_CAPABILITY),
     mediaUrl,
     mediaPreviewUrl,
     get githubConnector() {

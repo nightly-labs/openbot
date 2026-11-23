@@ -1314,6 +1314,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     githubConnector: githubPort,
     attachmentMedia: runtime.attachmentMedia,
     previewMedia: workflowPreviews,
+    download: (attachmentId) => workspace.runtime.download(attachmentId),
+    saveFile: createWebFileSaver(),
   });
   const mediaCredits = createWorkflowMediaCredits(
     () => (page() === "workflows" && workspace.state.status === "online" ? (server()?.id ?? null) : null),

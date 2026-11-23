@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   type AgentAccessChange,
+  decodeWorkflowFile,
+  fillWorkflowFileText,
   type StorageUsage,
   type StoredFileRow,
   WORKFLOW_FORMAT,
@@ -17,6 +19,7 @@ import {
   type WorkflowMediaOptionValue,
   type WorkflowMediaPriceRequest,
   type WorkflowNode,
+  workflowFileAssetBytes,
   workflowVideoLengthChoices,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -78,6 +81,16 @@ import {
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import {
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PAUSE_CODECS,
+  WORKFLOWS_PAUSE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-pause-v1";
+import {
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_PORTABLE_CODECS,
+  WORKFLOWS_PORTABLE_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-portable-v1";
+import {
   WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_STEP_SETTINGS_CODECS,
   WORKFLOWS_STEP_SETTINGS_ROUTES,
@@ -120,6 +133,7 @@ import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-trigger
 import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/workflows";
 import { LibraryFoldersService } from "../src/main/library-folders-service";
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
+import { createWorkflowFileExporter } from "../src/main/workflow-file-export";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
 let sunraSignedIn = false;
@@ -208,6 +222,9 @@ const STEP_DEADLINE_MS = 30_000;
 const WEBHOOK_URL = "https://relay.example.test/hooks/e2e";
 const SECRET = "whsec-e2e-not-a-real-secret";
 const LONG_ANSWER = "a".repeat(40_000);
+const NO_MODEL = "No model step runs in this check.";
+const modelReplies: string[] = [];
+const modelPrompts: string[] = [];
 
 plugin({
   name: "workflow-team-api-electron-boundary",
@@ -354,6 +371,50 @@ const teamBrowser: TeamApiBrowser = {
 const root = await mkdtemp(join(tmpdir(), "openbot-workflow-team-api-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
+const FAKE_CODEX = `#!/usr/bin/env node
+if (process.argv.includes("--version")) {
+  process.stdout.write("codex-cli 99.0.0\\n");
+  process.exit(0);
+}
+process.stdout.on("error", (error) => {
+  if (error.code === "EPIPE") process.exit(0);
+  throw error;
+});
+const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
+const answer = (message) => {
+  switch (message.method) {
+    case "initialize": return write({ id: message.id, result: {} });
+    case "account/read": return write({ id: message.id, result: { account: { type: "chatgpt", email: "codex@example.com" } } });
+    case "account/rateLimits/read": return write({ id: message.id, result: { rateLimits: { limitId: "codex", primary: null, secondary: null }, rateLimitsByLimitId: null } });
+    case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-5.5", displayName: "GPT-5.5" }] } });
+    case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
+    case "config/read": return write({ id: message.id, result: { config: { mcp_servers: {} }, layers: [] } });
+    case "config/batchWrite": return write({ id: message.id, result: {} });
+    default: return write({ id: message.id, error: { code: -32601, message: "Method not found: " + message.method } });
+  }
+};
+let buffer = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  let newline = buffer.indexOf("\\n");
+  while (newline >= 0) {
+    const line = buffer.slice(0, newline);
+    buffer = buffer.slice(newline + 1);
+    if (line) {
+      const message = JSON.parse(line);
+      if (message.method && message.id !== undefined) answer(message);
+    }
+    newline = buffer.indexOf("\\n");
+  }
+});
+process.stdin.on("end", () => process.exit(0));
+setInterval(() => {}, 1000);
+`;
+const fakeCodex = join(root, "codex");
+writeFileSync(fakeCodex, FAKE_CODEX, { mode: 0o755 });
+process.env.OPENBOT_CODEX_PATH = fakeCodex;
+process.env.CODEX_HOME = join(home, ".codex");
 
 interface Host {
   database: OpenBotDatabase;
@@ -433,7 +494,13 @@ async function startHost(): Promise<Host> {
       filePath: (attachmentId) =>
         Effect.succeed(attachmentId === MISSING_FILE ? null : join(userData, "e2e-files", attachmentId)),
       stopDelivery: () => Effect.void,
-      generateText: () => Effect.fail({ message: "No model step runs in this check." }),
+      generateText: (request) =>
+        Effect.suspend(() => {
+          const reply = modelReplies.shift();
+          if (reply === undefined) return Effect.fail({ message: NO_MODEL });
+          modelPrompts.push(request.prompt);
+          return Effect.succeed(reply);
+        }),
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
       sizePicture: (attachmentId, size) => {
@@ -527,6 +594,18 @@ async function startHost(): Promise<Host> {
           ),
         ),
       rotateWorkflowSecret: () => Effect.succeed({ secret: SECRET }),
+      files: createWorkflowFileExporter({
+        agents: () => agents.listAgents(),
+        channelName: () => null,
+        attachment: (fileId) =>
+          Effect.succeed(
+            fileId === MISSING_FILE
+              ? null
+              : { path: join(userData, "e2e-files", fileId), mimeType: "image/png", name: "picture.png" },
+          ),
+        timezone: () => "UTC",
+        appVersion: "0.0.0-e2e",
+      }),
     },
     admin: {
       routineResults: {
@@ -1549,6 +1628,77 @@ try {
     return { member: mine, owner: ["agent", "prompt"], retry, stop };
   });
 
+  await step("typed answer: a run keeps the checked JSON, and a retry uses the spec of the run", async () => {
+    const typedGraph = (answer: string): WorkflowGraph => ({
+      nodes: [
+        promptNode,
+        { id: "rate", kind: "llm", at: at(300), fields: { prompt: "Rate it.", answer } },
+        { id: "gate", kind: "condition", at: at(600), fields: { check: "priority = high and count > 2" } },
+      ],
+      edges: [
+        { id: "prompt-rate", from: "prompt", to: "rate", type: "text" },
+        { id: "rate-gate", from: "rate", to: "gate", type: "text" },
+      ],
+      strokes: [],
+    });
+    const spec = "priority: high|low\ncount: number";
+    const workflow = await hostWorkflow("Typed answer", typedGraph(spec));
+    const newest = (detail: JsonObject, nodeId: string) =>
+      list(detail.steps, "steps")
+        .map((row) => record(row, "step"))
+        .filter((row) => row.nodeId === nodeId)
+        .sort((first, second) => Number(second.attempt) - Number(first.attempt))[0];
+    const readEnded = async (runId: string, nodeId: string) => {
+      for (;;) {
+        await Effect.runPromise(current().workflows.sweep());
+        const detail = await ok(WORKFLOWS_ROUTES.run, ownerToken, { runId });
+        const found = newest(detail, nodeId);
+        const runEnded = ["done", "failed", "stopped"].includes(String(record(detail.run, "run").status));
+        if (runEnded && found && found.status !== "running") return detail;
+        await new Promise((done) => setImmediate(done));
+      }
+    };
+
+    modelReplies.push('{"priority":"high","count":"3"}');
+    const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+      workflowId: workflow.id,
+      requestId: requestId(),
+    });
+    const first = await readEnded(text(record(started.run, "run").id, "run id"), "gate");
+    const rate = newest(first, "rate");
+    const gate = newest(first, "gate");
+    assert.equal(rate?.output, '{"priority":"high","count":3}', JSON.stringify(rate));
+    assert.equal(gate?.branch, "yes", JSON.stringify(gate));
+
+    modelReplies.push("no JSON", "still no JSON");
+    const second = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, { workflowId: workflow.id, requestId: requestId() });
+    const secondRunId = text(record(second.run, "run").id, "run id");
+    const failed = newest(await readEnded(secondRunId, "rate"), "rate");
+    assert.equal(failed?.status, "failed", JSON.stringify(failed));
+    const stored = await runCauseEffect(current().workflows.get(workflow.id));
+    const resaved = await runCauseEffect(
+      current().workflows.saveGraph({
+        workflowId: workflow.id,
+        baseRevision: stored.revision,
+        graph: typedGraph(`${spec}\nreason: text`),
+      }),
+    );
+    assert.ok(resaved.ok);
+    const promptsBefore = modelPrompts.length;
+    modelReplies.push('{"priority":"high","count":4}');
+    await ok(WORKFLOWS_ROUTES.retryStep, ownerToken, { stepId: text(failed?.id, "step id"), requestId: requestId() });
+    const retried = await readEnded(secondRunId, "gate");
+    const retriedRate = newest(retried, "rate");
+    const retryPrompt = modelPrompts.at(-1) ?? "";
+    assert.equal(retriedRate?.status, "done", JSON.stringify(retriedRate));
+    assert.equal(retriedRate?.output, '{"priority":"high","count":4}');
+    assert.equal(newest(retried, "gate")?.branch, "yes");
+    assert.equal(modelPrompts.length, promptsBefore + 1);
+    assert.ok(!retryPrompt.includes("reason"), retryPrompt);
+    assert.equal(modelReplies.length, 0);
+    return { first: rate?.output, retried: retriedRate?.output };
+  });
+
   await step("provider: a model step on a local-only provider answers as missing to a peer", async () => {
     const local = await hostWorkflow("Local model", {
       nodes: [
@@ -2562,6 +2712,233 @@ try {
       assert.deepEqual(older, { settings: null, sources: null });
 
       return { first: firstRead, second: secondRead, old, hiddenWorkflowRead, hidden, missing, older };
+    },
+  );
+
+  await step(
+    "pause: the host advertises workflows-pause-v1 to a protocol 10 peer; a member who manages the agent pauses and resumes, a chat member is refused, and an old peer is told the server is too old",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_PAUSE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_PAUSE_CAPABILITY));
+      const codec = WORKFLOWS_PAUSE_CODECS.get(WORKFLOWS_PAUSE_ROUTES.pause);
+      assert.ok(codec, "No workflows-pause-v1 codec for pause.");
+      const raw = (
+        token: string,
+        body: { workflowId: string; paused: boolean },
+        capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10),
+      ) => {
+        codec.request(body);
+        return call("POST", WORKFLOWS_PAUSE_ROUTES.pause, { token, body, protocol: TEAM_PROTOCOL_V10, capabilities });
+      };
+      const pause = async (token: string, workflowId: string, paused: boolean) => {
+        const response = await raw(token, { workflowId, paused });
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return record(codec.response(response.status, response.body), "paused summary");
+      };
+      const refusal = async (
+        response: { status: number; body: unknown },
+        status: number,
+        key: "error.workflow.serverTooOld" | "error.workflow.missing" | "error.team.agentManageDenied",
+      ) => {
+        assert.equal(response.status, status, JSON.stringify(response.body));
+        assert.ok(JSON.stringify(response.body).includes(sourceText(key)), JSON.stringify(response.body));
+        return response.status;
+      };
+
+      const workflow = await hostWorkflow("Pausable", agentGraph(open));
+      const paused = await pause(member, workflow.id, true);
+      assert.equal(paused.paused, true);
+      assert.equal((await runCauseEffect(current().workflows.get(workflow.id))).summary.paused, true);
+      const listed = list((await ok(WORKFLOWS_ROUTES.list, member, {})).workflows, "member list").map((row) =>
+        record(row, "summary"),
+      );
+      assert.equal(listed.find((row) => row.id === workflow.id)?.paused, true);
+      const resumed = await pause(member, workflow.id, false);
+      assert.equal(resumed.paused, undefined);
+      assert.equal((await runCauseEffect(current().workflows.get(workflow.id))).summary.paused, undefined);
+
+      const created = await ok(WORKFLOWS_ROUTES.create, member, {
+        title: "Paused copy",
+        graph: agentGraph(open),
+        paused: true,
+      });
+      assert.equal(record(created.summary, "summary").paused, true);
+
+      const chatWorkflow = await hostWorkflow("Chat pause", agentGraph(chatter));
+      const chat = await refusal(
+        await raw(member, { workflowId: chatWorkflow.id, paused: true }),
+        403,
+        "error.team.agentManageDenied",
+      );
+      const hiddenWorkflow = await hostWorkflow("Hidden pause", agentGraph(closed));
+      const hidden = await refusal(
+        await raw(member, { workflowId: hiddenWorkflow.id, paused: true }),
+        404,
+        "error.workflow.missing",
+      );
+      assert.equal((await runCauseEffect(current().workflows.get(chatWorkflow.id))).summary.paused, undefined);
+      assert.equal((await runCauseEffect(current().workflows.get(hiddenWorkflow.id))).summary.paused, undefined);
+      const old = await refusal(
+        await raw(
+          member,
+          { workflowId: workflow.id, paused: true },
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+            (capability) => capability !== WORKFLOWS_PAUSE_CAPABILITY,
+          ),
+        ),
+        400,
+        "error.workflow.serverTooOld",
+      );
+      assert.equal((await runCauseEffect(current().workflows.get(workflow.id))).summary.paused, undefined);
+      return { paused: true, resumed: true, createdPaused: true, chat, hidden, old };
+    },
+  );
+
+  await step(
+    "export: the host advertises workflows-portable-v1 to a protocol 10 peer; a member who manages the agent gets the file text and the list of files to download, a secret or a missing file is refused, a chat member is refused, and an old peer is told the server is too old",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V10)).includes(WORKFLOWS_PORTABLE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_PORTABLE_CAPABILITY));
+      const codec = WORKFLOWS_PORTABLE_CODECS.get(WORKFLOWS_PORTABLE_ROUTES.export);
+      assert.ok(codec, "No workflows-portable-v1 codec for export.");
+      const raw = (
+        token: string,
+        workflowId: string,
+        capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10),
+      ) => {
+        const body = { workflowId };
+        codec.request(body);
+        return call("POST", WORKFLOWS_PORTABLE_ROUTES.export, {
+          token,
+          body,
+          protocol: TEAM_PROTOCOL_V10,
+          capabilities,
+        });
+      };
+      const exported = async (token: string, workflowId: string) => {
+        const response = await raw(token, workflowId);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return record(codec.response(response.status, response.body), "export");
+      };
+      const refusal = async (
+        response: { status: number; body: unknown },
+        status: number,
+        key: "error.workflow.serverTooOld" | "error.workflow.missing" | "error.team.agentManageDenied",
+      ) => {
+        assert.equal(response.status, status, JSON.stringify(response.body));
+        assert.ok(JSON.stringify(response.body).includes(sourceText(key)), JSON.stringify(response.body));
+        return response.status;
+      };
+      const withAsset = (agentId: string, fileId: string, task = "Describe the picture."): WorkflowGraph => ({
+        nodes: [
+          promptNode,
+          { id: "asset", kind: "asset", at: { x: 0, y: 200 }, fields: { fileId } },
+          { id: "agent", kind: "agent", at: at(300), fields: { agentId, task } },
+        ],
+        edges: [
+          { id: "edge", from: "prompt", to: "agent", type: "text" },
+          { id: "edge-asset", from: "asset", to: "agent", type: "image" },
+        ],
+        strokes: [],
+      });
+
+      const assetId = "e2e-export-asset";
+      mkdirSync(join(userData, "e2e-files"), { recursive: true });
+      const assetBytes = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+      writeFileSync(join(userData, "e2e-files", assetId), assetBytes);
+      const workflow = await hostWorkflow("Portable", withAsset(open, assetId));
+      const good = await exported(member, workflow.id);
+      assert.equal(good.problem, null);
+      const assets = list(good.assets, "assets").map((asset) => record(asset, "asset"));
+      assert.equal(assets.length, 1);
+      assert.equal(assets[0]?.fileId, assetId);
+      const fileText = text(good.text, "file text");
+      assert.ok(!fileText.includes(open), "The file text names the agent by its id.");
+      assert.ok(!fileText.includes(assetId), "The file text names the file by its id.");
+      assert.ok(!decodeWorkflowFile(fileText).ok, "The host text is a file before the client fills the files.");
+      const sources = assets.map((asset) => ({
+        key: text(asset.key, "asset key"),
+        fileId: text(asset.fileId, "asset file id"),
+        node: text(asset.node, "asset node"),
+        step: text(asset.step, "asset step"),
+      }));
+      const unfilled = fillWorkflowFileText(fileText, sources, new Map());
+      assert.ok(!unfilled.ok && unfilled.problem.kind === "asset-missing", JSON.stringify(unfilled));
+      const filled = fillWorkflowFileText(
+        fileText,
+        sources,
+        new Map(sources.map((source) => [source.key, assetBytes])),
+      );
+      assert.ok(filled.ok, JSON.stringify(filled));
+      assert.equal(filled.name, "Portable.openbot-workflow.json");
+      const decoded = decodeWorkflowFile(filled.text);
+      assert.ok(decoded.ok, JSON.stringify(decoded));
+      assert.equal(decoded.file.title, "Portable");
+      const references = Object.values(decoded.file.references);
+      assert.deepEqual(
+        references.map((reference) => [reference.kind, reference.name]),
+        [["agent", "Open"]],
+      );
+      const fileAssets = Object.values(decoded.file.assets);
+      assert.equal(fileAssets.length, 1);
+      assert.deepEqual(fileAssets[0] && [...workflowFileAssetBytes(fileAssets[0])], [...assetBytes]);
+      assert.equal(fileAssets[0]?.type, "image/png");
+      assert.equal(fileAssets[0]?.name, "picture.png");
+
+      const secretKey = "sk-ant-abcdefghijklmnopqrstuvwx";
+      const secretWorkflow = await hostWorkflow("Secret", withAsset(open, assetId, `Use ${secretKey} to call.`));
+      const secretResponse = await raw(member, secretWorkflow.id);
+      assert.equal(secretResponse.status, 200, JSON.stringify(secretResponse.body));
+      assert.ok(!JSON.stringify(secretResponse.body).includes(secretKey), "The export response sends the secret.");
+      const secret = record(codec.response(secretResponse.status, secretResponse.body), "secret export");
+      assert.equal(secret.text, null);
+      const secretProblem = record(secret.problem, "secret problem");
+      assert.equal(secretProblem.kind, "secret");
+      assert.deepEqual(
+        list(secretProblem.fields, "secret fields").map((field) => record(field, "field").node),
+        ["agent"],
+      );
+
+      const missingWorkflow = await hostWorkflow("Missing file", withAsset(open, MISSING_FILE));
+      const missing = await exported(member, missingWorkflow.id);
+      assert.equal(missing.text, null);
+      assert.equal(record(missing.problem, "missing problem").kind, "asset-missing");
+
+      const chatWorkflow = await hostWorkflow("Chat export", agentGraph(chatter));
+      const chat = await refusal(await raw(member, chatWorkflow.id), 403, "error.team.agentManageDenied");
+      const hiddenWorkflow = await hostWorkflow("Hidden export", agentGraph(closed));
+      const hidden = await refusal(await raw(member, hiddenWorkflow.id), 404, "error.workflow.missing");
+      const old = await refusal(
+        await raw(
+          member,
+          workflow.id,
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).filter(
+            (capability) => capability !== WORKFLOWS_PORTABLE_CAPABILITY,
+          ),
+        ),
+        400,
+        "error.workflow.serverTooOld",
+      );
+      return {
+        exported: true,
+        assets: assets.length,
+        references: references.length,
+        secret: secretProblem.kind,
+        missing: record(missing.problem, "missing problem").kind,
+        chat,
+        hidden,
+        old,
+      };
     },
   );
 
