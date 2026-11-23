@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   CLIENT_BROWSER_COMMAND_TIMEOUT_MS,
   CLIENT_BROWSER_EVENT,
@@ -13,9 +13,13 @@ import {
   clientBrowserCommandEvent,
 } from "@openbot/contracts/team-protocol/client-browser-v1";
 import { Effect } from "effect";
-import { type ClientBrowser, ClientBrowserFailed } from "../backend/agent/client-browser-tools";
+import { type ClientBrowser, ClientBrowserFailed, type SharedChrome } from "../backend/agent/client-browser-tools";
 
 type Deliver = (memberId: string, sessionId: string, event: ClientBrowserCommandEvent) => boolean;
+
+function chromeKey(sessionId: string): string {
+  return createHash("sha256").update(sessionId).digest("hex").slice(0, 6);
+}
 
 interface Presence {
   memberId: string;
@@ -67,18 +71,25 @@ export class ClientBrowserHub implements ClientBrowser {
       }
   }
 
-  tabs(memberId: string): ClientTab[] | null {
-    return this.#current(memberId)?.presence.tabs ?? null;
+  tabs(memberId: string): SharedChrome[] | null {
+    const chromes = this.#sessions(memberId).map(({ sessionId, presence }) => ({
+      chrome: chromeKey(sessionId),
+      tabs: presence.tabs,
+    }));
+    return chromes.length ? chromes : null;
   }
 
   call(
     memberId: string,
+    chrome: string,
     agent: { id: string; name: string },
     command: ClientBrowserCommand,
   ): Effect.Effect<ClientBrowserResult, ClientBrowserFailed> {
     return Effect.suspend(() => {
-      const current = this.#current(memberId);
-      if (!current) return Effect.fail(new ClientBrowserFailed({ code: "not-shared", message: "" }));
+      const sessions = this.#sessions(memberId);
+      if (!sessions.length) return Effect.fail(new ClientBrowserFailed({ code: "not-shared", message: "" }));
+      const current = sessions.find(({ sessionId }) => chromeKey(sessionId) === chrome);
+      if (!current) return Effect.fail(new ClientBrowserFailed({ code: "not-found", message: "" }));
       const event: ClientBrowserCommandEvent = {
         type: CLIENT_BROWSER_EVENT,
         id: randomUUID(),
@@ -137,11 +148,10 @@ export class ClientBrowserHub implements ClientBrowser {
     this.#deliver.clear();
   }
 
-  #current(memberId: string): { sessionId: string; presence: Presence } | null {
-    let best: { sessionId: string; presence: Presence } | null = null;
-    for (const [sessionId, presence] of this.#presence)
-      if (presence.memberId === memberId && (!best || presence.order > best.presence.order))
-        best = { sessionId, presence };
-    return best;
+  #sessions(memberId: string): { sessionId: string; presence: Presence }[] {
+    return [...this.#presence]
+      .filter(([, presence]) => presence.memberId === memberId)
+      .sort(([, left], [, right]) => right.order - left.order)
+      .map(([sessionId, presence]) => ({ sessionId, presence }));
   }
 }

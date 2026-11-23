@@ -785,9 +785,11 @@ The extension is a remote client, so no new data channel is necessary:
   is cancelled. A command that the contract decoder refuses never leaves the host, because the client
   closes its event stream on a malformed event.
 - **Tools** (`src/backend/agent/client-browser-tools.ts`). A shared tab has the id
-  `chrome:<member key>:<tab id>`; the key is a short hash of the member id. `list_tabs` adds the shared
-  tabs of the people who requested the turn (`#turnRequesters`), with a short note on what they take.
-  `open` with `browser: "chrome"` opens a tab in the Chrome of the first of them who shares. A turn
+  `chrome:<member key>:<Chrome key>:<tab id>`; the member key is a short hash of the member id, and the
+  Chrome key a short hash of the session that shares the tab, so a command reaches only the Chrome that
+  listed the tab (else `not-found`). `list_tabs` adds the shared tabs of each Chrome of the one person
+  who requested the turn (`#turnRequesters`), with a short note on what they take. `open` with
+  `browser: "chrome"` opens a tab in that person's newest shared Chrome. A turn
   that no person requested, such as a routine run or a message from another agent, reaches no Chrome.
   On a Chrome tab, only `snapshot`, `screenshot`, `navigate`, `click`, `type`, `press`, `scroll`,
   `wait_for` and `close_tab` run; each other tool (Vault, secrets, takeover, uploads, `evaluate`,
@@ -812,14 +814,16 @@ window.
   it is idle, and the worker opens it when the last panel closes or the browser starts.
 - **Commands** (`src/client-browser-executor.ts`). CDP 1.3 on any open web tab: it attaches on demand,
   puts the tab into the OpenBot group of its window, and detaches after 30 s with no command. Page
-  scripts run in an isolated world. `snapshot` marks the interactive elements with `data-openbot-ref`,
-  so a `ref` target finds them. A command gets `not-shared` while sharing is off, and `not-found` for
+  scripts run in one isolated world per tab, made again after a navigation. `snapshot` keeps a map from
+  each `ref` to its element in that world, where page scripts cannot change it. A command gets `not-shared` while sharing is off, and `not-found` for
   a closed tab. The X agent's chat of each post is kept for its notification (`openbot.x-chats.v1`,
   the newest 20), and becomes the chat to open only when the user clicks that notification.
 - **Approvals.** Before a command, the worker checks the site (origin) of the tab or address. A site
   that is not in `openbot.client-browser.sites.v1` gets a card in the side panel (Allow once / Always
   for this site / Deny), or a notification when no panel is open. The card waits 100 s, then the
-  command fails with `timeout`. These ask every time, also on an allowed site, and have no "Always":
+  command fails with `timeout`. A command also has a deadline 10 s before the host gives up on it
+  (120 s from its arrival): after the deadline it does not act, so the agent is never told "timeout"
+  for an action that then runs. "Stop sharing" ends the waiting cards with `not-shared`, not a denial. These ask every time, also on an allowed site, and have no "Always":
   typing into a password field or a field with `autocomplete="cc-*"`; a download; and a click, key,
   `navigate` or `open` on an address whose path has `oauth` or `authorize` and that has a `client_id`
   parameter. `chrome.debugger` cannot stop downloads (`Page.setDownloadBehavior` is a browser-level

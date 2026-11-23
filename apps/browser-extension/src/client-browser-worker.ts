@@ -1,5 +1,6 @@
 import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import {
+  CLIENT_BROWSER_COMMAND_TIMEOUT_MS,
   CLIENT_BROWSER_LIMITS,
   type ClientBrowserAnswer,
   type ClientBrowserCommandEvent,
@@ -36,6 +37,12 @@ import {
 } from "./client-browser-messages";
 
 const ASK_WAIT_MS = 100_000;
+const DEADLINE_MARGIN_MS = 10_000;
+const LATE = "The command took too long, and the agent was told that it did not run.";
+
+function lateAnswer(id: string): ClientBrowserAnswer {
+  return { id, ok: false, code: "timeout", error: LATE };
+}
 const KEEP_ALIVE_MS = 20_000;
 const GROUP_COLOR = "pink";
 const CHANGE_DELAY_MS = 400;
@@ -137,10 +144,11 @@ async function writeAsks(asks: BrowserAsk[]): Promise<void> {
 
 export function startClientBrowser(options: Options): ClientBrowserWorker {
   installExecutor();
-  const waiting = new Map<string, (choice: AskChoice | "timeout") => void>();
+  const waiting = new Map<string, (choice: AskChoice | "timeout" | "stopped") => void>();
   let queue: Promise<unknown> = Promise.resolve();
   let changeTimer: ReturnType<typeof setTimeout> | undefined;
   const downloadGuards = new Map<string, DownloadGuard>();
+  const deadlines = new Map<string, number>();
 
   function guardSite(site: string, event: ClientBrowserCommandEvent, labels: AskLabels): DownloadGuard {
     const guard = downloadGuards.get(site) ?? { event, labels, until: 0, allowed: 0, outcomes: null };
@@ -175,7 +183,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     const groupId = await sharedGroupId();
     await chrome.storage.local.set({ [SHARING_KEY]: { off: true } });
     downloadGuards.clear();
-    for (const finish of [...waiting.values()]) finish("deny");
+    for (const finish of [...waiting.values()]) finish("stopped");
     await detachAll();
     const groups = await chrome.tabGroups.query({ title: OPENBOT_GROUP_TITLE });
     const groupIds = new Set([...groups.map((group) => group.id), ...(groupId === null ? [] : [groupId])]);
@@ -196,14 +204,14 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       .catch(() => undefined);
   }
 
-  function ask(entry: BrowserAsk, labels: AskLabels): Promise<AskChoice | "timeout"> {
+  function ask(entry: BrowserAsk, labels: AskLabels, waitMs: number): Promise<AskChoice | "timeout" | "stopped"> {
     return new Promise((resolve) => {
       const keepAlive = setInterval(
         () => void chrome.storage.local.get(ASKS_KEY).catch(() => undefined),
         KEEP_ALIVE_MS,
       );
-      const timer = setTimeout(() => finish("timeout"), ASK_WAIT_MS);
-      function finish(choice: AskChoice | "timeout") {
+      const timer = setTimeout(() => finish("timeout"), waitMs);
+      function finish(choice: AskChoice | "timeout" | "stopped") {
         if (!waiting.delete(entry.id)) return;
         clearInterval(keepAlive);
         clearTimeout(timer);
@@ -233,6 +241,8 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     const site = new URL(url).origin;
     guardSite(site, event, labels);
     if (kind === "site" && (await approvedSites()).includes(site)) return;
+    const deadline = deadlines.get(event.id) ?? Number.POSITIVE_INFINITY;
+    if (Date.now() >= deadline) throw new BrowserCommandError("timeout", LATE);
     const choice = await ask(
       {
         id: crypto.randomUUID(),
@@ -243,7 +253,11 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
         detail: detail.slice(0, 300),
       },
       labels,
+      Math.min(ASK_WAIT_MS, deadline - Date.now()),
     );
+    if ((choice === "once" || choice === "always") && Date.now() >= deadline)
+      throw new BrowserCommandError("timeout", LATE);
+    if (choice === "stopped") throw new BrowserCommandError("not-shared", "The person stopped sharing tabs.");
     if (choice === "timeout")
       throw new BrowserCommandError("timeout", "The person did not answer in time. Ask the person in the chat first.");
     if (choice === "deny") throw new BrowserCommandError("denied", "The person denied it.");
@@ -316,7 +330,11 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
   }
 
   function run(event: ClientBrowserCommandEvent, labels: AskLabels): Promise<ClientBrowserAnswer> {
-    const work = queue.then(() => execute(event, labels));
+    const deadline = Date.now() + CLIENT_BROWSER_COMMAND_TIMEOUT_MS - DEADLINE_MARGIN_MS;
+    deadlines.set(event.id, deadline);
+    const work = queue
+      .then(() => (Date.now() >= deadline ? lateAnswer(event.id) : execute(event, labels)))
+      .finally(() => deadlines.delete(event.id));
     queue = work.catch(() => undefined);
     return work;
   }

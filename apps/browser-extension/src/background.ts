@@ -141,6 +141,14 @@ async function notify(id: string, title: string, body: string, post: QueuedPost)
     .catch(() => undefined);
 }
 
+let outboxChange: Promise<unknown> = Promise.resolve();
+
+function changeOutbox<T>(change: () => Promise<T>): Promise<T> {
+  const next = outboxChange.then(change);
+  outboxChange = next.catch(() => undefined);
+  return next;
+}
+
 function flushOutbox(force = false): Promise<void> {
   flushing ??= (async () => {
     try {
@@ -182,9 +190,12 @@ function flushOutbox(force = false): Promise<void> {
           reachedAt: post.reachedAt ?? (reached ? Date.now() : null),
         });
       }
-      const added = (await readOutbox()).filter((post) => !stored.some((entry) => entry.id === post.id));
-      const next = [...kept, ...added];
-      await writeOutbox(next);
+      const next = await changeOutbox(async () => {
+        const added = (await readOutbox()).filter((post) => !stored.some((entry) => entry.id === post.id));
+        const all = [...kept, ...added];
+        await writeOutbox(all);
+        return all;
+      });
       const due = Math.min(...next.map((post) => post.nextAt));
       if (Number.isFinite(due)) await chrome.alarms.create(OUTBOX_ALARM, { when: Math.max(due, Date.now() + 1_000) });
       else await chrome.alarms.clear(OUTBOX_ALARM);
@@ -205,7 +216,7 @@ async function queuePost(payload: XReplyPayload): Promise<void> {
     error: null,
     reachedAt: null,
   };
-  await writeOutbox([...(await readOutbox()), post]);
+  await changeOutbox(async () => writeOutbox([...(await readOutbox()), post]));
   if (flushing) await flushing;
   await flushOutbox();
 }

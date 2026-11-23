@@ -15094,12 +15094,15 @@ try {
         bobOld.ready &&
         adaSocket.ready &&
         shared.status === 200 &&
-        isDeepStrictEqual(clientBrowser.tabs(bobId), [tab]) &&
+        isDeepStrictEqual(
+          clientBrowser.tabs(bobId)?.map((shared) => shared.tabs),
+          [[tab]],
+        ) &&
         clientBrowser.tabs(adaId) === null &&
         chromeTabs.length === 1 &&
         groupListed.contentItems.length === 0 &&
         typeof chromeTabId === "string" &&
-        /^chrome:[0-9a-f]{8}:41$/u.test(chromeTabId),
+        /^chrome:[0-9a-f]{8}:[0-9a-f]{6}:41$/u.test(chromeTabId),
       [summary(shared), listedText],
     );
     assert.ok(typeof chromeTabId === "string", "The shared tab is not listed.");
@@ -15169,9 +15172,12 @@ try {
     const role = await runTool([bobId], "click", { tabId: chromeTabId, target: { kind: "role", role: "button" } });
     const notRequester = await runTool([adaId], "snapshot", { tabId: chromeTabId });
     const groupTurn = await runTool([adaId, bobId], "snapshot", { tabId: chromeTabId });
+    const otherChrome = await runTool([bobId], "snapshot", {
+      tabId: chromeTabId.replace(/:[0-9a-f]{6}:/u, ":000000:"),
+    });
     const httpOnly = await runTool([bobId], "open", { url: "file:///etc/hosts", browser: "chrome" });
     check(
-      "a tool that Chrome tabs do not take, a role target, a person who did not request the turn, a turn of many people, or a file URL sends no command",
+      "a tool that Chrome tabs do not take, a role target, a person who did not request the turn, a turn of many people, a Chrome that is not shared, or a file URL sends no command",
       !script.success &&
         text(script).startsWith("On a Chrome tab, use only") &&
         !role.success &&
@@ -15179,9 +15185,11 @@ try {
         text(notRequester).startsWith("No person who requested this turn") &&
         !groupTurn.success &&
         text(groupTurn).startsWith("No person who requested this turn") &&
+        !otherChrome.success &&
+        text(otherChrome).startsWith("The tab is not shared now") &&
         !httpOnly.success &&
         bobSocket.events.length === 3,
-      [script, role, notRequester, groupTurn, httpOnly],
+      [script, role, notRequester, groupTurn, otherChrome, httpOnly],
     );
 
     const waiting = runTool([bobId], "snapshot", { tabId: chromeTabId });

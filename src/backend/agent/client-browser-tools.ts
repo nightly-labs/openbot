@@ -19,10 +19,16 @@ export class ClientBrowserFailed extends Schema.TaggedError<ClientBrowserFailed>
   message: Schema.String,
 }) {}
 
+export interface SharedChrome {
+  chrome: string;
+  tabs: ClientTab[];
+}
+
 export interface ClientBrowser {
-  tabs(memberId: string): ClientTab[] | null;
+  tabs(memberId: string): SharedChrome[] | null;
   call(
     memberId: string,
+    chrome: string,
     agent: { id: string; name: string },
     command: ClientBrowserCommand,
   ): Effect.Effect<ClientBrowserResult, ClientBrowserFailed>;
@@ -32,8 +38,8 @@ function memberKey(memberId: string): string {
   return createHash("sha256").update(memberId).digest("hex").slice(0, 8);
 }
 
-function sharedTab(memberId: string, tab: ClientTab): ClientTab {
-  return { ...tab, id: `${TAB_PREFIX}${memberKey(memberId)}:${tab.id}` };
+function sharedTab(memberId: string, chrome: string, tab: ClientTab): ClientTab {
+  return { ...tab, id: `${TAB_PREFIX}${memberKey(memberId)}:${chrome}:${tab.id}` };
 }
 
 export function isClientBrowserCall(tool: string, args: unknown): boolean {
@@ -50,8 +56,8 @@ export function withClientTabs(
   requesters: readonly string[],
 ): DynamicToolResult {
   const shared = onlyRequester(requesters).flatMap((memberId) => {
-    const tabs = browser?.tabs(memberId);
-    return tabs ? [tabs.map((tab) => sharedTab(memberId, tab))] : [];
+    const chromes = browser?.tabs(memberId) ?? [];
+    return chromes.map(({ chrome, tabs }) => tabs.map((tab) => sharedTab(memberId, chrome, tab)));
   });
   if (!shared.length) return result;
   const text = JSON.stringify({ chromeTabs: shared.flat(), note: NOTE });
@@ -144,10 +150,10 @@ function clientCommand(tool: string, args: unknown, tabId: string): ClientBrowse
   }
 }
 
-function toolResult(memberId: string, result: ClientBrowserResult): DynamicToolResult["contentItems"] {
+function toolResult(memberId: string, chrome: string, result: ClientBrowserResult): DynamicToolResult["contentItems"] {
   return [
     ...(result.tab
-      ? [{ type: "inputText" as const, text: JSON.stringify({ tab: sharedTab(memberId, result.tab) }) }]
+      ? [{ type: "inputText" as const, text: JSON.stringify({ tab: sharedTab(memberId, chrome, result.tab) }) }]
       : []),
     ...(result.text ? [{ type: "inputText" as const, text: result.text }] : []),
     ...(result.image ? [{ type: "inputImage" as const, imageUrl: `data:image/jpeg;base64,${result.image}` }] : []),
@@ -163,11 +169,15 @@ export const runClientBrowserTool = Effect.fn("runClientBrowserTool")(function* 
 ) {
   const sharing = onlyRequester(requesters).filter((memberId) => browser?.tabs(memberId));
   let memberId: string | undefined;
+  let chrome = "";
   let tabId = "";
-  if (tool === "open") memberId = sharing[0];
-  else if (isRecord(args) && isString(args.tabId)) {
-    const [key, ...rest] = args.tabId.slice(TAB_PREFIX.length).split(":");
+  if (tool === "open") {
+    memberId = sharing[0];
+    chrome = (memberId && browser?.tabs(memberId)?.[0]?.chrome) || "";
+  } else if (isRecord(args) && isString(args.tabId)) {
+    const [key, chromeKey = "", ...rest] = args.tabId.slice(TAB_PREFIX.length).split(":");
     memberId = sharing.find((id) => memberKey(id) === key);
+    chrome = chromeKey;
     tabId = rest.join(":");
   }
   if (!browser || !memberId) return failure(NOT_SHARED);
@@ -175,8 +185,8 @@ export const runClientBrowserTool = Effect.fn("runClientBrowserTool")(function* 
   if (isString(command)) return failure(command);
   const member = memberId;
   const run = (next: ClientBrowserCommand) =>
-    browser.call(member, agent, next).pipe(
-      Effect.map((result) => toolResult(member, result)),
+    browser.call(member, chrome, agent, next).pipe(
+      Effect.map((result) => toolResult(member, chrome, result)),
       Effect.catchTag("ClientBrowserFailed", (error) =>
         Effect.fail(
           error.code === "failed" && error.message ? `${FAILURES.failed} ${error.message}` : FAILURES[error.code],

@@ -69,9 +69,12 @@ export function installExecutor(): void {
   });
 }
 
+const worlds = new Map<number, number>();
+
 function forget(tabId: number): void {
   clearTimeout(attached.get(tabId)?.idle);
   attached.delete(tabId);
+  worlds.delete(tabId);
 }
 
 function errorText(error: unknown): string {
@@ -132,7 +135,9 @@ export async function detachAll(): Promise<void> {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function world(tabId: number): Promise<number> {
+async function world(tabId: number, fresh: boolean): Promise<number> {
+  const kept = worlds.get(tabId);
+  if (!fresh && kept !== undefined) return kept;
   const tree = await send(tabId, "Page.getFrameTree");
   const frame = isDynamicRecord(tree.frameTree) ? tree.frameTree.frame : null;
   if (!isDynamicRecord(frame) || !isString(frame.id))
@@ -140,16 +145,19 @@ async function world(tabId: number): Promise<number> {
   const created = await send(tabId, "Page.createIsolatedWorld", { frameId: frame.id, worldName: "openbot" });
   if (!isNumber(created.executionContextId))
     throw new BrowserCommandError("failed", "Chrome did not make a script context for the page.");
+  worlds.set(tabId, created.executionContextId);
   return created.executionContextId;
 }
 
 async function inPage<I>(tabId: number, script: (input: I) => object, input: I): Promise<DynamicRecord> {
-  const answer = await send(tabId, "Runtime.evaluate", {
-    expression: `(${script.toString()})(${JSON.stringify(input)})`,
-    contextId: await world(tabId),
-    returnByValue: true,
-    awaitPromise: true,
-  });
+  const evaluate = async (fresh: boolean) =>
+    send(tabId, "Runtime.evaluate", {
+      expression: `(${script.toString()})(${JSON.stringify(input)})`,
+      contextId: await world(tabId, fresh),
+      returnByValue: true,
+      awaitPromise: true,
+    });
+  const answer = await evaluate(false).catch(() => evaluate(true));
   if (isDynamicRecord(answer.exceptionDetails)) {
     const detail = isString(answer.exceptionDetails.text) ? answer.exceptionDetails.text : "";
     throw new BrowserCommandError("failed", `The page script failed. ${detail}`.trim());
@@ -532,8 +540,10 @@ async function pressKey(id: number, key: string): Promise<void> {
   if (named) event = { key: main === "Space" ? " " : main, ...named };
   else if ([...main].length === 1) {
     const upper = main.toUpperCase();
-    const code = /[A-Z]/u.test(upper) ? `Key${upper}` : /\d/u.test(main) ? `Digit${main}` : "";
-    event = { key: main, code, keyCode: upper.charCodeAt(0), text: main };
+    const letter = /^[A-Z]$/u.test(upper);
+    const digit = /^\d$/u.test(main);
+    const code = letter ? `Key${upper}` : digit ? `Digit${main}` : "";
+    event = { key: main, code, keyCode: letter || digit ? upper.charCodeAt(0) : 0, text: main };
   } else throw new BrowserCommandError("failed", `Unknown key: ${main}.`);
   const text = modifiers & (2 | 4) ? undefined : event.text;
   const base = { modifiers, key: event.key, code: event.code, windowsVirtualKeyCode: event.keyCode };
@@ -549,7 +559,8 @@ function pageSnapshot(input: { text: number; elements: number; interactive: stri
     const text = value.replace(/\s+/g, " ").trim();
     return text.length > max ? `${text.slice(0, max - 1)}…` : text;
   };
-  for (const old of document.querySelectorAll("[data-openbot-ref]")) old.removeAttribute("data-openbot-ref");
+  const refs = new Map<string, WeakRef<Element>>();
+  globalThis.openbotRefs = refs;
   const lines: string[] = [];
   let count = 0;
   for (const element of document.querySelectorAll(input.interactive)) {
@@ -560,7 +571,7 @@ function pageSnapshot(input: { text: number; elements: number; interactive: stri
     if (box.width < 1 || box.height < 1 || style.visibility === "hidden" || style.display === "none") continue;
     count += 1;
     const ref = `e${count}`;
-    element.setAttribute("data-openbot-ref", ref);
+    refs.set(ref, new WeakRef(element));
     const field = element instanceof HTMLInputElement ? element : null;
     const tag = element.tagName.toLowerCase();
     const role = element.getAttribute("role") ?? (tag === "a" ? "link" : field ? `input ${field.type}` : tag);
@@ -781,8 +792,10 @@ function pageLocate(input: { target: ClientBrowserTarget; focus: boolean; intera
       .replace(/\s+/g, " ")
       .trim();
   let element: Element | null = null;
-  if ("ref" in target) element = document.querySelector(`[data-openbot-ref="${CSS.escape(target.ref)}"]`);
-  else if ("css" in target) {
+  if ("ref" in target) {
+    const found = globalThis.openbotRefs?.get(target.ref)?.deref();
+    element = found?.isConnected ? found : null;
+  } else if ("css" in target) {
     try {
       element = document.querySelector(target.css);
     } catch {
