@@ -49,8 +49,10 @@ import {
   finishedTurnSummaries,
   type TurnStepsSummary,
 } from "@/features/chat/model/turn-thinking";
+import { useServerProviderStatus } from "@/features/servers/model/use-server-providers";
 import { useChatBackgroundColor } from "@/features/settings/model/chat-background";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
+import { gptLiveAccess } from "@/features/voice/model/gpt-live-access";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
@@ -641,8 +643,11 @@ export function ChatView({
   const gptLiveChosen = useVoiceSettings((state) => state.gptLive);
   const gptLiveVoice = useVoiceSettings((state) => state.gptLiveVoice);
   const serverLiveVoice = useMobileWorkspaceSelector((current) => current.canUseLiveVoice(target.serverId));
+  const gptLiveWanted = target.kind === "agent" && gptLiveChosen && serverLiveVoice && liveVoiceWebRtc !== null;
+  const serverProviders = useServerProviderStatus(target.serverId, gptLiveWanted);
+  const gptLiveSignInNeeded = gptLiveAccess(serverProviders.data?.providers) === "signIn";
   const gptLive = useGptLiveConversation({
-    active: target.kind === "agent" && gptLiveChosen && serverLiveVoice && liveVoiceWebRtc !== null,
+    active: gptLiveWanted && !gptLiveSignInNeeded,
     enabled: isFocused && writable,
     online: serverOnline,
     focused: isFocused,

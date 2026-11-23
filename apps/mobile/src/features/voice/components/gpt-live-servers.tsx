@@ -9,10 +9,11 @@ import { isProviderKeyAccount } from "@/features/servers/model/provider-admin";
 import {
   useProviderAdmin,
   useServerProviderAccounts,
-  useServerProviders,
+  useServerProviderStatus,
 } from "@/features/servers/model/use-server-providers";
 import { SettingsRow } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { gptLiveAccess } from "@/features/voice/model/gpt-live-access";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
@@ -38,21 +39,9 @@ function GptLiveServerRow({ server }: { server: MobileServer }) {
   const { t } = useText();
   const online = server.state === "online";
   const supported = useMobileWorkspaceSelector((current) => online && current.canUseLiveVoice(server.id));
-  const { rows } = useServerProviders(server.id);
-  const codex = supported ? rows.find((row) => row.id === "codex")?.status : undefined;
-  const status: GptLiveServerStatus = !online
-    ? "offline"
-    : !supported
-      ? "update"
-      : !codex
-        ? "supported"
-        : codex.state === "sign-in-required" ||
-            codex.state === "not-installed" ||
-            (codex.state === "available" && codex.apiKeyInUse)
-          ? "signIn"
-          : codex.state === "available"
-            ? "ready"
-            : "supported";
+  const providerStatus = useServerProviderStatus(server.id);
+  const access = supported ? gptLiveAccess(providerStatus.data?.providers) : undefined;
+  const status: GptLiveServerStatus = !online ? "offline" : !supported ? "update" : (access ?? "supported");
   return (
     <SettingsRow
       supportingText={t(STATUS_TEXT[status])}

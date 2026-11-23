@@ -36,9 +36,9 @@ function useProviderStatusQuery(serverId: string, admin: ProviderAdmin | null, w
   });
 }
 
-export function useServerProviderStatus(serverId: string) {
+export function useServerProviderStatus(serverId: string, enabled = true) {
   const { admin } = useProviderAdmin(serverId);
-  return useProviderStatusQuery(serverId, admin, false);
+  return useProviderStatusQuery(serverId, enabled ? admin : null, false);
 }
 
 export function useServerProviders(serverId: string, options: { watchStatus?: boolean } = {}) {
