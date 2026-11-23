@@ -248,6 +248,7 @@ import { type MockCrmSeed, mockCrm } from "./mock-crm";
 import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostPersonality } from "./mock-host-personality";
+import { createMockHostSignalHome } from "./mock-host-signal-home";
 import { createMockHostTimezone } from "./mock-host-timezone";
 import { createMockHostTurnLimits } from "./mock-host-turn-limits";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
@@ -3694,6 +3695,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...createMockHostSignalHome(),
       ...createMockHostVoiceModel(),
       ...hostTurnLimits,
       ...createMockHostPersonality(),

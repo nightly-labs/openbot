@@ -346,10 +346,13 @@ export class QueueControls {
           ),
         ),
       );
-    yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
+    const steering = this.#mailbox.getDelivery(input.deliveryId)?.delivery;
+    const joinedTurn = steering?.status === "starting" && steering.turnId === turnId;
+    if (joinedTurn) yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
     yield* queueStep(() => {
       const current = liveSnapshot();
       if (
+        joinedTurn &&
         this.#conversation.isExecutionThread(current.threadId) &&
         !current.messages.some((message) => message.id === input.deliveryId)
       ) {
@@ -358,7 +361,9 @@ export class QueueControls {
       }
       this.#mailboxSync.syncMailboxMessages(current);
       this.#mailboxSync.emitQueue(agent.id);
-      this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
+      if (joinedTurn)
+        this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
+      else this.#conversation.emitConversation(current);
     });
   }, Effect.uninterruptible);
 }

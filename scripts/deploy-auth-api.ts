@@ -54,6 +54,7 @@ async function main(): Promise<void> {
   await putOptionalSecretSet("APNS_PRIVATE_KEY", "APNS_KEY_ID");
   await putOptionalSecret("FCM_SERVICE_ACCOUNT");
   await putOptionalSecretSet("MEDIA_API_URL", "MEDIA_API_KEY");
+  await putOptionalSecretSet("MEDIA_API_TASKS_URL", "MEDIA_API_TASKS_KEY");
   await run(wranglerExecutable, ["d1", "migrations", "apply", "DB", "--remote", ...environmentArgs], {
     label: "Remote D1 migrations",
   });

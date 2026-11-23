@@ -337,6 +337,7 @@ export const messages = {
   "mobile.server.route.invite": "Convidar pessoas",
   "mobile.server.route.member": "Membro",
   "mobile.server.route.timezone": "Fuso horário",
+  "mobile.server.route.signalHome": "Servidor do Signal",
   "mobile.server.route.personality": "Personalidade do agente",
   "mobile.server.route.agents": "Agentes",
   "mobile.server.route.voiceModel": "Reconhecimento de fala",
@@ -467,6 +468,29 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Conecte-se a este servidor como proprietário ou admin para alterar o fuso horário.",
   "mobile.server.settings.timezoneUnsupported": "Atualize o OpenBot neste servidor para alterar o fuso horário aqui.",
+  "mobile.server.settings.signalHomeAutomatic": "Automático",
+  "mobile.server.settings.signalHomeNearest": "O servidor do Signal mais próximo",
+  "mobile.server.settings.signalHomeInUse": "Em uso: {name}",
+  "mobile.server.settings.signalHomeLoading": "Medindo os servidores do Signal…",
+  "mobile.server.settings.signalHomeSaveFailed": "Não foi possível mudar o servidor do Signal. Tente novamente.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Conecte-se a este servidor como proprietário ou administrador para mudar o servidor do Signal dele.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Atualize o OpenBot neste servidor para mudar aqui o servidor do Signal dele.",
+  "mobile.server.settings.signalHomeDescription":
+    "Os membros se conectam a este servidor por meio deste servidor do Signal. Um servidor do Signal com menor latência dá conexões mais rápidas.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} não responde. O servidor usa {name} até que {chosen} responda novamente.",
+  "mobile.server.settings.signalHomeMoving":
+    "O servidor muda para {name}. Os membros se conectam novamente em alguns segundos.",
+  "mobile.server.settings.signalHomeLoadFailed": "Não foi possível carregar os servidores do Signal.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Sem resposta",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinque 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinque 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San José",
+  "mobile.server.settings.signalHomePlaceSydney": "Sydney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapura",
   "mobile.server.settings.voiceModelDescription":
     "Os agentes deste servidor usam este modelo para transcrever o som de vídeos que não têm legendas.",
   "mobile.server.settings.voiceModelLoading": "Carregando o reconhecimento de fala…",

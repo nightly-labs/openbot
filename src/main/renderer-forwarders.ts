@@ -58,6 +58,7 @@ import {
   desktopAgentEventLevel,
   type NotificationChat,
   RETAINED_NOTIFICATION_LIMIT,
+  releaseWhenNotificationGone,
   showRetainedNotification,
 } from "./desktop-notifications";
 import type { HostService } from "./host-service";
@@ -172,9 +173,7 @@ export function createRendererForwarders({
       shown.delete(notification);
       if (shown.size === 0 && chatNotifications.get(key) === shown) chatNotifications.delete(key);
     };
-    notification.on("click", release);
-    notification.on("close", release);
-    notification.on("failed", release);
+    releaseWhenNotificationGone(notification, release);
   }
 
   function closeChatNotifications(serverId: string, chat: NotificationChat): void {
@@ -259,10 +258,8 @@ export function createRendererForwarders({
       const release = () => {
         if (channelNotifications.get(key) === notification) channelNotifications.delete(key);
       };
-      notification.on("close", release);
-      notification.on("failed", release);
+      releaseWhenNotificationGone(notification, release);
       notification.on("click", () => {
-        release();
         const window = getMainWindow();
         if (!window || window.isDestroyed()) return;
         showMainWindow(window);
@@ -437,9 +434,7 @@ export function createRendererForwarders({
       const release = () => {
         if (requestNotifications.get(requestKey) === notification) requestNotifications.delete(requestKey);
       };
-      notification.on("click", release);
-      notification.on("close", release);
-      notification.on("failed", release);
+      releaseWhenNotificationGone(notification, release);
     }
     notification.on("click", () => {
       const current = getMainWindow();

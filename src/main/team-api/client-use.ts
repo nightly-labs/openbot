@@ -47,6 +47,7 @@ import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1"
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_ROUTES } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
+import { HOST_SIGNAL_HOME_ROUTES } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
@@ -128,6 +129,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   HOST_MEMBER_UPDATE_ROUTES.status,
   HOST_TIMEZONE_ROUTES.settings,
   HOST_VOICE_MODEL_ROUTES.settings,
+  HOST_SIGNAL_HOME_ROUTES.settings,
   HOST_TURN_LIMITS_ROUTES.settings,
   HOST_PERSONALITY_ROUTES.settings,
   AGENT_MEMORY_LIMIT_ROUTES.settings,

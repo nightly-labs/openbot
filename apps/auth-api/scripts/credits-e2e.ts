@@ -1329,7 +1329,7 @@ async function holdLimits() {
         credits: 50,
       }),
     );
-    await run(spending.submitting(`job-${job}`));
+    await run(spending.claimSubmit(`job-${job}`, { upstream: "router", model: "up-video-1", params: "{}" }));
   }
   for (const job of ["done", "run", "down"]) await run(spending.start(`job-${job}`, `p-${job}`));
 
