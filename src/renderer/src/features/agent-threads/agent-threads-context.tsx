@@ -4,7 +4,6 @@ import { useAgents } from "../agents/agents-context";
 import { useServers } from "../servers/servers-context";
 import { createAgentThreadTabs } from "./agent-thread-tabs";
 
-/** The thread tabs of the active server's agents on this device. */
 const AgentThreads = createSimpleContext({
   name: "AgentThreads",
   init: () => {

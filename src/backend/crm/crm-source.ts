@@ -11,41 +11,26 @@ import { CrmError } from "./crm-handle";
 import { CrmSourceStore, type SourceBatch, type SourceSkips } from "./crm-source-store";
 import type { CrmStore } from "./crm-store";
 
-/**
- * Payment sources: the host reads customers, subscriptions and invoices from a connected source with a
- * read-only key, every 5 minutes and on "Sync now". Each sync reads all of them again; there is no
- * webhook and no event cursor, so Cloudflare and the source never call the host and a missed change
- * cannot stay missed. One sync runs at a time. A failed sync sets the error state; the next tick
- * tries again.
- */
-
-/** A failed call to the source. The source's own text is never stored or shown. */
 export class SourceFailure extends Schema.TaggedError<SourceFailure>()("CrmSourceFailure", {
   code: Schema.Literals(["invalid-key", "permission", "rate-limited", "network", "stripe"]),
 }) {}
 
-/** What a key reads, for the source state. */
 export interface SourceAccount {
   testMode: boolean;
   accountLabel: string;
 }
 
-/** One sync with one key. */
 export interface SourceSession {
-  /** The current objects of `refs`. A ref that the source deleted is left out. */
   objects(refs: readonly string[]): Effect.Effect<SourceBatch, SourceFailure>;
-  /** All current subscriptions, open invoices, recent paid invoices and customers, page by page. */
   list(page: (batch: SourceBatch) => Effect.Effect<void, CrmError>): Effect.Effect<void, SourceFailure | CrmError>;
 }
 
 export interface CrmSourceAdapter {
   kind: CrmSourceKind;
-  /** Refuses a key that is not read-only or that cannot read what the sync needs. */
   check(key: string): Effect.Effect<SourceAccount, SourceFailure | CrmError>;
   open(key: string): Effect.Effect<SourceSession, SourceFailure>;
 }
 
-/** The saved keys, in main. A key never enters the database, the activity or a response. */
 interface CrmSourceKeys {
   get(kind: CrmSourceKind): string | null;
   set(kind: CrmSourceKind, key: string | null): Effect.Effect<void, CrmError>;
@@ -73,13 +58,11 @@ const FAILURE_TEXT = {
   stripe: "error.crm.sourceFailed",
 } as const satisfies Record<CrmSourceError, string>;
 
-/** Builds the source operations and starts the poll in the caller's scope. */
 export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
   store: CrmStore;
   dependencies: CrmSourceDependencies;
   changed: () => void;
   now: () => Date;
-  /** False while the CRM switch is off: the poll then does not sync. */
   enabled: () => boolean;
 }) {
   const { store, dependencies, changed, now, enabled } = options;
@@ -102,7 +85,6 @@ export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
           return sources.apply(sourceId, batch, skips);
         });
       yield* session.list((batch) => write(batch).pipe(Effect.asVoid));
-      // Rows that the listing no longer has: an ended subscription, a voided or old paid invoice.
       const missing = yield* attempt(() => sources.openRefs(sourceId).filter((ref) => !seen.has(ref)));
       if (missing.length > 0) yield* write(yield* session.objects(missing));
       return skips;
@@ -120,7 +102,6 @@ export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
         }
         const result = yield* found.open(key).pipe(
           Effect.flatMap((session) => pull(sourceId, session)),
-          // A database error in a batch is a defect. The source shows the error, and the next sync tries again.
           Effect.catchDefect(() => Effect.fail("defect" as const)),
           Effect.result,
         );
@@ -133,7 +114,6 @@ export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
               : sources.setState(sourceId, { state: "error", errorCode: "stripe" }),
         );
       }).pipe(
-        // A missing source was disconnected during the wait. A defect must not stop the poll.
         Effect.catch(() => Effect.void),
         Effect.catchDefect(() => Effect.void),
         Effect.ensuring(Effect.sync(changed)),
@@ -146,7 +126,6 @@ export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
     let last = 0;
     while (true) {
       yield* Effect.sleep(MINUTE);
-      // Wall-clock time, so a computer that slept syncs at its first tick.
       const at = now().getTime();
       if (at - last < SYNC_EVERY || !enabled()) continue;
       last = at;
@@ -170,7 +149,6 @@ export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
         return yield* new CrmError({ code: "refused", message: sourceText("error.crm.invalidChange") });
       const key = input.key.trim();
       const account = yield* found.check(key).pipe(Effect.mapError(failure));
-      // One connect at a time: a second connect must not replace or clear the key of the first.
       const source = yield* lock.withPermit(
         Effect.gen(function* () {
           if (store.sources().some((source) => source.kind === input.kind))

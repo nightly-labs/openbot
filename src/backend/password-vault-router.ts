@@ -4,21 +4,13 @@ import { type PasswordVault, PasswordVaultError, type VaultLogin } from "./passw
 
 const logger = createOpenBotLogger("password-vault");
 
-/** One source of logins. Its ids get `prefix`; the first source keeps an empty prefix. `name` is its brand. */
 export interface PasswordVaultSource {
   prefix: string;
   name: string;
   vault: PasswordVault;
 }
 
-/**
- * Lists the logins of every source and fills from the one that a login id names. Only new sources get
- * a prefix: existing 1Password item ids keep their meaning, and Bitwarden ids keep `bitwarden:`.
- * When a source cannot be read, the list fails, as a fill must not choose from part of the logins.
- * The failure names those sources and keeps the logins of the others, so `list_logins` can show them.
- */
 export function passwordVaultRouter(sources: ReadonlyArray<PasswordVaultSource>): PasswordVault {
-  // The longest prefix first, so the empty prefix matches only an id that no other source names.
   const byPrefix = [...sources].sort((a, b) => b.prefix.length - a.prefix.length);
   return {
     connected: () => sources.some(({ vault }) => vault.connected()),

@@ -14,18 +14,14 @@ const logger = createOpenBotLogger("routine-feed");
 const FEED_PATH = /^\/routines\/([A-Za-z0-9_-]+)\.ics$/;
 const storedFeedSchema = z.object({
   version: z.literal(1),
-  /** The token, encrypted with the secret storage cipher, in base64. */
   token: z.string().min(1),
-  /** The port the feed had last, so the URL that a calendar app holds still works after a restart. */
   port: z.number().int().min(1).max(65_535),
 });
 
-/** A read, write or listen that failed. The settings section shows it; the start only logs it. */
 export class RoutineFeedFailed extends Schema.TaggedError<RoutineFeedFailed>()("RoutineFeedFailed", {
   cause: Schema.Defect(),
 }) {}
 
-/** The agent filter names no agent of this computer. */
 export class RoutineFeedAgentNotFound extends Schema.TaggedError<RoutineFeedAgentNotFound>()(
   "RoutineFeedAgentNotFound",
   {},
@@ -41,34 +37,22 @@ interface SecretCipher {
 }
 
 export interface RoutineFeedServerOptions {
-  /** The file that keeps the encrypted token and the port. */
   path: string;
   cipher: SecretCipher;
-  /** The iCalendar text of every routine, or of the routines of one agent. */
   document: (agentId: string | null) => Effect.Effect<string, RoutineFeedAgentNotFound | RoutineFeedFailed>;
 }
 
-/**
- * The loopback door through which a calendar app on this computer reads the routine schedule.
- *
- * A calendar app cannot send a header, so the private token is in the path. The token is the only
- * credential: the URL alone gives read access, and a new token makes the old URL answer 404. A
- * request with an `Origin` header or a foreign `Host` is refused before the token is read, so a web
- * page cannot read the feed through DNS rebinding. The feed only reads; it never changes a routine.
- */
 export class RoutineFeedServer {
   readonly #options: RoutineFeedServerOptions;
   #server: Server | null = null;
   #port = 0;
   #token: Buffer = Buffer.alloc(0);
-  /** One state change at a time, in the order the calls came. */
   readonly #lock = Semaphore.makeUnsafe(1);
 
   constructor(options: RoutineFeedServerOptions) {
     this.#options = options;
   }
 
-  /** Opens the feed that the user turned on before. Never fails: a feed that cannot open is off. */
   readonly start = Effect.fn("RoutineFeedServer.start")(function* (this: RoutineFeedServer) {
     yield* this.#lock.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -85,7 +69,6 @@ export class RoutineFeedServer {
           return;
         }
         if (this.#port === port) return;
-        // The port was not free. Keep the new one, so the URL that the user subscribes to now stays.
         const saved = yield* Effect.result(this.#write(token, this.#port));
         if (Result.isFailure(saved)) logger.warn("The new routine feed port could not be saved.", saved.failure.cause);
       }),
@@ -96,7 +79,6 @@ export class RoutineFeedServer {
     return yield* this.#lock.withPermit(Effect.sync(() => this.#status()));
   }).bind(this);
 
-  /** Turns the feed on with a new token. A feed that is on gets a new URL, and the old one stops working. */
   readonly create = Effect.fn("RoutineFeedServer.create")(function* (this: RoutineFeedServer) {
     return yield* this.#lock.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -105,7 +87,6 @@ export class RoutineFeedServer {
         const port = this.#server ? this.#port : Result.isSuccess(stored) ? (stored.success?.port ?? 0) : 0;
         const previous = this.#server ? this.#token : null;
         yield* this.#open(token, port);
-        // Unsaved, the new URL would stop working at the next start, so the feed stays as it was.
         yield* this.#write(token, this.#port).pipe(
           Effect.tapError(() =>
             previous
@@ -121,7 +102,6 @@ export class RoutineFeedServer {
     );
   }).bind(this);
 
-  /** Turns the feed off. The URL stops working, and the next `create` makes a new one. */
   readonly remove = Effect.fn("RoutineFeedServer.remove")(function* (this: RoutineFeedServer) {
     return yield* this.#lock.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -170,7 +150,6 @@ export class RoutineFeedServer {
     );
   }
 
-  /** Listens on `port`, or on a new port when another program took it, and takes `token`. */
   #open(token: string, port: number): Effect.Effect<void, RoutineFeedFailed> {
     return Effect.gen({ self: this }, function* () {
       registerSecretValue(token);
@@ -215,7 +194,6 @@ export class RoutineFeedServer {
       if (request.method !== "GET" && request.method !== "HEAD") return sendText(response, 405, "Method not allowed");
       const url = new URL(request.url ?? "/", "http://127.0.0.1");
       const token = FEED_PATH.exec(url.pathname)?.[1];
-      // A wrong token gets the same answer as a path that does not exist.
       if (!token || !this.#authorized(token)) return sendText(response, 404, "Not found");
       const result = await runCauseEffect(Effect.result(this.#options.document(url.searchParams.get("agent"))));
       if (Result.isFailure(result)) {
@@ -230,7 +208,6 @@ export class RoutineFeedServer {
       });
       response.end(request.method === "HEAD" ? undefined : body);
     } catch (error) {
-      // The URL holds the token, so the log names neither.
       logger.warn("A routine feed request failed.", error);
       if (!response.headersSent) sendText(response, 500, "Internal error");
     }

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/provider";
 
 export const messages = {
-  // The provider list, shown in Settings and during onboarding.
   "provider.availableHere": "在这台电脑上可用",
   "provider.availableOnHost": "在 {name} 上运行",
   "provider.custom.name": "自定义服务商",
@@ -17,8 +16,6 @@ export const messages = {
   "provider.refreshingLabel": "正在检查服务商",
   "provider.refreshing": "检查中…",
 
-  // What a provider row reports about itself. A percentage while downloading is a number, not a
-  // message, so it has no key.
   "provider.status.connecting": "连接中",
   "provider.status.updateAvailable": "有可用更新",
   "provider.status.settingUp": "配置中",
@@ -37,12 +34,8 @@ export const messages = {
   "provider.gemini.hostSignIn":
     "要连接 Gemini，请在主机上打开 OpenBot，然后在“服务器设置 > 服务商”中选择“连接”。Google 登录需要该主机上有浏览器，不支持远程登录。",
 
-  // Which account tier the OpenCode row runs on. It shows only while it adds to the runtime
-  // badge: a saved key leaves the runtime "Connected" to speak for the row.
   "provider.key.free": "免费",
 
-  // The buttons on a provider row, and the name a screen reader reads for each. The name repeats
-  // the provider, because a list of rows all saying "Connect" tells a screen reader user nothing.
   "provider.action.connect": "连接",
   "provider.action.reconnect": "重新连接",
   "provider.action.restart": "重启",
@@ -73,15 +66,12 @@ export const messages = {
   "provider.aria.codeFallback": "用验证码登录 {name}",
   "provider.aria.moreActions": "{name} 的更多操作",
 
-  // The switch that turns a provider on or off in OpenBot. While an agent uses the provider, the
-  // switch stays on and a toast names the agent, or counts the agents when there are more.
   "provider.aria.use": "在 OpenBot 中使用 {name}",
   "provider.use.inUseOne": "{agent} 正在使用 {name}。请先更改该助手的模型，再关闭 {name}。",
   "provider.use.inUse": {
     other: "{count} 个助手正在使用 {name}。请先更改这些助手的模型，再关闭 {name}。",
   },
 
-  // The dialog that signs in to a provider with a code on another device.
   "provider.codeLogin.title": "用验证码登录 {name}",
   "provider.codeLogin.description": "在你的手机或另一个浏览器上完成，OpenBot 会在这里等待。",
   "provider.codeLogin.starting": "正在从 {name} 获取验证码…",
@@ -108,13 +98,11 @@ export const messages = {
   "provider.codeLogin.chatgptDeviceSetting":
     "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 
-  // A provider that only the OpenBot app can sign in, from a browser tab.
   "provider.useApp.title": "在 OpenBot 应用中连接 {name}",
   "provider.useApp.description":
     "{name} 的登录结果会返回发起登录的电脑，浏览器标签页无法接收。请在 OpenBot 应用中连接 {name}，应用会自动完成登录。",
   "provider.useApp.download": "获取应用",
 
-  // The agent model picker.
   "provider.picker.noEndpoints": "还没有端点",
   "provider.picker.customCounts": "{endpoints} · {agents}",
   "provider.picker.agentModel": "助手模型",
@@ -129,11 +117,14 @@ export const messages = {
   "provider.picker.download": "{name} 下载",
   "provider.picker.search": "搜索模型",
   "provider.picker.noMatches": "没有匹配的模型。",
+  "provider.picker.openrouterNoMatches":
+    "没有匹配的模型。你在 openrouter.ai 上的隐私、提供商和防护设置可能会在此列表中隐藏部分模型。",
   "provider.picker.workspaceOnlyUnavailable":
     "在 Windows 和 Linux 上，这些模型无法以“仅工作区”运行。要使用它们，请在助手设置中更改“权限”。",
   "provider.picker.olderModels": "旧版模型",
   "provider.picker.olderModelsList": "旧版 {name} 模型",
-  "provider.picker.noModels": "{name} 没有可用的模型。",
+  "provider.picker.noModels":
+    "这里没有显示 {name} 模型。如果它们已关闭，管理员可以在“服务器设置 > 服务商 > {name} > 模型”中开启它们。",
   "provider.picker.endpointModelsInCustom": "{name} 运行你的自定义端点。它们的模型在“自定义”标签页中。",
   "provider.picker.showCustomModels": "查看模型",
   "provider.picker.museNoModels":
@@ -211,7 +202,6 @@ export const messages = {
     "在主机上保存 OpenRouter API 密钥，即可使用 OpenRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.openrouterKey.label": "OpenRouter API 密钥",
 
-  // The optional OpenCode Go key dialog.
   "provider.openCodeKey.title": "登录 OpenCode Go",
   "provider.openCodeKey.description": "免费模型无需账号，填写密钥可解锁付费的 Go 模型。",
   "provider.openCodeKey.unreadable": "已保存的密钥无法读取，请重新粘贴或移除。",
@@ -261,7 +251,6 @@ export const messages = {
   "provider.account.poolCount": "{accounts}的账号池",
   "provider.account.poolInUse": "{pool} · 正在使用 {name}",
 
-  // Settings > Providers: a list of providers, and one page for each provider.
   "provider.settings.connected": "已连接",
   "provider.settings.other": "其他服务商",
   "provider.settings.search": "搜索服务商",
@@ -301,6 +290,7 @@ export const messages = {
   "provider.settings.geminiKeyInUse": "Gemini 使用该密钥，而不是你的 Google AI 套餐。不显示该套餐的用量。",
   "provider.settings.geminiKeyReplacesAccount":
     "已保存的 Gemini API 密钥代替 Google 登录使用。要使用 Google 套餐及其模型，请删除该密钥。",
+  "provider.settings.museKeyInUse": "Muse 使用此密钥，而不是你的登录。要使用你的登录，请移除该密钥。",
   "provider.settings.addKey": "添加密钥",
   "provider.settings.changeKey": "更换密钥",
   "provider.settings.runtime": "运行时",
@@ -318,10 +308,14 @@ export const messages = {
   "provider.settings.diagnostics": "诊断",
   "provider.settings.cache": "缓存",
   "provider.settings.promptCache": "提示缓存",
-  "provider.settings.promptCacheDescription": "Claude 在两轮对话之间把助手的上下文保留在缓存中的时长。",
+  "provider.settings.promptCacheDescription": "Claude 和 Pi 在两轮之间将智能体上下文保留在缓存中的时间。",
   "provider.settings.promptCacheHour": "1 小时",
-  "provider.settings.promptCacheDefault": "Claude Code 默认",
+  "provider.settings.promptCacheDefault": "提供商默认值",
   "provider.settings.promptCacheLoadFailed": "无法加载该服务器的提示缓存时长。",
+  "provider.settings.cacheExpiryCompaction": "在缓存过期前压缩",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "当上下文达到 20 万个令牌或更多的聊天在 1 小时缓存下处于空闲状态时，智能体会在缓存过期前压缩上下文。这样下一条消息就不会在没有缓存的情况下重新读取完整上下文。",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "无法加载此服务器的压缩设置。",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "使用我的 Claude Code 配置",
   "provider.settings.claudeUserSetupDescription":
@@ -386,4 +380,5 @@ export const messages = {
   "provider.settings.endpointModels": { other: "{url} · {count} 个模型" },
   "provider.settings.disconnectLocalOnly":
     "OpenBot 会在这台电脑上退出 {provider}。终端中的 {provider} CLI 保持自己的登录。",
+  "provider.settings.updateAll": "全部更新",
 } as const satisfies PartialTranslation<typeof source>;

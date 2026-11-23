@@ -30,10 +30,6 @@ const KIND_DESCRIPTION = {
   output: "mobile.workflow.add.output",
 } as const satisfies Record<AddableKind, MobileTextKey>;
 
-/**
- * The editor > Add a step: the kinds of step that can go at the place that the person chose. The place
- * is a list and an index of an outline, or a connection or the end of a path of any other workflow.
- */
 export function WorkflowAddStepScreen() {
   const { t } = useText();
   const params = useLocalSearchParams<{
@@ -49,9 +45,7 @@ export function WorkflowAddStepScreen() {
   const place = placeFromParams(params);
   const list: FlowList = FLOW_LISTS.find((name) => name === params.list) ?? "main";
   const index = Number(params.index) || 0;
-  // A workflow has one condition on the phone, and it starts from the steps before the paths.
   const conditionAllowed = place !== null || (list === "main" && draft !== null && !hasCondition(draft.graph));
-  // Every kind shows; a kind that cannot go at this place is off, so the page keeps one order.
   const allowed: readonly AddableKind[] =
     place && draft
       ? placeKinds(draft.graph, place, ADDABLE_KINDS)

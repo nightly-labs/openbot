@@ -1,18 +1,3 @@
-// The auth state of one linked WhatsApp device, and the small records the connector keeps beside it.
-//
-// One SQLite file per connection (`<userData>/whatsapp/<connectionId>.db`). It holds secrets — the
-// device's identity, prekeys, Signal sessions and sender keys — not user data: `openbot.db` stays the
-// source of truth for connections, threads and memories. Every value is sealed with AES-256-GCM under a
-// 32-byte store key that the main process keeps in its safeStorage credential file. The additional data
-// of each value names its table and row, so a value moved to another row does not open.
-//
-// The database is held in exclusive locking mode for as long as the store is open. A second process
-// that opens the same file gets `WhatsAppStoreLocked` at once, so two sockets never share one session
-// (WhatsApp would close both with "connection replaced").
-//
-// Writes are synchronous and each `keys.set` is one transaction, so a crash leaves either the old or
-// the new keys, never half of a ratchet step.
-
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -33,11 +18,8 @@ const KEY_BYTES = 32;
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
 
-/** How long a sent message stays available for a retry receipt. */
 const OUTBOUND_TTL_MS = 24 * 60 * 60 * 1000;
-/** How long an inbound message stays in the journal, for replay after a crash. */
 const INBOX_TTL_MS = 30 * 60 * 1000;
-/** How long a post keeps its reply chain. */
 const POSTS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class WhatsAppStoreLocked extends Schema.TaggedError<WhatsAppStoreLocked>()("WhatsAppStoreLocked", {}) {}
@@ -47,15 +29,12 @@ export class WhatsAppStoreUnreadable extends Schema.TaggedError<WhatsAppStoreUnr
   {},
 ) {}
 
-/** One inbound message kept until the connector has handed it on. */
 export interface InboxEntry {
   dedupKey: string;
-  /** The normalized message, as the connector serialized it. */
   payload: string;
   receivedAt: number;
 }
 
-/** Where a post of OpenBot belongs: its chat and the conversation it answers. */
 export interface PostRecord {
   chatJid: string;
   threadKey: string;
@@ -63,12 +42,10 @@ export interface PostRecord {
 
 export interface WhatsAppAuthStoreOptions {
   path: string;
-  /** 32 random bytes from the credential store. */
   key: Uint8Array;
   now?: () => number;
 }
 
-/** Makes a new random store key. */
 export function newStoreKey(): Uint8Array {
   return randomBytes(KEY_BYTES);
 }
@@ -87,7 +64,6 @@ export class WhatsAppAuthStore {
     this.#creds = creds;
   }
 
-  /** Opens or creates the store. Fails with `WhatsAppStoreLocked` when another process holds it. */
   static open(options: WhatsAppAuthStoreOptions): WhatsAppAuthStore {
     if (options.key.byteLength !== KEY_BYTES) throw new WhatsAppStoreUnreadable();
     mkdirSync(dirname(options.path), { recursive: true, mode: 0o700 });
@@ -97,7 +73,6 @@ export class WhatsAppAuthStore {
       db.exec("PRAGMA locking_mode = EXCLUSIVE");
       db.exec("PRAGMA journal_mode = WAL");
       db.exec("PRAGMA synchronous = FULL");
-      // The first write takes the exclusive lock and keeps it until close.
       db.exec("BEGIN IMMEDIATE");
       db.exec("COMMIT");
     } catch (cause) {
@@ -114,13 +89,11 @@ export class WhatsAppAuthStore {
       else store.saveCreds();
       return store;
     } catch (cause) {
-      // A store that does not open, such as one with another key, must not keep its lock.
       db.close();
       throw cause;
     }
   }
 
-  /** The Baileys auth state. `creds` is the live object that Baileys changes; call `saveCreds` after. */
   get state(): AuthenticationState {
     return {
       creds: this.#creds,
@@ -134,7 +107,6 @@ export class WhatsAppAuthStore {
     };
   }
 
-  /** True once the device is linked: WhatsApp gave it an account. */
   get linked(): boolean {
     return Boolean(this.#creds.me?.id);
   }
@@ -149,7 +121,6 @@ export class WhatsAppAuthStore {
     ]);
   }
 
-  /** Keeps a sent message for WhatsApp's retry receipts. */
   putOutbound(messageId: string, message: proto.IMessage): void {
     this.#run(
       "INSERT INTO outbound (id, value, sent_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET value = excluded.value",
@@ -157,7 +128,6 @@ export class WhatsAppAuthStore {
     );
   }
 
-  /** True for a message that this device sent in the last day. */
   hasOutbound(messageId: string): boolean {
     return this.#db.prepare("SELECT 1 FROM outbound WHERE id = ?").get(messageId) !== undefined;
   }
@@ -168,7 +138,6 @@ export class WhatsAppAuthStore {
     return proto.Message.decode(this.#openBytes(`outbound:${messageId}`, blob(row.value)));
   }
 
-  /** Journals an inbound message before it is handed on. Returns false when it was already there. */
   journal(entry: InboxEntry): boolean {
     const result = this.#db
       .prepare("INSERT OR IGNORE INTO inbox (dedup_key, value, received_at, handled) VALUES (?, ?, ?, 0)")
@@ -180,7 +149,6 @@ export class WhatsAppAuthStore {
     this.#run("UPDATE inbox SET handled = 1 WHERE dedup_key = ?", [dedupKey]);
   }
 
-  /** The journaled messages that were never handed on, oldest first. */
   unhandled(): InboxEntry[] {
     const since = this.#now() - INBOX_TTL_MS;
     return this.#db
@@ -224,7 +192,6 @@ export class WhatsAppAuthStore {
     ]);
   }
 
-  /** Removes outbound, journal and post rows past their time. */
   prune(): void {
     const now = this.#now();
     this.#transaction(() => {
@@ -253,7 +220,6 @@ export class WhatsAppAuthStore {
     for (const id of ids) {
       const row = select.get(type, id);
       if (!row) continue;
-      // Plain objects: an app state key is read through its fields only, as Baileys' own stores do.
       const value: SignalDataTypeMap[T] = JSON.parse(
         this.#open(`keys:${type}:${id}`, blob(row.value)),
         BufferJSON.reviver,

@@ -1,40 +1,41 @@
-import { Button, Lock } from "@openbot/ui";
+import { Button, CircleCheck, Lock } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
 import { PluginIcon } from "../marketplace/PluginIcon";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
-/**
- * Where the sign-in is. `signed-in`: the agent can test the server again. `sent`: the user told it
- * to. `unavailable`: this user cannot sign in here, or the server is gone.
- */
-export type McpSignInCardState = "sign-in" | "signed-in" | "sent" | "unavailable";
+export type McpSignInCardState =
+  | "sign-in"
+  | "checking"
+  | "signed-in"
+  | "not-needed"
+  | "sent"
+  | "not-needed-sent"
+  | "unavailable";
 
 export interface McpSignInCardProps {
   name: string;
-  /** The server address, without its query. */
   address: string;
   state: McpSignInCardState;
-  /** Why the user cannot sign in here. Shown under the header when `unavailable`. */
   unavailableText?: string;
-  /** Starts the sign-in. The sign-in dialogs stay in the consumer. */
+  notNeededText?: string;
   onSignIn?: (() => void) | undefined;
-  /** Tells the agent that the sign-in is done, so it tests the server again. */
   onContinue?: (() => void) | undefined;
 }
 
-/**
- * An MCP server that an agent added and that waits for the user's sign-in. The user signs in from
- * the chat, then tells the agent to continue.
- */
 export function McpSignInCard(props: McpSignInCardProps) {
   const { t } = useText();
-  const sent = () => props.state === "sent";
-  const canContinue = () => props.state === "signed-in" && props.onContinue !== undefined;
-  const canSignIn = () => props.state !== "unavailable" && props.onSignIn !== undefined;
+  const sent = () => props.state === "sent" || props.state === "not-needed-sent";
+  const notNeeded = () => props.state === "not-needed" || props.state === "not-needed-sent";
+  const canContinue = () =>
+    (props.state === "signed-in" || props.state === "not-needed") && props.onContinue !== undefined;
+  const canSignIn = () => props.state !== "unavailable" && !notNeeded() && props.onSignIn !== undefined;
   const status = () => (sent() ? "answered" : "pending");
-  const outcome = () => (sent() ? t("chat.mcpSignIn.signedIn") : undefined);
+  const outcome = () => {
+    if (props.state === "not-needed-sent") return t("chat.mcpSignIn.notNeededOutcome");
+    return sent() ? t("chat.mcpSignIn.signedIn") : undefined;
+  };
 
   function actionButtons(): JSX.Element | undefined {
     if (!canContinue() && !canSignIn()) return undefined;
@@ -55,6 +56,8 @@ export function McpSignInCard(props: McpSignInCardProps) {
             type="button"
             variant={props.state === "signed-in" ? "outline" : "default"}
             size="sm"
+            disabled={props.state === "checking"}
+            aria-busy={props.state === "checking" ? "true" : undefined}
             aria-label={t("chat.mcpSignIn.signInNamed", { name: props.name })}
             onClick={() => props.onSignIn?.()}
           >
@@ -81,6 +84,12 @@ export function McpSignInCard(props: McpSignInCardProps) {
         <p class="marketplace-suggestion-unavailable">
           <Lock aria-hidden="true" />
           {props.unavailableText}
+        </p>
+      </Show>
+      <Show when={notNeeded() && props.notNeededText}>
+        <p class="marketplace-suggestion-unavailable">
+          <CircleCheck aria-hidden="true" />
+          {props.notNeededText}
         </p>
       </Show>
     </UiBlockCard>

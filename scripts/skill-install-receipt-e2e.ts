@@ -1,7 +1,3 @@
-// Run: bun scripts/skill-install-receipt-e2e.ts
-// Report: .openbot-build/skill-install-receipt-e2e.json
-// Drives the real skill service with injected auth and runtime boundaries.
-
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -71,7 +67,6 @@ const decodeLock = Schema.decodeUnknownSync(
 );
 const decodeReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ receiptId: Schema.String })));
 
-// Do not copy messages, stacks, causes or assertion values into diagnostics.
 function failureReason(error: unknown, phase: string): string {
   if (error instanceof assert.AssertionError) return `Assertion failed during ${phase}.`;
   if (isMissingFileError(error)) return `A required file was missing during ${phase}.`;

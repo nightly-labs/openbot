@@ -1,17 +1,3 @@
-// Starts this worktree's dev stack three times and checks the run marker of the main process:
-//   1. Start, wait for the marker to say `running`, and kill the Electron main process by its PID.
-//   2. Start again. The marker of run 1 makes one `system_unclean_exit` event: the main log says so
-//      once, and a local capture server receives it once when analytics can send it.
-//   3. Send SIGTERM to the Electron main process. OpenBot quits for `signal` and runs its teardown.
-//      Check that the marker says `clean`, and start again. This start makes no event.
-// `bun run dev:stop` is not the clean quit here: it stops the whole process group and sends SIGKILL
-// after 3 s, which can end the teardown first. The run then correctly counts as `quitting`.
-// The script stops the stack at the end with `bun run dev:stop` and writes
-// .openbot-build/unclean-exit-e2e/report.json.
-//
-//   bun scripts/unclean-exit-e2e.ts [--capture-port=47321]
-//
-// It never kills by name: it kills the one PID that it finds under its own dev supervisor.
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
@@ -44,7 +30,6 @@ interface Captured {
   name: string | null;
   properties: z.infer<typeof openPanelBody>["payload"]["properties"] & {};
 }
-/** The run marker file that `src/main/run-marker.ts` writes. */
 const runMarkerFile = z.object({
   version: z.literal(1),
   appVersion: z.string(),
@@ -69,7 +54,6 @@ interface RunReport {
 interface Report {
   startedAt: string;
   capturePort: number;
-  /** Run 1: the marker after the kill. Run 3: the marker before the start, after the clean quit. */
   runs: RunReport[];
   passed?: boolean;
   error?: string;
@@ -84,7 +68,6 @@ async function readBody(request: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-/** `localhost` can resolve to either loopback address, so the server listens on both. */
 async function listenOnLoopback(port: number): Promise<Server[]> {
   const servers: Server[] = [];
   for (const host of ["127.0.0.1", "::1"]) {
@@ -138,7 +121,6 @@ function ownAppRecord() {
   return readDevInstanceRecords().find((record) => record.service === "app" && record.projectRoot === ROOT) ?? null;
 }
 
-/** The Electron main process under this supervisor: an Electron binary with no `--type=` switch. */
 function electronMainPid(supervisorPid: number): number | null {
   const rows = execFileSync("ps", ["-A", "-o", "pid=,ppid=,command="], { encoding: "utf8" })
     .split("\n")
@@ -193,7 +175,6 @@ async function startStack(run: number): Promise<Started> {
     () => electronMainPid(supervisorPid),
     START_TIMEOUT_MS,
   );
-  // The marker is written right after the single-instance lock, before the window opens.
   await waitFor(
     `a running marker of run ${run}`,
     () => {
@@ -232,11 +213,9 @@ const capture = await listenOnLoopback(CAPTURE_PORT);
 const report: Report = { startedAt: new Date().toISOString(), capturePort: CAPTURE_PORT, runs: [] };
 let failure: unknown = null;
 try {
-  // Run 1: start and kill the main process.
   const first = await startStack(1);
   process.kill(first.electronPid, "SIGKILL");
   await waitFor("the end of the killed Electron process", () => (isAlive(first.electronPid) ? null : true), 30_000);
-  // The supervisor stops the other services when the app ends.
   await waitFor(
     "the end of the first dev supervisor",
     () => (isAlive(first.supervisorPid) || ownAppRecord() ? null : true),
@@ -246,7 +225,6 @@ try {
   assert.equal(killedMarker?.state, "running", "A killed run leaves its marker in `running`.");
   report.runs.push({ run: 1, electronPid: first.electronPid, marker: killedMarker });
 
-  // Run 2: the start after the kill.
   const logBefore = mainLog(first.userData).length;
   const second = await startStack(2);
   const secondLog = await waitFor(
@@ -263,7 +241,6 @@ try {
     () => (uncleanEvents().length > 0 ? uncleanEvents() : null),
     EVENT_TIMEOUT_MS,
   );
-  // A second flush must not send it again: wait for the renderer's open event, which comes later.
   await waitFor(
     "the desktop_app_opened event of run 2",
     () => captured.find((event) => event.run === 2 && event.name === "desktop_app_opened"),
@@ -282,7 +259,6 @@ try {
   assert.equal(sent[0]?.properties.phase, "running", "A kill of the main process has the running phase.");
   assert.equal(sent[0]?.properties.host_kind, "desktop", "The dev app is a desktop host.");
 
-  // Clean quit, then run 3. The supervisor stops the other services when the app ends.
   process.kill(second.electronPid, "SIGTERM");
   await waitFor("the end of the quit Electron process", () => (isAlive(second.electronPid) ? null : true), 60_000);
   await waitFor(

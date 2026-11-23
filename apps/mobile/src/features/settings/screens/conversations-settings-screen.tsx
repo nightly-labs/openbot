@@ -43,7 +43,6 @@ export function ConversationsSettingsScreen() {
   const { t } = text;
   const { theme } = useUniwind();
   const dark = theme === "dark";
-  // Each setting keeps its own save error, so a save of one setting does not hide the error of another.
   const [failed, setFailed] = useState<ReadonlySet<ConversationSetting>>(() => new Set());
   function save(setting: ConversationSetting, write: Promise<void>) {
     setFailed((current) => withoutSetting(current, setting));
@@ -57,13 +56,11 @@ export function ConversationsSettingsScreen() {
   }
 
   const motion = useMotionPreferences();
-  // Reduced motion, from the device or from Settings > Animations, keeps the message field full size.
   const reduced = useReducedMotion();
   const chatSwipe = useChatSwipePreference();
   const chatPull = useChatPullPreference();
   const largeFiles = useLargeFilePreference();
   const photoQuality = usePhotoQualityPreference();
-  // The swipe goes away from Back: to the left, or to the right in a right-to-left layout.
   const chatSwipeLabel =
     END_X === 1 ? t("mobile.settings.conversations.swipeLeft") : t("mobile.settings.conversations.swipeRight");
 
@@ -108,6 +105,11 @@ export function ConversationsSettingsScreen() {
           value={chatSwipe.action}
           disabled={!chatSwipe.ready}
           options={[
+            {
+              value: "question",
+              label: t("mobile.settings.conversations.swipeQuestion"),
+              picture: (play) => <SwipePicture target="question" play={play} />,
+            },
             {
               value: "threads",
               label: t("mobile.settings.conversations.swipeThreads"),

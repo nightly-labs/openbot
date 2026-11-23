@@ -1,3 +1,4 @@
+import { coordinatorText } from "@openbot/contracts/coordinator-text";
 import type { ChannelSummary } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { Link, useLocalSearchParams } from "expo-router";
@@ -16,7 +17,7 @@ import { ChannelAvatar } from "../components/channel-avatar";
 import { useChannels } from "../components/use-channels";
 
 export function DeletedChatsScreen() {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, sourceText } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
   const agents = useMobileWorkspaceSelector((current) => current.agents);
   const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === serverId));
@@ -28,7 +29,6 @@ export function DeletedChatsScreen() {
     [agents, serverId],
   );
   const online = showsOnline(server);
-  // As on desktop, the people who can delete a channel can restore it. The host checks the role again.
   const canRestore = online && server?.role !== "member" && state.canDelete;
   const [restoring, setRestoring] = useState<string | null>(null);
   const pending = useRef(false);
@@ -56,7 +56,6 @@ export function DeletedChatsScreen() {
   };
   return (
     <SheetScrollView contentContainerClassName="gap-5 px-5 pb-safe-offset-5 pt-7">
-      {/* A sheet of the home menu, as Hidden chats: it has no native header. */}
       <View className="items-center gap-2 px-4">
         <Typography.Heading type="h4" align="center">
           {t("mobile.app.route.deletedChannels")}
@@ -105,7 +104,9 @@ export function DeletedChatsScreen() {
                         {channel.name}
                       </Typography.Paragraph>
                       <Typography.Paragraph type="body-xs" className="text-text-secondary" numberOfLines={1}>
-                        {channel.lastMessage?.text ?? t("mobile.channel.list.noMessages")}
+                        {channel.lastMessage
+                          ? coordinatorText(channel.lastMessage.author, channel.lastMessage.text, sourceText)
+                          : t("mobile.channel.list.noMessages")}
                       </Typography.Paragraph>
                     </View>
                   </Pressable>

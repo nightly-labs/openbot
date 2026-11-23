@@ -21,16 +21,11 @@ import { useText } from "@/shared/lib/text";
 import { loadMarketplaceSkill } from "../api/marketplace-catalog";
 import { useMarketplaceInstalled } from "../model/use-marketplace";
 
-/**
- * The second page of a skill's sheet: the agents of the server, to choose the ones that get the skill.
- * An agent that has it already shows so. Add skill installs it on each chosen agent, then goes back.
- */
 export function MarketplaceSkillAgentsScreen() {
   const { t, errorMessage } = useText();
   const { serverId, skillId } = useLocalSearchParams<{ serverId: string; skillId: string }>();
   const { session } = useMobileSession();
   const apiUrl = session?.apiUrl ?? null;
-  // The listing page read it already, so this answers from the cache.
   const skill = useQuery({
     queryKey: queryKeys.marketplace(apiUrl, "skill", skillId),
     enabled: apiUrl !== null,
@@ -50,7 +45,6 @@ export function MarketplaceSkillAgentsScreen() {
   const lock = useRef(false);
   const [leaving, setLeaving] = useState(false);
   usePreventRemove(pending, () => undefined);
-  // Back only after the render that releases the guard, or the guard keeps the page.
   useEffect(() => {
     if (leaving) router.back();
   }, [leaving]);
@@ -85,12 +79,10 @@ export function MarketplaceSkillAgentsScreen() {
     } catch (cause) {
       void haptics.notification("error");
       setError(errorMessage(cause, t("mobile.marketplace.installFailed")));
-      // The agents that have it now leave the choice; the others stay for a retry.
       setChosen((current) => new Set([...current].filter((agentId) => !added.includes(agentId))));
       lock.current = false;
       setPending(false);
     } finally {
-      // The agent pages and the listing read the skills again, with the ones that were added.
       for (const agentId of added)
         void queryClient.invalidateQueries({ queryKey: queryKeys.agentInfo(queryScope, serverId, agentId) });
     }

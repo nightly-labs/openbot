@@ -4,31 +4,62 @@ import {
   chatVisualDocument,
   chatVisualFrameUrl,
 } from "@openbot/contracts/chat-visual";
-import { Match, Switch } from "solid-js";
+import { Match, onSettled, Switch } from "solid-js";
 import { documentColorScheme } from "../../document-color-scheme";
+import { REDUCED_MOTION_QUERY } from "../../utils";
 
-/**
- * What a backdrop that the user added shows: a picture or GIF from a data URL, or an HTML page. The
- * desktop serves a page at an `openbot-visual:` address (`src`), because its policy stops scripts in
- * `srcdoc`; the web client gives the HTML (`html`).
- */
 export type CustomBackdropSource =
   | { kind: "image"; url: string }
+  | { kind: "video"; url: string }
   | { kind: "page"; src: string }
   | { kind: "page"; html: string };
 
-/**
- * A backdrop that the user added, behind the whole window like `ChatBackdrop`. A page plays in the
- * same locked frame as a visual reply, and it gets no pointer or keyboard input. A tint in the chat
- * color keeps the text readable on a bright or busy picture.
- */
+function BackdropVideo(props: { url: string }) {
+  let video: HTMLVideoElement | undefined;
+  const reducedMotion = window.matchMedia(REDUCED_MOTION_QUERY);
+  const sync = () => {
+    if (!video) return;
+    if (reducedMotion.matches || document.hidden) video.pause();
+    else void video.play().catch(() => undefined);
+  };
+  onSettled(() => {
+    reducedMotion.addEventListener("change", sync);
+    document.addEventListener("visibilitychange", sync);
+    sync();
+    return () => {
+      reducedMotion.removeEventListener("change", sync);
+      document.removeEventListener("visibilitychange", sync);
+    };
+  });
+  return (
+    <video
+      ref={(element) => {
+        video = element;
+      }}
+      class="chat-backdrop-media"
+      src={props.url}
+      muted
+      loop
+      playsinline
+      preload="auto"
+      disablepictureinpicture
+      disableremoteplayback
+      tabindex={-1}
+      onLoadedData={sync}
+    />
+  );
+}
+
 export function CustomBackdrop(props: { source: CustomBackdropSource; title: string }) {
   const theme = () => chatVisualAppTheme(documentColorScheme());
   return (
     <div class="chat-backdrop chat-backdrop-custom" aria-hidden="true">
       <Switch>
-        <Match when={"url" in props.source ? props.source.url : undefined}>
+        <Match when={props.source.kind === "image" ? props.source.url : undefined}>
           {(url) => <img class="chat-backdrop-media" src={url()} alt="" draggable={false} />}
+        </Match>
+        <Match when={props.source.kind === "video" ? props.source.url : undefined}>
+          {(url) => <BackdropVideo url={url()} />}
         </Match>
         <Match when={"src" in props.source ? props.source.src : undefined}>
           {(src) => (

@@ -1,27 +1,26 @@
 import type { OpenBotDesktopApi, PromptCacheTtl } from "@openbot/contracts/ipc";
-import type { ProviderPromptCache } from "@openbot/ui/features/settings/ProviderSettingsPage";
+import type {
+  ProviderCacheExpiryCompaction,
+  ProviderPromptCache,
+} from "@openbot/ui/features/settings/ProviderSettingsPage";
 import { useText } from "@openbot/ui/text";
 import { createHostSetting } from "./host-setting-state";
 
-/** The prompt cache calls of one server's host. The desktop reaches them through main. */
-export type HostPromptCacheTtlCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getPromptCacheTtl" | "setPromptCacheTtl">;
+export type HostPromptCacheTtlCalls = Pick<
+  OpenBotDesktopApi["hostAdmin"],
+  "getPromptCacheTtl" | "setPromptCacheTtl" | "getCacheExpiryCompaction" | "setCacheExpiryCompaction"
+>;
 
 export interface HostPromptCacheTtlOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostPromptCacheTtlCalls;
 }
 
 export interface ProviderPromptCacheSource extends HostPromptCacheTtlOptions {
   serverId: string;
+  appliesToPi: boolean;
+  compaction: boolean;
 }
 
-/**
- * The Claude page's prompt cache time of this computer or a joined server (`prompt-cache-ttl-v1`).
- * The host checks the role again. Undefined while `source` is.
- *
- * Each new value of `status` reads the time again: the host sends a status event after a change,
- * such as one from the mobile app or another admin.
- */
 export function createProviderPromptCache(
   source: () => ProviderPromptCacheSource | undefined,
   status: () => unknown,
@@ -35,15 +34,40 @@ export function createProviderPromptCache(
     save: async (ttl, serverId) => (await calls().setPromptCacheTtl(ttl, serverId)).ttl,
     loadFailed: () => t("provider.settings.promptCacheLoadFailed"),
   });
+  const compactionSetting = createHostSetting<boolean, boolean>({
+    serverId: () => (source()?.compaction ? source()?.serverId : undefined),
+    status,
+    read: async (serverId) => (await calls().getCacheExpiryCompaction(serverId)).enabled,
+    save: async (enabled, serverId) => (await calls().setCacheExpiryCompaction(enabled, serverId)).enabled,
+    loadFailed: () => t("provider.settings.cacheExpiryCompactionLoadFailed"),
+  });
+  const compaction: ProviderCacheExpiryCompaction = {
+    get value() {
+      return compactionSetting.state.value;
+    },
+    get pending() {
+      return compactionSetting.state.pending;
+    },
+    get error() {
+      return compactionSetting.state.error;
+    },
+    onChange: (enabled) => void compactionSetting.choose(enabled),
+  };
   const cache: ProviderPromptCache = {
     get value() {
       return setting.state.value;
+    },
+    get appliesToPi() {
+      return source()?.appliesToPi === true;
     },
     get pending() {
       return setting.state.pending;
     },
     get error() {
       return setting.state.error;
+    },
+    get compaction() {
+      return source()?.compaction ? compaction : undefined;
     },
     onChange: (ttl) => void setting.choose(ttl),
   };

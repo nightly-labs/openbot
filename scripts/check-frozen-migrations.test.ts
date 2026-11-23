@@ -1,4 +1,3 @@
-// Rule fixtures for `check-frozen-migrations.ts`: each rule stops its bad folder and passes a good one.
 import { describe, expect, it } from "vitest";
 import { frozenMigrationProblems, type ReleasedMigrations } from "./frozen-migrations";
 

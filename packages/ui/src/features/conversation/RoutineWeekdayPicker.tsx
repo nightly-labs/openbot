@@ -17,14 +17,9 @@ type RoutineWeekdayPickerProps = (
   | { mode: "one"; day: number; onChange: (day: number) => void }
 ) & {
   disabled?: boolean | undefined;
-  /** The popover closed, so the edit is complete. */
   onClose?: () => void;
 };
 
-/**
- * A chip that opens the S M T W T F S strip. Daily and hourly runs toggle any set of days;
- * a weekly run picks exactly one, so it is a radio group and the arrow keys move the choice.
- */
 export function RoutineWeekdayPicker(props: RoutineWeekdayPickerProps) {
   const text = useText();
   const anchor = createStableChipAnchor(() => props.onClose?.());
@@ -84,7 +79,6 @@ function ManyWeekdays(props: { days: number[]; onChange: (days: number[]) => voi
               aria-label={routineWeekdayName(day, text)}
               aria-pressed={selected() ? "true" : "false"}
               data-cuelume-tap="toggle"
-              // The last day stays on, and saying so beats a click that does nothing.
               title={selected() && props.days.length === 1 ? text.t("routine.weekday.oneRequired") : undefined}
               onClick={() => props.onChange(toggleRoutineDay(props.days, day))}
             >

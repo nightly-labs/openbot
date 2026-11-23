@@ -42,49 +42,33 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid } from "@/shared/lib/platform";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** The hold before a move drags the chat. A move before it scrolls the list or swipes the row. */
 const HOLD_MS = 250;
-/** A move this far before the hold is a scroll or a swipe, not a drag. A slow scroll passes it early. */
 const SCROLL_SLOP = 6;
-/** After the hold, a move this far starts the drag. iOS cancels its menu at about the same distance. */
 const DRAG_SLOP = 8;
-/** The band at the top and bottom of the list where a drag scrolls it. */
 const EDGE = 72;
-/** The fastest edge scroll, in points per millisecond: 14 points in a 60 Hz frame. */
 const MAX_SCROLL_SPEED = 14 / (1000 / 60);
-/** The first frame of an edge scroll, and the longest step after a late frame, in milliseconds. */
 const SCROLL_FRAME_MS = 1000 / 60;
 const MAX_SCROLL_FRAME_MS = 50;
 export const DRAG_AVATAR_SIZE = 40;
 
 type ViewRef = ViewInstance;
 
-/** A chat as a drag starts it. `preview` is the avatar that follows the finger. */
 export interface ChatDragSource extends DraggedChat {
   name: string;
   preview: ReactNode;
 }
 
-/** What the screen gives the drag: the chats it shows, and how to scroll its list. */
 export interface ChatDragScreen {
-  /** The list entries, as the list shows them. */
   items: readonly MobileSidebarItem[];
-  /** The pinned tiles, as the grid shows them: the agents, then the channels. */
   pins: readonly SidebarPin[];
   collapsedSectionIds: ReadonlySet<string> | undefined;
-  /** False when the host keeps no layout: then a drag in the list only unpins. */
   sections: boolean;
-  /** True when one more chat can be pinned. */
   canPin: boolean;
-  /** The heights at the top and bottom of the list that the bars cover. */
   scrollInsets: { top: number; bottom: number };
-  /** Called when a drag starts, before the first `scrollBy`. */
   beginScroll: () => void;
-  /** Scrolls the list by `delta` points, and returns false at an end of the list. */
   scrollBy: (delta: number) => boolean;
   onDraggingChange: (dragging: boolean) => void;
   onDrop: (dragged: DraggedChat, target: ChatDropTarget, change: DropChange) => void;
-  /** The pin list of the server in the order of the host, for the place of a new pin. */
   readPins: () => SidebarPin[];
   layout: () => Parameters<typeof chatDropChange>[3];
 }
@@ -94,7 +78,6 @@ interface ChatDragContextValue {
   begin: (key: string, source: ChatDragSource, x: number, y: number) => void;
   move: (x: number, y: number) => void;
   end: (drop: boolean) => void;
-  /** The key of the dragged chat, or "". Rows read it on the UI thread to fade their own copy. */
   activeKey: SharedValue<string>;
   fingerX: SharedValue<number>;
   fingerY: SharedValue<number>;
@@ -102,7 +85,6 @@ interface ChatDragContextValue {
 
 const ChatDragContext = createContext<ChatDragContextValue | null>(null);
 
-/** The key of a drop target or a drag source. */
 function chatDragKey(place: "pin" | "row", chat: SidebarPin): string {
   return `${place}:${sidebarPinKey(chat)}`;
 }
@@ -148,12 +130,6 @@ interface DragSession {
   origin: { x: number; y: number };
 }
 
-/**
- * Drag and drop of the chats of the home list. The user holds a row or a pinned tile, then moves the
- * finger: the chat follows the finger, a line shows where it goes, and the list scrolls at its ends.
- * A drop in the pins pins the chat or moves its pin; a drop in the list moves it in its section or to
- * another section, and unpins a pinned chat.
- */
 export function ChatDragProvider({ screen, children }: PropsWithChildren<{ screen: ChatDragScreen }>) {
   const views = useRef(new Map<string, ViewRef>());
   const root = useRef<ViewRef>(null);
@@ -175,7 +151,6 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
     const list: ListFrame[] = [];
     let sectionId: string | null = null;
     for (const item of items) {
-      // "Needs you" and "Unread" are not sections of the layout.
       if (item.kind === "waiting" || item.kind === "unread") {
         sectionId = null;
         continue;
@@ -210,7 +185,6 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
     current.target = target;
     current.change = change;
     const nextMark = useful ? found.mark : null;
-    // The mark is in window coordinates, and the overlay starts at the top left corner of the list.
     const shifted = nextMark
       ? {
           ...nextMark,
@@ -223,7 +197,6 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
   const tick = useCallback(
     (time: number) => {
       frame.current = null;
-      // The scroll moves by the time since the last frame, so it has one speed at 60 and 120 Hz.
       const elapsed =
         lastTick.current === null ? SCROLL_FRAME_MS : Math.min(time - lastTick.current, MAX_SCROLL_FRAME_MS);
       lastTick.current = null;
@@ -241,7 +214,6 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
       }
       const scrolled = step !== 0 && scrollBy(step);
       update();
-      // The list scrolls while the finger rests in a band, so the loop runs again without a move.
       if (scrolled) {
         lastTick.current = time;
         frame.current = requestAnimationFrame(tick);
@@ -261,7 +233,6 @@ export function ChatDragProvider({ screen, children }: PropsWithChildren<{ scree
       const from = measure(views.current.get(key));
       const origin = { x: area?.x ?? 0, y: area?.y ?? 0 };
       session.current = { key, source, target: null, change: {}, x, y, origin };
-      // The avatar stays under the same point of the finger, close to where the user took it.
       const grab = from
         ? { x: Math.min(Math.max(x - from.x, 0), 64), y: Math.min(Math.max(y - from.y, 0), from.height) }
         : { x: 32, y: 32 };
@@ -399,10 +370,6 @@ function DragGhost({
   );
 }
 
-/**
- * The drag of one chat: the gesture for its detector, the ref for its frame, and the style that fades
- * the chat while the user drags it. Without a `ChatDragProvider`, the gesture never starts.
- */
 export function useChatDrag(place: "pin" | "row", source: () => ChatDragSource) {
   const drag = useContext(ChatDragContext);
   const { openingGesture } = useAppDrawer();
@@ -428,7 +395,6 @@ export function useChatDrag(place: "pin" | "row", source: () => ChatDragSource) 
       enabled,
       manualActivation: true,
       maxPointers: 1,
-      // The drawer waits until the drag fails, as a hold and a move to the right would open it too.
       block: openingGesture,
       onTouchesDown: (event) => {
         "worklet";
@@ -485,12 +451,10 @@ export function useChatDrag(place: "pin" | "row", source: () => ChatDragSource) 
     gesture,
     ref,
     style,
-    /** True while this chat is the dragged one. Read it after the finger lifts, not in a render. */
     isDragging: () => activeKey?.get() === keyRef.current,
   };
 }
 
-/** The view that a chat drag holds: it takes the gesture, gives the frame, and fades while dragged. */
 export function ChatDragArea({
   drag,
   fill = false,
@@ -507,10 +471,6 @@ export function ChatDragArea({
   );
 }
 
-/**
- * The long press of a chat. On iOS the system menu opens while the finger rests. On Android the menu
- * opens when the finger lifts, so a hold that then moves drags the chat instead.
- */
 export function useHoldMenu(drag: ReturnType<typeof useChatDrag>, openAndroidMenu: () => void) {
   const armed = useRef(false);
   return {
@@ -521,7 +481,6 @@ export function useHoldMenu(drag: ReturnType<typeof useChatDrag>, openAndroidMen
     onPressOut: () => {
       if (!armed.current) return;
       armed.current = false;
-      // A drag ends the press too. The drag starts first on the UI thread, so a frame later it shows.
       requestAnimationFrame(() => {
         if (!drag.isDragging()) openAndroidMenu();
       });
@@ -529,7 +488,6 @@ export function useHoldMenu(drag: ReturnType<typeof useChatDrag>, openAndroidMen
   };
 }
 
-/** The avatar of an agent that follows the finger. */
 export function AgentDragPreview({ agent }: { agent: MobileAgent }) {
   return (
     <BloubAvatar
@@ -544,7 +502,6 @@ export function AgentDragPreview({ agent }: { agent: MobileAgent }) {
   );
 }
 
-/** Registers a view that takes a drop: a section header or the pin area. */
 export function useChatDropTarget(key: string) {
   const drag = useContext(ChatDragContext);
   return useCallback((view: ViewRef | null) => drag?.register(key, view), [drag, key]);

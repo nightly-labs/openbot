@@ -6,7 +6,6 @@ import type { RoutineActiveSwitchProps } from "./routine-active-switch.types";
 
 const MODIFIERS = [labelsHidden(), fixedSize()];
 
-/** The switch at the end of a routine card. The label names it for VoiceOver and is not shown. */
 export function RoutineActiveSwitch({ label, value, disabled, onValueChange }: RoutineActiveSwitchProps) {
   const { theme } = useUniwind();
   return (

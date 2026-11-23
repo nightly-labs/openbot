@@ -14,17 +14,6 @@ import { Effect, Result, Semaphore } from "effect";
 import { isMissingFileError } from "../backend/file-errors";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
 
-/**
- * Whether replies are read aloud, and in which voice. It is a file of its own rather than a field of
- * `voice-preference.json`, so an earlier version that rewrites that file keeps this one.
- *
- * A file that is missing, unreadable as JSON or names an unknown voice reads as the default: replies
- * are not read aloud. A file with no known speed, such as one from an earlier version, reads at normal
- * speed. The speed is an extra field of version 1, so an earlier version still reads the file. Codex
- * live voice is one more extra field, and a file without it reads as off. The model and the cloud
- * voices are extra fields too: a file without a known model reads as Supertonic 3. The pause that ends a
- * turn of a voice conversation is one more: a file without a known pause reads as the default.
- */
 export class SpeechPreferenceStore {
   readonly #path: string;
   #settings: SpeechSettings = { ...DEFAULT_SPEECH_SETTINGS };

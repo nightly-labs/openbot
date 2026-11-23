@@ -1,13 +1,3 @@
-// Checks that an OpenCode turn whose server stops in the middle of the answer continues (#10310).
-// OpenCode 2.2.7 and 2.3.0 fail each open prompt with "OpenCode server is unavailable" (`data.errorName`
-// `ServerUnavailable`) when its own server stops, and its process exits a moment later. The turn
-// failed at the prompt's error, so the recovery after the exit found no turn to continue.
-// Runs the real agent service on a temporary profile with a fake OpenCode. The second message gets a
-// part of an answer, then that error, then the exit. The runtime starts OpenCode again, and the agent's
-// chat must continue the answer once on the new process, not end the message as failed.
-// The third message gets the same error, but the process stays: the message fails after the wait for
-// an exit, with a plain message and not the RequestError text.
-// `bun scripts/opencode-server-lost-e2e.ts`. Writes .openbot-build/opencode-server-lost-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,7 +13,6 @@ const home = join(root, "home");
 const logPath = join(root, "protocol.jsonl");
 const fakeOpenCode = join(root, "opencode");
 
-// Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
 process.env.OPENBOT_OPENCODE_PATH = fakeOpenCode;
 process.env.OPENBOT_FAKE_OPENCODE_LOG = logPath;
@@ -36,8 +25,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The first prompt that names "Second message" loses the server one time, as OpenCode 2.3.0 does, and
-// the process exits. The first prompt that names "Third message" loses it with no exit.
 const FAKE_OPENCODE = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -111,6 +98,7 @@ const report: Report = { passed: false };
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -140,7 +128,6 @@ function protocol(): ProtocolLine[] {
   }
 }
 
-/** Waits for a state of the service or of the fake OpenCode. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -187,7 +174,6 @@ try {
     () => protocol().some((line) => line.method === "session/prompt") && idle(agent.id),
   );
 
-  // OpenCode starts a discovery process for its models before the agent's process.
   const firstPid = protocol().find((line) => line.method === "session/prompt")?.pid ?? 0;
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Second message." }));
   const lost = await waitFor("the server to stop", () =>
@@ -198,7 +184,6 @@ try {
     protocol().find((line) => line.start && line.pid !== lost.pid && line.pid !== firstPid),
   );
   report.restartedPid = restarted.pid;
-  // The recovery either continues the answer on the new process or ends the delivery.
   await waitFor(
     "the second message to settle",
     () =>
@@ -213,7 +198,6 @@ try {
   const second = agents.listQueue(agent.id).deliveries.find((delivery) => delivery.text === "Second message.");
   report.secondDelivery = second ? { status: second.status, error: second.error ?? null } : null;
 
-  // The process stays after it loses its server: the turn fails with the plain text, and nothing restarts.
   const starts = protocol().filter((line) => line.start).length;
   const errorsBefore = errors.length;
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Third message." }));

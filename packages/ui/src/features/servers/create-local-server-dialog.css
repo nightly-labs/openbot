@@ -1,8 +1,3 @@
-/*
- * The name of a new server on this computer. The same small dialog as the OpenCode key dialog:
- * a left-aligned title, one description line, one field.
- */
-
 .create-local-server-dialog {
   width: min(400px, 100%);
   max-height: calc(100dvh - var(--openbot-space-6) * 2);

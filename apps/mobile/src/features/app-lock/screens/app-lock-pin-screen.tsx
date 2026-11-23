@@ -8,7 +8,6 @@ import { PIN_LENGTH } from "@/features/app-lock/model/app-lock-storage";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 
-/** Sets a new PIN: the user enters it twice. */
 export function AppLockPinScreen() {
   const { t } = useText();
   const [first, setFirst] = useState<string | null>(null);
@@ -31,7 +30,6 @@ export function AppLockPinScreen() {
     }
     setBusy(true);
     try {
-      // The confirmation from the app lock screen can be old when the user waited here.
       if (!(await confirmOwner())) return;
       await saveAppLockPin(value);
       void haptics.notification("success");

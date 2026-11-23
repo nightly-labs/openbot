@@ -22,11 +22,8 @@ export interface ProviderArticlePageProps {
   page: ProviderPage;
 }
 
-// What OpenBot does with one provider: how to set it up, what OpenBot adds, the
-// provider's own apps for a fair picture, and the other plans an agent can use.
 export function ProviderArticlePage(props: ProviderArticlePageProps) {
   const isThisProvider = (plan: OpenBotPlan) => plan.provider === props.page.provider;
-  // This provider's plan first, then the rest in their usual order.
   const plans = () => [
     ...OPENBOT_PLANS.filter(isThisProvider),
     ...OPENBOT_PLANS.filter((plan) => !isThisProvider(plan)),
@@ -179,7 +176,6 @@ export function ProviderArticlePage(props: ProviderArticlePageProps) {
   );
 }
 
-/** The text with each part in backticks set as code, such as a command or a variable. */
 function WithCode(props: { text: string }) {
   const parts = () => props.text.split("`").map((text, index) => ({ text, code: index % 2 === 1 }));
   return <For each={parts()}>{(part) => (part.code ? <code>{part.text}</code> : part.text)}</For>;

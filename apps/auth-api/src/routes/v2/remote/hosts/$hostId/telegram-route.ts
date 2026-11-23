@@ -10,8 +10,6 @@ import {
   requestRemoteControlPlane,
 } from "../../../../../server/request-auth";
 
-// The Telegram route ticket for the host's Signal `ingress` socket. The host proves its machine token,
-// as it does for a Signal ticket.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/telegram-route")({
   server: {
     handlers: {

@@ -1,14 +1,3 @@
-// Sends the same task start again, as a client does when the answer to the first start got lost, and
-// checks that the host makes one task. Run it in this worktree's `bun run dev:test-client` stack: the
-// app of this worktree is the host, and the test client reaches it through the Team API. It changes
-// the data of the host profile and starts one real provider turn on each path, so the prompt is short.
-// Pass an agent of the host whose provider is signed in:
-// `bun scripts/task-start-retry-e2e.ts --allow-mutations --agent=<agent id>`
-//
-// 1. On the host: two starts at the same time and a third after them, with one client id, give one task.
-// 2. From the test client, through the Team API: the same, with a new client id.
-// At the end it deletes the tasks it started.
-// Writes .openbot-build/task-start-retry-e2e/report.json.
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import type { AgentTask, AgentTasksSnapshot } from "@openbot/contracts/ipc";
@@ -62,7 +51,6 @@ function hostTasks(): Promise<AgentTasksSnapshot> {
   return host.page.evaluate((id) => window.openbot.agent.listTasks(id), agentId);
 }
 
-/** Starts one task three times with one client id: two starts at the same time, then one more. */
 async function startThreeTimes(start: (clientMessageId: string) => Promise<AgentTask>): Promise<PathResult> {
   const before = new Set((await hostTasks()).tasks.map((task) => task.id));
   const clientMessageId = crypto.randomUUID();
@@ -70,7 +58,6 @@ async function startThreeTimes(start: (clientMessageId: string) => Promise<Agent
   const again = await start(clientMessageId);
   const taskIds = [...first, again].map((task) => task.id);
   for (const id of taskIds) started.add(id);
-  // The agent answers the first message once: the task is idle after one turn.
   const after = await waitFor(
     host.page,
     "the host runs the task",
@@ -82,7 +69,6 @@ async function startThreeTimes(start: (clientMessageId: string) => Promise<Agent
 }
 
 try {
-  // 1. The host's own app.
   report.host = await startThreeTimes((clientMessageId) =>
     host.page.evaluate(
       ({ id, text, clientMessageId }) => window.openbot.agent.startTask({ agentId: id, text, clientMessageId }),
@@ -92,7 +78,6 @@ try {
   assert.equal(new Set(report.host.taskIds).size, 1, "The host gave more than one task for one client id.");
   assert.equal(report.host.newTasks, 1, "The host made more than one task for one client id.");
 
-  // 2. The test client, through the Team API.
   const servers = await client.page.evaluate(() => window.openbot.servers.list());
   const server = servers.find(
     (item) => item.kind === "remote" && item.compatibility?.capabilities.includes(AGENT_TASKS_CAPABILITY) === true,

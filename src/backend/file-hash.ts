@@ -6,7 +6,6 @@ class FileHashFailure extends Schema.TaggedError<FileHashFailure>()("FileHashFai
   cause: Schema.Defect(),
 }) {}
 
-/** Reads a file as a stream and releases it on completion or interruption. */
 export const sha256File = Effect.fn("FileHash.sha256")(function* (path: string) {
   const hash = createHash("sha256");
   yield* Effect.acquireUseRelease(

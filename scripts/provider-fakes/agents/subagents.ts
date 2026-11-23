@@ -1,14 +1,3 @@
-// The ACP agent of `acp-subagents-e2e.ts`. `FAKE_STYLE` selects how it reports its subagents, as the
-// pinned agents do:
-// - `opencode` (OpenCode 2.2.5): a `subagent` tool call in the parent session, and the child sessions'
-//   work in `opencode/session/child_update` notifications, but only for a client that sets
-//   `_meta["opencode/child-session-updates"]` in `initialize` (packages/cli/src/acp/child.ts).
-// - `kimi` (Kimi 1.52.0): an `Agent` tool call with no `rawInput`; its content is the arguments as JSON
-//   while it runs, and its result at the end.
-// - `cline` (Cline 3.0.68): a `spawn_agent: <task>` tool call with `rawInput` `{ systemPrompt, task }`.
-// - `hermes`: a `delegate_task: <goal>` tool call with no `rawInput`.
-// The prompt `work` starts the foreground subagents; `background` starts one that runs on after the turn,
-// for `FAKE_BACKGROUND_MS` (200 by default).
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
 import { type AcpPeer, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
@@ -29,8 +18,6 @@ function text(value: string) {
   return { type: "content", content: { type: "text", text: value } } as const;
 }
 
-/** A child session's notification. OpenCode sends it only to a client that asked for it. */
-/** The fields of `opencode/session/child_update` after the session ids (packages/cli/src/acp/child.ts). */
 type ChildFields =
   | { title: string; type: "status"; status: string; error?: { type: string; message: string } }
   | { title: string; type: "update"; update: SessionUpdate };
@@ -80,7 +67,6 @@ function openCodeWork(peer: AcpPeer, root: string): void {
       content: { type: "text", text: "skips the last token." },
     },
   });
-  // A subagent of the subagent shows its work in the top subagent.
   if (childUpdates) {
     const grandchild = {
       rootSessionId: root,
@@ -144,7 +130,6 @@ function openCodeWork(peer: AcpPeer, root: string): void {
   });
 }
 
-/** A subagent that the parent leaves running, which ends after the turn. */
 function openCodeBackground(peer: AcpPeer, root: string): void {
   const input = {
     description: "Index the repository",
@@ -193,7 +178,6 @@ function kimiWork(peer: AcpPeer, root: string): void {
     subagent_type: "explore",
     run_in_background: false,
   };
-  // The arguments stream: the first content is not yet JSON.
   peer.update(root, {
     sessionUpdate: "tool_call",
     toolCallId: "agent_1",
@@ -229,7 +213,6 @@ function kimiWork(peer: AcpPeer, root: string): void {
     status: "failed",
     content: [text("Subagent crashed: context window exceeded.")],
   });
-  // A background call has no end signal, so it is not shown.
   peer.update(root, {
     sessionUpdate: "tool_call",
     toolCallId: "agent_3",
@@ -275,7 +258,6 @@ function clineWork(peer: AcpPeer, root: string): void {
     status: "failed",
     rawOutput: "The subagent hit its iteration limit.",
   });
-  // Another tool is not a subagent.
   peer.update(root, {
     sessionUpdate: "tool_call",
     toolCallId: "read_1",
@@ -303,7 +285,6 @@ function hermesWork(peer: AcpPeer, root: string): void {
   });
 }
 
-/** A foreground subagent that runs when the person stops the turn. */
 function stoppedWork(peer: AcpPeer, root: string): void {
   peer.update(root, {
     sessionUpdate: "tool_call",
@@ -333,7 +314,6 @@ serveFakeAcpAgent(
     },
     "session/prompt": (request, peer) => {
       const root = request.params.sessionId ?? "";
-      // The agent service puts its instructions before the user's text, and they use these words too.
       const text = request.params.prompt?.map((part) => part.text ?? "").join("") ?? "";
       const prompt = text.split("</openbot-developer-instructions>").at(-1) ?? "";
       const reply = () => peer.reply(request, { stopReason: "end_turn" });

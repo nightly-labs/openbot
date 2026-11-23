@@ -7,10 +7,6 @@ import { actionToast } from "../../action-toast";
 import { type DesktopAnalyticsProperties, desktopAnalytics } from "../../analytics";
 import { mergeChannelPage } from "./channel-page-merge";
 
-/**
- * Takes the older edge of a page: its cursor, and the unloaded length that belongs to that cursor. A
- * page with no length removes the old one, so the scroll rail never draws a length for another window.
- */
 function takeOlderWindow(target: ChannelPage, source: ChannelPage): void {
   target.olderCursor = source.olderCursor;
   if (source.olderCount === undefined) delete target.olderCount;
@@ -19,83 +15,46 @@ function takeOlderWindow(target: ChannelPage, source: ChannelPage): void {
   else target.oldestAt = source.oldestAt;
 }
 
+import type { ChannelFoldersMode } from "./channel-folders-port";
 import type { ChannelsPort } from "./channels-port";
 
 interface ChannelsState {
   channels: ChannelSummary[];
-  /** A list read for this reader has answered. Until then, a client can show the channels of its frame. */
   listed: boolean;
   selectedId: string | null;
   page: ChannelPage | null;
   loading: boolean;
   pending: boolean;
   error: string | null;
-  /** The code of the failure in `error`. It shows only while `error` is set. */
   errorReference: string | null;
   editing: "create" | "settings" | null;
   archived: boolean;
   collapsed: boolean;
 }
 
-/**
- * What the channels domain needs from the app around it. The desktop builds it from its contexts;
- * the browser client builds it from its host connection. The domain itself is the same code.
- */
 export interface ChannelsEnvironment {
-  /** Read on each call, so a test can replace the runtime per case. */
   port: () => ChannelsPort;
   agents: () => AgentProfile[];
-  /** Who reads. A change drops the list, the selection, and every command still pending. */
   scopeKey: () => string;
-  /** The channel this reader had open, if they are known and had one. */
   readSelection: (scope: string) => string | null;
   writeSelection: (channelId: string | null) => void;
   supported: () => boolean;
-  /** Whether this reader may delete a channel; `supported()` is checked as well. */
   deletionSupported: () => boolean;
-  /** Whether the host deletes a message (`message-delete-v1`); `supported()` is checked as well. */
   messageDeletionSupported: () => boolean;
-  /**
-   * Whether this reader may delete the messages of other senders: this computer, or an admin of the
-   * server. Every reader may delete a message that they sent. The host checks it again.
-   */
   deletesAnyMessage: () => boolean;
-  /** Whether the host takes `cancel` (`channel-task-cancel-v1`); `supported()` is checked as well. */
   taskCancelSupported: () => boolean;
-  /**
-   * Whether the host reads and keeps "Keep memories in this channel" (`channel-isolation-v1`);
-   * `supported()` is checked as well. An older joined server drops the setting on the wire, so its
-   * switch would always show off and never save.
-   */
   isolationSupported: () => boolean;
-  /**
-   * Whether the host reads and keeps the Browser setting (`channel-browser-v1`); `supported()` is
-   * checked as well. An older joined server drops the setting on the wire, so its select would always
-   * show every member and never save.
-   */
   browserSupported: () => boolean;
-  /**
-   * Whether this reader can change the picture of a channel. The host keeps a channel picture, and
-   * only a phone with `channel-picture-v1` changes it over the Team API, so a joined server and the
-   * browser client cannot.
-   */
   pictureSupported: () => boolean;
-  /**
-   * Whether this reader can start a new conversation in a channel or compact it: this computer, or a
-   * joined server with `chat-history-v1`.
-   */
   contextActionsSupported: () => boolean;
-  /** Clears whatever else covers the workspace, because a channel is about to cover it. */
+  foldersMode: () => ChannelFoldersMode | null;
   beforeOpen: () => void;
-  /** Whether a message that arrives now is in front of the reader. */
   canMarkRead: () => boolean;
-  /** Each channel list that the reader of `scope` gets, before the read marks the open channel read. */
   onList?: (channels: ChannelSummary[], scope: string) => void;
 }
 
 export type ChannelsController = ReturnType<typeof createChannelsController>;
 
-/** The localized and redacted sentence for a failure, and its code. */
 function failure(error: unknown, fallback: AppTextKey): Pick<ChannelsState, "error" | "errorReference"> {
   const details = currentText().errorDetails(error, currentText().t(fallback));
   return { error: details.message, errorReference: details.reference };
@@ -103,7 +62,6 @@ function failure(error: unknown, fallback: AppTextKey): Pick<ChannelsState, "err
 
 type ChannelAction = DesktopAnalyticsProperties<"channel_action">["action"];
 
-/** The tracked action of a command, or `null` for one that is not tracked, such as a settings edit. */
 function channelAction(input: ChannelCommand, creating: boolean, page: ChannelPage | null): ChannelAction | null {
   if (input.type === "archive") return "archived";
   if (input.type !== "save") return null;
@@ -113,9 +71,7 @@ function channelAction(input: ChannelCommand, creating: boolean, page: ChannelPa
   return input.draft.members.some((member) => !members.has(member.agentId)) ? "member_added" : null;
 }
 
-/** How many left channels keep their page for the next visit. */
 const KEPT_PAGES = 6;
-/** The shortest time from the start of one read to the next one that only host events asked for. */
 const CHANGE_READ_GAP_MS = 250;
 
 export function createChannelsController(env: ChannelsEnvironment) {
@@ -137,18 +93,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
   let refreshId = 0;
   let failedCommand: ChannelCommand | null = null;
   const readThrough = new Map<string, number>();
-  /**
-   * The open channel, once this visit has read it. A message that arrives while the reader looks at
-   * it is read at once, as in an agent chat, so it does not take the unread divider. Before, each
-   * answer was unread for one refresh, and the divider moved to it.
-   */
   let visitRead: string | null = null;
-  /**
-   * The pages of the channels the reader left last, newest last. A visit shows the kept page at once
-   * and the read brings it up to date, as a chat app does. Before, each visit showed Loading.
-   */
   const keptPages = new Map<string, ChannelPage>();
-  /** Other readers of channel pages, such as the agent dock. Null is a resync: every page can be old. */
   const changeListeners = new Set<(channelId: string | null) => void>();
   function announce(channelId: string | null): void {
     for (const listener of changeListeners) listener(channelId);
@@ -164,33 +110,15 @@ export function createChannelsController(env: ChannelsEnvironment) {
   }
 
   const supported = env.supported;
-  /**
-   * One read at a time, and at most one more behind it.
-   *
-   * A channel publishes on every streamed chunk, and a read is two calls: a read for each event,
-   * of which only the newest may write, threw away every answer while a member was writing. The
-   * transcript then stood still until the turn ended, and an opening channel stayed on Loading.
-   * Waiting for the newest answer instead of the newest request keeps the reads bounded and each
-   * one lands.
-   */
   let reading: Promise<void> | null = null;
   let readAgain = false;
-  /** Whether the read behind the current one also reads the open channel, not only the list. */
   let readAgainPage = false;
   let readToken = 0;
   let laterRead: Promise<void> | null = null;
   let settleLaterRead: (() => void) | null = null;
-  /** When the current read started, for the gap before a read that only host events asked for. */
   let readStartedAt = 0;
-  /** Ends the gap before a read that waits for it, so the read starts now. */
   let endWaitingGap: (() => void) | null = null;
-  /**
-   * `withPage: false` reads only the list: a change in another channel moves its row and its unread
-   * count, and the open transcript stays as it is. Before, each streamed chunk of any channel read
-   * the open channel's page again.
-   */
   function refresh(selectedOverride?: string | null, withPage = true): Promise<void> {
-    // Navigation carries the selection it wants, so it never waits behind the read it replaces.
     if (reading && selectedOverride === undefined) {
       readAgain = true;
       readAgainPage ||= withPage;
@@ -216,13 +144,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
     reading = run;
     return run;
   }
-  /**
-   * Host events alone asked for the next read, so it starts `CHANGE_READ_GAP_MS` after the last one.
-   * Each streamed chunk of each member is an event, and a read lists every channel and reads the
-   * open page: back to back, with many members writing, the reads kept the host busy all the time.
-   * The events of the gap join this read. A write that waits for a read (`refreshAfter`) ends the
-   * gap at once, and a navigation replaces the read.
-   */
   function readAfterGap(gap: number, page: boolean): void {
     const held = new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, gap);
@@ -242,13 +163,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
     });
     reading = held;
   }
-  /**
-   * A read that starts after this call.
-   *
-   * The read in flight started before the write, so its answer can hold the state the write
-   * replaced. A settings panel that saves each field builds the next save from the page it holds,
-   * and two removals in a row put the first member back.
-   */
   function refreshAfter(): Promise<void> {
     if (!reading) return refresh();
     readAgain = true;
@@ -277,8 +191,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
           )
         : channels;
       setState((state) => {
-        // Keep each summary object, so the sidebar, which keys its rows by object, does not remount
-        // every channel row (and close an open menu) on each refresh.
         reconcile(listed, "id")(state.channels);
         state.listed = true;
         if (selected && !selectedExists) {
@@ -327,8 +239,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
     }
   }
   async function open(channelId: string) {
-    // A saved selection, a search result or a notification can name a channel on a server that has
-    // no channels.
     if (!supported()) return;
     env.beforeOpen();
     env.writeSelection(channelId);
@@ -341,7 +251,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
         Object.assign(state, { selectedId: channelId, page: kept, editing: null, loading: kept === null });
       }),
     );
-    // The read carries the channel, so it does not wait behind a read of the channel the reader left.
     await refresh(channelId);
   }
   async function perform(action: () => Promise<void>): Promise<boolean> {
@@ -358,24 +267,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
       return false;
     }
   }
-  /**
-   * `onAccepted` runs after the service accepts the command and the channel refreshes. When the
-   * reader leaves the scope during the request, it runs at once and the result is `false`: a sent
-   * message must still leave the composer, or it comes back as a draft.
-   */
   async function command(input: ChannelCommand, onAccepted?: (accepted: ChannelCommand) => void): Promise<boolean> {
     const account = env.scopeKey();
-    // Only the save that creates a channel opens it, and only while the reader has stayed where
-    // the save started. The sidebar takes a click through a save of the settings, and settings
-    // save on every field, so a save that selected its own channel on arrival would pull the
-    // reader back out of the channel they opened and drop the draft they began there.
     const creating = input.type === "save" && state.editing === "create";
     const selectedBefore = state.selectedId;
     const action = channelAction(input, creating, state.page);
     let accepted = false;
-    // A `save` is never dropped: settings commit each field as it is left, and a silently
-    // discarded autosave is lost work. The service serializes saves per channel and every
-    // command is idempotent on its `operationId`, so letting them queue is safe.
     if (
       state.pending &&
       input.type !== "stop" &&
@@ -404,8 +301,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
         return false;
       }
       failedCommand = null;
-      // Only creation closes the editor. Settings save on every field, so closing on a save
-      // would shut the panel under the user between two edits.
       if (creating && state.selectedId === selectedBefore) {
         env.beforeOpen();
         env.writeSelection(input.channelId);
@@ -420,7 +315,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
       onAccepted?.(attempt);
       return true;
     } catch (error) {
-      // A refresh that fails after the service accepted the command is not a failed action.
       if (action && !accepted) desktopAnalytics.track("channel_action", { action, result: "failed" });
       if (!disposed && account === env.scopeKey()) {
         failedCommand = attempt;
@@ -437,20 +331,13 @@ export function createChannelsController(env: ChannelsEnvironment) {
         });
     }
   }
-  /**
-   * Sends a message and gives back a page that holds it. Unlike `command`, a failure throws and
-   * leaves the channel error alone: the conversation shows the message as not sent, with its own
-   * Retry, and the retry sends the same `operationId` again.
-   */
   async function send(input: Extract<ChannelCommand, { type: "send" }>): Promise<ChannelPage> {
     const account = env.scopeKey();
-    // The host that stored the message gives the page, also when the reader changes scope meanwhile.
     const port = env.port();
     const before = state.page?.channel.id === input.channelId ? state.page.throughSequence : null;
     await port.agent.channelCommand(input);
     if (disposed || account !== env.scopeKey()) return port.agent.readChannel({ channelId: input.channelId });
     await refreshAfter();
-    // A refresh that fails keeps the earlier page, which does not hold the message.
     const page = state.page;
     return page?.channel.id === input.channelId && (before === null || page.throughSequence > before)
       ? page
@@ -505,16 +392,12 @@ export function createChannelsController(env: ChannelsEnvironment) {
         if (next.supported) void untrack(() => refresh(selected));
         return;
       }
-      // A capability change does not reset the open channel. Support can arrive after the scope starts:
-      // a remote host reports its capabilities after it connects, and again after each reconnect.
       if (!next.supported || previous.supported) return;
       const saved = state.selectedId === null ? env.readSelection(next.scope) : null;
       if (saved === null) {
         void refresh();
         return;
       }
-      // As `open`, but the read gets the channel as an argument: a store write in an effect shows only
-      // after the flush, so a read that takes the selection from the store reads the old one.
       env.beforeOpen();
       flush(() =>
         setState((state) => {
@@ -534,7 +417,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
       window.removeEventListener("focus", focus);
     };
   });
-  /** Reads each unread channel's latest page for its boundary, since a summary has no sequence. */
   function markAllRead(): Promise<boolean> {
     const unread = state.channels.filter((channel) => channel.unreadCount > 0).map((channel) => channel.id);
     const account = env.scopeKey();
@@ -542,7 +424,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
       const results = await Promise.allSettled(
         unread.map(async (channelId) => {
           const page = await env.port().agent.readChannel({ channelId });
-          // The port follows the current server, so a read for the previous one must not reach it.
           if (disposed || account !== env.scopeKey()) return;
           await env.port().agent.channelCommand({
             type: "read",
@@ -552,7 +433,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
           });
         }),
       );
-      // The other channels are read, so the list shows them before the first failure is reported.
       const failure = results.find((result) => result.status === "rejected");
       if (failure) {
         await refreshAfter();
@@ -562,10 +442,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
   }
   const messageDeletionSupported = () =>
     supported() && env.messageDeletionSupported() && env.port().agent.deleteChannelMessage !== undefined;
-  /**
-   * Deletes one message of a channel, and removes it from the open page at once. The host also
-   * announces the change. A failure throws to the dialog that asked, not to the channel error.
-   */
   async function deleteMessage(channelId: string, messageId: string): Promise<void> {
     const remove = env.port().agent.deleteChannelMessage;
     if (!remove || !messageDeletionSupported()) throw new Error(currentText().t("error.team.messageDeleteUnsupported"));
@@ -592,7 +468,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     deletesAnyMessage: env.deletesAnyMessage,
     deleteMessage,
     pictureSupported: () => supported() && env.pictureSupported() && env.port().agent.setChannelImage !== undefined,
-    /** Saves or removes the uploaded image of a channel; a failure shows as the channel error. */
+    foldersMode: () => (supported() && env.port().agent.listChannelFolders !== undefined ? env.foldersMode() : null),
     setImage: (channelId: string, image: AvatarImageInput | null) =>
       perform(async () => {
         const setChannelImage = env.port().agent.setChannelImage;
@@ -604,27 +480,23 @@ export function createChannelsController(env: ChannelsEnvironment) {
       env.contextActionsSupported() &&
       env.port().agent.clearChannelContext !== undefined &&
       env.port().agent.compactChannelContext !== undefined,
-    /** "New conversation": the members forget the earlier messages. A failure rejects, for the dialog to show. */
     clearContext: async (channelId: string) => {
       const clearChannelContext = env.port().agent.clearChannelContext;
       if (!clearChannelContext) throw new Error(currentText().t("channel.error.action"));
       await clearChannelContext(channelId);
       await refreshAfter();
     },
-    /** Whether the host deletes a channel history: as the context actions, for an owner or admin only. */
     historyDeletionSupported: () =>
       supported() &&
       env.contextActionsSupported() &&
       env.deletesAnyMessage() &&
       env.port().agent.deleteChannelHistory !== undefined,
-    /** "Delete history": the messages go, and the members forget them. A failure rejects, for the dialog to show. */
     deleteHistory: async (channelId: string) => {
       const deleteChannelHistory = env.port().agent.deleteChannelHistory;
       if (!deleteChannelHistory) throw new Error(currentText().t("channel.error.action"));
       await deleteChannelHistory(channelId);
       await refreshAfter();
     },
-    /** Compacts the channel session of each member now. A failure rejects, for the row to show. */
     compactContext: async (channelId: string) => {
       const compactChannelContext = env.port().agent.compactChannelContext;
       if (!compactChannelContext) throw new Error(currentText().t("channel.error.action"));
@@ -646,10 +518,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
         state.editing = "settings";
       });
     },
-    /**
-     * The delete dialog shows a failure, so it does not stay as the open channel's error with a Retry
-     * of this delete. The host refuses it while a task runs there (#10472).
-     */
     remove: async (channelId: string) => {
       if (await command({ type: "archive", channelId, operationId: crypto.randomUUID() })) return;
       const message = state.error ?? currentText().t("channel.error.delete");
@@ -661,10 +529,6 @@ export function createChannelsController(env: ChannelsEnvironment) {
       }
       throw new Error(message);
     },
-    /**
-     * A deleted channel comes back with its history. Its stopped tasks stay stopped. The sidebar menu
-     * shows no channel error, so a failure is a toast, and it does not stay for the next channel.
-     */
     restore: async (channelId: string) => {
       if (await command({ type: "restore", channelId, operationId: crypto.randomUUID() })) return;
       if (failedCommand?.type !== "restore" || failedCommand.channelId !== channelId) return;
@@ -675,28 +539,16 @@ export function createChannelsController(env: ChannelsEnvironment) {
       });
       actionToast.error(message, { report: { operation: "other", source: "action", cause_code: "unknown" } });
     },
-    /**
-     * A host event for one channel. Another channel changes only the list; the open one reads its
-     * page too. A left channel drops its kept page, so the next visit does not show old work.
-     */
     changed: (channelId: string) => {
       if (channelId !== state.selectedId) keptPages.delete(channelId);
       announce(channelId);
       return refresh(undefined, channelId === state.selectedId);
     },
-    /**
-     * A runtime snapshot follows a start or a reconnect, when host events can be missed. The kept
-     * pages can then be old, so they go, and the next visit shows Loading until its read ends.
-     */
     resync: () => {
       keptPages.clear();
       announce(null);
       return refresh();
     },
-    /**
-     * Calls `listener` with the channel of each host event, and with null after a resync. Returns the
-     * function that removes it.
-     */
     onChange: (listener: (channelId: string | null) => void) => {
       changeListeners.add(listener);
       return () => {

@@ -1,8 +1,3 @@
-// `instance-transfer-chunks-v1` on the host: a transfer file larger than one WebRTC file transfer,
-// sent to or from an owner or admin of a joined client in parts. The files wait in the upload folder
-// of `InstanceTransferService`, which clears it after a restart. A request holds at most one part in
-// memory. Each id is bound to the member who started it: another member's id reads as closed.
-
 import { createHash, randomUUID } from "node:crypto";
 import { type FileHandle, open, rename, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -13,24 +8,17 @@ import {
 } from "@openbot/contracts/ipc";
 import { INSTANCE_TRANSFER_CHUNK_BYTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { Deferred, Effect, Exit } from "effect";
 import { diskSpace } from "../backend/storage-usage";
 import { type ArchiveOperationError, archiveCall, archiveFailure } from "./archive-effects";
 
-/** An upload or export that gets no request for this long is removed. */
 const IDLE_TTL_MS = 30 * 60_000;
-/** Free disk space that an upload must leave on the host. */
 const FREE_SPACE_MARGIN_BYTES = 256 * 1024 * 1024;
 
 export interface InstanceTransferChunkFiles {
-  /** The upload folder, after the cleanup of the previous process. */
   directory: () => Effect.Effect<string, ArchiveOperationError>;
-  /** Stages a complete file of the folder. From then on the staging owns the file and removes it. */
   stage: (path: string, owner: string) => Effect.Effect<InstanceTransferPreview, ArchiveOperationError>;
-  /**
-   * Writes an export to `path`, with the limits of an export on the host's own computer. `exporter`
-   * is the member who asked for the export.
-   */
+  staged: (token: string) => boolean;
   exportTo: (
     path: string,
     input: ExportInstanceInput,
@@ -43,12 +31,19 @@ interface Upload {
   owner: string;
   size: number;
   sha256: string;
-  /** `<id>.part`; each part is written at `index * INSTANCE_TRANSFER_CHUNK_BYTES`. */
   path: string;
   received: Set<number>;
-  /** Parts that are being written now. `finish` waits for none. */
   writing: number;
+  written: Deferred.Deferred<void> | null;
   timer: NodeJS.Timeout;
+}
+
+interface Finish {
+  owner: string;
+  size: number;
+  sha256: string;
+  token: string | null;
+  result: Deferred.Deferred<InstanceTransferPreview, ArchiveOperationError>;
 }
 
 interface Export {
@@ -71,11 +66,9 @@ export interface InstanceTransferExportState {
   sha256: string;
   chunkBytes: number;
   chunks: string[];
-  /** What the export left out, as a local export shows it. */
   warnings: string[];
 }
 
-/** The byte range of one export part. */
 export interface InstanceTransferExportPart {
   path: string;
   start: number;
@@ -97,7 +90,6 @@ export function sha256Hex(bytes: Uint8Array): string {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-/** Reads `length` bytes at `position` into the start of `buffer`. A file that is shorter fails. */
 export async function readFully(handle: FileHandle, buffer: Buffer, position: number, length: number): Promise<Buffer> {
   let read = 0;
   while (read < length) {
@@ -108,7 +100,6 @@ export async function readFully(handle: FileHandle, buffer: Buffer, position: nu
   return buffer.subarray(0, length);
 }
 
-/** The SHA-256 of each part and of the whole file, read one part at a time. */
 async function hashParts(path: string, size: number): Promise<{ sha256: string; chunks: string[] }> {
   const handle = await open(path, "r");
   try {
@@ -136,14 +127,11 @@ export async function writeFully(handle: FileHandle, bytes: Uint8Array, position
 
 export class InstanceTransferChunks {
   readonly #uploads = new Map<string, Upload>();
+  readonly #finishes = new Map<string, Finish>();
   readonly #exports = new Map<string, Export>();
 
   constructor(private readonly files: InstanceTransferChunkFiles) {}
 
-  /**
-   * Starts an upload, or answers the open upload of the same owner, size and SHA-256 with the parts
-   * that the host has, so the client sends only the rest. Another upload of the owner ends.
-   */
   readonly beginUpload = Effect.fn("InstanceTransferChunks.beginUpload")(function* (
     this: InstanceTransferChunks,
     input: { size: number; sha256: string },
@@ -152,6 +140,15 @@ export class InstanceTransferChunks {
     if (input.size === 0) return yield* archiveFailure(new Error(sourceText("error.import.transferNotFile")));
     if (input.size > INSTANCE_TRANSFER_LIMITS.archiveBytes)
       return yield* archiveFailure(new Error(sourceText("error.import.transferTooLarge")));
+    for (const [uploadId, finish] of this.#finishes) {
+      if (finish.size !== input.size || finish.sha256 !== input.sha256) continue;
+      if (this.#finished(uploadId, owner))
+        return {
+          uploadId,
+          chunkBytes: INSTANCE_TRANSFER_CHUNK_BYTES,
+          received: Array.from({ length: partCount(input.size) }, (_, index) => index),
+        };
+    }
     const current = [...this.#uploads.values()].find((upload) => upload.owner === owner);
     if (current && current.size === input.size && current.sha256 === input.sha256) {
       current.timer.refresh();
@@ -173,6 +170,7 @@ export class InstanceTransferChunks {
       path,
       received: new Set(),
       writing: 0,
+      written: null,
       timer: setTimeout(() => {
         if (this.#uploads.get(id) === upload && upload.writing === 0) void Effect.runPromise(this.#dropUpload(upload));
         else upload.timer.refresh();
@@ -182,13 +180,17 @@ export class InstanceTransferChunks {
     return this.#uploadState(upload);
   }).bind(this);
 
-  /** Writes one part at its place. `read` answers the request body, at most one part long. */
   readonly writePart = Effect.fn("InstanceTransferChunks.writePart")(function* (
     this: InstanceTransferChunks,
     input: { uploadId: string; index: number; sha256: string },
     read: (limit: number) => Promise<Uint8Array>,
     owner: string,
   ): Effect.fn.Return<{ receivedBytes: number }, ArchiveOperationError> {
+    const finished = this.#finished(input.uploadId, owner);
+    if (finished) {
+      yield* archiveCall(() => read(INSTANCE_TRANSFER_CHUNK_BYTES));
+      return { receivedBytes: finished.size };
+    }
     const upload = yield* this.#ownUpload(input.uploadId, owner);
     if (!Number.isSafeInteger(input.index) || input.index < 0 || input.index >= partCount(upload.size))
       return yield* invalidPart();
@@ -196,8 +198,10 @@ export class InstanceTransferChunks {
     const bytes = yield* archiveCall(() => read(INSTANCE_TRANSFER_CHUNK_BYTES));
     if (bytes.length !== partLength(upload.size, input.index) || sha256Hex(bytes) !== input.sha256)
       return yield* invalidPart();
-    // Another request can end the upload while this one reads its body.
-    if (this.#uploads.get(upload.id) !== upload) return yield* closed();
+    if (this.#uploads.get(upload.id) !== upload) {
+      const finished = this.#finished(upload.id, owner);
+      return finished ? { receivedBytes: finished.size } : yield* closed();
+    }
     upload.writing++;
     yield* archiveCall(async () => {
       const handle = await open(upload.path, "r+");
@@ -206,25 +210,47 @@ export class InstanceTransferChunks {
       } finally {
         await handle.close();
       }
-    }).pipe(Effect.ensuring(Effect.sync(() => upload.writing--)));
-    upload.received.add(input.index);
+    }).pipe(
+      Effect.tap(() => Effect.sync(() => upload.received.add(input.index))),
+      Effect.ensuring(
+        Effect.sync(() => {
+          upload.writing--;
+          if (upload.writing > 0 || !upload.written) return;
+          Deferred.doneUnsafe(upload.written, Effect.void);
+          upload.written = null;
+        }),
+      ),
+    );
     upload.timer.refresh();
     let receivedBytes = 0;
     for (const index of upload.received) receivedBytes += partLength(upload.size, index);
     return { receivedBytes };
   }).bind(this);
 
-  /** Checks every part and the whole file, and stages it as `instance-transfer-v1` stage does. */
   readonly finishUpload = Effect.fn("InstanceTransferChunks.finishUpload")(function* (
     this: InstanceTransferChunks,
     uploadId: string,
     owner: string,
   ): Effect.fn.Return<InstanceTransferPreview, ArchiveOperationError> {
+    const finished = this.#finished(uploadId, owner);
+    if (finished) return yield* Deferred.await(finished.result);
     const upload = yield* this.#ownUpload(uploadId, owner);
-    if (upload.writing > 0 || upload.received.size !== partCount(upload.size)) return yield* invalidPart();
-    // From here no request reaches the upload, and the staging owns the file once it is staged.
+    if (upload.writing > 0) {
+      upload.written ??= Deferred.makeUnsafe<void>();
+      yield* Deferred.await(upload.written);
+      return yield* this.finishUpload(uploadId, owner);
+    }
+    if (upload.received.size !== partCount(upload.size)) return yield* invalidPart();
     this.#uploads.delete(upload.id);
     clearTimeout(upload.timer);
+    const finish: Finish = {
+      owner,
+      size: upload.size,
+      sha256: upload.sha256,
+      token: null,
+      result: Deferred.makeUnsafe(),
+    };
+    this.#finishes.set(upload.id, finish);
     const zip = upload.path.replace(/\.part$/u, ".zip");
     return yield* Effect.gen({ self: this }, function* () {
       const info = yield* archiveCall(() => stat(upload.path));
@@ -233,16 +259,26 @@ export class InstanceTransferChunks {
       yield* archiveCall(() => rename(upload.path, zip));
       return yield* this.files.stage(zip, owner);
     }).pipe(
-      Effect.tapError(() =>
+      Effect.onError(() =>
         Effect.all([
           archiveCall(() => rm(upload.path, { force: true })),
           archiveCall(() => rm(zip, { force: true })),
         ]).pipe(Effect.ignore),
       ),
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          if (Exit.isSuccess(exit)) finish.token = exit.value.token;
+          Deferred.doneUnsafe(finish.result, exit);
+          const forget = () => {
+            if (this.#finishes.get(upload.id) === finish) this.#finishes.delete(upload.id);
+          };
+          if (Exit.isSuccess(exit)) setTimeout(forget, IDLE_TTL_MS).unref();
+          else forget();
+        }),
+      ),
     );
   }).bind(this);
 
-  /** Ends an upload of the owner. An id that is not open is not an error. */
   readonly abortUpload = Effect.fn("InstanceTransferChunks.abortUpload")(function* (
     this: InstanceTransferChunks,
     uploadId: string,
@@ -252,7 +288,6 @@ export class InstanceTransferChunks {
     if (upload && upload.owner === owner) yield* this.#dropUpload(upload);
   }).bind(this);
 
-  /** Writes the export and answers the SHA-256 of each part. Another export of the owner ends. */
   readonly beginExport = Effect.fn("InstanceTransferChunks.beginExport")(function* (
     this: InstanceTransferChunks,
     input: ExportInstanceInput,
@@ -287,7 +322,6 @@ export class InstanceTransferChunks {
     };
   }).bind(this);
 
-  /** The byte range of one part, for the route to send. */
   readonly exportPart = Effect.fn("InstanceTransferChunks.exportPart")(function* (
     this: InstanceTransferChunks,
     exportId: string,
@@ -305,7 +339,6 @@ export class InstanceTransferChunks {
     };
   }).bind(this);
 
-  /** Removes an export of the owner. An id that is not open is not an error. */
   readonly finishExport = Effect.fn("InstanceTransferChunks.finishExport")(function* (
     this: InstanceTransferChunks,
     exportId: string,
@@ -321,6 +354,14 @@ export class InstanceTransferChunks {
       chunkBytes: INSTANCE_TRANSFER_CHUNK_BYTES,
       received: [...upload.received].sort((a, b) => a - b),
     };
+  }
+
+  #finished(uploadId: string, owner: string): Finish | null {
+    const finished = this.#finishes.get(uploadId);
+    if (!finished || finished.owner !== owner) return null;
+    if (finished.token === null || this.files.staged(finished.token)) return finished;
+    this.#finishes.delete(uploadId);
+    return null;
   }
 
   #ownUpload(uploadId: string, owner: string): Effect.Effect<Upload, ArchiveOperationError> {

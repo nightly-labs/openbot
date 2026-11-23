@@ -1,5 +1,3 @@
-/** An asset step: a workspace file as an input. The output type follows the file. */
-
 import { type StoredFileRow, WORKFLOW_PICTURE_TYPES } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Download, File, FileInput, Input, Maximize2, Popover, Search, SlidingTabs, Upload } from "@openbot/ui";
@@ -9,10 +7,16 @@ import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
 import { usePictureShape } from "./picture-shape";
 import { useBoard, type WfnBoard } from "./workflow-board";
-import { asString, download, NodeShell, NodeToolbar, ToolAction, useField, useLocked } from "./workflow-node-parts";
+import {
+  asString,
+  downloadMedia,
+  NodeShell,
+  NodeToolbar,
+  ToolAction,
+  useField,
+  useLocked,
+} from "./workflow-node-parts";
 import { CardPicture, CardPictureLoading } from "./workflow-picture";
-
-/* --------------------------------------------------------------- Asset */
 
 type AssetFilter = "recent" | "images" | "files";
 
@@ -22,19 +26,13 @@ const ASSET_FILTERS: readonly { value: AssetFilter; label: AppTextKey }[] = [
   { value: "files", label: "workflow.asset.filter.files" },
 ];
 
-/** The files of the library: the files from the computer of this board, newest first, then the workspace files. */
 const libraryFiles = (board: WfnBoard) => [...board.uploads(), ...board.catalogs().files];
 
 const PICTURE_ACCEPT = [...WORKFLOW_PICTURE_TYPES].join(",");
 
-/** The files of a drag from the computer, or none when the drag holds no files. */
 const draggedFiles = (event: DragEvent) =>
   event.dataTransfer?.types.includes("Files") ? [...event.dataTransfer.files] : [];
 
-/**
- * A picture of the host that the library does not list, such as one that a member sent: a member gets
- * only the files of the agents that they see. The host gives it by its id.
- */
 function hostPicture(board: WfnBoard, id: string, name: string): StoredFileRow | undefined {
   const url = board.catalogs().media?.(id, "image");
   if (!url) return undefined;
@@ -67,21 +65,12 @@ function fileExtension(name: string): string {
   return name.split(".").pop()?.toUpperCase() ?? "";
 }
 
-/**
- * The address that a thumbnail of the file shows: the small copy of a host picture when the host
- * sends one, else the file. A file from the computer has its own address. Undefined while the copy
- * loads, null when there is no picture to show.
- */
 function thumbUrl(board: WfnBoard, file: StoredFileRow): string | null | undefined {
   const preview = board.catalogs().mediaPreview;
   if (!preview || file.previewKind !== "image" || board.uploads().includes(file)) return file.previewUrl;
   return preview(file.id);
 }
 
-/**
- * The file of an asset node by its id, so two files with one name stay apart. A graph saved before the
- * id finds it by name.
- */
 function findFile(board: WfnBoard, fileId: string, name: string): StoredFileRow | undefined {
   const files = libraryFiles(board);
   return (
@@ -91,20 +80,17 @@ function findFile(board: WfnBoard, fileId: string, name: string): StoredFileRow 
   );
 }
 
-/** The file of an asset node, from its fields. */
 function assetFile(board: WfnBoard, id: string): StoredFileRow | undefined {
   const fileId = board.field(id, "fileId");
   const name = board.field(id, "file");
   return findFile(board, typeof fileId === "string" ? fileId : "", typeof name === "string" ? name : "");
 }
 
-/** The thumbnail address of the picture of an asset node, or undefined when it has no picture to show. */
 export function assetPicture(board: WfnBoard, id: string): string | undefined {
   const file = assetFile(board, id);
   return file?.previewKind === "image" ? (thumbUrl(board, file) ?? undefined) : undefined;
 }
 
-/** The picture or the file icon of a file. On a card, a picture pulses until it shows. */
 function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
   const board = useBoard();
   return (
@@ -135,7 +121,6 @@ function AssetThumb(props: { file: StoredFileRow; card?: boolean }) {
   );
 }
 
-/** The files of one library tab whose names hold the query. Recent narrows nothing once the user searches. */
 function assetsMatching(board: WfnBoard, filter: AssetFilter, query: string): readonly StoredFileRow[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return assetsFor(board, filter);
@@ -144,11 +129,6 @@ function assetsMatching(board: WfnBoard, filter: AssetFilter, query: string): re
   return pool.filter((file) => file.name.toLowerCase().includes(needle));
 }
 
-/**
- * One library tab: a grid that scrolls under the shared top and bottom fades. A thin thumb in the
- * popover padding replaces the native bar; it shows on hover or focus, drags, and pages on a track
- * press. The wheel, the trackpad and the keyboard still scroll the grid itself.
- */
 function LibraryGrid(props: {
   files: readonly StoredFileRow[];
   query: string;
@@ -172,7 +152,6 @@ function LibraryGrid(props: {
   };
   const observer = new ResizeObserver(measure);
   onCleanup(() => observer.disconnect());
-  // Pixels of scroll for one pixel of thumb travel.
   const ratio = () =>
     scroller ? (scroller.scrollHeight - scroller.clientHeight) / (scroller.clientHeight - thumb.size) : 0;
   const drag = (event: PointerEvent & { currentTarget: HTMLElement }) => {
@@ -259,7 +238,6 @@ function LibraryGrid(props: {
   );
 }
 
-/** Opens the file dialog of the computer. The file goes into the workspace library. */
 function UploadButton(props: { busy: boolean; onChoose: (file: File) => void }) {
   const board = useBoard();
   const { t } = useText();
@@ -276,7 +254,6 @@ function UploadButton(props: { busy: boolean; onChoose: (file: File) => void }) 
         }}
         class="sr-only"
         type="file"
-        // A host keeps only the pictures that its models take.
         accept={board.catalogs().upload ? PICTURE_ACCEPT : undefined}
         tabindex={-1}
         aria-label={t("workflow.asset.upload")}
@@ -290,7 +267,6 @@ function UploadButton(props: { busy: boolean; onChoose: (file: File) => void }) 
   );
 }
 
-/** The workspace library, as the Higgsfield Assets panel: filter pills and a grid of files. */
 function AssetLibrary(props: { selected?: string | undefined; onPick: (file: StoredFileRow) => void }) {
   const board = useBoard();
   const { t } = useText();
@@ -345,7 +321,6 @@ function AssetLibrary(props: { selected?: string | undefined; onPick: (file: Sto
   );
 }
 
-/** A workspace file as an input. The card opens the library; the output type follows the file. */
 export function AssetNode(props: { id: string; file?: string }) {
   const board = useBoard();
   const { t, format } = useText();
@@ -358,7 +333,6 @@ export function AssetNode(props: { id: string; file?: string }) {
   const [fileId] = useField(() => props.id, "fileId", "", asString);
   const file = () => findFile(board, fileId(), fileName());
   const setFile = (next: StoredFileRow) => board.setFields(props.id, { file: next.name, fileId: next.id });
-  /** Files from the computer stay on this computer, so a host that cannot read them does not offer them. */
   const uploads = () => board.features()?.uploads !== false;
   const [open, setOpen] = createSignal(false);
   const [locked, setLocked] = useLocked(() => props.id);
@@ -369,10 +343,8 @@ export function AssetNode(props: { id: string; file?: string }) {
     const current = file();
     return current && isImage() ? (thumbUrl(board, current) ?? undefined) : undefined;
   });
-  /** A picture with clear pixels shows on the canvas at its own shape, with no card behind it. */
   const clear = () => (isImage() ? shape()?.clear === true : false);
   const [sending, setSending] = createSignal(false);
-  /** Sends a file from the computer to the library, and makes it the asset. The host shows a failure. */
   const send = (chosen: File) => {
     setSending(true);
     setOpen(false);
@@ -381,17 +353,12 @@ export function AssetNode(props: { id: string; file?: string }) {
       .then(setFile, () => undefined)
       .finally(() => setSending(false));
   };
-  /**
-   * A file from the computer, dropped on the card, goes into the library and becomes the asset. With
-   * more files, the canvas puts the others in new asset nodes beside this one, in one group.
-   */
   const onDrop = (event: DragEvent) => {
     setDropping(false);
     const files = draggedFiles(event);
     const [dropped] = files;
     if (!dropped || locked() || !uploads() || sending()) return;
     event.preventDefault();
-    // The canvas does not take the drop again.
     event.stopPropagation();
     if (files.length > 1 && board.dropFiles) board.dropFiles(props.id, files);
     else send(dropped);
@@ -435,7 +402,7 @@ export function AssetNode(props: { id: string; file?: string }) {
                       text={t("workflow.node.toolbar.download")}
                       label={t("workflow.asset.download")}
                       icon={<Download />}
-                      onClick={() => download(url(), current().name)}
+                      onClick={() => downloadMedia(board, current().id, url(), current().name)}
                     />
                   )}
                 </Show>
@@ -514,7 +481,7 @@ export function AssetNode(props: { id: string; file?: string }) {
           <ImageLightbox
             opening={opening()}
             onDownload={(attachment) => {
-              if (attachment.previewUrl) download(attachment.previewUrl, attachment.name);
+              if (attachment.previewUrl) downloadMedia(board, attachment.id, attachment.previewUrl, attachment.name);
             }}
             onClose={() => setViewer(undefined)}
           />

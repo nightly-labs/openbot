@@ -8,28 +8,17 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { MOCK_HOSTED_SERVER_CATALOG } from "../src/preview/mock-hosted-servers";
 import { STORY_SERVERS } from "./fixtures";
 
-/** The plans of the preview catalog, which has the Stripe sandbox prices. */
 const PLANS = hostedServerPlansFromCatalog(MOCK_HOSTED_SERVER_CATALOG);
 
-/** How long each fake setup step takes, so the progress is easy to watch. */
 const STEP_MS = 5_000;
 
 interface FlowProps {
-  /** Open the add-server dialog when the story loads. */
   startOpen?: boolean;
-  /** The fake setup stops with an error at the "Start OpenBot" step on the first try. */
   failFirstTry?: boolean;
-  /** The account has this many servers, the maximum, so the plans are disabled. */
   serverLimit?: number;
-  /** The account has no license: the dialog offers personal or work use, with a license for work. */
   licenseOffer?: { used: number; trialEnd?: number };
 }
 
-/**
- * The server rail with a working plus button. Create a hosted server: the fake payment page
- * "confirms" after one step, then the setup runs and the new server is added to the rail. Nothing
- * leaves the browser: every call is fake.
- */
 function AddServerFlow(props: FlowProps) {
   const [servers, setServers] = createSignal<ServerSummary[]>(STORY_SERVERS);
   const [addOpen, setAddOpen] = createSignal(props.startOpen ?? false);
@@ -183,46 +172,35 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Click the plus button, then create a hosted server. */
 export const ClickPlus: Story = {
   render: () => <AddServerFlow />,
 };
 
-/** The dialog is open when the story loads. */
 export const DialogOpen: Story = {
   render: () => <AddServerFlow startOpen />,
 };
 
-/** The first setup stops at "Start OpenBot". "Try again" then succeeds. */
 export const SetupFails: Story = {
   render: () => <AddServerFlow startOpen failFirstTry />,
 };
 
-/** The account has the maximum number of servers. "Manage servers" closes the dialog. */
 export const ServerLimit: Story = {
   render: () => <AddServerFlow startOpen serverLimit={3} />,
 };
 
-/** A narrow window: the plan cards stack. */
 export const Narrow: Story = {
   globals: { viewport: { value: "addServerNarrow", isRotated: false } },
   render: () => <AddServerFlow startOpen />,
 };
 
-/**
- * The account has no license, and 3 people use its servers. Work adds a license to each plan that fits
- * the people, at the bundle price; the people row starts at 3, and "Fewer" there tells why in a toast.
- */
 export const WithLicense: Story = {
   render: () => <AddServerFlow startOpen licenseOffer={{ used: 3 }} />,
 };
 
-/** A promotion: the license of the order is free until 1 December. */
 export const WithLicenseTrial: Story = {
   render: () => <AddServerFlow startOpen licenseOffer={{ used: 3, trialEnd: Date.UTC(2026, 11, 1) }} />,
 };
 
-/** A license offer in a narrow window. */
 export const WithLicenseNarrow: Story = {
   globals: { viewport: { value: "addServerNarrow", isRotated: false } },
   render: () => <AddServerFlow startOpen licenseOffer={{ used: 3 }} />,

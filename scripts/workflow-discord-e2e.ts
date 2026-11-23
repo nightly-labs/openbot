@@ -1,12 +1,3 @@
-// Checks Discord triggers and outputs of workflows on the real SQLite and the real workflow service, on
-// a temporary profile. The Discord connection is a row in the real table; only the send to Discord is a
-// stand-in, so no Signal, provider, account or network is started. A mention starts the matching
-// workflow; a reaction acts on the mention; a reply does not post the trigger's raw event; a mention
-// that Signal gives again while its run is open is not skipped; a webhook payload that copies a
-// mention's event cannot make an output reply to or react on a Discord message.
-//
-// Run: bun scripts/workflow-discord-e2e.ts
-// Writes .openbot-build/workflow-discord-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -32,7 +23,6 @@ const WAIT_MS = 5_000;
 
 interface Report {
   checks: string[];
-  /** The sends without their text: the action, the channel and the message. */
   sends: { connectionId: string; action: string; channelId: string; messageId: string | null }[];
   passed: boolean;
   failure?: string;
@@ -45,7 +35,6 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   report.checks.push(name);
 };
 
-/** `hang` keeps the next sends open, so that their run stays open. */
 let answer: "posted" | "hang" = "posted";
 
 const node = (id: string, kind: WorkflowNode["kind"], fields: WorkflowNode["fields"], x: number): WorkflowNode => ({
@@ -54,7 +43,6 @@ const node = (id: string, kind: WorkflowNode["kind"], fields: WorkflowNode["fiel
   at: { x, y: 0 },
   fields,
 });
-/** A trigger with a reply output and a reaction output, both on the trigger's message. */
 const graphOf = (trigger: WorkflowNode): WorkflowGraph => ({
   nodes: [
     trigger,
@@ -150,7 +138,6 @@ async function workflowWith(workflows: WorkflowsHandle, title: string, graph: Wo
   return created.summary.id;
 }
 
-/** Waits for the newest run of a workflow to reach a state. */
 async function newestRun(
   workflows: WorkflowsHandle,
   workflowId: string,
@@ -208,7 +195,14 @@ try {
     sends.every((send) => send.action === "react" || !send.text.includes(EXTERNAL_EVENT_START)),
   );
 
-  // The reaction does not answer, so the run stays open.
+  await runCauseEffect(workflows.setPaused({ workflowId: deploy, paused: true }));
+  check(
+    "a mention for a paused workflow stays with the agents",
+    (await runCauseEffect(workflows.receiveDiscord(mentionOf("deploy while paused")))) === "none" &&
+      (await runCauseEffect(workflows.runs({ workflowId: deploy, limit: 10 }))).runs.length === 1,
+  );
+  await runCauseEffect(workflows.setPaused({ workflowId: deploy, paused: false }));
+
   answer = "hang";
   const repeated = mentionOf("deploy again");
   check("a second mention starts a run", (await runCauseEffect(workflows.receiveDiscord(repeated))) === "started");

@@ -1,23 +1,5 @@
 language js(typescript)
 
-// scope: src/renderer/src, packages/ui/src, apps/mobile/src, except tests and stories
-
-// User-facing text written as a literal: JSX text, a literal accessible name, label or
-// placeholder, a literal toast or alert, and a literal fallback to `errorMessage`. Each one shows
-// English to a reader who chose another language. Text without a letter, such as "·" or "/", is not
-// matched. The message starts with the rule name, because Biome reports every plugin under the one
-// category `plugin`.
-//
-// The attribute arm checks the attribute name first. Without it, the long regex runs on every JSX
-// attribute, and that one arm used about 16 of the rule's 23 CPU-seconds in a full lint. Keep the
-// names in a group: Grit anchors a regex as `^a|b$`, so without the group `label` also matches
-// `aria-labelledby` and `labelledBy`.
-//
-// An untagged template literal in a named attribute is matched by syntax, not by regex. The rule
-// examines only the literal chunks: a letter in a chunk, as in `Open ${name}`, is matched. Text in
-// a `${...}` placeholder is code, so `${name} · ${count}` and `${t("key")}: ${name}` are not
-// matched. A tagged template is a function call, so it is not matched.
-
 or {
   JsxText() as $text where {
     $text <: r"(?s).*\p{L}.*",

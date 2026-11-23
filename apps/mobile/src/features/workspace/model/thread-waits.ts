@@ -1,12 +1,6 @@
 import type { AgentEvent, AgentPromptQuestion, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { type MobileAgentWaitReason, WAIT_RANK } from "./agent-activity";
 
-/**
- * A question, approval or takeover that an agent waits on. `task` is true when it is on a side thread
- * that the phone knows: the agent's chat does not show it (see `withoutTaskTurns`), but the home list
- * marks the agent with it. A request on a thread that is not known yet stays, so that it becomes a
- * side-thread wait when the agent's task list arrives.
- */
 export interface MobileThreadWait {
   requestId: string | number;
   agentId: string;
@@ -14,11 +8,9 @@ export interface MobileThreadWait {
   turnId: string;
   reason: MobileAgentWaitReason;
   task: boolean;
-  /** The questions of a question. A channel draws its card from them when it has no row for it. */
   questions?: AgentPromptQuestion[];
 }
 
-/** True when `threadId` is the thread of a side thread of the agent that the phone knows. */
 export type IsTaskThread = (agentId: string, threadId: string) => boolean;
 
 function threadWait(
@@ -64,12 +56,6 @@ function without(current: readonly MobileThreadWait[], drop: (wait: MobileThread
   return next.length === current.length ? current : next;
 }
 
-/**
- * Folds one host event into the pending requests of one server. Only a request on a thread that
- * `isTaskThread` knows is a side-thread wait; the agent's chat shows the others. A snapshot is the
- * current state, a task list marks the requests of its running threads, and a thread that no longer
- * runs waits on nothing but a question that outlives its turn, until the task closes.
- */
 export function reduceThreadWaits(
   current: readonly MobileThreadWait[],
   event: AgentEvent | TeamRealtimeEvent,
@@ -83,7 +69,6 @@ export function reduceThreadWaits(
         ...snapshot.pendingBrowserTakeovers.map((request) => threadWait(request, "takeover", isTaskThread)),
         ...snapshot.pendingPrompts.map((request) => threadWait(request, "question", isTaskThread)),
       ];
-      // A partial snapshot is whole for each agent that it names.
       const named = new Set(waits.map((wait) => wait.agentId));
       const next = snapshot.attentionComplete
         ? waits
@@ -110,9 +95,6 @@ export function reduceThreadWaits(
     case "browser-takeover-resolved":
       return without(current, (wait) => sameRequest(wait, event) && wait.reason === "takeover");
     case "turn-completed":
-      // The host closes each question that ends with its turn with `agent-input-resolved` before this
-      // event. A question that is still here outlives its turn, and the user can answer it later; the
-      // Team API does not mark it (#11440).
       return without(
         current,
         (wait) => wait.reason !== "question" && wait.agentId === event.agentId && wait.turnId === event.turnId,
@@ -123,9 +105,7 @@ export function reduceThreadWaits(
       const next = current.flatMap((wait) => {
         if (wait.agentId !== agentId) return [wait];
         const state = states.get(wait.threadId);
-        // A request on a thread that is not a task is a wait of the agent's chat; it stays.
         if (state === undefined) return wait.task ? [] : [wait];
-        // The host keeps a question that outlives its turn until the task closes (#11440).
         if (state !== "running" && (wait.reason !== "question" || state === "closed")) return [];
         return [wait.task ? wait : { ...wait, task: true }];
       });
@@ -140,10 +120,6 @@ export function reduceThreadWaits(
   }
 }
 
-/**
- * Whether the host still waits for an answer to this question of the agent. A question outlives its
- * turn when the provider stops waiting for its call; the answer then goes to the agent as a message.
- */
 export function hostAwaitsQuestion(
   waits: readonly MobileThreadWait[],
   agentId: string,
@@ -155,7 +131,6 @@ export function hostAwaitsQuestion(
   );
 }
 
-/** What the side threads of an agent wait on: the wait of the highest rank, as the agent's chat names it. */
 export function agentThreadWaitReason(
   waits: readonly MobileThreadWait[],
   agentId: string,

@@ -1,9 +1,3 @@
-/**
- * The Discord settings of a trigger and of an output card. A Discord trigger starts a run when a person
- * mentions OpenBot in a server, a channel and with a role that match it. A Discord output replies to that
- * message, adds a reaction to it, or posts in a channel.
- */
-
 import {
   WORKFLOW_DISCORD_ACTIONS,
   WORKFLOW_DISCORD_EMOJI,
@@ -52,7 +46,6 @@ const EMOJI_LABEL = {
   "❌": "workflow.discord.emoji.cross",
 } as const satisfies Record<WorkflowDiscordEmoji, AppTextKey>;
 
-/** The Discord servers of the host, with their channels and roles. */
 function useServers() {
   const board = useBoard();
   const servers = () => board.catalogs().discord ?? [];
@@ -69,9 +62,6 @@ function useServers() {
   return { servers, server, choices, channels };
 }
 
-/* ------------------------------------------------------------- Trigger */
-
-/** The fields that a Discord trigger stores when the user chooses it. The host reads the same names. */
 export const DISCORD_TRIGGER_DEFAULTS = { event: "mention", placeId: "" } as const;
 
 export function DiscordTriggerRows(props: { id: string; locked: boolean }) {
@@ -89,14 +79,12 @@ export function DiscordTriggerRows(props: { id: string; locked: boolean }) {
   const [placeId, setPlaceId] = useField<string>(id, "placeId", DISCORD_TRIGGER_DEFAULTS.placeId, asString);
   const [roles, setRoles] = useListField(id, "roles", []);
   const [text, setText] = useTextField(id, "text", "");
-  /** Channels and roles belong to one server, so a new server starts with none, in one change. */
   const setServer = (value: string) => board.setFields(props.id, { connectionId: value, placeId: "", roles: "" });
   const channels = (): Choice<string>[] => [
     { value: "", label: t("workflow.discord.anyChannel"), icon: () => <Hash aria-hidden="true" /> },
     ...servers.channels(connectionId()),
   ];
   const serverRoles = () => servers.server(connectionId())?.roles ?? [];
-  /** Keeps a chosen role that the server no longer lists, after the roles of the server. */
   const roleOptions = () => [
     ...serverRoles().map((role) => role.id),
     ...roles().filter((role) => !serverRoles().some((entry) => entry.id === role)),
@@ -130,7 +118,6 @@ export function DiscordTriggerRows(props: { id: string; locked: boolean }) {
         disabled={props.locked}
         onChange={setPlaceId}
       />
-      {/* A server without roles, or no server yet, has nothing to choose. */}
       <Show when={roleOptions().length > 0}>
         <SettingListRow
           name={t("workflow.discord.roles")}
@@ -153,9 +140,6 @@ export function DiscordTriggerRows(props: { id: string; locked: boolean }) {
   );
 }
 
-/* -------------------------------------------------------------- Output */
-
-/** The fields that a Discord output stores when the user chooses it. The host reads the same names. */
 export const DISCORD_OUTPUT_DEFAULTS = { connectionId: WORKFLOW_DISCORD_TRIGGER_SERVER, action: "reply" } as const;
 
 export function DiscordOutputRows(props: { id: string; locked: boolean }) {
@@ -178,9 +162,7 @@ export function DiscordOutputRows(props: { id: string; locked: boolean }) {
     oneOf(WORKFLOW_DISCORD_EMOJI),
   );
   const posts = () => action() === "post";
-  /** A channel belongs to one server, so a new server starts with none, in one change. */
   const setServer = (value: string) => board.setFields(props.id, { connectionId: value, placeId: "" });
-  /** A post needs a channel of a known server. A reply and a reaction act on the trigger's message. */
   const serverChoices = (): Choice<string>[] =>
     posts()
       ? servers.choices()

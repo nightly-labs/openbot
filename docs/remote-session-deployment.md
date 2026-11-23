@@ -251,7 +251,7 @@ What moves when a machine stops:
   which names the host's new home. The client drops its resume token, because the other machine does
   not know the socket.
 - The entry: each minute the account Worker checks `/health/ready` of the machine that
-  `signal.openbot.run` gives. When it fails two checks 20 seconds apart, the Worker sets the record to
+  `signal.openbot.run` gives. When it fails three checks 20 seconds apart, the Worker sets the record to
   the address of the first other home in `REMOTE_SIGNAL_HOMES` that answers. When no machine answers,
   or the records do not show one entry machine (proxied, two A records, or an address of no home),
   it changes nothing. The name does not go back when the old machine starts again. With the 60-second

@@ -1,28 +1,12 @@
-// The provider-aware base schema that protocols 4 to 8 share. Each version file passes its own
-// profile to `createProviderAwareCodec`; the profile is the only part of the schema that differs between
-// these versions. Versions 1-3 retain their own codec.
 import { PROVIDER_ID_PATTERN } from "../agent-providers";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-values";
 import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "./capability-limits";
 
-/**
- * What a released provider-aware protocol accepts. Each list is frozen with its protocol version: a value
- * added to a list is a new protocol version, never an edit to a released profile. `"open"` accepts every
- * id that `OPEN_PROVIDER_ID` matches, so a new provider needs no new protocol version; only an open
- * profile carries the `displayName` of a provider status row, for a peer that does not know the id.
- */
 export interface ProviderAwareProfile {
-  /** Agent `provider`, provider status `id`, and model option `provider` values. */
   readonly providers: readonly string[] | "open";
-  /** Agent auth `kind` values for a signed-in account, next to `unknown`, `signed-out` and `unsupported`. */
   readonly authKinds: readonly string[] | "open";
-  /** The charset and length of an agent summary `model`. It must not have the `g` or `y` flag. */
   readonly agentModel: RegExp;
   readonly maximumCapabilities?: number;
-  /**
-   * Agent `reasoningEffort` and model option effort values. Without it, the five levels that protocols
-   * 4 to 8 shipped with.
-   */
   readonly reasoningEfforts?: readonly string[];
 }
 
@@ -32,7 +16,6 @@ function isProfileReasoningEffort(profile: ProviderAwareProfile, value: unknown)
   return isProviderAwareOneOf(profile.reasoningEfforts ?? PROVIDER_AWARE_REASONING_EFFORTS, value);
 }
 
-/** Binds the codec entry points that read the profile; the other exports do not depend on it. */
 export function createProviderAwareCodec(profile: ProviderAwareProfile) {
   return {
     decodeEvent: (value: unknown): TeamProtocolProviderAwareEventDecodeResult =>
@@ -51,7 +34,6 @@ export function createProviderAwareCodec(profile: ProviderAwareProfile) {
   };
 }
 
-/** A provider id or auth kind of an open profile: lower case, as `provider-accounts-v1` bounds it. */
 export const OPEN_PROVIDER_ID = PROVIDER_ID_PATTERN;
 
 export const TEAM_PROTOCOL_VERSION_HEADER = "OpenBot-Protocol-Version";
@@ -341,7 +323,6 @@ function isTeamProtocolProviderAwareEventType(
   return TEAM_PROTOCOL_ProviderAware_EVENT_TYPE_SET.has(value);
 }
 
-// This is the frozen v1 wire validator. Do not replace its nested checks with current IPC validators.
 function isTeamProtocolProviderAwareKnownEvent(
   profile: ProviderAwareProfile,
   value: DynamicRecord,
@@ -537,7 +518,6 @@ function isProviderAwareSidebarLayout(value: unknown): value is TeamProtocolProv
   );
 }
 
-/** Also checks the task conversations of `agent-tasks-v1`, after their keys are put in the wire spelling. */
 export function isProviderAwareConversationSnapshot(value: unknown): value is TeamProtocolProviderAwareJsonObject {
   return (
     isTeamProtocolProviderAwareJsonObject(value) &&
@@ -1142,7 +1122,6 @@ interface TeamProtocolProviderAwareHttpContract {
   response: TeamProtocolProviderAwareHttpPayloadKind;
 }
 
-// This registry is the frozen v1 HTTP surface. A new route or a changed payload must use a new protocol.
 const TEAM_PROTOCOL_ProviderAware_HTTP_CONTRACTS = {
   "GET compatibility": { request: "none", response: "object" },
   "GET identity": { request: "none", response: "nullable-object" },
@@ -1671,7 +1650,6 @@ function projectProviderAwareSidebarLayout(value: unknown): TeamProtocolProvider
   return projected;
 }
 
-/** Also projects the task conversations of `agent-tasks-v1`, with no read state. */
 export function projectProviderAwareConversation(
   value: unknown,
   page: boolean,
@@ -1966,7 +1944,6 @@ function projectProviderAwareRemoteDisplay(value: unknown): TeamProtocolProvider
   return projectProviderAwareObject(value, ["id", "label", "width", "height", "primary"]);
 }
 
-/** The released message-search projection. `thread-message-search-v1` reuses it. */
 export function projectProviderAwareConversationSearch(value: unknown): TeamProtocolProviderAwareJsonObject {
   const projected = projectProviderAwareObject(
     value,
@@ -2069,9 +2046,6 @@ function projectProviderAwareRoutineSchedule(value: DynamicRecord): TeamProtocol
   }
 }
 
-// The host encodes every JSON response through this adapter, so a path `TEAM_API_ROUTES` builds that this
-// frozen list cannot name is a route no client can be answered on. Classification only: it reads the
-// list below and decides nothing, so exporting it leaves every released response meaning what it did.
 export function teamProtocolProviderAwareHttpRoute(
   method: string,
   path: string,
@@ -2831,7 +2805,6 @@ function isProviderAwareRoutineRun(value: unknown): boolean {
   );
 }
 
-/** The released message-search validator. `thread-message-search-v1` reuses it. */
 export function isProviderAwareConversationSearch(value: unknown): boolean {
   return (
     isDynamicRecord(value) &&

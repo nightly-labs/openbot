@@ -1,12 +1,6 @@
 import type { CrmEvery, CrmMethod, CrmPayment, CrmProposal, CrmSource, CrmTag } from "@openbot/contracts/ipc";
 import type { MockCrmCustomer, MockCrmSeed } from "../src/preview/mock-crm";
 
-/*
- * The CRM of the stories: customers with the plans they pay, their paid and late payments, leads, tags,
- * and changes that agents propose. Dates count from the day the story opens, so "late" and "due" stay
- * true each day.
- */
-
 const DAY = 86_400_000;
 const MONTHS: Record<Exclude<CrmEvery, "once">, number> = { month: 1, quarter: 3, year: 12 };
 const TAG_LABELS = ["Enterprise", "Healthcare", "Hospitality", "Logistics", "Referral", "VIP"] as const;
@@ -18,7 +12,6 @@ function localDate(time: number): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** `date` moved by whole months; a day that the month does not have becomes its last day. */
 function addMonths(date: string, months: number): string {
   const [year = 0, month = 1, day = 1] = date.split("-").map(Number);
   const first = new Date(Date.UTC(year, month - 1 + months, 1));
@@ -29,19 +22,15 @@ function addMonths(date: string, months: number): string {
 
 interface Recurring {
   plan: string;
-  /** Whole euros. */
   amount: number;
   every: Exclude<CrmEvery, "once">;
-  /** Days from today to the next payment. */
   nextIn: number;
-  /** The earlier payments, oldest first: the days late when paid, or null when not paid. */
   history: (number | null)[];
 }
 
 interface Project {
   plan: string;
   amount: number;
-  /** The parts of the project: days from today to the due date, and the days late when paid. */
   parts: { label: string; amount: number; dueIn: number; paidLate: number | null }[];
 }
 
@@ -552,7 +541,6 @@ const SEEDS: readonly Seed[] = [
   },
 ];
 
-/** A Stripe customer ID that stays the same for each customer. */
 function stripeId(key: string): string {
   const letters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789";
   let hash = 7;
@@ -564,11 +552,6 @@ function stripeId(key: string): string {
   return out;
 }
 
-/**
- * The demo CRM, with dates from `now`. The agents `chief`, `research` and `sales` may read it. With
- * `stripe`, Stripe is connected: the customers that pay with Stripe, and their recurring plans and
- * payments, come from it.
- */
 export function crmDemoSeed(now = Date.now(), options: { stripe?: boolean } = {}): MockCrmSeed {
   const today = localDate(now);
   const source = (method: CrmMethod) => (options.stripe && method === "stripe" ? "stripe" : null);
@@ -675,7 +658,6 @@ export function crmDemoSeed(now = Date.now(), options: { stripe?: boolean } = {}
     });
   }
 
-  // Invoice numbers follow the due date, as an accounting system gives them out.
   const numbered: CrmPayment[] = [...payments]
     .sort((a, b) => a.dueOn.localeCompare(b.dueOn))
     .map((payment, index) => ({ ...payment, number: 1001 + index }));
@@ -776,7 +758,6 @@ export function crmDemoSeed(now = Date.now(), options: { stripe?: boolean } = {}
         },
       ]
     : [];
-  // A proposal cannot change a row that Stripe owns.
   const owned = new Set(numbered.filter((payment) => payment.source !== null).map((payment) => payment.id));
   const ownedPlans = new Set(
     customers.flatMap((customer) => customer.plans.filter((plan) => plan.source !== null).map((plan) => plan.id)),

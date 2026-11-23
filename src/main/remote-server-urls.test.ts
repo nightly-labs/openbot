@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addRemotePreviewUrls, parseRemoteAvatarUrl } from "./remote-server-urls";
 
-// The `openbot-remote-avatar:` protocol handler asks a joined server only for what this parser
-// accepts. Any other form must answer 404 without a host request.
 const version = "0b6f0c52-7a4e-4c1f-9d2b-3f6a8e1c5d70";
 
 describe("remote avatar URLs", () => {
