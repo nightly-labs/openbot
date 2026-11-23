@@ -3268,35 +3268,34 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 
   #isEventReply(thread: AcpThread, turn: AcpTurn, update: SessionUpdate): boolean {
+    const failure = turn.replyFailure;
+    if (failure && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+      turn.replyFailure = null;
+      if (turn.providerError === failure.failure) turn.providerError = null;
+      this.#applyTurnUpdate(thread, turn, {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: failure.reply },
+      });
+    }
     const text =
       update.sessionUpdate === "agent_message_chunk" && update.content.type === "text" ? update.content.text : null;
     const event = text === null ? undefined : turn.eventReplies.find(({ reply }) => reply === text);
-    if (event) {
-      turn.eventReplies.splice(turn.eventReplies.indexOf(event), 1);
-      if (event.failure === null) {
-        turn.retrying = "model";
-        turn.eventRetries += 1;
-        this.#emitTurnProgress(
-          thread,
-          turn,
-          sourceText("status.provider.modelRetryServerError", { provider: this.#label, attempt: turn.eventRetries }),
-        );
-        return true;
-      }
-      turn.receivedOutput = true;
-      turn.replyFailure = event;
-      turn.providerError ??= event.failure;
+    if (!event) return false;
+    turn.eventReplies.splice(turn.eventReplies.indexOf(event), 1);
+    if (event.failure === null) {
+      turn.retrying = "model";
+      turn.eventRetries += 1;
+      this.#emitTurnProgress(
+        thread,
+        turn,
+        sourceText("status.provider.modelRetryServerError", { provider: this.#label, attempt: turn.eventRetries }),
+      );
       return true;
     }
-    const failure = turn.replyFailure;
-    if (!failure || SESSION_STATE_UPDATES.has(update.sessionUpdate)) return false;
-    turn.replyFailure = null;
-    if (turn.providerError === failure.failure) turn.providerError = null;
-    this.#applyTurnUpdate(thread, turn, {
-      sessionUpdate: "agent_message_chunk",
-      content: { type: "text", text: failure.reply },
-    });
-    return false;
+    turn.receivedOutput = true;
+    turn.replyFailure = event;
+    turn.providerError ??= event.failure;
+    return true;
   }
 
   #peekMessage(message: unknown): void {
