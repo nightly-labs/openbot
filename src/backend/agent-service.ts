@@ -6267,7 +6267,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #providerRestartHold(agentId: string): QueueHold | null {
     const agent = this.#store.get(agentId);
     const provider = agent ? providerForAgent(agent) : null;
-    return provider && this.#providers.isReplacingCli(provider) ? { reason: "provider-restart", provider } : null;
+    return provider && (this.#providers.isReplacingCli(provider) || this.#drain.awaitsEndpointReload(agentId))
+      ? { reason: "provider-restart", provider }
+      : null;
   }
 
   #signInHold(agentId: string): QueueHold | null {
