@@ -132,7 +132,7 @@ interface ProviderCliCommand {
   readonly timeoutMs: number;
   readonly closeInput?: true;
   readonly acpLogout?: true | AcpExtensionMethod;
-  readonly windowsPageByOpenBot?: true;
+  readonly pageByOpenBotOn?: readonly NodeJS.Platform[];
   readonly failureText?: (output: string) => string | null;
 }
 
@@ -199,7 +199,7 @@ const CLAUDE_SIGN_IN: ProviderCliCommand = {
   argv: ["auth", "login", "--claudeai"],
   env: CLAUDE_COMMAND_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
-  windowsPageByOpenBot: true,
+  pageByOpenBotOn: ["win32", "darwin"],
   failureText: claudeSignInFailure,
 };
 

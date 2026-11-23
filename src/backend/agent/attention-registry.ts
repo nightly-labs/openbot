@@ -444,6 +444,7 @@ export interface HostedSiteApprovals {
 export interface RoutineAttention {
   markNeedsAttention(turnId: string | null): void;
   markRunningForTurn(turnId: string | null): void;
+  runsTurn(turnId: string): boolean;
 }
 
 export interface AttentionBrowserHost {
@@ -1786,7 +1787,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     const pending: PendingPrompt = {
       client,
       id: request.id,
@@ -1860,7 +1861,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions, uiBlock);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     let autoAnswerTimer: PendingPrompt["autoAnswer"];
     if (auto && autoAnswer) {
       const timer = setTimeout(() => this.#answerAutomatically(request.id), autoAnswer.afterMs);
@@ -1929,7 +1930,7 @@ export class AttentionRegistry {
       return;
     }
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     const pending: PendingPrompt = {
       client,
       id: request.id,
@@ -2001,7 +2002,7 @@ export class AttentionRegistry {
     }
 
     const messageId = this.#persistQuestionPrompt(agentId, publicThreadId, turnId, request.id, questions);
-    this.#expireDetachedInChat(agentId, publicThreadId);
+    this.#expireDetachedInChat(agentId, publicThreadId, turnId);
     this.#prompts.set(request.id, {
       client,
       id: request.id,
@@ -2093,11 +2094,13 @@ export class AttentionRegistry {
     return true;
   }
 
-  #expireDetachedInChat(agentId: string, publicThreadId: string): void {
+  #expireDetachedInChat(agentId: string, publicThreadId: string, turnId: string): void {
+    const routineQuestion = this.#routines.runsTurn(turnId);
     let changed = false;
     for (const [requestId, pending] of this.#prompts) {
       if (!pending.detached || pending.saving) continue;
       if (pending.agentId !== agentId || pending.publicThreadId !== publicThreadId) continue;
+      if (routineQuestion && !this.#routines.runsTurn(pending.turnId)) continue;
       this.#expirePrompt(requestId, pending);
       changed = true;
     }

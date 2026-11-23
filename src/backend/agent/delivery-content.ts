@@ -118,6 +118,7 @@ export interface DeliveryPromptSources {
   tags?: TagReferenceSource | undefined;
   answeredRoutine?: AnsweredRoutine | null;
   liveVoice?: LiveVoiceRelayed | null;
+  fromChrome?: boolean;
   steerFramedAsUser?: boolean;
   steersQuietTurn?: boolean;
   externalChat?: boolean;
@@ -394,6 +395,9 @@ function taskReportFraming(taskId: string, report: TaskReportState | null, waiti
 
 export const TASK_REPORT_CUT_MARK = "[…]";
 
+const FROM_CHROME_NOTE =
+  'The person sent this message from their own Chrome, through the OpenBot extension. For web work in this turn, use that Chrome, not the OpenBot browser: openbot_browser list_tabs lists its open tabs (ids start with "chrome:", the first is the tab that the person looks at), and open with browser "chrome" opens a page there.';
+
 export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryPromptSources): DeliveryInputItem[] {
   const { delivery, managedAttachments } = context;
   const { agentNames, snapshot } = sources;
@@ -608,6 +612,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     ].join("\n\n");
     text = `${continuation}${CURRENT_MESSAGE_SEPARATOR}${text}`;
   }
+  if (delivery.sender.kind === "user" && sources.fromChrome) text = `${FROM_CHROME_NOTE}\n\n${text}`;
   return [
     { type: "text", text },
     ...managedAttachments.map(

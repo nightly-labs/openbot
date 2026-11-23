@@ -108,6 +108,11 @@ export const messages = defineMessages("error.team", {
   "error.team.sideQuestionUnsupported": "Side questions are not supported by this connection.",
   "error.team.liveVoiceUnsupported":
     "This server does not support Codex live voice. Update OpenBot on the computer that runs it.",
+  "error.team.voiceTranscriptionUnsupported":
+    "This server does not support dictation. Update OpenBot on the computer that runs it.",
+  "error.team.clientBrowserUnsupported":
+    "This server does not support shared Chrome tabs. Update OpenBot on the computer that runs it.",
+  "error.team.clientBrowserCommandUnknown": "The agent no longer waits for this Chrome action.",
   "error.team.routineFlowsUnsupported":
     "This server does not support routine flows. Update OpenBot on the computer that runs it.",
   "error.team.routineCanvasTooLarge":

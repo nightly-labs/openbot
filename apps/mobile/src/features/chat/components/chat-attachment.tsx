@@ -1,5 +1,10 @@
 import { playableMediaKind } from "@openbot/contracts/attachment-files";
-import { CHAT_VISUAL_PAGE_LIMIT, chatVisualFrameHeight, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
+import {
+  CHAT_VISUAL_DEFAULT_HEIGHT,
+  CHAT_VISUAL_PAGE_LIMIT,
+  chatVisualFrameHeight,
+  isChatVisualMimeType,
+} from "@openbot/contracts/chat-visual";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { requireOptionalNativeModule } from "expo";
 import { File } from "expo-file-system";
@@ -95,7 +100,7 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
   };
   const pageHeight = full
     ? chatVisualFrameHeight(reported ?? props.visual?.height)
-    : chatVisualFrameHeight(undefined, props.visual?.height);
+    : chatVisualFrameHeight(reported, props.visual?.height ?? CHAT_VISUAL_DEFAULT_HEIGHT);
   const file = useMediaFile(serverId, attachment, true);
   const [page, setPage] = useState<{ uri: string; source: string } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -147,7 +152,7 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
       >
         <View pointerEvents="none" style={FILL}>
           {settled && historyShown ? (
-            <HtmlPage source={page.source} title={attachment.name} mode="chat" onHeight={full ? report : undefined} />
+            <HtmlPage source={page.source} title={attachment.name} mode="chat" onHeight={report} />
           ) : null}
         </View>
       </Pressable>

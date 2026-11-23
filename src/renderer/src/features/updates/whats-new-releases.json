@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Update each joined server to this version too. On a server, OpenBot credit models, paused and exported workflows, WhatsApp read-only chats, location requests and the Signal server choice work only when the server has this version.",
+      "After this update, an older version of OpenBot cannot open your data."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Buy OpenBot credits for yourself or for a server from the Credits button in the page rail or in Settings → Billing. A paid license also gives free credits each month.",
+          "Image and video steps in a workflow can use OpenBot models that your credits pay for, with no other sign-in. Set Batch on a step to make up to 4 results at the same time.",
+          "Pause a workflow from the workflow menu. You can also export a workflow to a file and import it on another computer or server.",
+          "Type {{ in a workflow step to add a field from an earlier step. Schedule, GitHub, Discord, Telegram and Slack triggers now give fields too.",
+          "An agent can ask for your location when a request needs it, such as \"restaurants near me\". Nothing is sent until you answer.",
+          "Make an allowed WhatsApp contact or group read only. Your agents can read the chat, and OpenBot never writes in it."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "An idle Claude or Pi chat with 200K or more tokens of context compacts itself before its 1 hour prompt cache expires. This costs less than reading the full context again. Turn it off in Server settings → Providers.",
+          "Choose the Signal server of a server in Server settings → General. \"Automatic\" keeps the nearest one.",
+          "Gemini agents with Full access use OpenBot tools, such as memory, the browser and channels, without an approval card."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "A message that you send to a Claude agent while it works now gets to the agent at once, also while it runs a subagent or a long tool.",
+          "A ChatGPT (Codex) agent set to Ask first now asks you before it runs a command or changes a file.",
+          "A hosted or self-hosted server that stops responding now starts again by itself after 10 minutes.",
+          "On macOS, the agent dock no longer makes OpenBot and the whole computer slow.",
+          "Long chats scroll smoothly. Before, a chat with more than 100 messages stuttered while you scrolled."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.76.0",
     "date": "2026-11-21",
     "notices": [

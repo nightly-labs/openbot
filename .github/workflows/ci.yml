@@ -95,12 +95,12 @@ jobs:
           else
             echo "docs=false" >> "$GITHUB_OUTPUT"
           fi
-          lane_unless desktop '^(apps/(auth-api|mobile|mobile-updates|site-router|status)|docker|remote)/'
+          lane_unless desktop '^(apps/(auth-api|browser-extension|mobile|mobile-updates|site-router|status)|docker|remote)/'
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
           lane remote '^(remote|scripts)/'
           lane storybook '^(src|apps/(auth-api|status)|\.storybook|resources|marketplace|build)/'
           lane schema '^(src/backend/|scripts/released-schema-fixtures\.ts$)'
-          lane surfaces '^(apps/(mobile|mobile-updates|site-router|status)|remote|scripts)/'
+          lane surfaces '^(apps/(browser-extension|mobile|mobile-updates|site-router|status)|remote|scripts)/'
           cat "$GITHUB_OUTPUT"
 
   check:
@@ -1270,6 +1270,12 @@ jobs:
 
           - name: Typecheck status page
             run: bun run typecheck:status
+
+          - name: Typecheck browser extension
+            run: bun run typecheck:extension
+
+      - name: Build browser extension
+        run: bun run --cwd apps/browser-extension build
 
       - parallel:
           - name: Typecheck logging

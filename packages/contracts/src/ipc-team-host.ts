@@ -2,6 +2,7 @@ import type { CustomServerPlan } from "./custom-server-plans";
 import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import type { AvatarImageInput } from "./ipc-agents";
 import type { IceServer } from "./signal-protocol/messages";
+import type { ClientBrowserCommandEvent } from "./team-protocol/client-browser-v1";
 import type { HostAppearanceEvent, ServerAppearance } from "./team-protocol/host-appearance-v1";
 import type { HostRestartEvent, HostRestartState } from "./team-protocol/host-update-v1";
 import type { LiveVoiceEvent } from "./team-protocol/live-voice-v1";
@@ -294,7 +295,8 @@ export type TeamRealtimeEvent =
   | HostRestartEvent
   | HostAppearanceEvent
   | LiveVoiceEvent
-  | MachineAlertEvent;
+  | MachineAlertEvent
+  | ClientBrowserCommandEvent;
 
 export type DirectMessageRealtimeEvent = Extract<TeamRealtimeEvent, { type: "team-direct-message" }>;
 

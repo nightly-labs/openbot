@@ -14,6 +14,7 @@ export interface TeamApiRequestContext {
   readonly token: string;
   readonly sessionId: string;
   readonly sessionExpiresAt: string;
+  readonly fromChrome: boolean;
   readonly agentLevel: (agentId: string) => AgentAccessLevel;
   readonly json: (status: number, value: object | null) => RouteOutcome;
   readonly empty: (status: number) => RouteOutcome;

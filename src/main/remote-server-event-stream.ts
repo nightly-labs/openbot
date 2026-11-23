@@ -562,6 +562,7 @@ export class RemoteEventStream {
               this.#onMachineAlert(serverId, event);
             } else if (event.type === "live-voice") {
               this.#onLiveVoice(serverId, event);
+            } else if (event.type === "client-browser-command") {
             } else {
               if (!agentEventsReady) {
                 if (bufferedAgentEvents.length >= REMOTE_EVENT_INITIAL_BUFFER_LIMIT) {
