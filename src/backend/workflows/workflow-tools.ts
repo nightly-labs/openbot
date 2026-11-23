@@ -377,7 +377,7 @@ function checkedSchedule(value: WorkflowOp["schedule"]) {
 function withSchedule(
   node: WorkflowNode,
   scheduled: ReturnType<typeof checkedSchedule>,
-  requesterTimezone: string | undefined,
+  scheduleTimezone: string | undefined,
 ): WorkflowNode {
   if (node.kind !== "trigger") return node;
   const triggerFields =
@@ -386,8 +386,8 @@ function withSchedule(
     scheduled ?? node.schedule ?? (triggerFields.trigger === "schedule" ? { kind: "daily", time: "09:00" } : undefined);
   const scheduleChanged = schedule !== undefined && (scheduled !== undefined || node.schedule === undefined);
   const fields =
-    scheduleChanged && requesterTimezone && !nodeTimezone({ ...node, fields: triggerFields })
-      ? { ...triggerFields, timezone: requesterTimezone }
+    scheduleChanged && scheduleTimezone && !nodeTimezone({ ...node, fields: triggerFields })
+      ? { ...triggerFields, timezone: scheduleTimezone }
       : triggerFields;
   return { ...node, fields, ...(schedule ? { schedule } : {}) };
 }
@@ -422,7 +422,7 @@ function applyWorkflowOps(
   ops: readonly WorkflowOp[],
   agentIds: ReadonlySet<string>,
   tidy: boolean,
-  requesterTimezone: string | undefined,
+  scheduleTimezone: string | undefined,
 ): { graph: WorkflowGraph; ids: Record<string, string> } {
   let nodes = graph.nodes.map((node) => ({ ...node }));
   let edges = [...graph.edges];
@@ -458,7 +458,7 @@ function applyWorkflowOps(
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && op.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
-        const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled, requesterTimezone);
+        const node = withSchedule({ id, kind: op.kind, at: { x: 0, y: 0 }, fields }, scheduled, scheduleTimezone);
         checkMedia(node, n);
         if (changesTriggerEvent(op.fields)) eventChanges.set(id, n);
         const upstream = op.from === undefined ? undefined : resolve(op.from, n);
@@ -479,7 +479,7 @@ function applyWorkflowOps(
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && node.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
-        const next = withSchedule({ ...node, fields }, scheduled, requesterTimezone);
+        const next = withSchedule({ ...node, fields }, scheduled, scheduleTimezone);
         if (op.fields && ("media" in op.fields || "model" in op.fields)) checkMedia(next, n);
         replace(next);
         if (changesTriggerEvent(op.fields)) eventChanges.set(node.id, n);
@@ -667,7 +667,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
   callerId: string,
   callKey: string,
   agentIds: ReadonlySet<string>,
-  requesterTimezone: string | undefined,
+  scheduleTimezone: string | undefined,
   confirmDelete: (title: string) => Effect.Effect<boolean, ToolOperationFailed>,
 ) {
   if (!WORKFLOW_TOOL_NAMES.has(tool)) return null;
@@ -680,7 +680,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
   ) {
     let detail = yield* workflows.get(workflowId);
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const applied = yield* toolStep(() => applyWorkflowOps(detail.graph, ops, agentIds, tidy, requesterTimezone));
+      const applied = yield* toolStep(() => applyWorkflowOps(detail.graph, ops, agentIds, tidy, scheduleTimezone));
       const problem = graphProblem(applied.graph);
       if (problem) return yield* toolStep(() => refuse(problem));
       const result = yield* workflows.saveGraph(
@@ -729,7 +729,7 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
       if (workflowId === undefined) {
         if (input.title === undefined) return openBotToolFailure("A new workflow needs a title.");
         const applied = yield* toolStep(() =>
-          applyWorkflowOps({ nodes: [], edges: [], strokes: [] }, ops, agentIds, tidy, requesterTimezone),
+          applyWorkflowOps({ nodes: [], edges: [], strokes: [] }, ops, agentIds, tidy, scheduleTimezone),
         );
         const problem = graphProblem(applied.graph);
         if (problem) return openBotToolFailure(problem);

@@ -448,6 +448,7 @@ export interface AgentServiceOptions {
   agentMemoryLimit?: () => number;
   memoryReviewInterval?: () => number;
   timezone?: () => string;
+  chosenTimezone?: () => string | null;
   extraRoutineSources?: () => Iterable<RoutineDueSource>;
   channelPersonAgentLevel?: (personId: string, agentId: string) => AgentAccessLevel;
   channelRemotePerson?: (personId: string) => boolean;
@@ -1936,6 +1937,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(this.#localSkillTools === undefined ? {} : { localSkillTools: this.#localSkillTools }),
       ...(this.#routineFlowTools === undefined ? {} : { routineFlowTools: this.#routineFlowTools }),
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
+      ...(options.chosenTimezone === undefined ? {} : { chosenTimezone: options.chosenTimezone }),
       ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),
