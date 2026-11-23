@@ -21,6 +21,7 @@ const AT_CAPACITY = "Selected model is at capacity. Please try a different model
 const DISCONNECTED = "stream disconnected before completion: Connection reset by peer (os error 54)";
 const NOTICE = sourceText("error.backend.providerModelAtCapacity");
 const RETRYING = sourceText("error.backend.providerRetrying", { attempts: "3" });
+const RETRYING_AGAIN = sourceText("error.backend.providerRetrying", { attempts: "4" });
 
 interface Retry {
   info: "disconnected" | "overloaded";
@@ -140,6 +141,7 @@ interface CaseReport {
   finalStatus: string;
   turnStarts: number;
   errorEvents: { code: string; message: string }[];
+  outputAndNotices: string[];
   retryLogLines: string[];
   passed: boolean;
 }
@@ -208,9 +210,13 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
 });
 const errorEvents: { agentId: string | null; code: string; message: string }[] = [];
+const outputAndNotices: { agentId: string; entry: string }[] = [];
 agents.on("event", (event) => {
-  if (event.type === "error")
+  if (event.type === "error") {
     errorEvents.push({ agentId: event.agentId ?? null, code: event.code, message: event.message });
+    if (event.agentId) outputAndNotices.push({ agentId: event.agentId, entry: event.message });
+  }
+  if (event.type === "conversation-delta") outputAndNotices.push({ agentId: event.agentId, entry: "output" });
 });
 const logLines: string[] = [];
 const stopLog = teeLogLines(["turn-lifecycle"], (line) => logLines.push(line));
@@ -218,7 +224,7 @@ const stopLog = teeLogLines(["turn-lifecycle"], (line) => logLines.push(line));
 try {
   await runCauseEffect(agents.initialize());
 
-  const cases: { name: string; retries: Step[]; notices: string[] }[] = [
+  const cases: { name: string; retries: Step[]; notices: string[]; order?: string[] }[] = [
     { name: "model at capacity", retries: [capacity, capacity, capacity], notices: [NOTICE] },
     { name: "server overloaded info", retries: [{ info: "overloaded", details: null }], notices: [NOTICE] },
     { name: "connection reset", retries: [reset, reset], notices: [] },
@@ -226,7 +232,18 @@ try {
     {
       name: "connection resets, output, connection resets",
       retries: [reset, reset, reset, "output", reset, reset, reset],
-      notices: [RETRYING, RETRYING],
+      notices: [RETRYING, RETRYING_AGAIN],
+    },
+    {
+      name: "single connection resets with output between them",
+      retries: [reset, "output", reset, "output", reset],
+      notices: [RETRYING],
+    },
+    {
+      name: "output, then capacity",
+      retries: ["output", capacity],
+      notices: [NOTICE],
+      order: ["output", NOTICE],
     },
   ];
 
@@ -261,6 +278,7 @@ try {
       finalStatus: delivery.status,
       turnStarts: turnStarts(store.activeProviderSession(agent.id)?.externalSessionId ?? "missing"),
       errorEvents: agentEvents().map(({ code, message }) => ({ code, message })),
+      outputAndNotices: outputAndNotices.filter((item) => item.agentId === agent.id).map((item) => item.entry),
       retryLogLines: retryLines(),
       passed: false,
     };
@@ -278,6 +296,8 @@ try {
       entry.notices.map((message) => ({ code: "agent_warning", message })),
       `${entry.name}: the wrong notices showed`,
     );
+    if (entry.order)
+      assert.deepEqual(result.outputAndNotices, entry.order, `${entry.name}: the output came after the notice`);
     result.passed = true;
   }
   report.passed = true;

@@ -374,6 +374,7 @@ export class TurnLifecycle {
   readonly #turnCauses = new Map<string, CauseCode>();
   readonly #turnRetries = new Map<string, number>();
   readonly #capacityNotices = new Set<string>();
+  readonly #retryNotices = new Set<string>();
   readonly #runningTurns = new Map<
     string,
     {
@@ -569,6 +570,7 @@ export class TurnLifecycle {
     this.#turnCauses.clear();
     this.#turnRetries.clear();
     this.#capacityNotices.clear();
+    this.#retryNotices.clear();
     this.#limitedTurns.clear();
     this.#unreadReports.clear();
     this.#selfStartedOrigins.clear();
@@ -624,6 +626,7 @@ export class TurnLifecycle {
       this.#runningTurns.delete(turnId);
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
+      this.#retryNotices.delete(turnId);
       const compactionFailure = this.#compactionFailures.get(turnId);
       this.#compactionFailures.delete(turnId);
       const quietStop = this.#quietStops.has(turnId) && !this.#turnErrors.has(turnId);
@@ -1196,8 +1199,8 @@ export class TurnLifecycle {
     const itemId = getString(params, "itemId");
     const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
     if (!turnId || !itemId || delta === null || this.#compaction.isCompactionTurn(threadId, turnId)) return;
-    this.#turnRetries.delete(turnId);
     this.#capacityNotices.delete(turnId);
+    this.#retryNotices.delete(turnId);
     this.#itemTurns.set(itemId, turnId);
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
@@ -1839,7 +1842,11 @@ export class TurnLifecycle {
     if (atCapacity) {
       if (this.#capacityNotices.has(turnId)) return;
       this.#capacityNotices.add(turnId);
-    } else if (attempts !== RETRY_NOTICE_ATTEMPTS) return;
+    } else {
+      if (attempts < RETRY_NOTICE_ATTEMPTS || this.#retryNotices.has(turnId)) return;
+      this.#retryNotices.add(turnId);
+    }
+    this.#deltas.flushTurn(turnId);
     const compacts = !atCapacity && this.#compaction.retrying(threadId);
     const percent = this.#compaction.usedPercent(threadId);
     this.#hooks.emitError(
@@ -2082,6 +2089,7 @@ export class TurnLifecycle {
       this.#turnCauses.delete(turnId);
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
+      this.#retryNotices.delete(turnId);
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
           ? refusedSessionFailure(
@@ -2714,6 +2722,7 @@ export class TurnLifecycle {
     this.#runningTurns.delete(turnId);
     this.#turnRetries.delete(turnId);
     this.#capacityNotices.delete(turnId);
+    this.#retryNotices.delete(turnId);
     this.#reportedFailures.delete(turnId);
     this.#quietEmptyAnswers.delete(turnId);
     this.#clearQuietEnd(turnId);
