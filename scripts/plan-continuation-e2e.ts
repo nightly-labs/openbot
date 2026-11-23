@@ -36,6 +36,8 @@ interface FakeTurn {
   noAnswer?: boolean;
   delayMs?: number;
   holdUntil?: string;
+  background?: string;
+  later?: string;
   commands?: string[];
   calls?: { tool: string; arguments: Record<string, string | string[] | boolean> }[];
 }
@@ -80,8 +82,18 @@ const finish = (turn) => {
     write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item: step } });
   });
   const item = { type: "agentMessage", id: "message-" + turn.turnId, text: turn.script.answer || "Done.", phase: "final_answer" };
+  if (turn.script.background) write({ method: "openbot/background-work", params: { threadId: turn.threadId, running: true } });
   if (!turn.script.noAnswer) write({ method: "item/completed", params: { threadId: turn.threadId, turnId: turn.turnId, item } });
   write({ method: "turn/completed", params: { threadId: turn.threadId, turn: { id: turn.turnId, status: "completed" } } });
+  if (turn.script.background) finishBackground(turn.threadId, turn.script);
+};
+const finishBackground = (threadId, script) => {
+  if (!fs.existsSync(script.background)) return setTimeout(() => finishBackground(threadId, script), 25);
+  const turnId = "turn-" + process.pid + "-" + (++turns);
+  write({ method: "turn/started", params: { threadId, turn: { id: turnId }, unprompted: true } });
+  write({ method: "item/completed", params: { threadId, turnId, item: { type: "agentMessage", id: "message-" + turnId, text: script.later || "Done.", phase: "final_answer" } } });
+  write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } });
+  write({ method: "openbot/background-work", params: { threadId, running: false } });
 };
 const callNext = (turn) => {
   const call = turn.calls.shift();
@@ -866,6 +878,69 @@ try {
       ),
     );
     return { turns: turnsSince(mark).length, checks: check.length };
+  });
+
+  await check("a teammate's note while its background work runs does not end the wait", async () => {
+    const lead = await createAgent("Planner");
+    const worker = await createAgent("Runner");
+    const release = join(root, "runner-background");
+    const mark = loggedTurns().length;
+    const delegated = await send(
+      lead.id,
+      `Delegate the deploy. ${plan({
+        steps: [],
+        answer: "I asked Runner for the deploy.",
+        calls: [
+          {
+            tool: "send_message",
+            arguments: {
+              recipientAgentIds: [worker.id],
+              text: plan({
+                steps: [],
+                answer: "The deploy runs in the background.",
+                background: release,
+                later: "The deploy is done: deploy-ok.",
+              }),
+            },
+          },
+        ],
+      })}`,
+    );
+    assert.equal(await settled(delegated), "completed");
+    await waitFor("the runner's note", () =>
+      chatMessages(lead.id).some((message) => message.text.includes("The deploy runs in the background.")),
+    );
+    await waitFor("the lead's turn on the note", () =>
+      current.service.listQueue(lead.id).deliveries.every((delivery) => ended(delivery.status)),
+    );
+    const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Delegate the deploy."))?.threadId;
+    const checks = loggedChecks().length;
+    const asked = loggedTurns().length;
+    const news = await send(
+      lead.id,
+      `Any deploy news? ${verdicts({ verdict: "waiting" })} ${plan({
+        steps: [],
+        commands: ["ls deploys"],
+        answer: "Runner still works on it. Next, I'll check the deploy when Runner reports back.",
+      })}`,
+    );
+    assert.equal(await settled(news), "completed");
+    assert.deepEqual(
+      turnsSince(asked)
+        .filter((turn) => turn.threadId === leadThread)
+        .map((turn) => turn.note),
+      [false],
+      "The turn does not continue while the teammate's background work runs.",
+    );
+    const check = loggedChecks().slice(checks);
+    assert.equal(check.length, 1, "One finish check runs.");
+    assert.ok(check[0]?.text.includes("they still work on them"), "The finish check knows about the open request.");
+    assert.equal(continuationLines(lead.id).length, 0, "No continuation line shows.");
+    await writeFile(release, "");
+    const result = await waitFor("the runner's later result in the lead's chat", () =>
+      chatMessages(lead.id).find((message) => message.text.includes("deploy-ok")),
+    );
+    return { turns: turnsSince(mark).length, checks: check.length, result: result.text };
   });
 
   await check("a request with no plan continues at most 2 times for a next step", async () => {

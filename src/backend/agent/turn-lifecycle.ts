@@ -403,7 +403,10 @@ export class TurnLifecycle {
   >();
   readonly #unreadReports = new Map<string, Map<string, string>>();
   readonly #selfStartedOrigins = new Map<string, readonly string[]>();
-  readonly #lastResults = new Map<string, { turnIds: readonly string[]; requests: readonly DeliveryContext[] }>();
+  readonly #lastResults = new Map<
+    string,
+    { turnIds: readonly string[]; requests: readonly DeliveryContext[]; interim?: true }
+  >();
   readonly #deliveryStarts = new Map<string, DeliveryStart>();
   readonly #turnTimings = new Map<string, TurnTiming>();
   readonly #limitedTurns = new Map<string, number | null>();
@@ -676,6 +679,23 @@ export class TurnLifecycle {
   #taskForThread(agentId: string, externalThreadId: string): string | null {
     const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
     return this.#conversation.isTaskThread(threadId) ? this.#hooks.taskForThread(threadId) : null;
+  }
+
+  #teammateWorksInBackground(agentId: string, taskId: string | null): boolean {
+    return [...this.#waitingThreads].some(([threadId, work]) => {
+      const last = this.#lastResults.get(
+        `${work.agentId}\u0000${this.#conversation.publicThreadId(work.agentId, threadId)}`,
+      );
+      return (
+        last?.interim === true &&
+        last.requests.some(
+          ({ delivery, senderTaskId }) =>
+            delivery.sender.kind === "agent" &&
+            delivery.sender.agentId === agentId &&
+            (senderTaskId ?? null) === taskId,
+        )
+      );
+    });
   }
 
   #loseBackgroundWork(threadId: string, agentId: string): void {
@@ -2415,7 +2435,10 @@ export class TurnLifecycle {
             ))))
           ? "no"
           : planMode;
-      const awaitsEarlierRequest = continueMode !== "no" && this.#mailbox.awaitsTeammate(agentId, laneTaskId, null);
+      const awaitsEarlierRequest =
+        continueMode !== "no" &&
+        (this.#mailbox.awaitsTeammate(agentId, laneTaskId, null) ||
+          this.#teammateWorksInBackground(agentId, laneTaskId));
       const turnPlan = snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null;
       const toolSteps = trace?.steps.filter((step) => step.kind === "tool") ?? [];
       const finishCheck: FinishCheckMode =
@@ -2499,7 +2522,12 @@ export class TurnLifecycle {
               resulted.push(delivery);
           yield* this.#relayTaskResults(agentId, turnId, deliveries, resultText ?? noResult);
         }
-        if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, { turnIds: [turnId], requests: resulted });
+        if (resulted.length > 0)
+          keepBounded(this.#lastResults, resultsKey, {
+            turnIds: [turnId],
+            requests: resulted,
+            ...(running?.startedBackgroundWork ? { interim: true as const } : {}),
+          });
         else this.#lastResults.delete(resultsKey);
         if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
           const temporary =
@@ -2533,7 +2561,11 @@ export class TurnLifecycle {
           for (const request of last.requests)
             if (yield* this.#relayLaterResult(agentId, turnId, request, answerText)) kept.push(request);
           if (kept.length > 0)
-            this.#lastResults.set(resultsKey, { turnIds: [...last.turnIds, turnId], requests: kept });
+            this.#lastResults.set(resultsKey, {
+              turnIds: [...last.turnIds, turnId],
+              requests: kept,
+              ...(running.startedBackgroundWork ? { interim: true as const } : {}),
+            });
           else this.#lastResults.delete(resultsKey);
         }
       }
