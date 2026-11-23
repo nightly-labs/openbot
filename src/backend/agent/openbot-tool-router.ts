@@ -223,7 +223,7 @@ import {
   widensAgentSettings,
 } from "./profile-tools";
 import { apiKeyFormSpec, browserUserControlResult } from "./prompts";
-import { ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
+import { ROUTINE_NO_UPDATE_MARKER, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import {
@@ -2188,7 +2188,7 @@ export class OpenBotToolRouter {
         this.#endRoutineRunTurn(params, "quiet");
       return openBotToolResult(
         outcome === "quiet"
-          ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
+          ? { status: "quiet", note: client.provider === "antigravity" ? QUIET_MARKER_NOTE : QUIET_NOTE }
           : { status: "shown", note: "Someone waits for this answer. Report the result as usual." },
       );
     }
@@ -3666,6 +3666,10 @@ type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   queuedBecause?: Exclude<AgentMessageSteer, "steered" | null>;
   note?: string;
 };
+
+const QUIET_NOTE = "This turn ends without a message or a notification. End your turn now.";
+
+const QUIET_MARKER_NOTE = `This turn ends without a message or a notification. End your turn now with only ${ROUTINE_NO_UPDATE_MARKER} as your answer: no other text.`;
 
 const RECIPIENT_QUEUES_NOTE =
   "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";
