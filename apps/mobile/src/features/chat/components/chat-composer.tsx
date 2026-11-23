@@ -579,7 +579,9 @@ export const ChatComposer = memo(function ChatComposer({
     );
   }, [suggestionsVisible, suggestionCount, query?.query]);
 
-  const busy = preparing;
+  const [sendingDictation, setSendingDictation] = useState(false);
+  const sendingDictationRef = useRef(false);
+  const busy = preparing || sendingDictation;
   const attachmentsBlocked = disabled || preparing;
   const leadingBlocked = attachmentsBlocked;
   const [warningColor, dangerColor] = useCSSVariable(["--openbot-warning", "--openbot-danger"]);
@@ -618,7 +620,11 @@ export const ChatComposer = memo(function ChatComposer({
     stopping,
     voiceAvailable: voice?.available ?? false,
   });
-  const controlReady = control.pressable && !dictationBusy;
+  const controlReady = control.pressable;
+  const sendBlocked = useRef(false);
+  sendBlocked.current = disabled || preparing;
+  const hasFiles = useRef(false);
+  hasFiles.current = files.length > 0;
 
   const editAfterDictation = useRef(false);
   useEffect(() => {
@@ -629,7 +635,7 @@ export const ChatComposer = memo(function ChatComposer({
     inputRef.current?.focus();
   }, [dictationBusy, sendGate]);
   const finishDictation = useCallback(() => {
-    if (!dictation) return;
+    if (!dictation || sendingDictationRef.current) return;
     editAfterDictation.current = true;
     dictation.finish();
   }, [dictation]);
@@ -651,13 +657,38 @@ export const ChatComposer = memo(function ChatComposer({
     if (fieldFocused) input?.blur();
   }
 
+  async function sendAfterDictation(current: ComposerDictation): Promise<void> {
+    if (sendingDictationRef.current) return;
+    sendingDictationRef.current = true;
+    editAfterDictation.current = false;
+    setSendingDictation(true);
+    try {
+      const text = await current.finishDraft();
+      latestTextRef.current = text;
+      if (sendBlocked.current || (!text.trim() && !hasFiles.current)) return;
+      sendGate.edit();
+      sendAndCloseField(text);
+    } finally {
+      sendingDictationRef.current = false;
+      setSendingDictation(false);
+    }
+  }
+
   function requestSend(): void {
     if (disabled || preparing) return;
+    if (dictationBusy && dictation) {
+      void sendAfterDictation(dictation);
+      return;
+    }
     sendAndCloseField(latestTextRef.current);
   }
 
   function submitKey(text: string): void {
     if (control.mode !== "send" || !controlReady || voiceOpen) return;
+    if (dictationBusy) {
+      requestSend();
+      return;
+    }
     sendAndCloseField(editMentionDraft(latestTextRef.current, text));
   }
 
@@ -1100,7 +1131,7 @@ export const ChatComposer = memo(function ChatComposer({
                       <DictationMic
                         active={dictating}
                         presence={dictationPresence}
-                        enabled={!disabled && !voiceOpen}
+                        enabled={!disabled && !voiceOpen && !sendingDictation}
                         label={t(dictating ? "mobile.chat.composer.stopDictation" : "mobile.chat.composer.dictate")}
                         foreground={String(foreground)}
                         onPress={toggleDictation}
