@@ -1095,7 +1095,16 @@ and the copy that OpenBot installs can be older (2.3.0-2.3.2 are blocked, #13640
 descriptor has `steer: "reported"`: the catalog keeps the `steersTurns` of the `model/list` answer on
 each OpenCode model, and `agentSteersTurns` reads it for the whole OpenCode process. An OpenCode
 without the extension shows the agent settings warning and "Send now", and its messages wait in the
-queue (#14488). `scripts/opencode-steer-e2e.ts` checks both. Antigravity and Devin steer with
+queue (#14488). `scripts/opencode-steer-e2e.ts` checks both. OpenCode answers `injected` also when
+its session went idle after its busy check, and it then keeps the steer for later instead of reading
+it. So the ACP client counts a steer as read only when the agent writes, thinks or calls a tool
+after the steer was accepted. A steer that the turn did not read, or that was still in flight when
+the prompt ended, is listed in `unreadSteers` of `turn/completed` (not after a stop). The turn end
+puts those deliveries back in the queue with `restoreUnsteered`, so they run in the next turn and
+the sender gets no "blocked" note (#15062). A channel steer sends a channel message id, not a
+delivery id, so this does not cover it. OpenCode can still give its kept copy to a later prompt, as
+it does after a manual resend; over ACP, OpenBot cannot take that copy back. `scripts/opencode-late-steer-e2e.ts` checks both orders
+of the race and that a read steer does not run again. Antigravity and Devin steer with
 a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 and later,
 `steerByPromptCapability` for a Devin CLI that reports `cognition.ai/midTurnPrompts`, because Devin
 reports the version "0.0.0-dev"). While an approval or a question is open, the message waits in the
