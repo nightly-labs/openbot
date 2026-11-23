@@ -73,6 +73,8 @@ export const messages = defineMessages("workflow", {
   "workflow.node.place.choose": "Choose channel",
   "workflow.node.result.title": "Result",
   "workflow.node.result.copy": "Copy result",
+  "workflow.node.result.yes": "Yes",
+  "workflow.node.result.no": "No",
   "workflow.node.result.list": "Results",
   "workflow.node.result.previous": "Previous result",
   "workflow.node.result.next": "Next result",

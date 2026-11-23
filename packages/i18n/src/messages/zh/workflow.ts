@@ -74,6 +74,8 @@ export const messages = {
   "workflow.node.place.choose": "选择频道",
   "workflow.node.result.title": "结果",
   "workflow.node.result.copy": "复制结果",
+  "workflow.node.result.yes": "是",
+  "workflow.node.result.no": "否",
   "workflow.node.result.list": "结果",
   "workflow.node.result.previous": "上一个结果",
   "workflow.node.result.next": "下一个结果",
