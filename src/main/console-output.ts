@@ -3,7 +3,7 @@ interface ErrorStream {
   off(event: "error", listener: (error: NodeJS.ErrnoException) => void): unknown;
 }
 
-export function guardDevelopmentOutput(streams: ErrorStream[], onOutputClosed: () => void): () => void {
+export function guardConsoleOutput(streams: ErrorStream[], onOutputClosed: () => void): () => void {
   let outputClosed = false;
   const handleError = (error: NodeJS.ErrnoException) => {
     if (error.code !== "EIO" && error.code !== "EPIPE") throw error;

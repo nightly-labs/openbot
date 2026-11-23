@@ -182,6 +182,10 @@ export const messages = {
   "sidebar.storage.body": "{used} de {total} en uso en {server}.",
   "sidebar.storage.fullBody": "{used} de {total} en uso en {server}. Los agentes pueden no guardar archivos.",
   "sidebar.storage.meterLabel": "Almacenamiento en uso en {server}",
+  "sidebar.storage.bodyThisComputer": "{used} de {total} en uso en este equipo.",
+  "sidebar.storage.fullBodyThisComputer":
+    "{used} de {total} en uso en este equipo. Los agentes pueden no guardar archivos.",
+  "sidebar.storage.meterLabelThisComputer": "Almacenamiento en uso en este equipo",
   "sidebar.storage.used": "{percent} en uso",
   "sidebar.storage.freeUpSpace": "Liberar espacio",
   "sidebar.storage.dismiss": "Ocultar hasta que esté lleno",

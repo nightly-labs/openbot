@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { Readable, Writable } from "node:stream";
 import { promisify } from "node:util";
 import { type Client, ClientSideConnection, ndJsonStream } from "@agentclientprotocol/sdk";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect } from "effect";
 import { AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
@@ -206,9 +207,7 @@ export class AcpConnection {
     ended: Deferred.Deferred<ProcessEnd> | null,
     serverLost = false,
   ): Effect.fn.Return<unknown, ProviderClientOperationError> {
-    if (!ended || this.#stopping) return yield* providerSync(() => error);
-    const message = error instanceof Error ? error.message : "";
-    if (!serverLost && message !== "ACP connection closed" && message !== "ACP client is not running.")
+    if (!ended || this.#stopping || (!serverLost && !isClosedConnection(error)))
       return yield* providerSync(() => error);
     const ending = yield* Deferred.await(ended).pipe(
       Effect.timeoutOrElse({ duration: EXIT_REPORT_WAIT_MS, orElse: () => Effect.succeed(null) }),
@@ -226,11 +225,25 @@ export class AcpConnection {
     );
   });
 
+  explainClose(error: unknown): unknown {
+    if (!this.#ended || this.#stopping || !isClosedConnection(error)) return error;
+    return new AgentProcessExitError(
+      sourceText("error.provider.acpProcessStopped", { provider: this.options.label() }),
+      null,
+      { cause: error },
+    );
+  }
+
   #fail(error: Error, child: ChildProcessWithoutNullStreams): void {
     if (this.#process !== child) return;
     this.#process = null;
     if (!this.#stopping) this.options.exit(error);
   }
+}
+
+function isClosedConnection(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return message === "ACP connection closed" || message === "ACP client is not running.";
 }
 
 const endProcess = Effect.fn("AcpAgentClient.endProcess")(function* (child: ChildProcessWithoutNullStreams) {

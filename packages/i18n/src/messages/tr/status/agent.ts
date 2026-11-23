@@ -118,4 +118,8 @@ export const messages = {
   "status.agent.compactionContinues": "Ajan bağlamını sıkıştırırken bağlantı kesildi. Ajan devam ediyor.",
   "status.agent.providerExitContinues": "Ajan yanıtını bitirmeden durdu. Ajan devam ediyor.",
   "status.agent.branchTitle": "Dallandırılmış sohbet",
+  "status.agent.location.field": "Konumun",
+  "status.agent.location.placeholder": "Şehir, adres veya yer",
+  "status.agent.location.submit": "Paylaş",
+  "status.agent.location.shared": "Konum paylaşıldı",
 } as const satisfies PartialTranslation<typeof source>;

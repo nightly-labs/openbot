@@ -151,4 +151,8 @@ export const messages = {
   "status.agent.compactionContinues": "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו. הסוכן ממשיך.",
   "status.agent.providerExitContinues": "הסוכן נעצר לפני שסיים את התשובה שלו. הסוכן ממשיך.",
   "status.agent.branchTitle": "צ'אט מסועף",
+  "status.agent.location.field": "המיקום שלך",
+  "status.agent.location.placeholder": "עיר, כתובת או מקום",
+  "status.agent.location.submit": "שיתוף",
+  "status.agent.location.shared": "המיקום שותף",
 } as const satisfies PartialTranslation<typeof source>;

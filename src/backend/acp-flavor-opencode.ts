@@ -60,6 +60,8 @@ function isOpenCodeServiceFailure(error: unknown): boolean {
   return error instanceof RequestError && error.code === -32603 && /\bOpenCode service failure\b/.test(error.message);
 }
 
+const OPENCODE_PROMPT_MEDIA_BASE64_BYTES = 8 * 1024 * 1024;
+
 export const OPENCODE_INTERNAL_FAILURE = "Internal error: Internal service failure";
 
 export function isOpenCodeInternalFailure(error: unknown): boolean {
@@ -280,4 +282,5 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   mcpConnectLimitMs: 30_000,
   relayStdioMcpServers: true,
   childSessionUpdates: true,
+  promptMediaBase64Bytes: OPENCODE_PROMPT_MEDIA_BASE64_BYTES,
 };

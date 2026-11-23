@@ -68,6 +68,7 @@ export const messages = {
   "chat.trace.duration": "Duración",
   "chat.trace.cost": "Coste",
   "chat.trace.tokens": "Tokens",
+  "chat.trace.cachedInput": "Entrada en caché",
   "chat.trace.llmCalls": "Llamadas al LLM",
   "chat.trace.toolCalls": "Llamadas a herramientas",
   "chat.trace.errors": "Errores",
@@ -491,6 +492,8 @@ export const messages = {
   "chat.suggestion.updating": "Actualizando…",
   "chat.suggestion.saveReply": "Sí, guárdalo como habilidad.",
   "chat.suggestion.updateReply": "Sí, añádelo a la habilidad.",
+  "chat.suggestion.saveFailed":
+    "No se pudo guardar la habilidad. Inténtalo de nuevo cuando el agente termine su trabajo.",
   "chat.suggestion.detailsNamed": "Abrir {name} en Marketplace",
   "chat.suggestion.dismissed": "Sugerencia de {name} descartada.",
   "chat.suggestion.undo": "Deshacer",

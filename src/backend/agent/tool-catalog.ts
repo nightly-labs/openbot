@@ -113,14 +113,12 @@ const kimiCallShape = {
 const TOOL_SEARCH_DESCRIPTION =
   "Find built-in tools by keywords or qualified name: queries (array) or query. Returns short descriptions, default 5, max 10; the best matches also give inputSchema and guidance. Run found tools with tool_call, not directly. Describe others before use.";
 
-function toolDefinitions(catalog: typeof BUILTIN_TOOL_CATALOG, catalogInSearch = true) {
+function toolDefinitions(catalog: typeof BUILTIN_TOOL_CATALOG) {
   return [
     ...OPENBOT_TOOL_DEFINITIONS.filter((tool) => DIRECT_NAMES.has(tool.name)),
     {
       name: "tool_search",
-      description: catalogInSearch
-        ? `${TOOL_SEARCH_DESCRIPTION} Catalog: ${catalogNames(catalog)}`
-        : `${TOOL_SEARCH_DESCRIPTION} Your instructions list the catalog.`,
+      description: `${TOOL_SEARCH_DESCRIPTION} Catalog: ${catalogNames(catalog)}`,
       shape: searchShape,
     },
     {
@@ -163,7 +161,45 @@ const KIMI_DYNAMIC_TOOLS = dynamicTools(
     definition.name === "tool_call" ? { ...definition, shape: kimiCallShape } : definition,
   ),
 );
-const ANTIGRAVITY_DYNAMIC_TOOLS = dynamicTools(toolDefinitions(catalogFor("antigravity"), false));
+const ANTIGRAVITY_DISCOVERY_TOOLS: DynamicToolNamespace["tools"] = [
+  {
+    type: "function",
+    name: "tool_search",
+    description: "Find catalog tools by keywords.",
+    inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+  },
+  {
+    type: "function",
+    name: "tool_describe",
+    description: "Get catalog tool schemas.",
+    inputSchema: {
+      type: "object",
+      properties: { names: { type: "array", items: { type: "string" } } },
+      required: ["names"],
+    },
+  },
+  {
+    type: "function",
+    name: "tool_call",
+    description: "Run a catalog tool.",
+    inputSchema: {
+      type: "object",
+      properties: { name: { type: "string" }, arguments: { type: "object", properties: {}, additionalProperties: {} } },
+      required: ["name"],
+    },
+  },
+];
+
+const ANTIGRAVITY_DYNAMIC_TOOLS = dynamicTools(toolDefinitions(catalogFor("antigravity"))).map((namespace) =>
+  namespace.name === OPENBOT_DYNAMIC_TOOLS.name
+    ? {
+        ...namespace,
+        tools: namespace.tools.map(
+          (tool) => ANTIGRAVITY_DISCOVERY_TOOLS.find((compact) => compact.name === tool.name) ?? tool,
+        ),
+      }
+    : namespace,
+);
 
 export function toolCatalogNames(provider: AgentProviderId): string {
   return catalogNames(catalogFor(provider));

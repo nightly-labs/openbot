@@ -182,6 +182,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "{provider} stopte voordat dit bericht begon. Stuur het bericht opnieuw.",
   "error.provider.sessionStartTimedOut":
     "{provider} opende niet op tijd een nieuwe chat, dus dit bericht is niet begonnen. Open op de computer waarop OpenBot draait Aanbieders, kies {provider} en klik op Herstarten. Probeer het daarna opnieuw.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} opende deze chat niet op tijd, dus dit bericht is niet begonnen. Open op de computer waarop OpenBot draait Aanbieders, kies {provider} en klik op Herstarten. Probeer het daarna opnieuw.",
   "error.provider.serviceUnreachable":
     "{provider} kan geen verbinding maken met zijn service. Controleer je internetverbinding. OpenBot probeert het opnieuw.",
   "error.provider.serviceUnreachableRefresh":
@@ -290,6 +292,8 @@ export const messages = {
     "Linux heeft de provider gestopt, omdat OpenBot een realtime-CPU-limiet van 0 heeft. De limiet komt van je systeem. Installeer en start rtkit (`rtkit-daemon`), voer `systemctl --user restart xdg-desktop-portal` uit en start OpenBot daarna opnieuw. Alleen xdg-desktop-portal opnieuw starten helpt niet zolang rtkit ontbreekt.",
   "error.provider.cpuUnsupported":
     "De processor van deze computer kan deze aanbieder niet uitvoeren. Gebruik een andere aanbieder.",
+  "error.provider.windowsBlocked":
+    "Windows-beveiligingsinstellingen, zoals Slim app-beheer, hebben het starten van deze provider verhinderd. Gebruik een andere provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode kon de database niet openen, omdat een nieuwere versie van OpenCode deze heeft gewijzigd. Werk OpenCode bij naar versie 2 of nieuwer en probeer het opnieuw.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -305,6 +309,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} stopte zonder antwoord. Stuur het bericht opnieuw.",
   "error.provider.channelNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Klik in het kanaal op Doorgaan om de taak opnieuw uit te voeren, of op Opnieuw toewijzen om hem aan een ander lid te geven.",
+  "error.provider.acpProcessStopped": "{provider} stopte voordat het antwoordde. Stuur het bericht opnieuw.",
   "error.provider.chatgptPageFailed": "OpenBot kon de verbindingspagina van ChatGPT niet openen.",
   "error.provider.noneReady": "Er is geen agentaanbieder klaar.",
   "error.provider.claudeTurnActive": "Wacht op de actieve Claude-beurt voordat je de context vernieuwt.",
@@ -345,6 +350,8 @@ export const messages = {
     "{provider} heeft de vorige beurt niet afgerond en heeft dit bericht daarom niet aangenomen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Stuur je bericht opnieuw.",
   "error.provider.antigravityLocationUnsupported":
     "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini is gestopt door een fout. Stuur je bericht opnieuw. Stopt het weer, kies dan een ander model of een andere provider.",
   "error.provider.antigravityConnectionLost":
     "Gemini is de verbinding met zijn agent kwijtgeraakt en is gestopt. Stuur een bericht om verder te gaan.",
   "error.provider.grokServiceFailure":

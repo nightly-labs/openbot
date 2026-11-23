@@ -187,6 +187,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "{provider} parou antes de esta mensagem começar. Envie a mensagem de novo.",
   "error.provider.sessionStartTimedOut":
     "{provider} não abriu um novo chat a tempo, então esta mensagem não começou. No computador que executa o OpenBot, abra Provedores, selecione {provider} e clique em Reiniciar. Depois tente de novo.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} não abriu este chat a tempo, então esta mensagem não começou. No computador que executa o OpenBot, abra Provedores, selecione {provider} e clique em Reiniciar. Depois tente de novo.",
   "error.provider.serviceUnreachable":
     "{provider} não consegue se conectar ao serviço dele. Verifique sua conexão com a internet. O OpenBot tentará de novo.",
   "error.provider.serviceUnreachableRefresh":
@@ -292,6 +294,8 @@ export const messages = {
     "O Linux parou o provedor porque o OpenBot tem um limite de CPU em tempo real igual a 0. O limite vem do seu sistema. Instale e inicie o rtkit (`rtkit-daemon`), execute `systemctl --user restart xdg-desktop-portal` e depois reinicie o OpenBot. Reiniciar apenas o xdg-desktop-portal não resolve enquanto o rtkit estiver ausente.",
   "error.provider.cpuUnsupported":
     "O processador deste computador não consegue executar este provedor. Use outro provedor.",
+  "error.provider.windowsBlocked":
+    "As configurações de segurança do Windows, como o Controle Inteligente de Aplicativos, impediram que este provedor iniciasse. Use outro provedor.",
   "error.provider.opencodeDatabaseNewer":
     "O OpenCode não conseguiu abrir o banco de dados porque uma versão mais recente do OpenCode o alterou. Atualize o OpenCode para a versão 2 ou posterior e tente novamente.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -307,6 +311,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} parou sem resposta. Envie a mensagem novamente.",
   "error.provider.channelNoAnswer":
     "{provider} encerrou o turno sem resposta. No canal, clique em Continuar para executar a tarefa novamente, ou em Reatribuir para passá-la a outro membro.",
+  "error.provider.acpProcessStopped": "{provider} parou antes de responder. Envie a mensagem novamente.",
   "error.provider.chatgptPageFailed": "O OpenBot não conseguiu abrir a página de conexão do ChatGPT.",
   "error.provider.noneReady": "Nenhum provedor de agentes está pronto.",
   "error.provider.claudeTurnActive": "Aguarde o turno ativo do Claude terminar antes de atualizar seu contexto.",
@@ -346,6 +351,8 @@ export const messages = {
     "{provider} não terminou o turno anterior, então não aceitou esta mensagem. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Envie sua mensagem novamente.",
   "error.provider.antigravityLocationUnsupported":
     "O Google não permite que o Gemini funcione a partir da localização de rede do computador que executa este agente. Use o Gemini em outro computador ou escolha outro provedor para este agente.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "O Gemini parou por causa de um erro. Envie sua mensagem de novo. Se ele parar de novo, escolha outro modelo ou provedor.",
   "error.provider.antigravityConnectionLost":
     "O Gemini perdeu a conexão com seu agente e parou. Envie uma mensagem para continuar.",
   "error.provider.grokServiceFailure":

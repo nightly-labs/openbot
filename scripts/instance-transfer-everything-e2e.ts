@@ -21,6 +21,7 @@ import {
   type ServerNotificationLevel,
   type SkillLearningMode,
   type UpdateHostIdentityInput,
+  WORKFLOW_UNLINKED_CONNECTION,
 } from "@openbot/contracts/ipc";
 import { copiedTransferUpload } from "@openbot/team-client/team-api-requests";
 import { Effect } from "effect";
@@ -49,6 +50,7 @@ const { INSTANCE_TRANSFER_MANIFEST } = await import("../src/main/instance-transf
 const { LocalSkillLibrary } = await import("../src/main/local-skill-library");
 const { WorkflowStore } = await import("../src/backend/workflows/workflow-store");
 const { workflowScheduleDueAt } = await import("../src/backend/workflows/workflow-triggers");
+const { telegramTriggerMatches } = await import("../src/backend/workflows/telegram-matching");
 const { HostEventsService } = await import("../src/main/host-events-service");
 
 const HISTORY_MARK = "the blue notebook is on the second shelf";
@@ -363,7 +365,13 @@ function profile(name: string) {
         ),
       workflows: {
         workflows: () =>
-          Effect.sync(() => workflows.listWithGraphs().map(({ summary, graph }) => ({ title: summary.title, graph }))),
+          Effect.sync(() =>
+            workflows.listWithGraphs().map(({ summary, graph, needsNewerApp }) => ({
+              title: summary.title,
+              graph,
+              ...(needsNewerApp ? { needsNewerApp } : {}),
+            })),
+          ),
         createWorkflow: (input) => Effect.try(() => workflows.create(input, new Date(), "saved")),
       },
       signedInProviders: () => [],
@@ -593,6 +601,26 @@ try {
             at,
             fields: { trigger: "slack", connectionId: "messaging-1", event: "message" },
           },
+          {
+            id: "telegram",
+            kind: "trigger",
+            at,
+            fields: { trigger: "telegram", connectionId: "messaging-2", event: "mention" },
+          },
+          { id: "anyChat", kind: "trigger", at, fields: { trigger: "telegram", connectionId: "", event: "mention" } },
+          {
+            id: "discord",
+            kind: "trigger",
+            at,
+            fields: {
+              trigger: "discord",
+              connectionId: "messaging-3",
+              event: "mention",
+              placeId: "channel-1",
+              roles: "role-1\nrole-2",
+            },
+          },
+          { id: "reply", kind: "output", at, fields: { target: "telegram", connectionId: "trigger", action: "reply" } },
           { id: "write", kind: "agent", at, fields: { agentId: writer.id, task: "Write it." } },
           { id: "post", kind: "output", at, fields: { target: "chat-channel", channelId: channel.id } },
         ],
@@ -623,6 +651,13 @@ try {
       strokes: [],
     },
   });
+  const brokenRow = source.workflows.create({
+    title: "Broken row",
+    graph: { nodes: [{ id: "keep", kind: "text", at, fields: { text: "Keep me." } }], edges: [], strokes: [] },
+  });
+  source.database.connection
+    .prepare("UPDATE workflow_nodes SET fields_json = ? WHERE workflow_id = ?")
+    .run('{"text":{"rich":true}}', brokenRow.summary.id);
 
   Object.assign(source.serverPreferences, {
     timezone: "Europe/Warsaw",
@@ -1003,6 +1038,12 @@ try {
       exported.warnings.some((warning) => warning.startsWith("Long desk:") && warning.includes("2000")),
     JSON.stringify({ length: newLongDesk?.instructions.length, warnings: exported.warnings }),
   );
+  pass(
+    "a workflow with a step that this OpenBot cannot read stays out of the file, and the user is told",
+    !(manifest.settings?.workflows ?? []).some((workflow) => workflow.title === "Broken row") &&
+      exported.warnings.some((warning) => warning.startsWith("Broken row is not imported.")),
+    JSON.stringify(exported.warnings),
+  );
   assert.ok(newChannel);
   pass(
     "channel members and lead are the new agents",
@@ -1080,7 +1121,39 @@ try {
     node("write")?.agentId === newWriter.id && node("post")?.channelId === newChannel.id,
     JSON.stringify(newWorkflow?.graph.nodes.map((item) => item.fields)),
   );
-  pass("the workflow's messaging connection is left empty", node("slack")?.connectionId === "");
+  pass(
+    "the workflow's messaging connections need a new link",
+    ["slack", "telegram", "discord"].every((id) => node(id)?.connectionId === WORKFLOW_UNLINKED_CONNECTION),
+    JSON.stringify(newWorkflow?.graph.nodes.map((item) => item.fields)),
+  );
+  pass(
+    "the old server's channel and roles are cleared with the link",
+    node("discord")?.placeId === "" && node("discord")?.roles === "",
+    JSON.stringify(node("discord")),
+  );
+  pass(
+    "an any-chat trigger and a same-as-trigger reply keep their meaning",
+    node("anyChat")?.connectionId === "" && node("reply")?.connectionId === "trigger",
+    JSON.stringify([node("anyChat"), node("reply")]),
+  );
+  const unlinkedTelegram = newWorkflow?.graph.nodes.find((item) => item.id === "telegram");
+  const mention = (connectionId: string) => ({
+    connectionId,
+    chatName: "Team chat",
+    chatId: "chat-1",
+    threadKey: "chat-1",
+    messageId: randomUUID(),
+    authorId: "author-1",
+    authorName: "Ada",
+    text: "@agent hello",
+    receivedAt: new Date().toISOString(),
+  });
+  pass(
+    "a moved Telegram trigger does not start for a chat on the new server",
+    unlinkedTelegram !== undefined &&
+      !telegramTriggerMatches(unlinkedTelegram, mention("messaging-new")) &&
+      !telegramTriggerMatches(unlinkedTelegram, mention("messaging-2")),
+  );
   pass("a saved value that this OpenBot does not know moves as it is", node("slack")?.event === "message");
   const movedWorkflows = target.workflows.listWithGraphs();
   pass(

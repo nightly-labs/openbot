@@ -1,4 +1,4 @@
-import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, agentProviderName, KEY_ONLY_PROVIDERS } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -202,6 +202,7 @@ const POOL_PASS_OVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "usage_limit",
   "provider_unavailable",
   "authentication",
+  "model_not_found",
 ]);
 
 const COMPACTION_RETRY_CAUSES: ReadonlySet<CauseCode> = new Set(["network", "timeout"]);
@@ -947,7 +948,20 @@ export class TurnLifecycle {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
       return false;
     }
-    if (source.provider !== "codex" && source.provider !== "claude") return false;
+    if (
+      this.#hooks.hasOpenWait(
+        agentId,
+        deliveries.map(({ delivery }) => delivery.id),
+      )
+    ) {
+      logger.info("A turn that keeps a wait open ended with no answer.", {
+        agentId,
+        turnId,
+        provider: source.provider,
+      });
+      return false;
+    }
+    if (!NO_ANSWER_CHECKED_PROVIDERS.has(source.provider)) return false;
     if (deliveries.every(({ delivery }) => this.#mailbox.answersHandledRequest(delivery.id))) {
       logger.info("A turn for another teammate result to a handled request ended quietly.", {
         agentId,
@@ -1137,7 +1151,9 @@ export class TurnLifecycle {
   #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
     const resetDelayMs = providerResetDelayMs(failover.message);
     const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
-    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, failover.context.causeCode === "authentication");
+    const { causeCode, provider } = failover.context;
+    const notOffered = causeCode === "model_not_found" && provider === "claude";
+    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, causeCode === "authentication", notOffered);
   }
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {
@@ -1442,7 +1458,10 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         const reported = getString(turn, "status") ?? "completed";
-        const noAnswer = reported === "completed" && this.#holdNoAnswer(agentId, threadId, turnId, source);
+        const noAnswer =
+          reported === "completed" &&
+          turn?.handledCommand !== true &&
+          this.#holdNoAnswer(agentId, threadId, turnId, source);
         const status =
           ((reported === "failed" && this.#quietEmptyAnswers.has(turnId)) ||
             (reported === "interrupted" && this.#quietStops.has(turnId))) &&
@@ -3401,14 +3420,16 @@ export class TurnLifecycle {
   ): ConversationMessage | undefined {
     const message = traceMessage(messages, turnId);
     if (!message) return undefined;
-    let usage: { tokens: number; costUsd: number | null } | null = null;
+    let usage: { tokens: number; cachedInput: number; costUsd: number | null } | null = null;
     try {
       const since = new Date(Date.parse(trace.startedAt) - TURN_USAGE_MARGIN_MS).toISOString();
       usage = this.#store.database.usage.readTurnTotals(agentId, turnId, since);
     } catch (error) {
       logger.warn("The usage of a turn could not be read for its trace.", { error });
     }
-    message.trace = usage ? { ...trace, tokens: usage.tokens, costUsd: usage.costUsd } : trace;
+    message.trace = usage
+      ? { ...trace, tokens: usage.tokens, cachedInput: usage.cachedInput, costUsd: usage.costUsd }
+      : trace;
     return message;
   }
 
@@ -3539,6 +3560,13 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown;
   if (item.failureReport === true) return false;
   return item.phase !== "commentary" && hasText(item);
 }
+
+const NO_ANSWER_CHECKED_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
+  "codex",
+  "claude",
+  "pi",
+  ...KEY_ONLY_PROVIDERS,
+]);
 
 const NARRATION_KEEPING_TOOLS = new Set([
   "messaging_history",

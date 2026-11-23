@@ -181,6 +181,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "{provider}, bu mesaj başlamadan önce durdu. Mesajı yeniden gönderin.",
   "error.provider.sessionStartTimedOut":
     "{provider} yeni bir sohbeti zamanında açamadı, bu yüzden bu mesaj başlamadı. OpenBot'u çalıştıran bilgisayarda Sağlayıcılar sayfasını açın, {provider} öğesini seçin ve Yeniden başlat'a tıklayın. Sonra tekrar deneyin.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} bu sohbeti zamanında açamadı, bu yüzden bu mesaj başlamadı. OpenBot'u çalıştıran bilgisayarda Sağlayıcılar sayfasını açın, {provider} öğesini seçin ve Yeniden başlat'a tıklayın. Sonra tekrar deneyin.",
   "error.provider.serviceUnreachable":
     "{provider} hizmetine bağlanamıyor. İnternet bağlantınızı kontrol edin. OpenBot tekrar deneyecek.",
   "error.provider.serviceUnreachableRefresh":
@@ -290,6 +292,8 @@ export const messages = {
     "OpenBot'un gerçek zamanlı CPU sınırı 0 olduğu için Linux sağlayıcıyı durdurdu. Bu sınır sisteminizden geliyor. rtkit'i kurup başlatın (`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal` komutunu çalıştırın, ardından OpenBot'u yeniden başlatın. rtkit eksikken yalnızca xdg-desktop-portal'ı yeniden başlatmak işe yaramaz.",
   "error.provider.cpuUnsupported":
     "Bu bilgisayarın işlemcisi bu sağlayıcıyı çalıştıramıyor. Başka bir sağlayıcı kullanın.",
+  "error.provider.windowsBlocked":
+    "Akıllı Uygulama Denetimi gibi Windows güvenlik ayarları bu sağlayıcının başlamasını engelledi. Başka bir sağlayıcı kullanın.",
   "error.provider.opencodeDatabaseNewer":
     "Daha yeni bir OpenCode sürümü veritabanını değiştirdiği için OpenCode veritabanını açamadı. OpenCode'u 2 veya daha yeni bir sürüme güncelleyin, sonra yeniden deneyin.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -305,6 +309,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} yanıt vermeden durdu. Mesajı yeniden gönderin.",
   "error.provider.channelNoAnswer":
     "{provider} turu yanıt vermeden bitirdi. Kanalda görevi yeniden çalıştırmak için Devam et'e, başka bir üyeye vermek için Yeniden ata'ya tıklayın.",
+  "error.provider.acpProcessStopped": "{provider} yanıt vermeden önce durdu. Mesajı yeniden gönderin.",
   "error.provider.chatgptPageFailed": "OpenBot ChatGPT bağlantı sayfasını açamadı.",
   "error.provider.noneReady": "Hiçbir ajan sağlayıcısı hazır değil.",
   "error.provider.claudeTurnActive": "Bağlamını yenilemeden önce etkin Claude turunun bitmesini bekleyin.",
@@ -345,6 +350,8 @@ export const messages = {
     "{provider} önceki turunu bitirmediği için bu mesajı kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Mesajınızı yeniden gönderin.",
   "error.provider.antigravityLocationUnsupported":
     "Google, bu ajanı çalıştıran bilgisayarın ağ konumundan Gemini'nin çalışmasına izin vermiyor. Gemini'yi başka bir bilgisayarda kullanın veya bu ajan için başka bir sağlayıcı seçin.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini bir hata nedeniyle durdu. Mesajınızı yeniden gönderin. Yine durursa başka bir model veya sağlayıcı seçin.",
   "error.provider.antigravityConnectionLost":
     "Gemini, aracısıyla bağlantısını kaybetti ve durdu. Devam etmek için bir mesaj gönderin.",
   "error.provider.grokServiceFailure":

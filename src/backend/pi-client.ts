@@ -13,7 +13,7 @@ import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { CONTEXT_COMPACTION_THRESHOLD } from "./agent/context-compaction";
 import { withoutTurnContext } from "./agent/developer-instructions";
 import { secretElicitationField } from "./agent/prompts";
-import { isContextTooSmallFailure } from "./agent/provider-diagnostics";
+import { isContextTooSmallFailure, isPiCompactionNoOp } from "./agent/provider-diagnostics";
 import { waitForSuccessfulProcess } from "./agent/provider-status";
 import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
@@ -262,17 +262,22 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     failure: ProviderClientOperationError,
   ) {
     const message = failure.cause instanceof Error ? failure.cause.message : "";
-    if (!isContextTooSmallFailure(message)) return yield* failure;
-    const full = yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
+    const noOp = isPiCompactionNoOp(message);
+    const tooSmall = isContextTooSmallFailure(message);
+    if (!noOp && !tooSmall) return yield* failure;
+    const usedShare = yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
       Effect.map((stats) =>
-        Option.exists(
+        Option.map(
           Schema.decodeUnknownOption(PiContextUsage)(getRecord(stats, "contextUsage")),
-          (usage) => usage.tokens / usage.contextWindow >= CONTEXT_COMPACTION_THRESHOLD,
+          (usage) => usage.tokens / usage.contextWindow,
         ),
       ),
-      Effect.orElseSucceed(() => false),
+      Effect.orElseSucceed(() => Option.none<number>()),
     );
-    return yield* full ? providerFailure(new Error(this.#contextTooSmall(message))) : failure;
+    const full = Option.exists(usedShare, (share) => share >= CONTEXT_COMPACTION_THRESHOLD);
+    if (full && tooSmall) return yield* providerFailure(new Error(this.#contextTooSmall(message)));
+    if (!noOp || full || Option.isNone(usedShare)) return yield* failure;
+    logger.info("Pi has nothing to compact, so the session is already compact.", { provider: this.provider });
   });
 
   #contextTooSmall(reason: string): string {
@@ -860,7 +865,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           }),
         ),
         Effect.flatMap((response) =>
-          response.disposition === "handled" && thread.turn === turn ? this.#finish(thread, "completed") : Effect.void,
+          response.disposition === "handled" && thread.turn === turn
+            ? this.#finish(thread, "completed", undefined, undefined, true)
+            : Effect.void,
         ),
         Effect.catch(fail),
       ),
@@ -1090,6 +1097,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     status: string,
     failure?: string,
     causeCode?: CauseCode,
+    handledCommand = false,
   ) {
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
@@ -1138,7 +1146,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       if (Exit.isFailure(saved)) status = "failed";
     }
     if (thread.turn === turn) thread.turn = null;
-    this.#notify("turn/completed", thread, { turn: { id: turn.id, status } });
+    this.#notify("turn/completed", thread, {
+      turn: { id: turn.id, status, ...(handledCommand ? { handledCommand } : {}) },
+    });
     this.#background(this.#markIdle(thread));
   });
 

@@ -54,6 +54,7 @@ import {
   withQuestionContext,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
+import { promptAskedByThisPerson } from "@/features/chat/model/location-request";
 import {
   answerlessTurnSummaries,
   finishedTurnSummaries,
@@ -325,6 +326,7 @@ function AgentTaskChat({
     online,
     respond,
     (text) => setDraft((current) => (current.trim() ? `${current.trimEnd()}\n${text}` : text)),
+    promptAskedByThisPerson(messages, activePrompt?.id),
   );
   const answersQuestion = Boolean(questionForm.question && !questionForm.question.isSecret && questionForm.replyInChat);
   const threadId = conversation.data?.threadId ?? null;

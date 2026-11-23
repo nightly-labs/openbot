@@ -33,6 +33,8 @@ export const messages = {
     "1Password hat zu viele Anfragen erhalten. Warte ein paar Minuten und versuche es erneut.",
   "error.connector.onePasswordNoVault":
     "Das Dienstkonto kann keinen Tresor lesen. Gib ihm Zugriff auf einen Tresor und versuche es erneut.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot kann deine Logins in 1Password nicht lesen. Trenne 1Password und verbinde es dann erneut.",
   "error.connector.onePasswordFileUnreadable": "Die 1Password-Verbindungsdatei ist nicht lesbar.",
   "error.connector.onePasswordFileTooLarge": "Die 1Password-Verbindungsdatei ist zu groß.",
   "error.connector.bitwardenFailed":
@@ -45,6 +47,10 @@ export const messages = {
     "Gib eine HTTPS-Serveradresse, client_id und client_secret des API-Schlüssels und das Master-Passwort ein.",
   "error.connector.bitwardenHostFailed":
     "Bitwarden konnte auf diesem Server nicht geöffnet werden. Prüfe die Serveradresse, den API-Schlüssel und das Master-Passwort und stelle sicher, dass ein Ordner Shared with OpenBot heißt. Verbinde dann erneut.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Die Anmeldung bei Bitwarden auf diesem Server ist fehlgeschlagen. Prüfe die Serveradresse und den API-Schlüssel und verbinde dann erneut.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Bitwarden konnte auf diesem Server nicht entsperrt werden. Prüfe das Master-Passwort und verbinde dann erneut.",
   "error.connector.bitwardenCliInstallFailed":
     "Die Bitwarden CLI konnte auf diesem Server nicht installiert werden. Prüfe seine Netzwerkverbindung und verbinde dann erneut.",
   "error.connector.bitwardenFileUnreadable": "Die Bitwarden-Verbindungsdatei ist nicht lesbar.",

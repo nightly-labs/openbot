@@ -64,6 +64,7 @@ import { USAGE_LIMIT_METHOD } from "./agent/usage-limit-gate";
 import {
   type AgentProvider,
   MissingClaudeSessionError,
+  ProviderModelLimitedError,
   ProviderTurnActiveError,
   RequestTimeoutError,
 } from "./agent-client";
@@ -370,6 +371,7 @@ interface ActiveTurn {
   authenticationFailed: boolean;
   balanceSpent: boolean;
   billingFailed: boolean;
+  modelNotFound: boolean;
   retrying: boolean;
   sandboxBlockedWarned: boolean;
   unprompted: boolean;
@@ -1616,7 +1618,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const requestedModel = getString(params, "model");
     const modelChanged = Boolean(requestedModel && requestedModel !== runtime.config.model);
     if (requestedModel && modelChanged) {
-      yield* providerCall(() => runtime.query.setModel(this.#sdkModel(requestedModel)));
+      yield* providerCall(() => runtime.query.setModel(this.#sdkModel(requestedModel))).pipe(
+        Effect.mapError((failure) => {
+          const refusal = limitRefusal(failure.cause);
+          return refusal === null ? failure : providerFailure(new ProviderModelLimitedError(refusal));
+        }),
+      );
       runtime.config.model = requestedModel;
     }
     const requestedEffort = getString(params, "effort");
@@ -1713,6 +1720,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       authenticationFailed: false,
       balanceSpent: false,
       billingFailed: false,
+      modelNotFound: false,
       retrying: false,
       sandboxBlockedWarned: false,
       unprompted,
@@ -2111,6 +2119,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       if (message.error === "authentication_failed") turn.authenticationFailed = true;
       if (message.error === "billing_error") turn.billingFailed = true;
+      if (message.error === "model_not_found") turn.modelNotFound = true;
       if (message.error && message.error !== "max_output_tokens") return;
       this.#closeBlockedReply(runtime);
       const thinking = messageThinking(message.message);
@@ -2636,11 +2645,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
               ? { causeCode: "authentication" }
               : billing
                 ? { causeCode: "billing" }
-                : turn.stalled
-                  ? { causeCode: "stalled" }
-                  : crashed
-                    ? { causeCode: "provider_exited" }
-                    : {}),
+                : turn.modelNotFound
+                  ? { causeCode: "model_not_found" }
+                  : turn.stalled
+                    ? { causeCode: "stalled" }
+                    : crashed
+                      ? { causeCode: "provider_exited" }
+                      : {}),
         },
       });
     }
@@ -3020,7 +3031,7 @@ function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
 const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? Set sandbox\.failIfUnavailable=false/s;
 
 const CLAUDE_SANDBOX_BLOCKED =
-  /^(?:apply-seccomp: (?:unshare\(|write \/proc\/self\/(?:setgroups|uid_map|gid_map)\b)|bwrap: (?:Failed to make \/ slave|setting up uid map|No permissions to creat(?:e a new|ing new) namespace|Creating new namespace failed|pivot_root\b|loopback: Failed RTM_NEW(?:ADDR|LINK)))/mu;
+  /^(?:apply-seccomp: (?:unshare\(|write \/proc\/self\/(?:setgroups|uid_map|gid_map)\b)|bwrap: (?:Failed to make \/ slave|setting up uid map|No permissions to creat(?:e a new|ing new) namespace|Creating new namespace failed|pivot_root\b|loopback: Failed RTM_NEW(?:ADDR|LINK)|Can't mount proc on (?:\/newroot)?\/proc: (?:Operation not permitted|Permission denied|Invalid argument)))/mu;
 
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 
@@ -3058,6 +3069,12 @@ function claudeTurnError(error: unknown, apiKey: boolean, claudeAccount: boolean
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
   return CLAUDE_SANDBOX_UNAVAILABLE.test(text) ? sourceText("error.agent.claudeNoSandbox") : text;
+}
+
+function limitRefusal(cause: unknown): string | null {
+  const text = cause instanceof Error ? cause.message : String(cause);
+  const reason = classifyFailure(text);
+  return (reason === "rate_limit" || reason === "usage_limit") && !isPlanLimitDiagnostic(text) ? text : null;
 }
 
 function claudeProcessExited(error: unknown): boolean {

@@ -2274,6 +2274,7 @@ export async function createApplicationServices({
     listAgents: () => service.listAgents(),
     agentDefaults: () => agentDefaults.get(),
     listModels: () => service.listModels(),
+    providerStatuses: () => service.getStatus().providers ?? [],
     listRoutines: (agentId) => service.listRoutines(agentId),
     runRoutine: (input) => service.runRoutineFromAutomation(input),
     sendMessage: (input) => service.sendMessage(input),
@@ -3087,9 +3088,15 @@ export async function createApplicationServices({
       saveRoutineFlowPosition: (input) => routineFlowRuntime.savePosition(input),
       workflows: {
         workflows: () =>
-          workflowRuntime
-            .listWithGraphs()
-            .pipe(Effect.map((list) => list.map(({ summary, graph }) => ({ title: summary.title, graph })))),
+          workflowRuntime.listWithGraphs().pipe(
+            Effect.map((list) =>
+              list.map(({ summary, graph, needsNewerApp }) => ({
+                title: summary.title,
+                graph,
+                ...(needsNewerApp ? { needsNewerApp } : {}),
+              })),
+            ),
+          ),
         createWorkflow: (input) => workflowRuntime.createCopy(input),
       },
       signedInProviders: () =>
@@ -4062,7 +4069,7 @@ export async function createApplicationServices({
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
       agentWork: [
-        ...service.hasActiveWork(),
+        ...service.workBeforeRestart(),
         ...(workflowRuntime.working() ? ["routine-run"] : []),
         ...(localServers && localServers.workingAgents().length > 0 ? ["agent-turn"] : []),
       ],

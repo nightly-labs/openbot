@@ -177,6 +177,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.stoppedBeforeStart": "{provider} stopped before this message started. Send the message again.",
   "error.provider.sessionStartTimedOut":
     "{provider} did not open a new chat in time, so this message did not start. On the computer that runs OpenBot, open Providers, select {provider} and click Restart. Then try again.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} did not open this chat in time, so this message did not start. On the computer that runs OpenBot, open Providers, select {provider} and click Restart. Then try again.",
   "error.provider.serviceUnreachable":
     "{provider} cannot connect to its service. Check your internet connection. OpenBot will try again.",
   "error.provider.serviceUnreachableRefresh":
@@ -279,6 +281,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.realtimeLimitZero":
     "Linux stopped the provider because OpenBot has a real-time CPU limit of 0. The limit comes from your system. Install and start rtkit (`rtkit-daemon`), run `systemctl --user restart xdg-desktop-portal`, then restart OpenBot. Restarting xdg-desktop-portal alone does not help while rtkit is missing.",
   "error.provider.cpuUnsupported": "The processor of this computer cannot run this provider. Use a different provider.",
+  "error.provider.windowsBlocked":
+    "Windows security settings, such as Smart App Control, stopped this provider from starting. Use a different provider.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode could not open its database because a newer OpenCode version changed it. Update OpenCode to version 2 or later, then try again.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -294,6 +298,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpRefusedNoReason": "{provider} stopped without an answer. Send the message again.",
   "error.provider.channelNoAnswer":
     "{provider} ended the turn with no answer. In the channel, click Continue to run the task again, or Reassign to give it to another member.",
+  "error.provider.acpProcessStopped": "{provider} stopped before it answered. Send the message again.",
   "error.provider.chatgptPageFailed": "OpenBot could not open the ChatGPT connection page.",
   "error.provider.noneReady": "No agent provider is ready.",
   "error.provider.claudeTurnActive": "Wait for the active Claude turn before refreshing its context.",
@@ -332,6 +337,8 @@ export const messages = defineMessages("error.provider", {
     "{provider} did not end its earlier turn, so it did not accept this message. OpenBot started a new {provider} session with the chat history. Send your message again.",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini stopped because of an error. Send your message again. If it stops again, choose another model or provider.",
   "error.provider.antigravityConnectionLost":
     "Gemini lost the connection to its agent and stopped. Send a message to continue.",
   "error.provider.grokServiceFailure":

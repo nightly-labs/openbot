@@ -163,6 +163,10 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
+import {
+  forgetLocationAlwaysAllowed,
+  retainLocationAlwaysAllowed,
+} from "@/features/chat/model/location-always-allowed";
 import { deleteServerSideQuestions } from "@/features/chat/model/side-questions";
 import { useLiveActivity } from "@/features/live-activity/use-live-activity";
 import { NotificationAvatarSync } from "@/features/push-notifications/notification-avatar-sync";
@@ -626,6 +630,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       forgetDrawerSnapshots(serverIds);
       forgetAgentBackdrops(serverIds);
+      forgetLocationAlwaysAllowed(serverIds);
       setSidebarByServer((current) => withoutKeys(current, serverIds));
       setHostHidden((current) => withoutKeys(current, serverIds));
       hostColors.current = withoutKeys(hostColors.current, serverIds);
@@ -655,6 +660,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
         void workspaceCache?.retain([...available]).catch(() => undefined);
         retainAgentBackdrops([...available]);
+        retainLocationAlwaysAllowed([...available]);
         for (const host of hosts) removedServers.current.delete(host.hostId);
         keepHosts(hosts);
       }

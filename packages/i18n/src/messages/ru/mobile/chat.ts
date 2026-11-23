@@ -753,4 +753,19 @@ export const messages = {
   "mobile.chat.context.noAuto": "Этот агент не сжимает свой контекст.",
   "mobile.chat.context.lastCompaction": "Последнее сжатие: {before} → {after} токенов",
   "mobile.chat.context.unavailable": "Этот чат сейчас не сообщает о своём контексте.",
+  "mobile.chat.locationRequest.share": "Поделиться один раз",
+  "mobile.chat.locationRequest.decline": "Не делиться",
+  "mobile.chat.locationRequest.alwaysAllow": "Разрешать всегда",
+  "mobile.chat.locationRequest.alwaysAllowed":
+    "Этот агент получает ваше местоположение без вопроса, пока вы пользуетесь приложением.",
+  "mobile.chat.locationRequest.askEveryTime": "Спрашивать каждый раз",
+  "mobile.chat.locationRequest.locating": "Определяем ваше местоположение…",
+  "mobile.chat.locationRequest.private": "Текущее местоположение телефона будет отправлено этому агенту один раз.",
+  "mobile.chat.locationRequest.shared": "Местоположение отправлено",
+  "mobile.chat.locationRequest.declined": "Не отправлено",
+  "mobile.chat.locationRequest.unavailable": "Телефону не удалось определить местоположение. Попробуйте ещё раз.",
+  "mobile.chat.locationRequest.deniedTitle": "Доступ к геопозиции выключен",
+  "mobile.chat.locationRequest.denied":
+    "Чтобы поделиться местоположением, разрешите OpenBot доступ к нему в Настройках.",
+  "mobile.chat.locationRequest.openSettings": "Открыть Настройки",
 } as const satisfies PartialTranslation<typeof source>;

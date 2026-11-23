@@ -180,6 +180,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "{provider} остановился до начала этого сообщения. Отправьте сообщение ещё раз.",
   "error.provider.sessionStartTimedOut":
     "{provider} не открыл новый чат вовремя, поэтому это сообщение не началось. На компьютере, где работает OpenBot, откройте «Провайдеры», выберите {provider} и нажмите «Перезапустить». Затем попробуйте ещё раз.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} не открыл этот чат вовремя, поэтому это сообщение не началось. На компьютере, где работает OpenBot, откройте «Провайдеры», выберите {provider} и нажмите «Перезапустить». Затем попробуйте ещё раз.",
   "error.provider.serviceUnreachable":
     "{provider} не может подключиться к своему сервису. Проверьте подключение к интернету. OpenBot повторит попытку.",
   "error.provider.serviceUnreachableRefresh":
@@ -283,6 +285,8 @@ export const messages = {
     "Linux остановил провайдера, потому что у OpenBot ограничение процессорного времени реального времени равно 0. Это ограничение задаёт ваша система. Установите и запустите rtkit (`rtkit-daemon`), выполните `systemctl --user restart xdg-desktop-portal`, затем перезапустите OpenBot. Один перезапуск xdg-desktop-portal не поможет, пока rtkit не установлен.",
   "error.provider.cpuUnsupported":
     "Процессор этого компьютера не может запустить этого провайдера. Используйте другого провайдера.",
+  "error.provider.windowsBlocked":
+    "Параметры безопасности Windows, например интеллектуальное управление приложениями, не дали запустить этого провайдера. Используйте другого провайдера.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode не смог открыть свою базу данных, потому что её изменила более новая версия OpenCode. Обновите OpenCode до версии 2 или новее и повторите попытку.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -298,6 +302,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} остановился без ответа. Отправьте сообщение ещё раз.",
   "error.provider.channelNoAnswer":
     "{provider} завершил ход без ответа. В канале нажмите «Продолжить», чтобы снова запустить задачу, или «Переназначить», чтобы передать её другому участнику.",
+  "error.provider.acpProcessStopped": "{provider} остановился, не успев ответить. Отправьте сообщение ещё раз.",
   "error.provider.chatgptPageFailed": "OpenBot не смог открыть страницу подключения ChatGPT.",
   "error.provider.noneReady": "Ни один провайдер агентов не готов.",
   "error.provider.claudeTurnActive": "Дождитесь завершения текущего хода Claude, прежде чем обновлять его контекст.",
@@ -336,6 +341,8 @@ export const messages = {
     "{provider} не завершил предыдущий ход, поэтому не принял это сообщение. OpenBot начал новый сеанс {provider} с историей чата. Отправьте сообщение ещё раз.",
   "error.provider.antigravityLocationUnsupported":
     "Google не разрешает Gemini работать из сетевого местоположения компьютера, на котором работает этот агент. Используйте Gemini на другом компьютере или выберите другого провайдера для этого агента.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini остановился из-за ошибки. Отправьте сообщение ещё раз. Если он снова остановится, выберите другую модель или другого провайдера.",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
   "error.provider.grokServiceFailure":

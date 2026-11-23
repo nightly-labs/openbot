@@ -110,6 +110,7 @@ import {
   MARKETPLACE_APP_IDS,
   removeApiKeyToolSchema,
   requestApiKeyToolSchema,
+  requestLocationToolSchema,
   routineReportFailureToolSchema,
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
@@ -222,8 +223,8 @@ import {
   updateProfileToolSchema,
   widensAgentSettings,
 } from "./profile-tools";
-import { apiKeyFormSpec, browserUserControlResult } from "./prompts";
-import { ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
+import { apiKeyFormSpec, browserUserControlResult, locationFormSpec } from "./prompts";
+import { ROUTINE_NO_UPDATE_MARKER, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import {
@@ -956,6 +957,11 @@ export class OpenBotToolRouter {
               if (!toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
               return;
             }
+            if (toolRequest.params.tool === "request_location") {
+              const result = this.#locationTool(client, toolRequest, toolRequest.params);
+              if (result && !toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
+              return;
+            }
             if (API_KEY_TOOLS.has(toolRequest.params.tool)) {
               const result = yield* this.#apiKeyTool(client, toolRequest, toolRequest.params);
               if (result && !toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
@@ -1113,6 +1119,27 @@ export class OpenBotToolRouter {
       return;
     }
     this.#attention.surfaceUiBlock(client, request, { blockId, spec });
+  }
+
+  #locationTool(client: AgentClient, request: AppServerRequest, params: DynamicToolCallParams) {
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
+    const parsed = requestLocationToolSchema.safeParse(params.arguments);
+    if (!parsed.success)
+      return openBotToolFailure(`${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`);
+    const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
+    if (this.#messaging.store.linkForThread(threadId))
+      return openBotToolFailure(
+        "request_location does not work in an external chat. Ask the person for a place in your answer.",
+      );
+    if (this.#channels.store.channelForThread(threadId))
+      return openBotToolFailure(
+        "request_location does not work in a channel, because all members read it. Ask the person for a place in your answer.",
+      );
+    const spec = locationFormSpec(parsed.data.reason);
+    if (!spec) return openBotToolFailure("OpenBot could not show this card. Use a shorter reason and retry.");
+    this.#attention.surfaceUiBlock(client, request, { blockId: randomUUID(), spec, location: true });
+    return null;
   }
 
   readonly #apiKeyTool = Effect.fn("OpenBotToolRouter.apiKeyTool")(function* (
@@ -2188,7 +2215,10 @@ export class OpenBotToolRouter {
         this.#endRoutineRunTurn(params, "quiet");
       return openBotToolResult(
         outcome === "quiet"
-          ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
+          ? {
+              status: "quiet",
+              note: client.provider === "antigravity" && channelRun === null ? QUIET_MARKER_NOTE : QUIET_NOTE,
+            }
           : { status: "shown", note: "Someone waits for this answer. Report the result as usual." },
       );
     }
@@ -3675,6 +3705,10 @@ type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   queuedBecause?: Exclude<AgentMessageSteer, "steered" | null>;
   note?: string;
 };
+
+const QUIET_NOTE = "This turn ends without a message or a notification. End your turn now.";
+
+const QUIET_MARKER_NOTE = `This turn ends without a message or a notification. End your turn now with only ${ROUTINE_NO_UPDATE_MARKER} as your answer: no other text.`;
 
 const RECIPIENT_QUEUES_NOTE =
   "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";

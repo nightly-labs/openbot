@@ -168,6 +168,8 @@ export const messages = {
   "error.provider.stoppedBeforeStart": "توقف {provider} قبل أن تبدأ هذه الرسالة. أرسل الرسالة مرة أخرى.",
   "error.provider.sessionStartTimedOut":
     "لم يفتح {provider} محادثة جديدة في الوقت المحدد، لذلك لم تبدأ هذه الرسالة. على الكمبيوتر الذي يشغّل OpenBot، افتح المزوّدون، واختر {provider}، وانقر إعادة التشغيل. ثم حاول مرة أخرى.",
+  "error.provider.sessionResumeTimedOut":
+    "لم يفتح {provider} هذه المحادثة في الوقت المحدد، لذلك لم تبدأ هذه الرسالة. على الكمبيوتر الذي يشغّل OpenBot، افتح المزوّدون، واختر {provider}، وانقر إعادة التشغيل. ثم حاول مرة أخرى.",
   "error.provider.serviceUnreachable":
     "لا يستطيع {provider} الاتصال بخدمته. تحقّق من اتصال الإنترنت. سيعيد OpenBot المحاولة.",
   "error.provider.serviceUnreachableRefresh":
@@ -267,6 +269,8 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "أوقف Linux المزوّد لأن حد وقت المعالج في الوقت الحقيقي لدى OpenBot هو 0. يأتي هذا الحد من نظامك. ثبّت rtkit وشغّله (`rtkit-daemon`)، ثم نفّذ `systemctl --user restart xdg-desktop-portal`، ثم أعد تشغيل OpenBot. إعادة تشغيل xdg-desktop-portal وحدها لا تكفي ما دام rtkit غير مثبّت.",
   "error.provider.cpuUnsupported": "لا يمكن لمعالج هذا الكمبيوتر تشغيل هذا المزوّد. استخدم مزوّدًا آخر.",
+  "error.provider.windowsBlocked":
+    "منعت إعدادات أمان Windows، مثل التحكم الذكي في التطبيقات، هذا المزوّد من البدء. استخدم مزوّدًا آخر.",
   "error.provider.opencodeDatabaseNewer":
     "تعذّر على OpenCode فتح قاعدة بياناته لأن إصدارًا أحدث من OpenCode غيّرها. حدّث OpenCode إلى الإصدار 2 أو أحدث، ثم أعد المحاولة.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -280,6 +284,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "توقف {provider} بدون إجابة. أرسل الرسالة مرة أخرى.",
   "error.provider.channelNoAnswer":
     "أنهى {provider} الدور بدون إجابة. في القناة، انقر على «متابعة» لتشغيل المهمة مرة أخرى، أو على «إعادة الإسناد» لإعطائها لعضو آخر.",
+  "error.provider.acpProcessStopped": "توقف {provider} قبل أن يجيب. أرسل الرسالة مرة أخرى.",
   "error.provider.chatgptPageFailed": "تعذّر على OpenBot فتح صفحة ربط ChatGPT.",
   "error.provider.noneReady": "لا يوجد مزوّد وكلاء جاهز.",
   "error.provider.claudeTurnActive": "انتظر انتهاء دور Claude النشط قبل تحديث سياقه.",
@@ -318,6 +323,8 @@ export const messages = {
     "لم يُنهِ {provider} دوره السابق، لذلك لم يقبل هذه الرسالة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "توقف Gemini بسبب خطأ. أرسل رسالتك مرة أخرى. إذا توقف مرة أخرى، فاختر نموذجًا أو مزودًا آخر.",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
   "error.provider.grokServiceFailure": "خدمة Grok مشغولة أو بها خطأ. أعد المحاولة بعد بضع دقائق، أو اختر نموذجًا آخر.",
   "error.provider.grokConnectionFailed":

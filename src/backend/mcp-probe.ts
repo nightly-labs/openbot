@@ -6,13 +6,10 @@ import {
   Client as ModernClient,
   StreamableHTTPClientTransport as ModernHttpTransport,
 } from "@modelcontextprotocol/client";
+import { getDefaultEnvironment } from "@modelcontextprotocol/client/stdio";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import {
-  getDefaultEnvironment,
-  StdioClientTransport,
-  type StdioServerParameters,
-} from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StdioClientTransport, type StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   AccessDeniedError,

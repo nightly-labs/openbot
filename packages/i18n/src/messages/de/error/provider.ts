@@ -189,6 +189,8 @@ export const messages = {
     "{provider} wurde beendet, bevor diese Nachricht gestartet ist. Sende die Nachricht erneut.",
   "error.provider.sessionStartTimedOut":
     "{provider} hat nicht rechtzeitig einen neuen Chat geöffnet, daher ist diese Nachricht nicht gestartet. Öffne auf dem Computer, auf dem OpenBot läuft, Anbieter, wähle {provider} und klicke auf Neu starten. Versuche es dann erneut.",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} hat diesen Chat nicht rechtzeitig geöffnet, daher ist diese Nachricht nicht gestartet. Öffne auf dem Computer, auf dem OpenBot läuft, Anbieter, wähle {provider} und klicke auf Neu starten. Versuche es dann erneut.",
   "error.provider.serviceUnreachable":
     "{provider} kann keine Verbindung zu seinem Dienst herstellen. Prüfe deine Internetverbindung. OpenBot versucht es erneut.",
   "error.provider.serviceUnreachableRefresh":
@@ -300,6 +302,8 @@ export const messages = {
     "Linux hat den Anbieter beendet, weil OpenBot ein Echtzeit-CPU-Limit von 0 hat. Das Limit kommt von deinem System. Installiere und starte rtkit (`rtkit-daemon`), führe `systemctl --user restart xdg-desktop-portal` aus und starte OpenBot dann neu. Ein Neustart von xdg-desktop-portal allein hilft nicht, solange rtkit fehlt.",
   "error.provider.cpuUnsupported":
     "Der Prozessor dieses Computers kann diesen Anbieter nicht ausführen. Verwende einen anderen Anbieter.",
+  "error.provider.windowsBlocked":
+    "Windows-Sicherheitseinstellungen wie die Intelligente App-Steuerung haben den Start dieses Anbieters verhindert. Verwende einen anderen Anbieter.",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode konnte seine Datenbank nicht öffnen, weil eine neuere OpenCode-Version sie geändert hat. Aktualisiere OpenCode auf Version 2 oder neuer und versuche es dann erneut.",
   "error.provider.grokDefaultModelNotAllowed":
@@ -315,6 +319,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} hat ohne Antwort aufgehört. Sende die Nachricht erneut.",
   "error.provider.channelNoAnswer":
     "{provider} hat den Durchlauf ohne Antwort beendet. Klicke im Kanal auf „Weiter“, um die Aufgabe erneut auszuführen, oder auf „Neu zuweisen“, um sie einem anderen Mitglied zu geben.",
+  "error.provider.acpProcessStopped": "{provider} wurde vor der Antwort beendet. Sende die Nachricht erneut.",
   "error.provider.chatgptPageFailed": "OpenBot konnte die ChatGPT-Verbindungsseite nicht öffnen.",
   "error.provider.noneReady": "Kein Agentenanbieter ist bereit.",
   "error.provider.claudeTurnActive":
@@ -359,6 +364,8 @@ export const messages = {
     "{provider} hat seinen vorherigen Durchgang nicht beendet und diese Nachricht deshalb nicht angenommen. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
   "error.provider.antigravityLocationUnsupported":
     "Google lässt Gemini am Netzwerkstandort des Computers, auf dem dieser Agent läuft, nicht arbeiten. Nutze Gemini auf einem anderen Computer oder wähle einen anderen Anbieter für diesen Agenten.\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini wurde wegen eines Fehlers beendet. Sende deine Nachricht erneut. Wenn es wieder stoppt, wähle ein anderes Modell oder einen anderen Anbieter.",
   "error.provider.antigravityConnectionLost":
     "Gemini hat die Verbindung zu seinem Agenten verloren und wurde beendet. Sende eine Nachricht, um fortzufahren.",
   "error.provider.grokServiceFailure":

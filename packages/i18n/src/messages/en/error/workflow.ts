@@ -10,6 +10,7 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.conditionBranch": "Each connection from a condition must be yes or no.",
   "error.workflow.duplicateEdge": "These two steps already have this connection.",
   "error.workflow.serverTooOld": "This server does not support workflows. Update OpenBot on the computer that runs it.",
+  "error.workflow.newerSteps": "This workflow has steps from a newer OpenBot. Update OpenBot to change it.",
   "error.workflow.nodeUnsupported": "This version of OpenBot cannot run image, file and message steps yet.",
   "error.workflow.interrupted": "OpenBot stopped while this step ran. Run it again.",
   "error.workflow.agentMissing": "Choose an agent for this step.",

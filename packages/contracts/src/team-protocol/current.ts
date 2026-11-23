@@ -209,6 +209,7 @@ import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "./storage-workflow-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
+import { TEAM_UI_BLOCK_LOCATION_CAPABILITY } from "./ui-block-location-v1";
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "./ui-block-preview-edit-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
@@ -472,6 +473,7 @@ export {
   TEAM_REASONING_EFFORTS_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  TEAM_UI_BLOCK_LOCATION_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
   TEAM_USAGE_GROUPS_CAPABILITY,
@@ -824,6 +826,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [WORKFLOWS_PAUSE_CAPABILITY, V10],
   [WORKFLOWS_PORTABLE_CAPABILITY, V10],
   [MODEL_VISIBILITY_KEPT_CAPABILITY, V10],
+  [TEAM_UI_BLOCK_LOCATION_CAPABILITY, V10],
   [ROUTINE_RUN_CHANGES_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 

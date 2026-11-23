@@ -39,6 +39,7 @@ import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contract
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
+import { addUiBlockLocationRequests } from "@openbot/contracts/team-protocol/ui-block-location-v1";
 import { addUiBlockVaultRequests } from "@openbot/contracts/team-protocol/ui-block-vault-v1";
 import {
   type TeamProtocolV1CurrentEventControl,
@@ -1682,6 +1683,7 @@ export function createRemoteTeamPeer(
         if (sendsBlockExtensions(state)) {
           addUiBlockAutoAnswers(decoded.event, frame.payload);
           addUiBlockVaultRequests(decoded.event, frame.payload);
+          addUiBlockLocationRequests(decoded.event, frame.payload);
           addSkillSuggestionNames(decoded.event, frame.payload);
         }
         yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
@@ -2390,6 +2392,7 @@ function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown)
   if (sendsBlockExtensions(state)) {
     addUiBlockAutoAnswers(decoded, wire);
     addUiBlockVaultRequests(decoded, wire);
+    addUiBlockLocationRequests(decoded, wire);
     addSkillSuggestionNames(decoded, wire);
   }
   return decoded;

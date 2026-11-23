@@ -33,6 +33,8 @@ export const messages = {
     "1Password получил слишком много запросов. Подождите несколько минут и повторите попытку.",
   "error.connector.onePasswordNoVault":
     "Сервисный аккаунт не может читать ни одно хранилище. Дайте ему доступ к хранилищу и повторите попытку.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot не может прочитать ваши логины в 1Password. Отключите 1Password, затем подключите его снова.",
   "error.connector.onePasswordFileUnreadable": "Файл подключения 1Password не читается.",
   "error.connector.onePasswordFileTooLarge": "Файл подключения 1Password слишком большой.",
   "error.connector.bitwardenFailed":
@@ -45,6 +47,10 @@ export const messages = {
     "Введите адрес сервера HTTPS, client_id и client_secret ключа API и мастер-пароль.",
   "error.connector.bitwardenHostFailed":
     "Не удалось открыть Bitwarden на этом сервере. Проверьте адрес сервера, ключ API и мастер-пароль и убедитесь, что одна папка называется Shared with OpenBot. Затем подключитесь снова.",
+  "error.connector.bitwardenHostSignInFailed":
+    "Не удалось войти в Bitwarden на этом сервере. Проверьте адрес сервера и ключ API, затем подключитесь снова.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "Не удалось разблокировать Bitwarden на этом сервере. Проверьте мастер-пароль, затем подключитесь снова.",
   "error.connector.bitwardenCliInstallFailed":
     "Не удалось установить Bitwarden CLI на этом сервере. Проверьте его сетевое подключение и подключитесь снова.",
   "error.connector.bitwardenFileUnreadable": "Файл подключения Bitwarden не читается.",

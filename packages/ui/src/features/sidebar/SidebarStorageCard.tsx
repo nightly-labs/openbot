@@ -9,6 +9,8 @@ export interface SidebarStorageCardProps {
   serverName: string;
   freeBytes: number;
   totalBytes: number;
+  thisComputer?: boolean;
+  hostedPlan?: boolean;
   onFreeUpSpace: () => void;
   onDismiss: () => void;
 }
@@ -19,11 +21,19 @@ export function SidebarStorageCard(props: SidebarStorageCardProps) {
   const usedBytes = () => Math.max(0, props.totalBytes - props.freeBytes);
   const ratio = () => (props.totalBytes > 0 ? usedBytes() / props.totalBytes : 0);
   const percent = () => format.percent(Math.floor(ratio() * 100) / 100);
-  const bodyParams = () => ({
-    used: format.fileSize(usedBytes()),
-    total: format.fileSize(props.totalBytes),
-    server: props.serverName,
-  });
+  const size = (bytes: number) => (props.hostedPlan ? format.fileSize(bytes) : format.diskSize(bytes));
+  const body = () => {
+    const used = size(usedBytes());
+    const total = size(props.totalBytes);
+    if (props.thisComputer)
+      return full()
+        ? t("sidebar.storage.fullBodyThisComputer", { used, total })
+        : t("sidebar.storage.bodyThisComputer", { used, total });
+    const server = props.serverName;
+    return full()
+      ? t("sidebar.storage.fullBody", { used, total, server })
+      : t("sidebar.storage.body", { used, total, server });
+  };
   return (
     <section
       class="sidebar-mobile-app sidebar-storage"
@@ -35,7 +45,11 @@ export function SidebarStorageCard(props: SidebarStorageCardProps) {
           class="sidebar-storage-ring"
           value={Math.floor(ratio() * 100)}
           tone={full() ? "danger" : "warning"}
-          aria-label={t("sidebar.storage.meterLabel", { server: props.serverName })}
+          aria-label={
+            props.thisComputer
+              ? t("sidebar.storage.meterLabelThisComputer")
+              : t("sidebar.storage.meterLabel", { server: props.serverName })
+          }
           aria-valuetext={t("sidebar.storage.used", { percent: percent() })}
         >
           <span class="sidebar-storage-percent">{percent()}</span>
@@ -44,9 +58,7 @@ export function SidebarStorageCard(props: SidebarStorageCardProps) {
           <strong id="sidebar-storage-title">
             {full() ? t("sidebar.storage.fullTitle") : t("sidebar.storage.lowTitle")}
           </strong>
-          <p class="sidebar-mobile-app-body">
-            {full() ? t("sidebar.storage.fullBody", bodyParams()) : t("sidebar.storage.body", bodyParams())}
-          </p>
+          <p class="sidebar-mobile-app-body">{body()}</p>
         </div>
         <Show when={!full()}>
           <IconButton

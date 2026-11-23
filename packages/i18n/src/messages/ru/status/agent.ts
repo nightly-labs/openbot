@@ -120,4 +120,8 @@ export const messages = {
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
   "status.agent.providerExitContinues": "Агент остановился, не закончив ответ. Агент продолжает.",
   "status.agent.branchTitle": "Ответвлённый чат",
+  "status.agent.location.field": "Ваше местоположение",
+  "status.agent.location.placeholder": "Город, адрес или место",
+  "status.agent.location.submit": "Поделиться",
+  "status.agent.location.shared": "Местоположение отправлено",
 } as const satisfies PartialTranslation<typeof source>;

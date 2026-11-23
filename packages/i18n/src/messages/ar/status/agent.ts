@@ -156,4 +156,8 @@ export const messages = {
   "status.agent.compactionContinues": "توقف الاتصال أثناء ضغط الوكيل لسياقه. يتابع الوكيل.",
   "status.agent.providerExitContinues": "توقف الوكيل قبل أن يكمل إجابته. يتابع الوكيل.",
   "status.agent.branchTitle": "دردشة متفرعة",
+  "status.agent.location.field": "موقعك",
+  "status.agent.location.placeholder": "مدينة أو عنوان أو مكان",
+  "status.agent.location.submit": "مشاركة",
+  "status.agent.location.shared": "تمت مشاركة الموقع",
 } as const satisfies PartialTranslation<typeof source>;

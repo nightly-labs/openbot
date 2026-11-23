@@ -192,6 +192,8 @@ export const messages = {
     "このメッセージが始まる前に {provider} が停止しました。メッセージをもう一度送信してください。",
   "error.provider.sessionStartTimedOut":
     "{provider} が時間内に新しいチャットを開けなかったため、このメッセージは開始されませんでした。OpenBot を実行しているコンピューターでプロバイダーを開き、{provider} を選択して再起動をクリックしてください。その後、もう一度お試しください。",
+  "error.provider.sessionResumeTimedOut":
+    "{provider} が時間内にこのチャットを開けなかったため、このメッセージは開始されませんでした。OpenBot を実行しているコンピューターでプロバイダーを開き、{provider} を選択して再起動をクリックしてください。その後、もう一度お試しください。",
   "error.provider.serviceUnreachable":
     "{provider} がサービスに接続できません。インターネット接続を確認してください。OpenBot が再試行します。",
   "error.provider.serviceUnreachableRefresh":
@@ -299,6 +301,8 @@ export const messages = {
     "OpenBot のリアルタイム CPU 制限が 0 のため、Linux がプロバイダーを停止しました。この制限はシステムから来ています。rtkit をインストールして起動し (`rtkit-daemon`)、`systemctl --user restart xdg-desktop-portal` を実行してから OpenBot を再起動してください。rtkit がない間は、xdg-desktop-portal を再起動するだけでは解決しません。",
   "error.provider.cpuUnsupported":
     "このコンピューターのプロセッサーでは、このプロバイダーを実行できません。別のプロバイダーを使用してください。",
+  "error.provider.windowsBlocked":
+    "スマート アプリ コントロールなどの Windows のセキュリティ設定により、このプロバイダーを起動できませんでした。別のプロバイダーを使ってください。",
   "error.provider.opencodeDatabaseNewer":
     "新しいバージョンの OpenCode がデータベースを変更したため、OpenCode はデータベースを開けませんでした。OpenCode をバージョン 2 以降に更新してから、もう一度お試しください。",
   "error.provider.grokDefaultModelNotAllowed":
@@ -314,6 +318,7 @@ export const messages = {
   "error.provider.acpRefusedNoReason": "{provider} は回答せずに停止しました。メッセージをもう一度送信してください。",
   "error.provider.channelNoAnswer":
     "{provider} が回答なしでターンを終了しました。チャンネルで「続行」をクリックするとタスクをもう一度実行し、「再割り当て」をクリックすると別のメンバーに渡します。",
+  "error.provider.acpProcessStopped": "{provider} が回答する前に停止しました。メッセージをもう一度送信してください。",
   "error.provider.chatgptPageFailed": "OpenBot は ChatGPT の接続ページを開けませんでした。",
   "error.provider.noneReady": "準備ができているエージェントのプロバイダーがありません。",
   "error.provider.claudeTurnActive": "コンテキストを更新する前に、実行中の Claude のターンが終わるまでお待ちください。",
@@ -355,6 +360,8 @@ export const messages = {
     "{provider} は前のターンを終了しなかったため、このメッセージを受け付けませんでした。OpenBot はチャット履歴を引き継いで新しい {provider} セッションを開始しました。メッセージをもう一度送信してください。",
   "error.provider.antigravityLocationUnsupported":
     "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
+  "error.provider.antigravityTurnStopped":
+    "Gemini はエラーのため停止しました。メッセージをもう一度送信してください。再び停止する場合は、別のモデルまたはプロバイダーを選択してください。",
   "error.provider.antigravityConnectionLost":
     "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
   "error.provider.grokServiceFailure":

@@ -387,6 +387,7 @@ export const messages = {
   "mobile.workflow.discord.oneChannel": "Один канал",
   "mobile.workflow.discord.noChannel": "Не выбран",
   "mobile.workflow.discord.oneServer": "Один сервер",
+  "mobile.workflow.discord.chooseServer": "Выбрать сервер",
   "mobile.workflow.discord.roles": "Есть роль",
   "mobile.workflow.discord.anyRole": "Любая роль",
   "mobile.workflow.discord.roleCount": {
@@ -413,6 +414,7 @@ export const messages = {
   "mobile.workflow.telegram.chat": "Чат",
   "mobile.workflow.telegram.anyChat": "Любой связанный чат",
   "mobile.workflow.telegram.oneChat": "Один чат",
+  "mobile.workflow.telegram.chooseChat": "Выбрать чат",
   "mobile.workflow.telegram.sameChat": "Как у триггера",
   "mobile.workflow.telegram.event": "Событие",
   "mobile.workflow.telegram.event.mention": "Упоминание OpenBot",

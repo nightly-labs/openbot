@@ -146,6 +146,7 @@ export const messages = {
   "provider.picker.effort": "강도",
   "provider.picker.effortLabel": "에이전트 추론 강도",
   "provider.picker.effortFixed": "{effort} ({provider}에서 고정)",
+  "provider.picker.effortLimited": "Claude 설정이나 조직에서 추론 강도를 {effort}(으)로 제한했어요.",
   "provider.picker.fast": "빠르게",
   "provider.picker.fastText": "더 빠른 응답, 사용량 증가",
   "provider.picker.speed": "속도",
