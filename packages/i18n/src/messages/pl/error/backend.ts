@@ -296,6 +296,8 @@ export const messages = {
     "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz {name} w Marketplace, Aplikacje i wybierz Zaloguj się.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga klucza. Otwórz {name} w Marketplace, Aplikacje, wybierz Edytuj i wpisz poprawny klucz w sekcji Nagłówki.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} nie może uruchomić serwera MCP {name}. Otwórz {name} w Marketplace, Aplikacje i wybierz Testuj połączenie, aby zobaczyć przyczynę.",
   "error.backend.mcpServerFailedInProvider":

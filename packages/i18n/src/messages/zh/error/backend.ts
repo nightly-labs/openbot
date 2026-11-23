@@ -261,6 +261,8 @@ export const messages = {
     "它的工具 {tool} 使用了这个提供方无法读取的输入格式。其他提供方的智能体仍会获得这个服务器。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请在 市场、应用 中打开 {name} 并选择“登录”。",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求提供密钥。请在 市场、应用 中打开 {name}，选择“编辑”，然后在“请求头”中输入正确的密钥。",
   "error.backend.mcpServerFailedForProvider":
     "{provider} 无法启动 MCP 服务器 {name}。请在 市场、应用 中打开 {name} 并选择“测试连接”查看原因。",
   "error.backend.mcpServerFailedInProvider":

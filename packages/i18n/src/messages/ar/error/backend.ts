@@ -277,6 +277,8 @@ export const messages = {
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
     "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح {name} في المتجر، التطبيقات، واختر تسجيل الدخول.",
+  "error.backend.mcpServerKeyForProvider":
+    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب مفتاحًا. افتح {name} في المتجر، التطبيقات، واختر تعديل، ثم أدخل المفتاح الصحيح في الترويسات.",
   "error.backend.mcpServerFailedForProvider":
     "تعذّر على {provider} تشغيل خادم MCP {name}. افتح {name} في المتجر، التطبيقات، واختر اختبار الاتصال لمعرفة السبب.",
   "error.backend.mcpServerFailedInProvider":
