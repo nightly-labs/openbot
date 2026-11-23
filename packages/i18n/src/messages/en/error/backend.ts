@@ -107,6 +107,13 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelRoutingFailed": "Routing failed. Choose a member or try again.",
   "error.backend.channelLeadTimedOut": "The channel lead did not answer in time. Choose a member or try again.",
   "error.backend.channelLeadFailed": "The channel lead could not route this message. Choose a member or try again.",
+  "error.backend.channelLeadBusy": "The lead's model is busy now. Try again in a few minutes, or choose a member.",
+  "error.backend.channelLeadOffline": "The lead's model lost its connection. Try again, or choose a member.",
+  "error.backend.channelLeadSignIn": "The lead's provider sign-in expired. Sign in again, or choose a member.",
+  "error.backend.channelLeadModelGone":
+    "The lead's model is not available. Choose another model for the lead, or choose a member.",
+  "error.backend.channelLeadRefused":
+    "The lead's model refused this request. Choose a member, or choose another model for the lead.",
   "error.backend.channelRequestMemberRequired": "Choose a member for this request.",
   "error.backend.channelDeliveryNotCreated": "Channel delivery was not created.",
   "error.backend.channelAssignmentStopped": "This channel assignment has been stopped or replaced.",

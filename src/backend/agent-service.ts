@@ -330,7 +330,7 @@ import { channelSync, toChannelOperationError } from "./channel-effects";
 import { type ChannelImageFile, ChannelImages } from "./channel-images";
 import { ChannelRequestReturns } from "./channel-request-returns";
 import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
-import { ChannelService } from "./channel-service";
+import { ChannelService, channelLeadFailureText } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { CrmHandle } from "./crm/crm";
@@ -1514,6 +1514,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                   );
                 }
                 return Effect.void;
+              }),
+              Effect.mapError((failure) => {
+                const failed: { causeCode: CauseCode; message: string } | null = providerError;
+                const shown = background || !failed ? null : channelLeadFailureText(failed.causeCode);
+                return shown &&
+                  failure instanceof ProfileGenerationFailed &&
+                  failure.cause instanceof Error &&
+                  failure.cause.message === sourceText("error.agent.profileFailed")
+                  ? new ProfileGenerationFailed({ cause: new Error(shown, { cause: failure.cause }) })
+                  : failure;
               }),
             );
         }).pipe(toChannelOperationError),

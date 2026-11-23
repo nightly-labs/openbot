@@ -107,6 +107,14 @@ export const messages = {
   "error.backend.channelRoutingFailed": "라우팅에 실패했어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadTimedOut": "채널 리더가 제시간에 답하지 않았어요. 멤버를 선택하거나 다시 시도해 주세요.",
   "error.backend.channelLeadFailed": "채널 리더가 이 메시지를 전달하지 못했어요. 멤버를 선택하거나 다시 시도해 주세요.",
+  "error.backend.channelLeadBusy": "채널 리더의 모델이 지금 바빠요. 몇 분 뒤에 다시 시도하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadOffline": "채널 리더의 모델 연결이 끊겼어요. 다시 시도하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadSignIn":
+    "채널 리더의 제공업체 로그인이 만료되었어요. 다시 로그인하거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadModelGone":
+    "채널 리더의 모델을 사용할 수 없어요. 리더에게 다른 모델을 고르거나 멤버를 선택해 주세요.",
+  "error.backend.channelLeadRefused":
+    "채널 리더의 모델이 이 요청을 거부했어요. 멤버를 선택하거나 리더에게 다른 모델을 골라 주세요.",
   "error.backend.channelRequestMemberRequired": "이 요청을 맡을 멤버를 선택하세요.",
   "error.backend.channelDeliveryNotCreated": "채널 전달이 만들어지지 않았어요.",
   "error.backend.channelAssignmentStopped": "이 채널 배정은 중지되었거나 다른 배정으로 바뀌었어요.",

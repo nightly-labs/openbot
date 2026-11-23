@@ -112,6 +112,15 @@ export const messages = {
   "error.backend.channelLeadTimedOut": "Lider kanału nie odpowiedział na czas. Wybierz członka lub spróbuj ponownie.",
   "error.backend.channelLeadFailed":
     "Lider kanału nie mógł skierować tej wiadomości. Wybierz członka lub spróbuj ponownie.",
+  "error.backend.channelLeadBusy":
+    "Model lidera kanału jest teraz zajęty. Spróbuj ponownie za kilka minut lub wybierz członka.",
+  "error.backend.channelLeadOffline": "Model lidera kanału stracił połączenie. Spróbuj ponownie lub wybierz członka.",
+  "error.backend.channelLeadSignIn":
+    "Logowanie u dostawcy lidera kanału wygasło. Zaloguj się ponownie lub wybierz członka.",
+  "error.backend.channelLeadModelGone":
+    "Model lidera kanału jest niedostępny. Wybierz inny model dla lidera lub wybierz członka.",
+  "error.backend.channelLeadRefused":
+    "Model lidera kanału odrzucił tę prośbę. Wybierz członka lub inny model dla lidera.",
   "error.backend.channelRequestMemberRequired": "Wybierz członka do tego żądania.",
   "error.backend.channelDeliveryNotCreated": "Nie utworzono dostarczenia kanału.",
   "error.backend.channelAssignmentStopped": "Ten przydział kanału został zatrzymany lub zastąpiony.",

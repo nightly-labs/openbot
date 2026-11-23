@@ -108,6 +108,15 @@ export const messages = {
   "error.backend.channelRoutingFailed": "Yönlendirme başarısız oldu. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadTimedOut": "Kanal lideri zamanında yanıt vermedi. Bir üye seçin veya tekrar deneyin.",
   "error.backend.channelLeadFailed": "Kanal lideri bu mesajı yönlendiremedi. Bir üye seçin veya tekrar deneyin.",
+  "error.backend.channelLeadBusy":
+    "Kanal liderinin modeli şu anda meşgul. Birkaç dakika sonra tekrar deneyin veya bir üye seçin.",
+  "error.backend.channelLeadOffline": "Kanal liderinin modelinin bağlantısı koptu. Tekrar deneyin veya bir üye seçin.",
+  "error.backend.channelLeadSignIn":
+    "Kanal liderinin sağlayıcı oturumunun süresi doldu. Tekrar oturum açın veya bir üye seçin.",
+  "error.backend.channelLeadModelGone":
+    "Kanal liderinin modeli kullanılamıyor. Lider için başka bir model seçin veya bir üye seçin.",
+  "error.backend.channelLeadRefused":
+    "Kanal liderinin modeli bu isteği reddetti. Bir üye veya lider için başka bir model seçin.",
   "error.backend.channelRequestMemberRequired": "Bu istek için bir üye seçin.",
   "error.backend.channelDeliveryNotCreated": "Kanal teslimatı oluşturulamadı.",
   "error.backend.channelAssignmentStopped": "Bu kanal ataması durduruldu veya değiştirildi.",

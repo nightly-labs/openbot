@@ -115,6 +115,16 @@ export const messages = {
     "El coordinador del canal no respondió a tiempo. Elige un miembro o inténtalo de nuevo.",
   "error.backend.channelLeadFailed":
     "El coordinador del canal no pudo asignar este mensaje. Elige un miembro o inténtalo de nuevo.",
+  "error.backend.channelLeadBusy":
+    "El modelo del coordinador está ocupado. Inténtalo de nuevo en unos minutos o elige un miembro.",
+  "error.backend.channelLeadOffline":
+    "El modelo del coordinador perdió la conexión. Inténtalo de nuevo o elige un miembro.",
+  "error.backend.channelLeadSignIn":
+    "La sesión del proveedor del coordinador expiró. Vuelve a iniciar sesión o elige un miembro.",
+  "error.backend.channelLeadModelGone":
+    "El modelo del coordinador no está disponible. Elige otro modelo para el coordinador o elige un miembro.",
+  "error.backend.channelLeadRefused":
+    "El modelo del coordinador rechazó esta solicitud. Elige un miembro u otro modelo para el coordinador.",
   "error.backend.channelRequestMemberRequired": "Elige un miembro para esta solicitud.",
   "error.backend.channelDeliveryNotCreated": "No se creó la entrega del canal.",
   "error.backend.channelAssignmentStopped": "Esta asignación del canal se detuvo o se reemplazó.",

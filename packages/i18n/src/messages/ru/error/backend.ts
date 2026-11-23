@@ -111,6 +111,16 @@ export const messages = {
   "error.backend.channelLeadTimedOut": "Ведущий канала не ответил вовремя. Выберите участника или повторите попытку.",
   "error.backend.channelLeadFailed":
     "Ведущему канала не удалось направить это сообщение. Выберите участника или повторите попытку.",
+  "error.backend.channelLeadBusy":
+    "Модель ведущего канала сейчас занята. Повторите попытку через несколько минут или выберите участника.",
+  "error.backend.channelLeadOffline":
+    "Модель ведущего канала потеряла соединение. Повторите попытку или выберите участника.",
+  "error.backend.channelLeadSignIn":
+    "Срок входа у провайдера ведущего канала истёк. Войдите снова или выберите участника.",
+  "error.backend.channelLeadModelGone":
+    "Модель ведущего канала недоступна. Выберите для ведущего другую модель или выберите участника.",
+  "error.backend.channelLeadRefused":
+    "Модель ведущего канала отклонила этот запрос. Выберите участника или другую модель для ведущего.",
   "error.backend.channelRequestMemberRequired": "Выберите участника для этого запроса.",
   "error.backend.channelDeliveryNotCreated": "Доставка в канал не создана.",
   "error.backend.channelAssignmentStopped": "Это назначение в канале остановлено или заменено.",

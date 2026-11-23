@@ -114,6 +114,16 @@ export const messages = {
     "Il responsabile del canale non ha risposto in tempo. Scegli un membro o riprova.",
   "error.backend.channelLeadFailed":
     "Il responsabile del canale non è riuscito a instradare questo messaggio. Scegli un membro o riprova.",
+  "error.backend.channelLeadBusy":
+    "Il modello del responsabile è occupato. Riprova tra qualche minuto o scegli un membro.",
+  "error.backend.channelLeadOffline":
+    "Il modello del responsabile ha perso la connessione. Riprova o scegli un membro.",
+  "error.backend.channelLeadSignIn":
+    "L'accesso al provider del responsabile è scaduto. Accedi di nuovo o scegli un membro.",
+  "error.backend.channelLeadModelGone":
+    "Il modello del responsabile non è disponibile. Scegli un altro modello per il responsabile o un membro.",
+  "error.backend.channelLeadRefused":
+    "Il modello del responsabile ha rifiutato questa richiesta. Scegli un membro o un altro modello per il responsabile.",
   "error.backend.channelRequestMemberRequired": "Scegli un membro per questa richiesta.",
   "error.backend.channelDeliveryNotCreated": "La consegna del canale non è stata creata.",
   "error.backend.channelAssignmentStopped": "Questa assegnazione del canale è stata interrotta o sostituita.",
