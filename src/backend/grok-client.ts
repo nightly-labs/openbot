@@ -33,18 +33,27 @@ export class GrokAgentClient extends AcpAgentClient {
     fitImage?: ImageFitter | null,
     discoveryFolder?: () => string,
   ) {
-    const discoveryCwd = discoveryFolder && (() => realpathSync(discoveryFolder()));
+    let usedDiscoveryCwd: string | null = null;
+    const discoveryCwd =
+      discoveryFolder &&
+      (() => {
+        const cwd = realpathSync(discoveryFolder());
+        usedDiscoveryCwd = cwd;
+        return cwd;
+      });
     super(cli, requestTimeoutMs, {
       provider: "grok",
       flavor: discoveryCwd
         ? {
             ...GROK_ACP_FLAVOR,
             sessionFiles: (_argv, sessionId) =>
-              grokDiscoverySessionFiles(
-                grokHomeDirectory({ ...process.env, ...agentEnvironment?.() }),
-                discoveryCwd(),
-                sessionId,
-              ),
+              usedDiscoveryCwd
+                ? grokDiscoverySessionFiles(
+                    grokHomeDirectory({ ...process.env, ...agentEnvironment?.() }),
+                    usedDiscoveryCwd,
+                    sessionId,
+                  )
+                : [],
           }
         : GROK_ACP_FLAVOR,
       ...(discoveryCwd ? { discoveryCwd } : {}),
