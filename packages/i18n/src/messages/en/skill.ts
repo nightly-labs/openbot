@@ -62,6 +62,8 @@ export const messages = defineMessages("skill", {
   "skill.local.add": "Add skill",
   "skill.local.loading": "Loading local skills…",
   "skill.local.empty": "No local skills yet.",
+  "skill.local.global": "Add to all agents",
+  "skill.local.globalHint": "New agents get this skill too. Turning it off keeps it on agents that have it.",
 
   "skill.preview.label": "{name} preview",
   "skill.preview.creator": "By {name}",
