@@ -70,6 +70,7 @@ import { useReducedMotion } from "@/shared/lib/motion";
 import { isAndroid, longPressDelay } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
+import { DrawerCredits } from "./drawer-credits";
 import { DrawerHeaderBlur } from "./drawer-header-blur";
 import { ServerAvatar } from "./server-avatar";
 import { ServerDrawerIconButton } from "./server-drawer-icon-button";
@@ -305,7 +306,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
           if (action === "moveUp") move(serverItem.id, listIndex - 1);
           if (action === "moveDown") move(serverItem.id, listIndex + 1);
         }}
-        className={`flex-row items-center gap-3 rounded-2xl px-2.5 ${selected ? "bg-control" : ""}`}
+        className={`flex-row items-center gap-3 rounded-2xl px-3 ${selected ? "bg-control" : ""}`}
         onPress={editing ? undefined : () => onSelectServer(serverItem.id)}
         delayLongPress={longPressDelay}
         onLongPress={
@@ -395,7 +396,7 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
     <>
       <View className="flex-1">
         <View
-          className="absolute top-0 right-0 left-0 z-20 pr-3 pb-1"
+          className="absolute top-0 right-0 left-0 z-20 pr-6 pb-1"
           style={{ paddingTop: Math.max(topInset, 16) }}
           onLayout={(event) => {
             const measured = event.nativeEvent.layout.height;
@@ -525,26 +526,34 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
         </ScrollView>
       </View>
 
-      <View className="mr-3 flex-row items-center gap-2 pt-2">
-        <View className="min-h-14 min-w-0 flex-1 flex-row items-center gap-2.5 rounded-2xl px-2 py-2">
-          <ProfileAvatar neutral name={displayName} imageUrl={avatarUrl} size={36} />
-          <View className="min-w-0 flex-1">
-            <Typography.Paragraph className="font-semibold" numberOfLines={1} style={typeScale.preview}>
-              {displayName}
-            </Typography.Paragraph>
-            <Typography.Paragraph className="text-text-secondary" numberOfLines={1} selectable style={typeScale.small}>
-              {session.user.email}
-            </Typography.Paragraph>
+      <View className="mr-6 pt-2">
+        <DrawerCredits serverId={activeServer?.id ?? null} open={open} onNavigate={onNavigate} />
+        <View className="flex-row items-center gap-2">
+          <View className="min-h-14 min-w-0 flex-1 flex-row items-center gap-2.5 py-2 pl-3">
+            <ProfileAvatar neutral name={displayName} imageUrl={avatarUrl} size={36} />
+            <View className="min-w-0 flex-1">
+              <Typography.Paragraph className="font-semibold" numberOfLines={1} style={typeScale.preview}>
+                {displayName}
+              </Typography.Paragraph>
+              <Typography.Paragraph
+                className="text-text-secondary"
+                numberOfLines={1}
+                selectable
+                style={typeScale.small}
+              >
+                {session.user.email}
+              </Typography.Paragraph>
+            </View>
           </View>
+          <ServerDrawerIconButton
+            accessibilityLabel={t("mobile.server.drawer.settings")}
+            color={mutedColor}
+            systemName="gearshape"
+            onPress={() => onNavigate("/settings")}
+          >
+            <Settings color={mutedColor} size={18} strokeWidth={1.8} />
+          </ServerDrawerIconButton>
         </View>
-        <ServerDrawerIconButton
-          accessibilityLabel={t("mobile.server.drawer.settings")}
-          color={mutedColor}
-          systemName="gearshape"
-          onPress={() => onNavigate("/settings")}
-        >
-          <Settings color={mutedColor} size={18} strokeWidth={1.8} />
-        </ServerDrawerIconButton>
       </View>
     </>
   );
@@ -917,7 +926,7 @@ function ServerListCollapse({
 }
 
 function DrawerDivider() {
-  return <View accessibilityElementsHidden className="mx-2.5 mt-2.5 mb-1 h-px bg-grouped-border" />;
+  return <View accessibilityElementsHidden className="mx-3 mt-2.5 mb-1 h-px bg-grouped-border" />;
 }
 
 interface DrawerRowProps {

@@ -1,23 +1,33 @@
-import type { CreditActivityEntry, CreditExpiring, CreditServerRole, CreditsState } from "@openbot/contracts/credits";
+import type {
+  CreditActivityEntry,
+  CreditExpiring,
+  CreditServerRole,
+  CreditServerWallet,
+  CreditsState,
+} from "@openbot/contracts/credits";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Button, Chip, Typography } from "heroui-native";
 import type { LucideIcon } from "lucide-react-native";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
 import CreditCard from "lucide-react-native/icons/credit-card";
 import Gift from "lucide-react-native/icons/gift";
 import Hourglass from "lucide-react-native/icons/hourglass";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Server from "lucide-react-native/icons/server";
 import Sparkles from "lucide-react-native/icons/sparkles";
-import { useCallback } from "react";
-import { View } from "react-native";
+import { useCallback, useState } from "react";
+import { type TextStyle, View } from "react-native";
+import { useCSSVariable } from "uniwind";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { ServerAvatar } from "@/features/servers/components/server-avatar";
 import { CreditStar } from "@/features/settings/components/credit-star";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { useCreditActivity, useCreditsState } from "@/features/settings/model/credits";
+import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { useText } from "@/shared/lib/text";
 
 const ROLE_TEXT = {
@@ -32,17 +42,28 @@ const STATUS_TEXT = {
   canceled: "mobile.settings.credits.activity.canceled",
 } as const satisfies Record<NonNullable<CreditActivityEntry["status"]>, MobileTextKey>;
 
-const EXPIRY_DATE = { dateStyle: "long" } as const satisfies Intl.DateTimeFormatOptions;
-const SAME_DAY_TIME = { hour: "numeric", minute: "2-digit" } as const satisfies Intl.DateTimeFormatOptions;
-const OTHER_DAY_TIME = {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-} as const satisfies Intl.DateTimeFormatOptions;
+const STEPS = [
+  { title: "mobile.settings.credits.steps.buy", detail: "mobile.settings.credits.steps.buyDetail" },
+  { title: "mobile.settings.credits.steps.move", detail: "mobile.settings.credits.steps.moveDetail" },
+  { title: "mobile.settings.credits.steps.use", detail: "mobile.settings.credits.steps.useDetail" },
+] as const satisfies readonly { title: MobileTextKey; detail: MobileTextKey }[];
+
+const LONG_DATE = { dateStyle: "long" } as const satisfies Intl.DateTimeFormatOptions;
+const DAY_THIS_YEAR = { month: "long", day: "numeric" } as const satisfies Intl.DateTimeFormatOptions;
+const TIME = { hour: "numeric", minute: "2-digit" } as const satisfies Intl.DateTimeFormatOptions;
+const ROW_AVATAR_SIZE = 20;
+const HERO_STAR_SIZE = 34;
+const BALANCE_TEXT: TextStyle = { fontSize: 48, lineHeight: 56, letterSpacing: -1.4, fontVariant: ["tabular-nums"] };
+
+interface ActivityDay {
+  day: string;
+  key: string;
+  at: number;
+  entries: CreditActivityEntry[];
+}
 
 export function CreditsSettingsScreen() {
-  const { t, format, errorMessage } = useText();
+  const { t, errorMessage } = useText();
   const signedIn = useMobileSession().session !== null;
   const credits = useCreditsState();
   const available = credits.data?.available === true;
@@ -95,44 +116,112 @@ export function CreditsSettingsScreen() {
   const state = credits.data;
   return (
     <SettingsContent>
-      <SettingsSection>
-        <SettingsRow
-          leading={<CreditStar size={22} />}
-          supportingText={t("mobile.settings.credits.yours")}
-          description={state.expiring ? <ExpiringText expiring={state.expiring} /> : undefined}
+      <BalanceHero state={state} />
+      {state.servers.length > 0 ? <ServerCredits servers={state.servers} /> : null}
+      <CreditActivity
+        state={state}
+        entries={activity.data?.entries}
+        failed={activity.isError && !activity.data}
+        loading={activity.isPending}
+      />
+    </SettingsContent>
+  );
+}
+
+function BalanceHero({ state }: { state: CreditsState }) {
+  const { t, format } = useText();
+  const [warningSoft, warning] = useCSSVariable(["--openbot-warning-soft", "--openbot-warning-text"]);
+  const amount = format.number(state.balance);
+  return (
+    <View className="items-center gap-2 pt-2">
+      <View
+        accessible
+        accessibilityLabel={t("mobile.settings.credits.amount", { count: state.balance, amount })}
+        className="flex-row items-center gap-2.5"
+      >
+        <CreditStar size={HERO_STAR_SIZE} />
+        <Typography weight="bold" style={BALANCE_TEXT}>
+          {amount}
+        </Typography>
+      </View>
+      <Typography.Paragraph className="text-grouped-secondary">
+        {state.balance > 0 ? t("mobile.settings.credits.yours") : t("mobile.settings.credits.none")}
+      </Typography.Paragraph>
+      {state.expiring ? (
+        <View
+          className="mt-1 flex-row items-center gap-1.5 rounded-full px-3 py-1.5"
+          style={{ backgroundColor: String(warningSoft) }}
         >
-          <Typography.Paragraph className="font-semibold">
-            {t("mobile.settings.credits.amount", { count: state.balance, amount: format.number(state.balance) })}
+          <Hourglass color={String(warning)} size={13} strokeWidth={2} />
+          <Typography.Paragraph type="body-xs" className="font-medium text-warning-text">
+            <ExpiringText expiring={state.expiring} />
+          </Typography.Paragraph>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ServerCredits({ servers }: { servers: CreditServerWallet[] }) {
+  const { t } = useText();
+  const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
+  const [showsEmpty, setShowsEmpty] = useState(false);
+  const funded = servers.filter((server) => server.balance > 0);
+  const empty = servers.filter((server) => server.balance === 0);
+  return (
+    <SettingsSection
+      title={t("mobile.settings.credits.servers")}
+      footer={
+        servers.some((server) => server.role === "owner") ? t("mobile.settings.credits.serversFooter") : undefined
+      }
+    >
+      {funded.map((wallet) => (
+        <ServerCreditRow key={wallet.serverId} wallet={wallet} />
+      ))}
+      {empty.length > 0 ? (
+        <SettingsRow
+          leading={<RowIcon icon={Server} />}
+          expanded={showsEmpty}
+          disclosure={false}
+          onPress={() => setShowsEmpty((current) => !current)}
+          trailing={
+            <ChevronDown
+              color={muted}
+              size={18}
+              strokeWidth={1.5}
+              style={{ transform: [{ rotate: showsEmpty ? "180deg" : "0deg" }] }}
+            />
+          }
+        >
+          <Typography.Paragraph className="text-grouped-secondary">
+            {t("mobile.settings.credits.emptyServers", { count: empty.length })}
           </Typography.Paragraph>
         </SettingsRow>
-      </SettingsSection>
-      {state.servers.length > 0 ? (
-        <SettingsSection title={t("mobile.settings.credits.servers")}>
-          {state.servers.map((server) => (
-            <SettingsRow
-              key={server.serverId}
-              leading={<RowIcon icon={Server} />}
-              supportingText={t(ROLE_TEXT[server.role])}
-              description={server.expiring ? <ExpiringText expiring={server.expiring} /> : undefined}
-              value={t("mobile.settings.credits.amount", {
-                count: server.balance,
-                amount: format.number(server.balance),
-              })}
-            >
-              <Typography.Paragraph numberOfLines={1}>{server.name}</Typography.Paragraph>
-            </SettingsRow>
-          ))}
-        </SettingsSection>
       ) : null}
-      <SettingsSection title={t("mobile.settings.credits.activity.title")} footer={t("mobile.settings.credits.footer")}>
-        <ActivityRows
-          state={state}
-          entries={activity.data?.entries}
-          failed={activity.isError && !activity.data}
-          loading={activity.isPending}
-        />
-      </SettingsSection>
-    </SettingsContent>
+      {showsEmpty ? empty.map((wallet) => <ServerCreditRow key={wallet.serverId} wallet={wallet} />) : null}
+    </SettingsSection>
+  );
+}
+
+function ServerCreditRow({ wallet }: { wallet: CreditServerWallet }) {
+  const { t, format } = useText();
+  const server = useMobileWorkspaceSelector((current) => current.servers.find((item) => item.id === wallet.serverId));
+  return (
+    <SettingsRow
+      leading={
+        server ? <ServerAvatar server={server} size={ROW_AVATAR_SIZE} showStatus={false} /> : <RowIcon icon={Server} />
+      }
+      supportingText={t(ROLE_TEXT[wallet.role])}
+      description={wallet.expiring ? <ExpiringText expiring={wallet.expiring} /> : undefined}
+      value={format.number(wallet.balance)}
+      onPress={
+        wallet.role === "owner"
+          ? () => router.push({ pathname: "/settings/credits-move", params: { serverId: wallet.serverId } })
+          : undefined
+      }
+    >
+      <Typography.Paragraph numberOfLines={1}>{wallet.name}</Typography.Paragraph>
+    </SettingsRow>
   );
 }
 
@@ -141,11 +230,22 @@ function ExpiringText({ expiring }: { expiring: CreditExpiring }) {
   return t("mobile.settings.credits.expiring", {
     count: expiring.credits,
     amount: format.number(expiring.credits),
-    date: format.date(new Date(expiring.expiresAt), EXPIRY_DATE),
+    date: format.date(new Date(expiring.expiresAt), LONG_DATE),
   });
 }
 
-function ActivityRows({
+function activityDays(entries: CreditActivityEntry[]): ActivityDay[] {
+  const days: ActivityDay[] = [];
+  for (const entry of entries) {
+    const day = new Date(entry.at).toDateString();
+    const last = days.at(-1);
+    if (last?.day === day) last.entries.push(entry);
+    else days.push({ day, key: `${day}:${days.length}`, at: entry.at, entries: [entry] });
+  }
+  return days;
+}
+
+function CreditActivity({
   state,
   entries,
   failed,
@@ -156,36 +256,65 @@ function ActivityRows({
   failed: boolean;
   loading: boolean;
 }) {
-  const { t } = useText();
-  if (failed) {
+  const { t, format } = useText();
+  const footer = t("mobile.settings.credits.footer");
+  if (failed || (!entries && loading)) {
     return (
-      <SettingsRow>
-        <Typography.Paragraph className="text-grouped-secondary">
-          {t("mobile.settings.credits.activity.loadFailed")}
-        </Typography.Paragraph>
-      </SettingsRow>
+      <SettingsSection title={t("mobile.settings.credits.activity.title")} footer={footer}>
+        <SettingsRow>
+          <Typography.Paragraph className="text-grouped-secondary">
+            {failed ? t("mobile.settings.credits.activity.loadFailed") : t("mobile.settings.credits.activity.loading")}
+          </Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
     );
   }
-  if (!entries) {
-    return loading ? (
-      <SettingsRow>
-        <Typography.Paragraph className="text-grouped-secondary">
-          {t("mobile.settings.credits.activity.loading")}
-        </Typography.Paragraph>
-      </SettingsRow>
-    ) : null;
-  }
-  if (entries.length === 0) {
-    return (
-      <SettingsRow>
-        <Typography.Paragraph className="text-grouped-secondary">
-          {t("mobile.settings.credits.activity.empty")}
-        </Typography.Paragraph>
-      </SettingsRow>
-    );
-  }
-  const now = Date.now();
-  return entries.map((entry) => <ActivityRow key={entry.id} entry={entry} state={state} now={now} />);
+  if (!entries) return null;
+  if (entries.length === 0) return <CreditSteps />;
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const dayTitle = (at: number) => {
+    const date = new Date(at);
+    if (date.toDateString() === today.toDateString()) return t("mobile.settings.credits.activity.today");
+    if (date.toDateString() === yesterday.toDateString()) return t("mobile.settings.credits.activity.yesterday");
+    return format.date(date, date.getFullYear() === today.getFullYear() ? DAY_THIS_YEAR : LONG_DATE);
+  };
+  const days = activityDays(entries);
+  return (
+    <>
+      {days.map((day, index) => (
+        <SettingsSection key={day.key} title={dayTitle(day.at)} footer={index === days.length - 1 ? footer : undefined}>
+          {day.entries.map((entry) => (
+            <ActivityRow key={entry.id} entry={entry} state={state} />
+          ))}
+        </SettingsSection>
+      ))}
+    </>
+  );
+}
+
+function CreditSteps() {
+  const { t, format } = useText();
+  return (
+    <SettingsSection title={t("mobile.settings.credits.steps.title")}>
+      {STEPS.map((step, index) => (
+        <SettingsRow
+          key={step.title}
+          leading={
+            <View className="size-5 items-center justify-center rounded-full bg-control-active">
+              <Typography type="body-xs" weight="semibold">
+                {format.number(index + 1)}
+              </Typography>
+            </View>
+          }
+          supportingText={t(step.detail)}
+        >
+          <Typography.Paragraph>{t(step.title)}</Typography.Paragraph>
+        </SettingsRow>
+      ))}
+    </SettingsSection>
+  );
 }
 
 function activityIcon(entry: CreditActivityEntry): LucideIcon {
@@ -205,7 +334,7 @@ function activityIcon(entry: CreditActivityEntry): LucideIcon {
   }
 }
 
-function ActivityRow({ entry, state, now }: { entry: CreditActivityEntry; state: CreditsState; now: number }) {
+function ActivityRow({ entry, state }: { entry: CreditActivityEntry; state: CreditsState }) {
   const { t, format } = useText();
   const serverName = (serverId: string) =>
     state.servers.find((server) => server.serverId === serverId)?.name ??
@@ -223,10 +352,7 @@ function ActivityRow({ entry, state, now }: { entry: CreditActivityEntry; state:
         ? t("mobile.settings.credits.activity.openbot")
         : (entry.actorName ?? t("mobile.settings.credits.activity.member"));
   const wallet = entry.serverId ? serverName(entry.serverId) : t("mobile.settings.credits.yours");
-  const time = format.date(
-    entry.at,
-    new Date(entry.at).toDateString() === new Date(now).toDateString() ? SAME_DAY_TIME : OTHER_DAY_TIME,
-  );
+  const time = format.date(entry.at, TIME);
   const amount = format.number(Math.abs(entry.credits));
   const signed =
     entry.credits > 0
