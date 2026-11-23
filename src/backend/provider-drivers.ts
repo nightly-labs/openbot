@@ -140,6 +140,7 @@ interface ProviderSignInCommand extends Omit<ProviderCliCommand, "argv" | "env">
     | ((cli: AgentCliInfo, region: SignInRegion) => Effect.Effect<readonly string[], ProviderClientOperationError>);
   readonly env: (cli: AgentCliInfo, region: SignInRegion) => Record<string, string>;
   readonly savedSignIn?: (cli: AgentCliInfo, env: NodeJS.ProcessEnv) => Effect.Effect<string | null>;
+  readonly pipedInput?: true;
 }
 
 const CLI_LOGIN_TIMEOUT_MS = 10 * 60_000;
@@ -319,6 +320,13 @@ const ANTIGRAVITY_SIGN_IN: AcpAuthenticateSignIn = {
   argv: antigravityArgv,
   env: ANTIGRAVITY_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+};
+
+const ANTIGRAVITY_CODE_SIGN_IN: ProviderSignInCommand = {
+  argv: () => Effect.succeed([...antigravityArgv({ ...process.env, ...ANTIGRAVITY_ENV }), "--login"]),
+  env: () => ({ ...ANTIGRAVITY_ENV }),
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+  pipedInput: true,
 };
 
 const CLINE_ARGV: readonly string[] = ["--acp"];
@@ -894,6 +902,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   {
     id: "antigravity",
     signIn: ANTIGRAVITY_SIGN_IN,
+    codeSignIn: { kind: "cli", flow: "paste", command: ANTIGRAVITY_CODE_SIGN_IN },
     accounts: {
       homeVariable: "GEMINI_HOME",
       signIn: ANTIGRAVITY_SIGN_IN,
