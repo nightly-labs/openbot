@@ -180,6 +180,7 @@ three start routes, and `provider-account-relay-v1` and `-v2` add one more each.
 | --- | --- | --- |
 | `mcp/start` | A URL MCP server, from the Marketplace | It gives the code to `McpOAuth` (owned flow). |
 | `provider/start` | The CLI of a provider in `SIGN_IN_RELAY_PROVIDERS`: Codex, Claude, Gemini (`antigravity`) and Muse | It replays the query to the CLI's own loopback listener on the host. A Muse device page has no callback: the client only opens it. |
+| `provider/v2/start` | The CLI of a provider in `PROVIDER_SIGN_IN_RELAY_V2_PROVIDERS`: Devin. The separate capability `provider-sign-in-relay-v2` adds this route ([`provider-sign-in-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-sign-in-relay-v2.ts)). Only a Linux host advertises it, with v1: on macOS the CLI runs `/usr/bin/open` by its absolute path, and on Windows OpenBot has no `open` command that the CLI uses, so OpenBot cannot take the page there. `provider-sign-in-relays.ts` gives a client the route that takes a provider | As for `provider/start`. |
 | `link/start` | A sign-in page that an agent of the host printed in its conversation | It replays the query to the loopback address of that page. |
 | `provider-account/start` | An account after the first of Codex or Claude (`PROVIDER_ACCOUNT_RELAY_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v1` adds this route ([`provider-account-relay-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v1.ts)) | It replays the query to the loopback listener of the account's CLI on the host, as for `provider/start`. |
 | `provider-account/v2/start` | An account after the first of Codex, Claude or Gemini (`PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v2` adds this route ([`provider-account-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v2.ts)). A host advertises it with v1, and a client uses the newest one that the host advertises | As for `provider-account/start`. |
@@ -439,8 +440,9 @@ loopback too. Its client is the OpenBot Meta app 1479376854168579, with no secre
 listener of the computer where the browser runs, and a joined server uses the
 [callback relay](#remote-sign-in-the-callback-relay) as before. The relay always names port 28417:
 when another program holds that port, the sign-in cannot finish. A sign-in app that the admin saves
-replaces the built-in client and uses the loopback address. The Meta app must list the relay address
-in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
+replaces the built-in client, but it keeps the built-in client's redirect: Meta refuses the loopback
+address for every app (#13663). The "Sign-in app" section shows that redirect as its callback URL.
+The Meta app must list the relay address in "Valid OAuth Redirect URIs", and a user who has no role on the app can sign in only after Meta's
 App Review puts the app in Live mode. `bun run test:mcp-sign-in-https-relay` checks the Meta page,
 the relay, and that another server that names Meta's issuer does not get the app.
 

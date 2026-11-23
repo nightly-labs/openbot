@@ -99,9 +99,15 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
     },
     (app) => {
       if (app === undefined) return;
-      nav.reset();
-      if (app) nav.go({ kind: "app", id: app });
-      if (!app?.startsWith("custom:")) untrack(() => props.onMcpSignInRequestHandled)?.();
+      const view = untrack(() => nav.state.stack.at(-1));
+      if (!app || view?.kind !== "app" || view.id !== app) {
+        nav.reset();
+        if (app) nav.go({ kind: "app", id: app });
+      }
+      if (app?.startsWith("custom:")) return;
+      const id = untrack(() => props.mcpSignInRequest);
+      if (app && id) queueMicrotask(() => controller.signInPluginServer(id));
+      untrack(() => props.onMcpSignInRequestHandled)?.();
     },
   );
 
@@ -215,6 +221,7 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             signInHostName={props.pluginSignInRelay ? props.pluginHostName : undefined}
             onCancelSignIn={controller.cancelSignIn}
             onCopySignInLink={props.pluginHostName ? undefined : controller.copySignInLink()}
+            onPasteSignInAddress={props.pluginHostName ? undefined : controller.pasteSignInAddress()}
             signInExtra={
               <>
                 <Show when={controller.signInHostPage()} keyed>

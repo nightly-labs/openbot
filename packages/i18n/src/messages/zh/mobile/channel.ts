@@ -77,6 +77,8 @@ export const messages = {
   "mobile.channel.form.deselectAll": "取消全选",
   "mobile.channel.form.memories": "记忆",
   "mobile.channel.form.routines": "自动化任务",
+  "mobile.channel.folders.description": "{channel} 的所有成员都可以在这些文件夹中更改文件和运行命令。",
+  "mobile.channel.folders.removeBody": "{channel} 的成员不能再更改 {folder} 中的文件",
   "mobile.channel.form.deleteTitle": "删除频道？",
   "mobile.channel.form.deleteBody":
     "这会停止该频道。它的历史记录会留在“已删除的频道”中，仅供预览，你可以从那里恢复。成员助手会保留。",

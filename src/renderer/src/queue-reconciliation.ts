@@ -1,4 +1,11 @@
-import { isQueuedAgentReply, type QueueDelivery, type QueueSnapshot } from "@openbot/contracts/ipc";
+import { type AgentTask, isQueuedAgentReply, type QueueDelivery, type QueueSnapshot } from "@openbot/contracts/ipc";
+
+export function withoutSideThreadTurns(queue: QueueSnapshot, tasks: readonly AgentTask[]): QueueSnapshot {
+  const sideTurns = new Set(tasks.flatMap((task) => (task.activeTurnId ? [task.activeTurnId] : [])));
+  if (sideTurns.size === 0) return queue;
+  const deliveries = queue.deliveries.filter((delivery) => delivery.turnId === null || !sideTurns.has(delivery.turnId));
+  return deliveries.length === queue.deliveries.length ? queue : { ...queue, deliveries };
+}
 
 export function activeQueueDeliveries(
   snapshot: QueueSnapshot | undefined,

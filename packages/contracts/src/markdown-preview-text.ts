@@ -93,6 +93,32 @@ export function markdownPreviewText(body: string): string {
     .trim();
 }
 
+export function markdownImageName(alt: string, url: string): string {
+  if (alt.trim()) return alt.trim();
+  try {
+    const path = new URL(url).pathname;
+    const name = decodeURIComponent(path.split(/[\\/]/u).pop() ?? "");
+    if (name) return name;
+  } catch {}
+  return url;
+}
+
+function childTokens(token: Token): Token[] {
+  if (token.type === "list") return token.items;
+  if (token.type === "table") return [token.header, ...token.rows].flat().flatMap((cell) => cell.tokens);
+  return "tokens" in token && Array.isArray(token.tokens) ? token.tokens : [];
+}
+
+function imageNames(tokens: readonly Token[]): string[] {
+  return tokens.flatMap((token) =>
+    token.type === "image" ? [markdownImageName(token.text, token.href)] : imageNames(childTokens(token)),
+  );
+}
+
+export function markdownImageNames(body: string): string[] {
+  return imageNames(markdown.lexer(body));
+}
+
 export function markdownInlinePlainText(body: string): string {
   return inlineText(new markdown.Lexer(markdown.defaults).inlineTokens(body)).replace(/\s+/gu, " ").trim();
 }

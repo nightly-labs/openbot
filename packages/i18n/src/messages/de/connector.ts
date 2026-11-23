@@ -365,7 +365,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
+    "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp hat diesen Computer aus den verknüpften Geräten entfernt. Verknüpfe die Nummer erneut.",
   "connector.whatsapp.helpLoggedOutHost":

@@ -287,6 +287,7 @@ function normalizeQuestions(questions: PromptEvent["questions"], text: DynamicIs
     id: normalizeTechnical(question.id, `question-${questionIndex + 1}`, INPUT_LIMITS.identifier),
     header: normalizeRequired(question.header, text.questionHeader, INPUT_LIMITS.promptHeader),
     question: normalizeRequired(question.question, text.questionText, INPUT_LIMITS.promptQuestion),
+    ...questionDetail(question.detail),
     isSecret: question.isSecret,
     options:
       question.options?.slice(0, INPUT_LIMITS.promptOptions).map((option, optionIndex) => {
@@ -303,6 +304,11 @@ function normalizeQuestions(questions: PromptEvent["questions"], text: DynamicIs
         };
       }) ?? null,
   }));
+}
+
+function questionDetail(detail: string | undefined): { detail?: string } {
+  const text = detail?.trim();
+  return text ? { detail: truncate(text, INPUT_LIMITS.promptQuestion) } : {};
 }
 
 function normalizeTechnical(value: string, fallback: string, length: number): string {

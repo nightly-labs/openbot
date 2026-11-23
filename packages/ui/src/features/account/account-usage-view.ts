@@ -43,6 +43,7 @@ export interface AccountUsageProviderRow {
   ringWindows: AccountUsageWindowRow[];
   reportsUsage: boolean;
   sharedQuotaWith: AgentProviderId | null;
+  readFailed: boolean;
 }
 
 export function accountUsageProviderRows(
@@ -168,6 +169,7 @@ function usageRow(
     ringWindows,
     reportsUsage: agentProviderDescriptor(provider).reportsUsage,
     sharedQuotaWith: limit?.sharedQuotaWith ?? null,
+    readFailed: limit?.readFailed === true && windows.length === 0,
   };
 }
 

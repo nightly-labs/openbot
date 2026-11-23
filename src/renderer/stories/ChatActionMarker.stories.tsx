@@ -572,6 +572,7 @@ function SkillMarkers() {
         selectionRequest={selected()}
         agentId="chief"
         agentName="Chief"
+        agentProvider="claude"
         onOpenChange={(open) => {
           if (!open) setSelected(null);
         }}

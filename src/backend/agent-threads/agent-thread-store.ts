@@ -113,6 +113,19 @@ export class AgentThreadStore {
     ).map(decodeThread);
   }
 
+  archivedPage(agentId: string, last: ThreadListPosition | null, limit: number): AgentThreadRecord[] {
+    const lastUpdatedAt = last?.updatedAt ?? null;
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `${SELECT_THREAD} WHERE agent_id = ? AND archived_at IS NOT NULL
+           AND (? IS NULL OR updated_at < ? OR (updated_at = ? AND thread_id > ?))
+           ORDER BY updated_at DESC, thread_id LIMIT ?`,
+        )
+        .all(agentId, lastUpdatedAt, lastUpdatedAt, lastUpdatedAt, last?.threadId ?? null, limit),
+    ).map(decodeThread);
+  }
+
   recent(
     agentId: string,
     after: string | null,

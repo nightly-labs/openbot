@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import type { AgentProviderId } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, MANAGED_SKILL_FOLDERS } from "@openbot/contracts/agent-providers";
 import { AVATAR_IMAGE_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   AGENT_IMPORT_LIMITS,
@@ -147,7 +147,7 @@ import {
 import { exportWorkflows, importWorkflows, type TransferWorkflowPort } from "./instance-transfer-workflows";
 import { parseAvatarImage } from "./ipc/avatar-inputs";
 import { parseHostIdentity } from "./ipc/server-inputs";
-import { MANAGED_SKILL_FOLDERS, OWNERSHIP_MARKER } from "./managed-skill-service";
+import { OWNERSHIP_MARKER } from "./managed-skill-service";
 import { readPackFolders } from "./skill-marketplace-service";
 import { isUnsafeArchivePath, normalizedFiles } from "./skill-package";
 

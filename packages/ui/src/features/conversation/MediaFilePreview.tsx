@@ -19,6 +19,7 @@ export function MediaFilePreview(props: {
   onLoad?: (() => void) | undefined;
   onError?: (() => void) | undefined;
   menu?: VideoStageMenu | undefined;
+  onDownload?: (() => void) | undefined;
 }) {
   const [size, setSize] = createSignal<MediaSize | null>(untrack(() => rememberedMediaSize(props.attachmentId)));
   const { t } = useText();
@@ -62,6 +63,7 @@ export function MediaFilePreview(props: {
             onPlay={props.onPlay}
             onError={props.onError}
             fullControls
+            onDownload={props.onDownload}
             onMetadata={(video) => {
               const next = { width: video.videoWidth, height: video.videoHeight };
               if (next.width <= 0 || next.height <= 0) return;

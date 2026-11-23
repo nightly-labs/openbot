@@ -331,6 +331,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Für diesen Anbieter sind keine Modelle verfügbar.",
   "mobile.agent.runtime.searchModels": "Modelle suchen",
   "mobile.agent.runtime.noMatches": "Keine Modelle entsprechen deiner Suche.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Keine Modelle entsprechen deiner Suche. Deine Einstellungen für Datenschutz, Anbieter und Guardrails auf openrouter.ai können Modelle aus dieser Liste ausblenden.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Dieser Anbieter funktioniert unter Windows und Linux nicht mit „Nur Arbeitsbereich“. Ändere dafür zuerst die „Berechtigungen“.",
   "mobile.agent.runtime.usageLimit": "Nutzungslimit erreicht",
@@ -409,10 +411,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Profile verwalten",
   "mobile.agent.browserProfile.footer":
     "Jedes Profil hat eigene Anmeldungen und Cookies. Eine Änderung schließt die offenen Tabs des Agenten.",
+  "mobile.agent.browserProfile.movedNote":
+    "Anmeldungen bei Websites bleiben im alten Profil. Der Agent muss sich bei diesen Websites erneut anmelden.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot konnte das Browser-Profil des Agenten nicht ändern.",
   "mobile.agent.planCard.label": "Plan vor langen Aufgaben zeigen",
   "mobile.agent.planCard.footer":
     "Vor einer langen Aufgabe zeigt der Agent seinen Plan. Er beginnt nach 10 s oder wenn du auf Start drückst.",
+  "mobile.agent.builtinMemory.label": "OpenBot-Erinnerungen",
+  "mobile.agent.builtinMemory.footer":
+    "Der Agent speichert und liest eigene Erinnerungen. Schalte dies aus, um nur eine Gedächtnis-App wie Mem0 zu nutzen. Gespeicherte Erinnerungen bleiben.",
   "mobile.agent.workspace.title": "Arbeitsbereichsordner",
   "mobile.agent.workspace.footer": "Der Ordner dieses Agenten auf dem Host-Computer.",
   "mobile.agent.advanced.behavior": "Verhalten",
@@ -496,6 +503,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Dieser Host kann keine Agenten von einem Remote-Gerät aus veröffentlichen.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens ohne Cache-Lesevorgänge",
   "mobile.agent.usage.estimatedCost": "Geschätzte Kosten",
+  "mobile.agent.usage.noCostEstimate": "Keine Kostenschätzung",
   "mobile.agent.usage.daily": "Tägliche Nutzung",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Kosten",
@@ -620,7 +628,6 @@ export const messages = {
   "mobile.agent.home.noChatOpen": "Kein Chat geöffnet",
   "mobile.agent.home.noChatOpenBody": "Wähle einen Chat in der Liste.",
   "mobile.agent.home.chatListWidth": "Breite der Chatliste",
-  "mobile.agent.home.serverTitle": "{name}, Server öffnen",
   "mobile.agent.home.waiting": "Warten auf Verbindung",
   "mobile.agent.home.waitingBody": "Die Agentenliste wird geladen, sobald dieser Server verbunden ist.",
   "mobile.agent.home.noAgents": "Keine Agenten auf diesem Server",

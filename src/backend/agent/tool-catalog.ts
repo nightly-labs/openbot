@@ -3,6 +3,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
 import { BROWSER_DYNAMIC_TOOLS, BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
+import { CHANNEL_TOOL_DEFINITIONS } from "../channel-tools";
 import type { DynamicToolNamespace } from "../local-mcp-bridge";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
 import { type DynamicToolCallParams, isRecord, qualifiedToolName } from "../protocol";
@@ -26,6 +27,9 @@ const DIRECT_NAMES = new Set([
   "attach_files_to_response",
   "list_agents",
   "send_message",
+  "start_task",
+  "message_task",
+  "close_task",
   "search_memories",
   "routine_no_update",
   "routine_report_failure",
@@ -106,13 +110,17 @@ const kimiCallShape = {
   arguments: callShape.arguments.meta({ additionalProperties: KIMI_ARGUMENT_VALUE }),
 };
 
-function toolDefinitions(catalog: typeof BUILTIN_TOOL_CATALOG) {
-  const names = catalogNames(catalog);
+const TOOL_SEARCH_DESCRIPTION =
+  "Find built-in tools by keywords or qualified name: queries (array) or query. Returns short descriptions, default 5, max 10; the best matches also give inputSchema and guidance. Run found tools with tool_call, not directly. Describe others before use.";
+
+function toolDefinitions(catalog: typeof BUILTIN_TOOL_CATALOG, catalogInSearch = true) {
   return [
     ...OPENBOT_TOOL_DEFINITIONS.filter((tool) => DIRECT_NAMES.has(tool.name)),
     {
       name: "tool_search",
-      description: `Find built-in tools by keywords or qualified name: queries (array) or query. Returns short descriptions, default 5, max 10; the best matches also give inputSchema and guidance. Run found tools with tool_call, not directly. Describe others before use. Catalog: ${names}`,
+      description: catalogInSearch
+        ? `${TOOL_SEARCH_DESCRIPTION} Catalog: ${catalogNames(catalog)}`
+        : `${TOOL_SEARCH_DESCRIPTION} Your instructions list the catalog.`,
       shape: searchShape,
     },
     {
@@ -155,6 +163,11 @@ const KIMI_DYNAMIC_TOOLS = dynamicTools(
     definition.name === "tool_call" ? { ...definition, shape: kimiCallShape } : definition,
   ),
 );
+const ANTIGRAVITY_DYNAMIC_TOOLS = dynamicTools(toolDefinitions(catalogFor("antigravity"), false));
+
+export function toolCatalogNames(provider: AgentProviderId): string {
+  return catalogNames(catalogFor(provider));
+}
 
 export function visibleToolDefinitions(provider: AgentProviderId) {
   return OWN_WEB_SEARCH_PROVIDERS.has(provider) ? OWN_WEB_SEARCH_TOOL_DEFINITIONS : ALL_TOOL_DEFINITIONS;
@@ -162,6 +175,7 @@ export function visibleToolDefinitions(provider: AgentProviderId) {
 
 export function visibleDynamicTools(provider: AgentProviderId) {
   if (provider === "kimi") return KIMI_DYNAMIC_TOOLS;
+  if (provider === "antigravity") return ANTIGRAVITY_DYNAMIC_TOOLS;
   return OWN_WEB_SEARCH_PROVIDERS.has(provider) ? OWN_WEB_SEARCH_DYNAMIC_TOOLS : ALL_DYNAMIC_TOOLS;
 }
 
@@ -202,6 +216,21 @@ export function withCatalogTools(
       .filter((entry) => entry.namespace === namespace.name && !names.has(entry.tool))
       .flatMap((entry) => tools.get(entry.name) ?? []);
     return { ...namespace, tools: [...listed, ...added] };
+  });
+}
+
+const CHANNEL_TOOL_NAMES: ReadonlySet<string> = new Set(
+  CHANNEL_TOOL_DEFINITIONS.map((definition) => `${OPENBOT_DYNAMIC_TOOLS.name}.${definition.name}`),
+);
+
+export function withChannelTools(namespaces: readonly DynamicToolNamespace[]): DynamicToolNamespace[] {
+  const tools = mcpCatalogs.get(BUILTIN_TOOL_CATALOG) ?? mcpCatalogTools(BUILTIN_TOOL_CATALOG);
+  mcpCatalogs.set(BUILTIN_TOOL_CATALOG, tools);
+  const channelTools = [...tools].flatMap(([name, tool]) => (CHANNEL_TOOL_NAMES.has(name) ? [tool] : []));
+  return namespaces.map((namespace) => {
+    if (namespace.name !== OPENBOT_DYNAMIC_TOOLS.name) return namespace;
+    const names = new Set(namespace.tools.map((tool) => tool.name));
+    return { ...namespace, tools: [...namespace.tools, ...channelTools.filter((tool) => !names.has(tool.name))] };
   });
 }
 

@@ -231,6 +231,17 @@ function ComposerStackPlayground() {
           variant="secondary"
           size="sm"
           type="button"
+          onClick={() => {
+            setQueueShown(true);
+            mock?.setQueueSnapshot("chief", QUEUE, { reason: "sign-in", provider: "codex" });
+          }}
+        >
+          Sign-in wait
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          type="button"
           onClick={() =>
             mock?.emitAgentEvent({
               type: "error",

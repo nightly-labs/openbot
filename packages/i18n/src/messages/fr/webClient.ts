@@ -20,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "La réponse de connexion n’est pas valide.",
   "webClient.pane.navigation": "Navigation de l’espace de travail",
   "webClient.pane.chat": "Discussion",
-  "webClient.pane.routines": "Routines",
   "webClient.pane.workspace": "Espace de travail",
   "webClient.phoneApp.title": "Utilisez l’app OpenBot",
   "webClient.phoneApp.description":
@@ -38,7 +37,7 @@ export const messages = {
     "Créez un serveur hébergé pour discuter avec vos agents depuis ce navigateur. Vous pouvez aussi lancer OpenBot sur votre ordinateur ou rejoindre un serveur avec une invitation.",
   "webClient.connect.stepInstall": "Installez et ouvrez OpenBot sur votre ordinateur.",
   "webClient.connect.stepSignIn": "Connectez-vous avec votre adresse e-mail.",
-  "webClient.connect.stepRemote": "Activez l’accès à distance.",
+  "webClient.connect.stepRemote": "Dans OpenBot, ouvrez Réglages du serveur > Membres et activez Publier ce serveur.",
   "webClient.notice.download": "Télécharger OpenBot",
   "webClient.notice.createServer": "Créer un serveur hébergé",
   "webClient.notice.join": "Rejoindre par invitation",

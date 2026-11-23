@@ -7,7 +7,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
-import type { AwaitingReplyItem, AwaitingReplyState } from "@openbot/ui/features/conversation/AwaitingReplies";
+import {
+  type AwaitingReplyItem,
+  type AwaitingReplyState,
+  awaitingReplyEnded,
+} from "@openbot/ui/features/conversation/AwaitingReplies";
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import { currentText } from "@openbot/ui/text";
 
@@ -58,9 +62,15 @@ export function agentAwaitingReplies(input: AgentAwaitingInput): AwaitingReplyIt
       }
       const state = deliveryState(delivery.status);
       const superseded = index < lastUserIndex || index < (lastRequestIndex.get(delivery.recipientAgentId) ?? index);
-      if (!state || (state === "failed" && superseded)) continue;
-      const wait = state === "failed" ? undefined : input.waits?.[delivery.recipientAgentId];
-      rows.push({ ...rowFor(delivery.recipientAgentId, state, id), ...(wait ? { wait } : {}) });
+      if (!state || (awaitingReplyEnded(state) && superseded)) continue;
+      const wait = awaitingReplyEnded(state) ? undefined : input.waits?.[delivery.recipientAgentId];
+      const row = rowFor(delivery.recipientAgentId, state, id);
+      const stoppable = state === "asked" && row.agent !== undefined;
+      rows.push({
+        ...row,
+        ...(wait ? { wait } : {}),
+        ...(stoppable ? { deliveryId: delivery.id } : { stoppable: false }),
+      });
     }
     const exchangeRows = rows.slice(firstRow);
     if (exchangeRows.some((row) => row.state === "asked" || row.state === "working")) {
@@ -106,7 +116,8 @@ function lastRequestIndexByRecipient(messages: readonly AgentMessage[]): Map<str
 function deliveryState(status: QueueDelivery["status"]): Exclude<AwaitingReplyState, "replied"> | null {
   if (status === "queued") return "asked";
   if (status === "starting" || status === "running") return "working";
-  if (status === "failed" || status === "interrupted" || status === "cancelled") return "failed";
+  if (status === "cancelled") return "stopped";
+  if (status === "failed" || status === "interrupted") return "failed";
   return null;
 }
 
@@ -140,7 +151,7 @@ export function channelAwaitingReplies(input: ChannelAwaitingInput): AwaitingRep
   });
 }
 
-function channelTaskState(state: ChannelTask["state"]): AwaitingReplyState | null {
+function channelTaskState(state: ChannelTask["state"]): Exclude<AwaitingReplyState, "stopped"> | null {
   if (state === "paused") return null;
   if (state === "queued") return "asked";
   if (state === "running" || state === "waiting") return "working";

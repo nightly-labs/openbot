@@ -19,6 +19,7 @@ const ROOT = resolve(import.meta.dirname, "..");
 const OUT = resolve(ROOT, ".openbot-build/mcp-sign-in-https-relay-e2e");
 const META_ADS_MCP_URL = "https://mcp.facebook.com/ads";
 const META_APP_ID = "1479376854168579";
+const SAVED_APP_ID = "e2e-saved-meta-app";
 const LOOPBACK_REDIRECT_URL = `http://127.0.0.1:${MCP_OAUTH_REDIRECT_PORT}/mcp-auth`;
 
 interface Delivery {
@@ -57,6 +58,13 @@ interface Report {
   grant?: RelayResult & { delivered: Delivery[] };
   refusal?: RelayResult & { refused: Refusal[] };
   impostor?: { pages: { origin: string; clientId: string | null }[]; error: string | null };
+  savedApp?: {
+    clientId: string | null;
+    redirectUri: string | null;
+    shownRedirectUrl: string;
+    otherServerRedirectUrl: string;
+    error: string | null;
+  };
   listenerPort?: number;
 }
 
@@ -242,6 +250,42 @@ try {
   check(
     impostorPages.every((opened) => opened.clientId !== META_APP_ID),
     "a server that is not Meta's got the OpenBot Meta app",
+  );
+
+  const savedAppPages = pages.length;
+  let savedAppError: string | null = null;
+  try {
+    await runCauseEffect(
+      oauth.saveSignInApp(META_ADS_MCP_URL, { clientId: SAVED_APP_ID, clientSecret: null, scope: "" }),
+    );
+    const savedAppSignIn = oauth.signIn(META_ADS_MCP_URL);
+    assert.ok(savedAppSignIn, "McpOAuth takes the Meta Ads MCP address with a saved sign-in app");
+    await runCauseEffect(savedAppSignIn.begin());
+  } catch (error) {
+    savedAppError = error instanceof Error ? error.message : String(error);
+  } finally {
+    oauth.cancelSignIn(META_ADS_MCP_URL);
+  }
+  const savedAppPage = URL.parse(pages.slice(savedAppPages).at(-1) ?? "");
+  report.savedApp = {
+    clientId: savedAppPage?.searchParams.get("client_id") ?? null,
+    redirectUri: savedAppPage?.searchParams.get("redirect_uri") ?? null,
+    shownRedirectUrl: oauth.signInAppRedirectUrl(META_ADS_MCP_URL),
+    otherServerRedirectUrl: oauth.signInAppRedirectUrl(impostorUrl),
+    error: savedAppError,
+  };
+  check(report.savedApp.clientId === SAVED_APP_ID, "the page does not name the saved sign-in app");
+  check(
+    report.savedApp.redirectUri === MCP_OAUTH_RELAY_URL,
+    `a saved sign-in app for Meta sent ${report.savedApp.redirectUri}`,
+  );
+  check(
+    report.savedApp.shownRedirectUrl === MCP_OAUTH_RELAY_URL,
+    `the Sign-in app section shows ${report.savedApp.shownRedirectUrl} for Meta`,
+  );
+  check(
+    report.savedApp.otherServerRedirectUrl === LOOPBACK_REDIRECT_URL,
+    `the Sign-in app section shows ${report.savedApp.otherServerRedirectUrl} for another server`,
   );
 } catch (error) {
   report.failures.push(error instanceof Error ? error.message : String(error));

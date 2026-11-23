@@ -130,7 +130,6 @@ export function AgentPinSwipeRow({
         overshootFriction={1}
         rightThreshold={PIN_REVEAL_DISTANCE / 2}
         leftThreshold={PIN_REVEAL_DISTANCE / 2}
-        enableTrackpadTwoFingerGesture
         simultaneousWith={swipe.gesture}
         requireToFail={swipe.swipeRequires}
         onSwipeableWillOpen={swipe.onWillOpen}

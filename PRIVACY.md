@@ -5,8 +5,10 @@ browser data, and team data stay on the computer that runs OpenBot. The one exce
 encrypted copy that the signed-in mobile app keeps of what it shows (see the mobile section below).
 The optional OpenBot account
 service stores the minimum central data needed for email sign-in, account avatars, remote host
-configuration, memberships, invitations, logical sessions, and the account's product analytics
-answer.
+configuration, memberships, invitations, ownership transfers, logical sessions, and the account's
+product analytics answer. An ownership transfer keeps the server, the email that the owner entered
+and the two accounts, also after it ends, so that a server plan of the earlier owner still counts
+for the server.
 
 The optional browser client at `/app` connects to the computer that runs OpenBot. Conversation
 and attachment data travel through the existing encrypted host connection, not through the
@@ -80,6 +82,15 @@ after no use, starts, becomes ready after a start, changes its machine, stops at
 It also sends these events for a license: a Checkout starts, the license starts, its number of
 users goes up or down, its renewal is cancelled or resumed, it ends, or its payment succeeds, fails,
 is refunded or is disputed.
+It also sends an event when your OpenBot credits change: a credits Checkout starts, is paid or
+expires, a refund or a lost dispute takes credits back, you move credits to or from a server, a
+license gives free monthly credits or they expire, or a workflow step that uses OpenBot credits
+starts, is charged or ends with no charge. A credits event has your account ID (for a server step
+that no member started, or a server's free credits, the account ID of the server owner), whether
+the credits are personal or a server's, the number of credits, the currency and amount of a
+payment, and for a generation the model, its kind (image or video), the resolution, duration,
+number of results and audio setting that the step asked for, and the outcome. It does not have the
+prompt, the pictures, the result, the job, or the server ID.
 Each event has your account ID and only fixed values: the action, whether it is a server plan or a
 license, the plan, the number of license users, the billing period, the currency, the amount that
 Stripe reports, the place in the app where the plans were opened, the server size, the start reason,
@@ -87,13 +98,13 @@ how long a start took, and an error code. It has
 no email, name, Stripe ID or server ID. The desktop analytics setting does not stop these events,
 because the account service sends them and not your computer.
 When you pay for a plan or a license (it starts, each payment succeeds, it changes, or its renewal
-is cancelled or resumed), the account service also sets your normalized account email on the OpenPanel
+is cancelled or resumed), or when you buy credits, the account service also sets your normalized account email on the OpenPanel
 profile of your account ID, as the apps do at sign-in. It does this also when product analytics is
 off on your devices, so that the paid account is not anonymous in the sales data. The email is not
 copied into the events.
 
-For each email that the account service sends from its mailbox (a sign-in code, an invitation, a contact
-message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
+For each email that the account service sends from its mailbox (a sign-in code, an invitation, an
+ownership transfer, a contact message, a welcome email for a server plan, or a license email), it sends OpenPanel one event with the kind of email and the result of the send. This
 event has no account ID, email address, name or message content.
 
 Every 5 minutes, each Signal host sends OpenPanel one event with the number of TURN relay allocations
@@ -218,7 +229,8 @@ without account credentials. The phone sends no request to a plugin vendor until
 that vendor's app. A key the user types, or the grant of a browser sign-in, goes only to the user's
 own host over the encrypted Team channel.
 Mobile properties include app version/build, iOS or Android, result, timing, bounded connection stage,
-counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
+connection step times, the kind of connection path (direct or relayed, and UDP, TCP or TLS), whether
+the phone uses a VPN or a proxy app (never its name or an address), counts, coarse attachment size buckets, and provider/model/reasoning metadata where available.
 Mobile does not read the Android install referrer from Google Play. It never sends scanned QR values,
 install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
@@ -260,7 +272,7 @@ for that Checkout page. It is not sent to analytics. When you open an invite lin
 address with `?ref=CODE`), the website saves the code and the time in its `localStorage` for 30 days.
 When you sign in on the web, the web client sends the code to the account service and removes it from
 `localStorage`. On the desktop, on the web and on the phone, you can also type an invite link or code
-on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. When you choose a language on the website, it saves
+on the sign-in screen; the app sends only the code. The account service uses a code only for a new account. It is not sent to analytics. The invite page shows the first name from the profile of the account that made the link to anyone who opens the link. It shows no other name, picture or email. When you choose a language on the website, it saves
 the language code, and nothing else, in the `openbot_lang` cookie for one year, so that the next
 pages open in that language. The browser sends this cookie only to openbot.run. OpenPanel can also derive
 session, device, browser, operating-system, network, and approximate geographic metadata from a
@@ -447,6 +459,32 @@ The service stores:
   and whether it ends at the period end. For a license, it keeps the same fields and the number of
   users in place of the plan. The service also keeps the ID, type and receive time of each
   Stripe webhook event for 7 days, to ignore a repeated event. These records hold no card data.
+- OpenBot credits: for each credit purchase, the Stripe Checkout Session ID, the account, the server
+  that gets the credits (when one is selected), the number of credits, the currency, the amount, the
+  Stripe payment ID, the status and the times. For each purchase, move, reversal, use, free monthly
+  grant and expiry, the service keeps a ledger entry: the amount, the account or server whose balance changes, the account that
+  made the change, and the time. A balance is the sum of its entries. Deleting the account removes
+  its purchases and the entries of its own balance. The entries of a server stay with the server,
+  without the ID of the deleted account. For each image or video that OpenBot credits pay for, the
+  service keeps a hold record: the job ID, the account or server that pays, the account that started
+  it, the model, the credits held and charged, the result (completed, failed, canceled, refused or
+  expired), the job ID of the media generation processor, and the times. It keeps no prompt, picture
+  or result file. Deleting the account removes the hold records of its own balance. For the free
+  monthly credits of a paid license, it keeps a grant record: the license, the account or server that
+  has them, the credits given and left, and the start and end times. Deleting the account removes the
+  grant records of its own balance.
+  Settings > Billing shows an account the ledger entries and holds of its own balance and of the
+  servers where it is a member. The owner and the admins of a server see all of the server's entries,
+  with the names of the accounts that acted. Other members see only the entries that they made. No
+  email address is shown.
+  The service also keeps a credit audit record for each credit change and each failed credit action:
+  checkouts that open or expire, purchases, moves, reversals, free credits, holds, starts, charges and
+  releases, and refused checkouts, moves and generations. A record has the action, the result and the
+  error code, the account or server, the account that acted, the credits, the model, the job, Checkout
+  Session or Stripe object ID, and for a generation that the processor refused, the HTTP status and error
+  code of the processor. It keeps no prompt, picture, result file, card data or email address. The
+  service deletes a record after 400 days. Deleting the account removes the records of its own balance,
+  and removes the account from the records of a server.
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
   Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
   deletes them after the end of the next year.
@@ -567,7 +605,7 @@ account service stores a hash of the token of that request and the time of the l
 no customer data. The account service stores the Leaseweb server ID with the server. So that an operator can
 find the server in the Leaseweb portal, the operator gives it a reference in Leaseweb: your account
 email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
-delete the server, when its plan is cancelled with a refund, or 14 days after its plan ends with no renewal, the account service deletes the old
+delete the server, when its plan is cancelled with a refund, when a payment of a plan less than 30 days old is disputed, or 14 days after its plan ends with no renewal, the account service deletes the old
 sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
 its reference to `pool`.
 
@@ -893,6 +931,10 @@ your account email, the plan or the license tier and its number of users, the bi
 currency, and the list amount or the amount of the payment. It has no card data, no Stripe ID and no
 server ID. Discord keeps the message under its own policy.
 
+When your hosted server plan ends and the OpenBot team stores the data of the server in its archive,
+the same channel gets one message with your account email, the plan, the first 8 characters of the
+server ID, the size of the archive and the ID of the machine.
+
 ## Data stored on the OpenBot computer
 
 Saved agent memories, their inclusion settings, and their full-text search index stay in the local
@@ -1199,6 +1241,11 @@ Network traffic can also occur when:
 - the local Claude Agent SDK connects to Anthropic through Claude CLI;
 - a user or an agent visits a page in the embedded browser;
 - a user submits text that is not a web address in the browser address bar, which sends the query to Google Search;
+- a user clicks a web link in a chat of the desktop app or the web client, and it opens in the
+  system browser or a new browser tab. OpenBot adds `utm_source=openbot` to the address, so the
+  site can see that the visit came from OpenBot. It adds nothing else. It does not change a link that already has a `utm_source`,
+  a link to a local or private address, or a link with sign-in or signature values such as `state`,
+  `code`, `token` or `X-Amz-Signature`;
 - a locally installed Codex plugin connects to its service;
 - an MCP server the user enabled is reached at its own address, and, when that server asks for a
   sign-in, OpenBot connects to the server's authorization service to register itself, to exchange
@@ -1517,6 +1564,18 @@ Higgsfield's `balance` tool, which spends no credits. It shows the number only i
 each member of a joined server who can use workflows can see it. Higgsfield's own privacy policy
 covers what Higgsfield keeps.
 
+A step with an OpenBot model uses OpenBot credits. When the computer is signed in to an OpenBot
+account, the credits of that account pay; a server pays with its own credits. The computer sends the
+prompt, the model, the size settings and the input pictures to the account service
+(`openbot.run`). The account service holds the credits, sends the same values to a media generation
+processor, and returns the result file to the computer, which keeps it. The account service passes
+the prompt, the pictures and the file through in transit only: it does not store or log them. It
+keeps only the hold record above. A failed or refused generation spends no credits. A stop does not
+cancel a generation that was sent: when the run stops or the app closes, the job continues, and the
+computer gets the file when the job ends or at its next start. While the Canvas page is open, the computer also asks the account service for the OpenBot models, their
+prices in credits and the credit balance. Each member of a joined server who can use workflows can
+see them.
+
 While the Canvas page is open, the computer also asks Sunra and Higgsfield for their model lists, and
 for the price of the model and the settings of an image or video step. A price request sends the
 model, the size settings and a fixed sample prompt. It sends no prompt of the user and no picture,
@@ -1567,6 +1626,10 @@ message. The answers go from the computer to the Slack Web API directly.
   files from its workspace or the OpenBot shared directory to a channel that OpenBot is a member of,
   and list those channels' names. A new post can ping a user that it mentions, never a channel,
   `@here`, `@everyone` or a user group.
+  In answers, status posts and posts, redacted means that text in a known key format, such as an
+  API key, a token or a private key, is removed, and a saved secret that stands alone is removed.
+  A saved secret that is part of a word, an email address or a site name is sent as written.
+  Approval requests have all known secrets and email addresses removed.
 
 Anyone who can post in the Slack workspace, guests and Slack Connect members included, can give the
 agents work. The agents run on the host with the access the user gave them. A hosted server that sleeps starts for a message that addresses OpenBot. Until it connects,
@@ -2248,6 +2311,23 @@ Notifications only inform: they have no buttons.
 
 Settings > Notifications turns this off, and sets the preview and the sound. Android also lists one
 notification channel for each sound in the system settings of the app.
+
+## Phone background refresh
+
+While you are signed in, the phone app reads your servers in the background, so it shows current
+agents, chats and channels when you open it. iOS starts this refresh through Background App Refresh,
+and Android through its job scheduler, at most once every 15 minutes. The system decides when it
+runs, and it can run it less often or not at all. The app refreshes only while it is still in the
+memory of the phone.
+
+A refresh uses the same encrypted host connection and the same requests as the app on screen, for at
+most 25 seconds. It sends no new data to the hosts, the OpenBot services, Apple or Google. The phone
+keeps what it reads in the same encrypted copy that it keeps for an offline start. During a refresh,
+the hosts know that the app is not on screen, so they continue to send notifications, and the app does
+not mark a chat as read.
+
+On iPhone, Settings > General > Background App Refresh turns this off. Signing out stops it on both
+phones.
 
 ## Optional macOS Host Manager
 

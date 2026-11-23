@@ -115,7 +115,7 @@ const registry = new AttentionRegistry({
       snapshot.revision += 1;
     },
   },
-  browser: { listTabs: () => [], beginTakeover: () => Effect.void, endTakeover: () => {} },
+  browser: { listTabs: () => [], toolCanUseTab: () => false, beginTakeover: () => Effect.void, endTakeover: () => {} },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
   routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
   emit: (event) => events.push(event),
@@ -373,6 +373,31 @@ try {
     const { id, spec } = ask(dangerSpec, "turn-4");
     await answer(id, asNewClient(spec, { actionId: "keep" }), MEMBER);
     assert.equal(client.answers.get(id)?.value?.actionId, "keep");
+  });
+
+  await step("a local script cannot press a danger action, and may take the safe one (#11181)", async () => {
+    const { id, spec, message } = ask(dangerSpec, "turn-script");
+    const requestId = registry.localAttention("agent-1").prompts.at(-1)?.requestId;
+    assert.ok(requestId, "the script does not see the block");
+    const script = (actionId: string) =>
+      runCauseEffect(
+        registry.respondToLocalAttention("agent-1", {
+          kind: "prompt",
+          requestId,
+          answers: asNewClient(spec, { actionId }),
+        }),
+      );
+    const error = await script("delete").then(
+      () => null,
+      (cause: unknown) => cause,
+    );
+    assert.ok(error instanceof ForbiddenAttentionAnswer, `expected a refusal, got ${String(error)}`);
+    assert.equal(client.answers.has(id), false, "the agent got an answer");
+    assert.equal(message.uiBlock?.state.status, "pending", "the block closed");
+    await script("keep");
+    assert.equal(client.answers.get(id)?.value?.actionId, "keep");
+    assert.equal(message.uiBlock?.state.respondedBy, undefined);
+    return message.uiBlock?.state;
   });
 
   let secretMessage: ConversationMessage | undefined;

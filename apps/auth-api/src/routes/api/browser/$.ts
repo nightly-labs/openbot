@@ -8,11 +8,14 @@ import {
   requestAvatarBucket,
   requestBillingService,
   requestCompanySignIn,
+  requestCustomServerOffers,
   requestHostedServerService,
   requestHostedSiteService,
+  requestOwnerTransferEmailDelivery,
   requestReferrals,
   requestRemoteControlPlane,
   requestTeamInviteEmailDelivery,
+  schedule,
 } from "../../../server/request-auth";
 import { requestSourceIp } from "../../../server/source-ip";
 
@@ -23,7 +26,10 @@ function handle({ request }: { request: Request }) {
     companySignIn: requestCompanySignIn,
     hostLogo: (hostId, version) => readHostLogo(requestAvatarBucket(), hostId, version),
     hosting: requestHostedServerService,
+    customServerOffers: requestCustomServerOffers,
     inviteEmailDelivery: requestTeamInviteEmailDelivery,
+    ownerTransferEmailDelivery: requestOwnerTransferEmailDelivery,
+    schedule,
     attribution: requestAccountAttribution,
     billing: requestBillingService,
     referrals: requestReferrals,

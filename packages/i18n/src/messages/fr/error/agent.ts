@@ -57,6 +57,12 @@ export const messages = {
   "error.agent.modelUnavailable": "Le modèle d’agent sélectionné est indisponible.",
   "error.agent.modelProviderNotConnected":
     "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’est pas connecté.",
+  "error.agent.modelProviderSignInRequired":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} demande une connexion. Connectez-vous à {provider}, puis réessayez.",
+  "error.agent.modelProviderNotInstalled":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’est pas installé.",
+  "error.agent.modelProviderOutdated":
+    "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} doit être mis à jour.",
   "error.agent.modelListEmpty":
     "Le modèle d’agent sélectionné « {model} » est indisponible : {provider} n’a listé aucun modèle. Dernière erreur : {detail}",
   "error.agent.modelListEmptyNoError":
@@ -137,6 +143,8 @@ export const messages = {
     "Les données de l’agent n’ont pas pu être entièrement supprimées. Relancez la suppression de l’agent.",
   "error.agent.deleteFolderInUse":
     "Le travail d'un autre agent utilise encore le dossier de cet agent. Supprimez à nouveau cet agent quand ce travail se termine, ou après avoir redémarré OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Un autre programme utilise encore le dossier de cet agent, par exemple un programme que l’agent a lancé. Fermez ce programme ou redémarrez l’ordinateur sur lequel cet agent fonctionne, puis supprimez à nouveau l’agent.",
   "error.agent.deleteWhenFolderFree":
     "Le travail d'un autre agent utilise encore le dossier de cet agent. OpenBot supprime cet agent quand ce travail se termine.",
   "error.agent.duplicationBusy": "Cet agent est déjà en cours de duplication.",
@@ -164,6 +172,8 @@ export const messages = {
     "Le comportement des messages pendant le travail de l’agent ne peut être réglé que sur l’ordinateur qui exécute l’agent.",
   "error.agent.backupModelsLocalOnly":
     "Les modèles de secours ne peuvent être réglés que sur l’ordinateur qui exécute l’agent.",
+  "error.agent.backupModelsAtLimit":
+    "Aucun modèle de secours ne peut prendre le relais : chacun a atteint sa limite d’utilisation ou a échoué il y a peu. Les modèles d’un même compte peuvent partager une limite. Pour continuer, ajoutez un modèle de secours d’un autre fournisseur ou d’un autre compte, ou attendez la réinitialisation.",
   "error.agent.taskLimitLocalOnly": "La limite de tâches se règle uniquement sur l’ordinateur qui exécute l’agent.",
   "error.agent.localScriptsOff": "Cet agent n’autorise pas les scripts locaux.",
   "error.agent.localScriptsRateLimited":

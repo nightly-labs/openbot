@@ -232,6 +232,9 @@ export const messages = {
     "L'agente può avviare una nuova chat quando la sua diventa lunga. Prima salva delle note.",
   "agentSettings.quickAcknowledgement.title": "Mostra il piano prima delle attività lunghe",
   "agentSettings.quickAcknowledgement.description": "Prima di un'attività lunga, l'agente mostra il suo piano.",
+  "agentSettings.builtinMemory.title": "Memoria di OpenBot",
+  "agentSettings.builtinMemory.description":
+    "L'agente salva e legge le proprie memorie. Disattiva per usare solo un'app di memoria, come Mem0. Le memorie salvate restano.",
   "agentSettings.browserProfile.label": "Profilo del browser",
   "agentSettings.browserProfile.shared": "Condiviso",
   "agentSettings.browserProfile.agent": "Solo questo agente",
@@ -241,6 +244,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Ogni profilo mantiene accessi e cookie propri. Una modifica chiude le schede aperte dell'agente.",
   "agentSettings.browserProfile.manage": "Gestisci",
+  "agentSettings.browserProfile.movedNote":
+    "Gli accessi ai siti restano nel profilo precedente. L'agente deve accedere di nuovo a questi siti.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "L'intero processo di {provider} gira in una sandbox, quindi una scrittura all'esterno non riesce. Disponibile solo su macOS.",
 } as const satisfies PartialTranslation<typeof source>;

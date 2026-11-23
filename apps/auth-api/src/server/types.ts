@@ -33,6 +33,8 @@ export interface WorkerBindings {
   EMAIL_DELIVERY_WEBHOOK_URL?: string;
   EMAIL_DELIVERY_WEBHOOK_SECRET?: string;
   SKILLS_ADMIN_TOKEN?: string;
+  MEDIA_API_URL?: string;
+  MEDIA_API_KEY?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
   SITE_REPORT_HASH_SECRET?: string;
@@ -184,6 +186,15 @@ export interface EmailCodeDelivery {
     email: string;
     code: string;
     expiresAt: number;
+  }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
+}
+
+export interface OwnerTransferEmailDelivery {
+  send(message: {
+    email: string;
+    fromEmail: string;
+    serverName: string;
+    appUrl: string;
   }): Effect.Effect<void, EmailDeliveryError | SmtpFailure>;
 }
 

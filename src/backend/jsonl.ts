@@ -1,6 +1,7 @@
 import { Transform } from "node:stream";
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { perfCount } from "./perf-probe-hooks";
 import { isRpcMessage, type RpcMessage } from "./protocol";
 
 const MIB = 1024 * 1024;
@@ -40,6 +41,7 @@ export class JsonLineDecoder {
 
   push(chunk: Uint8Array | string): RpcMessage[] {
     if (this.#overflowed) throw new LineTooLongError("Codex");
+    perfCount("jsonl.chunks");
     const bytes = isString(chunk)
       ? Buffer.from(chunk, "utf8")
       : Buffer.from(chunk.buffer, chunk.byteOffset, chunk.length);

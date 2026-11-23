@@ -6,6 +6,8 @@ export const messages = {
   "error.workflow.versionMissing": "İş akışının bu sürümü artık yok.",
   "error.workflow.annotation": "Metinler, notlar ve şekiller bağlantı içeremez.",
   "error.workflow.port": "Bir adım bu tür girdiyi alamaz.",
+  "error.workflow.unknownValue":
+    "Bu OpenBot bir adımın ayarını bilmiyor. OpenBot’u güncelleyin, sonra yeniden deneyin.",
   "error.workflow.branch": "Yalnızca bir koşul evet ve hayır bağlantılarına sahip olabilir.",
   "error.workflow.conditionBranch": "Bir koşuldan çıkan her bağlantı evet veya hayır olmalıdır.",
   "error.workflow.duplicateEdge": "Bu iki adımda bu bağlantı zaten var.",
@@ -18,6 +20,16 @@ export const messages = {
   "error.workflow.agentStepEnded": "Ajana giden mesaj, ajan yanıt vermeden kaldırıldı.",
   "error.workflow.agentStepStopped": "Ajan bu adımı yanıtlamadan durdu. Adımı yeniden çalıştırın.",
   "error.workflow.conditionUnclear": "Model evet ya da hayır yanıtı vermedi.",
+  "error.workflow.answerInvalid": "Yanıt bu adımın istediği alanları içermiyordu: {fields}. Adımı yeniden çalıştırın.",
+  "error.workflow.answerSetup":
+    "Bu iş akışının yanıt alanlarında burada bir sorun var: {fields}. İş akışını düzeltin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.answerSourceEnded":
+    "Bu alanların değeri yok, çünkü onları veren adım tamamlanmadı: {fields}. Önce o adımı yeniden çalıştırın.",
+  "error.workflow.runInputInvalid":
+    "Çalıştırma girdisi tetikleyicinin yanıt alanlarına uymuyor: {fields}. Bu alanlarla bir JSON nesnesi gönderin.",
+  "error.workflow.sourceNotDone":
+    "Önceki bir adım son çalıştığında başarısız oldu veya durduruldu. Önce o adımı yeniden çalıştırın.",
+  "error.workflow.checkInvalid": "Bu adımın denetimi geçerli değil. Düzeltin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelFailed": "Model yanıt veremedi. Adımı yeniden çalıştırın.",
   "error.workflow.modelTimedOut":
     "Model zamanında yanıt vermedi. Bu adım için daha düşük bir efor veya daha hızlı bir model seçin, sonra adımı yeniden çalıştırın.",
@@ -33,6 +45,7 @@ export const messages = {
     "OpenBot sağlayıcıya ulaşamadı. İnternet bağlantısını kontrol edin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelBusy": "Başka bir model isteği çalışıyor. Adımı birazdan yeniden çalıştırın.",
   "error.workflow.mediaFailed": "Model görseli veya videoyu oluşturamadı. Adımı yeniden çalıştırın.",
+  "error.workflow.mediaNotMade": "Model görseli veya videoyu oluşturmadı. Modelin yanıtı: {answer}",
   "error.workflow.pictureMissing": "Görsel artık sunucuda değil. Yeniden gönderin.",
   "error.workflow.pictureType": "PNG, JPEG veya WebP görseli kullanın.",
   "error.workflow.mediaInputMissing": "Önceki bir adımın görseli kullanılamıyor. O adımı yeniden çalıştırın.",

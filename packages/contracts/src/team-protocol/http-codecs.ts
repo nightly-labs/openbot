@@ -61,9 +61,12 @@ export interface TeamHttpCodecOptions {
   promptMultiSelect?: boolean;
   videoGeneration?: boolean;
   usageTertiary?: boolean;
+  usageGroups?: boolean;
+  usageReadFailed?: boolean;
   agentPendingRuntime?: boolean;
   memoryChanges?: boolean;
   queueHold?: boolean;
+  queueHoldSignIn?: boolean;
 }
 
 type DecodedRequest =

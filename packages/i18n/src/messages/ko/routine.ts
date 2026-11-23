@@ -316,7 +316,6 @@ export const messages = {
   "routine.webhook.giveSecretConfirm": "전달",
   "routine.webhook.giveSecretFailed": "{name}에게 서명 시크릿을 전달하지 못했어요.",
   "routine.webhook.secretGiven": "{name}에게 새 서명 시크릿을 전달했어요.",
-  "routine.webhook.statusFailed": "호스트가 릴레이에 연결돼 있는지 확인할 수 없어요.",
   "routine.webhook.stepDone": "완료",
   "routine.webhook.stepUrl": "엔드포인트를 발신 서비스에 복사",
   "routine.webhook.stepUrlHint": "발신자는 최대 64 KiB의 JSON 본문으로 POST 요청을 보내요.",

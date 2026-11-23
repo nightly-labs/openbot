@@ -47,6 +47,7 @@ export const CHAT_BACKDROP_LABEL = {
   sunset: "settings.chatBackdrop.sunset",
   snowfall: "settings.chatBackdrop.snowfall",
   fireflies: "settings.chatBackdrop.fireflies",
+  coast: "settings.chatBackdrop.coast",
 } as const satisfies Record<ChatBackdropScene, AppTextKey>;
 
 export {

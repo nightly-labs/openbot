@@ -691,6 +691,7 @@ async function main(): Promise<void> {
       assert(contents, `Missing contents of sleep tab ${index}.`);
       loaded.push(contents);
     }
+    await runCauseEffect(sleepy.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
     const [first, second, ...newest] = loaded;
     assert(first && second, "Missing sleep tabs.");
     await unloaded(first);

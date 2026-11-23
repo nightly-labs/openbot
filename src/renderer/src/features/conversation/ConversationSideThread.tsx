@@ -8,7 +8,7 @@ import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createProjection, Show } from "solid-js";
+import { createEffect, createMemo, createProjection, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
@@ -17,6 +17,7 @@ import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { remoteAgentError } from "../agents/agent-error-text";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
@@ -25,8 +26,10 @@ import type { SideThread } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
+import { naturalThreadRows } from "./narration-rows";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
+import { createTurnStreamHold } from "./turn-stream-hold";
 import { useTurnTrace } from "./turn-trace";
 
 export function ConversationSideThread(props: { threadId: string; resizer: JSX.Element }) {
@@ -45,6 +48,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     openTaggedReference,
     threadComposer,
     threadQueue,
+    threadVoice,
+    besideFocusRequest,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
@@ -52,6 +57,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     messagePins,
     changeMarkerActions,
     openWaitingAgent,
+    shownSubagentId,
+    toggleSubagentPanel,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const threadBackgroundWorkSince = (taskId: string | undefined) =>
@@ -77,6 +84,10 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     [],
     { key: "id" },
   );
+  const streamHeld = createTurnStreamHold(() => thread()?.task.activeTurnId);
+  const shownMessages = createMemo(() =>
+    view.responseStyle === "natural" ? naturalThreadRows(messages, view.agent?.provider, streamHeld) : messages,
+  );
   const turnSteps = createTurnSteps({
     messages: () => messages,
     lines: () => undefined,
@@ -101,6 +112,11 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
     },
   );
   const draftKey = () => threadComposer.sideDraftKey(props.threadId);
+  const shownAt = untrack(besideFocusRequest);
+  const focusRequest = () => {
+    const request = besideFocusRequest();
+    return request > shownAt ? request : undefined;
+  };
   const rowImages = () => {
     const key = draftKey();
     return key ? threadComposer.rowImages(key) : [];
@@ -182,10 +198,11 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
         {(current) => (
           <AgentThreadView
             task={current().thread.task}
+            failureText={view.server && view.server.kind !== "local" ? remoteAgentError : undefined}
             limit={view.threads?.limit ?? 1}
             agent={current().agent}
             agents={view.agents}
-            messages={messages}
+            messages={shownMessages()}
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
@@ -204,6 +221,8 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
                 ? void previewAttachment(attachment)
                 : attachmentAction(attachment, "open")
             }
+            voice={threadVoice(draftKey())}
+            focusRequest={focusRequest()}
             mediaSource={view.runtime?.attachmentMedia}
             downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
@@ -243,6 +262,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             copiedMessageId={copiedMessageId()}
             compactMessageActions={compactMessageActions()}
             bubbleStyle={bubbleStyle()}
+            responseStyle={view.responseStyle}
             onBranch={branch()}
             onDeleteMessage={deleteMessage()}
             messagePins={threadPins(current().thread.task.id)}
@@ -254,6 +274,7 @@ export function ConversationSideThread(props: { threadId: string; resizer: JSX.E
             queue={threadQueue.view(current().thread.task, draftKey())}
             awaiting={awaiting()}
             selectionActions={selectionActions(current().thread)}
+            subagents={{ selectedId: shownSubagentId(), onOpen: toggleSubagentPanel }}
           />
         )}
       </Show>

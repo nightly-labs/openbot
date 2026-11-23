@@ -2,9 +2,15 @@ import type { ChannelPage } from "@openbot/contracts/ipc";
 import { Button, ErrorReference } from "@openbot/ui";
 import { SettingsPanel, SettingsPanelContent, SettingsPanelHeader } from "@openbot/ui/components/SettingsPanel";
 import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
+import {
+  type ChannelFolderCalls,
+  ChannelFoldersPage,
+  createChannelFolders,
+} from "@openbot/ui/features/channels/ChannelFolders";
 import { ChannelStoppedTasks } from "@openbot/ui/features/channels/ChannelStoppedTasks";
+import { type HostFolderPick, HostFolderPicker } from "@openbot/ui/features/conversation/HostFolderPicker";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createStore, For, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, For, Show, untrack } from "solid-js";
 import { createSidePanelWidth, readSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
 import { AgentMemoriesSettings } from "../conversation/AgentMemoriesSettings";
 import { AgentRoutinesSettings } from "../conversation/AgentRoutinesSettings";
@@ -14,6 +20,7 @@ import { desktopEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { channelRoutinesPort, eventRoutinesPort } from "../conversation/routines-port";
 import { ChannelEditor } from "./ChannelEditor";
 import { stoppedChannelTasks } from "./channel-conversation-rows";
+import { localChannelFolderCalls, remoteChannelFolderCalls } from "./channel-folders-port";
 import { useChannels } from "./channels-context";
 
 export interface ChannelRoutineHost {
@@ -191,8 +198,60 @@ export function ChannelSettingsPane(
   const [panel, setPanel] = createStore({
     memories: { open: false, count: 0 },
     routines: { open: false, count: 0 },
+    folders: { open: false },
   });
   const channelName = createMemo(() => page()?.channel.name ?? "");
+  const [folderPick, setFolderPick] = createSignal<(HostFolderPick & { done: (path: string | null) => void }) | null>(
+    null,
+  );
+  const finishFolderPick = (path: string | null) => {
+    const pick = folderPick();
+    setFolderPick(null);
+    pick?.done(path);
+  };
+  const folderCalls = createMemo((): ChannelFolderCalls | undefined => {
+    const mode = channels.foldersMode();
+    const api = runtime().agent;
+    const { listChannelFolders, addChannelFolder, removeChannelFolder, browseChannelFolders, chooseChannelFolder } =
+      api;
+    if (!mode || !listChannelFolders || !addChannelFolder || !removeChannelFolder || !browseChannelFolders)
+      return undefined;
+    const folders = { listChannelFolders, addChannelFolder, removeChannelFolder, browseChannelFolders };
+    if (mode === "local")
+      return chooseChannelFolder ? localChannelFolderCalls({ ...folders, chooseChannelFolder }) : undefined;
+    return remoteChannelFolderCalls(
+      folders,
+      () =>
+        new Promise((done) => {
+          folderPick()?.done(null);
+          const name = channelName();
+          setFolderPick({
+            mode: "add",
+            agentName: name,
+            title: t("dialog.chooseChannelFolder", { channel: name }),
+            start: null,
+            done,
+          });
+        }),
+    );
+  });
+  const browsePickFolders = (path: string | null) => {
+    const browse = runtime().agent.browseChannelFolders;
+    if (!browse) return Promise.reject(new Error(t("agentSettings.folders.browse.failed")));
+    return browse({ channelId: props.channelId, path });
+  };
+  const channelFolders = createChannelFolders(() => {
+    const calls = folderCalls();
+    return calls ? { channelId: props.channelId, channelName: channelName(), calls } : undefined;
+  });
+  createEffect(
+    () => {
+      const calls = folderCalls();
+      const opened = panel.folders.open;
+      return calls && { source: { channelId: props.channelId, channelName: untrack(channelName), calls }, opened };
+    },
+    (current) => channelFolders.load(current ? current.source : undefined),
+  );
   const memoriesPort = createMemo(() => channelMemoriesPort(props.channelId, channelName(), runtime().agent));
   const routinesPort = createMemo(() => {
     const legacy = channelRoutinesPort(
@@ -246,7 +305,7 @@ export function ChannelSettingsPane(
       maxWidth={props.maxWidth}
       onResize={setPanelWidth}
     >
-      <Show when={!panel.routines.open && !panel.memories.open}>
+      <Show when={!panel.routines.open && !panel.memories.open && !panel.folders.open}>
         <SettingsPanelHeader
           title={t("channel.settings.title")}
           onClose={props.onClose}
@@ -266,9 +325,31 @@ export function ChannelSettingsPane(
                 state.routines.open = true;
               })
             }
+            folders={folderCalls() ? channelFolders : undefined}
+            onOpenFolders={() =>
+              setPanel((state) => {
+                state.folders.open = true;
+              })
+            }
           />
         </SettingsPanelContent>
       </Show>
+      <Show when={panel.folders.open && folderCalls()}>
+        <SettingsPanelHeader
+          title={t("channel.settings.folders.title")}
+          onBack={() =>
+            setPanel((state) => {
+              state.folders.open = false;
+            })
+          }
+          onClose={props.onClose}
+          closeLabel={t("channel.panel.close")}
+        />
+        <SettingsPanelContent>
+          <ChannelFoldersPage folders={channelFolders} channelName={channelName()} />
+        </SettingsPanelContent>
+      </Show>
+      <HostFolderPicker request={folderPick()} browse={browsePickFolders} onDone={finishFolderPick} />
       <AgentMemoriesSettings
         port={memoriesPort()}
         open={panel.memories.open}

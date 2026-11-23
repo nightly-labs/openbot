@@ -17,6 +17,7 @@ interface TransferPreferences {
   allowAutomation?: boolean;
   allowNewChat?: boolean;
   quickAcknowledgement?: boolean;
+  memory?: boolean;
   fastMode?: boolean;
   ultrafast?: boolean;
   backupModels?: AgentBackupModels;
@@ -58,6 +59,7 @@ export const readPreferences = Effect.fn("InstanceTransfer.readPreferences")(fun
     ...(agent.allowAutomation === undefined ? {} : { allowAutomation: agent.allowAutomation }),
     ...(agent.allowNewChat === undefined ? {} : { allowNewChat: agent.allowNewChat }),
     ...(agent.quickAcknowledgement === undefined ? {} : { quickAcknowledgement: agent.quickAcknowledgement }),
+    ...(agent.memory === false ? { memory: false } : {}),
     ...(agent.fastMode === undefined ? {} : { fastMode: agent.fastMode }),
     ...(agent.ultrafast ? { ultrafast: true } : {}),
     ...(agent.backupModels ? { backupModels: agent.backupModels } : {}),
@@ -94,6 +96,7 @@ export const applyPreferences = Effect.fn("InstanceTransfer.applyPreferences")(f
   const update: UpdateAgentInput = { agentId: agent.id };
   if (value.computerUse === false) update.computerUse = false;
   if (typeof value.quickAcknowledgement === "boolean") update.quickAcknowledgement = value.quickAcknowledgement;
+  if (value.memory === false) update.memory = false;
   if (typeof value.fastMode === "boolean") update.fastMode = value.fastMode;
   if (value.fastMode === true && value.ultrafast === true) update.ultrafast = true;
   if (value.allowAutomation === false) update.allowAutomation = false;

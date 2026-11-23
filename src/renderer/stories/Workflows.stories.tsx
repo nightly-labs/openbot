@@ -1,4 +1,4 @@
-import type { WorkflowStepSettings } from "@openbot/contracts/ipc";
+import type { AgentStepActivity, WorkflowStepSettings } from "@openbot/contracts/ipc";
 import { Toaster } from "@openbot/ui";
 import { AgentNode } from "@openbot/ui/features/workflows/WorkflowAgentNode";
 import { ApprovalNode } from "@openbot/ui/features/workflows/WorkflowApprovalNode";
@@ -12,6 +12,7 @@ import { PromptNode } from "@openbot/ui/features/workflows/WorkflowPromptNode";
 import { TextNode } from "@openbot/ui/features/workflows/WorkflowTextNode";
 import { TriggerNode } from "@openbot/ui/features/workflows/WorkflowTriggerNode";
 import type { WorkflowCatalogs } from "@openbot/ui/features/workflows/workflow-model";
+import { createSignal, onCleanup } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { NodeGallery } from "./workflow-node-gallery";
 import { createStoryPresence } from "./workflow-presence-story";
@@ -60,6 +61,8 @@ const meta = {
 } satisfies Meta;
 
 export default meta;
+
+const secondsAgo = (seconds: number) => new Date(Date.now() - seconds * 1000).toISOString();
 type Story = StoryObj<typeof meta>;
 
 export const Example: Story = {
@@ -85,6 +88,11 @@ export const InApp: Story = {
   render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} />,
 };
 
+export const InAppOpening: Story = {
+  name: "In app, opening",
+  render: () => <WorkflowInAppStory workflows={[competitorWatch(), newCompetitorAlert()]} opening />,
+};
+
 export const HiggsfieldVideo: Story = {
   name: "Higgsfield video",
   render: () => <WorkflowStory workflows={[higgsfieldVideo()]} features={STORY_ALL_FEATURES} />,
@@ -108,6 +116,17 @@ export const BranchAndApproval: Story = {
 export const GitHubRuns: Story = {
   name: "GitHub runs",
   render: () => <WorkflowStory workflows={[githubTriage()]} features={STORY_ALL_FEATURES} />,
+};
+
+export const FieldNames: Story = {
+  name: "Field names",
+  render: () => (
+    <WorkflowStory
+      workflows={[githubTriage()]}
+      features={STORY_ALL_FEATURES}
+      catalogs={{ ...STORY_CATALOGS, answers: true }}
+    />
+  ),
 };
 
 export const EmptyCanvas: Story = {
@@ -230,6 +249,49 @@ export const Agent: Story = {
   ),
 };
 
+const LIVE_STEPS: readonly { detail: string; activity: AgentStepActivity }[] = [
+  { detail: "Searched the web: “Northwind Atlas launch”", activity: "searching" },
+  { detail: "Reading northwind.com/changelog", activity: "reading" },
+  { detail: "Reading northwind.com/pricing", activity: "reading" },
+  { detail: "Opening news.ycombinator.com", activity: "browsing" },
+  { detail: "Searched the web: “Northwind Slack connector”", activity: "searching" },
+  { detail: "Reading northwind.com/blog/atlas", activity: "reading" },
+  { detail: "Reviewing the results", activity: "reviewing" },
+];
+
+function RunningAgentGallery() {
+  const [step, setStep] = createSignal(0);
+  const timer = setInterval(() => setStep((value) => (value + 1) % LIVE_STEPS.length), 1800);
+  onCleanup(() => clearInterval(timer));
+  return (
+    <NodeGallery
+      selected="research"
+      status={{ research: "running" }}
+      fields={{ research: { stepName: "Research competitors" }, summary: { stepName: "Summary for #market" } }}
+      edges={[{ id: "research>summary", from: "research", to: "summary", type: "text" }]}
+      progress={(id) => {
+        const current = LIVE_STEPS[step()];
+        if (id !== "research" || !current) return undefined;
+        return {
+          agentId: AGENT,
+          detail: current.detail,
+          previous: LIVE_STEPS[step() - 1]?.detail,
+          activity: current.activity,
+          done: step(),
+        };
+      }}
+    >
+      <AgentNode id="research" agentId={AGENT} task={TASK} />
+      <LlmNode id="summary" prompt="Summarize the research in 3 lines for the market team" />
+    </NodeGallery>
+  );
+}
+
+export const AgentRunning: Story = {
+  name: "Agent, running with step names",
+  render: () => <RunningAgentGallery />,
+};
+
 export const Llm: Story = {
   name: "LLM",
   render: () => (
@@ -311,6 +373,29 @@ export const VideoCustomLength: Story = {
   ),
 };
 
+const STORY_CLIP = new URL("../../../packages/ui/src/assets/plush/fishing.webm", import.meta.url).href;
+
+export const VideoWithClip: Story = {
+  name: "Video, with a clip",
+  render: () => (
+    <NodeGallery
+      selected="clip"
+      catalogs={{
+        ...STORY_CATALOGS,
+        imageModels: [RANGE_VIDEO_MODEL, ...STORY_CATALOGS.imageModels],
+        media: (value, kind) => (kind === "video" && value === "plush-clip" ? STORY_CLIP : undefined),
+      }}
+      fields={{
+        empty: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 6 },
+        clip: { media: "video", model: RANGE_VIDEO_MODEL.id, aspect: "16:9", duration: 6 },
+      }}
+    >
+      <ImageNode id="empty" prompt="A plush toy fishing from a small wooden pier at sunset" />
+      <ImageNode id="clip" image="plush-clip" prompt="A plush toy fishing from a small wooden pier at sunset" />
+    </NodeGallery>
+  ),
+};
+
 export const ImageManyResults: Story = {
   name: "Image, many results",
   render: () => (
@@ -322,6 +407,92 @@ export const ImageManyResults: Story = {
           at: todayAt(9, index * 4),
           value: STORY_IMAGES[index % STORY_IMAGES.length]?.name ?? "",
         })),
+      }}
+    >
+      <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+export const ImageBatchFailedTake: Story = {
+  name: "Image, batch with a failed take",
+  render: () => (
+    <NodeGallery
+      selected="filled"
+      results={{
+        filled: [
+          ...Array.from({ length: 11 }, (_, index) => ({
+            id: `image-result-${index + 1}`,
+            at: todayAt(9, index * 4),
+            value: STORY_IMAGES[index % STORY_IMAGES.length]?.name ?? "",
+          })),
+          { id: "image-result-failed", at: todayAt(9, 50), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+      pending={{
+        filled: [
+          { id: "image-take-first", at: secondsAgo(25) },
+          { id: "image-take-second", at: secondsAgo(25) },
+        ],
+      }}
+    >
+      <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
+    </NodeGallery>
+  ),
+};
+
+const CREDITS_IMAGE_MODEL: WorkflowCatalogs["imageModels"][number] = {
+  id: "openbot-story-image",
+  provider: "openbot",
+  name: "Story Image",
+  maker: "Northwind Labs",
+  credits: true,
+  kinds: ["image"],
+  voices: false,
+  subscription: "OpenBot",
+  aspects: ["1:1", "16:9"],
+};
+
+const TOO_FEW_CREDITS: WorkflowCatalogs = {
+  ...STORY_CATALOGS,
+  imageModels: [CREDITS_IMAGE_MODEL, ...STORY_CATALOGS.imageModels],
+  creditBalance: 4,
+};
+
+const ENOUGH_CREDITS: WorkflowCatalogs = { ...TOO_FEW_CREDITS, creditBalance: 1250 };
+
+export const ImagePaidWithCredits: Story = {
+  name: "Image, paid with credits",
+  render: () => (
+    <NodeGallery
+      selected="batch"
+      catalogs={ENOUGH_CREDITS}
+      fields={{ single: { model: CREDITS_IMAGE_MODEL.id }, batch: { model: CREDITS_IMAGE_MODEL.id, batch: 4 } }}
+      results={{
+        batch: [
+          { id: "paid-result-1", at: todayAt(9, 0), value: STORY_IMAGES[0]?.name ?? "" },
+          { id: "paid-result-failed", at: todayAt(9, 4), value: "The image service did not answer.", failed: true },
+        ],
+      }}
+    >
+      <ImageNode id="single" prompt="Hero image for the Atlas comparison page, one product window" />
+      <ImageNode id="batch" prompt="Four cover options for the Atlas launch post" />
+    </NodeGallery>
+  ),
+};
+
+export const ImageBatchTooFewCredits: Story = {
+  name: "Image, batch with too few credits",
+  render: () => (
+    <NodeGallery
+      selected="filled"
+      catalogs={TOO_FEW_CREDITS}
+      fields={{ filled: { model: CREDITS_IMAGE_MODEL.id, batch: 4 } }}
+      results={{
+        filled: [
+          { id: "credits-result-1", at: todayAt(9, 0), value: STORY_IMAGES[0]?.name ?? "" },
+          { id: "credits-result-failed", at: todayAt(9, 4), value: "The image service did not answer.", failed: true },
+        ],
       }}
     >
       <ImageNode id="filled" prompt="Hero image for the Atlas comparison page, one product window" />
