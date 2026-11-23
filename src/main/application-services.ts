@@ -1889,8 +1889,12 @@ export async function createApplicationServices({
       applicationsDirectory: "/Applications",
     });
   };
+  const computerUseForegroundInput =
+    process.platform === "linux" &&
+    !cuaDriverDrivesWayland(process.platform) &&
+    !hasSeparateAgentDisplay(process.platform);
   const cuaDriver = new CuaDriverRuntime({
-    actionTap: new CuaDriverActionTap(Date.now, undefined, compactScreenshot),
+    actionTap: new CuaDriverActionTap(Date.now, undefined, compactScreenshot, computerUseForegroundInput),
     executable: await Effect.runPromise(resolveCuaDriverExecutable()),
     resolveExecutable: resolveCuaDriverExecutable,
     commandAlias: cuaDriverCommandAlias({
@@ -2145,6 +2149,7 @@ export async function createApplicationServices({
     agentCursorDrawn: drawsComputerUseHighlight,
     computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
     computerUseInputRefused: () => agentsShareDisplay && cuaDriver.waylandInputRefused(),
+    computerUseForegroundInput,
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,

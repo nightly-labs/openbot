@@ -94,6 +94,20 @@ screenshot-only read (`include_accessibility_tree: false`, `include_screenshot: 
 accessibility result to fail, so the driver keeps its frame. The agent instructions name that read
 on macOS. When a driver release with trycua/cua#8117 is pinned, the rule can go.
 
+On a Linux desktop where the driver uses its X11 routes (an X11 session, or XWayland without
+`CUA_DRIVER_RS_ENABLE_WAYLAND`) and no separate agent display is set, the tap sends every input
+call in the foreground. Background input on X11 adds an XInput2 master pointer and keyboard that
+driver 0.52.9 keeps until the X server exits, and while it exists Chromium and Electron windows,
+OpenBot included, get no keys from the user's keyboard (#15359, upstream trycua/cua#7930). The tap
+reads which tools take `delivery_mode` from the tool list, sets `delivery_mode: "foreground"` on
+calls to those tools and on each `run_steps` step that names a mode, and leaves a request line that
+it cannot parse, or that is too long, unchanged. It also removes `parallel_mouse_drag` from the
+tool list, because that tool has no foreground route on X11. The agent instructions on that desktop
+say that the app comes to the front for each action. `scripts/cua-driver-foreground-input-e2e.ts`
+runs the real driver behind the tap on Xvfb and checks that typed text reaches an Electron window
+and that no extra master device appears. When a driver release fixes trycua/cua#7930, the rewrite
+can go.
+
 ### Agent display on a server
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in

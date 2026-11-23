@@ -163,6 +163,7 @@ export interface ThreadLifecycleOptions {
   agentCursorDrawn?: boolean;
   computerUseOnWayland?: boolean;
   computerUseInputRefused?: () => boolean;
+  computerUseForegroundInput?: boolean;
   responseStyle?: () => ResponseStyle;
   memoryReview?: () => boolean;
   skillRevision?: () => boolean;
@@ -197,6 +198,7 @@ export class ThreadLifecycle {
   readonly #agentCursorDrawn: boolean;
   readonly #computerUseOnWayland: boolean;
   readonly #computerUseInputRefused: () => boolean;
+  readonly #computerUseForegroundInput: boolean;
   readonly #responseStyle: () => ResponseStyle;
   readonly #memoryReview: () => boolean;
   readonly #skillRevision: () => boolean;
@@ -240,6 +242,7 @@ export class ThreadLifecycle {
     this.#agentCursorDrawn = options.agentCursorDrawn ?? false;
     this.#computerUseOnWayland = options.computerUseOnWayland ?? false;
     this.#computerUseInputRefused = options.computerUseInputRefused ?? (() => false);
+    this.#computerUseForegroundInput = options.computerUseForegroundInput ?? false;
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
     this.#memoryReview = options.memoryReview ?? (() => false);
     this.#skillRevision = options.skillRevision ?? (() => false);
@@ -1165,6 +1168,7 @@ export class ThreadLifecycle {
       agentCursorDrawn: this.#agentCursorDrawn,
       computerUseOnWayland: this.#computerUseOnWayland,
       computerUseInputRefused: this.#computerUseInputRefused(),
+      computerUseForegroundInput: this.#computerUseForegroundInput,
       responseStyle: this.#responseStyle(),
       memoryReview: this.#memoryReview(),
       skillRevision: this.#skillRevision(),
