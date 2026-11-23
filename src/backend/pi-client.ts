@@ -13,7 +13,7 @@ import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { CONTEXT_COMPACTION_THRESHOLD } from "./agent/context-compaction";
 import { withoutTurnContext } from "./agent/developer-instructions";
 import { secretElicitationField } from "./agent/prompts";
-import { isContextTooSmallFailure } from "./agent/provider-diagnostics";
+import { isContextTooSmallFailure, isPiCompactionNoOp } from "./agent/provider-diagnostics";
 import { waitForSuccessfulProcess } from "./agent/provider-status";
 import { TurnContext } from "./agent/turn-context";
 import { type AgentClient, type DiagnosticOrigin, MissingPiSessionError, RequestTimeoutError } from "./agent-client";
@@ -262,7 +262,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     failure: ProviderClientOperationError,
   ) {
     const message = failure.cause instanceof Error ? failure.cause.message : "";
-    if (!isContextTooSmallFailure(message)) return yield* failure;
+    const noOp = isPiCompactionNoOp(message);
+    if (!noOp && !isContextTooSmallFailure(message)) return yield* failure;
     const full = yield* thread.rpc.request({ type: "get_session_stats" }, 2_000).pipe(
       Effect.map((stats) =>
         Option.exists(
@@ -272,7 +273,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       ),
       Effect.orElseSucceed(() => false),
     );
-    return yield* full ? providerFailure(new Error(this.#contextTooSmall(message))) : failure;
+    if (full) return yield* providerFailure(new Error(this.#contextTooSmall(message)));
+    if (!noOp) return yield* failure;
+    logger.info("Pi has nothing to compact, so the session is already compact.", { provider: this.provider });
   });
 
   #contextTooSmall(reason: string): string {
