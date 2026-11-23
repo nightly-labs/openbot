@@ -57,10 +57,6 @@ function ask(kind: BrowserAsk["kind"], action: BrowserAsk["action"], detail: str
   return { id: `${kind}-${action}`, agentName: "Chief", site, kind, action, detail };
 }
 
-export const SharingLine: Story = { render: () => <Home tabs={2} /> };
-
-export const SharingServerTooOld: Story = { render: () => <Home tabs={1} supported={false} /> };
-
 export const SettingsWithSites: Story = {
   render: () => {
     installStoryChrome({

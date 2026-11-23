@@ -7,7 +7,6 @@ import { ServerPlushLogo } from "@openbot/ui/server-plush-logo";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { avatarAgent, byRecent, composerAgents, rowTime } from "./agent-look";
-import { SharingLine } from "./BrowserSharing";
 import { createMenuPresence } from "./menu-presence";
 import type { Workspace } from "./workspace";
 import { XOutboxCard } from "./XOutboxCard";
@@ -182,6 +181,20 @@ export function HomeScreen(props: HomeScreenProps) {
                 <AppWindow size={16} aria-hidden="true" />
               </button>
             </Show>
+            <Show when={props.sharing}>
+              <button
+                type="button"
+                role="menuitem"
+                class="ext-menu-item"
+                onClick={() => {
+                  setMenuOpen(false);
+                  props.onManageSharing();
+                }}
+              >
+                <span>{t("extension.browser.manage")}</span>
+                <AppWindow size={16} aria-hidden="true" />
+              </button>
+            </Show>
             <button
               type="button"
               role="menuitem"
@@ -230,16 +243,6 @@ export function HomeScreen(props: HomeScreenProps) {
       <div class="ph-scroll">
         <Show when={props.offline}>
           <p class="ph-offline">{t("extension.connection.offline", { server: props.serverName })}</p>
-        </Show>
-        <Show when={props.sharing}>
-          {(sharing) => (
-            <SharingLine
-              tabs={sharing().tabs}
-              supported={sharing().supported}
-              serverName={props.serverName}
-              onManage={props.onManageSharing}
-            />
-          )}
         </Show>
         <XOutboxCard />
         <Show
