@@ -181,6 +181,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "De bijlage is beschadigd. Selecteer de bijlage opnieuw.",
   "mobile.chat.attachment.tooLarge": "{name} is groter dan {limit}.",
   "mobile.chat.attachment.cameraPermission": "Sta cameratoegang toe in Instellingen om een foto te maken.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "De foto is niet geladen. Open hem in de Foto’s-app tot hij helemaal zichtbaar is en probeer het opnieuw.",
   "mobile.chat.composer.send": "Verstuur bericht",
   "mobile.chat.composer.stop": "Stop {name}",
   "mobile.chat.composer.dictate": "Dicteer bericht",

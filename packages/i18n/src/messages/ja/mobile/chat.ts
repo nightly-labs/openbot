@@ -188,6 +188,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "添付ファイルが破損しています。もう一度選択してください。",
   "mobile.chat.attachment.tooLarge": "{name} は {limit} を超えています。",
   "mobile.chat.attachment.cameraPermission": "写真を撮るには、設定でカメラへのアクセスを許可してください。",
+  "mobile.chat.attachment.photoNotLoaded":
+    "写真を読み込めませんでした。写真アプリで完全に表示されるまで開いてから、もう一度お試しください。",
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
   "mobile.chat.composer.dictate": "メッセージを音声入力",

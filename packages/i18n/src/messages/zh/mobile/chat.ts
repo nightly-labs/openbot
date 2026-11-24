@@ -181,6 +181,7 @@ export const messages = {
   "mobile.chat.attachment.damaged": "附件已损坏，请重新选择。",
   "mobile.chat.attachment.tooLarge": "{name} 大于 {limit}。",
   "mobile.chat.attachment.cameraPermission": "请在系统设置中允许使用相机以拍照。",
+  "mobile.chat.attachment.photoNotLoaded": "照片未能载入。请在“照片”App 中打开它，等它完整显示后再试一次。",
   "mobile.chat.composer.send": "发送消息",
   "mobile.chat.composer.stop": "停止 {name}",
   "mobile.chat.composer.dictate": "口述消息",

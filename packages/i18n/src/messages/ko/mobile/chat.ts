@@ -186,6 +186,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "첨부 파일이 손상됐어요. 다시 선택해 주세요.",
   "mobile.chat.attachment.tooLarge": "{name} 파일이 {limit}보다 커요.",
   "mobile.chat.attachment.cameraPermission": "사진을 찍으려면 설정에서 카메라 접근을 허용해 주세요.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "사진을 불러오지 못했습니다. 사진 앱에서 사진이 완전히 표시될 때까지 연 다음 다시 시도해 주세요.",
   "mobile.chat.composer.send": "메시지 보내기",
   "mobile.chat.composer.stop": "{name} 중지",
   "mobile.chat.composer.dictate": "음성으로 메시지 입력",
