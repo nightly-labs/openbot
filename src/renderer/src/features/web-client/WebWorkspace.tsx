@@ -2069,8 +2069,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         errorBanners.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         const details = agentErrorDetails(event.message, message);
+        const link = event.link;
         controller.setConversationErrorRuns((current) => {
-          if (details) return { ...current, [key]: { message, run: null, details } };
+          if (link || details)
+            return {
+              ...current,
+              [key]: { message, run: null, ...(link ? { link } : {}), ...(details ? { details } : {}) },
+            };
           if (!(key in current)) return current;
           const { [key]: _replaced, ...next } = current;
           return next;
