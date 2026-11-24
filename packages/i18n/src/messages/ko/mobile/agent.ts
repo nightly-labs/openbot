@@ -521,6 +521,7 @@ export const messages = {
   "mobile.agent.usage.collection": "수집 시작: {started}. 업데이트: {updated}.",
   "mobile.agent.usage.never": "없음",
   "mobile.agent.record.time": "시간",
+  "mobile.agent.record.date": "날짜",
   "mobile.agent.section.changeFailed": "폴더를 변경할 수 없어요",
   "mobile.agent.section.tryAgain": "다시 시도해 주세요.",
   "mobile.agent.section.moveUp": "위로 이동",

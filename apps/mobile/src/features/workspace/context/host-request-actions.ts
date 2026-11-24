@@ -231,6 +231,7 @@ import {
   listOnceAgentRoutines,
   listOnceChannelRoutines,
   type RoutinesOncePost,
+  updateAgentRoutineOnce,
 } from "@openbot/team-client/routines-once";
 import {
   addAgentFolder,
@@ -455,6 +456,7 @@ type HostRequestActions = Pick<
   | "loadAgentMemorySelection"
   | "setAgentMemoryInclusion"
   | "loadAgentRoutines"
+  | "loadOnceAgentRoutines"
   | "loadRoutineCalendar"
   | "listEventRoutines"
   | "saveEventRoutine"
@@ -811,6 +813,11 @@ export function createHostRequestActions({
   const eventsAdmin = (serverId: string) =>
     capabilityApi(serverId, EVENTS_CAPABILITY, "mobile.agent.record.eventsUnsupported");
   const recovery = (serverId: string) => has(serverId, ROUTINE_RECOVERY_CAPABILITY);
+  const onceRoutines = (serverId: string) => has(serverId, ROUTINES_ONCE_CAPABILITY);
+  const oncePost =
+    (serverId: string): RoutinesOncePost =>
+    (path, decode, body) =>
+      teamApi(serverId)("POST", path, decode, body);
   const routineResultsAdmin = (serverId: string) =>
     capabilityApi(serverId, ROUTINE_RESULTS_CAPABILITY, "mobile.agent.record.resultDestinationUnsupported");
   const sessionSettingsAdmin = (serverId: string) =>
@@ -1172,7 +1179,7 @@ export function createHostRequestActions({
     listEventRoutines: (owner, serverId) =>
       runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner }, recovery(serverId))),
     saveEventRoutine: (input, serverId) =>
-      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId))),
+      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId), false, onceRoutines(serverId))),
     loadRoutineResultOptions: (serverId) => runTeamRequest(listRoutineResultOptions(routineResultsAdmin(serverId))),
     loadRoutineResultDestination: (input, serverId) =>
       runTeamRequest(getRoutineResultDestination(routineResultsAdmin(serverId), input)),
@@ -1225,25 +1232,35 @@ export function createHostRequestActions({
       );
     },
     updateAgentRoutine: async (input, serverId) => {
+      const changes = {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+        ...(input.active === undefined ? {} : { active: input.active }),
+        ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+      };
+      const savedRoutine = (value: unknown) => {
+        if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
+          throw new Error("The host returned an invalid saved record.");
+        return value;
+      };
       await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
-        request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          (value) => {
-            if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
-              throw new Error("The host returned an invalid saved record.");
-            return value;
-          },
-          {
-            ...(input.name === undefined ? {} : { name: input.name }),
-            ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
-            ...(input.active === undefined ? {} : { active: input.active }),
-            ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          },
-          serverId,
-        ),
+        onceRoutines(serverId)
+          ? updateAgentRoutineOnce(oncePost(serverId), {
+              agentId: input.agentId,
+              routineId: input.routineId,
+              ...changes,
+            }).then(savedRoutine)
+          : request(
+              "PATCH",
+              TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+              savedRoutine,
+              changes,
+              serverId,
+            ),
       );
     },
+    loadOnceAgentRoutines: async (agentId, serverId) =>
+      onceRoutines(serverId) ? listOnceAgentRoutines(oncePost(serverId), agentId) : [],
     deleteAgentRoutine: async (agentId, routineId, serverId) => {
       await request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse, undefined, serverId);
     },

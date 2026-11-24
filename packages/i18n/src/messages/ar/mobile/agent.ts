@@ -569,6 +569,7 @@ export const messages = {
   "mobile.agent.usage.collection": "بدأ الجمع {started}. آخر تحديث {updated}.",
   "mobile.agent.usage.never": "أبدًا",
   "mobile.agent.record.time": "الوقت",
+  "mobile.agent.record.date": "التاريخ",
   "mobile.agent.section.changeFailed": "تعذّر تغيير المجلد",
   "mobile.agent.section.tryAgain": "حاول مرة أخرى.",
   "mobile.agent.section.moveUp": "نقل لأعلى",

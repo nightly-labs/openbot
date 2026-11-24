@@ -518,6 +518,7 @@ export function RoutineEditor({
     <RoutineTriggerPicker
       value={trigger === "webhook" ? "webhook" : scheduleDraft.kind}
       webhook={Boolean(webhookRoutine || eventsSupported)}
+      once={savedSchedule.kind === "once"}
       disabled={disabled}
       onSelect={selectTrigger}
     />

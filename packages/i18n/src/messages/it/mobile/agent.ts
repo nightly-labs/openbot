@@ -528,6 +528,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Raccolta iniziata {started}. Aggiornata {updated}.",
   "mobile.agent.usage.never": "mai",
   "mobile.agent.record.time": "Ora",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Impossibile modificare la cartella",
   "mobile.agent.section.tryAgain": "Riprova.",
   "mobile.agent.section.moveUp": "Sposta su",

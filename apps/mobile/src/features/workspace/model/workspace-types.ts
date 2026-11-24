@@ -615,6 +615,7 @@ export interface MobileWorkspaceContextValue {
   ) => Promise<AgentMemorySelectionState>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
+  loadOnceAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadRoutineCalendar: (
     input: RoutineCalendarInput,
     serverId: string,

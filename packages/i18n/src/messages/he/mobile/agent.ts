@@ -521,6 +521,7 @@ export const messages = {
   "mobile.agent.usage.collection": "איסוף הנתונים התחיל {started}. עודכן {updated}.",
   "mobile.agent.usage.never": "אף פעם",
   "mobile.agent.record.time": "שעה",
+  "mobile.agent.record.date": "תאריך",
   "mobile.agent.section.changeFailed": "לא ניתן לשנות את התיקייה",
   "mobile.agent.section.tryAgain": "יש לנסות שוב.",
   "mobile.agent.section.moveUp": "העברה למעלה",
