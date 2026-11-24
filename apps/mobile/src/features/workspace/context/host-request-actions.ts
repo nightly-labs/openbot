@@ -1254,20 +1254,32 @@ export function createHostRequestActions({
           throw new Error("The host returned an invalid saved record.");
         return value;
       };
-      await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
-        onceRoutines(serverId)
-          ? updateAgentRoutineOnce(oncePost(serverId), {
-              agentId: input.agentId,
-              routineId: input.routineId,
-              ...changes,
-            }).then(savedRoutine)
-          : request(
-              "PATCH",
-              TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-              savedRoutine,
-              changes,
-              serverId,
-            ),
+      const releasedKey = queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines");
+      if (!onceRoutines(serverId)) {
+        await saveAgentRecord(queryClient, releasedKey, () =>
+          request(
+            "PATCH",
+            TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+            savedRoutine,
+            changes,
+            serverId,
+          ),
+        );
+        return;
+      }
+      const saved = savedRoutine(
+        await updateAgentRoutineOnce(oncePost(serverId), {
+          agentId: input.agentId,
+          routineId: input.routineId,
+          ...changes,
+        }),
+      );
+      await saveAgentRecord(
+        queryClient,
+        isOnceSchedule(saved.trigger.schedule)
+          ? queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId)
+          : releasedKey,
+        async () => saved,
       );
     },
     loadOnceAgentRoutines: async (agentId, serverId) =>
