@@ -1388,7 +1388,11 @@ export function createConversationViewScope(props: ConversationProps) {
   let conversationPanel: HTMLElement | undefined;
   const [browserSurface, setBrowserSurface] = createSignal<HTMLDivElement>();
   const [browserPaneSurface, setBrowserPaneSurface] = createSignal<HTMLDivElement>();
-  const shownBrowserSurface = () => (browserExpandedOpen() ? browserSurface() : browserPaneSurface());
+  const browserWindowShown = () => browserWindowOpen() && props.browserEnabled !== false;
+  const shownBrowserSurface = () => {
+    if (browserExpandedOpen()) return browserSurface();
+    return browserWindowShown() ? undefined : browserPaneSurface();
+  };
   const [messageLinkRelay, setMessageLinkRelay] = createSignal<{
     url: string;
     target: ConversationTarget;
@@ -2181,7 +2185,6 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
-  const browserWindowShown = () => browserWindowOpen() && props.browserEnabled !== false;
   const browserCanDetach = () =>
     !props.runtime && (props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-view"));
   createEffect(

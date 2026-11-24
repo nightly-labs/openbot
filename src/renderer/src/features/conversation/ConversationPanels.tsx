@@ -771,7 +771,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
       }}
       onCloseTab={(tabId) => void closeBrowserTab(tabId)}
       onNewTab={() => void openBrowserAddress(BROWSER_NEW_TAB_URL, true)}
-      pageShown={pageTabsShown() && browserTabs().length > 0}
+      pageShown={pageTabsShown() && browserTabs().length > 0 && !browserWindowShown()}
     >
       <BrowserFullViewAdapter
         pane={{

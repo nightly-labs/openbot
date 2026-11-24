@@ -356,6 +356,14 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     if (tab && "page" in tab) return "browser";
     return tab && "pane" in tab ? tab.pane : undefined;
   };
+  const hasPaneActions = (pane: SidePanelPane) =>
+    (props.moves?.length ?? 0) > 0 ||
+    props.windows?.[pane] !== undefined ||
+    (pane === "browser" && props.pageTabs !== undefined);
+  const actionMenuPane = () => {
+    const pane = menuPane();
+    return pane && hasPaneActions(pane) ? pane : undefined;
+  };
   const threadRemovable = () => props.threads?.onArchive !== undefined || props.threads?.onDelete !== undefined;
   const closeMenuTab = () => {
     const tab = liveMenuTab();
@@ -393,7 +401,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
               </>
             )}
           </Show>
-          <Show when={((props.moves?.length ?? 0) > 0 || props.windows || props.pageTabs) && menuPane()}>
+          <Show when={actionMenuPane()}>
             {(pane) => (
               <>
                 <For each={props.moves ?? []}>
