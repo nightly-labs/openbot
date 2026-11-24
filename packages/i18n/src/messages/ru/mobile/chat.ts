@@ -304,6 +304,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Не удалось сделать фото. Повторите попытку.",
   "mobile.chat.camera.startFailed": "Не удалось включить камеру. Закройте её и повторите попытку.",
   "mobile.chat.camera.close": "Закрыть камеру",
+  "mobile.chat.camera.fullScreenTipTitle": "Нужен обзор побольше?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Используйте полноэкранную камеру с зумом и всеми объективами. Это можно изменить в разделе «Настройки > Диалоги».",
+  "mobile.chat.camera.fullScreenTipUse": "Во весь экран",
+  "mobile.chat.camera.fullScreenTipDismiss": "Скрыть подсказку",
   "mobile.chat.camera.takePhoto": "Сделать фото",
   "mobile.chat.camera.switch": "Переключить камеру",
   "mobile.chat.header.info": "Информация: {name}",

@@ -242,6 +242,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "사진을 찍을 수 없어요. 다시 시도해 주세요.",
   "mobile.chat.camera.startFailed": "카메라를 시작할 수 없어요. 닫았다가 다시 시도해 주세요.",
   "mobile.chat.camera.close": "카메라 닫기",
+  "mobile.chat.camera.fullScreenTipTitle": "더 크게 보고 싶으신가요?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "확대/축소와 모든 렌즈를 쓸 수 있는 전체 화면 카메라를 사용하세요. 설정 > 대화에서 바꿀 수 있습니다.",
+  "mobile.chat.camera.fullScreenTipUse": "전체 화면 사용",
+  "mobile.chat.camera.fullScreenTipDismiss": "팁 숨기기",
   "mobile.chat.camera.takePhoto": "사진 찍기",
   "mobile.chat.camera.switch": "카메라 전환",
   "mobile.chat.header.info": "{name} 정보",

@@ -243,6 +243,11 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.camera.captureFailed": "Could not take the photo. Try again.",
   "mobile.chat.camera.startFailed": "Could not start the camera. Close it and try again.",
   "mobile.chat.camera.close": "Close camera",
+  "mobile.chat.camera.fullScreenTipTitle": "Need a bigger view?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Use the full-screen camera, with zoom and all lenses. You can change this in Settings > Conversations.",
+  "mobile.chat.camera.fullScreenTipUse": "Use full screen",
+  "mobile.chat.camera.fullScreenTipDismiss": "Hide tip",
   "mobile.chat.camera.takePhoto": "Take photo",
   "mobile.chat.camera.switch": "Switch camera",
   "mobile.chat.header.info": "Info for {name}",

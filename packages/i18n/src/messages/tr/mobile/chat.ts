@@ -244,6 +244,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Fotoğraf çekilemedi. Tekrar deneyin.",
   "mobile.chat.camera.startFailed": "Kamera başlatılamadı. Kapatıp tekrar deneyin.",
   "mobile.chat.camera.close": "Kamerayı kapat",
+  "mobile.chat.camera.fullScreenTipTitle": "Daha büyük görüntü mü lazım?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Yakınlaştırma ve tüm lenslerle tam ekran kamerayı kullanın. Bunu Ayarlar > Konuşmalar bölümünden değiştirebilirsiniz.",
+  "mobile.chat.camera.fullScreenTipUse": "Tam ekranı kullan",
+  "mobile.chat.camera.fullScreenTipDismiss": "İpucunu gizle",
   "mobile.chat.camera.takePhoto": "Fotoğraf çek",
   "mobile.chat.camera.switch": "Kamerayı değiştir",
   "mobile.chat.header.info": "{name} için bilgi",

@@ -321,6 +321,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "تعذّر التقاط الصورة. حاول مرة أخرى.",
   "mobile.chat.camera.startFailed": "تعذّر تشغيل الكاميرا. أغلقها وحاول مرة أخرى.",
   "mobile.chat.camera.close": "إغلاق الكاميرا",
+  "mobile.chat.camera.fullScreenTipTitle": "هل تحتاج إلى عرض أكبر؟",
+  "mobile.chat.camera.fullScreenTipBody":
+    "استخدم الكاميرا بملء الشاشة مع التكبير وجميع العدسات. يمكنك تغيير ذلك من الإعدادات > المحادثات.",
+  "mobile.chat.camera.fullScreenTipUse": "استخدام ملء الشاشة",
+  "mobile.chat.camera.fullScreenTipDismiss": "إخفاء النصيحة",
   "mobile.chat.camera.takePhoto": "التقاط صورة",
   "mobile.chat.camera.switch": "تبديل الكاميرا",
   "mobile.chat.header.info": "معلومات {name}",
