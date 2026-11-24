@@ -300,6 +300,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "播放速度：{speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "无法朗读消息",
+  "mobile.chat.message.readAloudModelMissing": "要收听消息，请在“设置 > 语音”中下载语音模型。",
   "mobile.chat.message.selectText": "选择文本",
   "mobile.chat.message.copyImage": "复制图片",
   "mobile.chat.message.copyText": "复制文本",

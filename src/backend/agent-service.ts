@@ -2411,6 +2411,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     for (const agentId of agentIds) this.#tasks.changed(agentId);
     this.#drain.scheduleDrains(agentIds);
     this.#drain.retrySlotWaiters();
+    this.#emit({ type: "host-turn-limits-changed" });
   }
 
   memoryLimitChanged(): void {

@@ -355,3 +355,11 @@ user's own Codex file. Codex (0.160 to 0.170) does not read `features.computer_u
 A loaded session keeps the plugins of its start, so the session fingerprint has a value for a
 session without Computer Use. The next turn replaces a session from before, and a session whose
 setting changed, with the usual handoff.
+
+Every Codex session also sets `plugins.<id>.enabled = false` for Codex's bundled browser plugins
+(`browser`, `chrome`, `chrome-dev` and `chrome-internal`, all `@openai-bundled`). These plugins need a
+browser access host that only the ChatGPT desktop app gives to the sessions that it starts. In an
+OpenBot session, each call fails with "The browser access host is unavailable" (openai/codex#57641).
+Agents use the OpenBot browser, or the user's Chrome through the OpenBot extension. The value does
+not change, so it is not in the session fingerprint: a resumed session gets it, and no session is
+replaced.

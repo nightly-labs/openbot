@@ -99,6 +99,7 @@ import {
   decodeHostSignalHomeSettings,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
+  decodeHostTurnLimits,
   decodeHostUpdateStatus,
   decodeHostVaultCodes,
   decodeHostVaultImport,
@@ -152,6 +153,8 @@ import {
   type HostSignalHomeSettings,
   type HostSkillLearning,
   type HostTimezoneSettings,
+  type HostTurnLimits,
+  type HostTurnLimitsInput,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
   type HostVoiceModel,
@@ -347,6 +350,7 @@ import { HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-relea
 import { HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_SIGNAL_HOME_ROUTES } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_ROUTES } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_ROUTES } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_ROUTES } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -846,6 +850,19 @@ export function setHostTimezone(
   timezone: string | null,
 ): Effect.Effect<HostTimezoneSettings, TeamAdminRequestError> {
   return adminCall(() => request("POST", HOST_TIMEZONE_ROUTES.update, decodeHostTimezoneSettings, { timezone }));
+}
+
+export function getHostTurnLimits(request: TeamApiRequest): Effect.Effect<HostTurnLimits, TeamAdminRequestError> {
+  return adminCall(() => request("POST", HOST_TURN_LIMITS_ROUTES.settings, decodeHostTurnLimits, {}));
+}
+
+export function setHostTurnLimits(
+  request: TeamApiRequest,
+  { turnLimit, agentTaskLimit }: HostTurnLimitsInput,
+): Effect.Effect<HostTurnLimits, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", HOST_TURN_LIMITS_ROUTES.update, decodeHostTurnLimits, { turnLimit, agentTaskLimit }),
+  );
 }
 
 export function getHostVoiceModel(request: TeamApiRequest): Effect.Effect<HostVoiceModel, TeamAdminRequestError> {

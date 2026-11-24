@@ -375,6 +375,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Szybkość odtwarzania: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Nie można odczytać wiadomości na głos",
+  "mobile.chat.message.readAloudModelMissing": "Aby słuchać wiadomości, pobierz model głosu w Ustawienia > Głos.",
   "mobile.chat.message.selectText": "Zaznacz tekst",
   "mobile.chat.message.copyImage": "Kopiuj obraz",
   "mobile.chat.message.copyText": "Kopiuj tekst",

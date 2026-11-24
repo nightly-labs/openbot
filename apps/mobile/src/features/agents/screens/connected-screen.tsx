@@ -15,7 +15,6 @@ import { type FlatList, Pressable, StyleSheet, View, type ViewInstance, type Vie
 import Animated, {
   cancelAnimation,
   Easing,
-  FadeIn,
   FadeOut,
   LinearTransition,
   ReduceMotion,
@@ -32,7 +31,7 @@ import {
   useAgentListReveal,
 } from "@/features/agents/components/agent-list-reveal";
 import { AgentListRow } from "@/features/agents/components/agent-list-row";
-import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { chatRowSlideIn, chatRowSlideOut, usePinMotion } from "@/features/agents/components/agent-pin-motion";
 import { AgentUnreadGroupHeader, AgentWaitingGroupHeader } from "@/features/agents/components/agent-wait-badge";
 import {
   ChatDragProvider,
@@ -112,7 +111,6 @@ import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const ONBOARDING_EXIT = FadeOut.duration(220).easing(EASE_OUT);
-const ROW_ENTER = FadeIn.duration(180).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const LIST_REFLOW = LinearTransition.duration(240).easing(EASE_OUT).reduceMotion(ReduceMotion.System);
 const CARD_MOVE = { duration: 240, easing: EASE_OUT, reduceMotion: ReduceMotion.Never };
 const LIST_WINDOW_SIZE = 3;
@@ -213,13 +211,15 @@ const TransitioningChatRow = memo(function TransitioningChatRow({
   reveal: AgentListRevealState;
   collapsed: boolean;
 }) {
-  const { transition } = useAgentPinTransition();
-  const chatId = agent?.id ?? channel?.id;
-  const isTarget = transition !== null && transition.chatId === chatId && transition.target === "row";
+  const motion = usePinMotion(agent?.id ?? channel?.id ?? "");
   return (
     <CollapsingRow collapsed={collapsed}>
-      <Animated.View collapsable={false} entering={isTarget ? ROW_ENTER : undefined}>
-        <AgentListRowReveal index={index} reveal={reveal} skip={isTarget}>
+      <Animated.View
+        collapsable={false}
+        entering={motion === "unpin" ? chatRowSlideIn : undefined}
+        exiting={motion === "pin" ? chatRowSlideOut : undefined}
+      >
+        <AgentListRowReveal index={index} reveal={reveal} skip={motion === "unpin"}>
           {agent ? (
             <AgentListRow agent={agent} leftInset={15} rightInset={24} />
           ) : channel && serverId && channelAgents ? (

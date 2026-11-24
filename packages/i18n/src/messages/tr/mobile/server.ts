@@ -527,6 +527,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Sunucu anahtarı değiştirilemedi. Tekrar deneyin.",
   "mobile.server.settings.keyOwnerOnly": "Sunucu anahtarını yalnızca sahip değiştirebilir.",
   "mobile.server.settings.keyUnsupported": "Anahtarını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.turnLimit": "Aynı anda mesaj dizileri",
+  "mobile.server.settings.turnLimitDescription":
+    "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",
+  "mobile.server.settings.turnLimitAutomatic": "Otomatik ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Otomatik (sınırsız)",
+  "mobile.server.settings.turnLimitUnlimited": "Sınırsız",
+  "mobile.server.settings.turnLimitsLoadFailed": "Bu sunucunun mesaj dizisi sınırları yüklenemedi.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Mesaj dizisi sınırı kaydedilemedi. Tekrar deneyin.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Mesaj dizisi sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.agentTaskLimit": "Ajan başına paralel mesaj dizileri",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Kendi sınırı olmayan her ajanın aynı anda kaç mesaj dizisi çalıştırabileceği.",
+  "mobile.server.settings.agentTaskLimitDefault": "Varsayılan ({count})",
   "mobile.server.settings.memoryLimit": "Ajan başına bellek",
   "mobile.server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "mobile.server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",

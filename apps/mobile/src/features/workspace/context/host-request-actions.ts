@@ -152,6 +152,7 @@ import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-r
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -266,6 +267,7 @@ import {
   getHostSignalHome,
   getHostSkillLearning,
   getHostTimezone,
+  getHostTurnLimits,
   getHostUpdateStatus,
   getHostVoiceModel,
   getRoutineResultDestination,
@@ -332,6 +334,7 @@ import {
   setHostSignalHome,
   setHostSkillLearning,
   setHostTimezone,
+  setHostTurnLimits,
   setHostUpdateSettings,
   setMcpServerEnabled,
   setOwnServerNotificationLevel,
@@ -540,6 +543,8 @@ type HostRequestActions = Pick<
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
+  | "loadServerTurnLimits"
+  | "setServerTurnLimits"
   | "loadServerVoiceModel"
   | "changeServerVoiceModel"
   | "loadServerSignalHome"
@@ -839,6 +844,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_RESTART_CAPABILITY, "mobile.server.settings.restartUnsupported");
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
+  const turnLimitsAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_TURN_LIMITS_CAPABILITY, "mobile.server.settings.turnLimitsUnsupported");
   const signalHomeAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_SIGNAL_HOME_CAPABILITY, "mobile.server.settings.signalHomeUnsupported");
   const voiceModelAdmin = (serverId: string) =>
@@ -916,6 +923,8 @@ export function createHostRequestActions({
     restartServerItself: async (serverId) => runTeamRequest(requestHostRestart(restartAdmin(serverId))),
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
     setServerTimezone: async (timezone, serverId) => runTeamRequest(setHostTimezone(timezoneAdmin(serverId), timezone)),
+    loadServerTurnLimits: async (serverId) => runTeamRequest(getHostTurnLimits(turnLimitsAdmin(serverId))),
+    setServerTurnLimits: async (input, serverId) => runTeamRequest(setHostTurnLimits(turnLimitsAdmin(serverId), input)),
     loadServerVoiceModel: async (serverId) => runTeamRequest(getHostVoiceModel(voiceModelAdmin(serverId))),
     loadServerSignalHome: async (serverId) => runTeamRequest(getHostSignalHome(signalHomeAdmin(serverId))),
     setServerSignalHome: async (home, serverId) => runTeamRequest(setHostSignalHome(signalHomeAdmin(serverId), home)),

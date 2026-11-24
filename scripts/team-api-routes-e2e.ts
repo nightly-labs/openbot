@@ -316,6 +316,7 @@ import {
   HOST_SIGNAL_HOME_CAPABILITY,
   HOST_SIGNAL_HOME_ROUTES,
 } from "@openbot/contracts/team-protocol/host-signal-home-v1";
+import { HOST_TURN_LIMITS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-events-v1";
 import {
   HOST_TURN_LIMITS_CAPABILITY,
   HOST_TURN_LIMITS_ROUTES,
@@ -1136,6 +1137,9 @@ function accountModelsStatus(): AgentStatus {
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
 
 const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => void>();
+hostTurnLimits.onChange(() => {
+  for (const listener of agentEventListeners) listener({ type: "host-turn-limits-changed" });
+});
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
 let largePendingPrompts = false;
 let importFreeBytes: number | null = null;
@@ -4251,11 +4255,66 @@ try {
         !existsSync(hostTurnLimitsPath),
       outOfRange.map(summary),
     );
+    const openTurnLimitsSocket = async (capabilities: string[]) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${bobToken}`,
+      ]);
+      const state = { declared: false, changed: 0, marked: false };
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "chat-colors-changed") state.declared = true;
+        if (isDynamicRecord(value) && value.type === "host-turn-limits-changed") state.changed++;
+        if (isDynamicRecord(value) && value.type === "library-folders-changed") state.marked = true;
+        for (const wake of waiters) wake();
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      const until = (ready: () => boolean) =>
+        new Promise<boolean>((resolveReady) => {
+          if (ready()) return resolveReady(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveReady(false);
+          }, 5_000);
+          const wake = () => {
+            if (!ready()) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveReady(true);
+          };
+          waiters.add(wake);
+        });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [CHAT_COLORS_CAPABILITY, LIBRARY_FOLDERS_EVENTS_CAPABILITY, ...capabilities],
+        }),
+      );
+      const ready = await until(() => state.declared);
+      return { socket, state, ready, until };
+    };
+    const listening = await openTurnLimitsSocket([HOST_TURN_LIMITS_EVENTS_CAPABILITY]);
+    const older = await openTurnLimitsSocket([]);
     const adminSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
       token: adaToken,
       json: { turnLimit: 32, agentTaskLimit: 8 },
       ...v9,
     });
+    const heard = await listening.until(() => listening.state.changed === 1);
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+    const olderMarked = await older.until(() => older.state.marked);
+    listening.socket.close();
+    older.socket.close();
+    check(
+      "a change of the limits reaches a member socket that has the events capability, and not an older socket",
+      listening.ready && older.ready && heard && olderMarked && older.state.changed === 0,
+      JSON.stringify({ listening: listening.state, older: older.state }),
+    );
     const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
     await runCauseEffect(reloaded.load());
     const chosen = { turnLimit: 32, automaticTurnLimit: 8, agentTaskLimit: 8, defaultAgentTaskLimit: 4 };

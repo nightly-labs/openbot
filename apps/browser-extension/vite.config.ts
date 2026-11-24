@@ -7,6 +7,19 @@ import { lazyLanguageCatalogs } from "../../packages/i18n/src/vite-plugin";
 
 const PRODUCTION_API_URL = "https://api.openbot.run";
 const PRODUCTION_WEB_URL = "https://openbot.run";
+const PRODUCTION_ANALYTICS_URL = "https://analytics.openbot.run/api";
+
+function loopbackCaptureUrl(value: string | undefined): string | null {
+  if (!value || !URL.canParse(value)) return null;
+  const url = new URL(value);
+  return url.protocol === "http:" && (url.hostname === "127.0.0.1" || url.hostname === "localhost") ? url.origin : null;
+}
+
+function analyticsUrl(apiUrl: string, development: boolean): string {
+  const capture = loopbackCaptureUrl(process.env.OPENBOT_ANALYTICS_CAPTURE_URL);
+  if (capture) return capture;
+  return !development && apiUrl === PRODUCTION_API_URL ? PRODUCTION_ANALYTICS_URL : "";
+}
 
 const X_CONTENT_SCRIPT = "x-content.js";
 
@@ -92,6 +105,7 @@ export default defineConfig(({ mode }) => {
     define: {
       "import.meta.env.VITE_OPENBOT_API_URL": JSON.stringify(apiUrl),
       "import.meta.env.VITE_OPENBOT_WEB_URL": JSON.stringify(webUrl),
+      "import.meta.env.VITE_OPENBOT_ANALYTICS_URL": JSON.stringify(analyticsUrl(apiUrl, development)),
       "import.meta.env.VITE_OPENBOT_X_RULES_URL": JSON.stringify(
         (development && process.env.VITE_OPENBOT_X_RULES_URL) || `${apiUrl}${X_PAGE_RULES_ROUTE}`,
       ),
