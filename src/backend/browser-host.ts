@@ -225,6 +225,7 @@ const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status
 const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
 const OPEN_REDIRECT_WAIT_MS = 5_000;
+const AGENT_OPEN_LOAD_TIMEOUT_MS = 30_000;
 const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
 const SERVICE_WORKER_CLEAR_WAIT_MS = 10_000;
 const OPEN_REDIRECT_READS = 2;
@@ -967,7 +968,7 @@ export class BrowserHost {
     ownerAgentId: string | null = null,
     focus = false,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
-    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus, false);
+    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus, false, null);
   }).bind(this);
 
   readonly openPrivate = Effect.fn("BrowserHost.openPrivate")(function* (
@@ -976,7 +977,7 @@ export class BrowserHost {
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     const privateSession = session.fromPartition(`openbot-private-${randomUUID()}`, { cache: false });
     this.#configureSession(privateSession);
-    return yield* this.#open(url, null, null, false, true, privateSession);
+    return yield* this.#open(url, null, null, false, true, null, privateSession);
   }).bind(this);
 
   readonly #open = Effect.fn("BrowserHost.openTab")(function* (
@@ -986,6 +987,7 @@ export class BrowserHost {
     ownerAgentId: string | null,
     focus: boolean,
     closeOnFailure: boolean,
+    firstLoadTimeoutMs: number | null,
     privateSession?: Session,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
@@ -1024,7 +1026,7 @@ export class BrowserHost {
         yield* navigateAndWait(
           tab.contents,
           () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
-          null,
+          firstLoadTimeoutMs,
         ).pipe(
           Effect.catchIf(isCommittedNavigationTimeout, () => Effect.void),
           Effect.ensuring(Effect.sync(() => (tab.opening = false))),
@@ -2361,7 +2363,14 @@ export class BrowserHost {
   readonly #toolHandlers: BrowserToolHandlers = {
     open: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
-        const tab = yield* this.#open(args.url, params.threadId, params.ownerAgentId ?? null, false, true);
+        const tab = yield* this.#open(
+          args.url,
+          params.threadId,
+          params.ownerAgentId ?? null,
+          false,
+          true,
+          AGENT_OPEN_LOAD_TIMEOUT_MS,
+        );
         this.#controls.updateTab(params, tab.id);
         let read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
         for (
