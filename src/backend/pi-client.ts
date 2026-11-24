@@ -832,26 +832,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     const prompt = yield* piPrompt(params);
     if (this.options.profileGeneration && prompt.images && !(yield* this.#modelReadsImages(thread)))
       return yield* providerFailure(new Error(sourceText("error.workflow.modelImageUnsupported")));
+    if (thread.turn) return yield* providerFailure(new Error(sourceText("error.provider.piSessionBusy")));
     const context = this.#turnContext.take(thread.id, prompt.message.startsWith("/"));
     const message = context.length > 0 ? [...context, prompt.message].join("\n\n") : prompt.message;
-    const turn: PiTurn = {
-      id: getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID(),
-      startedAt: Date.now() / 1_000,
-      messageIndex: 0,
-      items: new Map(),
-      stopped: false,
-      failure: null,
-      failureCause: null,
-      finishing: false,
-      lastActivityAt: Date.now(),
-      openTools: new Set(),
-      waitingOnUser: 0,
-      compacting: false,
-      stalled: null,
-    };
+    const turn = this.#openTurn(
+      thread,
+      getString(params, "clientTurnId") ?? getString(params, "clientUserMessageId") ?? randomUUID(),
+    );
     this.#addUserMessage(turn, prompt.message);
-    thread.turn = turn;
-    this.#disarmIdle(thread);
     this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" } });
     const fail = (failure: ProviderClientOperationError) =>
       thread.turn !== turn
@@ -899,6 +887,33 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     yield* Effect.forkIn(this.#watchStall(thread, turn), this.#scope);
     return { turn: { id: turn.id, status: "inProgress" }, turnId: turn.id };
   });
+
+  #openTurn(thread: PiThread, id: string): PiTurn {
+    const turn: PiTurn = {
+      id,
+      startedAt: Date.now() / 1_000,
+      messageIndex: 0,
+      items: new Map(),
+      stopped: false,
+      failure: null,
+      failureCause: null,
+      finishing: false,
+      lastActivityAt: Date.now(),
+      openTools: new Set(),
+      waitingOnUser: 0,
+      compacting: false,
+      stalled: null,
+    };
+    thread.turn = turn;
+    this.#disarmIdle(thread);
+    return turn;
+  }
+
+  #openSelfStartedTurn(thread: PiThread): void {
+    const turn = this.#openTurn(thread, randomUUID());
+    this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" }, unprompted: true });
+    this.#background(this.#watchStall(thread, turn));
+  }
 
   readonly #watchStall = Effect.fn("PiAgentClient.watchStall")(function* (
     this: PiAgentClient,
@@ -1034,6 +1049,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       return;
     }
     if (record.type === "compaction_end") this.#turnContext.resend(thread.id);
+    if (record.type === "agent_start" && !thread.turn && !this.options.profileGeneration)
+      this.#openSelfStartedTurn(thread);
     const turn = thread.turn;
     if (!turn || turn.finishing) return;
     turn.lastActivityAt = Date.now();
