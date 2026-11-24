@@ -280,8 +280,7 @@ function AuthenticatedStack() {
       whenUnlocked(() => {
         closeDrawer();
         if (router.canDismiss()) router.dismissAll();
-        if (workflowId) router.push({ pathname: "/server-workflows/workflow", params: { serverId, workflowId } });
-        else router.push({ pathname: "/server-workflows", params: { serverId } });
+        router.push({ pathname: "/server-workflows/workflow", params: { serverId, workflowId } });
       }),
     [closeDrawer],
   );

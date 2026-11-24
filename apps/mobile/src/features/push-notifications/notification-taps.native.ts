@@ -59,7 +59,7 @@ function workflowTarget(notification: Notifications.Notification): WorkflowTarge
   const serverId = data?.serverId;
   const workflowId = data?.agentId;
   if (data?.kind !== WORKFLOW_KIND || !isString(serverId) || !serverId) return null;
-  return { serverId, workflowId: isString(workflowId) && workflowId ? workflowId : null };
+  return isString(workflowId) && workflowId ? { serverId, workflowId } : null;
 }
 
 function notificationTarget(notification: Notifications.Notification): NotificationTarget | null {
