@@ -191,6 +191,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "הקובץ המצורף פגום. יש לבחור אותו שוב.",
   "mobile.chat.attachment.tooLarge": "{name} גדול מ-{limit}.",
   "mobile.chat.attachment.cameraPermission": "יש לאפשר גישה למצלמה בהגדרות כדי לצלם תמונה.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "התמונה לא נטענה. יש לפתוח אותה באפליקציית התמונות עד שהיא מוצגת במלואה, ואז לנסות שוב.",
   "mobile.chat.composer.send": "שליחת הודעה",
   "mobile.chat.composer.stop": "עצירת {name}",
   "mobile.chat.composer.dictate": "הכתבת הודעה",

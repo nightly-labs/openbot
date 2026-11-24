@@ -185,6 +185,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.attachment.damaged": "The attachment is damaged. Select it again.",
   "mobile.chat.attachment.tooLarge": "{name} is larger than {limit}.",
   "mobile.chat.attachment.cameraPermission": "Allow camera access in Settings to take a photo.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "The photo did not load. Open it in the Photos app until it shows fully, then try again.",
   "mobile.chat.composer.send": "Send message",
   "mobile.chat.composer.stop": "Stop {name}",
   "mobile.chat.composer.dictate": "Dictate message",

@@ -246,6 +246,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Вложение повреждено. Выберите его заново.",
   "mobile.chat.attachment.tooLarge": "{name} больше {limit}.",
   "mobile.chat.attachment.cameraPermission": "Чтобы сделать фото, разрешите доступ к камере в настройках.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Фото не загрузилось. Откройте его в приложении «Фото», пока оно не отобразится полностью, и повторите попытку.",
   "mobile.chat.composer.send": "Отправить сообщение",
   "mobile.chat.composer.stop": "Остановить: {name}",
   "mobile.chat.composer.dictate": "Надиктовать сообщение",

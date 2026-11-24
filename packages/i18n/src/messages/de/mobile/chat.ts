@@ -190,6 +190,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Der Anhang ist beschädigt. Wähle ihn erneut aus.",
   "mobile.chat.attachment.tooLarge": "{name} ist größer als {limit}.",
   "mobile.chat.attachment.cameraPermission": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Das Foto wurde nicht geladen. Öffne es in der Fotos-App, bis es ganz angezeigt wird, und versuche es dann erneut.",
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
   "mobile.chat.composer.dictate": "Nachricht diktieren",
