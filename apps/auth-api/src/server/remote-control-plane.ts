@@ -1582,7 +1582,8 @@ export class RemoteControlPlane {
       if (input.revoke && input.reactivate) return yield* invalid("member status");
       const activating = !input.revoke && (input.reactivate === true || membership.status === "active");
       const memberSeat = yield* this.#memberSeat(input.hostId, membership.user_id);
-      if (activating && membership.status !== "active") yield* this.#requireMemberSeat(memberSeat);
+      const reactivating = activating && membership.status !== "active";
+      if (reactivating) yield* this.#requireMemberSeat(memberSeat);
       const removedAt = removedAtAfterChange({
         revoke: input.revoke === true,
         leave: leavingOwnMembership,
@@ -1606,7 +1607,7 @@ export class RemoteControlPlane {
         dependencies.database.batch([
           dependencies.database
             .prepare(
-              `UPDATE remote_memberships SET ${guardsRole ? "role = ?, " : ""}status = ?, updated_at = ?, removed_at = ${removedAt}
+              `UPDATE remote_memberships SET ${guardsRole ? "role = ?, " : ""}status = ?, updated_at = ?, removed_at = ${removedAt}${reactivating ? ", hidden_at = NULL" : ""}
             WHERE membership_id = ? AND status = ?${guardsRole ? " AND role = ?" : " AND role != 'owner'"}${activating ? ` AND ${memberSeat.sql}` : ""}`,
             )
             .bind(

@@ -669,7 +669,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const shownServers = createMemo(() => servers().filter((item) => item.active || item.hidden !== true));
   const hiddenServers = createMemo<HiddenServer[]>(() =>
     servers()
-      .filter((item) => !item.active && item.hidden === true)
+      .filter((item) => item.hidden === true)
       .map((item) => ({
         id: item.id,
         name: item.name,

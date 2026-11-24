@@ -2018,10 +2018,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           if (switches && activeServerIdRef.current === nextActive) select(previousActive);
           throw error;
         }
-        pendingHidden.current.delete(serverId);
         const kept = keptHosts.current;
         if (kept) keepHosts(kept.map((host) => (host.hostId === serverId ? hostWithHidden(host, hidden) : host)));
         await refreshMemberships().catch(() => undefined);
+        pendingHidden.current.delete(serverId);
       },
       refreshServer: async (serverId) => {
         connections.current.get(serverId)?.refresh();

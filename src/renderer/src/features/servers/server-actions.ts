@@ -149,7 +149,7 @@ export function useServerActions() {
 
   function hiddenServers(): HiddenServer[] {
     return allServers()
-      .filter((server) => !shown(server))
+      .filter(isHidden)
       .map((server) => ({
         id: server.id,
         name: server.name,

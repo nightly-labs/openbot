@@ -192,11 +192,14 @@ export const ServerDrawerContent = memo(function ServerDrawerContent({
   const hiddenServers = servers.filter((server) => server.hidden);
   const activeServer = visibleServers.find((server) => server.id === activeServerId);
   const serverIds = visibleServers.map((server) => server.id);
-  const hiddenIds = hiddenServers.map((server) => server.id);
   const canReorder = serverIds.length > 1;
   const showsList = listOpen || editing || !activeServer;
   const showsHidden = hiddenOpen || serverIds.length === 0;
-  const reorderVisible = (ids: string[]) => onReorder([...ids, ...hiddenIds]);
+  const reorderVisible = (ids: string[]) => {
+    const visible = new Set(serverIds);
+    let index = 0;
+    return onReorder(servers.map((server) => (visible.has(server.id) ? (ids[index++] ?? server.id) : server.id)));
+  };
   const memberCount = useDrawerMemberCount(activeServer?.id ?? "");
   const hostedServerIds = useHostedServerAvailability((state) =>
     state.userId === session.user.id ? state.serverIds : null,

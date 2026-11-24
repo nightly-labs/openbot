@@ -1101,7 +1101,7 @@ export function createWebWorkspace(
           const savedHostId = readWebServerSelection(props.accountId);
           const ordered = orderWebHosts(hosts, serverOrder());
           const initialHost =
-            hosts.find((host) => host.hostId === savedHostId) ??
+            hosts.find((host) => host.hostId === savedHostId && host.hidden !== true) ??
             ordered.find((host) => host.hidden !== true) ??
             ordered[0];
           if (initialHost) await connect(initialHost);
