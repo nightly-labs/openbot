@@ -126,7 +126,7 @@ export class AutomationServer {
   }).bind(this);
 
   readonly removeStaleFiles = Effect.fn("AutomationServer.removeStaleFiles")(function* (this: AutomationServer) {
-    yield* this.#step(Effect.suspend(() => (this.#server ? Effect.void : this.#close())));
+    yield* this.#step(this.#close());
   }).bind(this);
 
   readonly stop = Effect.fn("AutomationServer.stop")(function* (this: AutomationServer) {
