@@ -137,6 +137,9 @@ All notable changes to OpenBot will be documented here. The project follows
 - Shared tables work again after their file is deleted while OpenBot is open. Before, each table action failed with "agent-data.db does not exist yet" until you restarted OpenBot. Now OpenBot makes a new, empty file at the next table action. Tables that were in the deleted file do not come back.
 - Stop now ends a Gemini agent's turn that shows "working" while Gemini no longer runs it. Before, Stop did nothing in this state: the agent stayed "working", and its new messages stayed in the queue until OpenBot restarted. Now the turn ends as stopped, and the queued messages start. This also applies to other agents that use the same connection, such as Cursor, Grok and OpenCode. When the agent runs on a joined server, the server must also be on this version.
 - On a server with little memory, the browser now opens the first tab of a chat while the memory is low. Before, it refused every new tab, also after all tabs were closed, and asked you to close a tab. When the memory is almost full, the browser still opens no tab, and the message no longer asks you to close a tab when no tab is open. The server must also be on the new version.
+- Steer a message that you send while the agent starts its turn. Before, the message waited until the whole turn was done.
+- Steer a message into an Antigravity or Devin turn before the agent writes its first update. Before, the steer failed and the message waited until the whole turn was done.
+- Steer messages again after a Stop that did not stop the turn. Before, each next steer failed.
 
 ## [0.77.0] - 2026-11-23
 
