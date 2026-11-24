@@ -523,6 +523,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Kan de serversleutel niet wijzigen. Probeer het opnieuw.",
   "mobile.server.settings.keyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
   "mobile.server.settings.keyUnsupported": "Werk OpenBot op deze server bij om de sleutel hier te wijzigen.",
+  "mobile.server.settings.turnLimit": "Threads tegelijk",
+  "mobile.server.settings.turnLimitDescription":
+    "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatisch (geen limiet)",
+  "mobile.server.settings.turnLimitUnlimited": "Geen limiet",
+  "mobile.server.settings.turnLimitsLoadFailed": "Kan de threadlimieten van deze server niet laden.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Kan de threadlimiet niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Werk OpenBot bij op deze server om de threadlimiet hier te wijzigen.",
+  "mobile.server.settings.agentTaskLimit": "Parallelle threads per agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Hoeveel threads elke agent zonder eigen limiet tegelijk kan draaien.",
+  "mobile.server.settings.agentTaskLimitDefault": "Standaard ({count})",
   "mobile.server.settings.memoryLimit": "Herinneringen per agent",
   "mobile.server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "mobile.server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",

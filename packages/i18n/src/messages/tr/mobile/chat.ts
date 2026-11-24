@@ -187,6 +187,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Ek bozuk. Tekrar seçin.",
   "mobile.chat.attachment.tooLarge": "{name} {limit}'tan daha büyük.",
   "mobile.chat.attachment.cameraPermission": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin verin.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Fotoğraf yüklenmedi. Fotoğraflar uygulamasında tamamen görünene kadar açın, sonra tekrar deneyin.",
   "mobile.chat.composer.send": "Mesaj gönder",
   "mobile.chat.composer.stop": "{name} ajanını durdur",
   "mobile.chat.composer.dictate": "Mesajı sesle yaz",
@@ -311,6 +313,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Oynatma hızı: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Mesaj sesli okunamadı",
+  "mobile.chat.message.readAloudModelMissing": "Mesajları dinlemek için Ayarlar > Ses bölümünden ses modelini indir.",
   "mobile.chat.message.selectText": "Metni seç",
   "mobile.chat.message.copyImage": "Görseli kopyala",
   "mobile.chat.message.copyText": "Metni kopyala",

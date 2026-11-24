@@ -3541,7 +3541,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostTimezone={{ calls: hostTimezoneCalls }}
                         hostVoiceModel={{ calls: hostVoiceModelCalls }}
                         hostSignalHome={{ calls: hostSignalHomeCalls }}
-                        hostTurnLimits={{ calls: hostTurnLimitsCalls }}
+                        hostTurnLimits={{
+                          calls: hostTurnLimitsCalls,
+                          onChanged: (listener) =>
+                            workspace.onHostEvent((event) => {
+                              if (event.type === "host-turn-limits-changed")
+                                listener(workspace.state.host?.hostId ?? "");
+                            }),
+                        }}
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}

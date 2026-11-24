@@ -266,6 +266,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "المرفق تالف. اختره مرة أخرى.",
   "mobile.chat.attachment.tooLarge": "{name} أكبر من {limit}.",
   "mobile.chat.attachment.cameraPermission": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "لم يتم تحميل الصورة. افتحها في تطبيق الصور حتى تظهر بالكامل، ثم حاول مرة أخرى.",
   "mobile.chat.composer.send": "إرسال الرسالة",
   "mobile.chat.composer.stop": "إيقاف {name}",
   "mobile.chat.composer.dictate": "إملاء رسالة",
@@ -386,6 +388,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "سرعة التشغيل: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "تعذّرت قراءة الرسالة بصوت عالٍ",
+  "mobile.chat.message.readAloudModelMissing": "لسماع الرسائل، نزّل نموذج الصوت من الإعدادات > الصوت.",
   "mobile.chat.message.selectText": "تحديد النص",
   "mobile.chat.message.copyImage": "نسخ الصورة",
   "mobile.chat.message.copyText": "نسخ النص",

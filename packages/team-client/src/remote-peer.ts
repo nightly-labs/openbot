@@ -36,6 +36,7 @@ import {
 } from "@openbot/contracts/team-protocol";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
+import { addPromptQuestionDetails } from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { addUiBlockAutoAnswers } from "@openbot/contracts/team-protocol/ui-block-auto-answer-v1";
@@ -280,6 +281,7 @@ export interface RemoteTeamDiagnostic {
     | "ice-state"
     | "ice-gathering"
     | "ice-candidate-error"
+    | "ice-gathering-stalled"
     | "route"
     | "ice-recovery"
     | "channels-open"
@@ -1717,6 +1719,7 @@ export function createRemoteTeamPeer(
           addUiBlockVaultRequests(decoded.event, frame.payload);
           addUiBlockLocationRequests(decoded.event, frame.payload);
           addSkillSuggestionNames(decoded.event, frame.payload);
+          addPromptQuestionDetails(decoded.event, frame.payload);
         }
         yield* RemotePeerIO.use((io) => io.teamEvent(state.hostId, decoded.event));
       }
@@ -2351,8 +2354,19 @@ export function createRemoteTeamPeer(
     if (!state.connected || state.connectedTimer !== null) return;
     state.connectedTimer = setTimeout(() => {
       diagnose(state, "stalled", `connect deadline: ${connectionSnapshot(state)}`);
+      if (gatheringFoundNothing(state)) diagnose(state, "ice-gathering-stalled");
       failPeer(state, connectTimeout(state), actions);
     }, 30_000);
+  }
+
+  function gatheringFoundNothing(state: PeerState): boolean {
+    const connection = state.connection;
+    return (
+      connection !== null &&
+      state.offerSentAt !== null &&
+      connection.iceGatheringState === "gathering" &&
+      state.localCandidates.size === 0
+    );
   }
 
   function connectionSnapshot(state: PeerState): string {
@@ -2455,6 +2469,7 @@ function withWireBlockExtensions<T>(state: PeerState, decoded: T, wire: unknown)
     addUiBlockVaultRequests(decoded, wire);
     addUiBlockLocationRequests(decoded, wire);
     addSkillSuggestionNames(decoded, wire);
+    addPromptQuestionDetails(decoded, wire);
   }
   return decoded;
 }

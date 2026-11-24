@@ -187,6 +187,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "O anexo está danificado. Selecione-o novamente.",
   "mobile.chat.attachment.tooLarge": "{name} tem mais de {limit}.",
   "mobile.chat.attachment.cameraPermission": "Permita o acesso à câmera em Configurações para tirar uma foto.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "A foto não carregou. Abra-a no app Fotos até ela aparecer por completo e tente novamente.",
   "mobile.chat.composer.send": "Enviar mensagem",
   "mobile.chat.composer.stop": "Parar {name}",
   "mobile.chat.composer.dictate": "Ditar mensagem",
@@ -312,6 +314,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Velocidade de reprodução: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Não foi possível ler a mensagem em voz alta",
+  "mobile.chat.message.readAloudModelMissing": "Para ouvir mensagens, baixe o modelo de voz em Ajustes > Voz.",
   "mobile.chat.message.selectText": "Selecionar texto",
   "mobile.chat.message.copyImage": "Copiar imagem",
   "mobile.chat.message.copyText": "Copiar texto",

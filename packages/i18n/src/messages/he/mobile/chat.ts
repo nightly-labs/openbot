@@ -191,6 +191,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "הקובץ המצורף פגום. יש לבחור אותו שוב.",
   "mobile.chat.attachment.tooLarge": "{name} גדול מ-{limit}.",
   "mobile.chat.attachment.cameraPermission": "יש לאפשר גישה למצלמה בהגדרות כדי לצלם תמונה.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "התמונה לא נטענה. יש לפתוח אותה באפליקציית התמונות עד שהיא מוצגת במלואה, ואז לנסות שוב.",
   "mobile.chat.composer.send": "שליחת הודעה",
   "mobile.chat.composer.stop": "עצירת {name}",
   "mobile.chat.composer.dictate": "הכתבת הודעה",
@@ -311,6 +313,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "מהירות ההשמעה: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "לא ניתן להקריא את ההודעה",
+  "mobile.chat.message.readAloudModelMissing": "כדי לשמוע הודעות, יש להוריד את מודל הקול בהגדרות > קול.",
   "mobile.chat.message.selectText": "בחירת טקסט",
   "mobile.chat.message.copyImage": "העתקת תמונה",
   "mobile.chat.message.copyText": "העתקת טקסט",

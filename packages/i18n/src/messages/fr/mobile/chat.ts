@@ -193,6 +193,8 @@ export const messages = {
   "mobile.chat.attachment.tooLarge": "{name} dépasse {limit}.",
   "mobile.chat.attachment.cameraPermission":
     "Autorisez l’accès à l’appareil photo dans Réglages pour prendre une photo.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "La photo ne s’est pas chargée. Ouvrez-la dans l’app Photos jusqu’à ce qu’elle s’affiche entièrement, puis réessayez.",
   "mobile.chat.composer.send": "Envoyer le message",
   "mobile.chat.composer.stop": "Arrêter {name}",
   "mobile.chat.composer.dictate": "Dicter un message",
@@ -318,6 +320,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Vitesse de lecture : {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Impossible de lire le message à voix haute",
+  "mobile.chat.message.readAloudModelMissing":
+    "Pour écouter les messages, téléchargez le modèle vocal dans Réglages > Voix.",
   "mobile.chat.message.selectText": "Sélectionner le texte",
   "mobile.chat.message.copyImage": "Copier l’image",
   "mobile.chat.message.copyText": "Copier le texte",

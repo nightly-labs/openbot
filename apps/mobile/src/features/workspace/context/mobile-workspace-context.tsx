@@ -23,6 +23,11 @@ import { AGENT_INSTALL_CAPABILITY } from "@openbot/contracts/team-protocol/agent
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
 import { AGENT_NEW_CHAT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-new-chat-v1";
+import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_PLAN_CARD_CAPABILITY } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_TASK_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
@@ -53,6 +58,7 @@ import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-r
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -2219,13 +2225,26 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       updateAgent: async (input: UpdateAgentInput, serverId = activeServerIdRef.current ?? undefined) => {
         if (!serverId || !agentsRef.current.some((agent) => agent.id === input.agentId && agent.serverId === serverId))
           throw new Error(currentText().t("mobile.workspace.error.agentUnavailableOnHost"));
-        const { avatarColor, avatarHue, ...other } = input;
+        const { avatarColor, avatarHue, providerAccountId, ...other } = input;
+        const runtimeChange =
+          providerAccountId !== undefined &&
+          hasCapability(serverCapabilities.current, serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
+            ? pendingRuntimeUpdateBody({
+                agentId: input.agentId,
+                provider: input.provider,
+                model: input.model,
+                reasoningEffort: input.reasoningEffort,
+                providerAccountId,
+              })
+            : null;
+        const { provider: _provider, model: _model, reasoningEffort: _reasoningEffort, ...profile } = other;
+        const fields = runtimeChange ? profile : other;
         const color = avatarColor !== undefined ? avatarColor : avatarHue === undefined ? undefined : null;
         const colorRoute = color !== undefined && hostKeepsAgentColors(serverCapabilities.current.get(serverId));
         const payload = updateAgentPayload(
-          colorRoute && color !== null ? other : { ...other, ...(avatarHue === undefined ? {} : { avatarHue }) },
+          colorRoute && color !== null ? fields : { ...fields, ...(avatarHue === undefined ? {} : { avatarHue }) },
         );
-        if (!colorRoute || Object.keys(payload).length > 1) {
+        if (Object.keys(payload).length > 1 || (!colorRoute && !runtimeChange)) {
           const updated = await request(
             "PATCH",
             TEAM_API_ROUTES.agent.one(input.agentId),
@@ -2237,6 +2256,18 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         }
         if (colorRoute && color !== undefined && (color !== null || hostColors.current[serverId]?.[input.agentId]))
           applyHostColors(serverId, await writeHostAgentColor(teamApi(serverId), input.agentId, color));
+        if (runtimeChange) {
+          await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, ignoreResponse, runtimeChange, serverId);
+          const updated = (
+            await request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries, undefined, serverId)
+          ).find((agent) => agent.id === input.agentId);
+          if (!updated) throw new Error(currentText().t("mobile.workspace.error.agentUnavailableOnHost"));
+          putAgent(serverId, updated);
+        } else if (providerAccountId !== undefined)
+          await hostRequests.actions.setAgentProviderAccount(
+            { agentId: input.agentId, accountId: providerAccountId },
+            serverId,
+          );
       },
       setAgentAvatar: async (agentId, image, serverId) => {
         if (!agentsRef.current.some((agent) => agent.id === agentId && agent.serverId === serverId))
@@ -2545,6 +2576,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           administers(serverId, LOCAL_SERVERS_CAPABILITY),
         canRestartServerItself: (serverId) => administers(serverId, HOST_RESTART_CAPABILITY),
         canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
+        canManageServerTurnLimits: (serverId) => administers(serverId, HOST_TURN_LIMITS_CAPABILITY),
         canManageServerVoiceModel: (serverId) => administers(serverId, HOST_VOICE_MODEL_CAPABILITY),
         canManageServerSignalHome: (serverId) => administers(serverId, HOST_SIGNAL_HOME_CAPABILITY),
         servesServerSignalHome: (serverId) => {

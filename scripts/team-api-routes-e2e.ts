@@ -270,6 +270,7 @@ import {
   TEAM_CURRENT_CAPABILITIES,
   TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_READ_FAILED_CAPABILITY,
+  teamCapabilitiesForProtocol,
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -315,6 +316,7 @@ import {
   HOST_SIGNAL_HOME_CAPABILITY,
   HOST_SIGNAL_HOME_ROUTES,
 } from "@openbot/contracts/team-protocol/host-signal-home-v1";
+import { HOST_TURN_LIMITS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-events-v1";
 import {
   HOST_TURN_LIMITS_CAPABILITY,
   HOST_TURN_LIMITS_ROUTES,
@@ -323,6 +325,7 @@ import {
   HOST_VOICE_MODEL_CAPABILITY,
   HOST_VOICE_MODEL_ROUTES,
 } from "@openbot/contracts/team-protocol/host-voice-model-v1";
+import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
@@ -391,6 +394,11 @@ import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_PI_CAPABILITY,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
@@ -644,6 +652,7 @@ import { emptyInstanceTransferService } from "./instance-transfer-e2e-fixture";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/team-api-routes-e2e");
 const APP_VERSION = "0.43.0";
+const PROMPT_DETAIL_E2E_TEXT = "Run:\n```sh\necho hello\n```";
 const MIB = 1024 * 1024;
 
 interface Check {
@@ -1124,6 +1133,9 @@ function accountModelsStatus(): AgentStatus {
 let hidden: HiddenAgentsSnapshot = { agents: [{ agentId: "agent-pi", hiddenAt: new Date(0).toISOString() }] };
 
 const agentEventListeners = new Set<(event: AgentEvent, memberId?: string) => void>();
+hostTurnLimits.onChange(() => {
+  for (const listener of agentEventListeners) listener({ type: "host-turn-limits-changed" });
+});
 let accessLevels: AgentAccessState = { revision: 0, everyone: {}, roles: [] };
 let largePendingPrompts = false;
 let importFreeBytes: number | null = null;
@@ -1733,6 +1745,24 @@ const fakeAgents: TeamApiAgents = {
                 status: "completed",
                 ...(anchor.messageId === "skill-question"
                   ? { itemType: "skill-suggestion:create", skillSuggestion: { name: "Weekly report" } }
+                  : {}),
+                ...(anchor.messageId === "detail-question"
+                  ? {
+                      questionPrompt: {
+                        requestId: "request-detail",
+                        questions: [
+                          {
+                            id: "install",
+                            header: "Install",
+                            question: "Did the install work?",
+                            detail: PROMPT_DETAIL_E2E_TEXT,
+                            isSecret: false,
+                            options: null,
+                          },
+                        ],
+                        resolution: null,
+                      },
+                    }
                   : {}),
               },
             ]
@@ -4216,11 +4246,66 @@ try {
         !existsSync(hostTurnLimitsPath),
       outOfRange.map(summary),
     );
+    const openTurnLimitsSocket = async (capabilities: string[]) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+        TEAM_PROTOCOL_V1_WEBSOCKET,
+        `openbot-token.${bobToken}`,
+      ]);
+      const state = { declared: false, changed: 0, marked: false };
+      const waiters = new Set<() => void>();
+      socket.addEventListener("message", (message) => {
+        const value = JSON.parse(String(message.data));
+        if (isDynamicRecord(value) && value.type === "chat-colors-changed") state.declared = true;
+        if (isDynamicRecord(value) && value.type === "host-turn-limits-changed") state.changed++;
+        if (isDynamicRecord(value) && value.type === "library-folders-changed") state.marked = true;
+        for (const wake of waiters) wake();
+      });
+      await new Promise<void>((resolveOpen, reject) => {
+        socket.addEventListener("open", () => resolveOpen(), { once: true });
+        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+      });
+      const until = (ready: () => boolean) =>
+        new Promise<boolean>((resolveReady) => {
+          if (ready()) return resolveReady(true);
+          const timer = setTimeout(() => {
+            waiters.delete(wake);
+            resolveReady(false);
+          }, 5_000);
+          const wake = () => {
+            if (!ready()) return;
+            clearTimeout(timer);
+            waiters.delete(wake);
+            resolveReady(true);
+          };
+          waiters.add(wake);
+        });
+      socket.send(
+        JSON.stringify({
+          type: "agent-event-scope",
+          includeConversations: false,
+          capabilities: [CHAT_COLORS_CAPABILITY, LIBRARY_FOLDERS_EVENTS_CAPABILITY, ...capabilities],
+        }),
+      );
+      const ready = await until(() => state.declared);
+      return { socket, state, ready, until };
+    };
+    const listening = await openTurnLimitsSocket([HOST_TURN_LIMITS_EVENTS_CAPABILITY]);
+    const older = await openTurnLimitsSocket([]);
     const adminSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
       token: adaToken,
       json: { turnLimit: 32, agentTaskLimit: 8 },
       ...v9,
     });
+    const heard = await listening.until(() => listening.state.changed === 1);
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+    const olderMarked = await older.until(() => older.state.marked);
+    listening.socket.close();
+    older.socket.close();
+    check(
+      "a change of the limits reaches a member socket that has the events capability, and not an older socket",
+      listening.ready && older.ready && heard && olderMarked && older.state.changed === 0,
+      JSON.stringify({ listening: listening.state, older: older.state }),
+    );
     const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
     await runCauseEffect(reloaded.load());
     const chosen = { turnLimit: 32, automaticTurnLimit: 8, agentTaskLimit: 8, defaultAgentTaskLimit: 4 };
@@ -7162,6 +7247,88 @@ try {
           [{ agentId: "agent-ada", messageId: "suggestion-2" }],
         ]),
       [summary(saved), summary(notSaved)],
+    );
+  }
+
+  {
+    const capabilities = [TEAM_PROMPT_DETAIL_CAPABILITY];
+    check(
+      "prompt-detail-v1 is a protocol 10 capability only",
+      !teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).includes(TEAM_PROMPT_DETAIL_CAPABILITY) &&
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).includes(TEAM_PROMPT_DETAIL_CAPABILITY),
+    );
+    const detailPagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=detail-question`;
+    const withDetail = await call("GET", detailPagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities,
+    });
+    const withoutDetail = await call("GET", detailPagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [],
+    });
+    const pageQuestion = (body: Json | undefined) =>
+      list(field(list(field(body, "messages"))[0], "questionPrompt", "questions"))[0];
+    check(
+      "a conversation page carries the detail of an agent question only with prompt-detail-v1",
+      withDetail.status === 200 &&
+        field(pageQuestion(withDetail.body), "detail") === PROMPT_DETAIL_E2E_TEXT &&
+        field(pageQuestion(withDetail.body), "question") === "Did the install work?" &&
+        withoutDetail.status === 200 &&
+        field(pageQuestion(withoutDetail.body), "question") === "Did the install work?" &&
+        field(pageQuestion(withoutDetail.body), "detail") === undefined,
+      [summary(withDetail), summary(withoutDetail)],
+    );
+    const decoded = teamHttpCodec(TEAM_PROTOCOL_V10).decodeResponse("GET", detailPagePath, 200, withDetail.body);
+    const frozenDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    addPromptQuestionDetails(decoded, withDetail.body);
+    const restoredDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    check(
+      "a client copies the question detail back after the frozen codec decodes the page",
+      frozenDetail === undefined && restoredDetail === PROMPT_DETAIL_E2E_TEXT,
+      { frozenDetail: frozenDetail ?? null, restoredDetail: restoredDetail ?? null },
+    );
+
+    const promptEvent = {
+      type: "prompt" as const,
+      requestId: 7,
+      agentId: "agent-ada",
+      threadId: "thread-agent-ada",
+      turnId: "turn-1",
+      questions: [
+        {
+          id: "install",
+          header: "Install",
+          question: "Did the install work?",
+          detail: PROMPT_DETAIL_E2E_TEXT,
+          isSecret: false,
+          options: [
+            { label: "Done", description: "It worked." },
+            { label: "Need help", description: "It failed." },
+          ],
+        },
+      ],
+    };
+    const plainEvent = encodeTeamProtocolV8BaseCurrentEvent(promptEvent, {}) ?? "";
+    const detailEvent = JSON.parse(withPromptQuestionDetails(plainEvent, promptEvent));
+    const readEvent = decodeTeamProtocolV8BaseCurrentEvent(detailEvent);
+    const frozenEventDetail =
+      readEvent.kind === "known" && readEvent.event.type === "prompt" ? readEvent.event.questions[0]?.detail : null;
+    if (readEvent.kind === "known") addPromptQuestionDetails(readEvent.event, detailEvent);
+    const restoredEvent = readEvent.kind === "known" && readEvent.event.type === "prompt" ? readEvent.event : null;
+    const otherAgentEvent = JSON.parse(
+      withPromptQuestionDetails(plainEvent, { ...promptEvent, agentId: "agent-pi", type: "prompt" }),
+    );
+    check(
+      "a prompt event carries the question detail with prompt-detail-v1, and only for the same prompt",
+      !plainEvent.includes("echo hello") &&
+        frozenEventDetail === undefined &&
+        restoredEvent?.questions[0]?.detail === PROMPT_DETAIL_E2E_TEXT &&
+        restoredEvent?.questions[0]?.question === "Did the install work?" &&
+        restoredEvent?.questions[0]?.options?.length === 2 &&
+        !JSON.stringify(otherAgentEvent).includes("echo hello"),
+      { plainEvent, restored: restoredEvent?.questions[0] ?? null },
     );
   }
 

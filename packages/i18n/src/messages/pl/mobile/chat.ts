@@ -249,6 +249,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Załącznik jest uszkodzony. Wybierz go ponownie.",
   "mobile.chat.attachment.tooLarge": "{name} ma ponad {limit}.",
   "mobile.chat.attachment.cameraPermission": "Zezwól na dostęp do aparatu w Ustawieniach, aby zrobić zdjęcie.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Zdjęcie się nie wczytało. Otwórz je w aplikacji Zdjęcia, aż wyświetli się w całości, i spróbuj ponownie.",
   "mobile.chat.composer.send": "Wyślij wiadomość",
   "mobile.chat.composer.stop": "Zatrzymaj: {name}",
   "mobile.chat.composer.dictate": "Dyktuj wiadomość",
@@ -375,6 +377,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Szybkość odtwarzania: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Nie można odczytać wiadomości na głos",
+  "mobile.chat.message.readAloudModelMissing": "Aby słuchać wiadomości, pobierz model głosu w Ustawienia > Głos.",
   "mobile.chat.message.selectText": "Zaznacz tekst",
   "mobile.chat.message.copyImage": "Kopiuj obraz",
   "mobile.chat.message.copyText": "Kopiuj tekst",

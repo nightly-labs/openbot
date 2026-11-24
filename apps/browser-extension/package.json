@@ -14,6 +14,7 @@
     "@openbot/brand": "workspace:*",
     "@openbot/contracts": "workspace:*",
     "@openbot/i18n": "workspace:*",
+    "@openbot/telemetry": "workspace:*",
     "@openbot/team-client": "workspace:*",
     "@openbot/ui": "workspace:*",
     "@solidjs/signals": "catalog:",
