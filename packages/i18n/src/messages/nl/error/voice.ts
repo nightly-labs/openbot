@@ -46,4 +46,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI weigerde live spraak te starten. Probeer het later opnieuw, of zet live spraak uit in Instellingen om met je stem te praten.",
   "error.voice.live.off": "Codex live spraak staat uit. Zet het aan in Instellingen → Spraak.",
+  "error.voice.server.modelUnsupported":
+    "{host} kan niet transcriberen met {model}. Kies in Instellingen een ander dicteermodel voor de spraakserver.",
 } as const satisfies PartialTranslation<typeof source>;
