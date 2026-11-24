@@ -40,7 +40,7 @@ import {
 } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { matchesShortcut } from "../../keyboard-shortcut-preference";
-import { holdNativeBrowserPage } from "../../native-browser-page";
+import { holdNativeBrowserPage, reserveNativeBrowserPageInset } from "../../native-browser-page";
 import { createScopeGuard } from "../../scope-lifetime";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
@@ -2212,7 +2212,12 @@ export function createConversationViewScope(props: ConversationProps) {
     !props.globalOverlayOpen &&
     !props.remoteDesktopVisible;
   createEffect(
-    () => props.browserEnabled !== false && browserPageVisible() && !props.runtime && props.server?.kind === "local",
+    () =>
+      props.browserEnabled !== false &&
+      browserExpandedOpen() &&
+      browserPageVisible() &&
+      !props.runtime &&
+      props.server?.kind === "local",
     (shown) => (shown ? holdNativeBrowserPage() : undefined),
   );
   createEffect(
@@ -2221,8 +2226,9 @@ export function createConversationViewScope(props: ConversationProps) {
       browserEnabled: props.browserEnabled !== false,
       surface: shownBrowserSurface(),
       visible: browserPageVisible(),
+      sidePanelPage: !browserExpandedOpen() && !props.runtime && props.server?.kind === "local",
     }),
-    ({ agentId, browserEnabled, visible, surface }) => {
+    ({ agentId, browserEnabled, visible, surface, sidePanelPage }) => {
       const generation = ++browserVisibilityGeneration;
       if (browserVisibilityFrame !== undefined) cancelAnimationFrame(browserVisibilityFrame);
       browserResizeObserver?.disconnect();
@@ -2236,6 +2242,7 @@ export function createConversationViewScope(props: ConversationProps) {
         void conversationRuntime(props).browser.setVisible({ visible: false, target: "main" });
         return;
       }
+      const pageInset = sidePanelPage ? reserveNativeBrowserPageInset() : undefined;
       browserVisibilityFrame = requestAnimationFrame(() => {
         browserVisibilityFrame = undefined;
         if (
@@ -2256,6 +2263,7 @@ export function createConversationViewScope(props: ConversationProps) {
             return;
           }
           const bounds = surface.getBoundingClientRect();
+          pageInset?.update(Math.max(0, window.innerWidth - bounds.x));
           void conversationRuntime(props).browser.setVisible({
             visible: true,
             target: "main",
@@ -2289,6 +2297,7 @@ export function createConversationViewScope(props: ConversationProps) {
           { signal },
         );
       });
+      return () => pageInset?.release();
     },
   );
 

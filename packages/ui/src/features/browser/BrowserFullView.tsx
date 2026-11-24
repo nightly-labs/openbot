@@ -188,6 +188,8 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
     </Button>
   );
 
+  const fullViewIdentity = () => (props.pane ? {} : { id: "browser-expanded-panel" });
+
   return (
     <Tabs.Root
       as="section"
@@ -195,7 +197,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
       hidden={!props.open}
       aria-hidden={props.open ? undefined : "true"}
       inert={!props.open}
-      id={props.pane ? undefined : "browser-expanded-panel"}
+      {...fullViewIdentity()}
       class={[
         "browser-full-view",
         {
