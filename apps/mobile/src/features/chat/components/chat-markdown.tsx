@@ -491,8 +491,23 @@ function openMessageLink(url: string): void {
   });
 }
 
+const WORD_STAR: Tokens.Text = { type: "text", raw: "*", text: "*", escaped: false };
+
+function withLiteralWordStars(tokens: Token[]): Token[] {
+  return tokens.flatMap((token, index) =>
+    tokenIs(token, "em") && isWordStarEmphasis(token, tokens[index - 1]?.raw ?? "", tokens[index + 1]?.raw ?? "")
+      ? [WORD_STAR, ...token.tokens, WORD_STAR]
+      : [token],
+  );
+}
+
+function shownTokens(tokens: Token[], presentation: TextPresentation): Token[] {
+  return presentation.literalWordStars ? withLiteralWordStars(tokens) : tokens;
+}
+
 function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNode {
-  return sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }, index) => {
+  const shown = shownTokens(tokens, parentPresentation);
+  return sourceEntries(shown, (token) => token.raw).map(({ value: token, offset }) => {
     const presentation = { ...parentPresentation, animateTail: parentPresentation.animateTail };
     if (token.type === "agentMention") {
       const reference = chatTagReferences(token.raw)[0];
@@ -559,19 +574,6 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
     if (tokenIs(token, "codespan")) {
       return <CodeSpan key={offset} text={token.text} presentation={presentation} />;
     }
-    if (
-      presentation.literalWordStars &&
-      tokenIs(token, "em") &&
-      isWordStarEmphasis(token, tokens[index - 1]?.raw ?? "", tokens[index + 1]?.raw ?? "")
-    ) {
-      return (
-        <Fragment key={offset}>
-          {"*"}
-          {inline(token.tokens, presentation)}
-          {"*"}
-        </Fragment>
-      );
-    }
     if (tokenIs(token, "strong") || tokenIs(token, "em") || tokenIs(token, "del")) {
       const style: TextStyle = {
         ...presentation.style,
@@ -629,7 +631,7 @@ function ListParagraph({ tokens, presentation }: { tokens: Token[]; presentation
   let run: Token[] = [];
   let line: Token[][] = [run];
   const lines: Token[][][] = [line];
-  for (const token of tokens) {
+  for (const token of shownTokens(tokens, presentation)) {
     if (token.type === "checkbox") continue;
     if (token.type === "br") {
       run = [];
