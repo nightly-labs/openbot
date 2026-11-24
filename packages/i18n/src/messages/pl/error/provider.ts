@@ -300,6 +300,8 @@ export const messages = {
     "Model OpenCode zakończył turę bez odpowiedzi. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Model OpenCode zakończył turę po rozumowaniu, bez odpowiedzi. Spróbuj ponownie albo wybierz inny model.",
+  "error.provider.opencodeToolCallsAsText":
+    "Model OpenCode zapisał swoje działania jako tekst i ich nie wykonał. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.acpNoAnswer":
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
   "error.provider.noAnswerAfterSteps":

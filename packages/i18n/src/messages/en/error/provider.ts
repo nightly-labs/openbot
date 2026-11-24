@@ -295,6 +295,8 @@ export const messages = defineMessages("error.provider", {
     "The OpenCode model ended the turn with no answer. Try again, or choose another model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "The OpenCode model ended the turn after its reasoning, with no answer. Try again, or choose another model.",
+  "error.provider.opencodeToolCallsAsText":
+    "The OpenCode model wrote its actions as text and did not do them. Try again, or choose another model.",
   "error.provider.acpNoAnswer":
     "{provider} ended the turn with no answer. Send the message again, or start a new chat.",
   "error.provider.noAnswerAfterSteps":

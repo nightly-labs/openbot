@@ -310,6 +310,8 @@ export const messages = {
     "Il modello OpenCode ha terminato il turno senza risposta. Riprova o scegli un altro modello.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Il modello OpenCode ha terminato il turno dopo il ragionamento, senza risposta. Riprova o scegli un altro modello.",
+  "error.provider.opencodeToolCallsAsText":
+    "Il modello OpenCode ha scritto le sue azioni come testo e non le ha eseguite. Riprova o scegli un altro modello.",
   "error.provider.acpNoAnswer":
     "{provider} ha terminato il turno senza risposta. Invia di nuovo il messaggio o avvia una nuova chat.",
   "error.provider.noAnswerAfterSteps":

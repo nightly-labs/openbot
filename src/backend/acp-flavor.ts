@@ -84,6 +84,7 @@ export interface AcpFlavor {
     label: string,
   ): string | null;
   emptyAnswerError?: RegExp;
+  textToolCallFailure?(answer: string): string | null;
   restoreFailure?(
     error: unknown,
     method: "load" | "resume",

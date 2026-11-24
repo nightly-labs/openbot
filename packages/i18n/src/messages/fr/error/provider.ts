@@ -321,6 +321,8 @@ export const messages = {
     "Le modèle OpenCode a terminé le tour sans réponse. Réessayez ou choisissez un autre modèle.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Le modèle OpenCode a terminé le tour après son raisonnement, sans réponse. Réessayez ou choisissez un autre modèle.",
+  "error.provider.opencodeToolCallsAsText":
+    "Le modèle OpenCode a écrit ses actions sous forme de texte sans les exécuter. Réessayez ou choisissez un autre modèle.",
   "error.provider.acpNoAnswer":
     "{provider} a terminé le tour sans réponse. Renvoyez le message ou démarrez une nouvelle discussion.",
   "error.provider.noAnswerAfterSteps":
