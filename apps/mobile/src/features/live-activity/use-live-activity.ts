@@ -114,6 +114,7 @@ export function useLiveActivity({
   hiddenRef.current = hidden;
   const foregroundRef = useRef(foreground);
   foregroundRef.current = foreground;
+  const pushServerRef = useRef<string | null>(null);
   const staleDate = useRef<Date | undefined>(undefined);
   const lastPublish = useRef<{ mode: string | null; at: number }>({ mode: null, at: 0 });
   const [resumed, setResumed] = useState(foreground);
@@ -171,7 +172,9 @@ export function useLiveActivity({
         shown: (props, startedAt) => {
           if (disposed.current) return;
           const failure = props ? shownFailures.current.get(props) : undefined;
-          const shown = failure && startedAt !== null ? { failure, startedAt } : null;
+          const pushServer = pushServerRef.current;
+          const otherServerPushes = !foregroundRef.current && pushServer !== null && pushServer !== failure?.serverId;
+          const shown = failure && startedAt !== null && !otherServerPushes ? { failure, startedAt } : null;
           const saved = savedDismissals();
           if (JSON.stringify(shown) === JSON.stringify(saved.shown)) return;
           updateDismissals({ ...saved, shown });
@@ -561,6 +564,12 @@ export function useLiveActivity({
     supportsPush(activeServerId)
       ? activeServerId
       : null;
+  pushServerRef.current = pushServerId;
+  useEffect(() => {
+    if (!live || foreground || !pushServerId) return;
+    const saved = savedDismissals();
+    if (saved.shown && saved.shown.failure.serverId !== pushServerId) updateDismissals({ ...saved, shown: null });
+  }, [live, foreground, pushServerId, savedDismissals, updateDismissals]);
   useEffect(() => {
     useLiveActivityHost.setState({ serverId: pushServerId, startedAt: pushServerId ? activityStartedAt : null });
     return () => useLiveActivityHost.setState({ serverId: null, startedAt: null });
