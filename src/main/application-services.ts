@@ -2151,6 +2151,12 @@ export async function createApplicationServices({
     agentCursorDrawn: drawsComputerUseHighlight,
     computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
     computerUseInputRefused: () => agentsShareDisplay && cuaDriver.waylandInputRefused(),
+    computerUseMissingPermissions: () => {
+      const state = cuaDriver.lastState;
+      return state.status === "permissions-required"
+        ? state.permissions.filter((permission) => !permission.granted).map((permission) => permission.id)
+        : [];
+    },
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,

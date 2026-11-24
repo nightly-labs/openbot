@@ -68,6 +68,7 @@ import {
   isMessageReaction,
   isPasswordManagerId,
   isSettingLinkId,
+  type MacPermissionId,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
   SETTING_LINK_SCOPES,
@@ -171,6 +172,7 @@ import {
   visualReplyFileName,
   visualReplyMessageId,
 } from "./delivery-content";
+import { macPermissionNames } from "./developer-instructions";
 import type { DrainScheduler } from "./drain-scheduler";
 import type { FeedbackWithdrawal } from "./feedback-withdrawal";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
@@ -437,6 +439,7 @@ export interface OpenBotToolRouterHooks {
   deleteAgent(agentId: string): Effect.Effect<void, ToolOperationFailed>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, ToolOperationFailed>;
   enabledMcpServers(agentId?: string): McpServerConfig[];
+  computerUseMissingPermissions?(): readonly MacPermissionId[];
   emitError(code: string, error: unknown, agentId?: string): void;
   redactMcp(text: string): string;
   redactMcpForAgent(text: string): string;
@@ -1786,6 +1789,9 @@ export class OpenBotToolRouter {
     const agent = yield* toolStep(() => this.#requireAgent(agentId));
     const computerUse = agentComputerUseEnabled(agent);
     const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(agentId), computerUse);
+    const computerUseReady = mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID);
+    const computerUseMissing =
+      computerUse && !computerUseReady ? macPermissionNames(this.#hooks.computerUseMissingPermissions?.() ?? []) : [];
     let skills: unknown[] | undefined;
     let skillsError: string | undefined;
     const loaded = yield* Effect.result(
@@ -1830,9 +1836,8 @@ export class OpenBotToolRouter {
       permissions,
       permissionLevels: agentPermissionLevels(agent.provider, permissions),
       computerUse,
-      ...(computerUse
-        ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
-        : {}),
+      ...(computerUse ? { computerUseReady } : {}),
+      ...(computerUseMissing.length > 0 ? { computerUseMissingPermissions: computerUseMissing } : {}),
       notifications: agent.notifications,
       ...this.#agentBrowserProfile(agent),
       ...(skills ? { skills } : { skillsError }),

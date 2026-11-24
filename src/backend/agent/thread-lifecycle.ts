@@ -13,6 +13,7 @@ import {
   COMPUTER_USE_MCP_SERVER_ID,
   DEFAULT_RESPONSE_STYLE,
   GITHUB_CONNECTOR_MCP_SERVER_ID,
+  type MacPermissionId,
   type McpServerConfig,
   type ResponseStyle,
   workspaceAccessEnforced,
@@ -163,6 +164,7 @@ export interface ThreadLifecycleOptions {
   agentCursorDrawn?: boolean;
   computerUseOnWayland?: boolean;
   computerUseInputRefused?: () => boolean;
+  computerUseMissingPermissions?: () => readonly MacPermissionId[];
   responseStyle?: () => ResponseStyle;
   memoryReview?: () => boolean;
   skillRevision?: () => boolean;
@@ -197,6 +199,7 @@ export class ThreadLifecycle {
   readonly #agentCursorDrawn: boolean;
   readonly #computerUseOnWayland: boolean;
   readonly #computerUseInputRefused: () => boolean;
+  readonly #computerUseMissingPermissions: () => readonly MacPermissionId[];
   readonly #responseStyle: () => ResponseStyle;
   readonly #memoryReview: () => boolean;
   readonly #skillRevision: () => boolean;
@@ -240,6 +243,7 @@ export class ThreadLifecycle {
     this.#agentCursorDrawn = options.agentCursorDrawn ?? false;
     this.#computerUseOnWayland = options.computerUseOnWayland ?? false;
     this.#computerUseInputRefused = options.computerUseInputRefused ?? (() => false);
+    this.#computerUseMissingPermissions = options.computerUseMissingPermissions ?? (() => []);
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
     this.#memoryReview = options.memoryReview ?? (() => false);
     this.#skillRevision = options.skillRevision ?? (() => false);
@@ -1157,6 +1161,7 @@ export class ThreadLifecycle {
       computerUseInOwnChat,
       computerUseNotReady:
         agentComputerUseEnabled(agent) && !mcpServers.some((config) => config.id === COMPUTER_USE_MCP_SERVER_ID),
+      computerUseMissingPermissions: this.#computerUseMissingPermissions(),
       sideThread,
       passwordVault: this.#passwordVaultConnected(),
       vaultItems: this.#vaultItems(agent.id),
