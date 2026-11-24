@@ -4,7 +4,7 @@ import { cachedStatement } from "./statement-cache";
 
 const ROLE_RANK_SQL = `CASE
       WHEN author = 'user' THEN 0
-      WHEN author = 'assistant' THEN CASE WHEN item_type IN ('commentary', 'plan', 'question_prompt') THEN 1 ELSE 3 END
+      WHEN author = 'assistant' THEN CASE WHEN item_type IN ('commentary', 'plan') THEN 1 ELSE 3 END
       WHEN json_extract(message_json, '$.exchange.direction') = 'incoming' THEN 0
       ELSE 2
     END`;

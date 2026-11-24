@@ -78,11 +78,9 @@ function messageTime(message: ConversationMessage): number {
   return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
 }
 
-const TURN_STEP_ITEM_TYPES = new Set(["commentary", "plan", "question_prompt"]);
-
 function turnMessageRank(message: ConversationMessage): 0 | 1 | 2 | 3 {
   if (message.exchange?.direction === "incoming" || message.author === "user") return 0;
-  if (message.author === "assistant" && TURN_STEP_ITEM_TYPES.has(message.itemType ?? "")) return 1;
+  if (message.author === "assistant" && (message.itemType === "commentary" || message.itemType === "plan")) return 1;
   if (message.exchange?.direction === "outgoing") return 2;
   if (message.author === "assistant") return 3;
   return 2;
