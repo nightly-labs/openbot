@@ -677,7 +677,7 @@ try {
     const openedTargets: (OutsideTarget | null)[] = [];
     const chatOpened: boolean[] = [];
     const link = `openbot://live-activity?${new URLSearchParams({ server: SERVER, agent: AGENT, thread: SIDE_THREAD })}`;
-    assert.equal(liveActivityRoute(link, true), `/chat/${AGENT}`);
+    assert.equal(liveActivityRoute(link, true), `/chat/${AGENT}?serverId=${SERVER}`);
     const stop = setLiveActivityNavigator((opened, routeOpenedChat) => {
       openedTargets.push(opened);
       chatOpened.push(routeOpenedChat === true);
@@ -688,7 +688,7 @@ try {
     assert.deepEqual(openedTargets, [target(SIDE_THREAD), target(SIDE_THREAD)]);
     assert.deepEqual(chatOpened, [true, false]);
     const plain = `openbot://live-activity?${new URLSearchParams({ server: SERVER, agent: AGENT })}`;
-    assert.equal(liveActivityRoute(plain, true), `/chat/${AGENT}`);
+    assert.equal(liveActivityRoute(plain, true), `/chat/${AGENT}?serverId=${SERVER}`);
     assert.equal(liveActivityRoute(plain, false), null);
     assert.deepEqual(openedTargets.at(-1), target(null));
     assert.equal(openedTargets.length, 3, "A link without a thread opened a thread when the app started.");
