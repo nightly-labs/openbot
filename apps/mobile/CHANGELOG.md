@@ -34,7 +34,6 @@ the [root changelog](../../CHANGELOG.md).
 - Pinned agents and channels show only their names, without their titles.
 - In a chat with an agent, a new progress update now fades in, as other new messages do. Before, its
   full text appeared at once. With Reduce Motion or the text reveal setting off, it still shows at once.
-- The desktop app and the web client now call the list of agent threads "Threads", as the phone app does. Before, the same list was called "Tasks" on a computer and "Threads" on the phone. The phone app does not change.
 - Pinning and unpinning a chat with a swipe or the menu now moves at once. The pinned chat pops into the pinned grid, and the row slides out of the list. An unpinned chat slides back into the list. Before, the avatar stopped for a short time and then moved across the screen, and the list could jerk.
 - In Server settings, the server picture has an edit button. It opens a new page where you add,
   change or remove the server logo, and select the shape and color. Server settings no longer show
