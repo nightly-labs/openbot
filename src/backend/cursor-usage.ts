@@ -100,12 +100,12 @@ function windowsPowerShell(env: NodeJS.ProcessEnv = process.env): string {
   return win32.join(env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 }
 
-function unprotectDpapiBlob(blob: string): Promise<string> {
+function unprotectDpapiBlob(blob: string, signal: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       windowsPowerShell(),
       ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", DPAPI_UNPROTECT_SCRIPT],
-      { timeout: CURSOR_USAGE_TIMEOUT_MS, windowsHide: true },
+      { timeout: CURSOR_USAGE_TIMEOUT_MS, windowsHide: true, signal },
       (error, stdout) => (error ? reject(error) : resolve(Buffer.from(stdout.trim(), "base64").toString("utf8"))),
     );
     child.stdin?.on("error", reject);
@@ -121,7 +121,7 @@ const readDpapiSecret = Effect.fn("Cursor.readDpapiSecret")(function* (dpapiFile
   const file = Option.isSome(text) ? decodeDpapiFile(text.value) : Option.none();
   if (Option.isNone(file)) return undefined;
   const secret = yield* Effect.tryPromise({
-    try: () => unprotectDpapiBlob(file.value.dpapi),
+    try: (signal) => unprotectDpapiBlob(file.value.dpapi, signal),
     catch: (cause) => new CursorUsageFailed({ cause }),
   }).pipe(Effect.option);
   return Option.getOrUndefined(secret);
