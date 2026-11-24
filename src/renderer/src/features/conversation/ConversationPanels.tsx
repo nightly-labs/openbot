@@ -1003,6 +1003,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           {sidePanelResizer("side-panel-launcher")}
           <SidePanelLauncher
             available={mainPanes()}
+            badges={sidePanelBadges()}
             settingsLabel={channel ? t("channel.settings.title") : undefined}
             onOpen={openSidePanelPane}
           />

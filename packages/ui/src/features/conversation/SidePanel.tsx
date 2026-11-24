@@ -1266,6 +1266,7 @@ function SidePanelTabRow(
 
 export function SidePanelLauncher(props: {
   available: readonly SidePanelPane[];
+  badges?: Partial<Record<SidePanelPane, SidePanelPaneBadge>> | undefined;
   settingsLabel?: string | undefined;
   onOpen: (pane: SidePanelPane) => void;
 }) {
@@ -1282,6 +1283,7 @@ export function SidePanelLauncher(props: {
           <Button variant="secondary" class="side-panel-launch" onClick={() => props.onOpen(pane)}>
             <PaneIcon pane={pane} />
             {t("conversation.sidePanel.openPane", { name: paneLabel(t, pane, props.settingsLabel) })}
+            <PaneBadge badge={props.badges?.[pane]} />
           </Button>
         )}
       </For>

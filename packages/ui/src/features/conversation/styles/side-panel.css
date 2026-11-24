@@ -273,7 +273,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.side-panel-menu-item .side-panel-tab-count.z-badge {
+:is(.side-panel-launch, .side-panel-menu-item) .side-panel-tab-count.z-badge {
   margin-inline-start: auto;
 }
 
