@@ -10,7 +10,10 @@
   "prompts": [
     { "id": "prompt-computers", "text": "List my TermSquad computers and their workspaces." },
     { "id": "prompt-agent-status", "text": "Check the status of my coding agents and summarize their latest output." },
-    { "id": "prompt-code-review", "text": "Start a coding agent to review the latest changes in my selected workspace." }
+    {
+      "id": "prompt-code-review",
+      "text": "Start a coding agent to review the latest changes in my selected workspace."
+    }
   ],
   "apps": [
     {

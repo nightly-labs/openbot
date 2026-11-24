@@ -7790,6 +7790,39 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
     ],
   },
   {
+    slug: "termsquad",
+    name: "TermSquad",
+    tagline: "Always-on computers for AI agents",
+    description:
+      "TermSquad lets agents start and prompt remote coding agents, read their output, run squads, and manage scheduled tasks on always-on computers. Each user signs in through the browser and chooses which computers, workspaces, and permissions to grant.",
+    category: "coding",
+    creatorName: "TermSquad",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-computers", text: "List my TermSquad computers and their workspaces." },
+      { id: "prompt-agent-status", text: "Check the status of my coding agents and summarize their latest output." },
+      { id: "prompt-code-review", text: "Start a coding agent to review the latest changes in my selected workspace." },
+    ],
+    websiteUrl: "https://termsquad.com",
+    privacyPolicyUrl: "https://termsquad.com/privacy",
+    termsUrl: "https://termsquad.com/terms",
+    featured: false,
+    apps: [
+      {
+        id: "app-termsquad-mcp",
+        name: "TermSquad",
+        description:
+          "Remote agent sessions, squads, scheduled tasks, and workspace access, over TermSquad's MCP server with browser sign-in.",
+        server: {
+          name: "termsquad",
+          transport: "http",
+          url: "https://mcp.termsquad.com/mcp",
+          auth: [{ id: "termsquad-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+  },
+  {
     slug: "tessie",
     name: "Tessie",
     tagline: "Tesla vehicle data",
