@@ -14,6 +14,7 @@ export function SettingsIdentityHeader({
   pictureLabel,
   pictureIcon: PictureIcon = Camera,
   onPicturePress,
+  pictureDisabled,
   name,
   nameLabel,
   namePlaceholder,
@@ -27,6 +28,7 @@ export function SettingsIdentityHeader({
   pictureLabel?: string;
   pictureIcon?: LucideIcon;
   onPicturePress?: () => void;
+  pictureDisabled?: boolean;
   name: string;
   nameLabel: string;
   namePlaceholder?: string;
@@ -47,8 +49,8 @@ export function SettingsIdentityHeader({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={pictureLabel}
-          accessibilityState={{ disabled }}
-          disabled={disabled}
+          accessibilityState={{ disabled: pictureDisabled ?? disabled }}
+          disabled={pictureDisabled ?? disabled}
           onPress={onPicturePress}
         >
           {picture}

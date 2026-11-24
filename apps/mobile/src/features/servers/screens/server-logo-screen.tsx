@@ -20,6 +20,7 @@ import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { haptics } from "@/shared/lib/haptics";
 import { type AvatarPhoto, pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
+import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
 const PREVIEW_SIZE = 120;
 
@@ -45,6 +46,8 @@ function ServerLogoEditor({ server }: { server: MobileServer }) {
   const [preview, setPreview] = useState<AvatarPhoto | null | undefined>();
   const hasLogo = server.logoKey !== null;
 
+  useDiscardGuard(busy, { busy: () => busy, warn: true });
+
   async function saveLogo(logo: AvatarPhoto | null): Promise<void> {
     setPreview(logo);
     try {
@@ -62,9 +65,12 @@ function ServerLogoEditor({ server }: { server: MobileServer }) {
     void haptics.impact("soft");
     let picked = false;
     void perform(
-      async () => {
+      async (cancel) => {
         const photo = await pickAvatarPhoto({ pathname: "/server-settings/crop-logo" }, SERVER_AVATAR_CORNER_RATIO);
-        if (!photo) return;
+        if (!photo) {
+          cancel();
+          return;
+        }
         picked = true;
         await saveLogo(photo);
       },

@@ -213,8 +213,9 @@ function ServerHeader({ server }: { server: MobileServer }) {
 
 function ServerIdentityForm({ server }: { server: MobileServer }) {
   const { t, errorMessage } = useText();
-  const { canEditServerIdentity, updateServerIdentity } = useMobileWorkspace();
+  const { canEditServerIdentity, canEditServerAppearance, updateServerIdentity } = useMobileWorkspace();
   const available = canEditServerIdentity(server.id);
+  const canEditPicture = available || canEditServerAppearance(server.id);
   const [draftName, setDraftName] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
@@ -266,7 +267,8 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
         }
         pictureLabel={t("mobile.server.settings.editLogo")}
         pictureIcon={Palette}
-        onPicturePress={available ? editPicture : undefined}
+        onPicturePress={canEditPicture ? editPicture : undefined}
+        pictureDisabled={saving}
         name={name}
         nameLabel={t("mobile.server.settings.name")}
         nameMaxLength={INPUT_LIMITS.serverName}
