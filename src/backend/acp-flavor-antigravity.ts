@@ -5,7 +5,12 @@ import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { GEMINI_INVALID_ARGUMENT, GEMINI_INVALID_CREDENTIALS, GOOGLE_RESET_FIELDS } from "./agent/provider-diagnostics";
+import {
+  GEMINI_INVALID_ARGUMENT,
+  GEMINI_INVALID_CREDENTIALS,
+  GEMINI_UNREADABLE_HISTORY,
+  GOOGLE_RESET_FIELDS,
+} from "./agent/provider-diagnostics";
 import { getRecord, getString, isRecord } from "./protocol";
 
 const GEMINI_QUOTA_CHUNK = /^\s*(?:\u26A0 )?Usage Limit Reached\n\n([\s\S]*)$/u;
@@ -128,6 +133,8 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
       logged && key !== "error.provider.antigravityNetwork" ? (GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text) : text;
     return { message: geminiRequestFailureText(key, shown, text), key };
   }
+  if (logged && GEMINI_UNREADABLE_HISTORY.test(text))
+    return { message: GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text, key: null };
   if (logged || GEMINI_TERMINATED_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityTurnStopped"), key: null };
   return { message: shownFailureDetail(text), key };
