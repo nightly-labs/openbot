@@ -101,6 +101,7 @@ export interface DrainHooks {
   redactMcp(text: string): string;
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
+  fromChrome(deliveryId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
   mayContinueOnBackup(agentId: string): boolean;
   mayFailOver(agentId: string): boolean;
@@ -417,6 +418,7 @@ export class DrainScheduler {
     const key = laneKey(lane);
     if (this.#reportedHolds.get(key) === reason || !this.#mailbox.nextQueued(lane.agentId, lane.taskId)) return;
     this.#reportedHolds.set(key, reason);
+    if (reason === "endpoint-reload") this.#mailboxSync.emitQueue(lane.agentId);
     const working =
       reason === "active-turn" && lane.taskId === null ? this.#conversation.workingSnapshot(lane.agentId) : undefined;
     const channelId = laneChannelId(lane.taskId);
@@ -469,11 +471,25 @@ export class DrainScheduler {
     return this.#heldBy(lane) ?? this.#providerHold(agentId) ?? (heldByMachine ? "machine" : null);
   }
 
-  #providerHold(agentId: string): "providers-not-ready" | "provider-cli-replaced" | null {
+  #providerHold(agentId: string): "providers-not-ready" | "provider-cli-replaced" | "endpoint-reload" | null {
     if (!this.#providers.isReady()) return "providers-not-ready";
     if (this.#deliveryProviders(agentId).some((provider) => this.#providers.isReplacingCli(provider)))
       return "provider-cli-replaced";
+    if (this.awaitsEndpointReload(agentId)) return "endpoint-reload";
     return null;
+  }
+
+  awaitsEndpointReload(agentId: string): boolean {
+    const agent = this.#store.get(agentId);
+    if (!agent) return false;
+    const provider = providerForAgent(agent);
+    if (!this.#providers.reloadPending(provider)) return false;
+    const client = this.#providers.runningAgentClient(agent);
+    return (
+      client !== null &&
+      this.#hooks.servesModel(agent.model, provider, null) &&
+      !this.#hooks.servesModel(agent.model, provider, this.#providers.configRevision(client))
+    );
   }
 
   scheduleDrain(agentId: string, followUsageLimit = true): void {
@@ -754,7 +770,7 @@ export class DrainScheduler {
           deliveryTaskId === null
             ? this.#conversation.loadedSnapshot(agentId)
             : taskThreadId
-              ? this.#conversation.loadedExecutionSnapshot(taskThreadId)
+              ? this.#conversation.executionSnapshot(taskThreadId)
               : undefined;
         if (!snapshot) continue;
         this.#mailboxSync.syncDeliveryMessage(snapshot, deliveryId);
@@ -953,6 +969,7 @@ export class DrainScheduler {
               taskReportWaiting: this.taskReportWaiting(item),
               tags,
               liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
+              fromChrome: this.#hooks.fromChrome(item.delivery.id),
               externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
               ...(executionText === undefined ? {} : { executionText }),
             });

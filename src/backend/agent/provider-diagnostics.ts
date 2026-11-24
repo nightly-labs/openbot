@@ -157,7 +157,7 @@ export function isPiCompactionNoOp(message: string): boolean {
 }
 
 const CONTEXT_TOO_SMALL =
-  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bnothing to compact \(session too small\)|\bgreater than the context length\b|\blonger than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
+  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bnothing to compact \(session too small\)|\bgreater than the context length\b|\blonger than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b|\bleaves no room for generation\b/iu;
 
 export function isContextTooSmallFailure(message: string): boolean {
   return CONTEXT_TOO_SMALL.test(message);
@@ -202,13 +202,36 @@ const RESET_DELAY = new RegExp(
 const RESET_DELAY_PART = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*(${RESET_DELAY_UNIT})`, "giu");
 const RESET_DELAY_UNIT_MS: Record<string, number> = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1_000 };
 
-export function providerResetDelayMs(message: string): number | null {
-  const named = RESET_DELAY.exec(message)?.[1];
-  if (!named) return null;
+const GOOGLE_DURATION = String.raw`((?:\d+(?:\.\d+)?[hms])+)(?![\w.])`;
+const GOOGLE_QUOTA_RESET_DELAY = new RegExp(String.raw`\bquotaResetDelay:${GOOGLE_DURATION}`, "u");
+const GOOGLE_RETRY_DELAY = new RegExp(String.raw`\bretryDelay:${GOOGLE_DURATION}`, "u");
+const GOOGLE_RESET_STAMP = /\bquotaResetTimeStamp:(\d{4}-\d\d-\d\dT[^\s\]]+)/u;
+
+export const GOOGLE_RESET_FIELDS = new RegExp(
+  `${GOOGLE_QUOTA_RESET_DELAY.source}|${GOOGLE_RETRY_DELAY.source}|${GOOGLE_RESET_STAMP.source}`,
+  "gu",
+);
+
+function durationMs(text: string): number {
   let delay = 0;
-  for (const [, amount, unit] of named.matchAll(RESET_DELAY_PART)) {
+  for (const [, amount, unit] of text.matchAll(RESET_DELAY_PART)) {
     delay += Number(amount) * (RESET_DELAY_UNIT_MS[unit?.[0]?.toLowerCase() ?? ""] ?? 0);
   }
+  return delay;
+}
+
+function googleResetDelayMs(message: string): number {
+  const quota = GOOGLE_QUOTA_RESET_DELAY.exec(message)?.[1];
+  if (quota) return durationMs(quota);
+  const stamp = Date.parse(GOOGLE_RESET_STAMP.exec(message)?.[1] ?? "");
+  if (Number.isFinite(stamp)) return stamp - Date.now();
+  const retry = GOOGLE_RETRY_DELAY.exec(message)?.[1];
+  return retry ? durationMs(retry) : 0;
+}
+
+export function providerResetDelayMs(message: string): number | null {
+  const named = RESET_DELAY.exec(message)?.[1];
+  const delay = named ? durationMs(named) : googleResetDelayMs(message);
   return delay > 0 ? delay : null;
 }
 

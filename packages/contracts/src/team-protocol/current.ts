@@ -46,6 +46,7 @@ import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "./agent-waits-v1";
 import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
+import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "./antigravity-code-sign-in-v1";
 import { ATTACHMENT_PREVIEW_CAPABILITY } from "./attachment-preview-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
@@ -84,6 +85,7 @@ import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "./claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "./claude-user-setup-v1";
+import { CLIENT_BROWSER_CAPABILITY } from "./client-browser-v1";
 import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
@@ -246,10 +248,12 @@ import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
+import { VOICE_TRANSCRIPTION_CAPABILITY } from "./voice-transcription-v1";
 import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "./whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_CAPABILITY } from "./workflow-folders-v1";
@@ -257,6 +261,7 @@ import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "./workflows-agent-files-v1";
 import { WORKFLOWS_ANSWERS_CAPABILITY } from "./workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
+import { WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY } from "./workflows-credit-media-unavailable-v1";
 import { WORKFLOWS_CREDIT_MEDIA_CAPABILITY } from "./workflows-credit-media-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
@@ -501,6 +506,7 @@ export {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
@@ -827,6 +833,11 @@ const TEAM_CAPABILITY_REGISTRY = [
   [MODEL_VISIBILITY_KEPT_CAPABILITY, V10],
   [TEAM_UI_BLOCK_LOCATION_CAPABILITY, V10],
   [HOST_SIGNAL_HOME_CAPABILITY, V10],
+  [WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY, V10],
+  [ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY, V10],
+  [WHATSAPP_READ_ONLY_CAPABILITY, V10],
+  [VOICE_TRANSCRIPTION_CAPABILITY, V10],
+  [CLIENT_BROWSER_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

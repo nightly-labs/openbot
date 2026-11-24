@@ -208,6 +208,7 @@ import { BootRecovery } from "./agent/boot-recovery";
 import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
+import type { ClientBrowser } from "./agent/client-browser-tools";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
 import type { SetCommitCoAuthor } from "./agent/commit-co-author-tool";
 import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
@@ -296,7 +297,7 @@ import {
   providerLabel,
   type ToolUsageSignal,
 } from "./agent/thread-items";
-import { ThreadLifecycle } from "./agent/thread-lifecycle";
+import { type RuntimeRefreshTiming, ThreadLifecycle } from "./agent/thread-lifecycle";
 import { ToolOperationFailed, toToolOperationFailed } from "./agent/tool-operation";
 import { TurnContext } from "./agent/turn-context";
 import { type AgentBrowserHost, FAILOVER_CAUSES, isStreamingDelta, TurnLifecycle } from "./agent/turn-lifecycle";
@@ -444,6 +445,7 @@ export interface AgentServiceOptions {
   feedback?: AgentFeedback | null;
   serverClaims?: AgentServerClaims | null;
   browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
+  clientBrowser?: ClientBrowser | null;
   crm?: (() => CrmHandle | null) | undefined;
   crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   personCanAdminister?: ((personId: string) => boolean) | undefined;
@@ -497,6 +499,7 @@ export interface AgentServiceOptions {
 
 const USER_SEND_RETRY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const LIVE_VOICE_RELAYED_LIMIT = 50;
+const FROM_CHROME_LIMIT = 200;
 
 function userSendKey(sender: ConversationMessageSender | undefined, agentId: string, clientMessageId: string): string {
   return `user-send:${createHash("sha256")
@@ -583,6 +586,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #sessionSettings: SessionSettings;
   readonly #liveVoice: LiveVoice;
   readonly #liveVoiceRelayed = new Map<string, LiveVoiceRelayed>();
+  readonly #fromChrome = new Set<string>();
   readonly #queue: QueueControls;
   readonly #attachments: AttachmentGateway;
   readonly #browserUploads: BrowserUploads;
@@ -659,7 +663,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       logger,
       hooks: {
         emitError: (code, error) => this.#emitError(code, error),
-        refreshAllAgentRuntimes: () => this.#threads.refreshAllAgentRuntimes(),
+        refreshAllAgentRuntimes: (timing) => this.#threads.refreshAllAgentRuntimes(timing),
       },
     });
     this.#mediaCatalog = new WorkflowMediaCatalogCache({
@@ -1141,6 +1145,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mcpHandoff: this.#mcp.handoffLog(),
       redactMcp: (text) => this.#mcp.redact(text),
       reportMcpSignIn: (provider, server, signInText) => this.#mcp.reportSignInFailure(provider, server, signInText),
+      recordMcpStartFailure: (config) => this.#mcp.recordFailedStart(config),
     });
     this.#endpoints = new CustomEndpoints({
       store,
@@ -1769,6 +1774,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         redactMcp: (text) => this.#mcp.redact(text),
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
         liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
+        fromChrome: (deliveryId) => this.#fromChrome.has(deliveryId),
         isStopping: () => this.#stopping,
         isDeleting: (agentId) => this.#removal.deleting().has(agentId),
         servesModel: (model, provider, configRevision) => this.#endpoints.servesClient(model, provider, configRevision),
@@ -1887,6 +1893,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         tagReferences: (agentId, threadId) => this.#tagReferences(agentId, threadId),
         liveVoiceRelayed: (deliveryId) => this.#liveVoiceRelayed.get(deliveryId) ?? null,
+        fromChrome: (deliveryId) => this.#fromChrome.has(deliveryId),
       },
     });
     this.#turn = new TurnLifecycle({
@@ -2090,6 +2097,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       feedbackWithdrawal: this.#feedbackWithdrawal,
       serverClaims: options.serverClaims ?? null,
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
+      ...(options.clientBrowser === undefined ? {} : { clientBrowser: options.clientBrowser }),
+      fromChrome: (deliveryId) => this.#fromChrome.has(deliveryId),
       ...(options.crm === undefined ? {} : { crm: options.crm }),
       ...(options.crmAgentVisibleToMembers === undefined
         ? {}
@@ -2655,8 +2664,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  refreshAllAgentRuntimes(): Effect.Effect<void, AgentLifecycleFailed> {
-    return this.#threads.refreshAllAgentRuntimes();
+  refreshAllAgentRuntimes(timing: RuntimeRefreshTiming): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#threads.refreshAllAgentRuntimes(timing);
   }
 
   testMcpServer(
@@ -2744,7 +2753,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   notifyComputerUseChanged(): Effect.Effect<void, AgentLifecycleFailed> {
-    return this.#mcp.changed().pipe(
+    return this.#mcp.changed("now").pipe(
       Effect.asVoid,
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "refresh computer use", cause: failure.cause }),
@@ -2760,7 +2769,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this: AgentService,
   ) {
     yield* this.#mcp
-      .changed()
+      .changed("now")
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "refresh GitHub tools", cause: failure.cause }),
@@ -3075,14 +3084,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const credit =
       this.#creditMedia && (only === undefined || only === "openbot")
         ? this.#creditMedia.catalog()
-        : Effect.succeed([]);
+        : Effect.succeed({ models: [], unavailable: [] } satisfies WorkflowMediaCatalog);
     const services =
       only === "openbot"
         ? Effect.succeed({ models: [] } satisfies WorkflowMediaCatalog)
         : this.#mediaCatalog.catalog(only);
     const [listed, credits] = yield* Effect.all([services, credit], { concurrency: "unbounded" });
     return {
-      models: [...credits, ...listed.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
+      models: [...credits.models, ...listed.models].slice(0, WORKFLOW_MEDIA_CATALOG_MAX),
+      ...(credits.unavailable.length > 0
+        ? { unavailable: credits.unavailable.slice(0, WORKFLOW_MEDIA_CATALOG_MAX) }
+        : {}),
     } satisfies WorkflowMediaCatalog;
   }).bind(this);
 
@@ -3543,15 +3555,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  #startingModels(): AgentModelOption[] {
+    return this.#endpoints.available().filter((model) => this.#hiddenModels?.(model.provider)?.has(model.id) !== true);
+  }
+
   #startingChoice(): ModelChoice | null {
-    return startingChoice(this.#endpoints.available(), this.#preference(), {
+    return startingChoice(this.#startingModels(), this.#preference(), {
       developmentDefaults: this.#developmentDefaults,
       providerAvailable: (provider) => this.#providerAvailable(provider),
     });
   }
 
   #runnableStartingChoice(): ModelChoice | null {
-    return runnableStartingChoice(this.#endpoints.available(), this.#preference(), this.getStatus().providers ?? [], {
+    return runnableStartingChoice(this.#startingModels(), this.#preference(), this.getStatus().providers ?? [], {
       developmentDefaults: this.#developmentDefaults,
       providerAvailable: (provider) => this.#providerAvailable(provider),
     });
@@ -4933,7 +4949,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #deleteChannelThreadHistory(agentId: string, threadId: string): void {
     const revision = this.#store.database.deleteThreadHistory({ agentId, threadId });
     this.#conversation.forgetDeletedHistory(threadId);
-    const loaded = this.#conversation.loadedExecutionSnapshot(threadId);
+    const loaded = this.#conversation.executionSnapshot(threadId);
     if (!loaded) return;
     const snapshot = { ...loaded, messages: [], revision };
     this.#conversation.setSnapshot(agentId, snapshot);
@@ -6267,7 +6283,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   #providerRestartHold(agentId: string): QueueHold | null {
     const agent = this.#store.get(agentId);
     const provider = agent ? providerForAgent(agent) : null;
-    return provider && this.#providers.isReplacingCli(provider) ? { reason: "provider-restart", provider } : null;
+    return provider && (this.#providers.isReplacingCli(provider) || this.#drain.awaitsEndpointReload(agentId))
+      ? { reason: "provider-restart", provider }
+      : null;
   }
 
   #signInHold(agentId: string): QueueHold | null {
@@ -6372,8 +6390,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: StartAgentTaskInput,
     sender?: ConversationMessageSender,
     timezone?: string,
+    fromChrome = false,
   ): Effect.fn.Return<AgentTask, AgentLifecycleFailed> {
-    if (!input.clientMessageId) return yield* this.#startTask(input, sender, timezone);
+    if (!input.clientMessageId) return yield* this.#startTask(input, sender, timezone, fromChrome);
     const key = userSendKey(sender, input.agentId, input.clientMessageId);
     const pending = this.#pendingTaskStarts.get(key);
     if (pending) return yield* Deferred.await(pending);
@@ -6383,7 +6402,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (startedTaskId) this.#mailbox.forgetIdempotencyKey(key);
     const start = Deferred.makeUnsafe<AgentTask, AgentLifecycleFailed>();
     this.#pendingTaskStarts.set(key, start);
-    return yield* this.#startTask(input, sender, timezone).pipe(
+    return yield* this.#startTask(input, sender, timezone, fromChrome).pipe(
       Effect.onExit((exit) => Deferred.done(start, exit)),
       Effect.ensuring(Effect.sync(() => this.#pendingTaskStarts.delete(key))),
     );
@@ -6394,6 +6413,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: StartAgentTaskInput,
     sender: ConversationMessageSender | undefined,
     timezone: string | undefined,
+    fromChrome: boolean,
   ): Effect.fn.Return<AgentTask, AgentLifecycleFailed> {
     const task = yield* lifecycleStep("start task", () => {
       if (!this.listAgents().some((agent) => agent.id === input.agentId))
@@ -6413,6 +6433,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       sender,
       timezone,
+      fromChrome,
     ).pipe(
       Effect.tapError(() =>
         Effect.sync(() => {
@@ -6747,6 +6768,26 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: SendMessageInput,
     sender?: ConversationMessageSender,
     timezone?: string,
+    fromChrome = false,
+  ): Effect.fn.Return<QueuedMessageReceipt, AgentLifecycleFailed> {
+    const receipt = yield* this.#sendMessageOnce(input, sender, timezone);
+    if (fromChrome) this.#noteFromChrome(receipt.deliveries.map((delivery) => delivery.id));
+    return receipt;
+  }).bind(this);
+
+  #noteFromChrome(deliveryIds: readonly string[]): void {
+    for (const deliveryId of deliveryIds) this.#fromChrome.add(deliveryId);
+    for (const deliveryId of this.#fromChrome) {
+      if (this.#fromChrome.size <= FROM_CHROME_LIMIT) break;
+      this.#fromChrome.delete(deliveryId);
+    }
+  }
+
+  readonly #sendMessageOnce = Effect.fn("AgentService.sendMessageOnce")(function* (
+    this: AgentService,
+    input: SendMessageInput,
+    sender: ConversationMessageSender | undefined,
+    timezone: string | undefined,
   ): Effect.fn.Return<QueuedMessageReceipt, AgentLifecycleFailed> {
     if (!input.clientMessageId) return yield* this.#sendUserMessage(input, sender, timezone);
     const idempotencyKey = userSendKey(sender, input.agentId, input.clientMessageId);

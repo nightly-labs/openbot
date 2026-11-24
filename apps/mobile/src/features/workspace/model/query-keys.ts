@@ -264,6 +264,15 @@ export const queryKeys = {
     "github-catalog",
   ],
   workflowChats: (scope: QueryScope, serverId: string) => [...queryKeys.serverWorkflows(scope, serverId), "chats"],
+  workflowMediaModels: (scope: QueryScope, serverId: string) => ["workflow-media", ...scope, serverId, "models"],
+  workflowMediaPrice: (scope: QueryScope, serverId: string, request: string) => [
+    "workflow-media",
+    ...scope,
+    serverId,
+    "price",
+    request,
+  ],
+  workflowCreditBalance: (scope: QueryScope, serverId: string) => ["workflow-media", ...scope, serverId, "balance"],
   workflowGitHubOptions: (scope: QueryScope, serverId: string, repository: string) => [
     ...queryKeys.serverWorkflows(scope, serverId),
     "github-options",

@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Zaktualizuj także do tej wersji każdy serwer, do którego dołączyłeś. Na serwerze modele płatne kredytami OpenBot, wstrzymane i wyeksportowane przepływy pracy, czaty WhatsApp tylko do odczytu, prośby o lokalizację oraz wybór serwera Signal działają tylko wtedy, gdy serwer ma tę wersję.",
+      "Po tej aktualizacji starsza wersja OpenBot nie może otworzyć twoich danych."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kup kredyty OpenBot dla siebie lub dla serwera przyciskiem „Credits” w pasku stron albo w Ustawienia → Rozliczenia. Płatna licencja daje też darmowe kredyty co miesiąc.",
+          "Kroki z obrazami i wideo w przepływie pracy mogą używać modeli OpenBot opłacanych twoimi kredytami, bez dodatkowego logowania. Ustaw w kroku opcję „Liczba”, aby uzyskać jednocześnie do 4 wyników.",
+          "Wstrzymaj przepływ pracy z jego menu. Możesz też wyeksportować przepływ pracy do pliku i zaimportować go na innym komputerze lub serwerze.",
+          "Wpisz {{ w kroku przepływu pracy, aby dodać pole z wcześniejszego kroku. Wyzwalacze Harmonogram, GitHub, Discord, Telegram i Slack też teraz podają pola.",
+          "Agent może poprosić o twoją lokalizację, gdy prośba jej wymaga, na przykład „restauracje w pobliżu”. Nic nie jest wysyłane, dopóki nie odpowiesz.",
+          "Ustaw dozwolony kontakt lub grupę WhatsApp jako tylko do odczytu. Twoi agenci mogą czytać czat, a OpenBot nigdy w nim nie pisze."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Bezczynny czat Claude lub Pi z 200K lub więcej tokenów kontekstu sam się kompaktuje, zanim wygaśnie jego 1-godzinna pamięć podręczna promptu. Kosztuje to mniej niż ponowne odczytanie pełnego kontekstu. Wyłącz to w Ustawienia serwera → Dostawcy.",
+          "Wybierz serwer Signal danego serwera w Ustawienia serwera → Ogólne. „Automatycznie” zachowuje najbliższy.",
+          "Agenci Gemini z „Pełnym dostępem” używają narzędzi OpenBot, takich jak pamięć, przeglądarka i kanały, bez karty zatwierdzenia."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Wiadomość wysłana do agenta Claude podczas jego pracy trafia do niego od razu, także gdy uruchamia subagenta lub długie narzędzie.",
+          "Agent ChatGPT (Codex) ustawiony na „Najpierw pytaj” pyta cię teraz, zanim uruchomi polecenie lub zmieni plik.",
+          "Hostowany lub samodzielnie hostowany serwer, który przestaje odpowiadać, uruchamia się znowu sam po 10 minutach.",
+          "Na macOS dok agentów nie spowalnia już OpenBot ani całego komputera.",
+          "Długie czaty przewijają się płynnie. Wcześniej czat z ponad 100 wiadomościami szarpał podczas przewijania."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.76.0",
     "date": "2026-11-21",
     "notices": [

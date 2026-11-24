@@ -20,6 +20,7 @@ export interface WorkerBindings {
   LIVE_ACTIVITY_RATE_LIMITER?: RateLimit;
   FEEDBACK_RATE_LIMITER?: RateLimit;
   AUTH_EXPOSE_DEVELOPMENT_CODE?: string;
+  BROWSER_EXTENSION_IDS?: string;
   EMAIL_SMTP_HOST?: string;
   EMAIL_SMTP_PORT?: string;
   EMAIL_SMTP_USERNAME?: string;

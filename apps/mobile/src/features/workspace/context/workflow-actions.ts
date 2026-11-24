@@ -5,6 +5,10 @@ import {
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import {
+  WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
   WORKFLOWS_PAUSE_CAPABILITY,
   WORKFLOWS_PAUSE_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-pause-v1";
@@ -15,6 +19,7 @@ import {
   decodeRemoteWorkflowGitHubHistory,
   decodeRemoteWorkflowGitHubOptions,
   decodeRemoteWorkflowList,
+  decodeRemoteWorkflowPicture,
   decodeRemoteWorkflowRunDetail,
   decodeRemoteWorkflowRunPage,
   decodeRemoteWorkflowSaveResult,
@@ -26,6 +31,11 @@ import {
 } from "@openbot/team-client/workflow-decoding";
 import * as Crypto from "expo-crypto";
 import type { WorkspaceRequest } from "@/features/workspace/context/host-request-actions";
+import {
+  loadWorkflowCreditBalance,
+  loadWorkflowMediaModels,
+  loadWorkflowMediaPrice,
+} from "@/features/workspace/context/workflow-media-models";
 import { requireCapability, type ServerCapabilities } from "@/features/workspace/model/server-capabilities";
 import { ignoreResponse } from "@/features/workspace/model/workspace-records";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
@@ -53,18 +63,24 @@ type WorkflowActions = Pick<
   | "loadWorkflowVersions"
   | "loadWorkflowVersionGraph"
   | "restoreWorkflowVersion"
+  | "loadWorkflowMediaModels"
+  | "loadWorkflowMediaPrice"
+  | "loadWorkflowCreditBalance"
   | "loadWorkflowGitHubCatalog"
   | "loadWorkflowGitHubOptions"
   | "loadWorkflowGitHubHistory"
   | "runWorkflowGitHubLastEvent"
+  | "keepWorkflowPicture"
 >;
 
 export function createWorkflowActions({
   request,
   capabilities,
+  loadAgentModels,
 }: {
   request: WorkspaceRequest;
   capabilities: ServerCapabilities;
+  loadAgentModels: MobileWorkspaceContextValue["loadAgentModels"];
 }): WorkflowActions {
   const send = <T>(serverId: string, path: string, decode: (value: unknown) => T, body: TeamProtocolV2Json) => {
     requireCapability(capabilities, serverId, WORKFLOWS_CAPABILITY, "mobile.workflow.unsupported");
@@ -145,6 +161,10 @@ export function createWorkflowActions({
         workflowId: input.workflowId,
         versionId: input.versionId,
       }),
+    loadWorkflowMediaModels: (serverId) =>
+      loadWorkflowMediaModels({ request, capabilities, loadAgentModels, serverId }),
+    loadWorkflowMediaPrice: (input, serverId) => loadWorkflowMediaPrice({ request, capabilities, serverId, input }),
+    loadWorkflowCreditBalance: (serverId) => loadWorkflowCreditBalance({ request, capabilities, serverId }),
     loadWorkflowGitHubCatalog: (serverId) =>
       sendGitHub(serverId, WORKFLOWS_GITHUB_ROUTES.catalog, decodeRemoteWorkflowGitHubCatalog, {}),
     loadWorkflowGitHubOptions: (repository, serverId) =>
@@ -157,6 +177,11 @@ export function createWorkflowActions({
         nodeId: input.nodeId,
         requestId: Crypto.randomUUID(),
       }),
+    keepWorkflowPicture: async (draftId, serverId) => {
+      requireCapability(capabilities, serverId, WORKFLOWS_MEDIA_CAPABILITY, "mobile.workflow.asset.unsupported");
+      const fileId = await send(serverId, WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId });
+      return { fileId };
+    },
   };
 }
 

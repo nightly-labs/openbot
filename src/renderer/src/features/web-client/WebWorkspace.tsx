@@ -214,6 +214,7 @@ import { queuedDeliveriesInOrder } from "../../queue-reconciliation";
 import { backgroundWorkKey } from "../conversation/background-work-key";
 import "katex/contrib/copy-tex";
 import "../../selection-copy";
+import type { CreationPreference } from "@openbot/ui/features/agents/agent-creation-model";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
 import { collectThreadMessageMatches, formatMessageTime, toAgentMessage } from "../../app-message-projection";
@@ -244,7 +245,6 @@ import {
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { sidebarAgentThreads } from "../agent-threads/sidebar-agent-threads";
-import type { CreationPreference } from "../agents/agent-creation-model";
 import {
   agentErrorDetails,
   claimErrorToast,

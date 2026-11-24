@@ -1599,6 +1599,7 @@ export class BrowserHost {
             let shown = false;
             let leaked = false;
             let stopWaiting = () => {};
+            let submitSent = false;
             const contents = tab.contents;
             const blockLeak = (event: ElectronEvent<WebContentsWillFrameNavigateEventParams>) => {
               if (!secrets.some((value) => urlCarriesSecret(event.url, value))) return;
@@ -1614,10 +1615,18 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(values, vault),
+                      entry.enter(values, vault, () => {
+                        submitSent = true;
+                      }),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,
+                    ).pipe(
+                      Effect.catch((error) =>
+                        submitSent && protection.replaced && isTimeoutError(error.cause)
+                          ? Effect.void
+                          : Effect.fail(error),
+                      ),
                     );
                     if (!protection.replaced && !leaked) {
                       yield* Effect.callback<void>((resume) => {

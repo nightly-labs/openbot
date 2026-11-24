@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { CreditMediaJob, CreditMediaModel } from "@openbot/contracts/credit-media";
 import type { WorkflowGraph } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
@@ -407,6 +408,33 @@ try {
       outputs.size === BATCH &&
       files.length === filesBeforeBatch + BATCH,
     batch.map((id) => ({ step: stored(id).status, output: stored(id).output, job: jobs.get(id) })),
+  );
+
+  const current = await runCauseEffect(workflows.get(workflowId));
+  const switchedOff = await runCauseEffect(
+    workflows.saveGraph({
+      workflowId,
+      baseRevision: current.revision,
+      graph: {
+        ...graph,
+        nodes: graph.nodes.map((node) => ({
+          ...node,
+          fields: { ...node.fields, model: creditWorkflowModelId("switched-off") },
+        })),
+      },
+    }),
+  );
+  if (!switchedOff.ok) throw new Error("The graph with an unavailable model did not save.");
+  const unavailable = (
+    await runCauseEffect(workflows.runStep({ workflowId, nodeId: "poster", requestId: "paid-unavailable" }))
+  ).id;
+  await until("the step with an unavailable model ends", () => stored(unavailable).status !== "running");
+  check(
+    "a step whose credit model is not in the catalog fails as not available and sends no job",
+    stored(unavailable).status === "failed" &&
+      stored(unavailable).error === sourceText("error.workflow.modelUnavailable") &&
+      !jobs.has(unavailable),
+    { step: stored(unavailable) },
   );
 
   report.passed = true;

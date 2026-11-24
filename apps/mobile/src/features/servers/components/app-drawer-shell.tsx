@@ -381,7 +381,12 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
                 <Animated.View collapsable={false} className="flex-1" style={contentTouchStyle}>
                   {children}
                 </Animated.View>
-                <Animated.View className="absolute inset-0" style={scrimTouchStyle}>
+                <Animated.View
+                  className="absolute inset-0"
+                  style={scrimTouchStyle}
+                  accessibilityElementsHidden={!drawerOpen}
+                  importantForAccessibility={drawerOpen ? "auto" : "no-hide-descendants"}
+                >
                   {isAndroid ? null : (
                     <Animated.View className="absolute inset-0" pointerEvents="none" style={blurStyle}>
                       <BlurView intensity={5} style={{ flex: 1 }} tint="systemThickMaterial" />

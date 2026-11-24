@@ -213,6 +213,7 @@ import {
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
 } from "./claude-user-setup-preference-store";
+import { ClientBrowserHub } from "./client-browser-hub";
 import { createComputerIdle } from "./computer-idle";
 import { ComputerUseDisplayAwake } from "./computer-use-display-awake";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
@@ -356,7 +357,13 @@ import {
   showMainWindow,
 } from "./main-window";
 import { DATA_SKILL_SLUG, ManagedSkillService, SKILL_CREATOR_SKILL_SLUG } from "./managed-skill-service";
-import { MCP_ACCESS_FILE, type McpAccessControl, McpAccessStore, sameMcpAgents } from "./mcp-access-store";
+import {
+  MCP_ACCESS_FILE,
+  type McpAccessControl,
+  McpAccessStore,
+  mcpAgentsOnlyAdded,
+  sameMcpAgents,
+} from "./mcp-access-store";
 import { McpHostSignIns } from "./mcp-host-sign-ins";
 import { McpOAuthProxySettingsFile } from "./mcp-oauth-proxy-store";
 import {
@@ -603,6 +610,7 @@ const TEARDOWN_ORDER = {
   hostEvents: 85.5,
   signalIngress: 86,
   host: 90,
+  clientBrowser: 98,
   browserEgress: 99,
   teamWebRtcBridge: 100,
   routineFlows: 103,
@@ -1303,6 +1311,8 @@ export async function createApplicationServices({
   );
   const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
   teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
+  const clientBrowser = new ClientBrowserHub();
+  teardown.push(TEARDOWN_ORDER.clientBrowser, "the shared Chrome tabs of members", () => clientBrowser.dispose());
   const hostMemory =
     hostedServer || serverModeEnvironment
       ? new ServerMemory({
@@ -2218,6 +2228,7 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
+    clientBrowser,
     crm: () => crmHandle,
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
     personCanAdminister: (personId) => host.personCanAdminister(personId),
@@ -2676,7 +2687,7 @@ export async function createApplicationServices({
     providerRuntimes.startUpdateChecks();
   }
   providerRuntimes.on("ready", (runtime) => {
-    if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes());
+    if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes("after-background-work"));
   });
   service.on("event", (event) => {
     if (event.type === "agents-changed") storageUsage.invalidate();
@@ -3181,7 +3192,11 @@ export async function createApplicationServices({
           .set(change, existing)
           .pipe(
             Effect.andThen(
-              sameMcpAgents(before, change.access.agents) ? Effect.void : service.refreshAllAgentRuntimes(),
+              sameMcpAgents(before, change.access.agents)
+                ? Effect.void
+                : service.refreshAllAgentRuntimes(
+                    mcpAgentsOnlyAdded(before, change.access.agents) ? "after-background-work" : "now",
+                  ),
             ),
           );
       }),
@@ -3231,6 +3246,28 @@ export async function createApplicationServices({
       subscribe: (listener) => {
         service.on("liveVoice", listener);
         return () => service.off("liveVoice", listener);
+      },
+    },
+    clientBrowser,
+    voiceTranscription: {
+      transcribe: (audio) => {
+        if (voiceServer.dictates()) return voiceServer.transcribe(audio, voice.getSettings().language);
+        return voice.getModelStatus().pipe(
+          Effect.flatMap((status) => {
+            if (status.phase === "ready" && (isLocalVoiceModelId(status.modelId) || isGroqVoiceModelId(status.modelId)))
+              return voice.transcribe(audio);
+            const preparing =
+              isLocalVoiceModelId(status.modelId) && (status.phase === "missing" || status.phase === "downloading");
+            const refusal = Effect.fail(
+              new VoiceOperationError({
+                cause: new Error(sourceText(preparing ? "error.voice.host.preparing" : "error.voice.host.notSetUp")),
+              }),
+            );
+            return preparing && status.phase === "missing"
+              ? Effect.forkDetach(Effect.ignore(voice.prepareModel())).pipe(Effect.andThen(refusal))
+              : refusal;
+          }),
+        );
       },
     },
     hostedSites,

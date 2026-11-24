@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.77.0",
+    "date": "2026-11-23",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, i modelli OpenBot che usano crediti, i flussi di lavoro in pausa ed esportati, le chat WhatsApp in sola lettura, le richieste di posizione e la scelta del server Signal funzionano solo se il server ha questa versione.",
+      "Dopo questo aggiornamento, una versione precedente di OpenBot non può aprire i tuoi dati."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Acquista crediti OpenBot per te o per un server dal pulsante Credits nella barra delle pagine o in Impostazioni → Fatturazione. Una licenza a pagamento dà anche crediti gratuiti ogni mese.",
+          "I passaggi di immagini e video di un flusso di lavoro possono usare i modelli OpenBot pagati dai tuoi crediti, senza un altro accesso. Imposta Lotto su un passaggio per ottenere fino a 4 risultati nello stesso momento.",
+          "Metti in pausa un flusso di lavoro dal menu del flusso di lavoro. Puoi anche esportare un flusso di lavoro in un file e importarlo su un altro computer o server.",
+          "Scrivi {{ in un passaggio del flusso di lavoro per aggiungere un campo di un passaggio precedente. Anche i trigger Pianificazione, GitHub, Discord, Telegram e Slack ora forniscono campi.",
+          "Un agente può chiedere la tua posizione quando una richiesta la richiede, ad esempio «ristoranti vicino a me». Non viene inviato nulla finché non rispondi.",
+          "Imposta un contatto o un gruppo WhatsApp consentito in sola lettura. I tuoi agenti possono leggere la chat, e OpenBot non ci scrive mai."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Una chat inattiva di Claude o Pi con 200K o più token di contesto si compatta da sola prima che scada la sua cache dei prompt di 1 ora. Costa meno che rileggere tutto il contesto. Disattivala in Impostazioni server → Provider.",
+          "Scegli il server Signal di un server in Impostazioni server → Generali. «Automatico» mantiene quello più vicino.",
+          "Gli agenti Gemini con Accesso completo usano gli strumenti di OpenBot, come memoria, browser e canali, senza una scheda di approvazione."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un messaggio che invii a un agente Claude mentre lavora ora arriva subito all’agente, anche mentre esegue un subagente o uno strumento lungo.",
+          "Un agente ChatGPT (Codex) impostato su Chiedi prima ora ti chiede conferma prima di eseguire un comando o modificare un file.",
+          "Un server ospitato o self-hosted che smette di rispondere ora riparte da solo dopo 10 minuti.",
+          "Su macOS, il dock degli agenti non rende più lenti OpenBot e tutto il computer.",
+          "Le chat lunghe scorrono in modo fluido. Prima una chat con più di 100 messaggi scattava mentre scorrevi."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.76.0",
     "date": "2026-11-21",
     "notices": [

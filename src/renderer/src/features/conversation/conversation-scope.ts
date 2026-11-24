@@ -24,6 +24,7 @@ import type { AgentThreadVoice } from "@openbot/ui/features/conversation/threads
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { currentText } from "@openbot/ui/text";
 import { prefersReducedMotion, usesTouchLayout } from "@openbot/ui/utils";
+import { appendVoiceTranscript } from "@openbot/ui/voice-recording";
 import { errorReference } from "@openbot/user-errors";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import {
@@ -41,7 +42,6 @@ import { actionToast } from "../../action-toast";
 import { matchesShortcut } from "../../keyboard-shortcut-preference";
 import { holdNativeBrowserPage } from "../../native-browser-page";
 import { createScopeGuard } from "../../scope-lifetime";
-import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { insideOverlay } from "../window/workspace-shortcuts";

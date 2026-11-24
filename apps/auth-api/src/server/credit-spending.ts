@@ -59,12 +59,14 @@ export interface CreditSubmitTarget {
   upstream: string;
   model: string;
   params: string;
+  fields: string;
 }
 
 interface SubmitTargetRow {
   upstream: string;
   upstream_model: string;
   upstream_params: string;
+  upstream_fields: string | null;
 }
 
 export interface CreditSweepResult {
@@ -298,7 +300,7 @@ export class CreditSpending {
   readonly claimSubmit = Effect.fn("CreditSpending.claimSubmit")(function* (
     this: CreditSpending,
     jobId: string,
-    target: CreditSubmitTarget,
+    target: CreditSubmitTarget | null,
   ): Effect.fn.Return<CreditSubmitTarget | null, Failure> {
     const now = this.#now();
     const claimed = yield* billingCall(() =>
@@ -307,16 +309,31 @@ export class CreditSpending {
           `UPDATE credit_holds
               SET submitted_at = COALESCE(submitted_at, ?2), submit_lease_until = ?3,
                   upstream = COALESCE(upstream, ?4), upstream_model = COALESCE(upstream_model, ?5),
-                  upstream_params = COALESCE(upstream_params, ?6)
+                  upstream_params = COALESCE(upstream_params, ?6),
+                  upstream_fields = CASE WHEN upstream IS NULL THEN ?7 ELSE upstream_fields END
             WHERE job_id = ?1 AND status = 'held' AND provider_job_id IS NULL
               AND (submit_lease_until IS NULL OR submit_lease_until <= ?2)
-           RETURNING upstream, upstream_model, upstream_params`,
+              AND (?4 IS NOT NULL OR upstream IS NOT NULL)
+           RETURNING upstream, upstream_model, upstream_params, upstream_fields`,
         )
-        .bind(jobId, now, now + CREDIT_HOLD_SUBMIT_LEASE_MS, target.upstream, target.model, target.params)
+        .bind(
+          jobId,
+          now,
+          now + CREDIT_HOLD_SUBMIT_LEASE_MS,
+          target?.upstream ?? null,
+          target?.model ?? null,
+          target?.params ?? null,
+          target?.fields ?? null,
+        )
         .first<SubmitTargetRow>(),
     );
     if (!claimed) return null;
-    return { upstream: claimed.upstream, model: claimed.upstream_model, params: claimed.upstream_params };
+    return {
+      upstream: claimed.upstream,
+      model: claimed.upstream_model,
+      params: claimed.upstream_params,
+      fields: claimed.upstream_fields ?? "{}",
+    };
   }).bind(this);
 
   readonly endSubmit = Effect.fn("CreditSpending.endSubmit")(function* (

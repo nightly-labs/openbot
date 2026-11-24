@@ -290,6 +290,10 @@ export const messages = {
     "OpenBot의 실시간 CPU 제한이 0이어서 Linux가 공급자를 중지했습니다. 이 제한은 시스템에서 옵니다. rtkit을 설치하고 시작한 다음(`rtkit-daemon`), `systemctl --user restart xdg-desktop-portal`을 실행하고 OpenBot을 다시 시작하세요. rtkit이 없으면 xdg-desktop-portal만 다시 시작해서는 해결되지 않습니다.",
   "error.provider.cpuUnsupported":
     "이 컴퓨터의 프로세서에서는 이 제공자를 실행할 수 없어요. 다른 제공자를 사용해 주세요.",
+  "error.provider.largeMemoryPages":
+    "이 Linux 커널은 4 KiB보다 큰 메모리 페이지를 사용해서 이 제공자를 실행할 수 없어요. Raspberry Pi 5나 Asahi Linux가 그래요. 4 KiB 페이지 커널이나 다른 제공자를 사용해 주세요.",
+  "error.provider.ipv6Missing":
+    "이 제공자에는 IPv6가 필요한데, 이 컴퓨터에서 IPv6가 꺼져 있어요. IPv6를 켠 다음 다시 시도해 주세요. WSL에서는 .wslconfig에서 ipv6.disable=1을 지우고 wsl --shutdown을 실행해 주세요.",
   "error.provider.windowsBlocked":
     "스마트 앱 컨트롤 같은 Windows 보안 설정 때문에 이 공급자를 시작할 수 없습니다. 다른 공급자를 사용하세요.",
   "error.provider.opencodeDatabaseNewer":
@@ -398,6 +402,8 @@ export const messages = {
     "이 메시지를 처리하는 중에 Hermes의 연결이 끊겨 작업이 완료되었는지 알 수 없습니다. 메시지를 다시 보내기 전에 에이전트가 한 일을 확인하세요.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot이 이 모델을 사용할 수 없습니다. 모델이 사고 설정을 받아들이지 않았습니다. 이 에이전트에 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
+  "error.provider.copilotAnswerIncomplete":
+    "모델이 답변을 끝내기 전에 멈췄습니다. 메시지를 다시 보내거나 이 에이전트에 다른 모델을 선택하세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
   "error.provider.claudeContextFull":
     "이 채팅이 Claude가 처리하기에 너무 길어졌어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
@@ -442,8 +448,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code가 이 채팅의 저장된 세션을 찾지 못했어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.grokSignIn": "Grok을 사용하려면 `grok login`을 실행하거나 XAI_API_KEY를 설정하세요.",
+  "error.provider.acpSignInNoStart":
+    "제공자가 시작되지 않아 로그인을 시작할 수 없었어요. 다시 시도하거나 OpenBot을 다시 시작해 주세요.",
   "error.provider.acpSignInTimedOut": "로그인 시간이 초과되었어요.",
   "error.provider.acpSignInStopped": "로그인이 완료되기 전에 중단되었어요.",
+  "error.provider.geminiNoBrowserUseCode":
+    "이 컴퓨터에는 Google 로그인에 쓸 브라우저가 없어요. ‘코드로 로그인’을 선택하고 아무 기기에서 링크를 연 다음 코드를 붙여넣어 주세요.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini가 로그인 페이지를 열 수 없었어요. 브라우저와 xdg-utils를 설치한 후 이 호스트의 데스크톱 세션에서 연결하세요. 데스크톱이 없는 서버에서는 이 로그인을 완료할 수 없어요.",
   "error.provider.geminiBrowserOpenFailed":

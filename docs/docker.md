@@ -28,6 +28,17 @@ docker run -d --name openbot --restart unless-stopped \
 docker exec -it openbot openbot login
 ```
 
+These commands get the files from `main` and run `latest`. To pin a release (see [Tags](#tags)),
+get the files of the same release tag, and use its version in the image. For example, for 0.76.1:
+
+```sh
+curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/v0.76.1/docker/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/nightly-labs/openbot/v0.76.1/docker/seccomp.json
+```
+
+Then set `image: ghcr.io/nightly-labs/openbot:0.76.1` in `compose.yaml`, or use
+`ghcr.io/nightly-labs/openbot:0.76.1` in `docker run`.
+
 `openbot login` asks for your email and the code that OpenBot sends to it. An operator who sets up
 the container for somebody else can use `openbot login --claim` instead (see
 [server claims](self-hosted-server.md#sign-in-with-a-server-claim)). After the sign-in, the
@@ -456,8 +467,9 @@ environment of OpenBot, so they can read these values.
 | Variable | Use |
 | --- | --- |
 | `XAI_API_KEY`, `CURSOR_API_KEY`, `CLINE_API_KEY` | A provider API key. |
-| `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, `OPENBOT_GROK_PATH`, `OPENBOT_OPENCODE_PATH`, `OPENBOT_CURSOR_PATH`, `OPENBOT_CLINE_PATH`, `OPENBOT_KIMI_PATH`, `OPENBOT_DEVIN_PATH`, `OPENBOT_COPILOT_PATH`, `OPENBOT_MISTRAL_PATH`, `OPENBOT_ANTIGRAVITY_PATH`, `OPENBOT_PI_PATH`, `OPENBOT_MUSE_PATH` | Another provider executable. Mount it read-only in the container. |
+| `OPENBOT_CODEX_PATH`, `OPENBOT_CLAUDE_PATH`, `OPENBOT_GROK_PATH`, `OPENBOT_OPENCODE_PATH`, `OPENBOT_CURSOR_PATH`, `OPENBOT_CLINE_PATH`, `OPENBOT_KIMI_PATH`, `OPENBOT_DEVIN_PATH`, `OPENBOT_COPILOT_PATH`, `OPENBOT_MISTRAL_PATH`, `OPENBOT_ANTIGRAVITY_PATH`, `OPENBOT_PI_PATH`, `OPENBOT_MUSE_PATH`, `OPENBOT_HERMES_PATH` | Another provider executable. Mount it read-only in the container. With `OPENBOT_HERMES_PATH`, OpenBot does not offer the Hermes download. |
 | `OPENBOT_AUTH_API_URL` | Another account server, for example a [self-hosted account service](self-hosting.md). |
+| `OPENBOT_REMOTE_SIGNAL_URL` | The Signal of a [self-hosted account service](self-hosting.md#4-start-the-app), as a `wss:` URL. Set it together with `OPENBOT_AUTH_API_URL`. Without that variable, OpenBot does not start. |
 | `OPENBOT_DISPLAY_SIZE` | The size of the virtual display that computer use reads, as `WIDTHxHEIGHT` from 640x480 to 2576x2576. The default is 1280x800. A value that is not valid writes a warning in `docker logs`, and the container starts with 1280x800. See [Display size](self-hosted-server.md#display-size) for when to use 1920x1080. `docker/instances/compose.yaml` does not pass it, so an instance uses 1280x800. |
 | `OPENBOT_SETUP_PAGE_PORT` | A port from 1024 to 65535 for the [setup page](umbrel.md#the-setup-page), which signs the server in from a browser. The Umbrel app sets it. Publish the port only behind a proxy that asks for a password: any client that reaches it can sign in a server that is signed out. |
 
@@ -476,10 +488,15 @@ environment of OpenBot, so they can read these values.
   and processes of the other agents, also the API key files of a Vault key that is for other agents.
   Put agents that must not share keys in different containers. Do not mount the Docker socket, your home folder or another
   host folder that agents must not change.
-- **Check the image.** Each release image has a build provenance attestation:
+- **Check the image.** Each release image has a build provenance attestation from the release
+  workflow. This command accepts only an attestation that this workflow made for the tag of that
+  release:
 
   ```sh
-  gh attestation verify oci://ghcr.io/nightly-labs/openbot:<version> --repo nightly-labs/openbot
+  gh attestation verify oci://ghcr.io/nightly-labs/openbot:<version> \
+    --repo nightly-labs/openbot \
+    --signer-workflow nightly-labs/openbot/.github/workflows/release.yml \
+    --source-ref refs/tags/v<version>
   ```
 
 ## How it works

@@ -109,7 +109,13 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
               }
             : undefined;
         file.parentDirectory.create({ intermediates: true, idempotent: true });
-        const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment, file.uri), progress);
+        const data = await downloadAttachment(
+          serverId,
+          attachment.id,
+          largeDownloadOf(attachment, file.uri),
+          progress,
+          !enabled,
+        );
         const handedOver = Date.now();
         if (!data.file) await writeMediaFile(file, data.base64);
         const bytesMs = (arrived ?? handedOver) - started;

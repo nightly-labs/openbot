@@ -1329,7 +1329,9 @@ async function holdLimits() {
         credits: 50,
       }),
     );
-    await run(spending.claimSubmit(`job-${job}`, { upstream: "router", model: "up-video-1", params: "{}" }));
+    await run(
+      spending.claimSubmit(`job-${job}`, { upstream: "router", model: "up-video-1", params: "{}", fields: "{}" }),
+    );
   }
   for (const job of ["done", "run", "down"]) await run(spending.start(`job-${job}`, `p-${job}`));
 

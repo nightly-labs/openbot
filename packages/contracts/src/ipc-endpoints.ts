@@ -461,6 +461,7 @@ import type {
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppSenderReadOnlyInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SlackOverview,
@@ -1154,6 +1155,9 @@ export const IPC_ENDPOINTS = {
     setWhatsAppStatusReactions: request<SetWhatsAppStatusReactionsInput, void>()(
       "messaging:set-whatsapp-status-reactions",
     ),
+    setWhatsAppSenderReadOnly: request<SetWhatsAppSenderReadOnlyInput, void>()(
+      "messaging:set-whatsapp-sender-read-only",
+    ),
     hostOverview: scopedRequest<HostMessagingPlatformInput, MessagingOverview, "required">()("messaging:host-overview"),
     hostConnect: scopedRequest<HostMessagingConnectInput, void, "required">()("messaging:host-connect"),
     hostDisconnect: scopedRequest<HostMessagingWorkspaceInput, void, "required">()("messaging:host-disconnect"),
@@ -1207,6 +1211,9 @@ export const IPC_ENDPOINTS = {
     ),
     hostSetWhatsAppStatusReactions: scopedRequest<SetWhatsAppStatusReactionsInput, void, "required">()(
       "messaging:host-set-whatsapp-status-reactions",
+    ),
+    hostSetWhatsAppSenderReadOnly: scopedRequest<SetWhatsAppSenderReadOnlyInput, void, "required">()(
+      "messaging:host-set-whatsapp-sender-read-only",
     ),
   },
   hostAdmin: {

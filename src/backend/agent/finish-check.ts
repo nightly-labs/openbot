@@ -18,7 +18,7 @@ const RESULT_CHARACTERS = 240;
 const MISSING_CHARACTERS = 600;
 
 export const FinishCheckResult = Schema.Struct({
-  verdict: Schema.Literals(["done", "continue", "user", "blocked"]),
+  verdict: Schema.Literals(["done", "continue", "user", "blocked", "waiting"]),
   missing: Schema.optional(Schema.NullOr(Schema.String)),
 });
 export type FinishCheckResult = typeof FinishCheckResult.Type;
@@ -35,6 +35,7 @@ export interface FinishCheckInput {
   plan: ConversationPlan | null;
   answer: string;
   continuations: number;
+  awaitsTeammate?: boolean;
 }
 
 const clip = (text: string, limit: number) =>
@@ -99,15 +100,26 @@ export function finishCheckPrompt(input: FinishCheckInput): string {
     "</answer>",
     "",
     `The request continued automatically ${input.continuations} times before this turn.`,
+    ...(input.awaitsTeammate
+      ? [
+          "",
+          "The agent sent requests to teammate agents, and they still work on them. OpenBot gives each reply to the agent automatically, and the reply starts a new turn of the agent.",
+        ]
+      : []),
     "",
     "Choose one verdict:",
     '- "done": the answer completes the whole request, or it says truthfully which part cannot be done and why. A question, a chat message, or a request for an opinion is done when it is answered.',
     '- "continue": a part of the request is not done and the agent can do it now without the user. For example: it did only some of the items; it says what it will do next and stops; it offers to do work that the request already asked for; it says done but did not check a result that it can check, such as a test, a build, a page or a file it changed; a step failed and it did not try another way.',
     '- "user": the agent needs something that only the user can give: a choice that changes the result, missing information, a sign-in, a payment, or approval of an action that sends, posts, publishes, buys, deletes, or changes something outside the agent\'s own work. A question of this kind in the answer is "user".',
     '- "blocked": the agent tried the other ways that it has, and it cannot go on for a reason that the user must fix. One failed step with no other try is "continue", not "blocked".',
+    ...(input.awaitsTeammate
+      ? [
+          '- "waiting": the parts that are not done need the replies of these teammates first. Do not choose "continue" only to make the agent check again or say again that it waits.',
+        ]
+      : []),
     'Do not ask for more than the request asked for. Do not choose "continue" for extra polish, a nice-to-have, or a risky action. When you are not sure, choose "done".',
     "",
-    'JSON shape: {"verdict":"done"|"continue"|"user"|"blocked","missing":"for continue only: what is not done, as at most 3 short instructions to the agent"}',
+    `JSON shape: {"verdict":"done"|"continue"|"user"|"blocked"${input.awaitsTeammate ? '|"waiting"' : ""},"missing":"for continue only: what is not done, as at most 3 short instructions to the agent"}`,
   ].join("\n");
 }
 

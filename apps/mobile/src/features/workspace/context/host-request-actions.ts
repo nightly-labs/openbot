@@ -43,6 +43,7 @@ import {
   withFastServiceTiers,
   withKeptModels,
   withSteeringModels,
+  withWhatsAppReadOnly,
   withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
   withWorkspaceOnlyLimit,
@@ -210,10 +211,13 @@ import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
+import { WORKFLOWS_MEDIA_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-v1";
 import { WORKFLOWS_PAUSE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-pause-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
@@ -350,10 +354,12 @@ import {
   whatsappConnectorGroups,
   whatsappConnectorLinkState,
   whatsappConnectorOverview,
+  whatsappConnectorReadOnly,
   whatsappConnectorReconnect,
   whatsappConnectorRemoveSender,
   whatsappConnectorSetEnabled,
   whatsappConnectorSetOwnNumber,
+  whatsappConnectorSetSenderReadOnly,
   whatsappConnectorSetStatusReactions,
   whatsappConnectorSetWorkingMessage,
   whatsappConnectorStartLink,
@@ -401,6 +407,7 @@ import { createProviderAdmin } from "@/features/servers/model/provider-admin";
 import { saveAgentAvatar, savedAgentAvatar } from "@/features/workspace/model/agent-avatar-cache";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
+import { attachmentDownloadKey, type DownloadQueue } from "@/features/workspace/model/request-lanes";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import {
   hasCapability,
@@ -612,6 +619,7 @@ type HostRequestActions = Pick<
   | "setWhatsAppOwnNumber"
   | "setWhatsAppWorkingMessage"
   | "setWhatsAppStatusReactions"
+  | "setWhatsAppSenderReadOnly"
   | "loadServerUpdate"
   | "checkServerUpdate"
   | "startServerUpdate"
@@ -650,6 +658,7 @@ type HostRequestActions = Pick<
   | "setMessageReaction"
   | "deleteMessage"
   | "downloadAttachment"
+  | "prioritizeAttachmentDownload"
   | "downloadMessageFile"
 >;
 
@@ -727,6 +736,15 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
       has(serverId, WORKFLOWS_CAPABILITY) &&
       has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
       has(serverId, ROUTINE_RESULTS_CAPABILITY),
+    canUseWorkflowMedia: (serverId) => has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_MEDIA_CAPABILITY),
+    canUseWorkflowMediaSize: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_SIZE_CAPABILITY),
+    canUseWorkflowAssets: (serverId) =>
+      has(serverId, WORKFLOWS_CAPABILITY) &&
+      has(serverId, WORKFLOWS_MEDIA_CAPABILITY) &&
+      has(serverId, STORAGE_CAPABILITY),
     canPauseWorkflows: (serverId) => has(serverId, WORKFLOWS_CAPABILITY) && has(serverId, WORKFLOWS_PAUSE_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
     canOrganizeLibrary: (serverId) => has(serverId, STORAGE_CAPABILITY) && has(serverId, LIBRARY_FOLDERS_CAPABILITY),
@@ -771,8 +789,8 @@ export function createHostRequestActions({
   queryClient: QueryClient;
   queryScope: QueryScope;
   capabilities: ServerCapabilities;
-  attachmentDownloads: { current: Promise<void> };
-  largeAttachmentDownloads: { current: Promise<void> };
+  attachmentDownloads: DownloadQueue;
+  largeAttachmentDownloads: DownloadQueue;
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   function capabilityApi(
@@ -1038,11 +1056,15 @@ export function createHostRequestActions({
             has(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY)
               ? whatsappConnectorStatusReactions(api)
               : Effect.succeed(null),
+            has(serverId, WHATSAPP_READ_ONLY_CAPABILITY) ? whatsappConnectorReadOnly(api) : Effect.succeed(null),
           ],
           { concurrency: "unbounded" },
         ).pipe(
-          Effect.map(([overview, workingMessages, statusReactions]) =>
-            withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+          Effect.map(([overview, workingMessages, statusReactions, readOnly]) =>
+            withWhatsAppReadOnly(
+              withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+              readOnly,
+            ),
           ),
         ),
       );
@@ -1080,6 +1102,13 @@ export function createHostRequestActions({
       runTeamRequest(
         whatsappConnectorSetStatusReactions(
           capabilityApi(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY, "mobile.server.connectors.unsupported"),
+          input,
+        ),
+      ),
+    setWhatsAppSenderReadOnly: async (input, serverId) =>
+      runTeamRequest(
+        whatsappConnectorSetSenderReadOnly(
+          capabilityApi(serverId, WHATSAPP_READ_ONLY_CAPABILITY, "mobile.server.connectors.unsupported"),
           input,
         ),
       ),
@@ -1731,7 +1760,7 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload, progress) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped) => {
       const download = () =>
         request(
           "GET",
@@ -1744,13 +1773,13 @@ export function createHostRequestActions({
           largeDownload,
           progress,
         );
-      const lane = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
-      const result = lane.current.then(download);
-      lane.current = result.then(
-        () => {},
-        () => {},
-      );
-      return result;
+      const queue = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
+      return queue.run(attachmentDownloadKey(serverId, attachmentId), download, tapped);
+    },
+    prioritizeAttachmentDownload: (serverId, attachmentId) => {
+      const key = attachmentDownloadKey(serverId, attachmentId);
+      attachmentDownloads.prioritize(key);
+      largeAttachmentDownloads.prioritize(key);
     },
     downloadMessageFile: (serverId, file) =>
       request(

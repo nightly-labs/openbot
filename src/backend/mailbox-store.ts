@@ -1127,7 +1127,7 @@ export class MailboxStore {
     });
   }
 
-  awaitsTeammate(agentId: string, taskId: string | null, turnIds: ReadonlySet<string>): boolean {
+  awaitsTeammate(agentId: string, taskId: string | null, turnIds: ReadonlySet<string> | null): boolean {
     const messages = this.#messagesById();
     const sourceTurnIds = this.#sourceTurnIds();
     return this.#state.deliveries.some((delivery) => {
@@ -1139,7 +1139,7 @@ export class MailboxStore {
         request.sender.agentId === agentId &&
         request.expectsReply !== false &&
         (request.senderTaskId ?? null) === taskId &&
-        turnIds.has(sourceTurnIds.get(request.id) ?? "") &&
+        (turnIds === null || turnIds.has(sourceTurnIds.get(request.id) ?? "")) &&
         (!held || this.heldByTask(delivery.recipientAgentId, request.id))
       );
     });

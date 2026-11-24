@@ -49,6 +49,7 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { ACP_REGISTRY_CAPABILITY, ACP_REGISTRY_ROUTES } from "@openbot/contracts/team-protocol/acp-registry-v1";
+import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/antigravity-code-sign-in-v1";
 import { CACHE_EXPIRY_COMPACTION_CAPABILITY } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
@@ -178,7 +179,8 @@ function codeSignInProviders(capabilities: readonly string[]): readonly AgentPro
         (agentProviderDescriptor(provider).localCodeSignIn === "device" &&
           !isOneOf(PROVIDERS_V4_SIGN_IN_PROVIDERS, provider) &&
           !isOneOf(SIGN_IN_RELAY_PROVIDERS, provider)) ||
-        (provider === "mistral" && capabilities.includes(MISTRAL_CODE_SIGN_IN_CAPABILITY)),
+        (provider === "mistral" && capabilities.includes(MISTRAL_CODE_SIGN_IN_CAPABILITY)) ||
+        (provider === "antigravity" && capabilities.includes(ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY)),
     );
   }
   if (capabilities.includes(PROVIDERS_SIGN_IN_V3_CAPABILITY)) return PROVIDERS_SIGN_IN_V3_PROVIDERS;
