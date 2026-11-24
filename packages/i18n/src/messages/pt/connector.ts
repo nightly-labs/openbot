@@ -380,7 +380,7 @@ export const messages = {
     "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Outras pessoas não recebem resposta. Quando desativado, o OpenBot responde a pessoas desconhecidas com um código.",
   "connector.whatsapp.workingMessage": "Mensagem “Trabalhando nisso…”",
   "connector.whatsapp.workingMessageDescription":
-    "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Uma solicitação que espera outra anterior também recebe uma mensagem de espera. Desative para enviar só a resposta.",
+    "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Uma solicitação que espera outra anterior também recebe uma mensagem de espera. Em um número pessoal, só o seu chat “Mensagem para você mesmo” recebe essas mensagens. Desative para enviar só a resposta.",
   "connector.whatsapp.statusReactions": "Reações de status",
   "connector.whatsapp.statusReactionsDescription":
     "O OpenBot reage com 👀 quando uma mensagem chega e com ✅ quando a resposta está pronta. Desative para não enviar reações.",
