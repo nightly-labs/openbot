@@ -521,6 +521,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Connessione al server",
   "mobile.chat.history.loading": "Caricamento della cronologia della chat",
   "mobile.chat.history.waiting": "In attesa della connessione",
+  "mobile.chat.history.syncing": "Caricamento dei nuovi messaggi",
   "mobile.chat.history.loadFailed": "Impossibile caricare la cronologia della chat",
   "mobile.chat.scrollToLatest": "Vai all'ultimo messaggio",
   "mobile.chat.agentUnavailable.title": "Agente non disponibile",

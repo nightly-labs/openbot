@@ -514,6 +514,7 @@ export const messages = {
   "mobile.chat.history.connecting": "サーバーに接続中",
   "mobile.chat.history.loading": "チャット履歴を読み込み中",
   "mobile.chat.history.waiting": "接続を待っています",
+  "mobile.chat.history.syncing": "新しいメッセージを読み込み中",
   "mobile.chat.history.loadFailed": "チャット履歴を読み込めませんでした",
   "mobile.chat.scrollToLatest": "最新のメッセージへ移動",
   "mobile.chat.agentUnavailable.title": "エージェントを利用できません",

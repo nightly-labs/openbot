@@ -514,6 +514,7 @@ export const messages = {
   "mobile.chat.history.connecting": "מתחבר לשרת",
   "mobile.chat.history.loading": "טוען את היסטוריית הצ'אט",
   "mobile.chat.history.waiting": "ממתין לחיבור",
+  "mobile.chat.history.syncing": "טוען הודעות חדשות",
   "mobile.chat.history.loadFailed": "לא ניתן לטעון את היסטוריית הצ'אט",
   "mobile.chat.scrollToLatest": "גלילה להודעה האחרונה",
   "mobile.chat.agentUnavailable.title": "הסוכן אינו זמין",
