@@ -157,6 +157,7 @@ export function ChatQuestionPrompt({
       <View className={`max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
         {pageTitle ? <QuestionText question={pageTitle} variant="title" /> : null}
         <QuestionText question={question.question} variant={pageTitle ? "body" : "title"} />
+        {question.detail ? <QuestionText question={question.detail} variant="secondary" /> : null}
         {described.length ? (
           <View className="gap-2 pt-1">
             {described.map((option) => (
