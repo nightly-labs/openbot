@@ -292,4 +292,5 @@ export const queryKeys = {
   chatQueue: (...target: [] | [serverId: string] | [serverId: string, agentId: string]) => ["chat-queue", ...target],
   chatAttachment: (serverId: string, attachmentId: string) => ["chat-attachment", serverId, attachmentId],
   chatMediaFile: (serverId: string, attachmentId: string) => ["chat-media-file", serverId, attachmentId],
+  chatMediaFiles: (serverId: string) => ["chat-media-file", serverId],
 };

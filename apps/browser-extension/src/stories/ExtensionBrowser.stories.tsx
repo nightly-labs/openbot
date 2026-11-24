@@ -23,7 +23,7 @@ const HOST: RemoteTeamHost = {
   role: "owner",
 };
 
-function Home(props: { tabs: number; supported?: boolean; asks?: BrowserAsk[] }) {
+function Home(props: { asks?: BrowserAsk[] }) {
   installStoryChrome(props.asks ? { [ASKS_KEY]: props.asks.map((ask) => ({ ...ask })) } : {});
   return (
     <WithWorkspace>
@@ -41,7 +41,7 @@ function Home(props: { tabs: number; supported?: boolean; asks?: BrowserAsk[] })
             onStartThread={() => undefined}
             onSelectHost={() => undefined}
             onSignOut={() => undefined}
-            sharing={{ tabs: props.tabs, supported: props.supported ?? true }}
+            sharing
             canShare
             onShareTabs={() => undefined}
             onManageSharing={() => undefined}
@@ -56,10 +56,6 @@ function Home(props: { tabs: number; supported?: boolean; asks?: BrowserAsk[] })
 function ask(kind: BrowserAsk["kind"], action: BrowserAsk["action"], detail: string, site: string): BrowserAsk {
   return { id: `${kind}-${action}`, agentName: "Chief", site, kind, action, detail };
 }
-
-export const SharingLine: Story = { render: () => <Home tabs={2} /> };
-
-export const SharingServerTooOld: Story = { render: () => <Home tabs={1} supported={false} /> };
 
 export const SettingsWithSites: Story = {
   render: () => {
@@ -90,29 +86,24 @@ export const SettingsNoSites: Story = {
 };
 
 export const AskNewSite: Story = {
-  render: () => <Home tabs={1} asks={[ask("site", "click", 'button "Add to cart"', "https://shop.example.com")]} />,
+  render: () => <Home asks={[ask("site", "click", 'button "Add to cart"', "https://shop.example.com")]} />,
 };
 
 export const AskPassword: Story = {
-  render: () => (
-    <Home tabs={1} asks={[ask("password", "type", 'input password "Password"', "https://accounts.example.com")]} />
-  ),
+  render: () => <Home asks={[ask("password", "type", 'input password "Password"', "https://accounts.example.com")]} />,
 };
 
 export const AskDownload: Story = {
-  render: () => (
-    <Home tabs={1} asks={[ask("download", "click", "invoice-2026-11.pdf", "https://billing.example.com")]} />
-  ),
+  render: () => <Home asks={[ask("download", "click", "invoice-2026-11.pdf", "https://billing.example.com")]} />,
 };
 
 export const AskSignInGrant: Story = {
-  render: () => <Home tabs={1} asks={[ask("sign-in", "click", 'button "Authorize"', "https://github.com")]} />,
+  render: () => <Home asks={[ask("sign-in", "click", 'button "Authorize"', "https://github.com")]} />,
 };
 
 export const AskPaymentAndSite: Story = {
   render: () => (
     <Home
-      tabs={2}
       asks={[
         ask("site", "snapshot", "", "https://news.ycombinator.com"),
         ask("payment", "type", 'input text "Card number"', "https://checkout.example.com"),

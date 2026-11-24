@@ -33,6 +33,8 @@ export const messages = {
   "error.voice.live.timedOut": "Codex canlı ses zamanında başlamadı. Tekrar dene.",
   "error.voice.live.failed": "Canlı ses durdu: {reason}",
   "error.voice.live.disconnected": "Canlı ses bağlantısı kesildi.",
+  "error.voice.live.startFailed":
+    "Canlı ses başlatılamadı. Aracıyı çalıştıran bilgisayarda Codex'i güncelleyin ve ChatGPT ile oturum açın, sonra yeniden deneyin. Neden: {reason}",
   "error.voice.live.hostFailed":
     "Sunucudaki Codex canlı sesi başlatamadı. Sahibinden o bilgisayardaki Codex'i güncellemesini ve ChatGPT ile oturum açmasını isteyin, sonra yeniden deneyin.",
   "error.voice.live.signIn": "Canlı sesi kullanmak için ChatGPT hesabınızla Codex'e giriş yapın.",

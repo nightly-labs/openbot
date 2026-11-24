@@ -33,6 +33,7 @@ import {
 } from "../protocol";
 import {
   GEMINI_INVALID_ARGUMENT,
+  GEMINI_UNREADABLE_HISTORY,
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
@@ -78,7 +79,16 @@ export function isCodexRolloutPending(error: unknown): boolean {
 function isCodexMissingThreadError(error: unknown): boolean {
   return (
     error instanceof AppServerError &&
-    (/thread not found:/i.test(error.message) || /\bno rollout found\b/i.test(error.message))
+    (/thread not found:/i.test(error.message) ||
+      /\bno rollout found\b/i.test(error.message) ||
+      isCodexUnconfiguredThreadProvider(error))
+  );
+}
+
+function isCodexUnconfiguredThreadProvider(error: AppServerError): boolean {
+  return (
+    getString(error.data, "type") === "modelProviderNotConfigured" ||
+    /^This chat uses model provider .+, which is no longer configured\./.test(error.message)
   );
 }
 
@@ -145,8 +155,8 @@ function isClearedAntigravityHistory(provider: AgentProvider, message: string): 
   );
 }
 
-function isUnencodableAntigravityHistory(provider: AgentProvider, message: string): boolean {
-  return provider === "antigravity" && /\bcontains invalid UTF-8\b/.test(message);
+function isUnreadableAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && GEMINI_UNREADABLE_HISTORY.test(message);
 }
 
 function isUnsignedAntigravityThinking(provider: AgentProvider, message: string): boolean {
@@ -232,7 +242,7 @@ export function refusedSessionFailure(
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
   if (
     isClearedAntigravityHistory(provider, message) ||
-    isUnencodableAntigravityHistory(provider, message) ||
+    isUnreadableAntigravityHistory(provider, message) ||
     isUnsignedAntigravityThinking(provider, message)
   )
     return sourceText("error.provider.antigravityHistoryUnreadable");

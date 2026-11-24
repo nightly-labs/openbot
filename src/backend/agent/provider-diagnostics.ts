@@ -265,6 +265,8 @@ export function isImageUnreadableDiagnostic(message: string): boolean {
 
 export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b/iu;
 
+export const GEMINI_UNREADABLE_HISTORY = /\bcontains invalid UTF-8\b|\bdoes not match to a display_name\b/u;
+
 export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
 
 const IMAGE_COUNT_LIMIT =

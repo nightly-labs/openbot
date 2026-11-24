@@ -1,3 +1,4 @@
+import { providerCliSource } from "@openbot/contracts/cli-version";
 import {
   type AcpRegistryEntry,
   type AcpRegistryInstallInput,
@@ -274,7 +275,7 @@ export function providerRows(
         raw &&
         (raw.phase === "ready" || raw.phase === "not-downloaded") &&
         (agent?.state === "available" || agent?.state === "sign-in-required") &&
-        (agent.cliSource === "system" || (raw.phase === "not-downloaded" && !raw.availableVersion))
+        (providerCliSource(agent, raw) === "system" || (raw.phase === "not-downloaded" && !raw.availableVersion))
           ? { ...raw, phase: "ready" as const, version: agent.version ?? null }
           : raw;
       const availableVersion = runtime?.availableVersion ?? null;

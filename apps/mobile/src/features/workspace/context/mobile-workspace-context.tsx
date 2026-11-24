@@ -227,7 +227,7 @@ import {
   withHostSidebarPins,
   withPhoneSidebarPins,
 } from "@/features/workspace/model/agent-pins";
-import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
+import { ConnectionWaits, isConnectionStop } from "@/features/workspace/model/connection-waits";
 import { NO_CONTEXT_STATES, reduceContextStates } from "@/features/workspace/model/context-states";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
@@ -248,6 +248,7 @@ import {
   reducePendingApprovals,
 } from "@/features/workspace/model/pending-approvals";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
+import { createDownloadQueue } from "@/features/workspace/model/request-lanes";
 import {
   hasCapability,
   requireCapability,
@@ -745,8 +746,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     };
   }, [directoryRefresh]);
 
-  const attachmentDownloads = useRef<Promise<void>>(Promise.resolve());
-  const largeAttachmentDownloads = useRef<Promise<void>>(Promise.resolve());
+  const [attachmentDownloads] = useState(createDownloadQueue);
+  const [largeAttachmentDownloads] = useState(createDownloadQueue);
   const request = useCallback(
     async <T,>(
       method: string,
@@ -1232,6 +1233,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (context.check && kept) {
         await compatibilityRead;
         if (!context.isCurrent()) return;
+        void queryClient.invalidateQueries({ queryKey: [...queryKeys.serverTasks(queryScope, serverId), "task"] });
         loadOpenChats(
           serverId,
           agentsRef.current
@@ -1290,6 +1292,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.serverTasks(queryScope, serverId), "task"] });
       if (compatibility.capabilities.includes(SIDEBAR_PINS_CAPABILITY))
         trackUntilSettled(
           serverLoads.current,
@@ -1376,6 +1379,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState,
       syncSidebarPins,
       loadOpenChats,
+      queryClient,
+      queryScope,
     ],
   );
 
@@ -1494,8 +1499,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return sameServerRecovery(server, next) ? current : current.map((item, at) => (at === index ? next : item));
       });
       connectionWaits.setResuming(hostId, resuming && status.phase !== "online");
-      if (status.phase === "online") connectionWaits.settle(hostId, null);
-      else if (!resuming && status.phase !== "connecting")
+      if (status.phase === "online") {
+        connectionWaits.settle(hostId, null);
+        void queryClient.refetchQueries(
+          {
+            queryKey: queryKeys.chatMediaFiles(hostId),
+            type: "active",
+            predicate: (query) => query.state.status === "error" && isConnectionStop(query.state.error),
+          },
+          { cancelRefetch: false },
+        );
+      } else if (!resuming && status.phase !== "connecting")
         connectionWaits.settle(hostId, new Error(sourceText("error.remote.selectedServerOffline")));
       if (status.phase === "online" && hostId === activeServerIdRef.current) setHold(null);
       if (status.phase === "online") wakeAttempts.current.delete(hostId);
@@ -1505,7 +1519,14 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       wakeAttempts.current.set(hostId, status.attempt);
       wakeSelectedServer(hostId);
     },
-    [recoveryCountdowns, wakeSelectedServer, connectionWaits, limitFirstConnection, backgroundRefreshStatus],
+    [
+      recoveryCountdowns,
+      wakeSelectedServer,
+      connectionWaits,
+      limitFirstConnection,
+      backgroundRefreshStatus,
+      queryClient,
+    ],
   );
   useEffect(() => {
     if (!foreground || !activeServerId) return;
@@ -1822,7 +1843,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         attachmentDownloads,
         largeAttachmentDownloads,
       }),
-    [request, teamApi, queryClient, queryScope],
+    [request, teamApi, queryClient, queryScope, attachmentDownloads, largeAttachmentDownloads],
   );
   useSyncedNotificationLevelsLoader({
     servers,
@@ -2256,10 +2277,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         return conversationMessageId(receipt, agentId);
       },
       respondToPrompt: async (agentId, input) => {
-        const activeServer = currentActiveServer();
         const agent = agentsRef.current.find((candidate) => candidate.id === agentId);
+        const agentServer = serversRef.current.find((server) => server.id === agent?.serverId);
         const snapshot = conversationStore.get(agentId);
-        const waits = liveState.get().threadWaitsByServer[activeServer.id] ?? [];
+        const waits = (agentServer ? liveState.get().threadWaitsByServer[agentServer.id] : undefined) ?? [];
         const message = snapshot?.messages.find(
           (item) =>
             item.questionPrompt?.requestId === input.requestId &&
@@ -2273,18 +2294,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             wait.agentId === agentId &&
             String(wait.requestId) === String(input.requestId),
         );
-        if (
-          agent?.serverId !== activeServer.id ||
-          !showsOnline(activeServer) ||
-          (!message?.questionPrompt && !hostWaits)
-        ) {
+        if (!agentServer || !showsOnline(agentServer) || (!message?.questionPrompt && !hostWaits)) {
           throw new Error(currentText().t("mobile.workspace.error.formUnavailable"));
         }
-        await request("POST", TEAM_API_ROUTES.respond.prompt, ignoreResponse, {
-          requestId: input.requestId,
-          answers: input.answers,
-        });
-        void loadConversation(agentId).catch(() => undefined);
+        await request(
+          "POST",
+          TEAM_API_ROUTES.respond.prompt,
+          ignoreResponse,
+          { requestId: input.requestId, answers: input.answers },
+          agentServer.id,
+        );
+        void loadConversation(agentId, agentServer.id).catch(() => undefined);
       },
       hideAgent: (agentId) => {
         const server = currentActiveServer();

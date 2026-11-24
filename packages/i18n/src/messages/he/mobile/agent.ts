@@ -611,7 +611,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "לא ניתן לטעון את השרתים שלך",
   "mobile.agent.home.serversFailedBody": "יש לוודא שאפליקציית שולחן העבודה פועלת ולנסות שוב.",
   "mobile.agent.home.noServers": "אין שרתים זמינים",
-  "mobile.agent.home.noServersBody": "יש לחבר מחדש את אפליקציית שולחן העבודה או להצטרף לשרת מרוחק.",
+  "mobile.agent.home.noServersBody":
+    "יש לפתוח את OpenBot במחשב עם החשבון הזה ולהפעיל את פרסום השרת הזה בהגדרות השרת ← חברים. אפשר גם להצטרף לשרת מרוחק.",
   "mobile.agent.home.chooseServer": "בחירת שרת",
   "mobile.agent.home.openServers": "פתיחת שרתים",
   "mobile.agent.home.noChatOpen": "אין צ'אט פתוח",

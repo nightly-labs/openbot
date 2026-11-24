@@ -5,6 +5,7 @@ export interface ExtensionConnectRequest {
   challenge: string;
   state: string;
   silent: boolean;
+  tab: boolean;
 }
 
 const STORAGE_KEY = "openbot.web.extension-connect";
@@ -17,7 +18,7 @@ function decodeRequest(value: unknown): ExtensionConnectRequest | null {
   const { extensionId, challenge, state } = value;
   if (!isString(extensionId) || !isString(challenge) || !isString(state)) return null;
   if (!EXTENSION_ID.test(extensionId) || !TOKEN.test(challenge) || !TOKEN.test(state)) return null;
-  return { extensionId, challenge, state, silent: value.silent === true };
+  return { extensionId, challenge, state, silent: value.silent === true, tab: value.tab === true };
 }
 
 export function takeExtensionConnect(): ExtensionConnectRequest | null {
@@ -27,9 +28,10 @@ export function takeExtensionConnect(): ExtensionConnectRequest | null {
     challenge: url.searchParams.get("challenge"),
     state: url.searchParams.get("state"),
     silent: url.searchParams.get("silent") === "1",
+    tab: url.searchParams.get("tab") === "1",
   });
   if (fromUrl) {
-    for (const name of ["extension", "challenge", "state", "silent"]) url.searchParams.delete(name);
+    for (const name of ["extension", "challenge", "state", "silent", "tab"]) url.searchParams.delete(name);
     window.history.replaceState(window.history.state, "", url);
     try {
       window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...fromUrl, until: Date.now() + REQUEST_LIFE_MS }));
@@ -63,6 +65,26 @@ export function extensionReturnUrl(
   if ("code" in answer) url.searchParams.set("code", answer.code);
   else url.searchParams.set("error", answer.error);
   return url.toString();
+}
+
+const SIGN_IN_MESSAGE = "openbot.extension-sign-in";
+
+export async function answerExtensionTab(
+  request: ExtensionConnectRequest,
+  answer: { code: string } | { error: "access_denied" },
+): Promise<boolean> {
+  const runtime = globalThis.chrome?.runtime;
+  if (!runtime?.sendMessage) return false;
+  try {
+    const reply = await runtime.sendMessage(request.extensionId, {
+      kind: SIGN_IN_MESSAGE,
+      state: request.state,
+      ...answer,
+    });
+    return reply?.received === true;
+  } catch {
+    return false;
+  }
 }
 
 const ALLOWED_KEY = "openbot.web.extension-allowed.v1";
