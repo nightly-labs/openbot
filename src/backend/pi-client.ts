@@ -1022,7 +1022,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   #reportMcpStartFailures(keys: ReadonlyMap<string, string>, message: string): void {
     for (const failure of piMcpStartFailures(message, keys))
-      this.emit("notification", { method: "mcpServer/startupStatus/updated", params: failure });
+      this.emit("notification", {
+        method: "mcpServer/startupStatus/updated",
+        params: { ...failure, error: this.#redact(failure.error) },
+      });
   }
 
   #record(thread: PiThread, record: DynamicRecord): void {
