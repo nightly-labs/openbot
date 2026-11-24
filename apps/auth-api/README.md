@@ -290,6 +290,15 @@ The encrypted `.env.production` has it, so `scripts/hosting/leaseweb-pool.ts cus
 server in for its owner. GitHub Actions reads it from the `cloudflare-production` Environment. When you
 change it, change it in both places and deploy the Worker.
 
+`STORE_REVIEW_EMAIL` and `STORE_REVIEW_CODE` give app store reviewers a sign-in that does not need an
+inbox. A sign-in that starts with this one email sends no email, and its code is `STORE_REVIEW_CODE`
+(8 characters from the sign-in code alphabet). The expiry, the 5 tries and the rate limits stay the
+same, and every other email works as before. Set both or neither: a value that is not a valid email or
+code turns the sign-in off. The account must be a member of the review server only, because each person
+who has the code can sign in to it. Change the code after a review. The encrypted `.env.production`
+has both values, and `scripts/deploy-auth-api.ts` puts them. The CI deploy keeps the values that the
+Worker has.
+
 Use `bun run api:deploy:test` for the isolated `openbot-auth-api-test` Worker
 and the `openbot-auth-test` D1 database.
 

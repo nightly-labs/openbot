@@ -1109,6 +1109,7 @@ Leaseweb accounts use one scheme:
 | `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number after the highest on all accounts; `leaseweb-pool.ts custom` sets it. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
+| `internal-<purpose>` | A machine of the operators, not in the pool and not for tests. `internal-store-review` is the server of the app store reviewers; see `AGENTS.md`. | `internal-store-review` |
 
 `leaseweb-pool.ts traffic [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]` is read only. It shows the public
 traffic in and out of each VPS on the five accounts, from the first day of this month (UTC) to today,
