@@ -2417,7 +2417,6 @@ export class ProviderRuntime implements ProviderPort {
           this.#updatesWhenIdle.add(provider);
           recordRestartActivity();
         }
-        this.#hooks.releasePersonWaits?.(provider);
       } else if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
       yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
     }
@@ -2458,6 +2457,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#updatesWhenIdle.delete(provider);
         this.#setProviderConnectionState(provider, "connecting", false);
         this.#replacingCli.add(provider);
+        this.#hooks.onProviderHeld?.(provider);
         recordRestartActivity();
         return true;
       }),
