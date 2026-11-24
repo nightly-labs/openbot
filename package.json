@@ -448,6 +448,7 @@
     "test:voice-transcription": "bun scripts/voice-transcription-smoke.ts",
     "test:remote-desktop-runtime": "bun scripts/remote-desktop-runtime-smoke.ts",
     "test:signal": "bun scripts/signal-security-e2e.ts",
+    "test:conversation-ownership": "bun scripts/conversation-ownership-e2e.ts",
     "test:remote-protocol": "bun scripts/remote-protocol-e2e.ts",
     "test:ipc-input": "bun scripts/ipc-input-e2e.ts",
     "test:automation-cli": "bun scripts/automation-cli-e2e.ts",
