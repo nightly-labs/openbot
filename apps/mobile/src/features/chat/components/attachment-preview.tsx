@@ -150,7 +150,8 @@ function newShareFolder() {
 }
 
 function shareCopy(folder: Directory, name: string) {
-  return new File(folder, safeFileName(name) || "file");
+  const safe = safeFileName(name);
+  return new File(folder, /^\.{0,2}$/u.test(safe) ? "file" : safe);
 }
 
 async function fileText(data: RemoteFileUpload & { fileUri?: string }) {
