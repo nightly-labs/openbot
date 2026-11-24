@@ -92,6 +92,10 @@ export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
   },
 };
 
+export const OPENCODE_APPROVING_AGENT_CONFIG: OpenCodeConfigBase = {
+  permission: { ...OPENCODE_AGENT_CONFIG.permission, bash: "ask", edit: "ask" },
+};
+
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
 const OPENCODE_GO_PROVIDER = "opencode-go";

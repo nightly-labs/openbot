@@ -87,6 +87,7 @@ import {
   type CustomProviderSource,
   customProvidersOn,
   OPENCODE_AGENT_CONFIG,
+  OPENCODE_APPROVING_AGENT_CONFIG,
   OPENCODE_PROFILE_CONFIG,
   openCodeConfigEnv,
   openCodeModelName,
@@ -857,7 +858,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               { ...process.env, ...agentEnvironment },
               cli.version,
             ),
-            ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
+            ...openCodeConfigEnv(
+              confinement ? OPENCODE_AGENT_CONFIG : OPENCODE_APPROVING_AGENT_CONFIG,
+              openCodeEndpoints(context),
+              context.apiKey("opencode"),
+            ),
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
         },
