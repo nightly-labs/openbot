@@ -314,7 +314,7 @@ svg.credit-target-logo {
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
   line-height: var(--openbot-leading-sm);
-  transform: translateX(-50%);
+  translate: -50% 0;
   transform-origin: bottom center;
   transition:
     color var(--openbot-duration-overlay) var(--openbot-ease-out),
