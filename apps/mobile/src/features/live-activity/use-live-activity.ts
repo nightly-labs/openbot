@@ -42,6 +42,14 @@ import { usePushEnvironment } from "@/shared/lib/push-environment";
 import { currentLocale, currentText } from "@/shared/lib/text";
 import { agentLiveActivity } from "./agent-live-activity";
 import type { AgentLiveActivityNative } from "./agent-live-activity.types";
+import {
+  emptyLiveActivityDismissals,
+  type LiveActivityDismissals,
+  type LiveActivityFailure,
+  loadLiveActivityDismissals,
+  sameLiveActivityFailure,
+  saveLiveActivityDismissals,
+} from "./model/live-activity-dismissals";
 import { useLiveActivityHost } from "./model/live-activity-host";
 import { liveActivityHostKeys, loadLiveActivitySecret, resetLiveActivitySecret } from "./model/live-activity-keys";
 import {
@@ -50,7 +58,7 @@ import {
   resetLiveActivityActions,
   setLiveActivityLinkKeys,
 } from "./model/live-activity-link";
-import { LiveActivitySync } from "./model/live-activity-sync";
+import { LiveActivitySync, RESTART_AFTER_MS } from "./model/live-activity-sync";
 
 const STALE_AFTER_BACKGROUND_MS = 5 * 60 * 1000;
 const PUBLISH_DELAY_MS = 1000;
@@ -130,18 +138,64 @@ export function useLiveActivity({
     return registrationQueue.current;
   }, []);
 
-  const syncFor = useCallback((native: AgentLiveActivityNative) => {
-    sync.current ??= new LiveActivitySync(
-      native.starter,
-      (token, startedAt) => {
-        if (disposed.current) return;
-        setPushToken(token);
-        setActivityStartedAt(startedAt);
-      },
-      (action) => mobileAnalytics.track("live_activity_action", { action }),
-    );
-    return sync.current;
+  const dismissals = useRef<LiveActivityDismissals | null>(null);
+  const shownFailures = useRef(new WeakMap<AgentLiveActivityProps, LiveActivityFailure>());
+  const savedDismissals = useCallback(() => {
+    dismissals.current ??= loadLiveActivityDismissals();
+    return dismissals.current;
   }, []);
+  const [unacknowledged, setUnacknowledged] = useState<readonly LiveActivityFailure[]>(() =>
+    live ? savedDismissals().dismissed : [],
+  );
+  const updateDismissals = useCallback((next: LiveActivityDismissals) => {
+    dismissals.current = next;
+    saveLiveActivityDismissals(next);
+    setUnacknowledged(next.dismissed);
+  }, []);
+  const hideDismissedFailures = useCallback(() => {
+    if (!live) return;
+    for (const failure of savedDismissals().dismissed) {
+      live.coordinator.resolveAction({ type: "dismiss-failure", ...failure });
+    }
+  }, [live, savedDismissals]);
+
+  const syncFor = useCallback(
+    (native: AgentLiveActivityNative) => {
+      sync.current ??= new LiveActivitySync(native.starter, {
+        pushToken: (token, startedAt) => {
+          if (disposed.current) return;
+          setPushToken(token);
+          setActivityStartedAt(startedAt);
+        },
+        change: (action) => mobileAnalytics.track("live_activity_action", { action }),
+        shown: (props, startedAt) => {
+          if (disposed.current) return;
+          const failure = props ? shownFailures.current.get(props) : undefined;
+          const shown = failure && startedAt !== null ? { failure, startedAt } : null;
+          const saved = savedDismissals();
+          if (JSON.stringify(shown) === JSON.stringify(saved.shown)) return;
+          updateDismissals({ ...saved, shown });
+        },
+        dismissed: (startedAt) => {
+          if (disposed.current) return;
+          const saved = savedDismissals();
+          const shown = saved.shown;
+          const swiped =
+            shown !== null &&
+            (startedAt === null || startedAt === shown.startedAt) &&
+            Date.now() - shown.startedAt < RESTART_AFTER_MS;
+          if (swiped) {
+            const known = saved.dismissed.some((failure) => sameLiveActivityFailure(failure, shown.failure));
+            updateDismissals({ shown: null, dismissed: known ? saved.dismissed : [...saved.dismissed, shown.failure] });
+            hideDismissedFailures();
+          }
+          void Promise.resolve().then(() => publishRef.current());
+        },
+      });
+      return sync.current;
+    },
+    [savedDismissals, updateDismissals, hideDismissedFailures],
+  );
 
   const keptAvatars = useRef(0);
   const keepAvatars = useCallback(() => {
@@ -236,10 +290,15 @@ export function useLiveActivity({
         return;
       }
       lastPublish.current = { mode, at: Date.now() };
-      void syncFor(live.native).show(
-        props && fitLiveActivityProps(props),
-        foregroundRef.current ? undefined : staleDate.current,
-      );
+      const fitted = props && fitLiveActivityProps(props);
+      if (fitted && presentation.mode === "failed") {
+        shownFailures.current.set(fitted, {
+          serverId: presentation.serverId,
+          agentId: presentation.item.agent.id,
+          turnId: presentation.item.turnId,
+        });
+      }
+      void syncFor(live.native).show(fitted, foregroundRef.current ? undefined : staleDate.current);
 
       function workingThread(): string | null {
         const working = live?.coordinator.workingTurn(presentation);
@@ -297,10 +356,35 @@ export function useLiveActivity({
       if (!live || !isAgentEvent(event)) return;
       received.current = true;
       live.coordinator.applyEvent({ serverId, event }, serverId);
+      hideDismissedFailures();
       schedule();
     },
-    [live, schedule],
+    [live, schedule, hideDismissedFailures],
   );
+
+  const acknowledging = useRef(new Set<string>());
+  useEffect(() => {
+    if (!live || !foreground) return;
+    for (const failure of unacknowledged) {
+      const key = JSON.stringify([failure.serverId, failure.agentId, failure.turnId]);
+      const server = servers.find((candidate) => candidate.id === failure.serverId);
+      if (server?.state !== "online" || acknowledging.current.has(key)) continue;
+      acknowledging.current.add(key);
+      void post(failure.serverId, TEAM_API_ROUTES.agent.failuresAcknowledge(failure.agentId), {
+        turnId: failure.turnId,
+      })
+        .then(
+          () => {
+            if (disposed.current) return;
+            const saved = savedDismissals();
+            const dismissed = saved.dismissed.filter((other) => !sameLiveActivityFailure(other, failure));
+            updateDismissals({ ...saved, dismissed });
+          },
+          () => undefined,
+        )
+        .finally(() => acknowledging.current.delete(key));
+    }
+  }, [live, foreground, unacknowledged, servers, post, savedDismissals, updateDismissals]);
 
   useEffect(() => {
     if (!live) return;
@@ -569,8 +653,9 @@ export function useLiveActivity({
       keptAvatars.current = 0;
       setPhotos({});
       void syncFor(live.native).show(null);
+      updateDismissals(emptyLiveActivityDismissals());
     };
-  }, [live, syncFor, enqueueRegistration]);
+  }, [live, syncFor, enqueueRegistration, updateDismissals]);
 
   return applyTeamEvent;
 }

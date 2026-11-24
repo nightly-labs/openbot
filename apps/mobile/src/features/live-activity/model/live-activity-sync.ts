@@ -6,31 +6,40 @@ export interface LiveActivityInstance<Props> {
   watchPushToken(receive: (token: string) => void): () => void;
 }
 
-const RESTART_AFTER_MS = 7 * 60 * 60 * 1000;
+export const RESTART_AFTER_MS = 7 * 60 * 60 * 1000;
 
 export interface LiveActivityStarter<Props> {
   start(props: Props, staleDate?: Date): LiveActivityInstance<Props>;
   getInstances(): LiveActivityInstance<Props>[];
 }
 
+export interface LiveActivitySyncEvents<Props> {
+  pushToken(token: string | null, startedAt: number | null): void;
+  change(change: "started" | "ended"): void;
+  shown(props: Props | null, startedAt: number | null): void;
+  dismissed(startedAt: number | null): void;
+}
+
+const NO_EVENTS: LiveActivitySyncEvents<unknown> = {
+  pushToken: () => undefined,
+  change: () => undefined,
+  shown: () => undefined,
+  dismissed: () => undefined,
+};
+
 export class LiveActivitySync<Props> {
   readonly #starter: LiveActivityStarter<Props>;
-  readonly #onPushToken: (token: string | null, startedAt: number | null) => void;
-  readonly #onChange: (change: "started" | "ended") => void;
+  readonly #events: LiveActivitySyncEvents<Props>;
   #activity: LiveActivityInstance<Props> | null = null;
   #stopWatch: (() => void) | null = null;
   #shown: string | null;
   #queue: Promise<void> = Promise.resolve();
 
-  constructor(
-    starter: LiveActivityStarter<Props>,
-    onPushToken: (token: string | null, startedAt: number | null) => void = () => undefined,
-    onChange: (change: "started" | "ended") => void = () => undefined,
-  ) {
+  constructor(starter: LiveActivityStarter<Props>, events: Partial<LiveActivitySyncEvents<Props>> = {}) {
     this.#starter = starter;
-    this.#onPushToken = onPushToken;
-    this.#onChange = onChange;
+    this.#events = { ...NO_EVENTS, ...events };
     const [current = null, ...extra] = starter.getInstances();
+    if (!current) this.#events.dismissed(null);
     this.#setActivity(current);
     this.#shown = current ? null : stateKey(null, undefined);
     for (const activity of extra) void activity.end("immediate").catch(() => undefined);
@@ -54,8 +63,12 @@ export class LiveActivitySync<Props> {
     if (!activity) return;
     const active = activity.isActive();
     if (active && (activity.startedAt === null || now - activity.startedAt < RESTART_AFTER_MS)) return;
+    if (!active) {
+      if (dismissedByUser(activity, now)) this.#events.dismissed(activity.startedAt);
+      this.#setActivity(null);
+      return;
+    }
     this.#setActivity(null);
-    if (!active) return;
     this.#queue = this.#queue.then(() => activity.end("immediate")).catch(() => undefined);
   }
 
@@ -65,28 +78,45 @@ export class LiveActivitySync<Props> {
       this.#setActivity(null);
       if (!activity) return;
       await activity.end("immediate");
-      this.#onChange("ended");
+      this.#events.change("ended");
       return;
     }
     if (activity) {
       try {
         await activity.update(props, staleDate);
+        this.#events.shown(props, activity.startedAt);
         return;
       } catch {
+        if (dismissedByUser(activity, Date.now())) {
+          this.#events.dismissed(activity.startedAt);
+          this.#setActivity(null);
+          this.#shown = null;
+          return;
+        }
         this.#setActivity(null);
       }
     }
-    this.#setActivity(this.#starter.start(props, staleDate));
-    this.#onChange("started");
+    const started = this.#starter.start(props, staleDate);
+    this.#setActivity(started);
+    this.#events.shown(props, started.startedAt);
+    this.#events.change("started");
   }
 
   #setActivity(activity: LiveActivityInstance<Props> | null): void {
     this.#stopWatch?.();
     this.#stopWatch = null;
     this.#activity = activity;
-    this.#onPushToken(null, null);
-    if (activity) this.#stopWatch = activity.watchPushToken((token) => this.#onPushToken(token, activity.startedAt));
+    this.#events.pushToken(null, null);
+    if (!activity) {
+      this.#events.shown(null, null);
+      return;
+    }
+    this.#stopWatch = activity.watchPushToken((token) => this.#events.pushToken(token, activity.startedAt));
   }
+}
+
+function dismissedByUser(activity: LiveActivityInstance<unknown>, now: number): boolean {
+  return activity.startedAt !== null && now - activity.startedAt < RESTART_AFTER_MS && !activity.isActive();
 }
 
 function stateKey(props: unknown, staleDate: Date | undefined): string {
