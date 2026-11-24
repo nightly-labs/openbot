@@ -83,14 +83,17 @@ It also sends these events for a license: a Checkout starts, the license starts,
 users goes up or down, its renewal is cancelled or resumed, it ends, or its payment succeeds, fails,
 is refunded or is disputed.
 It also sends an event when your OpenBot credits change: a credits Checkout starts, is paid or
-expires, a refund or a lost dispute takes credits back, you move credits to or from a server, a
-license gives free monthly credits or they expire, or a workflow step that uses OpenBot credits
+expires, a refund or a lost dispute takes credits back, you move credits to or from a server, you
+redeem a credit code, a license gives free monthly credits or they expire, or a workflow step that uses OpenBot credits
 starts, is charged or ends with no charge. A credits event has your account ID (for a server step
 that no member started, or a server's free credits, the account ID of the server owner), whether
 the credits are personal or a server's, the number of credits, the currency and amount of a
 payment, and for a generation the model, its kind (image or video), the resolution, duration,
-number of results and audio setting that the step asked for, and the outcome. It does not have the
-prompt, the pictures, the result, the job, or the server ID.
+number of results and audio setting that the step asked for, and the outcome. Each try to redeem a
+credit code also sends an event with its result (for example redeemed, wrong code, ended, used, or
+too many tries), the limit that stopped it, whether the code is for one account or for more, and the
+campaign name that OpenBot gave the code. It does not have the prompt, the pictures, the result, the
+job, the credit code, your network address, or the server ID.
 Each event has your account ID and only fixed values: the action, whether it is a server plan or a
 license, the plan, the number of license users, the billing period, the currency, the amount that
 Stripe reports, the place in the app where the plans were opened, the server size, the start reason,
@@ -499,16 +502,24 @@ The service stores:
   monthly credits of a paid license, it keeps a grant record: the license, the account or server that
   has them, the credits given and left, and the start and end times. Deleting the account removes the
   grant records of its own balance.
+  For credit codes, it keeps the SHA-256 hash of each code, never the code itself, with the credits,
+  the number of uses, the end date, and a campaign name and a note from OpenBot. For each redemption it
+  keeps the code, the account, the server that got the credits (when one is selected), the grant and
+  the time, and a grant record as for free monthly credits. To stop guessing and abuse, it counts the
+  tries and the wrong codes of each account and of each network address (an IPv6 address to its /64
+  network) in the current hour. With each count it keeps only a SHA-256 hash of the account ID or the
+  network address, never the address, and it deletes the counts when the hour ends. Deleting the
+  account removes its redemptions.
   Settings > Billing shows an account the ledger entries and holds of its own balance and of the
   servers where it is a member. The owner and the admins of a server see all of the server's entries,
   with the names of the accounts that acted. Other members see only the entries that they made. No
   email address is shown.
   The service also keeps a credit audit record for each credit change and each failed credit action:
   checkouts that open or expire, purchases, moves, reversals, free credits, holds, starts, charges and
-  releases, and refused checkouts, moves and generations. A record has the action, the result and the
+  releases, redemptions, and refused checkouts, moves, redemptions and generations. A record has the action, the result and the
   error code, the account or server, the account that acted, the credits, the model, the job, Checkout
   Session or Stripe object ID, and for a generation that the processor refused, the HTTP status and error
-  code of the processor. It keeps no prompt, picture, result file, card data or email address. The
+  code of the processor. It keeps no prompt, picture, result file, credit code, card data or email address. The
   service deletes a record after 400 days. Deleting the account removes the records of its own balance,
   and removes the account from the records of a server.
 - for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the

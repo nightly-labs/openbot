@@ -195,6 +195,7 @@ import { Route as V1MeBillingStorageRouteImport } from './routes/v1/me/billing/s
 import { Route as V1MeCreditsIndexRouteImport } from './routes/v1/me/credits/index'
 import { Route as V1MeCreditsActivityRouteImport } from './routes/v1/me/credits/activity'
 import { Route as V1MeCreditsCheckoutRouteImport } from './routes/v1/me/credits/checkout'
+import { Route as V1MeCreditsRedeemRouteImport } from './routes/v1/me/credits/redeem'
 import { Route as V1MeCreditsTransferRouteImport } from './routes/v1/me/credits/transfer'
 import { Route as V1MeLicenseIndexRouteImport } from './routes/v1/me/license/index'
 import { Route as V1MeLicenseCheckoutRouteImport } from './routes/v1/me/license/checkout'
@@ -1227,6 +1228,11 @@ const V1MeCreditsCheckoutRoute = V1MeCreditsCheckoutRouteImport.update({
   path: '/credits/checkout',
   getParentRoute: () => V1MeRoute,
 } as any)
+const V1MeCreditsRedeemRoute = V1MeCreditsRedeemRouteImport.update({
+  id: '/credits/redeem',
+  path: '/credits/redeem',
+  getParentRoute: () => V1MeRoute,
+} as any)
 const V1MeCreditsTransferRoute = V1MeCreditsTransferRouteImport.update({
   id: '/credits/transfer',
   path: '/credits/transfer',
@@ -1950,6 +1956,7 @@ export interface FileRoutesByFullPath {
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/credits/activity': typeof V1MeCreditsActivityRoute
   '/v1/me/credits/checkout': typeof V1MeCreditsCheckoutRoute
+  '/v1/me/credits/redeem': typeof V1MeCreditsRedeemRoute
   '/v1/me/credits/transfer': typeof V1MeCreditsTransferRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
@@ -2229,6 +2236,7 @@ export interface FileRoutesByTo {
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/credits/activity': typeof V1MeCreditsActivityRoute
   '/v1/me/credits/checkout': typeof V1MeCreditsCheckoutRoute
+  '/v1/me/credits/redeem': typeof V1MeCreditsRedeemRoute
   '/v1/me/credits/transfer': typeof V1MeCreditsTransferRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
@@ -2513,6 +2521,7 @@ export interface FileRoutesById {
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/credits/activity': typeof V1MeCreditsActivityRoute
   '/v1/me/credits/checkout': typeof V1MeCreditsCheckoutRoute
+  '/v1/me/credits/redeem': typeof V1MeCreditsRedeemRoute
   '/v1/me/credits/transfer': typeof V1MeCreditsTransferRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
@@ -2794,6 +2803,7 @@ export interface FileRouteTypes {
     | '/v1/me/billing/storage'
     | '/v1/me/credits/activity'
     | '/v1/me/credits/checkout'
+    | '/v1/me/credits/redeem'
     | '/v1/me/credits/transfer'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
@@ -3073,6 +3083,7 @@ export interface FileRouteTypes {
     | '/v1/me/billing/storage'
     | '/v1/me/credits/activity'
     | '/v1/me/credits/checkout'
+    | '/v1/me/credits/redeem'
     | '/v1/me/credits/transfer'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
@@ -3356,6 +3367,7 @@ export interface FileRouteTypes {
     | '/v1/me/billing/storage'
     | '/v1/me/credits/activity'
     | '/v1/me/credits/checkout'
+    | '/v1/me/credits/redeem'
     | '/v1/me/credits/transfer'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
@@ -4950,6 +4962,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1MeCreditsCheckoutRouteImport
       parentRoute: typeof V1MeRoute
     }
+    '/v1/me/credits/redeem': {
+      id: '/v1/me/credits/redeem'
+      path: '/credits/redeem'
+      fullPath: '/v1/me/credits/redeem'
+      preLoaderRoute: typeof V1MeCreditsRedeemRouteImport
+      parentRoute: typeof V1MeRoute
+    }
     '/v1/me/credits/transfer': {
       id: '/v1/me/credits/transfer'
       path: '/credits/transfer'
@@ -5797,6 +5816,7 @@ interface V1MeRouteChildren {
   V1MeBillingStorageRoute: typeof V1MeBillingStorageRoute
   V1MeCreditsActivityRoute: typeof V1MeCreditsActivityRoute
   V1MeCreditsCheckoutRoute: typeof V1MeCreditsCheckoutRoute
+  V1MeCreditsRedeemRoute: typeof V1MeCreditsRedeemRoute
   V1MeCreditsTransferRoute: typeof V1MeCreditsTransferRoute
   V1MeLicenseCheckoutRoute: typeof V1MeLicenseCheckoutRoute
   V1MeLicensePlanRoute: typeof V1MeLicensePlanRoute
@@ -5818,6 +5838,7 @@ const V1MeRouteChildren: V1MeRouteChildren = {
   V1MeBillingStorageRoute: V1MeBillingStorageRoute,
   V1MeCreditsActivityRoute: V1MeCreditsActivityRoute,
   V1MeCreditsCheckoutRoute: V1MeCreditsCheckoutRoute,
+  V1MeCreditsRedeemRoute: V1MeCreditsRedeemRoute,
   V1MeCreditsTransferRoute: V1MeCreditsTransferRoute,
   V1MeLicenseCheckoutRoute: V1MeLicenseCheckoutRoute,
   V1MeLicensePlanRoute: V1MeLicensePlanRoute,
