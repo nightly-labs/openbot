@@ -82,17 +82,13 @@ export class LiveActivitySync<Props> {
       return;
     }
     if (activity) {
+      if (this.#dropDismissed(activity)) return;
       try {
         await activity.update(props, staleDate);
         this.#events.shown(props, activity.startedAt);
         return;
       } catch {
-        if (dismissedByUser(activity, Date.now())) {
-          this.#events.dismissed(activity.startedAt);
-          this.#setActivity(null);
-          this.#shown = null;
-          return;
-        }
+        if (this.#dropDismissed(activity)) return;
         this.#setActivity(null);
       }
     }
@@ -100,6 +96,14 @@ export class LiveActivitySync<Props> {
     this.#setActivity(started);
     this.#events.shown(props, started.startedAt);
     this.#events.change("started");
+  }
+
+  #dropDismissed(activity: LiveActivityInstance<Props>): boolean {
+    if (!dismissedByUser(activity, Date.now())) return false;
+    this.#events.dismissed(activity.startedAt);
+    this.#setActivity(null);
+    this.#shown = null;
+    return true;
   }
 
   #setActivity(activity: LiveActivityInstance<Props> | null): void {
