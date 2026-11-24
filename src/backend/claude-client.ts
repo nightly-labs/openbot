@@ -102,6 +102,7 @@ import {
   isClaudeInterruptMarker,
   isClaudeLocalCommand,
   isClaudeTaskNotification,
+  LOST_BACKGROUND_WORK_TAG,
 } from "./conversation-snapshots";
 import { runCauseEffect } from "./effect-boundary";
 import { skillFolderNames } from "./home-skills";
@@ -507,10 +508,12 @@ function lostBackgroundTaskLine(task: ClaudeBackgroundTask): string {
 
 function lostBackgroundWorkNote(tasks: readonly ClaudeBackgroundTask[]): string {
   return [
+    `<${LOST_BACKGROUND_WORK_TAG}>`,
     "OpenBot note, not a message from the user. Your Claude Code process exited unexpectedly while this chat was idle. This background work stopped, or it ended but its result did not reach you, and it does not report back on its own:",
     ...tasks.map(lostBackgroundTaskLine),
     "Tell the user in one short line what stopped. Then resume or restart only the work that the user's request still needs, and wait for its result. A step possibly finished before the stop: check its result before you do it again. This note does not approve a risky action.",
     "Write each line for the user in the language of the user's chat messages, not in the language of OpenBot notes or other agents.",
+    `</${LOST_BACKGROUND_WORK_TAG}>`,
   ].join("\n");
 }
 
