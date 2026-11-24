@@ -17,7 +17,6 @@ import {
   COMPUTER_USE_MCP_SERVER_NAME,
   DEFAULT_AGENT_MEMORY_LIMIT,
   DEFAULT_RESPONSE_STYLE,
-  type MacPermissionId,
   OPENBOT_COMMIT_TRAILER,
   type ResponseStyle,
   workspaceAccessEnforced,
@@ -31,29 +30,11 @@ import { ROUTINE_NO_UPDATE_MARKER, ROUTINE_NO_UPDATE_TOOL } from "./routine-quie
 import type { PromptInstructionsFile } from "./workspace-instructions";
 import { existingAgentFolders, workspaceExcludedFolders } from "./workspace-sandbox";
 
-const MAC_PERMISSION_NAMES: Record<MacPermissionId, string> = {
-  "screen-recording": "Screen Recording",
-  accessibility: "Accessibility",
-};
-
-export function macPermissionNames(ids: readonly MacPermissionId[]): string[] {
-  return ids.map((id) => MAC_PERMISSION_NAMES[id]);
-}
-
-function computerUseNotReadyRule(options: {
-  serverHost?: boolean;
-  computerUseMissingPermissions?: readonly MacPermissionId[];
-}): string {
-  const place = options.serverHost ? "server" : "computer";
-  const missing = macPermissionNames(options.computerUseMissingPermissions ?? []);
-  const reason =
-    missing.length > 0
-      ? `: macOS has not given OpenBot the ${missing.join(" and ")} permission${missing.length > 1 ? "s" : ""}`
-      : "";
-  const next = options.serverHost
+function computerUseNotReadyRule(serverHost: boolean): string {
+  const next = serverHost
     ? " on this server, so you cannot do that step"
-    : `${missing.length > 0 ? " and name what is missing" : ""}; then call openbot.show_setting with computer-use.permissions: its card opens Settings, then Computer Use, where OpenBot starts it or shows what is missing and the user can grant it; it works from their next message`;
-  return `Computer Use is on for you, but it is not ready on this ${place} now${reason}, so you have no ${COMPUTER_USE_MCP_SERVER_NAME} tools; do not search for them or use another desktop-control plugin. When a task needs a desktop application outside the embedded browser, say in one plain sentence that Computer Use is not ready${next}.`;
+    : "; when openbot.read_agent for you gives computerUseMissingPermissions, name them. Then call openbot.show_setting with computer-use.permissions: its card opens Settings, then Computer Use, where OpenBot starts it or shows what is missing and the user can grant it; it works from their next message";
+  return `Computer Use is on for you, but it is not ready on this ${serverHost ? "server" : "computer"} now, so you have no ${COMPUTER_USE_MCP_SERVER_NAME} tools; do not search for them or use another desktop-control plugin. When a task needs a desktop application outside the embedded browser, say in one plain sentence that Computer Use is not ready${next}.`;
 }
 
 const ROUTINE_SIGN_IN_RULE =
@@ -129,7 +110,6 @@ export interface DeveloperInstructionOptions {
   sectionTeammates?: SectionTeammates | null;
   computerUseInOwnChat?: boolean;
   computerUseNotReady?: boolean;
-  computerUseMissingPermissions?: readonly MacPermissionId[];
   sideThread?: boolean;
   homeSkills?: readonly HomeSkill[];
   workspaceSkills?: readonly string[];
@@ -542,7 +522,7 @@ export function developerInstructions(
       : []),
     ...homeSkillInstructions(options.homeSkills ?? []),
     agentComputerUseEnabled(agent) && options.computerUseNotReady
-      ? computerUseNotReadyRule(options)
+      ? computerUseNotReadyRule(options.serverHost === true)
       : agentComputerUseEnabled(agent)
         ? `Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task outside the embedded browser, never ${agent.provider === "claude" ? "" : "Codex Computer Use, the Sky computer use service, or "}another desktop-control plugin: they show no OpenBot cursor and can fight this one for the pointer.${options.agentCursorDrawn ? " OpenBot draws your cursor at each point that you click, scroll or move_cursor to in another app, also when the driver refuses its own cursor overlay." : ""}${options.computerUseOnWayland ? " On this Wayland desktop, video recording can be unavailable: when start_recording with record_video true answers video_active false and does not ask you to install ffmpeg, call stop_recording and do not try video again; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot record video on this desktop, and offer screenshots instead." : ""}${options.computerUseInputRefused ? " On this desktop, OpenBot cannot send keys or clicks to other apps. Where a window offers an accessibility action, such as set_value on a text field, use it. When typing, a key or a click is refused, do not retry it and do not change its delivery mode; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot type or click in apps on this desktop, and say that you can still read windows and take screenshots." : inputRefusalRules(options.computerUseOnWayland === true)}${process.platform === "win32" ? WINDOWS_MENU_RULE : ""} After each action, read its structuredContent, or its JSON copy at the end of the result text: refused or suspected_noop means that the action did not happen, so do not report it as done; unverifiable means read the window again and report what you saw; a delivery.mode of foreground took the screen from the user. browser_consent_required means that OpenBot cannot use the user's own browser profiles: do not call browser_prepare; say so in one plain sentence and continue in openbot_browser, with request_takeover for a sign-in. Select a window by its title and size, never the first match: most windows are small empty helpers. Pixel coordinates apply only to the main display; on another display, use the element token, or the element_index with the window_id and snapshot_id of the same read. Take the shortest path and do not repeat reads; use query or include_screenshot false when you only need an element. Read ${COMPUTER_USE_GUIDE_URI} before the first GUI action of a conversation.${agent.provider === "pi" || isKeyOnlyProvider(agent.provider) ? ` ${piComputerUseGuideStep()}` : ""}`
         : options.computerUseInOwnChat

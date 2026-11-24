@@ -163,6 +163,7 @@ export class CuaDriverRuntime {
   #recheckTimer: ReturnType<typeof setTimeout> | null = null;
   #recheckAttempt = 0;
   #readySince: number | null = null;
+  #permissionsRead = false;
 
   constructor(options: CuaDriverRuntimeOptions) {
     this.#options = options;
@@ -179,6 +180,11 @@ export class CuaDriverRuntime {
 
   waylandInputRefused(): boolean {
     return this.#waylandInputRefused;
+  }
+
+  missingPermissions(): MacPermissionId[] {
+    if (!this.#permissionsRead || this.#state.status !== "permissions-required") return [];
+    return this.#state.permissions.filter((permission) => !permission.granted).map((permission) => permission.id);
   }
 
   running(): boolean {
@@ -300,6 +306,7 @@ export class CuaDriverRuntime {
         message: sourceText("status.computerUse.driverNoAnswer", { reason: describe(result.failure.cause) }),
       });
     const { permissions, waylandInputRefused } = result.success;
+    this.#permissionsRead = true;
     this.#waylandInputRefused = waylandInputRefused;
     const granted = requiredPermissions(this.#options.platform).every((id) =>
       permissions.some((p) => p.id === id && p.granted),

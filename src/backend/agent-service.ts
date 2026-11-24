@@ -1371,9 +1371,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.agentCursorDrawn ? { agentCursorDrawn: true } : {}),
       ...(options.computerUseOnWayland ? { computerUseOnWayland: true } : {}),
       ...(options.computerUseInputRefused ? { computerUseInputRefused: options.computerUseInputRefused } : {}),
-      ...(options.computerUseMissingPermissions
-        ? { computerUseMissingPermissions: options.computerUseMissingPermissions }
-        : {}),
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
       memoryReview: () => this.#memoryReview.running(),
       skillRevision: () => options.skillLearning?.() === "automatic",

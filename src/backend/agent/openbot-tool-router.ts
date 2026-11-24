@@ -172,7 +172,6 @@ import {
   visualReplyFileName,
   visualReplyMessageId,
 } from "./delivery-content";
-import { macPermissionNames } from "./developer-instructions";
 import type { DrainScheduler } from "./drain-scheduler";
 import type { FeedbackWithdrawal } from "./feedback-withdrawal";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
@@ -420,6 +419,11 @@ function listedDescription(description: string): string {
 function captureFailure(failure: ScreenCaptureFailed) {
   return openBotToolFailure(failure.reason);
 }
+
+const MAC_PERMISSION_NAMES: Record<MacPermissionId, string> = {
+  "screen-recording": "Screen Recording",
+  accessibility: "Accessibility",
+};
 
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
@@ -1791,7 +1795,9 @@ export class OpenBotToolRouter {
     const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(agentId), computerUse);
     const computerUseReady = mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID);
     const computerUseMissing =
-      computerUse && !computerUseReady ? macPermissionNames(this.#hooks.computerUseMissingPermissions?.() ?? []) : [];
+      computerUse && !computerUseReady
+        ? (this.#hooks.computerUseMissingPermissions?.() ?? []).map((id) => MAC_PERMISSION_NAMES[id])
+        : [];
     let skills: unknown[] | undefined;
     let skillsError: string | undefined;
     const loaded = yield* Effect.result(
