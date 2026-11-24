@@ -643,7 +643,9 @@ try {
   await page.getByRole("button", { name: english("common.back"), exact: true }).click();
   await serverTitle.click();
   await page.getByRole("menuitem", { name: english("extension.home.settings") }).click();
-  await page.getByRole("button", { name: english("extension.browser.title") }).click();
+  const sharedTabs = page.getByRole("button", { name: new RegExp(`^${english("extension.browser.title")}`) });
+  await sharedTabs.click();
+  assert.equal(await sharedTabs.getAttribute("aria-expanded"), "true", "Shared tabs did not open in Settings.");
   await shot(page, "6b-shared-tabs-settings");
   await page
     .getByRole("button", { name: english("extension.browser.revokeSite", { site: new URL(xBase).host }) })

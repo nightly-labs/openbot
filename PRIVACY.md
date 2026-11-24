@@ -1307,7 +1307,7 @@ your server the address, title and active state of your open web tabs (at most 5
 look at first), through the same encrypted connection, when they change and every 30 seconds. When an
 agent works in a tab, the tab joins a Chrome tab group named "OpenBot", unless it is in another group. When an agent acts on a site for the
 first time, the side panel asks you (Allow once, Always for this site, Deny); the sites that you allow
-always stay in the browser's extension storage until you remove them in the panel. The extension
+always stay in the browser's extension storage until you remove them in the side panel's Settings. The extension
 always asks again before an agent types into a password or payment field, downloads a file, or acts
 on a page that signs in to an app or gives an app access. To read and use a tab, the extension uses
 Chrome's debugger on that tab, and Chrome shows its own bar while it does. What an agent reads goes

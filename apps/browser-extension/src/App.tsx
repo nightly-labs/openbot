@@ -18,7 +18,7 @@ import {
   verifyEmailCode,
 } from "./account";
 import { identify, type SignInMethod, track } from "./analytics";
-import { BrowserAsks, BrowserSharingScreen } from "./BrowserSharing";
+import { BrowserAsks } from "./BrowserSharing";
 import { ChannelScreen } from "./ChannelScreen";
 import { ChatScreen } from "./ChatScreen";
 import { type ClientBrowserLink, createClientBrowserLink } from "./client-browser-link";
@@ -183,7 +183,7 @@ export function App() {
 }
 
 type PushedScreen =
-  | { kind: "chat" | "channel" | "new-agent" | "new-channel" | "new-folder" | "browser-sharing" | "settings" }
+  | { kind: "chat" | "channel" | "new-agent" | "new-channel" | "new-folder" | "settings" }
   | { kind: "agent-settings"; agentId: string };
 
 interface ServerState {
@@ -435,15 +435,11 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                       <Match when={shown.kind === "new-channel"}>
                         <NewChannelScreen workspace={current()} onClose={back} onCreated={openChannel} />
                       </Match>
-                      <Match when={shown.kind === "browser-sharing"}>
-                        <BrowserSharingScreen onBack={() => push("settings")} />
-                      </Match>
                       <Match when={shown.kind === "settings"}>
                         <SettingsScreen
                           sharing={presence().sharing}
                           onBack={back}
                           onAnalyticsChanged={(enabled) => void saveAnalyticsAnswer(props.session.token, enabled)}
-                          onOpenSharedTabs={() => push("browser-sharing")}
                         />
                       </Match>
                       <Match when={shown.kind === "new-folder"}>
