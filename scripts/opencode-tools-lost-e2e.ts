@@ -96,7 +96,6 @@ const model = createServer((request, response) => {
       return;
     }
     prompts += 1;
-    refuse = false;
     if (prompts === 1) await new Promise((wait) => setTimeout(wait, LONG_TURN_MS));
     sse(
       response,
@@ -209,6 +208,7 @@ try {
   const thread = await startThread(client, workspace);
   const firstTurn = await runTurn(client, thread, { text: "Call whoami.", timeoutMs: 180_000 });
   report.turns.push(firstTurn);
+  refuse = false;
   assert.ok(report.refusedConnects > 0, "The bridge must refuse the first connection.");
   assert.ok(
     firstTurn.error?.includes(TOOLS_NOT_LOADED),
@@ -228,7 +228,8 @@ try {
   Server.prototype.connect = connect;
   await stopClients(clients);
   if (cliPath) await run(cliPath, ["service", "stop"], { env: process.env }).catch(() => undefined);
-  model.close();
+  model.closeAllConnections();
+  await new Promise<void>((closed) => model.close(() => closed()));
   await rm(root, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);

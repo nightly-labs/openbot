@@ -307,6 +307,7 @@ interface AcpThread {
   mcp: LocalMcpSession;
   mcpListed: boolean;
   mcpSentAt: number;
+  mcpDropped: boolean;
   relays: Effect.Effect<void>;
   relayed: RelayedMcpServers;
   activeTurn: AcpTurn | null;
@@ -1642,8 +1643,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const limit = this.#flavor.mcpConnectLimitMs;
     if (limit === undefined || !this.#supportsSessionResume || Date.now() - thread.mcpSentAt < limit) return false;
     if (thread.mcp.servers.length === 0 || thread.mcp.listedWithin(0, Number.POSITIVE_INFINITY)) return false;
-    thread.mcp.dropped(thread.mcpSentAt, limit);
-    return true;
+    if (thread.mcp.dropped(thread.mcpSentAt, limit)) thread.mcpDropped = true;
+    return thread.mcpDropped;
   }
 
   #listedInTime(mcp: LocalMcpSession, sentAt: number, waitedMs = 0): boolean {
@@ -1900,6 +1901,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             const openedAt = Date.now();
             const connectLimit = this.#flavor.mcpConnectLimitMs;
             let mcpSentAt = sentAt;
+            let mcpDropped = false;
             if (connectLimit !== undefined && this.#supportsSessionResume && mcp.dropped(sentAt, connectLimit)) {
               this.emit("diagnostic", `${this.#label} did not load OpenBot's tools in time. The session opens again.`);
               mcpServers = [...given, ...mcp.renew()];
@@ -1913,7 +1915,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               const retried = yield* Effect.result(
                 sessionTransport ? retry : this.#whileProcessWrites(retry, "session/resume"),
               );
-              if (Result.isFailure(retried) || mcp.dropped(retriedAt, connectLimit))
+              mcpDropped = mcp.dropped(retriedAt, connectLimit);
+              if (Result.isFailure(retried) || mcpDropped)
                 this.emit("diagnostic", `${this.#label} still did not load OpenBot's tools.`);
             }
             if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())
@@ -1932,6 +1935,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               mcp,
               mcpListed: this.#listedInTime(mcp, sentAt, openedAt - sentAt),
               mcpSentAt,
+              mcpDropped,
               relays: closeRelays ?? Effect.void,
               relayed: relayedServers,
               activeTurn: null,
@@ -2430,7 +2434,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     let thread = yield* providerSync(() => this.#requireThread(threadId));
     if (thread.backgroundReplay) yield* Deferred.await(thread.backgroundReplay);
-    if (!thread.activeTurn && this.#openBotToolsDropped(thread)) thread.needsResume = true;
     if (thread.needsResume && !thread.activeTurn) {
       yield* this.#reopenThread(thread);
       thread = yield* providerSync(() => this.#requireThread(threadId));
