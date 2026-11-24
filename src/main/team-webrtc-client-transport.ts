@@ -32,7 +32,7 @@ import { decodeTeamProtocolV10WebRtcHttpResponse } from "@openbot/contracts/team
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout, startRemoteRequestDeadline } from "@openbot/team-client/remote-recovery";
 import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
-import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Result, Schema } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { RemoteConnectionBootstrap } from "./central-auth-manager";
 import type {
@@ -62,6 +62,7 @@ const CONNECT_RETRY_LIMIT_MILLISECONDS = 30_000;
 
 const CONNECT_LIMIT_MILLISECONDS = 30_000;
 const HOST_WAIT_LIMIT_MILLISECONDS = 60_000;
+const TYPING_REFRESH_MILLISECONDS = 2_000;
 const SIGNAL_HOLD_LIMIT_MILLISECONDS = 70_000;
 
 interface TeamWebRtcClientTransportEvents {
@@ -204,6 +205,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   >();
   readonly #lastAnswerAt = new Map<string, number>();
   readonly #lastEventSequence = new Map<string, number>();
+  readonly #eventAckTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  readonly #lastTyping = new Map<string, { agentId: string | null; typing: boolean; sentAt: number }>();
+  readonly #typingInFlight = new Map<string, { agentId: string | null; typing: boolean }>();
   readonly #hostPublicKeys = new Map<string, string>();
   #hostKeySync: Deferred.Deferred<void> | null = null;
   #signalUrl: string | null = null;
@@ -372,7 +376,26 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     agentId: string | null,
     typing: boolean,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
-    return yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "team-typing", agentId, typing }));
+    const pending = this.#typingInFlight.get(hostId);
+    const previous = this.#lastTyping.get(hostId);
+    const duplicate = pending
+      ? pending.agentId === agentId && pending.typing === typing
+      : previous?.agentId === agentId &&
+        previous.typing === typing &&
+        (!typing || Date.now() - previous.sentAt < TYPING_REFRESH_MILLISECONDS);
+    if (duplicate) return;
+    const inFlight = { agentId, typing };
+    this.#typingInFlight.set(hostId, inFlight);
+    yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "team-typing", agentId, typing })).pipe(
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          if (this.#typingInFlight.get(hostId) !== inFlight) return;
+          this.#typingInFlight.delete(hostId);
+          if (Exit.isSuccess(exit)) this.#lastTyping.set(hostId, { agentId, typing, sentAt: Date.now() });
+          else this.#lastTyping.delete(hostId);
+        }),
+      ),
+    );
   }).bind(this);
 
   readonly setDirectTyping = Effect.fn("TeamWebRtcClient.setDirectTyping")(function* (
@@ -1251,6 +1274,11 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     this.#files.setPeerAuthenticated(hostId, false);
     active.connected = false;
     this.#lastEventSequence.delete(hostId);
+    const ackTimer = this.#eventAckTimers.get(hostId);
+    if (ackTimer !== undefined) clearTimeout(ackTimer);
+    this.#eventAckTimers.delete(hostId);
+    this.#lastTyping.delete(hostId);
+    this.#typingInFlight.delete(hostId);
     for (const [requestId, pending] of this.#pending) {
       if (pending.hostId !== hostId) continue;
       clearTimeout(pending.timer);
@@ -1399,11 +1427,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       const frame = decodeTeamProtocolV2EventFrame(data);
       if (frame.type === "event-reset") {
         this.#lastEventSequence.set(hostId, frame.nextSequence - 1);
-        this.#sendRecoverable(
-          hostId,
-          "events",
-          encodeTeamProtocolV2Frame({ version: 2, type: "event-ack", throughSequence: frame.nextSequence - 1 }),
-        );
+        this.#scheduleEventAck(hostId);
         this.#sendRecoverable(
           hostId,
           "events",
@@ -1421,11 +1445,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
       }
       const lastSequence = this.#lastEventSequence.get(hostId) ?? 0;
       if (frame.sequence <= lastSequence) {
-        this.#sendRecoverable(
-          hostId,
-          "events",
-          encodeTeamProtocolV2Frame({ version: 2, type: "event-ack", throughSequence: lastSequence }),
-        );
+        this.#scheduleEventAck(hostId);
         return;
       }
       if (frame.sequence !== lastSequence + 1) {
@@ -1445,14 +1465,28 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         this.emit("event", hostId, decoded.event);
       }
       this.#lastEventSequence.set(hostId, frame.sequence);
-      this.#sendRecoverable(
-        hostId,
-        "events",
-        encodeTeamProtocolV2Frame({ version: 2, type: "event-ack", throughSequence: frame.sequence }),
-      );
+      this.#scheduleEventAck(hostId);
     } catch {
       this.#failProtocol(hostId, "The host returned an invalid event frame.");
     }
+  }
+
+  #scheduleEventAck(hostId: string): void {
+    if (this.#eventAckTimers.has(hostId)) return;
+    const timer = setTimeout(() => {
+      this.#eventAckTimers.delete(hostId);
+      if (!this.#active.get(hostId)?.connected) return;
+      this.#sendRecoverable(
+        hostId,
+        "events",
+        encodeTeamProtocolV2Frame({
+          version: 2,
+          type: "event-ack",
+          throughSequence: this.#lastEventSequence.get(hostId) ?? 0,
+        }),
+      );
+    }, 16);
+    this.#eventAckTimers.set(hostId, timer);
   }
 
   #sendsSkillSuggestionNames(hostId: string): boolean {

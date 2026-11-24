@@ -142,6 +142,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "닫기",
   "mobile.chat.attachment.sharingUnavailable": "이 기기에서는 파일 공유를 사용할 수 없어요.",
   "mobile.chat.attachment.unavailable": "첨부 파일을 사용할 수 없어요. 다시 시도해 주세요.",
+  "mobile.chat.attachment.downloadStopped": "다운로드가 멈췄어요. 서버가 연결되면 다시 시작돼요.",
   "mobile.chat.attachment.openFailed": "첨부 파일을 열 수 없어요",
   "mobile.chat.attachment.photosNeedUpdate": "사진을 저장하려면 앱을 최신 버전으로 업데이트해야 해요.",
   "mobile.chat.attachment.photosPermission":
@@ -154,6 +155,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "파일을 공유할 수 없습니다",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "여러 파일을 공유하려면 최신 버전의 앱이 필요합니다.",
   "mobile.chat.attachment.preview": "{name} 미리보기",
+  "mobile.chat.attachment.seeAll": "탭하여 모두 보기",
   "mobile.chat.attachment.displayFailed": "이 이미지를 표시할 수 없어요.",
   "mobile.chat.attachment.loadingImage": "이미지를 불러오는 중",
   "mobile.chat.attachment.uploading": "{name} 업로드 중",
@@ -228,6 +230,8 @@ export const messages = {
     "이 서버는 GPT Live Voice를 지원하지 않습니다. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice를 시작할 수 없습니다. 음소거를 해제하여 다시 시도하세요.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice가 중지되었습니다. 음소거를 해제하면 다시 시작합니다.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice를 시작할 수 없습니다",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice가 중지되었습니다",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "설정에서 OpenBot이 마이크를 사용하도록 허용하세요. 그런 다음 음소거를 해제하여 다시 시도하세요.",
   "mobile.chat.composer.addAttachment": "첨부 파일 추가",

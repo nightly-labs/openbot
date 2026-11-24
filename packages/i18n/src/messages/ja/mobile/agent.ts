@@ -611,7 +611,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "サーバーを読み込めませんでした",
   "mobile.agent.home.serversFailedBody": "デスクトップアプリが実行中か確認して、もう一度お試しください。",
   "mobile.agent.home.noServers": "利用できるサーバーはありません",
-  "mobile.agent.home.noServersBody": "デスクトップアプリに再接続するか、リモートサーバーに参加してください。",
+  "mobile.agent.home.noServersBody":
+    "このアカウントでコンピューターの OpenBot を開き、「サーバーの設定」→「メンバー」で「このサーバーを公開」をオンにしてください。または、リモートサーバーに参加してください。",
   "mobile.agent.home.chooseServer": "サーバーを選択",
   "mobile.agent.home.openServers": "サーバーを開く",
   "mobile.agent.home.noChatOpen": "チャットが開いていません",

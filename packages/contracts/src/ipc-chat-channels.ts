@@ -361,6 +361,45 @@ export function isChannelTask(value: unknown): value is ChannelTask {
   );
 }
 
+function finishedChannelTask(task: ChannelTask): boolean {
+  return task.state === "completed" || task.state === "cancelled";
+}
+
+function linksMessages(messages: readonly ChannelMessage[]): (task: ChannelTask) => boolean {
+  const taskIds = new Set(messages.map((item) => item.taskId));
+  const messageIds = new Set(messages.map((item) => item.id));
+  return (task) => taskIds.has(task.id) || messageIds.has(task.requestMessageId);
+}
+
+export function channelPageTasks(tasks: readonly ChannelTask[], messages: readonly ChannelMessage[]): ChannelTask[] {
+  const openRuns = new Set(tasks.flatMap((task) => (finishedChannelTask(task) ? [] : [task.rootTaskId])));
+  const linked = linksMessages(messages);
+  return tasks.filter((task) => openRuns.has(task.rootTaskId) || linked(task));
+}
+
+export function mergeChannelTasks(
+  newer: readonly ChannelTask[],
+  older: readonly ChannelTask[],
+  messages: readonly ChannelMessage[],
+): ChannelTask[] {
+  const newerIds = new Set(newer.map((task) => task.id));
+  const linked = linksMessages(messages);
+  const kept = older.filter((task) => !newerIds.has(task.id) && finishedChannelTask(task) && linked(task));
+  return kept.length ? [...kept, ...newer] : [...newer];
+}
+
+export function closedChannelTaskSequences(
+  newer: readonly ChannelTask[],
+  older: readonly ChannelTask[],
+  messages: readonly ChannelMessage[],
+): number[] {
+  const newerIds = new Set(newer.map((task) => task.id));
+  const closed = older.filter((task) => !newerIds.has(task.id) && !finishedChannelTask(task));
+  if (!closed.length) return [];
+  const sequences = messages.filter((item) => closed.some(linksMessages([item]))).map((item) => item.sequence);
+  return [...new Set(sequences)].sort((left, right) => right - left);
+}
+
 export function isChannelMessage(value: unknown): value is ChannelMessage {
   return (
     isDynamicRecord(value) &&

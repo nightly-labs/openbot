@@ -8,12 +8,14 @@ import {
   type ChannelPage,
   type ChannelSummary,
   type CreateChannelRoutineInput,
+  closedChannelTaskSequences,
   decodeChannel,
   decodeChannelMemories,
   decodeChannelPage,
   decodeChannelRoutines,
   decodeChannelSummaries,
   isAttachmentSummary,
+  mergeChannelTasks,
   type RespondToPromptInput,
   type UpdateChannelRoutineInput,
 } from "@openbot/contracts/ipc";
@@ -362,6 +364,10 @@ export class MobileChannelStore {
               nextPages.set(id, merged);
               this.publish(entry, { pages: nextPages });
             }
+            const first = page.messages[0]?.sequence ?? 0;
+            const held = merged.messages.filter((message) => message.sequence < first);
+            const closed = current ? closedChannelTaskSequences(page.tasks, current.tasks, held) : [];
+            if (closed.length) void this.readClosedTasks(serverId, entry, id, closed).catch(() => undefined);
             this.finishHistory(entry, id, true);
           };
           const results = await Promise.allSettled([
@@ -385,6 +391,27 @@ export class MobileChannelStore {
       entry.pending = null;
     });
     return entry.pending;
+  }
+  private async readClosedTasks(serverId: string, entry: Entry, channelId: string, sequences: number[]) {
+    let covered = Number.POSITIVE_INFINITY;
+    for (const sequence of sequences) {
+      if (sequence >= covered) continue;
+      const page = await this.request(
+        "POST",
+        CHANNEL_ROUTES.read,
+        decodeChannelPage,
+        { channelId, beforeSequence: sequence + 1 },
+        serverId,
+      );
+      covered = page.messages[0]?.sequence ?? sequence;
+      const latest = entry.state.pages.get(channelId);
+      if (!entry.valid || !latest) return;
+      const tasks = mergeChannelTasks(latest.tasks, page.tasks, latest.messages);
+      if (tasks.length === latest.tasks.length) continue;
+      const pages = new Map(entry.state.pages);
+      pages.set(channelId, { ...latest, tasks });
+      this.publish(entry, { pages });
+    }
   }
   private finishHistory(entry: Entry, channelId: string, success: boolean) {
     const waiters = entry.historyWaiters.get(channelId);
@@ -438,10 +465,12 @@ export class MobileChannelStore {
     if (!entry.valid || !latest || latest.olderCursor !== current.olderCursor) return;
     const messages = new Map(page.messages.map((message) => [message.id, message]));
     for (const message of latest.messages) messages.set(message.id, message);
+    const merged = [...messages.values()].sort((a, b) => a.sequence - b.sequence);
     const pages = new Map(entry.state.pages);
     pages.set(channelId, {
       ...latest,
-      messages: [...messages.values()].sort((a, b) => a.sequence - b.sequence),
+      messages: merged,
+      tasks: mergeChannelTasks(latest.tasks, page.tasks, merged),
       olderCursor: page.olderCursor,
     });
     this.publish(entry, { pages });
@@ -708,9 +737,8 @@ function mergeLatestChannelPage(current: ChannelPage | undefined, page: ChannelP
   if (!current) return page;
   const first = page.messages[0]?.sequence ?? 0;
   const older = current.messages.filter((message) => message.sequence < first);
-  const merged =
-    !older.length || (older.at(-1)?.sequence ?? 0) + 1 < first
-      ? page
-      : { ...page, messages: [...older, ...page.messages], olderCursor: current.olderCursor };
-  return replaceEqualDeep(current, merged);
+  if (!older.length || (older.at(-1)?.sequence ?? 0) + 1 < first) return replaceEqualDeep(current, page);
+  const messages = [...older, ...page.messages];
+  const tasks = mergeChannelTasks(page.tasks, current.tasks, older);
+  return replaceEqualDeep(current, { ...page, messages, tasks, olderCursor: current.olderCursor });
 }

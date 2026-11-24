@@ -168,8 +168,7 @@ async function openWorkflows(page: Page, serverName: string): Promise<void> {
 
 async function openWorkflow(page: Page, title: string, expected: number): Promise<PictureTimes> {
   const canvas = page.getByRole("main", { name: /^Workflow canvas: / });
-  const current = (await canvas.getAttribute("aria-label"))?.replace(/^Workflow canvas: /, "") ?? "";
-  await canvas.getByRole("button", { name: current, exact: true }).first().click();
+  await canvas.locator("button.wfn-corner-trigger").first().click();
   const item = page.getByRole("menuitem", { name: new RegExp(`^${title} `) });
   await item.waitFor();
   await page.evaluate(() => {

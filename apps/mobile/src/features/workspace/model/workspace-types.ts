@@ -808,7 +808,10 @@ export interface MobileWorkspaceContextValue {
     attachmentId: string,
     largeDownload?: RemoteLargeDownload,
     progress?: RemoteDownloadWatch,
+    tapped?: boolean,
+    wanted?: () => boolean,
   ) => Promise<RemoteFileUpload>;
+  prioritizeAttachmentDownload: (serverId: string, attachmentId: string) => void;
   downloadMessageFile: (serverId: string, file: MessageFileTarget) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   hidesAgentsOnServer: (serverId: string) => boolean;

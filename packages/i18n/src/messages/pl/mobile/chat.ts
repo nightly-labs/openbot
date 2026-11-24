@@ -205,6 +205,8 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Zamknij",
   "mobile.chat.attachment.sharingUnavailable": "Udostępnianie plików jest niedostępne na tym urządzeniu.",
   "mobile.chat.attachment.unavailable": "Załącznik jest niedostępny. Spróbuj ponownie.",
+  "mobile.chat.attachment.downloadStopped":
+    "Pobieranie zostało przerwane. Rozpocznie się ponownie po połączeniu z serwerem.",
   "mobile.chat.attachment.openFailed": "Nie udało się otworzyć załącznika",
   "mobile.chat.attachment.photosNeedUpdate": "Zapisywanie zdjęć wymaga najnowszej wersji aplikacji.",
   "mobile.chat.attachment.photosPermission": "Zezwól OpenBot na dodawanie zdjęć w Ustawieniach, aby zapisać ten obraz.",
@@ -216,6 +218,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Nie można udostępnić plików",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Udostępnianie wielu plików wymaga najnowszej wersji aplikacji.",
   "mobile.chat.attachment.preview": "Podgląd: {name}",
+  "mobile.chat.attachment.seeAll": "Stuknij, aby zobaczyć całość",
   "mobile.chat.attachment.displayFailed": "Nie udało się wyświetlić tego obrazu.",
   "mobile.chat.attachment.loadingImage": "Wczytywanie obrazu",
   "mobile.chat.attachment.uploading": "Przesyłanie: {name}",
@@ -293,6 +296,8 @@ export const messages = {
   "mobile.chat.liveVoice.gptFailed":
     "Nie udało się uruchomić GPT Live Voice. Wyłącz wyciszenie, aby spróbować ponownie.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice zatrzymał się. Wyłącz wyciszenie, aby uruchomić go ponownie.",
+  "mobile.chat.liveVoice.gptFailedTitle": "Nie udało się uruchomić GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice zatrzymał się",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Zezwól OpenBot na użycie mikrofonu w Ustawieniach. Potem wyłącz wyciszenie, aby spróbować ponownie.",
   "mobile.chat.composer.addAttachment": "Dodaj załącznik",

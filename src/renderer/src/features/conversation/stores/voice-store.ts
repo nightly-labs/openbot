@@ -420,10 +420,11 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       deps.clearConversationError(recordingTarget);
       const draft = submitRequest?.draft ?? deps.drafts()[composerDraftKey(recordingTarget)] ?? EMPTY_DRAFT;
       const transcribedDraft = { ...draft, text: appendVoiceTranscript(draft.text, result.text) };
-      const spokenReply = !deps.props.runtime && !deps.props.channel;
+      const spokenReply = !deps.props.runtime;
+      const inChannel = (agentId: string) => ({ channel: deps.props.channel?.id === agentId });
       if (submitRequest) {
         const target = { agentId: submitRequest.agentId, serverId: submitRequest.serverId };
-        if (spokenReply) noteDictatedMessage(target, result.text);
+        if (spokenReply) noteDictatedMessage(target, result.text, inChannel(target.agentId));
         let delivered: boolean;
         if (submitRequest.queuedEdit) {
           delivered = await deps.hooks.saveEdit(
@@ -442,7 +443,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           deps.hooks.restoreTranscript(target, result.text);
         }
       } else {
-        if (spokenReply) noteDictatedMessage(recordingTarget, result.text);
+        if (spokenReply) noteDictatedMessage(recordingTarget, result.text, inChannel(targetAgentId));
         const key = composerDraftKey(recordingTarget);
         deps.setDrafts((current) => ({ ...current, [key]: transcribedDraft }));
         if (atLimit) deps.setVoiceLimitReached?.(recordingTarget, true);

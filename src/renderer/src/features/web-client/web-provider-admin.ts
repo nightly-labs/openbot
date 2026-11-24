@@ -1,4 +1,5 @@
 import { isKeyOnlyProvider, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import { providerCliSource } from "@openbot/contracts/cli-version";
 import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import type {
   AgentProviderId,
@@ -425,9 +426,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       return id ? remoteProviderRuntimes(() => admin, id) : undefined;
     }),
     {
-      systemCliVersion: (provider) => {
+      systemCliVersion: (provider, runtime) => {
         const row = options.status().providers?.find((candidate) => candidate.id === provider);
-        return row?.cliSource === "system" ? (row.version ?? null) : null;
+        return row && providerCliSource(row, runtime) === "system" ? row.version : null;
       },
       isLocalServer: () => false,
       managesRuntimes: () => serverId() !== undefined,

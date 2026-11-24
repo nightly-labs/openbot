@@ -5,6 +5,7 @@ import { Button } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, onSettled, Show } from "solid-js";
 import {
+  answerExtensionTab,
   type ExtensionConnectRequest,
   extensionAllowedBy,
   extensionReturnUrl,
@@ -26,6 +27,7 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
   const { t, sourceText } = useText();
   const [pending, setPending] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [done, setDone] = createSignal(false);
 
   async function allow() {
     setPending(true);
@@ -50,7 +52,15 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
       }
       forgetExtensionConnect();
       rememberExtensionAllowed(props.request.extensionId, props.accountId);
-      window.location.assign(extensionReturnUrl(props.request, { code: value.code }));
+      if (!props.request.tab) {
+        window.location.assign(extensionReturnUrl(props.request, { code: value.code }));
+        return;
+      }
+      if (await answerExtensionTab(props.request, { code: value.code })) setDone(true);
+      else {
+        setError(t("webClient.extension.failed"));
+        setPending(false);
+      }
     } catch {
       setError(t("webClient.extension.failed"));
       setPending(false);
@@ -68,6 +78,14 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
 
   function cancel() {
     forgetExtensionConnect();
+    if (props.request.tab) {
+      setPending(true);
+      void answerExtensionTab(props.request, { error: "access_denied" }).then(() => {
+        setPending(false);
+        setDone(true);
+      });
+      return;
+    }
     window.location.assign(extensionReturnUrl(props.request, { error: "access_denied" }));
   }
 
@@ -89,27 +107,36 @@ export function WebExtensionConnect(props: WebExtensionConnectProps) {
           <p id="extension-connect-description" class="account-login-description">
             {t("webClient.extension.description", { email: props.email })}
           </p>
-          <div class="account-login-form">
-            <Show when={error()}>
-              {(text) => (
-                <p class="account-login-error" role="alert">
-                  {text()}
-                </p>
-              )}
-            </Show>
-            <Button
-              variant="default"
-              type="button"
-              class="account-login-primary"
-              disabled={pending()}
-              onClick={() => void allow()}
-            >
-              {t("webClient.extension.allow")}
-            </Button>
-            <Button variant="ghost" type="button" disabled={pending()} onClick={cancel}>
-              {t("common.cancel")}
-            </Button>
-          </div>
+          <Show
+            when={!done()}
+            fallback={
+              <p class="account-login-description" role="status">
+                {t("webClient.extension.done")}
+              </p>
+            }
+          >
+            <div class="account-login-form">
+              <Show when={error()}>
+                {(text) => (
+                  <p class="account-login-error" role="alert">
+                    {text()}
+                  </p>
+                )}
+              </Show>
+              <Button
+                variant="default"
+                type="button"
+                class="account-login-primary"
+                disabled={pending()}
+                onClick={() => void allow()}
+              >
+                {t("webClient.extension.allow")}
+              </Button>
+              <Button variant="ghost" type="button" disabled={pending()} onClick={cancel}>
+                {t("common.cancel")}
+              </Button>
+            </div>
+          </Show>
         </section>
       </div>
     </main>

@@ -27,6 +27,7 @@ declare namespace chrome {
     interface MessageSender {
       tab?: tabs.Tab;
       url?: string;
+      origin?: string;
     }
     function sendMessage(message: object): Promise<unknown>;
     type MessageListener = (
@@ -35,6 +36,10 @@ declare namespace chrome {
       sendResponse: (response: object) => void,
     ) => boolean | undefined;
     const onMessage: {
+      addListener(listener: MessageListener): void;
+      removeListener(listener: MessageListener): void;
+    };
+    const onMessageExternal: {
       addListener(listener: MessageListener): void;
       removeListener(listener: MessageListener): void;
     };
@@ -88,10 +93,20 @@ declare namespace chrome {
       status?: string;
       lastAccessed?: number;
     }
-    function create(properties: { url: string; windowId?: number; active?: boolean }): Promise<Tab>;
+    function create(properties: {
+      url: string;
+      windowId?: number;
+      active?: boolean;
+      openerTabId?: number;
+    }): Promise<Tab>;
     function getCurrent(): Promise<Tab | undefined>;
     function get(tabId: number): Promise<Tab>;
-    function query(filter: { groupId?: number; active?: boolean; lastFocusedWindow?: boolean }): Promise<Tab[]>;
+    function query(filter: {
+      groupId?: number;
+      active?: boolean;
+      lastFocusedWindow?: boolean;
+      currentWindow?: boolean;
+    }): Promise<Tab[]>;
     function update(tabId: number, properties: { url?: string; active?: boolean }): Promise<Tab | undefined>;
     function remove(tabId: number): Promise<void>;
     function goBack(tabId: number): Promise<void>;
@@ -112,7 +127,10 @@ declare namespace chrome {
         ) => void,
       ): void;
     };
-    const onRemoved: { addListener(listener: (tabId: number) => void): void };
+    const onRemoved: {
+      addListener(listener: (tabId: number) => void): void;
+      removeListener(listener: (tabId: number) => void): void;
+    };
     const onActivated: { addListener(listener: (info: { tabId: number; windowId: number }) => void): void };
   }
   export namespace tabGroups {

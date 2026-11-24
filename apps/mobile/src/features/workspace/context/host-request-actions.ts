@@ -407,6 +407,7 @@ import { createProviderAdmin } from "@/features/servers/model/provider-admin";
 import { saveAgentAvatar, savedAgentAvatar } from "@/features/workspace/model/agent-avatar-cache";
 import { decodeConversationSearchPage } from "@/features/workspace/model/conversation";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
+import { attachmentDownloadKey, type DownloadQueue } from "@/features/workspace/model/request-lanes";
 import { saveAgentRecord } from "@/features/workspace/model/save-agent-record";
 import {
   hasCapability,
@@ -657,6 +658,7 @@ type HostRequestActions = Pick<
   | "setMessageReaction"
   | "deleteMessage"
   | "downloadAttachment"
+  | "prioritizeAttachmentDownload"
   | "downloadMessageFile"
 >;
 
@@ -787,8 +789,8 @@ export function createHostRequestActions({
   queryClient: QueryClient;
   queryScope: QueryScope;
   capabilities: ServerCapabilities;
-  attachmentDownloads: { current: Promise<void> };
-  largeAttachmentDownloads: { current: Promise<void> };
+  attachmentDownloads: DownloadQueue;
+  largeAttachmentDownloads: DownloadQueue;
 }): { checks: HostRequestChecks; actions: HostRequestActions } {
   const has = (serverId: string, capability: string) => hasCapability(capabilities, serverId, capability);
   function capabilityApi(
@@ -1758,26 +1760,28 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload, progress) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped, wanted) => {
       const download = () =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.attachment(attachmentId),
-          (value) => decodeHostFile(value, largeDownload?.file),
-          undefined,
-          serverId,
-          undefined,
-          undefined,
-          largeDownload,
-          progress,
-        );
-      const lane = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
-      const result = lane.current.then(download);
-      lane.current = result.then(
-        () => {},
-        () => {},
-      );
-      return result;
+        wanted?.() === false
+          ? Promise.reject(new Error(sourceText("error.remote.downloadStopped")))
+          : request(
+              "GET",
+              TEAM_API_ROUTES.attachment(attachmentId),
+              (value) => decodeHostFile(value, largeDownload?.file),
+              undefined,
+              serverId,
+              undefined,
+              undefined,
+              largeDownload,
+              progress,
+            );
+      const queue = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
+      return queue.run(attachmentDownloadKey(serverId, attachmentId), download, tapped);
+    },
+    prioritizeAttachmentDownload: (serverId, attachmentId) => {
+      const key = attachmentDownloadKey(serverId, attachmentId);
+      attachmentDownloads.prioritize(key);
+      largeAttachmentDownloads.prioritize(key);
     },
     downloadMessageFile: (serverId, file) =>
       request(
