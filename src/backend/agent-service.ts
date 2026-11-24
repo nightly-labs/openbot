@@ -3921,7 +3921,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const requestedModel = input.model
           ? (this.#endpoints
               .available()
-              .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider)) ??
+              .find((model) => model.id === input.model && (!modelProvider || model.provider === modelProvider)) ??
             (modelProvider
               ? this.#providers
                   .accountModels(
