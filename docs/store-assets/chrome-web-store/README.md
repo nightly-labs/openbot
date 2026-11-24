@@ -18,9 +18,10 @@ Upload the files in this order:
 
 The pages in the browser use example sites (`*.example.com`) and sample data.
 
-## Icon and promo tile
+## Icon and promo tiles
 
 | File | Store field | Size and format |
 | --- | --- | --- |
 | `store-icon-128.png` | Store icon | 128 × 128 px PNG |
 | `small-promo-tile-440x280.png` | Small promo tile | 440 × 280 px, 24-bit PNG without an alpha channel |
+| `marquee-promo-tile-1400x560.png` | Marquee promo tile | 1400 × 560 px, 24-bit PNG without an alpha channel |
