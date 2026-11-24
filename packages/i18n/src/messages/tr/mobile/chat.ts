@@ -550,6 +550,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Kuyrukta mesaj yok",
   "mobile.chat.queue.emptyBody": "Ajan çalışırken yeni mesajlar kuyruğa eklenir.",
   "mobile.chat.queue.noLongerQueued": "Bu mesaj artık kuyrukta değil.",
+  "mobile.chat.queue.routine": "Rutin: {name}",
   "mobile.chat.queue.position": "Konum {position} · {date}",
   "mobile.chat.queue.attachments": "Ekler",
   "mobile.chat.queue.steer": "Yönlendir",

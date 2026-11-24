@@ -551,6 +551,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Nenhuma mensagem na fila",
   "mobile.chat.queue.emptyBody": "Novas mensagens entram na fila enquanto o agente trabalha.",
   "mobile.chat.queue.noLongerQueued": "Esta mensagem não está mais na fila.",
+  "mobile.chat.queue.routine": "Rotina: {name}",
   "mobile.chat.queue.position": "Posição {position} · {date}",
   "mobile.chat.queue.attachments": "Anexos",
   "mobile.chat.queue.steer": "Orientar",

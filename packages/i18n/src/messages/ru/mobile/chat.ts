@@ -637,6 +637,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Очередь пуста",
   "mobile.chat.queue.emptyBody": "Пока агент работает, новые сообщения встают в очередь.",
   "mobile.chat.queue.noLongerQueued": "Это сообщение больше не в очереди.",
+  "mobile.chat.queue.routine": "Регулярная задача: {name}",
   "mobile.chat.queue.position": "Место {position} · {date}",
   "mobile.chat.queue.attachments": "Вложения",
   "mobile.chat.queue.steer": "Направить",

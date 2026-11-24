@@ -562,6 +562,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Aucun message en file d’attente",
   "mobile.chat.queue.emptyBody": "Les nouveaux messages rejoignent la file d’attente pendant que l’agent travaille.",
   "mobile.chat.queue.noLongerQueued": "Ce message n’est plus en file d’attente.",
+  "mobile.chat.queue.routine": "Routine : {name}",
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Pièces jointes",
   "mobile.chat.queue.steer": "Orienter",

@@ -541,6 +541,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.queue.emptyTitle": "No queued messages",
   "mobile.chat.queue.emptyBody": "New messages join the queue while the agent works.",
   "mobile.chat.queue.noLongerQueued": "This message is no longer queued.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Attachments",
   "mobile.chat.queue.steer": "Steer",

@@ -550,6 +550,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "אין הודעות בתור",
   "mobile.chat.queue.emptyBody": "הודעות חדשות מצטרפות לתור בזמן שהסוכן עובד.",
   "mobile.chat.queue.noLongerQueued": "ההודעה הזו כבר אינה בתור.",
+  "mobile.chat.queue.routine": "שגרה: {name}",
   "mobile.chat.queue.position": "מקום {position} · {date}",
   "mobile.chat.queue.attachments": "קבצים מצורפים",
   "mobile.chat.queue.steer": "הכוונה",

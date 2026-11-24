@@ -541,6 +541,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "대기 중인 메시지가 없어요",
   "mobile.chat.queue.emptyBody": "에이전트가 작업하는 동안 새 메시지는 대기열에 들어가요.",
   "mobile.chat.queue.noLongerQueued": "이 메시지는 더 이상 대기 중이 아니에요.",
+  "mobile.chat.queue.routine": "루틴: {name}",
   "mobile.chat.queue.position": "{position}번째 · {date}",
   "mobile.chat.queue.attachments": "첨부 파일",
   "mobile.chat.queue.steer": "방향 지시",

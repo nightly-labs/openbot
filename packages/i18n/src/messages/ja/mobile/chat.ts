@@ -546,6 +546,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "キューにメッセージはありません",
   "mobile.chat.queue.emptyBody": "エージェントの作業中は、新しいメッセージがキューに入ります。",
   "mobile.chat.queue.noLongerQueued": "このメッセージはキューにありません。",
+  "mobile.chat.queue.routine": "ルーティン：{name}",
   "mobile.chat.queue.position": "{position} 番目 · {date}",
   "mobile.chat.queue.attachments": "添付ファイル",
   "mobile.chat.queue.steer": "方向を指示",
