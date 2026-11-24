@@ -6,7 +6,7 @@ import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
-import { type AcpHistoryPersistence, withStartModels } from "./acp-client";
+import { ACP_SESSION_PROCESS_START_TIMEOUT_MS, type AcpHistoryPersistence, withStartModels } from "./acp-client";
 import { type AcpFlavor, customAgentFlavor } from "./acp-flavor";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
@@ -612,7 +612,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       created.once("exit", (error) => this.#childExited(key, folder, created, this.#publicError(error)));
       yield* customStep(() => created.start());
       yield* created
-        .request("initialize", {}, decodeRecordResponse)
+        .request("initialize", {}, decodeRecordResponse, ACP_SESSION_PROCESS_START_TIMEOUT_MS)
         .pipe(toProviderClientOperationError)
         .pipe(Effect.onError(() => created.stop().pipe(Effect.catch(() => Effect.void))));
       return created;
