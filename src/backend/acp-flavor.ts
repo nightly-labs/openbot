@@ -288,6 +288,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   },
   retryNotice: grokRetryNotice,
   turnStallMs: 12 * 60_000,
+  openToolStallMs: 30 * 60_000,
   turnFailure: grokTurnFailure,
 };
 
