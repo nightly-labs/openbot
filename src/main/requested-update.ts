@@ -81,7 +81,7 @@ const DEFAULT_POLL_MS = 5_000;
 const DEFAULT_GRACE_MS = 1_000;
 // Hosts check for updates every few minutes, so a rollout step reaches all of them at once. Each
 // restart registers the host again and reconnects its clients; a random delay spreads that load.
-export const AUTOMATIC_RESTART_SPREAD_MS = 30 * 60 * 1000;
+const AUTOMATIC_RESTART_SPREAD_MS = 30 * 60 * 1000;
 
 export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreference] }> {
   readonly #updater: RequestedUpdateUpdater;
