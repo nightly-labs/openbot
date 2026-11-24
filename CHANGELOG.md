@@ -124,6 +124,12 @@ All notable changes to OpenBot will be documented here. The project follows
   runs at the first moment when no turn runs. While it waits, OpenBot no longer ends open questions
   early: an agent keeps waiting for your answer. A joined server must also be on the new version.
 - On a Mac, agents can now tap and scroll in iPhone Mirroring with Computer Use. Before, each tap and scroll said that it was sent, but the iPhone screen did not change. Now the agent brings iPhone Mirroring to the front and taps on the screen, as a person does.
+- An agent no longer stays on "Opening webpage…" for hours when a page never finishes loading. After 30 seconds the agent gets the page that loaded, or an error, and continues. Routine runs and messages in the queue then start as usual. The server must also be on the new version.
+- Your phone now gets a notification for a routine reminder or an agent reply, also when the desktop
+  app or the web client is open on a computer that nobody uses. Before, the server thought that you
+  used that computer when the app refreshed some data by itself, for example the CRM settings, the
+  provider accounts of the server, workflows or connector status, and did not send the notification
+  to your phone. The server must also be on this version.
 
 ## [0.77.0] - 2026-11-23
 
