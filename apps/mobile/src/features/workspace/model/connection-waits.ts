@@ -3,6 +3,8 @@ interface ConnectionWait {
   reject: (error: Error) => void;
 }
 
+export class ConnectionUnavailableError extends Error {}
+
 export class ConnectionWaits {
   readonly #resuming = new Set<string>();
   readonly #waits = new Map<string, Set<ConnectionWait>>();

@@ -1,6 +1,7 @@
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { useEffect } from "react";
 import { useMobileWorkspaceReader } from "@/features/workspace/context/workspace-store";
+import { ConnectionUnavailableError } from "@/features/workspace/model/connection-waits";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { handleShortcutSends, type ShortcutSendAnswer, type ShortcutSendRequest } from "./shortcuts-native";
 
@@ -24,7 +25,7 @@ async function sendShortcutMessage(
     );
     return "sent";
   } catch (error) {
-    return refusedByHost(error) ? "failed" : "unconfirmed";
+    return error instanceof ConnectionUnavailableError || refusedByHost(error) ? "failed" : "unconfirmed";
   }
 }
 

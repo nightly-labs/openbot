@@ -48,6 +48,7 @@ enum ShortcutMessageSender {
     session: ShortcutSession
   ) async -> ShortcutSendOutcome {
     let clientMessageId = UUID().uuidString
+    let deadline = Date().addingTimeInterval(limit)
     if UIApplication.shared.applicationState != .background,
       let outcome = await sendInApp(text: text, to: agent, clientMessageId: clientMessageId)
     {
@@ -86,7 +87,8 @@ enum ShortcutMessageSender {
         }
       }
       Task { @MainActor in
-        try? await Task.sleep(nanoseconds: UInt64(limit * 1_000_000_000))
+        let remaining = max(0, deadline.timeIntervalSinceNow)
+        try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
         result.finish(.unconfirmed)
       }
     }
