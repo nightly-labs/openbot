@@ -28,6 +28,12 @@ function afterLayout(): Promise<void> {
 const ANDROID_PLACE_FRAMES = 2;
 const ANDROID_PLACE_TIMEOUT_MS = 250;
 const OPENING_FOLLOW_MS = 600;
+const SEND_GLIDE_SCREENS = 1;
+
+function endIsNear(list: LegendListRef | null): boolean {
+  const state = list?.getState();
+  return state !== undefined && state.distanceFromEnd <= state.scrollLength * SEND_GLIDE_SCREENS;
+}
 
 type AnchorReadyInfo = Parameters<NonNullable<AnchoredEndSpaceConfig["onReady"]>>[0];
 
@@ -115,11 +121,10 @@ export function useChatMotion(
   const responseOpacity = useSharedValue(1);
   const revealed = useSharedValue(false);
   const [atLatest, setAtLatest] = useState(false);
-  const atLatestNow = useRef(false);
   const [userScrolled, setUserScrolled] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [responseVisible, setResponseVisible] = useState(true);
-  const pending = useRef<{ baseline: string | null; first: boolean; fromLatest: boolean } | null>(null);
+  const pending = useRef<{ baseline: string | null; first: boolean; nearLatest: boolean } | null>(null);
   const followLatest = useRef(true);
   const [keyboardLiftBehavior, setKeyboardLiftBehavior] = useState<"whenAtEnd" | "never">("whenAtEnd");
   const [latestGeneration, setLatestGeneration] = useState(0);
@@ -137,10 +142,6 @@ export function useChatMotion(
   current.current = { lastUserId };
 
   const finishFirstMessage = useCallback(() => setResponseVisible(true), []);
-  const updateAtLatest = useCallback((visible: boolean) => {
-    atLatestNow.current = visible;
-    setAtLatest(visible);
-  }, []);
   const reveal = useCallback(() => {
     if (shown.current) return;
     shown.current = true;
@@ -226,7 +227,7 @@ export function useChatMotion(
       if (!send || !list || info.anchorKey === undefined || info.anchorKey === send.baseline) return;
       pending.current = null;
       reveal();
-      const animated = !send.first && send.fromLatest && !reducedMotion;
+      const animated = !send.first && send.nearLatest && !reducedMotion;
       if (sendScrollFrame.current !== null) cancelAnimationFrame(sendScrollFrame.current);
       if (animated) {
         sendScrollFrame.current = requestAnimationFrame(() => {
@@ -277,7 +278,7 @@ export function useChatMotion(
         composerHeight.get() + Math.max(0, keyboardHeight.get() - keyboardOffset),
       ),
     (visible, previous) => {
-      if (visible !== previous) scheduleOnRN(updateAtLatest, visible);
+      if (visible !== previous) scheduleOnRN(setAtLatest, visible);
     },
   );
   useAnimatedReaction(
@@ -306,7 +307,7 @@ export function useChatMotion(
     setKeyboardLiftBehavior("whenAtEnd");
     const baseline = current.current.lastUserId;
     const first = baseline === null;
-    pending.current = { baseline, first, fromLatest: atLatestNow.current };
+    pending.current = { baseline, first, nearLatest: endIsNear(listRef.current) };
     if (first) {
       firstOpacity.set(0);
       responseOpacity.set(0);
