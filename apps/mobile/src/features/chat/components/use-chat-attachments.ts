@@ -272,6 +272,17 @@ export function useChatAttachments(
     }
     return true;
   }
+  async function takePhoto() {
+    if (!(await requestCamera())) return;
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 1,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+    });
+    if (result.canceled)
+      mobileAnalytics.track("attachment_action", { action: "select", result: "cancelled", attachment_count: 0 });
+    else for (const asset of result.assets) await addPhotoFile(asset.uri, photoName(asset));
+  }
   async function choosePhotos() {
     if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
     const result = await pickFromLibrary({
@@ -379,6 +390,7 @@ export function useChatAttachments(
     addPhoto: (uri: string) => report(() => addPhotoFile(uri, "photo.jpg")),
     choosePhotos: () => report(choosePhotos),
     requestCamera,
+    takePhoto: () => report(takePhoto),
     chooseFiles: () => report(chooseFiles),
     replace: (id: string) => report(() => replaceItem(id)),
     pasteText,
@@ -402,6 +414,7 @@ export function useChatAttachments(
     addPhoto: (uri: string) => latestActions.current.addPhoto(uri),
     choosePhotos: () => latestActions.current.choosePhotos(),
     requestCamera: () => latestActions.current.requestCamera(),
+    takePhoto: () => latestActions.current.takePhoto(),
     chooseFiles: () => latestActions.current.chooseFiles(),
     replace: (id: string) => latestActions.current.replace(id),
     pasteText: (text: string, onText: (text: string) => void) => latestActions.current.pasteText(text, onText),

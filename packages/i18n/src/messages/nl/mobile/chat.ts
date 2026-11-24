@@ -209,6 +209,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Kan de foto niet maken. Probeer opnieuw.",
   "mobile.chat.camera.startFailed": "Kan de camera niet starten. Sluit de camera en probeer opnieuw.",
   "mobile.chat.camera.close": "Sluit camera",
+  "mobile.chat.camera.fullScreenTipTitle": "Groter beeld nodig?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Gebruik de camera op volledig scherm, met zoom en alle lenzen. Je kunt dit wijzigen in Instellingen > Gesprekken.",
+  "mobile.chat.camera.fullScreenTipUse": "Volledig scherm gebruiken",
+  "mobile.chat.camera.fullScreenTipDismiss": "Tip verbergen",
   "mobile.chat.camera.takePhoto": "Maak foto",
   "mobile.chat.camera.switch": "Wissel camera",
   "mobile.chat.header.info": "Info over {name}",

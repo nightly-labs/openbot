@@ -246,6 +246,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "写真を撮れませんでした。もう一度お試しください。",
   "mobile.chat.camera.startFailed": "カメラを起動できませんでした。カメラを閉じて、もう一度お試しください。",
   "mobile.chat.camera.close": "カメラを閉じる",
+  "mobile.chat.camera.fullScreenTipTitle": "もっと大きく見たいですか？",
+  "mobile.chat.camera.fullScreenTipBody":
+    "ズームとすべてのレンズを使える全画面カメラを使いましょう。「設定 > 会話」で変更できます。",
+  "mobile.chat.camera.fullScreenTipUse": "全画面を使う",
+  "mobile.chat.camera.fullScreenTipDismiss": "ヒントを隠す",
   "mobile.chat.camera.takePhoto": "写真を撮る",
   "mobile.chat.camera.switch": "カメラを切り替え",
   "mobile.chat.header.info": "{name} の情報",

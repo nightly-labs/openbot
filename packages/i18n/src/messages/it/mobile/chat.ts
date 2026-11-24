@@ -247,6 +247,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Impossibile scattare la foto. Riprova.",
   "mobile.chat.camera.startFailed": "Impossibile avviare la fotocamera. Chiudila e riprova.",
   "mobile.chat.camera.close": "Chiudi fotocamera",
+  "mobile.chat.camera.fullScreenTipTitle": "Ti serve una vista più grande?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Usa la fotocamera a schermo intero, con zoom e tutti gli obiettivi. Puoi cambiarlo in Impostazioni > Conversazioni.",
+  "mobile.chat.camera.fullScreenTipUse": "Usa schermo intero",
+  "mobile.chat.camera.fullScreenTipDismiss": "Nascondi suggerimento",
   "mobile.chat.camera.takePhoto": "Scatta foto",
   "mobile.chat.camera.switch": "Cambia fotocamera",
   "mobile.chat.header.info": "Info su {name}",
