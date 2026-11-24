@@ -1,5 +1,6 @@
 import { Input, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
+import type { LucideIcon } from "lucide-react-native";
 import Camera from "lucide-react-native/icons/camera";
 import Pencil from "lucide-react-native/icons/pencil";
 import { type ReactNode, useRef, useState } from "react";
@@ -11,6 +12,7 @@ export const IDENTITY_PICTURE_SIZE = 72;
 export function SettingsIdentityHeader({
   picture,
   pictureLabel,
+  pictureIcon: PictureIcon = Camera,
   onPicturePress,
   name,
   nameLabel,
@@ -23,6 +25,7 @@ export function SettingsIdentityHeader({
 }: {
   picture: ReactNode;
   pictureLabel?: string;
+  pictureIcon?: LucideIcon;
   onPicturePress?: () => void;
   name: string;
   nameLabel: string;
@@ -50,7 +53,7 @@ export function SettingsIdentityHeader({
         >
           {picture}
           <View className="absolute -right-1.5 -bottom-1.5 size-7 items-center justify-center rounded-full border-4 border-sheet bg-grouped">
-            <Camera color={foreground} size={12} />
+            <PictureIcon color={foreground} size={12} />
           </View>
         </Pressable>
       ) : (
