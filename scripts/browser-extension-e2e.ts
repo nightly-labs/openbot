@@ -183,15 +183,12 @@ interface Report {
   sharedTabs?: {
     onWithoutSwitch: boolean;
     ungroupedBeforeUse: boolean;
-    sharedAgain: boolean;
     inOpenBotGroup: boolean;
     presenceAccepted: boolean;
     askShown: boolean;
     buttonClicked: boolean;
     siteStored: boolean;
     siteRevoked: boolean;
-    groupEnded: boolean;
-    presenceEnded: boolean;
   };
   xQueue?: { waitingShown: boolean; sentByRetry: boolean; queueEmpty: boolean };
   silentSignIn?: { signedIn: boolean; noWindow: boolean };
@@ -649,41 +646,19 @@ try {
     .click();
   await page.getByText(english("extension.browser.noSites")).waitFor({ timeout: UI_WAIT_MS });
   const siteRevoked = JSON.parse(await readStored(sitesKey))?.[site] === undefined;
-  await page.getByRole("button", { name: english("extension.browser.stop") }).click();
-  const groupEnded =
-    (await waitFor(host.page, "the group ended", fixtureGroup, (value) => value === "null")) === "null";
-  await waitFor(
-    host.page,
-    "the server accepted the end of the presence",
-    () => readStored(presenceKey),
-    (value) => value.includes('"sharing":false'),
-  );
-  await serverTitle.click();
-  await page.getByRole("menuitem", { name: english("extension.browser.share") }).click();
-  const sharedAgain = (
-    await waitFor(
-      host.page,
-      "the server accepted the presence again",
-      () => readStored(presenceKey),
-      (value) => value.includes('"sharing":true'),
-    )
-  ).includes('"sharing":true');
   report.sharedTabs = {
     onWithoutSwitch,
     ungroupedBeforeUse,
-    sharedAgain,
     inOpenBotGroup,
     presenceAccepted: true,
     askShown: true,
     buttonClicked: true,
     siteStored,
     siteRevoked,
-    groupEnded,
-    presenceEnded: true,
   };
+  assert.ok(onWithoutSwitch, "Sharing is not on by default.");
   assert.ok(ungroupedBeforeUse, "The page joined the OpenBot group before an agent used it.");
   assert.ok(inOpenBotGroup, "The page that the agent used is not in the OpenBot group.");
-  assert.ok(sharedAgain, "Share tabs with agents did not turn sharing on again.");
   assert.ok(siteStored, "Always for this site did not store the site.");
   assert.ok(siteRevoked, "Remove did not forget the site.");
   await shareFixture.close();

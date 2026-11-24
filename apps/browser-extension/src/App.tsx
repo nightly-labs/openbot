@@ -18,7 +18,7 @@ import {
   verifyEmailCode,
 } from "./account";
 import { identify, type SignInMethod, track } from "./analytics";
-import { BrowserAsks, BrowserSharingScreen, startSharing } from "./BrowserSharing";
+import { BrowserAsks, BrowserSharingScreen } from "./BrowserSharing";
 import { ChannelScreen } from "./ChannelScreen";
 import { ChatScreen } from "./ChatScreen";
 import { type ClientBrowserLink, createClientBrowserLink } from "./client-browser-link";
@@ -419,7 +419,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                   onOpenSettings={() => push("settings")}
                   sharing={presence().sharing}
                   canShare={canShare()}
-                  onShareTabs={() => void startSharing()}
                   onManageSharing={() => push("browser-sharing")}
                 />
               </section>

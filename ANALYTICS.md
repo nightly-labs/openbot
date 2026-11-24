@@ -238,8 +238,8 @@ queue: an event that fails to send is dropped. Each extension event and property
 | `agent_action`, `channel_action`, `folder_action` (extension) | Do users make agents, channels and folders in the side panel? | Extension. `action`: `create` (agent) or `created` (channel, folder); `result`. No names |
 | `agent_input_action` (extension) | Do users answer agent questions in the side panel? | Extension. `kind: prompt`, `decision: answered`, `result` |
 | `x_reply_action` | Do X replies reach the X agent? | Extension. `action`: `queued` (the reply is in the outbox), `sent` (the server has it), `retry` (an attempt failed; `reached` says if it may have reached the server), `dropped` (too old to send) or `notification_opened`. `attempts` is the count of failed attempts before. No post, handle or address |
-| `browser_sharing_action` | Do users keep shared tabs on? | Extension. `action`: `started`, `stopped` or `site_removed` (an "Always" site removed in the panel). No site |
-| `browser_sharing_ask` | How do users answer the shared-tab questions? | Extension. `kind`: `site`, `password`, `payment`, `download` or `sign-in`; `choice`: `once`, `always`, `deny`, `timeout` or `stopped`. No site, agent or action detail |
+| `browser_sharing_action` | Do users remove the sites that they allowed? | Extension. `action`: `site_removed` (an "Always" site removed in the panel). No site |
+| `browser_sharing_ask` | How do users answer the shared-tab questions? | Extension. `kind`: `site`, `password`, `payment`, `download` or `sign-in`; `choice`: `once`, `always`, `deny` or `timeout`. No site, agent or action detail |
 
 ## Privacy and runtime validation
 

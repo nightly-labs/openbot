@@ -40,8 +40,8 @@ interface ExtensionEvents {
   folder_action: { action: "created"; result: Result };
   agent_input_action: { kind: "prompt"; decision: "answered"; result: Result };
   x_reply_action: { action: XReplyAction; attempts?: number; reached?: boolean };
-  browser_sharing_action: { action: "started" | "stopped" | "site_removed" };
-  browser_sharing_ask: { kind: AskKind; choice: AskChoice | "timeout" | "stopped" };
+  browser_sharing_action: { action: "site_removed" };
+  browser_sharing_ask: { kind: AskKind; choice: AskChoice | "timeout" };
   analytics_preference_changed: { enabled: false };
 }
 
@@ -65,8 +65,8 @@ const EVENT_RULES: Rules = {
   folder_action: { action: ["created"], result: RESULTS },
   agent_input_action: { kind: ["prompt"], decision: ["answered"], result: RESULTS },
   x_reply_action: { action: X_REPLY_ACTIONS, attempts: "count", reached: "boolean" },
-  browser_sharing_action: { action: ["started", "stopped", "site_removed"] },
-  browser_sharing_ask: { kind: ASK_KINDS, choice: [...ASK_CHOICES, "timeout", "stopped"] },
+  browser_sharing_action: { action: ["site_removed"] },
+  browser_sharing_ask: { kind: ASK_KINDS, choice: [...ASK_CHOICES, "timeout"] },
   analytics_preference_changed: { enabled: "boolean" },
 };
 

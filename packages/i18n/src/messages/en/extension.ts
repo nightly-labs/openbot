@@ -81,7 +81,6 @@ export const messages = defineMessages("extension", {
   "extension.x.message.article": "Article:",
   "extension.x.message.pictures": "Pictures:",
   "extension.x.message.link": "Link to the post:",
-  "extension.browser.share": "Share tabs with agents",
   "extension.browser.unsupported": "{server} cannot use shared tabs yet. Update the server.",
   "extension.browser.title": "Shared tabs",
   "extension.browser.about":
@@ -92,7 +91,6 @@ export const messages = defineMessages("extension", {
   "extension.browser.noSites": "No site is allowed always. Agents ask on each new site.",
   "extension.browser.revoke": "Remove",
   "extension.browser.revokeSite": "Remove {site}",
-  "extension.browser.stop": "Stop sharing",
   "extension.browser.asks": "Requests from agents",
   "extension.browser.ask.site": "{agent} wants to use {site}",
   "extension.browser.ask.password": "{agent} wants to type a password on {site}",

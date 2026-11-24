@@ -38,7 +38,6 @@ interface HomeScreenProps {
   onOpenSettings: () => void;
   sharing: boolean;
   canShare: boolean;
-  onShareTabs: () => void;
   onManageSharing: () => void;
 }
 
@@ -180,20 +179,6 @@ export function HomeScreen(props: HomeScreenProps) {
               )}
             </For>
             <hr class="ext-menu-separator" />
-            <Show when={props.canShare && !props.sharing}>
-              <button
-                type="button"
-                role="menuitem"
-                class="ext-menu-item"
-                onClick={() => {
-                  setMenuOpen(false);
-                  props.onShareTabs();
-                }}
-              >
-                <span>{t("extension.browser.share")}</span>
-                <AppWindow size={16} aria-hidden="true" />
-              </button>
-            </Show>
             <Show when={props.sharing}>
               <button
                 type="button"

@@ -253,7 +253,7 @@ The production Chrome extension records its install and update, side panel opens
 sign-out results, message sends from the side panel (to a chat, a thread or a channel), dictation
 results and lengths, the agents, channels and folders made in it, answers to agent questions, the
 steps of X replies (queued, sent, retried, dropped, notification opened), and shared-tab events
-(sharing on or off, a site removed, and the kind of each question and your answer). It labels them
+(a site removed, and the kind of each question and your answer). It labels them
 as extension. It never sends message text, post text, X handles, addresses, sites, tab titles, or
 names. Its **Link analytics to my account** switch (server menu > **Settings**) works as on the web: on, events
 carry your account ID; off, only a random install ID kept in the extension's storage. With no choice
@@ -1300,7 +1300,7 @@ of the list that it has. Except for shared tabs (below), the extension does not 
 pages you visit. The extension's product analytics, which "Product analytics" describes,
 go to OpenBot's self-hosted analytics and contain none of this content.
 
-Shared tabs are on while you are signed in, until you press **Stop sharing** in the side panel. Your
+Shared tabs are always on while you are signed in to the extension; to stop them, sign out. Your
 open tabs are shared only with your own agents, and an agent uses them only for a message that you
 send from the side panel; for a message in the OpenBot app, it uses its own browser. The extension tells
 your server the address, title and active state of your open web tabs (at most 50, the tab that you
@@ -1313,9 +1313,8 @@ on a page that signs in to an app or gives an app access. To read and use a tab,
 Chrome's debugger on that tab, and Chrome shows its own bar while it does. What an agent reads goes
 to your server: the page text and the list of its buttons, links and fields (not the values of
 password or payment fields), screenshots of the visible page, and addresses. Text that an agent types
-goes from your server to the page. Nothing goes to OpenBot. **Stop sharing** ends the group and stops
-the reports; your server forgets the shared tabs at once, or at the latest 75 seconds after the
-extension stops. **Share tabs with agents** turns sharing on again.
+goes from your server to the page. Nothing goes to OpenBot. Your server forgets the shared tabs at the
+latest 75 seconds after the extension stops.
 
 ## Other network connections
 

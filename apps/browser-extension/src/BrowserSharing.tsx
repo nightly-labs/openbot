@@ -6,7 +6,6 @@ import {
   ASKS_KEY,
   type AskChoice,
   BROWSER_ANSWER_MESSAGE,
-  BROWSER_SHARE_MESSAGE,
   type BrowserAsk,
   decodeAsks,
   decodeSites,
@@ -33,10 +32,6 @@ function storedValue<T>(key: string, decode: (value: unknown) => T, initial: T):
 
 const siteName = (origin: string) => (URL.canParse(origin) ? new URL(origin).host : origin);
 
-export async function startSharing(): Promise<void> {
-  await chrome.runtime.sendMessage({ kind: BROWSER_SHARE_MESSAGE, on: true }).catch(() => undefined);
-}
-
 export function BrowserSharingScreen(props: { onBack: () => void }) {
   const { t } = useText();
   const sites = storedValue(SITES_KEY, decodeSites, []);
@@ -47,10 +42,6 @@ export function BrowserSharingScreen(props: { onBack: () => void }) {
     );
     await chrome.storage.local.set({ [SITES_KEY]: kept });
     void track("browser_sharing_action", { action: "site_removed" });
-  }
-  async function stop() {
-    await chrome.runtime.sendMessage({ kind: BROWSER_SHARE_MESSAGE, on: false }).catch(() => undefined);
-    props.onBack();
   }
   return (
     <div class="ext-form-screen">
@@ -93,11 +84,6 @@ export function BrowserSharingScreen(props: { onBack: () => void }) {
             )}
           </For>
         </section>
-      </div>
-      <div class="ext-form-footer">
-        <Button variant="destructive" onClick={() => void stop()}>
-          {t("extension.browser.stop")}
-        </Button>
       </div>
     </div>
   );

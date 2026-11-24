@@ -159,7 +159,6 @@ export function StoreHomePanel() {
           onOpenSettings={() => undefined}
           sharing={false}
           canShare
-          onShareTabs={() => undefined}
           onManageSharing={() => undefined}
         />
       )}

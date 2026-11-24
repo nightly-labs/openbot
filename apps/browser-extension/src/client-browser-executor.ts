@@ -129,10 +129,6 @@ async function detach(tabId: number): Promise<void> {
   await chrome.debugger.detach({ tabId }).catch(() => undefined);
 }
 
-export async function detachAll(): Promise<void> {
-  for (const tabId of [...attached.keys()]) await detach(tabId);
-}
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function world(tabId: number, fresh: boolean): Promise<number> {
