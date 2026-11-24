@@ -409,6 +409,8 @@ interface ThreadRuntime {
   plan: ClaudePlanState;
   subagents: SubagentState;
   backgroundTasks: number;
+  backgroundRoster: ClaudeBackgroundTask[];
+  unreportedTasks: ClaudeBackgroundTask[];
   awaitsResultTurn: boolean;
   taskTurns: Map<string, string | typeof SUBAGENT_OWNED_TASK>;
   endedTaskTurns: (string | null)[];
@@ -452,6 +454,65 @@ const SKIPPED_PROMPT_RETRIES = MAX_RUNS + 1;
 const CLAUDE_STOP_HOOK_FEEDBACK = "Stop hook feedback:\n";
 
 const SUBAGENT_OWNED_TASK = Symbol("subagent-owned task");
+
+interface ClaudeBackgroundTask {
+  id: string;
+  type: string;
+  description: string;
+}
+
+interface LostBackgroundWork {
+  tasks: ClaudeBackgroundTask[];
+  origins: (string | null)[];
+}
+
+const LOST_TASK_LABEL_LENGTH = 160;
+
+function claudeBackgroundTask(task: unknown): ClaudeBackgroundTask[] {
+  if (!isRecord(task) || !isString(task.task_id)) return [];
+  const description = isString(task.description) ? task.description.replaceAll(/\s+/g, " ").trim() : "";
+  return [
+    {
+      id: task.task_id,
+      type: isString(task.task_type) ? task.task_type : "",
+      description: Array.from(description).slice(0, LOST_TASK_LABEL_LENGTH).join(""),
+    },
+  ];
+}
+
+function lostBackgroundWork(runtime: ThreadRuntime): LostBackgroundWork | null {
+  const { config } = runtime;
+  if (runtime.activeTurn || !config.persistSession || config.profileGeneration) return null;
+  const tasks = [
+    ...runtime.backgroundRoster,
+    ...runtime.unreportedTasks.filter((task) => !runtime.backgroundRoster.some(({ id }) => id === task.id)),
+  ];
+  if (tasks.length === 0) return null;
+  const origins = [
+    ...runtime.endedTaskTurns,
+    ...tasks.flatMap((task) => {
+      const origin = runtime.taskTurns.get(task.id);
+      return isString(origin) ? [origin] : [];
+    }),
+  ];
+  return { tasks, origins };
+}
+
+function lostBackgroundTaskLine(task: ClaudeBackgroundTask): string {
+  const label = task.description || task.id;
+  if (task.type === "local_agent") return `- Subagent "${label}": resume it with SendMessage to '${task.id}'.`;
+  if (task.type === "local_bash") return `- Background command "${label}" (task ${task.id}).`;
+  return `- Background task "${label}" (task ${task.id}).`;
+}
+
+function lostBackgroundWorkNote(tasks: readonly ClaudeBackgroundTask[]): string {
+  return [
+    "OpenBot note, not a message from the user. Your Claude Code process exited unexpectedly while this chat was idle. This background work stopped, or it ended but its result did not reach you, and it does not report back on its own:",
+    ...tasks.map(lostBackgroundTaskLine),
+    "Tell the user in one short line what stopped. Then resume or restart only the work that the user's request still needs, and wait for its result. A step possibly finished before the stop: check its result before you do it again. This note does not approve a risky action.",
+    "Write each line for the user in the language of the user's chat messages, not in the language of OpenBot notes or other agents.",
+  ].join("\n");
+}
 
 function startedTaskOrigin(
   taskTurns: ReadonlyMap<string, string | typeof SUBAGENT_OWNED_TASK>,
@@ -635,6 +696,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #modelSdkValues = new Map<string, string>();
   readonly #turnContext = new TurnContext();
   readonly #threadResumes = new Map<string, Deferred.Deferred<void, ProviderClientOperationError>>();
+  readonly #lostWork = new Map<string, LostBackgroundWork>();
   #running = false;
   #scope = Scope.makeUnsafe();
   #weeklyLimitKey = "seven_day";
@@ -698,6 +760,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this: ClaudeAgentClient,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#running = false;
+    this.#lostWork.clear();
     const runtimes = this.#threads.clear();
     for (const runtime of runtimes) {
       runtime.input.close();
@@ -785,7 +848,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   #emitBackgroundWork(runtime: ThreadRuntime, closed = false): void {
     this.emit("notification", {
       method: "openbot/background-work",
-      params: { threadId: runtime.id, running: runtime.backgroundTasks > 0, ...(closed ? { closed } : {}) },
+      params: {
+        threadId: runtime.id,
+        running: runtime.backgroundTasks > 0,
+        ...(closed ? { closed } : {}),
+        ...(closed && this.#lostWork.has(runtime.id) ? { lost: true } : {}),
+      },
     });
   }
 
@@ -793,12 +861,49 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return this.holdsBackgroundWork(threadId);
   }
 
+  readonly wakeAfterLostWork = Effect.fn("ClaudeAgentClient.wakeAfterLostWork")(function* (
+    this: ClaudeAgentClient,
+    threadId: string,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    const lost = this.#lostWork.get(threadId);
+    this.#lostWork.delete(threadId);
+    if (!lost || !this.#running || !this.#threads.isReleased(threadId)) return;
+    yield* this.#threads
+      .startTurn(threadId, () => this.#openLostWorkTurn(threadId, lost))
+      .pipe(toProviderClientOperationError);
+  });
+
+  readonly #openLostWorkTurn = Effect.fn("ClaudeAgentClient.openLostWorkTurn")(function* (
+    this: ClaudeAgentClient,
+    threadId: string,
+    lost: LostBackgroundWork,
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
+    const runtime = this.#threads.get(threadId);
+    if (!runtime || runtime.activeTurn) return;
+    runtime.endedTaskTurns = [...lost.origins];
+    const turnId = randomUUID();
+    const turn = this.#beginTurn(runtime, turnId, true);
+    takePrompt(runtime, turnId);
+    const message: SDKUserMessage = {
+      type: "user",
+      message: { role: "user", content: lostBackgroundWorkNote(lost.tasks) },
+      parent_tool_use_id: null,
+      uuid: turnId,
+      session_id: threadId,
+    };
+    turn.prompt = { requestedId: null, message, retries: 0 };
+    turn.messageIds.add(turnId);
+    runtime.input.push(message);
+  });
+
   readonly releaseThread = Effect.fn("ClaudeAgentClient.releaseThread")(function* (
     this: ClaudeAgentClient,
     threadId: string,
     resumes = false,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#threads.forget(threadId);
+    this.#lostWork.delete(threadId);
     if (!resumes) {
       this.#turnContext.forget(threadId);
       this.#takenPrompts.delete(threadId);
@@ -1559,6 +1664,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       plan: newClaudePlanState(),
       subagents: newSubagentState(),
       backgroundTasks: 0,
+      backgroundRoster: [],
+      unreportedTasks: [],
       awaitsResultTurn: false,
       taskTurns: new Map(),
       endedTaskTurns: [],
@@ -1610,6 +1717,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     threadId: string,
     params: unknown,
   ): Effect.fn.Return<TurnResponse, ProviderClientOperationError> {
+    this.#lostWork.delete(threadId);
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     const runtime = yield* providerSync(() => this.#requireThread(threadId));
     if (runtime.activeTurn) return yield* providerFailure(this.#turnActiveError(runtime.activeTurn));
@@ -1742,6 +1850,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
     runtime.awaitsResultTurn = false;
+    runtime.unreportedTasks = [];
     startClaudePlanTurn(runtime.plan);
     this.#threads.holdForTurn(runtime);
     this.emit("notification", {
@@ -1894,6 +2003,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       noSandbox ? "Claude cannot start its sandbox for a Workspace only thread." : "A Claude query failed.",
       { threadId: runtime.id, error: redactText(String(error)) },
     );
+    const lost = lostBackgroundWork(runtime);
+    if (lost) this.#lostWork.set(runtime.id, lost);
     yield* runtime.config.persistSession
       ? this.#threads.releaseNow(runtime)
       : Effect.forkIn(this.#threads.close(runtime), this.#scope, { startImmediately: true });
@@ -1992,9 +2103,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
     if (message.type === "system" && message.subtype === "background_tasks_changed") {
       const before = runtime.backgroundTasks;
-      runtime.backgroundTasks = Array.isArray(message.tasks)
-        ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true)).length
-        : 0;
+      const tasks = Array.isArray(message.tasks)
+        ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true))
+        : [];
+      runtime.backgroundTasks = tasks.length;
+      const roster = tasks.flatMap(claudeBackgroundTask);
+      if (!runtime.activeTurn)
+        runtime.unreportedTasks.push(
+          ...runtime.backgroundRoster.filter((task) => !roster.some(({ id }) => id === task.id)),
+        );
+      runtime.backgroundRoster = roster;
       if (before > 0 !== runtime.backgroundTasks > 0 || runtime.backgroundTasks > before)
         this.#emitBackgroundWork(runtime);
       if (!runtime.activeTurn) {

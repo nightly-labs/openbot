@@ -54,6 +54,7 @@ export interface AgentClient {
   relaysMcpServer?(externalThreadId: string, config: McpServerConfig): boolean;
   holdsBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
   wakesAfterBackgroundWork?(externalThreadId: string): Effect.Effect<boolean, ProviderClientOperationError>;
+  wakeAfterLostWork?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   archiveThread?(externalThreadId: string): Effect.Effect<void, ProviderClientOperationError>;
   newestTurnId?(externalThreadId: string): Effect.Effect<string | null, ProviderClientOperationError>;
   nameThread?(externalThreadId: string, name: string): Effect.Effect<void, ProviderClientOperationError>;

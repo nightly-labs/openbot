@@ -700,10 +700,24 @@ export class TurnLifecycle {
     });
   }
 
-  #loseBackgroundWork(threadId: string, agentId: string): void {
+  #loseBackgroundWork(threadId: string, agentId: string, waker: AgentClient | null = null): void {
     this.#waitingThreads.delete(threadId);
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId !== null && this.#hooks.taskOpen(taskId)) this.#hooks.taskBackgroundLost(taskId);
+    else if (waker?.wakeAfterLostWork)
+      Effect.runFork(
+        waker.wakeAfterLostWork(threadId).pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() =>
+              logger.warn("The agent got no turn after its provider process stopped its background work.", {
+                provider: waker.provider,
+                error: failure.cause,
+              }),
+            ),
+          ),
+          Effect.forkIn(this.#scope, { startImmediately: true }),
+        ),
+      );
   }
 
   #taskRunsInProvider(agentId: string, taskId: string): boolean {
@@ -1564,7 +1578,8 @@ export class TurnLifecycle {
           for (const turn of this.#runningTurns.values())
             if (turn.threadId === threadId && turn.client === source) turn.startedBackgroundWork = true;
         const waited = this.#waitingThreads.has(threadId);
-        if (!runs && isRecord(params) && params.closed === true) this.#loseBackgroundWork(threadId, agentId);
+        if (!runs && isRecord(params) && params.closed === true)
+          this.#loseBackgroundWork(threadId, agentId, params.lost === true ? source : null);
         if (runs === waited) return;
         if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
         else this.#waitingThreads.delete(threadId);
