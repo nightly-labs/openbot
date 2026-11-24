@@ -303,6 +303,9 @@ export class QueueControls {
           threadId: session,
           expectedTurnId: turnId,
           clientUserMessageId: input.deliveryId,
+          ...(providerForAgent(agent) === "claude" && context.delivery.sender.kind !== "user"
+            ? { waitsForRunningTools: true }
+            : {}),
           input: [
             ...(note ? [{ type: "text" as const, text: note }] : []),
             ...deliveryPromptInput(context, {
