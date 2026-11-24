@@ -6,7 +6,9 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { supportLog } from "@/features/support/model/support-log";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import { isConnectionStop } from "@/features/workspace/model/connection-waits";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import type { MobileText } from "@/shared/lib/text";
 import { largeDownloadOf } from "../model/large-files";
 
 const MIME_EXTENSIONS: Record<string, string> = {
@@ -47,6 +49,10 @@ export function messageFileCopy(serverId: string, key: string, name: string) {
   for (let index = 0; index < key.length; index += 1) hash = Math.imul(hash ^ key.charCodeAt(index), 0x01000193);
   const folder = `message-file-${(hash >>> 0).toString(36)}`;
   return new File(mediaFolder(), segment(serverId), folder, fileName(name));
+}
+
+export function mediaFileErrorText(error: Error, text: MobileText): string {
+  return isConnectionStop(error) ? text.t("mobile.chat.attachment.downloadStopped") : text.sourceText(error.message);
 }
 
 const mediaWrites = new Map<string, Promise<void>>();

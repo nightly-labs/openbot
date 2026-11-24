@@ -148,6 +148,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "סגירה",
   "mobile.chat.attachment.sharingUnavailable": "שיתוף קבצים אינו זמין במכשיר הזה.",
   "mobile.chat.attachment.unavailable": "הקובץ המצורף אינו זמין. יש לנסות שוב.",
+  "mobile.chat.attachment.downloadStopped": "ההורדה נעצרה. היא תתחיל שוב כשהשרת יתחבר.",
   "mobile.chat.attachment.openFailed": "לא ניתן לפתוח את הקובץ המצורף",
   "mobile.chat.attachment.photosNeedUpdate": "שמירת תמונות דורשת את הגרסה האחרונה של האפליקציה.",
   "mobile.chat.attachment.photosPermission": "יש לאפשר ל-OpenBot להוסיף תמונות בהגדרות כדי לשמור את התמונה הזו.",

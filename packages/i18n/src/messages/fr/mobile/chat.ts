@@ -146,6 +146,8 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Fermer",
   "mobile.chat.attachment.sharingUnavailable": "Le partage de fichiers n’est pas disponible sur cet appareil.",
   "mobile.chat.attachment.unavailable": "La pièce jointe n’est pas disponible. Réessayez.",
+  "mobile.chat.attachment.downloadStopped":
+    "Le téléchargement s’est arrêté. Il recommence quand le serveur est connecté.",
   "mobile.chat.attachment.openFailed": "Impossible d’ouvrir la pièce jointe",
   "mobile.chat.attachment.photosNeedUpdate": "L’enregistrement de photos nécessite la dernière version de l’app.",
   "mobile.chat.attachment.photosPermission":

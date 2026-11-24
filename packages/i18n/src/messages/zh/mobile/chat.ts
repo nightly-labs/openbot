@@ -140,6 +140,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "关闭",
   "mobile.chat.attachment.sharingUnavailable": "这台设备不支持文件分享。",
   "mobile.chat.attachment.unavailable": "该附件不可用，请重试。",
+  "mobile.chat.attachment.downloadStopped": "下载已停止。服务器连接后会重新开始。",
   "mobile.chat.attachment.openFailed": "无法打开附件",
   "mobile.chat.attachment.photosNeedUpdate": "保存照片需要最新版本的应用。",
   "mobile.chat.attachment.photosPermission": "请在系统设置中允许 OpenBot 添加照片，以保存该图片。",

@@ -143,6 +143,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Kapat",
   "mobile.chat.attachment.sharingUnavailable": "Bu cihazda dosya paylaşımı kullanılamıyor.",
   "mobile.chat.attachment.unavailable": "Ek kullanılamıyor. Tekrar deneyin.",
+  "mobile.chat.attachment.downloadStopped": "İndirme durdu. Sunucu bağlandığında yeniden başlar.",
   "mobile.chat.attachment.openFailed": "Ek açılamadı",
   "mobile.chat.attachment.photosNeedUpdate": "Fotoğrafları kaydetmek uygulamanın en son sürümünü gerektirir.",
   "mobile.chat.attachment.photosPermission":

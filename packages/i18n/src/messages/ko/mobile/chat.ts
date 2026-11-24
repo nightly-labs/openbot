@@ -142,6 +142,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "닫기",
   "mobile.chat.attachment.sharingUnavailable": "이 기기에서는 파일 공유를 사용할 수 없어요.",
   "mobile.chat.attachment.unavailable": "첨부 파일을 사용할 수 없어요. 다시 시도해 주세요.",
+  "mobile.chat.attachment.downloadStopped": "다운로드가 멈췄어요. 서버가 연결되면 다시 시작돼요.",
   "mobile.chat.attachment.openFailed": "첨부 파일을 열 수 없어요",
   "mobile.chat.attachment.photosNeedUpdate": "사진을 저장하려면 앱을 최신 버전으로 업데이트해야 해요.",
   "mobile.chat.attachment.photosPermission":

@@ -143,6 +143,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Fechar",
   "mobile.chat.attachment.sharingUnavailable": "O compartilhamento de arquivos está indisponível neste dispositivo.",
   "mobile.chat.attachment.unavailable": "O anexo está indisponível. Tente novamente.",
+  "mobile.chat.attachment.downloadStopped": "O download parou. Ele recomeça quando o servidor se conectar.",
   "mobile.chat.attachment.openFailed": "Não foi possível abrir o anexo",
   "mobile.chat.attachment.photosNeedUpdate": "Para salvar fotos, é necessário ter a versão mais recente do app.",
   "mobile.chat.attachment.photosPermission":

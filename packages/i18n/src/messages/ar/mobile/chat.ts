@@ -225,6 +225,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "إغلاق",
   "mobile.chat.attachment.sharingUnavailable": "مشاركة الملفات غير متاحة على هذا الجهاز.",
   "mobile.chat.attachment.unavailable": "المرفق غير متاح. حاول مرة أخرى.",
+  "mobile.chat.attachment.downloadStopped": "توقف التنزيل. سيبدأ مرة أخرى عند اتصال الخادم.",
   "mobile.chat.attachment.openFailed": "تعذّر فتح المرفق",
   "mobile.chat.attachment.photosNeedUpdate": "يتطلب حفظ الصور أحدث إصدار من التطبيق.",
   "mobile.chat.attachment.photosPermission": "اسمح لـ OpenBot بإضافة الصور في الإعدادات لحفظ هذه الصورة.",

@@ -144,6 +144,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "閉じる",
   "mobile.chat.attachment.sharingUnavailable": "このデバイスではファイルの共有を利用できません。",
   "mobile.chat.attachment.unavailable": "添付ファイルを利用できません。もう一度お試しください。",
+  "mobile.chat.attachment.downloadStopped": "ダウンロードが止まりました。サーバーに接続すると、もう一度始まります。",
   "mobile.chat.attachment.openFailed": "添付ファイルを開けませんでした",
   "mobile.chat.attachment.photosNeedUpdate": "写真を保存するには、アプリを最新版に更新してください。",
   "mobile.chat.attachment.photosPermission": "この画像を保存するには、設定で OpenBot に写真の追加を許可してください。",

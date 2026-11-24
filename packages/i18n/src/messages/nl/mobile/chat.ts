@@ -136,6 +136,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Sluiten",
   "mobile.chat.attachment.sharingUnavailable": "Bestanden delen is niet beschikbaar op dit apparaat.",
   "mobile.chat.attachment.unavailable": "De bijlage is niet beschikbaar. Probeer opnieuw.",
+  "mobile.chat.attachment.downloadStopped": "De download is gestopt. Hij start opnieuw zodra de server verbonden is.",
   "mobile.chat.attachment.openFailed": "Kan bijlage niet openen",
   "mobile.chat.attachment.photosNeedUpdate": "Voor het bewaren van foto’s is de nieuwste versie van de app nodig.",
   "mobile.chat.attachment.photosPermission":

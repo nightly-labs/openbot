@@ -142,6 +142,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.backdrop.dismiss": "Close",
   "mobile.chat.attachment.sharingUnavailable": "File sharing is unavailable on this device.",
   "mobile.chat.attachment.unavailable": "The attachment is unavailable. Try again.",
+  "mobile.chat.attachment.downloadStopped": "The download stopped. It starts again when the server is connected.",
   "mobile.chat.attachment.openFailed": "Could not open attachment",
   "mobile.chat.attachment.photosNeedUpdate": "Saving photos needs the latest version of the app.",
   "mobile.chat.attachment.photosPermission": "Allow OpenBot to add photos in Settings to save this image.",
