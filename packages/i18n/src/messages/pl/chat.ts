@@ -558,6 +558,7 @@ export const messages = {
   "chat.errorStatus.send": "Nie udało się wysłać wiadomości",
   "chat.send.failed": "Nie wysłano",
   "chat.send.unconfirmed": "Niepotwierdzone. Sprawdź czat, zanim wyślesz ponownie.",
+  "chat.send.steerUnread": "Agent przeczyta to po zakończeniu bieżącego kroku.",
   "chat.send.edit": "Edytuj",
   "chat.send.dismiss": "Odrzuć",
   "chat.history.olderFailed": "Nie udało się wczytać starszych wiadomości.",

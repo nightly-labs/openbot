@@ -466,6 +466,7 @@ export const messages = {
   "chat.errorStatus.send": "Mesaj gönderilemedi",
   "chat.send.failed": "Gönderilmedi",
   "chat.send.unconfirmed": "Onaylanmadı. Yeniden göndermeden önce sohbeti kontrol edin.",
+  "chat.send.steerUnread": "Ajan bunu mevcut adımı bittiğinde okuyacak.",
   "chat.send.edit": "Düzenle",
   "chat.send.dismiss": "Kapat",
   "chat.history.olderFailed": "Daha eski mesajlar yüklenemedi.",

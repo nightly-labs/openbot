@@ -10,14 +10,17 @@ import {
   type QueueSnapshot,
 } from "@openbot/contracts/ipc";
 import { Effect, type Scope } from "effect";
-import { isMailboxMessageCopy } from "../conversation-snapshots";
+import { isMailboxMessageCopy, promptMessage } from "../conversation-snapshots";
+import { causeHelpers } from "../effect-boundary";
 import type { MailboxStore } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
+import { StoredStateFailure } from "../stored-state-effects";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import type { RoutineScheduler } from "./routine-scheduler";
 
 const OPEN_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
+const { sync: storedStep } = causeHelpers(StoredStateFailure);
 
 export interface MailboxSyncHooks {
   emit(event: AgentEvent): void;
@@ -72,6 +75,31 @@ export class MailboxSync {
       position: context.delivery.position,
     };
   }
+
+  readonly joinSteer = Effect.fn("MailboxSync.joinSteer")(function* (
+    this: MailboxSync,
+    agentId: string,
+    publicThreadId: string | null,
+    deliveryId: string,
+    turnId: string,
+  ) {
+    const context = this.#mailbox.getDelivery(deliveryId);
+    if (context?.delivery.status !== "starting" || context.delivery.turnId !== turnId) return;
+    yield* this.#mailbox.markRunning(deliveryId, turnId);
+    yield* storedStep(() => {
+      const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
+      if (
+        this.#conversation.isExecutionThread(snapshot.threadId) &&
+        !snapshot.messages.some((message) => message.id === deliveryId)
+      ) {
+        snapshot.messages.push({ ...promptMessage(context, { ...context.delivery, turnId }), steered: true });
+        this.syncDeliveryMessage(snapshot, deliveryId);
+      }
+      this.syncMailboxMessages(snapshot);
+      this.emitQueue(agentId);
+      this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId });
+    });
+  });
 
   syncMailboxMessages(snapshot: ConversationSnapshot, mailboxMessages?: readonly ConversationMessage[]): void {
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;

@@ -380,6 +380,7 @@
     "test:codex-midturn-compaction": "bun scripts/codex-midturn-compaction-e2e.ts",
     "test:codex-state-busy": "bun scripts/codex-state-busy-e2e.ts",
     "test:codex-subagent-steps": "bun scripts/codex-subagent-steps-e2e.ts",
+    "test:codex-steer-read": "bun scripts/codex-steer-read-e2e.ts",
     "test:subagent-status": "bun scripts/subagent-status-e2e.ts",
     "test:codex-idle-thread-release": "bun scripts/codex-idle-thread-release-e2e.ts",
     "test:codex-missing-rollout": "bun scripts/codex-missing-rollout-e2e.ts",

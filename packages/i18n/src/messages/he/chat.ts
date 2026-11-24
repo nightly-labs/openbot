@@ -465,6 +465,7 @@ export const messages = {
   "chat.errorStatus.send": "לא ניתן היה לשלוח את ההודעה",
   "chat.send.failed": "לא נשלחה",
   "chat.send.unconfirmed": "לא אושרה. יש לבדוק את הצ'אט לפני שליחה חוזרת.",
+  "chat.send.steerUnread": "הסוכן יקרא את זה כשהשלב הנוכחי שלו יסתיים.",
   "chat.send.edit": "עריכה",
   "chat.send.dismiss": "סגירה",
   "chat.history.olderFailed": "לא ניתן היה לטעון הודעות ישנות יותר.",

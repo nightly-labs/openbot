@@ -15,6 +15,15 @@ export interface PendingSendStatusProps {
   onDismiss: () => void;
 }
 
+export function SteerUnreadStatus(): JSX.Element {
+  const { t } = useText();
+  return (
+    <div class="pending-send-status">
+      <span role="status">{t("chat.send.steerUnread")}</span>
+    </div>
+  );
+}
+
 export function PendingSendStatus(props: PendingSendStatusProps): JSX.Element {
   const { t } = useText();
   const failed = () => props.state === "failed";

@@ -609,6 +609,7 @@ export const messages = {
   "chat.errorStatus.send": "تعذّر إرسال الرسالة",
   "chat.send.failed": "لم تُرسل",
   "chat.send.unconfirmed": "لم يتم التأكيد. تحقق من الدردشة قبل أن ترسلها مرة أخرى.",
+  "chat.send.steerUnread": "يقرأ الوكيل هذه الرسالة عندما تنتهي خطوته الحالية.",
   "chat.send.edit": "تعديل",
   "chat.send.dismiss": "إخفاء",
   "chat.history.olderFailed": "تعذّر تحميل الرسائل الأقدم.",

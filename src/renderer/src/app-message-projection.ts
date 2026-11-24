@@ -123,6 +123,9 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     ...(senderMember === undefined ? {} : { senderMember }),
     ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
     ...(message.steered ? { steered: true as const } : {}),
+    ...(message.author === "user" && message.delivery?.status === "starting" && message.turnId !== undefined
+      ? { steerUnread: true as const }
+      : {}),
     ...(message.attachments === undefined ? {} : { attachments: message.attachments }),
     ...(message.voiceRecording === undefined ? {} : { voiceRecording: message.voiceRecording }),
     ...(message.imageGeneration === undefined ? {} : { imageGeneration: message.imageGeneration }),
@@ -313,6 +316,7 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.senderMember?.name === right.senderMember?.name &&
     left.replyToMessageId === right.replyToMessageId &&
     left.steered === right.steered &&
+    left.steerUnread === right.steerUnread &&
     left.reaction === right.reaction &&
     sameJson(left.reactions, right.reactions) &&
     sameJson(left.reactionSummary, right.reactionSummary) &&

@@ -1393,6 +1393,15 @@ export class TurnLifecycle {
         if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
         const running = this.#runningTurns.get(turnId);
         if (running && item.type === "userMessage" && carriesHandoff(item)) running.carriedHistory = true;
+        const readSteerId = item.type === "userMessage" ? getString(item, "clientId") : null;
+        if (readSteerId)
+          yield* this.#mailboxSync
+            .joinSteer(agentId, this.#conversation.publicThreadId(agentId, threadId), readSteerId, turnId)
+            .pipe(
+              Effect.catch((failure) =>
+                Effect.sync(() => this.#hooks.emitError("delivery_turn_association_failed", failure.cause, agentId)),
+              ),
+            );
         if (item.type !== "userMessage" && (notification.method !== "item/completed" || !isEmptyAnswer(item))) {
           const acted = isRepeatedWork(item);
           this.#markProduced(turnId, acted, acted, acted && isUserReactionCall(item));

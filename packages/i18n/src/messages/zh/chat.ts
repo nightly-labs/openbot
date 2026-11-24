@@ -448,6 +448,7 @@ export const messages = {
   "chat.errorStatus.send": "无法发送消息",
   "chat.send.failed": "未发送",
   "chat.send.unconfirmed": "未确认成功。请先检查对话，再决定是否重发。",
+  "chat.send.steerUnread": "助手会在当前步骤结束后读取这条消息。",
   "chat.send.edit": "编辑",
   "chat.send.dismiss": "关闭",
   "chat.history.olderFailed": "更早的消息加载失败。",

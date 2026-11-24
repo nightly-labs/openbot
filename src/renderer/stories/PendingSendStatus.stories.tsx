@@ -1,4 +1,4 @@
-import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
+import { PendingSendStatus, SteerUnreadStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
@@ -27,3 +27,5 @@ export const FailedWithDraft: Story = { args: { canEdit: false } };
 export const Unconfirmed: Story = { args: { retrySafe: false, error: null } };
 
 export const UpdateRequired: Story = { args: { updateRequired: true } };
+
+export const SteerUnread: Story = { render: () => <SteerUnreadStatus /> };

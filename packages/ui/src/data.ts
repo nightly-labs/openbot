@@ -203,6 +203,7 @@ export interface AgentMessage {
   senderMember?: ConversationMessageSender | undefined;
   replyToMessageId?: string | null | undefined;
   steered?: true | undefined;
+  steerUnread?: true | undefined;
   attachments?: AttachmentSummary[] | undefined;
   voiceRecording?: AttachmentSummary | undefined;
   imageGeneration?: ImageGenerationInfo | undefined;

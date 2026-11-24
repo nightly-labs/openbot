@@ -38,7 +38,7 @@ import {
 } from "@openbot/ui/features/conversation/MessageRendering";
 import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-message-tally";
 import { ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
-import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
+import { PendingSendStatus, SteerUnreadStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
@@ -1573,6 +1573,15 @@ export function ConversationTimeline() {
                                       if (send) dismissPendingSend(send.clientMessageId);
                                     }}
                                   />
+                                </Show>
+                                <Show
+                                  when={
+                                    message()?.steerUnread &&
+                                    props.activeTurnId &&
+                                    message()?.turnId === props.activeTurnId
+                                  }
+                                >
+                                  <SteerUnreadStatus />
                                 </Show>
                                 <Show when={!hostless() && !turnStep()}>
                                   <MessageActions

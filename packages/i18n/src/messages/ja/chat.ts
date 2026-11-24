@@ -443,6 +443,7 @@ export const messages = {
   "chat.errorStatus.send": "メッセージを送信できませんでした",
   "chat.send.failed": "未送信",
   "chat.send.unconfirmed": "未確認です。もう一度送信する前にチャットを確認してください。",
+  "chat.send.steerUnread": "エージェントは現在のステップが終わるとこれを読みます。",
   "chat.send.edit": "編集",
   "chat.send.dismiss": "閉じる",
   "chat.history.olderFailed": "以前のメッセージを読み込めませんでした。",

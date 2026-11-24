@@ -553,6 +553,7 @@ export const messages = {
   "chat.errorStatus.send": "Не удалось отправить сообщение",
   "chat.send.failed": "Не отправлено",
   "chat.send.unconfirmed": "Не подтверждено. Проверьте чат, прежде чем отправлять ещё раз.",
+  "chat.send.steerUnread": "Агент прочитает это, когда закончит текущий шаг.",
   "chat.send.edit": "Изменить",
   "chat.send.dismiss": "Скрыть",
   "chat.history.olderFailed": "Не удалось загрузить прежние сообщения.",

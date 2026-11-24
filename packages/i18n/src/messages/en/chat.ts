@@ -449,6 +449,7 @@ export const messages = defineMessages("chat", {
   "chat.errorStatus.send": "Could not send the message",
   "chat.send.failed": "Not sent",
   "chat.send.unconfirmed": "Not confirmed. Check the chat before you send it again.",
+  "chat.send.steerUnread": "The agent reads this when its current step ends.",
   "chat.send.edit": "Edit",
   "chat.send.dismiss": "Dismiss",
   "chat.history.olderFailed": "Older messages could not load.",

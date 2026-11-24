@@ -13,7 +13,6 @@ import { Effect, Schema } from "effect";
 import type { AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelAssignment } from "../channel-store";
-import { promptMessage } from "../conversation-snapshots";
 import { causeHelpers } from "../effect-boundary";
 import { type MailboxStore, QUEUE_EDIT_HOLD_MS } from "../mailbox-store";
 import { decodeRecordResponse } from "../protocol";
@@ -348,28 +347,25 @@ export class QueueControls {
         ),
       );
     const steering = this.#mailbox.getDelivery(input.deliveryId)?.delivery;
-    const joinedTurn = steering?.status === "starting" && steering.turnId === turnId;
-    if (joinedTurn) yield* this.#mailbox.markRunning(input.deliveryId, turnId).pipe(toQueueOperationFailed);
+    const joinsNow =
+      steering?.status === "starting" &&
+      steering.turnId === turnId &&
+      !PROVIDERS_THAT_READ_STEERS_BETWEEN_STEPS.has(providerForAgent(agent));
+    if (joinsNow)
+      return yield* this.#mailboxSync
+        .joinSteer(agent.id, publicThreadId, input.deliveryId, turnId)
+        .pipe(toQueueOperationFailed);
     yield* queueStep(() => {
       const current = liveSnapshot();
-      if (
-        joinedTurn &&
-        this.#conversation.isExecutionThread(current.threadId) &&
-        !current.messages.some((message) => message.id === input.deliveryId)
-      ) {
-        current.messages.push({ ...promptMessage(context, { ...context.delivery, turnId }), steered: true });
-        this.#mailboxSync.syncDeliveryMessage(current, input.deliveryId);
-      }
       this.#mailboxSync.syncMailboxMessages(current);
       this.#mailboxSync.emitQueue(agent.id);
-      if (joinedTurn)
-        this.#conversation.emitConversation(current, "queue.message-steered", { deliveryId: input.deliveryId });
-      else this.#conversation.emitConversation(current);
+      this.#conversation.emitConversation(current);
     });
   }, Effect.uninterruptible);
 }
 
 const PROVIDERS_THAT_FRAME_STEERS: ReadonlySet<AgentProvider> = new Set(["claude", "grok"]);
+const PROVIDERS_THAT_READ_STEERS_BETWEEN_STEPS: ReadonlySet<AgentProvider> = new Set(["codex"]);
 
 export function steerNoteFor(provider: AgentProvider, sender: QueueDelivery["sender"], text: string): string | null {
   if (PROVIDERS_THAT_FRAME_STEERS.has(provider)) return null;

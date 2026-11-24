@@ -449,6 +449,7 @@ export const messages = {
   "chat.errorStatus.send": "메시지를 보낼 수 없어요",
   "chat.send.failed": "보내지 못함",
   "chat.send.unconfirmed": "확인되지 않았어요. 다시 보내기 전에 채팅을 확인해 주세요.",
+  "chat.send.steerUnread": "에이전트는 현재 단계가 끝나면 이 메시지를 읽어요.",
   "chat.send.edit": "편집",
   "chat.send.dismiss": "닫기",
   "chat.history.olderFailed": "이전 메시지를 불러올 수 없어요.",
