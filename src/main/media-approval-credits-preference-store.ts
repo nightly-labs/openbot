@@ -25,7 +25,7 @@ export function mediaApprovalCreditsControl(store: MediaApprovalCreditsPreferenc
   return {
     get: () => store.get(),
     set: Effect.fn("MediaApprovalCredits.set")(function* (update: MediaApprovalCreditsUpdate) {
-      const saved = yield* store.set({ ...store.get(), ...update });
+      const saved = yield* store.update((current) => ({ ...current, ...update }));
       onChange();
       return saved;
     }),
@@ -61,8 +61,10 @@ export function creditAsksControl(settings: MediaApprovalCreditsControl, muted: 
       yield* settings.set({ askWhenBlocked: !mute });
       return;
     }
-    const others = muted.get().members.filter((member) => member !== person.id);
-    yield* muted.set({ members: mute ? [...others, person.id] : others });
+    yield* muted.update(({ members }) => {
+      const others = members.filter((member) => member !== person.id);
+      return { members: mute ? [...others, person.id] : others };
+    });
   });
   return {
     mutedFor: (person: CreditAsksPerson | null) =>

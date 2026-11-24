@@ -9983,6 +9983,29 @@ try {
         field(askOn.body, "askWhenBlocked") === true,
       [summary(askOff), summary(askText), summary(memberAsk), summary(askOn)],
     );
+    const together = await Promise.all([
+      call("POST", route.update, { ...setup, json: { credits: 75 } }),
+      call("POST", route.update, { ...setup, json: { imageModel: "nano-banana-2" } }),
+      call("POST", route.update, { ...setup, json: { agents: false } }),
+      call("POST", route.update, { ...setup, json: { askWhenBlocked: false } }),
+    ]);
+    const afterTogether = await call("POST", route.settings, { ...setup, json: {} });
+    check(
+      "updates of different fields at the same time keep each change",
+      together.every((reply) => reply.status === 200) &&
+        isDeepStrictEqual(afterTogether.body, {
+          agents: false,
+          askWhenBlocked: false,
+          credits: 75,
+          imageModel: "nano-banana-2",
+          videoModel: "kling-3",
+        }),
+      [...together.map(summary), summary(afterTogether)],
+    );
+    await call("POST", route.update, {
+      ...setup,
+      json: { credits: 100_000, imageModel: null, agents: true, askWhenBlocked: true },
+    });
   }
 
   {
