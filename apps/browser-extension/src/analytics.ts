@@ -4,7 +4,7 @@ import { analyticsOnByDefault, currentAnalyticsInstallId, newAnalyticsInstallId 
 import { ASK_CHOICES, ASK_KINDS, type AskChoice, type AskKind } from "./client-browser-messages";
 import { type ExtensionSession, readSession } from "./extension-storage";
 
-export const EXTENSION_ANALYTICS_GENERATION = 1;
+const EXTENSION_ANALYTICS_GENERATION = 1;
 const ANALYTICS_URL = import.meta.env.VITE_OPENBOT_ANALYTICS_URL;
 const OPENPANEL_CLIENT_ID = "6c989975-87ef-4f0c-857e-ab449a65b5c2";
 const CHOICE_KEY = "openbot.analytics.v1";
@@ -15,7 +15,7 @@ type Result = "succeeded" | "failed";
 type ResultOrCancelled = Result | "cancelled";
 export type SignInMethod = "web" | "email";
 export type SignInFailureCode = (typeof SIGN_IN_FAILURE_CODES)[number];
-export type XReplyAction = (typeof X_REPLY_ACTIONS)[number];
+type XReplyAction = (typeof X_REPLY_ACTIONS)[number];
 
 const RESULTS = ["succeeded", "failed"] as const;
 const RESULTS_OR_CANCELLED = ["succeeded", "failed", "cancelled"] as const;
