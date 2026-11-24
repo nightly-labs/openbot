@@ -306,6 +306,8 @@ interface AcpThread {
   currentModelId: string | null;
   mcp: LocalMcpSession;
   mcpListed: boolean;
+  mcpSentAt: number;
+  mcpDropped: boolean;
   relays: Effect.Effect<void>;
   relayed: RelayedMcpServers;
   activeTurn: AcpTurn | null;
@@ -1637,6 +1639,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
   }
 
+  #openBotToolsDropped(thread: AcpThread): boolean {
+    const limit = this.#flavor.mcpConnectLimitMs;
+    if (limit === undefined || !this.#supportsSessionResume || Date.now() - thread.mcpSentAt < limit) return false;
+    if (thread.mcp.servers.length === 0 || thread.mcp.listedWithin(0, Number.POSITIVE_INFINITY)) return false;
+    if (thread.mcp.dropped(thread.mcpSentAt, limit)) thread.mcpDropped = true;
+    return thread.mcpDropped;
+  }
+
   #listedInTime(mcp: LocalMcpSession, sentAt: number, waitedMs = 0): boolean {
     const limit = this.#flavor.mcpListLimit;
     const version = this.#initialization?.agentInfo?.version;
@@ -1890,10 +1900,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               );
             const openedAt = Date.now();
             const connectLimit = this.#flavor.mcpConnectLimitMs;
+            let mcpSentAt = sentAt;
+            let mcpDropped = false;
             if (connectLimit !== undefined && this.#supportsSessionResume && mcp.dropped(sentAt, connectLimit)) {
               this.emit("diagnostic", `${this.#label} did not load OpenBot's tools in time. The session opens again.`);
               mcpServers = [...given, ...mcp.renew()];
               const retriedAt = Date.now();
+              mcpSentAt = retriedAt;
               const retry = this.#restoreSessionEffect(
                 connection,
                 { sessionId: id, cwd, ...directories, mcpServers, ...meta },
@@ -1902,7 +1915,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               const retried = yield* Effect.result(
                 sessionTransport ? retry : this.#whileProcessWrites(retry, "session/resume"),
               );
-              if (Result.isFailure(retried) || mcp.dropped(retriedAt, connectLimit))
+              mcpDropped = mcp.dropped(retriedAt, connectLimit);
+              if (Result.isFailure(retried) || mcpDropped)
                 this.emit("diagnostic", `${this.#label} still did not load OpenBot's tools.`);
             }
             if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())
@@ -1920,6 +1934,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               currentModelId,
               mcp,
               mcpListed: this.#listedInTime(mcp, sentAt, openedAt - sentAt),
+              mcpSentAt,
+              mcpDropped,
               relays: closeRelays ?? Effect.void,
               relayed: relayedServers,
               activeTurn: null,
@@ -2754,12 +2770,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       if (!thread.mcpListed) thread.mcpListed = this.#listedInTime(thread.mcp, sentAt);
       if (
-        !thread.mcpListed &&
         !promptedAgain &&
         !turn.wake &&
         !turn.providerError &&
         !turn.stopped &&
-        response.stopReason === "end_turn"
+        response.stopReason === "end_turn" &&
+        (!thread.mcpListed || this.#openBotToolsDropped(thread))
       ) {
         turn.failureCause = "unknown";
         turn.providerError = sourceText("error.provider.acpToolsNotLoaded", { provider: this.#label });
