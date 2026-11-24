@@ -178,5 +178,6 @@ export function defaultWorkflowModel(catalogs: WorkflowCatalogs): ClientAgentMod
     const model = startingModel(provider, options, catalogs.preference);
     if (model) return model;
   }
-  return catalogs.models.find((option) => option.provider === providers[0]);
+  const fallback = catalogs.models.filter((option) => option.provider === providers[0]);
+  return fallback.find((option) => option.listing !== "kept") ?? fallback[0];
 }

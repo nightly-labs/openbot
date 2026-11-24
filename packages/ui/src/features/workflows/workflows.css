@@ -990,7 +990,8 @@
   grid-template-columns: min(100%, 60rem);
   gap: var(--openbot-space-6);
   padding: var(--openbot-space-6);
-  place-content: center;
+  place-content: safe center;
+  overflow-y: auto;
   pointer-events: none;
   animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
 }
@@ -1035,16 +1036,17 @@
 .wfn-empty .wfn-start-card {
   display: grid;
   height: auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--openbot-space-3);
   align-content: start;
   align-items: stretch;
+  justify-content: stretch;
   padding: var(--openbot-space-2);
   border: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-card);
   background: var(--openbot-bg-surface);
   color: var(--openbot-text-primary);
   font: inherit;
-  line-height: normal;
   text-align: start;
   white-space: normal;
   user-select: none;

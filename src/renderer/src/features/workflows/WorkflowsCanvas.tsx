@@ -275,7 +275,7 @@ export function WorkflowsCanvas(props: {
     const slack = props.admin && workflows.slack().length > 0;
     const outputs = [
       ...WORKFLOW_FEATURES_V1.outputs.filter((output) => output !== "channel" || workflows.places().length > 0),
-      ...(workflows.channels().length > 0 ? (["chat-channel"] as const) : []),
+      ...(props.admin && workflows.channels().length > 0 ? (["chat-channel"] as const) : []),
     ];
     const added = [
       ...(github ? (["github"] as const) : []),

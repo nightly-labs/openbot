@@ -5,7 +5,7 @@ import { For } from "solid-js";
 import { useText } from "../../text";
 import type { WfnFields } from "./workflow-board";
 import type { Clip } from "./workflow-clipboard";
-import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
+import { defaultWorkflowModel, type WorkflowCatalogs, type WorkflowFeatures } from "./workflow-model";
 
 type TextKey = Extract<keyof AppMessages, `workflow.template.${string}`>;
 
@@ -158,10 +158,17 @@ const fieldText = (fields: WfnFields | undefined, name: string) => {
   return typeof value === "string" ? value : undefined;
 };
 
+function stepRunnable(kind: WorkflowNodeKind, catalogs: WorkflowCatalogs): boolean {
+  if (kind === "agent") return catalogs.agents.length > 0;
+  if (kind === "llm" || kind === "condition") return defaultWorkflowModel(catalogs) !== undefined;
+  if (kind === "image") return catalogs.imageModels.some((choice) => choice.kinds.includes("image"));
+  return true;
+}
+
 export function templateAvailable(template: WorkflowTemplate, host: TemplateHost): boolean {
   const fields = template.fields(host);
   return template.steps.every((step) => {
-    if (!host.features.kinds.includes(step.kind)) return false;
+    if (!host.features.kinds.includes(step.kind) || !stepRunnable(step.kind, host.catalogs)) return false;
     const own = fields[step.id];
     const trigger = fieldText(own, "trigger");
     const target = fieldText(own, "target");
