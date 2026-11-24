@@ -9,13 +9,19 @@ import { runtimeTarget } from "./remote-desktop-runtime-release";
 const logger = createOpenBotLogger("verify-remote-desktop-runtime");
 
 const platform = process.argv.includes("--windows") ? "win32" : process.argv.includes("--linux") ? "linux" : "darwin";
-const architecture = process.argv.includes("--arm64")
-  ? "arm64"
-  : process.argv.includes("--x64")
-    ? "x64"
-    : platform === "win32"
-      ? "x64"
-      : process.arch;
+function resolveArchitecture(argv: string[], targetPlatform: string): string {
+  const hasArm64 = argv.includes("--arm64");
+  const hasX64 = argv.includes("--x64");
+  if (hasArm64 && hasX64) {
+    throw new Error("Cannot pass both --arm64 and --x64.");
+  }
+  if (hasArm64) return "arm64";
+  if (hasX64) return "x64";
+  if (targetPlatform === "win32") return "x64";
+  return process.arch;
+}
+
+const architecture = resolveArchitecture(process.argv, platform);
 const distributionRoot = resolve("build/remote-desktop-runtime");
 const root = resolve("build/remote-desktop-runtime", platform, architecture);
 const lock = await loadNativeRuntimeLock();

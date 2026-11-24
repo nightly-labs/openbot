@@ -296,7 +296,7 @@ jobs:
 
       - name: Verify runtime
         shell: bash
-        run: bun scripts/verify-remote-desktop-runtime.ts ${{ matrix.platform == 'win32' && '--windows' || matrix.platform == 'linux' && '--linux' || '' }}
+        run: bun scripts/verify-remote-desktop-runtime.ts ${{ matrix.platform == 'win32' && '--windows' || matrix.platform == 'linux' && '--linux' || '' }} --${{ matrix.architecture }}
 
       - name: Run macOS smoke test
         if: runner.os == 'macOS'
@@ -558,7 +558,7 @@ jobs:
 
       - name: Verify published runtime
         shell: bash
-        run: bun scripts/verify-remote-desktop-runtime.ts ${{ matrix.platform == 'win32' && '--windows' || matrix.platform == 'linux' && '--linux' || '' }}
+        run: bun scripts/verify-remote-desktop-runtime.ts ${{ matrix.platform == 'win32' && '--windows' || matrix.platform == 'linux' && '--linux' || '' }} --${{ matrix.architecture }}
 
       - name: Run published macOS smoke test
         if: runner.os == 'macOS'
@@ -583,10 +583,10 @@ jobs:
       # Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor, and the verifier
       # starts the unpacked build from the workspace. Give it the same sandbox setup as the
       # release workflow, then run the launch check under a virtual display.
-      - name: Permit the Electron sandbox for the ARM64 verification build
-        if: matrix.target == 'linux-arm64'
+      - name: Permit the Electron sandbox for the Linux verification build
+        if: matrix.platform == 'linux'
         env:
-          SUFFIX: linux-arm64
+          SUFFIX: ${{ matrix.architecture == 'arm64' && 'linux-arm64' || 'linux' }}
         run: |
           set -euo pipefail
           sudo chown root:root "dist/$SUFFIX-unpacked/chrome-sandbox"
@@ -601,9 +601,11 @@ jobs:
           PROFILE
           sudo apparmor_parser -r /etc/apparmor.d/openbot-verify
 
-      - name: Verify the packaged Linux ARM64 application
-        if: matrix.target == 'linux-arm64'
-        run: xvfb-run -a bun run verify:package:linux "dist/linux-arm64-unpacked"
+      - name: Verify the packaged Linux application
+        if: matrix.platform == 'linux'
+        env:
+          SUFFIX: ${{ matrix.architecture == 'arm64' && 'linux-arm64' || 'linux' }}
+        run: xvfb-run -a bun run verify:package:linux "dist/$SUFFIX-unpacked"
 
   pin:
     name: Open runtime lock PR

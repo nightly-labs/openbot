@@ -367,35 +367,7 @@
       "linux-x64": ["sunshine", "web-server", "streamer"],
       "linux-arm64": ["sunshine", "web-server", "streamer"]
     },
-    "releaseArtifacts": {
-      "darwin-arm64": {
-        "asset": "remote-desktop-runtime-darwin-arm64.tar.gz",
-        "sha256": "c8b3d97e6fb205b37d520b93a903d5b9f882bf23756987f00647671d5ae9e519"
-      },
-      "darwin-x64": {
-        "asset": "remote-desktop-runtime-darwin-x64.tar.gz",
-        "sha256": "6b3e739bc07eea45c446a69099237f93b46d67a754561de02016aeaaa5bf7864"
-      },
-      "win32-x64": {
-        "asset": "remote-desktop-runtime-win32-x64.tar.gz",
-        "sha256": "15f4d0a60b39760624de5c9b517dcf34d646bd23b2bbe41e3918780ac6dba6ac"
-      },
-      "linux-x64": {
-        "asset": "remote-desktop-runtime-linux-x64.tar.gz",
-        "sha256": "d0a789a549fd8f6367a376e25858a8b25aac1c23c9915614ff954b9da527cda7"
-      },
-      "linux-arm64": {
-        "asset": "remote-desktop-runtime-linux-arm64.tar.gz",
-        "sha256": "4b3f54b8d53975f14b7a39a73e5a3fc6f5d63b242893da07426c359929ff329e"
-      }
-    },
-    "artifactRelease": {
-      "repository": "rodrigoedu94-png/openbot",
-      "tag": "remote-desktop-runtime-04435c83785a2b1849964b550dd4bcd181b4b36942632ab06f1217caef9f948a",
-      "inputDigest": "04435c83785a2b1849964b550dd4bcd181b4b36942632ab06f1217caef9f948a",
-      "manifestAsset": "remote-desktop-runtime-manifest.json",
-      "manifestSha256": "4a5dc260fd5b625a7ebbeec0c112525eb51c3e7e66c70d2e054b8634357934de"
-    }
+    "releaseArtifacts": {}
   },
   "bun": {
     "registry": "https://registry.npmjs.org",
