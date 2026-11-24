@@ -1,6 +1,3 @@
-// The NEAR Intents wallet of this computer: the agent account on the NEAR Intents Agent API, the payment
-// grant of this app, the owner's signatures, the payment rules, and the payments that agents ask for.
-
 import { randomUUID } from "node:crypto";
 import {
   type AgentApi,
@@ -49,33 +46,22 @@ import type { NearOwner, NearStoredPayment, NearWalletRecord, NearWalletStore } 
 
 const logger = createOpenBotLogger("near-wallet");
 
-/** The grant of this app. The Agent API checks the token on each payment; it is renewed in the panel. */
 const GRANT_DAYS = 30;
 const DAY_MS = 24 * 60 * 60_000;
-/** A grant this close to its end is reported as expired, so a payment does not fail halfway. */
 const GRANT_MARGIN_MS = 5 * 60_000;
-/** The longest wait of one status request; the API allows 30 s. */
 const STATUS_WAIT_MS = 25_000;
-/** An owner intent that is not done after this is reported as pending. */
 const INTENT_TIMEOUT_MS = 3 * 60_000;
-/** A payment that is not done after this is reported as uncertain; it stays stored. */
 const PAYMENT_TIMEOUT_MS = 5 * 60_000;
-/** A policy change is applied and synced to the provider in this time. */
 const POLICY_SYNC_TIMEOUT_MS = 3 * 60_000;
 const POLICY_POLL_MS = 3_000;
-/** Prices and the token list change slowly. */
 const TOKEN_CACHE_MS = 60_000;
 const BALANCE_CACHE_MS = 30_000;
-/** A payment without an answer is sent again with its key only while the API surely keeps the key. */
 const REPLAY_WINDOW_MS = 60 * 60_000;
-/** Retries of a `retryable` Agent API answer, with the same idempotency key. */
 const SEND_ATTEMPTS = 3;
-/** Payments that wait for the owner at one time. */
 const MAX_PREPARED = 32;
 const MAX_ACTIONS_PER_HOUR = 20;
 const AGENT_NAME = "OpenBot";
 
-/** A NEAR account id: named (`bob.near`) or implicit (64 hex, or `0x` and 40 hex). */
 const NEAR_ACCOUNT =
   /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$|^[0-9a-f]{64}$|^0x[0-9a-f]{40}$/u;
 const CHAIN = /^[a-z][a-z0-9-]{1,31}$/u;
@@ -88,13 +74,11 @@ const UNCLEAR = new Set(["UNCERTAIN", "NEEDS_REVIEW"]);
 export interface NearWalletServiceOptions {
   store: NearWalletStore;
   signing: NearOwnerSigning;
-  /** Development and tests only: another Agent API origin. HTTP is accepted for localhost only. */
   baseUrl?: string | undefined;
   fetch?: typeof fetch;
   now?: () => number;
 }
 
-/** A payment that `prepare` checked. It waits for `pay` or `drop`. */
 interface PreparedPayment {
   request: NearPaymentRequest;
   kind: "transfer" | "withdraw";
@@ -105,15 +89,9 @@ interface PreparedPayment {
   atomicAmount: string;
   amountCents: number | null;
   auto: boolean;
-  /** Shown in the status while the owner decides. Null for a payment that a rule allows. */
   pending: NearPendingPayment | null;
 }
 
-/**
- * Owns the wallet. The partner key and the grant token stay in this class and the encrypted store:
- * no status, event, log or agent answer carries them. Agents reach the wallet only through `NearWallet`,
- * which checks each payment against the owner's agents, rules and limits.
- */
 export class NearWalletService implements NearWallet {
   readonly #store: NearWalletStore;
   readonly #signing: NearOwnerSigning;
@@ -122,7 +100,6 @@ export class NearWalletService implements NearWallet {
   readonly #now: () => number;
   readonly #scope = Scope.makeUnsafe();
   readonly #listeners = new Set<(status: NearWalletStatus) => void>();
-  /** Owner actions, one at a time: each can wait for a signature in the browser. */
   readonly #ownerQueue = Semaphore.makeUnsafe(1);
   readonly #prepared = new Map<string, PreparedPayment>();
   #signingState: NearSigning | null = null;
@@ -140,7 +117,6 @@ export class NearWalletService implements NearWallet {
     this.#now = options.now ?? Date.now;
   }
 
-  /** Reads the record, then reads the account and finishes stored payments in the background. */
   readonly load = Effect.fn("NearWallet.load")(function* (this: NearWalletService) {
     const error = yield* this.#store.load();
     if (error) {
@@ -189,13 +165,11 @@ export class NearWalletService implements NearWallet {
     return this.#state() === "ready" && this.#grantValid(this.#store.read());
   }
 
-  /** Reads the balances, the policy and the token list again. A failure is shown, not thrown. */
   readonly refresh = Effect.fn("NearWallet.refresh")(function* (this: NearWalletService) {
     yield* this.#background(this.#refresh(true));
     return this.status();
   }).bind(this);
 
-  /** Checks a partner key with the Agent API, then stores it. Only main sees it. */
   readonly setKey = Effect.fn("NearWallet.setKey")(function* (this: NearWalletService, key: string) {
     registerSecretValue(key);
     return yield* this.#ownerStep(
@@ -207,11 +181,6 @@ export class NearWalletService implements NearWallet {
     );
   }).bind(this);
 
-  /**
-   * Sets the wallet up: the owner's passkey or EVM wallet, the agent account with its policy, and the
-   * grant of this app. Each step is stored as soon as the Agent API gives it, so a restart continues
-   * and never makes a second account. Runs in the background; the status reports each signature.
-   */
   readonly create = Effect.fn("NearWallet.create")(function* (this: NearWalletService, input: NearWalletCreateInput) {
     if (this.#disposed) return this.status();
     const record = this.#store.read();
@@ -229,7 +198,6 @@ export class NearWalletService implements NearWallet {
     return this.status();
   }).bind(this);
 
-  /** Changes the daily budget that the Agent API keeps. The owner signs it. */
   readonly setBudget = Effect.fn("NearWallet.setBudget")(function* (this: NearWalletService, dailyBudgetUsd: string) {
     return yield* this.#ownerStep(
       Effect.gen({ self: this }, function* () {
@@ -248,12 +216,10 @@ export class NearWalletService implements NearWallet {
     );
   }).bind(this);
 
-  /** The OpenBot agents that can ask to pay. Kept on this computer only, so no signature is needed. */
   readonly setAgents = Effect.fn("NearWallet.setAgents")(function* (this: NearWalletService, agentIds: string[]) {
     return yield* this.#ownerStep(this.#store.update((record) => ({ ...record, agentIds })));
   }).bind(this);
 
-  /** Issues a new 30-day grant. The old one ends at its own time. */
   readonly renewGrant = Effect.fn("NearWallet.renewGrant")(function* (this: NearWalletService) {
     return yield* this.#ownerStep(
       Effect.gen({ self: this }, function* () {
@@ -263,10 +229,6 @@ export class NearWalletService implements NearWallet {
     );
   }).bind(this);
 
-  /**
-   * Stops all payments. This computer stops at once; then the owner signs the freeze, so the Agent API
-   * also refuses the grant. A signature that fails leaves the local freeze in place.
-   */
   readonly freeze = Effect.fn("NearWallet.freeze")(function* (this: NearWalletService) {
     const wallet = this.#store.read().wallet;
     if (!wallet) return this.status();
@@ -287,7 +249,6 @@ export class NearWalletService implements NearWallet {
     );
   }).bind(this);
 
-  /** The owner signs the unfreeze first; this computer pays again only after the Agent API applied it. */
   readonly unfreeze = Effect.fn("NearWallet.unfreeze")(function* (this: NearWalletService) {
     return yield* this.#ownerStep(
       Effect.gen({ self: this }, function* () {
@@ -302,7 +263,6 @@ export class NearWalletService implements NearWallet {
     );
   }).bind(this);
 
-  /** A deposit address for one asset. The funds arrive in the agent account. */
   readonly deposit = Effect.fn("NearWallet.deposit")(
     function* (this: NearWalletService, input: NearDepositInput) {
       const wallet = yield* this.#activeWallet();
@@ -323,10 +283,6 @@ export class NearWalletService implements NearWallet {
     (operation) => operation.pipe(Effect.mapError((error) => nearFailure(redactText(failureText(error.cause))))),
   ).bind(this);
 
-  /**
-   * Saves a payment rule. The first rule turns off the owner's signature for each payment: the owner
-   * signs that once, and OpenBot then checks the rules and the daily limits itself.
-   */
   readonly saveRule = Effect.fn("NearWallet.saveRule")(function* (this: NearWalletService, input: NearRuleInput) {
     return yield* this.#ownerStep(
       Effect.gen({ self: this }, function* () {
@@ -352,10 +308,6 @@ export class NearWalletService implements NearWallet {
     );
   }).bind(this);
 
-  /**
-   * "Always allow" on a payment card: the recipient of the waiting payment is added to the rule of its
-   * domain, with the daily limit that the owner chose. The renderer then approves the payment.
-   */
   readonly allowPayment = Effect.fn("NearWallet.allowPayment")(function* (
     this: NearWalletService,
     input: NearAllowPaymentInput,
@@ -389,7 +341,6 @@ export class NearWalletService implements NearWallet {
     );
   }).bind(this);
 
-  /** Opens the signing page again, when the owner closed the tab. */
   readonly openSigning = Effect.fn("NearWallet.openSigning")(function* (this: NearWalletService) {
     yield* nearCall(() => this.#signing.reopen()).pipe(
       Effect.catch(({ cause }) =>
@@ -403,15 +354,10 @@ export class NearWalletService implements NearWallet {
     return this.status();
   }
 
-  /** The result of the signing page, from an `openbot://near-signature` link or the dev loopback. */
   receiveSignature(nonce: string, data: string): boolean {
     return this.#signing.receive(nonce, data);
   }
 
-  /**
-   * Forgets the wallet on this computer. The agent account and its funds stay on the Agent API; the
-   * grant ends at its own time. Waiting payments are dropped.
-   */
   readonly disconnect = Effect.fn("NearWallet.disconnect")(function* (this: NearWalletService) {
     this.#signing.cancel();
     return yield* this.#ownerStep(
@@ -513,7 +459,6 @@ export class NearWalletService implements NearWallet {
       if (wallet.frozen) return yield* nearFailure(sourceText("error.connector.nearFrozen"));
       if (!this.#grantValid(record)) return yield* nearFailure(sourceText("error.connector.nearGrantExpired"));
       const rule = record.rules.find((candidate) => candidate.domain === payment.request.domain);
-      // A rule payment is checked again: another payment can have used the limit in the meantime.
       if (
         payment.auto &&
         (!rule ||
@@ -547,8 +492,6 @@ export class NearWalletService implements NearWallet {
     (operation) => operation.pipe(Effect.mapError(walletError)),
   ).bind(this);
 
-  // --- Setup -------------------------------------------------------------------------------------
-
   readonly #create = Effect.fn("NearWallet.createSteps")(function* (
     this: NearWalletService,
     input: NearWalletCreateInput,
@@ -573,7 +516,6 @@ export class NearWalletService implements NearWallet {
     yield* this.#refresh(true);
   });
 
-  /** Makes the agent account, or continues the one that the record names. */
   readonly #createAccount = Effect.fn("NearWallet.createAccount")(function* (
     this: NearWalletService,
     owner: NearOwner,
@@ -594,7 +536,6 @@ export class NearWalletService implements NearWallet {
         const status = yield* this.#waitIntent(stored.createCorrelationId);
         if (status === "SUCCESS") return yield* this.#createAccount(owner, dailyBudgetUsd);
       }
-      // The account was never made: it can be made again.
       yield* this.#store.update((record) => ({ ...record, wallet: null }));
     }
     const intent = yield* this.#generate({
@@ -622,7 +563,6 @@ export class NearWalletService implements NearWallet {
       null,
     ).pipe(Effect.result);
     if (Result.isFailure(signed)) {
-      // Nothing was submitted, so no account exists. A new setup starts from the beginning.
       yield* this.#store.update((record) => ({ ...record, wallet: null }));
       return yield* signed.failure;
     }
@@ -635,10 +575,6 @@ export class NearWalletService implements NearWallet {
     );
   });
 
-  /**
-   * Issues the grant of this app. The token is stored before the owner signs, so a grant that the Agent
-   * API applies always has its token on this computer.
-   */
   readonly #issueGrant = Effect.fn("NearWallet.issueGrant")(function* (this: NearWalletService, renew: boolean) {
     const wallet = this.#store.read().wallet;
     if (!wallet) return yield* nearFailure(sourceText("error.connector.nearNoWallet"));
@@ -665,7 +601,6 @@ export class NearWalletService implements NearWallet {
       correlationId: intent.correlation_id,
       active: false,
     };
-    // A renewal keeps the grant in force until the new one is applied.
     if (!current?.active)
       yield* this.#store.update((record) =>
         record.wallet ? { ...record, wallet: { ...record.wallet, grant } } : record,
@@ -711,9 +646,6 @@ export class NearWalletService implements NearWallet {
     );
   });
 
-  // --- Policy ------------------------------------------------------------------------------------
-
-  /** Turns off the owner's signature for each payment, once. Rules then decide what pays without asking. */
   readonly #allowAutoPay = Effect.fn("NearWallet.allowAutoPay")(function* (this: NearWalletService) {
     if (!this.#store.read().wallet?.ownerApproval) return;
     yield* this.#updatePolicy(
@@ -726,7 +658,6 @@ export class NearWalletService implements NearWallet {
     );
   });
 
-  /** A signed policy change. It waits until the Agent API applied it and synced it to the provider. */
   readonly #updatePolicy = Effect.fn("NearWallet.updatePolicy")(function* (
     this: NearWalletService,
     action: "budget" | "auto-pay",
@@ -761,8 +692,6 @@ export class NearWalletService implements NearWallet {
     return yield* nearFailure(sourceText("error.connector.nearPolicyPending"));
   });
 
-  // --- Owner intents -----------------------------------------------------------------------------
-
   #generate<Type extends IntentType>(
     request: Extract<GenerateIntentRequest, { type: Type }>,
   ): Effect.Effect<GenerateIntentResponse, NearOperationError> {
@@ -783,7 +712,6 @@ export class NearWalletService implements NearWallet {
     yield* this.#submit(intent, signed);
   });
 
-  /** The owner signs the intent in the browser. Returns the `signed_data` for the Agent API. */
   readonly #signIntent = Effect.fn("NearWallet.signIntent")(function* (
     this: NearWalletService,
     action: Exclude<NearOwnerAction, "register">,
@@ -804,7 +732,6 @@ export class NearWalletService implements NearWallet {
     return yield* nearFailure(sourceText("error.connector.nearSigningInvalid"));
   });
 
-  /** Opens the signing page and waits. The status names the action while the page waits. */
   readonly #sign = Effect.fn("NearWallet.sign")(function* (
     this: NearWalletService,
     request: NearSigningRequest,
@@ -837,7 +764,6 @@ export class NearWalletService implements NearWallet {
     if (status !== "SUCCESS") return yield* nearFailure(sourceText("error.connector.nearPolicyPending"));
   });
 
-  /** Waits for an owner intent. Gives the last status; a failure is an error with its code. */
   readonly #waitIntent = Effect.fn("NearWallet.waitIntent")(function* (this: NearWalletService, correlationId: string) {
     const api = yield* this.#partnerClient();
     const deadline = this.#now() + INTENT_TIMEOUT_MS;
@@ -855,12 +781,6 @@ export class NearWalletService implements NearWallet {
     return status?.status ?? "PENDING_SIGNATURE";
   });
 
-  // --- Payments ----------------------------------------------------------------------------------
-
-  /**
-   * Stores the payment with its idempotency key, then sends it. A refusal removes it; a lost answer
-   * keeps it, so a later try uses the same key and the payment is never made twice. Not interrupted.
-   */
   readonly #dispatch = Effect.fn("NearWallet.dispatch")(function* (
     this: NearWalletService,
     agentId: string,
@@ -891,7 +811,6 @@ export class NearWalletService implements NearWallet {
       }
       const cause = sent.failure.cause;
       if (cause instanceof AgentApiError && !cause.retryable) {
-        // A proven refusal: nothing was sent, so the key and the counted spend go.
         yield* this.#removePayment(payment, true);
         return {
           status: "done" as const,
@@ -947,17 +866,12 @@ export class NearWalletService implements NearWallet {
     });
   }
 
-  /**
-   * Waits for a sent payment. A payment that needs the owner's vote is signed in the browser. A final
-   * answer removes the stored payment; no answer keeps it for the next start.
-   */
   readonly #follow = Effect.fn("NearWallet.follow")(function* (
     this: NearWalletService,
     agentId: string,
     payment: NearStoredPayment,
     correlationId: string,
     timeoutMs: number,
-    /** The text of the owner's vote, or null when no signing page may open (a restart). */
     voteSummary: string | null,
   ): Effect.fn.Return<NearPaymentResult, NearOperationError> {
     const api = yield* this.#partnerClient();
@@ -1016,7 +930,6 @@ export class NearWalletService implements NearWallet {
     return { status: "uncertain", correlationId, detail: sourceText("error.connector.nearUncertain") };
   });
 
-  /** Payments of an earlier run: read their result, or send them again with the same key. */
   readonly #resume = Effect.fn("NearWallet.resume")(function* (this: NearWalletService) {
     const record = this.#store.read();
     const wallet = record.wallet;
@@ -1050,7 +963,6 @@ export class NearWalletService implements NearWallet {
     }));
   }
 
-  /** Forgets a stored payment. `refund` gives back its counted spend, for a refused payment only. */
   #removePayment(payment: NearStoredPayment, refund: boolean) {
     const today = this.#today();
     return this.#store.update((record) => {
@@ -1065,8 +977,6 @@ export class NearWalletService implements NearWallet {
       };
     });
   }
-
-  // --- Reads -------------------------------------------------------------------------------------
 
   readonly #startup = Effect.fn("NearWallet.startup")(function* (this: NearWalletService) {
     yield* this.#refresh(true);
@@ -1091,9 +1001,6 @@ export class NearWalletService implements NearWallet {
     this.#emitStatus();
   });
 
-  // --- Helpers -----------------------------------------------------------------------------------
-
-  /** Runs an owner action: one at a time, its failure shown in the status. Gives the status. */
   #ownerStep(operation: Effect.Effect<unknown, NearOperationError>): Effect.Effect<NearWalletStatus> {
     return this.#ownerQueue
       .withPermit(
@@ -1113,7 +1020,6 @@ export class NearWalletService implements NearWallet {
       .pipe(Effect.catchDefect((defect) => Effect.sync(() => this.#defect(defect))));
   }
 
-  /** A background read: its failure is shown, not thrown. */
   #background(operation: Effect.Effect<unknown, NearOperationError>): Effect.Effect<void> {
     return operation.pipe(
       Effect.catch((failure) =>
@@ -1178,7 +1084,6 @@ export class NearWalletService implements NearWallet {
     return record.spend.day === this.#today() ? (record.spend.byDomainCents[domain] ?? 0) : 0;
   }
 
-  /** The local date, `YYYY-MM-DD`. A rule's daily limit starts again at local midnight. */
   #today(): string {
     const date = new Date(this.#now());
     const pad = (value: number) => String(value).padStart(2, "0");
@@ -1219,7 +1124,6 @@ function approvalIdOf(status: StatusResponse): string | null {
   return status.details.approval_id ?? null;
 }
 
-/** A NEAR account, or `chain:address` for a payment on another chain. */
 function parseRecipient(value: string): { chain: string | null; address: string } | null {
   const split = value.indexOf(":");
   if (split < 0) return NEAR_ACCOUNT.test(value) ? { chain: null, address: value } : null;
@@ -1229,7 +1133,6 @@ function parseRecipient(value: string): { chain: string | null; address: string 
   return CHAIN.test(chain) && CHAIN_ADDRESS.test(address) ? { chain, address } : null;
 }
 
-/** The balance entry of a symbol or asset id. With many chains for one symbol, the one that covers the amount. */
 function findAsset(balances: BalanceRow[], asset: string, amount: string): BalanceRow | null {
   const exact = balances.find((entry) => entry.asset_id === asset);
   if (exact) return exact;
@@ -1238,7 +1141,6 @@ function findAsset(balances: BalanceRow[], asset: string, amount: string): Balan
   return matches.find((entry) => Number(entry.available ?? entry.balance ?? 0) >= Number(amount)) ?? matches[0] ?? null;
 }
 
-/** Decimal text in whole units to integer text in the smallest unit. Null when it does not fit. */
 function toAtomic(amount: string, decimals: number): string | null {
   if (!AMOUNT.test(amount) || !Number.isInteger(decimals) || decimals < 0 || decimals > 36) return null;
   const [whole = "0", fraction = ""] = amount.split(".");
@@ -1247,7 +1149,6 @@ function toAtomic(amount: string, decimals: number): string | null {
   return atomic > 0n ? atomic.toString() : null;
 }
 
-/** USD cents, rounded up, so a limit is never passed by rounding. */
 function usdCents(amount: string, price: number): number | null {
   const cents = Math.ceil(Number(amount) * price * 100 - 1e-6);
   return Number.isSafeInteger(cents) && cents >= 0 ? cents : null;
@@ -1271,7 +1172,6 @@ function apiDetail(error: AgentApiError): string {
   return error.detail ? `${error.code}: ${error.detail}` : error.code;
 }
 
-/** A sentence for the owner or the agent. API error codes and details stay; nothing else of a body does. */
 function failureText(cause: unknown): string {
   if (cause instanceof AgentApiError) {
     if (cause.status === 401) return sourceText("error.connector.nearKeyRejected");
@@ -1285,12 +1185,10 @@ function failureText(cause: unknown): string {
   return sourceText("error.connector.nearUnexpected", { detail: String(cause) });
 }
 
-/** Failures that the owner caused or can fix: no log entry. */
 function isOwnerFailure(cause: unknown): boolean {
   return cause instanceof AgentApiError ? cause.status < 500 : !(cause instanceof AgentApiRequestError);
 }
 
-/** The agent reads this sentence. Keys and tokens are masked in it. */
 function walletError(error: NearOperationError): NearWalletError {
   return new NearWalletError({ message: redactText(failureText(error.cause)) });
 }

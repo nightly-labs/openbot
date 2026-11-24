@@ -1,6 +1,3 @@
-// The NEAR Intents wallet of this computer: the partner key, the owner, the agent account, the payment
-// grant of this app, the payment rules and the payments in flight. Encrypted at rest by the operating system.
-
 import { readFile, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
@@ -10,7 +7,6 @@ import { writeJsonFileAtomically } from "../backend/atomic-json-file";
 import { NearOperationError, nearCall, nearDecode, nearFailure, toNearOperationError } from "./near-wallet-effects";
 import type { SecretCipher } from "./provider-credential-store";
 
-/** The owner wallet as the Agent API takes it. OpenBot offers a passkey or an EVM wallet. */
 const ownerSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("evm"),
@@ -30,22 +26,16 @@ const ownerSchema = z.discriminatedUnion("type", [
 export type NearOwner = z.infer<typeof ownerSchema>;
 
 const grantSchema = z.object({
-  /** The `ngt_` token. Only main reads it; it goes to the Agent API in `X-Grant-Token` only. */
   token: z.string().min(1),
-  /** ISO time. */
   expiresAt: z.string(),
   grantId: z.string().nullable(),
-  /** The `grant_issue` intent, while it is not applied. */
   correlationId: z.string().nullable(),
-  /** False until the Agent API reports the grant. */
   active: z.boolean(),
 });
 
 const walletSchema = z.object({
-  /** The Agent API id of the agent account, 64 hex. Stored as soon as `agent_create` returns it. */
   agentId: z.string().regex(/^[0-9a-f]{64}$/u),
   accountId: z.string().nullable(),
-  /** The `agent_create` intent, while the account is not active. */
   createCorrelationId: z.string().nullable(),
   dailyBudgetUsd: z.string(),
   ownerApproval: z.boolean(),
@@ -59,24 +49,17 @@ const ruleSchema = z.object({
   dailyUsd: z.number(),
 });
 
-/**
- * A payment that was sent, or may have been sent, to the Agent API. It is written before the request
- * goes out, so a crash cannot send it a second time with a new idempotency key.
- */
 const paymentSchema = z.object({
   idempotencyKey: z.string().regex(/^[A-Za-z0-9._:-]{8,128}$/u),
   kind: z.enum(["transfer", "withdraw"]),
   assetId: z.string().min(1),
-  /** Integer text in the smallest unit of the asset. */
   atomicAmount: z.string().regex(/^[1-9]\d*$/u),
   recipient: z.string().min(1),
   chain: z.string().nullable(),
   domain: z.string(),
   agentId: z.string(),
   amountCents: z.number().int().nonnegative().nullable(),
-  /** Epoch milliseconds. */
   createdAt: z.number(),
-  /** The Agent API execution, after the request was answered. */
   correlationId: z.string().nullable(),
 });
 
@@ -86,10 +69,8 @@ const recordSchema = z.object({
   partnerKey: z.string().min(1).nullable(),
   owner: ownerSchema.nullable(),
   wallet: walletSchema.nullable(),
-  /** The OpenBot agents that can ask to pay. */
   agentIds: z.array(z.string()),
   rules: z.array(ruleSchema),
-  /** Cents paid today under each rule. `day` is the local date, `YYYY-MM-DD`. */
   spend: z.object({ day: z.string(), byDomainCents: z.record(z.string(), z.number().int().nonnegative()) }),
   payments: z.array(paymentSchema),
 });
@@ -108,27 +89,19 @@ export const EMPTY_NEAR_WALLET_RECORD: NearWalletRecord = {
   payments: [],
 };
 
-/** A version that this build cannot read is reported as unreadable. */
 const envelopeSchema = z.object({ version: z.literal(1), record: z.string() });
 
-/** 64 rules with 8 recipients each and the payments in flight stay far under this. */
 const MAX_ENVELOPE_BYTES = 512 * 1024;
 
-/** Registers each secret of the record for redaction before any code can log it. */
 export function registerNearSecrets(record: NearWalletRecord): void {
   if (record.partnerKey) registerSecretValue(record.partnerKey);
   if (record.wallet?.grant) registerSecretValue(record.wallet.grant.token);
 }
 
-/**
- * Reads and writes the wallet record. The decrypted record is kept in memory only. Writes run one at
- * a time and are not interrupted, so a payment key is never half written.
- */
 export class NearWalletStore {
   readonly #path: string;
   readonly #cipher: SecretCipher;
   #record: NearWalletRecord = EMPTY_NEAR_WALLET_RECORD;
-  /** The file is there and cannot be read. Writes stop, so they cannot replace the agent account id. */
   #unreadable: Error | null = null;
   readonly #queue = Semaphore.makeUnsafe(1);
 
@@ -137,10 +110,6 @@ export class NearWalletStore {
     this.#cipher = cipher;
   }
 
-  /**
-   * Reads the file. Returns the error when the file is there but cannot be read. The file then stays,
-   * so a later build or the owner can still recover the agent account id from it.
-   */
   readonly load = Effect.fn("NearWalletStore.load")(function* (this: NearWalletStore) {
     this.#record = EMPTY_NEAR_WALLET_RECORD;
     this.#unreadable = null;
@@ -161,12 +130,10 @@ export class NearWalletStore {
     return this.#record;
   }
 
-  /** The read failure of `load`, until `clear` removes the file. */
   unreadable(): Error | null {
     return this.#unreadable;
   }
 
-  /** Writes `change(current)`. The memory copy changes only after the file is written. */
   readonly update = Effect.fn("NearWalletStore.update")(
     function* (this: NearWalletStore, change: (record: NearWalletRecord) => NearWalletRecord) {
       if (this.#unreadable) return yield* new NearOperationError({ cause: this.#unreadable });

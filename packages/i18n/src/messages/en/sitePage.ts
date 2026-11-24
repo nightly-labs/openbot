@@ -53,7 +53,6 @@ export const messages = defineMessages("sitePage", {
   "sitePage.billing.updatedBody": "Go back to OpenBot. You can close this page.",
   "sitePage.billing.cancelledTitle": "Checkout cancelled",
   "sitePage.billing.cancelledBody": "Nothing was charged. Go back to OpenBot.",
-  // The page where the owner of the NEAR wallet in OpenBot signs with a passkey or an EVM wallet.
   "sitePage.nearSign.pageTitle": "OpenBot wallet signature",
   "sitePage.nearSign.eyebrow": "NEAR wallet",
   "sitePage.nearSign.loading": "Reading the request",
@@ -79,7 +78,6 @@ export const messages = defineMessages("sitePage", {
   "sitePage.nearSign.doneTitle": "Signature sent",
   "sitePage.nearSign.doneBody": "Go back to OpenBot. You can close this tab.",
   "sitePage.nearSign.openAgain": "Open OpenBot again",
-  // The name of the new passkey in the owner's password manager.
   "sitePage.nearSign.passkeyName": "OpenBot NEAR wallet",
   "sitePage.nearSign.failure.cancelled": "You cancelled the request. Nothing was signed.",
   "sitePage.nearSign.failure.noPasskey": "This browser cannot use passkeys. Open the link in another browser.",

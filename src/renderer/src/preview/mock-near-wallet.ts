@@ -5,12 +5,10 @@ import {
   NO_NEAR_WALLET,
 } from "@openbot/contracts/ipc";
 
-/** How long the mock waits, as for the owner's signature in the browser. */
 const MOCK_SIGNATURE_MS = 2_000;
 
 const MOCK_ACCOUNT_ID = "7f3c2a9e41b8d6c05e12f4a3b7c9d8e1f0a2b4c6d8e0f1a3b5c7d9e1f2a4b6c8";
 
-/** Starts with no key. Each owner action waits a moment, as for a signature, then applies. */
 export function createMockNearWallet(): NearWalletDesktopApi {
   let status: NearWalletStatus = structuredClone(NO_NEAR_WALLET);
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -24,7 +22,6 @@ export function createMockNearWallet(): NearWalletDesktopApi {
     if (timer) clearTimeout(timer);
     timer = null;
   };
-  /** Shows the signing state, then applies `change`. */
   const sign = (action: NearOwnerAction, change: (current: NearWalletStatus) => NearWalletStatus) => {
     stopTimer();
     timer = setTimeout(() => {

@@ -12,7 +12,6 @@ import { Button } from "../ui/button";
 import { NEAR_ADDRESS_MARKER, type NearSignText } from "./page-text";
 import { TransactionalPage } from "./TransactionalPage";
 
-/** Where the page is in the signature. */
 export type NearSignState =
   | { step: "loading" }
   | { step: "invalid" }
@@ -23,24 +22,16 @@ export type NearSignState =
 
 const TITLE_ID = "near-sign-title";
 
-/**
- * The page where the owner of the NEAR wallet in OpenBot signs with a passkey or an EVM wallet. The
- * desktop app opens it with the request in the fragment. The page reads the fragment once, removes it
- * from the address bar, and sends the signature back to the app as an `openbot://near-signature` link.
- * Nothing on this page talks to a server.
- */
 export function NearSignPage(props: { lang: string; text: NearSignText }) {
   const [state, setState] = createSignal<NearSignState>({ step: "loading" });
 
   onSettled(() => {
     const page = new URL(window.location.href);
     const request = parseNearSignFragment(page.hash.slice(1));
-    // The nonce in the fragment is the only proof of this request. Remove it from the address bar.
     window.history.replaceState(null, "", page.pathname);
     setState(request ? { step: "ready", request } : { step: "invalid" });
   });
 
-  // The click that starts the passkey or wallet prompt. The browser and the wallets ask for it.
   const start = (request: NearSignRequest) => {
     setState({ step: "working", request });
     runNearSignature(request, props.text.passkeyName).then(
@@ -71,14 +62,11 @@ function failureText(text: NearSignText, request: NearSignRequest, failure: Near
     : sentence;
 }
 
-/** The request of a state that has one. */
 function requestOf(state: NearSignState): NearSignRequest | null {
   return state.step === "loading" || state.step === "invalid" ? null : state.request;
 }
 
-/** The card: what the owner approves, the one button that asks the passkey or the wallet, and the result. */
 export function NearSignView(props: {
-  /** The language of `text`. */
   lang: string;
   text: NearSignText;
   state: NearSignState;

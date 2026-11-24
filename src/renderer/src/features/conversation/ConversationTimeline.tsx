@@ -367,7 +367,6 @@ export function ConversationTimeline() {
     void nearWallet.refresh().catch(() => undefined);
     return stop;
   });
-  /** The payment that `approval` asks for, when the wallet holds it. */
   const nearPayment = (approval: AgentApproval) => {
     if (approval.kind !== "permissions" || !nearWalletLocal()) return undefined;
     const requestId = String(approval.requestId);

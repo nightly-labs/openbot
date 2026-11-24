@@ -94,7 +94,6 @@ export interface VaultContents {
   cards: boolean;
   contacts: boolean;
   link?: boolean;
-  /** The NEAR Intents wallet is ready: `request_near_payment` pays a crypto request. */
   near?: boolean;
 }
 

@@ -156,7 +156,6 @@ export const messages = defineMessages("vault", {
     other: "The code changes every {count} seconds. The site also accepts the previous one.",
   },
   "vault.twoStep.theSite": "the site",
-  // NEAR Intents wallet of this computer, in the Crypto tab. Agents pay services from it.
   "vault.near.tab": "Crypto",
   "vault.near.name": "NEAR Intents",
   "vault.near.open": "Open NEAR Intents",
@@ -241,7 +240,6 @@ export const messages = defineMessages("vault", {
   "vault.near.disconnectTitle": "Disconnect NEAR Intents?",
   "vault.near.disconnectDescription":
     "Agents can no longer pay from this wallet. OpenBot forgets the wallet and the partner key. The funds stay in the wallet on NEAR Intents.",
-  // Chat card of a payment that waits for the owner.
   "vault.near.payment": "{amount} {symbol}",
   "vault.near.overLimit": "Over the daily limit",
   "vault.near.approve": "Approve",

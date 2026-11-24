@@ -1,8 +1,3 @@
-/**
- * The parts of the NEAR Intents wallet: the logo, the site icon, the dialog frame of the Vault, the
- * sign-in choice, the agent list, the risk notice, the deposit address and the signature wait.
- */
-
 import type { NearDepositAddress, NearDepositAsset, NearOwnerMethod, NearWalletStatus } from "@openbot/contracts/ipc";
 import {
   Alert,
@@ -39,16 +34,11 @@ import { createEffect, createSignal, createStore, createUniqueId, For, onCleanup
 import type { AgentProfile } from "../../data";
 import { type TextValue, useText } from "../../text";
 
-/** An agent that can be allowed to pay: what the dock shows of it. */
 export type NearWalletAgent = Pick<
   AgentProfile,
   "id" | "name" | "title" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
 >;
 
-/**
- * The wallet operations. Each owner action gives the status after it ends; a failure is in its
- * `error`, not thrown. Only `deposit` rejects.
- */
 export interface NearWalletActions {
   setKey: (key: string) => Promise<NearWalletStatus>;
   create: (input: {
@@ -64,14 +54,12 @@ export interface NearWalletActions {
   deposit: (assetId: string) => Promise<NearDepositAddress>;
   saveRule: (input: { domain: string; recipients: string[]; dailyUsd: number }) => Promise<NearWalletStatus>;
   removeRule: (domain: string) => Promise<NearWalletStatus>;
-  /** Lets agents pay the domain of a payment that waits, up to `dailyUsd` a day. */
   allowPayment: (input: { requestId: string; dailyUsd: number }) => Promise<NearWalletStatus>;
   openSigning: () => Promise<void>;
   cancelSigning: () => Promise<NearWalletStatus>;
   disconnect: () => Promise<NearWalletStatus>;
 }
 
-/** The NEAR Intents mark. It is artwork, so it has no text. */
 export function NearIntentsLogo() {
   return (
     <span class="vault-logo vault-card-logo near-wallet-logo" aria-hidden="true">
@@ -85,13 +73,8 @@ export function NearIntentsLogo() {
   );
 }
 
-/** The site of a service domain: "api.exa.ai" is on "exa.ai". */
 const siteOf = (domain: string) => domain.split(".").slice(-2).join(".");
 
-/**
- * The icon of the site: the favicon of its site (an API host often has none), then its own favicon,
- * then the letter tile of the Vault. The request goes to the site that the agent pays, with no referrer.
- */
 export function SiteIcon(props: { domain: string; class?: string | undefined }) {
   const sources = () => [...new Set([siteOf(props.domain), props.domain])].map((host) => `https://${host}/favicon.ico`);
   const [failed, setFailed] = createSignal<readonly string[]>([]);
@@ -114,11 +97,9 @@ export function SiteIcon(props: { domain: string; class?: string | undefined }) 
   );
 }
 
-/** The frame of the Vault item dialog: the logo, the title and a close button, a body and actions. */
 export function NearWalletDialog(props: {
   title: string;
   busy?: boolean | undefined;
-  /** The dialog opens on its search field, not on Close. */
   focusSearch?: boolean | undefined;
   onClose: () => void;
   onSubmit?: (() => void) | undefined;
@@ -170,7 +151,6 @@ export function NearWalletDialog(props: {
   );
 }
 
-/** While the owner signs in the browser: open the signing page again, or stop waiting. */
 export function NearSigningWait(props: { onOpenAgain: () => Promise<void>; onCancel: () => Promise<unknown> }) {
   const { t } = useText();
   return (
@@ -189,10 +169,6 @@ export function NearSigningWait(props: { onOpenAgain: () => Promise<void>; onCan
   );
 }
 
-/**
- * Runs one wallet action: busy while it runs, then its failure as a sentence. An owner action gives
- * the status, and its `error` is the failure.
- */
 export function createNearRun() {
   const { t, errorMessage, sourceText } = useText();
   const [ui, setUi] = createStore<{ busy: boolean; failure: string | null }>({ busy: false, failure: null });
@@ -231,7 +207,6 @@ export function createNearRun() {
   };
 }
 
-/** A failure in a dialog, in the danger colour of the Vault. */
 export function NearFailure(props: { text: string | null }) {
   return (
     <Show when={props.text}>
@@ -244,7 +219,6 @@ export function NearFailure(props: { text: string | null }) {
   );
 }
 
-/** How the owner signs: radio cards with the recommended passkey first. */
 export function OwnerMethodChoice(props: { value: NearOwnerMethod; onChange: (value: NearOwnerMethod) => void }) {
   const { t } = useText();
   const methods = [
@@ -288,10 +262,6 @@ export function OwnerMethodChoice(props: { value: NearOwnerMethod; onChange: (va
 
 const matches = (query: string, text: string) => text.toLowerCase().includes(query.trim().toLowerCase());
 
-/**
- * The agents as the dock has them: the search field of the dock "Add agent" menu, then one row for
- * each agent with its avatar, name, role and a switch, as Settings → Agent dock lists them.
- */
 export function AgentPicker(props: {
   agents: readonly NearWalletAgent[];
   label: string;
@@ -373,7 +343,6 @@ export function AgentPicker(props: {
   );
 }
 
-/** Small avatars of the first agents, one over the next, as the Marketplace "On 12 of 50" button has. */
 export function AgentStack(props: { agents: readonly NearWalletAgent[]; ids: readonly string[] }) {
   const shown = () => props.agents.filter((agent) => props.ids.includes(agent.id)).slice(0, 3);
   return (
@@ -389,7 +358,6 @@ export function AgentStack(props: { agents: readonly NearWalletAgent[]; ids: rea
   );
 }
 
-/** The required risk notice and the owner's acceptance. */
 export function RiskAccept(props: { accepted: boolean; onChange: (accepted: boolean) => void }) {
   const { t } = useText();
   const id = `near-wallet-accept-${createUniqueId()}`;
@@ -413,15 +381,12 @@ export function RiskAccept(props: { accepted: boolean; onChange: (accepted: bool
   );
 }
 
-/** The chain of a deposit asset, as the Agent API names it: "near", "eth", "base". */
 export const chainName = (blockchain: string) => blockchain.toUpperCase();
 
-/** One asset as a choice: "USDC on NEAR". */
 export function assetLabel(t: TextValue["t"], asset: NearDepositAsset) {
   return t("vault.near.assetOn", { symbol: asset.symbol, chain: chainName(asset.blockchain) });
 }
 
-/** An asset, its deposit address as a QR code and as text, its memo and the smallest deposit. */
 export function AddFundsFields(props: {
   assets: readonly NearDepositAsset[];
   deposit: (assetId: string) => Promise<NearDepositAddress>;
@@ -514,12 +479,10 @@ export function AddFundsFields(props: {
   );
 }
 
-/** "Chief", "Chief and Research", "Chief, Research, and 3 more" are left to `format.list`. */
 export function agentNames(format: TextValue["format"], agents: readonly NearWalletAgent[], ids: readonly string[]) {
   return format.list(ids.map((id) => agents.find((agent) => agent.id === id)?.name ?? id));
 }
 
-/** A USD amount that the Agent API gives as decimal text. */
 export const usdNumber = (text: string | null | undefined) => {
   const value = Number(text ?? 0);
   return Number.isFinite(value) ? value : 0;

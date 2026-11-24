@@ -9,13 +9,6 @@ import {
   nearJsonValue,
 } from "./near-sign-request";
 
-/*
- * The browser half of the NEAR wallet signature: a passkey (WebAuthn) or an EVM wallet (EIP-1193).
- * Each function runs from one click, because the browser and the wallet ask for a user gesture. The
- * result has the exact shape that `src/main/near-wallet-signing.ts` checks: no other keys.
- */
-
-/** Why a signature did not finish. Each kind has its own sentence on the page. */
 export type NearSignFailure =
   | "cancelled"
   | "noPasskey"
@@ -38,27 +31,20 @@ export class NearSignError extends Error {
   }
 }
 
-/** The text that an EVM owner signs. The same as `evmRegisterMessage` in main. */
 function evmRegisterMessage(challenge: string): string {
   return `OpenBot NEAR wallet owner\nNonce: ${challenge}`;
 }
 
 const PASSKEY_REGISTER_TIMEOUT_MS = 5 * 60_000;
-/** ES256: ECDSA with P-256 and SHA-256, the one key type that the Agent API takes. */
 const ES256 = -7;
-/** Main refuses a returned link with more data than this. */
 const MAX_RESULT_CHARS = 16 * 1024;
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/u;
 const EVM_SIGNATURE_PATTERN = /^0x[0-9a-fA-F]{130}$/u;
-/** Main checks the credential id with this pattern. */
 const CREDENTIAL_ID_PATTERN = /^[A-Za-z0-9_-]{16,1366}$/u;
 
-/** EIP-1193: the user rejected the request. */
 const EIP1193_USER_REJECTED = 4001;
-/** EIP-1193 wallets: a request of the same kind is still open in the wallet. */
 const EIP1193_REQUEST_PENDING = -32002;
 
-/** The domain fields of EIP-712, in the order of the standard. */
 const EIP712_DOMAIN_FIELDS = [
   { name: "name", type: "string" },
   { name: "version", type: "string" },
@@ -75,7 +61,6 @@ function isEip1193Provider(value: unknown): value is Eip1193Provider {
   return typeof value === "object" && value !== null && "request" in value && typeof value.request === "function";
 }
 
-/** The wallet extension of the browser. It adds itself as `window.ethereum`, which the DOM types do not have. */
 function browserWallet(): Eip1193Provider {
   const provider = "ethereum" in window ? window.ethereum : undefined;
   if (!isEip1193Provider(provider)) throw new NearSignError("noWallet");
@@ -86,10 +71,8 @@ function passkeysAvailable(): boolean {
   return typeof window.PublicKeyCredential === "function" && typeof navigator.credentials?.create === "function";
 }
 
-/** A wallet or passkey error, as a failure that the page shows. */
 function failureOf(error: unknown): NearSignFailure {
   if (error instanceof NearSignError) return error.failure;
-  // WebAuthn: the user closed the prompt, or it timed out. Both mean "nothing was signed".
   if (error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "AbortError")) {
     return "cancelled";
   }
@@ -156,7 +139,6 @@ async function registerPasskey(challenge: string, userId: string, userName: stri
   return { credentialId, publicKey: bytesToBase64url(publicKey) };
 }
 
-/** The extension results as JSON. The round trip drops values that are not JSON, such as an `ArrayBuffer`. */
 function extensionResults(credential: PublicKeyCredential): NearJsonObject {
   const results = nearJsonValue(JSON.parse(JSON.stringify(credential.getClientExtensionResults())));
   return isNearJsonObject(results) ? results : {};
@@ -207,7 +189,6 @@ async function registerEvmWallet(challenge: string) {
   return { address, chainId: Number(chainId), signature };
 }
 
-/** The types of the typed data, with `EIP712Domain` made from the domain fields when it is missing. */
 function typesWithDomain(payload: NearEip712Payload): NearEip712Payload["types"] {
   if (Object.hasOwn(payload.types, "EIP712Domain")) return payload.types;
   const domain = EIP712_DOMAIN_FIELDS.filter(
@@ -249,12 +230,6 @@ function encodeResult(result: unknown): string {
   return data;
 }
 
-/**
- * Asks the passkey or the wallet for the signature, and returns it as the `data` of the return link.
- * Throws a `NearSignError`. Each failure can be tried again with a new click.
- *
- * @param passkeyName The name of a new passkey in the visitor's password manager.
- */
 export async function runNearSignature(request: NearSignRequest, passkeyName: string): Promise<string> {
   try {
     if (request.kind === "register") {

@@ -755,7 +755,6 @@ export function decodeLinkAccountStatus(value: unknown): LinkAccountStatus {
   return status;
 }
 
-/** A status never holds the partner key or a grant token: the contract has no field for them. */
 export function decodeNearWalletStatus(value: unknown): NearWalletStatus {
   const status = parseNearWalletStatus(value);
   if (!status) throw new Error("Invalid NEAR wallet response.");

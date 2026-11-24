@@ -295,7 +295,6 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   );
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
   const [importDetail, setImportDetail] = createSignal<ServerImportDetail | null>(null);
-  /** Set while the wallet page is open, so the header reads `Vault › NEAR Intents`. */
   const [vaultDetail, setVaultDetail] = createSignal<SettingsCrumb | null>(null);
   const crumbDetail = () => {
     if (section() === "vault") return vaultDetail();

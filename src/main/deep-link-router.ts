@@ -17,7 +17,6 @@ export const MCP_OAUTH_REDIRECT_URL = "openbot://mcp-auth";
 
 const MCP_OAUTH_HOST = "mcp-auth";
 const SLACK_WORKSPACE_HOST = "slack-workspace";
-/** The NEAR signing page sends the owner's signature back here. `nonce` names the waiting signature. */
 export const NEAR_SIGNATURE_HOST = "near-signature";
 const DISCORD_GUILD_HOST = "discord-guild";
 

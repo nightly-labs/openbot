@@ -1,9 +1,3 @@
-/**
- * The dialogs of the NEAR Intents wallet: the guided setup, the daily budget, the agents that can
- * pay, Add funds, and the daily limit of a domain. An owner change waits for a signature in the
- * browser; the dialog shows the wait and can open the signing page again or stop.
- */
-
 import {
   NEAR_RULE_DAILY_USD,
   NEAR_WALLET_LIMITS,
@@ -30,21 +24,17 @@ import {
   usdNumber,
 } from "./near-wallet-parts";
 
-/** What every dialog of the wallet gets. */
 export interface NearDialogProps {
   status: NearWalletStatus;
   actions: NearWalletActions;
   onClose: () => void;
 }
 
-/** The daily budgets that the setup offers, in USD. */
 const BUDGET_PRESETS = ["10", "25", "100"] as const;
 
-/** The owner signs now for one of these actions. */
 const signingFor = (status: NearWalletStatus, actions: readonly NearOwnerAction[]) =>
   status.signing !== null && actions.includes(status.signing.action);
 
-/** The daily budget as radio cards: "Up to $25 a day". */
 function BudgetChoice(props: { values: readonly string[]; value: string; onChange: (value: string) => void }) {
   const { t, format } = useText();
   return (
@@ -85,14 +75,8 @@ const STEP_KEYS = {
   funds: "vault.near.step.funds",
 } as const;
 
-/** The setup signatures: the owner, the agent account and the grant of this app. */
 const SETUP_ACTIONS: readonly NearOwnerAction[] = ["register", "create", "grant"];
 
-/**
- * Connects a wallet: the partner key when there is none, the daily budget, the agents, the owner's
- * sign-in with the risk notice, then Add funds. `create` runs in the background, so the dialog waits
- * for the wallet to be ready.
- */
 export function NearSetupDialog(props: NearDialogProps & { agents: readonly NearWalletAgent[] }) {
   const { t, sourceText } = useText();
   const steps: readonly SetupStep[] = untrack(() =>
@@ -100,7 +84,6 @@ export function NearSetupDialog(props: NearDialogProps & { agents: readonly Near
       ? ["key", "spending", "agents", "sign", "funds"]
       : ["spending", "agents", "sign", "funds"],
   );
-  // A setup that already waits for a signature opens on its Sign step.
   const [started, setStarted] = createSignal(untrack(() => signingFor(props.status, SETUP_ACTIONS)));
   const [index, setIndex] = createSignal(untrack(() => (started() ? steps.indexOf("sign") : 0)));
   const step = () => steps[index()] ?? "funds";
@@ -109,7 +92,6 @@ export function NearSetupDialog(props: NearDialogProps & { agents: readonly Near
   const [agentIds, setAgentIds] = createSignal<string[]>(untrack(() => [...props.status.agentIds]));
   const [method, setMethod] = createSignal<NearOwnerMethod>("passkey");
   const [accepted, setAccepted] = createSignal(false);
-  // The background setup stopped with a failure in the status.
   const [stopped, setStopped] = createSignal(false);
   const action = createNearRun();
   const connected = () => props.status.state === "ready" || props.status.state === "frozen";
@@ -121,7 +103,6 @@ export function NearSetupDialog(props: NearDialogProps & { agents: readonly Near
     return stopped() && error !== null ? sourceText(error) : null;
   };
 
-  // A new failure ends the wait. The failure that was there before the setup started does not.
   createEffect(
     () => props.status.error,
     (error) => {
@@ -129,7 +110,6 @@ export function NearSetupDialog(props: NearDialogProps & { agents: readonly Near
     },
   );
 
-  // The wallet is ready after the last signature: go on to Add funds.
   createEffect(
     () => started() && connected(),
     (ready) => {
@@ -244,7 +224,6 @@ export function NearSetupDialog(props: NearDialogProps & { agents: readonly Near
   );
 }
 
-/** Add funds: the deposit address of the chosen asset. */
 export function NearAddFundsDialog(props: NearDialogProps) {
   const { t } = useText();
   const footer = () => <Button type="submit">{t("common.done")}</Button>;
@@ -260,12 +239,10 @@ export function NearAddFundsDialog(props: NearDialogProps) {
   );
 }
 
-/** The frame of a dialog that makes one owner change: Cancel, the submit button and the wait. */
 function OwnerChangeDialog(props: {
   title: string;
   submitLabel: string;
   canSave: boolean;
-  /** The owner signs this change in the browser. */
   sign: boolean;
   focusSearch?: boolean | undefined;
   actions: NearWalletActions;
@@ -314,7 +291,6 @@ function OwnerChangeDialog(props: {
   );
 }
 
-/** The daily budget of all payments. The Agent API takes one policy change in 10 minutes. */
 export function NearBudgetDialog(props: NearDialogProps) {
   const { t } = useText();
   const current = untrack(() => props.status.account?.dailyBudgetUsd ?? "25");
@@ -341,10 +317,6 @@ export function NearBudgetDialog(props: NearDialogProps) {
   );
 }
 
-/**
- * The agents that can pay, with a search. Changes wait for the button, which says what it does:
- * "Allow Code Review", "Remove Chief", "Save: allow 3, remove 1". The list stays on this computer.
- */
 export function NearAgentsDialog(props: NearDialogProps & { agents: readonly NearWalletAgent[] }) {
   const { t, format } = useText();
   const [draft, setDraft] = createStore<{ on: Record<string, boolean> }>({ on: {} });
@@ -365,7 +337,6 @@ export function NearAgentsDialog(props: NearDialogProps & { agents: readonly Nea
   const run = createNearRun();
   async function save() {
     if (unchanged()) return;
-    // Agents of another computer keep their place in the list.
     const known = new Set(props.agents.map((agent) => agent.id));
     const agentIds = [
       ...props.status.agentIds.filter((id) => !known.has(id)),
@@ -399,21 +370,14 @@ export function NearAgentsDialog(props: NearDialogProps & { agents: readonly Nea
   );
 }
 
-/** The smallest daily limit that covers the amount. */
 export const limitFor = (amountUsd: number) =>
   NEAR_RULE_DAILY_USD.find((limit) => limit >= amountUsd) ?? NEAR_RULE_DAILY_USD.at(-1) ?? 0;
 
-/**
- * The daily limit of a domain that agents pay without asking. `always` comes from a payment in the
- * chat; `edit` from the wallet page. While each payment asks, the first domain is a policy change
- * that the owner signs.
- */
 export function NearDomainDialog(
   props: NearDialogProps & {
     mode: "always" | "edit";
     domain: string;
     limit?: number | undefined;
-    /** The amount of the payment that the limit must cover. */
     min?: number | undefined;
     onSave: (dailyUsd: number) => Promise<NearWalletStatus | undefined>;
   },

@@ -1,9 +1,3 @@
-/**
- * A payment from the NEAR Intents wallet that waits for the owner in the chat. It takes the place of
- * the approval card of the same request: Reject and Approve answer the approval, and "Always allow"
- * lets agents pay the domain without asking, up to a daily limit, then approves this payment.
- */
-
 import type { NearPendingPayment, NearWalletStatus } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
 import { Button, toast } from "@openbot/ui";
@@ -17,7 +11,6 @@ export interface NearPaymentCardProps {
   payment: NearPendingPayment;
   status: NearWalletStatus;
   actions: NearWalletActions;
-  /** Answer the approval of this payment, as the approval card does. */
   onApprove: () => Promise<boolean>;
   onReject: () => Promise<boolean>;
 }
@@ -31,7 +24,6 @@ export function NearPaymentCard(props: NearPaymentCardProps) {
     if (!signing) return false;
     return signing.requestId === props.payment.requestId || signing.action === "auto-pay";
   };
-  // A payment with no price always asks, and one over the limit is already on an allowed domain.
   const canAllow = () => !props.payment.overLimit && props.payment.amountUsd !== null;
   const subtitle = () =>
     [props.payment.domain, props.payment.reason, props.payment.overLimit && t("vault.near.overLimit")]
@@ -51,7 +43,6 @@ export function NearPaymentCard(props: NearPaymentCardProps) {
     }
   }
 
-  /** Allows the domain, then approves this payment. A failure stays in the dialog. */
   async function allow(dailyUsd: number): Promise<NearWalletStatus> {
     const status = await props.actions.allowPayment({ requestId: props.payment.requestId, dailyUsd });
     if (status.error === null) void answer(props.onApprove);

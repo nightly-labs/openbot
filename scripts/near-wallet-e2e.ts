@@ -1,12 +1,3 @@
-// Runs the NEAR Intents wallet of the main process end to end against a fake Agent API on 127.0.0.1.
-// The real Agent API has no testnet, so it is never called and no funds move. The real
-// `NearWalletService`, `NearWalletStore` and `NearOwnerSigning` (loopback mode) run; this script acts as
-// the signing page in the browser and signs with a real secp256k1 key: EIP-191 for the owner
-// registration and EIP-712 for each owner intent. The fake API checks every signature, the grant token
-// commitment, the daily budget, the owner approval and the idempotency keys.
-// The IPC handlers bind to Electron's `ipcMain`, so they do not run here; inputs go through the same
-// contract parsers that the handlers use.
-// `bun scripts/near-wallet-e2e.ts`. Writes .openbot-build/near-wallet-e2e/report.json.
 import assert from "node:assert/strict";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -42,7 +33,6 @@ const AGENT_B = "agent-b";
 const DOMAIN = "api.example.com";
 const MERCHANT = "merchant.near";
 const SHOP = "shop.near";
-/** A guard only: each wait ends on a status, a store write or a promise. */
 const WAIT_MS = 20_000;
 
 const jsonSchema = z.json();
@@ -55,9 +45,6 @@ function toJson(value: unknown): Json {
   return text === undefined ? null : jsonSchema.parse(JSON.parse(text));
 }
 
-// --- Output capture -------------------------------------------------------------------------------
-
-/** All that the process writes. The main-process logger writes through these two streams. */
 const captured: string[] = [];
 type WriteCallback = (error?: Error | null) => void;
 function tee(stream: NodeJS.WriteStream): void {
@@ -74,8 +61,6 @@ function tee(stream: NodeJS.WriteStream): void {
 }
 tee(process.stdout);
 tee(process.stderr);
-
-// --- Hex, hashes and EVM signatures ---------------------------------------------------------------
 
 const hex = (bytes: Uint8Array) => Buffer.from(bytes).toString("hex");
 const fromHex = (value: string) => new Uint8Array(Buffer.from(value.replace(/^0x/u, ""), "hex"));
@@ -94,7 +79,6 @@ function newEvmKey(): EvmKey {
   return { secret, address: evmAddressOf(secp256k1.getPublicKey(secret, false).subarray(1)) };
 }
 
-/** `r || s || v` with `v` 27 or 28, as a wallet returns it. */
 function signDigest(key: EvmKey, digest: Uint8Array): string {
   const recovered = secp256k1.sign(digest, key.secret, { prehash: false, format: "recovered" });
   return `0x${hex(concat(recovered.subarray(1, 65), new Uint8Array([27 + (recovered[0] ?? 0)])))}`;
@@ -118,8 +102,6 @@ function personalSignDigest(message: string): Uint8Array {
   return keccak_256(concat(utf8(`\x19Ethereum Signed Message:\n${text.length}`), text));
 }
 
-// EIP-712, for the types that the fake API sends: structs, arrays, string, bytes, bytesN, address,
-// bool, uintN and intN.
 const typedFieldsSchema = z.record(z.string(), z.array(z.object({ name: z.string(), type: z.string() })));
 type TypedFields = z.infer<typeof typedFieldsSchema>;
 const typedPayloadSchema = z.object({
@@ -138,7 +120,6 @@ const EIP712_DOMAIN_FIELDS = [
   { name: "salt", type: "bytes32" },
 ];
 
-/** As the signing page does: `EIP712Domain` made from the domain fields when the payload has none. */
 function typesWithDomain(payload: TypedPayload): TypedFields {
   if (Object.hasOwn(payload.types, "EIP712Domain")) return payload.types;
   const domain = EIP712_DOMAIN_FIELDS.filter(
@@ -213,11 +194,8 @@ function eip712Digest(payload: TypedPayload): Uint8Array {
   );
 }
 
-// --- The encrypted store ----------------------------------------------------------------------------
-
 const writtenRecordSchema = z.object({ payments: z.array(z.object({ idempotencyKey: z.string() })) });
 
-/** AES-256-GCM, as a stand-in for the operating system's encryption. Each record write is reported. */
 class RecordingCipher implements SecretCipher {
   readonly #key = randomBytes(32);
   readonly #listeners = new Set<(paymentKeys: string[]) => void>();
@@ -239,7 +217,6 @@ class RecordingCipher implements SecretCipher {
     return Buffer.concat([decipher.update(value.subarray(28)), decipher.final()]).toString("utf8");
   };
 
-  /** Resolves on the next record write whose stored payment keys match. */
   nextWrite(label: string, matches: (paymentKeys: string[]) => boolean): Promise<string[]> {
     return withDeadline(
       label,
@@ -255,15 +232,11 @@ class RecordingCipher implements SecretCipher {
   }
 }
 
-// --- The fake Agent API -----------------------------------------------------------------------------
-
 interface RecordedRequest {
   method: string;
   path: string;
   query: { [key: string]: string };
-  /** `<partner-key>`, `<other>` or absent. The value is never recorded. */
   apiKey: string | null;
-  /** `<grant-token>`, `<other>` or absent. */
   grantToken: string | null;
   idempotencyKey: string | null;
   body: Json;
@@ -343,14 +316,12 @@ function policyOf(agent: FakeAgent) {
 
 class FakeAgentApi {
   readonly requests: RecordedRequest[] = [];
-  /** URL and body of each request, for the secret checks. Never written to the report. */
   readonly rawRequests: string[] = [];
   readonly agents = new Map<string, FakeAgent>();
   readonly intents = new Map<string, FakeIntent>();
   readonly executions = new Map<string, FakeExecution>();
   readonly executionsByKey = new Map<string, string>();
   balanceRaw = 1_000n * 10n ** BigInt(USDC_DECIMALS);
-  /** The next execution is accepted and settled, then the connection drops before the answer. */
   dropNextExecution = false;
   #server: Server | null = null;
   port = 0;
@@ -565,7 +536,6 @@ class FakeAgentApi {
     return answer(202, this.#statusOf(intent.correlationId));
   }
 
-  /** Applies a signed intent. Returns an error code when the API refuses it. */
   #apply(intent: FakeIntent): string | null {
     const agent = this.agents.get(intent.agentId);
     if (!agent) return "not_found";
@@ -812,8 +782,6 @@ function atomicToDecimal(raw: bigint): string {
   return fraction ? `${raw / scale}.${fraction}` : `${raw / scale}`;
 }
 
-// --- The signing page ----------------------------------------------------------------------------
-
 const fragmentSchema = z.object({
   v: z.literal(1),
   nonce: z.string(),
@@ -828,16 +796,10 @@ const fragmentSchema = z.object({
 });
 type Fragment = z.infer<typeof fragmentSchema>;
 
-type PageMode =
-  | { kind: "honest" }
-  /** Signs with another key. For the registration it still claims the owner's address. */
-  | { kind: "other-key" }
-  /** Returns the right result under a wrong nonce. */
-  | { kind: "wrong-nonce" };
+type PageMode = { kind: "honest" } | { kind: "other-key" } | { kind: "wrong-nonce" };
 
 interface PageReturn {
   nonce: "right" | "wrong";
-  /** What the loopback listener answered, or the network error. */
   status: number | null;
   text: string | null;
   error: string | null;
@@ -848,7 +810,6 @@ interface PageVisit {
   returns: PageReturn[];
 }
 
-/** Acts as the OpenBot signing page in the browser: reads the fragment, signs, and returns the result. */
 class SigningPage {
   readonly visits: PageVisit[] = [];
   mode: PageMode = { kind: "honest" };
@@ -876,7 +837,6 @@ class SigningPage {
     this.#pending.add(run);
   };
 
-  /** Resolves when the page made its return for the next visit. */
   nextVisit(label: string): Promise<PageVisit> {
     return withDeadline(
       label,
@@ -894,7 +854,6 @@ class SigningPage {
     await Promise.all([...this.#pending]);
   }
 
-  /** The signed result, encoded as the page encodes it. */
   result(fragment: Fragment, key: EvmKey): string {
     if (fragment.kind === "register") {
       const signature = signDigest(key, personalSignDigest(evmRegisterMessage(fragment.challenge ?? "")));
@@ -918,7 +877,6 @@ class SigningPage {
 
   async #return(fragment: Fragment, nonce: string, data: string, label: "right" | "wrong"): Promise<PageReturn> {
     assert.ok(fragment.port, "the development fragment names the loopback port");
-    // As `nearReturnUrl` of the page builds it.
     const url = `http://127.0.0.1:${fragment.port}/near-signature?nonce=${encodeURIComponent(nonce)}&data=${data}`;
     try {
       const response = await fetch(url);
@@ -929,8 +887,6 @@ class SigningPage {
     }
   }
 }
-
-// --- Harness ---------------------------------------------------------------------------------------
 
 class Details {
   readonly values: { [key: string]: Json } = {};
@@ -1001,7 +957,6 @@ class Wallet {
     return status;
   }
 
-  /** Resolves on the first status, now or emitted, that matches. */
   waitFor(label: string, matches: (status: NearWalletStatus) => boolean): Promise<NearWalletStatus> {
     return withDeadline(
       label,
@@ -1024,7 +979,6 @@ class Wallet {
     return answer;
   }
 
-  /** Pays a prepared request. A refusal fails the scenario. */
   async pay(requestId: string): Promise<NearPaymentResult> {
     const result = await attempt(this.service.pay(requestId));
     agentAnswers.push(toJson(result.value ?? { error: result.error }));
@@ -1068,8 +1022,6 @@ function sent(api: FakeAgentApi, from: number) {
 
 const isTransfer = (request: RecordedRequest) => request.path.endsWith("/transfer");
 
-// --- Scenarios -------------------------------------------------------------------------------------
-
 async function main(): Promise<void> {
   await mkdir(OUT, { recursive: true });
   const dir = await mkdtemp(join(tmpdir(), "openbot-near-wallet-e2e-"));
@@ -1081,7 +1033,6 @@ async function main(): Promise<void> {
   const page = new SigningPage(owner);
   let wallet = new Wallet(storePath, cipher, page, api);
   await Effect.runPromise(wallet.service.load());
-  /** Kept after disconnect, to check that the report does not hold it. */
   let grantToken = "";
 
   try {
@@ -1331,7 +1282,6 @@ async function main(): Promise<void> {
       const cleared = cipher.nextWrite("the restart removes the stored payment", (keys) => !keys.includes(key));
       await Effect.runPromise(restarted.service.load());
       await cleared;
-      // Store writes run one at a time; this one ends after the write that the cipher reported.
       await Effect.runPromise(restarted.store.update((record) => record));
       wallet = restarted;
       const transfers = api.requests.slice(mark).filter(isTransfer);
@@ -1380,7 +1330,6 @@ async function main(): Promise<void> {
     });
 
     await scenario("forged signature returns are refused", async (details) => {
-      // A wrong nonce: the listener ignores it and the signature still waits.
       const wrongNoncePage = new SigningPage(owner);
       wrongNoncePage.mode = { kind: "wrong-nonce" };
       const signing = new NearOwnerSigning({
@@ -1400,7 +1349,6 @@ async function main(): Promise<void> {
       assert.equal(visit.returns[0]?.status, 404, "the listener does not take a wrong nonce");
       assert.equal(signing.busy(), true, "the signature still waits");
       assert.equal(signing.receive("not-the-nonce", "e30"), false);
-      // The right nonce, but the registration is signed by another key than the claimed address.
       const forged = wrongNoncePage.result(visit.fragment, wrongNoncePage.other);
       assert.equal(signing.receive(visit.fragment.nonce, forged), true);
       const registerOutcome = await outcome;
@@ -1410,7 +1358,6 @@ async function main(): Promise<void> {
       assert.equal(signing.receive(visit.fragment.nonce, forged), false, "a used nonce is not taken again");
       await signing.dispose();
 
-      // The right nonce, but the intent is signed by another key: the API refuses it and nothing changes.
       const agentId = wallet.store.read().wallet?.agentId ?? "";
       const fakeAgent = api.agents.get(agentId);
       assert.ok(fakeAgent);
@@ -1482,7 +1429,6 @@ async function main(): Promise<void> {
         tokenRequests.every((request) => request.grantToken === "<grant-token>"),
         "the grant token header is the stored token",
       );
-      // By design the encrypted record keeps both; the file holds them only encrypted.
       const fileRecord = z.object({ record: z.string() }).parse(JSON.parse(file));
       const decrypted = cipher.decrypt(Buffer.from(fileRecord.record, "base64"));
       assert.ok(decrypted.includes(PARTNER_KEY) && decrypted.includes(token), "the encrypted record keeps both");

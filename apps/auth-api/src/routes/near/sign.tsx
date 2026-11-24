@@ -4,11 +4,6 @@ import { nearSignText } from "../../components/transactional/page-text";
 import { nearSignHeaders } from "../../lib/near-sign-csp";
 import { loadPageText } from "../../lib/page-text";
 
-/**
- * The NEAR wallet signing page. The desktop app opens it in the system browser with the request in
- * the fragment (`src/main/near-wallet-signing.ts`). The server never sees the request: it renders an
- * empty card, and the browser reads the fragment.
- */
 export const Route = createFileRoute("/near/sign")({
   loader: ({ context }) => loadPageText(context.locale, nearSignText),
   head: ({ loaderData }) => ({

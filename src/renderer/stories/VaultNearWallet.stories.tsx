@@ -58,7 +58,6 @@ const READY: NearWalletStatus = {
   error: null,
 };
 
-/** Each change applies at once, as if the owner signed in the browser. */
 function storyNearApi(initial: NearWalletStatus): NearWalletDesktopApi {
   let status = structuredClone(initial);
   const listeners = new Set<(status: NearWalletStatus) => void>();
@@ -93,7 +92,6 @@ function storyNearApi(initial: NearWalletStatus): NearWalletDesktopApi {
   };
 }
 
-/** A store on the story API, loaded before the first paint. */
 function storyStore(initial: NearWalletStatus) {
   const api = storyNearApi(initial);
   const store = createNearWalletStore(() => api);
@@ -165,46 +163,36 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The Crypto tab of the Vault on this computer. The row opens the wallet page. */
 export const Vault: Story = {
   parameters: { layout: "fullscreen" },
   render: () => <InVault status={READY} />,
 };
 
-/** The Crypto tab before the user connects a wallet. Connect opens the guided setup. */
 export const VaultNotConnected: Story = {
   parameters: { layout: "fullscreen" },
   render: () => <InVault status={NO_NEAR_WALLET} />,
 };
 
-/** The guided setup, from the partner key to the first funds. */
 export const GuidedSetup: Story = { render: () => <Setup /> };
 
-/** The wallet page: funds, the daily budget, the domains that agents pay without asking, and the agents. */
 export const WalletPage: Story = { render: () => <WalletPageView status={READY} /> };
 
-/** Payments are paused. Resume starts them again. */
 export const WalletPagePaused: Story = { render: () => <WalletPageView status={{ ...READY, state: "frozen" }} /> };
 
-/** A change waits for the owner's signature in the browser. */
 export const WalletPageSigning: Story = {
   render: () => <WalletPageView status={{ ...READY, signing: { action: "budget", requestId: null } }} />,
 };
 
-/** The grant of the agent key ended. Renew asks the owner to sign again. */
 export const WalletPageGrantEnded: Story = {
   render: () => <WalletPageView status={{ ...READY, account: null }} />,
 };
 
-/** A payment in the chat. "Always allow" lets agents pay this domain up to a daily limit. */
 export const Payment: Story = { render: () => <PaymentCard payment={PAYMENT} status={READY} /> };
 
-/** A payment over the daily limit of its domain: the owner approves it once. */
 export const PaymentOverLimit: Story = {
   render: () => <PaymentCard payment={{ ...PAYMENT, overLimit: true }} status={READY} />,
 };
 
-/** The owner signs the payment in the browser. */
 export const PaymentSigning: Story = {
   render: () => (
     <PaymentCard

@@ -1,18 +1,10 @@
 import type { NearOwnerAction, NearOwnerMethod } from "@openbot/contracts/ipc";
 
-/*
- * The request of the NEAR wallet signing page. The desktop app writes it in the URL fragment of
- * `/near/sign` (`src/main/near-wallet-signing.ts`, `SigningFragment`). The fragment stays in the
- * browser: no server, log or analytics gets it. This module only reads and checks it.
- */
-
-/** A value that `JSON.parse` can give. */
 export type NearJsonValue = string | number | boolean | null | NearJsonValue[] | NearJsonObject;
 export interface NearJsonObject {
   [key: string]: NearJsonValue;
 }
 
-/** The typed data of an EIP-712 intent, as the Agent API gives it. */
 export interface NearEip712Payload {
   domain: NearJsonObject;
   types: Record<string, { name: string; type: string }[]>;
@@ -20,7 +12,6 @@ export interface NearEip712Payload {
   message: NearJsonObject;
 }
 
-/** The WebAuthn options of a passkey intent, as the Agent API gives them. */
 export interface NearWebAuthnPayload {
   challenge: string;
   rpId: string;
@@ -60,7 +51,6 @@ export type NearSignRequest =
       port: number | null;
     };
 
-/** The owner actions of `packages/contracts/src/ipc-near-wallet.ts`. */
 const OWNER_ACTIONS = {
   register: true,
   create: true,
@@ -86,7 +76,6 @@ const FRAGMENT_KEYS = new Set([
   "port",
 ]);
 
-/** Main makes the nonce from 32 random bytes. */
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/u;
 const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/u;
@@ -94,7 +83,6 @@ const MAX_FRAGMENT_CHARS = 64 * 1024;
 const MAX_SUMMARY_CHARS = 2000;
 const MAX_ID_CHARS = 1366;
 
-/** The value as JSON. Undefined when it holds anything that JSON does not have. */
 export function nearJsonValue(value: unknown): NearJsonValue | undefined {
   if (value === null || typeof value === "string" || typeof value === "boolean") return value;
   if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
@@ -173,13 +161,11 @@ function webAuthnPayload(value: NearJsonValue | undefined): NearWebAuthnPayload 
   return { challenge: value.challenge, rpId: value.rpId, allowCredentials, userVerification: "required", timeout };
 }
 
-/** The loopback port of a development app. Null when the page returns with `openbot://`. */
 function returnPort(value: NearJsonValue | undefined): number | null | undefined {
   if (value === undefined) return null;
   return typeof value === "number" && Number.isInteger(value) && value >= 1024 && value <= 65535 ? value : undefined;
 }
 
-/** Decodes base64url text to bytes. Throws on text that is not base64url. */
 export function base64urlToBytes(value: string): Uint8Array<ArrayBuffer> {
   if (!BASE64URL_PATTERN.test(value)) throw new Error("not base64url");
   const binary = atob(value.replaceAll("-", "+").replaceAll("_", "/"));
@@ -197,10 +183,6 @@ export function bytesToBase64url(value: ArrayBuffer | Uint8Array): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 }
 
-/**
- * Reads the request from the URL fragment (without `#`). Null for any fragment that the desktop app
- * did not make: an unknown version, an unknown key, or a field that has the wrong shape.
- */
 export function parseNearSignFragment(fragment: string): NearSignRequest | null {
   if (fragment.length === 0 || fragment.length > MAX_FRAGMENT_CHARS) return null;
   let value: NearJsonValue | undefined;
@@ -240,12 +222,10 @@ export function parseNearSignFragment(fragment: string): NearSignRequest | null 
   return { kind, method, nonce, action, summary, payload: checked, address, port };
 }
 
-/** The action that the request asks the owner to approve. */
 export function nearSignAction(request: NearSignRequest): NearOwnerAction {
   return request.kind === "register" ? "register" : request.action;
 }
 
-/** One readable field of the EIP-712 message: its path and its value as text. */
 export interface NearTypedField {
   path: string;
   value: string;
@@ -254,7 +234,6 @@ export interface NearTypedField {
 const MAX_TYPED_FIELDS = 64;
 const MAX_TYPED_DEPTH = 6;
 
-/** The fields of the EIP-712 message, flat, in the order of the payload. The page shows them as text. */
 export function nearTypedFields(message: NearJsonObject): NearTypedField[] {
   const fields: NearTypedField[] = [];
   const visit = (value: NearJsonValue, path: string, depth: number) => {
@@ -273,7 +252,6 @@ export function nearTypedFields(message: NearJsonObject): NearTypedField[] {
   return fields;
 }
 
-/** The address that the signing page returns the result to. */
 export function nearReturnUrl(request: NearSignRequest, data: string): string {
   const query = `nonce=${encodeURIComponent(request.nonce)}&data=${data}`;
   return request.port === null

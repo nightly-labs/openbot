@@ -1,7 +1,3 @@
-// The owner's signatures for the NEAR Intents wallet. The owner signs on an OpenBot page in the system
-// browser, with a passkey or an EVM wallet. The page gets the request in the URL fragment, which no
-// server sees, and sends the signature back as an `openbot://near-signature` link.
-
 import { createPublicKey, randomBytes, timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { Socket } from "node:net";
@@ -14,32 +10,24 @@ import { z } from "zod";
 import { parseDeepLink } from "./deep-link-router";
 import type { NearOwner } from "./near-wallet-store";
 
-/** The path of the signing page on the account service. */
 export const NEAR_SIGNING_PATH = "/near/sign";
-/** Where the page returns on a development computer, where `openbot://` opens the installed app. */
 export const NEAR_SIGNATURE_DEV_PATH = "/near-signature";
-/** After this, the wait ends and the owner starts again. */
 export const NEAR_SIGNING_TIMEOUT_MS = 10 * 60_000;
-/** A deep link longer than this is not one that the page made. */
 const MAX_RESULT_CHARS = 16 * 1024;
 
-/** The intent that the Agent API gave, as the owner's wallet signs it. */
 export type NearIntentToSign = Extract<Intent, { standard: "eip712" | "webauthn" }>;
 
 export type NearSigningRequest =
   | { kind: "register"; method: NearOwnerMethod; action: "register"; summary: string }
   | { kind: "sign"; action: Exclude<NearOwnerAction, "register">; summary: string; intent: NearIntentToSign };
 
-/** What the page sends back, after main checked it. */
 export type NearSigningResult =
   | { kind: "owner"; owner: NearOwner }
   | { kind: "eip712"; signature: string }
   | { kind: "webauthn"; credential: NearWebAuthnCredential };
 
-/** An `AuthenticationResponseJSON`, as the Agent API takes it: an optional field is absent, not undefined. */
 export type NearWebAuthnCredential = Extract<SignedData, { standard: "webauthn" }>["credential"];
 
-/** The fragment that the page reads. It has no secret but the nonce, which is used once. */
 interface SigningFragment {
   v: 1;
   nonce: string;
@@ -47,21 +35,16 @@ interface SigningFragment {
   method: NearOwnerMethod;
   action: NearOwnerAction;
   summary: string;
-  /** Register: the random value that the owner signs (EVM) or the passkey challenge. */
   challenge?: string;
-  /** Register with a passkey: the random WebAuthn user id. */
   userId?: string;
   intent?: NearIntentToSign;
-  /** Sign with an EVM wallet: the owner address, so the page signs with the right account. */
   address?: string;
-  /** Development only: the loopback port that takes the result. */
   port?: number;
 }
 
 const base64url = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64url");
 const randomToken = (size: number) => base64url(randomBytes(size));
 
-/** The text that an EVM owner signs to prove the address. */
 export function evmRegisterMessage(challenge: string): string {
   return `OpenBot NEAR wallet owner\nNonce: ${challenge}`;
 }
@@ -76,7 +59,6 @@ const passkeyRegisterSchema = z.object({
   publicKey: z.string().regex(/^MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE[A-Za-z0-9_-]{85}[AQgw]$/u),
 });
 const eip712ResultSchema = z.object({ signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/u) });
-/** An `AuthenticationResponseJSON`. The Agent API checks the signature; main checks the shape. */
 const webauthnResultSchema = z.object({
   credential: z
     .object({
@@ -98,7 +80,6 @@ const webauthnResultSchema = z.object({
     .strict(),
 });
 
-/** Recovers the uncompressed public key, without the `04` prefix, of an EIP-191 `personal_sign`. */
 export function recoverPersonalSignKey(message: string, signatureHex: string): Uint8Array {
   const text = new TextEncoder().encode(message);
   const prefix = new TextEncoder().encode(`\x19Ethereum Signed Message:\n${text.length}`);
@@ -117,7 +98,6 @@ export function evmAddressOf(publicKey: Uint8Array): string {
   return `0x${Buffer.from(keccak_256(publicKey).subarray(-20)).toString("hex")}`;
 }
 
-/** True when the base64url SPKI is an ECDSA P-256 key, the one kind that the Agent API takes. */
 function isP256Key(spki: string): boolean {
   try {
     const key = createPublicKey({ key: Buffer.from(spki, "base64url"), format: "der", type: "spki" });
@@ -132,7 +112,6 @@ interface Session {
   request: NearSigningRequest;
   method: NearOwnerMethod;
   challenge: string | null;
-  /** The owner address for an EVM signature. */
   address: string | null;
   resolve: (result: NearSigningResult) => void;
   reject: (error: Error) => void;
@@ -140,22 +119,15 @@ interface Session {
 }
 
 export interface NearSigningOptions {
-  /** The account service, such as `https://api.openbot.run`. */
   pageOrigin: string;
   openExternal: (url: string) => Promise<void>;
-  /** Development: the page returns to a loopback listener, not to `openbot://`. */
   loopback: boolean;
   timeoutMs?: number;
 }
 
-/**
- * One signature at a time. The nonce in the fragment is the only proof that a returned link belongs
- * to this request: it is 32 random bytes, used once, and compared before anything else is read.
- */
 export class NearOwnerSigning {
   readonly #options: NearSigningOptions;
   #session: Session | null = null;
-  /** The URL of the page for the current signature, to open it again. */
   #url: string | null = null;
   #server: { port: number; close: () => Promise<void> } | null = null;
 
@@ -167,10 +139,6 @@ export class NearOwnerSigning {
     return this.#session !== null;
   }
 
-  /**
-   * Opens the page and waits for the signature. Rejects with a sentence on cancel, timeout or a result
-   * that does not check out.
-   */
   async sign(
     request: NearSigningRequest,
     method: NearOwnerMethod,
@@ -207,7 +175,6 @@ export class NearOwnerSigning {
     return done;
   }
 
-  /** Opens the page of the current signature again, when the owner closed the tab. */
   async reopen(): Promise<void> {
     if (this.#url) await this.#options.openExternal(this.#url);
   }
@@ -217,10 +184,6 @@ export class NearOwnerSigning {
     if (session) this.#end(session.nonce, new Error(sourceText("error.connector.nearSigningCanceled")));
   }
 
-  /**
-   * Takes the result of a returned link. False when no signature waits for this nonce; the link is
-   * then ignored. A result that waits but does not check out ends the wait with an error.
-   */
   receive(nonce: string, data: string): boolean {
     const session = this.#session;
     if (!session || !timingSafeEqualText(session.nonce, nonce)) return false;
@@ -295,14 +258,12 @@ export class NearOwnerSigning {
     else session.resolve(result);
   }
 
-  /** Development only: a loopback listener that lives while one signature waits. */
   async #listen(): Promise<number> {
     if (this.#server) return this.#server.port;
     const sockets = new Set<Socket>();
     const server: Server = createServer((request, response) => {
       const link = this.#returnedLink(request.method, request.url);
       const received = link !== null;
-      // The result is taken after the answer is sent: taking it ends the wait and closes this listener.
       if (link) response.once("finish", () => this.receive(link.nonce, link.data));
       response
         .writeHead(received ? 200 : 404, {
@@ -335,7 +296,6 @@ export class NearOwnerSigning {
     return port;
   }
 
-  /** The returned link of a loopback request, when its nonce is the one of the waiting signature. */
   #returnedLink(method: string | undefined, url: string | undefined): { nonce: string; data: string } | null {
     if (method !== "GET" || !url?.startsWith(`${NEAR_SIGNATURE_DEV_PATH}?`)) return null;
     const link = parseDeepLink(`openbot://${url.replace(/^\/+/u, "")}`);

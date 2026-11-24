@@ -1,9 +1,3 @@
-/**
- * The NEAR Intents wallet of this computer in the Vault: one row in the Crypto tab, and a page with
- * the balance, the daily budget, the domains that agents pay without asking, the agents that can pay,
- * and Pause and Disconnect. Agents pay; the owner signs each policy change in the browser.
- */
-
 import type { NearPayRule, NearWalletStatus } from "@openbot/contracts/ipc";
 import {
   Alert,
@@ -60,22 +54,17 @@ export type { NearWalletActions, NearWalletAgent } from "./near-wallet-parts";
 
 export interface VaultNearWalletProps {
   status: NearWalletStatus;
-  /** The agents of this computer. */
   agents: readonly NearWalletAgent[];
   actions: NearWalletActions;
 }
 
-/** Agents can pay, or could before a pause: the wallet has a page. */
 export const nearWalletConnected = (status: NearWalletStatus) => status.state === "ready" || status.state === "frozen";
 
-/** The USD value of every asset that has a price. */
 const totalUsd = (status: NearWalletStatus) =>
   status.balances.reduce((sum, balance) => sum + (balance.usd === null ? 0 : usdNumber(balance.usd)), 0);
 
-/** A grant that ends in this time gets a Renew button. */
 const RENEW_BEFORE_MS = 7 * 24 * 60 * 60_000;
 
-/** True once `iso` is in the past. It changes when that time comes. */
 function createPassed(iso: () => string | null) {
   const [passed, setPassed] = createSignal(true);
   createEffect(iso, (at) => {
@@ -91,7 +80,6 @@ function createPassed(iso: () => string | null) {
   return passed;
 }
 
-/** The Crypto tab row. A connected wallet opens its page; otherwise the row starts the setup. */
 export function VaultNearWalletRow(props: VaultNearWalletProps & { onOpen: () => void }) {
   const { t, format, sourceText } = useText();
   const [setup, setSetup] = createSignal(false);
@@ -183,7 +171,6 @@ function Card(props: { label: string; children: JSX.Element }) {
   );
 }
 
-/** The wallet page. The settings header shows its name and the way back. */
 export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: HTMLElement | undefined }) {
   const { t, format, sourceText } = useText();
   const [dialog, setDialog] = createSignal<PageDialog | null>(null);
@@ -583,7 +570,6 @@ const domainRule = (dialog: PageDialog | null) => (dialog?.kind === "domain" ? d
 const disconnectError = (dialog: PageDialog | null, failure: string | null) =>
   dialog?.kind === "disconnect" && failure ? failure : undefined;
 
-/** The ⋯ menu of an allowed domain: Change limit and Remove. */
 function DomainMenu(props: {
   domain: string;
   menuMount?: HTMLElement | undefined;

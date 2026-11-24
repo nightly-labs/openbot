@@ -114,7 +114,6 @@ export interface VaultPanelProps {
 export type { VaultAgentChoice };
 
 type Filter = VaultItemKind | "all";
-/** The Crypto tab is not a kind of item: it holds the wallet. */
 type Tab = Filter | "crypto";
 
 const FILTERS = [

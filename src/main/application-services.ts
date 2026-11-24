@@ -689,7 +689,6 @@ export interface ApplicationServices {
   relayedMessagingInstalls: RelayedMessagingInstalls;
   githubConnector: GitHubConnectorService;
   linkAccount: LinkAccountService;
-  /** The NEAR Intents wallet that agents ask to pay from. */
   nearWallet: NearWalletService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
