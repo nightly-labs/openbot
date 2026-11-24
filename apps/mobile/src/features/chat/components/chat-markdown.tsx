@@ -8,7 +8,7 @@ import {
 import { chatMathStart } from "@openbot/contracts/chat-math";
 import { chatPreviewKind } from "@openbot/contracts/chat-preview";
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
-import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
+import { isWordStarEmphasis, markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
 import type { MobileTranslate } from "@openbot/i18n/mobile";
 import * as Linking from "expo-linking";
 import { Typography } from "heroui-native";
@@ -126,6 +126,7 @@ interface TextPresentation {
   outside: boolean;
   tableFrame: ((card: ReactNode) => ReactNode) | undefined;
   align: "start" | "end";
+  literalWordStars: boolean;
 }
 
 function blockDirectionStyle(source: string, presentation: TextPresentation): TextStyle {
@@ -491,7 +492,7 @@ function openMessageLink(url: string): void {
 }
 
 function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNode {
-  return sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }) => {
+  return sourceEntries(tokens, (token) => token.raw).map(({ value: token, offset }, index) => {
     const presentation = { ...parentPresentation, animateTail: parentPresentation.animateTail };
     if (token.type === "agentMention") {
       const reference = chatTagReferences(token.raw)[0];
@@ -557,6 +558,19 @@ function inline(tokens: Token[], parentPresentation: TextPresentation): ReactNod
     if (tokenIs(token, "escape")) return token.text;
     if (tokenIs(token, "codespan")) {
       return <CodeSpan key={offset} text={token.text} presentation={presentation} />;
+    }
+    if (
+      presentation.literalWordStars &&
+      tokenIs(token, "em") &&
+      isWordStarEmphasis(token, tokens[index - 1]?.raw ?? "", tokens[index + 1]?.raw ?? "")
+    ) {
+      return (
+        <Fragment key={offset}>
+          {"*"}
+          {inline(token.tokens, presentation)}
+          {"*"}
+        </Fragment>
+      );
     }
     if (tokenIs(token, "strong") || tokenIs(token, "em") || tokenIs(token, "del")) {
       const style: TextStyle = {
@@ -1084,6 +1098,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   renderTable,
   tableFrame,
   align = "start",
+  literalWordStars = false,
 }: {
   body: string;
   color: ColorValue | undefined;
@@ -1092,6 +1107,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
   renderTable?: (table: ReactNode, key: string) => ReactNode;
   tableFrame?: (card: ReactNode) => ReactNode;
   align?: "start" | "end";
+  literalWordStars?: boolean;
   fontWeight?: TextStyle["fontWeight"];
   inline?: boolean;
   compact?: boolean;
@@ -1145,6 +1161,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       outside: false,
       tableFrame: undefined,
       align,
+      literalWordStars,
     }),
     [
       linkFavicons,
@@ -1162,6 +1179,7 @@ export const ChatMarkdown = memo(function ChatMarkdown({
       tone,
       chipBackground,
       align,
+      literalWordStars,
     ],
   );
   const screenPresentation = useMemo<TextPresentation>(
