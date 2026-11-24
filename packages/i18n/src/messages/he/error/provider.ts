@@ -287,6 +287,8 @@ export const messages = {
   "error.provider.opencodeToolCallsAsText":
     "מודל OpenCode כתב את הפעולות שלו כטקסט ולא ביצע אותן. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.acpNoAnswer": "{provider} סיים את התור בלי תשובה. יש לשלוח את ההודעה שוב, או להתחיל צ'אט חדש.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} קיבל את התוצאות מחברי הצוות, ואז סיים את התור בלי תשובה. יש לבקש מהסוכן להמשיך.",
   "error.provider.noAnswerAfterSteps":
     "{provider} ביצע כמה צעדים ואז סיים את התור בלי תשובה. יש לשאול את הסוכן מה הוא עשה לפני שליחת אותה בקשה שוב.",
   "error.provider.acpRefusedNoReason": "{provider} עצר בלי תשובה. יש לשלוח את ההודעה שוב.",

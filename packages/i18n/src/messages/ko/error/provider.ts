@@ -307,6 +307,8 @@ export const messages = {
     "OpenCode 모델이 작업을 텍스트로만 쓰고 실행하지 않았어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.acpNoAnswer":
     "{provider}이(가) 답변 없이 턴을 끝냈어요. 메시지를 다시 보내거나 새 채팅을 시작해 주세요.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider}이(가) 팀원의 결과를 받은 뒤 답변 없이 턴을 끝냈어요. 에이전트에게 계속하라고 요청해 주세요.",
   "error.provider.noAnswerAfterSteps":
     "{provider}이(가) 몇 가지 단계를 실행한 뒤 답변 없이 턴을 끝냈어요. 같은 요청을 다시 보내기 전에 에이전트에게 무엇을 했는지 물어보세요.",
   "error.provider.acpRefusedNoReason": "{provider}이(가) 답변 없이 멈췄어요. 메시지를 다시 보내 주세요.",

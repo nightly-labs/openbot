@@ -319,6 +319,8 @@ export const messages = {
     "OpenCode のモデルが操作をテキストとして書き、実行しませんでした。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.acpNoAnswer":
     "{provider} が回答なしでターンを終了しました。メッセージをもう一度送信するか、新しいチャットを開始してください。",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} はチームメイトから結果を受け取りましたが、回答なしでターンを終了しました。エージェントに続けるよう頼んでください。",
   "error.provider.noAnswerAfterSteps":
     "{provider} はいくつかのステップを実行した後、回答せずにターンを終了しました。同じ依頼をもう一度送る前に、エージェントに何をしたか尋ねてください。",
   "error.provider.acpRefusedNoReason": "{provider} は回答せずに停止しました。メッセージをもう一度送信してください。",

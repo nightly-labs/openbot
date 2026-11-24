@@ -310,6 +310,8 @@ export const messages = {
     "OpenCode modeli eylemlerini metin olarak yazdı ve gerçekleştirmedi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.acpNoAnswer":
     "{provider} turu yanıt vermeden bitirdi. Mesajı yeniden gönderin veya yeni bir sohbet başlatın.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} takım arkadaşlarından sonuçları aldı, ardından turu yanıt vermeden bitirdi. Ajandan devam etmesini isteyin.",
   "error.provider.noAnswerAfterSteps":
     "{provider} bazı adımları uyguladı, sonra turu yanıt vermeden bitirdi. Aynı isteği yeniden göndermeden önce ajana ne yaptığını sorun.",
   "error.provider.acpRefusedNoReason": "{provider} yanıt vermeden durdu. Mesajı yeniden gönderin.",

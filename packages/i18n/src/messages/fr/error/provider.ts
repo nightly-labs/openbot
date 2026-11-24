@@ -325,6 +325,8 @@ export const messages = {
     "Le modèle OpenCode a écrit ses actions sous forme de texte sans les exécuter. Réessayez ou choisissez un autre modèle.",
   "error.provider.acpNoAnswer":
     "{provider} a terminé le tour sans réponse. Renvoyez le message ou démarrez une nouvelle discussion.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} a reçu les résultats de ses coéquipiers, puis a terminé le tour sans réponse. Demandez à l'agent de continuer.",
   "error.provider.noAnswerAfterSteps":
     "{provider} a effectué quelques étapes, puis a terminé le tour sans réponse. Demandez à l'agent ce qu'il a fait avant d'envoyer à nouveau la même demande.",
   "error.provider.acpRefusedNoReason": "{provider} s’est arrêté sans réponse. Renvoyez le message.",

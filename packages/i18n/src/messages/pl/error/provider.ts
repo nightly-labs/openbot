@@ -304,6 +304,8 @@ export const messages = {
     "Model OpenCode zapisał swoje działania jako tekst i ich nie wykonał. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.acpNoAnswer":
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
+  "error.provider.teammateResultsNoAnswer":
+    "{provider} otrzymał wyniki od członków zespołu, a potem zakończył turę bez odpowiedzi. Poproś agenta, aby kontynuował.",
   "error.provider.noAnswerAfterSteps":
     "{provider} wykonał kilka kroków, a potem zakończył turę bez odpowiedzi. Zanim wyślesz tę samą prośbę ponownie, zapytaj agenta, co zrobił.",
   "error.provider.acpRefusedNoReason": "{provider} zatrzymał się bez odpowiedzi. Wyślij wiadomość ponownie.",
