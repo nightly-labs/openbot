@@ -2,7 +2,7 @@ import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "@openbo
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { analyticsOnByDefault, currentAnalyticsInstallId, newAnalyticsInstallId } from "@openbot/telemetry";
 import { ASK_CHOICES, ASK_KINDS, type AskChoice, type AskKind } from "./client-browser-messages";
-import { type ExtensionSession, readSession } from "./extension-storage";
+import { type ExtensionSession, readSession, saveSession } from "./extension-storage";
 
 const EXTENSION_ANALYTICS_GENERATION = 1;
 const ANALYTICS_URL = import.meta.env.VITE_OPENBOT_ANALYTICS_URL;
@@ -99,8 +99,10 @@ function regionDefault(): boolean {
 }
 
 export async function analyticsLinked(session: ExtensionSession | null): Promise<boolean> {
+  if (session?.user.analyticsEnabled === false) return false;
   const choice = (await chrome.storage.local.get(CHOICE_KEY))[CHOICE_KEY];
-  if (isDynamicRecord(choice) && isBoolean(choice.enabled)) return choice.enabled;
+  if (session && isDynamicRecord(choice) && choice.accountId === session.user.id && isBoolean(choice.enabled))
+    return choice.enabled;
   return session?.user.analyticsEnabled ?? regionDefault();
 }
 
@@ -192,6 +194,9 @@ export async function setAnalyticsLinked(enabled: boolean): Promise<void> {
   const session = await readSession();
   if (!enabled && ANALYTICS_URL && session && (await analyticsLinked(session)))
     send("analytics_preference_changed", { enabled: false }, session.user.id);
-  await chrome.storage.local.set({ [CHOICE_KEY]: { enabled, at: Date.now() } });
-  if (enabled && session) await identify(session);
+  await chrome.storage.local.set({ [CHOICE_KEY]: { enabled, at: Date.now(), accountId: session?.user.id ?? null } });
+  if (!session) return;
+  const updated = { ...session, user: { ...session.user, analyticsEnabled: enabled } };
+  await saveSession(updated);
+  if (enabled) await identify(updated);
 }

@@ -324,7 +324,6 @@ try {
   const extensionId = new URL(worker.url()).host;
   report.extensionId = extensionId;
   await capturedEvent((event) => event.name === "extension_installed", "extension_installed");
-  await worker.evaluate(`chrome.storage.local.set({ "${ANALYTICS_CHOICE_KEY}": { enabled: true, at: Date.now() } })`);
   const agentName = await host.page.evaluate(async (id) => {
     const found = (await window.openbot.agent.listAgents()).find((candidate) => candidate.id === id);
     if (!found) throw new Error(`Unknown agent: ${id}`);
@@ -395,6 +394,9 @@ try {
   const agentButton = page.getByRole("button", { name: new RegExp(`^${literal(agentName)}\\b`) }).first();
   await agentButton.waitFor({ timeout: UI_WAIT_MS });
   report.signIn = { invalidExtensionRefused: true, cancelShown: true, homeShowsServer: true, homeShowsAgent: true };
+  await worker.evaluate(
+    `chrome.storage.local.get("openbot.session.v1").then((items) => chrome.storage.local.set({ "${ANALYTICS_CHOICE_KEY}": { enabled: true, at: Date.now(), accountId: items["openbot.session.v1"].user.id } }))`,
+  );
   await shot(page, "1-home");
 
   await agentButton.click();

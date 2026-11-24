@@ -134,9 +134,10 @@ service worker. It sends only from a production build that uses `https://api.ope
 development build sends nothing, or sends to the loopback `OPENBOT_ANALYTICS_CAPTURE_URL` given at
 build time. The extension's **Link analytics to my account** switch (server menu > **Settings**) decides the
 `profileId`: on, the account ID (with an `identify` that sets the email); off or signed out, a random
-install ID kept in the extension's storage, rotated after 395 days. A choice made in the extension
-wins; with none, the extension follows the account's answer, and with no answer, the same region
-default as the web app. The choice also goes to the account (`PUT /v1/me/analytics`). There is no
+install ID kept in the extension's storage, rotated after 395 days. An account answer of off always
+wins. Else a choice made in the extension by the same account wins; with none, the extension follows
+the account's answer, and with no answer, the same region default as the web app. The panel reads the
+account's answer again each time it opens. The choice also goes to the account (`PUT /v1/me/analytics`). There is no
 queue: an event that fails to send is dropped. Each extension event and property is allowlisted in
 `apps/browser-extension/src/analytics.ts`.
 

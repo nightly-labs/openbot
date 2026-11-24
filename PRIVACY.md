@@ -256,9 +256,10 @@ steps of X replies (queued, sent, retried, dropped, notification opened), and sh
 (a site removed, and the kind of each question and your answer). It labels them
 as extension. It never sends message text, post text, X handles, addresses, sites, tab titles, or
 names. Its **Link analytics to my account** switch (server menu > **Settings**) works as on the web: on, events
-carry your account ID; off, only a random install ID kept in the extension's storage. With no choice
-in the extension, it follows your account's answer, and with no answer, the same region default as the
-web app. Development builds of the extension send no analytics.
+carry your account ID; off, only a random install ID kept in the extension's storage. When your account
+says off, for example after you turn it off on another device, the extension is off too. Else your
+choice in the extension wins; with no choice by your account, it follows your account's answer, and
+with no answer, the same region default as the web app. Development builds of the extension send no analytics.
 
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
 search queries, embedded-browser URLs, paths or page titles, file names, local paths, commands, raw
