@@ -270,6 +270,7 @@ import {
   TEAM_CURRENT_CAPABILITIES,
   TEAM_USAGE_GROUPS_CAPABILITY,
   TEAM_USAGE_READ_FAILED_CAPABILITY,
+  teamCapabilitiesForProtocol,
   teamCapabilityHeaders,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -323,6 +324,7 @@ import {
   HOST_VOICE_MODEL_CAPABILITY,
   HOST_VOICE_MODEL_ROUTES,
 } from "@openbot/contracts/team-protocol/host-voice-model-v1";
+import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
@@ -391,6 +393,11 @@ import {
   PROMPT_CACHE_TTL_CAPABILITY,
   PROMPT_CACHE_TTL_PI_CAPABILITY,
 } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
@@ -644,6 +651,7 @@ import { emptyInstanceTransferService } from "./instance-transfer-e2e-fixture";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/team-api-routes-e2e");
 const APP_VERSION = "0.43.0";
+const PROMPT_DETAIL_E2E_TEXT = "Run:\n```sh\necho hello\n```";
 const MIB = 1024 * 1024;
 
 interface Check {
@@ -1733,6 +1741,24 @@ const fakeAgents: TeamApiAgents = {
                 status: "completed",
                 ...(anchor.messageId === "skill-question"
                   ? { itemType: "skill-suggestion:create", skillSuggestion: { name: "Weekly report" } }
+                  : {}),
+                ...(anchor.messageId === "detail-question"
+                  ? {
+                      questionPrompt: {
+                        requestId: "request-detail",
+                        questions: [
+                          {
+                            id: "install",
+                            header: "Install",
+                            question: "Did the install work?",
+                            detail: PROMPT_DETAIL_E2E_TEXT,
+                            isSecret: false,
+                            options: null,
+                          },
+                        ],
+                        resolution: null,
+                      },
+                    }
                   : {}),
               },
             ]
@@ -7162,6 +7188,88 @@ try {
           [{ agentId: "agent-ada", messageId: "suggestion-2" }],
         ]),
       [summary(saved), summary(notSaved)],
+    );
+  }
+
+  {
+    const capabilities = [TEAM_PROMPT_DETAIL_CAPABILITY];
+    check(
+      "prompt-detail-v1 is a protocol 10 capability only",
+      !teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).includes(TEAM_PROMPT_DETAIL_CAPABILITY) &&
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V10).includes(TEAM_PROMPT_DETAIL_CAPABILITY),
+    );
+    const detailPagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=detail-question`;
+    const withDetail = await call("GET", detailPagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities,
+    });
+    const withoutDetail = await call("GET", detailPagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [],
+    });
+    const pageQuestion = (body: Json | undefined) =>
+      list(field(list(field(body, "messages"))[0], "questionPrompt", "questions"))[0];
+    check(
+      "a conversation page carries the detail of an agent question only with prompt-detail-v1",
+      withDetail.status === 200 &&
+        field(pageQuestion(withDetail.body), "detail") === PROMPT_DETAIL_E2E_TEXT &&
+        field(pageQuestion(withDetail.body), "question") === "Did the install work?" &&
+        withoutDetail.status === 200 &&
+        field(pageQuestion(withoutDetail.body), "question") === "Did the install work?" &&
+        field(pageQuestion(withoutDetail.body), "detail") === undefined,
+      [summary(withDetail), summary(withoutDetail)],
+    );
+    const decoded = teamHttpCodec(TEAM_PROTOCOL_V10).decodeResponse("GET", detailPagePath, 200, withDetail.body);
+    const frozenDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    addPromptQuestionDetails(decoded, withDetail.body);
+    const restoredDetail = field(pageQuestion(parseJson(JSON.stringify(decoded))), "detail");
+    check(
+      "a client copies the question detail back after the frozen codec decodes the page",
+      frozenDetail === undefined && restoredDetail === PROMPT_DETAIL_E2E_TEXT,
+      { frozenDetail: frozenDetail ?? null, restoredDetail: restoredDetail ?? null },
+    );
+
+    const promptEvent = {
+      type: "prompt" as const,
+      requestId: 7,
+      agentId: "agent-ada",
+      threadId: "thread-agent-ada",
+      turnId: "turn-1",
+      questions: [
+        {
+          id: "install",
+          header: "Install",
+          question: "Did the install work?",
+          detail: PROMPT_DETAIL_E2E_TEXT,
+          isSecret: false,
+          options: [
+            { label: "Done", description: "It worked." },
+            { label: "Need help", description: "It failed." },
+          ],
+        },
+      ],
+    };
+    const plainEvent = encodeTeamProtocolV8BaseCurrentEvent(promptEvent, {}) ?? "";
+    const detailEvent = JSON.parse(withPromptQuestionDetails(plainEvent, promptEvent));
+    const readEvent = decodeTeamProtocolV8BaseCurrentEvent(detailEvent);
+    const frozenEventDetail =
+      readEvent.kind === "known" && readEvent.event.type === "prompt" ? readEvent.event.questions[0]?.detail : null;
+    if (readEvent.kind === "known") addPromptQuestionDetails(readEvent.event, detailEvent);
+    const restoredEvent = readEvent.kind === "known" && readEvent.event.type === "prompt" ? readEvent.event : null;
+    const otherAgentEvent = JSON.parse(
+      withPromptQuestionDetails(plainEvent, { ...promptEvent, agentId: "agent-pi", type: "prompt" }),
+    );
+    check(
+      "a prompt event carries the question detail with prompt-detail-v1, and only for the same prompt",
+      !plainEvent.includes("echo hello") &&
+        frozenEventDetail === undefined &&
+        restoredEvent?.questions[0]?.detail === PROMPT_DETAIL_E2E_TEXT &&
+        restoredEvent?.questions[0]?.question === "Did the install work?" &&
+        restoredEvent?.questions[0]?.options?.length === 2 &&
+        !JSON.stringify(otherAgentEvent).includes("echo hello"),
+      { plainEvent, restored: restoredEvent?.questions[0] ?? null },
     );
   }
 
