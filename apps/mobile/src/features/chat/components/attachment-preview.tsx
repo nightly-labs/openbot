@@ -441,7 +441,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
 
   async function saveToFiles(only: readonly AttachmentSummary[] = attachments): Promise<boolean> {
     if (Platform.OS === "ios" && (only.length === 1 || shareFilesNative)) {
-      await shareAll(only);
+      await shareAll(only, t("mobile.chat.attachment.saveFilesFailed"));
       return false;
     }
     let folder: Directory;
@@ -463,29 +463,30 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     }
   }
 
-  async function shareFile(attachment: AttachmentSummary) {
+  async function shareFile(attachment: AttachmentSummary, failTitle = t("mobile.chat.attachment.openFailed")) {
     setBusy(true);
-    let file: File | null = null;
+    const folder = new Directory(Paths.cache, `share-${Date.now()}`);
     try {
       if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
       const data = await load(attachment);
-      file = new File(Paths.cache, `${Date.now()}-${safeFileName(attachment.name)}`);
+      folder.create({ intermediates: true, idempotent: true });
+      const file = new File(folder, safeFileName(attachment.name) || "file");
       await writeFileData(file, data);
       await Sharing.shareAsync(file.uri, {
         ...shareTypeOptions(file.uri, data.mimeType),
         dialogTitle: attachment.name,
       });
     } catch (error) {
-      fail(error, t("mobile.chat.attachment.openFailed"));
+      fail(error, failTitle);
     } finally {
-      if (file?.exists) file.delete();
+      if (folder.exists) folder.delete();
       setBusy(false);
     }
   }
 
-  async function shareAll(only: readonly AttachmentSummary[] = attachments) {
+  async function shareAll(only: readonly AttachmentSummary[] = attachments, failTitle?: string) {
     const single = only.length === 1 ? only[0] : undefined;
-    if (single) return shareFile(single);
+    if (single) return shareFile(single, failTitle);
     setBusy(true);
     const images = only.every(showsAsImage);
     try {
@@ -511,7 +512,11 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
         types.size === 1 ? ([...types][0] ?? "*/*") : imageTypes ? "image/*" : "*/*",
       );
     } catch (error) {
-      fail(error, images ? t("mobile.chat.imageGallery.shareFailed") : t("mobile.chat.attachment.shareFilesFailed"));
+      fail(
+        error,
+        failTitle ??
+          (images ? t("mobile.chat.imageGallery.shareFailed") : t("mobile.chat.attachment.shareFilesFailed")),
+      );
     } finally {
       setBusy(false);
     }
