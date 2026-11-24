@@ -295,7 +295,7 @@ function redactEmbeddedJson(value: string, emails: boolean, unscanned: Unscanned
 function parseRedacted(candidate: string, emails: boolean): string | null {
   try {
     const parsed = JSON.parse(candidate);
-    const converted = convertValue(parsed, new Set<object>(), emails);
+    const converted = convertValue(parsed, new Set<object>(), { emails, unscanned: "drop" });
     if (unchangedKeyCount(parsed, converted) === writtenKeyCount(candidate)) return candidate;
     return JSON.stringify(converted) ?? null;
   } catch {
@@ -393,12 +393,20 @@ export function toLogValue(value: unknown): LogValue {
 }
 
 export function toSecretSafeValue(value: unknown): LogValue {
-  return convertSafely(value, false);
+  return convertSafely(value, CHAT_RULES);
 }
 
-function convertSafely<T>(value: T, emails = true): LogValue {
+interface ConversionRules {
+  emails: boolean;
+  unscanned: UnscannedText;
+}
+
+const LOG_RULES: ConversionRules = { emails: true, unscanned: "drop" };
+const CHAT_RULES: ConversionRules = { emails: false, unscanned: "keep" };
+
+function convertSafely<T>(value: T, rules = LOG_RULES): LogValue {
   try {
-    return convertValue(value, new Set<object>(), emails);
+    return convertValue(value, new Set<object>(), rules);
   } catch {
     return UNSERIALIZABLE;
   }
@@ -406,25 +414,26 @@ function convertSafely<T>(value: T, emails = true): LogValue {
 
 const MAX_CONVERSION_DEPTH = 32;
 
-function convertValue<T>(value: T, seen: Set<object>, emails: boolean, depth = 0): LogValue {
-  if (typeof value === "string") return redact(value, emails);
+function convertValue<T>(value: T, seen: Set<object>, rules: ConversionRules, depth = 0): LogValue {
+  const text = (input: string) => redact(input, rules.emails, rules.unscanned);
+  if (typeof value === "string") return text(value);
   if (value === null) return null;
   if (value === undefined) return undefined;
   if (typeof value === "number" || typeof value === "boolean") return value;
   if (typeof value === "bigint") return `${value.toString()}n`;
   if (value instanceof Error) {
     const converted: { [key: string]: LogValue } = {
-      name: redact(value.name, emails),
-      message: redact(value.message, emails),
+      name: text(value.name),
+      message: text(value.message),
     };
-    if (typeof value.stack === "string") converted.stack = redact(value.stack, emails);
+    if (typeof value.stack === "string") converted.stack = text(value.stack);
     return converted;
   }
   if (Array.isArray(value)) {
     if (seen.has(value)) return "[circular]";
     if (depth >= MAX_CONVERSION_DEPTH) return "[too deep]";
     seen.add(value);
-    return value.map((entry: LogValue) => convertValue(entry, seen, emails, depth + 1));
+    return value.map((entry: LogValue) => convertValue(entry, seen, rules, depth + 1));
   }
   if (typeof value === "object") {
     if (seen.has(value)) return "[circular]";
@@ -441,21 +450,21 @@ function convertValue<T>(value: T, seen: Set<object>, emails: boolean, depth = 0
     );
     return Object.fromEntries(
       entries.map(([key, entry]): [string, LogValue] => [
-        redact(key, emails),
-        secretPair && key === "value" ? "[redacted]" : convertEntry(key, entry, seen, emails, depth),
+        text(key),
+        secretPair && key === "value" ? "[redacted]" : convertEntry(key, entry, seen, rules, depth),
       ]),
     );
   }
   try {
-    return redact(String(value), emails);
+    return text(String(value));
   } catch {
     return UNSERIALIZABLE;
   }
 }
 
-function convertEntry(key: string, entry: unknown, seen: Set<object>, emails: boolean, depth: number): LogValue {
+function convertEntry(key: string, entry: unknown, seen: Set<object>, rules: ConversionRules, depth: number): LogValue {
   if (SECRET_KEY.test(key)) return "[redacted]";
-  const converted = convertValue(entry, seen, emails, depth + 1);
+  const converted = convertValue(entry, seen, rules, depth + 1);
   if (!HEADER_KEY.test(key) || entry === null || typeof entry !== "object") return converted;
   return redactHeaderStrings(converted);
 }
