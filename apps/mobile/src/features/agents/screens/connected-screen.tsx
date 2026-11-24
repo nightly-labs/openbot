@@ -31,7 +31,7 @@ import {
   useAgentListReveal,
 } from "@/features/agents/components/agent-list-reveal";
 import { AgentListRow } from "@/features/agents/components/agent-list-row";
-import { chatRowEntering, chatRowExiting } from "@/features/agents/components/agent-pin-motion";
+import { chatRowSlideIn, chatRowSlideOut, usePinMotion } from "@/features/agents/components/agent-pin-motion";
 import { AgentUnreadGroupHeader, AgentWaitingGroupHeader } from "@/features/agents/components/agent-wait-badge";
 import {
   ChatDragProvider,
@@ -211,13 +211,15 @@ const TransitioningChatRow = memo(function TransitioningChatRow({
   reveal: AgentListRevealState;
   collapsed: boolean;
 }) {
-  const chatId = agent?.id ?? channel?.id ?? "";
-  const entering = useMemo(() => chatRowEntering(chatId), [chatId]);
-  const exiting = useMemo(() => chatRowExiting(chatId), [chatId]);
+  const motion = usePinMotion(agent?.id ?? channel?.id ?? "");
   return (
     <CollapsingRow collapsed={collapsed}>
-      <Animated.View collapsable={false} entering={entering} exiting={exiting}>
-        <AgentListRowReveal index={index} reveal={reveal}>
+      <Animated.View
+        collapsable={false}
+        entering={motion === "unpin" ? chatRowSlideIn : undefined}
+        exiting={motion === "pin" ? chatRowSlideOut : undefined}
+      >
+        <AgentListRowReveal index={index} reveal={reveal} skip={motion === "unpin"}>
           {agent ? (
             <AgentListRow agent={agent} leftInset={15} rightInset={24} />
           ) : channel && serverId && channelAgents ? (
