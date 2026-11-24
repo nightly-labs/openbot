@@ -154,13 +154,17 @@ Triggered by `packages/contracts/src/team-protocol/`, `packages/team-client/`,
   (`has("<capability>")` in `workspace.ts`). A new request with no gate is a **stop**: hosts in the
   window answer it with an error. A frozen Team API codec or fixture that changed meaning is a
   **stop**; use the gate C rules of the release-upgrade-safety skill.
-- **Account service.** List the routes that the extension calls in `v<new>`:
+- **Account service.** List the routes that the extension calls in `v<new>`, with the `team-client`
+  routes (`remote-directory.ts` calls `/v2/remote/...`) and template strings:
 
   ```bash
-  git grep --no-color -h -o -E "\"/v1/[a-zA-Z0-9/_-]+\"" v<new> -- apps/browser-extension/src packages/contracts/src/browser-extension-x.ts | sort -u
+  git grep --no-color -h -o -E "[\"\`]/v[0-9]+/[^\"\` ?]*" v<new> -- apps/browser-extension/src \
+    packages/team-client/src packages/contracts/src/browser-extension-x.ts | sed 's/^.//' | sort -u
   ```
 
-  For each route that is new in the range, check that production has it now:
+  The list must have `/v1/mobile-auth/session` and `/v2/remote/hosts/` routes. Run it on `v<last>`
+  too, and compare. For each route that is new in the range, put `x` in place of each `${...}` part
+  and check that production has it now:
   `curl -s -o /dev/null -w '%{http_code}\n' -X OPTIONS https://api.openbot.run<route>`. A `404` is a
   **stop**: deploy the account service first. Do not deploy it from this skill.
 
