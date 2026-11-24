@@ -226,7 +226,7 @@ const SETTING_LINKS: Record<SettingLinkId, SettingLinkEntry> = {
     title: "System permissions",
     place: `${APP} > Computer Use`,
     about:
-      "Shows if Computer Use is ready on this computer and what is missing, such as the macOS Screen Recording and Accessibility permissions, with a button to grant each one. Show it when Computer Use is not ready.",
+      "Shows if Computer Use is ready on this computer, and what is missing when it is not, with a button to fix it. Show it when Computer Use is not ready.",
     words: "computer use ready not ready permissions screen recording accessibility grant macos privacy driver",
   },
   "updates.track": {
