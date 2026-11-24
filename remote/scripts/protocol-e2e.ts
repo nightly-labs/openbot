@@ -5,13 +5,13 @@ import type { QueuedSignalMessage } from "@openbot/contracts/signal-protocol/ing
 import { createIngressQueueKeyPair } from "@openbot/contracts/signal-protocol/ingress-queue";
 import type { RemoteTicketClaims } from "@openbot/contracts/signal-protocol/ticket";
 import { Effect } from "effect";
-import { createRemoteCommandMailbox, decodeRemoteTeamCommand } from "../packages/team-client/src/remote-peer";
-import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "../packages/team-client/src/webrtc-framing";
-import { IngressQueue, queueRouteKey } from "../remote/api/src/ingress-queue";
-import { SignalService } from "../remote/api/src/signal-service";
-import { RemoteTokenError } from "../remote/api/src/tokens";
+import { createRemoteCommandMailbox, decodeRemoteTeamCommand } from "../../packages/team-client/src/remote-peer";
+import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "../../packages/team-client/src/webrtc-framing";
+import { IngressQueue, queueRouteKey } from "../api/src/ingress-queue";
+import { SignalService } from "../api/src/signal-service";
+import { RemoteTokenError } from "../api/src/tokens";
 
-const OUT = resolve(import.meta.dirname, "../.openbot-build/remote-protocol-e2e");
+const OUT = resolve(import.meta.dirname, "../../.openbot-build/remote-protocol-e2e");
 const checks: Array<{ name: string; passed: boolean; error?: string }> = [];
 
 function check(name: string, run: () => void | Promise<void>): Promise<void> {
