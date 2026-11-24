@@ -144,11 +144,11 @@ function RailPreview(props: {
   customAgentUsage?: readonly CustomAgentUsageRailRow[];
   usageRows?: PageRailProps["usageRows"];
   mediaCredits?: readonly MediaCreditsRailRow[];
-  creditBalance?: number;
+  creditBalance?: number | undefined;
   creditAgents?: boolean;
   creditAsk?: boolean;
   creditMove?: boolean;
-  creditWalletName?: string;
+  creditWalletName?: string | undefined;
   onCreditMove?: () => void;
   hiddenItems?: readonly PageRailHideableItem[];
   crm?: boolean;

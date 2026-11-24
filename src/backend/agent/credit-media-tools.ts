@@ -51,55 +51,54 @@ const specValue = z.string().trim().min(1).max(16);
 const prompt = z.string().max(CREDIT_MEDIA_PROMPT_LIMIT);
 
 const listMediaModelsToolSchema = z.strictObject({
-  kind: z.enum(["image", "video"]).describe("Only list image or video models.").optional(),
+  kind: z.enum(["image", "video"]).optional(),
 });
 
 const generateImageToolSchema = z.strictObject({
-  prompt: prompt.describe("What the image shows. Write it in detail."),
-  model: modelId.describe("A model id from list_media_models. Omit it to use the default model.").optional(),
-  aspect: specValue.describe('An aspect of the model, such as "16:9". Omit it for the model default.').optional(),
-  resolution: specValue.describe("A resolution of the model. Omit it for the model default.").optional(),
+  prompt: prompt.describe("What the image shows, in detail."),
+  model: modelId.describe("An id from list_media_models. Omit for the default.").optional(),
+  aspect: specValue.describe('Such as "16:9". Omit for the model default.').optional(),
+  resolution: specValue.describe("Omit for the model default.").optional(),
   images: z
     .array(localPath)
     .max(CREDIT_MEDIA_REFERENCE_LIMIT)
-    .describe("Local PNG, JPEG or WebP pictures to edit or to use as references.")
+    .describe("Local PNG, JPEG or WebP pictures to edit or use as references.")
     .optional(),
 });
 
 const generateVideoToolSchema = z.strictObject({
-  prompt: prompt.describe("What happens in the video: subject, motion, camera and sound."),
-  model: modelId.describe("A model id from list_media_models. Omit it to use the default model.").optional(),
-  aspect: specValue.describe('An aspect of the model, such as "16:9". Omit it for the model default.').optional(),
-  resolution: specValue.describe("A resolution of the model. Omit it for the model default.").optional(),
-  duration: z.number().int().min(1).max(600).describe("Seconds, from the durations of the model.").optional(),
-  audio: z.boolean().describe("False for a silent video, when the model makes sound. Default true.").optional(),
+  prompt: prompt.describe("Subject, motion, camera and sound."),
+  model: modelId.describe("An id from list_media_models. Omit for the default.").optional(),
+  aspect: specValue.describe('Such as "16:9". Omit for the model default.').optional(),
+  resolution: specValue.describe("Omit for the model default.").optional(),
+  duration: z.number().int().min(1).max(600).describe("Seconds, from the model durations.").optional(),
+  audio: z.boolean().describe("False for a silent video. Default true.").optional(),
   firstFrame: localPath.describe("A local picture for the first frame.").optional(),
   lastFrame: localPath.describe("A local picture for the last frame.").optional(),
-  images: z
-    .array(localPath)
-    .max(CREDIT_MEDIA_REFERENCE_LIMIT)
-    .describe("Local reference pictures, for models that take references.")
-    .optional(),
+  images: z.array(localPath).max(CREDIT_MEDIA_REFERENCE_LIMIT).describe("Local reference pictures.").optional(),
 });
 
 const PAID_RULE =
-  "It spends OpenBot credits of the user, or of the server wallet on a server. OpenBot asks the user and shows the price when a generation costs more than the limit in list_media_models, so do not ask for approval yourself.";
+  "It spends OpenBot credits. OpenBot asks the user above the price limit, so do not ask for approval yourself.";
+
+const OWN_TOOL_RULE =
+  "only when you have no such tool of your own, when the user asks for OpenBot credits, or when the user names a model that your own tool cannot make.";
 
 export const CREDIT_MEDIA_TOOL_DEFINITIONS = [
   {
     name: LIST_MEDIA_MODELS_TOOL,
     description:
-      "List the image and video models that generate_image and generate_video can use with OpenBot credits: aspects, resolutions, durations, input pictures and prices. Also returns the default model of each kind, the credit balance and askAboveCredits, the price above which OpenBot asks the user to approve a generation.",
+      "List the models of generate_image and generate_video with their options and prices, the default model of each kind, the credit balance, and askAboveCredits: the price above which OpenBot asks the user.",
     shape: listMediaModelsToolSchema.shape,
   },
   {
     name: GENERATE_IMAGE_TOOL,
-    description: `Make one image from a prompt, or edit local pictures, and show it in this conversation. Use it when the user asks for a picture and you have no image generation tool of your own, when the user asks for OpenBot credits, or when the user names a model that your own tool cannot make. ${PAID_RULE} Do not repeat the image in your reply. The result gives the saved file, to use in images or firstFrame of a later call. With tool_call, openbot.list_media_models gives the models and prices.`,
+    description: `Make one image from a prompt, or edit local pictures, and show it in the chat. Use it ${OWN_TOOL_RULE} ${PAID_RULE} Do not repeat the image. The result gives the saved file for images or firstFrame of a later call.`,
     shape: generateImageToolSchema.shape,
   },
   {
     name: GENERATE_VIDEO_TOOL,
-    description: `Make one video from a prompt, a first and last frame, or reference pictures, and show it in this conversation. Use it when the user asks for a video and you have no video generation model of your own, when the user asks for OpenBot credits, or when the user names a model that your own tool cannot make. Use it before you draw frames or use other tools. It can take some minutes. ${PAID_RULE} Do not repeat the video in your reply.`,
+    description: `Make one video from a prompt, frames or reference pictures, and show it in the chat. Use it ${OWN_TOOL_RULE} Use it before you draw frames yourself. It can take some minutes. ${PAID_RULE} Do not repeat the video.`,
     shape: generateVideoToolSchema.shape,
   },
 ];
