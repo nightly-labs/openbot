@@ -98,6 +98,7 @@ import {
   readSavedAgentPicture,
   saveAgentPicture,
 } from "./web-agent-pictures";
+import { readCachedWebHosts, writeCachedWebHosts } from "./web-host-cache";
 import type { WebHostNotice } from "./web-host-connections";
 import { createWebHostLifecycle } from "./web-host-lifecycle";
 import { WebHostOtherTabError, type WebHostState } from "./web-host-lock";
@@ -125,6 +126,7 @@ interface WebConversation {
 
 const LATEST_PAGE_SIZE = 50;
 const PRELOADED_AGENTS = 3;
+const PRELOAD_CONCURRENCY = 2;
 const EVENT_READS_INTERVAL_MS = 1_000;
 
 function trimToLatestPage(conversation: WebConversation): void {
@@ -229,8 +231,9 @@ export function createWebWorkspace(
     onStatus?: (status: AgentStatus) => void;
   } = {},
 ) {
+  const cachedHosts = readCachedWebHosts(props.accountId);
   const [state, setState] = createStore<WebWorkspaceState>({
-    hosts: [],
+    hosts: cachedHosts,
     host: null,
     agents: [],
     agentsLoaded: false,
@@ -269,7 +272,7 @@ export function createWebWorkspace(
     restartReady: false,
     hostStates: {},
     incompatibility: null,
-    hostsLoaded: false,
+    hostsLoaded: cachedHosts.length > 0,
     hostsLoading: false,
     hostsError: null,
     revocationRevision: 0,
@@ -1014,8 +1017,6 @@ export function createWebWorkspace(
   }
   function refreshHosts(): Promise<void> {
     if (hostsRefreshPromise) return hostsRefreshPromise;
-    const refreshGeneration = generation;
-    const refreshHostId = hostId;
     const promise = (async () => {
       if (disposed) return;
       setState((draft) => {
@@ -1024,9 +1025,21 @@ export function createWebWorkspace(
       });
       try {
         markRemoteSync("hosts-start");
-        const hosts = await runtime.listHosts();
+        const cachedHostId = readWebServerSelection(props.accountId);
+        const cachedHost =
+          hostId === null
+            ? (state.hosts.find((host) => host.hostId === cachedHostId) ??
+              orderWebHosts(state.hosts, serverOrder())[0] ??
+              null)
+            : null;
+        const listedHosts = runtime.listHosts();
+        if (cachedHost) void connect(cachedHost);
+        const refreshGeneration = generation;
+        const refreshHostId = hostId;
+        const hosts = await listedHosts;
         markRemoteSync("hosts");
         if (disposed) return;
+        writeCachedWebHosts(props.accountId, hosts);
         deleteRemoteWorkspaceFrames(
           props.accountId,
           hosts.map((host) => host.hostId),
@@ -1039,8 +1052,16 @@ export function createWebWorkspace(
           props.accountId,
           hosts.map((host) => host.hostId),
         );
-        const activeGeneration = refreshGeneration === generation && refreshHostId === hostId;
-        if (!activeGeneration) return;
+        const earlyHostId = cachedHost?.hostId ?? null;
+        const activeGeneration =
+          refreshHostId === hostId && (refreshGeneration === generation || refreshHostId === earlyHostId);
+        if (!activeGeneration) {
+          setState((draft) => {
+            draft.hosts = hosts;
+            draft.hostsLoaded = true;
+          });
+          return;
+        }
         if (refreshHostId && !hosts.some((host) => host.hostId === refreshHostId)) {
           generation += 1;
           hostId = null;
@@ -1077,16 +1098,24 @@ export function createWebWorkspace(
             draft.duplicatingAgentIds = [];
             draft.capabilities = [];
             draft.status = "offline";
-            draft.error = leftHostIds.has(refreshHostId)
-              ? null
-              : { message: currentText().t("webClient.error.accessEnded"), reference: null };
+            draft.error =
+              leftHostIds.has(refreshHostId) || refreshHostId === earlyHostId
+                ? null
+                : { message: currentText().t("webClient.error.accessEnded"), reference: null };
           });
           runtime.hosts?.setHosts(hosts);
           await runtime.disconnect().catch(() => undefined);
         }
         const connected = hosts.find((host) => host.hostId === hostId);
+        const listedEarlyHost = connected && connected.hostId === earlyHostId ? connected : null;
         setState((draft) => {
-          if (connected && draft.host?.hostId === connected.hostId) {
+          if (listedEarlyHost && draft.host?.hostId === listedEarlyHost.hostId) {
+            const appearance = draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY)
+              ? draft.host.appearance
+              : listedEarlyHost.appearance;
+            draft.host = { ...listedEarlyHost };
+            if (appearance !== undefined) draft.host.appearance = appearance;
+          } else if (connected && draft.host?.hostId === connected.hostId) {
             draft.host.name = connected.name;
             draft.host.logoKey = connected.logoKey;
             if (connected.appearance !== undefined && !draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY))
@@ -1097,6 +1126,10 @@ export function createWebWorkspace(
           draft.hostsError = null;
         });
         for (const left of leftHostIds) if (!hosts.some((host) => host.hostId === left)) leftHostIds.delete(left);
+        if (listedEarlyHost && cachedHost && listedEarlyHost.devicePublicKey !== cachedHost.devicePublicKey) {
+          await connectionPromise?.promise.catch(() => undefined);
+          if (!disposed && hostId === listedEarlyHost.hostId) await connect(listedEarlyHost);
+        }
         if (!hostId) {
           const savedHostId = readWebServerSelection(props.accountId);
           const initialHost =
@@ -1798,16 +1831,22 @@ export function createWebWorkspace(
     }
   }
   async function preloadRecent(ids: readonly string[], current: number) {
-    for (const id of ids.slice(0, PRELOADED_AGENTS)) {
-      if (disposed || current !== generation) return;
-      if (state.conversations[id]) continue;
-      setState((draft) => {
-        draft.conversations[id] ??= { page: null, draft: "", attachments: [], loading: false, trimmed: true };
-      });
-      try {
-        await load(id);
-      } catch {}
-    }
+    const pending = ids.slice(0, PRELOADED_AGENTS);
+    let next = 0;
+    const worker = async () => {
+      while (next < pending.length) {
+        if (disposed || current !== generation) return;
+        const id = pending[next++];
+        if (!id || state.conversations[id]) continue;
+        setState((draft) => {
+          draft.conversations[id] ??= { page: null, draft: "", attachments: [], loading: false, trimmed: true };
+        });
+        try {
+          await load(id);
+        } catch {}
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(PRELOAD_CONCURRENCY, pending.length) }, worker));
   }
   let readsLoad: { generation: number; promise: Promise<void> } | null = null;
   let pendingReads = false;

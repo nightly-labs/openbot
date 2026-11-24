@@ -10,6 +10,7 @@ export function createLibraryPictureLoader(options: {
 }) {
   const source = options.source;
   const refused = new Set<string>();
+  const pending = new Set<string>();
   let shown: IntersectionObserver | undefined;
   let added: MutationObserver | undefined;
   onCleanup(() => {
@@ -27,13 +28,18 @@ export function createLibraryPictureLoader(options: {
       file.previewKind !== "image" ||
       file.status !== "available" ||
       file.size > source.thumbnailLimit ||
-      refused.has(file.id)
+      refused.has(file.id) ||
+      pending.has(file.id)
     )
       return;
+    pending.add(file.id);
     const refuse = () => refused.add(file.id);
-    void source.load(file).then((loaded) => {
-      if (!loaded) refuse();
-    }, refuse);
+    void source
+      .load(file)
+      .then((loaded) => {
+        if (!loaded) refuse();
+      }, refuse)
+      .finally(() => pending.delete(file.id));
   }
 
   function attach(container: HTMLElement): void {
