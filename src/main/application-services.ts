@@ -2634,13 +2634,14 @@ export async function createApplicationServices({
     libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
   );
 
+  const runsAsServer = Boolean(hostedServer || serverModeEnvironment || localServerChild);
   const trackSystemCliVersionsOnly = createSystemCliTracker({
     runtimes: providerRuntimes,
     providerUse,
     agentProviders: () =>
       new Set(service.listAgents().map((agent) => (isKeyOnlyProvider(agent.provider) ? "pi" : agent.provider))),
     hosted: hostedServer !== null,
-    server: Boolean(hostedServer || serverModeEnvironment || localServerChild),
+    server: runsAsServer,
   });
   const trackSystemCliVersions = (status: AgentStatus): void => {
     trackSystemCliVersionsOnly(status);
@@ -2649,6 +2650,7 @@ export async function createApplicationServices({
   trackSystemCliVersions(service.getStatus());
   service.on("event", (event) => {
     if (event.type === "status") trackSystemCliVersions(event.status);
+    else if (event.type === "agents-changed" && runsAsServer) trackSystemCliVersionsOnly(service.getStatus());
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   if (diskRestoring()) {

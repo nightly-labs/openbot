@@ -456,7 +456,9 @@ complete Codex starts, and Settings > Providers offers the managed copy. A deskt
 the user to click Download. A server (hosted, server mode, or a local server child) has no window
 where a user sees that offer, so `createSystemCliTracker` in `src/main/system-cli-tracker.ts`
 downloads the managed copy once per process when an agent uses ChatGPT, the provider is on, the
-managed copy is not downloaded, and the user did not choose "Use installed version". An explicit
+managed copy is not downloaded, and the user did not choose "Use installed version". It checks
+again at each provider status and each change to the agent list, so a server's first ChatGPT agent
+starts the download without a restart. An explicit
 `OPENBOT_CODEX_PATH` is never `incomplete`. The download replaces the CLI as Download in Settings
 does. `scripts/server-incomplete-codex-e2e.ts` checks these cases.
 
