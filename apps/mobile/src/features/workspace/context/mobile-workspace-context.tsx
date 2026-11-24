@@ -1233,6 +1233,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       if (context.check && kept) {
         await compatibilityRead;
         if (!context.isCurrent()) return;
+        void queryClient.invalidateQueries({ queryKey: [...queryKeys.serverTasks(queryScope, serverId), "task"] });
         loadOpenChats(
           serverId,
           agentsRef.current
@@ -1291,6 +1292,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       }
       serverCapabilities.current.set(serverId, compatibility.capabilities);
       channelStore.configure(serverId, compatibility.capabilities);
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.serverTasks(queryScope, serverId), "task"] });
       if (compatibility.capabilities.includes(SIDEBAR_PINS_CAPABILITY))
         trackUntilSettled(
           serverLoads.current,
@@ -1377,6 +1379,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState,
       syncSidebarPins,
       loadOpenChats,
+      queryClient,
+      queryScope,
     ],
   );
 
