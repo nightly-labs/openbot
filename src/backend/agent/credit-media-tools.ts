@@ -23,7 +23,7 @@ import {
   type VideoGenerationInfo,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { Effect, Fiber, type Scope } from "effect";
 import { z } from "zod";
 import { imageSizeOfBytes } from "../image-size";
 import type { DynamicToolResult } from "../protocol";
@@ -94,7 +94,7 @@ export const CREDIT_MEDIA_TOOL_DEFINITIONS = [
   },
   {
     name: GENERATE_IMAGE_TOOL,
-    description: `Make one image from a prompt, or edit local pictures, and show it in this conversation. Use it when the user asks for a picture and you have no image generation tool of your own, when the user asks for OpenBot credits, or when the user names a model that your own tool cannot make. ${PAID_RULE} Do not repeat the image in your reply. With tool_call, openbot.list_media_models gives the models and prices.`,
+    description: `Make one image from a prompt, or edit local pictures, and show it in this conversation. Use it when the user asks for a picture and you have no image generation tool of your own, when the user asks for OpenBot credits, or when the user names a model that your own tool cannot make. ${PAID_RULE} Do not repeat the image in your reply. The result gives the saved file, to use in images or firstFrame of a later call. With tool_call, openbot.list_media_models gives the models and prices.`,
     shape: generateImageToolSchema.shape,
   },
   {
@@ -123,7 +123,7 @@ export interface CreditMediaToolCall {
     hold: { call: CreditsHoldCall; balance: number | null; wallet: CreditsHoldWallet },
   ) => Effect.Effect<CreditsHoldAnswer>;
   requesters: readonly string[];
-  show: (media: CreditMediaShown) => Effect.Effect<void, unknown>;
+  show: (media: CreditMediaShown) => Effect.Effect<string | null, unknown>;
 }
 
 export interface CreditAsksPerson {
@@ -148,6 +148,7 @@ export interface CreditMediaToolsOptions {
   muteAsks: (person: CreditAsksPerson | null) => Effect.Effect<void, unknown>;
   defaultModel: (kind: CreditMediaGenerationKind) => string | null;
   fitImage: ImageFitter | null;
+  scope: () => Scope.Scope;
 }
 
 interface Inputs {
@@ -356,7 +357,12 @@ function argumentsOf(prompt: string, choice: MediaApprovalChoice): JobArguments 
   };
 }
 
-function inputRoles(inputs: Inputs): { role: CreditMediaInputRole; path: string }[] {
+interface InputRole {
+  role: CreditMediaInputRole;
+  path: string;
+}
+
+function inputRoles(inputs: Inputs): InputRole[] {
   return [
     ...(inputs.first === null ? [] : [{ role: "first" as const, path: inputs.first }]),
     ...(inputs.last === null ? [] : [{ role: "last" as const, path: inputs.last }]),
@@ -452,6 +458,21 @@ export class CreditMediaTools {
         role && bytes ? { mimeType: attachmentMimeTypeForName(role.path), bytes: Effect.succeed(bytes) } : null,
       );
     };
+    const delivery = yield* this.#deliver(media, call, kind, planned, readInput, roles).pipe(
+      Effect.forkIn(this.#options.scope(), { startImmediately: true }),
+    );
+    return yield* Fiber.join(delivery);
+  });
+
+  #deliver = Effect.fn("CreditMediaTools.deliver")(function* (
+    this: CreditMediaTools,
+    media: CreditMediaWorkflows,
+    call: CreditMediaToolCall,
+    kind: CreditMediaGenerationKind,
+    planned: PlannedJob,
+    readInput: CreditMediaInputRead,
+    roles: readonly InputRole[],
+  ) {
     const made = yield* Effect.result(
       media.make(readInput, {
         jobId: randomUUID(),
@@ -493,13 +514,15 @@ export class CreditMediaTools {
       ),
     );
     if (shown._tag === "Failure") return failure(sourceText("error.agent.creditMediaNotSaved"));
-    if (kind === "image") return this.#imageResult(planned, credits, bytes, size);
+    const file = shown.success === null ? {} : { file: shown.success };
+    if (kind === "image") return this.#imageResult(planned, credits, bytes, size, file);
     return openBotToolResult({
       status: "shown",
       model: planned.model.id,
       credits,
       duration: planned.job.duration,
       resolution: planned.job.resolution,
+      ...file,
     });
   });
 
@@ -553,8 +576,9 @@ export class CreditMediaTools {
     credits: number,
     bytes: Uint8Array,
     size: { width: number; height: number } | null,
+    file: { file?: string },
   ): DynamicToolResult {
-    const summary = { status: "shown", model: planned.model.id, credits, ...(size ?? {}) };
+    const summary = { status: "shown", model: planned.model.id, credits, ...(size ?? {}), ...file };
     const fitted = this.#options.fitImage?.(bytes);
     if (!fitted || typeof fitted === "string") return openBotToolResult(summary);
     return {

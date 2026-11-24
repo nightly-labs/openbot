@@ -2113,6 +2113,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           return (kind === "image" ? setting?.imageModel : setting?.videoModel) ?? CREDIT_MEDIA_PREFERRED_MODELS[kind];
         },
         fitImage: options.fitImage ?? null,
+        scope: () => this.#scope,
       }),
       mcpServers: mcpServersFromGateway(
         this.#mcp,

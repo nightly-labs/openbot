@@ -2774,6 +2774,7 @@ export class OpenBotToolRouter {
     const attachment = yield* this.#mailbox
       .stageGeneratedBytes({ ...message.file, ownerAgentId: message.agentId, ownerThreadId: message.threadId })
       .pipe(toToolOperationFailed);
+    const savedPath = this.#mailbox.attachmentPath(attachment.id);
     const snapshot = this.#conversation.ensureSnapshot(message.agentId, message.threadId);
     snapshot.messages.push({
       id: message.messageId,
@@ -2804,6 +2805,7 @@ export class OpenBotToolRouter {
       throw error;
     }
     this.#conversation.publishConversation(snapshot);
+    return savedPath;
   });
 
   readonly #previewVisual = Effect.fn("OpenBotToolRouter.previewVisual")(function* (

@@ -7,7 +7,7 @@ import type {
 } from "@openbot/contracts/credit-media";
 import type { MediaApprovalChoice, MediaApprovalOffer } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect } from "effect";
+import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
 import { z } from "zod";
 import type { CreditsHoldAnswer, CreditsHoldCall, CreditsHoldWallet } from "../src/backend/agent/attention-registry";
 import {
@@ -94,6 +94,8 @@ const MODELS: CreditMediaModel[] = [
 ];
 
 const submits: { request: CreditMediaJobRequest; inputs: readonly CreditMediaUpload[] }[] = [];
+const runningJobs = new Map<string, boolean>();
+let heldJob: Deferred.Deferred<string> | null = null;
 let signedIn = true;
 let walletBalance = 100;
 const gateway: CreditMediaGateway = {
@@ -104,10 +106,16 @@ const gateway: CreditMediaGateway = {
     Effect.sync(() => {
       submits.push({ request, inputs });
       const video = MODELS.find((entry) => entry.id === request.model)?.kind === "video";
+      const held = heldJob;
+      heldJob = null;
+      if (held) {
+        runningJobs.set(request.jobId, false);
+        Deferred.doneUnsafe(held, Effect.succeed(request.jobId));
+      }
       return {
         jobId: request.jobId,
         model: request.model,
-        status: "completed" as const,
+        status: held ? ("processing" as const) : ("completed" as const),
         credits: 7,
         pollAfterSeconds: 0,
         outputs: [
@@ -116,7 +124,20 @@ const gateway: CreditMediaGateway = {
         failure: null,
       };
     }),
-  job: () => Effect.fail(new CreditMediaGatewayFailed({ message: "Not found.", status: 404, code: "not_found" })),
+  job: (jobId) => {
+    const finished = runningJobs.get(jobId);
+    if (finished === undefined)
+      return Effect.fail(new CreditMediaGatewayFailed({ message: "Not found.", status: 404, code: "not_found" }));
+    return Effect.succeed({
+      jobId,
+      model: "video-both",
+      status: finished ? ("completed" as const) : ("processing" as const),
+      credits: 7,
+      pollAfterSeconds: 0,
+      outputs: finished ? [{ index: 0, mimeType: "video/mp4", width: null, height: null, durationMs: null }] : [],
+      failure: null,
+    });
+  },
   output: (jobId) =>
     Effect.sync(() => {
       const request = submits.find((entry) => entry.request.jobId === jobId)?.request;
@@ -130,8 +151,10 @@ let agentsAllowed = true;
 let askWhenBlocked = true;
 const mutedMembers = new Set<string>();
 const mutes: (CreditAsksPerson | null)[] = [];
+const toolScope = Scope.makeUnsafe();
 const tools = new CreditMediaTools({
   media: () => workflows,
+  scope: () => toolScope,
   agentsAllowed: () => agentsAllowed,
   enableAgents: () =>
     Effect.sync(() => {
@@ -167,6 +190,7 @@ const workflows = new CreditMediaWorkflows({
 const ToolData = z.looseObject({
   status: z.string().optional(),
   error: z.string().optional(),
+  file: z.string().optional(),
   balance: z.number().nullable().optional(),
   askAboveCredits: z.number().optional(),
   defaultModels: z.object({ image: z.string().nullable(), video: z.string().nullable() }).optional(),
@@ -194,6 +218,10 @@ interface CallOutcome {
   reads: string[][];
   submitted: (typeof submits)[number] | undefined;
   creditsChanges: number;
+}
+
+function savedPath(media: CreditMediaShown) {
+  return `/saved/generated/${media.name}`;
 }
 
 async function call(
@@ -237,7 +265,11 @@ async function call(
           return options.hold?.(hold.wallet) ?? { action: "skip" as const };
         }),
       requesters: options.requesters ?? ["member-1"],
-      show: (media) => Effect.sync(() => void shown.push(media)),
+      show: (media) =>
+        Effect.sync(() => {
+          shown.push(media);
+          return savedPath(media);
+        }),
     }),
   );
   const first = result.contentItems[0];
@@ -309,6 +341,16 @@ async function flow() {
       image.result.contentItems[1]?.type === "inputImage",
     { shown: image.shown.map(({ bytes: _bytes, ...rest }) => rest), data: image.data },
   );
+  const reused = await call("generate_image", { prompt: "Make it blue", images: [image.data?.file ?? ""] });
+  check(
+    "the result gives the saved file, and the agent can pass it to a later call",
+    image.shown[0] !== undefined &&
+      image.data?.file === savedPath(image.shown[0]) &&
+      reused.result.success &&
+      reused.submitted?.request.model === "image-edit" &&
+      JSON.stringify(reused.reads) === JSON.stringify([[savedPath(image.shown[0])]]),
+    { shown: image.shown.map(({ bytes: _bytes, ...rest }) => rest), data: image.data },
+  );
 
   const edit = await call("generate_image", { prompt: "Make it blue", images: ["/tmp/a.png", "/tmp/b.jpg"] });
   check(
@@ -378,7 +420,8 @@ async function flow() {
       video.shown[0].mimeType === "video/mp4" &&
       video.shown[0].videoGeneration?.durationSeconds === 8 &&
       video.shown[0].videoGeneration.aspectRatio === "landscape" &&
-      video.data?.status === "shown",
+      video.data?.status === "shown" &&
+      video.data.file === savedPath(video.shown[0]),
     { request: video.submitted?.request, data: video.data },
   );
 
@@ -610,11 +653,40 @@ async function flow() {
   );
 }
 
+async function stoppedCall() {
+  const submitted = Deferred.makeUnsafe<string>();
+  const delivered = Deferred.makeUnsafe<CreditMediaShown>();
+  const before = submits.length;
+  heldJob = submitted;
+  const running = Effect.runFork(
+    tools.handle({
+      tool: "generate_video",
+      arguments: { prompt: "Slow waves", duration: 4 },
+      readInputs: (paths) => Effect.succeed(paths.map(() => PNG)),
+      approve: () => Effect.succeed({ accepted: true, choice: null }),
+      hold: () => Effect.succeed({ action: "skip" as const }),
+      requesters: ["member-1"],
+      show: (media) => Deferred.succeed(delivered, media).pipe(Effect.as(savedPath(media))),
+    }),
+  );
+  const jobId = await Effect.runPromise(Deferred.await(submitted));
+  const stopped = await Effect.runPromise(Fiber.interrupt(running).pipe(Effect.andThen(Fiber.await(running))));
+  runningJobs.set(jobId, true);
+  const shown = await Effect.runPromise(Deferred.await(delivered));
+  check(
+    "a stopped call keeps waiting for a paid job and shows the result in the chat",
+    Exit.hasInterrupts(stopped) && shown.itemType === "video_generation" && submits.length === before + 1,
+    { jobId, interrupted: Exit.hasInterrupts(stopped), shown: shown.name },
+  );
+}
+
 let passed = false;
 try {
   await flow();
+  await stoppedCall();
   passed = checks.every((item) => item.passed);
 } finally {
+  await Effect.runPromise(Scope.close(toolScope, Exit.void));
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify({ passed, checks }, null, 2)}\n`);
 }
