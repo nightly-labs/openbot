@@ -2,7 +2,7 @@ import { Button, Plus, TriangleAlert } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import { AppLogo, Done } from "./MarketplaceParts";
-import { customServerStatus, type MarketplaceApp, pluginNeedsMac } from "./marketplace-model";
+import { customServerStatus, type MarketplaceApp, pluginNeedsDesktopApp, pluginNeedsMac } from "./marketplace-model";
 import type { MarketplaceScope } from "./marketplace-view";
 
 export function useInstalls() {
@@ -78,6 +78,7 @@ export function AppAction(props: {
           props.app.kind === "x" ||
           (props.app.kind === "plugin" &&
             !pluginNeedsMac(model(), props.app.plugin) &&
+            !pluginNeedsDesktopApp(model(), props.app.plugin) &&
             (model().canConnectApps() || (!list() && checking())))
         }
       >

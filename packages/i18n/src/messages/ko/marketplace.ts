@@ -172,6 +172,7 @@ export const messages = {
   "marketplace.app.blocked.member":
     "{host}에서는 소유자나 관리자만 앱을 연결할 수 있습니다. 이들에게 {name} 연결을 요청하거나, 멤버도 앱을 연결할 수 있도록 {host}의 OpenBot 업데이트를 요청하세요.",
   "marketplace.app.blocked.mac": "{name}은(는) OpenBot을 실행하는 Mac에서만 작동합니다.",
+  "marketplace.app.blocked.desktopApp": "{name}은(는) OpenBot과 {name} 데스크톱 앱을 실행하는 컴퓨터에서만 작동합니다.",
   "marketplace.app.connectAgain": "다시 연결",
   "marketplace.app.automation.askOnInstall": "설치할 때 macOS에 접근 요청",
   "marketplace.app.automation.title": "Apple 앱 접근",
@@ -637,8 +638,6 @@ export const messages = {
   "marketplace.error.connectNoServer": "이 앱을 연결하려면 로컬 서버를 선택해 주세요.",
   "marketplace.error.installNoServer": "플러그인을 설치하려면 로컬 서버를 선택해 주세요.",
   "marketplace.error.installNoAgent": "이 플러그인의 스킬을 설치할 에이전트를 선택해 주세요.",
-  "marketplace.error.installLocalOnHost":
-    "이 에이전트를 실행하는 컴퓨터에 {name}을(를) 설치해 주세요. 앱이 그 컴퓨터에서 서버를 실행해요.",
   "marketplace.error.installOnHost":
     "이 에이전트를 실행하는 컴퓨터에 {name}을(를) 설치해 주세요. 앱에 브라우저 로그인이 필요해요.",
   "marketplace.error.appInvalid": "{name}을(를) 추가할 수 없어요: {reason}",

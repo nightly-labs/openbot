@@ -192,6 +192,8 @@ export const messages = {
   "marketplace.app.blocked.member":
     "{host} üzerinde yalnızca bir sahip veya yönetici uygulama bağlayabilir. Onlardan {name} uygulamasını bağlamalarını ya da üyelerin uygulama bağlayabilmesi için {host} üzerindeki OpenBot'u güncellemelerini isteyin.",
   "marketplace.app.blocked.mac": "{name} yalnızca OpenBot çalıştıran bir Mac'te çalışır.",
+  "marketplace.app.blocked.desktopApp":
+    "{name} yalnızca OpenBot ve {name} masaüstü uygulamasını çalıştıran bir bilgisayarda çalışır.",
   "marketplace.app.connectAgain": "Tekrar bağlan",
   "marketplace.app.automation.askOnInstall": "Yüklerken macOS'ten erişim iste",
   "marketplace.app.automation.title": "Apple uygulamalarına erişim",
@@ -702,8 +704,6 @@ export const messages = {
   "marketplace.error.connectNoServer": "Bu uygulamayı bağlamak için yerel bir sunucu seçin.",
   "marketplace.error.installNoServer": "Bir eklenti yüklemek için yerel bir sunucu seçin.",
   "marketplace.error.installNoAgent": "Bu eklentinin becerilerini yüklemek için bir ajan seçin.",
-  "marketplace.error.installLocalOnHost":
-    "{name} uygulamasını bu ajanları çalıştıran bilgisayara yükleyin: uygulaması sunucusunu o bilgisayarda çalıştırır.",
   "marketplace.error.installOnHost":
     "{name} uygulamasını bu ajanları çalıştıran bilgisayara yükleyin: uygulaması tarayıcıda oturum açmayı gerektirir.",
   "marketplace.error.appInvalid": "{name} eklenemiyor: {reason}",

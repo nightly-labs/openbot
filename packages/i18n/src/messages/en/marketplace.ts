@@ -194,6 +194,7 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.blocked.member":
     "Only an owner or admin of {host} can connect apps there. Ask one of them to connect {name}, or to update OpenBot on {host} so that members can connect apps.",
   "marketplace.app.blocked.mac": "{name} works only on a Mac that runs OpenBot.",
+  "marketplace.app.blocked.desktopApp": "{name} works only on a computer that runs OpenBot and the {name} desktop app.",
   "marketplace.app.connectAgain": "Connect again",
   "marketplace.app.automation.askOnInstall": "Ask macOS for access at install",
   "marketplace.app.automation.title": "Access to Apple apps",
@@ -687,8 +688,6 @@ export const messages = defineMessages("marketplace", {
   "marketplace.error.connectNoServer": "Select a local server to connect this app.",
   "marketplace.error.installNoServer": "Select a local server to install a plugin.",
   "marketplace.error.installNoAgent": "Choose an agent to install this plugin's skills.",
-  "marketplace.error.installLocalOnHost":
-    "Install {name} on the computer that runs these agents: its app runs its server on that computer.",
   "marketplace.error.installOnHost":
     "Install {name} on the computer that runs these agents: its app needs a browser sign-in.",
   "marketplace.error.appInvalid": "{name} cannot be added: {reason}",

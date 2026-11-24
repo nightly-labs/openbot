@@ -54,6 +54,7 @@ import {
   type MarketplaceAppStatus,
   type MarketplaceMacAutomation,
   pluginAppSetup,
+  pluginNeedsDesktopApp,
   pluginNeedsMac,
 } from "./marketplace-model";
 import { type MarketplaceScope, serverAddress } from "./marketplace-view";
@@ -371,9 +372,12 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
     const fields = mcpFlowFields(props.entry.server.auth?.find((flow) => flow.kind === "key"));
     return (fields.find((field) => !field.optional) ?? fields[0])?.label ?? "";
   };
+  const needsDesktopApp = () => pluginNeedsDesktopApp(model(), { apps: [props.entry] });
   const reason = () => {
     if (pluginNeedsMac(model(), { apps: [props.entry] }))
       return t("marketplace.app.blocked.mac", { name: props.entry.name });
+    if (needsDesktopApp() && !connection().held)
+      return t("marketplace.app.blocked.desktopApp", { name: props.entry.name });
     const blocked = connection().held ? undefined : model().appsBlocked?.();
     if (blocked?.reason === "update") return t("marketplace.app.blocked.update", { host: blocked.host });
     if (blocked?.reason === "member")
@@ -401,7 +405,7 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
     }
   };
   const action = (): AppTextKey | null => {
-    if (!connection().held || !model().canConnectApps()) return null;
+    if (!connection().held || !model().canConnectApps() || needsDesktopApp()) return null;
     switch (setup()) {
       case "account":
         return "provider.account.signInAgain";

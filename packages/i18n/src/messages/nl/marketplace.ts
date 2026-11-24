@@ -176,6 +176,8 @@ export const messages = {
   "marketplace.app.blocked.member":
     "Alleen een eigenaar of beheerder van {host} kan daar apps koppelen. Vraag een van hen om {name} te koppelen, of om OpenBot op {host} bij te werken zodat leden apps kunnen koppelen.",
   "marketplace.app.blocked.mac": "{name} werkt alleen op een Mac waarop OpenBot draait.",
+  "marketplace.app.blocked.desktopApp":
+    "{name} werkt alleen op een computer waarop OpenBot en de desktop-app van {name} draaien.",
   "marketplace.app.connectAgain": "Opnieuw koppelen",
   "marketplace.app.automation.askOnInstall": "Bij installatie macOS om toegang vragen",
   "marketplace.app.automation.title": "Toegang tot Apple-apps",
@@ -691,8 +693,6 @@ export const messages = {
   "marketplace.error.connectNoServer": "Kies een lokale server om deze app te koppelen.",
   "marketplace.error.installNoServer": "Kies een lokale server om een plug-in te installeren.",
   "marketplace.error.installNoAgent": "Kies een agent om de vaardigheden van deze plug-in te installeren.",
-  "marketplace.error.installLocalOnHost":
-    "Installeer {name} op de computer waarop deze agents draaien: de app ervan draait de server op die computer.",
   "marketplace.error.installOnHost":
     "Installeer {name} op de computer waarop deze agents draaien: de app ervan vereist inloggen in de browser.",
   "marketplace.error.appInvalid": "{name} kan niet worden toegevoegd: {reason}",

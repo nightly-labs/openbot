@@ -112,6 +112,18 @@ export function pluginNeedsMac(
   return model.macAppsUnavailable === true && plugin.apps.some((app) => (app.macAutomation?.length ?? 0) > 0);
 }
 
+function needsDesktopApp(app: MarketplacePluginApp): boolean {
+  const flows = app.server.auth ?? [];
+  return flows.length > 0 && flows.every((flow) => flow.kind === "local");
+}
+
+export function pluginNeedsDesktopApp(
+  model: Pick<MarketplaceModel, "appHostName">,
+  plugin: { apps: readonly MarketplacePluginApp[] },
+): boolean {
+  return model.appHostName !== undefined && plugin.apps.some(needsDesktopApp);
+}
+
 export function customServerStatus(
   app: Extract<MarketplaceApp, { kind: "custom" }>,
 ): "mcp.status.enabled" | "mcp.status.disabled" {

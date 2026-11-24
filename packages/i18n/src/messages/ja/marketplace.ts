@@ -180,6 +180,8 @@ export const messages = {
   "marketplace.app.blocked.member":
     "{host} でアプリを接続できるのはオーナーまたは管理者だけです。{name} の接続か、メンバーもアプリを接続できるよう {host} の OpenBot のアップデートを依頼してください。",
   "marketplace.app.blocked.mac": "{name} は OpenBot を実行している Mac でのみ動作します。",
+  "marketplace.app.blocked.desktopApp":
+    "{name} は OpenBot と {name} デスクトップアプリを実行しているコンピューターでのみ動作します。",
   "marketplace.app.connectAgain": "もう一度接続",
   "marketplace.app.automation.askOnInstall": "インストール時に macOS にアクセスを求める",
   "marketplace.app.automation.title": "Apple アプリへのアクセス",
@@ -694,8 +696,6 @@ export const messages = {
   "marketplace.error.connectNoServer": "このアプリを接続するローカルサーバーを選択してください。",
   "marketplace.error.installNoServer": "プラグインをインストールするローカルサーバーを選択してください。",
   "marketplace.error.installNoAgent": "このプラグインのスキルをインストールするエージェントを選んでください。",
-  "marketplace.error.installLocalOnHost":
-    "{name} は、これらのエージェントを実行するコンピューターにインストールしてください。そのアプリはそのコンピューター上でサーバーを実行します。",
   "marketplace.error.installOnHost":
     "{name} は、これらのエージェントを実行するコンピューターにインストールしてください。そのアプリはブラウザーでのサインインが必要です。",
   "marketplace.error.appInvalid": "{name} を追加できません: {reason}",

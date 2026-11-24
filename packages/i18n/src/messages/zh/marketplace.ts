@@ -172,6 +172,7 @@ export const messages = {
   "marketplace.app.blocked.member":
     "只有 {host} 的所有者或管理员可以在那里连接应用。请他们连接 {name}，或更新 {host} 上的 OpenBot，以便成员也能连接应用。",
   "marketplace.app.blocked.mac": "{name} 仅在运行 OpenBot 的 Mac 上可用。",
+  "marketplace.app.blocked.desktopApp": "{name} 仅在运行 OpenBot 和 {name} 桌面应用的电脑上可用。",
   "marketplace.app.connectAgain": "再次连接",
   "marketplace.app.automation.askOnInstall": "安装时向 macOS 请求访问权限",
   "marketplace.app.automation.title": "Apple 应用访问权限",
@@ -610,7 +611,6 @@ export const messages = {
   "marketplace.error.connectNoServer": "请选择一台本地服务器来连接该应用。",
   "marketplace.error.installNoServer": "请选择一台本地服务器来安装插件。",
   "marketplace.error.installNoAgent": "请选择要安装该插件技能的助手。",
-  "marketplace.error.installLocalOnHost": "请在运行这些助手的那台电脑上安装 {name}：它的应用在那台电脑上运行服务器。",
   "marketplace.error.installOnHost": "请在运行这些助手的那台电脑上安装 {name}：它的应用需要浏览器登录。",
   "marketplace.error.appInvalid": "无法添加 {name}：{reason}",
   "marketplace.error.appNotConnected": "无法连接 {name}：{reason}",

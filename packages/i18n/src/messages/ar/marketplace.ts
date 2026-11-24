@@ -210,6 +210,7 @@ export const messages = {
   "marketplace.app.blocked.member":
     "يمكن لمالك {host} أو لمشرف فيه فقط ربط التطبيقات هناك. اطلب من أحدهم ربط {name}، أو تحديث OpenBot على {host} ليتمكن الأعضاء من ربط التطبيقات.",
   "marketplace.app.blocked.mac": "يعمل {name} فقط على جهاز Mac يشغّل OpenBot.",
+  "marketplace.app.blocked.desktopApp": "يعمل {name} فقط على حاسوب يشغّل OpenBot وتطبيق {name} لسطح المكتب.",
   "marketplace.app.connectAgain": "الربط مرة أخرى",
   "marketplace.app.automation.askOnInstall": "طلب الوصول من macOS عند التثبيت",
   "marketplace.app.automation.title": "الوصول إلى تطبيقات Apple",
@@ -731,8 +732,6 @@ export const messages = {
   "marketplace.error.connectNoServer": "اختر خادمًا محليًا لربط هذا التطبيق.",
   "marketplace.error.installNoServer": "اختر خادمًا محليًا لتثبيت إضافة.",
   "marketplace.error.installNoAgent": "اختر وكيلًا لتثبيت مهارات هذه الإضافة.",
-  "marketplace.error.installLocalOnHost":
-    "ثبّت {name} على الحاسوب الذي يشغّل هؤلاء الوكلاء: يشغّل تطبيقه خادمه على ذلك الحاسوب.",
   "marketplace.error.installOnHost":
     "ثبّت {name} على الحاسوب الذي يشغّل هؤلاء الوكلاء: يحتاج تطبيقه إلى تسجيل الدخول في المتصفح.",
   "marketplace.error.appInvalid": "لا يمكن إضافة {name}: {reason}",

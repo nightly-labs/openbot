@@ -1363,7 +1363,7 @@ export function createMarketplaceController(
     if (!hostOnly) return true;
     const key =
       hostOnly.server.auth?.[0]?.kind === "local"
-        ? "marketplace.error.installLocalOnHost"
+        ? "marketplace.app.blocked.desktopApp"
         : "marketplace.error.installOnHost";
     setError(t(key, { name: plugin.name }));
     return false;
