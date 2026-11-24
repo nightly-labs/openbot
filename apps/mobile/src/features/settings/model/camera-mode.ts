@@ -28,9 +28,13 @@ export async function loadFullScreenCameraPreference(): Promise<void> {
 
 export async function saveFullScreenCameraPreference(fullScreen: boolean): Promise<void> {
   if (!useFullScreenCameraPreference.getState().ready || useFullScreenCameraPreference.getState().saving) return;
+  const previous = useFullScreenCameraPreference.getState().fullScreen;
   useFullScreenCameraPreference.setState({ fullScreen, saving: true });
   try {
     await SecureStore.setItemAsync(key, String(fullScreen));
+  } catch (error) {
+    useFullScreenCameraPreference.setState({ fullScreen: previous });
+    throw error;
   } finally {
     useFullScreenCameraPreference.setState({ saving: false });
   }

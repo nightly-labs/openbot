@@ -170,6 +170,7 @@ export function ChatAttachmentPanel({
   const busyRef = useRef(false);
   const reduceMotion = useReducedMotion();
   const [glassLit, setGlassLit] = useState(true);
+  const [cameraFailed, setCameraFailed] = useState(false);
   const captured = useRef<string | null>(null);
   const morph = useSharedValue(0);
   const cameraWidth = Math.min(440, safeWidth - BAR_INSET * 2);
@@ -430,14 +431,19 @@ export function ChatAttachmentPanel({
                   busyRef.current = busy;
                 }}
                 onCancel={showOptions}
+                onFailedChange={setCameraFailed}
                 onCaptured={(uri) => {
                   captured.current = uri;
                   dismiss();
                 }}
               />
             ) : null}
-            {mode === "camera" && !closing && appActive ? (
-              <FullScreenCameraTip outerRadius={SURFACE_RADIUS} onUseFullScreen={() => choose(attachments.takePhoto)} />
+            {mode === "camera" && !closing && appActive && !cameraFailed ? (
+              <FullScreenCameraTip
+                outerRadius={SURFACE_RADIUS}
+                canSwitch={() => !busyRef.current && !closingRef.current}
+                onUseFullScreen={() => choose(attachments.takePhoto)}
+              />
             ) : null}
           </Animated.View>
         </Animated.View>

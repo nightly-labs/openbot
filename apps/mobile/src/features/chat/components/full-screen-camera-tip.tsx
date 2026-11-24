@@ -20,9 +20,11 @@ const EXITING = FadeOut.duration(160).reduceMotion(ReduceMotion.System);
 
 export function FullScreenCameraTip({
   outerRadius,
+  canSwitch,
   onUseFullScreen,
 }: {
   outerRadius: number;
+  canSwitch: () => boolean;
   onUseFullScreen: () => void;
 }) {
   const { t } = useText();
@@ -33,7 +35,7 @@ export function FullScreenCameraTip({
   const radius = outerRadius - TIP_INSET;
 
   async function switchToFullScreen() {
-    if (pending) return;
+    if (pending || !canSwitch()) return;
     setPending(true);
     setFailed(false);
     const saved = await saveFullScreenCameraPreference(true).then(
@@ -42,14 +44,13 @@ export function FullScreenCameraTip({
     );
     setPending(false);
     if (!saved) {
-      useFullScreenCameraPreference.setState({ fullScreen: false });
       void haptics.notification("error");
       setFailed(true);
       return;
     }
     void markFullScreenCameraTipSeen().catch(() => undefined);
     void haptics.notification("success");
-    onUseFullScreen();
+    if (canSwitch()) onUseFullScreen();
   }
 
   if (!visible) return null;
