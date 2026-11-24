@@ -4,7 +4,8 @@ import { Button } from "@openbot/ui";
 import { AccountLogin } from "@openbot/ui/features/account/AccountLogin";
 import { useText } from "@openbot/ui/text";
 import { createSignal, Show } from "solid-js";
-import { SignInIssue, signInWithWeb } from "./account";
+import { SignInIssue, signInOutcome, signInWithWeb } from "./account";
+import { track } from "./analytics";
 import type { ExtensionSession } from "./extension-storage";
 
 const PRODUCT_NAME = "OpenBot";
@@ -32,6 +33,7 @@ export function SignInScreen(props: SignInScreenProps) {
     try {
       await props.onSignedIn(await signInWithWeb());
     } catch (error) {
+      void track("account_sign_in_completed", { method: "web", ...signInOutcome(error) });
       setIssue(
         error instanceof SignInIssue
           ? sourceText(error.issue.message)

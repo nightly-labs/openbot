@@ -140,6 +140,7 @@
         "@openbot/contracts": "workspace:*",
         "@openbot/i18n": "workspace:*",
         "@openbot/team-client": "workspace:*",
+        "@openbot/telemetry": "workspace:*",
         "@openbot/ui": "workspace:*",
         "@solidjs/signals": "catalog:",
         "@solidjs/web": "catalog:",

@@ -16,12 +16,12 @@ of activated accounts that return for another successful turn within one and fou
 
 Every event has these low-cardinality properties:
 
-- `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `account_api`, or `signal`;
+- `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `extension`, `account_api`, or `signal`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `13` on `desktop`,
-  `21` on `desktop_host`, `10` on `landing`, `18` on `account_api`, `5` on `mobile`, `2` on `web`, and `2` on
+  `21` on `desktop_host`, `10` on `landing`, `18` on `account_api`, `5` on `mobile`, `2` on `web`, `1` on `extension`, and `2` on
   `signal`;
-- `app_version` and `platform` on desktop surfaces;
+- `app_version` and `platform` on desktop surfaces, and on `extension` (`platform: chrome`);
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
 - `source_platform` on landing surfaces: an allowlisted platform name, or `unknown`.
 
@@ -128,6 +128,19 @@ and `platform: web`, through the same allowlists. It sends only from a productio
 the failure reports. It is on by default, is stored in the browser, and a storage failure turns it
 off. Turning analytics off on any surface first sends one `analytics_preference_changed` event.
 
+From extension generation 1, the Chrome extension (`apps/browser-extension`) sends its own events
+(below) with `surface: extension` and `platform: chrome`, from its side panel and its background
+service worker. It sends only from a production build that uses `https://api.openbot.run`; a
+development build sends nothing, or sends to the loopback `OPENBOT_ANALYTICS_CAPTURE_URL` given at
+build time. The extension's **Link analytics to my account** switch (server menu > **Settings**) decides the
+`profileId`: on, the account ID (with an `identify` that sets the email); off or signed out, a random
+install ID kept in the extension's storage, rotated after 395 days. An account answer of off always
+wins. Else a choice made in the extension by the same account wins; with none, the extension follows
+the account's answer, and with no answer, the same region default as the web app. The panel reads the
+account's answer again each time it opens. The choice also goes to the account (`PUT /v1/me/analytics`). There is no
+queue: an event that fails to send is dropped. Each extension event and property is allowlisted in
+`apps/browser-extension/src/analytics.ts`.
+
 ## Event catalogue
 
 | Event | Product question | Success definition |
@@ -196,7 +209,7 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 | `notification_settings_action` | Do mobile users keep notifications on? | Mobile. `action`: `enabled`, `disabled`, `preview_toggled`, `thread_replies_toggled`, `live_activities_toggled` (with `enabled`), or `permission_prompted` with `permission` `granted`, `denied` or `undetermined`, sent only when the system prompt shows |
 | `live_activity_action` | Are iPhone Live Activities used? | Mobile. `action` is `started` or `ended`. A Live Activity left from an earlier launch that the app ends also sends `ended` |
 | `usage_viewed` | Is the Usage view used? | Desktop and mobile. `scope` is `agent` or `server`. Desktop adds `range` (`7d`, `30d`, `90d`, `1y`) and `filtered` (an agent filter that the user selected); each change of these sends again |
-| `analytics_preference_changed` | How many users turn product analytics off? | Desktop, web and mobile. `enabled: false`, sent once before tracking stops. Turning analytics on sends nothing |
+| `analytics_preference_changed` | How many users turn product analytics off? | Desktop, web, mobile and extension. `enabled: false`, sent once before tracking stops. Turning analytics on sends nothing |
 | `screen_view` | Which public website routes and articles are viewed in a session? | One safe view for `/`, `/join`, `/contact`, `/teams`, `/pricing`, `/download`, a `/download/<os>` page, a collection index, or a published article path, with allowlisted campaign tags and no hash |
 | `landing_viewed` | How much qualified landing traffic arrives? | Non-automation production page view |
 | `landing_download_clicked` | Which safe channel/placement drives downloads? | Allowlisted download link clicked |
@@ -217,6 +230,17 @@ off. Turning analytics off on any surface first sends one `analytics_preference_
 | `email_sent` | How much of the hourly quota of the SMTP mailbox (500 messages) does the account service use? | One event for each message that the account service tries to send by SMTP through the SMTP mailbox (`no_reply@openbot.run`; `hello@openbot.run` before the change to a no-reply sender), after its retries. The webhook delivery does not use the mailbox and sends none. `kind`: `sign_in_code`, `team_invite`, `contact`, `welcome` (the welcome email of the first server plan of an account), or, from account service generation 13, `license` (a license email, with replies to `licenses@openbot.run`: the first payment, a failed renewal payment, or the end of a license). `result`: `accepted`; `rate_limited` (the mail server refused it for its sender limit); `unknown` (the send stopped after the server may have taken the message); or `failed` (also a message that a check stopped before the connection). Count `accepted` and `unknown` against the quota. No `profileId`, address, name or content |
 | `email_fallback_sent` | How often does Cloudflare Email Service send because the SMTP mailbox could not? | From account service generation 14. One event for each message that the account service sends through Cloudflare after its `email_sent` ended `rate_limited` or `failed` for a reason that any sender would not also refuse. It does not send after an `unknown` SMTP result, because the recipient can already have the message. `kind` as on `email_sent`. `result`: `accepted`; `unknown` (no answer before the deadline); or `failed`. These messages do not count against the mailbox quota. No `profileId`, address, name or content |
 | `signal_capacity` | How near is the TURN relay to its allocation quota (`total-quota` in `remote/coturn/turnserver.conf`)? | One event every 5 minutes from each Signal host. `turn_host` (`turn.openbot.run`, `turn2.openbot.run` on the second Signal machine, `turn-us.openbot.run` in San Jose or `turn-au.openbot.run` in Sydney); `turn_allocations`, and `turn_allocations_udp`, `_tcp` and `_tls` for the client transports (0 when a transport has none); `signal_sockets` and `signal_peer_connections`. From generation 2, the generic webhook answers of the 5 minutes before: `webhook_answers_<status>` for `200`, `202`, `400`, `401`, `404`, `413`, `415`, `429` and `503`, `webhook_waits` (requests that Signal sent to a host and waited for), `webhook_slow_waits` (waits of 5 s or more) and `webhook_wait_ms_avg` (only when there was a wait). The first sample after the reporter starts sends no webhook values; a Signal restart starts the counts again. From generation 3, `network_in_bytes` and `network_out_bytes`: the public traffic of the machine since the last sent event, from the kernel counters of the interface of the default route. They are not in the first event after the reporter starts, and a sample that is not sent adds its traffic to the next one. Add them up for the traffic of a day or a month |
+| `extension_installed` | How many browsers install or update the extension? | Extension. `reason`: `install` or `update`; an update adds `from_version` |
+| `extension_opened` | How often is the side panel opened, and by signed-in users? | Extension. Once each time the side panel opens and has read its session. `signed_in` |
+| `account_sign_in_completed` (extension) | Does extension sign-in work? | Extension. `method`: `web` (through openbot.run) or `email`; `result`: `succeeded`, `failed` or `cancelled`; `failure_code`: `invalid_sign_in_code`, `invalid_company_sign_in_code`, `company_sign_in_required`, `auth_api_unavailable` or `unknown` |
+| `account_sign_out` (extension) | Why do extension sessions end? | Extension. `reason`: `user` or `session_ended` (the account service ended the session) |
+| `message_send` (extension) | Do users send messages from the side panel? | Extension. `target`: `chat`, `thread`, `new_thread` or `channel`; `result`: `succeeded` or `failed`. No text, agent or channel |
+| `voice_transcription` (extension) | Does dictation in the side panel work? | Extension. `result`, `audio_duration_seconds`, and `empty: true` when the server found no words |
+| `agent_action`, `channel_action`, `folder_action` (extension) | Do users make agents, channels and folders in the side panel? | Extension. `action`: `create` (agent) or `created` (channel, folder); `result`. No names |
+| `agent_input_action` (extension) | Do users answer agent questions in the side panel? | Extension. `kind: prompt`, `decision: answered`, `result` |
+| `x_reply_action` | Do X replies reach the X agent? | Extension. `action`: `queued` (the reply is in the outbox), `sent` (the server has it), `retry` (an attempt failed; `reached` says if it may have reached the server), `dropped` (too old to send) or `notification_opened`. `attempts` is the count of failed attempts before. No post, handle or address |
+| `browser_sharing_action` | Do users remove the sites that they allowed? | Extension. `action`: `site_removed` (an "Always" site removed in the panel). No site |
+| `browser_sharing_ask` | How do users answer the shared-tab questions? | Extension. `kind`: `site`, `password`, `payment`, `download` or `sign-in`; `choice`: `once`, `always`, `deny` or `timeout`. No site, agent or action detail |
 
 ## Privacy and runtime validation
 

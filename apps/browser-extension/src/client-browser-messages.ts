@@ -1,4 +1,4 @@
-import { isBoolean, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import {
   type ClientBrowserCommand,
   type ClientBrowserCommandEvent,
@@ -8,7 +8,6 @@ import {
 export const BROWSER_RUN_MESSAGE = "openbot-browser-run";
 export const BROWSER_PRESENCE_MESSAGE = "openbot-browser-presence";
 export const BROWSER_CHANGED_MESSAGE = "openbot-browser-changed";
-export const BROWSER_SHARE_MESSAGE = "openbot-browser-share";
 export const BROWSER_ANSWER_MESSAGE = "openbot-browser-answer";
 export const BROWSER_HOLD_MESSAGE = "openbot-browser-hold";
 
@@ -19,9 +18,9 @@ export const PRESENCE_KEY = "openbot.client-browser.presence.v1";
 
 export const OPENBOT_GROUP_TITLE = "OpenBot";
 
-const ASK_KINDS = ["site", "password", "payment", "download", "sign-in"] as const;
+export const ASK_KINDS = ["site", "password", "payment", "download", "sign-in"] as const;
 export type AskKind = (typeof ASK_KINDS)[number];
-const ASK_CHOICES = ["once", "always", "deny"] as const;
+export const ASK_CHOICES = ["once", "always", "deny"] as const;
 export type AskChoice = (typeof ASK_CHOICES)[number];
 const ACTIONS = [
   "open",
@@ -89,11 +88,6 @@ export function decodeSites(value: unknown): string[] {
 export function decodeAnswer(value: unknown): { id: string; choice: AskChoice } | null {
   if (!isDynamicRecord(value) || value.kind !== BROWSER_ANSWER_MESSAGE || !isString(value.id)) return null;
   return isOneOf(ASK_CHOICES, value.choice) ? { id: value.id, choice: value.choice } : null;
-}
-
-export function decodeShare(value: unknown): { on: boolean } | null {
-  if (!isDynamicRecord(value) || value.kind !== BROWSER_SHARE_MESSAGE || !isBoolean(value.on)) return null;
-  return { on: value.on };
 }
 
 export interface PresenceAck {

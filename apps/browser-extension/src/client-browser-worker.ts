@@ -7,14 +7,8 @@ import {
   type ClientBrowserPresence,
   type ClientTab,
 } from "@openbot/contracts/team-protocol/client-browser-v1";
-import {
-  BrowserCommandError,
-  clientTab,
-  detachAll,
-  installExecutor,
-  isWebUrl,
-  runCommand,
-} from "./client-browser-executor";
+import { track } from "./analytics";
+import { BrowserCommandError, clientTab, installExecutor, isWebUrl, runCommand } from "./client-browser-executor";
 import {
   ASKS_KEY,
   type AskChoice,
@@ -29,7 +23,6 @@ import {
   decodeAnswer,
   decodeAsks,
   decodeRunRequest,
-  decodeShare,
   decodeSites,
   OPENBOT_GROUP_TITLE,
   SHARING_KEY,
@@ -71,7 +64,6 @@ interface Options {
 }
 
 export interface ClientBrowserWorker {
-  sharing: () => Promise<boolean>;
   panelClosed: () => void;
 }
 
@@ -79,11 +71,9 @@ function fromExtensionPage(sender: chrome.runtime.MessageSender): boolean {
   return Boolean(sender.url?.startsWith(chrome.runtime.getURL("")));
 }
 
-async function readSharing(): Promise<{ groupId: number | null } | null> {
+async function savedGroupId(): Promise<number | null> {
   const value = (await chrome.storage.local.get(SHARING_KEY))[SHARING_KEY];
-  if (!isDynamicRecord(value)) return { groupId: null };
-  if (value.off === true) return null;
-  return { groupId: isNumber(value.groupId) ? value.groupId : null };
+  return isDynamicRecord(value) && isNumber(value.groupId) ? value.groupId : null;
 }
 
 async function findGroup(saved: number | null): Promise<number | null> {
@@ -95,15 +85,13 @@ async function findGroup(saved: number | null): Promise<number | null> {
 }
 
 async function sharedGroupId(): Promise<number | null> {
-  const sharing = await readSharing();
-  if (!sharing) return null;
-  const groupId = await findGroup(sharing.groupId);
-  if (groupId !== sharing.groupId) await chrome.storage.local.set({ [SHARING_KEY]: { groupId } });
+  const saved = await savedGroupId();
+  const groupId = await findGroup(saved);
+  if (groupId !== saved) await chrome.storage.local.set({ [SHARING_KEY]: { groupId } });
   return groupId;
 }
 
 async function presence(): Promise<ClientBrowserPresence> {
-  if (!(await readSharing())) return { sharing: false, tabs: [] };
   const [current] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const rank = (tab: chrome.tabs.Tab) => (tab.id === current?.id ? Number.MAX_SAFE_INTEGER : (tab.lastAccessed ?? 0));
   const tabs = (await chrome.tabs.query({})).filter((tab) => isWebUrl(tab.url));
@@ -117,7 +105,6 @@ async function presence(): Promise<ClientBrowserPresence> {
 }
 
 async function addToGroup(tabId: number): Promise<number | null> {
-  if (!(await readSharing())) return null;
   const tab = await chrome.tabs.get(tabId);
   if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return null;
   const [inWindow] = await chrome.tabGroups.query({ title: OPENBOT_GROUP_TITLE, windowId: tab.windowId });
@@ -144,7 +131,7 @@ async function writeAsks(asks: BrowserAsk[]): Promise<void> {
 
 export function startClientBrowser(options: Options): ClientBrowserWorker {
   installExecutor();
-  const waiting = new Map<string, (choice: AskChoice | "timeout" | "stopped") => void>();
+  const waiting = new Map<string, (choice: AskChoice | "timeout") => void>();
   let queue: Promise<unknown> = Promise.resolve();
   let changeTimer: ReturnType<typeof setTimeout> | undefined;
   const downloadGuards = new Map<string, DownloadGuard>();
@@ -160,7 +147,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
   }
 
   async function hold(): Promise<void> {
-    if (options.panelOpen() || !(await readSharing())) return;
+    if (options.panelOpen()) return;
     await options.ensureOffscreen();
     await chrome.runtime.sendMessage({ kind: BROWSER_HOLD_MESSAGE }).catch(() => undefined);
   }
@@ -175,24 +162,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     }, CHANGE_DELAY_MS);
   }
 
-  async function startSharing(): Promise<void> {
-    await chrome.storage.local.set({ [SHARING_KEY]: { groupId: await findGroup(null) } });
-  }
-
-  async function stopSharing(): Promise<void> {
-    const groupId = await sharedGroupId();
-    await chrome.storage.local.set({ [SHARING_KEY]: { off: true } });
-    downloadGuards.clear();
-    for (const finish of [...waiting.values()]) finish("stopped");
-    await detachAll();
-    const groups = await chrome.tabGroups.query({ title: OPENBOT_GROUP_TITLE });
-    const groupIds = new Set([...groups.map((group) => group.id), ...(groupId === null ? [] : [groupId])]);
-    for (const id of groupIds) {
-      const ids = (await chrome.tabs.query({ groupId: id })).flatMap((tab) => (tab.id === undefined ? [] : [tab.id]));
-      if (ids.length) await chrome.tabs.ungroup(ids).catch(() => undefined);
-    }
-  }
-
   async function notify(ask: BrowserAsk, labels: AskLabels): Promise<void> {
     await chrome.notifications
       .create(`${ASK_NOTIFICATION}${ask.id}`, {
@@ -204,14 +173,14 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       .catch(() => undefined);
   }
 
-  function ask(entry: BrowserAsk, labels: AskLabels, waitMs: number): Promise<AskChoice | "timeout" | "stopped"> {
+  function ask(entry: BrowserAsk, labels: AskLabels, waitMs: number): Promise<AskChoice | "timeout"> {
     return new Promise((resolve) => {
       const keepAlive = setInterval(
         () => void chrome.storage.local.get(ASKS_KEY).catch(() => undefined),
         KEEP_ALIVE_MS,
       );
       const timer = setTimeout(() => finish("timeout"), waitMs);
-      function finish(choice: AskChoice | "timeout" | "stopped") {
+      function finish(choice: AskChoice | "timeout") {
         if (!waiting.delete(entry.id)) return;
         clearInterval(keepAlive);
         clearTimeout(timer);
@@ -255,9 +224,9 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       labels,
       Math.min(ASK_WAIT_MS, deadline - Date.now()),
     );
+    void track("browser_sharing_ask", { kind, choice });
     if ((choice === "once" || choice === "always") && Date.now() >= deadline)
       throw new BrowserCommandError("timeout", LATE);
-    if (choice === "stopped") throw new BrowserCommandError("not-shared", "The person stopped sharing tabs.");
     if (choice === "timeout")
       throw new BrowserCommandError("timeout", "The person did not answer in time. Ask the person in the chat first.");
     if (choice === "deny") throw new BrowserCommandError("denied", "The person denied it.");
@@ -311,7 +280,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       code,
       error: error.slice(0, CLIENT_BROWSER_LIMITS.error),
     });
-    if (!(await readSharing())) return fail("not-shared", "The person does not share Chrome tabs now.");
     try {
       const result = await runCommand(event.command, {
         groupId: await sharedGroupId(),
@@ -352,16 +320,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
         (value) => sendResponse({ sharing: value.sharing, tabs: value.tabs.map((tab: ClientTab) => ({ ...tab })) }),
         () => sendResponse({ sharing: false, tabs: [] }),
       );
-      return true;
-    }
-    const share = decodeShare(message);
-    if (share) {
-      void (share.on ? startSharing() : stopSharing())
-        .catch(() => undefined)
-        .finally(() => {
-          changed();
-          sendResponse({});
-        });
       return true;
     }
     const answer = message.kind === BROWSER_ANSWER_MESSAGE ? decodeAnswer(message) : null;
@@ -411,7 +369,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
   setTimeout(() => void hold().catch(() => undefined), 2_000);
 
   return {
-    sharing: async () => (await readSharing()) !== null,
     panelClosed: () => {
       setTimeout(() => void hold().catch(() => undefined), 1_000);
     },
