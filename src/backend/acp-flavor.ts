@@ -148,6 +148,7 @@ export interface AcpFlavor {
   retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   turnStallMs?: number;
+  openToolStallMs?: number;
   subagentTools?: readonly string[];
   mcpServersPerDirectory?: true;
   mcpServersLoadWithSession?: true;
