@@ -1498,6 +1498,7 @@ export class TurnLifecycle {
                 noAnswer
               ? "failed"
               : reported;
+        if (status !== "failed") this.#dropCapacityHandOff(turnId);
         if (status === "failed" && !this.#turnErrors.has(turnId)) {
           this.#hooks.emitFailure?.({
             code: "agent_error",
@@ -1839,6 +1840,7 @@ export class TurnLifecycle {
     capacityMessage: string | null,
   ): void {
     if (!agentId || !threadId || !turnId || !this.#runningTurns.has(turnId)) return;
+    if (this.#failoverTurns.get(turnId)?.movesToBackup) return;
     const atCapacity = capacityMessage !== null;
     const attempts = (this.#turnRetries.get(turnId) ?? 0) + 1;
     this.#turnRetries.set(turnId, attempts);
@@ -1910,8 +1912,30 @@ export class TurnLifecycle {
       movesToBackup: true,
     });
     Effect.runFork(
-      running.client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore),
+      running.client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            if (!this.#dropCapacityHandOff(turnId) || !this.#runningTurns.has(turnId)) return;
+            logger.warn("OpenBot could not stop a turn at capacity, so the provider tries again.", { provider, error });
+            this.#hooks.emitError("agent_warning", sourceText("error.backend.providerModelAtCapacity"), agentId, {
+              provider,
+              model,
+              turnId,
+              severity: "warning",
+              causeCode: CAPACITY_CAUSE,
+            });
+          }),
+        ),
+      ),
     );
+    return true;
+  }
+
+  #dropCapacityHandOff(turnId: string): boolean {
+    if (!this.#failoverTurns.get(turnId)?.movesToBackup) return false;
+    this.#failoverTurns.delete(turnId);
+    this.#turnErrors.delete(turnId);
+    this.#turnCauses.delete(turnId);
     return true;
   }
 
