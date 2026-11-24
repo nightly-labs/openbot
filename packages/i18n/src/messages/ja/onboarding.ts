@@ -51,6 +51,7 @@ export const messages = {
   "onboarding.provider.inceptionKey": "Inception API キーで Mercury モデル",
   "onboarding.provider.deepseekKey": "DeepSeek API キーで使う DeepSeek モデル",
   "onboarding.provider.openrouterKey": "OpenRouter API キーで使う多数のモデル",
+  "onboarding.provider.bf16Key": "bf16.ai API キーで使う検閲なしオープンウェイトモデル",
   "onboarding.provider.tryFree": "無料で試す",
   "onboarding.provider.noSignIn": "サインイン不要",
   "onboarding.provider.more": "その他のプロバイダー",

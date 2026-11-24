@@ -400,6 +400,10 @@
   --openbot-provider-current: var(--openbot-text-primary);
 }
 
+[data-provider="bf16"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
 [data-provider="acp"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

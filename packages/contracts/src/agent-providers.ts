@@ -17,6 +17,7 @@ export const AGENT_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "bf16",
   "hermes",
   "acp",
   "kimi",
@@ -462,6 +463,29 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     approvalsInFullAccess: true,
     foldersInFullAccess: false,
   },
+  bf16: {
+    id: "bf16",
+    displayName: "bf16.ai",
+    cliName: "Pi CLI",
+    onboardingDescription: "Uncensored open-weight models with a bf16.ai API key",
+    signInMessage: "Add a bf16.ai API key to continue.",
+    installGuideLink: null,
+    defaultModel: "deepseek/deepseek-v4.1-flash-uncensored",
+    legacyModelPrefix: null,
+    authKind: "bf16",
+    pickerOrder: 17,
+    localCodeSignIn: null,
+    signInPageEnd: "callback",
+    skillFolders: [".agents/skills"],
+    homeSkills: "native",
+    workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
+    workspaceEnforcement: "confined-process",
+    steer: "native",
+    concurrentTurns: true,
+    reportsUsage: false,
+    approvalsInFullAccess: true,
+    foldersInFullAccess: false,
+  },
   hermes: {
     id: "hermes",
     displayName: "Hermes",
@@ -587,6 +611,7 @@ export const LOCAL_ONLY_PROVIDERS = [
   "inception",
   "deepseek",
   "openrouter",
+  "bf16",
   "hermes",
   "acp",
 ] as const satisfies readonly AgentProviderId[];
@@ -595,7 +620,12 @@ export function isLocalOnlyProvider(provider: AgentProviderId): boolean {
   return isOneOf(LOCAL_ONLY_PROVIDERS, provider);
 }
 
-export const KEY_ONLY_PROVIDERS = ["inception", "deepseek", "openrouter"] as const satisfies readonly AgentProviderId[];
+export const KEY_ONLY_PROVIDERS = [
+  "inception",
+  "deepseek",
+  "openrouter",
+  "bf16",
+] as const satisfies readonly AgentProviderId[];
 export type KeyOnlyProviderId = (typeof KEY_ONLY_PROVIDERS)[number];
 
 export function isKeyOnlyProvider(provider: AgentProviderRef): provider is KeyOnlyProviderId {

@@ -208,6 +208,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "OpenRouter modellerini kullanmak için ana makineye bir OpenRouter API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
   "provider.openrouterKey.label": "OpenRouter API anahtarı",
+  "provider.bf16Key.title": "bf16.ai API anahtarı",
+  "provider.bf16Key.description":
+    "bf16.ai modellerini kullanmak için bu bilgisayara bir bf16.ai API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.bf16Key.descriptionHost":
+    "bf16.ai modellerini kullanmak için ana makineye bir bf16.ai API anahtarı kaydedin. OpenBot bunları indirdiği Pi CLI'da çalıştırır.",
+  "provider.bf16Key.label": "bf16.ai API anahtarı",
   "provider.openCodeKey.title": "OpenCode Go'da oturum açın",
   "provider.openCodeKey.description":
     "Ücretsiz modeller hesap gerektirmez. Bir anahtar, ücretli Go modellerinin kilidini açar.",

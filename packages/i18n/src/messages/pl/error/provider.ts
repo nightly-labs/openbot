@@ -621,6 +621,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "Dodaj klucz API Inception, aby kontynuować.",
   "error.provider.deepseekSignIn": "Dodaj klucz API DeepSeek, aby kontynuować.",
   "error.provider.openrouterSignIn": "Dodaj klucz API OpenRouter, aby kontynuować.",
+  "error.provider.bf16SignIn": "Dodaj klucz API bf16.ai, aby kontynuować.",
   "error.provider.terminalLoginFailed":
     "Nie można otworzyć terminala logowania. Otwórz CLI dostawcy na tym hoście, zaloguj się tam, a potem odśwież dostawców.",
   "error.provider.nativeArchiveInvalid": "Pobrany plik dostawcy nie zawiera prawidłowej instalacji.",

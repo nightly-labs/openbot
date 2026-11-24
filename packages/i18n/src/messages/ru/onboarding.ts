@@ -51,6 +51,7 @@ export const messages = {
   "onboarding.provider.inceptionKey": "Модели Mercury с ключом API Inception",
   "onboarding.provider.deepseekKey": "Модели DeepSeek с ключом API DeepSeek",
   "onboarding.provider.openrouterKey": "Множество моделей с ключом API OpenRouter",
+  "onboarding.provider.bf16Key": "Модели с открытыми весами без цензуры по ключу API bf16.ai",
   "onboarding.provider.tryFree": "Попробовать бесплатно",
   "onboarding.provider.noSignIn": "Вход не нужен",
   "onboarding.provider.more": "Другие провайдеры",

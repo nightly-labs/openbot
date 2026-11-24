@@ -201,6 +201,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "Sla een OpenRouter-API-sleutel op de host op om de modellen van OpenRouter te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
   "provider.openrouterKey.label": "OpenRouter-API-sleutel",
+  "provider.bf16Key.title": "bf16.ai-API-sleutel",
+  "provider.bf16Key.description":
+    "Sla een bf16.ai-API-sleutel op deze computer op om de modellen van bf16.ai te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.bf16Key.descriptionHost":
+    "Sla een bf16.ai-API-sleutel op de host op om de modellen van bf16.ai te gebruiken. OpenBot draait ze in de Pi CLI die het downloadt.",
+  "provider.bf16Key.label": "bf16.ai-API-sleutel",
   "provider.openCodeKey.title": "Inloggen bij OpenCode Go",
   "provider.openCodeKey.description":
     "Gratis modellen hebben geen account nodig. Een sleutel ontgrendelt de betaalde Go-modellen.",

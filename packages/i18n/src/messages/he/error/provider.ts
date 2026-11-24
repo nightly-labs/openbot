@@ -585,6 +585,7 @@ export const messages = {
   "error.provider.inceptionSignIn": "יש להוסיף מפתח API של Inception כדי להמשיך.",
   "error.provider.deepseekSignIn": "יש להוסיף מפתח API של DeepSeek כדי להמשיך.",
   "error.provider.openrouterSignIn": "יש להוסיף מפתח API של OpenRouter כדי להמשיך.",
+  "error.provider.bf16SignIn": "יש להוסיף מפתח API של bf16.ai כדי להמשיך.",
   "error.provider.terminalLoginFailed":
     "לא ניתן לפתוח את טרמינל ההתחברות. יש לפתוח את ה-CLI של הספק במארח הזה, להתחבר שם, ואז לרענן את הספקים.",
   "error.provider.nativeArchiveInvalid": "ההורדה של הספק אינה מכילה התקנה תקינה.",

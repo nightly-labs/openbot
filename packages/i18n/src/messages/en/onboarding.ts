@@ -48,6 +48,7 @@ export const messages = defineMessages("onboarding", {
   "onboarding.provider.inceptionKey": "Mercury models with an Inception API key",
   "onboarding.provider.deepseekKey": "DeepSeek models with a DeepSeek API key",
   "onboarding.provider.openrouterKey": "Many models with an OpenRouter API key",
+  "onboarding.provider.bf16Key": "Uncensored open-weight models with a bf16.ai API key",
   "onboarding.provider.tryFree": "Try it free",
   "onboarding.provider.noSignIn": "No sign-in needed",
   "onboarding.provider.more": "More providers",

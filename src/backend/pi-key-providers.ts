@@ -3,8 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { Effect } from "effect";
+import { BF16_MODELS } from "./bf16-models";
 import type { PiMcpExtension } from "./pi-mcp";
 import { providerCall } from "./provider-client-effects";
+
+const BF16_MODELS_VARIABLE = "OPENBOT_PI_BF16_MODELS";
 
 const readKey = (provider: KeyOnlyProviderId, variable: string) => `
   const slot = Symbol.for("openbot.pi.${provider}ApiKey");
@@ -84,6 +87,26 @@ const KEY_EXTENSIONS = {
 }
 `,
   },
+  // bf16.ai serves uncensored open-weight models through OpenAI chat completions at
+  // https://api.bf16.ai/v1. Pi has no built-in bf16 provider, so this registers one with
+  // the bundled catalog from bf16-models.ts.
+  bf16: {
+    variable: "OPENBOT_PI_BF16_API_KEY",
+    source: `import { readFileSync } from "node:fs";
+export default function (pi) {${readKey("bf16", "OPENBOT_PI_BF16_API_KEY")}
+  const modelSlot = Symbol.for("openbot.pi.bf16Models");
+  globalThis[modelSlot] ??= JSON.parse(readFileSync(process.env.${BF16_MODELS_VARIABLE}, "utf8"));
+  delete process.env.${BF16_MODELS_VARIABLE};
+  pi.registerProvider("bf16", {
+    baseUrl: "https://api.bf16.ai/v1",
+    api: "openai-completions",
+    apiKey,
+    headers: { Authorization: "Bearer " + literal },
+    models: globalThis[modelSlot],
+  });
+}
+`,
+  },
 } as const satisfies Record<KeyOnlyProviderId, { variable: string; source: string }>;
 
 export const createPiKeyExtension = Effect.fn("PiKeyProviders.createExtension")(function* (
@@ -96,12 +119,16 @@ export const createPiKeyExtension = Effect.fn("PiKeyProviders.createExtension")(
   yield* providerCall(() => mkdir(root, { recursive: true, mode: 0o700 }));
   const folder = yield* providerCall(() => mkdtemp(join(root, "openbot-pi-")));
   const path = join(folder, `${provider}.mjs`);
-  yield* providerCall(() => writeFile(path, source, { mode: 0o600 })).pipe(
-    Effect.onError(() => providerCall(() => rm(folder, { recursive: true, force: true })).pipe(Effect.orDie)),
-  );
+  const models = provider === "bf16" ? join(folder, "bf16-models.json") : null;
+  yield* providerCall(async () => {
+    await writeFile(path, source, { mode: 0o600 });
+    if (models) await writeFile(models, JSON.stringify(BF16_MODELS), { mode: 0o600 });
+  }).pipe(Effect.onError(() => providerCall(() => rm(folder, { recursive: true, force: true })).pipe(Effect.orDie)));
+  const environment: Record<string, string> = { [variable]: key };
+  if (models) environment[BF16_MODELS_VARIABLE] = models;
   return {
     path,
-    environment: { [variable]: key },
+    environment,
     secrets: [key],
     close: () => providerCall(() => rm(folder, { recursive: true, force: true })),
   } satisfies PiMcpExtension;

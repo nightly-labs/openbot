@@ -209,6 +209,12 @@ export const messages = {
   "provider.openrouterKey.descriptionHost":
     "OpenRouter のモデルを使うには、ホストに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.openrouterKey.label": "OpenRouter API キー",
+  "provider.bf16Key.title": "bf16.ai API キー",
+  "provider.bf16Key.description":
+    "bf16.ai のモデルを使うには、このコンピューターに bf16.ai API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.bf16Key.descriptionHost":
+    "bf16.ai のモデルを使うには、ホストに bf16.ai API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.bf16Key.label": "bf16.ai API キー",
 
   "provider.openCodeKey.title": "OpenCode Go にサインイン",
   "provider.openCodeKey.description": "無料モデルにアカウントは不要です。キーがあると有料の Go モデルを使えます。",

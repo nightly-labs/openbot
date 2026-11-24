@@ -1874,6 +1874,22 @@ Pi unchanged. The catalog drops the aliases that start with `~`, such as
 `provider-model-options.ts`) and marks the `:free` models as free. A 402 means the account has no
 credits. Peers see OpenRouter from v8, as Inception.
 
+## bf16.ai
+
+bf16.ai works as Inception does: a key-only provider on Pi's managed CLI. The key is stored as the
+`bf16` API key. Pi has no built-in bf16 provider, so the extension from `pi-key-providers.ts`
+registers `bf16` with `https://api.bf16.ai/v1`, Pi's `openai-completions` API, the key, the
+`Authorization` header, and the models. The models come from `src/backend/bf16-models.ts`, which
+`bun scripts/bf16-model-catalog.ts` builds from bf16.ai's public `GET /v1/models` (no key).
+The catalog keeps active tool-calling uncensored open-weight models and smart routers, with context
+windows, completion limits, vision support, prices, and reasoning efforts (Pi's `off` maps to
+`none`). `createPiKeyExtension` writes the model list to `bf16-models.json` beside the extension
+and passes its path in `OPENBOT_PI_BF16_MODELS`; the key is never written to either file. When
+OpenBot reads the model list, Pi does not contact bf16.ai. Model ids are bf16.ai's ids, and the
+default is `deepseek/deepseek-v4.1-flash-uncensored`. A 401 or 402 shows the saved-key or balance
+text. Peers see bf16.ai from v8, as Inception. `bun scripts/bf16-agent-smoke.ts` checks the driver
+with the real Pi CLI against a local fake bf16.ai server.
+
 ## Muse
 
 Muse uses the official `@muse-code/sdk` to run `muse serve` over MSP. The SDK is pinned to `1.4.2`;

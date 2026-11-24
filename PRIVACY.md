@@ -2199,6 +2199,18 @@ with the key, for the models that the key can use. Pi keeps its session files in
 files. OpenRouter's terms apply: <https://openrouter.ai/terms>. OpenRouter agents stay on this
 computer: OpenBot does not show them to team members.
 
+### bf16.ai
+
+bf16.ai agents run in the Pi CLI that OpenBot downloads for Pi. On this computer, Connect on the
+bf16.ai row saves a bf16.ai API key. OpenBot encrypts it in its existing provider credential store,
+gives it to the local Pi process in its environment, and redacts it from logs. Pi does not write
+the key to a file. Prompts, attachments, and tool results go to that process, and Pi sends them with
+this key to `api.bf16.ai`. The bf16.ai model list comes with OpenBot, so when OpenBot reads it, Pi
+does not contact bf16.ai. Pi keeps its session files in its own folder, as for Pi agents. OpenBot
+does not copy or upload these files. bf16.ai's terms and privacy policy apply:
+<https://bf16.ai/legal/terms> and <https://bf16.ai/legal/privacy>. bf16.ai agents stay on this
+computer: OpenBot does not show them to team members.
+
 ### Local model servers
 
 When Server settings shows the Providers section of this computer, and once on the onboarding

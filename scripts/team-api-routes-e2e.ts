@@ -9451,6 +9451,24 @@ try {
         isDeepStrictEqual(callsOf("changeProviderCredential"), [["deepseek"]]),
       summary(pending),
     );
+    const bf16Key = ["sk", "bf16", "v1", "e2efake0000"].join("-");
+    const bf16Set = await call("POST", PROVIDERS_V8_ROUTES.apiKeySet, {
+      ...v8,
+      json: { provider: "bf16", key: bf16Key },
+    });
+    const bf16State = await call("POST", PROVIDERS_V8_ROUTES.apiKeyState, { ...v8, json: { provider: "bf16" } });
+    const bf16Cleared = await call("POST", PROVIDERS_V8_ROUTES.apiKeyClear, { ...v8, json: { provider: "bf16" } });
+    check(
+      "an admin on providers-v8 saves and clears a bf16.ai key, and the host restarts bf16 on the Pi CLI",
+      bf16Set.status === 200 &&
+        isDeepStrictEqual(callsOf("setProviderKey").at(-1), ["bf16", bf16Key]) &&
+        isDeepStrictEqual(callsOf("startKeyProviderCli").at(-1), ["bf16"]) &&
+        isDeepStrictEqual(callsOf("changeProviderCredential").at(-1), ["bf16"]) &&
+        field(bf16State.body, "status") === "saved" &&
+        bf16Cleared.status === 200 &&
+        isDeepStrictEqual(callsOf("clearProviderKey").at(-1), ["bf16"]),
+      [summary(bf16Set), summary(bf16State), summary(bf16Cleared)],
+    );
     const openAiKey = ["sk", "e2e", "openai", "fake0000"].join("-");
     const keysBefore = callsOf("setProviderKey").length;
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });

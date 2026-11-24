@@ -75,6 +75,13 @@ const KEY_TEXT = {
     descriptionHost: "provider.openrouterKey.descriptionHost",
     label: "provider.openrouterKey.label",
   },
+  bf16: {
+    name: "bf16.ai",
+    title: "provider.bf16Key.title",
+    description: "provider.bf16Key.description",
+    descriptionHost: "provider.bf16Key.descriptionHost",
+    label: "provider.bf16Key.label",
+  },
 } as const satisfies Record<string, KeyDialogText>;
 
 export interface KeyDialogText {
