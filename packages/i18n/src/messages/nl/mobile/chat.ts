@@ -167,6 +167,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "Vervangen",
   "mobile.chat.attachment.files": "Bestanden",
   "mobile.chat.attachment.photos": "Foto’s",
+  "mobile.chat.attachment.recentPhoto": "Recent foto",
+  "mobile.chat.attachment.sheetTitle": "Toevoegen aan chat",
   "mobile.chat.attachment.camera": "Camera",
   "mobile.chat.attachment.useSkill": "Gebruik vaardigheid of app",
   "mobile.chat.attachment.addFailed": "Kan bijlage niet toevoegen",

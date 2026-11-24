@@ -169,6 +169,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "替换",
   "mobile.chat.attachment.files": "文件",
   "mobile.chat.attachment.photos": "照片",
+  "mobile.chat.attachment.recentPhoto": "最近的照片",
+  "mobile.chat.attachment.sheetTitle": "添加到聊天",
   "mobile.chat.attachment.camera": "相机",
   "mobile.chat.attachment.useSkill": "使用技能或应用",
   "mobile.chat.attachment.addFailed": "无法添加附件",

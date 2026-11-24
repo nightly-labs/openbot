@@ -177,6 +177,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "החלפה",
   "mobile.chat.attachment.files": "קבצים",
   "mobile.chat.attachment.photos": "תמונות",
+  "mobile.chat.attachment.recentPhoto": "תמונה אחרונה",
+  "mobile.chat.attachment.sheetTitle": "הוספה לצ׳אט",
   "mobile.chat.attachment.camera": "מצלמה",
   "mobile.chat.attachment.useSkill": "שימוש במיומנות או באפליקציה",
   "mobile.chat.attachment.addFailed": "לא ניתן להוסיף את הקובץ המצורף",

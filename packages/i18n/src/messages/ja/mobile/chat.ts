@@ -174,6 +174,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "置き換え",
   "mobile.chat.attachment.files": "ファイル",
   "mobile.chat.attachment.photos": "写真",
+  "mobile.chat.attachment.recentPhoto": "最近の写真",
+  "mobile.chat.attachment.sheetTitle": "チャットに追加",
   "mobile.chat.attachment.camera": "カメラ",
   "mobile.chat.attachment.useSkill": "スキルやアプリを使う",
   "mobile.chat.attachment.addFailed": "添付ファイルを追加できませんでした",

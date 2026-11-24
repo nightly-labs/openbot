@@ -254,6 +254,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "استبدال",
   "mobile.chat.attachment.files": "الملفات",
   "mobile.chat.attachment.photos": "الصور",
+  "mobile.chat.attachment.recentPhoto": "صورة حديثة",
+  "mobile.chat.attachment.sheetTitle": "إضافة إلى المحادثة",
   "mobile.chat.attachment.camera": "الكاميرا",
   "mobile.chat.attachment.useSkill": "استخدام مهارة أو تطبيق",
   "mobile.chat.attachment.addFailed": "تعذّرت إضافة المرفق",

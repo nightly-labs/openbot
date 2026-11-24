@@ -23,7 +23,7 @@ import { readFileBase64 } from "@/shared/lib/read-file-base64";
 import { useText } from "@/shared/lib/text";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
 import { fileLimitText } from "../model/large-files";
-import { smallerPhoto } from "../model/smaller-photo";
+import { jpegPhoto, smallerPhoto } from "../model/smaller-photo";
 
 export interface ChatAttachmentAnchor {
   left: number;
@@ -363,10 +363,30 @@ export function useChatAttachments(
         endPreparing();
       });
   }
+  async function preparePhoto(resolveUri: () => Promise<string>, name: string): Promise<ChatAttachment | null> {
+    if (busyRef.current) return null;
+    busyRef.current = true;
+    beginPreparing();
+    try {
+      if (itemsRef.current.length >= INPUT_LIMITS.attachments) throw new Error(limitMessage());
+      const resized = await smallerPhoto(await resolveUri(), name);
+      const photo = /\.(heic|heif)$/iu.test(resized.name) ? await jpegPhoto(resized.uri, resized.name) : resized;
+      const item = prepare(await readFile(photo.uri, photo.name));
+      trackSelected(item.size);
+      return item;
+    } catch (error) {
+      reportFailures([error]);
+      return null;
+    } finally {
+      busyRef.current = false;
+      endPreparing();
+    }
+  }
   const actions = {
     openMenu: (anchor: ChatAttachmentAnchor) => setMenuAnchor(anchor),
     closeMenu: () => setMenuAnchor(null),
     addPhoto: (uri: string) => report(() => addPhotoFile(uri, "photo.jpg")),
+    preparePhoto,
     choosePhotos: () => report(choosePhotos),
     requestCamera,
     chooseFiles: () => report(chooseFiles),
@@ -390,6 +410,8 @@ export function useChatAttachments(
     openMenu: (anchor: ChatAttachmentAnchor) => latestActions.current.openMenu(anchor),
     closeMenu: () => latestActions.current.closeMenu(),
     addPhoto: (uri: string) => latestActions.current.addPhoto(uri),
+    preparePhoto: (resolveUri: () => Promise<string>, name: string) =>
+      latestActions.current.preparePhoto(resolveUri, name),
     choosePhotos: () => latestActions.current.choosePhotos(),
     requestCamera: () => latestActions.current.requestCamera(),
     chooseFiles: () => latestActions.current.chooseFiles(),

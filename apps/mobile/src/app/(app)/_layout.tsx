@@ -433,6 +433,7 @@ function AuthenticatedStack() {
       <Stack.Screen name="server-marketplace/index" options={largeTitlePage} />
       <Stack.Screen name="share" options={formSheet([0.85])} />
       <Stack.Screen name="plan-limits" options={formSheet([0.85])} />
+      <Stack.Screen name="attach" options={formSheet([0.5])} />
       <Stack.Screen name="message-actions" options={formSheet([0.6])} />
       <Stack.Screen name="pinned-messages" options={formSheet([0.6, 0.85])} />
       <Stack.Screen name="queued-messages" options={formSheet([0.85])} />

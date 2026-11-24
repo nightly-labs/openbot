@@ -173,6 +173,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "Değiştir",
   "mobile.chat.attachment.files": "Dosyalar",
   "mobile.chat.attachment.photos": "Fotoğraflar",
+  "mobile.chat.attachment.recentPhoto": "Son fotoğraf",
+  "mobile.chat.attachment.sheetTitle": "Sohbete ekle",
   "mobile.chat.attachment.camera": "Kamera",
   "mobile.chat.attachment.useSkill": "Beceri veya uygulama kullan",
   "mobile.chat.attachment.addFailed": "Ek eklenemedi",

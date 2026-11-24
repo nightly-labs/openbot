@@ -172,6 +172,8 @@ export const messages = {
   "mobile.chat.attachment.replace": "교체",
   "mobile.chat.attachment.files": "파일",
   "mobile.chat.attachment.photos": "사진",
+  "mobile.chat.attachment.recentPhoto": "최근 사진",
+  "mobile.chat.attachment.sheetTitle": "채팅에 추가",
   "mobile.chat.attachment.camera": "카메라",
   "mobile.chat.attachment.useSkill": "스킬 또는 앱 사용",
   "mobile.chat.attachment.addFailed": "첨부 파일을 추가할 수 없어요",
