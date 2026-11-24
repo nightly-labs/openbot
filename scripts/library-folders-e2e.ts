@@ -282,6 +282,7 @@ async function startHost(directory: string, withFolders: boolean) {
     mailbox,
     agents: () => agents.listAgents(),
     workflowFiles: () => workflowOwners,
+    libraryFiles: () => new Set(libraryFolders ? Object.keys(libraryFolders.getSnapshot().placement) : []),
   };
   const storage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
   const foldersService = libraryFolders
@@ -312,6 +313,7 @@ async function startHost(directory: string, withFolders: boolean) {
   return {
     agents,
     mailbox,
+    storage,
     libraryFolders,
     workflowOwners,
     folderChanges: () => folderChanges,
@@ -1062,6 +1064,12 @@ try {
     "organize_library place puts a small new file in a folder on a host with more stored files than the storage list shows",
     notePlaced?.success === true && notesFolder !== undefined && crowded.stored().placement[noteId] === notesFolder.id,
     notePlaced?.text,
+  );
+  const crowdedRows = (await runCauseEffect(crowded.storage.usage({ scope: "host" }))).files;
+  pass(
+    "Right after the place, the cached host storage rows have the small file in a folder and stay at most the row limit",
+    crowdedRows.length === STORAGE_LIMITS.files && crowdedRows.some((file) => file.id === noteId),
+    JSON.stringify({ rows: crowdedRows.length, note: noteId }),
   );
 
   const bare = await startHost(join(root, "user-data-bare"), false);

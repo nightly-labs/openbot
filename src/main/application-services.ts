@@ -2015,6 +2015,7 @@ export async function createApplicationServices({
   const workflowRuns = new WorkflowRunStore({ database: store.database });
   const userData = app.getPath("userData");
   const storageSources = {
+    libraryFiles: () => new Set(Object.keys(libraryFolders.getSnapshot().placement)),
     roots: {
       database: store.database.path,
       downloads: store.downloadsRoot,
@@ -2630,7 +2631,10 @@ export async function createApplicationServices({
     Effect.runFork(providerRuntimes.ensureToolRuntimes());
   performance.mark("openbot:services.messaging");
   await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
-  libraryFolders.onChanged(() => service.notifyLibraryFoldersChanged());
+  libraryFolders.onChanged(() => {
+    storageUsage.invalidate();
+    service.notifyLibraryFoldersChanged();
+  });
   workflowFolders.onChanged(() => service.notifyWorkflowFoldersChanged());
   await runCauseEffect(libraryFolders.reconcileAgents(new Set(service.listAgents().map((agent) => agent.id))));
   await runCauseEffect(

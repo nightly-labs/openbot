@@ -55,6 +55,7 @@ export interface StorageUsageSources {
   channelFiles?: (channelId: string) => readonly StorageChannelFile[] | null;
   userFiles?: Pick<UserFilesBytes, "read" | "forget" | "dispose">;
   workflowFiles?: () => ReadonlyMap<string, WorkflowFileOwner>;
+  libraryFiles?: () => ReadonlySet<string>;
 }
 
 export interface StorageChannelFile {
@@ -177,6 +178,16 @@ interface MeasuredFile {
 
 function breakdownRow(category: StorageCategory, bytes: number): StorageBreakdown {
   return { category, bytes, removable: isOneOf(CLEARABLE_STORAGE_CATEGORIES, category) };
+}
+
+function libraryFilesFirst(
+  largestFirstRows: readonly StoredFileRow[],
+  libraryFiles: ReadonlySet<string>,
+): StoredFileRow[] {
+  const inLibrary = (row: StoredFileRow) => libraryFiles.has(row.id);
+  const kept = new Set(largestFirstRows.filter(inLibrary).slice(0, STORAGE_LIMITS.files));
+  let room = STORAGE_LIMITS.files - kept.size;
+  return largestFirstRows.filter((row) => kept.has(row) || (!inLibrary(row) && room-- > 0));
 }
 
 function largestFirst<T extends { bytes: number }>(rows: T[], limit: number): { rows: T[]; cut: boolean } {
@@ -528,7 +539,7 @@ function scopeKey(input: GetStorageUsageInput): string {
 
 export class StorageUsageService {
   readonly #scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> };
-  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">;
+  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles" | "libraryFiles">;
   readonly #now: () => number;
   readonly #cache = new Map<string, { at: number; scan: StorageScan }>();
   readonly #running = new Map<string, { token: symbol; fiber: Fiber.Fiber<StorageScan, StoredStateFailure> }>();
@@ -538,7 +549,7 @@ export class StorageUsageService {
 
   constructor(
     scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> },
-    sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">,
+    sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles" | "libraryFiles">,
     now: () => number = Date.now,
   ) {
     this.#scanner = scanner;
@@ -546,8 +557,16 @@ export class StorageUsageService {
     this.#now = now;
   }
 
-  readonly usage = Effect.fn("StorageUsage.usage")(function* (this: StorageUsageService, input: GetStorageUsageInput) {
-    return (yield* this.#scan(input)).usage;
+  readonly usage = Effect.fn("StorageUsage.usage")(function* (
+    this: StorageUsageService,
+    input: GetStorageUsageInput,
+    visibleFile?: (file: StoredFileRow) => boolean,
+  ) {
+    const scan = yield* this.#scan(input);
+    const libraryFiles = this.#sources.libraryFiles?.() ?? new Set<string>();
+    if (libraryFiles.size === 0 && !visibleFile) return scan.usage;
+    const files = visibleFile ? scan.files.filter(visibleFile) : scan.files;
+    return { ...scan.usage, files: libraryFilesFirst(files, libraryFiles) };
   }).bind(this);
 
   readonly hostFiles = Effect.fn("StorageUsage.hostFiles")(function* (
