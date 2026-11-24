@@ -266,6 +266,7 @@ interface AcpTurn {
   answered: boolean;
   retrying?: "agent" | "model";
   waitingOnUser: number;
+  openbotToolCalls: number;
   abandoned: boolean;
   reportedCost: number | null;
   unprompted: boolean;
@@ -2533,6 +2534,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       modelRetries: 0,
       answered: false,
       waitingOnUser: 0,
+      openbotToolCalls: 0,
       abandoned: false,
       reportedCost: null,
       unprompted,
@@ -3740,8 +3742,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         continue;
       }
       const silentFor = Date.now() - turn.lastActivityAt;
-      if (silentFor < limit || turn.toolItems.size > 0 || turn.waitingOnUser > 0) {
-        yield* Effect.sleep(silentFor < limit ? limit - silentFor : limit);
+      const silenceLimit = this.#silenceLimit(turn, limit);
+      if (silentFor < silenceLimit) {
+        yield* Effect.sleep(Math.min(silenceLimit - silentFor, limit));
         continue;
       }
       this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
@@ -3757,6 +3760,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       );
     }
   });
+
+  #silenceLimit(turn: AcpTurn, limit: number): number {
+    if (turn.waitingOnUser > 0) return Number.POSITIVE_INFINITY;
+    if (turn.toolItems.size === 0) return limit;
+    if (turn.openbotToolCalls > 0 || this.#flavor.openToolStallMs === undefined) return Number.POSITIVE_INFINITY;
+    return Math.max(limit, this.#flavor.openToolStallMs);
+  }
 
   readonly #endSilentTurn = Effect.fn("AcpAgentClient.endSilentTurn")(function* (
     this: AcpAgentClient,
@@ -4581,6 +4591,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             detachAfterMs,
           ].filter((ms) => ms !== undefined)
         : [];
+    const ownTurn = turn?.id === params.turnId ? turn : null;
+    if (ownTurn) ownTurn.openbotToolCalls += 1;
     const result = yield* this.#serverRequests
       .call(
         "item/tool/call",
@@ -4590,7 +4602,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         deadlines.length > 0 ? Math.min(...deadlines) : undefined,
         subagent,
       )
-      .pipe(toProviderClientOperationError);
+      .pipe(
+        toProviderClientOperationError,
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (!ownTurn) return;
+            ownTurn.openbotToolCalls -= 1;
+            ownTurn.lastActivityAt = Date.now();
+          }),
+        ),
+      );
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));
     if (turn?.id === params.turnId && params.tool === ROUTINE_NO_UPDATE_TOOL) turn.quietNoUpdate = endsQuiet(result);
