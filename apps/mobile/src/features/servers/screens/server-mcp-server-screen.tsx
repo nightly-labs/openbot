@@ -136,7 +136,7 @@ function McpServerForm({
   const signedIn =
     saved?.transport === "http" &&
     Boolean(mcp.signIns.data?.some((state) => state.mcpServerId === saved.id && state.signedIn));
-  const signInsKnown = mcp.signIns.data !== undefined;
+  const signInsKnown = mcp.signIns.isSuccess;
   const testAsksSignIn = test?.status === "done" && isSignInError(test.result.error);
   const showSignIn =
     canRelay &&
