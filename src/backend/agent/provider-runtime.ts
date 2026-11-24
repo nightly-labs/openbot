@@ -63,6 +63,7 @@ import {
   cliSpawnTarget,
 } from "./../cli";
 import { readCursorUsage } from "./../cursor-usage";
+import { CUSTOM_AGENT_MODELS_LISTED } from "./../custom-acp-agents-client";
 import { DISK_RESTORE_WAIT_MS, diskRestoring, providerCheckTimeoutMs } from "../disk-restore";
 import { causeHelpers } from "../effect-boundary";
 import { isPythonKimiCli, type SignInRegion } from "../kimi-region";
@@ -376,6 +377,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
   readonly #relisting = new Set<AgentProvider>();
+  readonly #lateRelists = new Set<AgentProvider>();
   readonly #heldListTimeouts = new Map<AgentProvider, unknown>();
   #modelsReadAt = 0;
   readonly #relistedAfterFailure = new WeakSet<AgentClient>();
@@ -4040,6 +4042,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#reportMcpStartupStatus(client, notification.params);
       }
       if (notification.method === "error") this.#reportTurnSignedOut(client, notification.params);
+      if (notification.method === CUSTOM_AGENT_MODELS_LISTED) this.#relistLateModels(client);
     });
     client.once("exit", (error) => this.#handleExit(client, error));
   }
@@ -4434,9 +4437,27 @@ export class ProviderRuntime implements ProviderPort {
     if (changed) this.#setStatus({});
   });
 
+  #relistLateModels(client: AgentClient): void {
+    const provider = client.provider;
+    if (this.#clients.get(provider) !== client) return;
+    if (this.#relisting.has(provider)) {
+      this.#lateRelists.add(provider);
+      return;
+    }
+    this.#relisting.add(provider);
+    Effect.runFork(
+      this.#relistModels(provider).pipe(
+        Effect.ensuring(Effect.sync(() => this.#releaseRelisting(provider))),
+        Effect.forkIn(this.#scope),
+      ),
+    );
+  }
+
   #releaseRelisting(provider: AgentProvider): void {
     this.#relisting.delete(provider);
     this.#heldListTimeouts.delete(provider);
+    const client = this.#clients.get(provider);
+    if (this.#lateRelists.delete(provider) && client) this.#relistLateModels(client);
   }
 
   #emitProviderError(provider: AgentProvider, kind: string, error: unknown, agentId?: string): void {
