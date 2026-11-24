@@ -535,6 +535,7 @@ import { canConfineProcesses } from "../src/backend/process-confinement";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
+import { resolveSharedFile as resolveSharedFileOnDisk } from "../src/backend/workspace-paths";
 import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
 import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
@@ -1438,10 +1439,17 @@ const fakeAgents: TeamApiAgents = {
   resolveSharedFile: (path) =>
     Effect.sync(() => {
       record("resolveSharedFile", path);
-      return path === "big.bin"
-        ? { path: sharedPath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1 }
-        : { path: sharedPath, name: "shared.txt", size: readFileSync(sharedPath).length };
-    }),
+    }).pipe(
+      Effect.flatMap(() =>
+        path === "big.bin"
+          ? Effect.succeed({ path: sharedPath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1 })
+          : resolveSharedFileOnDisk(files, path).pipe(
+              Effect.mapError(
+                (failure) => new AgentLifecycleFailed({ operation: "resolveSharedFile", cause: failure.cause }),
+              ),
+            ),
+      ),
+    ),
   resolveWorkspaceFile: (agentId, path) =>
     Effect.sync(() => {
       record("resolveWorkspaceFile", agentId, path);
@@ -13273,6 +13281,28 @@ try {
         shared.headers.get("content-disposition") === "attachment; filename*=UTF-8''shared.txt" &&
         errorIs(sharedBig, 413, sourceText("error.team.sharedFileTooLarge")),
       [summary(sharedMissing), summary(shared), summary(sharedBig)],
+    );
+    const sharedAtLine = await call(
+      "GET",
+      `${TEAM_API_ROUTES.sharedFiles}?path=${encodeURIComponent("shared.txt:26")}`,
+      {
+        token: bobToken,
+      },
+    );
+    const sharedAtAnchor = await call(
+      "GET",
+      `${TEAM_API_ROUTES.sharedFiles}?path=${encodeURIComponent("Shared/shared.txt#L26")}`,
+      { token: bobToken },
+    );
+    check(
+      "shared files: a link with a line number gives the bytes of the file without the line number",
+      [sharedAtLine, sharedAtAnchor].every(
+        (response) =>
+          response.status === 200 &&
+          response.text === "shared file bytes\n" &&
+          response.headers.get("content-disposition") === "attachment; filename*=UTF-8''shared.txt",
+      ),
+      [summary(sharedAtLine), summary(sharedAtAnchor)],
     );
     const workspaceMissing = await call("GET", `${TEAM_API_ROUTES.workspaceFiles}?path=notes.md`, { token: bobToken });
     const workspace = await call("GET", `${TEAM_API_ROUTES.workspaceFiles}?botId=agent-ada&path=notes.md`, {
