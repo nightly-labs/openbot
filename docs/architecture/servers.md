@@ -1953,11 +1953,13 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
   and is never logged.
 - **Provider sign-ins.** A server made since #15846 has the folder `provider-homes` in its user
-  data. At each start, `LocalServers` gives the child its own `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
-  `GROK_HOME` and `GEMINI_HOME` there, so its default provider account is its own: a sign-in or a
-  sign-out on one server does not change the others. Claude Code also uses a separate macOS Keychain
+  data. At each start, `LocalServers` gives the child its own `CLAUDE_CONFIG_DIR`, `CODEX_HOME` and
+  `GROK_HOME` there, so its default provider account is its own: a sign-in or a sign-out on one
+  server does not change the others. Gemini stays shared: Antigravity before 1.5.3 ignores
+  `GEMINI_HOME`, and the desktop does not know the CLI version of the child. Other providers also
+  stay shared. Claude Code also uses a separate macOS Keychain
   item when `CLAUDE_CONFIG_DIR` is set. A server without the folder, made by an earlier build, keeps
-  the shared homes (`~/.claude`, `~/.codex` and others): a new home would remove its sign-in and the
+  the shared homes (`~/.claude`, `~/.codex` and `~/.grok`): a new home would remove its sign-in and the
   Claude session files that its agents resume from. An earlier build ignores the folder.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.

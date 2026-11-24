@@ -48,7 +48,6 @@ const PROVIDER_HOME_VARIABLES = {
   claude: "CLAUDE_CONFIG_DIR",
   codex: "CODEX_HOME",
   grok: "GROK_HOME",
-  gemini: "GEMINI_HOME",
 } as const;
 
 const pathExists = (path: string) =>
