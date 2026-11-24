@@ -2426,8 +2426,8 @@ export async function createApplicationServices({
           Effect.ensuring(Effect.sync(() => storageUsage.invalidate())),
         ),
       notify: (notice) => {
-        forwardWorkflowNotice(notice);
         workflowNotices.emit("notice", notice);
+        forwardWorkflowNotice(notice);
       },
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),

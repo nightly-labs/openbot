@@ -14,3 +14,8 @@ export interface PushNotificationsNative {
 }
 
 export type NotificationTarget = OutsideTarget;
+
+export interface WorkflowTarget {
+  serverId: string;
+  workflowId: string | null;
+}

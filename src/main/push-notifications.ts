@@ -77,6 +77,11 @@ type PushNotice = AgentEvent | ProviderSignInWaitNotice | WorkflowPushNotice;
 
 export type WorkflowPushNeed = "view" | "chat";
 
+export interface WorkflowPushDetail {
+  graph: WorkflowGraph;
+  title: string;
+}
+
 export interface WorkflowNoticeSource {
   on(event: "notice", listener: (notice: WorkflowNotice) => void): unknown;
   off(event: "notice", listener: (notice: WorkflowNotice) => void): unknown;
@@ -86,7 +91,7 @@ interface PushNotificationOptions {
   agents: PushNotificationAgents;
   signInWaits?: Pick<ProviderSignInWaits, "on" | "off">;
   workflowNotices?: WorkflowNoticeSource;
-  workflowGraph?(workflowId: string): Effect.Effect<WorkflowGraph | null>;
+  workflowDetail?(workflowId: string): Effect.Effect<WorkflowPushDetail | null>;
   workflowAllows?(viewer: PushNotificationViewer, graph: WorkflowGraph, need: WorkflowPushNeed): boolean;
   store: Pick<PushNotificationStore, "list" | "replace">;
   send(request: NotificationRelayRequest): Effect.Effect<"sent" | "gone", PushNotificationSendFailure>;
@@ -407,17 +412,27 @@ export class PushNotificationService {
     only?: Registration,
   ) {
     const { notice } = received;
-    const graph = yield* this.#options.workflowGraph?.(notice.workflowId) ?? Effect.succeed(null);
+    const detail = yield* this.#options.workflowDetail?.(notice.workflowId) ?? Effect.succeed(null);
     const allows = this.#options.workflowAllows;
-    if (!graph || !allows) return;
+    if (!detail || !allows) return;
     const approval = notice.kind === "approval";
     const now = this.#now();
     const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
       const { memberId, protocol } = registration.stored;
       return (
         registration.capabilities.has(PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY) &&
-        allows({ memberId, protocol, capabilities: registration.capabilities }, graph, approval ? "chat" : "view") &&
-        this.#reaches(registration, received, null, { desktopNotifies: true, hostEvent: null, now, only })
+        this.#reaches(registration, received, null, {
+          desktopNotifies: true,
+          hostEvent: null,
+          now,
+          only,
+          sendWhileOpen: true,
+        }) &&
+        allows(
+          { memberId, protocol, capabilities: registration.capabilities },
+          detail.graph,
+          approval ? "chat" : "view",
+        )
       );
     });
     for (const registration of targets) {
@@ -433,7 +448,7 @@ export class PushNotificationService {
         agentId: notice.workflowId,
         threadId: null,
         kind: "workflow",
-        title: redactText(notice.workflowTitle).trim(),
+        title: redactText(value.preview ? notice.workflowTitle : detail.title).trim(),
         body: (value.preview && plainPreview(redactText(notice.text))) || fallback,
       };
       yield* this.#send(registration, content, fallback).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
@@ -444,11 +459,17 @@ export class PushNotificationService {
     registration: Registration,
     received: PushNotice,
     agentId: string | null,
-    delivery: { desktopNotifies: boolean; hostEvent: AgentEvent | null; now: number; only: Registration | undefined },
+    delivery: {
+      desktopNotifies: boolean;
+      hostEvent: AgentEvent | null;
+      now: number;
+      only: Registration | undefined;
+      sendWhileOpen?: boolean;
+    },
   ): boolean {
     const { value, memberId, protocol, sessionId } = registration.stored;
     const { now } = delivery;
-    if (!value.away && registration.connected) {
+    if (!value.away && registration.connected && !delivery.sendWhileOpen) {
       if (!delivery.only) this.#hold(registration, received, now);
       return false;
     }

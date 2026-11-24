@@ -90,6 +90,7 @@ import {
   PushNotificationService,
   type PushNotificationViewer,
   type WorkflowNoticeSource,
+  type WorkflowPushDetail,
   type WorkflowPushNeed,
 } from "./push-notifications";
 import type { RemoteControlPolicyStore } from "./remote-control-policy-store";
@@ -433,7 +434,7 @@ export class HostService extends EventEmitter<HostEvents> {
             agents: options.agents,
             ...(options.signInWaits === undefined ? {} : { signInWaits: options.signInWaits }),
             ...(options.workflowNotices === undefined ? {} : { workflowNotices: options.workflowNotices }),
-            workflowGraph: (workflowId) => this.#workflowGraph(workflowId),
+            workflowDetail: (workflowId) => this.#workflowDetail(workflowId),
             workflowAllows: (viewer, graph, need) => this.#workflowAllows(viewer, graph, need),
             store: pushNotificationStore,
             send: (request) => {
@@ -1581,11 +1582,11 @@ export class HostService extends EventEmitter<HostEvents> {
     return this.#api.copyAgentAccess(sourceAgentId, agentId);
   }
 
-  #workflowGraph(workflowId: string): Effect.Effect<WorkflowGraph | null> {
+  #workflowDetail(workflowId: string): Effect.Effect<WorkflowPushDetail | null> {
     const workflows = this.#options.workflows;
     if (!workflows) return Effect.succeed(null);
     return workflows.get(workflowId).pipe(
-      Effect.map((detail) => (detail.needsNewerApp ? null : detail.graph)),
+      Effect.map((detail) => (detail.needsNewerApp ? null : { graph: detail.graph, title: detail.summary.title })),
       Effect.catch(() => Effect.succeed(null)),
     );
   }

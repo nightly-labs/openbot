@@ -18,7 +18,7 @@ import { QueuedMessagesProvider } from "@/features/chat/context/queued-messages-
 import { requestComposerText } from "@/features/chat/model/composer-requests";
 import { setLiveActivityNavigator } from "@/features/live-activity/model/live-activity-link";
 import { HomeOnboardingProvider, useHomeOnboarding } from "@/features/onboarding/context/home-onboarding-context";
-import type { NotificationTarget } from "@/features/push-notifications/push-notifications-native.types";
+import type { NotificationTarget, WorkflowTarget } from "@/features/push-notifications/push-notifications-native.types";
 import { useNotificationTaps } from "@/features/push-notifications/use-notification-taps";
 import type { QuickActionTarget } from "@/features/quick-actions/model/quick-action-items";
 import { shareOpenBot } from "@/features/quick-actions/model/share-app";
@@ -275,16 +275,17 @@ function AuthenticatedStack() {
     },
     [targetSources],
   );
-  const openWorkflows = useCallback(
-    (serverId: string) =>
+  const openWorkflow = useCallback(
+    ({ serverId, workflowId }: WorkflowTarget) =>
       whenUnlocked(() => {
         closeDrawer();
         if (router.canDismiss()) router.dismissAll();
-        router.push({ pathname: "/server-workflows", params: { serverId } });
+        if (workflowId) router.push({ pathname: "/server-workflows/workflow", params: { serverId, workflowId } });
+        else router.push({ pathname: "/server-workflows", params: { serverId } });
       }),
     [closeDrawer],
   );
-  useNotificationTaps(openTarget, onScreen, openWorkflows);
+  useNotificationTaps(openTarget, onScreen, openWorkflow);
 
   return (
     <Stack
