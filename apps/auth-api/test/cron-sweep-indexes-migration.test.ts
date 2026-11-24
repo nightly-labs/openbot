@@ -1,6 +1,12 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  PRUNE_SITE_CREATION_EVENTS_SQL,
+  PRUNE_SITE_OPERATION_RECEIPTS_SQL,
+  UNSYNCED_SITES_SQL,
+} from "../src/server/hosted-site-service";
+import { READY_EVENTS_SQL, RECOVER_EXPIRED_CLAIMS_SQL } from "../src/server/sales-analytics-delivery";
 
 const databases: DatabaseSync[] = [];
 
@@ -25,14 +31,13 @@ const migration = readFileSync(new URL("../migrations/0071_cron_sweep_indexes.sq
 
 const TABLES = ["site_operation_receipts", "site_creation_events", "hosted_sites", "billing_analytics_events"];
 
-// The released query and its replacement in SalesAnalyticsDelivery.#readyEvents.
-const RELEASED_READY = `SELECT source_key FROM billing_analytics_events
-  WHERE status = 'pending' OR (status = 'rejected' AND next_attempt_at > 0 AND next_attempt_at <= 100 AND attempts < 3)
-  ORDER BY created_at ASC LIMIT 50`;
-const READY = `SELECT source_key FROM billing_analytics_events
-  WHERE status IN ('pending', 'rejected')
-    AND (status = 'pending' OR (next_attempt_at > 0 AND next_attempt_at <= 100 AND attempts < 3))
-  ORDER BY created_at ASC LIMIT 50`;
+// The released SalesAnalyticsDelivery.#readyEvents query, which READY_EVENTS_SQL replaces.
+const RELEASED_READY = `SELECT source_key, profile_id, event_name, properties_json, event_timestamp, attempts,
+    '' AS claim_token
+  FROM billing_analytics_events
+  WHERE status = 'pending' OR (status = 'rejected' AND next_attempt_at > 0 AND next_attempt_at <= ? AND attempts < ?)
+  ORDER BY created_at ASC LIMIT ?`;
+const READY_PARAMETERS = [100, 3, 50] as const;
 
 function seed(database: DatabaseSync) {
   database.exec(`
@@ -77,40 +82,30 @@ describe("cron sweep indexes migration", () => {
     const database = migratedTo("0071");
     seed(database);
     const before = TABLES.map((table) => rows(database, table));
-    const releasedReady = database.prepare(RELEASED_READY).all();
+    const releasedReady = database.prepare(RELEASED_READY).all(...READY_PARAMETERS);
 
     database.exec(migration);
 
     expect(TABLES.map((table) => rows(database, table))).toEqual(before);
-    expect(database.prepare(READY).all()).toEqual(releasedReady);
+    expect(database.prepare(READY_EVENTS_SQL).all(...READY_PARAMETERS)).toEqual(releasedReady);
     expect(releasedReady.map((row) => row.source_key)).toEqual(["rejected-due", "pending"]);
 
-    const receipts = plan(database, "DELETE FROM site_operation_receipts WHERE created_at < 50");
+    const receipts = plan(database, PRUNE_SITE_OPERATION_RECEIPTS_SQL);
     expect(receipts).toContain("site_operation_receipts_created_at");
-    const events = plan(database, "DELETE FROM site_creation_events WHERE created_at < 50");
+    const events = plan(database, PRUNE_SITE_CREATION_EVENTS_SQL);
     expect(events).toContain("site_creation_events_created_at");
-    const unsynced = plan(
-      database,
-      `SELECT id, hostname FROM hosted_sites
-        WHERE +status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
-        ORDER BY updated_at, id LIMIT 50`,
-    );
+    const unsynced = plan(database, UNSYNCED_SITES_SQL);
     expect(unsynced).toContain("hosted_sites_route_unsynced");
-    const claims = plan(
-      database,
-      `UPDATE billing_analytics_events SET status = 'uncertain', claimed_at = NULL, claim_token = NULL,
-          last_error = 'claim_expired', updated_at = 100
-        WHERE status = 'sending' AND claimed_at IS NOT NULL AND claimed_at <= 50`,
-    );
+    const claims = plan(database, RECOVER_EXPIRED_CLAIMS_SQL);
     expect(claims).toContain("billing_analytics_events_sending");
-    expect(plan(database, READY)).toContain("billing_analytics_events_ready");
+    const ready = plan(database, READY_EVENTS_SQL);
+    expect(ready).toContain("billing_analytics_events_ready");
     expect(unsynced).not.toContain("TEMP B-TREE");
     // A partial index scan reads only the rows that its WHERE clause keeps; a table scan reads every row.
-    for (const sweep of [receipts, events, unsynced, claims, plan(database, READY)])
-      expect(sweep).not.toMatch(/^SCAN \w+$/m);
+    for (const sweep of [receipts, events, unsynced, claims, ready]) expect(sweep).not.toMatch(/^SCAN \w+$/m);
 
-    expect(database.prepare("DELETE FROM site_operation_receipts WHERE created_at < 50").run().changes).toBe(1);
-    expect(database.prepare("DELETE FROM site_creation_events WHERE created_at < 50").run().changes).toBe(1);
+    expect(database.prepare(PRUNE_SITE_OPERATION_RECEIPTS_SQL).run(50).changes).toBe(1);
+    expect(database.prepare(PRUNE_SITE_CREATION_EVENTS_SQL).run(50).changes).toBe(1);
   });
 
   it("can run again on a database that has the indexes", () => {

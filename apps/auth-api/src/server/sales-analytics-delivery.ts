@@ -17,6 +17,18 @@ const MAX_BATCH_SIZE = 50;
 const MAX_RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_RETRY_DELAY_MS = 60_000;
 
+// The cron runs these statements every five minutes. Migration 0071 gives each one an index.
+export const RECOVER_EXPIRED_CLAIMS_SQL = `UPDATE billing_analytics_events
+    SET status = 'uncertain', claimed_at = NULL, claim_token = NULL, last_error = 'claim_expired', updated_at = ?
+  WHERE status = 'sending' AND claimed_at IS NOT NULL AND claimed_at <= ?`;
+// Parameters: now, maximum attempts, batch size.
+export const READY_EVENTS_SQL = `SELECT source_key, profile_id, event_name, properties_json, event_timestamp, attempts,
+    '' AS claim_token
+  FROM billing_analytics_events
+  WHERE status IN ('pending', 'rejected')
+    AND (status = 'pending' OR (next_attempt_at > 0 AND next_attempt_at <= ? AND attempts < ?))
+  ORDER BY created_at ASC LIMIT ?`;
+
 const PROFILE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 const SOURCE_KEY_PATTERN = /^[A-Za-z0-9_.:-]{1,512}$/u;
 const SAFE_VALUE_PATTERN = /^[A-Za-z0-9_.:/+-]{1,128}$/u;
@@ -367,25 +379,14 @@ export class SalesAnalyticsDelivery {
 
   async #recoverExpiredClaims(now: number): Promise<void> {
     await this.#database
-      .prepare(
-        `UPDATE billing_analytics_events
-            SET status = 'uncertain', claimed_at = NULL, claim_token = NULL,
-                last_error = 'claim_expired', updated_at = ?
-          WHERE status = 'sending' AND claimed_at IS NOT NULL AND claimed_at <= ?`,
-      )
+      .prepare(RECOVER_EXPIRED_CLAIMS_SQL)
       .bind(now, now - CLAIM_TIMEOUT_MS)
       .run();
   }
 
   async #readyEvents(now: number): Promise<LedgerEvent[]> {
     const result = await this.#database
-      .prepare(
-        `SELECT source_key, profile_id, event_name, properties_json, event_timestamp, attempts, '' AS claim_token
-           FROM billing_analytics_events
-          WHERE status IN ('pending', 'rejected')
-            AND (status = 'pending' OR (next_attempt_at > 0 AND next_attempt_at <= ? AND attempts < ?))
-          ORDER BY created_at ASC LIMIT ?`,
-      )
+      .prepare(READY_EVENTS_SQL)
       .bind(now, MAX_RATE_LIMIT_RETRIES, MAX_BATCH_SIZE)
       .all<unknown>();
     return result.results.filter(isLedgerEvent);

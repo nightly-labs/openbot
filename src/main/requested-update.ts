@@ -102,6 +102,9 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #declinedVersion: string | null = null;
   #schedule: Schedule | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
+  // The random wait before an automatic restart. It makes no schedule, so members see no notice yet.
+  #spreadTimer: ReturnType<typeof setTimeout> | null = null;
+  #spreadVersion: string | null = null;
   #installError: UpdateFailureCode | null = null;
   #installing = false;
   #publishing = false;
@@ -224,10 +227,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
       return;
     }
     if (status.managedByHost || status.phase === "unsupported") return;
-    if (this.#schedule?.memberId === null && this.#timer && !this.#restarting()) {
-      this.#scheduleAttempt(this.#graceMs);
-      return;
-    }
     if (status.phase === "idle" || status.phase === "up-to-date" || status.errorCode === "check_failed")
       yield* Effect.forkIn(this.#updater.checkForUpdates(), this.#workScope, { startImmediately: true });
     else yield* this.#advance(status);
@@ -247,6 +246,7 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   readonly dispose = Effect.fn("RequestedUpdate.dispose")(function* (this: RequestedUpdate) {
     this.#updater.off("status", this.#onStatus);
     this.#clearTimer();
+    this.#clearSpreadTimer();
     yield* Scope.close(this.#workScope, Exit.void);
   }).bind(this);
 
@@ -281,11 +281,25 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     if (status.phase === "available")
       yield* Effect.forkIn(this.#updater.downloadUpdate(), this.#workScope, { startImmediately: true });
     else if (status.phase === "ready") {
-      const spreadMs = this.#required ? 0 : Math.floor(this.#random() * this.#automaticSpreadMs);
+      if (this.#required) this.#clearSpreadTimer();
+      else if (this.#spreadTimer) return;
+      else if (this.#spreadVersion !== status.availableVersion) {
+        this.#spreadVersion = status.availableVersion;
+        const spreadMs = Math.floor(this.#random() * this.#automaticSpreadMs);
+        if (spreadMs > 0) {
+          this.#log(`The automatic restart into ${status.availableVersion} waits ${Math.round(spreadMs / 1000)} s.`);
+          this.#spreadTimer = setTimeout(() => {
+            this.#spreadTimer = null;
+            this.#onStatus(this.#updater.getStatus());
+          }, spreadMs);
+          this.#spreadTimer.unref?.();
+          return;
+        }
+      }
       this.#schedule = newSchedule(null, null, "when-idle");
-      this.#log(`Scheduled the automatic restart into ${status.availableVersion} in ${Math.round(spreadMs / 1000)} s.`);
+      this.#log(`Scheduled the automatic restart into ${status.availableVersion}.`);
       this.#publish();
-      this.#scheduleAttempt(this.#graceMs + spreadMs);
+      this.#scheduleAttempt(this.#graceMs);
     }
   });
 
@@ -389,6 +403,11 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #clearTimer(): void {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = null;
+  }
+
+  #clearSpreadTimer(): void {
+    if (this.#spreadTimer) clearTimeout(this.#spreadTimer);
+    this.#spreadTimer = null;
   }
 
   #announceState(state: HostRestartState): void {

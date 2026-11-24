@@ -186,16 +186,23 @@ await until("the install after the browser view closed", () => unlimited.updater
 await Effect.runPromise(unlimited.requested.dispose());
 
 // A rollout step reaches every host within one update check. The automatic restart waits a random
-// part of the spread, so the hosts do not register again all at once. A required update does not wait.
+// part of the spread before it makes a schedule, so the hosts do not register again all at once,
+// and members see no restart notice during the wait. A required update does not wait.
 const SPREAD_MS = 4 * DEADLINE_MS;
 const spreadState: HostState = { ...unlimitedState, browserView: false, clientInUse: false };
 const spread = hostedServer(spreadState, MAXIMUM_WAIT_MS, { ms: SPREAD_MS, random: () => 0.5 });
-await until("the spread automatic restart", () => hasLine(spread.log, `into ${RELEASE} in ${SPREAD_MS / 2000} s.`));
+const control = hostedServer({ ...spreadState }, MAXIMUM_WAIT_MS);
+await until("the install of the host with no spread", () => control.updater.installs === 1);
+assert.ok(hasLine(spread.log, `into ${RELEASE} waits ${SPREAD_MS / 2000} s.`), "The spread was not logged.");
 assert.equal(spread.updater.installs, 0, "The automatic restart did not wait for its spread.");
 assert.equal(spread.readinessChecks(), 0, "The automatic restart checked readiness before its spread ended.");
+assert.deepEqual(spread.announced, [], "Members got a restart notice during the spread.");
+assert.equal(spread.updater.status.scheduledRestart, undefined, "The spread published a scheduled restart.");
 spread.requested.setRequired(true);
 await until("the required install that skips the spread", () => spread.updater.installs === 1);
+assert.deepEqual(spread.announced, ["waiting", "restarting"]);
 await Effect.runPromise(spread.requested.dispose());
+await Effect.runPromise(control.requested.dispose());
 
 const report = {
   ok: true,

@@ -54,6 +54,13 @@ export interface HostedSiteUploadSession {
 type OperationClaim = { status: "pending"; token: string } | { status: "completed"; response: string };
 
 const CLEANUP_BATCH_SIZE = 50;
+// The five-minute cron runs these statements. Migration 0071 gives each one an index.
+// "+status" stops the status term from choosing hosted_sites_expiry over hosted_sites_route_unsynced.
+export const UNSYNCED_SITES_SQL = `SELECT id, hostname FROM hosted_sites
+  WHERE +status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
+  ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`;
+export const PRUNE_SITE_CREATION_EVENTS_SQL = "DELETE FROM site_creation_events WHERE created_at < ?";
+export const PRUNE_SITE_OPERATION_RECEIPTS_SQL = "DELETE FROM site_operation_receipts WHERE created_at < ?";
 const CLEANUP_RUNTIME_BUDGET_MS = 20_000;
 
 export class HostedSiteService {
@@ -801,13 +808,7 @@ export class HostedSiteService {
         }
 
         const unsyncedSites = yield* siteCall(() =>
-          database
-            .prepare(
-              `SELECT id, hostname FROM hosted_sites
-           WHERE +status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
-           ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`,
-            )
-            .all<{ id: string; hostname: string }>(),
+          database.prepare(UNSYNCED_SITES_SQL).all<{ id: string; hostname: string }>(),
         );
         hasMore ||= unsyncedSites.results.length === CLEANUP_BATCH_SIZE;
         for (const site of unsyncedSites.results) {
@@ -920,13 +921,13 @@ export class HostedSiteService {
       }
       yield* siteCall(() =>
         database
-          .prepare("DELETE FROM site_creation_events WHERE created_at < ?")
+          .prepare(PRUNE_SITE_CREATION_EVENTS_SQL)
           .bind(now - 2 * 24 * 60 * 60_000)
           .run(),
       );
       yield* siteCall(() =>
         database
-          .prepare("DELETE FROM site_operation_receipts WHERE created_at < ?")
+          .prepare(PRUNE_SITE_OPERATION_RECEIPTS_SQL)
           .bind(now - 90 * 24 * 60 * 60_000)
           .run(),
       );
