@@ -40,7 +40,7 @@ import { revokeRoutineWebhooks } from "./webhook-route-store";
 const SHOWN_MESSAGE_SQL =
   "(instr(message_json, '\"deleted\"') = 0 OR json_extract(message_json, '$.deleted') IS NOT 1)";
 
-const CHANNEL_SUMMARY_ROWS_SQL = `SELECT c.channel_id AS channel_id, c.channel_json AS channel_json,
+const CHANNEL_SUMMARY_ROWS_SQL = `SELECT c.channel_json AS channel_json,
   (SELECT m.message_json FROM projection_channel_messages AS m
     WHERE m.channel_id = c.channel_id
       AND ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}

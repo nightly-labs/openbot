@@ -145,6 +145,6 @@ selection by leverage. The audit did not modify source code.
 
 - Plan 014 landed in commit `6e8482570f`. Focused related tests passed with 238 tests.
 - Plan 015 landed in commit `eb2d4c7928`. The generated catalog check passes and CI now runs it.
-- Plan 016 landed in commit `a0cac6b8b4` and was reverted. The batched queries read every message row on each call and recounted all channels when one changed: 64 channels × 500 messages went from 1 ms to 44 ms on a repeated list. The per-channel unread query and its cache are back. One list query gets the latest message and the task counts of each channel through indexed subqueries, with cached statements. `scripts/channel-list-bench-e2e.ts` times cold, repeated and one-changed lists.
+- Plan 016 landed in commit `a0cac6b8b4` and was reverted. The batched queries read every message row on each call and recounted all channels when one changed: 64 channels × 500 messages went from 1 ms to 44 ms on a repeated list. The per-channel unread query and its cache are back, as on `main`; the list queries now use cached statements. `scripts/channel-list-bench-e2e.ts` times cold, repeated and one-changed lists.
 - Plan 017 landed in commit `79772b6f48`. The direct remote protocol E2E passed 6 checks.
 - Plan 018 landed in commit `8e1e789e64`. Decoder E2E passed 9 checks.

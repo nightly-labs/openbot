@@ -73,7 +73,7 @@ export class ConversationQueries {
           .prepare(
             `SELECT message_json FROM projection_thread_messages
              WHERE thread_id = ?
-               AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+               AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)
              ORDER BY created_at, ordinal, message_id`,
           )
           .all(threadId, agentId),
@@ -90,7 +90,7 @@ export class ConversationQueries {
           .prepare(
             `SELECT message_json FROM projection_thread_messages
              WHERE thread_id = ? AND turn_id = ?
-               AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+               AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)
              ORDER BY created_at, ordinal, message_id`,
           )
           .all(threadId, turnId, agentId),
@@ -253,7 +253,7 @@ export class ConversationQueries {
         .prepare(
           `SELECT message_json FROM projection_thread_messages
            WHERE thread_id = ? AND message_id IN (${placeholders})
-           AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+           AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)
            ORDER BY created_at, ordinal, message_id`,
         )
         .all(threadId, ...messageIds, agentId),
@@ -266,7 +266,7 @@ export class ConversationQueries {
         .prepare(
           `SELECT message_json FROM projection_thread_messages
            WHERE thread_id = ? AND item_type = ?
-           AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+           AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)
            ORDER BY created_at, ordinal, message_id`,
         )
         .all(threadId, itemType, agentId),
@@ -284,7 +284,7 @@ export class ConversationQueries {
         .prepare(
           `SELECT message_json FROM projection_thread_messages
            WHERE thread_id = ?
-             AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+             AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)
              AND (
                (? IS NOT NULL AND turn_id = ? AND status = 'streaming')
                OR json_type(message_json, '$.questionPrompt.resolution') = 'null'
@@ -346,7 +346,7 @@ export class ConversationQueries {
           .prepare(
             `SELECT message_id, message_json FROM projection_thread_messages
              WHERE thread_id = ? AND message_id IN (${placeholders})
-             AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+             AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)
              ${conversationMarkerSqlFilter(options)}`,
           )
           .all(threadId, ...referenceIds, agentId),
@@ -582,7 +582,7 @@ export class ConversationQueries {
           .prepare(
             `SELECT message_id, message_json FROM projection_thread_messages
              WHERE thread_id = ? AND message_id IN (${rows.map(() => "?").join(", ")})
-               AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)`,
+               AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)`,
           )
           .all(threadId, ...rows.map((row) => requiredStringColumn(row, "message_id")), agentId),
       ).map((row) => [requiredStringColumn(row, "message_id"), requiredStringColumn(row, "message_json")]),
@@ -699,7 +699,9 @@ export class ConversationQueries {
   ): { count: number; oldestAt: string | null } {
     const routineFilter = conversationMarkerSqlFilter(exclusions);
     const ordered = agentId ? ORDERED_THREAD_MESSAGES_FOR_AGENT : ORDERED_THREAD_MESSAGES;
-    const ownership = agentId ? "AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)" : "";
+    const ownership = agentId
+      ? "AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)"
+      : "";
     const row = databaseRow(
       this.#core.connection
         .prepare(
@@ -735,7 +737,7 @@ const ORDERED_THREAD_MESSAGES_FOR_AGENT = `WITH ordered AS (
   SELECT created_at, ordinal, message_id, author, item_type, group_start, group_first, group_id, turn_rank
   FROM projection_thread_messages
   WHERE thread_id = ?
-    AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+    AND EXISTS (SELECT 1 FROM projection_threads AS owner WHERE owner.thread_id = projection_thread_messages.thread_id AND owner.agent_id = ?)
 )`;
 export const ORDER_KEY_COLUMNS = "group_start, group_first, group_id, turn_rank, created_at, ordinal, message_id";
 export const ORDER_KEY_DESC =

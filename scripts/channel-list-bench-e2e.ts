@@ -88,10 +88,18 @@ async function main(): Promise<void> {
   await runCauseEffect(database.initialize());
   try {
     const connection = database.connection;
-    const insertChannel = connection.prepare("INSERT INTO projection_channels VALUES (?, ?)");
-    const insertMessage = connection.prepare("INSERT INTO projection_channel_messages VALUES (?, ?, ?, ?)");
-    const insertTask = connection.prepare("INSERT INTO projection_channel_tasks VALUES (?, ?, ?)");
-    const insertRead = connection.prepare("INSERT INTO projection_channel_reads VALUES (?, ?, ?)");
+    const insertChannel = connection.prepare(
+      "INSERT INTO projection_channels (channel_id, channel_json) VALUES (?, ?)",
+    );
+    const insertMessage = connection.prepare(
+      "INSERT INTO projection_channel_messages (channel_id, message_id, sequence, message_json) VALUES (?, ?, ?, ?)",
+    );
+    const insertTask = connection.prepare(
+      "INSERT INTO projection_channel_tasks (task_id, channel_id, task_json) VALUES (?, ?, ?)",
+    );
+    const insertRead = connection.prepare(
+      "INSERT INTO projection_channel_reads (channel_id, member_id, through_sequence) VALUES (?, ?, ?)",
+    );
     for (let channelIndex = 0; channelIndex < CHANNEL_COUNT; channelIndex += 1) {
       const channelId = `channel-${channelIndex}`;
       insertChannel.run(channelId, JSON.stringify(channel(channelId)));

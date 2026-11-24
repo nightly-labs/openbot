@@ -277,6 +277,7 @@ jobs:
         run: bun run test:signal
 
       - name: Run the direct remote protocol E2E test
+        if: ${{ !cancelled() }}
         run: bun run test:remote-protocol
 
       - name: Upload the Signal E2E report

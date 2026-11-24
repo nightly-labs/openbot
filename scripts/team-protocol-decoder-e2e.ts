@@ -28,18 +28,26 @@ import {
   decodeTeamProtocolV8BaseEvent,
   decodeTeamProtocolV8BaseHttpRequest,
 } from "../packages/contracts/src/team-protocol/v8-base";
-import { decodeTeamCapabilitiesV10, TEAM_PROTOCOL_V10 } from "../packages/contracts/src/team-protocol/v10";
+import {
+  decodeTeamCapabilitiesV10,
+  TEAM_PROTOCOL_V10,
+  TEAM_PROTOCOL_V10_ABSENT_LIMIT,
+} from "../packages/contracts/src/team-protocol/v10";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const FIXTURE_PATH = resolve(ROOT, "packages/contracts/src/team-protocol/fixtures/decoder-edge-cases.json");
 const REPORT_PATH = resolve(ROOT, ".openbot-build/team-protocol-decoder-e2e/report.json");
 const fixture = JSON.parse(await readFile(FIXTURE_PATH, "utf8"));
 
-const steps: { name: string; passed: boolean }[] = [];
+const steps: { name: string; passed: boolean; error?: string }[] = [];
 
 function step(name: string, run: () => void): void {
-  run();
-  steps.push({ name, passed: true });
+  try {
+    run();
+    steps.push({ name, passed: true });
+  } catch (error) {
+    steps.push({ name, passed: false, error: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 function oversized(length: number): string[] {
@@ -47,9 +55,13 @@ function oversized(length: number): string[] {
 }
 
 step("all released protocols are represented", () => {
+  const released = Object.keys(TEAM_PROTOCOL_CAPABILITY_LIMITS).map(Number);
+  assert.equal(released[0], TEAM_PROTOCOL_V1);
+  assert.ok(released.includes(TEAM_PROTOCOL_V3));
+  assert.equal(Math.max(...released), TEAM_PROTOCOL_V10);
   assert.deepEqual(
-    [TEAM_PROTOCOL_V1, 2, TEAM_PROTOCOL_V3, 4, 5, 6, 7, 8, 9, TEAM_PROTOCOL_V10],
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    released,
+    Array.from({ length: TEAM_PROTOCOL_V10 }, (_, index) => index + 1),
   );
 });
 
@@ -126,10 +138,17 @@ step("capability and absent lists enforce released limits", () => {
       capabilities: oversized(TEAM_PROTOCOL_CAPABILITY_LIMITS[9] + 1),
     }),
   );
+  assert.equal(
+    decodeTeamCapabilitiesV10(fixture.v10.capabilities, oversized(TEAM_PROTOCOL_V10_ABSENT_LIMIT)).absent.length,
+    TEAM_PROTOCOL_V10_ABSENT_LIMIT,
+  );
   assert.throws(() =>
-    decodeTeamCapabilitiesV10(fixture.v10.capabilities, oversized(TEAM_PROTOCOL_CAPABILITY_LIMITS[9] + 1)),
+    decodeTeamCapabilitiesV10(fixture.v10.capabilities, oversized(TEAM_PROTOCOL_V10_ABSENT_LIMIT + 1)),
   );
 });
 
 await mkdir(resolve(ROOT, ".openbot-build/team-protocol-decoder-e2e"), { recursive: true });
-await writeFile(REPORT_PATH, `${JSON.stringify({ passed: true, steps }, null, 2)}\n`);
+const failed = steps.filter((entry) => !entry.passed);
+await writeFile(REPORT_PATH, `${JSON.stringify({ passed: failed.length === 0, steps }, null, 2)}\n`);
+for (const entry of failed) process.stderr.write(`FAIL ${entry.name}: ${entry.error}\n`);
+if (failed.length > 0) process.exitCode = 1;

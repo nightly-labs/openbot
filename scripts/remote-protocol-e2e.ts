@@ -12,7 +12,7 @@ import { SignalService } from "../remote/api/src/signal-service";
 import { RemoteTokenError } from "../remote/api/src/tokens";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/remote-protocol-e2e");
-const checks: Array<{ name: string; passed: boolean }> = [];
+const checks: Array<{ name: string; passed: boolean; error?: string }> = [];
 
 function check(name: string, run: () => void | Promise<void>): Promise<void> {
   return Promise.resolve()
@@ -21,9 +21,8 @@ function check(name: string, run: () => void | Promise<void>): Promise<void> {
       () => {
         checks.push({ name, passed: true });
       },
-      (error) => {
-        checks.push({ name, passed: false });
-        throw error;
+      (error: unknown) => {
+        checks.push({ name, passed: false, error: error instanceof Error ? error.message : String(error) });
       },
     );
 }
@@ -89,7 +88,7 @@ await check("Signal rejects an unauthenticated message", async () => {
   assert.equal(socket.closed?.code, 1003);
 });
 
-await check("Signal authenticates a host and reconnects a member", async () => {
+await check("Signal authenticates a host and a member and refuses a used member ticket", async () => {
   const host = new FakeSocket("host");
   signal.connect(host);
   await receive(host, { type: "hello", version: 1, peer: "host", token: "host-ticket" });
@@ -106,7 +105,7 @@ await check("Signal authenticates a host and reconnects a member", async () => {
   assert.equal(replacement.closed?.code, 1008);
 });
 
-await check("Ingress queue preserves order and seals delivery", async () => {
+await check("Ingress queue keeps each message and seals each delivery", async () => {
   const keyPair = await createIngressQueueKeyPair();
   const queue = new IngressQueue(() => Effect.succeed({ hostId: "host", state: "starting" }));
   queue.rememberKey("host", keyPair.publicKey);
@@ -171,9 +170,13 @@ await check("Team mailbox resolves pending requests on disconnect", async () => 
   const mailbox = createRemoteCommandMailbox(() => undefined);
   const result = mailbox.send({ id: "request-1", type: "request", method: "GET", path: "/", body: null });
   void mailbox.send({ id: "disconnect", type: "disconnect" });
-  mailbox.dispose();
   const answer = await result;
   assert.equal(answer.ok, false);
+  assert.deepEqual(
+    mailbox.outstanding().map((command) => command.id),
+    ["disconnect"],
+  );
+  mailbox.dispose();
   assert.equal(mailbox.outstanding().length, 0);
 });
 
@@ -185,4 +188,6 @@ const report = {
   checks,
 };
 writeFileSync(resolve(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+for (const failed of checks.filter((entry) => !entry.passed))
+  process.stderr.write(`FAIL ${failed.name}: ${failed.error}\n`);
 if (report.failed > 0) process.exitCode = 1;
