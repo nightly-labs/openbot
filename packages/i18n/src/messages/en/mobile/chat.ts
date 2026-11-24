@@ -308,6 +308,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.message.readAloudSpeed": "Playback speed: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Could not read the message aloud",
+  "mobile.chat.message.readAloudModelMissing": "To hear messages, download the voice model in Settings > Voice.",
   "mobile.chat.message.selectText": "Select text",
   "mobile.chat.message.copyImage": "Copy image",
   "mobile.chat.message.copyText": "Copy text",
