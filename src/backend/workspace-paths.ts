@@ -1,6 +1,6 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentSummary,
@@ -160,7 +160,7 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
       if (!isMissing(error) || options.exactPath) return Effect.fail(error);
       const requestedPath = decodePath(inputPath.trim());
       if (isAbsolute(requestedPath) || requestedPath.replaceAll("\\", "/").startsWith("~/")) return Effect.fail(error);
-      return findOutsideWorkspace(agent, workspaceRoot, candidatePath, readAllowedRoots, options).pipe(
+      return findOutsideWorkspace(agent, workspaceRoot, candidatePath, requestedPath, readAllowedRoots, options).pipe(
         Effect.flatMap((found) => (found === null ? Effect.fail(error) : Effect.succeed(found))),
       );
     }),
@@ -205,6 +205,7 @@ const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(functio
   agent: Pick<AgentSummary, "workspacePath">,
   workspaceRoot: string,
   candidatePath: string,
+  requestedPath: string,
   readAllowedRoots: Effect.Effect<string[]>,
   options: WorkspacePathAccess & ToolHistory,
 ): Effect.fn.Return<string | null, AttachmentOperationError> {
@@ -213,17 +214,15 @@ const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(functio
   const relativePath = isWithin(agent.workspacePath, candidatePath)
     ? relative(agent.workspacePath, candidatePath)
     : null;
-  const relativePaths =
-    relativePath === null ? [] : [...new Set([relativePath, relativePath.replace(LOCATION_SUFFIX, "")])];
+  const relativePaths = relativePath === null ? [] : withLocationVariants(relativePath);
   const inAddedFolder = yield* onlyMatch(allowedRoots, relativePaths, mayAccess);
   if (inAddedFolder !== null) return inAddedFolder;
-  const name = basename(candidatePath);
-  const withoutLocation = name.replace(LOCATION_SUFFIX, "");
+  const historyEndings =
+    relativePath === null ? withLocationVariants(withoutLeadingParents(requestedPath)) : relativePaths;
   const history = [...(options.fileHistory ?? [])].reverse();
-  const historyPaths = new Set([
-    ...history.filter((path) => basename(path) === name),
-    ...history.filter((path) => basename(path) === withoutLocation),
-  ]);
+  const historyPaths = new Set(
+    historyEndings.flatMap((linkPath) => history.filter((path) => endsWithPath(path, linkPath))),
+  );
   for (const historyPath of historyPaths) {
     const found = yield* Effect.result(attachmentCall(() => realpath(historyPath)));
     if (Result.isSuccess(found) && mayAccess(found.success)) return found.success;
@@ -233,6 +232,21 @@ const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(functio
   const workFolders = [...new Set([...(options.workFolders ?? [])].reverse())].slice(0, WORK_FOLDER_LIMIT);
   return yield* onlyMatch(workFolders, relativePaths, mayAccess);
 });
+
+function withLocationVariants(path: string): string[] {
+  return path === "" ? [] : [...new Set([path, path.replace(LOCATION_SUFFIX, "")])];
+}
+
+function withoutLeadingParents(path: string): string {
+  const parts = normalize(path.replaceAll("\\", "/")).split(sep);
+  const first = parts.findIndex((part) => part !== ".." && part !== ".");
+  return first === -1 ? "" : parts.slice(first).join(sep);
+}
+
+function endsWithPath(path: string, ending: string): boolean {
+  const normalized = normalize(path);
+  return normalized === ending || normalized.endsWith(`${sep}${ending}`);
+}
 
 const onlyMatch = Effect.fn("Workspace.onlyMatch")(function* (
   folders: readonly string[],

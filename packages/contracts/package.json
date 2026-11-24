@@ -129,6 +129,7 @@
     "./team-protocol/password-managers-v1": "./src/team-protocol/password-managers-v1.ts",
     "./team-protocol/pending-approval-v1": "./src/team-protocol/pending-approval-v1.ts",
     "./team-protocol/pending-prompts-v1": "./src/team-protocol/pending-prompts-v1.ts",
+    "./team-protocol/prompt-detail-v1": "./src/team-protocol/prompt-detail-v1.ts",
     "./team-protocol/phone-feedback-v1": "./src/team-protocol/phone-feedback-v1.ts",
     "./team-protocol/current": "./src/team-protocol/current.ts",
     "./team-protocol/current-agent-keys": "./src/team-protocol/current-agent-keys.ts",
