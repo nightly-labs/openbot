@@ -1,4 +1,4 @@
-import { useIsFocused } from "expo-router";
+import { useNavigation } from "expo-router";
 import { type PropsWithChildren, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import Animated, {
@@ -19,7 +19,7 @@ const ROW_STAGGER = 30;
 const ROW_RISE = 10;
 const MAX_DELAY = 300;
 const REDUCED_DURATION = 150;
-const SETTLE_GRACE = 250;
+const SETTLE_GRACE = 1000;
 const EASE_OUT = Easing.bezierFn(0.23, 1, 0.32, 1);
 
 export interface AgentListRevealState {
@@ -39,13 +39,8 @@ export function useAgentListReveal(ready: boolean, scope: string): AgentListReve
   const finished = finishedScope === scope;
   const [laidOutScope, setLaidOutScope] = useState<string | null>(null);
   const onLayout = useCallback(() => setLaidOutScope(scope), [scope]);
-  const focused = useIsFocused();
-  const focusedNow = useRef(focused);
+  const navigation = useNavigation();
   const settledScope = useRef<string | null>(null);
-
-  useLayoutEffect(() => {
-    focusedNow.current = focused;
-  }, [focused]);
 
   useLayoutEffect(() => {
     elapsed.set(0);
@@ -62,7 +57,7 @@ export function useAgentListReveal(ready: boolean, scope: string): AgentListReve
       elapsed.set(duration);
       setFinishedScope(scope);
     };
-    if (!focusedNow.current || settledScope.current === scope) {
+    if (!navigation.isFocused() || settledScope.current === scope) {
       showAll();
       return;
     }
@@ -90,7 +85,7 @@ export function useAgentListReveal(ready: boolean, scope: string): AgentListReve
       clearTimeout(settleTimer);
       cancelAnimation(elapsed);
     };
-  }, [elapsed, elapsedScope, laidOutScope, ready, reducedMotion, scope]);
+  }, [elapsed, elapsedScope, laidOutScope, navigation, ready, reducedMotion, scope]);
 
   return useMemo(
     () => ({ elapsed, elapsedScope, scope, finished, reducedMotion, onLayout }),
