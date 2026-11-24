@@ -419,7 +419,6 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                   onOpenSettings={() => push("settings")}
                   sharing={presence().sharing}
                   canShare={canShare()}
-                  onManageSharing={() => push("browser-sharing")}
                 />
               </section>
               <section class="ext-layer ext-chat-layer" inert={!pushed()}>
@@ -437,12 +436,14 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                         <NewChannelScreen workspace={current()} onClose={back} onCreated={openChannel} />
                       </Match>
                       <Match when={shown.kind === "browser-sharing"}>
-                        <BrowserSharingScreen onBack={back} />
+                        <BrowserSharingScreen onBack={() => push("settings")} />
                       </Match>
                       <Match when={shown.kind === "settings"}>
                         <SettingsScreen
+                          sharing={presence().sharing}
                           onBack={back}
                           onAnalyticsChanged={(enabled) => void saveAnalyticsAnswer(props.session.token, enabled)}
+                          onOpenSharedTabs={() => push("browser-sharing")}
                         />
                       </Match>
                       <Match when={shown.kind === "new-folder"}>

@@ -277,11 +277,14 @@ async function shot(page: Page, label: string): Promise<void> {
 let panel: Page | null = null;
 async function toHome(target: Page): Promise<void> {
   const server = target.getByRole("button", { name: english("extension.home.serverMenu") });
-  const atHome = await server.click({ trial: true, timeout: 2_000 }).then(
-    () => true,
-    () => false,
-  );
-  if (!atHome) await target.getByRole("button", { name: english("common.back"), exact: true }).click();
+  for (let step = 0; step < 3; step += 1) {
+    const atHome = await server.click({ trial: true, timeout: 2_000 }).then(
+      () => true,
+      () => false,
+    );
+    if (atHome) return;
+    await target.getByRole("button", { name: english("common.back"), exact: true }).click();
+  }
 }
 const made: { folderId: string | null; channelId: string | null; agentId: string | null } = {
   folderId: null,
@@ -639,7 +642,8 @@ try {
   );
   await page.getByRole("button", { name: english("common.back"), exact: true }).click();
   await serverTitle.click();
-  await page.getByRole("menuitem", { name: english("extension.browser.title") }).click();
+  await page.getByRole("menuitem", { name: english("extension.home.settings") }).click();
+  await page.getByRole("button", { name: english("extension.browser.title") }).click();
   await shot(page, "6b-shared-tabs-settings");
   await page
     .getByRole("button", { name: english("extension.browser.revokeSite", { site: new URL(xBase).host }) })

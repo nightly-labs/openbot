@@ -46,7 +46,6 @@ function Home(props: { options?: StoryServerOptions; offline?: boolean; setup?: 
           onOpenSettings={() => undefined}
           sharing={false}
           canShare
-          onManageSharing={() => undefined}
         />
       )}
     </WithWorkspace>

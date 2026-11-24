@@ -44,7 +44,6 @@ function Home(props: { asks?: BrowserAsk[] }) {
             onOpenSettings={() => undefined}
             sharing
             canShare
-            onManageSharing={() => undefined}
           />
           <BrowserAsks />
         </>

@@ -1,10 +1,18 @@
-import { ArrowLeft, SwitchField } from "@openbot/ui";
+import { AppWindow, ArrowLeft, SwitchField } from "@openbot/ui";
+import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { createSignal, onSettled, Show } from "solid-js";
 import { analyticsLinked, setAnalyticsLinked } from "./analytics";
 import { readSession } from "./extension-storage";
 
-export function SettingsScreen(props: { onBack: () => void; onAnalyticsChanged: (enabled: boolean) => void }) {
+interface SettingsScreenProps {
+  sharing: boolean;
+  onBack: () => void;
+  onAnalyticsChanged: (enabled: boolean) => void;
+  onOpenSharedTabs: () => void;
+}
+
+export function SettingsScreen(props: SettingsScreenProps) {
   const { t } = useText();
   const [linked, setLinked] = createSignal<boolean | null>(null);
   onSettled(() => {
@@ -32,6 +40,15 @@ export function SettingsScreen(props: { onBack: () => void; onAnalyticsChanged: 
             onChange={(enabled) => void changeAnalytics(enabled).catch(() => undefined)}
             label={t("settings.analytics.title")}
           />
+        </Show>
+        <Show when={props.sharing}>
+          <SettingsLinkGroup inset>
+            <SettingsLinkRow
+              icon={<AppWindow aria-hidden="true" />}
+              label={t("extension.browser.title")}
+              onClick={() => props.onOpenSharedTabs()}
+            />
+          </SettingsLinkGroup>
         </Show>
       </div>
     </div>

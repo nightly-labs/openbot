@@ -159,7 +159,6 @@ export function StoreHomePanel() {
           onOpenSettings={() => undefined}
           sharing={false}
           canShare
-          onManageSharing={() => undefined}
         />
       )}
     </LoadWorkspace>

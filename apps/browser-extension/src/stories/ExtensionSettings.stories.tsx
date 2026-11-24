@@ -11,11 +11,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-function Settings(props: { linked: boolean }) {
+function Settings(props: { linked: boolean; sharing?: boolean }) {
   installStoryChrome({ "openbot.analytics.v1": { enabled: props.linked, at: 0 } });
   return (
     <PanelFrame>
-      <SettingsScreen onBack={() => undefined} onAnalyticsChanged={() => undefined} />
+      <SettingsScreen
+        sharing={props.sharing ?? true}
+        onBack={() => undefined}
+        onAnalyticsChanged={() => undefined}
+        onOpenSharedTabs={() => undefined}
+      />
     </PanelFrame>
   );
 }
@@ -23,3 +28,5 @@ function Settings(props: { linked: boolean }) {
 export const AnalyticsLinked: Story = { render: () => <Settings linked /> };
 
 export const AnalyticsNotLinked: Story = { render: () => <Settings linked={false} /> };
+
+export const ServerWithoutSharedTabs: Story = { render: () => <Settings linked sharing={false} /> };
