@@ -622,7 +622,7 @@ export function AgentEventBridge() {
       if (event.type === "runtime-snapshot") snapshotReceived = true;
       if (platform.chatWindow) return;
       playAgentEventSound(event);
-      readDictatedReplies(event, activeServerId());
+      readDictatedReplies(event, activeServerId(), isMainThread);
     });
     void agentsPort()
       .agent.getRuntimeSnapshot()
