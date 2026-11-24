@@ -111,6 +111,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "לא ניתן לעזוב את {name}",
   "mobile.server.drawer.removeFailed": "לא ניתן להסיר את {name}",
   "mobile.server.drawer.deleteFailed": "לא ניתן למחוק את {name}",
+  "mobile.server.drawer.hide": "הסתרת השרת",
+  "mobile.server.drawer.show": "הצגת השרת",
+  "mobile.server.drawer.hiddenServers": "שרתים מוסתרים",
+  "mobile.server.drawer.hideFailed": "לא ניתן להסתיר את {name}",
+  "mobile.server.drawer.showFailed": "לא ניתן להציג את {name}",
   "mobile.server.drawer.actionFailed": "OpenBot לא הצליח להשלים את הפעולה. אפשר לנסות שוב.",
   "mobile.server.drawer.moveUp": "הזזה למעלה",
   "mobile.server.drawer.moveDown": "הזזה למטה",
@@ -385,6 +390,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "הפעולה מסירה את השרת משירות החשבונות עבור כל החברים. הקבצים והצ'אטים במחשב שלו נשמרים. כדי להשתמש בו שוב, יש לרשום אותו מאותו מחשב.",
   "mobile.server.settings.remove": "הסרת השרת",
+  "mobile.server.settings.hide": "הסתרת השרת",
+  "mobile.server.settings.show": "הצגת השרת",
   "mobile.server.settings.deleteTitle": "למחוק את {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot עוצר את השרת במחשב שלו ומעביר את הסוכנים, הצ'אטים והקבצים שלו לפח של אותו מחשב. השרת נעלם מרשימת השרתים בכל המכשירים שלך.",

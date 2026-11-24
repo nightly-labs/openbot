@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} konnte nicht verlassen werden",
   "mobile.server.drawer.removeFailed": "{name} konnte nicht entfernt werden",
   "mobile.server.drawer.deleteFailed": "{name} konnte nicht gelöscht werden",
+  "mobile.server.drawer.hide": "Server ausblenden",
+  "mobile.server.drawer.show": "Server einblenden",
+  "mobile.server.drawer.hiddenServers": "Ausgeblendete Server",
+  "mobile.server.drawer.hideFailed": "{name} konnte nicht ausgeblendet werden",
+  "mobile.server.drawer.showFailed": "{name} konnte nicht eingeblendet werden",
   "mobile.server.drawer.actionFailed": "OpenBot konnte diese Aktion nicht ausführen. Versuche es erneut.",
   "mobile.server.drawer.moveUp": "Nach oben verschieben",
   "mobile.server.drawer.moveDown": "Nach unten verschieben",
@@ -276,6 +281,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Dadurch wird der Server für alle Mitglieder aus dem Kontodienst entfernt. Dateien und Chats auf seinem Computer bleiben erhalten. Um ihn wieder zu nutzen, registriere ihn auf diesem Computer.",
   "mobile.server.settings.remove": "Server entfernen",
+  "mobile.server.settings.hide": "Server ausblenden",
+  "mobile.server.settings.show": "Server einblenden",
   "mobile.server.settings.deleteTitle": "{name} löschen?",
   "mobile.server.settings.deleteBody":
     "OpenBot stoppt den Server auf seinem Computer und verschiebt seine Agenten, Chats und Dateien in den Papierkorb dieses Computers. Der Server verschwindet aus der Serverliste auf allen deinen Geräten.",

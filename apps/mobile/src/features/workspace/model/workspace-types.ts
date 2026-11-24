@@ -274,6 +274,7 @@ export interface MobileServer {
   role: "owner" | "admin" | "member";
   memberLimit?: number;
   hosted?: boolean;
+  hidden?: true;
   storageGb?: number;
   restartAvailable?: boolean;
   keyChangedAt?: number;
@@ -389,6 +390,7 @@ export interface MobileWorkspaceContextValue {
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   removeServer: (serverId: string) => Promise<void>;
+  setServerHidden: (serverId: string, hidden: boolean) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
   hostedServerStarting: (serverId: string) => void;

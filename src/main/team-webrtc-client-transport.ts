@@ -109,6 +109,7 @@ interface TeamWebRtcClientTransportOptions {
   ) => Effect.Effect<void, CentralAuthOperationError>;
   removeMember: (hostId: string, membershipId: string) => Effect.Effect<void, CentralAuthOperationError>;
   removeOwnedHost: (hostId: string) => Effect.Effect<void, CentralAuthOperationError>;
+  setHostHidden: (hostId: string, hidden: boolean) => Effect.Effect<void, CentralAuthOperationError>;
   getPrincipalId: () => string;
   controlPlaneUrl: string;
   downloadHostLogo: (
@@ -349,6 +350,14 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
         yield* this.#options.removeOwnedHost(hostId).pipe(toRemoteWorkflowError);
       }),
     );
+  }).bind(this);
+
+  readonly setHostHidden = Effect.fn("TeamWebRtcClient.setHostHidden")(function* (
+    this: TeamWebRtcClientTransport,
+    hostId: string,
+    hidden: boolean,
+  ): Effect.fn.Return<void, RemoteWorkflowError> {
+    return yield* this.#owned(this.#options.setHostHidden(hostId, hidden).pipe(toRemoteWorkflowError));
   }).bind(this);
 
   readonly sendDesktop = Effect.fn("TeamWebRtcClient.sendDesktop")(function* (

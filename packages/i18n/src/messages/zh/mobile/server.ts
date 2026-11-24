@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "无法退出 {name}",
   "mobile.server.drawer.removeFailed": "无法移除 {name}",
   "mobile.server.drawer.deleteFailed": "无法删除 {name}",
+  "mobile.server.drawer.hide": "隐藏服务器",
+  "mobile.server.drawer.show": "显示服务器",
+  "mobile.server.drawer.hiddenServers": "已隐藏的服务器",
+  "mobile.server.drawer.hideFailed": "无法隐藏 {name}",
+  "mobile.server.drawer.showFailed": "无法显示 {name}",
   "mobile.server.drawer.actionFailed": "OpenBot 无法完成该操作，请重试。",
   "mobile.server.drawer.moveUp": "上移",
   "mobile.server.drawer.moveDown": "下移",
@@ -260,6 +265,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "这会把该服务器从账号服务中移除，对所有成员生效。其电脑上的文件和对话会保留。如需再次使用，请在那台电脑上重新注册。",
   "mobile.server.settings.remove": "移除服务器",
+  "mobile.server.settings.hide": "隐藏服务器",
+  "mobile.server.settings.show": "显示服务器",
   "mobile.server.settings.deleteTitle": "删除 {name}？",
   "mobile.server.settings.deleteBody":
     "OpenBot 会在其电脑上停止该服务器，并将其智能体、聊天和文件移到该电脑的废纸篓。该服务器会从你所有设备的服务器列表中移除。",

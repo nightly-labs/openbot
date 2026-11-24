@@ -232,6 +232,9 @@ export const messages = {
   "server.rail.delete": "Server löschen",
   "server.rail.hide": "Server ausblenden",
   "server.rail.showLocal": "{name} anzeigen",
+  "server.rail.hiddenServers": "Ausgeblendete Server",
+  "server.rail.hideFailed": "{name} konnte nicht ausgeblendet werden",
+  "server.rail.showFailed": "{name} konnte nicht eingeblendet werden",
   "server.plan.daysLeft": {
     one: "{count} Tag",
     other: "{count} Tage",

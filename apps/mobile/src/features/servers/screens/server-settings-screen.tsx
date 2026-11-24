@@ -2,6 +2,8 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { canAdministerServer } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
+import Eye from "lucide-react-native/icons/eye";
+import EyeOff from "lucide-react-native/icons/eye-off";
 import LogOut from "lucide-react-native/icons/log-out";
 import Palette from "lucide-react-native/icons/palette";
 import Trash2 from "lucide-react-native/icons/trash";
@@ -60,6 +62,7 @@ function ServerSettingsHome({ server }: { server: MobileServer }) {
       <ServerAiSection serverId={server.id} />
       <ServerDataSections serverId={server.id} />
       <ServerConnectionSection server={server} hostedServerIds={hostedServerIds} />
+      <ServerVisibilitySection server={server} />
       <ServerExitSection server={server} hostedServerIds={hostedServerIds} />
       <ServerKeySettings server={server} />
     </SettingsContent>
@@ -85,6 +88,39 @@ function ServerStatusLine({ server }: { server: MobileServer }) {
         </Typography.Paragraph>
       ) : null}
     </View>
+  );
+}
+
+function ServerVisibilitySection({ server }: { server: MobileServer }) {
+  const { t, errorMessage } = useText();
+  const { servers, setServerHidden } = useMobileWorkspace();
+  const { busy, error, perform } = useLockedAction();
+  const hidden = server.hidden === true;
+  if (!hidden && !servers.some((item) => item.id !== server.id && !item.hidden)) return null;
+  return (
+    <SettingsSection footer={error}>
+      <SettingsRow
+        leading={<RowIcon icon={hidden ? Eye : EyeOff} tone="accent" />}
+        disclosure={false}
+        disabled={busy}
+        onPress={() =>
+          void perform(
+            () => setServerHidden(server.id, !hidden),
+            (caught) =>
+              errorMessage(
+                caught,
+                hidden
+                  ? t("mobile.server.drawer.showFailed", { name: server.name })
+                  : t("mobile.server.drawer.hideFailed", { name: server.name }),
+              ),
+          )
+        }
+      >
+        <Typography.Paragraph className="text-accent">
+          {hidden ? t("mobile.server.settings.show") : t("mobile.server.settings.hide")}
+        </Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
   );
 }
 
@@ -129,9 +165,7 @@ function ServerExitSection({
         </SettingsRow>
       </SettingsSection>
     );
-  const kind = localServerKind(serverId);
-  if (kind === "computer") return null;
-  if (kind === "onComputer")
+  if (localServerKind(serverId) === "onComputer")
     return (
       <SettingsSection footer={error}>
         <SettingsRow

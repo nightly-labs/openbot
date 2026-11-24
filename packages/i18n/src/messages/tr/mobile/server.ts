@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} sunucusundan ayrılınamadı",
   "mobile.server.drawer.removeFailed": "{name} kaldırılamadı",
   "mobile.server.drawer.deleteFailed": "{name} silinemedi",
+  "mobile.server.drawer.hide": "Sunucuyu gizle",
+  "mobile.server.drawer.show": "Sunucuyu göster",
+  "mobile.server.drawer.hiddenServers": "Gizli sunucular",
+  "mobile.server.drawer.hideFailed": "{name} gizlenemedi",
+  "mobile.server.drawer.showFailed": "{name} gösterilemedi",
   "mobile.server.drawer.actionFailed": "OpenBot bu işlemi tamamlayamadı. Tekrar deneyin.",
   "mobile.server.drawer.moveUp": "Yukarı taşı",
   "mobile.server.drawer.moveDown": "Aşağı taşı",
@@ -276,6 +281,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Bu işlem sunucuyu tüm üyeler için hesap hizmetinden kaldırır. Bilgisayarındaki dosyalar ve sohbetler kalır. Yeniden kullanmak için o bilgisayardan kaydedin.",
   "mobile.server.settings.remove": "Sunucuyu kaldır",
+  "mobile.server.settings.hide": "Sunucuyu gizle",
+  "mobile.server.settings.show": "Sunucuyu göster",
   "mobile.server.settings.deleteTitle": "{name} silinsin mi?",
   "mobile.server.settings.deleteBody":
     "OpenBot sunucuyu bilgisayarında durdurur ve ajanlarını, sohbetlerini ve dosyalarını o bilgisayarın çöp kutusuna taşır. Sunucu tüm cihazlarınızdaki sunucu listesinden çıkar.",

@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Não foi possível sair de {name}",
   "mobile.server.drawer.removeFailed": "Não foi possível remover {name}",
   "mobile.server.drawer.deleteFailed": "Não foi possível excluir {name}",
+  "mobile.server.drawer.hide": "Ocultar servidor",
+  "mobile.server.drawer.show": "Mostrar servidor",
+  "mobile.server.drawer.hiddenServers": "Servidores ocultos",
+  "mobile.server.drawer.hideFailed": "Não foi possível ocultar {name}",
+  "mobile.server.drawer.showFailed": "Não foi possível mostrar {name}",
   "mobile.server.drawer.actionFailed": "O OpenBot não conseguiu concluir esta ação. Tente novamente.",
   "mobile.server.drawer.moveUp": "Mover para cima",
   "mobile.server.drawer.moveDown": "Mover para baixo",
@@ -272,6 +277,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Isto remove o servidor do serviço de contas para todos os membros. Os arquivos e chats no computador dele continuam. Para usá-lo de novo, registre-o naquele computador.",
   "mobile.server.settings.remove": "Remover servidor",
+  "mobile.server.settings.hide": "Ocultar servidor",
+  "mobile.server.settings.show": "Mostrar servidor",
   "mobile.server.settings.deleteTitle": "Excluir {name}?",
   "mobile.server.settings.deleteBody":
     "O OpenBot para o servidor no computador dele e move os agentes, conversas e arquivos para a lixeira desse computador. O servidor sai da lista de servidores em todos os seus dispositivos.",

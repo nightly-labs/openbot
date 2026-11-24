@@ -265,9 +265,11 @@ import {
 import { serverAccent } from "@/features/workspace/model/server-order";
 import {
   applyServerRecovery,
+  hostWithHidden,
   sameServerRecovery,
   serverFromHost,
   serverKind,
+  serverWithHidden,
   showsOnline,
 } from "@/features/workspace/model/server-status";
 import { moveSidebarChat } from "@/features/workspace/model/sidebar-layout";
@@ -511,6 +513,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const quietStarts = useRef(new Set<string>());
   const keptCapabilities = useRef(new Map<string, readonly string[]>());
   const keptHosts = useRef<readonly RemoteTeamHost[] | null>(null);
+  const pendingHidden = useRef(new Map<string, boolean>());
   const directoryLoaded = useRef(false);
   const keepHosts = useCallback(
     (hosts: readonly RemoteTeamHost[]) => {
@@ -662,7 +665,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
 
   const installHosts = useCallback(
-    (hosts: readonly RemoteTeamHost[], confirmed = true) => {
+    (listed: readonly RemoteTeamHost[], confirmed = true) => {
+      const hosts = listed.map((host) => {
+        const hidden = pendingHidden.current.get(host.hostId);
+        return hidden === undefined ? host : hostWithHidden(host, hidden);
+      });
       const available = new Set(hosts.map((host) => host.hostId));
       if (confirmed) {
         dropServerState(new Set(serversRef.current.filter((server) => !available.has(server.id)).map(({ id }) => id)));
@@ -670,7 +677,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         retainAgentBackdrops([...available]);
         retainLocationAlwaysAllowed([...available]);
         for (const host of hosts) removedServers.current.delete(host.hostId);
-        keepHosts(hosts);
+        keepHosts(listed);
       }
       setServers((current) => {
         const previousServers = new Map(current.map((server) => [server.id, server]));
@@ -678,10 +685,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           serverFromHost(host, serverKind(host.hostId, session.host?.hostId), previousServers.get(host.hostId)),
         );
       });
+      const shown = hosts.filter((host) => !host.hidden);
       setActiveServerId((current) =>
-        hosts.some((host) => host.hostId === current)
+        shown.some((host) => host.hostId === current)
           ? current
-          : (sortByPreference(hosts.map((host) => ({ id: host.hostId })))[0]?.id ?? null),
+          : (sortByPreference(shown.map((host) => ({ id: host.hostId })))[0]?.id ?? null),
       );
     },
     [dropServerState, session.host?.hostId, sortByPreference, workspaceCache, keepHosts],
@@ -1599,7 +1607,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     if (active?.resuming === true) return;
     const activeFailed = active?.state === "offline" || active?.state === "error";
     if (!startupWaitOver && !activeFailed) return;
-    const online = sortByPreference(servers).find((server) => server.state === "online");
+    const online = sortByPreference(servers).find((server) => !server.hidden && server.state === "online");
     if (!online) return;
     startupFallback.current = false;
     loadGeneration.current += 1;
@@ -1852,7 +1860,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       setServerDirectoryError(null);
       if (activeServerIdRef.current === serverId) {
         loadGeneration.current += 1;
-        const remaining = serversRef.current.filter((candidate) => candidate.id !== serverId);
+        const remaining = serversRef.current.filter((candidate) => candidate.id !== serverId && !candidate.hidden);
         setActiveServerId(sortByPreference(remaining)[0]?.id ?? null);
       }
       setServers((current) => current.filter((candidate) => candidate.id !== serverId));
@@ -2021,7 +2029,49 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         const server = serversRef.current.find((candidate) => candidate.id === serverId);
         if (server?.role !== "owner") throw new Error(currentText().t("mobile.workspace.error.removeOwnedServerOnly"));
         await runTeamEffect(directory.removeOwnedHost(server.id));
+        setLocalServerLinks((current) =>
+          current.computers.has(serverId)
+            ? { computers: new Set([...current.computers].filter((id) => id !== serverId)), parents: current.parents }
+            : current,
+        );
         forgetServer(serverId);
+      },
+      setServerHidden: async (serverId, hidden) => {
+        const server = serversRef.current.find((candidate) => candidate.id === serverId);
+        if (!server || (server.hidden === true) === hidden) return;
+        const others = sortByPreference(
+          serversRef.current.filter((candidate) => candidate.id !== serverId && !candidate.hidden),
+        );
+        if (hidden && others.length === 0) return;
+        const apply = (value: boolean) =>
+          setServers((current) =>
+            current.map((candidate) => (candidate.id === serverId ? serverWithHidden(candidate, value) : candidate)),
+          );
+        pendingHidden.current.set(serverId, hidden);
+        apply(hidden);
+        const previousActive = activeServerIdRef.current;
+        const activeShown = others.some((candidate) => candidate.id === previousActive);
+        const nextActive = hidden ? (others[0]?.id ?? null) : serverId;
+        const switches = hidden ? previousActive === serverId : !activeShown;
+        const select = (id: string | null) => {
+          startupFallback.current = false;
+          loadGeneration.current += 1;
+          conversationStore.cancelRequests();
+          setActiveServerId(id);
+        };
+        if (switches) select(nextActive);
+        try {
+          await runTeamEffect(directory.setHostHidden(serverId, hidden));
+        } catch (error) {
+          pendingHidden.current.delete(serverId);
+          apply(!hidden);
+          if (switches && activeServerIdRef.current === nextActive) select(previousActive);
+          throw error;
+        }
+        const kept = keptHosts.current;
+        if (kept) keepHosts(kept.map((host) => (host.hostId === serverId ? hostWithHidden(host, hidden) : host)));
+        await refreshMemberships().catch(() => undefined);
+        pendingHidden.current.delete(serverId);
       },
       refreshServer: async (serverId) => {
         connections.current.get(serverId)?.refresh();
@@ -2502,6 +2552,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     refreshHosts,
     refreshMemberships,
     reorderServers,
+    sortByPreference,
+    keepHosts,
     applySidebarLayout,
     channelStore,
     conversationStore,

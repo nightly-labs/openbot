@@ -726,6 +726,42 @@
   stroke-width: var(--openbot-icon-stroke-lg);
 }
 
+.server-rail-folder-grid {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 2px;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-lg);
+  padding: 4px;
+  background: var(--openbot-bg-surface);
+  opacity: 0.72;
+  transition: opacity var(--openbot-duration-hover) ease;
+}
+
+.server-rail-folder:is(:hover, [data-expanded]) .server-rail-folder-grid {
+  opacity: 1;
+}
+
+.server-rail-folder-mark {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+}
+
+.server-rail-folder-mark > * {
+  width: 100%;
+  height: 100%;
+}
+
+.server-rail-folder-mark > .server-rail-logo {
+  border-radius: var(--openbot-radius-xs);
+}
+
 .server-rail-tooltip {
   z-index: var(--openbot-layer-tooltip);
   max-width: min(240px, calc(100vw - 16px));
@@ -1117,6 +1153,27 @@ textarea {
 
 .server-menu-mark:has(> .ui-server-plush-logo)::after {
   content: none;
+}
+
+.server-menu-hidden-folder-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--openbot-text-secondary);
+}
+
+.server-menu-hidden-count {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.server-menu-hidden-show {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
 }
 
 .server-menu-name {

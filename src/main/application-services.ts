@@ -3782,6 +3782,7 @@ export async function createApplicationServices({
           centralAuth.updateRemoteMember(hostId, membershipId, role, reactivate),
         removeMember: (hostId, membershipId) => centralAuth.removeRemoteMember(hostId, membershipId),
         removeOwnedHost: (hostId) => centralAuth.removeOwnedRemoteHost(hostId),
+        setHostHidden: (hostId, hidden) => centralAuth.setRemoteHostHidden(hostId, hidden),
         getPrincipalId: () => centralAuth.getSignedInUser().id,
         controlPlaneUrl: centralAuth.resolveApiUrl("/"),
         downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),
