@@ -427,7 +427,7 @@ function LibraryTile({
     else if (action === "move") router.push({ pathname: "/library-folders", params: { serverId, fileId: file.id } });
     else if (action === "delete") confirmDelete();
     else if (action === "showInChat" && agentId && messageId)
-      router.push({ pathname: "/chat/[agentId]", params: { agentId, messageId } });
+      router.push({ pathname: "/chat/[agentId]", params: { agentId, serverId, messageId } });
   }
 
   function longPress() {

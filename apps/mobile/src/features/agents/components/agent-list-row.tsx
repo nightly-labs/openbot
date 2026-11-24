@@ -232,7 +232,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
     >
       {isAndroid ? (
         <View>
-          <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+          <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
             <Link.Trigger>{row}</Link.Trigger>
           </Link>
           {menuKey > 0 ? <AgentAndroidMenu key={menuKey} agent={agent} onClose={() => setMenuKey(0)} /> : null}

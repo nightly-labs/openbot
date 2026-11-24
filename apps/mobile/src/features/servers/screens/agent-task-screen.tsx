@@ -99,8 +99,8 @@ const NO_OLDER = () => {};
 const AWAIT_TURN_MS = 10_000;
 const taskMessageId = retryOperationIds(() => Crypto.randomUUID());
 
-function onThreadDeleted(task: AgentTask) {
-  router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId } });
+function onThreadDeleted(task: AgentTask, serverId: string) {
+  router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId, serverId } });
 }
 
 export function AgentTaskScreen() {
@@ -260,11 +260,14 @@ function AgentTaskChat({
       link && sourceTitle !== null
         ? () => {
             if (link.sourceTaskId === null)
-              router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId, messageId: link.sourceMessageId } });
+              router.dismissTo({
+                pathname: "/chat/[agentId]",
+                params: { agentId, serverId, messageId: link.sourceMessageId },
+              });
             else router.setParams<"/task/[taskId]">({ taskId: link.sourceTaskId, messageId: link.sourceMessageId });
           }
         : undefined,
-    [link, sourceTitle, agentId],
+    [link, sourceTitle, agentId, serverId],
   );
   const [focus, setFocus] = useState(focusMessageId);
   const openingUnread = useThreadOpeningUnread(serverId, agentId, isDraft ? null : taskId);
