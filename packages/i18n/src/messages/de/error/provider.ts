@@ -302,6 +302,10 @@ export const messages = {
     "Linux hat den Anbieter beendet, weil OpenBot ein Echtzeit-CPU-Limit von 0 hat. Das Limit kommt von deinem System. Installiere und starte rtkit (`rtkit-daemon`), führe `systemctl --user restart xdg-desktop-portal` aus und starte OpenBot dann neu. Ein Neustart von xdg-desktop-portal allein hilft nicht, solange rtkit fehlt.",
   "error.provider.cpuUnsupported":
     "Der Prozessor dieses Computers kann diesen Anbieter nicht ausführen. Verwende einen anderen Anbieter.",
+  "error.provider.largeMemoryPages":
+    "Dieser Anbieter kann auf diesem Linux-Kernel nicht laufen, weil der Kernel Speicherseiten größer als 4 KiB verwendet, wie auf dem Raspberry Pi 5 oder unter Asahi Linux. Verwende einen Kernel mit 4-KiB-Seiten oder einen anderen Anbieter.",
+  "error.provider.ipv6Missing":
+    "Dieser Anbieter braucht IPv6, und IPv6 ist auf diesem Computer ausgeschaltet. Schalte IPv6 ein und versuche es erneut. Unter WSL entferne ipv6.disable=1 aus .wslconfig und führe wsl --shutdown aus.",
   "error.provider.windowsBlocked":
     "Windows-Sicherheitseinstellungen wie die Intelligente App-Steuerung haben den Start dieses Anbieters verhindert. Verwende einen anderen Anbieter.",
   "error.provider.opencodeDatabaseNewer":
@@ -418,6 +422,8 @@ export const messages = {
     "Hermes hat während dieser Nachricht die Verbindung verloren und weiß daher nicht, ob die Arbeit fertig ist. Prüfe, was der Agent getan hat, bevor du die Nachricht erneut sendest.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot konnte dieses Modell nicht verwenden: Das Modell hat die Denk-Einstellung nicht akzeptiert. Wähle ein anderes Modell für diesen Agenten und sende deine Nachricht erneut.",
+  "error.provider.copilotAnswerIncomplete":
+    "Das Modell hat aufgehört, bevor seine Antwort vollständig war. Sende deine Nachricht erneut oder wähle ein anderes Modell für diesen Agenten.",
   "error.provider.usageLimitReached": "Das Konto hat sein Nutzungslimit erreicht.",
   "error.provider.claudeContextFull":
     "Dieser Chat ist für Claude zu lang geworden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
@@ -441,6 +447,8 @@ export const messages = {
     "{provider} hat diese Nachricht wegen seiner Sicherheitsregeln blockiert: {reason} Wenn {provider} auch deine nächsten Nachrichten blockiert, starte einen neuen Chat.",
   "error.provider.codexAudioRefused":
     "Dieses Modell kann kein Audio anhören, darum hat es den Ton in diesem Chat nicht akzeptiert. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Um fortzufahren, sende deine Anfrage erneut und bitte den Agenten, ohne den Ton zu arbeiten. Um Ton zu prüfen, wähle im Modellmenü des Agenten ein Modell, das Audio anhören kann.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex konnte die Einstellungen deines ChatGPT-Kontos nicht laden, darum hat der Agent angehalten. Versuche es erneut. Wenn er wieder anhält, wähle für ChatGPT „Neu verbinden“ unter Servereinstellungen → Anbieter.",
   "error.provider.imageTooSmall":
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu klein ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooLarge":
@@ -462,8 +470,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code hat die gespeicherte Sitzung dieses Chats nicht gefunden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.grokSignIn": "Führe `grok login` aus oder setze XAI_API_KEY, um Grok zu verwenden.",
+  "error.provider.acpSignInNoStart":
+    "Der Anbieter ist nicht gestartet, darum konnte die Anmeldung nicht beginnen. Versuche es erneut oder starte OpenBot neu.",
   "error.provider.acpSignInTimedOut": "Die Zeit für die Anmeldung ist abgelaufen.",
   "error.provider.acpSignInStopped": "Die Anmeldung wurde vor dem Abschluss gestoppt.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Dieser Computer hat keinen Browser für die Google-Anmeldung. Wähle „Mit Code anmelden“, öffne den Link auf einem beliebigen Gerät und füge dann den Code ein.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini konnte die Anmeldeseite nicht öffnen. Installiere einen Browser und xdg-utils und verbinde dich dann aus einer Desktop-Sitzung auf diesem Host. Ein Server ohne Desktop kann diese Anmeldung nicht abschließen.",
   "error.provider.geminiBrowserOpenFailed":
@@ -581,6 +593,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Warte, bis der aktuelle Pi-Durchlauf endet.",
   "error.provider.acpSessionBusy":
     "{provider} beendet noch einen gestoppten Durchlauf. Versuche es gleich noch einmal.",
+  "error.provider.acpSettingsConflict":
+    "{provider} hat diesen Chat geändert, während OpenBot seine Einstellungen übernommen hat. Versuche es erneut.",
   "error.provider.acpSessionStale":
     "{provider} konnte die neueste Version dieses Chats nicht laden. Sende deine Nachricht noch einmal.",
   "error.provider.acpModelNotOffered":

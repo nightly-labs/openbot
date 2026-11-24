@@ -10,6 +10,7 @@ import {
   type ChannelTask,
   type ChannelTaskWait,
   canAdministerServer,
+  channelPageTasks,
   isReleasedRoutineSchedule,
   parseChannelCommand,
   parseChannelRead,
@@ -22,6 +23,7 @@ import {
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHANNEL_ROUTES, channelRequest, isChannelSettingsRoute } from "@openbot/contracts/team-protocol/channels-v1";
 import {
+  CHANNEL_PAGE_TASKS_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_WAITS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -102,6 +104,7 @@ export async function routeChannels(
     const seenSubtasks = capabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY);
     const taskWaits = capabilities.has(CHANNEL_TASK_WAITS_CAPABILITY) && input.beforeSequence === undefined;
     const settingLinks = capabilities.has(SETTING_LINK_MARKERS_CAPABILITY);
+    const pageTasksOnly = capabilities.has(CHANNEL_PAGE_TASKS_CAPABILITY);
     const newest = channels.store.pageWithoutExtent(input.channelId, input.beforeSequence, 100);
     const tasks =
       seenSubtasks && input.beforeSequence === undefined
@@ -118,14 +121,15 @@ export async function routeChannels(
       const messages = newest.messages.slice(-limit);
       const hasOlder = newest.olderCursor !== null || newest.messages.length > limit;
       const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;
+      const shown = messages.filter(
+        (item) => !hiddenAuthor(item, hiddenAgentIds) && (settingLinks || settingLinkEvent(item.message) === null),
+      );
       const base = {
         ...newest,
-        tasks,
+        tasks: pageTasksOnly ? channelPageTasks(tasks, shown) : tasks,
         olderCursor,
         channel: peerChannel(newest.channel),
-        messages: messages.filter(
-          (item) => !hiddenAuthor(item, hiddenAgentIds) && (settingLinks || settingLinkEvent(item.message) === null),
-        ),
+        messages: shown,
       };
       let extent: { olderCount: number; oldestAt?: string } | undefined;
       const sized = <Page extends typeof base>(value: Page) => {
@@ -137,7 +141,7 @@ export async function routeChannels(
       let bytes = Buffer.byteLength(JSON.stringify(body));
       if (bytes <= WEBRTC_FRAME_BODY_BUDGET) ({ body, bytes } = sized(body));
       if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
-        body = withWaits({ ...base, tasks: pageTasks(base.tasks, base.messages) });
+        body = withWaits({ ...base, tasks: channelPageTasks(base.tasks, base.messages) });
         bytes = Buffer.byteLength(JSON.stringify(body));
         if (bytes <= WEBRTC_FRAME_BODY_BUDGET || limit === 1) ({ body, bytes } = sized(body));
       }
@@ -207,14 +211,6 @@ export function requireVisibleChannel(
   if (hiddenAgentIds.size === 0 || !channels.store.exists(channelId)) return;
   if (!seesChannel(channels.store.get(channelId).members, hiddenAgentIds))
     throw new HttpError(404, sourceText("error.backend.channelNotFound"));
-}
-
-function pageTasks(tasks: readonly ChannelTask[], messages: readonly ChannelMessage[]): ChannelTask[] {
-  const openRuns = new Set(
-    tasks.flatMap((task) => (task.state === "completed" || task.state === "cancelled" ? [] : [task.rootTaskId])),
-  );
-  const shown = new Set(messages.map((item) => item.taskId));
-  return tasks.filter((task) => openRuns.has(task.rootTaskId) || shown.has(task.id));
 }
 
 export function hiddenAuthor(message: ChannelMessage, hiddenAgentIds: ReadonlySet<string>): boolean {

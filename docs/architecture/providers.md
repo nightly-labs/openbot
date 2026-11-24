@@ -632,8 +632,9 @@ a delivery on its way to one, which holds no turn id yet, or a context compactio
 `turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore makes the
 update wait, as a restart the user asked for waits, before anything is downloaded. Main shows the
 wait as a `downloading` runtime with no progress and the message `status.provider.updateWaiting`;
-its Cancel aborts the wait. New turns of the provider wait for the update from the start of the
-wait, so a busy provider still gets a moment without turns. No turn may start on that provider until the new client is ready: the drain
+its Cancel aborts the wait. The wait does not hold new turns, so one long turn does not stop the
+other agents of the provider; the update runs at the first moment with no turn. The check that finds
+that moment also starts the hold, in one step. No turn may start on that provider until the new client is ready: the drain
 scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
 delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
 failure as well as after a success.
@@ -944,7 +945,7 @@ sign-out. Runtime installation alone does not confirm authentication.
 On Ubuntu 24.04, install a desktop browser and `xdg-utils` before sign-in. The Google
 callback uses `127.0.0.1` on the host, so complete sign-in in a desktop session on that same
 VM. A browser on another computer cannot complete this loopback callback. A server with no
-desktop can install and start Gemini, but cannot complete the interactive Google sign-in.
+desktop signs Gemini in with the code sign-in below.
 
 The local Server settings > Providers screen offers Connect for both a managed runtime and an
 external runtime. Gemini has no device-code flow, so a remote host signs it in on a page in its
@@ -954,7 +955,16 @@ from the CLI in a private tab of its browser. The client polls `status`, shows t
 the live view (`browser-view`), and closes the dialog on the `result`. The Google callback goes to
 `127.0.0.1` on the host, so the host's browser completes it. No route carries the link or a
 credential, and every route requires an owner or admin. A host on another platform does not
-advertise the capability; open OpenBot in the host's desktop session to connect it there. A runtime status of "Runtime installed" means only that the files are
+advertise the capability; open OpenBot in the host's desktop session to connect it there.
+
+A host on any platform also advertises the `antigravity-code-sign-in-v1` marker (Team API v10). It
+adds nothing to the wire: it tells a client that the released providers-v8 `codeLoginStart` route
+signs Gemini in with `agy acp --login` (`ANTIGRAVITY_CODE_SIGN_IN` in `provider-drivers.ts`) and
+answers with the `paste` shape. The CLI prints the Google link; the user opens it on any device and
+pastes the code, or the URL of the page they land on, with the released `codeLoginSubmit`. This
+works on a server with no desktop and on a Windows host. A host before this marker refuses Gemini on
+that route, so the desktop with a joined server, the web client and mobile offer the code sign-in
+only when the host advertises it. It signs in the default Gemini account of the host. A runtime status of "Runtime installed" means only that the files are
 available; "Connected" requires a successful provider check. A known authentication or launch
 error takes priority over runtime readiness.
 

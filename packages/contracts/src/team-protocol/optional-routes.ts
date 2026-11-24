@@ -56,6 +56,7 @@ import { CHAT_COLORS_CODECS } from "./chat-colors-v1";
 import { CHAT_HISTORY_CODECS } from "./chat-history-v1";
 import { CLAUDE_COMPACT_WINDOW_CODECS } from "./claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CODECS } from "./claude-user-setup-v1";
+import { CLIENT_BROWSER_CODECS } from "./client-browser-v1";
 import { COMPUTER_ACTIVITY_CODECS } from "./computer-activity-v1";
 import { CONNECTORS_CODECS } from "./connectors-v1";
 import { CONTEXT_COMPACT_CODECS } from "./context-compact-v1";
@@ -163,10 +164,12 @@ import { VAULT_CODECS } from "./vault-v1";
 import { VAULT_V2_CODECS } from "./vault-v2";
 import { VAULT_V3_CODECS } from "./vault-v3";
 import { VAULT_V4_CODECS } from "./vault-v4";
+import { VOICE_TRANSCRIPTION_CODECS } from "./voice-transcription-v1";
 import { WEBHOOK_AGENT_SECRET_CODECS } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CODECS } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CODECS } from "./whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CODECS } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_CODECS } from "./workflow-folders-v1";
@@ -322,6 +325,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WHATSAPP_CONNECTOR_CODECS,
   ...WHATSAPP_WORKING_MESSAGE_CODECS,
   ...WHATSAPP_STATUS_REACTIONS_CODECS,
+  ...WHATSAPP_READ_ONLY_CODECS,
   ...MESSAGE_DELETE_CODECS,
   ...CHAT_HISTORY_CODECS,
   ...CONVERSATION_UNREAD_FROM_CODECS,
@@ -347,6 +351,8 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...SIDE_QUESTION_CODECS,
   ...LIVE_VOICE_CODECS,
   ...LIVE_VOICE_ACCOUNT_CODECS,
+  ...VOICE_TRANSCRIPTION_CODECS,
+  ...CLIENT_BROWSER_CODECS,
   ...BROWSER_PROFILES_CODECS,
   ...WORKFLOWS_CODECS,
   ...CRM_CODECS,

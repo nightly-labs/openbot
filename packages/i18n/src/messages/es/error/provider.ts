@@ -298,6 +298,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux detuvo el proveedor porque OpenBot tiene un límite de CPU en tiempo real de 0. El límite viene de tu sistema. Instala e inicia rtkit (`rtkit-daemon`), ejecuta `systemctl --user restart xdg-desktop-portal` y luego reinicia OpenBot. Reiniciar solo xdg-desktop-portal no sirve mientras falte rtkit.",
   "error.provider.cpuUnsupported": "El procesador de este equipo no puede ejecutar este proveedor. Usa otro proveedor.",
+  "error.provider.largeMemoryPages":
+    "Este proveedor no puede ejecutarse en este kernel de Linux, porque el kernel usa páginas de memoria de más de 4 KiB, como en Raspberry Pi 5 o Asahi Linux. Usa un kernel con páginas de 4 KiB u otro proveedor.",
+  "error.provider.ipv6Missing":
+    "Este proveedor necesita IPv6, y IPv6 está desactivado en este equipo. Activa IPv6 y vuelve a intentarlo. En WSL, quita ipv6.disable=1 de .wslconfig y ejecuta wsl --shutdown.",
   "error.provider.windowsBlocked":
     "La configuración de seguridad de Windows, como el Control inteligente de aplicaciones, impidió que este proveedor se iniciara. Usa otro proveedor.",
   "error.provider.opencodeDatabaseNewer":
@@ -408,6 +412,8 @@ export const messages = {
     "Hermes perdió su conexión durante este mensaje, así que no sabe si el trabajo terminó. Revisa lo que hizo el agente antes de enviar el mensaje de nuevo.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot no pudo usar este modelo: el modelo no aceptó su ajuste de razonamiento. Selecciona otro modelo para este agente y envía tu mensaje de nuevo.",
+  "error.provider.copilotAnswerIncomplete":
+    "El modelo se detuvo antes de completar su respuesta. Envía tu mensaje de nuevo o selecciona otro modelo para este agente.",
   "error.provider.usageLimitReached": "La cuenta alcanzó su límite de uso.",
   "error.provider.claudeContextFull":
     "Este chat se volvió demasiado largo para Claude. OpenBot inició una nueva sesión de Claude Code con el historial del chat. Inténtalo de nuevo.",
@@ -431,6 +437,8 @@ export const messages = {
     "{provider} bloqueó este mensaje por sus reglas de seguridad: {reason} Si {provider} también bloquea tus próximos mensajes, inicia un nuevo chat.",
   "error.provider.codexAudioRefused":
     "Este modelo no puede escuchar audio, por eso no aceptó el sonido de este chat. OpenBot inició una nueva sesión de Codex con el historial del chat. Para continuar, envía tu solicitud de nuevo y pide al agente que trabaje sin el sonido. Para revisar el sonido, selecciona en el menú de modelos del agente un modelo que pueda escuchar audio.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex no pudo cargar los ajustes de tu cuenta de ChatGPT, por eso el agente se detuvo. Inténtalo de nuevo. Si se detiene otra vez, selecciona Reconectar para ChatGPT en Ajustes del servidor → Proveedores.",
   "error.provider.imageTooSmall":
     "El modelo no aceptó una imagen de este chat porque la imagen es demasiado pequeña. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageTooLarge":
@@ -452,8 +460,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code no encontró la sesión guardada de este chat. OpenBot inició una nueva sesión de Claude Code con el historial del chat. Inténtalo de nuevo.",
   "error.provider.grokSignIn": "Ejecuta `grok login` o define XAI_API_KEY para usar Grok.",
+  "error.provider.acpSignInNoStart":
+    "El proveedor no se inició, así que el inicio de sesión no pudo empezar. Vuelve a intentarlo o reinicia OpenBot.",
   "error.provider.acpSignInTimedOut": "Se agotó el tiempo del inicio de sesión.",
   "error.provider.acpSignInStopped": "El inicio de sesión se detuvo antes de completarse.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Este equipo no tiene un navegador para iniciar sesión en Google. Elige «Usar código», abre el enlace en cualquier dispositivo y pega el código.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini no pudo abrir la página de inicio de sesión. Instala un navegador y xdg-utils, y conéctate desde una sesión de escritorio en este host. Un servidor sin escritorio no puede completar este inicio de sesión.",
   "error.provider.geminiBrowserOpenFailed":
@@ -564,6 +576,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "No se pudo leer la versión de la CLI de {provider}.",
   "error.provider.piSessionBusy": "Espera a que termine el turno actual de Pi.",
   "error.provider.acpSessionBusy": "{provider} aún termina un turno detenido. Inténtalo de nuevo en un momento.",
+  "error.provider.acpSettingsConflict":
+    "{provider} cambió este chat mientras OpenBot aplicaba su configuración. Inténtalo de nuevo.",
   "error.provider.acpSessionStale":
     "{provider} no pudo cargar la versión más reciente de este chat. Envía tu mensaje de nuevo.",
   "error.provider.acpModelNotOffered":

@@ -9,7 +9,6 @@ import { memo, useMemo } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useUniwind } from "uniwind";
-import { AgentPinAvatar } from "@/features/agents/components/agent-pin-avatar";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
@@ -129,16 +128,14 @@ export const ChatHeader = memo(function ChatHeader({
         disconnected={disconnected}
       />
     ) : (
-      <AgentPinAvatar agentId={target.id} location="chat" size={32}>
-        <BloubAvatar
-          agentId={target.id}
-          serverId={target.serverId}
-          hue={target.avatarHue}
-          color={target.avatarColor}
-          seed={target.avatarSeed}
-          size={32}
-        />
-      </AgentPinAvatar>
+      <BloubAvatar
+        agentId={target.id}
+        serverId={target.serverId}
+        hue={target.avatarHue}
+        color={target.avatarColor}
+        seed={target.avatarSeed}
+        size={32}
+      />
     );
   const identity =
     threadSubtitle === null ? (

@@ -107,6 +107,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Ouvrez la page de connexion de {name}.",
   "mobile.marketplace.app.stepAllow": "Connectez-vous et autorisez l’accès.",
   "mobile.marketplace.app.stepReturn": "Revenez ici. {name} se connecte sur votre serveur.",
+  "mobile.marketplace.app.stepBlank": "La dernière page ne se charge pas. C'est normal.",
+  "mobile.marketplace.app.stepCopy": "Touchez la barre d'adresse et copiez l'adresse complète.",
+  "mobile.marketplace.app.stepPaste": "Revenez dans OpenBot et collez l'adresse ci-dessous.",
   "mobile.marketplace.app.openSignIn": "Ouvrir la connexion",
   "mobile.marketplace.app.keySecure": "La clé va uniquement à votre serveur, par une connexion chiffrée.",
   "mobile.marketplace.app.connecting": "Connexion",
@@ -124,8 +127,6 @@ export const messages = {
     "Cette app demande une connexion dans le navigateur. Mettez à jour OpenBot sur le serveur ou connectez l’app sur l’ordinateur.",
   "mobile.marketplace.app.waiting": "En attente de la page de connexion…",
   "mobile.marketplace.app.openAgain": "Rouvrir la page de connexion",
-  "mobile.marketplace.app.pasteHint":
-    "À la fin, la page ouvre une adresse qui ne se charge pas. Copiez cette adresse et collez-la ci-dessous.",
   "mobile.marketplace.app.pasteLabel": "Adresse après la connexion",
   "mobile.marketplace.app.pasteInvalid": "Cette adresse n’est pas la fin de cette connexion.",
   "mobile.marketplace.app.finishSignIn": "Terminer",

@@ -31,6 +31,12 @@ interface AcpRetryUpdate {
   readonly cause: AcpRetryCause;
 }
 
+export interface AcpReplyEvent {
+  readonly sessionId: string;
+  readonly reply: string;
+  readonly failure: string | null;
+}
+
 export interface AcpCustomEndpoint {
   readonly name: string;
   readonly hasCredentials: boolean;
@@ -88,6 +94,7 @@ export interface AcpFlavor {
   lostServerUntilRestart?(error: unknown): boolean;
   serverLost?(error: unknown): boolean;
   sessionBusy?(error: unknown): boolean;
+  configConflict?(error: unknown): boolean;
   staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
   processWideModel?: true;
@@ -97,6 +104,7 @@ export interface AcpFlavor {
   configSetUnsaved?(error: RequestError): boolean;
   closeKeepsSession?: true;
   probeCloseDelayMs?: number;
+  sessionFiles?(argv: readonly string[], sessionId: string): readonly string[];
   effortCategories?: readonly string[];
   promptMediaBase64Bytes?: number;
   sessionProcesses?: true;
@@ -109,13 +117,14 @@ export interface AcpFlavor {
     emptyOutputFailure?: RegExp;
     textToolCall?: { starts: readonly string[]; whole: RegExp };
     turnFailure(text: string): string;
-    fallbackCause?(text: string): CauseCode | null;
+    fallbackCause?(text: string, reachedModel: boolean): CauseCode | null;
     accountLink?(text: string, argv: readonly string[], sessionId: string): string | null;
     accountVerification?: RegExp;
     quota(text: string): string | null;
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
     loggedFailure?(text: string, argv: readonly string[], sessionId: string): string | null;
+    silentFailure?(argv: readonly string[], sessionId: string, since: number): string | null;
     sessionLost?: RegExp;
   };
   cancelLocallyThenResume?: true;
@@ -126,6 +135,7 @@ export interface AcpFlavor {
   thoughtsInsideAnswer?: true;
   resumesAnswerAfterThought?: { report: RegExp };
   promptOpenForBackgroundTasks?: true;
+  silentTurnLimitMs?: number;
   unsentBackgroundTurns?: true;
   wakesAfterPromptEnds?: true;
   selfWakeTools?: RegExp;
@@ -133,6 +143,8 @@ export interface AcpFlavor {
   resendsAnswer?: true;
   childSessionUpdates?: true;
   retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
+  clientMeta?: DynamicRecord;
+  replyEvent?: (method: string, params: DynamicRecord) => AcpReplyEvent | null;
   retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   turnStallMs?: number;
@@ -160,6 +172,7 @@ export interface AcpFlavor {
   connectionLostChunk?: RegExp;
   approvedEditSweep?: RegExp;
   mcpCallInputNamesServer?: true;
+  bridgeToolsWithoutCard?: true;
   sessionMeta?: NewSessionRequest["_meta"];
   workspaceAsAdditionalDirectory?: true;
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
@@ -190,17 +203,32 @@ export const CLINE_ACP_FLAVOR: AcpFlavor = {
     error.code === -32603 ? isRecord(error.data) && error.data.details === `session not found: ${sessionId}` : null,
 };
 
+const COPILOT_SESSION_EVENT = "github.com/copilot/sessionEvent";
+
 export const COPILOT_ACP_FLAVOR: AcpFlavor = {
   relayStdioMcpServers: true,
   turnFailure: copilotTurnFailure,
   planUsedUpChunk: COPILOT_PLAN_USED_UP,
   failureCause: (error) => (COPILOT_PLAN_USED_UP_TEXT.test(errorText(error)) ? "usage_limit" : null),
   compactsItself: true,
+  clientMeta: { "github.com/copilot": { events: ["session.error", "session.info"] } },
+  replyEvent: copilotReplyEvent,
 };
+
+function copilotReplyEvent(method: string, params: DynamicRecord): AcpReplyEvent | null {
+  const { sessionId, type, data, agentId } = params;
+  if (method.replace(/^_/u, "") !== COPILOT_SESSION_EVENT || agentId !== undefined) return null;
+  if (typeof sessionId !== "string" || !isRecord(data) || typeof data.message !== "string") return null;
+  if (type === "session.error") return { sessionId, reply: `Error: ${data.message}`, failure: data.message };
+  if (type === "session.info" && data.infoType === "model_retry")
+    return { sessionId, reply: `Info: ${data.message}`, failure: null };
+  return null;
+}
 
 function copilotTurnFailure(_error: unknown, detail: string): string {
   if (COPILOT_PLAN_USED_UP_TEXT.test(detail))
     return sourceText("error.provider.acpPlanUsedUp", { provider: agentProviderName("copilot") });
+  if (/\bmissing_finish_reason\b/u.test(detail)) return sourceText("error.provider.copilotAnswerIncomplete");
   return /"thinking\.type\.enabled" is not supported for this model/u.test(detail)
     ? sourceText("error.provider.copilotThinkingRejected")
     : detail;
@@ -367,6 +395,15 @@ function hermesSessionBusy(error: unknown): boolean {
   );
 }
 
+function hermesRevisionConflict(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.details === "revision_conflict"
+  );
+}
+
 const HERMES_FAILURE_REASONS: Readonly<Partial<Record<string, CauseCode>>> = {
   auth: "authentication",
   auth_permanent: "authentication",
@@ -405,6 +442,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   refusesUntilRestart: hermesRefusal,
   lostServerUntilRestart: hermesGatewayLost,
   sessionBusy: hermesSessionBusy,
+  configConflict: hermesRevisionConflict,
   mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
   sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
   setsConfigOnlyOnChange: true,
@@ -543,6 +581,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     refusesUntilRestart: hermesRefusal,
     lostServerUntilRestart: hermesGatewayLost,
     sessionBusy: hermesSessionBusy,
+    configConflict: hermesRevisionConflict,
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
     sessionProcessesBefore: HERMES_SESSION_MCP_SINCE,
     setsConfigOnlyOnChange: true,

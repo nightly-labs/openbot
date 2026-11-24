@@ -29,7 +29,7 @@ export function useMcpSignIns(serverId: string, canManage: boolean) {
     queryKey: queryKeys.mcpSignIns(queryScope, serverId),
     enabled: canManage,
     retry: false,
-    queryFn: () => listMcpSignIns(serverId).catch((): McpSignInState[] => []),
+    queryFn: () => listMcpSignIns(serverId),
   });
 }
 

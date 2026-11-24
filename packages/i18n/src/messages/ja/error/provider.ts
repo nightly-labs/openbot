@@ -301,6 +301,10 @@ export const messages = {
     "OpenBot のリアルタイム CPU 制限が 0 のため、Linux がプロバイダーを停止しました。この制限はシステムから来ています。rtkit をインストールして起動し (`rtkit-daemon`)、`systemctl --user restart xdg-desktop-portal` を実行してから OpenBot を再起動してください。rtkit がない間は、xdg-desktop-portal を再起動するだけでは解決しません。",
   "error.provider.cpuUnsupported":
     "このコンピューターのプロセッサーでは、このプロバイダーを実行できません。別のプロバイダーを使用してください。",
+  "error.provider.largeMemoryPages":
+    "この Linux カーネルは 4 KiB より大きいメモリーページを使用しているため、このプロバイダーを実行できません（Raspberry Pi 5 や Asahi Linux など）。4 KiB ページのカーネルか、別のプロバイダーを使用してください。",
+  "error.provider.ipv6Missing":
+    "このプロバイダーには IPv6 が必要ですが、このコンピューターでは IPv6 がオフになっています。IPv6 をオンにしてから、もう一度お試しください。WSL では、.wslconfig から ipv6.disable=1 を削除し、wsl --shutdown を実行してください。",
   "error.provider.windowsBlocked":
     "スマート アプリ コントロールなどの Windows のセキュリティ設定により、このプロバイダーを起動できませんでした。別のプロバイダーを使ってください。",
   "error.provider.opencodeDatabaseNewer":
@@ -417,6 +421,8 @@ export const messages = {
     "このメッセージの処理中に Hermes の接続が切れたため、作業が完了したかどうかわかりません。メッセージをもう一度送信する前に、エージェントが行ったことを確認してください。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot はこのモデルを使用できませんでした。モデルが思考の設定を受け付けませんでした。このエージェントに別のモデルを選択してから、メッセージをもう一度送信してください。",
+  "error.provider.copilotAnswerIncomplete":
+    "モデルが回答を完了する前に停止しました。メッセージをもう一度送信するか、このエージェントに別のモデルを選択してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
   "error.provider.claudeContextFull":
     "このチャットは Claude には長くなりすぎました。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
@@ -440,6 +446,8 @@ export const messages = {
     "{provider} が安全ルールによりこのメッセージをブロックしました: {reason} 次のメッセージも {provider} にブロックされる場合は、新しいチャットを開始してください。",
   "error.provider.codexAudioRefused":
     "このモデルは音声を聞けないため、このチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。続けるには、リクエストをもう一度送信し、音声を使わずに作業するようエージェントに頼んでください。音声を確認するには、エージェントのモデルメニューで音声を聞けるモデルを選択してください。",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex が ChatGPT アカウントの設定を読み込めなかったため、エージェントが停止しました。もう一度お試しください。再び停止する場合は、サーバー設定 → プロバイダーで ChatGPT の「再接続」を選択してください。",
   "error.provider.imageTooSmall":
     "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooLarge":
@@ -461,8 +469,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code はこのチャットの保存済みセッションを見つけられませんでした。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
   "error.provider.grokSignIn": "Grok を使うには `grok login` を実行するか、XAI_API_KEY を設定してください。",
+  "error.provider.acpSignInNoStart":
+    "プロバイダーが起動しなかったため、ログインを開始できませんでした。もう一度お試しいただくか、OpenBot を再起動してください。",
   "error.provider.acpSignInTimedOut": "サインインがタイムアウトしました。",
   "error.provider.acpSignInStopped": "サインインが完了する前に停止しました。",
+  "error.provider.geminiNoBrowserUseCode":
+    "このコンピューターには Google ログイン用のブラウザーがありません。「コードでログイン」を選び、任意のデバイスでリンクを開いてから、コードを貼り付けてください。",
   "error.provider.geminiBrowserUnavailable":
     "Gemini はサインインページを開けませんでした。ブラウザーと xdg-utils をインストールしてから、このホストのデスクトップセッションで接続してください。デスクトップのないサーバーではこのサインインを完了できません。",
   "error.provider.geminiBrowserOpenFailed":
@@ -579,6 +591,8 @@ export const messages = {
   "error.provider.piSessionBusy": "現在の Pi のターンが終わるまでお待ちください。",
   "error.provider.acpSessionBusy":
     "{provider} は停止したターンをまだ終了しています。少し待ってからもう一度お試しください。",
+  "error.provider.acpSettingsConflict":
+    "OpenBot が設定を適用している間に {provider} がこのチャットを変更しました。もう一度お試しください。",
   "error.provider.acpSessionStale":
     "{provider} はこのチャットの最新の状態を読み込めませんでした。もう一度メッセージを送信してください。",
   "error.provider.acpModelNotOffered":

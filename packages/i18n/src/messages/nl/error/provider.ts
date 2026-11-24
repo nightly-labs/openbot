@@ -292,6 +292,10 @@ export const messages = {
     "Linux heeft de provider gestopt, omdat OpenBot een realtime-CPU-limiet van 0 heeft. De limiet komt van je systeem. Installeer en start rtkit (`rtkit-daemon`), voer `systemctl --user restart xdg-desktop-portal` uit en start OpenBot daarna opnieuw. Alleen xdg-desktop-portal opnieuw starten helpt niet zolang rtkit ontbreekt.",
   "error.provider.cpuUnsupported":
     "De processor van deze computer kan deze aanbieder niet uitvoeren. Gebruik een andere aanbieder.",
+  "error.provider.largeMemoryPages":
+    "Deze aanbieder kan niet draaien op deze Linux-kernel, omdat de kernel geheugenpagina’s groter dan 4 KiB gebruikt, zoals op Raspberry Pi 5 of Asahi Linux. Gebruik een kernel met pagina’s van 4 KiB of een andere aanbieder.",
+  "error.provider.ipv6Missing":
+    "Deze aanbieder heeft IPv6 nodig, en IPv6 staat uit op deze computer. Zet IPv6 aan en probeer het opnieuw. Verwijder in WSL ipv6.disable=1 uit .wslconfig en voer wsl --shutdown uit.",
   "error.provider.windowsBlocked":
     "Windows-beveiligingsinstellingen, zoals Slim app-beheer, hebben het starten van deze provider verhinderd. Gebruik een andere provider.",
   "error.provider.opencodeDatabaseNewer":
@@ -402,6 +406,8 @@ export const messages = {
     "Hermes heeft tijdens dit bericht de verbinding verloren en weet dus niet of het werk klaar is. Controleer wat de agent heeft gedaan voordat je het bericht opnieuw stuurt.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot kon dit model niet gebruiken: het model accepteerde de denkinstelling niet. Selecteer een ander model voor deze agent en verstuur je bericht opnieuw.",
+  "error.provider.copilotAnswerIncomplete":
+    "Het model stopte voordat het antwoord klaar was. Verstuur je bericht opnieuw of selecteer een ander model voor deze agent.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
   "error.provider.claudeContextFull":
     "Deze chat is te lang geworden voor Claude. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
@@ -425,6 +431,8 @@ export const messages = {
     "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} Als {provider} ook je volgende berichten blokkeert, start dan een nieuwe chat.",
   "error.provider.codexAudioRefused":
     "Dit model kan geen audio beluisteren, dus het accepteerde het geluid in deze chat niet. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Stuur je verzoek opnieuw en vraag de agent om zonder het geluid te werken om verder te gaan. Kies in het modelmenu van de agent een model dat audio kan beluisteren om geluid te controleren.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex kon de instellingen van je ChatGPT-account niet laden, dus de agent is gestopt. Probeer het opnieuw. Als hij weer stopt, kies dan Opnieuw verbinden voor ChatGPT in Serverinstellingen → Aanbieders.",
   "error.provider.imageTooSmall":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooLarge":
@@ -446,8 +454,12 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code heeft de opgeslagen sessie van deze chat niet gevonden. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.grokSignIn": "Voer `grok login` uit of stel XAI_API_KEY in om Grok te gebruiken.",
+  "error.provider.acpSignInNoStart":
+    "De aanbieder is niet gestart, dus het inloggen kon niet beginnen. Probeer het opnieuw of start OpenBot opnieuw.",
   "error.provider.acpSignInTimedOut": "Het inloggen duurde te lang.",
   "error.provider.acpSignInStopped": "Het inloggen is gestopt voordat het klaar was.",
+  "error.provider.geminiNoBrowserUseCode":
+    "Deze computer heeft geen browser voor de Google-aanmelding. Kies ‘Inloggen met code’, open de link op een willekeurig apparaat en plak daarna de code.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini kon de inlogpagina niet openen. Installeer een browser en xdg-utils en verbind vanuit een desktopsessie op deze host. Een server zonder desktop kan deze inlog niet afronden.",
   "error.provider.geminiBrowserOpenFailed":
@@ -558,6 +570,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "De versie van de {provider} CLI kon niet worden gelezen.",
   "error.provider.piSessionBusy": "Wacht tot de huidige Pi-beurt klaar is.",
   "error.provider.acpSessionBusy": "{provider} rondt nog een gestopte beurt af. Probeer het zo opnieuw.",
+  "error.provider.acpSettingsConflict":
+    "{provider} heeft deze chat gewijzigd terwijl OpenBot de instellingen toepaste. Probeer het opnieuw.",
   "error.provider.acpSessionStale":
     "{provider} kon de nieuwste versie van deze chat niet laden. Stuur je bericht opnieuw.",
   "error.provider.acpModelNotOffered":

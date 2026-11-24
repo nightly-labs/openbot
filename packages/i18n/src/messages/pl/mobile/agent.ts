@@ -565,6 +565,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Zbieranie rozpoczęto {started}. Zaktualizowano {updated}.",
   "mobile.agent.usage.never": "nigdy",
   "mobile.agent.record.time": "Godzina",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Nie udało się zmienić folderu",
   "mobile.agent.section.tryAgain": "Spróbuj ponownie.",
   "mobile.agent.section.moveUp": "Przenieś w górę",
@@ -665,7 +666,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Nie udało się wczytać serwerów",
   "mobile.agent.home.serversFailedBody": "Sprawdź, czy aplikacja na komputer działa, i spróbuj ponownie.",
   "mobile.agent.home.noServers": "Brak dostępnych serwerów",
-  "mobile.agent.home.noServersBody": "Połącz ponownie aplikację na komputer lub dołącz do zdalnego serwera.",
+  "mobile.agent.home.noServersBody":
+    "Otwórz OpenBot na komputerze na tym koncie i włącz Opublikuj ten serwer w Ustawienia serwera → Członkowie. Możesz też dołączyć do zdalnego serwera.",
   "mobile.agent.home.chooseServer": "Wybierz serwer",
   "mobile.agent.home.openServers": "Otwórz serwery",
   "mobile.agent.home.noChatOpen": "Brak otwartego czatu",

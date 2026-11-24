@@ -1,3 +1,17 @@
+import { sourceText } from "@openbot/i18n/source";
+
+const CONNECTION_STOPS = new Set([
+  sourceText("error.remote.appInBackground"),
+  sourceText("error.remote.serverDisconnected"),
+  sourceText("error.remote.selectedServerOffline"),
+  sourceText("error.remote.connectionDropped"),
+  sourceText("error.remote.attachmentConnectionChanged"),
+]);
+
+export function isConnectionStop(error: Error | null): boolean {
+  return error !== null && CONNECTION_STOPS.has(error.message);
+}
+
 interface ConnectionWait {
   resolve: () => void;
   reject: (error: Error) => void;

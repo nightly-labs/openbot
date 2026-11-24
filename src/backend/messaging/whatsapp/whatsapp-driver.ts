@@ -42,12 +42,18 @@ import {
 import { downloadWhatsAppMedia } from "./whatsapp-media";
 import { whatsAppChunks, whatsAppText } from "./whatsapp-render";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
-import { allowsContact, whatsAppNumberForms } from "./whatsapp-senders";
+import { allowsContact, isReadOnlyChat, whatsAppNumberForms } from "./whatsapp-senders";
 import { WhatsAppTransport } from "./whatsapp-transport";
 
 const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
 const WHATSAPP_CAPTION_LIMIT = 1_024;
-const WHATSAPP_POST_STOPS = new Set(["place_not_allowed", "not_linked", "not_connected", "not_confirmed"]);
+const WHATSAPP_POST_STOPS = new Set([
+  "place_not_allowed",
+  "place_read_only",
+  "not_linked",
+  "not_connected",
+  "not_confirmed",
+]);
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
 const SAVED_HISTORY_NOTE =
@@ -386,8 +392,15 @@ class WhatsAppAdapter implements MessagingAdapter {
           id: userJid(contact),
           name: savedName || (this.#handle.chats.name(contact) ?? maskedNumber(contact)),
           kind: "chat",
+          ...(rules.readOnly.has(contact) ? { readOnly: true as const } : {}),
         });
-      for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
+      for (const group of rules.groups)
+        places.push({
+          id: group,
+          name: yield* this.placeName(group),
+          kind: "channel",
+          ...(rules.readOnly.has(group) ? { readOnly: true as const } : {}),
+        });
       return { places };
     });
   }
@@ -463,7 +476,10 @@ class WhatsAppAdapter implements MessagingAdapter {
       const allowed = isJidGroup(chatJid)
         ? rules.groups.has(chatJid)
         : user === identity.number || (user !== null && allowsContact(rules, user));
-      return allowed ? Effect.void : Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
+      if (!allowed) return Effect.fail(new MessagingAdapterError({ cause: new Error("place_not_allowed") }));
+      return isReadOnlyChat(rules, chatJid)
+        ? Effect.fail(new MessagingAdapterError({ cause: new Error("place_read_only") }))
+        : Effect.void;
     });
   }
 

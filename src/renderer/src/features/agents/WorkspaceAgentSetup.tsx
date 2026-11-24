@@ -1,5 +1,6 @@
 import { TEAM_AGENT_CREATE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import { resolveCreationModel } from "@openbot/ui/features/agents/agent-creation-model";
 import { FIRST_AGENT_SUGGESTIONS, FirstAgentSetup } from "@openbot/ui/features/agents/FirstAgentSetup";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { useProviders } from "../../providers";
@@ -10,7 +11,6 @@ import { serverCanAdminister } from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useAgentActions } from "./agent-actions";
-import { resolveCreationModel } from "./agent-creation-model";
 import { useAgents } from "./agents-context";
 import { withHostAccountUsage } from "./host-provider-accounts";
 

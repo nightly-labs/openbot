@@ -314,6 +314,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #getLocalHostId: () => string | null;
   #localMemberLimit: number | null = null;
   #keyChangedAt = new Map<string, number>();
+  #accountHidden: ReadonlyMap<string, boolean> = new Map();
   #thisComputerServers: ReadonlySet<string> = new Set();
   #registeredThisComputerServers: ReadonlySet<string> = new Set();
   #thisComputerMembersChanged: (serverId: string) => void = () => undefined;
@@ -658,11 +659,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       (serverId) => this.#keyChangedAt.get(serverId),
     ).map((server) => {
       const mute = this.#store.muteState(server.id);
+      const hidden = this.#accountHidden.get(server.id);
       return {
         ...server,
         notificationsMuted: mute.muted,
         notificationsMutedUntil: mute.mutedUntil,
         notificationLevel: this.cachedNotificationLevels(server.id).server ?? this.#store.notificationLevel(server.id),
+        ...(hidden === undefined ? {} : { hidden }),
       };
     });
   }
@@ -916,6 +919,27 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       yield* this.#store.setMuted(serverId, muted, durationMs === undefined ? null : Date.now() + durationMs);
       this.#scheduleMuteExpiry();
       this.#emitChanged();
+      return this.list();
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  readonly setHidden = Effect.fn("RemoteManager.setHidden")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      hidden: boolean,
+    ): Effect.fn.Return<ServerSummary[], RemoteWorkflowError, RemoteRequest> {
+      const transport = this.#webrtcTransport;
+      if (!transport)
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.webRtcUnavailable")) });
+      const hostId = serverId === LOCAL_SERVER_ID ? this.#getLocalHostId() : serverId;
+      if (hostId === null || !this.#accountHidden.has(serverId))
+        return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.serverNotFound")) });
+      yield* transport.setHostHidden(hostId, hidden);
+      this.#accountHidden = new Map(this.#accountHidden).set(serverId, hidden);
+      this.#emitChanged();
+      this.requestDirectoryRefresh();
       return this.list();
     },
     (operation) => this.#owned(operation),
@@ -2605,6 +2629,10 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     function* (this: RemoteServerManager): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
       const transport = this.#webrtcTransport;
 
+      if (this.#accountHidden.size > 0) {
+        this.#accountHidden = new Map();
+        this.#emitChanged();
+      }
       this.#attachments.clear();
       this.#attachmentPreviews.clear();
       yield* this.#pictures.clear();
@@ -2660,6 +2688,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#keyChangedAt = new Map(
       [...changeTimes].map(([hostId, changedAt]) => [hostId === localHostId ? LOCAL_SERVER_ID : hostId, changedAt]),
     );
+    this.#accountHidden = new Map(
+      hosts.map((host) => [host.hostId === localHostId ? LOCAL_SERVER_ID : host.hostId, host.hidden === true]),
+    );
     for (const serverId of removedHostIds) {
       yield* transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void));
       this.#clearServerConnectionState(serverId);
@@ -2680,6 +2711,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     else if (event.type === "host-appearance") this.#applyHostAppearance(serverId, event);
     else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
     else if (event.type === "live-voice") this.emit("liveVoice", serverId, event);
+    else if (event.type === "client-browser-command") return;
     else this.#background(this.#owned(this.#refresh.forward(serverId, event)));
   }
 

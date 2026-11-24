@@ -521,6 +521,7 @@ export const messages = {
   "mobile.agent.usage.collection": "איסוף הנתונים התחיל {started}. עודכן {updated}.",
   "mobile.agent.usage.never": "אף פעם",
   "mobile.agent.record.time": "שעה",
+  "mobile.agent.record.date": "תאריך",
   "mobile.agent.section.changeFailed": "לא ניתן לשנות את התיקייה",
   "mobile.agent.section.tryAgain": "יש לנסות שוב.",
   "mobile.agent.section.moveUp": "העברה למעלה",
@@ -611,7 +612,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "לא ניתן לטעון את השרתים שלך",
   "mobile.agent.home.serversFailedBody": "יש לוודא שאפליקציית שולחן העבודה פועלת ולנסות שוב.",
   "mobile.agent.home.noServers": "אין שרתים זמינים",
-  "mobile.agent.home.noServersBody": "יש לחבר מחדש את אפליקציית שולחן העבודה או להצטרף לשרת מרוחק.",
+  "mobile.agent.home.noServersBody":
+    "יש לפתוח את OpenBot במחשב עם החשבון הזה ולהפעיל את פרסום השרת הזה בהגדרות השרת ← חברים. אפשר גם להצטרף לשרת מרוחק.",
   "mobile.agent.home.chooseServer": "בחירת שרת",
   "mobile.agent.home.openServers": "פתיחת שרתים",
   "mobile.agent.home.noChatOpen": "אין צ'אט פתוח",

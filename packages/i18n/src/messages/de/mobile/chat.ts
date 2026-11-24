@@ -145,6 +145,8 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Schließen",
   "mobile.chat.attachment.sharingUnavailable": "Dateifreigabe ist auf diesem Gerät nicht verfügbar.",
   "mobile.chat.attachment.unavailable": "Der Anhang ist nicht verfügbar. Versuche es erneut.",
+  "mobile.chat.attachment.downloadStopped":
+    "Der Download wurde unterbrochen. Er startet erneut, wenn der Server verbunden ist.",
   "mobile.chat.attachment.openFailed": "Anhang konnte nicht geöffnet werden",
   "mobile.chat.attachment.photosNeedUpdate": "Zum Speichern von Fotos wird die neueste Version der App benötigt.",
   "mobile.chat.attachment.photosPermission":
@@ -157,6 +159,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Dateien konnten nicht geteilt werden",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Zum Teilen vieler Dateien ist die neueste App-Version nötig.",
   "mobile.chat.attachment.preview": "Vorschau von {name}",
+  "mobile.chat.attachment.seeAll": "Tippe, um alles zu sehen",
   "mobile.chat.attachment.displayFailed": "Dieses Bild konnte nicht angezeigt werden.",
   "mobile.chat.attachment.loadingImage": "Bild wird geladen",
   "mobile.chat.attachment.uploading": "{name} wird hochgeladen",
@@ -187,6 +190,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Der Anhang ist beschädigt. Wähle ihn erneut aus.",
   "mobile.chat.attachment.tooLarge": "{name} ist größer als {limit}.",
   "mobile.chat.attachment.cameraPermission": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Das Foto wurde nicht geladen. Öffne es in der Fotos-App, bis es ganz angezeigt wird, und versuche es dann erneut.",
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
   "mobile.chat.composer.dictate": "Nachricht diktieren",
@@ -235,6 +240,8 @@ export const messages = {
   "mobile.chat.liveVoice.gptFailed":
     "GPT Live Voice konnte nicht starten. Hebe die Stummschaltung auf, um es erneut zu versuchen.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice wurde beendet. Hebe die Stummschaltung auf, um es neu zu starten.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice konnte nicht starten",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice wurde beendet",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Erlaube OpenBot in den Einstellungen, das Mikrofon zu verwenden. Hebe dann die Stummschaltung auf.",
   "mobile.chat.composer.addAttachment": "Anhang hinzufügen",
@@ -313,6 +320,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Wiedergabegeschwindigkeit: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Nachricht konnte nicht vorgelesen werden",
+  "mobile.chat.message.readAloudModelMissing":
+    "Lade das Sprachmodell unter Einstellungen > Stimme herunter, um Nachrichten zu hören.",
   "mobile.chat.message.selectText": "Text auswählen",
   "mobile.chat.message.copyImage": "Bild kopieren",
   "mobile.chat.message.copyText": "Text kopieren",
@@ -560,6 +569,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Keine Nachrichten in der Warteschlange",
   "mobile.chat.queue.emptyBody": "Neue Nachrichten kommen in die Warteschlange, während der Agent arbeitet.",
   "mobile.chat.queue.noLongerQueued": "Diese Nachricht ist nicht mehr in der Warteschlange.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Anhänge",
   "mobile.chat.queue.steer": "Steuern",

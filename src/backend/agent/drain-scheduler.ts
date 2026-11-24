@@ -16,6 +16,7 @@ import {
   ProviderModelLimitedError,
   ProviderModelNotOfferedError,
   ProviderSessionBusyError,
+  ProviderSettingsConflictError,
   ProviderStoppedError,
   ProviderTurnActiveError,
 } from "../agent-client";
@@ -101,6 +102,7 @@ export interface DrainHooks {
   redactMcp(text: string): string;
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
+  fromChrome(deliveryId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
   mayContinueOnBackup(agentId: string): boolean;
   mayFailOver(agentId: string): boolean;
@@ -968,6 +970,7 @@ export class DrainScheduler {
               taskReportWaiting: this.taskReportWaiting(item),
               tags,
               liveVoice: this.#hooks.liveVoiceRelayed(item.delivery.id),
+              fromChrome: this.#hooks.fromChrome(item.delivery.id),
               externalChat: this.#messaging?.ownsDelivery(item.delivery.id) === true,
               ...(executionText === undefined ? {} : { executionText }),
             });
@@ -1163,8 +1166,9 @@ export class DrainScheduler {
           }
           const recipient = this.#store.list().find((candidate) => candidate.id === delivery.recipientAgentId);
           const providerStopped = error instanceof ProviderStoppedError;
+          const settingsConflict = error instanceof ProviderSettingsConflictError;
           const resumeTimedOut =
-            (providerStopped || isRequestTimeout(error, "thread/resume")) &&
+            (providerStopped || settingsConflict || isRequestTimeout(error, "thread/resume")) &&
             this.#mayRetryResume(
               delivery.recipientAgentId,
               laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }),
@@ -1185,7 +1189,9 @@ export class DrainScheduler {
               logger.warn(
                 providerStopped
                   ? "The provider stopped before the turn was sent. Its messages try again."
-                  : "A session did not open in time. Its messages try again.",
+                  : settingsConflict
+                    ? "The provider changed the session while its settings were set. Its messages try again."
+                    : "A session did not open in time. Its messages try again.",
                 { agentId: delivery.recipientAgentId, provider: error.providerName },
               );
             if (error instanceof ProviderSessionBusyError || resumeTimedOut)

@@ -16,6 +16,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  McpServerConfig,
   ProviderAccountCodeLoginStatus,
   ProviderAccountPool,
   ProviderAccountStatus,
@@ -50,6 +51,7 @@ import {
   AgentProcessExitError,
   type AgentProvider,
   reportsMissingProcessorFeature,
+  unsupportedKernelReason,
 } from "./../agent-client";
 import { AppServerError, CodexAppServerClient } from "./../app-server-client";
 import {
@@ -188,6 +190,8 @@ function userMustFixStart(reason: string | null | undefined): reason is string {
   return (
     reason === sourceText("error.provider.realtimeLimitZero") ||
     reason === sourceText("error.provider.cpuUnsupported") ||
+    reason === sourceText("error.provider.largeMemoryPages") ||
+    reason === sourceText("error.provider.ipv6Missing") ||
     reason === sourceText("error.provider.geminiSettingsUnreadable") ||
     reason === sourceText("error.provider.geminiAccountSettingsUnreadable") ||
     reason === sourceText("error.provider.grokDefaultModelNotAllowed")
@@ -344,6 +348,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #mcpHandoff: McpHandoffLog;
   readonly #redactMcp: (text: string) => string;
   readonly #reportMcpSignIn: ((provider: AgentProvider, server: string, signInText: string) => void) | null;
+  readonly #recordMcpStartFailure: ((config: McpServerConfig) => void) | null;
   readonly #configRevisions = new WeakMap<AgentClient, number>();
   readonly #cli = new Map<AgentProvider, AgentCliInfo>();
   readonly #cliSources = new Map<AgentProvider, Pick<AgentCliInfo, "source" | "incomplete">>();
@@ -440,6 +445,7 @@ export class ProviderRuntime implements ProviderPort {
     mcpHandoff?: McpHandoffLog;
     redactMcp: (text: string) => string;
     reportMcpSignIn?: (provider: AgentProvider, server: string, signInText: string) => void;
+    recordMcpStartFailure?: (config: McpServerConfig) => void;
     accounts?: ProviderAccountStore;
   }) {
     this.#off = new Set(options.offProviders);
@@ -460,6 +466,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#mcpHandoff = options.mcpHandoff ?? new McpHandoffLog();
     this.#redactMcp = options.redactMcp;
     this.#reportMcpSignIn = options.reportMcpSignIn ?? null;
+    this.#recordMcpStartFailure = options.recordMcpStartFailure ?? null;
     this.#codexLogin = new CodexLoginFlow({
       bundledExecutable: () => this.#bundledExecutables.codex,
       installedChosen: () => this.#installedChosen.has("codex") || this.#installedFallback.has("codex"),
@@ -996,7 +1003,11 @@ export class ProviderRuntime implements ProviderPort {
     });
     if (!scope) {
       const statuses = (this.status().providers ?? []).filter(
-        (item) => isAgentProvider(item.id) && !item.off && item.connectionState !== "connecting",
+        (item) =>
+          isAgentProvider(item.id) && !item.off && !(item.connectionState === "connecting" && item.signInPending),
+      );
+      const reconnecting = new Set(
+        statuses.filter((item) => item.connectionState === "connecting").map((item) => item.id),
       );
       const available = new Set(statuses.filter((item) => item.state === "available").map((item) => item.id));
       const providers = statuses
@@ -1053,14 +1064,8 @@ export class ProviderRuntime implements ProviderPort {
               usage = yield* this.#refreshUsage(client, defaultUsageModel(provider), false).pipe(deadline);
               const first = usage.limits[0];
               const last = this.#lastUsage.get(provider);
-              if (
-                accounts &&
-                !isKeyAccountSupport(accounts) &&
-                accounts.usageLeavesSession &&
-                last &&
-                !first?.primary &&
-                !first?.secondary
-              )
+              const leavesSession = Boolean(accounts && !isKeyAccountSupport(accounts) && accounts.usageLeavesSession);
+              if (last && !first?.primary && !first?.secondary && (leavesSession || !usageWindowHasReset(last)))
                 return last;
             }
           }
@@ -1116,6 +1121,11 @@ export class ProviderRuntime implements ProviderPort {
         providers,
         (provider) =>
           Effect.gen(function* () {
+            if (reconnecting.has(provider)) {
+              const kept = available.has(provider) ? keptReading(provider) : null;
+              if (kept && !usageWindowHasReset(kept)) collected.set(provider, kept);
+              return;
+            }
             if (available.has(provider)) yield* readDefault(provider).pipe(logFailure(provider));
             yield* readAccounts(provider).pipe(logFailure(provider));
           }),
@@ -2405,10 +2415,8 @@ export class ProviderRuntime implements ProviderPort {
       if (busy) {
         if (!this.#updatesWhenIdle.has(provider)) {
           this.#updatesWhenIdle.add(provider);
-          this.#hooks.onProviderHeld?.(provider);
           recordRestartActivity();
         }
-        this.#hooks.releasePersonWaits?.(provider);
       } else if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
       yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
     }
@@ -2430,12 +2438,6 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
-    const busy = yield* providerStep(() => {
-      if ((provider === "codex" && this.#codexLogin.pending) || this.#cliLogin.has(provider))
-        throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
-      return this.#hooks.isProviderBusy(provider);
-    });
-    if (busy) return null;
     const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
     const stoppedByLimit = this.#status.providers?.find((row) => row.id === provider)?.message === realtimeLimitZero;
     if (stoppedByLimit && (yield* providerStep(hasZeroRealtimeLimit)))
@@ -2447,15 +2449,21 @@ export class ProviderRuntime implements ProviderPort {
     );
     const wasAvailable = this.#status.providers?.find((row) => row.id === provider)?.state === "available";
     let installed = false;
-    yield* Effect.acquireUseRelease(
+    const replaced = yield* Effect.acquireUseRelease(
       providerStep(() => {
+        if ((provider === "codex" && this.#codexLogin.pending) || this.#cliLogin.has(provider))
+          throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
+        if (this.#hooks.isProviderBusy(provider)) return false;
         this.#updatesWhenIdle.delete(provider);
         this.#setProviderConnectionState(provider, "connecting", false);
         this.#replacingCli.add(provider);
+        this.#hooks.onProviderHeld?.(provider);
         recordRestartActivity();
+        return true;
       }),
-      () =>
+      (idle) =>
         Effect.gen({ self: this }, function* () {
+          if (!idle) return false;
           const executable = yield* install();
           installed = true;
           this.#bundledExecutables[provider] = executable;
@@ -2473,6 +2481,7 @@ export class ProviderRuntime implements ProviderPort {
             yield* this.#saveInstalledChoice(provider, false).pipe(
               Effect.catch(() => Effect.sync(() => logger.warn("The provider CLI choice did not save.", { provider }))),
             );
+          return true;
         }).pipe(
           Effect.mapError((error) => {
             const installedIsOnlyCopy = installed && firstInstall;
@@ -2501,16 +2510,18 @@ export class ProviderRuntime implements ProviderPort {
             return new ProviderOperationFailed({ cause: failure });
           }),
         ),
-      () =>
+      (idle) =>
         Effect.sync(() => {
+          if (!idle) return;
           this.#replacingCli.delete(provider);
           this.#hooks.onProviderResumed(provider);
         }),
     );
+    if (!replaced) return null;
     for (const driver of BUILT_IN_PROVIDER_DRIVERS) {
       if (driver.cliProvider !== provider || this.#off.has(driver.id)) continue;
       yield* (
-        this.#clients.has(driver.id) ? this.restartProviderWhenIdle(driver.id) : this.#reprobeProvider(driver.id)
+        this.#clients.has(driver.id) ? this.#restartWhenIdle(driver.id, false) : this.#reprobeProvider(driver.id)
       ).pipe(Effect.ignore);
     }
     return this.status();
@@ -2754,8 +2765,7 @@ export class ProviderRuntime implements ProviderPort {
   isReplacingCli(provider: AgentProvider): boolean {
     return (
       this.#replacingCli.has(provider) ||
-      (this.#restartsWhenIdle.has(provider) && !this.#restartsKeepingTurns.has(provider)) ||
-      this.#updatesWhenIdle.has(provider)
+      (this.#restartsWhenIdle.has(provider) && !this.#restartsKeepingTurns.has(provider))
     );
   }
 
@@ -3165,6 +3175,8 @@ export class ProviderRuntime implements ProviderPort {
       return new AgentProcessExitError(sourceText("error.provider.realtimeLimitZero"), null, { cause: detailed });
     if (reportsMissingProcessorFeature(detailed.message, ILLEGAL_INSTRUCTION.test(error.message)))
       return new AgentProcessExitError(sourceText("error.provider.cpuUnsupported"), null, { cause: detailed });
+    const kernel = unsupportedKernelReason(detailed.message);
+    if (kernel) return new AgentProcessExitError(sourceText(kernel), null, { cause: detailed });
     return detailed;
   }
 
@@ -4065,7 +4077,8 @@ export class ProviderRuntime implements ProviderPort {
       client.provider === "codex" ? `openbot_${providerMcpServerName(config?.name ?? "")}` : config?.name;
     if (config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID && key === githubKey)
       this.#reportGitHubToolsFailure(client.provider);
-    if (!server) return;
+    if (!config || !server) return;
+    this.#recordMcpStartFailure?.(config);
     const signIn = getString(params, "failureReason") === "reauthenticationRequired" || isMcpSignInDiagnostic(message);
     this.#reportMcpServerFailure(client.provider, server, message, signIn);
   }

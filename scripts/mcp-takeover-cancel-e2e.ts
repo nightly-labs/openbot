@@ -72,7 +72,7 @@ const registry = new AttentionRegistry({
     endTakeover: (tabId) => endedTakeovers.push(tabId),
   },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
   emit: () => {},
   emitError: () => {},
   emitRuntimeSnapshot: () => snapshotChanged(),

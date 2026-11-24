@@ -271,6 +271,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "Linux עצר את הספק כי ל-OpenBot יש מגבלת מעבד בזמן אמת של 0. המגבלה מגיעה מהמערכת שלך. יש להתקין ולהפעיל את rtkit (`rtkit-daemon`), להריץ `systemctl --user restart xdg-desktop-portal`, ואז להפעיל מחדש את OpenBot. הפעלה מחדש של xdg-desktop-portal בלבד לא תעזור כל עוד rtkit חסר.",
   "error.provider.cpuUnsupported": "המעבד של המחשב הזה לא יכול להריץ את הספק הזה. השתמש בספק אחר.",
+  "error.provider.largeMemoryPages":
+    "הספק הזה לא יכול לרוץ על ליבת Linux הזו, כי הליבה משתמשת בדפי זיכרון גדולים מ-4 KiB, כמו ב-Raspberry Pi 5 או ב-Asahi Linux. השתמש בליבה עם דפים של 4 KiB או בספק אחר.",
+  "error.provider.ipv6Missing":
+    "הספק הזה צריך IPv6, ו-IPv6 כבוי במחשב הזה. הפעל IPv6 ונסה שוב. ב-WSL, הסר את ipv6.disable=1 מ-.wslconfig והרץ wsl --shutdown.",
   "error.provider.windowsBlocked":
     "הגדרות האבטחה של Windows, כמו Smart App Control, מנעו מהספק הזה להתחיל. השתמש בספק אחר.",
   "error.provider.opencodeDatabaseNewer":
@@ -375,6 +379,8 @@ export const messages = {
     "Hermes איבד את החיבור שלו במהלך ההודעה הזו, ולכן הוא לא יודע אם העבודה הסתיימה. יש לבדוק מה הסוכן עשה לפני שליחת ההודעה שוב.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot לא הצליח להשתמש במודל הזה: המודל לא קיבל את הגדרת החשיבה שלו. בחרו מודל אחר לסוכן הזה ושלחו שוב את ההודעה.",
+  "error.provider.copilotAnswerIncomplete":
+    "המודל עצר לפני שהתשובה שלו הושלמה. שלחו שוב את ההודעה, או בחרו מודל אחר לסוכן הזה.",
   "error.provider.usageLimitReached": "החשבון הגיע למגבלת השימוש שלו.",
   "error.provider.claudeContextFull":
     "הצ'אט הזה נעשה ארוך מדי עבור Claude. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
@@ -398,6 +404,8 @@ export const messages = {
     "{provider} חסם את ההודעה הזאת בגלל כללי הבטיחות שלו: {reason} אם {provider} חוסם גם את ההודעות הבאות שלך, התחל צ'אט חדש.",
   "error.provider.codexAudioRefused":
     "המודל הזה לא יכול להאזין לאודיו, ולכן הוא לא קיבל את הצליל בצ'אט הזה. OpenBot התחיל סשן Codex חדש עם היסטוריית הצ'אט. כדי להמשיך, שלח שוב את הבקשה ובקש מהסוכן לעבוד בלי הצליל. כדי לבדוק צליל, בחר בתפריט המודל של הסוכן מודל שיכול להאזין לאודיו.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex לא הצליח לטעון את ההגדרות של חשבון ChatGPT, ולכן הסוכן נעצר. יש לנסות שוב. אם הוא נעצר שוב, יש לבחור חיבור מחדש עבור ChatGPT בהגדרות שרת ← ספקים.",
   "error.provider.imageTooSmall":
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageTooLarge":
@@ -419,8 +427,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code לא מצא את הסשן השמור של הצ'אט הזה. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.grokSignIn": "יש להריץ `grok login` או להגדיר XAI_API_KEY כדי להשתמש ב-Grok.",
+  "error.provider.acpSignInNoStart": "הספק לא הופעל, ולכן ההתחברות לא יכלה להתחיל. נסה שוב או הפעל מחדש את OpenBot.",
   "error.provider.acpSignInTimedOut": "זמן ההתחברות אזל.",
   "error.provider.acpSignInStopped": "ההתחברות נעצרה לפני שהושלמה.",
+  "error.provider.geminiNoBrowserUseCode":
+    "למחשב הזה אין דפדפן להתחברות ל-Google. בחר „התחברות עם קוד”, פתח את הקישור בכל מכשיר ואז הדבק את הקוד.",
   "error.provider.geminiBrowserUnavailable":
     "Gemini לא הצליח לפתוח את דף ההתחברות. יש להתקין דפדפן ו-xdg-utils, ואז להתחבר מסשן שולחן עבודה במארח הזה. שרת בלי שולחן עבודה לא יכול להשלים את ההתחברות הזו.",
   "error.provider.geminiBrowserOpenFailed":
@@ -519,6 +530,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",
+  "error.provider.acpSettingsConflict":
+    "{provider} שינה את הצ'אט הזה בזמן ש-OpenBot החיל את ההגדרות שלו. יש לנסות שוב.",
   "error.provider.acpSessionStale": "{provider} לא הצליח לטעון את הגרסה האחרונה של הצ'אט הזה. יש לשלוח את ההודעה שוב.",
   "error.provider.acpModelNotOffered": "{provider} לא מציע כעת את {model}. בחרו מודל אחר לסוכן הזה ונסו שוב.",
   "error.provider.piStopped": "Pi אינו פועל. יש לחבר את Pi ולנסות שוב.",

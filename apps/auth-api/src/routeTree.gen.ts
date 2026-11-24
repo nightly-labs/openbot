@@ -137,6 +137,7 @@ import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-temp
 import { Route as V1AppMinimumVersionRouteImport } from './routes/v1/app/minimum-version'
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
+import { Route as V1BrowserExtensionXRulesRouteImport } from './routes/v1/browser-extension/x-rules'
 import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
 import { Route as V1FeedbackWithdrawRouteImport } from './routes/v1/feedback/withdraw'
 import { Route as V1GithubInstallationTokensRouteImport } from './routes/v1/github/installation-tokens'
@@ -257,6 +258,7 @@ import { Route as V2RemoteHostsHostIdCheckoutRouteImport } from './routes/v2/rem
 import { Route as V2RemoteHostsHostIdDiscordDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/discord-disconnect'
 import { Route as V2RemoteHostsHostIdDiscordRouteRouteImport } from './routes/v2/remote/hosts/$hostId/discord-route'
 import { Route as V2RemoteHostsHostIdGithubRouteRouteImport } from './routes/v2/remote/hosts/$hostId/github-route'
+import { Route as V2RemoteHostsHostIdHiddenRouteImport } from './routes/v2/remote/hosts/$hostId/hidden'
 import { Route as V2RemoteHostsHostIdInvitesRouteImport } from './routes/v2/remote/hosts/$hostId/invites'
 import { Route as V2RemoteHostsHostIdKeyHandoverRouteImport } from './routes/v2/remote/hosts/$hostId/key-handover'
 import { Route as V2RemoteHostsHostIdLiveActivityRouteImport } from './routes/v2/remote/hosts/$hostId/live-activity'
@@ -929,6 +931,12 @@ const V1AvatarsUserIdRoute = V1AvatarsUserIdRouteImport.update({
   path: '/v1/avatars/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const V1BrowserExtensionXRulesRoute =
+  V1BrowserExtensionXRulesRouteImport.update({
+    id: '/v1/browser-extension/x-rules',
+    path: '/v1/browser-extension/x-rules',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V1FeedbackSimilarRoute = V1FeedbackSimilarRouteImport.update({
   id: '/similar',
   path: '/similar',
@@ -1571,6 +1579,12 @@ const V2RemoteHostsHostIdGithubRouteRoute =
     path: '/v2/remote/hosts/$hostId/github-route',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdHiddenRoute =
+  V2RemoteHostsHostIdHiddenRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/hidden',
+    path: '/v2/remote/hosts/$hostId/hidden',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdInvitesRoute =
   V2RemoteHostsHostIdInvitesRouteImport.update({
     id: '/v2/remote/hosts/$hostId/invites',
@@ -1880,6 +1894,7 @@ export interface FileRoutesByFullPath {
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
@@ -1999,6 +2014,7 @@ export interface FileRoutesByFullPath {
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
+  '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2157,6 +2173,7 @@ export interface FileRoutesByTo {
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
@@ -2276,6 +2293,7 @@ export interface FileRoutesByTo {
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
+  '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2439,6 +2457,7 @@ export interface FileRoutesById {
   '/v1/app/minimum-version': typeof V1AppMinimumVersionRoute
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
+  '/v1/browser-extension/x-rules': typeof V1BrowserExtensionXRulesRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
   '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
@@ -2558,6 +2577,7 @@ export interface FileRoutesById {
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
+  '/v2/remote/hosts/$hostId/hidden': typeof V2RemoteHostsHostIdHiddenRoute
   '/v2/remote/hosts/$hostId/invites': typeof V2RemoteHostsHostIdInvitesRoute
   '/v2/remote/hosts/$hostId/key-handover': typeof V2RemoteHostsHostIdKeyHandoverRoute
   '/v2/remote/hosts/$hostId/live-activity': typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -2718,6 +2738,7 @@ export interface FileRouteTypes {
     | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/browser-extension/x-rules'
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
@@ -2837,6 +2858,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
+    | '/v2/remote/hosts/$hostId/hidden'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -2995,6 +3017,7 @@ export interface FileRouteTypes {
     | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/browser-extension/x-rules'
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
@@ -3114,6 +3137,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
+    | '/v2/remote/hosts/$hostId/hidden'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3276,6 +3300,7 @@ export interface FileRouteTypes {
     | '/v1/app/minimum-version'
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
+    | '/v1/browser-extension/x-rules'
     | '/v1/feedback/similar'
     | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
@@ -3395,6 +3420,7 @@ export interface FileRouteTypes {
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
+    | '/v2/remote/hosts/$hostId/hidden'
     | '/v2/remote/hosts/$hostId/invites'
     | '/v2/remote/hosts/$hostId/key-handover'
     | '/v2/remote/hosts/$hostId/live-activity'
@@ -3498,6 +3524,7 @@ export interface RootRouteChildren {
   V1AppMinimumVersionRoute: typeof V1AppMinimumVersionRoute
   V1AuthLogoutRoute: typeof V1AuthLogoutRoute
   V1AvatarsUserIdRoute: typeof V1AvatarsUserIdRoute
+  V1BrowserExtensionXRulesRoute: typeof V1BrowserExtensionXRulesRoute
   V1GithubInstallationTokensRoute: typeof V1GithubInstallationTokensRoute
   V1MediaBalanceRoute: typeof V1MediaBalanceRoute
   V1MediaModelsRoute: typeof V1MediaModelsRoute
@@ -3584,6 +3611,7 @@ export interface RootRouteChildren {
   V2RemoteHostsHostIdDiscordDisconnectRoute: typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   V2RemoteHostsHostIdDiscordRouteRoute: typeof V2RemoteHostsHostIdDiscordRouteRoute
   V2RemoteHostsHostIdGithubRouteRoute: typeof V2RemoteHostsHostIdGithubRouteRoute
+  V2RemoteHostsHostIdHiddenRoute: typeof V2RemoteHostsHostIdHiddenRoute
   V2RemoteHostsHostIdInvitesRoute: typeof V2RemoteHostsHostIdInvitesRoute
   V2RemoteHostsHostIdKeyHandoverRoute: typeof V2RemoteHostsHostIdKeyHandoverRoute
   V2RemoteHostsHostIdLiveActivityRoute: typeof V2RemoteHostsHostIdLiveActivityRoute
@@ -4516,6 +4544,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1AvatarsUserIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v1/browser-extension/x-rules': {
+      id: '/v1/browser-extension/x-rules'
+      path: '/v1/browser-extension/x-rules'
+      fullPath: '/v1/browser-extension/x-rules'
+      preLoaderRoute: typeof V1BrowserExtensionXRulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v1/feedback/similar': {
       id: '/v1/feedback/similar'
       path: '/similar'
@@ -5356,6 +5391,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdGithubRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/hidden': {
+      id: '/v2/remote/hosts/$hostId/hidden'
+      path: '/v2/remote/hosts/$hostId/hidden'
+      fullPath: '/v2/remote/hosts/$hostId/hidden'
+      preLoaderRoute: typeof V2RemoteHostsHostIdHiddenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/hosts/$hostId/invites': {
       id: '/v2/remote/hosts/$hostId/invites'
       path: '/v2/remote/hosts/$hostId/invites'
@@ -5973,6 +6015,7 @@ const rootRouteChildren: RootRouteChildren = {
   V1AppMinimumVersionRoute: V1AppMinimumVersionRoute,
   V1AuthLogoutRoute: V1AuthLogoutRoute,
   V1AvatarsUserIdRoute: V1AvatarsUserIdRoute,
+  V1BrowserExtensionXRulesRoute: V1BrowserExtensionXRulesRoute,
   V1GithubInstallationTokensRoute: V1GithubInstallationTokensRoute,
   V1MediaBalanceRoute: V1MediaBalanceRoute,
   V1MediaModelsRoute: V1MediaModelsRoute,
@@ -6063,6 +6106,7 @@ const rootRouteChildren: RootRouteChildren = {
     V2RemoteHostsHostIdDiscordDisconnectRoute,
   V2RemoteHostsHostIdDiscordRouteRoute: V2RemoteHostsHostIdDiscordRouteRoute,
   V2RemoteHostsHostIdGithubRouteRoute: V2RemoteHostsHostIdGithubRouteRoute,
+  V2RemoteHostsHostIdHiddenRoute: V2RemoteHostsHostIdHiddenRoute,
   V2RemoteHostsHostIdInvitesRoute: V2RemoteHostsHostIdInvitesRoute,
   V2RemoteHostsHostIdKeyHandoverRoute: V2RemoteHostsHostIdKeyHandoverRoute,
   V2RemoteHostsHostIdLiveActivityRoute: V2RemoteHostsHostIdLiveActivityRoute,

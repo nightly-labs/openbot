@@ -132,7 +132,7 @@ interface ProviderCliCommand {
   readonly timeoutMs: number;
   readonly closeInput?: true;
   readonly acpLogout?: true | AcpExtensionMethod;
-  readonly windowsPageByOpenBot?: true;
+  readonly pageByOpenBotOn?: readonly NodeJS.Platform[];
   readonly failureText?: (output: string) => string | null;
 }
 
@@ -199,7 +199,7 @@ const CLAUDE_SIGN_IN: ProviderCliCommand = {
   argv: ["auth", "login", "--claudeai"],
   env: CLAUDE_COMMAND_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
-  windowsPageByOpenBot: true,
+  pageByOpenBotOn: ["win32", "darwin"],
   failureText: claudeSignInFailure,
 };
 
@@ -793,6 +793,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         withAccountEnvironment(context),
         context.history?.("grok"),
         context.fitImage,
+        () => discoveryFolder("grok"),
       ),
     createProfileClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
@@ -805,6 +806,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         undefined,
         accountEnvironment && (() => accountEnvironment),
+        undefined,
+        undefined,
+        () => discoveryFolder("grok"),
       ),
     createMediaClient: (cli, requestTimeoutMs, { accountEnvironment }) =>
       new GrokAgentClient(
@@ -817,6 +821,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         undefined,
         accountEnvironment && (() => accountEnvironment),
+        undefined,
+        undefined,
+        () => discoveryFolder("grok"),
       ),
     authState: (account) => ({ kind: "grok", email: account?.email ?? null }),
     validateAccount: () => undefined,

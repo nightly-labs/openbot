@@ -538,6 +538,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Erfasst seit {started}. Aktualisiert {updated}.",
   "mobile.agent.usage.never": "nie",
   "mobile.agent.record.time": "Uhrzeit",
+  "mobile.agent.record.date": "Datum",
   "mobile.agent.section.changeFailed": "Ordner konnte nicht geändert werden",
   "mobile.agent.section.tryAgain": "Versuche es erneut.",
   "mobile.agent.section.moveUp": "Nach oben verschieben",
@@ -622,7 +623,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Deine Server konnten nicht geladen werden",
   "mobile.agent.home.serversFailedBody": "Prüfe, ob die Desktop-App läuft, und versuche es erneut.",
   "mobile.agent.home.noServers": "Keine Server verfügbar",
-  "mobile.agent.home.noServersBody": "Verbinde die Desktop-App erneut oder tritt einem Remote-Server bei.",
+  "mobile.agent.home.noServersBody":
+    "Öffne OpenBot auf deinem Computer mit diesem Konto und aktiviere „Server veröffentlichen“ unter Servereinstellungen → Mitglieder. Oder tritt einem Remote-Server bei.",
   "mobile.agent.home.chooseServer": "Wähle einen Server",
   "mobile.agent.home.openServers": "Server öffnen",
   "mobile.agent.home.noChatOpen": "Kein Chat geöffnet",

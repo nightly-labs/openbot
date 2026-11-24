@@ -254,6 +254,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "由于 OpenBot 的实时 CPU 限制为 0，Linux 停止了该提供方。此限制来自你的系统。请安装并启动 rtkit（`rtkit-daemon`），运行 `systemctl --user restart xdg-desktop-portal`，然后重新启动 OpenBot。缺少 rtkit 时，仅重启 xdg-desktop-portal 没有作用。",
   "error.provider.cpuUnsupported": "这台电脑的处理器无法运行此服务商。请使用其他服务商。",
+  "error.provider.largeMemoryPages":
+    "此服务商无法在这个 Linux 内核上运行，因为该内核使用大于 4 KiB 的内存页（例如 Raspberry Pi 5 或 Asahi Linux）。请使用 4 KiB 页的内核，或使用其他服务商。",
+  "error.provider.ipv6Missing":
+    "此服务商需要 IPv6，但这台电脑上的 IPv6 已关闭。请开启 IPv6 后重试。在 WSL 中，请从 .wslconfig 中删除 ipv6.disable=1，然后运行 wsl --shutdown。",
   "error.provider.windowsBlocked": "Windows 安全设置（例如智能应用控制）阻止了此服务商启动。请使用其他服务商。",
   "error.provider.opencodeDatabaseNewer":
     "OpenCode 无法打开它的数据库，因为较新的 OpenCode 版本已更改了数据库。请把 OpenCode 更新到版本 2 或更高，然后重试。",
@@ -353,6 +357,7 @@ export const messages = {
     "Hermes 在处理这条消息时连接断开，因此不知道工作是否已完成。重新发送消息前，请先检查智能体做了什么。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
+  "error.provider.copilotAnswerIncomplete": "模型在完成回答前停止了。请重新发送消息，或为此 Agent 选择其他模型。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",
   "error.provider.claudeContextFull":
     "此聊天对 Claude 来说已经太长。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
@@ -376,6 +381,8 @@ export const messages = {
     "{provider} 因其安全规则拦截了此消息：{reason} 如果 {provider} 也拦截你后续的消息，请开始新对话。",
   "error.provider.codexAudioRefused":
     "此模型无法收听音频，因此未接受此聊天中的声音。OpenBot 已使用聊天记录开始新的 Codex 会话。要继续，请重新发送你的请求，并让智能体在不使用声音的情况下工作。要检查声音，请在智能体的模型菜单中选择一个可以收听音频的模型。",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex 无法加载你的 ChatGPT 账户设置，因此助手已停止。请重试。如果它再次停止，请在“服务器设置 → 服务商”中为 ChatGPT 选择“重新连接”。",
   "error.provider.imageTooSmall":
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooLarge":
@@ -397,8 +404,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "Claude Code 找不到此聊天已保存的会话。OpenBot 已带着聊天记录开启新的 Claude Code 会话，请重试。",
   "error.provider.grokSignIn": "请运行 `grok login`，或设置 XAI_API_KEY 以使用 Grok。",
+  "error.provider.acpSignInNoStart": "服务商没有启动，所以无法开始登录。请重试，或重新启动 OpenBot。",
   "error.provider.acpSignInTimedOut": "登录超时。",
   "error.provider.acpSignInStopped": "登录在完成之前就停止了。",
+  "error.provider.geminiNoBrowserUseCode":
+    "这台电脑没有可用于 Google 登录的浏览器。请选择“用验证码登录”，在任意设备上打开链接，然后粘贴验证码。",
   "error.provider.geminiBrowserUnavailable":
     "Gemini 无法打开登录页面。请安装浏览器与 xdg-utils，然后在该主机的桌面会话中连接。没有桌面的服务器无法完成该登录。",
   "error.provider.geminiBrowserOpenFailed": "Gemini 无法在浏览器中打开登录页面。请检查默认浏览器，然后重新连接。",
@@ -486,6 +496,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "无法读取 {provider} CLI 版本。",
   "error.provider.piSessionBusy": "请等待当前 Pi 对话结束。",
   "error.provider.acpSessionBusy": "{provider} 仍在结束已停止的对话。请稍后再试。",
+  "error.provider.acpSettingsConflict": "OpenBot 应用设置时，{provider} 更改了此对话。请重试。",
   "error.provider.acpSessionStale": "{provider} 无法加载此对话的最新版本。请重新发送你的消息。",
   "error.provider.acpModelNotOffered": "{provider} 目前不提供 {model}。请为此智能体选择其他模型，然后重试。",
   "error.provider.piStopped": "Pi 未运行。请连接 Pi 后重试。",

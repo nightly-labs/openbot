@@ -82,8 +82,7 @@ export function ServerActionItems(
     props.server.restartAvailable !== false &&
     !(props.server.hostedSleep === "waking" && props.server.hostedStart?.step !== "openbot") &&
     (props.server.hosted === true || Boolean(props.canRestart?.(props.server.id)));
-  const canHide = () =>
-    Boolean(props.onHide) && props.server.kind === "local" && Boolean(props.canHide?.(props.server.id));
+  const canHide = () => Boolean(props.onHide) && Boolean(props.canHide?.(props.server.id));
   const Menu = props.menu;
   return (
     <>

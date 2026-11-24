@@ -77,7 +77,10 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
     segments[1] === "remote" &&
     segments[2] === "hosts" &&
     segments[3] &&
-    (segments[4] === "logo" || segments[4] === "appearance" || segments[4] === "owner-transfer")
+    (segments[4] === "logo" ||
+      segments[4] === "appearance" ||
+      segments[4] === "owner-transfer" ||
+      segments[4] === "hidden")
   )
     return true;
   if (

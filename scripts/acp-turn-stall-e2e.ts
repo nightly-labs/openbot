@@ -41,6 +41,8 @@ interface Report {
   stop?: { status: string | null; elapsedMs: number; next: string | null };
   stream?: { deltaBeforeCompletion: boolean; reply: string };
   antigravity?: { stalled: boolean; stopStatus: string | null };
+  antigravitySilent?: { status: string | null; error: string | null; elapsedMs: number };
+  antigravityLogged?: { status: string | null; error: string | null; elapsedMs: number };
   lostPrompt?: { status: string | null; reply: string; prompts: number; cancels: number; resumes: number };
   lostTwice?: { status: string | null; error: string | null; elapsedMs: number; next: string | null };
   quiet?: { status: string | null; reply: string; prompts: number };
@@ -61,6 +63,7 @@ async function open(
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null,
   firstUpdateMs?: number,
   turnStallMs: number | null = STALL_MS,
+  argv: readonly string[] = ["acp"],
 ): Promise<AgentClient> {
   const executable = join(root, provider, "bin", provider);
   await installFakeAgent(executable, "stall", {
@@ -72,7 +75,7 @@ async function open(
   const client = new AcpAgentClient({ executable, version: "99.0.0", source: "managed" }, 20_000, {
     provider,
     flavor,
-    argv: ["acp"],
+    argv,
     env: {},
     signInMessage: "Sign in to the fake agent.",
     ...(turnStallMs !== null ? { turnStallMs } : {}),
@@ -285,6 +288,55 @@ try {
   report.antigravity = { stalled: antigravityStalled, stopStatus: antigravityStop.status };
   assert.equal(antigravityStalled, false, "A silent Antigravity prompt is not ended as stalled.");
   assert.equal(antigravityStop.status, "interrupted", "A stop still ends the Antigravity turn.");
+
+  const silentFlavor: AcpFlavor = { ...ANTIGRAVITY_ACP_FLAVOR, silentTurnLimitMs: STALL_MS * 2 };
+  const silentLog = join(root, "antigravity-silent.jsonl");
+  const silent = await open("antigravity", silentFlavor, silentLog);
+  const silentThread = await startThread(silent, { cwd: workspace });
+  const silentTurn = await timed(() => runTurn(silent, silentThread, { text: "hang", timeoutMs: STALL_MS * 20 }));
+  report.antigravitySilent = {
+    status: silentTurn.value.status,
+    error: silentTurn.value.error,
+    elapsedMs: silentTurn.elapsedMs,
+  };
+  assert.equal(silentTurn.value.status, "failed", "A silent Antigravity prompt ends at its silent limit.");
+  assert.ok(silentTurn.elapsedMs >= STALL_MS * 2, "The silent prompt is not ended before its silent limit.");
+
+  const geminiDir = join(root, "gemini");
+  const agyLogs = join(geminiDir, "antigravity-acp", "log");
+  await mkdir(agyLogs, { recursive: true });
+  const loggedLog = join(root, "antigravity-logged.jsonl");
+  const logged = await open("antigravity", silentFlavor, loggedLog, {}, undefined, undefined, STALL_MS, [
+    "acp",
+    `--gemini-dir=${geminiDir}`,
+    "--app-data-dir=antigravity-acp",
+  ]);
+  const loggedThread = await startThread(logged, { cwd: workspace });
+  const loggedTurn = timed(() => runTurn(logged, loggedThread, { text: "hang", timeoutMs: STALL_MS * 20 }));
+  await waitForEntry(loggedLog, (entry) => entry.event === "prompt" && entry.text === "hang");
+  const prompt = (await readJsonl<LogEntry>(loggedLog)).find((entry) => entry.event === "prompt");
+  await writeFile(
+    join(agyLogs, "acp-server.log"),
+    [
+      `I1123 10:00:00.000000 server.go:10] Sending user message to conversation ${prompt?.sessionId ?? ""}`,
+      "E1123 10:00:01.000000 executor.go:20] agent executor error: Error 502, Message: Bad Gateway, Status: 502 Bad Gateway, Details: []",
+      "I1123 10:00:02.000000 server.go:10] Sending user message to conversation other-session",
+      "E1123 10:00:03.000000 executor.go:20] agent executor error: Error 429, Message: Resource exhausted, Status: 429 Too Many Requests, Details: []",
+      "",
+    ].join("\n"),
+  );
+  const loggedEnd = await loggedTurn;
+  report.antigravityLogged = {
+    status: loggedEnd.value.status,
+    error: loggedEnd.value.error,
+    elapsedMs: loggedEnd.elapsedMs,
+  };
+  assert.equal(loggedEnd.value.status, "failed", "A silent prompt with a logged error ends at its silent limit.");
+  assert.equal(
+    loggedEnd.value.error,
+    sourceText("error.provider.antigravityServiceFailure", { detail: "Bad Gateway" }),
+    "The turn shows its own error from the agy log, not a generic stall or the error of another session.",
+  );
 
   const firstLog = join(root, "antigravity-first.jsonl");
   const first = await open(

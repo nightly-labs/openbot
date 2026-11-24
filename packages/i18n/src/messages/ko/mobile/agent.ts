@@ -521,6 +521,7 @@ export const messages = {
   "mobile.agent.usage.collection": "수집 시작: {started}. 업데이트: {updated}.",
   "mobile.agent.usage.never": "없음",
   "mobile.agent.record.time": "시간",
+  "mobile.agent.record.date": "날짜",
   "mobile.agent.section.changeFailed": "폴더를 변경할 수 없어요",
   "mobile.agent.section.tryAgain": "다시 시도해 주세요.",
   "mobile.agent.section.moveUp": "위로 이동",
@@ -599,7 +600,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "서버를 불러올 수 없어요",
   "mobile.agent.home.serversFailedBody": "데스크톱 앱이 실행 중인지 확인한 후 다시 시도해 주세요.",
   "mobile.agent.home.noServers": "사용할 수 있는 서버가 없어요",
-  "mobile.agent.home.noServersBody": "데스크톱 앱을 다시 연결하거나 원격 서버에 참여해 주세요.",
+  "mobile.agent.home.noServersBody":
+    "이 계정으로 컴퓨터에서 OpenBot을 열고 서버 설정 → 멤버에서 이 서버 게시를 켜 주세요. 또는 원격 서버에 참여해 주세요.",
   "mobile.agent.home.chooseServer": "서버 선택",
   "mobile.agent.home.openServers": "서버 열기",
   "mobile.agent.home.noChatOpen": "열린 채팅 없음",

@@ -1,4 +1,6 @@
+import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { homedir, hostname, tmpdir } from "node:os";
@@ -213,6 +215,7 @@ import {
   claudeUserSetupControl,
   createClaudeUserSetupPreferenceStore,
 } from "./claude-user-setup-preference-store";
+import { ClientBrowserHub } from "./client-browser-hub";
 import { createComputerIdle } from "./computer-idle";
 import { ComputerUseDisplayAwake } from "./computer-use-display-awake";
 import { ComputerUseHighlightController } from "./computer-use-highlight-window";
@@ -609,6 +612,7 @@ const TEARDOWN_ORDER = {
   hostEvents: 85.5,
   signalIngress: 86,
   host: 90,
+  clientBrowser: 98,
   browserEgress: 99,
   teamWebRtcBridge: 100,
   routineFlows: 103,
@@ -1309,6 +1313,8 @@ export async function createApplicationServices({
   );
   const browserEgress = new BrowserEgressHost(teamWebRtcBridge);
   teardown.push(TEARDOWN_ORDER.browserEgress, "the computer proxies of members", () => browserEgress.dispose());
+  const clientBrowser = new ClientBrowserHub();
+  teardown.push(TEARDOWN_ORDER.clientBrowser, "the shared Chrome tabs of members", () => clientBrowser.dispose());
   const hostMemory =
     hostedServer || serverModeEnvironment
       ? new ServerMemory({
@@ -2224,6 +2230,7 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
+    clientBrowser,
     crm: () => crmHandle,
     crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
     personCanAdminister: (personId) => host.personCanAdminister(personId),
@@ -2355,6 +2362,7 @@ export async function createApplicationServices({
     download: (url, maxBytes) => downloadDiscordAttachment(url, maxBytes),
   });
   const workflowGitHub = workflowGitHubDirectory(() => githubConnector.workflowCatalog(), githubRest);
+  const workflowNotices = new EventEmitter<{ notice: [WorkflowNotice] }>();
   const workflowRuntime = await Effect.runPromise(
     createWorkflows({
       store: workflowStore,
@@ -2418,7 +2426,10 @@ export async function createApplicationServices({
           Effect.map((kept) => (typeof kept === "string" ? kept : kept.id)),
           Effect.ensuring(Effect.sync(() => storageUsage.invalidate())),
         ),
-      notify: forwardWorkflowNotice,
+      notify: (notice) => {
+        workflowNotices.emit("notice", notice);
+        forwardWorkflowNotice(notice);
+      },
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
       post: (connectionId, placeId, markdown) => service.messaging.deliver(connectionId, placeId, markdown),
       channelPost: (input) => service.channels.postNote(input),
@@ -3204,6 +3215,7 @@ export async function createApplicationServices({
     store: teamStore,
     agents: service,
     signInWaits: service.signInWaits,
+    workflowNotices,
     agentsReady: () => agentInitialization.awaitRoster(),
     events,
     skills,
@@ -3241,6 +3253,28 @@ export async function createApplicationServices({
       subscribe: (listener) => {
         service.on("liveVoice", listener);
         return () => service.off("liveVoice", listener);
+      },
+    },
+    clientBrowser,
+    voiceTranscription: {
+      transcribe: (audio) => {
+        if (voiceServer.dictates()) return voiceServer.transcribe(audio, voice.getSettings().language);
+        return voice.getModelStatus().pipe(
+          Effect.flatMap((status) => {
+            if (status.phase === "ready" && (isLocalVoiceModelId(status.modelId) || isGroqVoiceModelId(status.modelId)))
+              return voice.transcribe(audio);
+            const preparing =
+              isLocalVoiceModelId(status.modelId) && (status.phase === "missing" || status.phase === "downloading");
+            const refusal = Effect.fail(
+              new VoiceOperationError({
+                cause: new Error(sourceText(preparing ? "error.voice.host.preparing" : "error.voice.host.notSetUp")),
+              }),
+            );
+            return preparing && status.phase === "missing"
+              ? Effect.forkDetach(Effect.ignore(voice.prepareModel())).pipe(Effect.andThen(refusal))
+              : refusal;
+          }),
+        );
       },
     },
     hostedSites,
@@ -3494,6 +3528,9 @@ export async function createApplicationServices({
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => Effect.succeed(remoteDesktopRuntimeCredentials),
     remoteDesktopScreenLocked: () => powerMonitor.getSystemIdleState(1) === "locked",
+    wakeRemoteDesktopScreen: () => {
+      execFile("/usr/bin/caffeinate", ["-u", "-t", "5"], () => undefined).unref();
+    },
     getRemoteDesktopDisplays: () => {
       const primaryId = screen.getPrimaryDisplay().id;
       return screen.getAllDisplays().map((display, index) => ({
@@ -3745,6 +3782,7 @@ export async function createApplicationServices({
           centralAuth.updateRemoteMember(hostId, membershipId, role, reactivate),
         removeMember: (hostId, membershipId) => centralAuth.removeRemoteMember(hostId, membershipId),
         removeOwnedHost: (hostId) => centralAuth.removeOwnedRemoteHost(hostId),
+        setHostHidden: (hostId, hidden) => centralAuth.setRemoteHostHidden(hostId, hidden),
         getPrincipalId: () => centralAuth.getSignedInUser().id,
         controlPlaneUrl: centralAuth.resolveApiUrl("/"),
         downloadHostLogo: (hostId, version) => centralAuth.downloadRemoteHostLogo(hostId, version),

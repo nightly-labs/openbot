@@ -30,8 +30,9 @@ export const messages = {
   "mobile.auth.signIn.subtitle": "Bilgisayarınızdaki OpenBot'a bağlanın.",
   "mobile.auth.signIn.helpTitle": "QR kodu nerede?",
   "mobile.auth.signIn.helpStep1": "1. Bilgisayarınızda OpenBot'u açın.",
-  "mobile.auth.signIn.helpStep2": "2. Ayarlar → Mobile Connect bölümüne gidin.",
-  "mobile.auth.signIn.helpStep3": "3. “QR kodu oluştur” seçeneğini seçin, ardından kodu buradan tarayın.",
+  "mobile.auth.signIn.helpStep2": "2. Ayarlar → Mobil Bağlantı bölümüne gidin.",
+  "mobile.auth.signIn.helpStep3":
+    "3. “Telefon ekle” → “Evet, oturum aç” seçeneğini seçin, ardından kodu buradan tarayın.",
   "mobile.auth.signIn.emailButton": "E-posta ile devam et",
   "mobile.auth.done.title": "Bağlandı",
   "mobile.auth.done.body": "Oturum açtınız.",
