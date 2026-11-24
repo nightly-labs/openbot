@@ -430,7 +430,10 @@ export class LiveVoice {
           Effect.suspend(() => {
             const repeated = this.#repeatedAsk(session, text);
             if (!repeated) return this.#send(session, request, text, pending);
-            return Effect.sync(() => this.#wait(session, request, repeated.deliveryId));
+            return Effect.sync(() => {
+              if (!repeated.reply) this.#wait(session, request, repeated.deliveryId);
+              else if (!request.signal?.aborted) this.#respond(session, request.id, repeated.reply);
+            });
           }),
         ),
       );
@@ -471,11 +474,13 @@ export class LiveVoice {
     );
   }
 
-  #repeatedAsk(session: LiveSession, text: string): SentAsk | null {
+  #repeatedAsk(session: LiveSession, text: string): { deliveryId: string; reply: LiveVoiceReply | null } | null {
     const last = session.lastAsk;
     if (!last || last.userLines !== session.userLines || last.words !== requestWords(text)) return null;
+    const reply = this.#hooks.reply(session.agentId, last.deliveryId);
+    if (reply && !reply.success) return null;
     logger.info("Live voice gave the same request again without new speech. It is not sent again.");
-    return last;
+    return { deliveryId: last.deliveryId, reply };
   }
 
   #wait(session: LiveSession, request: AppServerRequest, deliveryId: string): PendingAsk | null {
