@@ -4606,7 +4606,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         toProviderClientOperationError,
         Effect.ensuring(
           Effect.sync(() => {
-            if (ownTurn) ownTurn.openbotToolCalls -= 1;
+            if (!ownTurn) return;
+            ownTurn.openbotToolCalls -= 1;
+            ownTurn.lastActivityAt = Date.now();
           }),
         ),
       );
