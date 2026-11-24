@@ -10,7 +10,6 @@ import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import type { AgentClient, DiagnosticOrigin } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
 import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecoder } from "../src/backend/protocol";
-import type { ReadProviderHistory } from "../src/backend/provider-history";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/acp-stale-turn-stop-e2e");
 const root = await mkdtemp(join(tmpdir(), "openbot-acp-stale-stop-"));
@@ -76,12 +75,10 @@ interface ClientEvents {
 class AntigravityStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "antigravity";
   readonly #real: AgentClient;
-  readonly readHistory: ReadProviderHistory | undefined;
 
   constructor(cli: AgentCliInfo) {
     super();
     this.#real = requireProviderDriver("antigravity").createClient(cli, 10_000, NO_PROVIDER_CREDENTIALS);
-    this.readHistory = this.#real.readHistory;
     this.#real.on("notification", (notification) => {
       if (
         lostTurnEvents.active &&
