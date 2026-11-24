@@ -106,7 +106,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
     >
       {({ pressed }) => (
         <View
-          className="min-h-21 w-full flex-row items-center gap-3.5 py-1"
+          className="min-h-17 w-full flex-row items-center gap-3.5 py-1"
           style={{
             backgroundColor: background,
             opacity: pressed ? 0.58 : 1,

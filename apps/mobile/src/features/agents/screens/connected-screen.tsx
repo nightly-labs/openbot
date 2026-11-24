@@ -651,6 +651,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
                 unread={folderUnread.get(item.id) ?? 0}
                 visibleSectionIds={visibleSectionIds}
                 collapsed={collapsedSectionIds.has(item.id)}
+                first={index === 0}
                 onToggle={toggleSection}
               />
             </SectionDropTarget>

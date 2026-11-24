@@ -366,7 +366,7 @@ export const ChannelListRow = memo(function ChannelListRow({
       ) : (
         ({ pressed }) => (
           <View
-            className="min-h-21 w-full flex-row items-center gap-3.5 py-1"
+            className="min-h-17 w-full flex-row items-center gap-3.5 py-1"
             style={{
               backgroundColor: rowBackground,
               opacity: pressed ? 0.58 : 1,
