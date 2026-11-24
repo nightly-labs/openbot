@@ -412,6 +412,8 @@ export const messages = {
     "Bu sitenin güvenlik sertifikasına güvenilmiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":
     "Bu sunucunun belleği azaldı, bu nedenle tarayıcı başka bir sekme açamıyor. Bir sekmeyi kapatın veya diğer ajanların bitmesini bekleyin.",
+  "error.backend.browserNoMemory":
+    "Bu sunucunun belleği neredeyse doldu, bu nedenle tarayıcı şu anda sekme açamıyor. Diğer ajanların bitmesini bekleyin, sonra tekrar deneyin.",
   "error.backend.browserOpenFailed": "{url} açılamadı: {reason}",
   "error.backend.popupSecureInput":
     "Güvenli giriş sırasında açılır pencereler engellenir. Güvenli girişi tamamlayın veya iptal edin, ardından sayfadan tekrar deneyin.",

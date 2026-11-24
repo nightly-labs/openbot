@@ -531,6 +531,7 @@ export const messages = {
   "mobile.agent.usage.collection": "収集開始: {started}。更新: {updated}。",
   "mobile.agent.usage.never": "なし",
   "mobile.agent.record.time": "時刻",
+  "mobile.agent.record.date": "日付",
   "mobile.agent.section.changeFailed": "フォルダーを変更できませんでした",
   "mobile.agent.section.tryAgain": "もう一度お試しください。",
   "mobile.agent.section.moveUp": "上へ移動",

@@ -1,5 +1,38 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Veel van de onderstaande oplossingen werken op een server alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Gebruik spraak in kanalen. Wanneer je een bericht voor een kanaal dicteert, leest de app het antwoord van een agent hardop voor. Je kunt ook een spraakgesprek starten vanuit het berichtvak van het kanaal.",
+          "Verberg een server op de serverbalk. De server is ook verborgen op je andere computers. Selecteer hem in de map “Verborgen servers” om hem weer te tonen."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "De pagina Taken heet nu Threads, zoals in de telefoon-app en in het zijpaneel van de chat.",
+          "Gestreamde antwoorden en workflows die tegelijk lopen, gebruiken minder CPU, en de webclient opent een server sneller."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Op een Mac openen Koppelen en Account toevoegen voor Claude nu de aanmeldpagina van Claude vanuit OpenBot.",
+          "Wanneer de verbinding met een server waarbij je bent aangesloten stopt met het verzenden van gegevens, maakt de app zelf weer verbinding.",
+          "Lange kanalen op een server waarbij je bent aangesloten, openen en updaten sneller.",
+          "Een workflowuitvoer “Melding” of een stap die op goedkeuring wacht, stuurt nu een melding naar je telefoon.",
+          "Een Gemini-chat gaat door nadat Google een toolresultaat weigert. Eerder mislukte elk volgend bericht."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

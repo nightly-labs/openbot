@@ -530,6 +530,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Verzamelen gestart {started}. Bijgewerkt {updated}.",
   "mobile.agent.usage.never": "nooit",
   "mobile.agent.record.time": "Tijd",
+  "mobile.agent.record.date": "Datum",
   "mobile.agent.section.changeFailed": "Kan map niet wijzigen",
   "mobile.agent.section.tryAgain": "Probeer het opnieuw.",
   "mobile.agent.section.moveUp": "Omhoog",

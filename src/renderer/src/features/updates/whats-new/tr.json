@@ -1,5 +1,38 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Katıldığınız her sunucuyu da bu sürüme güncelleyin. Aşağıdaki düzeltmelerin çoğu bir sunucuda yalnızca sunucu bu sürümdeyse çalışır."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Kanallarda ses kullanın. Bir kanala sesle ileti dikte ettiğinizde uygulama bir ajanın yanıtını sesli okur. Kanalın ileti kutusundan sesli bir konuşma da başlatabilirsiniz.",
+          "Bir sunucuyu sunucu çubuğundan gizleyin. Sunucu diğer bilgisayarlarınızda da gizli olur. Yeniden göstermek için \"Gizli sunucular\" klasöründe seçin."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Görevler sayfası artık Mesaj dizileri olarak adlandırılıyor; telefon uygulamasında ve sohbet yan panelinde olduğu gibi.",
+          "Akış halindeki yanıtlar ve aynı anda çalışan iş akışları daha az CPU kullanır; web istemcisi bir sunucuyu daha hızlı açar."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "macOS'te Claude için Bağlan ve Hesap ekle artık OpenBot'tan Claude oturum açma sayfasını açar.",
+          "Katıldığınız bir sunucuyla bağlantı veri göndermeyi durdurduğunda uygulama artık kendiliğinden yeniden bağlanır.",
+          "Katıldığınız bir sunucuda uzun kanallar daha hızlı açılır ve güncellenir.",
+          "Bir iş akışının \"Bildirim\" çıktısı veya onay bekleyen bir adım artık telefona bildirim gönderir.",
+          "Bir Gemini sohbeti, Google bir araç sonucunu reddettikten sonra devam eder. Önceden sonraki her ileti başarısız oluyordu."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

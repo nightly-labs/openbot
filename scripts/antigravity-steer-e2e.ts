@@ -29,6 +29,7 @@ interface Report {
   passed: boolean;
   steered?: Finished & { turnId: string; prompts: LogEntry[]; cancelSent: boolean };
   twice?: Finished & { prompts: LogEntry[] };
+  beforeAnswer?: Finished & { events: string[] };
   wrongTurn?: { refused: string; prompts: number };
   afterTurn?: { refused: string; prompts: number };
   waitingOnUser?: { refused: string; prompts: number; reply: string; status: string | null };
@@ -163,7 +164,9 @@ async function refusal(operation: Promise<string | null>): Promise<string> {
 }
 
 try {
-  const { client, log } = await open("native", {});
+  const firstUpdateRelease = join(root, "native-release", "first-update");
+  await mkdir(join(root, "native-release"), { recursive: true });
+  const { client, log } = await open("native", { FAKE_FIRST_UPDATE_RELEASE: firstUpdateRelease });
   let heldApproval: (() => void) | undefined;
   let approvals = 0;
   let approvalAsked: () => void = () => undefined;
@@ -217,6 +220,21 @@ try {
     ["work", "more context", "finish now"],
   );
   report.twice = { ...twice, prompts: twicePrompts };
+
+  const slow = await startTurn(client, thread, log, "slow start");
+  const beforeSlow = await readJsonl<LogEntry>(log);
+  const slowSteer = steer(client, thread, slow.id, "before the first answer");
+  await writeFile(firstUpdateRelease, "");
+  assert.equal(await slowSteer, slow.id);
+  const slowFinished = await slow.done;
+  const slowEvents = (await readJsonl<LogEntry>(log))
+    .slice(beforeSlow.length)
+    .map((entry) => (entry.event === "prompt" ? `prompt:${entry.text}` : entry.event));
+  assert.equal(slowFinished.status, "completed");
+  assert.match(slowFinished.reply, /steered: before the first answer/u);
+  assert.equal(slowFinished.started, 1, "The steer must not start another turn.");
+  assert.deepEqual(slowEvents, ["first-update", "prompt:before the first answer"]);
+  report.beforeAnswer = { ...slowFinished, events: slowEvents };
 
   const third = await startTurn(client, thread, log, "work");
   const beforeWrong = (await prompts(log)).length;

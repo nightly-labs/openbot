@@ -541,6 +541,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Collecte commencée {started}. Mise à jour {updated}.",
   "mobile.agent.usage.never": "jamais",
   "mobile.agent.record.time": "Heure",
+  "mobile.agent.record.date": "Date",
   "mobile.agent.section.changeFailed": "Impossible de modifier le dossier",
   "mobile.agent.section.tryAgain": "Veuillez réessayer.",
   "mobile.agent.section.moveUp": "Monter",

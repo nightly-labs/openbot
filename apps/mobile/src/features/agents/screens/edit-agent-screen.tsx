@@ -274,6 +274,10 @@ function AgentForm({
     pending.current = true;
     setSaving(true);
     setError(null);
+    const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
+    const accountWithRuntime =
+      accountChanged &&
+      (edits.provider !== undefined || edits.model !== undefined || edits.reasoningEffort !== undefined);
     try {
       if (Object.keys(edits).length > 0)
         await updateAgent(
@@ -288,13 +292,14 @@ function AgentForm({
             ...(edits.provider === undefined ? {} : { provider: edits.provider }),
             ...(edits.model === undefined ? {} : { model: edits.model }),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
+            ...(accountWithRuntime ? { providerAccountId: accountId } : {}),
           },
           agent.serverId,
         );
       setEdits({});
       if (accountChanged || (edits.provider !== undefined && edits.provider !== agent.provider)) {
-        const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
-        if (accountChanged) await setAgentProviderAccount({ agentId: agent.id, accountId }, agent.serverId);
+        if (accountChanged && !accountWithRuntime)
+          await setAgentProviderAccount({ agentId: agent.id, accountId }, agent.serverId);
         setAccount(undefined);
         queryClient.setQueryData<HostProviderAccounts | null>(accountsKey, (current) =>
           current

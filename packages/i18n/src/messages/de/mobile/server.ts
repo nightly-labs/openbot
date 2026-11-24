@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} konnte nicht verlassen werden",
   "mobile.server.drawer.removeFailed": "{name} konnte nicht entfernt werden",
   "mobile.server.drawer.deleteFailed": "{name} konnte nicht gelöscht werden",
+  "mobile.server.drawer.hide": "Server ausblenden",
+  "mobile.server.drawer.show": "Server einblenden",
+  "mobile.server.drawer.hiddenServers": "Ausgeblendete Server",
+  "mobile.server.drawer.hideFailed": "{name} konnte nicht ausgeblendet werden",
+  "mobile.server.drawer.showFailed": "{name} konnte nicht eingeblendet werden",
   "mobile.server.drawer.actionFailed": "OpenBot konnte diese Aktion nicht ausführen. Versuche es erneut.",
   "mobile.server.drawer.moveUp": "Nach oben verschieben",
   "mobile.server.drawer.moveDown": "Nach unten verschieben",
@@ -276,6 +281,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Dadurch wird der Server für alle Mitglieder aus dem Kontodienst entfernt. Dateien und Chats auf seinem Computer bleiben erhalten. Um ihn wieder zu nutzen, registriere ihn auf diesem Computer.",
   "mobile.server.settings.remove": "Server entfernen",
+  "mobile.server.settings.hide": "Server ausblenden",
+  "mobile.server.settings.show": "Server einblenden",
   "mobile.server.settings.deleteTitle": "{name} löschen?",
   "mobile.server.settings.deleteBody":
     "OpenBot stoppt den Server auf seinem Computer und verschiebt seine Agenten, Chats und Dateien in den Papierkorb dieses Computers. Der Server verschwindet aus der Serverliste auf allen deinen Geräten.",
@@ -536,6 +543,21 @@ export const messages = {
   "mobile.server.settings.keyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
   "mobile.server.settings.keyUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seinen Schlüssel hier zu ändern.",
+  "mobile.server.settings.turnLimit": "Threads gleichzeitig",
+  "mobile.server.settings.turnLimitDescription":
+    "Wie viele Agent-Threads auf diesem Server gleichzeitig laufen können. Mehr Threads brauchen mehr Arbeitsspeicher.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatisch (kein Limit)",
+  "mobile.server.settings.turnLimitUnlimited": "Kein Limit",
+  "mobile.server.settings.turnLimitsLoadFailed": "Die Thread-Limits dieses Servers konnten nicht geladen werden.",
+  "mobile.server.settings.turnLimitsSaveFailed":
+    "Das Thread-Limit konnte nicht gespeichert werden. Versuche es erneut.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um sein Thread-Limit hier zu ändern.",
+  "mobile.server.settings.agentTaskLimit": "Parallele Threads pro Agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Wie viele Threads jeder Agent gleichzeitig ausführen kann, wenn er kein eigenes Limit hat.",
+  "mobile.server.settings.agentTaskLimitDefault": "Standard ({count})",
   "mobile.server.settings.memoryLimit": "Erinnerungen pro Agent",
   "mobile.server.settings.memoryLimitDescription":
     "Wie viele Erinnerungen jeder Agent auf diesem Server behalten kann.",
@@ -985,7 +1007,7 @@ export const messages = {
     "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Andere bekommen keine Antwort. Wenn es aus ist, antwortet OpenBot unbekannten Personen mit einem Code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Nachricht „Wird bearbeitet…“",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Schalte sie aus, um nur die Antwort zu senden.",
+    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Bei einer privaten Nummer bekommt nur dein Chat „Nachricht an dich selbst“ diese Meldungen. Schalte sie aus, um nur die Antwort zu senden.",
   "mobile.server.connectors.whatsapp.statusReactions": "Status-Reaktionen",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reagiert mit 👀, wenn eine Nachricht ankommt, und mit ✅, wenn die Antwort fertig ist. Schalte sie aus, um keine Reaktionen zu senden.",

@@ -300,6 +300,8 @@ export const messages = {
     "Model OpenCode zakończył turę bez odpowiedzi. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Model OpenCode zakończył turę po rozumowaniu, bez odpowiedzi. Spróbuj ponownie albo wybierz inny model.",
+  "error.provider.opencodeToolCallsAsText":
+    "Model OpenCode zapisał swoje działania jako tekst i ich nie wykonał. Spróbuj ponownie albo wybierz inny model.",
   "error.provider.acpNoAnswer":
     "{provider} zakończył turę bez odpowiedzi. Wyślij wiadomość ponownie albo rozpocznij nowy czat.",
   "error.provider.noAnswerAfterSteps":
@@ -424,6 +426,8 @@ export const messages = {
     "{provider} zablokował tę wiadomość z powodu swoich zasad bezpieczeństwa: {reason} Jeśli {provider} zablokuje także twoje kolejne wiadomości, rozpocznij nowy czat.",
   "error.provider.codexAudioRefused":
     "Ten model nie może słuchać dźwięku, więc nie przyjął dźwięku z tego czatu. OpenBot rozpoczął nową sesję Codex z historią czatu. Aby kontynuować, wyślij prośbę ponownie i poproś agenta, aby pracował bez dźwięku. Aby sprawdzić dźwięk, wybierz w menu modeli agenta model, który może słuchać dźwięku.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex nie mógł wczytać ustawień Twojego konta ChatGPT, więc agent się zatrzymał. Spróbuj ponownie. Jeśli znów się zatrzyma, wybierz Połącz ponownie dla ChatGPT w Ustawieniach serwera → Dostawcy.",
   "error.provider.imageTooSmall":
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za mały. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooLarge":
@@ -559,6 +563,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Nie udało się odczytać wersji {provider} CLI.",
   "error.provider.piSessionBusy": "Zaczekaj na zakończenie bieżącej tury Pi.",
   "error.provider.acpSessionBusy": "{provider} wciąż kończy zatrzymaną turę. Spróbuj ponownie za chwilę.",
+  "error.provider.acpSettingsConflict":
+    "{provider} zmienił ten czat, gdy OpenBot stosował jego ustawienia. Spróbuj ponownie.",
   "error.provider.acpSessionStale":
     "{provider} nie może wczytać najnowszej wersji tego czatu. Wyślij wiadomość ponownie.",
   "error.provider.acpModelNotOffered":

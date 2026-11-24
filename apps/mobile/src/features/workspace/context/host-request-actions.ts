@@ -152,6 +152,7 @@ import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-r
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -228,9 +229,13 @@ import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
+  createOnceAgentRoutine,
+  isOnceSchedule,
   listOnceAgentRoutines,
   listOnceChannelRoutines,
   type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateAgentRoutineOnce,
 } from "@openbot/team-client/routines-once";
 import {
   addAgentFolder,
@@ -266,6 +271,7 @@ import {
   getHostSignalHome,
   getHostSkillLearning,
   getHostTimezone,
+  getHostTurnLimits,
   getHostUpdateStatus,
   getHostVoiceModel,
   getRoutineResultDestination,
@@ -332,6 +338,7 @@ import {
   setHostSignalHome,
   setHostSkillLearning,
   setHostTimezone,
+  setHostTurnLimits,
   setHostUpdateSettings,
   setMcpServerEnabled,
   setOwnServerNotificationLevel,
@@ -455,6 +462,7 @@ type HostRequestActions = Pick<
   | "loadAgentMemorySelection"
   | "setAgentMemoryInclusion"
   | "loadAgentRoutines"
+  | "loadOnceAgentRoutines"
   | "loadRoutineCalendar"
   | "listEventRoutines"
   | "saveEventRoutine"
@@ -540,6 +548,8 @@ type HostRequestActions = Pick<
   | "restartServerItself"
   | "loadServerTimezone"
   | "setServerTimezone"
+  | "loadServerTurnLimits"
+  | "setServerTurnLimits"
   | "loadServerVoiceModel"
   | "changeServerVoiceModel"
   | "loadServerSignalHome"
@@ -811,6 +821,11 @@ export function createHostRequestActions({
   const eventsAdmin = (serverId: string) =>
     capabilityApi(serverId, EVENTS_CAPABILITY, "mobile.agent.record.eventsUnsupported");
   const recovery = (serverId: string) => has(serverId, ROUTINE_RECOVERY_CAPABILITY);
+  const onceRoutines = (serverId: string) => has(serverId, ROUTINES_ONCE_CAPABILITY);
+  const oncePost =
+    (serverId: string): RoutinesOncePost =>
+    (path, decode, body) =>
+      teamApi(serverId)("POST", path, decode, body);
   const routineResultsAdmin = (serverId: string) =>
     capabilityApi(serverId, ROUTINE_RESULTS_CAPABILITY, "mobile.agent.record.resultDestinationUnsupported");
   const sessionSettingsAdmin = (serverId: string) =>
@@ -839,6 +854,8 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_RESTART_CAPABILITY, "mobile.server.settings.restartUnsupported");
   const timezoneAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_TIMEZONE_CAPABILITY, "mobile.server.settings.timezoneUnsupported");
+  const turnLimitsAdmin = (serverId: string) =>
+    capabilityApi(serverId, HOST_TURN_LIMITS_CAPABILITY, "mobile.server.settings.turnLimitsUnsupported");
   const signalHomeAdmin = (serverId: string) =>
     capabilityApi(serverId, HOST_SIGNAL_HOME_CAPABILITY, "mobile.server.settings.signalHomeUnsupported");
   const voiceModelAdmin = (serverId: string) =>
@@ -916,6 +933,8 @@ export function createHostRequestActions({
     restartServerItself: async (serverId) => runTeamRequest(requestHostRestart(restartAdmin(serverId))),
     loadServerTimezone: async (serverId) => runTeamRequest(getHostTimezone(timezoneAdmin(serverId))),
     setServerTimezone: async (timezone, serverId) => runTeamRequest(setHostTimezone(timezoneAdmin(serverId), timezone)),
+    loadServerTurnLimits: async (serverId) => runTeamRequest(getHostTurnLimits(turnLimitsAdmin(serverId))),
+    setServerTurnLimits: async (input, serverId) => runTeamRequest(setHostTurnLimits(turnLimitsAdmin(serverId), input)),
     loadServerVoiceModel: async (serverId) => runTeamRequest(getHostVoiceModel(voiceModelAdmin(serverId))),
     loadServerSignalHome: async (serverId) => runTeamRequest(getHostSignalHome(signalHomeAdmin(serverId))),
     setServerSignalHome: async (home, serverId) => runTeamRequest(setHostSignalHome(signalHomeAdmin(serverId), home)),
@@ -1172,7 +1191,7 @@ export function createHostRequestActions({
     listEventRoutines: (owner, serverId) =>
       runTeamRequest(listEventRoutines(eventsAdmin(serverId), { owner }, recovery(serverId))),
     saveEventRoutine: (input, serverId) =>
-      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId))),
+      runTeamRequest(saveEventRoutine(eventsAdmin(serverId), input, recovery(serverId), false, onceRoutines(serverId))),
     loadRoutineResultOptions: (serverId) => runTeamRequest(listRoutineResultOptions(routineResultsAdmin(serverId))),
     loadRoutineResultDestination: (input, serverId) =>
       runTeamRequest(getRoutineResultDestination(routineResultsAdmin(serverId), input)),
@@ -1204,6 +1223,20 @@ export function createHostRequestActions({
       await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
     },
     createAgentRoutine: async (input, serverId) => {
+      const fields = {
+        name: input.name,
+        instruction: input.instruction,
+        active: input.active,
+        timezone: input.timezone,
+        schedule: input.schedule,
+      };
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, onceRoutines(serverId));
+        await saveAgentRecord(queryClient, queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId), () =>
+          createOnceAgentRoutine(oncePost(serverId), { agentId: input.agentId, ...fields }),
+        );
+        return;
+      }
       await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
         request(
           "POST",
@@ -1213,37 +1246,53 @@ export function createHostRequestActions({
               throw new Error("The host returned an invalid saved record.");
             return value;
           },
-          {
-            name: input.name,
-            instruction: input.instruction,
-            active: input.active,
-            timezone: input.timezone,
-            schedule: input.schedule,
-          },
+          fields,
           serverId,
         ),
       );
     },
     updateAgentRoutine: async (input, serverId) => {
-      await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
-        request(
-          "PATCH",
-          TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
-          (value) => {
-            if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
-              throw new Error("The host returned an invalid saved record.");
-            return value;
-          },
-          {
-            ...(input.name === undefined ? {} : { name: input.name }),
-            ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
-            ...(input.active === undefined ? {} : { active: input.active }),
-            ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
-          },
-          serverId,
-        ),
+      const changes = {
+        ...(input.name === undefined ? {} : { name: input.name }),
+        ...(input.instruction === undefined ? {} : { instruction: input.instruction }),
+        ...(input.active === undefined ? {} : { active: input.active }),
+        ...(input.schedule === undefined ? {} : { schedule: input.schedule }),
+      };
+      const savedRoutine = (value: unknown) => {
+        if (!isRoutine(value) || value.agentId !== input.agentId || value.id !== input.routineId)
+          throw new Error("The host returned an invalid saved record.");
+        return value;
+      };
+      const releasedKey = queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines");
+      if (!onceRoutines(serverId)) {
+        await saveAgentRecord(queryClient, releasedKey, () =>
+          request(
+            "PATCH",
+            TEAM_API_ROUTES.agent.routine(input.agentId, input.routineId),
+            savedRoutine,
+            changes,
+            serverId,
+          ),
+        );
+        return;
+      }
+      const saved = savedRoutine(
+        await updateAgentRoutineOnce(oncePost(serverId), {
+          agentId: input.agentId,
+          routineId: input.routineId,
+          ...changes,
+        }),
+      );
+      await saveAgentRecord(
+        queryClient,
+        isOnceSchedule(saved.trigger.schedule)
+          ? queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId)
+          : releasedKey,
+        async () => saved,
       );
     },
+    loadOnceAgentRoutines: async (agentId, serverId) =>
+      onceRoutines(serverId) ? listOnceAgentRoutines(oncePost(serverId), agentId) : [],
     deleteAgentRoutine: async (agentId, routineId, serverId) => {
       await request("DELETE", TEAM_API_ROUTES.agent.routine(agentId, routineId), ignoreResponse, undefined, serverId);
     },
@@ -1760,19 +1809,21 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped, wanted) => {
       const download = () =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.attachment(attachmentId),
-          (value) => decodeHostFile(value, largeDownload?.file),
-          undefined,
-          serverId,
-          undefined,
-          undefined,
-          largeDownload,
-          progress,
-        );
+        wanted?.() === false
+          ? Promise.reject(new Error(sourceText("error.remote.downloadStopped")))
+          : request(
+              "GET",
+              TEAM_API_ROUTES.attachment(attachmentId),
+              (value) => decodeHostFile(value, largeDownload?.file),
+              undefined,
+              serverId,
+              undefined,
+              undefined,
+              largeDownload,
+              progress,
+            );
       const queue = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
       return queue.run(attachmentDownloadKey(serverId, attachmentId), download, tapped);
     },

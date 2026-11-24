@@ -303,6 +303,8 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "OpenCode 모델이 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 모델이 추론만 하고 답변 없이 턴을 끝냈어요. 다시 시도하거나 다른 모델을 선택하세요.",
+  "error.provider.opencodeToolCallsAsText":
+    "OpenCode 모델이 작업을 텍스트로만 쓰고 실행하지 않았어요. 다시 시도하거나 다른 모델을 선택하세요.",
   "error.provider.acpNoAnswer":
     "{provider}이(가) 답변 없이 턴을 끝냈어요. 메시지를 다시 보내거나 새 채팅을 시작해 주세요.",
   "error.provider.noAnswerAfterSteps":
@@ -427,6 +429,8 @@ export const messages = {
     "{provider}이(가) 안전 규칙 때문에 이 메시지를 차단했습니다: {reason} {provider}이(가) 다음 메시지도 차단하면 새 채팅을 시작하세요.",
   "error.provider.codexAudioRefused":
     "이 모델은 오디오를 들을 수 없어서 이 채팅의 소리를 받지 않았습니다. OpenBot이 채팅 기록으로 새 Codex 세션을 시작했습니다. 계속하려면 요청을 다시 보내고 에이전트에게 소리 없이 작업하라고 요청하세요. 소리를 확인하려면 에이전트의 모델 메뉴에서 오디오를 들을 수 있는 모델을 선택하세요.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex가 ChatGPT 계정 설정을 불러오지 못해서 에이전트가 멈췄어요. 다시 시도해 주세요. 다시 멈추면 서버 설정 → 제공자에서 ChatGPT의 다시 연결을 선택해 주세요.",
   "error.provider.imageTooSmall":
     "이미지가 너무 작아서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageTooLarge":
@@ -559,6 +563,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "{provider} CLI 버전을 읽을 수 없었어요.",
   "error.provider.piSessionBusy": "현재 Pi 턴이 끝날 때까지 기다려 주세요.",
   "error.provider.acpSessionBusy": "{provider}이(가) 중지된 턴을 아직 마무리하고 있습니다. 잠시 후 다시 시도해 주세요.",
+  "error.provider.acpSettingsConflict":
+    "OpenBot이 설정을 적용하는 동안 {provider}이(가) 이 채팅을 변경했습니다. 다시 시도하세요.",
   "error.provider.acpSessionStale":
     "{provider}이(가) 이 채팅의 최신 버전을 불러오지 못했어요. 메시지를 다시 보내 주세요.",
   "error.provider.acpModelNotOffered":

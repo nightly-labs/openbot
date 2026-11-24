@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Не удалось покинуть {name}",
   "mobile.server.drawer.removeFailed": "Не удалось удалить {name}",
   "mobile.server.drawer.deleteFailed": "Не удалось удалить {name}",
+  "mobile.server.drawer.hide": "Скрыть сервер",
+  "mobile.server.drawer.show": "Показать сервер",
+  "mobile.server.drawer.hiddenServers": "Скрытые серверы",
+  "mobile.server.drawer.hideFailed": "Не удалось скрыть {name}",
+  "mobile.server.drawer.showFailed": "Не удалось показать {name}",
   "mobile.server.drawer.actionFailed": "OpenBot не смог выполнить это действие. Повторите попытку.",
   "mobile.server.drawer.moveUp": "Выше",
   "mobile.server.drawer.moveDown": "Ниже",
@@ -313,6 +318,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Сервер будет удалён из сервиса аккаунтов для всех участников. Файлы и чаты на его компьютере останутся. Чтобы снова использовать сервер, зарегистрируйте его с того компьютера.",
   "mobile.server.settings.remove": "Удалить сервер",
+  "mobile.server.settings.hide": "Скрыть сервер",
+  "mobile.server.settings.show": "Показать сервер",
   "mobile.server.settings.deleteTitle": "Удалить {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot останавливает сервер на его компьютере и перемещает его агентов, чаты и файлы в корзину этого компьютера. Сервер исчезнет из списка серверов на всех ваших устройствах.",
@@ -576,6 +583,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Не удалось сменить ключ сервера. Попробуйте ещё раз.",
   "mobile.server.settings.keyOwnerOnly": "Сменить ключ сервера может только владелец.",
   "mobile.server.settings.keyUnsupported": "Обновите OpenBot на этом сервере, чтобы сменить его ключ здесь.",
+  "mobile.server.settings.turnLimit": "Ветки одновременно",
+  "mobile.server.settings.turnLimitDescription":
+    "Сколько веток агентов может выполняться одновременно на этом сервере. Больше веток — больше памяти.",
+  "mobile.server.settings.turnLimitAutomatic": "Автоматически ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Автоматически (без ограничения)",
+  "mobile.server.settings.turnLimitUnlimited": "Без ограничения",
+  "mobile.server.settings.turnLimitsLoadFailed": "Не удалось загрузить ограничения веток этого сервера.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Не удалось сохранить ограничение веток. Повторите попытку.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь его ограничение веток.",
+  "mobile.server.settings.agentTaskLimit": "Параллельные ветки на агента",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Сколько веток одновременно может выполнять каждый агент без собственного ограничения.",
+  "mobile.server.settings.agentTaskLimitDefault": "По умолчанию ({count})",
   "mobile.server.settings.memoryLimit": "Записей памяти на агента",
   "mobile.server.settings.memoryLimitDescription": "Сколько записей памяти может хранить каждый агент на этом сервере.",
   "mobile.server.settings.memoryLimitLoadFailed": "Не удалось загрузить лимит памяти этого сервера.",
@@ -1056,7 +1077,7 @@ export const messages = {
     "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
   "mobile.server.connectors.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. Выключите, чтобы отправлять только ответ.",
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. На личном номере эти сообщения получает только чат «Сообщение себе». Выключите, чтобы отправлять только ответ.",
   "mobile.server.connectors.whatsapp.statusReactions": "Реакции статуса",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",

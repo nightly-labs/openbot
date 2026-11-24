@@ -632,8 +632,9 @@ a delivery on its way to one, which holds no turn id yet, or a context compactio
 `turn/started` `ContextCompaction.claimTurn` takes away from the agent - therefore makes the
 update wait, as a restart the user asked for waits, before anything is downloaded. Main shows the
 wait as a `downloading` runtime with no progress and the message `status.provider.updateWaiting`;
-its Cancel aborts the wait. New turns of the provider wait for the update from the start of the
-wait, so a busy provider still gets a moment without turns. No turn may start on that provider until the new client is ready: the drain
+its Cancel aborts the wait. The wait does not hold new turns, so one long turn does not stop the
+other agents of the provider; the update runs at the first moment with no turn. The check that finds
+that moment also starts the hold, in one step. No turn may start on that provider until the new client is ready: the drain
 scheduler skips an agent whose provider reports `isReplacingCli`, before it can reschedule the
 delivery, and `onProviderResumed` schedules the held deliveries when the replacement ends, after a
 failure as well as after a success.

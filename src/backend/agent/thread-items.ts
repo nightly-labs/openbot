@@ -48,6 +48,7 @@ export function isNonActionableCodexWarning(message: string): boolean {
   return (
     message.startsWith("Skill descriptions were shortened to fit") ||
     message.startsWith("Exceeded skills context budget") ||
+    message.startsWith("Combined user instructions use ") ||
     message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
     message.startsWith("Under-development features enabled:") ||
     message.startsWith("Configured service tier ") ||
@@ -79,7 +80,16 @@ export function isCodexRolloutPending(error: unknown): boolean {
 function isCodexMissingThreadError(error: unknown): boolean {
   return (
     error instanceof AppServerError &&
-    (/thread not found:/i.test(error.message) || /\bno rollout found\b/i.test(error.message))
+    (/thread not found:/i.test(error.message) ||
+      /\bno rollout found\b/i.test(error.message) ||
+      isCodexUnconfiguredThreadProvider(error))
+  );
+}
+
+function isCodexUnconfiguredThreadProvider(error: AppServerError): boolean {
+  return (
+    getString(error.data, "type") === "modelProviderNotConfigured" ||
+    /^This chat uses model provider .+, which is no longer configured\./.test(error.message)
   );
 }
 
@@ -128,7 +138,9 @@ function isCodexRefusedAudio(provider: AgentProvider, message: string): boolean 
 function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): boolean {
   return (
     provider === "opencode" &&
-    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b/i.test(message)
+    /\bthe request contains invalid parameters\b|\bInternal error: Invalid request parameters\b|\bUpstream request failed: \[invalid_request\] the request is invalid\b/i.test(
+      message,
+    )
   );
 }
 

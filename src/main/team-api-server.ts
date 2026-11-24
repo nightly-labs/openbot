@@ -119,6 +119,7 @@ import {
   HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_EVENTS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -253,6 +254,10 @@ import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/mode
 import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
+import {
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+  withPromptQuestionDetails,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
@@ -262,6 +267,7 @@ import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protoco
 import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
+import { PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-workflows-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
@@ -1661,9 +1667,12 @@ export class TeamApiServer {
       const withLocation = capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)
         ? withUiBlockLocationRequests(withVault, visible)
         : withVault;
-      return capabilities.has(SKILL_LEARNING_CAPABILITY)
+      const withSkills = capabilities.has(SKILL_LEARNING_CAPABILITY)
         ? withSkillSuggestionNames(withLocation, visible)
         : withLocation;
+      return capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
+        ? withPromptQuestionDetails(withSkills, visible)
+        : withSkills;
     }
     return encodeTeamProtocolV1CurrentEvent(visible, options);
   }
@@ -1759,7 +1768,8 @@ export class TeamApiServer {
     memberId?: string,
     agentList?: readonly AgentSummary[],
   ): void {
-    const filteredConversationPayloads = new Map<string, string>();
+    type EncodedPayload = { value: string | null; bytes: number };
+    const filteredConversationPayloads = new Map<string, EncodedPayload>();
     let agents = () => {
       const list = agentList ?? this.#options.agents.listAgents();
       agents = () => list;
@@ -1785,7 +1795,7 @@ export class TeamApiServer {
       }
       return hidden;
     };
-    const encodedPayloads = new Map<string, string | null>();
+    const encodedPayloads = new Map<string, EncodedPayload>();
     const access = new Map<string, { member: AccessMember; blocked: Set<string>; key: string }>();
     const accessFor = (connection: EventClientState) => {
       const known = access.get(connection.memberId);
@@ -1833,7 +1843,10 @@ export class TeamApiServer {
           sharedAs === undefined
             ? undefined
             : `${sharedAs}|${eventEncodingKey(connection.capabilities, options)}|${blockedKey}`;
-        if (key !== undefined && encodedPayloads.has(key)) return encodedPayloads.get(key) ?? null;
+        if (key !== undefined) {
+          const cached = encodedPayloads.get(key);
+          if (cached) return cached;
+        }
         let encoded: string | null;
         perfCount("teamapi.encode");
         try {
@@ -1848,10 +1861,12 @@ export class TeamApiServer {
           (this.#options.logger ?? logger).warn("Team API event could not be encoded:", toLogValue(error));
           encoded = null;
         }
-        if (key !== undefined) encodedPayloads.set(key, encoded);
-        return encoded;
+        const result = { value: encoded, bytes: encoded === null ? 0 : Buffer.byteLength(encoded) };
+        if (key !== undefined) encodedPayloads.set(key, result);
+        return result;
       };
       let outgoing: string;
+      let outgoingBytes: number;
       let optional: OptionalTeamEvent | null;
       try {
         optional =
@@ -1923,6 +1938,7 @@ export class TeamApiServer {
                   }
                 : optional,
         );
+        outgoingBytes = Buffer.byteLength(outgoing);
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         const conversationInvalidation = encodeEvent(
           {
@@ -1933,16 +1949,18 @@ export class TeamApiServer {
           {},
           "conversation-invalidated",
         );
-        if (!conversationInvalidation) continue;
-        outgoing = conversationInvalidation;
+        if (!conversationInvalidation.value) continue;
+        outgoing = conversationInvalidation.value;
+        outgoingBytes = conversationInvalidation.bytes;
       } else if (event.type === "queue-changed" && supportsRuntimeSnapshots) {
         const queueInvalidation = encodeEvent(
           { type: "queue-invalidated", agentId: event.snapshot.agentId },
           {},
           "queue-invalidated",
         );
-        if (!queueInvalidation) continue;
-        outgoing = queueInvalidation;
+        if (!queueInvalidation.value) continue;
+        outgoing = queueInvalidation.value;
+        outgoingBytes = queueInvalidation.bytes;
       } else if (
         event.type === "conversation" &&
         (!connection.capabilities.has("routine-event-markers") ||
@@ -1950,28 +1968,29 @@ export class TeamApiServer {
           !connection.capabilities.has("hosted-site-event-markers") ||
           event.snapshot.messages.some((message) => !markerSupported(message.itemType, connection.capabilities)))
       ) {
-        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
-          filtered =
-            encodeEvent(
-              {
-                ...event,
-                snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
-              },
-              encodingOptions,
-            ) ?? undefined;
+          filtered = encodeEvent(
+            {
+              ...event,
+              snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
+            },
+            encodingOptions,
+          );
           if (filtered) filteredConversationPayloads.set(key, filtered);
         }
-        if (!filtered) continue;
-        outgoing = filtered;
+        if (!filtered?.value) continue;
+        outgoing = filtered.value;
+        outgoingBytes = filtered.bytes;
       } else {
         const payload = encodeEvent(event, encodingOptions, event === broadcast ? "event" : undefined);
-        if (!payload) continue;
-        outgoing = payload;
+        if (!payload.value) continue;
+        outgoing = payload.value;
+        outgoingBytes = payload.bytes;
       }
       const limit = event.type === "runtime-snapshot" ? AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT : JSON_LIMIT;
-      if (Buffer.byteLength(outgoing) > limit) continue;
+      if (outgoingBytes > limit) continue;
       if (client.readyState !== webSockets.WebSocket.OPEN) continue;
       client.send(outgoing);
       perfCount(`teamapi.send ${event.type}`);
@@ -1987,9 +2006,9 @@ export class TeamApiServer {
         encodingOptions,
         "runtime-snapshot",
       );
-      if (!completionSnapshot) continue;
-      if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
-      client.send(completionSnapshot);
+      if (!completionSnapshot.value) continue;
+      if (completionSnapshot.bytes > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
+      client.send(completionSnapshot.value);
       perfCount("teamapi.completionSnapshot");
     }
   }
@@ -2500,9 +2519,12 @@ export class TeamApiServer {
     const withLocation = route.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)
       ? withUiBlockLocationRequests(withVault, effortValue)
       : withVault;
-    const body = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
+    const withSkills = route.capabilities.has(SKILL_LEARNING_CAPABILITY)
       ? withSkillSuggestionNames(withLocation, effortValue)
       : withLocation;
+    const body = route.capabilities.has(TEAM_PROMPT_DETAIL_CAPABILITY)
+      ? withPromptQuestionDetails(withSkills, effortValue)
+      : withSkills;
     response.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
     response.end(`${body}\n`);
     return "handled";
@@ -2860,7 +2882,8 @@ export class TeamApiServer {
         if (capability === HOST_TIMEZONE_CAPABILITY) return this.#options.admin?.timezone !== undefined;
         if (capability === HOST_VOICE_MODEL_CAPABILITY) return this.#options.admin?.voiceModel !== undefined;
         if (capability === HOST_SIGNAL_HOME_CAPABILITY) return this.#options.admin?.signalHome !== undefined;
-        if (capability === HOST_TURN_LIMITS_CAPABILITY) return this.#options.admin?.turnLimits !== undefined;
+        if (capability === HOST_TURN_LIMITS_CAPABILITY || capability === HOST_TURN_LIMITS_EVENTS_CAPABILITY)
+          return this.#options.admin?.turnLimits !== undefined;
         if (capability === HOST_RESTART_CAPABILITY) return this.#options.admin?.restart !== undefined;
         if (capability === OWNER_TRANSFER_CAPABILITY) return this.#options.admin?.ownerTransfer === true;
         if (capability === HOST_PERSONALITY_CAPABILITY) return this.#options.admin?.personality !== undefined;
@@ -2934,6 +2957,8 @@ export class TeamApiServer {
           capability === COMPUTER_ACTIVITY_CAPABILITY
         )
           return this.#options.pushNotifications !== undefined;
+        if (capability === PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY)
+          return this.#options.pushNotifications !== undefined && this.#options.workflows !== undefined;
         if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
         if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
           return this.#options.agentNotificationLevels !== undefined;
@@ -3097,6 +3122,7 @@ const EVENT_ENCODING_CAPABILITIES = [
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCK_LOCATION_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
   QUEUE_HOLD_CAPABILITY,
   QUEUE_HOLD_SIGN_IN_CAPABILITY,
 ];
@@ -3144,6 +3170,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "crm-changed") return CRM_CAPABILITY;
   if (event.type === "vault-changed") return VAULT_CAPABILITY;
   if (event.type === "browser-profiles-changed") return BROWSER_PROFILES_EVENTS_CAPABILITY;
+  if (event.type === "host-turn-limits-changed") return HOST_TURN_LIMITS_EVENTS_CAPABILITY;
   if (event.type === "library-folders-changed") return LIBRARY_FOLDERS_EVENTS_CAPABILITY;
   if (event.type === "usage-credits-changed") return USAGE_CREDITS_CAPABILITY;
   if (event.type === "turn-progress") return TEAM_AGENT_ACTIVITY_CAPABILITY;

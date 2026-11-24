@@ -432,6 +432,8 @@ export const messages = {
     "El certificado de seguridad de este sitio no es de confianza, así que la página no se abrió.",
   "error.backend.browserLowMemory":
     "Este servidor tiene poca memoria disponible, por lo que el navegador no puede abrir otra pestaña. Cierra una pestaña o espera a que terminen otros agentes.",
+  "error.backend.browserNoMemory":
+    "Este servidor casi no tiene memoria libre, por lo que el navegador no puede abrir una pestaña ahora. Espera a que terminen otros agentes y vuelve a intentarlo.",
   "error.backend.browserOpenFailed": "No se pudo abrir {url}: {reason}",
   "error.backend.popupSecureInput":
     "Las ventanas emergentes están bloqueadas durante la entrada segura. Termina o cancela la entrada segura y vuelve a intentarlo desde la página.",

@@ -1,6 +1,6 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { useQuery } from "@tanstack/react-query";
+import { hashKey, type QueryClient, type QueryKey, useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { useMemo } from "react";
 import { create } from "zustand";
@@ -65,6 +65,31 @@ export function writeMediaFile(file: File, base64: string): Promise<void> {
   return write;
 }
 
+const requestedFiles = new Map<string, number>();
+
+export async function requestFile<T>(queryKey: QueryKey, fetch: () => Promise<T>): Promise<T> {
+  const key = hashKey(queryKey);
+  requestedFiles.set(key, (requestedFiles.get(key) ?? 0) + 1);
+  try {
+    return await fetch();
+  } finally {
+    const left = (requestedFiles.get(key) ?? 1) - 1;
+    if (left > 0) requestedFiles.set(key, left);
+    else requestedFiles.delete(key);
+  }
+}
+
+export function fileWantedOrDropped(client: QueryClient, queryKey: QueryKey): () => boolean {
+  const cache = client.getQueryCache();
+  const query = cache.find({ queryKey, exact: true });
+  return () => {
+    if (!query || cache.find({ queryKey, exact: true }) !== query) return false;
+    if (requestedFiles.has(hashKey(queryKey)) || query.getObserversCount() > 0) return true;
+    cache.remove(query);
+    return false;
+  };
+}
+
 const useDownloadedBytes = create<{ bytes: ReadonlyMap<string, number> }>(() => ({ bytes: new Map() }));
 
 const downloadKey = (serverId: string, attachmentId: string) => `${serverId}\n${attachmentId}`;
@@ -97,7 +122,7 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
   return useQuery({
     enabled,
     queryKey: queryKeys.chatMediaFile(serverId, attachment.id),
-    queryFn: async () => {
+    queryFn: async ({ client, queryKey }) => {
       const file = mediaFile(serverId, attachment);
       if (file.exists && file.size === attachment.size) return file.uri;
       const key = downloadKey(serverId, attachment.id);
@@ -121,6 +146,7 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
           largeDownloadOf(attachment, file.uri),
           progress,
           !enabled,
+          fileWantedOrDropped(client, queryKey),
         );
         const handedOver = Date.now();
         if (!data.file) await writeMediaFile(file, data.base64);

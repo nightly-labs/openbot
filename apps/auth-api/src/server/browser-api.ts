@@ -67,6 +67,7 @@ export interface BrowserApiServices {
     RemoteControlPlane,
     | "listHosts"
     | "removeOwnedHost"
+    | "setHostHidden"
     | "startSession"
     | "issueSessionTicket"
     | "endSession"
@@ -332,6 +333,13 @@ const handleBrowserOperation = Effect.fn("BrowserApi.handleOperation")(function*
   const [, removedHostId] = /^v2\/remote\/hosts\/([^/]+)$/u.exec(path) ?? [];
   if (removedHostId !== undefined && request.method === "DELETE") {
     yield* services.remote.removeOwnedHost(user.id, decodeURIComponent(removedHostId));
+    return new Response(null, { status: 204 });
+  }
+  const [, hiddenHostId] = /^v2\/remote\/hosts\/([^/]+)\/hidden$/u.exec(path) ?? [];
+  if (hiddenHostId !== undefined && request.method === "PUT") {
+    const body = yield* readJsonObject(request);
+    if (!isBoolean(body.hidden)) return yield* invalidRemoteRequest("The request is invalid.");
+    yield* services.remote.setHostHidden(user.id, decodeURIComponent(hiddenHostId), body.hidden);
     return new Response(null, { status: 204 });
   }
   const [, checkoutHostId] = /^v2\/remote\/hosts\/([^/]+)\/checkout$/u.exec(path) ?? [];

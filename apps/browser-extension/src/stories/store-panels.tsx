@@ -156,10 +156,9 @@ export function StoreHomePanel() {
           onStartThread={() => undefined}
           onSelectHost={() => undefined}
           onSignOut={() => undefined}
+          onOpenSettings={() => undefined}
           sharing={false}
           canShare
-          onShareTabs={() => undefined}
-          onManageSharing={() => undefined}
         />
       )}
     </LoadWorkspace>

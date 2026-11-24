@@ -111,6 +111,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "לא ניתן לעזוב את {name}",
   "mobile.server.drawer.removeFailed": "לא ניתן להסיר את {name}",
   "mobile.server.drawer.deleteFailed": "לא ניתן למחוק את {name}",
+  "mobile.server.drawer.hide": "הסתרת השרת",
+  "mobile.server.drawer.show": "הצגת השרת",
+  "mobile.server.drawer.hiddenServers": "שרתים מוסתרים",
+  "mobile.server.drawer.hideFailed": "לא ניתן להסתיר את {name}",
+  "mobile.server.drawer.showFailed": "לא ניתן להציג את {name}",
   "mobile.server.drawer.actionFailed": "OpenBot לא הצליח להשלים את הפעולה. אפשר לנסות שוב.",
   "mobile.server.drawer.moveUp": "הזזה למעלה",
   "mobile.server.drawer.moveDown": "הזזה למטה",
@@ -385,6 +390,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "הפעולה מסירה את השרת משירות החשבונות עבור כל החברים. הקבצים והצ'אטים במחשב שלו נשמרים. כדי להשתמש בו שוב, יש לרשום אותו מאותו מחשב.",
   "mobile.server.settings.remove": "הסרת השרת",
+  "mobile.server.settings.hide": "הסתרת השרת",
+  "mobile.server.settings.show": "הצגת השרת",
   "mobile.server.settings.deleteTitle": "למחוק את {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot עוצר את השרת במחשב שלו ומעביר את הסוכנים, הצ'אטים והקבצים שלו לפח של אותו מחשב. השרת נעלם מרשימת השרתים בכל המכשירים שלך.",
@@ -626,6 +633,18 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "לא ניתן להחליף את מפתח השרת. אפשר לנסות שוב.",
   "mobile.server.settings.keyOwnerOnly": "רק הבעלים יכול להחליף את מפתח השרת.",
   "mobile.server.settings.keyUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי להחליף כאן את המפתח שלו.",
+  "mobile.server.settings.turnLimit": "שרשורים בו־זמנית",
+  "mobile.server.settings.turnLimitDescription":
+    "כמה שרשורים של סוכנים יכולים לרוץ בו־זמנית בשרת הזה. יותר שרשורים משתמשים ביותר זיכרון.",
+  "mobile.server.settings.turnLimitAutomatic": "אוטומטי ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "אוטומטי (ללא הגבלה)",
+  "mobile.server.settings.turnLimitUnlimited": "ללא הגבלה",
+  "mobile.server.settings.turnLimitsLoadFailed": "לא ניתן לטעון את מגבלות השרשורים של השרת הזה.",
+  "mobile.server.settings.turnLimitsSaveFailed": "לא ניתן לשמור את מגבלת השרשורים. אפשר לנסות שוב.",
+  "mobile.server.settings.turnLimitsUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את מגבלת השרשורים שלו.",
+  "mobile.server.settings.agentTaskLimit": "שרשורים במקביל לכל סוכן",
+  "mobile.server.settings.agentTaskLimitDescription": "כמה שרשורים כל סוכן ללא מגבלה משלו יכול להריץ בו־זמנית.",
+  "mobile.server.settings.agentTaskLimitDefault": "ברירת מחדל ({count})",
   "mobile.server.settings.memoryLimit": "זיכרונות לכל סוכן",
   "mobile.server.settings.memoryLimitDescription": "כמה זיכרונות כל סוכן בשרת הזה יכול לשמור.",
   "mobile.server.settings.memoryLimitLoadFailed": "לא ניתן לטעון את מגבלת הזיכרונות של השרת הזה.",
@@ -1215,7 +1234,7 @@ export const messages = {
     "רק הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לכתוב. אנשים אחרים לא מקבלים תשובה. כשהאפשרות כבויה, OpenBot משיב לאנשים לא מוכרים עם קוד.",
   "mobile.server.connectors.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. בקשה שממתינה לבקשה קודמת מקבלת גם הודעת המתנה. יש לכבות כדי לשלוח רק את התשובה.",
+    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. בקשה שממתינה לבקשה קודמת מקבלת גם הודעת המתנה. במספר אישי, רק הצ'אט ״הודעה לעצמך״ מקבל את ההודעות האלה. יש לכבות כדי לשלוח רק את התשובה.",
   "mobile.server.connectors.whatsapp.statusReactions": "תגובות סטטוס",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot מגיב עם 👀 כשהודעה מגיעה ועם ✅ כשהתשובה מוכנה. יש לכבות כדי לא לשלוח תגובות.",

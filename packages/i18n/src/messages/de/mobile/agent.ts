@@ -538,6 +538,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Erfasst seit {started}. Aktualisiert {updated}.",
   "mobile.agent.usage.never": "nie",
   "mobile.agent.record.time": "Uhrzeit",
+  "mobile.agent.record.date": "Datum",
   "mobile.agent.section.changeFailed": "Ordner konnte nicht geändert werden",
   "mobile.agent.section.tryAgain": "Versuche es erneut.",
   "mobile.agent.section.moveUp": "Nach oben verschieben",

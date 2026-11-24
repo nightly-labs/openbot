@@ -150,6 +150,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesNeedsUpdate":
     "Voor het delen van veel bestanden is de nieuwste versie van de app nodig.",
   "mobile.chat.attachment.preview": "Bekijk {name}",
+  "mobile.chat.attachment.seeAll": "Tik om alles te zien",
   "mobile.chat.attachment.displayFailed": "Kan deze afbeelding niet tonen.",
   "mobile.chat.attachment.loadingImage": "Afbeelding laden",
   "mobile.chat.attachment.uploading": "{name} uploaden",
@@ -180,6 +181,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "De bijlage is beschadigd. Selecteer de bijlage opnieuw.",
   "mobile.chat.attachment.tooLarge": "{name} is groter dan {limit}.",
   "mobile.chat.attachment.cameraPermission": "Sta cameratoegang toe in Instellingen om een foto te maken.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "De foto is niet geladen. Open hem in de Foto’s-app tot hij helemaal zichtbaar is en probeer het opnieuw.",
   "mobile.chat.composer.send": "Verstuur bericht",
   "mobile.chat.composer.stop": "Stop {name}",
   "mobile.chat.composer.dictate": "Dicteer bericht",
@@ -206,6 +209,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Kan de foto niet maken. Probeer opnieuw.",
   "mobile.chat.camera.startFailed": "Kan de camera niet starten. Sluit de camera en probeer opnieuw.",
   "mobile.chat.camera.close": "Sluit camera",
+  "mobile.chat.camera.fullScreenTipTitle": "Groter beeld nodig?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Gebruik de camera op volledig scherm, met zoom en alle lenzen. Je kunt dit wijzigen in Instellingen > Gesprekken.",
+  "mobile.chat.camera.fullScreenTipUse": "Volledig scherm gebruiken",
+  "mobile.chat.camera.fullScreenTipDismiss": "Tip verbergen",
   "mobile.chat.camera.takePhoto": "Maak foto",
   "mobile.chat.camera.switch": "Wissel camera",
   "mobile.chat.header.info": "Info over {name}",
@@ -521,6 +529,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Geen berichten in wachtrij",
   "mobile.chat.queue.emptyBody": "Nieuwe berichten komen in de wachtrij terwijl de agent werkt.",
   "mobile.chat.queue.noLongerQueued": "Dit bericht staat niet meer in de wachtrij.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Positie {position} · {date}",
   "mobile.chat.queue.attachments": "Bijlagen",
   "mobile.chat.queue.steer": "Bijsturen",

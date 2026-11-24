@@ -1493,7 +1493,8 @@ export class MessagingService {
                 if (
                   this.#posts.has(key) ||
                   !this.#targets.has(key) ||
-                  this.#withoutStatusPost(live.record.connectionId)
+                  this.#withoutStatusPost(live.record.connectionId) ||
+                  this.#quietEnd(live.record.connectionId, message.target)
                 )
                   return;
                 const messageId = yield* adapter
@@ -1879,7 +1880,12 @@ export class MessagingService {
     }
     if (activity.type === "started") {
       if (!live) return;
-      if (!post?.messageId && (activity.teammateRequest || this.#withoutStatusPost(live.record.connectionId))) {
+      if (
+        !post?.messageId &&
+        (activity.teammateRequest ||
+          this.#withoutStatusPost(live.record.connectionId) ||
+          this.#quietEnd(live.record.connectionId, target))
+      ) {
         this.#posts.set(key, { connectionId: live.record.connectionId, target, messageId: null, stopToken: null });
         this.#status.restored.delete(key);
         yield* this.#status.save();

@@ -69,8 +69,10 @@ import {
   createStore,
   createUniqueId,
   For,
+  getOwner,
   onCleanup,
   onSettled,
+  runWithOwner,
   Show,
   untrack,
 } from "solid-js";
@@ -216,7 +218,14 @@ import {
   type WorkflowPeer,
   type WorkflowPresence,
 } from "./workflow-presence";
-import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./workflow-run-view";
+import {
+  activeRun,
+  indexRunView,
+  isOpenRun,
+  sameNodeRunState,
+  type WorkflowNodeRunState,
+  type WorkflowRunView,
+} from "./workflow-run-view";
 import { type TidyUnit, tidyLayout } from "./workflow-tidy";
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
@@ -560,16 +569,34 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       for (const entry of entries) {
         if (!(entry.target instanceof HTMLElement)) continue;
         const id = entry.target.dataset.slot;
-        if (id) draft[id] = { width: entry.target.offsetWidth, height: entry.target.offsetHeight };
+        if (!id) continue;
+        const width = entry.target.offsetWidth;
+        const height = entry.target.offsetHeight;
+        const previous = draft[id];
+        if (previous?.width === width && previous.height === height) continue;
+        draft[id] = { width, height };
       }
     }),
   );
   const [camera, setCamera] = createStore({ x: 0, y: 0, scale: 1 });
 
   const running = () => openRun() !== undefined;
-  const statusOf = (id: string) => runIndex().get(id)?.status;
-  const waitingOf = (id: string) => statusOf(id) === "running" && runIndex().get(id)?.step.waiting === true;
-  const stepOf = (id: string) => runIndex().get(id)?.step.id;
+  const canvasOwner = getOwner();
+  const runStates = new Map<string, () => WorkflowNodeRunState | undefined>();
+  const runStateOf = (id: string) => {
+    let state = runStates.get(id);
+    if (!state) {
+      state = runWithOwner(canvasOwner, () => createMemo(() => runIndex().get(id), { equals: sameNodeRunState }));
+      runStates.set(id, state);
+    }
+    return state();
+  };
+  const statusOf = (id: string) => runStateOf(id)?.status;
+  const waitingOf = (id: string) => {
+    const state = runStateOf(id);
+    return state?.status === "running" && state.step.waiting === true;
+  };
+  const stepOf = (id: string) => runStateOf(id)?.step.id;
 
   let viewport: HTMLElement | undefined;
   let root: HTMLElement | undefined;
@@ -628,12 +655,12 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     status: statusOf,
     waiting: waitingOf,
     progress: (id) => {
-      const agentId = statusOf(id) === "running" && !waitingOf(id) ? runIndex().get(id)?.step.agentId : null;
+      const agentId = statusOf(id) === "running" && !waitingOf(id) ? runStateOf(id)?.step.agentId : null;
       return agentId ? props.agentProgress?.(agentId) : undefined;
     },
-    error: (id) => runIndex().get(id)?.error,
-    resultsOf: (id) => runIndex().get(id)?.results ?? [],
-    pendingOf: (id) => (kindOf(id) === "image" ? (runIndex().get(id)?.pending ?? []) : []),
+    error: (id) => runStateOf(id)?.error,
+    resultsOf: (id) => runStateOf(id)?.results ?? [],
+    pendingOf: (id) => (kindOf(id) === "image" ? (runStateOf(id)?.pending ?? []) : []),
     duplicate: (id) => duplicateNodes([id]),
     resetSize: (id) => resetSize(id),
     beforeChange: () => commit(),
@@ -659,7 +686,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     rotateWebhookSecret: untrack(() => props.onRotateWebhookSecret),
     runStep: (id) => runNode(id),
     stopStep: (id) => {
-      const pending = runIndex().get(id)?.pending ?? [];
+      const pending = runStateOf(id)?.pending ?? [];
       if (pending.length === 0) {
         const step = stepOf(id);
         if (step) props.onStopStep(step);

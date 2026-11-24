@@ -1,7 +1,20 @@
 import type { SpeechModelFile } from "@openbot/contracts/speech-models";
-import { Directory, File } from "expo-file-system";
+import { Directory, type DownloadProgress, File } from "expo-file-system";
+import { Platform } from "react-native";
 import { create } from "zustand";
 import { speechNative } from "./speech-native";
+
+async function transferFile(
+  url: string,
+  destination: File,
+  signal: AbortSignal,
+  onBytesWritten: (bytesWritten: number) => void,
+): Promise<void> {
+  const onProgress = ({ bytesWritten }: DownloadProgress) => onBytesWritten(bytesWritten);
+  if (Platform.OS === "ios")
+    await File.createDownloadTask(url, destination, { sessionType: "background", signal, onProgress }).downloadAsync();
+  else await File.downloadFileAsync(url, destination, { idempotent: true, signal, onProgress });
+}
 
 type ModelPhase = "unknown" | "missing" | "downloading" | "ready" | "error";
 
@@ -54,30 +67,41 @@ export function createModelDownload(options: {
       const controller = new AbortController();
       download = controller;
       useModel.setState({ phase: "downloading", progress: 0, failure: null });
-      let done = 0;
+      const written = options.files.map(() => 0);
+      const showProgress = () =>
+        useModel.setState({ progress: written.reduce((sum, value) => sum + value, 0) / bytes });
       try {
         directory.create({ intermediates: true, idempotent: true });
         if (markerOf(directory).exists) markerOf(directory).delete();
-        for (const item of options.files) {
+        const missing: { item: SpeechModelFile; index: number; file: File }[] = [];
+        for (const [index, item] of options.files.entries()) {
           const file = new File(directory, item.name);
-          if (!(file.exists && file.size === item.bytes && (await file.digest("SHA-256")) === item.sha256)) {
-            const partial = new File(directory, `${item.name}.download`);
-            if (partial.exists) partial.delete();
-            await File.downloadFileAsync(item.url, partial, {
-              idempotent: true,
-              signal: controller.signal,
-              onProgress: ({ bytesWritten }) => useModel.setState({ progress: (done + bytesWritten) / bytes }),
-            });
-            if ((await partial.digest("SHA-256")) !== item.sha256) {
-              partial.delete();
-              useModel.setState({ phase: "error", failure: "verify" });
-              return;
-            }
-            if (file.exists) file.delete();
-            await partial.move(file);
+          if (file.exists && file.size === item.bytes && (await file.digest("SHA-256")) === item.sha256)
+            written[index] = item.bytes;
+          else missing.push({ item, index, file });
+        }
+        showProgress();
+        const transfers = missing.map(({ item, index, file }) => {
+          const partial = new File(directory, `${item.name}.download`);
+          if (partial.exists) partial.delete();
+          const done = transferFile(item.url, partial, controller.signal, (bytesWritten) => {
+            written[index] = bytesWritten;
+            showProgress();
+          });
+          done.catch(() => {});
+          return { item, index, file, partial, done };
+        });
+        for (const { item, index, file, partial, done } of transfers) {
+          await done;
+          if ((await partial.digest("SHA-256")) !== item.sha256) {
+            partial.delete();
+            useModel.setState({ phase: "error", failure: "verify" });
+            return;
           }
-          done += item.bytes;
-          useModel.setState({ progress: done / bytes });
+          if (file.exists) file.delete();
+          await partial.move(file);
+          written[index] = item.bytes;
+          showProgress();
         }
         markerOf(directory).create();
         useModel.setState({ phase: "ready", progress: 1 });
@@ -86,6 +110,7 @@ export function createModelDownload(options: {
           controller.signal.aborted ? { phase: "missing", progress: 0 } : { phase: "error", failure: "download" },
         );
       } finally {
+        controller.abort();
         download = null;
       }
     },

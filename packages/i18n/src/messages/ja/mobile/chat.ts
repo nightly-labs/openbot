@@ -157,6 +157,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesNeedsUpdate":
     "複数のファイルを共有するには、アプリを最新バージョンにしてください。",
   "mobile.chat.attachment.preview": "{name} のプレビュー",
+  "mobile.chat.attachment.seeAll": "タップしてすべて表示",
   "mobile.chat.attachment.displayFailed": "この画像を表示できませんでした。",
   "mobile.chat.attachment.loadingImage": "画像を読み込み中",
   "mobile.chat.attachment.uploading": "{name} をアップロード中",
@@ -187,6 +188,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "添付ファイルが破損しています。もう一度選択してください。",
   "mobile.chat.attachment.tooLarge": "{name} は {limit} を超えています。",
   "mobile.chat.attachment.cameraPermission": "写真を撮るには、設定でカメラへのアクセスを許可してください。",
+  "mobile.chat.attachment.photoNotLoaded":
+    "写真を読み込めませんでした。写真アプリで完全に表示されるまで開いてから、もう一度お試しください。",
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
   "mobile.chat.composer.dictate": "メッセージを音声入力",
@@ -243,6 +246,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "写真を撮れませんでした。もう一度お試しください。",
   "mobile.chat.camera.startFailed": "カメラを起動できませんでした。カメラを閉じて、もう一度お試しください。",
   "mobile.chat.camera.close": "カメラを閉じる",
+  "mobile.chat.camera.fullScreenTipTitle": "もっと大きく見たいですか？",
+  "mobile.chat.camera.fullScreenTipBody":
+    "ズームとすべてのレンズを使える全画面カメラを使いましょう。「設定 > 会話」で変更できます。",
+  "mobile.chat.camera.fullScreenTipUse": "全画面を使う",
+  "mobile.chat.camera.fullScreenTipDismiss": "ヒントを隠す",
   "mobile.chat.camera.takePhoto": "写真を撮る",
   "mobile.chat.camera.switch": "カメラを切り替え",
   "mobile.chat.header.info": "{name} の情報",
@@ -312,6 +320,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "再生速度：{speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "メッセージを読み上げられませんでした",
+  "mobile.chat.message.readAloudModelMissing":
+    "メッセージを聞くには、設定 > 音声 で音声モデルをダウンロードしてください。",
   "mobile.chat.message.selectText": "テキストを選択",
   "mobile.chat.message.copyImage": "画像をコピー",
   "mobile.chat.message.copyText": "テキストをコピー",
@@ -545,6 +555,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "キューにメッセージはありません",
   "mobile.chat.queue.emptyBody": "エージェントの作業中は、新しいメッセージがキューに入ります。",
   "mobile.chat.queue.noLongerQueued": "このメッセージはキューにありません。",
+  "mobile.chat.queue.routine": "ルーティン：{name}",
   "mobile.chat.queue.position": "{position} 番目 · {date}",
   "mobile.chat.queue.attachments": "添付ファイル",
   "mobile.chat.queue.steer": "方向を指示",

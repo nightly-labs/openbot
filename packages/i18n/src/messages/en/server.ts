@@ -242,6 +242,9 @@ export const messages = defineMessages("server", {
   "server.rail.delete": "Delete server",
   "server.rail.hide": "Hide server",
   "server.rail.showLocal": "Show {name}",
+  "server.rail.hiddenServers": "Hidden servers",
+  "server.rail.hideFailed": "Could not hide {name}",
+  "server.rail.showFailed": "Could not show {name}",
   "server.plan.daysLeft": {
     one: "{count} day",
     other: "{count} days",

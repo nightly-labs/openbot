@@ -84,7 +84,12 @@ const OPENCODE_TITLE_OFF = { title: { disable: true } } as const;
 export const OPENCODE_PROFILE_CONFIG: OpenCodeConfigBase = { permission: { "*": "deny", bash: "ask", read: "ask" } };
 
 export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
-  permission: { "opencode_session_*": "deny", "opencode_worktree_*": "deny" },
+  permission: {
+    "opencode_session_*": "deny",
+    "opencode_worktree_*": "deny",
+    automation_create: "deny",
+    automation_resume: "deny",
+  },
 };
 
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";

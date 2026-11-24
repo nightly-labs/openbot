@@ -501,6 +501,7 @@ export const messages = {
   "mobile.agent.usage.collection": "统计自 {started} 开始，最近更新于 {updated}。",
   "mobile.agent.usage.never": "从未",
   "mobile.agent.record.time": "时间",
+  "mobile.agent.record.date": "日期",
   "mobile.agent.section.changeFailed": "无法更改文件夹",
   "mobile.agent.section.tryAgain": "请重试。",
   "mobile.agent.section.moveUp": "上移",

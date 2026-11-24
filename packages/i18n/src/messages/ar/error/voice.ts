@@ -47,4 +47,6 @@ export const messages = {
   "error.voice.server.invalidAnswer": "لم يرسل {host} ردًا متوافقًا مع OpenAI.",
   "error.voice.server.invalidAudio": "أرسل {host} صوتًا لا يمكن لـ OpenBot تشغيله. استخدم خادمًا يرسل WAV.",
   "error.voice.server.tooLarge": "الرد من {host} كبير جدًا.",
+  "error.voice.server.modelUnsupported":
+    "لا يستطيع {host} التفريغ النصي باستخدام {model}. في الإعدادات ← الصوت، اختر نموذج إملاء آخر لخادم الصوت.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { constants } from "node:fs";
 import { mkdir, mkdtemp, open, readFile, rm, utimes, writeFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { BrowserBounds } from "@openbot/contracts/ipc";
@@ -43,6 +43,8 @@ interface PersistenceSnapshot {
   localStorage: string | null;
   indexedDb: string | null;
 }
+
+const stalledResponses: ServerResponse[] = [];
 
 const server = createServer((request, response) => {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -402,6 +404,15 @@ const server = createServer((request, response) => {
     );
     return;
   }
+  if (url.pathname === "/stalled-load") {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(`<!doctype html><main>Stalled page</main><img src="/stalled-image">`);
+    return;
+  }
+  if (url.pathname === "/stalled-image") {
+    stalledResponses.push(response);
+    return;
+  }
   if (url.pathname === "/redirect-image") {
     setTimeout(() => response.end(), 300);
     return;
@@ -494,6 +505,7 @@ const SCENARIOS = [
   "secret-handoff",
   "popups",
   "redirect-navigation",
+  "stalled-open",
   "cookie-banner",
 ];
 
@@ -578,6 +590,8 @@ async function main(): Promise<void> {
           await runToolBoundaryScenario(browser, origin);
         } else if (scenario === "redirect-navigation") {
           await runRedirectNavigationScenario(browser, origin);
+        } else if (scenario === "stalled-open") {
+          await runStalledOpenScenario(browser, origin);
         } else if (scenario === "typing-focus") {
           await runTypingFocusScenario(browser, origin);
         } else if (scenario === "cookie-banner") {
@@ -672,6 +686,7 @@ async function main(): Promise<void> {
 
     await runDoubleClickScenario(browser, origin);
     await runRedirectNavigationScenario(browser, origin);
+    await runStalledOpenScenario(browser, origin);
     const v2Tab = await runCauseEffect(browser.open(`${origin}/v2`, "smoke-thread", "smoke-bot"));
     const v2Contents = webContents
       .getAllWebContents()
@@ -2564,6 +2579,32 @@ async function runRedirectNavigationScenario(browser: BrowserHost, origin: strin
   const failed = outcomes.filter((outcome) => !outcome.success);
   if (failed.length > 0) throw new Error(`${failed.length} redirecting navigations failed: ${failed[0]?.error}`);
   process.stdout.write(`BrowserHost: ${outcomes.length} redirecting navigations kept the process alive.\n`);
+}
+
+const STALLED_OPEN_LIMIT_SECONDS = 45;
+
+async function runStalledOpenScenario(browser: BrowserHost, origin: string): Promise<void> {
+  const url = `${origin}/stalled-load`;
+  const started = Date.now();
+  const result = await callBrowserTool(browser, "open", { url });
+  const seconds = Math.round((Date.now() - started) / 1000);
+  const tabs = browser.listTabs().filter((tab) => tab.url.startsWith(url));
+  for (const tab of tabs) await runCauseEffect(browser.close(tab.id));
+  for (const response of stalledResponses) response.destroy();
+  const outcome = {
+    url,
+    success: result.success,
+    seconds,
+    tabsAfter: tabs.length,
+    text: toolError(result).slice(0, 300),
+  };
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(".openbot-build/browser-stalled-open-report.json", JSON.stringify(outcome, null, 2));
+  if (!outcome.success || !outcome.text.includes("Stalled page") || outcome.tabsAfter !== 1)
+    throw new Error(`A page with a stalled image did not open with its snapshot: ${JSON.stringify(outcome)}`);
+  if (seconds > STALLED_OPEN_LIMIT_SECONDS)
+    throw new Error(`An open of a stalled page did not end in time: ${JSON.stringify(outcome)}`);
+  process.stdout.write(`BrowserHost: open of a page that never finishes loading ended after ${seconds} s.\n`);
 }
 
 async function runBackgroundScenario(browser: BrowserHost, origin: string): Promise<void> {

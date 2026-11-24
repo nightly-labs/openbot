@@ -314,7 +314,11 @@ svg.credit-target-logo {
   font-size: var(--openbot-text-sm);
   font-variant-numeric: tabular-nums;
   line-height: var(--openbot-leading-sm);
-  transform: translateX(-50%);
+  translate: -50% 0;
+  transform-origin: bottom center;
+  transition:
+    color var(--openbot-duration-overlay) var(--openbot-ease-out),
+    scale var(--openbot-duration-overlay) var(--openbot-ease-out);
 }
 
 .credit-page .credit-stop::after {
@@ -322,6 +326,12 @@ svg.credit-target-logo {
   height: 5px;
   background: var(--openbot-border-strong);
   content: "";
+  transition: background-color var(--openbot-duration-overlay) var(--openbot-ease-out);
+}
+
+.credit-page .credit-stop[data-passed]::after,
+.credit-page .credit-stop[data-active]::after {
+  background: var(--credit-tier);
 }
 
 .credit-page .credit-stop:hover {
@@ -336,6 +346,7 @@ svg.credit-target-logo {
 .credit-page .credit-stop[data-active] {
   color: var(--openbot-text-primary);
   font-weight: var(--openbot-weight-semibold);
+  scale: 1.12;
 }
 
 .credit-slider-field .ui-slider-header {
@@ -1031,6 +1042,8 @@ svg.credit-target-logo {
   .credit-page,
   .credit-split,
   .credit-move-swap svg,
+  .credit-page .credit-stop,
+  .credit-page .credit-stop::after,
   .credit-slider-field .ui-slider-thumb,
   .credit-slider-field .ui-slider-track::after {
     transition: none;

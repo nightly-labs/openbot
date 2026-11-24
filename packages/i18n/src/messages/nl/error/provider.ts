@@ -306,6 +306,8 @@ export const messages = {
     "Het OpenCode-model beëindigde de beurt zonder antwoord. Probeer het opnieuw, of kies een ander model.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Het OpenCode-model beëindigde de beurt na het redeneren, zonder antwoord. Probeer het opnieuw, of kies een ander model.",
+  "error.provider.opencodeToolCallsAsText":
+    "Het OpenCode-model schreef zijn acties als tekst en voerde ze niet uit. Probeer het opnieuw, of kies een ander model.",
   "error.provider.acpNoAnswer":
     "{provider} beëindigde de beurt zonder antwoord. Stuur het bericht opnieuw, of begin een nieuwe chat.",
   "error.provider.noAnswerAfterSteps":
@@ -431,6 +433,8 @@ export const messages = {
     "{provider} heeft dit bericht geblokkeerd vanwege zijn veiligheidsregels: {reason} Als {provider} ook je volgende berichten blokkeert, start dan een nieuwe chat.",
   "error.provider.codexAudioRefused":
     "Dit model kan geen audio beluisteren, dus het accepteerde het geluid in deze chat niet. OpenBot heeft een nieuwe Codex-sessie gestart met de chatgeschiedenis. Stuur je verzoek opnieuw en vraag de agent om zonder het geluid te werken om verder te gaan. Kies in het modelmenu van de agent een model dat audio kan beluisteren om geluid te controleren.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex kon de instellingen van je ChatGPT-account niet laden, dus de agent is gestopt. Probeer het opnieuw. Als hij weer stopt, kies dan Opnieuw verbinden voor ChatGPT in Serverinstellingen → Aanbieders.",
   "error.provider.imageTooSmall":
     "Het model accepteerde een afbeelding in deze chat niet, omdat de afbeelding te klein is. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooLarge":
@@ -568,6 +572,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "De versie van de {provider} CLI kon niet worden gelezen.",
   "error.provider.piSessionBusy": "Wacht tot de huidige Pi-beurt klaar is.",
   "error.provider.acpSessionBusy": "{provider} rondt nog een gestopte beurt af. Probeer het zo opnieuw.",
+  "error.provider.acpSettingsConflict":
+    "{provider} heeft deze chat gewijzigd terwijl OpenBot de instellingen toepaste. Probeer het opnieuw.",
   "error.provider.acpSessionStale":
     "{provider} kon de nieuwste versie van deze chat niet laden. Stuur je bericht opnieuw.",
   "error.provider.acpModelNotOffered":

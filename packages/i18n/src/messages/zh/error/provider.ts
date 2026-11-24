@@ -266,6 +266,7 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "OpenCode 模型结束本轮对话时没有给出回答。请重试或改用其他模型。",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode 模型给出推理过程后结束本轮对话，但没有回答。请重试或改用其他模型。",
+  "error.provider.opencodeToolCallsAsText": "OpenCode 模型把操作写成了文字，没有实际执行。请重试或改用其他模型。",
   "error.provider.acpNoAnswer": "{provider} 结束本轮对话时没有给出回答。请重新发送消息，或开始新对话。",
   "error.provider.noAnswerAfterSteps":
     "{provider} 执行了一些步骤后结束了本轮对话，但没有给出回答。再次发送相同请求之前，请先问问助手做了什么。",
@@ -381,6 +382,8 @@ export const messages = {
     "{provider} 因其安全规则拦截了此消息：{reason} 如果 {provider} 也拦截你后续的消息，请开始新对话。",
   "error.provider.codexAudioRefused":
     "此模型无法收听音频，因此未接受此聊天中的声音。OpenBot 已使用聊天记录开始新的 Codex 会话。要继续，请重新发送你的请求，并让智能体在不使用声音的情况下工作。要检查声音，请在智能体的模型菜单中选择一个可以收听音频的模型。",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex 无法加载你的 ChatGPT 账户设置，因此助手已停止。请重试。如果它再次停止，请在“服务器设置 → 服务商”中为 ChatGPT 选择“重新连接”。",
   "error.provider.imageTooSmall":
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooLarge":
@@ -494,6 +497,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "无法读取 {provider} CLI 版本。",
   "error.provider.piSessionBusy": "请等待当前 Pi 对话结束。",
   "error.provider.acpSessionBusy": "{provider} 仍在结束已停止的对话。请稍后再试。",
+  "error.provider.acpSettingsConflict": "OpenBot 应用设置时，{provider} 更改了此对话。请重试。",
   "error.provider.acpSessionStale": "{provider} 无法加载此对话的最新版本。请重新发送你的消息。",
   "error.provider.acpModelNotOffered": "{provider} 目前不提供 {model}。请为此智能体选择其他模型，然后重试。",
   "error.provider.piStopped": "Pi 未运行。请连接 Pi 后重试。",

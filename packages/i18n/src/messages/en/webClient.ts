@@ -30,6 +30,7 @@ export const messages = defineMessages("webClient", {
     "The OpenBot extension in this browser can then use {email}: your servers, agents and chats. You can end it in your account's device list.",
   "webClient.extension.allow": "Allow",
   "webClient.extension.failed": "The extension was not signed in. Try again from the extension.",
+  "webClient.extension.done": "You can close this tab and go back to the extension.",
   "webClient.notice.connecting": "Connecting to your server",
   "webClient.notice.findingHosts": "Finding your servers",
   "webClient.notice.hostsFailed": "Could not load your servers",

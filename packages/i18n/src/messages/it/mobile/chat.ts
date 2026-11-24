@@ -157,6 +157,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Impossibile condividere i file",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Per condividere più file serve l’ultima versione dell’app.",
   "mobile.chat.attachment.preview": "Anteprima di {name}",
+  "mobile.chat.attachment.seeAll": "Tocca per vedere tutto",
   "mobile.chat.attachment.displayFailed": "Impossibile mostrare questa immagine.",
   "mobile.chat.attachment.loadingImage": "Caricamento dell'immagine",
   "mobile.chat.attachment.uploading": "Caricamento di {name}",
@@ -188,6 +189,8 @@ export const messages = {
   "mobile.chat.attachment.tooLarge": "{name} supera i {limit}.",
   "mobile.chat.attachment.cameraPermission":
     "Consenti l'accesso alla fotocamera nelle Impostazioni per scattare una foto.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "La foto non è stata caricata. Aprila nell’app Foto finché non si vede per intero, poi riprova.",
   "mobile.chat.composer.send": "Invia messaggio",
   "mobile.chat.composer.stop": "Ferma {name}",
   "mobile.chat.composer.dictate": "Detta messaggio",
@@ -244,6 +247,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Impossibile scattare la foto. Riprova.",
   "mobile.chat.camera.startFailed": "Impossibile avviare la fotocamera. Chiudila e riprova.",
   "mobile.chat.camera.close": "Chiudi fotocamera",
+  "mobile.chat.camera.fullScreenTipTitle": "Ti serve una vista più grande?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Usa la fotocamera a schermo intero, con zoom e tutti gli obiettivi. Puoi cambiarlo in Impostazioni > Conversazioni.",
+  "mobile.chat.camera.fullScreenTipUse": "Usa schermo intero",
+  "mobile.chat.camera.fullScreenTipDismiss": "Nascondi suggerimento",
   "mobile.chat.camera.takePhoto": "Scatta foto",
   "mobile.chat.camera.switch": "Cambia fotocamera",
   "mobile.chat.header.info": "Info su {name}",
@@ -313,6 +321,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Velocità di riproduzione: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Impossibile leggere il messaggio ad alta voce",
+  "mobile.chat.message.readAloudModelMissing":
+    "Per ascoltare i messaggi, scarica il modello vocale in Impostazioni > Voce.",
   "mobile.chat.message.selectText": "Seleziona testo",
   "mobile.chat.message.copyImage": "Copia immagine",
   "mobile.chat.message.copyText": "Copia testo",
@@ -553,6 +563,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Nessun messaggio in coda",
   "mobile.chat.queue.emptyBody": "I nuovi messaggi si mettono in coda mentre l'agente lavora.",
   "mobile.chat.queue.noLongerQueued": "Questo messaggio non è più in coda.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Posizione {position} · {date}",
   "mobile.chat.queue.attachments": "Allegati",
   "mobile.chat.queue.steer": "Indirizza",

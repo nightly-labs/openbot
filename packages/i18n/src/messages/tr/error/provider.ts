@@ -306,6 +306,8 @@ export const messages = {
     "OpenCode modeli turu yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode modeli turu akıl yürütmesinden sonra yanıt vermeden bitirdi. Tekrar deneyin veya başka bir model seçin.",
+  "error.provider.opencodeToolCallsAsText":
+    "OpenCode modeli eylemlerini metin olarak yazdı ve gerçekleştirmedi. Tekrar deneyin veya başka bir model seçin.",
   "error.provider.acpNoAnswer":
     "{provider} turu yanıt vermeden bitirdi. Mesajı yeniden gönderin veya yeni bir sohbet başlatın.",
   "error.provider.noAnswerAfterSteps":
@@ -434,6 +436,8 @@ export const messages = {
     "{provider}, güvenlik kuralları nedeniyle bu mesajı engelledi: {reason} {provider} sonraki mesajlarınızı da engellerse yeni bir sohbet başlatın.",
   "error.provider.codexAudioRefused":
     "Bu model ses dinleyemez, bu yüzden bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Devam etmek için isteğinizi yeniden gönderin ve ajandan ses olmadan çalışmasını isteyin. Sesi kontrol etmek için ajanın model menüsünde ses dinleyebilen bir model seçin.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex, ChatGPT hesabınızın ayarlarını yükleyemediği için ajan durdu. Tekrar deneyin. Yine durursa Sunucu ayarları → Sağlayıcılar bölümünde ChatGPT için Yeniden bağlan'ı seçin.",
   "error.provider.imageTooSmall":
     "Görsel çok küçük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooLarge":
@@ -567,6 +571,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
   "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",
+  "error.provider.acpSettingsConflict":
+    "OpenBot ayarlarını uygularken {provider} bu sohbeti değiştirdi. Tekrar deneyin.",
   "error.provider.acpSessionStale": "{provider} bu sohbetin en son sürümünü yükleyemedi. Mesajınızı yeniden gönderin.",
   "error.provider.acpModelNotOffered":
     "{provider} şu anda {model} modelini sunmuyor. Bu ajan için başka bir model seçip yeniden deneyin.",
