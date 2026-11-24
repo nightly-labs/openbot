@@ -10,7 +10,7 @@ import type {
   VoiceLiveStart,
 } from "@openbot/contracts/ipc";
 import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
-import { sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, sourceText, sourceTextValues } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Fiber, Schema, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
@@ -32,6 +32,7 @@ import {
 
 const ANSWER_TIMEOUT_MS = 20_000;
 const REASON_LIMIT = 1_000;
+const START_REASON_LIMIT = 160;
 const UNAUTHORIZED = /\bstatus 401\b|\b401 Unauthorized\b/;
 const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 const FORBIDDEN = /^(?=[\s\S]*\brealtime\b)[\s\S]*(?:\bstatus 403\b|\b403 Forbidden\b)/;
@@ -510,7 +511,12 @@ export class LiveVoice {
   #startFailure(failure: LiveVoiceFailed, agentId: string): LiveVoiceFailed {
     const message = failure.cause instanceof Error ? failure.cause.message : String(failure.cause);
     const text = this.#plainText(message, agentId);
-    return text ? liveFailure(text) : failure;
+    if (text) return liveFailure(text);
+    if (isFixedSourceText(message)) return failure;
+    const fullReason = sourceTextValues(message, "error.voice.live.failed")?.reason ?? this.#hooks.redact(message);
+    logger.warn("Codex could not start live voice.", { reason: fullReason.slice(0, REASON_LIMIT) });
+    const reason = Array.from(fullReason).slice(0, START_REASON_LIMIT).join("");
+    return liveFailure(sourceText("error.voice.live.startFailed", { reason }));
   }
 
   #reason(message: string | null, agentId: string): string {

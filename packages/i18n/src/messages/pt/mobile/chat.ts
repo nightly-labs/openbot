@@ -233,6 +233,8 @@ export const messages = {
   "mobile.chat.liveVoice.gptFailed":
     "Não foi possível iniciar o GPT Live Voice. Ative o microfone para tentar de novo.",
   "mobile.chat.liveVoice.gptEnded": "O GPT Live Voice parou. Ative o microfone para iniciá-lo de novo.",
+  "mobile.chat.liveVoice.gptFailedTitle": "Não foi possível iniciar o GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "O GPT Live Voice parou",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Permita que o OpenBot use o microfone em Ajustes. Depois ative o microfone para tentar de novo.",
   "mobile.chat.composer.addAttachment": "Adicionar anexo",

@@ -229,6 +229,8 @@ export const messages = {
     "이 서버는 GPT Live Voice를 지원하지 않습니다. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice를 시작할 수 없습니다. 음소거를 해제하여 다시 시도하세요.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice가 중지되었습니다. 음소거를 해제하면 다시 시작합니다.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice를 시작할 수 없습니다",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice가 중지되었습니다",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "설정에서 OpenBot이 마이크를 사용하도록 허용하세요. 그런 다음 음소거를 해제하여 다시 시도하세요.",
   "mobile.chat.composer.addAttachment": "첨부 파일 추가",

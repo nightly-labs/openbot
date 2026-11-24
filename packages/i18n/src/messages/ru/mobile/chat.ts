@@ -291,6 +291,8 @@ export const messages = {
     "Этот сервер не поддерживает GPT Live Voice. Обновите OpenBot на компьютере, где он работает.",
   "mobile.chat.liveVoice.gptFailed": "Не удалось запустить GPT Live Voice. Включите микрофон, чтобы повторить.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice остановлен. Включите микрофон, чтобы запустить его снова.",
+  "mobile.chat.liveVoice.gptFailedTitle": "Не удалось запустить GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice остановлен",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Разрешите OpenBot использовать микрофон в Настройках. Затем включите микрофон, чтобы повторить.",
   "mobile.chat.composer.addAttachment": "Добавить вложение",

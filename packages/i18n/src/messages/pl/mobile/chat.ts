@@ -295,6 +295,8 @@ export const messages = {
   "mobile.chat.liveVoice.gptFailed":
     "Nie udało się uruchomić GPT Live Voice. Wyłącz wyciszenie, aby spróbować ponownie.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice zatrzymał się. Wyłącz wyciszenie, aby uruchomić go ponownie.",
+  "mobile.chat.liveVoice.gptFailedTitle": "Nie udało się uruchomić GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice zatrzymał się",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Zezwól OpenBot na użycie mikrofonu w Ustawieniach. Potem wyłącz wyciszenie, aby spróbować ponownie.",
   "mobile.chat.composer.addAttachment": "Dodaj załącznik",

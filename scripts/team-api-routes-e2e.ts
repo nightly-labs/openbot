@@ -2481,6 +2481,13 @@ const liveVoice: TeamApiLiveVoice = {
           cause: new Error(sourceText("error.voice.live.signIn")),
         }),
       );
+    if (input.sdp === "offer-codex-failed")
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "startLiveVoice",
+          cause: new Error(sourceText("error.voice.live.startFailed", { reason: "realtime session failed" })),
+        }),
+      );
     liveVoiceStarts += 1;
     return Effect.succeed({ sessionId: `voice-${liveVoiceStarts}`, sdp: `answer to ${input.sdp}` });
   },
@@ -13243,6 +13250,16 @@ try {
           bobId,
         ]),
       [summary(noSignIn), callsOf("startLiveVoice").at(-1)],
+    );
+    const codexFailed = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", sdp: "offer-codex-failed" },
+    });
+    check(
+      "a host whose Codex cannot start the voice answers 409 with the reason and the next step for the member",
+      errorIs(codexFailed, 409, sourceText("error.voice.live.startFailed", { reason: "realtime session failed" })),
+      summary(codexFailed),
     );
     const revoked = await call("POST", LIVE_VOICE_ROUTES.start, {
       token: bobToken,

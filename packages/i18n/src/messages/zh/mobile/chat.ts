@@ -223,6 +223,8 @@ export const messages = {
   "mobile.chat.liveVoice.gptUnsupported": "此服务器不支持 GPT Live Voice。请在运行它的电脑上更新 OpenBot。",
   "mobile.chat.liveVoice.gptFailed": "无法启动 GPT Live Voice。取消静音以重试。",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice 已停止。取消静音以重新开始。",
+  "mobile.chat.liveVoice.gptFailedTitle": "无法启动 GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice 已停止",
   "mobile.chat.liveVoice.gptMicrophoneOff": "请在“设置”中允许 OpenBot 使用麦克风，然后取消静音以重试。",
   "mobile.chat.composer.addAttachment": "添加附件",
   "mobile.chat.composer.ask": "问 {name}",
