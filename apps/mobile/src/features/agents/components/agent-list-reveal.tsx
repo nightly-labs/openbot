@@ -1,3 +1,4 @@
+import { useIsFocused } from "expo-router";
 import { type PropsWithChildren, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import Animated, {
@@ -18,6 +19,7 @@ const ROW_STAGGER = 30;
 const ROW_RISE = 10;
 const MAX_DELAY = 300;
 const REDUCED_DURATION = 150;
+const SETTLE_GRACE = 250;
 const EASE_OUT = Easing.bezierFn(0.23, 1, 0.32, 1);
 
 export interface AgentListRevealState {
@@ -37,28 +39,55 @@ export function useAgentListReveal(ready: boolean, scope: string): AgentListReve
   const finished = finishedScope === scope;
   const [laidOutScope, setLaidOutScope] = useState<string | null>(null);
   const onLayout = useCallback(() => setLaidOutScope(scope), [scope]);
+  const focused = useIsFocused();
+  const focusedNow = useRef(focused);
+  const settledScope = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    focusedNow.current = focused;
+  }, [focused]);
 
   useLayoutEffect(() => {
     elapsed.set(0);
     elapsedScope.set(scope);
     setFinishedScope(null);
     if (!ready) {
+      settledScope.current = null;
       setLaidOutScope(null);
       return;
     }
-    if (laidOutScope !== scope) return;
+    const duration = reducedMotion ? REDUCED_DURATION : ROW_DURATION + MAX_DELAY;
+    const showAll = () => {
+      settledScope.current = scope;
+      elapsed.set(duration);
+      setFinishedScope(scope);
+    };
+    if (!focusedNow.current || settledScope.current === scope) {
+      showAll();
+      return;
+    }
     let active = true;
     const finish = () => {
-      if (active) setFinishedScope(scope);
+      if (!active) return;
+      settledScope.current = scope;
+      setFinishedScope(scope);
     };
-    const duration = reducedMotion ? REDUCED_DURATION : ROW_DURATION + MAX_DELAY;
-    elapsed.set(
-      withTiming(duration, { duration, easing: Easing.linear, reduceMotion: ReduceMotion.Never }, (done) => {
-        if (done) scheduleOnRN(finish);
-      }),
-    );
+    const settle = () => {
+      if (!active) return;
+      cancelAnimation(elapsed);
+      showAll();
+    };
+    const settleTimer = setTimeout(settle, duration + SETTLE_GRACE);
+    if (laidOutScope === scope) {
+      elapsed.set(
+        withTiming(duration, { duration, easing: Easing.linear, reduceMotion: ReduceMotion.Never }, (done) => {
+          if (done) scheduleOnRN(finish);
+        }),
+      );
+    }
     return () => {
       active = false;
+      clearTimeout(settleTimer);
       cancelAnimation(elapsed);
     };
   }, [elapsed, elapsedScope, laidOutScope, ready, reducedMotion, scope]);
