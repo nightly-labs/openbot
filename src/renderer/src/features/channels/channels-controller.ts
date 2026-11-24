@@ -1,4 +1,10 @@
-import type { AvatarImageInput, ChannelCommand, ChannelPage, ChannelSummary } from "@openbot/contracts/ipc";
+import {
+  type AvatarImageInput,
+  type ChannelCommand,
+  type ChannelPage,
+  type ChannelSummary,
+  mergeChannelTasks,
+} from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import type { AgentProfile } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
@@ -202,8 +208,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
         }
         if (page && state.page?.channel.id === page.channel.id) {
           const merged = mergeChannelPage(state.page.messages, page.messages);
+          const kept = merged.messages.slice(0, merged.messages.length - page.messages.length);
+          const tasks = mergeChannelTasks(page.tasks, snapshot(state.page.tasks), kept);
           reconcile(merged.messages, "id")(state.page.messages);
-          reconcile(page.tasks, "id")(state.page.tasks);
+          reconcile(tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
           if (page.waits === undefined) delete state.page.waits;
           else state.page.waits = page.waits;
@@ -355,7 +363,10 @@ export function createChannelsController(env: ChannelsEnvironment) {
           const page = state.page;
           if (!page || page.olderCursor !== beforeSequence) return;
           const ids = new Set(page.messages.map((item) => item.id));
-          reconcile([...older.messages.filter((item) => !ids.has(item.id)), ...page.messages], "id")(page.messages);
+          const added = older.messages.filter((item) => !ids.has(item.id));
+          const tasks = mergeChannelTasks(snapshot(page.tasks), older.tasks, added);
+          reconcile([...added, ...page.messages], "id")(page.messages);
+          reconcile(tasks, "id")(page.tasks);
           takeOlderWindow(page, older);
         });
     } catch (error) {

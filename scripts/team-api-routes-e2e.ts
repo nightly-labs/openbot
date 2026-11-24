@@ -36,6 +36,7 @@ import {
   type Channel,
   type ChannelMessage,
   type ChannelRoutine,
+  type ChannelTask,
   type ConversationMessage,
   type CustomAgentResult,
   type CustomAgentSummary,
@@ -264,6 +265,7 @@ import {
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import {
   AGENT_HIDDEN_WORK_CAPABILITY,
+  CHANNEL_PAGE_TASKS_CAPABILITY,
   decodeTeamProtocolSupportExpanded,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_USAGE_GROUPS_CAPABILITY,
@@ -9910,6 +9912,54 @@ try {
         field(alertRow, "unreadCount") === 1 &&
         logged.slice(alertLogStart).every((line) => !line.includes("Team API request failed")),
       [heldSequence, shownSequence, summary(readAfterDelete), summary(readPastHistory), field(alertRow, "unreadCount")],
+    );
+
+    const pageTask = (id: string, requestMessageId: string, state: ChannelTask["state"]): ChannelTask => ({
+      id,
+      channelId,
+      parentTaskId: null,
+      rootTaskId: id,
+      ownerAgentId: "agent-ada",
+      requestMessageId,
+      instruction: id,
+      attachmentDraftIds: [],
+      expectedResult: id,
+      sourceMessageIds: [requestMessageId],
+      dependencies: [],
+      resources: [],
+      state,
+      revision: 1,
+      assignmentCount: 1,
+      error: null,
+    });
+    pictures.store.commit("page-tasks", {
+      channel: pictures.store.get(channelId),
+      messages: [],
+      tasks: [
+        pageTask("task-history", "message-not-in-channel", "completed"),
+        pageTask("task-open", "message-not-in-channel", "running"),
+        pageTask("task-shown", "alert-first", "completed"),
+      ],
+      assignments: [],
+    });
+    const taskIds = (reply: Reply) =>
+      list(field(reply.body, "tasks"))
+        .map((task) => field(task, "id"))
+        .filter((id) => typeof id === "string" && id.startsWith("task-"))
+        .sort();
+    const fullTasks = await call("POST", CHANNEL_ROUTES.read, { ...use, json: { channelId } });
+    const windowTasks = await call("POST", CHANNEL_ROUTES.read, {
+      ...use,
+      capabilities: [...pictured, CHANNEL_PAGE_TASKS_CAPABILITY],
+      json: { channelId },
+    });
+    check(
+      "a client with channel-page-tasks-v1 gets only open runs and the tasks of shown messages, and an older client keeps every task",
+      fullTasks.status === 200 &&
+        windowTasks.status === 200 &&
+        taskIds(fullTasks).join() === "task-history,task-open,task-shown" &&
+        taskIds(windowTasks).join() === "task-open,task-shown",
+      [taskIds(fullTasks), taskIds(windowTasks)],
     );
   }
 
