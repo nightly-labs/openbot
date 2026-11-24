@@ -516,6 +516,20 @@ export const messages = {
   "mobile.server.settings.keyOwnerOnly": "サーバーキーを変更できるのはオーナーだけです。",
   "mobile.server.settings.keyUnsupported":
     "ここでキーを変更するには、このサーバーの OpenBot をアップデートしてください。",
+  "mobile.server.settings.turnLimit": "同時に実行するスレッド",
+  "mobile.server.settings.turnLimitDescription":
+    "このサーバーで同時に実行できるエージェントのスレッド数です。スレッドが多いほどメモリーを多く使います。",
+  "mobile.server.settings.turnLimitAutomatic": "自動 ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "自動 (上限なし)",
+  "mobile.server.settings.turnLimitUnlimited": "上限なし",
+  "mobile.server.settings.turnLimitsLoadFailed": "このサーバーのスレッド上限を読み込めませんでした。",
+  "mobile.server.settings.turnLimitsSaveFailed": "スレッド上限を保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "ここでスレッド上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.agentTaskLimit": "エージェントごとの並列スレッド",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "独自の上限がない各エージェントが同時に実行できるスレッド数です。",
+  "mobile.server.settings.agentTaskLimitDefault": "デフォルト ({count})",
   "mobile.server.settings.memoryLimit": "エージェントごとのメモリー数",
   "mobile.server.settings.memoryLimitDescription": "このサーバーの各エージェントが保持できるメモリーの数です。",
   "mobile.server.settings.memoryLimitLoadFailed": "このサーバーのメモリー上限を読み込めませんでした。",

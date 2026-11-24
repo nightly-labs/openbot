@@ -528,6 +528,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Impossible de changer la clé du serveur. Réessayez.",
   "mobile.server.settings.keyOwnerOnly": "Seul le propriétaire peut changer la clé du serveur.",
   "mobile.server.settings.keyUnsupported": "Mettez à jour OpenBot sur ce serveur pour changer sa clé ici.",
+  "mobile.server.settings.turnLimit": "Fils en même temps",
+  "mobile.server.settings.turnLimitDescription":
+    "Le nombre de fils d’agents qui peuvent s’exécuter en même temps sur ce serveur. Plus de fils utilisent plus de mémoire.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatique ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatique (sans limite)",
+  "mobile.server.settings.turnLimitUnlimited": "Sans limite",
+  "mobile.server.settings.turnLimitsLoadFailed": "Impossible de charger les limites de fils de ce serveur.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Impossible d’enregistrer la limite de fils. Réessayez.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Mettez à jour OpenBot sur ce serveur pour changer sa limite de fils ici.",
+  "mobile.server.settings.agentTaskLimit": "Fils en parallèle par agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Le nombre de fils que chaque agent sans limite propre peut exécuter en même temps.",
+  "mobile.server.settings.agentTaskLimitDefault": "Par défaut ({count})",
   "mobile.server.settings.memoryLimit": "Souvenirs par agent",
   "mobile.server.settings.memoryLimitDescription": "Nombre de souvenirs que chaque agent de ce serveur peut conserver.",
   "mobile.server.settings.memoryLimitLoadFailed": "Impossible de charger la limite de souvenirs de ce serveur.",

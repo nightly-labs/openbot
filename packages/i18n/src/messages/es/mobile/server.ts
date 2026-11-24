@@ -526,6 +526,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "No se pudo cambiar la clave del servidor. Inténtalo de nuevo.",
   "mobile.server.settings.keyOwnerOnly": "Solo el propietario puede cambiar la clave del servidor.",
   "mobile.server.settings.keyUnsupported": "Actualiza OpenBot en este servidor para cambiar su clave aquí.",
+  "mobile.server.settings.turnLimit": "Hilos a la vez",
+  "mobile.server.settings.turnLimitDescription":
+    "Cuántos hilos de agentes pueden ejecutarse a la vez en este servidor. Más hilos usan más memoria.",
+  "mobile.server.settings.turnLimitAutomatic": "Automático ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automático (sin límite)",
+  "mobile.server.settings.turnLimitUnlimited": "Sin límite",
+  "mobile.server.settings.turnLimitsLoadFailed": "No se pudieron cargar los límites de hilos de este servidor.",
+  "mobile.server.settings.turnLimitsSaveFailed": "No se pudo guardar el límite de hilos. Inténtalo de nuevo.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Actualiza OpenBot en este servidor para cambiar aquí su límite de hilos.",
+  "mobile.server.settings.agentTaskLimit": "Hilos en paralelo por agente",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Cuántos hilos puede ejecutar a la vez cada agente que no tiene un límite propio.",
+  "mobile.server.settings.agentTaskLimitDefault": "Predeterminado ({count})",
   "mobile.server.settings.memoryLimit": "Recuerdos por agente",
   "mobile.server.settings.memoryLimitDescription": "Cuántos recuerdos puede guardar cada agente en este servidor.",
   "mobile.server.settings.memoryLimitLoadFailed": "No se pudo cargar el límite de recuerdos de este servidor.",
