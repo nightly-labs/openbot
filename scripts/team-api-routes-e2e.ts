@@ -2596,11 +2596,13 @@ const githubSkillsAdmin: Pick<
 const adaSkills = join(root, "workspaces", "agent-ada", ".claude", "skills");
 mkdirSync(join(adaSkills, "good-skill"), { recursive: true });
 writeFileSync(join(adaSkills, "good-skill", "SKILL.md"), "---\nname: good-skill\ndescription: Works.\n---\n# Good\n");
-mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+mkdirSync(join(adaSkills, "bom-skill"), { recursive: true });
 writeFileSync(
-  join(adaSkills, "settlement-economy", "SKILL.md"),
-  "\uFEFF---\r\nname: settlement-economy\r\ndescription: Settles.\r\n---\r\n# Settle\r\n",
+  join(adaSkills, "bom-skill", "SKILL.md"),
+  "\uFEFF---\r\nname: bom-skill\r\ndescription: Saved with a byte order mark.\r\n---\r\n# Bom\r\n",
 );
+mkdirSync(join(adaSkills, "settlement-economy"), { recursive: true });
+writeFileSync(join(adaSkills, "settlement-economy", "SKILL.md"), "\uFEFF# Settle\r\n");
 const chatSkills = new SkillMarketplaceService(
   {
     requestAuthorized: () => Effect.die("Not used."),
@@ -7730,14 +7732,19 @@ try {
         .filter((skill) => skill.skillId.startsWith("workspace:"))
         .map(({ slug, problem }) => ({ slug, problem }));
     check(
-      "an older client gets only the usable skill folder, as before",
-      plain.status === 200 && isDeepStrictEqual(named(plain), [{ slug: "good-skill", problem: undefined }]),
+      "an older client gets only the usable skill folders, as before, and a byte order mark does not make a folder unusable",
+      plain.status === 200 &&
+        isDeepStrictEqual(named(plain), [
+          { slug: "bom-skill", problem: undefined },
+          { slug: "good-skill", problem: undefined },
+        ]),
       summary(plain),
     );
     check(
-      "a client with skill-problems-v1 also gets the folder whose SKILL.md has a byte order mark, with the reason",
+      "a client with skill-problems-v1 also gets the folder whose SKILL.md has no frontmatter, with the reason",
       withProblems.status === 200 &&
         isDeepStrictEqual(named(withProblems), [
+          { slug: "bom-skill", problem: undefined },
           { slug: "good-skill", problem: undefined },
           { slug: "settlement-economy", problem: sourceText("error.skill.frontmatterMissing") },
         ]),
