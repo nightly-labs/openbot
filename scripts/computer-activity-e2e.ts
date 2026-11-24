@@ -19,6 +19,11 @@ import {
   COMPUTER_ACTIVITY_CODECS,
   COMPUTER_ACTIVITY_ROUTES,
 } from "@openbot/contracts/team-protocol/computer-activity-v1";
+import { CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
+import { CRM_ROUTES } from "@openbot/contracts/team-protocol/crm-v1";
+import { PENDING_PROMPTS_ROUTES } from "@openbot/contracts/team-protocol/pending-prompts-v1";
+import { PROVIDER_ACCOUNTS_ROUTES } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import { WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { createOpenBotLogger } from "@openbot/logging";
 import { encodeLiveActivityBytes, LIVE_ACTIVITY_SECRET_BYTES } from "@openbot/team-client/live-activity-seal";
 import { plugin } from "bun";
@@ -42,6 +47,14 @@ const OWNER_PHONE = "owner-phone-session";
 const WITNESS = "witness-member";
 const WITNESS_PHONE = "witness-phone-session";
 const logger = createOpenBotLogger("computer-activity-e2e");
+const AUTOMATIC_READS = [
+  CRM_ROUTES.settings,
+  PROVIDER_ACCOUNTS_ROUTES.list,
+  PROVIDER_ACCOUNTS_ROUTES.usage,
+  PENDING_PROMPTS_ROUTES.list,
+  WORKFLOWS_ROUTES.list,
+  CONNECTORS_ROUTES.messagingOverview,
+];
 
 plugin({
   name: "computer-activity-electron-boundary",
@@ -249,6 +262,10 @@ function failedTurn(agentId: string, threadId: string, turnId: string): AgentEve
   return { type: "turn-completed", agentId, threadId, turnId, status: "failed" };
 }
 
+function routineReply(agentId: string, threadId: string, turnId: string): AgentEvent {
+  return { type: "turn-completed", agentId, threadId, turnId, status: "completed", origin: "routine" };
+}
+
 try {
   const setup = await step("Start the host with phone notifications, and sign in the desktop", async () => {
     await runCauseEffect(sidebar.initialize());
@@ -310,10 +327,10 @@ try {
   assert.ok(agents && phones && server);
   const service = agents;
 
-  async function phonesFor(turnId: string): Promise<{ owner: boolean }> {
+  async function phonesFor(turnId: string, received = event(turnId)): Promise<{ owner: boolean }> {
     const from = sent.length;
     const witness = nextSendTo(WITNESS_PHONE);
-    service.emit("event", event(turnId));
+    service.emit("event", received);
     const index = await witness;
     return { owner: sent.slice(from, index).includes(OWNER_PHONE) };
   }
@@ -398,6 +415,24 @@ try {
     const result = await phonesFor("turn-after-away");
     assert.equal(result.owner, true, "The owner's phone stayed quiet after the away time.");
     return { sends, ...result };
+  });
+
+  await step("Automatic reads of an open client keep the routine push, and an action still hides it", async () => {
+    const ownerId = team.getOwnerMemberId();
+    assert.ok(ownerId && server);
+    const before = server.lastMemberUseElsewhere(ownerId, OWNER_PHONE);
+    for (const path of AUTOMATIC_READS) await wire(port, { method: "POST", path, body: {}, token });
+    assert.equal(server.lastMemberUseElsewhere(ownerId, OWNER_PHONE), before, "An automatic read counted as use.");
+    hostNow = Math.max(hostNow, Date.now());
+    const afterReads = await phonesFor("turn-after-reads", routineReply(agentId, threadId, "turn-after-reads"));
+    assert.equal(afterReads.owner, true, "An automatic read of another client hid the routine reply.");
+    await wire(port, { method: "POST", path: CRM_ROUTES.setSettings, body: {}, token });
+    const used = server.lastMemberUseElsewhere(ownerId, OWNER_PHONE);
+    assert.ok(used !== null && used !== before, "An action on another client did not count as use.");
+    hostNow = Math.max(hostNow, Date.now());
+    const afterAction = await phonesFor("turn-after-action", routineReply(agentId, threadId, "turn-after-action"));
+    assert.equal(afterAction.owner, false, "The routine reply went to the phone right after an action elsewhere.");
+    return { reads: AUTOMATIC_READS, afterReads, afterAction };
   });
 
   await step("A host with no phone of the member is not told again for a while", async () => {
