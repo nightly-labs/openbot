@@ -676,6 +676,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:question-steer-order
 
+      - name: Run the steer before the turn id E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:steer-before-turn-id
+
       - name: Run the provider session reuse E2E test
         if: ${{ !cancelled() }}
         run: bun run test:provider-session-reuse
@@ -974,6 +978,7 @@ jobs:
             .openbot-build/claude-late-steer-e2e/
             .openbot-build/claude-steer-now-e2e/
             .openbot-build/question-steer-order-e2e/
+            .openbot-build/steer-before-turn-id-e2e/
             .openbot-build/provider-session-reuse-e2e/
             .openbot-build/backup-model-failover-e2e/
             .openbot-build/codex-empty-lead-turn-e2e/
