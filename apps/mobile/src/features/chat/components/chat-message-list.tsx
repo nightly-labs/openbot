@@ -37,6 +37,7 @@ import { GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import Animated, {
   Easing,
   Extrapolation,
+  FadeIn,
   FadeInDown,
   interpolate,
   Keyframe,
@@ -179,6 +180,9 @@ const FOLLOW_END = { animated: false, on: { dataChange: true, itemLayout: true, 
 const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .withInitialValues({ opacity: 0, transform: [{ translateY: 12 }] })
+  .reduceMotion(ReduceMotion.System);
+const PROGRESS_UPDATE_ENTRANCE = FadeIn.duration(220)
+  .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .reduceMotion(ReduceMotion.System);
 const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
 const REPLY_APPEAR = { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.Never };
@@ -802,7 +806,13 @@ const MessageRow = memo(function MessageRow({
       <Animated.View
         key={message.id}
         entering={
-          arriving && !isFirstUser ? (message.author === "user" ? USER_MESSAGE_ENTRANCE : undefined) : undefined
+          arriving && !isFirstUser
+            ? message.author === "user"
+              ? USER_MESSAGE_ENTRANCE
+              : message.progress && shared.playbackActive
+                ? PROGRESS_UPDATE_ENTRANCE
+                : undefined
+            : undefined
         }
         className={
           message.author === "user" ? "max-w-full items-end self-end gap-2" : "max-w-full items-start self-start gap-2"
