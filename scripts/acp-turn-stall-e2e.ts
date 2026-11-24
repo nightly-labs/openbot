@@ -38,6 +38,7 @@ interface Report {
   slowEndpoint?: { status: string | null; reply: string; elapsedMs: number };
   slowFlavor?: { quietStatus: string | null; hangStatus: string | null; hangElapsedMs: number };
   tool?: { status: string | null; elapsedMs: number };
+  openTool?: { longToolStatus: string | null; hangStatus: string | null; error: string | null; elapsedMs: number };
   stop?: { status: string | null; elapsedMs: number; next: string | null };
   stream?: { deltaBeforeCompletion: boolean; reply: string };
   antigravity?: { stalled: boolean; stopStatus: string | null };
@@ -245,6 +246,29 @@ try {
   report.tool = { status: tool.value.status, elapsedMs: tool.elapsedMs };
   assert.equal(tool.value.status, "completed", "A long tool call does not stall the turn.");
   assert.ok(tool.elapsedMs >= TOOL_MS, "The tool call ran for its whole time.");
+
+  const openToolLog = join(root, "opencode-open-tool.jsonl");
+  const openToolClient = await open("opencode", { ...OPENCODE_ACP_FLAVOR, openToolStallMs: TOOL_MS * 2 }, openToolLog);
+  const openToolThread = await startThread(openToolClient, { cwd: workspace });
+  const longTool = await runTurn(openToolClient, openToolThread, { text: "tool" });
+  const openTool = await timed(() =>
+    runTurn(openToolClient, openToolThread, { text: "tool-hang", timeoutMs: TOOL_MS * 10 }),
+  );
+  report.openTool = {
+    longToolStatus: longTool.status,
+    hangStatus: openTool.value.status,
+    error: openTool.value.error,
+    elapsedMs: openTool.elapsedMs,
+  };
+  assert.equal(longTool.status, "completed", "A tool call shorter than the open tool limit still completes.");
+  assert.equal(openTool.value.status, "failed", "A tool call that never ends fails the turn.");
+  assert.equal(
+    openTool.value.error,
+    sourceText("error.agent.turnStalled", { provider: "OpenCode" }),
+    "A tool call that never ends names the stall.",
+  );
+  assert.ok(openTool.elapsedMs >= TOOL_MS * 2, "The open tool call was ended at the open tool limit, not before.");
+  assert.ok(openTool.elapsedMs < TOOL_MS * 6, "The open tool call did not hold the turn much past its limit.");
 
   const stopThread = await startThread(client, { cwd: workspace });
   const stopping = timed(() => runTurn(client, stopThread, { text: "hang", timeoutMs: 30_000 }));
