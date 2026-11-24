@@ -437,7 +437,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                       </Match>
                       <Match when={shown.kind === "settings"}>
                         <SettingsScreen
-                          sharing={presence().sharing}
+                          canShare={canShare()}
                           onBack={back}
                           onAnalyticsChanged={(enabled) => void saveAnalyticsAnswer(props.session.token, enabled)}
                         />

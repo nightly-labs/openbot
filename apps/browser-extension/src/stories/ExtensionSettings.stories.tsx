@@ -19,14 +19,14 @@ const SITES = {
   "https://www.a-very-long-subdomain-name.example-shop.co.uk": "always",
 };
 
-function Settings(props: { linked: boolean; sharing?: boolean; sites?: boolean }) {
+function Settings(props: { linked: boolean; canShare?: boolean; sites?: boolean }) {
   installStoryChrome({
     "openbot.analytics.v1": { enabled: props.linked, at: 0 },
     ...(props.sites === false ? {} : { [SITES_KEY]: SITES }),
   });
   return (
     <PanelFrame>
-      <SettingsScreen sharing={props.sharing ?? true} onBack={() => undefined} onAnalyticsChanged={() => undefined} />
+      <SettingsScreen canShare={props.canShare ?? true} onBack={() => undefined} onAnalyticsChanged={() => undefined} />
     </PanelFrame>
   );
 }
@@ -37,4 +37,4 @@ export const AnalyticsNotLinked: Story = { render: () => <Settings linked={false
 
 export const NoAllowedSites: Story = { render: () => <Settings linked sites={false} /> };
 
-export const ServerWithoutSharedTabs: Story = { render: () => <Settings linked sharing={false} /> };
+export const ServerWithoutSharedTabs: Story = { render: () => <Settings linked canShare={false} /> };

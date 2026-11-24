@@ -6,7 +6,7 @@ import { removeAllowedSite, siteName, useAllowedSites } from "./BrowserSharing";
 import { readSession } from "./extension-storage";
 
 interface SettingsScreenProps {
-  sharing: boolean;
+  canShare: boolean;
   onBack: () => void;
   onAnalyticsChanged: (enabled: boolean) => void;
 }
@@ -43,7 +43,7 @@ export function SettingsScreen(props: SettingsScreenProps) {
               />
             </div>
           </Show>
-          <Show when={props.sharing}>
+          <Show when={props.canShare}>
             <SharedTabsRow />
           </Show>
         </div>
