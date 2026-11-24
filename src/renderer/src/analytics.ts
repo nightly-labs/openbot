@@ -52,6 +52,9 @@ interface AgentAnalyticsProperties {
   server_kind: ServerKind;
 }
 
+const CREDITS_CARD_ACTIONS = ["buy", "enable", "continue", "skip", "mute", "unmute", "allow", "set_default"] as const;
+export type CreditsCardAnalyticsAction = (typeof CREDITS_CARD_ACTIONS)[number];
+
 const WORKFLOW_ACTIONS = [
   "create",
   "rename",
@@ -109,6 +112,15 @@ interface DesktopAnalyticsEvents {
   };
   queue_action: {
     action: "cancel" | "steer" | "send_now" | "edit" | "reorder" | "interrupt";
+    result: AnalyticsResult;
+    failure_code?: string;
+  };
+  credits_card_action: {
+    card: "hold" | "approval";
+    action: CreditsCardAnalyticsAction;
+    server_kind: "local" | "remote" | "unknown";
+    media_kind?: "image" | "video";
+    still_short?: boolean;
     result: AnalyticsResult;
     failure_code?: string;
   };
@@ -395,6 +407,7 @@ const EVENT_PROPERTY_ALLOWLIST = {
   ],
   agent_input_action: ["kind", "decision", "result", "failure_code"],
   queue_action: ["action", "result", "failure_code"],
+  credits_card_action: ["card", "action", "server_kind", "media_kind", "still_short", "result", "failure_code"],
   routine_action: ["action", "trigger_type", "duration_ms", "result", "failure_code"],
   workflow_action: ["action", "node_kind", "duration_ms", "result", "failure_code"],
   team_action: ["action", "result", "server_kind", "role", "email_bound", "entry_point", "failure_code"],
@@ -560,6 +573,7 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
   agent_action: ["create", "update", "delete", "duplicate", "branch"],
   agent_input_action: ["prompt", "approval"],
   queue_action: ["cancel", "steer", "send_now", "edit", "reorder", "interrupt"],
+  credits_card_action: CREDITS_CARD_ACTIONS,
   routine_action: ["create", "update", "delete", "test"],
   workflow_action: WORKFLOW_ACTIONS,
   team_action: [
@@ -654,6 +668,7 @@ const EVENT_ENUMS: Partial<Record<AnalyticsEventName, Readonly<Record<string, re
   agent_template_action: { entry_point: ["deep_link", "in_app"] },
   usage_viewed: { scope: ["agent", "server"] },
   workflow_action: { node_kind: WORKFLOW_NODE_KINDS },
+  credits_card_action: { card: ["hold", "approval"], media_kind: ["image", "video"] },
 };
 
 const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
@@ -796,6 +811,7 @@ function sanitizeDesktopProperty(
       "completed",
       "skipped",
       "filtered",
+      "still_short",
     ].includes(key)
   ) {
     return isBoolean(value) ? value : undefined;

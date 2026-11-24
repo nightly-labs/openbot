@@ -3001,13 +3001,19 @@ export class OpenBotToolRouter {
       permissions: null,
     });
     return yield* tools.handle({
+      agentId,
+      turnId: params.turnId,
       tool: params.tool,
       arguments: params.arguments,
       readInputs: (paths) => this.#readCreditMediaInputs(agentId, paths),
       approve: (reason, offer) =>
-        this.#attention
-          .awaitMediaApproval(client, request, approval(reason), offer)
-          .pipe(Effect.map((answer) => ({ accepted: answer.decision === "accept", choice: answer.choice ?? null }))),
+        this.#attention.awaitMediaApproval(client, request, approval(reason), offer).pipe(
+          Effect.map((answer) => ({
+            accepted: answer.decision === "accept",
+            choice: answer.choice ?? null,
+            via: answer.decision === "cancel" ? null : answer.via,
+          })),
+        ),
       hold: (reason, hold) => this.#attention.awaitCreditsHold(client, request, approval(reason), hold),
       requesters: this.#turnRequesters(agentId, params.turnId),
       show: (media: CreditMediaShown) =>

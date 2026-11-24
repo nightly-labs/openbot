@@ -23,12 +23,12 @@ import {
   type VideoGenerationInfo,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Fiber, type Scope } from "effect";
+import { Effect, Exit, Fiber, type Scope } from "effect";
 import { z } from "zod";
 import { imageSizeOfBytes } from "../image-size";
 import type { DynamicToolResult } from "../protocol";
 import type { CreditMediaInputRead, CreditMediaWorkflows } from "../workflows/credit-media";
-import type { CreditsHoldAnswer, CreditsHoldCall, CreditsHoldWallet } from "./attention-registry";
+import type { CreditAnswerVia, CreditsHoldAnswer, CreditsHoldCall, CreditsHoldWallet } from "./attention-registry";
 import { generatedImageName, generatedVideoName } from "./image-generation";
 import type { ImageFitter } from "./image-reader";
 import { openBotToolFailure, openBotToolResult } from "./routine-tools";
@@ -113,6 +113,8 @@ export interface CreditMediaShown {
 }
 
 export interface CreditMediaToolCall {
+  agentId: string;
+  turnId: string;
   tool: string;
   arguments: unknown;
   readInputs: (paths: readonly string[]) => Effect.Effect<readonly Uint8Array[], CreditMediaToolInputFailed>;
@@ -133,6 +135,48 @@ export interface CreditAsksPerson {
 interface CreditMediaApproval {
   accepted: boolean;
   choice: MediaApprovalChoice | null;
+  via: CreditAnswerVia | null;
+}
+
+export type CreditMediaOutcome =
+  | "generated"
+  | "failed"
+  | "not_saved"
+  | "declined"
+  | "skipped"
+  | "muted"
+  | "not_asked"
+  | "short"
+  | "invalid"
+  | "input_failed"
+  | "stopped"
+  | "unavailable";
+
+export type CreditsHoldOutcome = "continued" | "enabled" | "skipped" | "muted" | "not_asked" | "stopped";
+
+export interface CreditMediaReport {
+  agentId: string;
+  turnId: string;
+  kind: CreditMediaGenerationKind;
+  outcome: CreditMediaOutcome;
+  agentModel: string | null;
+  model: string | null;
+  modelSource: "agent" | "default" | null;
+  cost: number | null;
+  charged: number | null;
+  resolution: string | null;
+  durationSeconds: number | null;
+  audio: boolean | null;
+  references: number;
+  hold: { reason: "balance" | "agents_off"; answer: CreditsHoldOutcome | null; via: CreditAnswerVia | null } | null;
+  approval: { accepted: boolean; via: CreditAnswerVia | null; modelChanged: boolean } | null;
+  durationMs: number;
+}
+
+interface CreditMediaRun {
+  facts: Omit<CreditMediaReport, "durationMs">;
+  startedAt: number;
+  delivering: boolean;
 }
 
 export class CreditMediaToolInputFailed extends Error {}
@@ -148,6 +192,7 @@ export interface CreditMediaToolsOptions {
   defaultModel: (kind: CreditMediaGenerationKind) => string | null;
   fitImage: ImageFitter | null;
   scope: () => Scope.Scope;
+  report?: (report: CreditMediaReport) => void;
 }
 
 interface Inputs {
@@ -361,6 +406,50 @@ interface InputRole {
   path: string;
 }
 
+function startRun(call: CreditMediaToolCall, kind: CreditMediaGenerationKind): CreditMediaRun {
+  return {
+    facts: {
+      agentId: call.agentId,
+      turnId: call.turnId,
+      kind,
+      outcome: "failed",
+      agentModel: null,
+      model: null,
+      modelSource: null,
+      cost: null,
+      charged: null,
+      resolution: null,
+      durationSeconds: null,
+      audio: null,
+      references: 0,
+      hold: null,
+      approval: null,
+    },
+    startedAt: Date.now(),
+    delivering: false,
+  };
+}
+
+function notePlan(run: CreditMediaRun, planned: PlannedJob): void {
+  run.facts.model = planned.model.id;
+  run.facts.cost = planned.cost;
+  run.facts.resolution = planned.job.resolution;
+  run.facts.durationSeconds = planned.job.duration;
+  run.facts.audio = run.facts.kind === "video" ? planned.job.audio : null;
+}
+
+function exitOutcome(exit: Exit.Exit<unknown, unknown>, outcome: CreditMediaOutcome): CreditMediaOutcome {
+  if (Exit.isSuccess(exit)) return outcome;
+  return Exit.hasInterrupts(exit) ? "stopped" : "failed";
+}
+
+function holdOutcome(answer: CreditsHoldAnswer): CreditsHoldOutcome {
+  if (answer.stopped) return "stopped";
+  if (answer.action === "skip") return "skipped";
+  if (answer.action === "mute") return "muted";
+  return answer.enabled ? "enabled" : "continued";
+}
+
 function inputRoles(inputs: Inputs): InputRole[] {
   return [
     ...(inputs.first === null ? [] : [{ role: "first" as const, path: inputs.first }]),
@@ -378,23 +467,55 @@ export class CreditMediaTools {
 
   readonly handle = Effect.fn("CreditMediaTools.handle")(function* (this: CreditMediaTools, call: CreditMediaToolCall) {
     const media = this.#options.media();
-    if (!media?.available()) return failure(sourceText("error.billing.mediaSignInRequired"));
-    if (call.tool === LIST_MEDIA_MODELS_TOOL) return yield* this.#list(media, call);
-    if (call.tool === GENERATE_IMAGE_TOOL) {
+    if (call.tool === LIST_MEDIA_MODELS_TOOL) {
+      if (!media?.available()) return failure(sourceText("error.billing.mediaSignInRequired"));
+      return yield* this.#list(media, call);
+    }
+    const run = startRun(call, call.tool === GENERATE_IMAGE_TOOL ? "image" : "video");
+    return yield* this.#generateTool(media, call, run).pipe(
+      Effect.onExit((exit) => (run.delivering ? Effect.void : this.#report(run, exitOutcome(exit, run.facts.outcome)))),
+    );
+  }).bind(this);
+
+  #generateTool = Effect.fn("CreditMediaTools.generateTool")(function* (
+    this: CreditMediaTools,
+    media: CreditMediaWorkflows | null,
+    call: CreditMediaToolCall,
+    run: CreditMediaRun,
+  ) {
+    if (!media?.available()) {
+      run.facts.outcome = "unavailable";
+      return failure(sourceText("error.billing.mediaSignInRequired"));
+    }
+    if (run.facts.kind === "image") {
       const parsed = generateImageToolSchema.safeParse(call.arguments, { reportInput: true });
-      if (!parsed.success) return failure(z.prettifyError(parsed.error));
+      if (!parsed.success) {
+        run.facts.outcome = "invalid";
+        return failure(z.prettifyError(parsed.error));
+      }
       const { images, ...args } = parsed.data;
-      return yield* this.#generate(media, call, "image", args, { first: null, last: null, references: images ?? [] });
+      return yield* this.#generate(media, call, run, args, { first: null, last: null, references: images ?? [] });
     }
     const parsed = generateVideoToolSchema.safeParse(call.arguments, { reportInput: true });
-    if (!parsed.success) return failure(z.prettifyError(parsed.error));
+    if (!parsed.success) {
+      run.facts.outcome = "invalid";
+      return failure(z.prettifyError(parsed.error));
+    }
     const { firstFrame, lastFrame, images, ...args } = parsed.data;
-    return yield* this.#generate(media, call, "video", args, {
+    return yield* this.#generate(media, call, run, args, {
       first: firstFrame ?? null,
       last: lastFrame ?? null,
       references: images ?? [],
     });
-  }).bind(this);
+  });
+
+  #report(run: CreditMediaRun, outcome: CreditMediaOutcome) {
+    const report = this.#options.report;
+    if (!report) return Effect.void;
+    return Effect.sync(() => report({ ...run.facts, outcome, durationMs: Date.now() - run.startedAt })).pipe(
+      Effect.catchDefect(() => Effect.void),
+    );
+  }
 
   #list = Effect.fn("CreditMediaTools.list")(function* (
     this: CreditMediaTools,
@@ -418,19 +539,31 @@ export class CreditMediaTools {
     this: CreditMediaTools,
     media: CreditMediaWorkflows,
     call: CreditMediaToolCall,
-    kind: CreditMediaGenerationKind,
+    run: CreditMediaRun,
     args: JobArguments,
     inputs: Inputs,
   ) {
+    const kind = run.facts.kind;
+    const roles = inputRoles(inputs);
+    run.facts.references = roles.length;
+    run.facts.modelSource = args.model === undefined ? "default" : "agent";
     const models = yield* media.models();
     const defaultModel = this.#options.defaultModel(kind);
     const first = plannedJob(models, kind, args, inputs, defaultModel);
-    if (typeof first === "string") return failure(first);
-    const held = yield* this.#holdUntilFunded(media, call, kind, first.cost);
+    if (typeof first === "string") {
+      run.facts.outcome = "invalid";
+      run.facts.agentModel = args.model ?? null;
+      return failure(first);
+    }
+    run.facts.agentModel = first.model.id;
+    notePlan(run, first);
+    const held = yield* this.#holdUntilFunded(media, call, run, first.cost);
     if (held) return failure(held);
-    const roles = inputRoles(inputs);
     const read = yield* Effect.result(call.readInputs(roles.map(({ path }) => path)));
-    if (read._tag === "Failure") return failure(read.failure.message);
+    if (read._tag === "Failure") {
+      run.facts.outcome = "input_failed";
+      return failure(read.failure.message);
+    }
     const files = read.success;
     let planned = first;
     if (first.cost > this.#options.approvalCredits()) {
@@ -440,12 +573,27 @@ export class CreditMediaTools {
           ? sourceText("status.agent.creditImageApproval", { model: name, credits: first.cost })
           : sourceText("status.agent.creditVideoApproval", { model: name, credits: first.cost });
       const approval = yield* call.approve(reason, approvalOffer(models, kind, first, defaultModel));
-      if (!approval.accepted) return failure(sourceText("error.agent.creditMediaDeclined"));
+      run.facts.approval = {
+        accepted: approval.accepted,
+        via: approval.via,
+        modelChanged: approval.choice !== null && approval.choice.model !== first.model.id,
+      };
+      if (!approval.accepted) {
+        run.facts.outcome = approval.via === null ? "stopped" : "declined";
+        return failure(sourceText("error.agent.creditMediaDeclined"));
+      }
       if (approval.choice) {
         const chosen = plannedJob(models, kind, argumentsOf(args.prompt, approval.choice), inputs, defaultModel);
-        if (typeof chosen === "string") return failure(chosen);
+        if (typeof chosen === "string") {
+          run.facts.outcome = "invalid";
+          return failure(chosen);
+        }
+        notePlan(run, chosen);
         const chosenFunded = chosen.cost > first.cost ? yield* this.#funded(media, chosen) : null;
-        if (chosenFunded) return failure(chosenFunded);
+        if (chosenFunded) {
+          run.facts.outcome = "short";
+          return failure(chosenFunded);
+        }
         planned = chosen;
       }
     }
@@ -457,7 +605,11 @@ export class CreditMediaTools {
         role && bytes ? { mimeType: attachmentMimeTypeForName(role.path), bytes: Effect.succeed(bytes) } : null,
       );
     };
-    const delivery = yield* this.#deliver(media, call, kind, planned, readInput, roles).pipe(
+    const delivery = yield* Effect.suspend(() => {
+      run.delivering = true;
+      return this.#deliver(media, call, run, planned, readInput, roles);
+    }).pipe(
+      Effect.onExit((exit) => this.#report(run, exitOutcome(exit, run.facts.outcome))),
       Effect.forkIn(this.#options.scope(), { startImmediately: true }),
     );
     return yield* Fiber.join(delivery);
@@ -467,11 +619,12 @@ export class CreditMediaTools {
     this: CreditMediaTools,
     media: CreditMediaWorkflows,
     call: CreditMediaToolCall,
-    kind: CreditMediaGenerationKind,
+    run: CreditMediaRun,
     planned: PlannedJob,
     readInput: CreditMediaInputRead,
     roles: readonly InputRole[],
   ) {
+    const kind = run.facts.kind;
     const made = yield* Effect.result(
       media.make(readInput, {
         jobId: randomUUID(),
@@ -480,8 +633,12 @@ export class CreditMediaTools {
         images: roles.map(({ role }, index) => ({ role, attachmentId: String(index) })),
       }),
     );
-    if (made._tag === "Failure") return failure(made.failure.message);
+    if (made._tag === "Failure") {
+      run.facts.outcome = "failed";
+      return failure(made.failure.message);
+    }
     const { bytes, mimeType, credits } = made.success;
+    run.facts.charged = credits;
     const extension = extensionOf(mimeType);
     const size = kind === "image" ? imageSizeOfBytes(bytes) : null;
     const shown = yield* Effect.result(
@@ -512,7 +669,11 @@ export class CreditMediaTools {
             },
       ),
     );
-    if (shown._tag === "Failure") return failure(sourceText("error.agent.creditMediaNotSaved"));
+    if (shown._tag === "Failure") {
+      run.facts.outcome = "not_saved";
+      return failure(sourceText("error.agent.creditMediaNotSaved"));
+    }
+    run.facts.outcome = "generated";
     const file = shown.success === null ? {} : { file: shown.success };
     if (kind === "image") return this.#imageResult(planned, credits, bytes, size, file);
     return openBotToolResult({
@@ -540,13 +701,23 @@ export class CreditMediaTools {
     this: CreditMediaTools,
     media: CreditMediaWorkflows,
     call: CreditMediaToolCall,
-    kind: CreditMediaGenerationKind,
+    run: CreditMediaRun,
     cost: number,
   ) {
+    const kind = run.facts.kind;
     const blocked = yield* this.#blocked(media, cost);
     if (!blocked) return null;
-    if (!this.#options.askWhenBlocked() || this.#options.asksMuted(call.requesters))
+    const hold: NonNullable<CreditMediaReport["hold"]> = {
+      reason: blocked.reason === "agentsOff" ? "agents_off" : "balance",
+      answer: null,
+      via: null,
+    };
+    run.facts.hold = hold;
+    if (!this.#options.askWhenBlocked() || this.#options.asksMuted(call.requesters)) {
+      hold.answer = "not_asked";
+      run.facts.outcome = "not_asked";
       return `${blockedText(blocked, cost)} The user turned off credit requests, so OpenBot did not ask. ${NOT_AGAIN} Tell the user once, in a few words, that you skipped this step.`;
+    }
     const reason =
       blocked.reason === "agentsOff"
         ? sourceText("status.agent.creditsHoldAgentsOff")
@@ -557,7 +728,10 @@ export class CreditMediaTools {
       balance: () => media.credits().pipe(Effect.map((balance) => balance?.available ?? null)),
     };
     const answer = yield* call.hold(reason, { call: { kind, cost }, balance: blocked.balance, wallet });
+    hold.answer = holdOutcome(answer);
+    hold.via = answer.via ?? null;
     if (answer.action === "continue") return null;
+    run.facts.outcome = answer.stopped ? "stopped" : answer.action === "skip" ? "skipped" : "muted";
     if (answer.action === "skip") return `The user skipped this step. ${NOT_AGAIN}`;
     const person = answer.responder?.person ?? null;
     yield* this.#options.muteAsks(person).pipe(Effect.ignore);

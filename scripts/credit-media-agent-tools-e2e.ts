@@ -13,6 +13,7 @@ import type { CreditsHoldAnswer, CreditsHoldCall, CreditsHoldWallet } from "../s
 import {
   CREDIT_MEDIA_TOOL_DEFINITIONS,
   type CreditAsksPerson,
+  type CreditMediaReport,
   type CreditMediaShown,
   CreditMediaToolInputFailed,
   CreditMediaTools,
@@ -152,6 +153,8 @@ let askWhenBlocked = true;
 const mutedMembers = new Set<string>();
 const mutes: (CreditAsksPerson | null)[] = [];
 const toolScope = Scope.makeUnsafe();
+const reports: CreditMediaReport[] = [];
+let nextReport: Deferred.Deferred<CreditMediaReport> | null = null;
 const tools = new CreditMediaTools({
   media: () => workflows,
   scope: () => toolScope,
@@ -177,6 +180,10 @@ const tools = new CreditMediaTools({
     sourceWidth: 1920,
     sourceHeight: 1080,
   }),
+  report: (report) => {
+    reports.push(report);
+    if (nextReport) Deferred.doneUnsafe(nextReport, Effect.succeed(report));
+  },
 });
 let creditsChanges = 0;
 const workflows = new CreditMediaWorkflows({
@@ -218,6 +225,7 @@ interface CallOutcome {
   reads: string[][];
   submitted: (typeof submits)[number] | undefined;
   creditsChanges: number;
+  reports: CreditMediaReport[];
 }
 
 function savedPath(media: CreditMediaShown) {
@@ -242,8 +250,11 @@ async function call(
   const reads: string[][] = [];
   const before = submits.length;
   const changesBefore = creditsChanges;
+  const reportsBefore = reports.length;
   const result = await Effect.runPromise(
     tools.handle({
+      agentId: "agent-1",
+      turnId: "turn-1",
       tool,
       arguments: args,
       readInputs: (paths) =>
@@ -257,7 +268,7 @@ async function call(
         Effect.sync(() => {
           approvals.push(reason);
           offers.push(offer);
-          return { accepted: options.approve ?? true, choice: options.choice ?? null };
+          return { accepted: options.approve ?? true, choice: options.choice ?? null, via: "local" as const };
         }),
       hold: (reason, hold) =>
         Effect.sync(() => {
@@ -287,6 +298,7 @@ async function call(
     reads,
     submitted: submits.length > before ? submits.at(-1) : undefined,
     creditsChanges: creditsChanges - changesBefore,
+    reports: reports.slice(reportsBefore),
   };
 }
 
@@ -341,6 +353,21 @@ async function flow() {
       image.result.contentItems[1]?.type === "inputImage",
     { shown: image.shown.map(({ bytes: _bytes, ...rest }) => rest), data: image.data },
   );
+  const imageReport = image.reports[0];
+  check(
+    "a made image gives one report with the agent, the media model, the cost and the charge",
+    image.reports.length === 1 &&
+      imageReport?.agentId === "agent-1" &&
+      imageReport.turnId === "turn-1" &&
+      imageReport.kind === "image" &&
+      imageReport.outcome === "generated" &&
+      typeof imageReport.model === "string" &&
+      imageReport.cost !== null &&
+      imageReport.charged !== null &&
+      imageReport.hold === null,
+    imageReport,
+  );
+
   const reused = await call("generate_image", { prompt: "Make it blue", images: [image.data?.file ?? ""] });
   check(
     "the result gives the saved file, and the agent can pass it to a later call",
@@ -385,6 +412,12 @@ async function flow() {
     badAspect.text,
   );
 
+  check(
+    "a bad argument gives an invalid report",
+    badAspect.reports.length === 1 && badAspect.reports[0]?.outcome === "invalid",
+    badAspect.reports,
+  );
+
   const declined = await call(
     "generate_video",
     { prompt: "Waves", duration: 8, firstFrame: "/tmp/first.png" },
@@ -400,6 +433,19 @@ async function flow() {
       declined.shown.length === 0 &&
       declined.creditsChanges === 0,
     { text: declined.text, approvals: declined.approvals },
+  );
+
+  const declinedReport = declined.reports[0];
+  check(
+    "a declined approval gives a declined report with the answer and where it came from",
+    declined.reports.length === 1 &&
+      declinedReport?.outcome === "declined" &&
+      declinedReport.kind === "video" &&
+      declinedReport.approval?.accepted === false &&
+      declinedReport.approval.via === "local" &&
+      declinedReport.references === 1 &&
+      declinedReport.charged === null,
+    declinedReport,
   );
 
   const video = await call("generate_video", {
@@ -447,6 +493,19 @@ async function flow() {
     { text: tooExpensive.text, holds: tooExpensive.holds },
   );
 
+  const skippedReport = tooExpensive.reports[0];
+  check(
+    "a skipped credits hold gives a skipped report with the balance reason",
+    tooExpensive.reports.length === 1 &&
+      skippedReport?.outcome === "skipped" &&
+      skippedReport.hold?.reason === "balance" &&
+      skippedReport.hold.answer === "skipped" &&
+      skippedReport.resolution === "1080p" &&
+      skippedReport.durationSeconds === 8 &&
+      skippedReport.cost === 124,
+    skippedReport,
+  );
+
   const funded = await call(
     "generate_video",
     { prompt: "Waves", duration: 8, resolution: "1080p" },
@@ -462,6 +521,14 @@ async function flow() {
     "when credits arrive during the hold, the same call continues and runs",
     funded.result.success && funded.holds.length === 1 && funded.submitted?.request.resolution === "1080p",
     { text: funded.text, holds: funded.holds },
+  );
+
+  check(
+    "a hold that continues gives a generated report with the continued answer",
+    funded.reports.length === 1 &&
+      funded.reports[0]?.outcome === "generated" &&
+      funded.reports[0].hold?.answer === "continued",
+    funded.reports[0],
   );
 
   const memberMute = await call(
@@ -486,6 +553,14 @@ async function flow() {
       !memberMuted.submitted &&
       otherMember.holds.length === 1,
     { mute: memberMute.text, muted: memberMuted.text },
+  );
+  check(
+    "a muted hold and a call that does not ask give the muted and not_asked reports",
+    memberMute.reports[0]?.outcome === "muted" &&
+      memberMute.reports[0].hold?.answer === "muted" &&
+      memberMuted.reports[0]?.outcome === "not_asked" &&
+      memberMuted.reports[0].hold?.answer === "not_asked",
+    { mute: memberMute.reports, muted: memberMuted.reports },
   );
   mutedMembers.clear();
 
@@ -646,6 +721,11 @@ async function flow() {
     agentsAllowed && turnedOn.result.success && turnedOn.holds.length === 1 && Boolean(turnedOn.submitted),
     turnedOn.text,
   );
+  check(
+    "a hold for agent use gives the agents_off reason",
+    turnedOn.reports[0]?.hold?.reason === "agents_off" && turnedOn.reports[0].outcome === "generated",
+    turnedOn.reports,
+  );
   const onAgain = await call("generate_image", { prompt: "A red boat" });
   check(
     "when the server turns it on again, an image runs with no hold",
@@ -658,12 +738,16 @@ async function stoppedCall() {
   const delivered = Deferred.makeUnsafe<CreditMediaShown>();
   const before = submits.length;
   heldJob = submitted;
+  const report = Deferred.makeUnsafe<CreditMediaReport>();
+  nextReport = report;
   const running = Effect.runFork(
     tools.handle({
+      agentId: "agent-1",
+      turnId: "turn-2",
       tool: "generate_video",
       arguments: { prompt: "Slow waves", duration: 4 },
       readInputs: (paths) => Effect.succeed(paths.map(() => PNG)),
-      approve: () => Effect.succeed({ accepted: true, choice: null }),
+      approve: () => Effect.succeed({ accepted: true, choice: null, via: "remote" as const }),
       hold: () => Effect.succeed({ action: "skip" as const }),
       requesters: ["member-1"],
       show: (media) => Deferred.succeed(delivered, media).pipe(Effect.as(savedPath(media))),
@@ -673,6 +757,17 @@ async function stoppedCall() {
   const stopped = await Effect.runPromise(Fiber.interrupt(running).pipe(Effect.andThen(Fiber.await(running))));
   runningJobs.set(jobId, true);
   const shown = await Effect.runPromise(Deferred.await(delivered));
+  const stoppedReport = await Effect.runPromise(Deferred.await(report));
+  nextReport = null;
+  check(
+    "a stopped call with a paid job reports once, when the job is shown",
+    stoppedReport.turnId === "turn-2" &&
+      stoppedReport.outcome === "generated" &&
+      stoppedReport.approval === null &&
+      stoppedReport.charged !== null &&
+      reports.filter((item) => item.turnId === "turn-2").length === 1,
+    stoppedReport,
+  );
   check(
     "a stopped call keeps waiting for a paid job and shows the result in the chat",
     Exit.hasInterrupts(stopped) && shown.itemType === "video_generation" && submits.length === before + 1,

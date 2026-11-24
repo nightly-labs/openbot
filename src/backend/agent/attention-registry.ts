@@ -202,9 +202,18 @@ export interface CreditsHoldWallet {
   balance: () => Effect.Effect<number | null>;
 }
 
+export type CreditAnswerVia = "local" | "remote" | "automatic";
+
+function answerVia(responder: ApprovalResponder | undefined): CreditAnswerVia {
+  return responder ? "remote" : "local";
+}
+
 export interface CreditsHoldAnswer {
   action: "continue" | "skip" | "mute";
   responder?: ApprovalResponder;
+  via?: CreditAnswerVia;
+  enabled?: boolean;
+  stopped?: boolean;
 }
 
 interface PendingCreditsHold {
@@ -231,7 +240,7 @@ interface PendingApproval {
   approval: AgentApproval;
   executionThreadId: string;
   hostedSiteMutation?: HostedSiteMutationContext;
-  decide?: (decision: ToolApprovalDecision, phone?: FeedbackPhone, choice?: MediaApprovalChoice) => void;
+  decide?: (decision: ToolApprovalDecision, responder?: ApprovalResponder, choice?: MediaApprovalChoice) => void;
   media?: MediaApprovalOffer;
   creditsHold?: PendingCreditsHold;
   alwaysAsk?: boolean;
@@ -244,6 +253,7 @@ export type ToolApprovalDecision = "accept" | "decline" | "cancel";
 interface MediaApprovalAnswer {
   readonly decision: ToolApprovalDecision;
   readonly choice?: MediaApprovalChoice;
+  readonly via: CreditAnswerVia;
 }
 
 const TOOL_APPROVAL_METHOD = "openbot/tool-approval";
@@ -678,6 +688,7 @@ export class AttentionRegistry {
     this: AttentionRegistry,
     input: RespondToCreditsHoldInput,
     responder?: ApprovalResponder,
+    automatic = false,
   ) {
     const { pending, hold } = yield* attentionStep(() => {
       const value = this.#approvals.get(input.requestId);
@@ -688,9 +699,11 @@ export class AttentionRegistry {
       return { pending: value, hold: value.creditsHold };
     });
     const canEnable = respondsAsAdmin(responder);
+    const via = automatic ? "automatic" : answerVia(responder);
     if (input.action === "skip" || input.action === "mute") {
       this.#resolveCreditsHolds(this.#creditsHoldGroup(pending), {
         action: input.action,
+        via,
         ...(responder ? { responder } : {}),
       });
       return null;
@@ -705,7 +718,12 @@ export class AttentionRegistry {
       for (const other of group) if (other.creditsHold) other.creditsHold.balance = balance;
       return this.#creditsHoldSummary(pending, hold, canEnable);
     }
-    this.#resolveCreditsHolds(group, { action: "continue", ...(responder ? { responder } : {}) });
+    this.#resolveCreditsHolds(group, {
+      action: "continue",
+      via,
+      ...(input.action === "enable" ? { enabled: true } : {}),
+      ...(responder ? { responder } : {}),
+    });
     return null;
   }, Effect.uninterruptible).bind(this);
 
@@ -722,11 +740,15 @@ export class AttentionRegistry {
             this.#emitError("credits_hold_recheck_failed", error, pending.approval.agentId);
         });
       Effect.runFork(
-        this.respondToCreditsHold({
-          agentId: pending.approval.agentId,
-          requestId: pending.id,
-          action: "continue",
-        }).pipe(Effect.catch(report), Effect.catchDefect(report)),
+        this.respondToCreditsHold(
+          {
+            agentId: pending.approval.agentId,
+            requestId: pending.id,
+            action: "continue",
+          },
+          undefined,
+          true,
+        ).pipe(Effect.catch(report), Effect.catchDefect(report)),
       );
     }
   }
@@ -1090,7 +1112,7 @@ export class AttentionRegistry {
 
     const mutation = pending.hostedSiteMutation;
     if (pending.decide) {
-      pending.decide(input.decision, responder?.phone, choice);
+      pending.decide(input.decision, responder, choice);
     } else if (mutation) {
       this.#approvals.delete(input.requestId);
       yield* this.#hostedSites
@@ -1296,7 +1318,8 @@ export class AttentionRegistry {
   ) {
     const answer = yield* this.#awaitToolAnswer(client, request, approval, { alwaysAsk: true, media });
     const choice = "choice" in answer ? answer.choice : undefined;
-    return { decision: answer.decision, ...(choice ? { choice } : {}) } satisfies MediaApprovalAnswer;
+    const via = "via" in answer && answer.via ? answer.via : "local";
+    return { decision: answer.decision, via, ...(choice ? { choice } : {}) } satisfies MediaApprovalAnswer;
   }).bind(this);
 
   readonly awaitCreditsHold = Effect.fn("AttentionRegistry.awaitCreditsHold")(function* (
@@ -1315,7 +1338,12 @@ export class AttentionRegistry {
       method: TOOL_APPROVAL_METHOD,
       params: request.params,
       approval,
-      decide: (decision) => settle({ action: decision === "accept" ? "continue" : "skip" }),
+      decide: (decision, responder) =>
+        settle(
+          decision === "cancel"
+            ? { action: "skip", stopped: true }
+            : { action: decision === "accept" ? "continue" : "skip", via: answerVia(responder) },
+        ),
       creditsHold: { ...hold, answer: settle },
       alwaysAsk: true,
     });
@@ -1350,6 +1378,7 @@ export class AttentionRegistry {
       decision: ToolApprovalDecision;
       phone?: FeedbackPhone;
       choice?: MediaApprovalChoice;
+      via?: CreditAnswerVia;
     }>();
     this.#holdApproval({
       client,
@@ -1357,12 +1386,13 @@ export class AttentionRegistry {
       method: TOOL_APPROVAL_METHOD,
       params: request.params,
       approval,
-      decide: (decision, phone, choice) =>
+      decide: (decision, responder, choice) =>
         Deferred.doneUnsafe(
           answer,
           Effect.succeed({
             decision,
-            ...(phone ? { phone } : {}),
+            via: answerVia(responder),
+            ...(responder?.phone ? { phone: responder.phone } : {}),
             ...(choice && decision === "accept" ? { choice } : {}),
           }),
         ),

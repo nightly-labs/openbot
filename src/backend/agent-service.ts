@@ -220,7 +220,12 @@ import type { SetCommitCoAuthor } from "./agent/commit-co-author-tool";
 import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
-import { type CreditAsksPerson, CreditMediaTools, DEFAULT_MEDIA_APPROVAL_CREDITS } from "./agent/credit-media-tools";
+import {
+  type CreditAsksPerson,
+  type CreditMediaReport,
+  CreditMediaTools,
+  DEFAULT_MEDIA_APPROVAL_CREDITS,
+} from "./agent/credit-media-tools";
 import { CustomEndpoints, toEndpointChangeFailed } from "./agent/custom-endpoints";
 import { agentNamesById, displayMessageReferences, type TagReferenceSource } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
@@ -417,6 +422,7 @@ interface AgentServiceEvents {
   event: [event: AgentEvent, memberId?: string];
   toolUsage: [usage: ToolUsageSignal];
   workflowRun: [end: WorkflowRunEnd];
+  creditMedia: [report: CreditMediaReport];
   liveVoice: [event: VoiceLiveEvent, memberId: string | null];
 }
 
@@ -2114,6 +2120,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         },
         fitImage: options.fitImage ?? null,
         scope: () => this.#scope,
+        report: (report) => this.emit("creditMedia", report),
       }),
       mcpServers: mcpServersFromGateway(
         this.#mcp,

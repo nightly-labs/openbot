@@ -1,6 +1,7 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import type { AppAppearance } from "@openbot/contracts/app-appearance";
 import type { AppLanguage } from "@openbot/contracts/app-language";
+import type { CreditMediaGenerationKind } from "@openbot/contracts/credit-media";
 import { HOSTED_SERVER_CONTACT_URL } from "@openbot/contracts/hosted-servers";
 import {
   type AddedAgent,
@@ -285,6 +286,7 @@ import type {
   ConversationThreads,
   PromptAnswerOptions,
 } from "../conversation/conversation-types";
+import { trackedMediaApproval } from "../conversation/credits-card-analytics";
 import { creditsHoldControls } from "../conversation/credits-hold-controls";
 import {
   type AgentLevelsSource,
@@ -2686,31 +2688,35 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const threadId = open === undefined ? agent.threadId : open?.threadId;
     return workspace.state.takeovers.find((request) => request.agentId === agent.id && request.threadId === threadId);
   });
-  const mediaApproval: MediaApprovalControls = {
-    read: (approval) => workspace.readMediaApproval({ agentId: approval.agentId, requestId: approval.requestId }),
-    allow: async (approval, choice) => {
-      await workspace.respondToMediaApproval({ agentId: approval.agentId, requestId: approval.requestId, choice });
-      return true;
-    },
-    setDefault: async (kind, model) => {
-      const serverId = server()?.id;
-      if (!serverId) throw new Error(t("webClient.error.connectServerFirst"));
-      await saveMediaApprovalCredits(
-        serverId,
-        mediaApprovalDefaultModelUpdate(kind, model),
-        hostMediaApprovalCreditsCalls,
-      );
-    },
-    hold: creditsHoldControls({
-      agents: workspace.profiles,
-      credits: creditsMenu,
-      walletId: () => server()?.id ?? null,
-      serverId: () => server()?.id,
-      respond: (approval, action) =>
-        workspace.respondToCreditsHold({ agentId: approval.agentId, requestId: approval.requestId, action }),
-      setMuted: (muted) => workspace.setCreditsAskMuted(muted),
-    }),
+  const setMediaApprovalDefault = async (kind: CreditMediaGenerationKind, model: string | null) => {
+    const serverId = server()?.id;
+    if (!serverId) throw new Error(t("webClient.error.connectServerFirst"));
+    await saveMediaApprovalCredits(
+      serverId,
+      mediaApprovalDefaultModelUpdate(kind, model),
+      hostMediaApprovalCreditsCalls,
+    );
   };
+  const mediaApproval: MediaApprovalControls = trackedMediaApproval(
+    {
+      read: (approval) => workspace.readMediaApproval({ agentId: approval.agentId, requestId: approval.requestId }),
+      allow: async (approval, choice) => {
+        await workspace.respondToMediaApproval({ agentId: approval.agentId, requestId: approval.requestId, choice });
+        return true;
+      },
+      setDefault: setMediaApprovalDefault,
+      hold: creditsHoldControls({
+        agents: workspace.profiles,
+        credits: creditsMenu,
+        walletId: () => server()?.id ?? null,
+        serverId: () => server()?.id,
+        respond: (approval, action) =>
+          workspace.respondToCreditsHold({ agentId: approval.agentId, requestId: approval.requestId, action }),
+        setMuted: (muted) => workspace.setCreditsAskMuted(muted),
+      }),
+    },
+    () => "remote",
+  );
   const view = createWebConversationView({
     workspace,
     remoteAgentAdmin,
@@ -4002,17 +4008,20 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onTypingChange={() => {}}
                         onAnswerPrompt={channelView.onAnswerPrompt}
                         onRespondToApproval={channelView.onRespondToApproval}
-                        mediaApproval={{
-                          ...channelView.mediaApproval,
-                          setDefault: mediaApproval.setDefault,
-                          hold: creditsHoldControls({
-                            agents: workspace.profiles,
-                            credits: creditsMenu,
-                            walletId: () => server()?.id ?? null,
-                            serverId: () => server()?.id,
-                            ...channelView.creditsHold,
-                          }),
-                        }}
+                        mediaApproval={trackedMediaApproval(
+                          {
+                            ...channelView.mediaApproval,
+                            setDefault: setMediaApprovalDefault,
+                            hold: creditsHoldControls({
+                              agents: workspace.profiles,
+                              credits: creditsMenu,
+                              walletId: () => server()?.id ?? null,
+                              serverId: () => server()?.id,
+                              ...channelView.creditsHold,
+                            }),
+                          },
+                          () => "remote",
+                        )}
                         onRespondToBrowserTakeover={channelView.onRespondToBrowserTakeover}
                         onCancelQueuedMessage={() => {}}
                         onSteerQueuedMessage={() => {}}
