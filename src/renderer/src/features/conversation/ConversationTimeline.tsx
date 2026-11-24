@@ -1574,15 +1574,6 @@ export function ConversationTimeline() {
                                     }}
                                   />
                                 </Show>
-                                <Show
-                                  when={
-                                    message()?.steerUnread &&
-                                    props.activeTurnId &&
-                                    message()?.turnId === props.activeTurnId
-                                  }
-                                >
-                                  <SteerUnreadStatus />
-                                </Show>
                                 <Show when={!hostless() && !turnStep()}>
                                   <MessageActions
                                     message={message() ?? initialMessage}
@@ -1638,6 +1629,13 @@ export function ConversationTimeline() {
                                   onCycleSpeed={replySpeedChange()}
                                 />
                               )}
+                            </Show>
+                            <Show
+                              when={
+                                message()?.steerUnread && props.activeTurnId && message()?.turnId === props.activeTurnId
+                              }
+                            >
+                              <SteerUnreadStatus />
                             </Show>
                           </ChatMessageRow>
                         }

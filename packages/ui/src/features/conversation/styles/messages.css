@@ -1966,6 +1966,21 @@ button.chat-action-target:active,
   overflow-wrap: anywhere;
 }
 
+.steer-unread-status {
+  margin-top: var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+
+[data-slot="bubble"][data-author="user"] .steer-unread-status {
+  color: var(--openbot-text-readable);
+}
+
+.ui-bubble.message-bubble-solid .steer-unread-status {
+  color: var(--openbot-text-secondary);
+}
+
 .pending-send-error::before {
   content: "·";
   margin-inline-end: var(--openbot-space-1);

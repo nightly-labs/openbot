@@ -18,9 +18,9 @@ export interface PendingSendStatusProps {
 export function SteerUnreadStatus(): JSX.Element {
   const { t } = useText();
   return (
-    <div class="pending-send-status">
-      <span role="status">{t("chat.send.steerUnread")}</span>
-    </div>
+    <p role="status" class="steer-unread-status">
+      {t("chat.send.steerUnread")}
+    </p>
   );
 }
 
