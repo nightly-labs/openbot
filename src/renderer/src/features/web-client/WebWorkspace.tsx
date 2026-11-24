@@ -687,7 +687,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     if (!workspace.canHideHosts) return false;
     const target = servers().find((item) => item.id === serverId);
     if (!target || target.hidden === true) return false;
-    return shownServers().some((item) => item.id !== serverId);
+    return servers().some((item) => item.id !== serverId && item.hidden !== true);
   }
   async function changeServerHidden(serverId: string, hidden: boolean): Promise<void> {
     const host = workspace.state.hosts.find((item) => item.hostId === serverId);

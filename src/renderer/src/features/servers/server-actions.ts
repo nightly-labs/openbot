@@ -121,7 +121,7 @@ export function useServerActions() {
   function canHide(serverId: string): boolean {
     const server = servers().find((candidate) => candidate.id === serverId);
     if (!server || isHidden(server) || (server.hidden === undefined && server.kind !== "local")) return false;
-    return orderedServers().some((candidate) => candidate.id !== serverId);
+    return allServers().some((candidate) => candidate.id !== serverId && !isHidden(candidate));
   }
 
   async function hide(serverId: string): Promise<void> {
