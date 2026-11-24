@@ -1,7 +1,7 @@
-import { Button, Spinner, Typography } from "heroui-native";
+import { Button, Typography } from "heroui-native";
 import Maximize from "lucide-react-native/icons/maximize";
 import X from "lucide-react-native/icons/x";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import Animated, { FadeInDown, FadeOut, ReduceMotion } from "react-native-reanimated";
 import {
@@ -29,31 +29,36 @@ export function FullScreenCameraTip({
 }) {
   const { t } = useText();
   const reduceMotion = useReducedMotion();
-  const visible = useFullScreenCameraPreference((state) => state.ready && !state.tipSeen && !state.fullScreen);
-  const [pending, setPending] = useState(false);
+  const firstShow = useFullScreenCameraPreference((state) => state.ready && !state.tipSeen && !state.fullScreen);
+  const fullScreen = useFullScreenCameraPreference((state) => state.fullScreen);
+  const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState(false);
   const radius = outerRadius - TIP_INSET;
 
+  useEffect(() => {
+    if (!firstShow) return;
+    setOpen(true);
+    void markFullScreenCameraTipSeen().catch(() => undefined);
+  }, [firstShow]);
+
   async function switchToFullScreen() {
-    if (pending || !canSwitch()) return;
-    setPending(true);
+    if (!canSwitch()) return;
     setFailed(false);
     const saved = await saveFullScreenCameraPreference(true).then(
       () => useFullScreenCameraPreference.getState().fullScreen,
       () => false,
     );
-    setPending(false);
     if (!saved) {
       void haptics.notification("error");
       setFailed(true);
       return;
     }
-    void markFullScreenCameraTipSeen().catch(() => undefined);
+    setOpen(false);
     void haptics.notification("success");
     if (canSwitch()) onUseFullScreen();
   }
 
-  if (!visible) return null;
+  if (!open || fullScreen) return null;
   return (
     <Animated.View
       entering={reduceMotion ? undefined : ENTERING}
@@ -83,10 +88,9 @@ export function FullScreenCameraTip({
           variant="ghost"
           className="size-8 rounded-full"
           accessibilityLabel={t("mobile.chat.camera.fullScreenTipDismiss")}
-          isDisabled={pending}
           onPress={() => {
             void haptics.impact("soft");
-            void markFullScreenCameraTipSeen().catch(() => undefined);
+            setOpen(false);
           }}
         >
           <X color="white" size={18} />
@@ -96,10 +100,9 @@ export function FullScreenCameraTip({
         size="sm"
         variant="secondary"
         className="self-start rounded-full bg-white"
-        isDisabled={pending}
         onPress={() => void switchToFullScreen()}
       >
-        {pending ? <Spinner size="sm" color="black" /> : <Maximize color="black" size={16} />}
+        <Maximize color="black" size={16} />
         <Button.Label className="font-sans font-semibold text-black">
           {t("mobile.chat.camera.fullScreenTipUse")}
         </Button.Label>
