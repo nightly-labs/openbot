@@ -1296,12 +1296,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       case "turn/interrupt": {
         const threadId = yield* providerSync(() => requiredString(params, "threadId"));
-        if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder({}));
+        const requestedTurnId = getString(params, "turnId");
+        const notRunning = requestedTurnId === null ? {} : { turnActive: false };
+        if (this.#threads.isReleased(threadId)) return yield* providerSync(() => decoder(notRunning));
         const thread = yield* providerSync(() => this.#requireThread(threadId));
         const turn = thread.activeTurn;
-        const requestedTurnId = getString(params, "turnId");
         if (!turn || (requestedTurnId !== null && requestedTurnId !== turn.id))
-          return yield* providerSync(() => decoder({}));
+          return yield* providerSync(() => decoder(notRunning));
         turn.stopped = true;
         turn.stop.abort();
         const cancel = providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id }));

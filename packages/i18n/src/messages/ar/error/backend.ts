@@ -402,6 +402,8 @@ export const messages = {
   "error.backend.browserCertificateUntrusted": "شهادة الأمان لهذا الموقع غير موثوقة، لذلك لم تُفتح الصفحة.",
   "error.backend.browserLowMemory":
     "ذاكرة هذا الخادم منخفضة، لذا لا يمكن للمتصفح فتح علامة تبويب أخرى. أغلق علامة تبويب، أو انتظر حتى ينتهي الوكلاء الآخرون.",
+  "error.backend.browserNoMemory":
+    "ذاكرة هذا الخادم شبه ممتلئة، لذا لا يمكن للمتصفح فتح علامة تبويب الآن. انتظر حتى ينتهي الوكلاء الآخرون، ثم حاول مرة أخرى.",
   "error.backend.browserOpenFailed": "تعذّر فتح {url}: {reason}",
   "error.backend.popupSecureInput":
     "النوافذ المنبثقة محظورة أثناء الإدخال الآمن. أكمل الإدخال الآمن أو ألغه، ثم أعد المحاولة من الصفحة.",
