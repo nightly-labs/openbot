@@ -241,7 +241,7 @@ interface PendingApproval {
 
 export type ToolApprovalDecision = "accept" | "decline" | "cancel";
 
-export interface MediaApprovalAnswer {
+interface MediaApprovalAnswer {
   readonly decision: ToolApprovalDecision;
   readonly choice?: MediaApprovalChoice;
 }

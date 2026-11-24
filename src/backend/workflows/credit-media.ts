@@ -82,14 +82,14 @@ export interface CreditMediaWorkflowsOptions {
   creditsChanged?: () => void;
 }
 
-export interface CreditMediaInput {
+interface CreditMediaInput {
   mimeType: string;
   bytes: Effect.Effect<Uint8Array, McpMediaFailed>;
 }
 
 export type CreditMediaInputRead = (attachmentId: string) => Effect.Effect<CreditMediaInput | null, McpMediaFailed>;
 
-export interface CreditMediaMade {
+interface CreditMediaMade {
   bytes: Uint8Array;
   mimeType: string;
   credits: number;

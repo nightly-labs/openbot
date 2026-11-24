@@ -34,8 +34,8 @@ import type { ImageFitter } from "./image-reader";
 import { openBotToolFailure, openBotToolResult } from "./routine-tools";
 
 export const LIST_MEDIA_MODELS_TOOL = "list_media_models";
-export const GENERATE_IMAGE_TOOL = "generate_image";
-export const GENERATE_VIDEO_TOOL = "generate_video";
+const GENERATE_IMAGE_TOOL = "generate_image";
+const GENERATE_VIDEO_TOOL = "generate_video";
 
 export const CREDIT_MEDIA_TOOL_NAMES: ReadonlySet<string> = new Set([
   LIST_MEDIA_MODELS_TOOL,
@@ -50,11 +50,11 @@ const modelId = z.string().trim().min(1).max(80);
 const specValue = z.string().trim().min(1).max(16);
 const prompt = z.string().max(CREDIT_MEDIA_PROMPT_LIMIT);
 
-export const listMediaModelsToolSchema = z.strictObject({
+const listMediaModelsToolSchema = z.strictObject({
   kind: z.enum(["image", "video"]).describe("Only list image or video models.").optional(),
 });
 
-export const generateImageToolSchema = z.strictObject({
+const generateImageToolSchema = z.strictObject({
   prompt: prompt.describe("What the image shows. Write it in detail."),
   model: modelId.describe("A model id from list_media_models. Omit it to use the default model.").optional(),
   aspect: specValue.describe('An aspect of the model, such as "16:9". Omit it for the model default.').optional(),
@@ -66,7 +66,7 @@ export const generateImageToolSchema = z.strictObject({
     .optional(),
 });
 
-export const generateVideoToolSchema = z.strictObject({
+const generateVideoToolSchema = z.strictObject({
   prompt: prompt.describe("What happens in the video: subject, motion, camera and sound."),
   model: modelId.describe("A model id from list_media_models. Omit it to use the default model.").optional(),
   aspect: specValue.describe('An aspect of the model, such as "16:9". Omit it for the model default.').optional(),
@@ -131,7 +131,7 @@ export interface CreditAsksPerson {
   canAdminister: boolean;
 }
 
-export interface CreditMediaApproval {
+interface CreditMediaApproval {
   accepted: boolean;
   choice: MediaApprovalChoice | null;
 }
