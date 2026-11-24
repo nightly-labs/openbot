@@ -126,6 +126,8 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
     return { message: sourceText("error.provider.geminiKeyRefused"), key: null };
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityConnectionLost"), key: null };
+  if (GEMINI_UNREADABLE_HISTORY.test(text))
+    return { message: GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text, key: null };
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
   const logged = GEMINI_EXECUTOR_ERROR.test(text);
   if (key) {
@@ -133,8 +135,6 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
       logged && key !== "error.provider.antigravityNetwork" ? (GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text) : text;
     return { message: geminiRequestFailureText(key, shown, text), key };
   }
-  if (GEMINI_UNREADABLE_HISTORY.test(text))
-    return { message: GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text, key: null };
   if (logged || GEMINI_TERMINATED_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityTurnStopped"), key: null };
   return { message: shownFailureDetail(text), key };
@@ -155,7 +155,12 @@ const GEMINI_ZERO_LIMIT = /\blimit:\s*0(?!\d|\.\d)/u;
 export function geminiSavedKeyLimitFailure(text: string, error?: unknown): string | null {
   if (error !== undefined && !(error instanceof RequestError)) return null;
   const reason = text.replace(GEMINI_WARNING_ANSWER, "").replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
-  if (geminiAccountLink(reason) !== null || GEMINI_CONNECTION_LOST_ANSWER.test(reason)) return null;
+  if (
+    geminiAccountLink(reason) !== null ||
+    GEMINI_CONNECTION_LOST_ANSWER.test(reason) ||
+    GEMINI_UNREADABLE_HISTORY.test(reason)
+  )
+    return null;
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (key !== "error.provider.antigravityRateLimited") return null;
   return sourceText(
@@ -168,6 +173,7 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
   const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
   if (GEMINI_VERIFICATION_REQUIRED.test(reason)) return sourceText("error.provider.geminiVerificationRequired");
+  if (GEMINI_UNREADABLE_HISTORY.test(reason)) return detail;
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   return key ? geminiRequestFailureText(key, reason) : detail;
 }
