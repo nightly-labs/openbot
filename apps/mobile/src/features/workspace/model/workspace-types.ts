@@ -589,6 +589,7 @@ export interface MobileWorkspaceContextValue {
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   canManageEvents: (serverId: string) => boolean;
   canManageMissedRuns: (serverId: string) => boolean;
+  canUseOnceRoutines: (serverId: string) => boolean;
   canManageRoutineResults: (serverId: string) => boolean;
   canGiveWebhookSecretToAgent: (serverId: string) => boolean;
   loadRoutineResultOptions: (serverId: string) => Promise<RoutineResultConnectionOption[]>;
@@ -919,6 +920,7 @@ type ServerCheckKey =
   | "canUpdateMarketplaceAgents"
   | "canManageEvents"
   | "canManageMissedRuns"
+  | "canUseOnceRoutines"
   | "canManageRoutineResults"
   | "canGiveWebhookSecretToAgent"
   | "canManageAgentSkills"

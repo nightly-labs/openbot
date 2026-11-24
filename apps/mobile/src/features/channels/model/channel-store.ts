@@ -32,8 +32,11 @@ import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/cont
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import {
+  createOnceChannelRoutine,
+  isOnceSchedule,
   listOnceChannelRoutines,
   type RoutinesOncePost,
+  requireReleasedScheduleOn,
   updateChannelRoutineOnce,
 } from "@openbot/team-client/routines-once";
 import { replaceEqualDeep } from "@tanstack/react-query";
@@ -669,6 +672,11 @@ export class MobileChannelStore {
     await this.request("POST", CHANNEL_ROUTES.memoryDelete, () => undefined, { channelId, memoryId }, serverId);
   }
   async createRoutine(serverId: string, input: CreateChannelRoutineInput) {
+    if (isOnceSchedule(input.schedule)) {
+      requireReleasedScheduleOn(input.schedule, this.entry(serverId).state.canUseOnceRoutines);
+      await createOnceChannelRoutine(this.oncePost(serverId), input);
+      return;
+    }
     await this.request(
       "POST",
       CHANNEL_ROUTES.routineCreate,

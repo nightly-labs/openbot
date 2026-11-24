@@ -377,6 +377,7 @@ export function RoutineEditor({
   const filters = edits.filters ?? filterDrafts(savedFilters);
   const eventsSupported = useMobileWorkspaceSelector((current) => current.canManageEvents(agent.serverId));
   const missedRuns = useMobileWorkspaceSelector((current) => current.canManageMissedRuns(agent.serverId));
+  const onceSupported = useMobileWorkspaceSelector((current) => current.canUseOnceRoutines(agent.serverId));
   const routineResults = useMobileWorkspaceSelector((current) => current.canManageRoutineResults(agent.serverId));
   const agentSecretSupported = useMobileWorkspaceSelector((current) =>
     current.canGiveWebhookSecretToAgent(agent.serverId),
@@ -518,7 +519,7 @@ export function RoutineEditor({
     <RoutineTriggerPicker
       value={trigger === "webhook" ? "webhook" : scheduleDraft.kind}
       webhook={Boolean(webhookRoutine || eventsSupported)}
-      once={savedSchedule.kind === "once"}
+      once={onceSupported || savedSchedule.kind === "once"}
       disabled={disabled}
       onSelect={selectTrigger}
     />

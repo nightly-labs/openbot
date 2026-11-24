@@ -228,9 +228,12 @@ import { readPlanLimits } from "@openbot/team-client/plan-limits";
 import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
+  createOnceAgentRoutine,
+  isOnceSchedule,
   listOnceAgentRoutines,
   listOnceChannelRoutines,
   type RoutinesOncePost,
+  requireReleasedScheduleOn,
   updateAgentRoutineOnce,
 } from "@openbot/team-client/routines-once";
 import {
@@ -1211,6 +1214,20 @@ export function createHostRequestActions({
       await request("DELETE", TEAM_API_ROUTES.agent.memory(agentId, memoryId), ignoreResponse, undefined, serverId);
     },
     createAgentRoutine: async (input, serverId) => {
+      const fields = {
+        name: input.name,
+        instruction: input.instruction,
+        active: input.active,
+        timezone: input.timezone,
+        schedule: input.schedule,
+      };
+      if (isOnceSchedule(input.schedule)) {
+        requireReleasedScheduleOn(input.schedule, onceRoutines(serverId));
+        await saveAgentRecord(queryClient, queryKeys.agentOnceRoutines(queryScope, serverId, input.agentId), () =>
+          createOnceAgentRoutine(oncePost(serverId), { agentId: input.agentId, ...fields }),
+        );
+        return;
+      }
       await saveAgentRecord(queryClient, queryKeys.agentRecord(queryScope, serverId, input.agentId, "routines"), () =>
         request(
           "POST",
@@ -1220,13 +1237,7 @@ export function createHostRequestActions({
               throw new Error("The host returned an invalid saved record.");
             return value;
           },
-          {
-            name: input.name,
-            instruction: input.instruction,
-            active: input.active,
-            timezone: input.timezone,
-            schedule: input.schedule,
-          },
+          fields,
           serverId,
         ),
       );
