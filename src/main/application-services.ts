@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readdir, readFile, rm } from "node:fs/promises";
@@ -3521,6 +3522,9 @@ export async function createApplicationServices({
     remoteDesktopStateDirectory: join(app.getPath("userData"), "remote-desktop-runtime"),
     getRemoteDesktopRuntimeCredentials: () => Effect.succeed(remoteDesktopRuntimeCredentials),
     remoteDesktopScreenLocked: () => powerMonitor.getSystemIdleState(1) === "locked",
+    wakeRemoteDesktopScreen: () => {
+      execFile("/usr/bin/caffeinate", ["-u", "-t", "5"], () => undefined).unref();
+    },
     getRemoteDesktopDisplays: () => {
       const primaryId = screen.getPrimaryDisplay().id;
       return screen.getAllDisplays().map((display, index) => ({
