@@ -67,6 +67,8 @@ export class MobileConversationStore {
   invalidate(agentId: string) {
     if (this.isObserved(agentId)) return true;
     this.#upToDate.delete(agentId);
+    const pending = this.#loads.get(agentId);
+    if (pending) pending.dirty = true;
     return false;
   }
 
