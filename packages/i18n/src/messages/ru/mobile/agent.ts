@@ -407,6 +407,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Убрать {model}",
   "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "mobile.agent.busyMessage.label": "Во время работы",
