@@ -518,6 +518,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.usage.collection": "Collection started {started}. Updated {updated}.",
   "mobile.agent.usage.never": "never",
   "mobile.agent.record.time": "Time",
+  "mobile.agent.record.date": "Date",
   "mobile.agent.section.changeFailed": "Could not change folder",
   "mobile.agent.section.tryAgain": "Please try again.",
   "mobile.agent.section.moveUp": "Move up",

@@ -72,6 +72,10 @@ export const queryKeys = {
     ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
     "events",
   ],
+  agentOnceRoutines: (scope: QueryScope, serverId: string, agentId: string) => [
+    ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
+    "once",
+  ],
   agentRoutineResultOptions: (scope: QueryScope, serverId: string, agentId: string) => [
     ...queryKeys.agentRecord(scope, serverId, agentId, "routines"),
     "result-options",

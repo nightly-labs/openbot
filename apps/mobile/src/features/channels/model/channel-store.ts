@@ -27,9 +27,18 @@ import {
 } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { CHAT_HISTORY_CAPABILITY, CHAT_HISTORY_ROUTES } from "@openbot/contracts/team-protocol/chat-history-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteFileUpload } from "@openbot/team-client/remote-peer";
+import {
+  createOnceChannelRoutine,
+  isOnceSchedule,
+  listOnceChannelRoutines,
+  type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateChannelRoutineOnce,
+} from "@openbot/team-client/routines-once";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { answeredPromptResolution } from "../../chat/model/question-prompt";
 import { saveChannelImage, savedChannelImage } from "../../workspace/model/agent-avatar-cache";
@@ -51,6 +60,7 @@ export interface ChannelState {
   canCancelTasks: boolean;
   canSetPicture: boolean;
   canUseContextActions: boolean;
+  canUseOnceRoutines: boolean;
   loading: boolean;
   listed: boolean;
   error: { cause: unknown } | null;
@@ -62,6 +72,7 @@ const FLAG_KEYS: readonly (keyof ChannelFlags)[] = [
   "canCancelTasks",
   "canSetPicture",
   "canUseContextActions",
+  "canUseOnceRoutines",
   "loading",
   "listed",
   "error",
@@ -82,6 +93,7 @@ const EMPTY: ChannelState = {
   canCancelTasks: false,
   canSetPicture: false,
   canUseContextActions: false,
+  canUseOnceRoutines: false,
   loading: false,
   listed: false,
   error: null,
@@ -203,6 +215,7 @@ export class MobileChannelStore {
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
+      canUseOnceRoutines: capabilities.includes(ROUTINES_ONCE_CAPABILITY),
       ...(supported ? {} : { listed: true, channels: [], pages: new Map() }),
     });
   }
@@ -216,6 +229,7 @@ export class MobileChannelStore {
       canCancelTasks: capabilities.includes(CHANNEL_TASK_CANCEL_CAPABILITY),
       canSetPicture: capabilities.includes(CHANNEL_PICTURE_CAPABILITY),
       canUseContextActions: capabilities.includes(CHAT_HISTORY_CAPABILITY),
+      canUseOnceRoutines: capabilities.includes(ROUTINES_ONCE_CAPABILITY),
       channels,
       pages: new Map(pages.filter((page) => ids.has(page.channel.id)).map((page) => [page.channel.id, page])),
     });
@@ -638,6 +652,13 @@ export class MobileChannelStore {
   routines(serverId: string, channelId: string) {
     return this.request("POST", CHANNEL_ROUTES.routines, decodeChannelRoutines, { channelId }, serverId);
   }
+  async onceRoutines(serverId: string, channelId: string) {
+    if (!this.entry(serverId).state.canUseOnceRoutines) return [];
+    return listOnceChannelRoutines(this.oncePost(serverId), channelId);
+  }
+  private oncePost(serverId: string): RoutinesOncePost {
+    return (path, decode, body) => this.request("POST", path, decode, body, serverId);
+  }
   async saveMemory(serverId: string, channelId: string, text: string, memoryId?: string) {
     await this.request(
       "POST",
@@ -651,6 +672,11 @@ export class MobileChannelStore {
     await this.request("POST", CHANNEL_ROUTES.memoryDelete, () => undefined, { channelId, memoryId }, serverId);
   }
   async createRoutine(serverId: string, input: CreateChannelRoutineInput) {
+    if (isOnceSchedule(input.schedule)) {
+      requireReleasedScheduleOn(input.schedule, this.entry(serverId).state.canUseOnceRoutines);
+      await createOnceChannelRoutine(this.oncePost(serverId), input);
+      return;
+    }
     await this.request(
       "POST",
       CHANNEL_ROUTES.routineCreate,
@@ -660,6 +686,10 @@ export class MobileChannelStore {
     );
   }
   async updateRoutine(serverId: string, input: UpdateChannelRoutineInput) {
+    if (this.entry(serverId).state.canUseOnceRoutines) {
+      await updateChannelRoutineOnce(this.oncePost(serverId), input);
+      return;
+    }
     await this.request(
       "POST",
       CHANNEL_ROUTES.routineUpdate,

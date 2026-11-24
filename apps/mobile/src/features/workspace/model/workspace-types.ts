@@ -596,6 +596,7 @@ export interface MobileWorkspaceContextValue {
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   canManageEvents: (serverId: string) => boolean;
   canManageMissedRuns: (serverId: string) => boolean;
+  canUseOnceRoutines: (serverId: string) => boolean;
   canManageRoutineResults: (serverId: string) => boolean;
   canGiveWebhookSecretToAgent: (serverId: string) => boolean;
   loadRoutineResultOptions: (serverId: string) => Promise<RoutineResultConnectionOption[]>;
@@ -622,6 +623,7 @@ export interface MobileWorkspaceContextValue {
   ) => Promise<AgentMemorySelectionState>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
+  loadOnceAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadRoutineCalendar: (
     input: RoutineCalendarInput,
     serverId: string,
@@ -926,6 +928,7 @@ type ServerCheckKey =
   | "canUpdateMarketplaceAgents"
   | "canManageEvents"
   | "canManageMissedRuns"
+  | "canUseOnceRoutines"
   | "canManageRoutineResults"
   | "canGiveWebhookSecretToAgent"
   | "canManageAgentSkills"

@@ -537,6 +537,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Coleta iniciada em {started}. Atualizado em {updated}.",
   "mobile.agent.usage.never": "nunca",
   "mobile.agent.record.time": "Horário",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Não foi possível alterar a pasta",
   "mobile.agent.section.tryAgain": "Tente novamente.",
   "mobile.agent.section.moveUp": "Mover para cima",

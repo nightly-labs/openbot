@@ -540,6 +540,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Toplama başlangıcı: {started}. Güncellendi: {updated}.",
   "mobile.agent.usage.never": "hiçbir zaman",
   "mobile.agent.record.time": "Zaman",
+  "mobile.agent.record.date": "Tarih",
   "mobile.agent.section.changeFailed": "Klasör değiştirilemedi",
   "mobile.agent.section.tryAgain": "Lütfen tekrar deneyin.",
   "mobile.agent.section.moveUp": "Yukarı taşı",

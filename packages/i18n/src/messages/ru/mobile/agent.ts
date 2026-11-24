@@ -566,6 +566,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Сбор данных начат: {started}. Обновлено: {updated}.",
   "mobile.agent.usage.never": "никогда",
   "mobile.agent.record.time": "Время",
+  "mobile.agent.record.date": "Дата",
   "mobile.agent.section.changeFailed": "Не удалось изменить папку",
   "mobile.agent.section.tryAgain": "Повторите попытку.",
   "mobile.agent.section.moveUp": "Выше",
