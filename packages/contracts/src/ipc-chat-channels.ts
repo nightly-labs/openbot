@@ -388,6 +388,18 @@ export function mergeChannelTasks(
   return kept.length ? [...kept, ...newer] : [...newer];
 }
 
+export function closedChannelTaskSequences(
+  newer: readonly ChannelTask[],
+  older: readonly ChannelTask[],
+  messages: readonly ChannelMessage[],
+): number[] {
+  const newerIds = new Set(newer.map((task) => task.id));
+  const closed = older.filter((task) => !newerIds.has(task.id) && !finishedChannelTask(task));
+  if (!closed.length) return [];
+  const sequences = messages.filter((item) => closed.some(linksMessages([item]))).map((item) => item.sequence);
+  return [...new Set(sequences)].sort((left, right) => right - left);
+}
+
 export function isChannelMessage(value: unknown): value is ChannelMessage {
   return (
     isDynamicRecord(value) &&

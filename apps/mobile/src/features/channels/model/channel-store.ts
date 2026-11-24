@@ -8,6 +8,7 @@ import {
   type ChannelPage,
   type ChannelSummary,
   type CreateChannelRoutineInput,
+  closedChannelTaskSequences,
   decodeChannel,
   decodeChannelMemories,
   decodeChannelPage,
@@ -363,6 +364,10 @@ export class MobileChannelStore {
               nextPages.set(id, merged);
               this.publish(entry, { pages: nextPages });
             }
+            const first = page.messages[0]?.sequence ?? 0;
+            const held = merged.messages.filter((message) => message.sequence < first);
+            const closed = current ? closedChannelTaskSequences(page.tasks, current.tasks, held) : [];
+            if (closed.length) void this.readClosedTasks(serverId, entry, id, closed).catch(() => undefined);
             this.finishHistory(entry, id, true);
           };
           const results = await Promise.allSettled([
@@ -386,6 +391,27 @@ export class MobileChannelStore {
       entry.pending = null;
     });
     return entry.pending;
+  }
+  private async readClosedTasks(serverId: string, entry: Entry, channelId: string, sequences: number[]) {
+    let covered = Number.POSITIVE_INFINITY;
+    for (const sequence of sequences) {
+      if (sequence >= covered) continue;
+      const page = await this.request(
+        "POST",
+        CHANNEL_ROUTES.read,
+        decodeChannelPage,
+        { channelId, beforeSequence: sequence + 1 },
+        serverId,
+      );
+      covered = page.messages[0]?.sequence ?? sequence;
+      const latest = entry.state.pages.get(channelId);
+      if (!entry.valid || !latest) return;
+      const tasks = mergeChannelTasks(latest.tasks, page.tasks, latest.messages);
+      if (tasks.length === latest.tasks.length) continue;
+      const pages = new Map(entry.state.pages);
+      pages.set(channelId, { ...latest, tasks });
+      this.publish(entry, { pages });
+    }
   }
   private finishHistory(entry: Entry, channelId: string, success: boolean) {
     const waiters = entry.historyWaiters.get(channelId);

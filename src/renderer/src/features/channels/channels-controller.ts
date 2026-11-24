@@ -3,6 +3,7 @@ import {
   type ChannelCommand,
   type ChannelPage,
   type ChannelSummary,
+  closedChannelTaskSequences,
   mergeChannelTasks,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -190,6 +191,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
       const page = selectedExists && withPage ? await env.port().agent.readChannel({ channelId: selected }) : null;
       if (disposed || account !== env.scopeKey() || id !== refreshId || selected !== state.selectedId) return;
       env.onList?.(channels, account);
+      let closed: number[] = [];
       const readNow = selected !== null && selected === visitRead && env.canMarkRead();
       const listed = readNow
         ? channels.map((channel) =>
@@ -209,7 +211,9 @@ export function createChannelsController(env: ChannelsEnvironment) {
         if (page && state.page?.channel.id === page.channel.id) {
           const merged = mergeChannelPage(state.page.messages, page.messages);
           const kept = merged.messages.slice(0, merged.messages.length - page.messages.length);
-          const tasks = mergeChannelTasks(page.tasks, snapshot(state.page.tasks), kept);
+          const held = snapshot(state.page.tasks);
+          const tasks = mergeChannelTasks(page.tasks, held, kept);
+          closed = closedChannelTaskSequences(page.tasks, held, kept);
           reconcile(merged.messages, "id")(state.page.messages);
           reconcile(tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
@@ -220,6 +224,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
         if (withPage || !selectedExists) state.loading = false;
         if (!failedCommand && withPage) state.error = null;
       });
+      if (selected && closed.length) void loadClosedTasks(selected, closed, account);
       if (selected && !selectedExists) env.writeSelection(null);
       if (selected && page && env.canMarkRead()) visitRead = selected;
       if (selected && page && env.canMarkRead() && page.throughSequence > (readThrough.get(selected) ?? 0)) {
@@ -350,6 +355,23 @@ export function createChannelsController(env: ChannelsEnvironment) {
     return page?.channel.id === input.channelId && (before === null || page.throughSequence > before)
       ? page
       : port.agent.readChannel({ channelId: input.channelId });
+  }
+  async function loadClosedTasks(channelId: string, sequences: readonly number[], account: string) {
+    let covered = Number.POSITIVE_INFINITY;
+    for (const sequence of sequences) {
+      if (sequence >= covered) continue;
+      const fetched = await env
+        .port()
+        .agent.readChannel({ channelId, beforeSequence: sequence + 1 })
+        .catch(() => null);
+      if (!fetched || disposed || account !== env.scopeKey() || state.page?.channel.id !== channelId) return;
+      covered = fetched.messages[0]?.sequence ?? sequence;
+      setState((state) => {
+        const page = state.page;
+        if (!page || page.channel.id !== channelId) return;
+        reconcile(mergeChannelTasks(snapshot(page.tasks), fetched.tasks, snapshot(page.messages)), "id")(page.tasks);
+      });
+    }
   }
   async function loadOlder() {
     const channelId = state.selectedId;
