@@ -10,7 +10,7 @@ const PRODUCTION_WEB_URL = "https://openbot.run";
 
 const X_CONTENT_SCRIPT = "x-content.js";
 
-function extensionManifest(apiUrl: string, development: boolean): Plugin {
+function extensionManifest(apiUrl: string, webUrl: string, development: boolean): Plugin {
   return {
     name: "openbot-extension-manifest",
     generateBundle() {
@@ -38,6 +38,12 @@ function extensionManifest(apiUrl: string, development: boolean): Plugin {
           "downloads",
         ],
         host_permissions: hostPermissions,
+        externally_connectable: {
+          matches: [
+            `${new URL(webUrl).origin}/*`,
+            ...(development ? ["http://localhost/*", "http://127.0.0.1/*"] : []),
+          ],
+        },
         content_scripts: [
           {
             matches: [
@@ -112,7 +118,7 @@ export default defineConfig(({ mode }) => {
       lazyLanguageCatalogs(),
       tailwindcss(),
       solidPlugin(),
-      extensionManifest(apiUrl, development),
+      extensionManifest(apiUrl, webUrl, development),
       xContentScript(development),
     ],
   };
