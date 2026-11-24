@@ -140,7 +140,6 @@ import {
   readSidebarPins,
   rotateHostKey,
   seedSidebarPins,
-  setAgentProviderAccount,
   setHostAppearance,
   setSidebarPins,
   updateHostIdentity,
@@ -2237,8 +2236,6 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
                 providerAccountId,
               })
             : null;
-        if (runtimeChange)
-          await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, ignoreResponse, runtimeChange, serverId);
         const { provider: _provider, model: _model, reasoningEffort: _reasoningEffort, ...profile } = other;
         const fields = runtimeChange ? profile : other;
         const color = avatarColor !== undefined ? avatarColor : avatarHue === undefined ? undefined : null;
@@ -2255,25 +2252,21 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             serverId,
           );
           putAgent(serverId, updated);
-        } else if (runtimeChange) {
-          const updated = (
-            await request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries, undefined, serverId)
-          ).find((agent) => agent.id === input.agentId);
-          if (updated) putAgent(serverId, updated);
         }
         if (colorRoute && color !== undefined && (color !== null || hostColors.current[serverId]?.[input.agentId]))
           applyHostColors(serverId, await writeHostAgentColor(teamApi(serverId), input.agentId, color));
-        if (providerAccountId !== undefined && !runtimeChange) {
-          requireCapability(
-            serverCapabilities.current,
+        if (runtimeChange) {
+          await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, ignoreResponse, runtimeChange, serverId);
+          const updated = (
+            await request("GET", TEAM_API_ROUTES.agents.all, decodeAgentSummaries, undefined, serverId)
+          ).find((agent) => agent.id === input.agentId);
+          if (!updated) throw new Error(currentText().t("mobile.workspace.error.agentUnavailableOnHost"));
+          putAgent(serverId, updated);
+        } else if (providerAccountId !== undefined)
+          await hostRequests.actions.setAgentProviderAccount(
+            { agentId: input.agentId, accountId: providerAccountId },
             serverId,
-            PROVIDER_ACCOUNTS_CAPABILITY,
-            "mobile.agent.runtime.accountUnsupported",
           );
-          await runTeamRequest(
-            setAgentProviderAccount(teamApi(serverId), { agentId: input.agentId, accountId: providerAccountId }),
-          );
-        }
       },
       setAgentAvatar: async (agentId, image, serverId) => {
         if (!agentsRef.current.some((agent) => agent.id === agentId && agent.serverId === serverId))
