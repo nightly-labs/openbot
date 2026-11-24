@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { createReadStream, createWriteStream } from "node:fs";
+import { type BigIntStats, createReadStream, createWriteStream } from "node:fs";
 import {
   access,
   lstat,
@@ -836,7 +836,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #readStoreEffect(spec: RuntimeSpec): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
       const installRoot = this.#installRoot(spec);
-      if (yield* this.#verifiesEffect(installRoot, spec)) {
+      const verified = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false)),
+      );
+      if (verified) {
         yield* this.#stampInUseEffect(spec.runtime, installRoot);
         return readyStatus(spec.version);
       }
@@ -1054,11 +1058,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
                   downloadSmallFile: (url, hash) => this.#downloadSmallFileEffect(url, hash),
                 });
                 if (spec.source === "latest") yield* writeInstallRecord(staging, spec);
-                yield* verifyInstalledRuntime(staging, spec, this.#lock, this.#isProviderOn);
+                const staged = yield* verifyRuntimeFiles(
+                  staging,
+                  spec,
+                  this.#lock,
+                  this.#isProviderOn,
+                  yield* runtimeFingerprint(staging),
+                );
                 const destination = this.#installRoot(spec);
                 yield* runtimeIO(() => mkdir(dirname(destination), { recursive: true }));
                 committed = yield* this.#commitEffect(staging, destination, spec);
-                yield* verifyInstalledRuntime(destination, spec, this.#lock, this.#isProviderOn);
+                yield* verifyChangedRuntime(
+                  destination,
+                  spec,
+                  this.#lock,
+                  this.#isProviderOn,
+                  committed ? staged : null,
+                );
                 return committed;
               }),
             );
@@ -1544,33 +1560,89 @@ function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailur
 
 const VERIFICATION_RECORD_LAYOUT = 1;
 
+interface RuntimeVerification {
+  key: string;
+  versionChecked: boolean;
+  files: string[];
+}
+
+function verificationKey(spec: RuntimeSpec, lock: AgentRuntimeLock): string {
+  const subject =
+    spec.source === "lock"
+      ? [VERIFICATION_RECORD_LAYOUT, spec, lock[spec.runtime]]
+      : [VERIFICATION_RECORD_LAYOUT, spec.runtime, spec.target, spec.version, spec.source, spec.executableName];
+  return createHash("sha256").update(JSON.stringify(subject)).digest("hex");
+}
+
+function versionCheckRequired(spec: RuntimeSpec, isProviderOn: (provider: ManagedProviderId) => boolean): boolean {
+  return isManagedToolRuntime(spec.runtime) || isProviderOn(spec.runtime);
+}
+
+function verificationCovers(
+  verification: RuntimeVerification | null,
+  key: string,
+  versionChecked: boolean,
+  files: string[] | null,
+): verification is RuntimeVerification {
+  return (
+    verification !== null &&
+    files !== null &&
+    verification.key === key &&
+    (verification.versionChecked || !versionChecked) &&
+    verification.files.join("\n") === files.join("\n")
+  );
+}
+
+const verifyRuntimeFiles = Effect.fn("ProviderRuntime.verifyRuntimeFiles")(function* (
+  root: string,
+  spec: RuntimeSpec,
+  lock: AgentRuntimeLock,
+  isProviderOn: (provider: ManagedProviderId) => boolean,
+  before: string[] | null,
+): Effect.fn.Return<RuntimeVerification | null, ProviderRuntimeFailure> {
+  yield* verifyInstalledRuntime(root, spec, lock, isProviderOn);
+  if (before === null) return null;
+  const after = yield* runtimeFingerprint(root);
+  if (after === null || after.join("\n") !== before.join("\n")) {
+    logger.info("Provider runtime files changed during the check.", { runtime: spec.runtime, version: spec.version });
+    return null;
+  }
+  return { key: verificationKey(spec, lock), versionChecked: versionCheckRequired(spec, isProviderOn), files: after };
+});
+
 const verifyChangedRuntime = Effect.fn("ProviderRuntime.verifyChangedRuntime")(function* (
   root: string,
   spec: RuntimeSpec,
   lock: AgentRuntimeLock,
   isProviderOn: (provider: ManagedProviderId) => boolean,
+  verified: RuntimeVerification | null = null,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const recordPath = verificationRecordPath(root);
-  const key = createHash("sha256")
-    .update(JSON.stringify([VERIFICATION_RECORD_LAYOUT, spec, lock[spec.runtime]]))
-    .digest("hex");
-  const versionChecked = isManagedToolRuntime(spec.runtime) || isProviderOn(spec.runtime);
+  const key = verificationKey(spec, lock);
+  const versionChecked = versionCheckRequired(spec, isProviderOn);
   const before = yield* runtimeFingerprint(root);
-  const saved = yield* runtimeIO(() => readFile(recordPath, "utf8")).pipe(
+  if (verificationCovers(verified, key, versionChecked, before)) {
+    yield* writeVerificationRecord(recordPath, verified);
+    return;
+  }
+  const saved = yield* readVerificationRecord(recordPath);
+  if (verificationCovers(saved, key, versionChecked, before)) return;
+  const checked = yield* verifyRuntimeFiles(root, spec, lock, isProviderOn, before);
+  if (checked !== null) yield* writeVerificationRecord(recordPath, checked);
+});
+
+const readVerificationRecord = Effect.fn("ProviderRuntime.readVerificationRecord")(function* (recordPath: string) {
+  return yield* runtimeIO(() => readFile(recordPath, "utf8")).pipe(
     Effect.flatMap((text) => runtimeSync(() => parseVerificationRecord(text))),
     Effect.catch(() => Effect.succeed(null)),
   );
-  if (
-    before !== null &&
-    saved?.key === key &&
-    (saved.versionChecked || !versionChecked) &&
-    saved.files.join("\n") === before.join("\n")
-  )
-    return;
-  yield* verifyInstalledRuntime(root, spec, lock, isProviderOn);
-  const after = before === null ? null : yield* runtimeFingerprint(root);
-  if (after === null || after.join("\n") !== before?.join("\n")) return;
-  const record = `${JSON.stringify({ key, versionChecked, files: after })}\n`;
+});
+
+const writeVerificationRecord = Effect.fn("ProviderRuntime.writeVerificationRecord")(function* (
+  recordPath: string,
+  verification: RuntimeVerification,
+) {
+  const record = `${JSON.stringify(verification)}\n`;
   const staged = `${recordPath}.${process.pid}-${randomBytes(4).toString("hex")}`;
   yield* runtimeIO(async () => {
     await writeFile(staged, record);
@@ -1582,7 +1654,7 @@ function verificationRecordPath(root: string): string {
   return join(dirname(root), `.${basename(root)}.verified.json`);
 }
 
-function parseVerificationRecord(text: string): { key: string; versionChecked: boolean; files: string[] } | null {
+function parseVerificationRecord(text: string): RuntimeVerification | null {
   const value = JSON.parse(text);
   if (!isDynamicRecord(value) || !isString(value.key) || !isBoolean(value.versionChecked)) return null;
   const files = value.files;
@@ -1604,15 +1676,19 @@ const runtimeFingerprint = Effect.fn("ProviderRuntime.runtimeFingerprint")(funct
       lines.push(...nested);
     } else if (entry.isFile()) {
       const info = yield* runtimeIO(() => lstat(join(root, path), { bigint: true }));
-      lines.push([path, info.size, info.mtimeNs, info.ctimeNs, info.ino, info.dev].join("\0"));
+      lines.push([path, info.size, info.mtimeNs, fingerprintChangeTime(info), info.ino, info.dev].join("\0"));
     } else if (entry.isSymbolicLink()) {
       const info = yield* runtimeIO(() => lstat(join(root, path), { bigint: true }));
       const target = yield* runtimeIO(() => readlink(join(root, path)));
-      lines.push([path, "link", target, info.ctimeNs, info.ino, info.dev].join("\0"));
+      lines.push([path, "link", target, fingerprintChangeTime(info), info.ino, info.dev].join("\0"));
     } else return null;
   }
   return lines.sort();
 });
+
+function fingerprintChangeTime(info: BigIntStats): bigint | null {
+  return process.platform === "win32" ? null : info.ctimeNs;
+}
 
 const renameIfVacant = Effect.fn("ProviderRuntime.renameIfVacant")(function* (
   from: string,

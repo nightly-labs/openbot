@@ -1,9 +1,7 @@
-import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
-import { promisify } from "node:util";
 import {
   type AgentProviderId,
   COMPUTER_USE_MCP_SERVER_ID,
@@ -15,13 +13,11 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Schema } from "effect";
-import { agentLaunchPath, isExecutable, isWindowsRunnable } from "./cli";
+import { agentLaunchPath, forgetWindowsLookups, isExecutable, isWindowsRunnable, windowsWhere } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
 import type { McpOperationError } from "./mcp-effects";
 import { getRecord } from "./protocol";
-
-const execFileAsync = promisify(execFile);
 
 export type McpServerSource = (agentId?: string | null) => readonly McpServerConfig[];
 
@@ -241,6 +237,7 @@ const isMissingCommandFile = Effect.fn("McpShape.isMissingCommandFile")(function
 
 export function clearMcpCommandCache(): void {
   resolvedCommands.clear();
+  forgetWindowsLookups();
 }
 
 export function pickWindowsExecutable(stdout: string, pathext: string | undefined): string | null {
@@ -254,13 +251,7 @@ export function pickWindowsExecutable(stdout: string, pathext: string | undefine
 const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
   function* (trimmed: string, path: string | null) {
     if (process.platform === "win32") {
-      const { stdout } = yield* mcpShapeIo(() =>
-        execFileAsync("where.exe", [trimmed], {
-          timeout: 5_000,
-          maxBuffer: 64 * 1024,
-          ...(path === null ? {} : { env: { ...process.env, PATH: path } }),
-        }),
-      );
+      const stdout = yield* mcpShapeIo(() => windowsWhere(trimmed, path));
       return pickWindowsExecutable(stdout, process.env.PATHEXT);
     }
     if (trimmed.includes("/")) return null;
