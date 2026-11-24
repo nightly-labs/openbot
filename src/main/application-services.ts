@@ -2713,12 +2713,17 @@ export async function createApplicationServices({
     githubSkillSource((url, init) => fetch(url, init)),
   );
   const marketplaceAgents = new AgentMarketplaceService(marketplaceAuth, service, skills);
-  const agentTemplates = new AgentTemplateService(centralAuth, service, {
-    listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
-    installVersion: (input) => skills.installVersion(input),
-    library: () => skills.requireLocalLibrary(),
-    installLocal: (input) => skills.installLocal(input),
-  });
+  const agentTemplates = new AgentTemplateService(
+    centralAuth,
+    service,
+    {
+      listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
+      installVersion: (input) => skills.installVersion(input),
+      library: () => skills.requireLocalLibrary(),
+      installLocal: (input) => skills.installLocal(input),
+    },
+    marketplaceAuth,
+  );
   const teamStore = new TeamStore(
     join(app.getPath("userData"), TEAM_STORE_FILE),
     join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),
