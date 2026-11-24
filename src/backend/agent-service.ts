@@ -1706,6 +1706,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             Effect.andThen(this.#providers.releaseIdleThreads()),
           ),
         releaseQuietBackgroundThreads: () => this.#providers.releaseQuietBackgroundThreads(),
+        releaseIdleBrowserTabs: () =>
+          Effect.suspend(
+            () =>
+              this.#browser.releaseIdleTabs?.(new Set(this.#store.database.readRunningTurnIds().keys())) ?? Effect.void,
+          ),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
       },
     });
