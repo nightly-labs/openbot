@@ -1380,9 +1380,25 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
           yield* transport.retry(serverId);
           if (this.#connections.stateFor(serverId) === "connecting" && transport.isConnected(serverId)) {
             const hostRestart = this.#connections.hostRestartFor(serverId);
+            const compatibility = this.#connections.compatibilityFor(serverId);
             this.#connections.markConnected(serverId);
             this.#connections.setHostRestart(serverId, hostRestart);
+            if (compatibility) this.#connections.setCompatibility(serverId, compatibility);
+            const capabilityRead = this.#connections.startCapabilityRead(serverId);
             this.#emitChanged();
+            this.#background(
+              this.#owned(
+                this.#client.refreshWebRtcCompatibility(server).pipe(
+                  Effect.catch(() => Effect.void),
+                  Effect.ensuring(
+                    Effect.sync(() => {
+                      this.#connections.endCapabilityRead(serverId, capabilityRead);
+                      this.#emitChanged();
+                    }),
+                  ),
+                ),
+              ),
+            );
           }
           return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
         }
