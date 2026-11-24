@@ -21,6 +21,14 @@ const MAX_BODY_BYTES = 4096;
 const MAX_EMAIL_LENGTH = 254;
 const DEFAULT_SERVER_NAME = "OpenBot";
 
+// The packaged Linux server process: the host that the mobile app and openbot.run/app drive. There
+// is no screen, so the desktop UI is never seen (see loadRenderer in main-window.ts).
+export function isServerProcess(): boolean {
+  return (
+    process.platform === "linux" && (process.env.OPENBOT_SERVER === "1" || process.env.OPENBOT_HOSTED_SERVER === "1")
+  );
+}
+
 export interface ServerModeEnvironment {
   controlSocketPath: string;
   setupPagePort: number | null;

@@ -60,6 +60,7 @@ import { createQuitShortcut, isQuitGuarded, type QuitShortcut } from "./quit-sho
 import type { RemoteServerManager } from "./remote-server-manager";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
+import { isServerProcess } from "./server-mode";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
 import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgroundColor } from "./window-appearance";
@@ -480,6 +481,10 @@ export function createMainWindowController({
   }
 
   function loadRenderer(window: BrowserWindow, options: { restarted?: boolean } = {}): Promise<void> {
+    // A server has nobody at the screen: the owner uses the mobile app or openbot.run/app. Loading
+    // the UI here keeps a Chromium renderer for a window that is never shown, about 350 MB and 11%
+    // of one CPU on an arm64 host. The window itself stays: closing every window quits the app.
+    if (isServerProcess()) return Promise.resolve();
     onRendererLoadStarted();
     const url = appRendererUrl(process.env.ELECTRON_RENDERER_URL);
     if (options.restarted) url.searchParams.set(RESTARTED_RENDERER_QUERY, "1");
