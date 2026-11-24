@@ -189,9 +189,9 @@ export const messages = {
   "provider.claudeKey.label": "Clé d’API Anthropic",
   "provider.cursorKey.title": "Clé d’API Cursor",
   "provider.cursorKey.description":
-    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous Integrations, puis collez-la ici. La clé est enregistrée sur cet ordinateur.",
+    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous API Keys (cursor.com/dashboard/api), puis collez-la ici. La clé est enregistrée sur cet ordinateur.",
   "provider.cursorKey.descriptionHost":
-    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous Integrations, puis collez-la ici. La clé est enregistrée sur l’hôte.",
+    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous API Keys (cursor.com/dashboard/api), puis collez-la ici. La clé est enregistrée sur l’hôte.",
   "provider.cursorKey.label": "Clé d’API Cursor",
   "provider.inceptionKey.title": "Clé d’API Inception",
   "provider.inceptionKey.description":

@@ -190,9 +190,9 @@ export const messages = {
   "provider.codexKey.label": "מפתח OpenAI API",
   "provider.cursorKey.title": "מפתח Cursor API",
   "provider.cursorKey.description":
-    "כל חשבון Cursor אחרי הראשון משתמש במפתח API. יש ליצור מפתח בלוח הבקרה של Cursor, תחת Integrations, ולהדביק אותו כאן. המפתח נשמר במחשב הזה.",
+    "כל חשבון Cursor אחרי הראשון משתמש במפתח API. יש ליצור מפתח בלוח הבקרה של Cursor, תחת API Keys (cursor.com/dashboard/api), ולהדביק אותו כאן. המפתח נשמר במחשב הזה.",
   "provider.cursorKey.descriptionHost":
-    "כל חשבון Cursor אחרי הראשון משתמש במפתח API. יש ליצור מפתח בלוח הבקרה של Cursor, תחת Integrations, ולהדביק אותו כאן. המפתח נשמר במארח.",
+    "כל חשבון Cursor אחרי הראשון משתמש במפתח API. יש ליצור מפתח בלוח הבקרה של Cursor, תחת API Keys (cursor.com/dashboard/api), ולהדביק אותו כאן. המפתח נשמר במארח.",
   "provider.cursorKey.label": "מפתח Cursor API",
   "provider.inceptionKey.title": "מפתח Inception API",
   "provider.inceptionKey.description":

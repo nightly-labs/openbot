@@ -201,9 +201,9 @@ export const messages = {
   "provider.claudeKey.label": "Ключ API Anthropic",
   "provider.cursorKey.title": "Ключ API Cursor",
   "provider.cursorKey.description":
-    "Каждый аккаунт Cursor после первого использует ключ API. Создайте ключ в панели Cursor в разделе Integrations и вставьте его сюда. Ключ сохраняется на этом компьютере.",
+    "Каждый аккаунт Cursor после первого использует ключ API. Создайте ключ в панели Cursor в разделе API Keys (cursor.com/dashboard/api) и вставьте его сюда. Ключ сохраняется на этом компьютере.",
   "provider.cursorKey.descriptionHost":
-    "Каждый аккаунт Cursor после первого использует ключ API. Создайте ключ в панели Cursor в разделе Integrations и вставьте его сюда. Ключ сохраняется на хосте.",
+    "Каждый аккаунт Cursor после первого использует ключ API. Создайте ключ в панели Cursor в разделе API Keys (cursor.com/dashboard/api) и вставьте его сюда. Ключ сохраняется на хосте.",
   "provider.cursorKey.label": "Ключ API Cursor",
   "provider.inceptionKey.title": "Ключ API Inception",
   "provider.inceptionKey.description":
