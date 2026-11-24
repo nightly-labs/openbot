@@ -224,7 +224,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Sunucu bağlı değil. Yeniden bağlandığında konuşma devam eder.",
   "mobile.chat.liveVoice.speakFailed": "Yanıt sesli okunamadı.",
   "mobile.chat.liveVoice.voiceNotReady": "Ayarlar > Ses bölümünden bir yanıt sesi seç.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 bu dili okuyamaz.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 bu dili okuyamaz. Ayarlar > Ses bölümünden başka bir yanıt sesi seç.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs API anahtarını kabul etmedi.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "ElevenLabs anahtarında bir izin eksik. Ayarlar > Ses bölümünden kontrol et.",

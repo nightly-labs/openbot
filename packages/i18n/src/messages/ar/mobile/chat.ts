@@ -303,7 +303,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "الخادم غير متصل. تستمر المحادثة عند عودة الاتصال.",
   "mobile.chat.liveVoice.speakFailed": "تعذّرت قراءة الرد بصوت عالٍ.",
   "mobile.chat.liveVoice.voiceNotReady": "اختر صوت الرد في الإعدادات > الصوت.",
-  "mobile.chat.liveVoice.languageUnsupported": "لا يستطيع Supertonic 3 قراءة هذه اللغة.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "لا يستطيع Supertonic 3 قراءة هذه اللغة. اختر صوت رد آخر في الإعدادات > الصوت.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "لم يقبل ElevenLabs مفتاح API.",
   "mobile.chat.liveVoice.elevenLabsPermission": "ينقص مفتاح ElevenLabs إذنٌ. تحقق منه في الإعدادات > الصوت.",
   "mobile.chat.liveVoice.networkNeeded": "يحتاج ElevenLabs إلى اتصال بالشبكة.",

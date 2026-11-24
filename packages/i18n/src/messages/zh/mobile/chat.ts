@@ -217,7 +217,7 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "服务器未连接。重新连接后，对话会继续。",
   "mobile.chat.liveVoice.speakFailed": "无法朗读回复。",
   "mobile.chat.liveVoice.voiceNotReady": "请在“设置 > 语音”中选择回复语音。",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 无法朗读这种语言。",
+  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 无法朗读这种语言。请在“设置 > 语音”中选择其他回复语音。",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs 不接受此 API 密钥。",
   "mobile.chat.liveVoice.elevenLabsPermission": "ElevenLabs 密钥缺少权限。请在“设置 > 语音”中检查。",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs 需要网络连接。",

@@ -228,7 +228,8 @@ export const messages = {
     "Der Server ist nicht verbunden. Das Gespräch geht weiter, sobald er wieder verbunden ist.",
   "mobile.chat.liveVoice.speakFailed": "Die Antwort konnte nicht vorgelesen werden.",
   "mobile.chat.liveVoice.voiceNotReady": "Wähle eine Antwortstimme unter Einstellungen > Stimme.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 kann diese Sprache nicht lesen.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 kann diese Sprache nicht lesen. Wähle eine andere Antwortstimme unter Einstellungen > Stimme.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs hat den API-Schlüssel nicht akzeptiert.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "Dem ElevenLabs-Schlüssel fehlt eine Berechtigung. Prüfe sie unter Einstellungen > Stimme.",

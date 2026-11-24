@@ -223,7 +223,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "서버에 연결되지 않았어요. 다시 연결되면 대화를 이어갈게요.",
   "mobile.chat.liveVoice.speakFailed": "답변을 소리 내어 읽지 못했어요.",
   "mobile.chat.liveVoice.voiceNotReady": "설정 > 음성에서 답변 목소리를 선택하세요.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3는 이 언어를 읽을 수 없어요.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3는 이 언어를 읽을 수 없어요. 설정 > 음성에서 다른 답변 목소리를 선택하세요.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs가 API 키를 받아들이지 않았어요.",
   "mobile.chat.liveVoice.elevenLabsPermission": "ElevenLabs 키에 권한이 없어요. 설정 > 음성에서 확인하세요.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs에는 네트워크 연결이 필요해요.",
