@@ -160,6 +160,7 @@ interface ChannelHandoffCommand {
   recipientAgentIds: string[];
   sourcePaths: string[];
   senderAgentId: string;
+  senderTaskId?: string;
 }
 
 type ChannelServiceCommand = ChannelCommand | ChannelHandoffCommand;
@@ -177,6 +178,12 @@ function channelHandoffAuthorId(agentId: string): string {
 export function channelHandoffSenderAgentId(request: ChannelMessage): string | null {
   return request.author.kind === "member" && request.author.id.startsWith(CHANNEL_HANDOFF_AUTHOR_PREFIX)
     ? request.author.id.slice(CHANNEL_HANDOFF_AUTHOR_PREFIX.length) || null
+    : null;
+}
+
+export function channelHandoffSenderTaskId(request: ChannelMessage): string | null {
+  return "senderTaskId" in request && isString(request.senderTaskId) && request.senderTaskId
+    ? request.senderTaskId
     : null;
 }
 
@@ -274,6 +281,7 @@ export class ChannelService {
       text: string;
       recipientAgentIds: string[];
       sourcePaths: string[];
+      senderTaskId?: string;
     },
   ) {
     const command: ChannelHandoffCommand = {
@@ -284,6 +292,7 @@ export class ChannelService {
       recipientAgentIds: [...new Set(input.recipientAgentIds)],
       sourcePaths: input.sourcePaths,
       senderAgentId: input.senderAgentId,
+      ...(input.senderTaskId ? { senderTaskId: input.senderTaskId } : {}),
     };
     const actor = this.agentActor(input.senderAgentId);
     return yield* this.#serialize(
@@ -1057,8 +1066,9 @@ export class ChannelService {
       const others = rest.map((agentId) => this.newTask(current.id, id, text, agentId));
       const message = this.message(current.id, task.id, { kind: "member", ...actor }, text, id);
       if (committed) message.message.attachments = committed.attachments;
+      const request = command.senderTaskId ? { ...message, senderTaskId: command.senderTaskId } : message;
       return yield* channelSync(() =>
-        this.store.update(current, { messages: [message], tasks: [task, ...others] }, operationId),
+        this.store.update(current, { messages: [request], tasks: [task, ...others] }, operationId),
       );
     }).pipe(
       Effect.onExit((exit) =>

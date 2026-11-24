@@ -1638,6 +1638,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     });
     this.#channelRequestReturns = new ChannelRequestReturns(this.channels, mailbox, {
       agentExists: (agentId) => this.#store.has(agentId),
+      taskOpen: (taskId) => this.#tasks.threadId(taskId) !== null,
       delivered: (recipientAgentId, deliveryIds) =>
         Effect.gen({ self: this }, function* () {
           for (const deliveryId of deliveryIds) yield* this.#steerAgentMessage(recipientAgentId, deliveryId, false);
