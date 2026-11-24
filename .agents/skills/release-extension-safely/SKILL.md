@@ -128,12 +128,14 @@ Triggered by any change to a file that reads or writes `chrome.storage` or defin
 Derive the set; do not trust a list:
 
 ```bash
-git grep --no-color -l -E "chrome\.storage|_KEY =|_PREFIX =" v<new> -- apps/browser-extension/src \
-  | sed 's/^[^:]*://' | xargs -r git diff --no-color v<last>..v<new> --
+for ref in v<last> v<new>; do
+  git grep --no-color -l -E "chrome\.storage|_KEY =|_PREFIX =" "$ref" -- apps/browser-extension/src
+done | sed 's/^[^:]*://' | sort -u | xargs -r git diff --no-color v<last>..v<new> --
 ```
 
-The first command alone must list files: `extension-storage.ts` and `client-browser-messages.ts`
-own keys. An empty list means a wrong tag or a broken pattern. Stop and fix the command.
+The grep runs on both refs, so a key file that the range deleted or moved shows as removed lines.
+The loop alone must list files: `extension-storage.ts` and `client-browser-messages.ts` own keys.
+An empty list means a wrong tag or a broken pattern. Stop and fix the command.
 
 - A renamed or removed key, or a `.v1` → `.v2` change, needs a read of the old key in the new
   version, or a written reason that the loss is acceptable. Else **stop**. `openbot.session.v1`
