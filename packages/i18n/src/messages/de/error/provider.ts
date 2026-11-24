@@ -591,6 +591,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Warte, bis der aktuelle Pi-Durchlauf endet.",
   "error.provider.acpSessionBusy":
     "{provider} beendet noch einen gestoppten Durchlauf. Versuche es gleich noch einmal.",
+  "error.provider.acpSettingsConflict":
+    "{provider} hat diesen Chat geändert, während OpenBot seine Einstellungen übernommen hat. Versuche es erneut.",
   "error.provider.acpSessionStale":
     "{provider} konnte die neueste Version dieses Chats nicht laden. Sende deine Nachricht noch einmal.",
   "error.provider.acpModelNotOffered":

@@ -559,6 +559,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Nie udało się odczytać wersji {provider} CLI.",
   "error.provider.piSessionBusy": "Zaczekaj na zakończenie bieżącej tury Pi.",
   "error.provider.acpSessionBusy": "{provider} wciąż kończy zatrzymaną turę. Spróbuj ponownie za chwilę.",
+  "error.provider.acpSettingsConflict":
+    "{provider} zmienił ten czat, gdy OpenBot stosował jego ustawienia. Spróbuj ponownie.",
   "error.provider.acpSessionStale":
     "{provider} nie może wczytać najnowszej wersji tego czatu. Wyślij wiadomość ponownie.",
   "error.provider.acpModelNotOffered":

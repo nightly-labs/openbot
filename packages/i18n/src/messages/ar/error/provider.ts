@@ -527,6 +527,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
   "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",
+  "error.provider.acpSettingsConflict": "غيّر {provider} هذه الدردشة أثناء تطبيق OpenBot لإعداداتها. حاول مرة أخرى.",
   "error.provider.acpSessionStale": "تعذّر على {provider} تحميل أحدث نسخة من هذه المحادثة. أرسل رسالتك مرة أخرى.",
   "error.provider.acpModelNotOffered":
     "لا يوفّر {provider} النموذج {model} الآن. اختر نموذجًا آخر لهذا الوكيل، ثم حاول مرة أخرى.",
