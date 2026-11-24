@@ -11,6 +11,7 @@ const CODE_LIMIT = 60;
 export type CreditAuditEvent =
   | "checkout"
   | "transfer"
+  | "redeem"
   | "purchase"
   | "reversal"
   | "media_submit"

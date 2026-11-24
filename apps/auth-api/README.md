@@ -46,8 +46,36 @@ The bootstrap also creates the `openbot_credits` Product and one Price for each 
 (`openbot_credits_<n>`). `GET /v1/me/credits` returns the balance of the account and of its servers,
 `POST /v1/me/credits/checkout` with `{credits, currency, serverId?}` opens a Checkout, and
 `POST /v1/me/credits/transfer` with `{serverId, direction, credits}` moves credits between the account
-and a server that it owns. The web client uses the same routes under `/api/browser`.
-`bun run test:credits` checks them.
+and a server that it owns. `POST /v1/me/credits/redeem` with `{code, serverId?}` redeems a credit code
+for the account or for a server that the account is a member of. The web client uses the same routes
+under `/api/browser`. `bun run test:credits` checks them.
+
+Make credit codes with `bun apps/auth-api/scripts/credit-codes.ts`:
+
+```sh
+bun apps/auth-api/scripts/credit-codes.ts create --credits 500 --count 200 --expires 2027-03-31 --campaign launch-week --note "Launch" --out ~/launch-codes.csv --production --confirm-production --apply
+bun apps/auth-api/scripts/credit-codes.ts list --campaign launch-week --production
+bun apps/auth-api/scripts/credit-codes.ts disable <code id> --production --confirm-production --apply
+```
+
+A code has 16 random characters from a 32-character alphabet (80 bits), for example
+`7KQ2-M9XD-4TPA-HW3C`. The script shows each code one time. D1 keeps only the SHA-256 hash of the
+code, so nobody can read a code back from the database. `--max-redemptions <m>` lets up to `<m>`
+accounts redeem the same code, one time each (default 1). The credits are free credits that end
+`--grant-days` days after the redemption (default 365). An account can redeem each code one time and
+any number of different codes. `--count` makes up to 1000 codes in one run. `--campaign` (lower-case
+letters, digits and dashes) groups codes in `list` and in the OpenPanel Credits dashboard. `--out`
+writes the codes to a new CSV file with mode 0600 instead of the terminal. `disable` stops a code;
+credits that accounts already redeemed stay.
+
+Redemptions have hourly limits (`CREDIT_CODE_LIMITS` in `src/server/credit-codes.ts`): 30 tries and 10
+wrong codes for each account, 120 tries and 30 wrong codes for each network address (IPv6 to its /64),
+and 20 redemptions of one code from one network. Only a code that does not exist or is disabled is a
+wrong code; a used, expired or already redeemed code counts only as a try. A try over a limit gets
+`429 credit_code_attempts`.
+D1 keeps only SHA-256 hashes of the counted keys in `credit_code_limits`, and the retention job deletes
+old hours.
+Without `--apply` the script makes no change. `--local` (the default) and `--test` work the same way.
 
 The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
 `PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the

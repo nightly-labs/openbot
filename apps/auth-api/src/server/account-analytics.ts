@@ -27,10 +27,17 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
+import {
+  CREDIT_CODE_CAMPAIGN_PATTERN,
+  CREDIT_CODE_LIMIT_NAMES,
+  CREDIT_CODE_OUTCOMES,
+  type CreditCodeLimit,
+  type CreditCodeOutcome,
+} from "./credit-codes";
 import type { HostedPoolGroup } from "./hosted-pool-snapshot";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 18;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 19;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -101,6 +108,7 @@ const CREDIT_ACTIONS = [
   "moved",
   "granted",
   "grant_expired",
+  "redeemed",
   "media_started",
   "media_charged",
   "media_released",
@@ -131,6 +139,18 @@ export interface CreditActionEvent {
   duration?: number | null;
   count?: number;
   audio?: boolean;
+  campaign?: string;
+  multiUse?: boolean;
+}
+
+export interface CreditCodeRedeemEvent {
+  name: "credit_code_redeem";
+  outcome: CreditCodeOutcome;
+  wallet: CreditMediaWallet;
+  limit?: CreditCodeLimit;
+  campaign?: string;
+  multiUse?: boolean;
+  credits?: number;
 }
 
 type AnalyticsProperties = Record<string, string | number | boolean>;
@@ -165,7 +185,8 @@ export type AccountAnalyticsEvent =
     }
   | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
   | { name: "hosted_pool_snapshot"; group: HostedPoolGroup }
-  | CreditActionEvent;
+  | CreditActionEvent
+  | CreditCodeRedeemEvent;
 
 export interface AccountAnalytics {
   track(accountId: string | null, event: AccountAnalyticsEvent): void;
@@ -300,6 +321,7 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   }
   if (event.name === "hosted_pool_snapshot") return hostedPoolProperties(properties, event.group);
   if (event.name === "credit_action") return creditActionProperties(properties, event);
+  if (event.name === "credit_code_redeem") return creditCodeRedeemProperties(properties, event);
   if (event.name !== "hosted_server_action" || !isOneOf(HOSTED_SERVER_ACTIONS, event.action)) return null;
   properties.action = event.action;
   if (isOneOf(BILLING_PLAN_IDS, event.plan)) properties.plan = event.plan;
@@ -356,6 +378,32 @@ function creditActionProperties(properties: AnalyticsProperties, event: CreditAc
   if (isWholeInRange(event.duration, MAX_ANALYTICS_MEDIA_SECONDS)) result.duration_seconds = event.duration;
   if (isWholeInRange(event.count, MAX_ANALYTICS_MEDIA_COUNT)) result.count = event.count;
   if (typeof event.audio === "boolean") result.audio = event.audio;
+  if (event.action === "redeemed") Object.assign(result, creditCodeFacts(event));
+  return result;
+}
+
+function creditCodeFacts(event: { campaign?: string; multiUse?: boolean }): AnalyticsProperties {
+  const facts: AnalyticsProperties = {};
+  if (typeof event.campaign === "string" && CREDIT_CODE_CAMPAIGN_PATTERN.test(event.campaign))
+    facts.campaign = event.campaign;
+  if (typeof event.multiUse === "boolean") facts.code_uses = event.multiUse ? "multi" : "single";
+  return facts;
+}
+
+function creditCodeRedeemProperties(
+  properties: AnalyticsProperties,
+  event: CreditCodeRedeemEvent,
+): AnalyticsProperties | null {
+  if (!isOneOf(CREDIT_CODE_OUTCOMES, event.outcome) || !isOneOf(CREDIT_MEDIA_WALLETS, event.wallet)) return null;
+  const result: AnalyticsProperties = {
+    ...properties,
+    outcome: event.outcome,
+    wallet: event.wallet,
+    ...creditCodeFacts(event),
+  };
+  if (event.outcome === "rate_limited" && isOneOf(CREDIT_CODE_LIMIT_NAMES, event.limit)) result.limit = event.limit;
+  if (event.outcome === "redeemed" && isAnalyticsCredits(event.credits))
+    result.credits = analyticsCredits(event.credits);
   return result;
 }
 
