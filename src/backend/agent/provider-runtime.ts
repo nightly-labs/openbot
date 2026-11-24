@@ -2415,10 +2415,8 @@ export class ProviderRuntime implements ProviderPort {
       if (busy) {
         if (!this.#updatesWhenIdle.has(provider)) {
           this.#updatesWhenIdle.add(provider);
-          this.#hooks.onProviderHeld?.(provider);
           recordRestartActivity();
         }
-        this.#hooks.releasePersonWaits?.(provider);
       } else if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
       yield* Effect.sleep(PROVIDER_RESTART_POLL_MS);
     }
@@ -2440,12 +2438,6 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const start = this.#providerStarts.get(provider);
     if (start) yield* Deferred.await(start);
-    const busy = yield* providerStep(() => {
-      if ((provider === "codex" && this.#codexLogin.pending) || this.#cliLogin.has(provider))
-        throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
-      return this.#hooks.isProviderBusy(provider);
-    });
-    if (busy) return null;
     const realtimeLimitZero = sourceText("error.provider.realtimeLimitZero");
     const stoppedByLimit = this.#status.providers?.find((row) => row.id === provider)?.message === realtimeLimitZero;
     if (stoppedByLimit && (yield* providerStep(hasZeroRealtimeLimit)))
@@ -2457,15 +2449,21 @@ export class ProviderRuntime implements ProviderPort {
     );
     const wasAvailable = this.#status.providers?.find((row) => row.id === provider)?.state === "available";
     let installed = false;
-    yield* Effect.acquireUseRelease(
+    const replaced = yield* Effect.acquireUseRelease(
       providerStep(() => {
+        if ((provider === "codex" && this.#codexLogin.pending) || this.#cliLogin.has(provider))
+          throw new Error(sourceText("error.provider.cliSigningIn", { provider: providerLabel(provider) }));
+        if (this.#hooks.isProviderBusy(provider)) return false;
         this.#updatesWhenIdle.delete(provider);
         this.#setProviderConnectionState(provider, "connecting", false);
         this.#replacingCli.add(provider);
+        this.#hooks.onProviderHeld?.(provider);
         recordRestartActivity();
+        return true;
       }),
-      () =>
+      (idle) =>
         Effect.gen({ self: this }, function* () {
+          if (!idle) return false;
           const executable = yield* install();
           installed = true;
           this.#bundledExecutables[provider] = executable;
@@ -2483,6 +2481,7 @@ export class ProviderRuntime implements ProviderPort {
             yield* this.#saveInstalledChoice(provider, false).pipe(
               Effect.catch(() => Effect.sync(() => logger.warn("The provider CLI choice did not save.", { provider }))),
             );
+          return true;
         }).pipe(
           Effect.mapError((error) => {
             const installedIsOnlyCopy = installed && firstInstall;
@@ -2511,16 +2510,18 @@ export class ProviderRuntime implements ProviderPort {
             return new ProviderOperationFailed({ cause: failure });
           }),
         ),
-      () =>
+      (idle) =>
         Effect.sync(() => {
+          if (!idle) return;
           this.#replacingCli.delete(provider);
           this.#hooks.onProviderResumed(provider);
         }),
     );
+    if (!replaced) return null;
     for (const driver of BUILT_IN_PROVIDER_DRIVERS) {
       if (driver.cliProvider !== provider || this.#off.has(driver.id)) continue;
       yield* (
-        this.#clients.has(driver.id) ? this.restartProviderWhenIdle(driver.id) : this.#reprobeProvider(driver.id)
+        this.#clients.has(driver.id) ? this.#restartWhenIdle(driver.id, false) : this.#reprobeProvider(driver.id)
       ).pipe(Effect.ignore);
     }
     return this.status();
@@ -2764,8 +2765,7 @@ export class ProviderRuntime implements ProviderPort {
   isReplacingCli(provider: AgentProvider): boolean {
     return (
       this.#replacingCli.has(provider) ||
-      (this.#restartsWhenIdle.has(provider) && !this.#restartsKeepingTurns.has(provider)) ||
-      this.#updatesWhenIdle.has(provider)
+      (this.#restartsWhenIdle.has(provider) && !this.#restartsKeepingTurns.has(provider))
     );
   }
 
