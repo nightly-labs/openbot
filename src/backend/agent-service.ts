@@ -1879,7 +1879,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       busy: (agentId) => this.#drain.ownChatHold(agentId) !== null,
       answer: (agentId, threadId, turnId) =>
         this.#store.get(agentId)?.threadId === threadId ? this.#turnAnswer(agentId, turnId) : null,
-      summarize: (agentId, prompt) => this.#liveVoiceSummary(agentId, prompt),
+      summarize: (agentId, accountId, prompt) => this.#liveVoiceSummary(agentId, accountId, prompt),
       emit: (event, memberId) => this.emit("liveVoice", event, memberId),
       redact: (text) => this.#mcp.redact(text),
       otherAccounts: (agentId) =>
@@ -6160,11 +6160,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
     const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
+    const accountId = this.#liveVoiceAccountId(agent);
     const client = yield* Effect.try({
-      try: () => this.#providers.createProfileClient("codex", this.#liveVoiceAccountId(agent)),
+      try: () => this.#providers.createProfileClient("codex", accountId),
       catch: signIn,
     });
-    return { client, model: model.id, effort: model.defaultReasoningEffort };
+    return { client, model: model.id, effort: model.defaultReasoningEffort, accountId };
   }).bind(this);
 
   readonly #searchWeb = Effect.fn("AgentService.searchWeb")(function* (
@@ -6218,16 +6219,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   #liveVoiceReply(agentId: string, deliveryId: string): LiveVoiceReply | null {
     const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
-    if (!delivery) return { success: false, text: "The user removed the request." };
+    if (!delivery) return { success: false, text: "The request was removed." };
     switch (delivery.status) {
       case "queued":
       case "starting":
       case "running":
         return null;
       case "cancelled":
-        return { success: false, text: "The user cancelled the request." };
+        return { success: false, text: "The request was cancelled." };
       case "interrupted":
-        return { success: false, text: "The user stopped the agent before it finished." };
+        return { success: false, text: "The agent was stopped before it finished." };
       case "failed":
         return { success: false, text: delivery.error ?? "The agent could not finish the request." };
       case "completed": {
@@ -6256,6 +6257,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #liveVoiceSummary = Effect.fn("AgentService.liveVoiceSummary")(function* (
     this: AgentService,
     agentId: string,
+    accountId: string | undefined,
     prompt: string,
   ) {
     const failed = (message: string) => ({ cause: new Error(message) });
@@ -6264,9 +6266,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#stopping || !this.#profileClients.hasSpare()) return yield* Effect.fail(failed("No generation slot."));
     const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail(failed("No Codex model."));
-    const agent = this.#store.get(agentId);
+    const accountRemoved =
+      accountId !== undefined &&
+      accountId !== DEFAULT_PROVIDER_ACCOUNT_ID &&
+      !this.#providers.hasProviderAccount("codex", accountId);
+    if (accountRemoved) return yield* Effect.fail(failed("The Codex account of the call was removed."));
     const client = yield* Effect.try({
-      try: () => this.#providers.createProfileClient("codex", this.#liveVoiceAccountId(agent)),
+      try: () => this.#providers.createProfileClient("codex", accountId),
       catch: (cause) => ({ cause }),
     });
     return yield* this.#profileClients
