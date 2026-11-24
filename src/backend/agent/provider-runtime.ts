@@ -299,6 +299,7 @@ export interface ProviderHooks {
   onProviderResumed(provider: AgentProvider): void;
   onProviderHeld?(provider: AgentProvider): void;
   releasePersonWaits?(provider: AgentProvider): void;
+  endDroppedTurns?(provider: AgentProvider): Effect.Effect<void>;
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   onModelsRelisted?(provider: AgentProvider, configRevision: number): void;
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
@@ -2863,8 +2864,11 @@ export class ProviderRuntime implements ProviderPort {
       this.#cliLogin.has(provider) ||
       (provider === "codex" && this.#codexLogin.pending);
     if (waiting) {
-      if (this.#hooks.isProviderBusy(provider) && !this.#restartsKeepingTurns.has(provider))
+      if (this.#hooks.isProviderBusy(provider) && !this.#restartsKeepingTurns.has(provider)) {
         this.#hooks.releasePersonWaits?.(provider);
+        yield* this.#hooks.endDroppedTurns?.(provider) ?? Effect.void;
+        if (!this.#restartsWhenIdle.has(provider)) return;
+      }
       const timer = setTimeout(
         () => Effect.runFork(this.#checkRestartWhenIdle(provider).pipe(Effect.forkIn(this.#scope))),
         PROVIDER_RESTART_POLL_MS,
