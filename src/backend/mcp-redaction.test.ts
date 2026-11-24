@@ -72,7 +72,8 @@ describe("redactMcpRecord", () => {
 
   it("keeps a long html answer with many CSS rules whole (#9778)", () => {
     const rules = Array.from({ length: 40 }, (_, index) => `.card-${index}{display:flex;color:#fff}`);
-    const text = ["```html", '<div class="digest">', "<style>", ...rules, "</style>", "</div>", "```"].join("\n");
+    const jsx = "{items.map((item) => <li key={item.id}>{item.name}</li>)}";
+    const text = ["```html", '<div class="digest">', "<style>", ...rules, "</style>", jsx, "</div>", "```"].join("\n");
     expect(redactMcpRecord({ item: { type: "agentMessage", text } }, [])).toEqual({
       item: { type: "agentMessage", text },
     });
