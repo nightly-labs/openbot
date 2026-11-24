@@ -10,7 +10,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Exit, Fiber, Schedule, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
-import { type AgentProvider, ProviderModelNotOfferedError, ProviderSessionBusyError } from "./agent-client";
+import { type AgentProvider, ProviderModelNotOfferedError, ProviderSettingsConflictError } from "./agent-client";
 import { isRecord } from "./protocol";
 import {
   type ProviderClientOperationError,
@@ -32,6 +32,8 @@ const MODEL_DISCOVERY_RETURN_MS = 250;
 const PROBE_START_RETRY_MS = 1_000;
 
 const CONFIG_CONFLICT_RETRIES = 2;
+
+const CONFIG_CONFLICT_RETRY_MS = 250;
 
 export interface AcpModel {
   id: string;
@@ -296,23 +298,7 @@ export class AcpConfiguration {
     return yield* providerSync(() => probed);
   });
 
-  applyConfig(
-    thread: AcpConfigurationState,
-    model: string | null,
-    effort: string | null,
-    models: AcpModel[],
-    requireModel = false,
-  ): Effect.Effect<void, ProviderClientOperationError> {
-    return this.#applyConfig(thread, model, effort, models, requireModel).pipe(
-      Effect.mapError((failure) =>
-        this.options.configConflict?.(failure.cause)
-          ? providerFailure(new ProviderSessionBusyError(this.options.label()))
-          : failure,
-      ),
-    );
-  }
-
-  readonly #applyConfig = Effect.fn("AcpConfiguration.applyConfig")(function* (
+  readonly applyConfig = Effect.fn("AcpConfiguration.applyConfig")(function* (
     this: AcpConfiguration,
     thread: AcpConfigurationState,
     model: string | null,
@@ -568,7 +554,16 @@ export class AcpConfiguration {
     const conflict = this.options.configConflict;
     const call = conflict
       ? providerCall(request).pipe(
-          Effect.retry({ times: CONFIG_CONFLICT_RETRIES, while: (failure) => conflict(failure.cause) }),
+          Effect.retry({
+            times: CONFIG_CONFLICT_RETRIES,
+            while: (failure) => conflict(failure.cause),
+            schedule: Schedule.spaced(CONFIG_CONFLICT_RETRY_MS),
+          }),
+          Effect.mapError((failure) =>
+            conflict(failure.cause)
+              ? providerFailure(new ProviderSettingsConflictError(this.options.label()))
+              : failure,
+          ),
         )
       : providerCall(request);
     return call.pipe(

@@ -547,6 +547,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.nativeVersionUnreadable": "The {provider} CLI version could not be read.",
   "error.provider.piSessionBusy": "Wait for the current Pi turn to finish.",
   "error.provider.acpSessionBusy": "{provider} still finishes a stopped turn. Try again in a moment.",
+  "error.provider.acpSettingsConflict": "{provider} changed this chat while OpenBot applied its settings. Try again.",
   "error.provider.acpSessionStale":
     "{provider} could not load the latest version of this chat. Send your message again.",
   "error.provider.acpModelNotOffered":
