@@ -256,6 +256,7 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   readonly stop = Effect.fn("CustomAcp.stop")(function* (this: CustomAcpAgentsClient) {
     this.#running = false;
     this.#lateModels.clear();
+    this.#startReads.clear();
     const children = [...this.#children.values()];
     this.#children.clear();
     this.#sessionKeys.clear();
@@ -727,9 +728,15 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
         Effect.catch((error) => Effect.sync(() => this.#modelsNotListed(config, error))),
       );
     }
-    const listed = yield* Deferred.await(startRead.models).pipe(
+    const waiting = startRead;
+    const listed = yield* Deferred.await(waiting.models).pipe(
       Effect.timeoutOption(timeoutMs),
       Effect.catch(() => Effect.succeed(Option.none<ModelEntry[]>())),
+      Effect.onInterrupt(() =>
+        Effect.sync(() => {
+          waiting.outwaited = true;
+        }),
+      ),
     );
     if (Option.isSome(listed)) return listed.value;
     startRead.outwaited = true;
@@ -743,14 +750,15 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
     startRead: StartModelsRead,
   ) {
     const result = yield* Effect.result(this.#readModels(config, params, ACP_SESSION_PROCESS_START_TIMEOUT_MS));
-    if (this.#startReads.get(config.id) === startRead) this.#startReads.delete(config.id);
+    const current = this.#running && this.#startReads.get(config.id) === startRead;
+    if (current) this.#startReads.delete(config.id);
     if (Result.isFailure(result)) {
       yield* Deferred.fail(startRead.models, result.failure);
-      if (this.#running) this.#modelsNotListed(config, result.failure);
+      if (current) this.#modelsNotListed(config, result.failure);
       return;
     }
     yield* Deferred.succeed(startRead.models, result.success);
-    if (!startRead.outwaited || !this.#running) return;
+    if (!startRead.outwaited || !current) return;
     this.#lateModels.add(config.id);
     this.emit("notification", { method: CUSTOM_AGENT_MODELS_LISTED, params: {} });
   });
