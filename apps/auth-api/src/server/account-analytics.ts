@@ -143,7 +143,7 @@ export interface CreditActionEvent {
   multiUse?: boolean;
 }
 
-export interface CreditCodeRedeemEvent {
+interface CreditCodeRedeemEvent {
   name: "credit_code_redeem";
   outcome: CreditCodeOutcome;
   wallet: CreditMediaWallet;
