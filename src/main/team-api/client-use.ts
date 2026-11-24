@@ -111,6 +111,7 @@ import { WHATSAPP_READ_ONLY_ROUTES } from "@openbot/contracts/team-protocol/what
 import { WHATSAPP_STATUS_REACTIONS_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOW_FOLDERS_ROUTES } from "@openbot/contracts/team-protocol/workflow-folders-v1";
+import { WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES } from "@openbot/contracts/team-protocol/workflows-credit-media-unavailable-v1";
 import { WORKFLOWS_CREDIT_MEDIA_ROUTES } from "@openbot/contracts/team-protocol/workflows-credit-media-v1";
 import { WORKFLOWS_GITHUB_ROUTES } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_ROUTES } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
@@ -262,16 +263,23 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   CRM_ROUTES.overview,
   CRM_ROUTES.customers,
   CRM_ROUTES.payments,
+  CRM_ROUTES.activity,
   PROVIDER_ACCOUNTS_ROUTES.list,
   PROVIDER_ACCOUNTS_ROUTES.usage,
+  PROVIDER_ACCOUNTS_ROUTES.signInStatus,
   AGENT_ACCESS_ROUTES.read,
   PENDING_PROMPTS_ROUTES.list,
   WORKFLOWS_ROUTES.list,
   WORKFLOWS_ROUTES.get,
   WORKFLOWS_ROUTES.runs,
   WORKFLOWS_ROUTES.versions,
+  WORKFLOWS_ROUTES.versionGraph,
+  WORKFLOWS_ROUTES.run,
   WORKFLOWS_GITHUB_ROUTES.catalog,
   WORKFLOWS_GITHUB_ROUTES.history,
+  WORKFLOWS_GITHUB_ROUTES.options,
+  WORKFLOWS_CREDIT_MEDIA_ROUTES.catalog,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_ROUTES.list,
   WORKFLOWS_CREDIT_MEDIA_ROUTES.credits,
   CONNECTORS_ROUTES.githubStatus,
   CONNECTORS_ROUTES.githubRepositories,
@@ -281,7 +289,9 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   PASSWORD_MANAGERS_ROUTES.list,
   EVENTS_ROUTES.status,
   EVENTS_ROUTES.listRoutines,
+  EVENTS_ROUTES.listActivity,
   MCP_SIGN_IN_ROUTES.list,
+  MCP_SIGN_IN_ROUTES.status,
 ]);
 
 const PASSIVE_PATTERNS: readonly RegExp[] = [

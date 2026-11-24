@@ -21,6 +21,7 @@ import {
 } from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { CONNECTORS_ROUTES } from "@openbot/contracts/team-protocol/connectors-v1";
 import { CRM_ROUTES } from "@openbot/contracts/team-protocol/crm-v1";
+import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { PENDING_PROMPTS_ROUTES } from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PROVIDER_ACCOUNTS_ROUTES } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
@@ -51,6 +52,8 @@ const AUTOMATIC_READS = [
   CRM_ROUTES.settings,
   PROVIDER_ACCOUNTS_ROUTES.list,
   PROVIDER_ACCOUNTS_ROUTES.usage,
+  PROVIDER_ACCOUNTS_ROUTES.signInStatus,
+  MCP_SIGN_IN_ROUTES.status,
   PENDING_PROMPTS_ROUTES.list,
   WORKFLOWS_ROUTES.list,
   CONNECTORS_ROUTES.messagingOverview,
@@ -421,7 +424,10 @@ try {
     const ownerId = team.getOwnerMemberId();
     assert.ok(ownerId && server);
     const before = server.lastMemberUseElsewhere(ownerId, OWNER_PHONE);
-    for (const path of AUTOMATIC_READS) await wire(port, { method: "POST", path, body: {}, token });
+    for (const path of AUTOMATIC_READS) {
+      const read = await wire(port, { method: "POST", path, body: {}, token });
+      assert.notEqual(read.status, 401, `The host did not accept the session for ${path}.`);
+    }
     assert.equal(server.lastMemberUseElsewhere(ownerId, OWNER_PHONE), before, "An automatic read counted as use.");
     hostNow = Math.max(hostNow, Date.now());
     const afterReads = await phonesFor("turn-after-reads", routineReply(agentId, threadId, "turn-after-reads"));
