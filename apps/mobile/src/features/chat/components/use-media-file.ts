@@ -80,11 +80,12 @@ export async function requestFile<T>(queryKey: QueryKey, fetch: () => Promise<T>
 }
 
 export function fileWantedOrDropped(client: QueryClient, queryKey: QueryKey): () => boolean {
+  const cache = client.getQueryCache();
+  const query = cache.find({ queryKey, exact: true });
   return () => {
-    const cache = client.getQueryCache();
-    const query = cache.find({ queryKey, exact: true });
-    if (requestedFiles.has(hashKey(queryKey)) || (query?.getObserversCount() ?? 0) > 0) return true;
-    if (query) cache.remove(query);
+    if (!query || cache.find({ queryKey, exact: true }) !== query) return false;
+    if (requestedFiles.has(hashKey(queryKey)) || query.getObserversCount() > 0) return true;
+    cache.remove(query);
     return false;
   };
 }
