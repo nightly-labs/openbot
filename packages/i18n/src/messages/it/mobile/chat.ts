@@ -558,6 +558,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Nessun messaggio in coda",
   "mobile.chat.queue.emptyBody": "I nuovi messaggi si mettono in coda mentre l'agente lavora.",
   "mobile.chat.queue.noLongerQueued": "Questo messaggio non è più in coda.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Posizione {position} · {date}",
   "mobile.chat.queue.attachments": "Allegati",
   "mobile.chat.queue.steer": "Indirizza",

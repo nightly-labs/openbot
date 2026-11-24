@@ -644,6 +644,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Brak wiadomości w kolejce",
   "mobile.chat.queue.emptyBody": "Nowe wiadomości trafiają do kolejki, gdy agent pracuje.",
   "mobile.chat.queue.noLongerQueued": "Ta wiadomość nie jest już w kolejce.",
+  "mobile.chat.queue.routine": "Rutyna: {name}",
   "mobile.chat.queue.position": "Pozycja {position} · {date}",
   "mobile.chat.queue.attachments": "Załączniki",
   "mobile.chat.queue.steer": "Pokieruj",

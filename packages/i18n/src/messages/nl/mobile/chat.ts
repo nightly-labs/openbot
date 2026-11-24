@@ -524,6 +524,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Geen berichten in wachtrij",
   "mobile.chat.queue.emptyBody": "Nieuwe berichten komen in de wachtrij terwijl de agent werkt.",
   "mobile.chat.queue.noLongerQueued": "Dit bericht staat niet meer in de wachtrij.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Positie {position} · {date}",
   "mobile.chat.queue.attachments": "Bijlagen",
   "mobile.chat.queue.steer": "Bijsturen",

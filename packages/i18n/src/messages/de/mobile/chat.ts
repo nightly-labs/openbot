@@ -569,6 +569,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Keine Nachrichten in der Warteschlange",
   "mobile.chat.queue.emptyBody": "Neue Nachrichten kommen in die Warteschlange, während der Agent arbeitet.",
   "mobile.chat.queue.noLongerQueued": "Diese Nachricht ist nicht mehr in der Warteschlange.",
+  "mobile.chat.queue.routine": "Routine: {name}",
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Anhänge",
   "mobile.chat.queue.steer": "Steuern",

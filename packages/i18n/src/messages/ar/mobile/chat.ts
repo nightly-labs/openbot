@@ -668,6 +668,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "لا رسائل في قائمة الانتظار",
   "mobile.chat.queue.emptyBody": "تنضم الرسائل الجديدة إلى قائمة الانتظار أثناء عمل الوكيل.",
   "mobile.chat.queue.noLongerQueued": "هذه الرسالة لم تعد في قائمة الانتظار.",
+  "mobile.chat.queue.routine": "مهمة دورية: {name}",
   "mobile.chat.queue.position": "الموضع {position} · {date}",
   "mobile.chat.queue.attachments": "المرفقات",
   "mobile.chat.queue.steer": "توجيه",

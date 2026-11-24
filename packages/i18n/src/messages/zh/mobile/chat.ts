@@ -531,6 +531,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "没有排队的消息",
   "mobile.chat.queue.emptyBody": "助手工作期间，新消息会加入队列。",
   "mobile.chat.queue.noLongerQueued": "该消息已不在队列中。",
+  "mobile.chat.queue.routine": "自动化任务：{name}",
   "mobile.chat.queue.position": "第 {position} 位 · {date}",
   "mobile.chat.queue.attachments": "附件",
   "mobile.chat.queue.steer": "引导",
