@@ -281,6 +281,7 @@ export interface RemoteTeamDiagnostic {
     | "ice-state"
     | "ice-gathering"
     | "ice-candidate-error"
+    | "ice-gathering-stalled"
     | "route"
     | "ice-recovery"
     | "channels-open"
@@ -2353,8 +2354,19 @@ export function createRemoteTeamPeer(
     if (!state.connected || state.connectedTimer !== null) return;
     state.connectedTimer = setTimeout(() => {
       diagnose(state, "stalled", `connect deadline: ${connectionSnapshot(state)}`);
+      if (gatheringFoundNothing(state)) diagnose(state, "ice-gathering-stalled");
       failPeer(state, connectTimeout(state), actions);
     }, 30_000);
+  }
+
+  function gatheringFoundNothing(state: PeerState): boolean {
+    const connection = state.connection;
+    return (
+      connection !== null &&
+      state.offerSentAt !== null &&
+      connection.iceGatheringState === "gathering" &&
+      state.localCandidates.size === 0
+    );
   }
 
   function connectionSnapshot(state: PeerState): string {
