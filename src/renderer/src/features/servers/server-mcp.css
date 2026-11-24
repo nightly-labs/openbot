@@ -46,6 +46,7 @@
 }
 
 .server-mcp-sign-in-link {
+  display: grid;
   justify-items: start;
   gap: var(--openbot-space-2);
 }
