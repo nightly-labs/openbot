@@ -136,9 +136,14 @@ function McpServerForm({
   const signedIn =
     saved?.transport === "http" &&
     Boolean(mcp.signIns.data?.some((state) => state.mcpServerId === saved.id && state.signedIn));
+  const signInsKnown = mcp.signIns.data !== undefined;
   const testAsksSignIn = test?.status === "done" && isSignInError(test.result.error);
   const showSignIn =
-    canRelay && saved?.transport === "http" && !dirty && !signedIn && (signInRequested || testAsksSignIn || signingIn);
+    canRelay &&
+    saved?.transport === "http" &&
+    !dirty &&
+    !signedIn &&
+    (signInsKnown || signInRequested || testAsksSignIn || signingIn);
   const busy = action.isPending || test?.status === "testing" || signingIn;
 
   useDiscardGuard((dirty || action.isPending) && !leaving, { busy: () => action.isPending, warn: true });
