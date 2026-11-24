@@ -232,6 +232,8 @@ export const messages = {
     "このサーバーは GPT Live Voice に対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice を開始できませんでした。ミュートを解除して再試行してください。",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice が停止しました。ミュートを解除すると再開します。",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice を開始できませんでした",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice が停止しました",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "設定で OpenBot にマイクの使用を許可してから、ミュートを解除して再試行してください。",
   "mobile.chat.composer.addAttachment": "添付ファイルを追加",

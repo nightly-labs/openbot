@@ -236,6 +236,8 @@ export const messages = {
     "Ce serveur ne prend pas en charge GPT Live Voice. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice n’a pas pu démarrer. Réactivez le micro pour réessayer.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice s’est arrêté. Réactivez le micro pour le relancer.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice n’a pas pu démarrer",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice s’est arrêté",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Autorisez OpenBot à utiliser le micro dans Réglages. Puis réactivez le micro pour réessayer.",
   "mobile.chat.composer.addAttachment": "Ajouter une pièce jointe",

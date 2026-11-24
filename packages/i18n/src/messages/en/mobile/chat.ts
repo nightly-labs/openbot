@@ -229,6 +229,8 @@ export const messages = defineMessages("mobile.chat", {
     "This server does not support GPT live voice. Update OpenBot on the computer that runs it.",
   "mobile.chat.liveVoice.gptFailed": "GPT live voice could not start. Unmute to try again.",
   "mobile.chat.liveVoice.gptEnded": "GPT live voice stopped. Unmute to start it again.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT live voice could not start",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT live voice stopped",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Allow OpenBot to use the microphone in Settings. Then unmute to try again.",
   "mobile.chat.composer.addAttachment": "Add attachment",

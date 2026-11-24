@@ -232,6 +232,8 @@ export const messages = {
   "mobile.chat.liveVoice.gptUnsupported": "השרת הזה לא תומך ב-GPT Live Voice. עדכנו את OpenBot במחשב שמריץ אותו.",
   "mobile.chat.liveVoice.gptFailed": "לא ניתן היה להפעיל את GPT Live Voice. בטלו את ההשתקה כדי לנסות שוב.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice נעצר. בטלו את ההשתקה כדי להפעיל אותו שוב.",
+  "mobile.chat.liveVoice.gptFailedTitle": "לא ניתן היה להפעיל את GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice נעצר",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "אפשרו ל-OpenBot להשתמש במיקרופון בהגדרות. אחר כך בטלו את ההשתקה כדי לנסות שוב.",
   "mobile.chat.composer.addAttachment": "הוספת קובץ מצורף",

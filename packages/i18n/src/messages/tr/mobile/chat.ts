@@ -230,6 +230,8 @@ export const messages = {
     "Bu sunucu GPT Live Voice'u desteklemiyor. Onu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice başlatılamadı. Yeniden denemek için mikrofonun sesini açın.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice durdu. Yeniden başlatmak için mikrofonun sesini açın.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice başlatılamadı",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice durdu",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Ayarlar'da OpenBot'un mikrofonu kullanmasına izin verin. Sonra yeniden denemek için mikrofonun sesini açın.",
   "mobile.chat.composer.addAttachment": "Ek ekle",

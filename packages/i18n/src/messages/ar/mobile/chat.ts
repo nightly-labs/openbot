@@ -307,6 +307,8 @@ export const messages = {
   "mobile.chat.liveVoice.gptUnsupported": "هذا الخادم لا يدعم GPT Live Voice. حدّث OpenBot على الكمبيوتر الذي يشغّله.",
   "mobile.chat.liveVoice.gptFailed": "تعذّر بدء GPT Live Voice. ألغِ كتم الميكروفون للمحاولة مرة أخرى.",
   "mobile.chat.liveVoice.gptEnded": "توقّف GPT Live Voice. ألغِ كتم الميكروفون لبدئه مرة أخرى.",
+  "mobile.chat.liveVoice.gptFailedTitle": "تعذّر بدء GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "توقّف GPT Live Voice",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "اسمح لـ OpenBot باستخدام الميكروفون في الإعدادات. ثم ألغِ الكتم للمحاولة مرة أخرى.",
   "mobile.chat.composer.addAttachment": "إضافة مرفق",

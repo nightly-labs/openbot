@@ -197,6 +197,8 @@ export const messages = {
   "mobile.chat.composer.messageAgent": "Bericht aan {name}",
   "mobile.chat.composer.pasteFailed": "Kan geplakte tekst niet bijvoegen",
   "mobile.chat.voice.listening": "Luisteren…",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice kon niet starten",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice is gestopt",
   "mobile.chat.composer.addAttachment": "Voeg bijlage toe",
   "mobile.chat.composer.ask": "Vraag {name}",
   "mobile.chat.composer.stopFailed": "Kan de agent niet stoppen. Misschien is die al klaar.",
