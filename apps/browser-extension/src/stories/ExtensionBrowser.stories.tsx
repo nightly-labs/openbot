@@ -41,6 +41,7 @@ function Home(props: { asks?: BrowserAsk[] }) {
             onStartThread={() => undefined}
             onSelectHost={() => undefined}
             onSignOut={() => undefined}
+            onAnalyticsChanged={() => undefined}
             sharing
             canShare
             onShareTabs={() => undefined}

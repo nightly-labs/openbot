@@ -1,6 +1,7 @@
 import { AppWindow, ArrowLeft, Button, CreditCard, Download, Globe2, KeyRound, LogIn, Trash2 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
+import { track } from "./analytics";
 import {
   ASKS_KEY,
   type AskChoice,
@@ -45,6 +46,7 @@ export function BrowserSharingScreen(props: { onBack: () => void }) {
       decodeSites(stored).flatMap((entry) => (entry === site ? [] : [[entry, "always"]])),
     );
     await chrome.storage.local.set({ [SITES_KEY]: kept });
+    void track("browser_sharing_action", { action: "site_removed" });
   }
   async function stop() {
     await chrome.runtime.sendMessage({ kind: BROWSER_SHARE_MESSAGE, on: false }).catch(() => undefined);

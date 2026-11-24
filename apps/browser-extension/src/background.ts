@@ -6,6 +6,7 @@ import {
   xPageRulesHash,
 } from "@openbot/contracts/browser-extension-x";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { track } from "./analytics";
 import { startClientBrowser } from "./client-browser-worker";
 import { openXChat } from "./extension-storage";
 import {
@@ -158,7 +159,10 @@ function flushOutbox(force = false): Promise<void> {
       const queued: QueuedPost[] = [];
       for (const post of stored) {
         if (stillSendable(post, now)) queued.push(post);
-        else if (labels) await notify(`openbot-x-dropped-${post.id}`, labels.droppedTitle, labels.droppedBody, post);
+        else {
+          void track("x_reply_action", { action: "dropped", attempts: post.attempts });
+          if (labels) await notify(`openbot-x-dropped-${post.id}`, labels.droppedTitle, labels.droppedBody, post);
+        }
       }
       const kept: QueuedPost[] = [];
       for (const post of queued) {
@@ -171,6 +175,7 @@ function flushOutbox(force = false): Promise<void> {
           decodeXSendResult,
         ).catch(() => null);
         if (answer?.ok) {
+          void track("x_reply_action", { action: "sent", attempts: post.attempts });
           if (labels)
             await notify(
               `${X_SENT_NOTIFICATION}${post.id}`,
@@ -182,6 +187,7 @@ function flushOutbox(force = false): Promise<void> {
         }
         const attempts = post.attempts + 1;
         const reached = answer === null || answer.ok || answer.reached;
+        void track("x_reply_action", { action: "retry", attempts, reached });
         kept.push({
           ...post,
           attempts,
@@ -217,6 +223,7 @@ async function queuePost(payload: XReplyPayload): Promise<void> {
     reachedAt: null,
   };
   await changeOutbox(async () => writeOutbox([...(await readOutbox()), post]));
+  void track("x_reply_action", { action: "queued" });
   if (flushing) await flushing;
   await flushOutbox();
 }
@@ -225,10 +232,18 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === OUTBOX_ALARM) void flushOutbox();
 });
 chrome.runtime.onStartup.addListener(() => void flushOutbox(true));
-chrome.runtime.onInstalled.addListener(() => void flushOutbox(true));
+chrome.runtime.onInstalled.addListener((details) => {
+  void flushOutbox(true);
+  if (details.reason === "install" || details.reason === "update")
+    void track("extension_installed", {
+      reason: details.reason,
+      ...(details.previousVersion ? { from_version: details.previousVersion } : {}),
+    });
+});
 void flushOutbox();
 chrome.notifications.onClicked.addListener((id) => {
   if (id.startsWith(X_SENT_NOTIFICATION)) {
+    void track("x_reply_action", { action: "notification_opened" });
     void chrome.sidePanel.open({ windowId: chrome.windows.WINDOW_ID_CURRENT }).catch(() => undefined);
     void openXChat(id.slice(X_SENT_NOTIFICATION.length)).then(() => {
       for (const port of panels) port.postMessage(OPEN_X_CHAT_MESSAGE);

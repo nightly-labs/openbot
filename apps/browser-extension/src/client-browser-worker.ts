@@ -7,6 +7,7 @@ import {
   type ClientBrowserPresence,
   type ClientTab,
 } from "@openbot/contracts/team-protocol/client-browser-v1";
+import { track } from "./analytics";
 import {
   BrowserCommandError,
   clientTab,
@@ -255,6 +256,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       labels,
       Math.min(ASK_WAIT_MS, deadline - Date.now()),
     );
+    void track("browser_sharing_ask", { kind, choice });
     if ((choice === "once" || choice === "always") && Date.now() >= deadline)
       throw new BrowserCommandError("timeout", LATE);
     if (choice === "stopped") throw new BrowserCommandError("not-shared", "The person stopped sharing tabs.");
@@ -356,6 +358,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     }
     const share = decodeShare(message);
     if (share) {
+      void track("browser_sharing_action", { action: share.on ? "started" : "stopped" });
       void (share.on ? startSharing() : stopSharing())
         .catch(() => undefined)
         .finally(() => {

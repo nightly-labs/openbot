@@ -249,6 +249,17 @@ Mobile does not read the Android install referrer from Google Play. It never sen
 install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
+The production Chrome extension records its install and update, side panel opens, sign-in and
+sign-out results, message sends from the side panel (to a chat, a thread or a channel), dictation
+results and lengths, the agents, channels and folders made in it, answers to agent questions, the
+steps of X replies (queued, sent, retried, dropped, notification opened), and shared-tab events
+(sharing on or off, a site removed, and the kind of each question and your answer). It labels them
+as extension. It never sends message text, post text, X handles, addresses, sites, tab titles, or
+names. Its **Link analytics to my account** item in the server menu works as on the web: on, events
+carry your account ID; off, only a random install ID kept in the extension's storage. With no choice
+in the extension, it follows your account's answer, and with no answer, the same region default as the
+web app. Development builds of the extension send no analytics.
+
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
 search queries, embedded-browser URLs, paths or page titles, file names, local paths, commands, raw
 error messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
@@ -316,7 +327,7 @@ the device was offline or signed out goes to the account at the next sign-in, st
 refresh; the account keeps it only if it has no newer answer from another device. Disabling it
 drops pending mobile events; it does not remove previously received events or retract an in-flight
 request. There is no persistent offline analytics queue.
-When a user turns product analytics off on desktop, web or mobile, the app first sends one event
+When a user turns product analytics off on desktop, web, mobile or the Chrome extension, the app first sends one event
 that says analytics was turned off, with the account. After that, events go with the install ID only.
 Turning it on again sends no separate event.
 Development and preview mobile builds do not collect product analytics. Mobile sign-in uses the
@@ -1286,7 +1297,8 @@ notification. Nothing goes to OpenBot,
 and nothing is sent when you do not click. To find the parts of the page, the extension
 asks openbot.run once an hour for the newest list of page selectors; that request carries only the hash
 of the list that it has. Except for shared tabs (below), the extension does not read your tabs or the
-pages you visit.
+pages you visit. The extension's product analytics, which "Product analytics" describes,
+go to OpenBot's self-hosted analytics and contain none of this content.
 
 Shared tabs are on while you are signed in, until you press **Stop sharing** in the side panel. Your
 open tabs are shared only with your own agents, and an agent uses them only for a message that you

@@ -1,6 +1,7 @@
 import type { CentralAuthIssue, CentralAuthUser } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
+import { SIGN_IN_FAILURE_CODES, type SignInFailureCode } from "./analytics";
 import { decodeUser, deviceId, type ExtensionSession } from "./extension-storage";
 
 export const ACCOUNT_API_URL = import.meta.env.VITE_OPENBOT_API_URL;
@@ -23,7 +24,7 @@ export interface EmailChallenge {
 
 async function accountRequest(
   path: string,
-  init: { method: "GET" | "POST" | "DELETE"; body?: object; token?: string; idempotencyKey?: string },
+  init: { method: "GET" | "POST" | "PUT" | "DELETE"; body?: object; token?: string; idempotencyKey?: string },
 ): Promise<{ response: Response; body: DynamicRecord | null }> {
   const response = await fetch(`${ACCOUNT_API_URL}${path}`, {
     method: init.method,
@@ -111,6 +112,19 @@ export async function readAccount(token: string): Promise<CentralAuthUser | null
 
 export async function endSession(token: string): Promise<void> {
   await accountRequest("/v1/mobile-auth/session", { method: "DELETE", token }).catch(() => undefined);
+}
+
+export async function saveAnalyticsAnswer(token: string, enabled: boolean): Promise<void> {
+  await accountRequest("/v1/me/analytics", { method: "PUT", token, body: { enabled, ageMs: 0 } }).catch(
+    () => undefined,
+  );
+}
+
+export function signInOutcome(error: unknown): { result: "failed" | "cancelled"; failure_code?: SignInFailureCode } {
+  if (!(error instanceof SignInIssue)) return { result: "failed", failure_code: "unknown" };
+  if (error.issue.code === "sign_in_cancelled") return { result: "cancelled" };
+  const code = error.issue.code;
+  return { result: "failed", failure_code: isOneOf(SIGN_IN_FAILURE_CODES, code) ? code : "unknown" };
 }
 
 const WEB_URL = import.meta.env.VITE_OPENBOT_WEB_URL;

@@ -19,9 +19,9 @@ export const PRESENCE_KEY = "openbot.client-browser.presence.v1";
 
 export const OPENBOT_GROUP_TITLE = "OpenBot";
 
-const ASK_KINDS = ["site", "password", "payment", "download", "sign-in"] as const;
+export const ASK_KINDS = ["site", "password", "payment", "download", "sign-in"] as const;
 export type AskKind = (typeof ASK_KINDS)[number];
-const ASK_CHOICES = ["once", "always", "deny"] as const;
+export const ASK_CHOICES = ["once", "always", "deny"] as const;
 export type AskChoice = (typeof ASK_CHOICES)[number];
 const ACTIONS = [
   "open",

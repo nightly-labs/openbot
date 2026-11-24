@@ -99,6 +99,52 @@ const xServer = Bun.serve({
 });
 const xBase = `http://127.0.0.1:${xServer.port}`;
 
+interface CapturedEvent {
+  type: string;
+  clientId: string | null;
+  name: string;
+  profileId: string;
+  surface: unknown;
+  generation: unknown;
+  platform: unknown;
+  raw: string;
+}
+const captured: CapturedEvent[] = [];
+const captureServer = Bun.serve({
+  hostname: "127.0.0.1",
+  port: 0,
+  async fetch(request) {
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "content-type, openpanel-client-id",
+    };
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+    const raw = await request.text();
+    const body = JSON.parse(raw);
+    captured.push({
+      type: String(body.type),
+      clientId: request.headers.get("openpanel-client-id"),
+      name: String(body.payload?.name ?? ""),
+      profileId: String(body.payload?.profileId ?? ""),
+      surface: body.payload?.properties?.surface,
+      generation: body.payload?.properties?.event_schema_version,
+      platform: body.payload?.properties?.platform,
+      raw,
+    });
+    return new Response(null, { status: 202, headers: cors });
+  },
+});
+const ANALYTICS_CHOICE_KEY = "openbot.analytics.v1";
+async function capturedEvent(test: (event: CapturedEvent) => boolean, label: string): Promise<CapturedEvent> {
+  const deadline = Date.now() + UI_WAIT_MS;
+  for (;;) {
+    const found = captured.find(test);
+    if (found) return found;
+    if (Date.now() > deadline) throw new Error(`No analytics event: ${label}`);
+    await Bun.sleep(100);
+  }
+}
+
 interface Report {
   agentId: string;
   extensionId?: string;
@@ -151,6 +197,13 @@ interface Report {
   silentSignIn?: { signedIn: boolean; noWindow: boolean };
   xRestart?: { sentAfterRestart: boolean; deliveredBy: "start" | "panel"; twoDayOldKept: boolean; queueEmpty: boolean };
   signOut?: { signInShown: boolean };
+  analytics?: {
+    events: string[];
+    allExtensionSurface: boolean;
+    optOutLinked: boolean;
+    afterOptOutAnonymous: boolean;
+    leaks: string[];
+  };
   pageErrors: string[];
   screenshots: string[];
   passed: boolean;
@@ -161,7 +214,12 @@ const host = await connectChannelE2e(NAME);
 
 const build = spawnSync("bun", ["run", "build", "--", "--mode", "development"], {
   cwd: EXTENSION,
-  env: { ...process.env, VITE_OPENBOT_API_URL: authApi, VITE_OPENBOT_X_RULES_URL: `${xBase}/x-rules` },
+  env: {
+    ...process.env,
+    VITE_OPENBOT_API_URL: authApi,
+    VITE_OPENBOT_X_RULES_URL: `${xBase}/x-rules`,
+    OPENBOT_ANALYTICS_CAPTURE_URL: `http://127.0.0.1:${captureServer.port}`,
+  },
   stdio: "inherit",
 });
 assert.equal(build.status, 0, "The extension build failed.");
@@ -265,6 +323,8 @@ try {
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker", { timeout: UI_WAIT_MS }));
   const extensionId = new URL(worker.url()).host;
   report.extensionId = extensionId;
+  await capturedEvent((event) => event.name === "extension_installed", "extension_installed");
+  await worker.evaluate(`chrome.storage.local.set({ "${ANALYTICS_CHOICE_KEY}": { enabled: true, at: Date.now() } })`);
   const agentName = await host.page.evaluate(async (id) => {
     const found = (await window.openbot.agent.listAgents()).find((candidate) => candidate.id === id);
     if (!found) throw new Error(`Unknown agent: ${id}`);
@@ -820,9 +880,25 @@ try {
   await toHome(page);
 
   await toHome(page);
+  const accountId = await page.evaluate<string>(
+    `chrome.storage.local.get("openbot.session.v1").then((items) => items["openbot.session.v1"].user.id)`,
+  );
   await serverTitle.click();
+  const analyticsSwitch = page.getByRole("menuitemcheckbox", { name: english("settings.analytics.title") });
+  await analyticsSwitch.waitFor({ timeout: UI_WAIT_MS });
+  assert.equal(await analyticsSwitch.getAttribute("aria-checked"), "true", "Analytics is not linked at the start.");
+  await analyticsSwitch.click();
+  const optOut = await capturedEvent(
+    (event) => event.name === "analytics_preference_changed",
+    "analytics_preference_changed",
+  );
+  assert.equal(await analyticsSwitch.getAttribute("aria-checked"), "false", "The switch did not turn off.");
   await page.getByRole("menuitem", { name: english("extension.home.signOut") }).click();
   await signInButton.waitFor({ timeout: UI_WAIT_MS });
+  const signedOut = await capturedEvent(
+    (event) => event.name === "account_sign_out" && captured.indexOf(event) > captured.indexOf(optOut),
+    "account_sign_out after the opt-out",
+  );
   const windows: string[] = [];
   const seeWindow = (opened: Page) => windows.push(opened.url());
   context.on("page", seeWindow);
@@ -909,6 +985,47 @@ try {
   await reopened.getByRole("menuitem", { name: english("extension.home.signOut") }).click();
   await reopened.getByRole("button", { name: english("extension.signIn.withWeb") }).waitFor({ timeout: UI_WAIT_MS });
   report.signOut = { signInShown: true };
+
+  const tracks = captured.filter((event) => event.type === "track");
+  const names = [...new Set(tracks.map((event) => event.name))].sort();
+  const leaks = captured.flatMap((event) =>
+    [run, new URL(xBase).host, ...(event.type === "track" ? [email] : [])]
+      .filter((secret) => event.raw.includes(secret))
+      .map((secret) => `${event.type} ${event.name}: ${secret}`),
+  );
+  report.analytics = {
+    events: names,
+    allExtensionSurface: tracks.every(
+      (event) =>
+        event.clientId !== null &&
+        event.surface === "extension" &&
+        event.generation === 1 &&
+        event.platform === "chrome",
+    ),
+    optOutLinked: optOut.profileId === accountId,
+    afterOptOutAnonymous: signedOut.profileId.startsWith("install-"),
+    leaks,
+  };
+  for (const expected of [
+    "extension_installed",
+    "extension_opened",
+    "account_sign_in_completed",
+    "message_send",
+    "voice_transcription",
+    "folder_action",
+    "channel_action",
+    "agent_action",
+    "x_reply_action",
+    "browser_sharing_action",
+    "browser_sharing_ask",
+    "analytics_preference_changed",
+    "account_sign_out",
+  ])
+    assert.ok(names.includes(expected), `No ${expected} event: ${names.join(", ")}`);
+  assert.ok(report.analytics.allExtensionSurface, "An event has no extension surface.");
+  assert.ok(report.analytics.optOutLinked, "The opt-out event is not linked to the account.");
+  assert.ok(report.analytics.afterOptOutAnonymous, "An event after the opt-out has the account.");
+  assert.deepEqual(leaks, [], "An analytics event has user content.");
   assert.deepEqual(report.pageErrors, [], "The panel threw errors.");
   report.passed = true;
 } catch (error) {
@@ -921,5 +1038,6 @@ try {
   await context.close().catch(() => undefined);
   rmSync(profile, { recursive: true, force: true });
   await xServer.stop(true);
+  await captureServer.stop(true);
   await host.close().catch(() => undefined);
 }

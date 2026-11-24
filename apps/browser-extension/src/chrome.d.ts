@@ -23,6 +23,7 @@ declare namespace chrome {
   export namespace runtime {
     const id: string;
     function getURL(path: string): string;
+    function getManifest(): { version: string };
     interface MessageSender {
       tab?: tabs.Tab;
       url?: string;
@@ -48,7 +49,9 @@ declare namespace chrome {
     function connect(info: { name: string }): Port;
     const onConnect: { addListener(listener: (port: Port) => void): void };
     const onStartup: { addListener(listener: () => void): void };
-    const onInstalled: { addListener(listener: () => void): void };
+    const onInstalled: {
+      addListener(listener: (details: { reason: string; previousVersion?: string }) => void): void;
+    };
   }
   export namespace alarms {
     interface Alarm {
