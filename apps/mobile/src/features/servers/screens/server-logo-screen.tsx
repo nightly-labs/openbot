@@ -46,7 +46,7 @@ function ServerLogoEditor({ server }: { server: MobileServer }) {
   const [preview, setPreview] = useState<AvatarPhoto | null | undefined>();
   const hasLogo = server.logoKey !== null;
 
-  useDiscardGuard(busy, { busy: () => busy, warn: true });
+  useDiscardGuard(busy, { busy: () => busy });
 
   async function saveLogo(logo: AvatarPhoto | null): Promise<void> {
     setPreview(logo);
