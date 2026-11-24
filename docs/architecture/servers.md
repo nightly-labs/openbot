@@ -1957,7 +1957,9 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   `GROK_HOME` there, so its default provider account is its own: a sign-in or a sign-out on one
   server does not change the others. Gemini stays shared: Antigravity before 1.5.3 ignores
   `GEMINI_HOME`, and the desktop does not know the CLI version of the child. Other providers also
-  stay shared. Claude Code also uses a separate macOS Keychain
+  stay shared. Claude Code reads its user setup from `CLAUDE_CONFIG_DIR` too, so on such a server
+  "Use my Claude Code setup" loads the `CLAUDE.md`, skills, agents, hooks and plugins of
+  `provider-homes/claude`, not of `~/.claude`. Claude Code also uses a separate macOS Keychain
   item when `CLAUDE_CONFIG_DIR` is set. A server without the folder, made by an earlier build, keeps
   the shared homes (`~/.claude`, `~/.codex` and `~/.grok`): a new home would remove its sign-in and the
   Claude session files that its agents resume from. An earlier build ignores the folder.
