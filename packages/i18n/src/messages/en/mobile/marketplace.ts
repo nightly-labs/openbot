@@ -102,6 +102,9 @@ export const messages = defineMessages("mobile.marketplace", {
   "mobile.marketplace.app.stepOpen": "Open the {name} sign-in page.",
   "mobile.marketplace.app.stepAllow": "Sign in and allow access.",
   "mobile.marketplace.app.stepReturn": "Come back here. {name} connects on your server.",
+  "mobile.marketplace.app.stepBlank": "The last page does not load. This is correct.",
+  "mobile.marketplace.app.stepCopy": "Tap the address bar and copy the full address.",
+  "mobile.marketplace.app.stepPaste": "Come back to OpenBot and paste the address below.",
   "mobile.marketplace.app.openSignIn": "Open sign-in page",
   "mobile.marketplace.app.keySecure": "The key goes only to your server, over an encrypted connection.",
   "mobile.marketplace.app.connecting": "Connecting",
@@ -116,8 +119,6 @@ export const messages = defineMessages("mobile.marketplace", {
     "This app needs a browser sign-in. Update OpenBot on the server, or connect the app on the computer.",
   "mobile.marketplace.app.waiting": "Waiting for the sign-in page…",
   "mobile.marketplace.app.openAgain": "Open the sign-in page again",
-  "mobile.marketplace.app.pasteHint":
-    "At the end, the page opens an address that does not load. Copy that address and paste it below.",
   "mobile.marketplace.app.pasteLabel": "Address after the sign-in",
   "mobile.marketplace.app.pasteInvalid": "This address is not the end of this sign-in.",
   "mobile.marketplace.app.finishSignIn": "Finish sign-in",
