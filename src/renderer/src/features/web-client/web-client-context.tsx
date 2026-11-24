@@ -1099,8 +1099,11 @@ export function createWebWorkspace(
         for (const left of leftHostIds) if (!hosts.some((host) => host.hostId === left)) leftHostIds.delete(left);
         if (!hostId) {
           const savedHostId = readWebServerSelection(props.accountId);
+          const ordered = orderWebHosts(hosts, serverOrder());
           const initialHost =
-            hosts.find((host) => host.hostId === savedHostId) ?? orderWebHosts(hosts, serverOrder())[0];
+            hosts.find((host) => host.hostId === savedHostId) ??
+            ordered.find((host) => host.hidden !== true) ??
+            ordered[0];
           if (initialHost) await connect(initialHost);
         }
         if (!disposed) runtime.hosts?.setHosts(hosts);
@@ -1137,6 +1140,18 @@ export function createWebWorkspace(
     const remove = runtime.removeOwnedHost;
     if (!remove) throw new Error(currentText().t("server.settings.actionFailed"));
     await departHost(host, () => remove(host.hostId));
+  }
+  async function setHostHidden(host: RemoteTeamHost, hidden: boolean): Promise<void> {
+    const change = runtime.setHostHidden;
+    if (!change) throw new Error(currentText().t("server.settings.actionFailed"));
+    await change(host.hostId, hidden);
+    setState((draft) => {
+      const listed = draft.hosts.find((candidate) => candidate.hostId === host.hostId);
+      if (!listed) return;
+      if (hidden) listed.hidden = true;
+      else delete listed.hidden;
+    });
+    void (hostsRefreshPromise ?? Promise.resolve()).catch(() => undefined).then(retryHosts);
   }
   async function departHost(host: RemoteTeamHost, operation: () => Promise<void>): Promise<void> {
     leftHostIds.add(host.hostId);
@@ -2127,6 +2142,8 @@ export function createWebWorkspace(
     setHostAppearance,
     leaveHost,
     removeOwnedHost,
+    setHostHidden,
+    canHideHosts: runtime.setHostHidden !== undefined,
     retryHosts,
     reconnect,
     restartRequested,

@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Не удалось покинуть {name}",
   "mobile.server.drawer.removeFailed": "Не удалось удалить {name}",
   "mobile.server.drawer.deleteFailed": "Не удалось удалить {name}",
+  "mobile.server.drawer.hide": "Скрыть сервер",
+  "mobile.server.drawer.show": "Показать сервер",
+  "mobile.server.drawer.hiddenServers": "Скрытые серверы",
+  "mobile.server.drawer.hideFailed": "Не удалось скрыть {name}",
+  "mobile.server.drawer.showFailed": "Не удалось показать {name}",
   "mobile.server.drawer.actionFailed": "OpenBot не смог выполнить это действие. Повторите попытку.",
   "mobile.server.drawer.moveUp": "Выше",
   "mobile.server.drawer.moveDown": "Ниже",
@@ -313,6 +318,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Сервер будет удалён из сервиса аккаунтов для всех участников. Файлы и чаты на его компьютере останутся. Чтобы снова использовать сервер, зарегистрируйте его с того компьютера.",
   "mobile.server.settings.remove": "Удалить сервер",
+  "mobile.server.settings.hide": "Скрыть сервер",
+  "mobile.server.settings.show": "Показать сервер",
   "mobile.server.settings.deleteTitle": "Удалить {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot останавливает сервер на его компьютере и перемещает его агентов, чаты и файлы в корзину этого компьютера. Сервер исчезнет из списка серверов на всех ваших устройствах.",

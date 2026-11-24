@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Kan {name} niet verlaten",
   "mobile.server.drawer.removeFailed": "Kan {name} niet verwijderen",
   "mobile.server.drawer.deleteFailed": "Kan {name} niet verwijderen",
+  "mobile.server.drawer.hide": "Server verbergen",
+  "mobile.server.drawer.show": "Server tonen",
+  "mobile.server.drawer.hiddenServers": "Verborgen servers",
+  "mobile.server.drawer.hideFailed": "Kan {name} niet verbergen",
+  "mobile.server.drawer.showFailed": "Kan {name} niet tonen",
   "mobile.server.drawer.actionFailed": "OpenBot kan deze actie niet voltooien. Probeer het opnieuw.",
   "mobile.server.drawer.moveUp": "Omhoog",
   "mobile.server.drawer.moveDown": "Omlaag",
@@ -271,6 +276,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Hiermee verwijder je de server uit de accountdienst voor alle leden. Bestanden en chats op de computer blijven bewaard. Registreer de server vanaf die computer om hem weer te gebruiken.",
   "mobile.server.settings.remove": "Server verwijderen",
+  "mobile.server.settings.hide": "Server verbergen",
+  "mobile.server.settings.show": "Server tonen",
   "mobile.server.settings.deleteTitle": "{name} verwijderen?",
   "mobile.server.settings.deleteBody":
     "OpenBot stopt de server op zijn computer en verplaatst de agents, chats en bestanden naar de prullenbak van die computer. De server verdwijnt uit de serverlijst op al je apparaten.",

@@ -181,7 +181,7 @@ import {
 import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
 import { createServerPaywall } from "@openbot/ui/features/servers/ServerPaywall";
 import { serverPlanBlocks, serverPlanScreenShown } from "@openbot/ui/features/servers/ServerPlanEnd";
-import { ServerRail } from "@openbot/ui/features/servers/ServerRail";
+import { type HiddenServer, ServerRail } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { createSettingsHostedServersStore } from "@openbot/ui/features/settings/stores/hosted-servers-store";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
@@ -643,6 +643,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         notificationsMutedUntil: notice.mutedUntil,
         notificationLevel: notice.level,
         remoteDesktopAvailable: false,
+        hidden: host.hidden === true,
         ...(appearance === undefined ? {} : { appearance }),
         ...(host.memberLimit === undefined ? {} : { memberLimit: host.memberLimit }),
         ...(host.hosted === undefined ? {} : { hosted: host.hosted }),
@@ -665,6 +666,53 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     }),
   );
   const server = createMemo(() => servers().find((item) => item.active));
+  const shownServers = createMemo(() => servers().filter((item) => item.active || item.hidden !== true));
+  const hiddenServers = createMemo<HiddenServer[]>(() =>
+    servers()
+      .filter((item) => !item.active && item.hidden === true)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        logoUrl: item.logoUrl,
+        appearance: item.appearance,
+        show: () => void changeServerHidden(item.id, false),
+      })),
+  );
+  function reorderShownServers(shownIds: string[]): void {
+    const shown = new Set(shownIds);
+    let index = 0;
+    workspace.reorderHosts(servers().map((item) => (shown.has(item.id) ? (shownIds[index++] ?? item.id) : item.id)));
+  }
+  function canHideServer(serverId: string): boolean {
+    if (!workspace.canHideHosts) return false;
+    const target = servers().find((item) => item.id === serverId);
+    if (!target || target.hidden === true) return false;
+    return shownServers().some((item) => item.id !== serverId);
+  }
+  async function changeServerHidden(serverId: string, hidden: boolean): Promise<void> {
+    const host = workspace.state.hosts.find((item) => item.hostId === serverId);
+    if (!host) return;
+    try {
+      await workspace.setHostHidden(host, hidden);
+    } catch (error) {
+      actionToast.error(t(hidden ? "server.rail.hideFailed" : "server.rail.showFailed", { name: host.name }), {
+        error,
+        report: { operation: "team", source: "action", cause_code: classifyFailure(error) },
+      });
+    }
+  }
+  async function hideServer(serverId: string): Promise<void> {
+    if (!canHideServer(serverId)) return;
+    if (workspace.state.host?.hostId === serverId) {
+      const others = shownServers().filter((item) => item.id !== serverId);
+      const other = others.find((item) => item.state === "online") ?? others[0];
+      if (!other) return;
+      chatHistory.userOpensServer(other.id);
+      await connectServer(other.id);
+      if (workspace.state.host?.hostId === serverId) return;
+    }
+    await changeServerHidden(serverId, true);
+  }
   const paywall = createServerPaywall({
     server,
     subscribe: (request) => hostedServers.calls.openCustomCheckout(request),
@@ -1913,6 +1961,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     canRestart: (serverId) => hostedServers.isHosted(serverId) || restartsItself(serverId),
     planDeletesAt: hostedServers.planDeletesAt,
     onRenewPlan: hostedServers.renewPlan,
+    onHide: (serverId) => void hideServer(serverId),
+    canHide: canHideServer,
   } satisfies ServerActionCallbacks;
   let entry: { id: string; offered: boolean } | null = null;
   createEffect(
@@ -2865,8 +2915,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
           when={!workspace.state.otherTab}
           fallback={
             <div class="web-other-tab-window">
-              <Show when={servers().length > 1}>
-                <ServerRail servers={servers()} onSelect={selectServer} onReorder={workspace.reorderHosts} />
+              <Show when={shownServers().length > 1}>
+                <ServerRail servers={shownServers()} onSelect={selectServer} onReorder={reorderShownServers} />
               </Show>
               <WebServerOtherTab
                 name={workspace.state.host?.name ?? ""}
@@ -2924,7 +2974,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 <ServerMenu
                   rail
                   serverName={workspace.state.host?.name ?? "OpenBot"}
-                  servers={servers()}
+                  servers={shownServers()}
+                  hiddenServers={hiddenServers()}
                   view={layout.serverView()}
                   onViewChange={layout.setServerView}
                   onSelect={selectServer}
@@ -3207,9 +3258,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 <>
                   <Show when={layout.serverRailVisible()}>
                     <ServerRail
-                      servers={servers()}
+                      servers={shownServers()}
+                      hiddenServers={hiddenServers()}
                       onSelect={selectServer}
-                      onReorder={workspace.reorderHosts}
+                      onReorder={reorderShownServers}
                       onAdd={() => hostedServers.openAddServer("server_rail")}
                       addCreatesServer={hostedServers.available()}
                       {...serverActionCallbacks}
@@ -3256,7 +3308,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         return id && badge ? { ...badge, onOpen: () => void showServerUpdate(id) } : undefined;
                       })()}
                       serverMenu={{
-                        servers: servers(),
+                        servers: shownServers(),
+                        hiddenServers: hiddenServers(),
                         view: layout.serverView(),
                         onViewChange: layout.setServerView,
                         onSelect: selectServer,

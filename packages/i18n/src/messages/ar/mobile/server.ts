@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "تعذّرت مغادرة {name}",
   "mobile.server.drawer.removeFailed": "تعذّرت إزالة {name}",
   "mobile.server.drawer.deleteFailed": "تعذّر حذف {name}",
+  "mobile.server.drawer.hide": "إخفاء الخادم",
+  "mobile.server.drawer.show": "إظهار الخادم",
+  "mobile.server.drawer.hiddenServers": "الخوادم المخفية",
+  "mobile.server.drawer.hideFailed": "تعذر إخفاء {name}",
+  "mobile.server.drawer.showFailed": "تعذر إظهار {name}",
   "mobile.server.drawer.actionFailed": "تعذّر على OpenBot إكمال هذا الإجراء. أعد المحاولة.",
   "mobile.server.drawer.moveUp": "نقل لأعلى",
   "mobile.server.drawer.moveDown": "نقل لأسفل",
@@ -340,6 +345,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "يزيل هذا الخادم من خدمة الحسابات لكل الأعضاء. تبقى الملفات والدردشات على حاسوبه. لاستخدامه مجددًا، سجّله من ذلك الحاسوب.",
   "mobile.server.settings.remove": "إزالة الخادم",
+  "mobile.server.settings.hide": "إخفاء الخادم",
+  "mobile.server.settings.show": "إظهار الخادم",
   "mobile.server.settings.deleteTitle": "هل تريد حذف {name}؟",
   "mobile.server.settings.deleteBody":
     "يوقف OpenBot الخادم على حاسوبه وينقل وكلاءه ودردشاته وملفاته إلى سلة المهملات في ذلك الحاسوب. ويختفي الخادم من قائمة الخوادم على كل أجهزتك.",

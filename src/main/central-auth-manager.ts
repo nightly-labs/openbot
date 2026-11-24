@@ -1318,6 +1318,21 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  readonly setRemoteHostHidden = Effect.fn("CentralAuth.setRemoteHostHidden")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      hidden: boolean,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      return yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/hidden`,
+        { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hidden }) },
+        decodeVoid,
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   readonly pendingOwnerTransfer = Effect.fn("CentralAuth.pendingOwnerTransfer")(
     function* (
       this: CentralAuthManager,
