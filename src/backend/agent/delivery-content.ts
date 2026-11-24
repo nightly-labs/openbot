@@ -505,10 +505,10 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   const wokenWaits = sources.wokenWaits ?? [];
   if (delivery.sender.kind === "routine" && sources.continuesWait) {
     text = [
-      "An event of an existing OpenBot routine continues a wait that you opened in this thread.",
+      "An event of an existing OpenBot routine continues a wait that you opened in this chat.",
       `Routine name: ${delivery.sender.routineName}`,
       "The routine run does the routine task in its own chat. Do not do the routine task here, and do not create, update, delete, or test routines.",
-      "Continue the work of this thread with the event, then give your answer as usual.",
+      "Continue the work of this chat with the event, then give your answer as usual.",
       ROUTINE_TASK_START,
       displayText,
       ROUTINE_TASK_END,

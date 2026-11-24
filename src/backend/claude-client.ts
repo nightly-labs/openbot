@@ -2938,20 +2938,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const turn = runtime.activeTurn;
     const hostToolCall = new AbortController();
     turn?.hostToolCalls.add(hostToolCall);
-    const result = yield* this.#awaitHost(
-      threadId,
-      this.#serverRequests.call(
-        "item/tool/call",
-        {
-          threadId,
-          turnId: turn?.id ?? randomUUID(),
-          callId: randomUUID(),
-          namespace,
-          tool: name,
-          arguments: args,
-        },
-        hostToolCall.signal,
-      ),
+    const call = this.#serverRequests.call(
+      "item/tool/call",
+      {
+        threadId,
+        turnId: turn?.id ?? randomUUID(),
+        callId: randomUUID(),
+        namespace,
+        tool: name,
+        arguments: args,
+      },
+      hostToolCall.signal,
+    );
+    const result = yield* (
+      waitsForBrowserPerson(namespace, name, args) ? this.#awaitPerson(threadId, call) : this.#awaitHost(threadId, call)
     ).pipe(
       Effect.ensuring(Effect.sync(() => turn?.hostToolCalls.delete(hostToolCall))),
       toProviderClientOperationError,
@@ -3076,6 +3076,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 }
 
 type ClaudeSdkLaunch = Pick<Options, "pathToClaudeCodeExecutable" | "spawnClaudeCodeProcess">;
+
+const BROWSER_PERSON_TOOLS: ReadonlySet<string> = new Set(
+  ["request_takeover", "submit_secret"].map((tool) => `mcp__${OPENBOT_BROWSER_NAMESPACE}__${tool}`),
+);
+
+function waitsForBrowserPerson(namespace: string, name: string, args: unknown): boolean {
+  return BROWSER_PERSON_TOOLS.has(claudeBridgedToolName(`mcp__${namespace}__${name}`, args));
+}
 
 const writeClaudeMcpConfig = Effect.fn("ClaudeAgentClient.writeMcpConfig")(function* (
   stateDirectory: string,
