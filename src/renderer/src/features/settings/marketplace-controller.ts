@@ -1,4 +1,4 @@
-import { X_AGENT_LISTING_ID } from "@openbot/contracts/browser-extension-x";
+import { X_AGENT_LISTING_ID, X_EXTENSION_URL } from "@openbot/contracts/browser-extension-x";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AddedAgent,
@@ -889,7 +889,7 @@ export function createMarketplaceController(
           status: status === "unavailable" ? "idle" : status,
         };
       }),
-      ...(props.xApp
+      ...(props.xApp && X_EXTENSION_URL
         ? [
             {
               kind: "x",
@@ -899,6 +899,7 @@ export function createMarketplaceController(
               category: "productivity",
               status: xAgent() ? "connected" : "idle",
               agent: xAgent(),
+              extensionUrl: X_EXTENSION_URL,
             } satisfies MarketplaceApp,
           ]
         : []),

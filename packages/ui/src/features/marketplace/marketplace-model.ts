@@ -78,7 +78,7 @@ export type MarketplaceApp =
       connections: Readonly<Record<string, MarketplaceAppConnection>>;
     })
   | (AppBase & { kind: "connector"; connector: ConnectorId; category: SkillCategory })
-  | (AppBase & { kind: "x"; category: SkillCategory; agent: MarketplaceAgent | null })
+  | (AppBase & { kind: "x"; category: SkillCategory; agent: MarketplaceAgent | null; extensionUrl: string })
   | (AppBase & { kind: "custom"; server: McpServerConfig });
 
 export type AppSetup = "channel" | "vault" | "account" | "key" | "desktop" | "open" | "custom";

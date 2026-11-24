@@ -307,6 +307,7 @@ function storyXApp(agent: MarketplaceAgent | null): MarketplaceApp {
     category: "productivity",
     status: agent ? "connected" : "idle",
     agent,
+    extensionUrl: "https://chromewebstore.google.com/detail/openbot",
   };
 }
 

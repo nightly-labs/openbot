@@ -1,4 +1,4 @@
-import { X_AGENT_LISTING_ID, X_EXTENSION_URL } from "@openbot/contracts/browser-extension-x";
+import { X_AGENT_LISTING_ID } from "@openbot/contracts/browser-extension-x";
 import type { MarketplaceAgentDetail } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -107,7 +107,7 @@ export function MarketplaceXAppPage(props: {
       });
   };
   const update = (detail: MarketplaceAgentDetail) => void model().addAgent(detail, true);
-  const openExtension = () => model().openUrl(X_EXTENSION_URL);
+  const openExtension = () => model().openUrl(props.app.extensionUrl);
   return (
     <IntegrationPage
       class="marketplace-x-page"

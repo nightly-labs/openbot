@@ -2,7 +2,7 @@ import { isDynamicRecord, isString } from "./runtime-values";
 
 export const X_AGENT_LISTING_ID = "openbot-curated-agent-x-desk";
 
-export const X_EXTENSION_URL = "https://chromewebstore.google.com/detail/openbot";
+export const X_EXTENSION_URL: string | null = null;
 
 export const X_PAGE_RULES_ROUTE = "/v1/browser-extension/x-rules";
 
