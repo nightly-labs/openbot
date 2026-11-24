@@ -222,6 +222,7 @@ interface HeldProviderError {
   context: FailureContext & { causeCode: CauseCode };
   quiet?: boolean;
   link?: string;
+  movesToBackup?: true;
 }
 
 function accountLink(params: unknown): string | undefined {
@@ -1492,7 +1493,7 @@ export class TurnLifecycle {
           !this.#turnErrors.has(turnId)
             ? "completed"
             : (reported === "interrupted" &&
-                  this.#compactionFailures.get(turnId)?.stalled &&
+                  (this.#compactionFailures.get(turnId)?.stalled || this.#failoverTurns.get(turnId)?.movesToBackup) &&
                   !this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId)) ||
                 noAnswer
               ? "failed"
@@ -1616,12 +1617,13 @@ export class TurnLifecycle {
           return;
         }
         if (isRecord(params) && params.willRetry === true) {
+          const details = getString(error, "additionalDetails");
           this.#providerRetried(
             agentId,
             threadId,
             getString(params, "turnId"),
             source.provider,
-            modelAtCapacity(error, getString(error, "additionalDetails")),
+            modelAtCapacity(error, details) ? (details ?? message) : null,
           );
           return;
         }
@@ -1834,9 +1836,10 @@ export class TurnLifecycle {
     threadId: string | null | undefined,
     turnId: string | null,
     provider: AgentClient["provider"],
-    atCapacity: boolean,
+    capacityMessage: string | null,
   ): void {
     if (!agentId || !threadId || !turnId || !this.#runningTurns.has(turnId)) return;
+    const atCapacity = capacityMessage !== null;
     const attempts = (this.#turnRetries.get(turnId) ?? 0) + 1;
     this.#turnRetries.set(turnId, attempts);
     logger.info("A provider retries a request.", {
@@ -1848,6 +1851,7 @@ export class TurnLifecycle {
     if (atCapacity) {
       if (this.#capacityNotices.has(turnId)) return;
       this.#capacityNotices.add(turnId);
+      if (this.#movesToBackupAtCapacity(agentId, threadId, turnId, provider, capacityMessage)) return;
     } else if (attempts !== RETRY_NOTICE_ATTEMPTS) return;
     const compacts = !atCapacity && this.#compaction.retrying(threadId);
     const percent = this.#compaction.usedPercent(threadId);
@@ -1870,6 +1874,45 @@ export class TurnLifecycle {
         ...(atCapacity ? { causeCode: CAPACITY_CAUSE } : {}),
       },
     );
+  }
+
+  #movesToBackupAtCapacity(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    provider: AgentClient["provider"],
+    message: string,
+  ): boolean {
+    const running = this.#runningTurns.get(turnId);
+    const model = this.#hooks.turnModel(agentId, turnId);
+    const failedKey = this.#usageLimits.failureKey(agentId, model);
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    if (
+      running === undefined ||
+      failedKey === null ||
+      deliveries.length === 0 ||
+      this.#limitedTurns.has(turnId) ||
+      this.#failoverTurns.has(turnId) ||
+      this.#observedCompactions.get(threadId) === turnId ||
+      this.#compaction.isCompactionTurn(threadId, turnId) ||
+      this.#channelTask(this.#conversation.publicThreadId(agentId, threadId), deliveries) ||
+      deliveries.some(({ delivery }) => this.#failoverRetries.get(delivery.id)?.has(failedKey)) ||
+      this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId) ||
+      !this.#hooks.mayFailOver(agentId)
+    )
+      return false;
+    logger.info("A model is at capacity, so OpenBot moves the turn to a backup model.", { provider, model });
+    this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, CAPACITY_CAUSE);
+    this.#failoverTurns.set(turnId, {
+      message,
+      context: { causeCode: CAPACITY_CAUSE, provider, model, turnId, severity: "error" },
+      movesToBackup: true,
+    });
+    Effect.runFork(
+      running.client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore),
+    );
+    return true;
   }
 
   requestNoUpdate(
