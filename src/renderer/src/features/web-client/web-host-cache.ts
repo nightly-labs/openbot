@@ -1,4 +1,4 @@
-import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 
 function cacheKey(accountId: string): string {
@@ -21,7 +21,7 @@ function decodeHost(value: unknown): RemoteTeamHost | null {
     (role !== "owner" && role !== "admin" && role !== "member")
   )
     return null;
-  return {
+  const host: RemoteTeamHost = {
     hostId,
     name,
     logoKey: value.logoKey,
@@ -29,6 +29,13 @@ function decodeHost(value: unknown): RemoteTeamHost | null {
     membershipId,
     role,
   };
+  if (isNumber(value.memberLimit)) host.memberLimit = value.memberLimit;
+  if (isBoolean(value.hosted)) host.hosted = value.hosted;
+  if (isBoolean(value.restartAvailable)) host.restartAvailable = value.restartAvailable;
+  if (isNumber(value.storageGb)) host.storageGb = value.storageGb;
+  if (isNumber(value.keyChangedAt)) host.keyChangedAt = value.keyChangedAt;
+  if (value.paymentRequired === true) host.paymentRequired = true;
+  return host;
 }
 
 export function readCachedWebHosts(accountId: string): RemoteTeamHost[] {

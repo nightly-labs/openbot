@@ -492,10 +492,15 @@ export function MessageBody(props: {
   });
   const loadedImages = new Set<string>();
   const loadingImages = new Set<string>();
+  let loadingSource = props.mediaSource;
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
       const source = props.mediaSource;
+      if (source !== loadingSource) {
+        loadingImages.clear();
+        loadingSource = source;
+      }
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
@@ -503,11 +508,13 @@ export function MessageBody(props: {
           unloaded(attachment);
           continue;
         }
-        if (loadingImages.has(attachment.id)) continue;
         if (!source) continue;
-        loadingImages.add(attachment.id);
+        const limit = loadLimit(attachment);
+        const loading = `${attachment.id}:${limit}`;
+        if (loadingImages.has(loading)) continue;
+        loadingImages.add(loading);
         void source
-          .load(attachment, loadLimit(attachment))
+          .load(attachment, limit)
           .then(
             (shown) => {
               if (shown) loadedImages.add(attachment.id);
@@ -515,7 +522,7 @@ export function MessageBody(props: {
             },
             () => unloaded(attachment),
           )
-          .finally(() => loadingImages.delete(attachment.id));
+          .finally(() => loadingImages.delete(loading));
       }
     },
   );

@@ -10,10 +10,7 @@ interface PictureShape {
 const CACHE_LIMIT = 128;
 const shapeCache = new Map<string, Promise<PictureShape | undefined>>();
 
-async function pictureShape(url: string): Promise<PictureShape | undefined> {
-  const response = await fetch(url);
-  if (!response.ok) return undefined;
-  const blob = await response.blob();
+async function blobShape(blob: Blob): Promise<PictureShape | undefined> {
   if (blob.type === "image/jpeg") return undefined;
   const bitmap = await createImageBitmap(blob);
   try {
@@ -39,17 +36,22 @@ async function pictureShape(url: string): Promise<PictureShape | undefined> {
 
 function cachedPictureShape(url: string): Promise<PictureShape | undefined> {
   const known = shapeCache.get(url);
-  if (known) return known;
-  const pending = pictureShape(url).then(
-    (shape) => {
-      if (!shape) shapeCache.delete(url);
-      return shape;
-    },
-    (error: unknown) => {
-      shapeCache.delete(url);
-      throw error;
-    },
-  );
+  if (known) {
+    shapeCache.delete(url);
+    shapeCache.set(url, known);
+    return known;
+  }
+  const forget = () => {
+    if (shapeCache.get(url) === pending) shapeCache.delete(url);
+  };
+  const pending = fetch(url).then(async (response) => {
+    if (!response.ok) {
+      forget();
+      return undefined;
+    }
+    return blobShape(await response.blob());
+  });
+  pending.catch(forget);
   shapeCache.set(url, pending);
   if (shapeCache.size > CACHE_LIMIT) {
     const oldest = shapeCache.keys().next().value;

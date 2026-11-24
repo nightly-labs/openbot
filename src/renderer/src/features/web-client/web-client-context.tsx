@@ -1027,9 +1027,13 @@ export function createWebWorkspace(
         markRemoteSync("hosts-start");
         const cachedHostId = readWebServerSelection(props.accountId);
         const cachedHost =
-          hostId === null ? (state.hosts.find((host) => host.hostId === cachedHostId) ?? state.hosts[0] ?? null) : null;
+          hostId === null
+            ? (state.hosts.find((host) => host.hostId === cachedHostId) ??
+              orderWebHosts(state.hosts, serverOrder())[0] ??
+              null)
+            : null;
         const listedHosts = runtime.listHosts();
-        if (cachedHost) void attemptConnection(cachedHost).catch(() => undefined);
+        if (cachedHost) void connect(cachedHost);
         const refreshGeneration = generation;
         const refreshHostId = hostId;
         const hosts = await listedHosts;
@@ -1103,8 +1107,15 @@ export function createWebWorkspace(
           await runtime.disconnect().catch(() => undefined);
         }
         const connected = hosts.find((host) => host.hostId === hostId);
+        const listedEarlyHost = connected && connected.hostId === earlyHostId ? connected : null;
         setState((draft) => {
-          if (connected && draft.host?.hostId === connected.hostId) {
+          if (listedEarlyHost && draft.host?.hostId === listedEarlyHost.hostId) {
+            const appearance = draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY)
+              ? draft.host.appearance
+              : listedEarlyHost.appearance;
+            draft.host = { ...listedEarlyHost };
+            if (appearance !== undefined) draft.host.appearance = appearance;
+          } else if (connected && draft.host?.hostId === connected.hostId) {
             draft.host.name = connected.name;
             draft.host.logoKey = connected.logoKey;
             if (connected.appearance !== undefined && !draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY))
@@ -1115,6 +1126,10 @@ export function createWebWorkspace(
           draft.hostsError = null;
         });
         for (const left of leftHostIds) if (!hosts.some((host) => host.hostId === left)) leftHostIds.delete(left);
+        if (listedEarlyHost && cachedHost && listedEarlyHost.devicePublicKey !== cachedHost.devicePublicKey) {
+          await connectionPromise?.promise.catch(() => undefined);
+          if (!disposed && hostId === listedEarlyHost.hostId) await connect(listedEarlyHost);
+        }
         if (!hostId) {
           const savedHostId = readWebServerSelection(props.accountId);
           const initialHost =

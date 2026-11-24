@@ -32,7 +32,7 @@ import { decodeTeamProtocolV10WebRtcHttpResponse } from "@openbot/contracts/team
 import { sourceText } from "@openbot/i18n/source";
 import { remoteWorkspaceReadTimeout, startRemoteRequestDeadline } from "@openbot/team-client/remote-recovery";
 import { type RemoteRequestProfile, startRemoteRequest } from "@openbot/team-client/sync-profile";
-import { Context, Deferred, Effect, Fiber, Layer, Result, Schema } from "effect";
+import { Context, Deferred, Effect, Exit, Fiber, Layer, Result, Schema } from "effect";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { RemoteConnectionBootstrap } from "./central-auth-manager";
 import type {
@@ -207,6 +207,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
   readonly #lastEventSequence = new Map<string, number>();
   readonly #eventAckTimers = new Map<string, ReturnType<typeof setTimeout>>();
   readonly #lastTyping = new Map<string, { agentId: string | null; typing: boolean; sentAt: number }>();
+  readonly #typingInFlight = new Map<string, { agentId: string | null; typing: boolean }>();
   readonly #hostPublicKeys = new Map<string, string>();
   #hostKeySync: Deferred.Deferred<void> | null = null;
   #signalUrl: string | null = null;
@@ -375,15 +376,26 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     agentId: string | null,
     typing: boolean,
   ): Effect.fn.Return<void, RemoteWorkflowError> {
+    const pending = this.#typingInFlight.get(hostId);
     const previous = this.#lastTyping.get(hostId);
-    if (
-      previous?.agentId === agentId &&
-      previous.typing === typing &&
-      (!typing || Date.now() - previous.sentAt < TYPING_REFRESH_MILLISECONDS)
-    )
-      return;
-    yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "team-typing", agentId, typing }));
-    this.#lastTyping.set(hostId, { agentId, typing, sentAt: Date.now() });
+    const duplicate = pending
+      ? pending.agentId === agentId && pending.typing === typing
+      : previous?.agentId === agentId &&
+        previous.typing === typing &&
+        (!typing || Date.now() - previous.sentAt < TYPING_REFRESH_MILLISECONDS);
+    if (duplicate) return;
+    const inFlight = { agentId, typing };
+    this.#typingInFlight.set(hostId, inFlight);
+    yield* this.#owned(this.#sendEventControlEffect(hostId, { type: "team-typing", agentId, typing })).pipe(
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          if (this.#typingInFlight.get(hostId) !== inFlight) return;
+          this.#typingInFlight.delete(hostId);
+          if (Exit.isSuccess(exit)) this.#lastTyping.set(hostId, { agentId, typing, sentAt: Date.now() });
+          else this.#lastTyping.delete(hostId);
+        }),
+      ),
+    );
   }).bind(this);
 
   readonly setDirectTyping = Effect.fn("TeamWebRtcClient.setDirectTyping")(function* (
@@ -1266,6 +1278,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     if (ackTimer !== undefined) clearTimeout(ackTimer);
     this.#eventAckTimers.delete(hostId);
     this.#lastTyping.delete(hostId);
+    this.#typingInFlight.delete(hostId);
     for (const [requestId, pending] of this.#pending) {
       if (pending.hostId !== hostId) continue;
       clearTimeout(pending.timer);

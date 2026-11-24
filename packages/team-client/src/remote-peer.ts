@@ -562,11 +562,11 @@ export function createRemoteTeamPeer(
       const state = peer;
       if (!state || !isPeerOnline(state)) return;
       const nextTyping = { agentId, typing };
-      if (
-        (lastTyping?.agentId === agentId && lastTyping.typing === typing && typingSentRecently(lastTyping)) ||
-        (typingInFlight?.state.agentId === agentId && typingInFlight.state.typing === typing)
-      )
-        return;
+      const pending = typingInFlight?.state ?? null;
+      const duplicate = pending
+        ? pending.agentId === agentId && pending.typing === typing
+        : lastTyping?.agentId === agentId && lastTyping.typing === typing && typingSentRecently(lastTyping);
+      if (duplicate) return;
       const send = runPeerEffect(sendEventControl(state, { type: "team-typing", agentId, typing }));
       const inFlight = { state: nextTyping };
       typingInFlight = inFlight;
@@ -577,7 +577,9 @@ export function createRemoteTeamPeer(
           typingInFlight = null;
         },
         () => {
-          if (typingInFlight === inFlight) typingInFlight = null;
+          if (typingInFlight !== inFlight) return;
+          typingInFlight = null;
+          lastTyping = null;
         },
       );
     },
