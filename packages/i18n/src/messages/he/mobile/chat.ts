@@ -311,6 +311,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "מהירות ההשמעה: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "לא ניתן להקריא את ההודעה",
+  "mobile.chat.message.readAloudModelMissing": "כדי לשמוע הודעות, יש להוריד את מודל הקול בהגדרות > קול.",
   "mobile.chat.message.selectText": "בחירת טקסט",
   "mobile.chat.message.copyImage": "העתקת תמונה",
   "mobile.chat.message.copyText": "העתקת טקסט",

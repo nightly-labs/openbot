@@ -313,6 +313,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "再生速度：{speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "メッセージを読み上げられませんでした",
+  "mobile.chat.message.readAloudModelMissing":
+    "メッセージを聞くには、設定 > 音声 で音声モデルをダウンロードしてください。",
   "mobile.chat.message.selectText": "テキストを選択",
   "mobile.chat.message.copyImage": "画像をコピー",
   "mobile.chat.message.copyText": "テキストをコピー",

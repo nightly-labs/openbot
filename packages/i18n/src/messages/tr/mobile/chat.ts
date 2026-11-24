@@ -311,6 +311,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Oynatma hızı: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Mesaj sesli okunamadı",
+  "mobile.chat.message.readAloudModelMissing": "Mesajları dinlemek için Ayarlar > Ses bölümünden ses modelini indir.",
   "mobile.chat.message.selectText": "Metni seç",
   "mobile.chat.message.copyImage": "Görseli kopyala",
   "mobile.chat.message.copyText": "Metni kopyala",

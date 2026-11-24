@@ -309,6 +309,7 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "재생 속도: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "메시지를 읽을 수 없습니다",
+  "mobile.chat.message.readAloudModelMissing": "메시지를 들으려면 설정 > 음성에서 음성 모델을 다운로드하세요.",
   "mobile.chat.message.selectText": "텍스트 선택",
   "mobile.chat.message.copyImage": "이미지 복사",
   "mobile.chat.message.copyText": "텍스트 복사",
