@@ -156,6 +156,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Dosyalar paylaşılamadı",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Birçok dosyayı paylaşmak için uygulamanın en son sürümü gerekir.",
   "mobile.chat.attachment.preview": "{name} önizlemesi",
+  "mobile.chat.attachment.seeAll": "Tümünü görmek için dokunun",
   "mobile.chat.attachment.displayFailed": "Bu görsel görüntülenemedi.",
   "mobile.chat.attachment.loadingImage": "Görsel yükleniyor",
   "mobile.chat.attachment.uploading": "{name} yükleniyor",

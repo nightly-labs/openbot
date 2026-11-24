@@ -157,6 +157,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesNeedsUpdate":
     "複数のファイルを共有するには、アプリを最新バージョンにしてください。",
   "mobile.chat.attachment.preview": "{name} のプレビュー",
+  "mobile.chat.attachment.seeAll": "タップしてすべて表示",
   "mobile.chat.attachment.displayFailed": "この画像を表示できませんでした。",
   "mobile.chat.attachment.loadingImage": "画像を読み込み中",
   "mobile.chat.attachment.uploading": "{name} をアップロード中",

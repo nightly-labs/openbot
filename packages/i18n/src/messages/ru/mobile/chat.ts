@@ -215,6 +215,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Не удалось поделиться файлами",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Чтобы поделиться несколькими файлами, обновите приложение.",
   "mobile.chat.attachment.preview": "Просмотр: {name}",
+  "mobile.chat.attachment.seeAll": "Нажмите, чтобы увидеть всё",
   "mobile.chat.attachment.displayFailed": "Не удалось показать это изображение.",
   "mobile.chat.attachment.loadingImage": "Загрузка изображения",
   "mobile.chat.attachment.uploading": "Загрузка: {name}",
