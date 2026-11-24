@@ -19,7 +19,6 @@ import {
   OUTBOX_FLUSH_MESSAGE,
   PANEL_PORT,
   type StorageRequest,
-  X_IDLE_MESSAGE,
   X_MESSAGE,
   X_OFFSCREEN_MESSAGE,
   X_PANEL_MESSAGE,
@@ -258,12 +257,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.tab || sender.url !== chrome.runtime.getURL(OFFSCREEN_PAGE)) return undefined;
     void storageAnswer(storage).then(sendResponse, () => sendResponse({}));
     return true;
-  }
-  if (isDynamicRecord(message) && message.kind === X_IDLE_MESSAGE && !sender.tab) {
-    void clientBrowser.sharing().then((sharing) => {
-      if (!sharing) void chrome.offscreen.closeDocument().catch(() => undefined);
-    });
-    return undefined;
   }
   if (isDynamicRecord(message) && message.kind === OUTBOX_FLUSH_MESSAGE && fromExtensionPage(sender)) {
     void flushOutbox(true).then(

@@ -831,8 +831,8 @@ window.
 - **Connection** (`src/client-browser-link.ts`). The page that holds the server connection (the side
   panel, else the offscreen page) sends the presence when it changes (at most once in 5 s, and an
   unchanged presence only every 30 s) and at once after a reconnection. It passes each `client-browser-command` event to the worker and posts the worker's
-  answer to `/v1/client-browser/result`. While the user shares, the offscreen page does not close when
-  it is idle, and the worker opens it when the last panel closes or the browser starts.
+  answer to `/v1/client-browser/result`. The offscreen page does not close when it is idle, and the
+  worker opens it when the last panel closes or the browser starts.
 - **Commands** (`src/client-browser-executor.ts`). CDP 1.3 on any open web tab: it attaches on demand,
   puts the tab into the OpenBot group of its window, and detaches after 30 s with no command. Page
   scripts run in one isolated world per tab, made again after a navigation. `snapshot` keeps a map from

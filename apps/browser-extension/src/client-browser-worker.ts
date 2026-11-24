@@ -64,7 +64,6 @@ interface Options {
 }
 
 export interface ClientBrowserWorker {
-  sharing: () => Promise<boolean>;
   panelClosed: () => void;
 }
 
@@ -370,7 +369,6 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
   setTimeout(() => void hold().catch(() => undefined), 2_000);
 
   return {
-    sharing: async () => true,
     panelClosed: () => {
       setTimeout(() => void hold().catch(() => undefined), 1_000);
     },
