@@ -2016,6 +2016,7 @@ export async function createApplicationServices({
   const workflowRuns = new WorkflowRunStore({ database: store.database });
   const userData = app.getPath("userData");
   const storageSources = {
+    libraryFiles: () => new Set(Object.keys(libraryFolders.getSnapshot().placement)),
     roots: {
       database: store.database.path,
       downloads: store.downloadsRoot,
