@@ -48,6 +48,7 @@ export function isNonActionableCodexWarning(message: string): boolean {
   return (
     message.startsWith("Skill descriptions were shortened to fit") ||
     message.startsWith("Exceeded skills context budget") ||
+    message.startsWith("Combined user instructions use ") ||
     message.startsWith("Falling back from WebSockets to HTTPS transport.") ||
     message.startsWith("Under-development features enabled:") ||
     message.startsWith("Configured service tier ") ||

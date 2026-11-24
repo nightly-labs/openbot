@@ -424,6 +424,8 @@ export const messages = {
     "{provider} zablokował tę wiadomość z powodu swoich zasad bezpieczeństwa: {reason} Jeśli {provider} zablokuje także twoje kolejne wiadomości, rozpocznij nowy czat.",
   "error.provider.codexAudioRefused":
     "Ten model nie może słuchać dźwięku, więc nie przyjął dźwięku z tego czatu. OpenBot rozpoczął nową sesję Codex z historią czatu. Aby kontynuować, wyślij prośbę ponownie i poproś agenta, aby pracował bez dźwięku. Aby sprawdzić dźwięk, wybierz w menu modeli agenta model, który może słuchać dźwięku.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex nie mógł wczytać ustawień Twojego konta ChatGPT, więc agent się zatrzymał. Spróbuj ponownie. Jeśli znów się zatrzyma, wybierz Połącz ponownie dla ChatGPT w Ustawienia serwera > Dostawcy.",
   "error.provider.imageTooSmall":
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za mały. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooLarge":

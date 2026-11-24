@@ -87,6 +87,7 @@ import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import {
   GEMINI_INVALID_CREDENTIALS,
   isBalanceDiagnostic,
+  isCodexAccountSettingsFailure,
   isPlanLimitDiagnostic,
   isUsageLimitDiagnostic,
   providerResetDelayMs,
@@ -1809,7 +1810,16 @@ export class TurnLifecycle {
             model: context.model,
             message: this.#hooks.redactMcp(message),
           });
-        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : message;
+        const accountSettingsFailure = source.provider === "codex" && isCodexAccountSettingsFailure(message);
+        if (accountSettingsFailure)
+          logger.warn("Codex could not load the settings of its ChatGPT account.", {
+            message: this.#hooks.redactMcp(message),
+          });
+        const shown = backupsAtLimit
+          ? sourceText("error.agent.backupModelsAtLimit")
+          : accountSettingsFailure
+            ? sourceText("error.provider.codexAccountSettingsUnreadable")
+            : message;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
           this.#hooks.taskFailed(taskId, shown);

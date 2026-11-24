@@ -287,6 +287,10 @@ export function isRequestBodyLimitDiagnostic(message: string): boolean {
   return /\brequest body exceeds \d+ bytes\b|\bmessage size exceeds [\d.,]+ ?MB limit\b/iu.test(message);
 }
 
+export function isCodexAccountSettingsFailure(message: string): boolean {
+  return /\bfailed to (?:re)?load workspace requirements\b/u.test(message);
+}
+
 export function isUnreadableContentDiagnostic(message: string): boolean {
   return /\[unsupported_content_type\]|\bis not a multimodal model\b|\bmultimodal processing is not enabled\b|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
     message,
