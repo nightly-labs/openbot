@@ -92,3 +92,46 @@ function resultOf(step: WorkflowStep, run: number | undefined): WorkflowNodeResu
   if (step.status === "failed") return { ...base, value: step.error ?? "", failed: true };
   return undefined;
 }
+
+export const sameWorkflowStep = (left: WorkflowStep, right: WorkflowStep): boolean =>
+  left.id === right.id &&
+  left.workflowId === right.workflowId &&
+  left.runId === right.runId &&
+  left.nodeId === right.nodeId &&
+  left.attempt === right.attempt &&
+  left.agentId === right.agentId &&
+  left.status === right.status &&
+  left.output === right.output &&
+  left.branch === right.branch &&
+  left.error === right.error &&
+  left.startedAt === right.startedAt &&
+  left.endedAt === right.endedAt &&
+  left.waiting === right.waiting;
+
+const sameResult = (left: WorkflowNodeResult, right: WorkflowNodeResult | undefined): boolean =>
+  left.id === right?.id &&
+  left.run === right.run &&
+  left.at === right.at &&
+  left.value === right.value &&
+  left.failed === right.failed &&
+  left.branch === right.branch;
+
+const samePending = (left: WorkflowNodePending, right: WorkflowNodePending | undefined): boolean =>
+  left.id === right?.id && left.at === right.at;
+
+export const sameNodeRunState = (
+  left: WorkflowNodeRunState | undefined,
+  right: WorkflowNodeRunState | undefined,
+): boolean => {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return (
+    left.status === right.status &&
+    left.error === right.error &&
+    sameWorkflowStep(left.step, right.step) &&
+    left.results.length === right.results.length &&
+    left.pending.length === right.pending.length &&
+    left.results.every((result, index) => sameResult(result, right.results[index])) &&
+    left.pending.every((pending, index) => samePending(pending, right.pending[index]))
+  );
+};

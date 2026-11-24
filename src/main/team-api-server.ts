@@ -1857,7 +1857,7 @@ export class TeamApiServer {
         return result;
       };
       let outgoing: string;
-      let outgoingBytes: number | undefined;
+      let outgoingBytes: number;
       let optional: OptionalTeamEvent | null;
       try {
         optional =
@@ -1981,7 +1981,7 @@ export class TeamApiServer {
         outgoingBytes = payload.bytes;
       }
       const limit = event.type === "runtime-snapshot" ? AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT : JSON_LIMIT;
-      if ((outgoingBytes ?? Buffer.byteLength(outgoing)) > limit) continue;
+      if (outgoingBytes > limit) continue;
       if (client.readyState !== webSockets.WebSocket.OPEN) continue;
       client.send(outgoing);
       perfCount(`teamapi.send ${event.type}`);

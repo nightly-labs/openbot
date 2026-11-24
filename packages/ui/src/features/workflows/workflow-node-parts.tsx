@@ -90,7 +90,11 @@ function createSharedClock(intervalMs: number) {
       timer = undefined;
     };
   };
-  return { now, subscribe };
+  const read = () => {
+    const value = now();
+    return users === 0 ? readClock() : value;
+  };
+  return { now: read, subscribe };
 }
 
 const runTimeClock = createSharedClock(100);
@@ -548,18 +552,22 @@ function StepName(props: { id: string; kind: string }) {
 function RunTime(props: { id: string }) {
   const board = useBoard();
   const { t, format } = useText();
-  const [clock, setClock] = createStore({ finishedMs: 0, done: false });
+  const [clock, setClock] = createStore<{ startMs: number | undefined; finishedMs: number; done: boolean }>({
+    startMs: undefined,
+    finishedMs: 0,
+    done: false,
+  });
   let start = 0;
   createEffect(
     () => board.status(props.id),
     (status, before) => {
       if (status === "running") {
         start = performance.now();
-        setClock(() => ({ finishedMs: 0, done: false }));
+        setClock(() => ({ startMs: start, finishedMs: 0, done: false }));
         return runTimeClock.subscribe();
       }
       if (status === "done" && before === "running") {
-        setClock(() => ({ finishedMs: performance.now() - start, done: true }));
+        setClock(() => ({ startMs: start, finishedMs: performance.now() - start, done: true }));
         const timer = setTimeout(
           () =>
             setClock((draft) => {
@@ -575,7 +583,11 @@ function RunTime(props: { id: string }) {
       return undefined;
     },
   );
-  const elapsedMs = () => (clock.done ? clock.finishedMs : Math.max(0, runTimeClock.now().mono - start));
+  const elapsedMs = () => {
+    if (clock.done) return clock.finishedMs;
+    const startMs = clock.startMs;
+    return startMs === undefined ? 0 : Math.max(0, runTimeClock.now().mono - startMs);
+  };
   return (
     <Show
       when={board.status(props.id) === "running" || clock.done}
@@ -898,13 +910,21 @@ function PendingTake(props: { number: number; since: string; current: boolean; o
 export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 export function useElapsed(running: () => boolean) {
-  let start = 0;
+  const [span, setSpan] = createSignal<{ start: number; end: number | undefined }>();
   createEffect(running, (on) => {
-    if (!on) return;
-    start = performance.now();
+    if (!on) {
+      setSpan((current) => current && { start: current.start, end: untrack(() => workflowClock.now().mono) });
+      return;
+    }
+    setSpan({ start: performance.now(), end: undefined });
     return workflowClock.subscribe();
   });
-  return () => Math.max(0, Math.floor((workflowClock.now().mono - start) / 1000));
+  return () => {
+    const current = span();
+    if (!current) return 0;
+    const end = current.end ?? workflowClock.now().mono;
+    return Math.max(0, Math.floor((end - current.start) / 1000));
+  };
 }
 
 export function useSince(since: () => string | undefined) {

@@ -584,7 +584,7 @@ const Conversation = createSimpleContext({
             "") + event.delta;
         rawAgentMessageBodies.set(messageKey, rawBody);
         const cleanedBody = cleanAgentMessageText(rawBody);
-        rendererPerfCount("conversation.cleanTextChars", cleanedBody.length);
+        rendererPerfCount("conversation.cleanTextChars", rawBody.length);
         if (existing) {
           updateStored(existing, {
             ...existing,

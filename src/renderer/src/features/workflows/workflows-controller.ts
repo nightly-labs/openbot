@@ -35,7 +35,7 @@ import type {
   WorkflowSlackWorkspace,
   WorkflowTelegramChat,
 } from "@openbot/ui/features/workflows/workflow-model";
-import { EMPTY_WORKFLOW_RUN_VIEW } from "@openbot/ui/features/workflows/workflow-run-view";
+import { EMPTY_WORKFLOW_RUN_VIEW, sameWorkflowStep } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
 import { agentAskedHere } from "../../agent-requests";
@@ -76,21 +76,6 @@ type WorkflowBase = { revision: number; graph: WorkflowGraph; readOnly?: true };
 
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
 
-const sameStep = (left: WorkflowStep, right: WorkflowStep): boolean =>
-  left.id === right.id &&
-  left.workflowId === right.workflowId &&
-  left.runId === right.runId &&
-  left.nodeId === right.nodeId &&
-  left.attempt === right.attempt &&
-  left.agentId === right.agentId &&
-  left.status === right.status &&
-  left.output === right.output &&
-  left.branch === right.branch &&
-  left.error === right.error &&
-  left.startedAt === right.startedAt &&
-  left.endedAt === right.endedAt &&
-  left.waiting === right.waiting;
-
 const sameRun = (left: WorkflowRunDetail, right: WorkflowRunDetail): boolean => {
   const one = left.run;
   const other = right.run;
@@ -109,7 +94,7 @@ const sameRun = (left: WorkflowRunDetail, right: WorkflowRunDetail): boolean => 
     return false;
   return left.steps.every((step, index) => {
     const otherStep = right.steps[index];
-    return otherStep !== undefined && sameStep(step, otherStep);
+    return otherStep !== undefined && sameWorkflowStep(step, otherStep);
   });
 };
 
@@ -128,7 +113,7 @@ const sameRunPage = (left: RunPageLike, right: RunPageLike): boolean =>
   }) &&
   left.soloSteps.every((step, index) => {
     const other = right.soloSteps[index];
-    return other !== undefined && sameStep(step, other);
+    return other !== undefined && sameWorkflowStep(step, other);
   });
 
 const lastWorkflowKey = (hostKey: string) => `openbot:last-workflow:${hostKey}`;
@@ -241,7 +226,6 @@ export function createWorkflowsController(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   const refreshPending = new Map<string, { workflowId: string | null; agentId: string | undefined }>();
-  let refreshRunning = false;
   let edits = 0;
   let writing = 0;
   let previewRequest = 0;
@@ -636,42 +620,33 @@ export function createWorkflowsController(
     ) {
       playBuild(workflowId, agentId, null);
       open(workflowId);
-      return Promise.resolve(undefined);
+      return;
     }
-    const done = read(workflowId ?? current, agentId).catch(report);
-    if (workflowId !== null) return done;
+    read(workflowId ?? current, agentId).catch(report);
+    if (workflowId !== null) return;
     readPlaces();
     readLevels();
     readGitHubCatalog();
     readFolders();
-    return done;
-  };
-
-  const scheduleRefresh = () => {
-    if (refreshTimer === undefined && !refreshRunning && refreshPending.size > 0) {
-      refreshTimer = setTimeout(flushRefresh, REFRESH_DELAY_MS);
-    }
   };
 
   const flushRefresh = () => {
     refreshTimer = undefined;
-    if (disposed || refreshPending.size === 0) return;
+    if (disposed) return;
     const requests = [...refreshPending.values()];
     refreshPending.clear();
-    refreshRunning = true;
-    const runs = requests.map((request) =>
-      Promise.resolve().then(() => refreshNow(request.workflowId, request.agentId)),
-    );
-    void Promise.allSettled(runs).then((results) => {
-      refreshRunning = false;
-      for (const result of results) if (result.status === "rejected") report(result.reason);
-      scheduleRefresh();
-    });
+    for (const request of requests) {
+      try {
+        refreshNow(request.workflowId, request.agentId);
+      } catch (error) {
+        report(error);
+      }
+    }
   };
 
   const refresh = (workflowId: string | null, agentId?: string) => {
     refreshPending.set(`${workflowId ?? ""}\u0000${agentId ?? ""}`, { workflowId, agentId });
-    scheduleRefresh();
+    refreshTimer ??= setTimeout(flushRefresh, REFRESH_DELAY_MS);
   };
 
   onSettled(() => {

@@ -69,8 +69,10 @@ import {
   createStore,
   createUniqueId,
   For,
+  getOwner,
   onCleanup,
   onSettled,
+  runWithOwner,
   Show,
   untrack,
 } from "solid-js";
@@ -220,6 +222,7 @@ import {
   activeRun,
   indexRunView,
   isOpenRun,
+  sameNodeRunState,
   type WorkflowNodeRunState,
   type WorkflowRunView,
 } from "./workflow-run-view";
@@ -554,51 +557,6 @@ const savedJson = (graph: WorkflowGraph) => stableJson(asSaved(graph));
 
 const SENT_LIMIT = 200;
 
-type RunStateSignal = ReturnType<typeof createSignal<WorkflowNodeRunState | undefined>>;
-
-const sameStep = (left: WorkflowNodeRunState["step"], right: WorkflowNodeRunState["step"]): boolean =>
-  left.id === right.id &&
-  left.workflowId === right.workflowId &&
-  left.runId === right.runId &&
-  left.nodeId === right.nodeId &&
-  left.status === right.status &&
-  left.attempt === right.attempt &&
-  left.agentId === right.agentId &&
-  left.output === right.output &&
-  left.branch === right.branch &&
-  left.error === right.error &&
-  left.startedAt === right.startedAt &&
-  left.endedAt === right.endedAt &&
-  left.waiting === right.waiting;
-
-const sameRunState = (left: WorkflowNodeRunState | undefined, right: WorkflowNodeRunState | undefined): boolean => {
-  if (left === right) return true;
-  if (!left || !right) return false;
-  if (left.status !== right.status || left.error !== right.error || !sameStep(left.step, right.step)) return false;
-  if (left.results.length !== right.results.length || left.pending.length !== right.pending.length) return false;
-  for (let index = 0; index < left.results.length; index += 1) {
-    const one = left.results[index];
-    const other = right.results[index];
-    if (!one) return false;
-    if (
-      one.id !== other?.id ||
-      one.run !== other?.run ||
-      one.at !== other?.at ||
-      one.value !== other?.value ||
-      one.failed !== other?.failed ||
-      one.branch !== other?.branch
-    )
-      return false;
-  }
-  for (let index = 0; index < left.pending.length; index += 1) {
-    const one = left.pending[index];
-    const other = right.pending[index];
-    if (!one) return false;
-    if (one.id !== other?.id || one.at !== other?.at) return false;
-  }
-  return true;
-};
-
 export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const { t, format, errorMessage } = useText();
   const initial = untrack(() => snapshotFromGraph(props.workflow.graph));
@@ -623,16 +581,16 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const [camera, setCamera] = createStore({ x: 0, y: 0, scale: 1 });
 
   const running = () => openRun() !== undefined;
-  const runStateSignals = new Map<string, RunStateSignal>();
-  const runStateValues = new Map<string, WorkflowNodeRunState | undefined>();
-  const runStateSignal = (id: string): RunStateSignal => {
-    const current = runStateSignals.get(id);
-    if (current) return current;
-    const created = createSignal<WorkflowNodeRunState | undefined>();
-    runStateSignals.set(id, created);
-    return created;
+  const canvasOwner = getOwner();
+  const runStates = new Map<string, () => WorkflowNodeRunState | undefined>();
+  const runStateOf = (id: string) => {
+    let state = runStates.get(id);
+    if (!state) {
+      state = runWithOwner(canvasOwner, () => createMemo(() => runIndex().get(id), { equals: sameNodeRunState }));
+      runStates.set(id, state);
+    }
+    return state();
   };
-  const runStateOf = (id: string) => runStateSignal(id)[0]();
   const statusOf = (id: string) => runStateOf(id)?.status;
   const waitingOf = (id: string) => {
     const state = runStateOf(id);
@@ -771,18 +729,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return viewed && isOpenRun(viewed) ? viewed : activeRun(props.runs);
   });
   const runIndex = createMemo(() => indexRunView(props.runs, openRun()?.run.id));
-  createEffect(
-    () => [runIndex(), nodes()] as const,
-    ([indexed, currentNodes]) => {
-      for (const node of currentNodes) {
-        const signal = runStateSignal(node.id);
-        const next = indexed.get(node.id);
-        if (sameRunState(runStateValues.get(node.id), next)) continue;
-        runStateValues.set(node.id, next);
-        signal[1](next);
-      }
-    },
-  );
 
   const [strokes, setStrokes] = createSignal<readonly Stroke[]>(initial.strokes);
   const [ink, setInk] = createStore<{ sketch: Stroke | null; erasing: readonly string[]; eraser: WfnPoint | null }>({
