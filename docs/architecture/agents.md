@@ -1115,10 +1115,12 @@ failed at once and the message waited for the end of the whole turn. `scripts/an
 `scripts/devin-steer-e2e.ts` check these paths.
 
 A message that comes while a turn starts, before the provider gave the turn id, cannot steer yet and
-stays in the queue. `AgentService` keeps its delivery id (`#steersAfterTurnStart`) when the mode is
-"steer", and steers it at `turn-started` of the same thread if it is still queued. Before, it ran only
-after the whole turn. A Stop that fails or that does not stop the turn removes the turn from
-`#stoppedTurns`, so the steers that follow are not refused as steers into a stopped turn.
+stays in the queue. When the mode is "steer" and a delivery of the same lane is starting,
+`AgentService` keeps its delivery id (`#steersAfterTurnStart`) and steers it at `turn-started` of the
+same thread if it is still queued. Before, it ran only after the whole turn. A message to an idle
+agent with a held queue is not kept, so it does not join the next turn. A Stop of a chat or task turn
+that fails or that does not stop the turn records the turn in `#failedStops`. The steers that follow
+then join the running turn. The stop mark stays, so a late interrupted end still counts as a stop.
 `scripts/steer-before-turn-id-e2e.ts` checks both.
 
 A custom agent (`acp`) uses the same extension (#4977). Its descriptor has `steer: "reported"`: each

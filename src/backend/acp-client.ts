@@ -1288,21 +1288,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         const blocks = yield* promptBlocksEffect(params, this.#promptMedia);
         const thread = this.#threads.get(threadId);
         const turn = thread?.activeTurn;
-        if (
-          !thread ||
-          !turn ||
+        if (!thread || !turn) return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
+        const turnChanged = () =>
+          thread.activeTurn !== turn ||
           turn.id !== getString(params, "expectedTurnId") ||
           turn.stopped ||
           turn.completing ||
-          (!steer && (turn.unprompted || turn.waitingOnUser > 0))
-        )
-          return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
+          (!steer && (turn.unprompted || turn.waitingOnUser > 0));
+        if (turnChanged()) return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
         if (!steer && !turn.answered)
           yield* Effect.raceFirst(
             Deferred.await(turn.answer),
             Effect.sleep(this.options.firstUpdateMs ?? ACP_FIRST_UPDATE_MS),
           );
-        if (!steer && !turn.answered)
+        if (turnChanged() || (!steer && !turn.answered))
           return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
         if (steer) yield* this.#steerSession(steer, thread, turn, getString(params, "clientUserMessageId"), blocks);
         else yield* turn.steerLock.withPermit(this.#steerByPrompt(thread, turn, blocks));

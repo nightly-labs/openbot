@@ -607,6 +607,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #busyMessageMode: () => BusyMessageMode;
   readonly #defaultTaskLimit: () => number;
   readonly #stoppedTurns = new Map<string, string>();
+  readonly #failedStops = new Map<string, string>();
   readonly #steersAfterTurnStart = new Map<string, { agentId: string; taskId: string | null; threadId: string }>();
 
   readonly #requestedNewChats = new Set<string>();
@@ -6527,7 +6528,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const turnId = this.#conversation.loadedExecutionSnapshot(task.threadId)?.activeTurnId;
     if (turnId) {
       this.#tasks.markStopped(task.taskId, turnId, byUser);
-      yield* this.#interruptTurn(task.agentId, turnId, task.threadId);
+      yield* this.#steerAfterFailedStop(
+        task.agentId,
+        task.taskId,
+        turnId,
+        this.#interruptTurn(task.agentId, turnId, task.threadId),
+      );
     } else if (byUser) yield* this.#tasks.releaseAfterLostWork(task.taskId);
     this.#tasks.changed(task.agentId);
   }).bind(this);
@@ -6915,7 +6921,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const releaseQuestions = Effect.sync(() => {
       if (!targetThreadId) return;
       if (!welcome && !agentSetup && !lateAnswer) this.#attention.closeDetachedForUserMessage(agent.id, targetThreadId);
-      if (waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
+      if (waitingTurnId && !this.#stopHolds(agent.id, task?.taskId ?? null, waitingTurnId))
         this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     });
     const steerFirst = providerForAgent(agent) === "claude";
@@ -6978,7 +6984,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const steerTurnId = this.#turnToSteer(agent.id, task?.taskId ?? null, snapshot);
     const steers = (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer";
     if (!steerTurnId) {
-      if (explain && steers && snapshot.activeTurnId === null && snapshot.threadId)
+      if (
+        explain &&
+        steers &&
+        snapshot.activeTurnId === null &&
+        snapshot.threadId &&
+        this.#mailbox.laneActive(agent.id, task?.taskId ?? null)
+      )
         this.#steersAfterTurnStart.set(deliveryId, {
           agentId: agent.id,
           taskId: task?.taskId ?? null,
@@ -7009,16 +7021,39 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   });
 
   #turnToSteer(agentId: string, taskId: string | null, snapshot: ConversationSnapshot): string | null {
-    return snapshot.activeTurnId !== this.#stoppedTurn(agentId, taskId) ? snapshot.activeTurnId : null;
+    const turnId = snapshot.activeTurnId;
+    return turnId !== null && !this.#stopHolds(agentId, taskId, turnId) ? turnId : null;
+  }
+
+  #stopHolds(agentId: string, taskId: string | null, turnId: string): boolean {
+    return turnId === this.#stoppedTurn(agentId, taskId) && this.#failedStops.get(stopKey(agentId, taskId)) !== turnId;
+  }
+
+  #steerAfterFailedStop<E>(
+    agentId: string,
+    taskId: string | null,
+    turnId: string,
+    stop: Effect.Effect<boolean, E>,
+  ): Effect.Effect<boolean, E> {
+    const key = stopKey(agentId, taskId);
+    return Effect.suspend(() => {
+      this.#failedStops.delete(key);
+      return stop.pipe(
+        Effect.onExit((exit) =>
+          Effect.sync(() => {
+            if (!Exit.isSuccess(exit) || !exit.value) this.#failedStops.set(key, turnId);
+          }),
+        ),
+      );
+    });
   }
 
   #steerAfterTurnStart(agentId: string, threadId: string): void {
     const waiting: Array<{ deliveryId: string; taskId: string | null }> = [];
     for (const [deliveryId, pending] of this.#steersAfterTurnStart) {
-      if (pending.agentId !== agentId) continue;
       const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
       if (delivery?.status !== "queued" || delivery.steerFallback) this.#steersAfterTurnStart.delete(deliveryId);
-      else if (pending.threadId === threadId) {
+      else if (pending.agentId === agentId && pending.threadId === threadId) {
         this.#steersAfterTurnStart.delete(deliveryId);
         waiting.push({ deliveryId, taskId: pending.taskId });
       }
@@ -7230,15 +7265,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const taskId = executionThreadId ? this.#tasks.taskForThread(executionThreadId) : null;
       const endContinuation =
         executionThreadId && taskId === null ? Effect.void : this.#drain.endPlanContinuation(agentId, taskId);
+      const stop = this.#interruptTurn(agentId, turnId, executionThreadId);
       return endContinuation.pipe(
-        Effect.andThen(this.#interruptTurn(agentId, turnId, executionThreadId)),
-        Effect.onExit((exit) =>
-          Effect.sync(() => {
-            const stopped = Exit.isSuccess(exit) && exit.value;
-            if (!executionThreadId && !stopped && this.#stoppedTurns.get(agentId) === turnId)
-              this.#stoppedTurns.delete(agentId);
-          }),
-        ),
+        Effect.andThen(executionThreadId ? stop : this.#steerAfterFailedStop(agentId, null, turnId, stop)),
       );
     }).pipe(Effect.asVoid);
   }
@@ -7598,6 +7627,10 @@ function workspaceOnlyUnavailable(provider: AgentProvider): boolean {
 
 function usageLimitOf(choice: AgentModelChoice): UsageLimitKey {
   return { provider: choice.provider, accountId: agentProviderAccount(choice), model: choice.model };
+}
+
+function stopKey(agentId: string, taskId: string | null): string {
+  return taskId === null ? agentId : `${agentId}\u0000${taskId}`;
 }
 
 function lifecycleStep<A>(operation: string, run: () => A): Effect.Effect<A, AgentLifecycleFailed> {

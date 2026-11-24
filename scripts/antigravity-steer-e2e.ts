@@ -164,7 +164,9 @@ async function refusal(operation: Promise<string | null>): Promise<string> {
 }
 
 try {
-  const { client, log } = await open("native", {});
+  const firstUpdateRelease = join(root, "native-release", "first-update");
+  await mkdir(join(root, "native-release"), { recursive: true });
+  const { client, log } = await open("native", { FAKE_FIRST_UPDATE_RELEASE: firstUpdateRelease });
   let heldApproval: (() => void) | undefined;
   let approvals = 0;
   let approvalAsked: () => void = () => undefined;
@@ -221,11 +223,9 @@ try {
 
   const slow = await startTurn(client, thread, log, "slow start");
   const beforeSlow = await readJsonl<LogEntry>(log);
-  assert.ok(
-    !beforeSlow.some((entry) => entry.event === "first-update"),
-    "The steer must start before the agent's first update.",
-  );
-  assert.equal(await steer(client, thread, slow.id, "before the first answer"), slow.id);
+  const slowSteer = steer(client, thread, slow.id, "before the first answer");
+  await writeFile(firstUpdateRelease, "");
+  assert.equal(await slowSteer, slow.id);
   const slowFinished = await slow.done;
   const slowEvents = (await readJsonl<LogEntry>(log))
     .slice(beforeSlow.length)

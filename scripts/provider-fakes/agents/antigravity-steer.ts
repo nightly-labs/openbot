@@ -1,3 +1,5 @@
+import { existsSync, watch } from "node:fs";
+import { dirname } from "node:path";
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" };
@@ -13,6 +15,22 @@ function promptText(request: AcpRequest): string {
     .join("")
     .replace(/^[\s\S]*<\/openbot-developer-instructions>/u, "")
     .trim();
+}
+
+function afterFirstUpdateRelease(): Promise<void> {
+  const release = process.env.FAKE_FIRST_UPDATE_RELEASE;
+  if (!release) return Promise.resolve();
+  return new Promise((released) => {
+    const watcher = watch(dirname(release), () => {
+      if (!existsSync(release)) return;
+      watcher.close();
+      released();
+    });
+    if (existsSync(release)) {
+      watcher.close();
+      released();
+    }
+  });
 }
 
 function answer(peer: AcpPeer, request: AcpRequest): void {
@@ -135,19 +153,16 @@ serveFakeAcpAgent(
       }
       if (text === "slow start") {
         open.set(sessionId, request);
-        setTimeout(
-          () => {
-            logEntry({ event: "first-update", sessionId });
-            peer.update(sessionId, {
-              sessionUpdate: "tool_call",
-              toolCallId: "tool-1",
-              title: "sleep 25",
-              kind: "execute",
-              status: "in_progress",
-            });
-          },
-          Number(process.env.FAKE_FIRST_UPDATE_MS ?? 1000),
-        );
+        void afterFirstUpdateRelease().then(() => {
+          logEntry({ event: "first-update", sessionId });
+          peer.update(sessionId, {
+            sessionUpdate: "tool_call",
+            toolCallId: "tool-1",
+            title: "sleep 25",
+            kind: "execute",
+            status: "in_progress",
+          });
+        });
         return;
       }
       if (text !== "work") {
