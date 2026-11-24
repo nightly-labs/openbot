@@ -54,6 +54,7 @@ import {
   BACKGROUND_WAKE_NOTE,
   isTurnContextBlock,
   SELF_WAKE_NOTE,
+  SESSION_RELOAD_NOTE,
   withoutTurnContext,
 } from "./agent/developer-instructions";
 import type { GeneratedMediaKind } from "./agent/image-generation";
@@ -202,6 +203,8 @@ const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
 const ACP_WORK_HOLD_POLL_MS = 60_000;
 
 const ACP_WORK_HOLD_MAX_MS = 4 * 60 * 60_000;
+
+const idleStoppedSessions = new Set<string>();
 
 const ACP_WORK_HOLD_QUIET_RELEASE_MS = 10 * 60_000;
 
@@ -825,6 +828,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           for (const replay of this.#historyReplays.values()) this.#abortHistoryReplay(replay);
           this.#historyReplays.clear();
           const threads = this.#threads.clear();
+          for (const thread of threads) this.#noteIdleStop(thread);
           for (const thread of threads) thread.mcp.close();
           yield* Effect.forEach(threads, (thread) => thread.relays, { concurrency: "unbounded", discard: true });
           yield* Effect.forEach(
@@ -1019,6 +1023,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     thread: AcpThread,
   ): Effect.fn.Return<void, ProviderClientOperationError> {
     this.#markSessionClosed(thread.id);
+    this.#noteIdleStop(thread);
     this.#stopThreadSubagents(thread.id);
     thread.mcp.close();
     yield* thread.relays;
@@ -1027,6 +1032,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#transport.connection?.closeSession({ sessionId: thread.id, ...this.#forcedClose }).catch(() => undefined),
     );
   });
+
+  #noteIdleStop(thread: AcpThread): void {
+    if (!this.#flavor.restartNoticeOnReload || thread.activeTurn) return;
+    if (thread.workHold !== null || thread.backgroundUntil !== 0 || this.#heldByBackgroundSubagent(thread)) return;
+    idleStoppedSessions.add(thread.id);
+  }
 
   #markSessionClosed(sessionId: string): void {
     const now = Date.now();
@@ -2438,6 +2449,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         (thread.contextUsed === null && thread.promptsSinceInstructions > ACP_INSTRUCTIONS_REFRESH_PROMPTS));
     if (sendInstructions) this.#turnContext.resend(thread.id);
     blocks.unshift(...this.#turnContext.take(thread.id, command).map((text) => ({ type: "text" as const, text })));
+    if (!command && idleStoppedSessions.delete(thread.id)) blocks.unshift({ type: "text", text: SESSION_RELOAD_NOTE });
     if (sendInstructions) {
       blocks.unshift({
         type: "text",

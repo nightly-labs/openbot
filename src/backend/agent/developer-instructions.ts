@@ -334,6 +334,14 @@ export const SELF_WAKE_NOTE = [
   "</openbot_background_wake>",
 ].join("\n");
 
+const SESSION_RELOAD_START = "<openbot_session_reload>";
+
+export const SESSION_RELOAD_NOTE = [
+  SESSION_RELOAD_START,
+  "OpenBot stopped the idle process of this session and loaded the session again. No server restarted. If a notice says that your subagents and background tasks stopped because of a server restart: OpenBot, your teammates and the tasks that you gave them with OpenBot tools still run, and their replies still come to you. Do not send those tasks again. Start again only your own background work that you still need and that no longer runs.",
+  "</openbot_session_reload>",
+].join("\n");
+
 export function isTurnContextBlock(text: string): boolean {
   return [
     MEMORY_BLOCK_START,
@@ -344,12 +352,13 @@ export function isTurnContextBlock(text: string): boolean {
     TURN_STYLE_START,
     STEER_NOTE_START,
     BACKGROUND_WAKE_START,
+    SESSION_RELOAD_START,
   ].some((start) => text.startsWith(`${start}\n`));
 }
 
 export function withoutTurnContext(text: string): string {
   return text.replace(
-    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake)>\n[\s\S]*?\n<\/\1>\n*)+/u,
+    /^(?:<(openbot_saved_memories|openbot_saved_memories_update|openbot_section_teammates|openbot_agent_instructions|openbot_saved_logins|openbot_turn_style|openbot_steer|openbot_background_wake|openbot_session_reload)>\n[\s\S]*?\n<\/\1>\n*)+/u,
     "",
   );
 }
