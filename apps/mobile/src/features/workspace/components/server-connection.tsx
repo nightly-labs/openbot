@@ -231,7 +231,7 @@ export const ServerConnection = memo(function ServerConnection({
       client,
       refresh: () => recovery.refresh(),
       reconnect: () => {
-        if (lastStatus.current && lastStatus.current.status.phase !== "online") client.newPage();
+        if (activeRef.current && lastStatus.current && lastStatus.current.status.phase !== "online") client.newPage();
         recovery.refresh();
       },
       quietStart,
