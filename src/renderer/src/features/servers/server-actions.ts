@@ -154,7 +154,7 @@ export function useServerActions() {
         id: server.id,
         name: server.name,
         logoUrl: server.logoUrl,
-        appearance: server.appearance,
+        ...(server.appearance === undefined ? {} : { appearance: server.appearance }),
         show: () => show(server),
       }));
   }

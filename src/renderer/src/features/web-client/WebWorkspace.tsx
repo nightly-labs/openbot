@@ -674,7 +674,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         id: item.id,
         name: item.name,
         logoUrl: item.logoUrl,
-        appearance: item.appearance,
+        ...(item.appearance === undefined ? {} : { appearance: item.appearance }),
         show: () => void changeServerHidden(item.id, false),
       })),
   );
