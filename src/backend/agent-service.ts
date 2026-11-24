@@ -689,6 +689,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ? new CreditMediaWorkflows({
           gateway: options.creditMedia,
           warn: (message, details) => logger.warn(message, details),
+          creditsChanged: () => this.#emit({ type: "openbot-credits-changed" }),
         })
       : null;
     this.#sidebarLayout = sidebarLayout;

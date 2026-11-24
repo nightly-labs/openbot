@@ -155,7 +155,14 @@ const tools = new CreditMediaTools({
     sourceHeight: 1080,
   }),
 });
-const workflows = new CreditMediaWorkflows({ gateway, warn: () => undefined });
+let creditsChanges = 0;
+const workflows = new CreditMediaWorkflows({
+  gateway,
+  warn: () => undefined,
+  creditsChanged: () => {
+    creditsChanges += 1;
+  },
+});
 
 const ToolData = z.looseObject({
   status: z.string().optional(),
@@ -186,6 +193,7 @@ interface CallOutcome {
   shown: CreditMediaShown[];
   reads: string[][];
   submitted: (typeof submits)[number] | undefined;
+  creditsChanges: number;
 }
 
 async function call(
@@ -205,6 +213,7 @@ async function call(
   const shown: CreditMediaShown[] = [];
   const reads: string[][] = [];
   const before = submits.length;
+  const changesBefore = creditsChanges;
   const result = await Effect.runPromise(
     tools.handle({
       tool,
@@ -245,6 +254,7 @@ async function call(
     shown,
     reads,
     submitted: submits.length > before ? submits.at(-1) : undefined,
+    creditsChanges: creditsChanges - changesBefore,
   };
 }
 
@@ -281,6 +291,11 @@ async function flow() {
       image.submitted.request.resolution === "2K" &&
       image.submitted.request.count === 1,
     { data: image.data, request: image.submitted?.request },
+  );
+  check(
+    "a finished generation tells the clients once that the credits changed, and a model list does not",
+    image.creditsChanges === 1 && listed.creditsChanges === 0,
+    { image: image.creditsChanges, listed: listed.creditsChanges },
   );
   check(
     "the image shows in the chat as an image generation, and the model sees it",
@@ -340,7 +355,8 @@ async function flow() {
       declined.approvals.length === 1 &&
       declined.approvals[0] === sourceText("status.agent.creditVideoApproval", { model: "video-both", credits: 56 }) &&
       declined.submitted === undefined &&
-      declined.shown.length === 0,
+      declined.shown.length === 0 &&
+      declined.creditsChanges === 0,
     { text: declined.text, approvals: declined.approvals },
   );
 

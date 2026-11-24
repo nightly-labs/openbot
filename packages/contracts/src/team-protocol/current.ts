@@ -148,6 +148,7 @@ import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
+import { OPENBOT_CREDITS_EVENTS_CAPABILITY } from "./openbot-credits-events-v1";
 import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
@@ -420,6 +421,7 @@ export {
   MODEL_STEERING_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
+  OPENBOT_CREDITS_EVENTS_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
@@ -855,6 +857,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [HOST_TURN_LIMITS_EVENTS_CAPABILITY, V10],
   [MEDIA_APPROVAL_CREDITS_CAPABILITY, V10],
   [MEDIA_APPROVAL_CHOICE_CAPABILITY, V10],
+  [OPENBOT_CREDITS_EVENTS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

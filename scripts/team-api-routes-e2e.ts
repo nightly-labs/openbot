@@ -390,6 +390,7 @@ import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
+import { OPENBOT_CREDITS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/openbot-credits-events-v1";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
@@ -4359,12 +4360,13 @@ try {
         TEAM_PROTOCOL_V1_WEBSOCKET,
         `openbot-token.${bobToken}`,
       ]);
-      const state = { declared: false, changed: 0, marked: false };
+      const state = { declared: false, changed: 0, credits: 0, marked: false };
       const waiters = new Set<() => void>();
       socket.addEventListener("message", (message) => {
         const value = JSON.parse(String(message.data));
         if (isDynamicRecord(value) && value.type === "chat-colors-changed") state.declared = true;
         if (isDynamicRecord(value) && value.type === "host-turn-limits-changed") state.changed++;
+        if (isDynamicRecord(value) && value.type === "openbot-credits-changed") state.credits++;
         if (isDynamicRecord(value) && value.type === "library-folders-changed") state.marked = true;
         for (const wake of waiters) wake();
       });
@@ -4413,6 +4415,23 @@ try {
       "a change of the limits reaches a member socket that has the events capability, and not an older socket",
       listening.ready && older.ready && heard && olderMarked && older.state.changed === 0,
       JSON.stringify({ listening: listening.state, older: older.state }),
+    );
+    const creditsListening = await openTurnLimitsSocket([OPENBOT_CREDITS_EVENTS_CAPABILITY]);
+    const creditsOlder = await openTurnLimitsSocket([]);
+    for (const listener of agentEventListeners) listener({ type: "openbot-credits-changed" });
+    const creditsHeard = await creditsListening.until(() => creditsListening.state.credits === 1);
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+    const creditsOlderMarked = await creditsOlder.until(() => creditsOlder.state.marked);
+    creditsListening.socket.close();
+    creditsOlder.socket.close();
+    check(
+      "a credits change reaches a member socket that has the credits events capability, and not an older socket",
+      creditsListening.ready &&
+        creditsOlder.ready &&
+        creditsHeard &&
+        creditsOlderMarked &&
+        creditsOlder.state.credits === 0,
+      JSON.stringify({ listening: creditsListening.state, older: creditsOlder.state }),
     );
     const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
     await runCauseEffect(reloaded.load());

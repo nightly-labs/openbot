@@ -79,6 +79,7 @@ export interface CreditMediaWorkflowsOptions {
   gateway: CreditMediaGateway;
   warn: (message: string, details: { error: string }) => void;
   now?: () => number;
+  creditsChanged?: () => void;
 }
 
 export interface CreditMediaInput {
@@ -458,6 +459,8 @@ export class CreditMediaWorkflows {
     const started =
       existing === null ? yield* start(jobId) : existing.status === "queued" ? yield* start(existing.jobId) : existing;
     const done = yield* this.#wait(started);
+    if (existing === null || existing.status === "queued" || existing.status === "processing")
+      this.#options.creditsChanged?.();
     if (done.status === "failed" && done.failure === "refused")
       return yield* mediaFail(sourceText("error.billing.mediaRequestRefused"));
     if (done.status !== "completed") return yield* mediaFailed();

@@ -342,6 +342,7 @@
     "./team-protocol/cache-expiry-compaction-v1": "./src/team-protocol/cache-expiry-compaction-v1.ts",
     "./team-protocol/media-approval-credits-v1": "./src/team-protocol/media-approval-credits-v1.ts",
     "./team-protocol/media-approval-choice-v1": "./src/team-protocol/media-approval-choice-v1.ts",
+    "./team-protocol/openbot-credits-events-v1": "./src/team-protocol/openbot-credits-events-v1.ts",
     "./team-protocol/provider-environment-v1": "./src/team-protocol/provider-environment-v1.ts",
     "./team-protocol/agent-thread-queue-v1": "./src/team-protocol/agent-thread-queue-v1.ts",
     "./team-protocol/agent-active-queues-v1": "./src/team-protocol/agent-active-queues-v1.ts",

@@ -1514,6 +1514,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => creditsCalls,
     () => props.accountId,
   );
+  onCleanup(
+    workspace.onHostEvent((event) => {
+      if (event.type === "openbot-credits-changed") creditsSummary.refresh();
+    }),
+  );
   const creditWallet = () => creditsRailWallet(creditsSummary.state(), server() ?? null, null);
   const [movingCredits, setMovingCredits] = createSignal(false);
   function creditsRailAction(): (() => void) | undefined {
