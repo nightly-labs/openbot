@@ -716,6 +716,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
   let found = false;
   let outdated: CodexCliError | undefined;
   for (const candidate of candidates) {
+    if (provider === "muse" && isWindowsLauncherScript(candidate.executable)) continue;
     if (!(yield* isExecutable(candidate.executable))) continue;
     found = true;
     const attempt = yield* Effect.result(
@@ -1215,12 +1216,16 @@ function batchArgument(argument: string): string {
   return `${quoted}${"\\".repeat(backslashes)}"`;
 }
 
+function isWindowsLauncherScript(executable: string, platform: NodeJS.Platform = process.platform): boolean {
+  return platform === "win32" && [".bat", ".cmd"].includes(extname(executable).toLowerCase());
+}
+
 export function cliSpawnTarget(
   executable: string,
   argv: readonly string[],
   platform: NodeJS.Platform = process.platform,
 ): { command: string; args: string[]; windowsVerbatimArguments: boolean } {
-  if (platform !== "win32" || ![".bat", ".cmd"].includes(extname(executable).toLowerCase())) {
+  if (!isWindowsLauncherScript(executable, platform)) {
     return { command: executable, args: [...argv], windowsVerbatimArguments: false };
   }
 
@@ -1248,7 +1253,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
-  const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
+  const target = isWindowsLauncherScript(candidate);
   const slow = slowVersionReads.has(candidate);
   const firstTimeout = provider === "antigravity" ? ANTIGRAVITY_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS;
   const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : firstTimeout);
