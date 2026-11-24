@@ -1370,6 +1370,7 @@ export async function createApplicationServices({
   };
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
+    memoryCritical: () => hostMemory?.level() === "critical",
     ...(hostMemory ? { tabLimit: () => hostMemory.browserTabLimit() } : {}),
     browserProfile: (agentId) => {
       const agent = store.get(agentId);

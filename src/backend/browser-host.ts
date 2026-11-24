@@ -559,6 +559,7 @@ export class BrowserHost {
     { ownerThreadId: string | null; ownerAgentId: string | null; sharedThreadIds: ReadonlySet<string> }
   >();
   readonly #memoryLow: () => boolean;
+  readonly #memoryCritical: () => boolean;
   readonly #tabLimit: () => number;
   readonly #idleTabSweep: NodeJS.Timeout;
   readonly #awakeTabGraceMs: number;
@@ -574,6 +575,7 @@ export class BrowserHost {
       recordingMaxConcurrent?: number;
       recordingMaxAggregateBytes?: number;
       memoryLow?: () => boolean;
+      memoryCritical?: () => boolean;
       tabLimit?: () => number;
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       profileExists?: (profileId: string) => boolean;
@@ -601,6 +603,7 @@ export class BrowserHost {
       window.once("closed", () => this.#closeBackgroundWindow());
     }
     this.#memoryLow = options.memoryLow ?? (() => false);
+    this.#memoryCritical = options.memoryCritical ?? (() => false);
     this.#tabLimit = options.tabLimit ?? (() => INPUT_LIMITS.browserTabs);
     this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
     this.#idleTabFreezeMs = options.tabSleep?.freezeMs ?? IDLE_TAB_FREEZE_MS;
@@ -993,7 +996,12 @@ export class BrowserHost {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
       return yield* browserFailure(new Error(sourceText("error.backend.browserTabLimit", { limit: this.#tabLimit() })));
     }
-    if (this.#memoryLow()) return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
+    if (this.#memoryLow()) {
+      if (this.#ownedTabs(ownerThreadId, ownerAgentId).some((tab) => !tab.pendingRestore)) {
+        return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
+      }
+      if (this.#memoryCritical()) return yield* browserFailure(new Error(sourceText("error.backend.browserNoMemory")));
+    }
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
     const previouslyFocused = focus ? null : this.#focusedContentsOutsideTabs();
     const tabSession = privateSession || !ownerAgentId ? undefined : yield* this.#agentTabSession(ownerAgentId);
@@ -1071,14 +1079,17 @@ export class BrowserHost {
   }).bind(this);
 
   #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {
-    const tabs = [...this.#tabs.values()].filter(
+    return this.#ownedTabs(ownerThreadId, ownerAgentId).length < this.#tabLimit();
+  }
+
+  #ownedTabs(ownerThreadId: string | null, ownerAgentId: string | null): BrowserHostTab[] {
+    return [...this.#tabs.values()].filter(
       (tab) =>
         !tab.closing &&
         !tab.contents.isDestroyed() &&
         tab.ownerThreadId === ownerThreadId &&
         (tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId),
     );
-    return tabs.length < this.#tabLimit();
   }
 
   readonly activate = Effect.fn("BrowserHost.activate")(function* (

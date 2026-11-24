@@ -423,6 +423,8 @@ export const messages = {
     "Certyfikat bezpieczeństwa tej witryny nie jest zaufany, więc strona się nie otworzyła.",
   "error.backend.browserLowMemory":
     "Na tym serwerze brakuje pamięci, więc przeglądarka nie może otworzyć kolejnej karty. Zamknij kartę lub poczekaj, aż inni agenci skończą.",
+  "error.backend.browserNoMemory":
+    "Na tym serwerze prawie skończyła się pamięć, więc przeglądarka nie może teraz otworzyć karty. Poczekaj, aż inni agenci skończą, i spróbuj ponownie.",
   "error.backend.browserOpenFailed": "Nie można otworzyć {url}: {reason}",
   "error.backend.popupSecureInput":
     "Wyskakujące okna są blokowane podczas bezpiecznego wprowadzania. Zakończ lub anuluj bezpieczne wprowadzanie, a potem ponów próbę na stronie.",
