@@ -67,6 +67,12 @@ export const messages = {
     "Sıkıştırma bu sohbeti küçültmüyor: iki sıkıştırmadan sonra hâlâ modelin bağlam penceresinin %{percent} kadarını kullanıyor, bu yüzden OpenBot sıkıştırmayı durduruyor. Pencerenin çoğunu araçlar ve talimatlar kullanıyor. Bu ajanın ihtiyaç duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın ya da daha büyük pencereli bir model seçin. Ardından yeni bir sohbet başlatın.",
   "error.backend.contextCompactionStopped":
     'Bu sohbetin art arda iki sıkıştırması başarısız oldu, bu yüzden OpenBot onu otomatik olarak sıkıştırmayı bırakıyor. Her deneme tüm sohbeti modele gönderir ve plan sınırınızı kullanır. Yeniden denemek için "Şimdi sıkıştır"ı seçin veya yeni bir sohbet başlatın.',
+  "error.backend.contextCompactionRetrying":
+    "Sağlayıcı bu sohbeti sıkıştıramadı ve yeniden deniyor. Bu sohbetteki yeni mesajlar sıkıştırma bitene kadar bekler. Yakında bitmezse OpenBot onu durdurur ve mesajlarını gönderir.",
+  "error.backend.contextCompactionFailed":
+    "Bu sohbetin sıkıştırılması başarısız oldu. Sohbet değişmedi. Bekleyen mesajlar şimdi ajana gidiyor.",
+  "error.backend.contextCompactionTimedOut":
+    "Bu sohbetin sıkıştırılması çok uzun sürdü, bu yüzden OpenBot onu durdurdu. Sohbet değişmedi. Bekleyen mesajlar şimdi ajana gidiyor.",
   "error.backend.providerModelAtCapacity":
     "Model kapasitesinin sınırında. Sağlayıcı birkaç dakika içinde yeniden deneyecek. Hemen devam etmek için turu durdurun ve başka bir model seçin.",
   "error.backend.providerRetrying":

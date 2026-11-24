@@ -70,6 +70,12 @@ export const messages = {
     "La compactación no reduce este chat: tras dos compactaciones aún usa el {percent}% de la ventana de contexto del modelo, así que OpenBot deja de compactarlo. Las herramientas y las instrucciones usan la mayor parte de la ventana. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita, o elige un modelo con una ventana mayor. Después, inicia un chat nuevo.",
   "error.backend.contextCompactionStopped":
     "Dos compactaciones seguidas de este chat fallaron, así que OpenBot deja de compactarlo automáticamente. Cada intento envía todo el chat al modelo y consume el límite de tu plan. Selecciona «Compactar ahora» para intentarlo de nuevo o inicia un chat nuevo.",
+  "error.backend.contextCompactionRetrying":
+    "El proveedor no pudo compactar este chat y lo intenta de nuevo. Los mensajes nuevos de este chat esperan hasta que termine la compactación. Si no termina pronto, OpenBot la detiene y envía tus mensajes.",
+  "error.backend.contextCompactionFailed":
+    "La compactación de este chat falló. El chat no cambió. Los mensajes en espera se envían ahora al agente.",
+  "error.backend.contextCompactionTimedOut":
+    "La compactación de este chat tardó demasiado, así que OpenBot la detuvo. El chat no cambió. Los mensajes en espera se envían ahora al agente.",
   "error.backend.providerModelAtCapacity":
     "El modelo está al límite de su capacidad. El proveedor lo intentará de nuevo en unos minutos. Para continuar ahora, detén el turno y elige otro modelo.",
   "error.backend.providerRetrying":
