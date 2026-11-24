@@ -762,6 +762,11 @@ There are three parts:
   click (or Cmd/Ctrl+Enter) is stopped in the capture phase. The script reads the post, the posts above
   it and the author's next posts (no replies by other people), gives them to the worker, and clicks the
   button again with `data-openbot-x-pass`, so X posts the reply at once.
+  Each part has selectors for the earlier X web app (`data-testid`) and for the X web app of November
+  2026, which has no test ids: its text box is a `textarea`, so the script reads its value. That app
+  shows no `<time datetime>`, so the time comes from the status ID in the post link (an X ID holds its
+  creation time). In the reply dialog the post has no link; the script then takes the ID from
+  `in_reply_to` in the page address when the address has one.
 - **Worker** (`src/background.ts`). It answers the selectors, and keeps each post in a queue
   (`src/x-outbox.ts`, `chrome.storage.local`) until the server has it. Each post keeps one
   `clientMessageId`, and the host answers a repeated id with the first receipt for a day, so a retry
@@ -787,7 +792,8 @@ There are three parts:
   other.
 
 The E2E (`scripts/browser-extension-e2e.ts`, step 7) uses a local copy of an X post page whose reply
-button has a test id that only the served selectors know.
+button has a test id that only the served selectors know, then a local page in the markup of the new X
+web app that the built-in selectors must find.
 
 ## Agents on the member's Chrome (host side)
 
