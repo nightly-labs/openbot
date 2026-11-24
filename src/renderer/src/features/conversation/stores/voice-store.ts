@@ -47,7 +47,7 @@ interface VoiceSubmitHooks {
 
 type VoiceStoreProps = Pick<ConversationProps, "runtime"> & {
   agent: Pick<NonNullable<ConversationProps["agent"]>, "id"> | undefined;
-  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id"> | undefined;
+  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id" | "replyView"> | undefined;
   server: Pick<NonNullable<ConversationProps["server"]>, "id"> | undefined;
 };
 
@@ -420,10 +420,12 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       deps.clearConversationError(recordingTarget);
       const draft = submitRequest?.draft ?? deps.drafts()[composerDraftKey(recordingTarget)] ?? EMPTY_DRAFT;
       const transcribedDraft = { ...draft, text: appendVoiceTranscript(draft.text, result.text) };
-      const spokenReply = !deps.props.runtime && !deps.props.channel;
+      const spokenReply = !deps.props.runtime;
+      const channelReplies = (agentId: string) =>
+        deps.props.channel?.id === agentId ? { channelReplies: deps.props.channel.replyView } : undefined;
       if (submitRequest) {
         const target = { agentId: submitRequest.agentId, serverId: submitRequest.serverId };
-        if (spokenReply) noteDictatedMessage(target, result.text);
+        if (spokenReply) noteDictatedMessage(target, result.text, channelReplies(target.agentId));
         let delivered: boolean;
         if (submitRequest.queuedEdit) {
           delivered = await deps.hooks.saveEdit(
@@ -442,7 +444,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           deps.hooks.restoreTranscript(target, result.text);
         }
       } else {
-        if (spokenReply) noteDictatedMessage(recordingTarget, result.text);
+        if (spokenReply) noteDictatedMessage(recordingTarget, result.text, channelReplies(targetAgentId));
         const key = composerDraftKey(recordingTarget);
         deps.setDrafts((current) => ({ ...current, [key]: transcribedDraft }));
         if (atLimit) deps.setVoiceLimitReached?.(recordingTarget, true);

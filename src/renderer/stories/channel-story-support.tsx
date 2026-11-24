@@ -112,6 +112,8 @@ export function StoryChannelConversation(props: ChannelStoryProps) {
     workingTurns: () => [],
     interactionAgentName: () => undefined,
     awaitingReplies: () => props.awaiting ?? [],
+    replyView: () => ({ messages: [], activeTaskIds: [] }),
+    voiceAgent: () => CHANNEL_STORY_CHIEF,
     HeaderTitle: () => (
       <Button variant="ghost" size="sm" class="conversation-title channel-title no-drag" aria-label="Channel settings">
         <ChannelAvatar members={members} agents={STORY_AGENTS} />

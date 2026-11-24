@@ -1,6 +1,9 @@
+import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import {
   type AgentEvent,
+  type ChannelMessage,
   type ConversationMessage,
+  isAgentAnswer,
   latestTurnAnswer,
   type SpeechLanguage,
 } from "@openbot/contracts/ipc";
@@ -35,6 +38,18 @@ import { voiceServer } from "./voice-server";
 const DICTATION_LIFETIME_MS = 10 * 60_000;
 const ANSWER_LOOKUP_LIMIT = 50;
 
+export interface ChannelReplyView {
+  messages: readonly ChannelMessage[];
+  activeTaskIds: readonly string[];
+}
+
+interface ChannelReplyWatch {
+  view: () => ChannelReplyView;
+  sent: { knownMessageIds: ReadonlySet<string>; knownTaskIds: ReadonlySet<string> } | undefined;
+  recipientAgentId: string | null;
+  sawWork: boolean;
+}
+
 interface DictatedMessage {
   dictatedAt: number;
   language: SpeechLanguage;
@@ -45,6 +60,7 @@ interface DictatedMessage {
   continuedTurnId: string | undefined;
   always: boolean;
   progressUpdate: ((message: ConversationMessage) => boolean) | undefined;
+  channel: ChannelReplyWatch | undefined;
 }
 
 type SpeechTrigger = "voice_conversation" | "progress_update" | "dictation" | "read_aloud";
@@ -104,7 +120,11 @@ function isSpoken(agent: SpeechAgent): boolean {
 export function noteDictatedMessage(
   agent: SpeechAgent,
   transcript: string,
-  options?: { always: boolean; progressUpdate?: (message: ConversationMessage) => boolean },
+  options?: {
+    always?: boolean;
+    progressUpdate?: (message: ConversationMessage) => boolean;
+    channelReplies?: (() => ChannelReplyView) | undefined;
+  },
 ): void {
   const key = agentKey(agent);
   dictated.set(key, {
@@ -117,6 +137,9 @@ export function noteDictatedMessage(
     continuedTurnId: undefined,
     always: options?.always ?? false,
     progressUpdate: options?.progressUpdate,
+    channel: options?.channelReplies
+      ? { view: options.channelReplies, sent: undefined, recipientAgentId: null, sawWork: false }
+      : undefined,
   });
   followSpeechModel();
   void warmSpeech(options?.always ?? false);
@@ -130,14 +153,58 @@ async function warmSpeech(always: boolean): Promise<void> {
   } catch {}
 }
 
-export function claimDictatedSend(agent: SpeechAgent): ((messageId: string) => void) | undefined {
+export function claimDictatedSend(agent: SpeechAgent, sentText = ""): ((messageId: string) => void) | undefined {
   const message = dictated.get(agentKey(agent));
   if (!message || message.sending) return undefined;
   message.sending = true;
+  if (message.channel) watchChannelReply(message.channel, sentText);
   return (messageId) => {
     message.messageId = messageId;
     takeDeliveryTurn(message);
   };
+}
+
+function watchChannelReply(watch: ChannelReplyWatch, sentText: string): void {
+  const view = watch.view();
+  watch.sent = {
+    knownMessageIds: new Set(view.messages.map((entry) => entry.id)),
+    knownTaskIds: new Set(view.activeTaskIds),
+  };
+  watch.recipientAgentId = leadingAddress(sentText).mentions[0]?.id ?? null;
+}
+
+export function followDictatedChannelReply(channel: SpeechAgent, view: ChannelReplyView): void {
+  const key = agentKey(channel);
+  const message = dictated.get(key);
+  const watch = message?.channel;
+  const sent = watch?.sent;
+  if (!message || !watch || !sent) return;
+  if (Date.now() - message.dictatedAt > DICTATION_LIFETIME_MS) {
+    dictated.delete(key);
+    replyEnded(channel);
+    return;
+  }
+  const answer = view.messages.find(
+    (entry) =>
+      !sent.knownMessageIds.has(entry.id) &&
+      entry.author.kind === "agent" &&
+      (watch.recipientAgentId === null || entry.author.id === watch.recipientAgentId) &&
+      isAgentAnswer(entry.message),
+  );
+  if (answer?.message.status === "streaming") return;
+  if (answer) {
+    dictated.delete(key);
+    if (answer.message.status === "completed") void readChannelReply(channel, answer, message);
+    else void afterReadings(async () => {}).finally(replyEndedUnlessDropped(channel));
+    return;
+  }
+  if (view.activeTaskIds.some((taskId) => !sent.knownTaskIds.has(taskId))) {
+    watch.sawWork = true;
+    return;
+  }
+  if (!watch.sawWork) return;
+  dictated.delete(key);
+  void afterReadings(async () => {}).finally(replyEndedUnlessDropped(channel));
 }
 
 function takeDeliveryTurn(message: DictatedMessage): void {
@@ -295,6 +362,26 @@ async function readReply(agent: SpeechAgent, turnId: string, message: DictatedMe
       result: "failed",
       failure_code: "load_failed",
     });
+    reportReadFailure(error);
+  } finally {
+    loading.delete(own);
+    ended();
+  }
+}
+
+async function readChannelReply(channel: SpeechAgent, entry: ChannelMessage, message: DictatedMessage): Promise<void> {
+  const own = { ...channel };
+  const ended = replyEndedUnlessDropped(channel);
+  const trigger = message.always ? "voice_conversation" : "dictation";
+  loading.add(own);
+  try {
+    if (!message.always && !(await speechPort().voice.getSpeechSettings()).readReplies) return;
+    if (!loading.has(own)) return;
+    loading.delete(own);
+    await readAfterReadings(entry.message.text, { ...channel, messageId: entry.id }, message.language, trigger);
+  } catch (error) {
+    if (!loading.has(own)) return;
+    desktopAnalytics.track("speech_reply", { trigger, result: "failed", failure_code: "load_failed" });
     reportReadFailure(error);
   } finally {
     loading.delete(own);

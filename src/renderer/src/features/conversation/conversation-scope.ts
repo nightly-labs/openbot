@@ -44,6 +44,7 @@ import { holdNativeBrowserPage } from "../../native-browser-page";
 import { createScopeGuard } from "../../scope-lifetime";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
+import { followDictatedChannelReply } from "../speech/speech-replies";
 import { insideOverlay } from "../window/workspace-shortcuts";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import { createChangeMarkerActions } from "./change-marker-actions";
@@ -2504,19 +2505,29 @@ export function createConversationViewScope(props: ConversationProps) {
   const setAttachmentPickerElement = (element: HTMLInputElement) => {
     attachmentPicker = element;
   };
+  if (channel)
+    createEffect(
+      () => ({ view: channel.replyView(), serverId: props.server?.id ?? "local" }),
+      ({ view, serverId }) => followDictatedChannelReply({ serverId, agentId: channel.id }, view),
+    );
   const voiceConversationAvailable = () =>
-    !channel &&
-    (!props.runtime ||
-      (props.runtime.liveVoice !== undefined && codexLiveAccess(props.agentStatus.providers) !== "signIn"));
-  const voiceConversationOpen = () => Boolean(props.agent && controller.voiceSessions.active(props.agent.id));
+    channel
+      ? !props.runtime
+      : !props.runtime ||
+        (props.runtime.liveVoice !== undefined && codexLiveAccess(props.agentStatus.providers) !== "signIn");
+  const voiceConversationOpen = () => {
+    const ownerId = conversationOwnerId(props);
+    return Boolean(ownerId && controller.voiceSessions.active(ownerId));
+  };
   function toggleVoiceConversation() {
-    const agentId = props.agent?.id;
-    if (!agentId) return;
-    if (controller.voiceSessions.active(agentId)) controller.voiceSessions.stop(agentId);
-    else if (voiceConversationAvailable()) controller.voiceSessions.start(agentId);
+    const ownerId = conversationOwnerId(props);
+    if (!ownerId) return;
+    if (controller.voiceSessions.active(ownerId)) controller.voiceSessions.stop(ownerId);
+    else if (voiceConversationAvailable()) controller.voiceSessions.start(ownerId);
   }
   function endVoiceConversation() {
-    if (props.agent) controller.voiceSessions.stop(props.agent.id);
+    const ownerId = conversationOwnerId(props);
+    if (ownerId) controller.voiceSessions.stop(ownerId);
   }
   onCleanup(() => controller.voiceSessions.end("transcribed"));
   const startVoiceConversation = (agentId: string) =>
@@ -2527,7 +2538,9 @@ export function createConversationViewScope(props: ConversationProps) {
       submit: (draft, target, submittedSnapshot, voice) =>
         actions.submitMessage(draft, target, submittedSnapshot, voice),
       serverOnline: () => props.server?.kind !== "remote" || props.server.state === "online",
-      progressUpdate: (message) => isNarrationItemId(message.id, props.agent?.provider),
+      progressUpdate: (message) => !channel && isNarrationItemId(message.id, props.agent?.provider),
+      keepsRecording: !channel,
+      channelReplies: channel?.replyView,
     });
 
   return {

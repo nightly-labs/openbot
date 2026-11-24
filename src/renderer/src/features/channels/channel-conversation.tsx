@@ -18,6 +18,7 @@ import type {
   SendMessageResult,
 } from "../conversation/conversation-types";
 import { readerCanDeleteMessage } from "../conversation/message-delete-access";
+import { speechReading } from "../speech/speech-playback";
 import {
   ChannelAboveComposer,
   ChannelEmptyState,
@@ -145,6 +146,19 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     const current = page();
     return current ? activeChannelRuns(current) : [];
   });
+  const replyView = createMemo(() => ({ messages: page()?.messages ?? [], activeTaskIds: activeRuns() }));
+  const voiceAgent = createMemo(() => {
+    const current = page();
+    if (!current) return undefined;
+    const readingId = speechReading()?.messageId;
+    const reader = readingId
+      ? current.messages.find((entry) => entry.id === readingId && entry.author.kind === "agent")?.author.id
+      : undefined;
+    const running = new Set(activeRuns());
+    const worker = current.tasks.findLast((task) => running.has(task.id) && task.ownerAgentId)?.ownerAgentId;
+    const speakerId = reader ?? worker ?? current.channel.leadAgentId ?? current.channel.members[0]?.agentId;
+    return channels.agents().find((agent) => agent.id === speakerId);
+  });
 
   let settingsNonce = 0;
   const settingsRequest = createMemo<AgentSettingsRequest | null>((previous) => {
@@ -263,6 +277,8 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
           rowStopping = false;
         });
     },
+    replyView,
+    voiceAgent,
     HeaderTitle: (props) => <ChannelHeaderTitle channelId={channelId} onOpenSettings={props.onOpenSettings} />,
     SettingsPane: (props) => (
       <ChannelSettingsPane
