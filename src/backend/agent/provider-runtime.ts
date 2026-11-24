@@ -1003,7 +1003,11 @@ export class ProviderRuntime implements ProviderPort {
     });
     if (!scope) {
       const statuses = (this.status().providers ?? []).filter(
-        (item) => isAgentProvider(item.id) && !item.off && item.connectionState !== "connecting",
+        (item) =>
+          isAgentProvider(item.id) && !item.off && !(item.connectionState === "connecting" && item.signInPending),
+      );
+      const reconnecting = new Set(
+        statuses.filter((item) => item.connectionState === "connecting").map((item) => item.id),
       );
       const available = new Set(statuses.filter((item) => item.state === "available").map((item) => item.id));
       const providers = statuses
@@ -1060,14 +1064,8 @@ export class ProviderRuntime implements ProviderPort {
               usage = yield* this.#refreshUsage(client, defaultUsageModel(provider), false).pipe(deadline);
               const first = usage.limits[0];
               const last = this.#lastUsage.get(provider);
-              if (
-                accounts &&
-                !isKeyAccountSupport(accounts) &&
-                accounts.usageLeavesSession &&
-                last &&
-                !first?.primary &&
-                !first?.secondary
-              )
+              const leavesSession = Boolean(accounts && !isKeyAccountSupport(accounts) && accounts.usageLeavesSession);
+              if (last && !first?.primary && !first?.secondary && (leavesSession || !usageWindowHasReset(last)))
                 return last;
             }
           }
@@ -1123,6 +1121,11 @@ export class ProviderRuntime implements ProviderPort {
         providers,
         (provider) =>
           Effect.gen(function* () {
+            if (reconnecting.has(provider)) {
+              const kept = available.has(provider) ? keptReading(provider) : null;
+              if (kept && !usageWindowHasReset(kept)) collected.set(provider, kept);
+              return;
+            }
             if (available.has(provider)) yield* readDefault(provider).pipe(logFailure(provider));
             yield* readAccounts(provider).pipe(logFailure(provider));
           }),

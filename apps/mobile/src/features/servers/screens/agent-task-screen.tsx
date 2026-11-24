@@ -82,7 +82,7 @@ import type { MobileAgentActivity } from "@/features/workspace/model/agent-activ
 import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import { addStartedTask } from "@/features/workspace/model/task-cache";
+import { addStartedTask, loadNewestTaskConversation } from "@/features/workspace/model/task-cache";
 import { hostAwaitsQuestion } from "@/features/workspace/model/thread-waits";
 import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
@@ -209,11 +209,15 @@ function AgentTaskChat({
     retry: false,
     queryFn: () => loadAgentTasks(agentId, serverId),
   });
+  const conversationKey = queryKeys.agentTaskConversation(queryScope, serverId, taskId);
   const conversation = useQuery({
-    queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId),
+    queryKey: conversationKey,
     enabled: enabled && !isDraft,
     retry: false,
-    queryFn: () => loadAgentTaskConversation({ agentId, taskId }, serverId),
+    queryFn: () =>
+      loadNewestTaskConversation(queryClient, conversationKey, () =>
+        loadAgentTaskConversation({ agentId, taskId }, serverId),
+      ),
   });
   const task = list.data?.tasks.find((item) => item.id === taskId);
   const memberId = server?.membershipId ?? null;

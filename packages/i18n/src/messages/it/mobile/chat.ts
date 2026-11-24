@@ -144,6 +144,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Chiudi",
   "mobile.chat.attachment.sharingUnavailable": "La condivisione dei file non è disponibile su questo dispositivo.",
   "mobile.chat.attachment.unavailable": "L'allegato non è disponibile. Riprova.",
+  "mobile.chat.attachment.downloadStopped": "Il download si è interrotto. Ricomincia quando il server è connesso.",
   "mobile.chat.attachment.openFailed": "Impossibile aprire l'allegato",
   "mobile.chat.attachment.photosNeedUpdate": "Per salvare le foto serve l'ultima versione dell'app.",
   "mobile.chat.attachment.photosPermission":
@@ -156,6 +157,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Impossibile condividere i file",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Per condividere più file serve l’ultima versione dell’app.",
   "mobile.chat.attachment.preview": "Anteprima di {name}",
+  "mobile.chat.attachment.seeAll": "Tocca per vedere tutto",
   "mobile.chat.attachment.displayFailed": "Impossibile mostrare questa immagine.",
   "mobile.chat.attachment.loadingImage": "Caricamento dell'immagine",
   "mobile.chat.attachment.uploading": "Caricamento di {name}",
@@ -233,6 +235,8 @@ export const messages = {
     "Questo server non supporta GPT Live Voice. Aggiorna OpenBot sul computer che lo esegue.",
   "mobile.chat.liveVoice.gptFailed": "Impossibile avviare GPT Live Voice. Riattiva il microfono per riprovare.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice si è fermato. Riattiva il microfono per avviarlo di nuovo.",
+  "mobile.chat.liveVoice.gptFailedTitle": "Impossibile avviare GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice si è fermato",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Consenti a OpenBot di usare il microfono in Impostazioni. Poi riattiva il microfono per riprovare.",
   "mobile.chat.composer.addAttachment": "Aggiungi allegato",

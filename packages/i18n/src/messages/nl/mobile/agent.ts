@@ -615,7 +615,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Kan je servers niet laden",
   "mobile.agent.home.serversFailedBody": "Controleer of de desktop-app draait en probeer het opnieuw.",
   "mobile.agent.home.noServers": "Geen servers beschikbaar",
-  "mobile.agent.home.noServersBody": "Verbind de desktop-app opnieuw of word lid van een externe server.",
+  "mobile.agent.home.noServersBody":
+    "Open OpenBot op je computer met dit account en zet Publiceer deze server aan in Serverinstellingen → Leden. Of word lid van een externe server.",
   "mobile.agent.home.chooseServer": "Kies een server",
   "mobile.agent.home.openServers": "Servers openen",
   "mobile.agent.home.noChatOpen": "Geen chat geopend",

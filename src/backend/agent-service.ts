@@ -3555,15 +3555,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  #startingModels(): AgentModelOption[] {
+    return this.#endpoints.available().filter((model) => this.#hiddenModels?.(model.provider)?.has(model.id) !== true);
+  }
+
   #startingChoice(): ModelChoice | null {
-    return startingChoice(this.#endpoints.available(), this.#preference(), {
+    return startingChoice(this.#startingModels(), this.#preference(), {
       developmentDefaults: this.#developmentDefaults,
       providerAvailable: (provider) => this.#providerAvailable(provider),
     });
   }
 
   #runnableStartingChoice(): ModelChoice | null {
-    return runnableStartingChoice(this.#endpoints.available(), this.#preference(), this.getStatus().providers ?? [], {
+    return runnableStartingChoice(this.#startingModels(), this.#preference(), this.getStatus().providers ?? [], {
       developmentDefaults: this.#developmentDefaults,
       providerAvailable: (provider) => this.#providerAvailable(provider),
     });
@@ -3917,7 +3921,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         const requestedModel = input.model
           ? (this.#endpoints
               .available()
-              .find((model) => model.id === input.model && (!input.provider || model.provider === input.provider)) ??
+              .find((model) => model.id === input.model && (!modelProvider || model.provider === modelProvider)) ??
             (modelProvider
               ? this.#providers
                   .accountModels(

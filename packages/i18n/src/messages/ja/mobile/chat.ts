@@ -144,6 +144,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "閉じる",
   "mobile.chat.attachment.sharingUnavailable": "このデバイスではファイルの共有を利用できません。",
   "mobile.chat.attachment.unavailable": "添付ファイルを利用できません。もう一度お試しください。",
+  "mobile.chat.attachment.downloadStopped": "ダウンロードが止まりました。サーバーに接続すると、もう一度始まります。",
   "mobile.chat.attachment.openFailed": "添付ファイルを開けませんでした",
   "mobile.chat.attachment.photosNeedUpdate": "写真を保存するには、アプリを最新版に更新してください。",
   "mobile.chat.attachment.photosPermission": "この画像を保存するには、設定で OpenBot に写真の追加を許可してください。",
@@ -156,6 +157,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesNeedsUpdate":
     "複数のファイルを共有するには、アプリを最新バージョンにしてください。",
   "mobile.chat.attachment.preview": "{name} のプレビュー",
+  "mobile.chat.attachment.seeAll": "タップしてすべて表示",
   "mobile.chat.attachment.displayFailed": "この画像を表示できませんでした。",
   "mobile.chat.attachment.loadingImage": "画像を読み込み中",
   "mobile.chat.attachment.uploading": "{name} をアップロード中",
@@ -232,6 +234,8 @@ export const messages = {
     "このサーバーは GPT Live Voice に対応していません。サーバーを実行しているコンピューターの OpenBot を更新してください。",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice を開始できませんでした。ミュートを解除して再試行してください。",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice が停止しました。ミュートを解除すると再開します。",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice を開始できませんでした",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice が停止しました",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "設定で OpenBot にマイクの使用を許可してから、ミュートを解除して再試行してください。",
   "mobile.chat.composer.addAttachment": "添付ファイルを追加",

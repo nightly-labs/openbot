@@ -18,7 +18,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "加入别人分享给你的服务器。",
   "mobile.onboarding.server.computerTitle": "连接你的电脑",
   "mobile.onboarding.server.computerSteps":
-    "先在这台手机上退出登录。然后打开电脑上的 OpenBot，进入“设置 → Mobile Connect”，选择“生成二维码”，用这台手机扫描。",
+    "先在这台手机上退出登录。然后打开电脑上的 OpenBot，进入“设置 → 手机连接”，选择“添加手机 → 已安装，登录”，用这台手机扫描二维码。",
   "mobile.onboarding.server.signOut": "退出登录",
   "mobile.onboarding.server.connecting": "正在连接 {name}…",
   "mobile.onboarding.agent.title": "挑选你的第一位助手",
