@@ -97,7 +97,7 @@ jobs:
           fi
           lane_unless desktop '^(apps/(auth-api|browser-extension|mobile|mobile-updates|site-router|status)|docker|remote)/'
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
-          lane remote '^(remote|scripts)/'
+          lane remote '^(remote|scripts|packages/team-client|packages/contracts/src/signal-protocol)/'
           lane storybook '^(src|apps/(auth-api|status)|\.storybook|resources|marketplace|build)/'
           lane schema '^(src/backend/|scripts/released-schema-fixtures\.ts$)'
           lane surfaces '^(apps/(browser-extension|mobile|mobile-updates|site-router|status)|remote|scripts)/'
