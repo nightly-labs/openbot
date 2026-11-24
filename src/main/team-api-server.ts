@@ -262,6 +262,7 @@ import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protoco
 import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
+import { PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-workflows-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
@@ -2944,6 +2945,8 @@ export class TeamApiServer {
           capability === COMPUTER_ACTIVITY_CAPABILITY
         )
           return this.#options.pushNotifications !== undefined;
+        if (capability === PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY)
+          return this.#options.pushNotifications !== undefined && this.#options.workflows !== undefined;
         if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
         if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
           return this.#options.agentNotificationLevels !== undefined;
