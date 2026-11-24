@@ -2631,10 +2631,7 @@ export async function createApplicationServices({
     Effect.runFork(providerRuntimes.ensureToolRuntimes());
   performance.mark("openbot:services.messaging");
   await runCauseEffect(sidebarLayout.reconcileAgents(service.sidebarChatIds()));
-  libraryFolders.onChanged(() => {
-    storageUsage.invalidate();
-    service.notifyLibraryFoldersChanged();
-  });
+  libraryFolders.onChanged(() => service.notifyLibraryFoldersChanged());
   workflowFolders.onChanged(() => service.notifyWorkflowFoldersChanged());
   await runCauseEffect(libraryFolders.reconcileAgents(new Set(service.listAgents().map((agent) => agent.id))));
   await runCauseEffect(

@@ -253,10 +253,9 @@ export class StorageUsageScanner {
       input.scope === "host" && this.#sources.workflowFiles
         ? yield* storedSync(this.#sources.workflowFiles)
         : new Map<string, WorkflowFileOwner>();
-    const allFileRows = files.map((file) => ({
-      bytes: file.bytes,
-      row: this.#fileRow(file, threadById, workflowFiles, scannedAt),
-    }));
+    const allFileRows = files
+      .map((file) => ({ bytes: file.bytes, row: this.#fileRow(file, threadById, workflowFiles, scannedAt) }))
+      .sort((left, right) => right.bytes - left.bytes);
     const fileRows = largestFirst(allFileRows, STORAGE_LIMITS.files);
     truncated ||= conversations.cut || fileRows.cut;
 
@@ -319,7 +318,7 @@ export class StorageUsageScanner {
       files: fileRows.rows.map((entry) => entry.row),
       truncated,
     };
-    return { usage, files: allFileRows.map((entry) => entry.row) };
+    return { usage, files: input.scope === "host" ? allFileRows.map((entry) => entry.row) : usage.files };
   }).bind(this);
 
   #placements = Effect.fn("StorageUsage.placements")(function* (
