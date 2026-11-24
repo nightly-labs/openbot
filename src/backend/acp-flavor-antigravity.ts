@@ -133,7 +133,7 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
       logged && key !== "error.provider.antigravityNetwork" ? (GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text) : text;
     return { message: geminiRequestFailureText(key, shown, text), key };
   }
-  if (logged && GEMINI_UNREADABLE_HISTORY.test(text))
+  if (GEMINI_UNREADABLE_HISTORY.test(text))
     return { message: GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text, key: null };
   if (logged || GEMINI_TERMINATED_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityTurnStopped"), key: null };
