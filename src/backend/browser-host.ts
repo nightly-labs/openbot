@@ -722,6 +722,24 @@ export class BrowserHost {
     }
   });
 
+  readonly releaseIdleTabs = Effect.fn("BrowserHost.releaseIdleTabs")(function* (
+    this: BrowserHost,
+    runningThreadIds: ReadonlySet<string>,
+  ) {
+    for (const tab of [...this.#tabs.values()]) {
+      if (tab.pendingRestore || tab.ownerThreadId === null || !this.#maySleep(tab) || this.#tabInUse(tab)) continue;
+      if ([tab.ownerThreadId, ...(tab.sharedThreadIds ?? [])].some((threadId) => runningThreadIds.has(threadId))) {
+        continue;
+      }
+      yield* this.#sleep(tab).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => logger.warn("Unable to sleep a browser tab to free memory", { error: toLogValue(error) })),
+        ),
+        Effect.ignore,
+      );
+    }
+  }).bind(this);
+
   #throttleHiddenTabs(now: number): void {
     for (const tab of this.#tabs.values()) {
       if (tab.closing || tab.contents.isDestroyed() || this.#viewShown(tab.view) || this.#tabBusy(tab)) continue;

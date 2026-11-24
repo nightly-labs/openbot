@@ -248,6 +248,7 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
   shareTab(tabId: string, target: { agentId: string; threadId: string }): void;
   unshareThread(threadId: string): void;
   agentTab(tabId: string, agentId: string): { title: string; url: string } | null;
+  releaseIdleTabs?(runningThreadIds: ReadonlySet<string>): Effect.Effect<void>;
 }
 
 export interface TurnHooks {
