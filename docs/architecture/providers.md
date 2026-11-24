@@ -1125,8 +1125,13 @@ a desktop keyring keeps its sign-in in the Secret Service (service `cursor-crede
 reader runs `secret-tool search`, not `lookup`, so a locked keyring gives no reading and no unlock
 prompt at each poll. It keeps a token until the CLI rewrites `auth.json`, which the CLI does after
 each keyring write, and a read with no token (locked keyring, no session bus, no `secret-tool`) for 30
-minutes. Windows 2026.11.22 keeps its
-sign-in in `auth.dpapi`, which the reader does not read. Cursor does not document
+minutes. A Windows CLI from 2026.11.22 leaves the same marker and keeps its sign-in in `auth.dpapi`
+next to `auth.json`: `{"version":1,"dpapi":"<base64>"}`, encrypted with DPAPI for the current user.
+With that marker the reader decrypts the blob with `ProtectedData.Unprotect` in the system Windows
+PowerShell, as the CLI does, and sends the blob on standard input. It keeps the result by the
+modification time of `auth.dpapi`, with the same 30 minute reuse for a read with no token. The CLI
+uses the Windows Credential Manager only when `CURSOR_CLI_WINDOWS_CREDENTIAL_MANAGER=1`; the reader
+does not read it. Cursor does not document
 this API. `autoPercentUsed` (Cursor's own models) fills the primary window and `apiPercentUsed`
 (all other models) the secondary one, both for the billing cycle; the dock names them by slot for a
 `cursor` row, because both windows have the same length. The total of that split plan
