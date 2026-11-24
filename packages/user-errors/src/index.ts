@@ -55,8 +55,6 @@ const AUTH_SIGNALS =
 
 const RATE_LIMIT_SIGNALS = /\b429\s+too many requests\b|\blast status:\s*429\b|"status"\s*:\s*429\b/iu;
 
-const IPC_TIMEOUT = /^Error invoking remote method '[^']+':\s*TimeoutError:/u;
-
 const CLOCK_SIGNALS = /\bCERT_NOT_YET_VALID\b|\bcertificate is not yet valid\b/iu;
 
 const INTERRUPTED_ANSWER = /\bstream disconnected before completion\b/iu;
@@ -73,7 +71,8 @@ export function classifyUserError(error: unknown): UserErrorKind {
   if (
     code === "ETIMEDOUT" ||
     code === "ERR_CONNECTION_TIMED_OUT" ||
-    (error instanceof Error && (error.name === "TimeoutError" || IPC_TIMEOUT.test(error.message.trim())))
+    (error instanceof Error && error.name === "TimeoutError") ||
+    errorReference(error) === "error/TimeoutError"
   ) {
     return "timeout";
   }
