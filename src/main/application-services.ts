@@ -13,6 +13,7 @@ import {
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentProviderStatus,
@@ -2243,6 +2244,8 @@ export async function createApplicationServices({
         mcpServerOwners.remove(mcpServerId).pipe(Effect.andThen(mcpAccessStore.remove(mcpServerId))),
     },
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
+    reviewSkillsFull: (agentId) =>
+      skills.lockedSkillIds(agentId).pipe(Effect.map((ids) => ids.length >= INPUT_LIMITS.agentSkills)),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,
     webhookRoutines: () => agentWebhookRoutineWriter(events),

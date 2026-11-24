@@ -491,6 +491,7 @@ export function ConversationTimeline() {
             <ChatMessageRow
               message={answer}
               author={ownAgentAuthor()}
+              showAuthor
               showTime
               agents={props.agents}
               onSelectAgent={props.onSelectAgent}
