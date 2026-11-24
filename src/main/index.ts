@@ -153,7 +153,7 @@ import {
   keepWindowsHidden,
   openWindowsInBackground,
   showMainWindow,
-  windowsOpenWithoutFocus,
+  windowsOpenInBackground,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openMessageLink } from "./message-link-relay";
@@ -1194,6 +1194,7 @@ async function recoverFromStartLoop(): Promise<
     locale,
     translate: translateFor(locale),
     iconPath: appIconPath,
+    showWithoutFocus: windowsOpenInBackground(),
   });
   const choice = await recovery.choice;
   logger.info(`Recovery window choice: ${choice}.`);
@@ -1204,8 +1205,7 @@ async function presentApplication(): Promise<void> {
   await ensureMacApplicationPresence(
     process.platform,
     (policy) => app.setActivationPolicy(policy),
-    () =>
-      windowsOpenWithoutFocus() && app.dock?.isVisible() ? Promise.resolve() : (app.dock?.show() ?? Promise.resolve()),
+    () => (windowsOpenInBackground() ? Promise.resolve() : (app.dock?.show() ?? Promise.resolve())),
   );
   await Effect.runPromise(
     installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),

@@ -306,7 +306,7 @@ export function createMainWindowController({
         sandbox: true,
         nodeIntegration: false,
         webSecurity: true,
-        backgroundThrottling: !windowsOpenInBackground,
+        backgroundThrottling: !backgroundWindows,
       },
     });
     hideMenuBar(window);
@@ -321,7 +321,7 @@ export function createMainWindowController({
           testClientEnabled: developmentTestClientEnabled,
         })
       ) {
-        if (windowsOpenInBackground) window.showInactive();
+        if (backgroundWindows) window.showInactive();
         else window.show();
       }
     });
@@ -919,14 +919,14 @@ export function sendComputerUseHighlightPlacement(
 }
 
 let windowsKeptHidden = false;
-let windowsOpenInBackground = false;
+let backgroundWindows = false;
 
 export function openWindowsInBackground(): void {
-  windowsOpenInBackground = true;
+  backgroundWindows = true;
 }
 
-export function windowsOpenWithoutFocus(): boolean {
-  return windowsOpenInBackground;
+export function windowsOpenInBackground(): boolean {
+  return backgroundWindows;
 }
 
 export function keepWindowsHidden(): void {
