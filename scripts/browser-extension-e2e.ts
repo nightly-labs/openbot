@@ -394,9 +394,19 @@ try {
   const agentButton = page.getByRole("button", { name: new RegExp(`^${literal(agentName)}\\b`) }).first();
   await agentButton.waitFor({ timeout: UI_WAIT_MS });
   report.signIn = { invalidExtensionRefused: true, cancelShown: true, homeShowsServer: true, homeShowsAgent: true };
-  await worker.evaluate(
-    `chrome.storage.local.get("openbot.session.v1").then((items) => chrome.storage.local.set({ "${ANALYTICS_CHOICE_KEY}": { enabled: true, at: Date.now(), accountId: items["openbot.session.v1"].user.id } }))`,
-  );
+  await worker.evaluate(`(async () => {
+    const session = (await chrome.storage.local.get("openbot.session.v1"))["openbot.session.v1"];
+    const response = await fetch(${JSON.stringify(`${authApi}/v1/me/analytics`)}, {
+      method: "PUT",
+      headers: { authorization: "Bearer " + session.token, "content-type": "application/json" },
+      body: JSON.stringify({ enabled: true, ageMs: 0 }),
+    });
+    if (!response.ok) throw new Error("The account did not save the analytics answer: " + response.status);
+    await chrome.storage.local.set({
+      "openbot.session.v1": { ...session, user: { ...session.user, analyticsEnabled: true } },
+      "${ANALYTICS_CHOICE_KEY}": { enabled: true, at: Date.now(), accountId: session.user.id },
+    });
+  })()`);
   await shot(page, "1-home");
 
   await agentButton.click();
