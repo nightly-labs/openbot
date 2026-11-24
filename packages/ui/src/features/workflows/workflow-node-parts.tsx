@@ -73,6 +73,29 @@ export type CanvasColor = "ink" | NoteTone;
 export type ShapeKind = "rectangle" | "circle" | "diamond" | "triangle" | "inverted" | "oval" | "star";
 type BlockKind = "trigger" | "condition" | "output" | "approval" | "note" | "shape";
 
+const readClock = () => ({ wall: Date.now(), mono: performance.now() });
+
+function createSharedClock(intervalMs: number) {
+  const [now, setNow] = createSignal(readClock());
+  let users = 0;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const subscribe = () => {
+    users += 1;
+    setNow(readClock());
+    if (users === 1) timer = setInterval(() => setNow(readClock()), intervalMs);
+    return () => {
+      users -= 1;
+      if (users !== 0 || timer === undefined) return;
+      clearInterval(timer);
+      timer = undefined;
+    };
+  };
+  return { now, subscribe };
+}
+
+const runTimeClock = createSharedClock(100);
+const workflowClock = createSharedClock(250);
+
 export function PortIcon(props: { type: WfnPortType }) {
   return (
     <Show when={props.type === "text"} fallback={props.type === "image" ? <Image /> : <File />}>
@@ -146,7 +169,13 @@ export function Toolbar(props: { id: string; children: JSX.Element }) {
   onSettled(() => {
     const target = element;
     if (!target) return;
-    const observer = new ResizeObserver(() => setBar({ width: target.offsetWidth, height: target.offsetHeight }));
+    const observer = new ResizeObserver(() => {
+      const width = target.offsetWidth;
+      const height = target.offsetHeight;
+      const previous = bar();
+      if (previous?.width === width && previous.height === height) return;
+      setBar({ width, height });
+    });
     observer.observe(target);
     return () => observer.disconnect();
   });
@@ -519,31 +548,18 @@ function StepName(props: { id: string; kind: string }) {
 function RunTime(props: { id: string }) {
   const board = useBoard();
   const { t, format } = useText();
-  const [clock, setClock] = createStore({ ms: 0, done: false });
+  const [clock, setClock] = createStore({ finishedMs: 0, done: false });
   let start = 0;
   createEffect(
     () => board.status(props.id),
     (status, before) => {
       if (status === "running") {
         start = performance.now();
-        setClock((draft) => {
-          draft.ms = 0;
-          draft.done = false;
-        });
-        const timer = setInterval(
-          () =>
-            setClock((draft) => {
-              draft.ms = performance.now() - start;
-            }),
-          100,
-        );
-        return () => clearInterval(timer);
+        setClock(() => ({ finishedMs: 0, done: false }));
+        return runTimeClock.subscribe();
       }
       if (status === "done" && before === "running") {
-        setClock((draft) => {
-          draft.ms = performance.now() - start;
-          draft.done = true;
-        });
+        setClock(() => ({ finishedMs: performance.now() - start, done: true }));
         const timer = setTimeout(
           () =>
             setClock((draft) => {
@@ -559,6 +575,7 @@ function RunTime(props: { id: string }) {
       return undefined;
     },
   );
+  const elapsedMs = () => (clock.done ? clock.finishedMs : Math.max(0, runTimeClock.now().mono - start));
   return (
     <Show
       when={board.status(props.id) === "running" || clock.done}
@@ -576,7 +593,10 @@ function RunTime(props: { id: string }) {
           <CircleCheck aria-hidden="true" />
         </Show>
         {t("workflow.node.runTime", {
-          seconds: format.number(clock.ms / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+          seconds: format.number(elapsedMs() / 1000, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+          }),
         })}
       </span>
     </Show>
@@ -878,29 +898,23 @@ function PendingTake(props: { number: number; since: string; current: boolean; o
 export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 export function useElapsed(running: () => boolean) {
-  const [now, setNow] = createSignal(0);
   let start = 0;
   createEffect(running, (on) => {
     if (!on) return;
     start = performance.now();
-    setNow(start);
-    const timer = setInterval(() => setNow(performance.now()), 250);
-    return () => clearInterval(timer);
+    return workflowClock.subscribe();
   });
-  return () => Math.max(0, Math.floor((now() - start) / 1000));
+  return () => Math.max(0, Math.floor((workflowClock.now().mono - start) / 1000));
 }
 
 export function useSince(since: () => string | undefined) {
-  const [now, setNow] = createSignal(Date.now());
   createEffect(since, (at) => {
     if (at === undefined) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(timer);
+    return workflowClock.subscribe();
   });
   return () => {
     const at = since();
-    return at === undefined ? undefined : Math.max(0, Math.floor((now() - Date.parse(at)) / 1000));
+    return at === undefined ? undefined : Math.max(0, Math.floor((workflowClock.now().wall - Date.parse(at)) / 1000));
   };
 }
 

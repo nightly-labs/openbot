@@ -10,7 +10,10 @@ import {
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
   type WorkflowNodeKind,
+  type WorkflowRunDetail,
+  type WorkflowRunPage,
   type WorkflowSaveResult,
+  type WorkflowStep,
   type WorkflowSummary,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
@@ -45,6 +48,7 @@ import type { WorkflowHost } from "./workflows-port";
 const RUN_PAGE = 20;
 const CACHED_WORKFLOWS = 20;
 const SAVE_DELAY_MS = 400;
+const REFRESH_DELAY_MS = 50;
 
 const NO_OPTIONS: WorkflowGitHubRepositoryOptions = { labels: [], people: [] };
 
@@ -71,6 +75,61 @@ export interface WorkflowRequest {
 type WorkflowBase = { revision: number; graph: WorkflowGraph; readOnly?: true };
 
 type WorkflowsControllerProps = Omit<WorkflowCanvasProps, "workflow" | "features" | "frame" | "readOnly" | "catalogs">;
+
+const sameStep = (left: WorkflowStep, right: WorkflowStep): boolean =>
+  left.id === right.id &&
+  left.workflowId === right.workflowId &&
+  left.runId === right.runId &&
+  left.nodeId === right.nodeId &&
+  left.attempt === right.attempt &&
+  left.agentId === right.agentId &&
+  left.status === right.status &&
+  left.output === right.output &&
+  left.branch === right.branch &&
+  left.error === right.error &&
+  left.startedAt === right.startedAt &&
+  left.endedAt === right.endedAt &&
+  left.waiting === right.waiting;
+
+const sameRun = (left: WorkflowRunDetail, right: WorkflowRunDetail): boolean => {
+  const one = left.run;
+  const other = right.run;
+  if (
+    one.id !== other.id ||
+    one.workflowId !== other.workflowId ||
+    one.number !== other.number ||
+    one.triggerNodeId !== other.triggerNodeId ||
+    one.source !== other.source ||
+    one.status !== other.status ||
+    one.error !== other.error ||
+    one.startedAt !== other.startedAt ||
+    one.endedAt !== other.endedAt ||
+    left.steps.length !== right.steps.length
+  )
+    return false;
+  return left.steps.every((step, index) => {
+    const otherStep = right.steps[index];
+    return otherStep !== undefined && sameStep(step, otherStep);
+  });
+};
+
+type RunPageLike = Pick<WorkflowRunPage, "nextBefore"> & {
+  readonly runs: readonly WorkflowRunDetail[];
+  readonly soloSteps: readonly WorkflowStep[];
+};
+
+const sameRunPage = (left: RunPageLike, right: RunPageLike): boolean =>
+  left.nextBefore === right.nextBefore &&
+  left.soloSteps.length === right.soloSteps.length &&
+  left.runs.length === right.runs.length &&
+  left.runs.every((run, index) => {
+    const other = right.runs[index];
+    return other !== undefined && sameRun(run, other);
+  }) &&
+  left.soloSteps.every((step, index) => {
+    const other = right.soloSteps[index];
+    return other !== undefined && sameStep(step, other);
+  });
 
 const lastWorkflowKey = (hostKey: string) => `openbot:last-workflow:${hostKey}`;
 function readLastWorkflow(hostKey: string): string | undefined {
@@ -180,6 +239,9 @@ export function createWorkflowsController(
   let disposed = false;
   let pending: { workflowId: string; graph: WorkflowGraph } | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  const refreshPending = new Map<string, { workflowId: string | null; agentId: string | undefined }>();
+  let refreshRunning = false;
   let edits = 0;
   let writing = 0;
   let previewRequest = 0;
@@ -323,8 +385,8 @@ export function createWorkflowsController(
     if (workflowId !== current || !list.some((summary) => summary.id === workflowId)) return;
     const [next, page, versions, github] = await (details ?? readDetail(workflowId));
     if (disposed || workflowId !== current) return;
-    const open = stored()?.detail;
-    const shown = open?.summary.id === workflowId ? open : undefined;
+    const open = stored();
+    const shown = open?.detail.summary.id === workflowId ? open.detail : undefined;
     const known = shown && bases.get(workflowId);
     const detail = shown && known && next.revision < known.revision ? shown : next;
     const newer = known !== undefined && next.revision > known.revision;
@@ -334,7 +396,12 @@ export function createWorkflowsController(
       const entry = cache.get(hostKey);
       if (entry) entry.last = workflowId;
     }
-    const value = { detail, runs: page, versions, github };
+    const value = {
+      detail,
+      runs: open && shown ? (sameRunPage(open.runs, page) ? open.runs : page) : page,
+      versions,
+      github,
+    };
     if (newer && idle && agentId !== undefined && shown) {
       playBuild(workflowId, agentId, shown.graph);
       show(value);
@@ -556,7 +623,7 @@ export function createWorkflowsController(
     return libraryPictures();
   };
 
-  const refresh = (workflowId: string | null, agentId?: string) => {
+  const refreshNow = (workflowId: string | null, agentId?: string) => {
     if (
       workflowId !== null &&
       agentId !== undefined &&
@@ -569,14 +636,42 @@ export function createWorkflowsController(
     ) {
       playBuild(workflowId, agentId, null);
       open(workflowId);
-      return;
+      return Promise.resolve(undefined);
     }
-    read(workflowId ?? current, agentId).catch(report);
-    if (workflowId !== null) return;
+    const done = read(workflowId ?? current, agentId).catch(report);
+    if (workflowId !== null) return done;
     readPlaces();
     readLevels();
     readGitHubCatalog();
     readFolders();
+    return done;
+  };
+
+  const scheduleRefresh = () => {
+    if (refreshTimer === undefined && !refreshRunning && refreshPending.size > 0) {
+      refreshTimer = setTimeout(flushRefresh, REFRESH_DELAY_MS);
+    }
+  };
+
+  const flushRefresh = () => {
+    refreshTimer = undefined;
+    if (disposed || refreshPending.size === 0) return;
+    const requests = [...refreshPending.values()];
+    refreshPending.clear();
+    refreshRunning = true;
+    const runs = requests.map((request) =>
+      Promise.resolve().then(() => refreshNow(request.workflowId, request.agentId)),
+    );
+    void Promise.allSettled(runs).then((results) => {
+      refreshRunning = false;
+      for (const result of results) if (result.status === "rejected") report(result.reason);
+      scheduleRefresh();
+    });
+  };
+
+  const refresh = (workflowId: string | null, agentId?: string) => {
+    refreshPending.set(`${workflowId ?? ""}\u0000${agentId ?? ""}`, { workflowId, agentId });
+    scheduleRefresh();
   };
 
   onSettled(() => {
@@ -587,6 +682,7 @@ export function createWorkflowsController(
       stop();
       stopFolders();
       window.removeEventListener("focus", onFocus);
+      if (refreshTimer !== undefined) clearTimeout(refreshTimer);
       flush();
       disposed = true;
     };

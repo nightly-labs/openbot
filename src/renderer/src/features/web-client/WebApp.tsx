@@ -371,7 +371,7 @@ function WebAppContent(props: { createRuntime?: WebRuntimeFactory }) {
   }
   async function checkSession() {
     const generation = sessionGeneration;
-    void loadWorkspace().catch(() => undefined);
+    if (state.account) void loadWorkspace().catch(() => undefined);
     const screenWaits = !state.loaded || (!state.account && state.login.status === "error");
     if (screenWaits && state.loaded)
       setState((draft) => {

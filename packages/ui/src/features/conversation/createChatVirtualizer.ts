@@ -63,7 +63,9 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
       ),
     ),
   );
-  const [totalSize, setTotalSize] = createSignal(initialCount * options.estimateSize(0));
+  const initialTotalSize = initialCount * options.estimateSize(0);
+  const [totalSize, setTotalSize] = createSignal(initialTotalSize);
+  let lastTotalSize = initialTotalSize;
   const stableItems = new Map<VirtualItem["key"], { item: VirtualItem; update: (next: VirtualItem) => void }>();
   const syncScrollEndThreshold = (instance: Virtualizer<TScrollElement, TItemElement>): void => {
     instance.options.scrollEndThreshold = options.stickToLatest?.() === false ? -1 : SCROLL_END_THRESHOLD;
@@ -214,7 +216,11 @@ export function createChatVirtualizer<TScrollElement extends Element, TItemEleme
         ? current
         : nextItems,
     );
-    setTotalSize(virtualizer.getTotalSize() || count * options.estimateSize(0));
+    const nextTotalSize = virtualizer.getTotalSize() || count * options.estimateSize(0);
+    if (nextTotalSize !== lastTotalSize) {
+      lastTotalSize = nextTotalSize;
+      setTotalSize(nextTotalSize);
+    }
   };
 
   const scheduleRefresh = (): void => {

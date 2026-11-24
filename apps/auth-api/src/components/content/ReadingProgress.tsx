@@ -1,4 +1,4 @@
-import { createSignal, createTrackedEffect, For, Show } from "solid-js";
+import { createStore, createTrackedEffect, For, Show } from "solid-js";
 
 const READING_LINE = 0.3;
 
@@ -14,6 +14,15 @@ interface ReadingGeometry {
   ends: number[];
 }
 
+interface ReadingState {
+  sections: ReadingSection[];
+  lengths: number[];
+  fills: number[];
+  active: number;
+  progress: number;
+  visible: boolean;
+}
+
 export interface ReadingProgressProps {
   article: () => HTMLElement | undefined;
   title: string;
@@ -21,12 +30,14 @@ export interface ReadingProgressProps {
 }
 
 export function ReadingProgress(props: ReadingProgressProps) {
-  const [sections, setSections] = createSignal<ReadingSection[]>([]);
-  const [lengths, setLengths] = createSignal<number[]>([]);
-  const [fills, setFills] = createSignal<number[]>([]);
-  const [active, setActive] = createSignal(0);
-  const [progress, setProgress] = createSignal(0);
-  const [visible, setVisible] = createSignal(false);
+  const [progressState, setProgressState] = createStore<ReadingState>({
+    sections: [],
+    lengths: [],
+    fills: [],
+    active: 0,
+    progress: 0,
+    visible: false,
+  });
 
   createTrackedEffect(() => {
     void props.slug;
@@ -42,7 +53,9 @@ export function ReadingProgress(props: ReadingProgressProps) {
       const starts = [top, ...headings.map((heading) => heading.getBoundingClientRect().top + window.scrollY)];
       const ends = [...starts.slice(1), bottom];
       geometry = { top, bottom, starts, ends };
-      setLengths(starts.map((start, index) => Math.max(1, (ends[index] ?? bottom) - start)));
+      setProgressState((next) => {
+        next.lengths = starts.map((start, index) => Math.max(1, (ends[index] ?? bottom) - start));
+      });
     };
 
     const update = () => {
@@ -55,16 +68,18 @@ export function ReadingProgress(props: ReadingProgressProps) {
       const position =
         window.scrollY + line + unreachable * clamp(1 - (lastScroll - window.scrollY) / Math.max(1, viewport));
 
-      setProgress(clamp((position - top) / Math.max(1, bottom - top)));
-      setFills(starts.map((start, index) => clamp((position - start) / Math.max(1, (ends[index] ?? bottom) - start))));
-      setActive(
-        Math.max(
+      const firstHeading = starts[1] ?? bottom;
+      setProgressState((next) => {
+        next.progress = clamp((position - top) / Math.max(1, bottom - top));
+        next.fills = starts.map((start, index) =>
+          clamp((position - start) / Math.max(1, (ends[index] ?? bottom) - start)),
+        );
+        next.active = Math.max(
           0,
           starts.findLastIndex((start) => position >= start),
-        ),
-      );
-      const firstHeading = starts[1] ?? bottom;
-      setVisible(window.scrollY + viewport * 0.6 > firstHeading && position < bottom);
+        );
+        next.visible = window.scrollY + viewport * 0.6 > firstHeading && position < bottom;
+      });
     };
 
     let frame = 0;
@@ -86,10 +101,12 @@ export function ReadingProgress(props: ReadingProgressProps) {
       const fragment = window.location.hash.slice(1);
       const unopened = fragment !== "" && !document.getElementById(fragment);
       const taken = new Set<string>();
-      setSections([
-        { id: "top", label: props.title },
-        ...headings.map((heading) => ({ id: headingId(heading, taken), label: heading.textContent?.trim() ?? "" })),
-      ]);
+      setProgressState((next) => {
+        next.sections = [
+          { id: "top", label: props.title },
+          ...headings.map((heading) => ({ id: headingId(heading, taken), label: heading.textContent?.trim() ?? "" })),
+        ];
+      });
       if (unopened) document.getElementById(fragment)?.scrollIntoView({ behavior: "instant" });
       layout();
       update();
@@ -108,18 +125,18 @@ export function ReadingProgress(props: ReadingProgressProps) {
     };
   });
 
-  const count = () => sections().length;
+  const count = () => progressState.sections.length;
   const state = (index: number) => {
-    if (index === active()) return "active";
-    return index < active() ? "read" : "unread";
+    if (index === progressState.active) return "active";
+    return index < progressState.active ? "read" : "unread";
   };
 
   return (
     <Show when={count() > 1}>
       <div
         class="reading-progress"
-        data-visible={visible() ? "true" : "false"}
-        style={{ "--reading-progress": progress() }}
+        data-visible={progressState.visible ? "true" : "false"}
+        style={{ "--reading-progress": progressState.progress }}
       >
         <span class="reading-progress-line" aria-hidden="true" />
         <nav class="reading-progress-rail" aria-label="On this page">
@@ -127,25 +144,25 @@ export function ReadingProgress(props: ReadingProgressProps) {
           <p class="reading-progress-eyebrow" aria-hidden="true">
             <span>On this page</span>
             <span class="reading-progress-count">
-              {pad(active() + 1)} / {pad(count())}
+              {pad(progressState.active + 1)} / {pad(count())}
             </span>
           </p>
           <ol class="reading-progress-list">
-            <For each={sections()}>
+            <For each={progressState.sections}>
               {(section, index) => (
                 <li
                   class="reading-progress-item"
                   data-state={state(index())}
                   style={{
-                    "flex-grow": lengths()[index()] ?? 1,
-                    "--reading-fill": fills()[index()] ?? 0,
+                    "flex-grow": progressState.lengths[index()] ?? 1,
+                    "--reading-fill": progressState.fills[index()] ?? 0,
                     "--reading-index": index(),
                   }}
                 >
                   <a
                     class="reading-progress-link"
                     href={`#${section.id}`}
-                    aria-current={index() === active() ? "location" : undefined}
+                    aria-current={index() === progressState.active ? "location" : undefined}
                   >
                     <span class="reading-progress-label">{section.label}</span>
                     <span class="reading-progress-bar" aria-hidden="true">

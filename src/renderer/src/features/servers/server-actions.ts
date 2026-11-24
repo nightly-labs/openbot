@@ -1,8 +1,8 @@
-import type { ServerSummary } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
 import type { HiddenLocalServer } from "@openbot/ui/features/servers/ServerRail";
 import { useText } from "@openbot/ui/text";
+import { createMemo } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
 import { useSettings } from "../settings/settings-context";
@@ -39,19 +39,15 @@ export function useServerActions() {
   const { openServerSettings, requestLeaveServer, requestRestartServer } = useServerSettings();
   const { openHostedServerDelete, openNotificationLevels } = useSettings();
 
-  function remoteServers(): ServerSummary[] {
-    return servers().filter((server) => server.kind === "remote");
-  }
-
-  function hiddenLocalServer(): ServerSummary | undefined {
+  const remoteServers = createMemo(() => servers().filter((server) => server.kind === "remote"));
+  const hiddenLocalServer = createMemo(() => {
     if (!localServerHidden() || remoteServers().length === 0) return undefined;
     return servers().find((server) => server.kind === "local" && !server.active);
-  }
-
-  function orderedServers(): ServerSummary[] {
+  });
+  const orderedServers = createMemo(() => {
     const hidden = hiddenLocalServer();
     return [...servers().filter((server) => server.kind === "local" && server !== hidden), ...remoteServers()];
-  }
+  });
 
   function selectFailed(error: unknown): void {
     actionToast.error(t("server.select.failedTitle"), {
@@ -99,10 +95,10 @@ export function useServerActions() {
     setLocalServerHidden(true);
   }
 
-  function hiddenLocal(): HiddenLocalServer | undefined {
+  const hiddenLocal = createMemo<HiddenLocalServer | undefined>(() => {
     const server = hiddenLocalServer();
     return server ? { name: server.name, show: () => setLocalServerHidden(false) } : undefined;
-  }
+  });
 
   function onThisComputer(serverId: string): boolean {
     return servers().some((server) => server.id === serverId && server.thisComputer === true);
