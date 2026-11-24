@@ -88,18 +88,20 @@ export class MailboxSync {
     yield* this.#mailbox.markRunning(deliveryId, turnId);
     yield* storedStep(() => {
       const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
-      if (
-        this.#conversation.isExecutionThread(snapshot.threadId) &&
-        !snapshot.messages.some((message) => message.id === deliveryId)
-      ) {
-        snapshot.messages.push({ ...promptMessage(context, { ...context.delivery, turnId }), steered: true });
-        this.syncDeliveryMessage(snapshot, deliveryId);
-      }
+      this.showSteer(snapshot, deliveryId, turnId);
       this.syncMailboxMessages(snapshot);
       this.emitQueue(agentId);
       this.#conversation.emitConversation(snapshot, "queue.message-steered", { deliveryId });
     });
   });
+
+  showSteer(snapshot: ConversationSnapshot, deliveryId: string, turnId: string): void {
+    const context = this.#mailbox.getDelivery(deliveryId);
+    if (!context || !this.#conversation.isExecutionThread(snapshot.threadId)) return;
+    if (!snapshot.messages.some((message) => message.id === deliveryId))
+      snapshot.messages.push({ ...promptMessage(context, { ...context.delivery, turnId }), steered: true });
+    this.syncDeliveryMessage(snapshot, deliveryId);
+  }
 
   syncMailboxMessages(snapshot: ConversationSnapshot, mailboxMessages?: readonly ConversationMessage[]): void {
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;

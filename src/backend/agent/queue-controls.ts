@@ -347,16 +347,14 @@ export class QueueControls {
         ),
       );
     const steering = this.#mailbox.getDelivery(input.deliveryId)?.delivery;
-    const joinsNow =
-      steering?.status === "starting" &&
-      steering.turnId === turnId &&
-      !PROVIDERS_THAT_READ_STEERS_BETWEEN_STEPS.has(providerForAgent(agent));
-    if (joinsNow)
+    const accepted = steering?.status === "starting" && steering.turnId === turnId;
+    if (accepted && !PROVIDERS_THAT_READ_STEERS_BETWEEN_STEPS.has(providerForAgent(agent)))
       return yield* this.#mailboxSync
         .joinSteer(agent.id, publicThreadId, input.deliveryId, turnId)
         .pipe(toQueueOperationFailed);
     yield* queueStep(() => {
       const current = liveSnapshot();
+      if (accepted) this.#mailboxSync.showSteer(current, input.deliveryId, turnId);
       this.#mailboxSync.syncMailboxMessages(current);
       this.#mailboxSync.emitQueue(agent.id);
       this.#conversation.emitConversation(current);
