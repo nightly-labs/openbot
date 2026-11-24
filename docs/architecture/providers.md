@@ -9,7 +9,11 @@ To add a provider, or to see how a provider signs in on a joined server, read
 Claude uses its native question tool instead of `ask_user`. The direct tools are `ask_user`,
 `attach_files_to_response`, `list_agents`, `send_message`, `search_memories`, `remember`,
 `forget_memory`, `react_to_user_message`, `request_api_key`, `routine_no_update`, and
-`routine_report_failure`. External plugin registration stays with each provider adapter.
+`routine_report_failure`. `generate_image` and `generate_video` are direct tools too: as a
+deferred tool behind `tool_call`, Claude did not find `generate_video` and made a video with ffmpeg.
+`list_media_models` stays behind `tool_call`. The guidance tells an agent with its own image tool,
+such as Codex `image_gen`, to use that tool, and to use `generate_image` only when the user asks for a
+credits model. External plugin registration stays with each provider adapter.
 
 A Claude session of a channel thread also gets `channel_result` and `channel_reply` as direct tools,
 and names them in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Their accepted call tells the agent to end the

@@ -84,8 +84,8 @@ users goes up or down, its renewal is cancelled or resumed, it ends, or its paym
 is refunded or is disputed.
 It also sends an event when your OpenBot credits change: a credits Checkout starts, is paid or
 expires, a refund or a lost dispute takes credits back, you move credits to or from a server, a
-license gives free monthly credits or they expire, or a workflow step that uses OpenBot credits
-starts, is charged or ends with no charge. A credits event has your account ID (for a server step
+license gives free monthly credits or they expire, or a workflow step or an agent's image or video
+tool that uses OpenBot credits starts, is charged or ends with no charge. A credits event has your account ID (for a server step
 that no member started, or a server's free credits, the account ID of the server owner), whether
 the credits are personal or a server's, the number of credits, the currency and amount of a
 payment, and for a generation the model, its kind (image or video), the resolution, duration,
@@ -1648,6 +1648,15 @@ cancel a generation that was sent: when the run stops or the app closes, the job
 computer gets the file when the job ends or at its next start. While the Canvas page is open, the computer also asks the account service for the OpenBot models, their
 prices in credits and the credit balance. Each member of a joined server who can use workflows can
 see them.
+
+An agent can make an image or a video with OpenBot credits through its `generate_image` and
+`generate_video` tools, and it can ask for the OpenBot models and their prices with
+`list_media_models`. The computer that runs the agent sends the prompt, the model, the size settings
+and the input pictures that the agent names to the account service, in the same way as a workflow
+step, and the same rules apply. It pays with the credits of the signed-in account, or a server pays
+with its own credits. When the price is more than the approval limit of the server (50 credits by
+default, and owners and administrators can change it), the agent asks the user first. The result
+file stays in the chat on that computer, and each member who can read the chat can see it.
 
 While the Canvas page is open, the computer also asks Sunra and Higgsfield for their model lists, and
 for the price of the model and the settings of an image or video step. A price request sends the

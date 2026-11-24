@@ -746,6 +746,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:credit-media-workflow
 
+      - name: Run the credit media agent tools E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:credit-media-agent-tools
+
       - name: Run the workflow paid media E2E test
         if: ${{ !cancelled() }}
         run: bun run test:workflow-paid-media
@@ -974,6 +978,7 @@ jobs:
             .openbot-build/antigravity-verification-link-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/credit-media-workflow-e2e/
+            .openbot-build/credit-media-agent-tools-e2e/
             .openbot-build/workflow-paid-media-e2e/
             .openbot-build/credit-media-payer-switch-e2e/
             .openbot-build/workflow-discord-e2e/

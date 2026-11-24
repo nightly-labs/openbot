@@ -102,6 +102,7 @@ export function serverSupportsCapability(
       capability === "prompt-cache-ttl-v1" ||
       capability === "prompt-cache-ttl-pi-v1" ||
       capability === "cache-expiry-compaction-v1" ||
+      capability === "media-approval-credits-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||

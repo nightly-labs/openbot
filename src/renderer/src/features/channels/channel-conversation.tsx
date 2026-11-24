@@ -3,10 +3,12 @@ import {
   type AgentApproval,
   type AgentEvent,
   type BrowserTakeoverRequest,
+  type CreditsHoldAction,
   channelBrowserAgent,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo } from "solid-js";
 import { agentMessagesEqual } from "../../app-message-projection";
@@ -321,6 +323,29 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
       const requestId = approval()?.requestId;
       if (requestId === undefined) return Promise.resolve(false);
       return respond(() => channels.port().agent.respondToApproval({ requestId, decision }));
+    },
+    mediaApproval: {
+      read: (item) => {
+        const read = channels.port().agent.readMediaApproval;
+        return read
+          ? read({ agentId: item.agentId, requestId: item.requestId })
+          : Promise.resolve({ media: null, hold: null });
+      },
+      allow: (item, choice) => {
+        const respondToMedia = channels.port().agent.respondToMediaApproval;
+        if (!respondToMedia) return Promise.resolve(false);
+        return respond(() => respondToMedia({ agentId: item.agentId, requestId: item.requestId, choice }));
+      },
+    } satisfies MediaApprovalControls,
+    creditsHold: {
+      respond: (item: AgentApproval, action: CreditsHoldAction) => {
+        const respondToHold = channels.port().agent.respondToCreditsHold;
+        if (!respondToHold) return Promise.resolve(null);
+        return respondToHold({ agentId: item.agentId, requestId: item.requestId, action });
+      },
+      setMuted: async (muted: boolean) => {
+        await channels.port().agent.setCreditsAskMuted?.({ muted });
+      },
     },
     onRespondToBrowserTakeover: (decision: "complete" | "cancel") => {
       const requestId = browserTakeover()?.requestId;

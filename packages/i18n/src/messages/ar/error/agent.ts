@@ -174,6 +174,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "لا يعمل التقاط الشاشة في محادثة Slack أو Discord أو Telegram، لأن أشخاصًا آخرين يتلقون ملفاته.",
   "error.agent.screenCaptureDeclined": "لم يسمح المستخدم بالتقاط الشاشة هذا. لم يُلتقط شيء.",
+  "error.agent.creditMediaDeclined": "لم يسمح المستخدم بعملية الإنشاء هذه. لم يُنفق أي رصيد.",
+  "error.agent.creditMediaNotSaved": "تم إنشاء الملف، لكن OpenBot لم يتمكن من حفظه في الدردشة.",
   "error.agent.mcpServerDeclined": "لم يسمح المستخدم بتغيير خادم MCP هذا. لم يتغير شيء.",
   "error.agent.mcpToolDeclined": "لم يسمح المستخدم باستدعاء أداة MCP هذه. لم تعمل الأداة.",
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",

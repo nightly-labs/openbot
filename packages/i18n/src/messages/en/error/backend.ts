@@ -3,6 +3,8 @@ import { defineMessages } from "../../../message";
 export const messages = defineMessages("error.backend", {
   "error.backend.eventsUnavailable": "Events are not available on this host.",
   "error.backend.databaseIntegrity": "OpenBot database failed its integrity check.",
+  "error.backend.creditsHoldAdminOnly": "Only an owner or admin of this server can let agents use credits.",
+  "error.backend.creditsHoldShort": "There are not enough credits yet.",
   "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
   "error.backend.webhookSenderSecretInvalid":

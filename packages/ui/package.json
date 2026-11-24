@@ -190,6 +190,8 @@
     "./features/conversation/ConversationIcons": "./src/features/conversation/ConversationIcons.tsx",
     "./features/conversation/TabShape": "./src/features/conversation/TabShape.tsx",
     "./features/conversation/ConversationPrompts": "./src/features/conversation/ConversationPrompts.tsx",
+    "./features/conversation/MediaApprovalCard": "./src/features/conversation/MediaApprovalCard.tsx",
+    "./features/conversation/CreditsHoldCard": "./src/features/conversation/CreditsHoldCard.tsx",
     "./features/conversation/DataTable": "./src/features/conversation/DataTable.tsx",
     "./features/conversation/FileReference": "./src/features/conversation/FileReference.ts",
     "./features/conversation/ImageGeneration": "./src/features/conversation/ImageGeneration.tsx",

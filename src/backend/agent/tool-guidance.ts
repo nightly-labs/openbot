@@ -157,6 +157,10 @@ function openbotGuidance(namespace: string, tool: string): string {
         "OpenBot renders GitHub-flavored Markdown tables: a header row, a separator row with three or more dashes per column, and one or more data rows. A fenced ```mermaid block shows a diagram. A fenced ```html block shows a static page next to its code: inline CSS, inline SVG, and data: URLs only, with no scripts or network loads.",
         "When a chart, a table, a diagram, an image collage, or a mockup needs scripts or a CDN library, publish a self-contained page with openbot.html_render before your final answer. OpenBot shows it above the answer, so do not announce or repeat it; add only what it does not say.",
       ].join("\n");
+    case "list_media_models":
+    case "generate_image":
+    case "generate_video":
+      return "Use these when the user asks for an image or a video. When you have your own image tool, use it for images, unless the user names a model or asks for OpenBot credits: then call openbot.list_media_models, and use generate_image when the model is in that list. Omit model to use the default model. When the user asks for another model, an option or a price, call openbot.list_media_models and give the id, aspect, resolution and duration from that list. Each call makes one file and spends credits: do not make variants that the user did not ask for. To edit a picture, give its local path in images. OpenBot asks the user when a price is above the limit, so call the tool and do not ask for approval yourself. When the user declines, skips or cancels, or the balance is too low, tell the user and do not try again with another model. The result shows in the chat, so do not repeat it or attach it again.";
     case "set_backdrop":
       return "Check the page with openbot.html_preview first when you can. Give matching bubbles colors unless the user wants the page only.";
     case "react_to_user_message":

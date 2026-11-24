@@ -185,6 +185,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.screenCaptureShared":
     "Screen capture does not work in a Slack, Discord or Telegram conversation, because other people get its files.",
   "error.agent.screenCaptureDeclined": "The user did not allow this screen capture. Nothing was captured.",
+  "error.agent.creditMediaDeclined": "The user did not allow this generation. No credits were spent.",
+  "error.agent.creditMediaNotSaved": "The file was made, but OpenBot could not save it in the chat.",
   "error.agent.mcpServerDeclined": "The user did not allow this MCP server change. Nothing changed.",
   "error.agent.mcpToolDeclined": "The user did not allow this MCP tool call. The tool did not run.",
   "error.agent.mcpServerNotSaved": "The MCP server did not answer, so it was not saved. {error}",

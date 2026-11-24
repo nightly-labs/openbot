@@ -29,6 +29,7 @@ import {
   decodeHostVoiceModel,
   LEGACY_RESPONSE_STYLE,
   type McpSignInState,
+  mediaApprovalDefaultModelUpdate,
   type RoutineFields,
   type ServerConnectionState,
   type ServerSummary,
@@ -121,6 +122,7 @@ import {
   getHostBrowsingMemory,
   getHostCacheExpiryCompaction,
   getHostClaudeCompactWindow,
+  getHostMediaApprovalCredits,
   getHostMemoryReview,
   getHostModelVisibility,
   getHostPersonality,
@@ -139,6 +141,7 @@ import {
   setHostBrowsingMemory,
   setHostCacheExpiryCompaction,
   setHostClaudeCompactWindow,
+  setHostMediaApprovalCredits,
   setHostMemoryReview,
   setHostModelVisibility,
   setHostPersonality,
@@ -164,11 +167,18 @@ import { createBillingStore } from "@openbot/ui/features/billing/billing-store";
 import { LicenseSection } from "@openbot/ui/features/billing/LicenseSection";
 import { createLicenseStore } from "@openbot/ui/features/billing/license-store";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
+import type { MediaApprovalControls } from "@openbot/ui/features/conversation/MediaApprovalCard";
 import { MAIN_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { BuyCreditsPage } from "@openbot/ui/features/credits/BuyCreditsPage";
 import { CreditActivitySection } from "@openbot/ui/features/credits/CreditActivitySection";
 import { CreditsSection } from "@openbot/ui/features/credits/CreditsSection";
-import { type CreditsMenu, createCreditsStore, createCreditsSummary } from "@openbot/ui/features/credits/credits-store";
+import {
+  type CreditsMenu,
+  createCreditsStore,
+  createCreditsSummary,
+  creditsRailWallet,
+} from "@openbot/ui/features/credits/credits-store";
+import { RailMoveCreditsDialog } from "@openbot/ui/features/credits/MoveCreditsDialog";
 import { LeaveServerDialog } from "@openbot/ui/features/servers/LeaveServerDialog";
 import { RestartServerDialog } from "@openbot/ui/features/servers/RestartServerDialog";
 import type { ServerActionCallbacks } from "@openbot/ui/features/servers/ServerActionItems";
@@ -275,6 +285,7 @@ import type {
   ConversationThreads,
   PromptAnswerOptions,
 } from "../conversation/conversation-types";
+import { creditsHoldControls } from "../conversation/credits-hold-controls";
 import {
   type AgentLevelsSource,
   createAgentMessageDeleteAccess,
@@ -289,8 +300,10 @@ import { createRoutineTimezonePrompt } from "../schedule/routine-timezone-prompt
 import type { ScheduleRoutine } from "../schedule/SchedulePanel";
 import { scheduleRoutinePorts } from "../schedule/schedule-routine-create";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
+import { createCreditAgentsRail } from "../servers/credit-agents-rail";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { mcpSignInRecord } from "../servers/mcp-servers";
+import { type HostMediaApprovalCreditsCalls, saveMediaApprovalCredits } from "../servers/media-approval-credits-store";
 import { OwnerTransferPrompt } from "../servers/OwnerTransferPrompt";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
 import type { HostAgentDefaultsCalls } from "../servers/ServerAgentsSection";
@@ -1453,8 +1466,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     () => creditsCalls,
     () => props.accountId,
   );
+  const creditWallet = () => creditsRailWallet(creditsSummary.state(), server() ?? null, null);
+  const [movingCredits, setMovingCredits] = createSignal(false);
   function creditsRailAction(): (() => void) | undefined {
-    return creditsSummary.available() ? () => openCredits(null) : undefined;
+    return creditsSummary.available() ? () => openCredits(creditWallet()?.serverId ?? null) : undefined;
+  }
+  function creditMoveAction(): (() => void) | undefined {
+    return creditWallet()?.movable ? () => setMovingCredits(true) : undefined;
   }
   function creditsMenu(): CreditsMenu {
     return { state: creditsSummary.state(), onOpen: openCredits, onRefresh: creditsSummary.refresh };
@@ -1732,6 +1750,23 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         setHostAgentMemoryLimit(hostRequest(serverId), limit).pipe(Effect.mapError((error) => error.cause)),
       ),
   };
+  const hostMediaApprovalCreditsCalls: HostMediaApprovalCreditsCalls = {
+    getMediaApprovalCredits: async (serverId) =>
+      runTeamEffect(getHostMediaApprovalCredits(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
+    setMediaApprovalCredits: async (update, serverId) =>
+      runTeamEffect(
+        setHostMediaApprovalCredits(hostRequest(serverId), update).pipe(Effect.mapError((error) => error.cause)),
+      ),
+  };
+  const creditAgents = createCreditAgentsRail({
+    server,
+    shown: () => creditsRailAction() !== undefined,
+    calls: hostMediaApprovalCreditsCalls,
+    asks: {
+      readMuted: () => workspace.readCreditsAskMuted(),
+      setMuted: (muted) => workspace.setCreditsAskMuted(muted),
+    },
+  });
   const hostMemoryReviewCalls: HostMemoryReviewCalls = {
     getMemoryReview: async (serverId) =>
       runTeamEffect(getHostMemoryReview(hostRequest(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -2596,6 +2631,31 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     const threadId = open === undefined ? agent.threadId : open?.threadId;
     return workspace.state.takeovers.find((request) => request.agentId === agent.id && request.threadId === threadId);
   });
+  const mediaApproval: MediaApprovalControls = {
+    read: (approval) => workspace.readMediaApproval({ agentId: approval.agentId, requestId: approval.requestId }),
+    allow: async (approval, choice) => {
+      await workspace.respondToMediaApproval({ agentId: approval.agentId, requestId: approval.requestId, choice });
+      return true;
+    },
+    setDefault: async (kind, model) => {
+      const serverId = server()?.id;
+      if (!serverId) throw new Error(t("webClient.error.connectServerFirst"));
+      await saveMediaApprovalCredits(
+        serverId,
+        mediaApprovalDefaultModelUpdate(kind, model),
+        hostMediaApprovalCreditsCalls,
+      );
+    },
+    hold: creditsHoldControls({
+      agents: workspace.profiles,
+      credits: creditsMenu,
+      walletId: () => server()?.id ?? null,
+      serverId: () => server()?.id,
+      respond: (approval, action) =>
+        workspace.respondToCreditsHold({ agentId: approval.agentId, requestId: approval.requestId, action }),
+      setMuted: (muted) => workspace.setCreditsAskMuted(muted),
+    }),
+  };
   const view = createWebConversationView({
     workspace,
     remoteAgentAdmin,
@@ -2917,22 +2977,42 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 openMarketplace();
               }}
               onCredits={creditsRailAction()}
-              creditBalance={creditsMenu().state?.balance}
+              creditBalance={creditWallet()?.balance}
+              creditWalletName={creditWallet()?.name}
+              onCreditMove={creditMoveAction()}
+              creditAgents={creditAgents.agents()}
+              onCreditAgentsChange={creditAgents.change()}
+              creditAsk={creditAgents.ask()}
+              onCreditAskChange={creditAgents.changeAsk()}
+              hiddenItems={layout.railHidden()}
+              onHiddenChange={layout.setRailHidden}
               onMarketplace={workspace.state.status === "online" ? openMarketplace : undefined}
               onSettings={openAccountSettings}
               server={
-                <ServerMenu
-                  rail
-                  serverName={workspace.state.host?.name ?? "OpenBot"}
-                  servers={servers()}
-                  view={layout.serverView()}
-                  onViewChange={layout.setServerView}
-                  onSelect={selectServer}
-                  onAdd={() => hostedServers.openAddServer("server_rail")}
-                  addCreatesServer={hostedServers.available()}
-                  credits={creditsMenu()}
-                  {...serverActionCallbacks}
-                />
+                <>
+                  <ServerMenu
+                    rail
+                    serverName={workspace.state.host?.name ?? "OpenBot"}
+                    servers={servers()}
+                    view={layout.serverView()}
+                    onViewChange={layout.setServerView}
+                    onSelect={selectServer}
+                    onAdd={() => hostedServers.openAddServer("server_rail")}
+                    addCreatesServer={hostedServers.available()}
+                    credits={creditsMenu()}
+                    {...serverActionCallbacks}
+                  />
+                  <Show when={movingCredits() ? creditWallet()?.movable : null}>
+                    {(wallet) => (
+                      <RailMoveCreditsDialog
+                        calls={() => creditsCalls}
+                        server={wallet()}
+                        onChange={(state) => creditsSummary.adopt(state)}
+                        onClose={() => setMovingCredits(false)}
+                      />
+                    )}
+                  </Show>
+                </>
               }
               help={
                 <RailHelpMenu
@@ -3542,6 +3622,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostVoiceModel={{ calls: hostVoiceModelCalls }}
                         hostSignalHome={{ calls: hostSignalHomeCalls }}
                         hostTurnLimits={{ calls: hostTurnLimitsCalls }}
+                        mediaApprovalCredits={{ calls: hostMediaApprovalCreditsCalls }}
                         hostPersonality={{ calls: hostPersonalityCalls }}
                         hostMemoryLimit={{ calls: hostMemoryLimitCalls }}
                         memoryReview={{ calls: hostMemoryReviewCalls }}
@@ -3675,6 +3756,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         discard: (id, serverId) => runtime.agent.discardDraftAttachment(id, serverId),
                       }}
                       agents={workspace.profiles()}
+                      mediaApproval={mediaApproval}
                       onOpenLink={(url) => void openWebLink(url)}
                       onAttachmentAction={(attachment) =>
                         void runtime.agent
@@ -3855,6 +3937,17 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onTypingChange={() => {}}
                         onAnswerPrompt={channelView.onAnswerPrompt}
                         onRespondToApproval={channelView.onRespondToApproval}
+                        mediaApproval={{
+                          ...channelView.mediaApproval,
+                          setDefault: mediaApproval.setDefault,
+                          hold: creditsHoldControls({
+                            agents: workspace.profiles,
+                            credits: creditsMenu,
+                            walletId: () => server()?.id ?? null,
+                            serverId: () => server()?.id,
+                            ...channelView.creditsHold,
+                          }),
+                        }}
                         onRespondToBrowserTakeover={channelView.onRespondToBrowserTakeover}
                         onCancelQueuedMessage={() => {}}
                         onSteerQueuedMessage={() => {}}
@@ -4031,6 +4124,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   }
                   onRespondToApproval={view.respondToApproval}
                   onAlwaysAllowApproval={view.alwaysAllowApproval()}
+                  mediaApproval={mediaApproval}
                   agentAutoApproves={remoteAgentAdmin.autoApproves()}
                   remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
                   remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}

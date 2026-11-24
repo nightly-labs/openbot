@@ -198,6 +198,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "La captura de pantalla no funciona en una conversación de Slack, Discord o Telegram, porque otras personas reciben sus archivos.",
   "error.agent.screenCaptureDeclined": "El usuario no permitió esta captura de pantalla. No se capturó nada.",
+  "error.agent.creditMediaDeclined": "El usuario no permitió esta generación. No se gastaron créditos.",
+  "error.agent.creditMediaNotSaved": "El archivo se creó, pero OpenBot no pudo guardarlo en el chat.",
   "error.agent.mcpToolDeclined":
     "El usuario no permitió esta llamada a la herramienta MCP. La herramienta no se ejecutó.",
   "error.agent.screenCaptureWindowMissing":

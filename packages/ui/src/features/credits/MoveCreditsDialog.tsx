@@ -1,5 +1,6 @@
 import {
   type CreditServerWallet,
+  type CreditsState,
   type CreditTransferDirection,
   creditsFromTenths,
   creditTenths,
@@ -9,7 +10,7 @@ import type { JSX } from "@solidjs/web";
 import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { CreditIcon } from "./CreditIcon";
-import type { CreditsStore } from "./credits-store";
+import { type CreditsCalls, type CreditsStore, createCreditsStore, creditsServer } from "./credits-store";
 
 export interface MoveCreditsDialogProps {
   store: CreditsStore;
@@ -178,4 +179,15 @@ export function MoveCreditsDialog(props: MoveCreditsDialogProps): JSX.Element {
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+export function RailMoveCreditsDialog(props: {
+  calls: () => CreditsCalls | undefined;
+  server: CreditServerWallet;
+  onChange: (credits: CreditsState) => void;
+  onClose: () => void;
+}): JSX.Element {
+  const store = createCreditsStore(props.calls, () => true, props.onChange);
+  const server = () => creditsServer(store.state.credits, props.server.serverId) ?? props.server;
+  return <MoveCreditsDialog store={store} server={server()} direction="to_server" onClose={props.onClose} />;
 }

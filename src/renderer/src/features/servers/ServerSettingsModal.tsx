@@ -88,6 +88,7 @@ import {
   type ServerImportOptions,
   ServerImportPanel,
 } from "./ServerImportPanel";
+import type { ServerMediaApprovalOptions } from "./ServerMediaApprovalSetting";
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
@@ -146,6 +147,7 @@ export interface ServerSettingsModalProps {
   hostVoiceModel?: ServerVoiceModelOptions | undefined;
   hostSignalHome?: ServerSignalHomeOptions | undefined;
   hostTurnLimits?: ServerTurnLimitsOptions | undefined;
+  mediaApprovalCredits?: ServerMediaApprovalOptions | undefined;
   hostPersonality?: ServerPersonalityOptions | undefined;
   hostMemoryLimit?: ServerMemoryLimitOptions | undefined;
   memoryReview?: ServerMemoryReviewOptions | undefined;
@@ -239,6 +241,8 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
     "server.settings.turnLimit",
     "server.settings.voiceModel.section",
     "server.settings.agentTaskLimit",
+    "server.settings.mediaApprovalAgents",
+    "server.settings.mediaApprovalCredits",
     "agentSettings.automation.title",
     "agentSettings.agentNewChat.title",
     "agentSettings.quickAcknowledgement.title",

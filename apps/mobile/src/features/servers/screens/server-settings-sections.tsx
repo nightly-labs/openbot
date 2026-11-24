@@ -30,6 +30,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import {
   ServerBrowsingMemoryRow,
+  ServerMediaApprovalCreditsRow,
   ServerMemoryLimitRow,
   ServerMemoryReviewRow,
   ServerPersonalityRow,
@@ -323,6 +324,7 @@ function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
     checks.canManageMemoryReview(serverId) ||
     checks.canManageSkillLearning(serverId) ||
     checks.canManageBrowsingMemory(serverId) ||
+    checks.canManageMediaApprovalCredits(serverId) ||
     checks.canManageServerVoiceModel(serverId)
   );
 }
@@ -418,6 +420,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
     canManageMemoryReview,
     canManageSkillLearning,
     canManageBrowsingMemory,
+    canManageMediaApprovalCredits,
     canManageServerVoiceModel,
   } = useMobileWorkspace();
   return (
@@ -427,6 +430,7 @@ export function ServerAgentsSection({ serverId }: { serverId: string }) {
       {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
       {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
       {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+      {canManageMediaApprovalCredits(serverId) ? <ServerMediaApprovalCreditsRow serverId={serverId} /> : null}
       {canManageServerVoiceModel(serverId) ? <ServerVoiceModelRow serverId={serverId} /> : null}
     </>
   );

@@ -507,6 +507,17 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "메모리 한도를 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryLimitUnsupported":
     "여기에서 메모리 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.mediaApprovalCredits": "다음 값을 넘으면 확인",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "크레딧",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "이 서버의 크레딧 승인 한도를 불러오지 못했어요.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "크레딧 승인 한도를 저장하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "여기에서 크레딧 승인 한도를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
+  "mobile.server.settings.mediaApprovalAgents": "에이전트의 크레딧 사용 허용",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "에이전트의 크레딧 사용을 변경하지 못했어요. 다시 시도해 주세요.",
+  "mobile.server.settings.mediaApprovalAsk": "크레딧이 필요할 때 묻기",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "크레딧 요청 설정을 변경하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.settings.memoryReview": "메모리 검토",
   "mobile.server.settings.memoryReviewDescription":
     "이 서버의 에이전트가 채팅에서 오래 쓸 사실을 백그라운드에서 저장하는 빈도예요.",

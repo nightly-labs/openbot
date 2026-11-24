@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "이 호스트에서는 이벤트를 사용할 수 없어요.",
   "error.backend.databaseIntegrity": "OpenBot 데이터베이스가 무결성 검사에 실패했어요.",
+  "error.backend.creditsHoldAdminOnly": "이 서버의 소유자나 관리자만 에이전트가 크레딧을 사용하도록 허용할 수 있어요.",
+  "error.backend.creditsHoldShort": "크레딧이 아직 충분하지 않아요.",
   "error.backend.webhookRouteLimit": "호스트 하나에는 웹훅 루틴을 최대 {limit}개까지 둘 수 있어요.",
   "error.backend.webhookSettingsInvalid": "웹훅 설정을 확인한 후 다시 시도해 주세요.",
   "error.backend.webhookSenderSecretInvalid":

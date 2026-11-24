@@ -522,6 +522,19 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "メモリー数の上限を保存できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryLimitUnsupported":
     "ここでメモリー数の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.mediaApprovalCredits": "次の値を超えたら確認",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "クレジット",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "このサーバーのクレジット確認の上限を読み込めませんでした。",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "クレジット確認の上限を保存できませんでした。もう一度お試しください。",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "ここでクレジット確認の上限を変更するには、このサーバーの OpenBot を更新してください。",
+  "mobile.server.settings.mediaApprovalAgents": "エージェントのクレジット使用を許可",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "エージェントのクレジット使用を変更できませんでした。もう一度お試しください。",
+  "mobile.server.settings.mediaApprovalAsk": "クレジットが必要なときに確認する",
+  "mobile.server.settings.mediaApprovalAskSaveFailed":
+    "クレジットの確認設定を変更できませんでした。もう一度お試しください。",
   "mobile.server.settings.memoryReview": "メモリーの見直し",
   "mobile.server.settings.memoryReviewDescription":
     "このサーバーのエージェントが、チャットから長く使う事実をバックグラウンドで保存する頻度です。",

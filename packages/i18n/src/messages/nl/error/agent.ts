@@ -202,6 +202,9 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Schermopname werkt niet in een gesprek in Slack, Discord of Telegram, omdat andere mensen de bestanden krijgen.",
   "error.agent.screenCaptureDeclined": "De gebruiker heeft deze schermopname niet toegestaan. Er is niets opgenomen.",
+  "error.agent.creditMediaDeclined":
+    "De gebruiker heeft deze generatie niet toegestaan. Er zijn geen credits gebruikt.",
+  "error.agent.creditMediaNotSaved": "Het bestand is gemaakt, maar OpenBot kon het niet in de chat opslaan.",
   "error.agent.mcpServerDeclined":
     "De gebruiker heeft deze wijziging van de MCP-server niet toegestaan. Er is niets gewijzigd.",
   "error.agent.mcpToolDeclined": "De gebruiker heeft deze MCP-toolaanroep niet toegestaan. De tool is niet uitgevoerd.",

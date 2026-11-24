@@ -191,6 +191,8 @@ export const messages = {
     "Przechwytywanie ekranu nie działa w rozmowie w Slacku, Discordzie lub Telegramie, ponieważ jego pliki trafiają do innych osób.",
   "error.agent.screenCaptureDeclined":
     "Użytkownik nie zezwolił na to przechwycenie ekranu. Nic nie zostało przechwycone.",
+  "error.agent.creditMediaDeclined": "Użytkownik nie zezwolił na to generowanie. Nie wydano żadnych kredytów.",
+  "error.agent.creditMediaNotSaved": "Plik został utworzony, ale OpenBot nie mógł zapisać go w czacie.",
   "error.agent.mcpToolDeclined":
     "Użytkownik nie zezwolił na to wywołanie narzędzia MCP. Narzędzie nie zostało uruchomione.",
   "error.agent.screenCaptureWindowMissing":

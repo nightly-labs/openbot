@@ -3,6 +3,10 @@ import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runti
 
 export const CREDIT_MEDIA_KINDS = ["image", "video"] as const;
 export type CreditMediaGenerationKind = (typeof CREDIT_MEDIA_KINDS)[number];
+export const CREDIT_MEDIA_PREFERRED_MODELS: Readonly<Record<CreditMediaGenerationKind, string>> = {
+  image: "gpt-image-2.6",
+  video: "seedance-2.5",
+};
 export const CREDIT_MEDIA_PRICE_UNITS = ["item", "second"] as const;
 export type CreditMediaPriceUnit = (typeof CREDIT_MEDIA_PRICE_UNITS)[number];
 export const CREDIT_MEDIA_JOB_STATUSES = ["queued", "processing", "completed", "failed", "canceled"] as const;

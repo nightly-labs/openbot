@@ -173,6 +173,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "צילום מסך לא פועל בשיחה ב-Slack, ב-Discord או ב-Telegram, כי אנשים אחרים מקבלים את הקבצים שלו.",
   "error.agent.screenCaptureDeclined": "המשתמש לא אישר את צילום המסך הזה. דבר לא צולם.",
+  "error.agent.creditMediaDeclined": "המשתמש לא אישר את היצירה הזו. לא נוצלו קרדיטים.",
+  "error.agent.creditMediaNotSaved": "הקובץ נוצר, אבל OpenBot לא הצליח לשמור אותו בצ׳אט.",
   "error.agent.mcpServerDeclined": "המשתמש לא אישר את שינוי שרת ה-MCP הזה. דבר לא השתנה.",
   "error.agent.mcpToolDeclined": "המשתמש לא אישר את הקריאה לכלי MCP הזה. הכלי לא הופעל.",
   "error.agent.mcpServerNotSaved": "שרת ה-MCP לא הגיב, ולכן לא נשמר. {error}",

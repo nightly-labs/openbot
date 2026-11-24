@@ -582,6 +582,19 @@ export const messages = {
   "mobile.server.settings.memoryLimitSaveFailed": "Не удалось сохранить лимит воспоминаний. Повторите попытку.",
   "mobile.server.settings.memoryLimitUnsupported":
     "Обновите OpenBot на этом сервере, чтобы изменить здесь его лимит воспоминаний.",
+  "mobile.server.settings.mediaApprovalCredits": "Спрашивать, если больше",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "кредитов",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed":
+    "Не удалось загрузить порог подтверждения кредитов этого сервера.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed":
+    "Не удалось сохранить порог подтверждения кредитов. Повторите попытку.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь его порог подтверждения кредитов.",
+  "mobile.server.settings.mediaApprovalAgents": "Агенты могут использовать кредиты",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed":
+    "Не удалось изменить использование кредитов агентами. Повторите попытку.",
+  "mobile.server.settings.mediaApprovalAsk": "Спрашивать, когда нужны кредиты",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "Не удалось изменить запросы кредитов. Повторите попытку.",
   "mobile.server.settings.memoryReview": "Проверка памяти",
   "mobile.server.settings.memoryReviewDescription":
     "Как часто агенты на этом сервере сохраняют в фоне устойчивые факты из своих чатов.",

@@ -214,6 +214,9 @@ export const messages = {
     "Die Bildschirmaufnahme funktioniert nicht in einer Slack-, Discord- oder Telegram-Unterhaltung, da andere Personen ihre Dateien erhalten.",
   "error.agent.screenCaptureDeclined":
     "Der Benutzer hat diese Bildschirmaufnahme nicht erlaubt. Es wurde nichts aufgenommen.",
+  "error.agent.creditMediaDeclined":
+    "Der Benutzer hat diese Erstellung nicht erlaubt. Es wurden keine Credits verbraucht.",
+  "error.agent.creditMediaNotSaved": "Die Datei wurde erstellt, aber OpenBot konnte sie nicht im Chat speichern.",
   "error.agent.mcpToolDeclined":
     "Der Benutzer hat diesen MCP-Toolaufruf nicht erlaubt. Das Tool wurde nicht ausgeführt.",
   "error.agent.screenCaptureWindowMissing":

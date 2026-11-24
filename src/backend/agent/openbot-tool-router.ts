@@ -9,6 +9,7 @@ import {
   withChatBackdropRequesters,
 } from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
+import { CREDIT_MEDIA_INPUT_LIMIT_BYTES, CREDIT_MEDIA_INPUT_TYPES } from "@openbot/contracts/credit-media";
 import {
   BUG_REPORT_AREAS,
   BUG_REPORT_SEVERITIES,
@@ -47,11 +48,13 @@ import type {
   AvatarImageInput,
   ConversationMessage,
   CreateAgentInput,
+  ImageGenerationInfo,
   McpServerConfig,
   PasswordManagerId,
   QueuedMessageReceipt,
   SidebarLayoutSnapshot,
   UpdateAgentInput,
+  VideoGenerationInfo,
 } from "@openbot/contracts/ipc";
 import {
   type AgentPermissionLevel,
@@ -162,6 +165,13 @@ import type { ChatVisualPreviewHost } from "./chat-visual-preview";
 import { type ClientBrowser, isClientBrowserCall, runClientBrowserTool, withClientTabs } from "./client-browser-tools";
 import { handleSetCommitCoAuthorTool, type SetCommitCoAuthor } from "./commit-co-author-tool";
 import type { ConversationRuntime } from "./conversation-runtime";
+import {
+  CREDIT_MEDIA_TOOL_NAMES,
+  type CreditMediaShown,
+  CreditMediaToolInputFailed,
+  type CreditMediaTools,
+  LIST_MEDIA_MODELS_TOOL,
+} from "./credit-media-tools";
 import { CRM_TOOL_NAMES, handleCrmTool } from "./crm-tool";
 import { handleDataTool } from "./data-tools";
 import { handleDeleteAgentTool } from "./delete-agent-tool";
@@ -489,6 +499,7 @@ export interface OpenBotToolRouterOptions {
   screenCapture?: ScreenCaptureHost | null | undefined;
   videoReader?: VideoReaderHost | null | undefined;
   fitImage?: ImageFitter | null | undefined;
+  creditMediaTools?: CreditMediaTools | null | undefined;
   avatarDecoder?: AvatarImageDecoder | null | undefined;
   mcpServers?: AgentMcpServers | null | undefined;
   marketplaceAppServer?: ((appId: string) => MarketplaceAppServer | null) | undefined;
@@ -545,6 +556,7 @@ export class OpenBotToolRouter {
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #videoReader: VideoReaderHost | null;
   readonly #fitImage: ImageFitter | null;
+  readonly #creditMediaTools: CreditMediaTools | null;
   readonly #avatarDecoder: AvatarImageDecoder | null;
   readonly #mcpServers: AgentMcpServers | null;
   readonly #marketplaceAppServer: (appId: string) => MarketplaceAppServer | null;
@@ -615,6 +627,7 @@ export class OpenBotToolRouter {
     this.#screenCapture = options.screenCapture ?? null;
     this.#videoReader = options.videoReader ?? null;
     this.#fitImage = options.fitImage ?? null;
+    this.#creditMediaTools = options.creditMediaTools ?? null;
     this.#avatarDecoder = options.avatarDecoder ?? null;
     this.#mcpServers = options.mcpServers ?? null;
     this.#marketplaceAppServer = options.marketplaceAppServer ?? (() => null);
@@ -985,6 +998,16 @@ export class OpenBotToolRouter {
             if (API_KEY_TOOLS.has(toolRequest.params.tool)) {
               const result = yield* this.#apiKeyTool(client, toolRequest, toolRequest.params);
               if (result && !toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
+              return;
+            }
+            if (CREDIT_MEDIA_TOOL_NAMES.has(toolRequest.params.tool)) {
+              if (toolRequest.signal?.aborted) return;
+              const result = yield* this.#creditMediaTool(client, toolRequest, toolRequest.params).pipe(
+                Effect.raceFirst(requestAborted(toolRequest.signal)),
+              );
+              if (!result.success)
+                this.#rememberToolFailure(toolRequest.params.threadId, toolRequest.params.tool, result);
+              if (!toolRequest.signal?.aborted && client.running) client.respond(toolRequest.id, result);
               return;
             }
             if (isMcpServerTool(toolRequest.params.tool)) {
@@ -2736,6 +2759,8 @@ export class OpenBotToolRouter {
       itemType: string;
       eventType: string;
       detail: (attachmentId: string) => Record<string, string | number>;
+      imageGeneration?: ImageGenerationInfo | undefined;
+      videoGeneration?: VideoGenerationInfo | undefined;
     },
   ) {
     const attachment = yield* this.#mailbox
@@ -2752,6 +2777,8 @@ export class OpenBotToolRouter {
       status: "completed",
       itemType: message.itemType,
       attachments: [attachment],
+      ...(message.imageGeneration ? { imageGeneration: message.imageGeneration } : {}),
+      ...(message.videoGeneration ? { videoGeneration: message.videoGeneration } : {}),
     });
     sortConversationMessages(snapshot.messages);
     try {
@@ -2931,6 +2958,108 @@ export class OpenBotToolRouter {
     if (Result.isFailure(image)) return captureFailure(image.failure);
     return yield* this.#showCapture(agent.id, threadId, params, messageId, image.success);
   });
+
+  readonly #creditMediaTool = Effect.fn("OpenBotToolRouter.creditMediaTool")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+  ) {
+    const agentId = this.#conversation.agentForThread(params.threadId);
+    const tools = this.#creditMediaTools;
+    if (!agentId || !tools) return openBotToolFailure(sourceText("error.billing.mediaSignInRequired"));
+    const threadId = this.#conversation.publicThreadId(agentId, params.threadId);
+    const messageId = responseAttachmentMessageId(params.threadId, params.turnId, params.callId);
+    if (
+      params.tool !== LIST_MEDIA_MODELS_TOOL &&
+      this.#conversation.ensureSnapshot(agentId, threadId).messages.some(({ id }) => id === messageId)
+    )
+      return openBotToolResult({ status: "shown", messageId });
+    const channelId = this.#channels.store.channelForThread(threadId);
+    const approval = (reason: string) => ({
+      requestId: request.id,
+      agentId,
+      threadId,
+      turnId: params.turnId,
+      kind: "permissions" as const,
+      command: null,
+      cwd: null,
+      reason: channelId
+        ? `${reason} ${sourceText("status.agent.creditMediaChannel", { channel: this.#channels.store.get(channelId).name })}`
+        : reason,
+      grantRoot: null,
+      permissions: null,
+    });
+    return yield* tools.handle({
+      tool: params.tool,
+      arguments: params.arguments,
+      readInputs: (paths) => this.#readCreditMediaInputs(agentId, paths),
+      approve: (reason, offer) =>
+        this.#attention
+          .awaitMediaApproval(client, request, approval(reason), offer)
+          .pipe(Effect.map((answer) => ({ accepted: answer.decision === "accept", choice: answer.choice ?? null }))),
+      hold: (reason, hold) => this.#attention.awaitCreditsHold(client, request, approval(reason), hold),
+      requesters: this.#turnRequesters(agentId, params.turnId),
+      show: (media: CreditMediaShown) =>
+        Effect.uninterruptible(
+          this.#addGeneratedMessage({
+            agentId,
+            threadId,
+            turnId: params.turnId,
+            messageId,
+            file: { bytes: media.bytes, name: media.name, mimeType: media.mimeType },
+            text: "",
+            itemType: media.itemType,
+            eventType: "response.attachments-added",
+            detail: () => ({ turnId: params.turnId, messageId, attachmentCount: 1 }),
+            imageGeneration: media.imageGeneration,
+            videoGeneration: media.videoGeneration,
+          }),
+        ),
+    });
+  });
+
+  #readCreditMediaInputs(agentId: string, paths: readonly string[]) {
+    if (paths.length === 0) return Effect.succeed([]);
+    return Effect.acquireUseRelease(
+      this.#attachments.openSources(agentId, [...paths], { allowAnyReadablePath: true }),
+      (sources) =>
+        Effect.tryPromise({
+          try: () =>
+            Promise.all(
+              paths.map(async (path, index) => {
+                const source = sources[index];
+                if (!source) throw new CreditMediaToolInputFailed(`${path} was not found.`);
+                const { size } = await source.handle.stat();
+                if (size === 0) throw new CreditMediaToolInputFailed(`${path} is empty.`);
+                if (size > CREDIT_MEDIA_INPUT_LIMIT_BYTES)
+                  throw new CreditMediaToolInputFailed(
+                    `${path} is larger than ${CREDIT_MEDIA_INPUT_LIMIT_BYTES / 1024 / 1024} MB. Make a smaller copy first.`,
+                  );
+                const mimeType = attachmentMimeTypeForName(path);
+                if (!CREDIT_MEDIA_INPUT_TYPES.some((type) => type === mimeType))
+                  throw new CreditMediaToolInputFailed(`${path} is not a PNG, JPEG or WebP picture.`);
+                const bytes = Buffer.alloc(size);
+                const { bytesRead } = await source.handle.read(bytes, 0, size, 0);
+                return new Uint8Array(bytes.subarray(0, bytesRead));
+              }),
+            ),
+          catch: (error) =>
+            error instanceof CreditMediaToolInputFailed
+              ? error
+              : new CreditMediaToolInputFailed("OpenBot could not read the input pictures."),
+        }),
+      (sources) => Effect.promise(() => Promise.allSettled(sources.map((source) => source.handle.close()))),
+    ).pipe(
+      Effect.catch((failure) =>
+        Effect.fail(
+          failure instanceof CreditMediaToolInputFailed
+            ? failure
+            : new CreditMediaToolInputFailed("OpenBot could not open the input pictures."),
+        ),
+      ),
+    );
+  }
 
   readonly #mcpServerTool = Effect.fn("OpenBotToolRouter.mcpServerTool")(function* (
     this: OpenBotToolRouter,

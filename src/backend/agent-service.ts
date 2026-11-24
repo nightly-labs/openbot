@@ -9,6 +9,7 @@ import {
   customAgentIdOfModel,
 } from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
+import { CREDIT_MEDIA_PREFERRED_MODELS } from "@openbot/contracts/credit-media";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import type { FeedbackFacts } from "@openbot/contracts/feedback";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -150,15 +151,20 @@ import {
   agentTaskLimit,
   type BusyMessageMode,
   CONTEXT_RESET_ITEM_TYPE,
+  type CreditsHold,
   DEFAULT_BUSY_MESSAGE_MODE,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   DEFAULT_RESPONSE_STYLE,
   isContextResetMarker,
   isCustomProviderHarness,
+  type MediaApprovalCreditsSetting,
+  type MediaApprovalOffer,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
+  type RespondToCreditsHoldInput,
+  type RespondToMediaApprovalInput,
   type ResponseStyle,
   type SkillLearningMode,
   sameAgentBrowserProfile,
@@ -214,6 +220,7 @@ import type { SetCommitCoAuthor } from "./agent/commit-co-author-tool";
 import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
+import { type CreditAsksPerson, CreditMediaTools, DEFAULT_MEDIA_APPROVAL_CREDITS } from "./agent/credit-media-tools";
 import { CustomEndpoints, toEndpointChangeFailed } from "./agent/custom-endpoints";
 import { agentNamesById, displayMessageReferences, type TagReferenceSource } from "./agent/delivery-content";
 import { DeltaBuffer } from "./agent/delta-buffer";
@@ -421,6 +428,12 @@ export interface AgentServiceOptions {
   contextCompactionTimeoutMs?: number;
   cacheExpiryCompactionDelayMs?: number;
   cacheExpiryCompaction?: () => boolean;
+  mediaApprovalCredits?: () => MediaApprovalCreditsSetting;
+  creditAsks?: {
+    muted: (personIds: readonly string[]) => boolean;
+    enableAgents: () => Effect.Effect<void, unknown>;
+    mute: (person: CreditAsksPerson | null) => Effect.Effect<void, unknown>;
+  };
   memoryReviewIdleMs?: number;
   finishCheck?: boolean;
   preferredProvider?: AgentProvider;
@@ -2077,6 +2090,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.avatarDecoder === undefined ? {} : { avatarDecoder: options.avatarDecoder }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
+      creditMediaTools: new CreditMediaTools({
+        media: () => this.#creditMedia,
+        approvalCredits: () => options.mediaApprovalCredits?.().credits ?? DEFAULT_MEDIA_APPROVAL_CREDITS,
+        agentsAllowed: () => options.mediaApprovalCredits?.().agents ?? true,
+        askWhenBlocked: () => options.mediaApprovalCredits?.().askWhenBlocked ?? true,
+        asksMuted: (personIds) => options.creditAsks?.muted(personIds) ?? false,
+        enableAgents: () => options.creditAsks?.enableAgents() ?? Effect.void,
+        muteAsks: (person) => options.creditAsks?.mute(person) ?? Effect.void,
+        defaultModel: (kind) => {
+          const setting = options.mediaApprovalCredits?.();
+          return (kind === "image" ? setting?.imageModel : setting?.videoModel) ?? CREDIT_MEDIA_PREFERRED_MODELS[kind];
+        },
+        fitImage: options.fitImage ?? null,
+      }),
       mcpServers: mcpServersFromGateway(
         this.#mcp,
         options.prepareMcpTest,
@@ -2299,6 +2326,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   pendingApproval(requestId: string | number): AgentApproval | undefined {
     return this.#attention.pendingApproval(requestId);
+  }
+
+  pendingMediaApproval(agentId: string, requestId: string | number): MediaApprovalOffer | undefined {
+    return this.#attention.pendingMediaApproval(agentId, requestId);
+  }
+
+  pendingCreditsHold(agentId: string, requestId: string | number, canEnable: boolean): CreditsHold | undefined {
+    return this.#attention.pendingCreditsHold(agentId, requestId, canEnable);
+  }
+
+  recheckCreditsHolds(): void {
+    this.#attention.recheckCreditsHolds();
   }
 
   approvalExecutionThreadId(requestId: string | number): string | undefined {
@@ -7326,6 +7365,32 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "respondToApproval", cause: failure.cause }),
+        ),
+      );
+  }
+
+  respondToMediaApproval(
+    input: RespondToMediaApprovalInput,
+    responder?: ApprovalResponder,
+  ): Effect.Effect<void, AgentLifecycleFailed> {
+    return this.#attention
+      .respondToMediaApproval(input, responder)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "respondToMediaApproval", cause: failure.cause }),
+        ),
+      );
+  }
+
+  respondToCreditsHold(
+    input: RespondToCreditsHoldInput,
+    responder?: ApprovalResponder,
+  ): Effect.Effect<CreditsHold | null, AgentLifecycleFailed> {
+    return this.#attention
+      .respondToCreditsHold(input, responder)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "respondToCreditsHold", cause: failure.cause }),
         ),
       );
   }

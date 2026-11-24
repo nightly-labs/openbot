@@ -47,6 +47,26 @@ export function creditsServer(credits: CreditsState | null, serverId: string | n
   return credits.servers.find((server) => server.serverId === serverId) ?? null;
 }
 
+export interface CreditsRailWallet {
+  balance: number;
+  serverId: string | null;
+  name: string | null;
+  movable: CreditServerWallet | null;
+}
+
+export function creditsRailWallet(
+  credits: CreditsState | null,
+  server: { kind: "local" | "remote"; id: string } | null,
+  localServerId: string | null | undefined,
+): CreditsRailWallet | null {
+  if (!credits) return null;
+  const walletId = server?.kind === "remote" ? server.id : (localServerId ?? null);
+  const wallet = creditsServer(credits, walletId);
+  const movable = wallet?.role === "owner" ? wallet : null;
+  if (!wallet) return { balance: credits.balance, serverId: null, name: null, movable };
+  return { balance: wallet.balance, serverId: wallet.serverId, name: wallet.name, movable };
+}
+
 export function createCreditsStore(
   calls: () => CreditsCalls | undefined,
   isActive: () => boolean,

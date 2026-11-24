@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "Los eventos no están disponibles en este host.",
   "error.backend.databaseIntegrity": "La base de datos de OpenBot no superó la comprobación de integridad.",
+  "error.backend.creditsHoldAdminOnly":
+    "Solo un propietario o administrador de este servidor puede permitir que los agentes usen créditos.",
+  "error.backend.creditsHoldShort": "Aún no hay suficientes créditos.",
   "error.backend.webhookRouteLimit": "Un host puede tener un máximo de {limit} rutinas de webhook.",
   "error.backend.webhookSettingsInvalid": "Comprueba los ajustes del webhook e inténtalo de nuevo.",
   "error.backend.webhookSenderSecretInvalid":

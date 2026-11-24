@@ -631,6 +631,16 @@ export const messages = {
   "mobile.server.settings.memoryLimitLoadFailed": "לא ניתן לטעון את מגבלת הזיכרונות של השרת הזה.",
   "mobile.server.settings.memoryLimitSaveFailed": "לא ניתן לשמור את מגבלת הזיכרונות. אפשר לנסות שוב.",
   "mobile.server.settings.memoryLimitUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את מגבלת הזיכרונות שלו.",
+  "mobile.server.settings.mediaApprovalCredits": "לשאול לפני הוצאה של יותר מ־",
+  "mobile.server.settings.mediaApprovalCreditsUnit": "קרדיטים",
+  "mobile.server.settings.mediaApprovalCreditsLoadFailed": "לא ניתן לטעון את סף אישור הקרדיטים של השרת הזה.",
+  "mobile.server.settings.mediaApprovalCreditsSaveFailed": "לא ניתן לשמור את סף אישור הקרדיטים. אפשר לנסות שוב.",
+  "mobile.server.settings.mediaApprovalCreditsUnsupported":
+    "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את סף אישור הקרדיטים שלו.",
+  "mobile.server.settings.mediaApprovalAgents": "סוכנים יכולים להשתמש בקרדיטים",
+  "mobile.server.settings.mediaApprovalAgentsSaveFailed": "לא ניתן לשנות את השימוש של סוכנים בקרדיטים. אפשר לנסות שוב.",
+  "mobile.server.settings.mediaApprovalAsk": "לשאול כשצריך קרדיטים",
+  "mobile.server.settings.mediaApprovalAskSaveFailed": "לא ניתן לשנות את בקשות הקרדיטים. אפשר לנסות שוב.",
   "mobile.server.settings.memoryReview": "סקירת זיכרון",
   "mobile.server.settings.memoryReviewDescription":
     "באיזו תדירות סוכנים בשרת הזה שומרים ברקע עובדות מתמשכות מהצ'אטים שלהם.",

@@ -38,6 +38,8 @@ const DIRECT_NAMES = new Set([
   "react_to_user_message",
   "request_api_key",
   "suggest_marketplace_app",
+  "generate_image",
+  "generate_video",
 ]);
 
 const BROWSER_SCRIPT_TOOL = requireTool(`${OPENBOT_BROWSER_NAMESPACE}.run_script`);

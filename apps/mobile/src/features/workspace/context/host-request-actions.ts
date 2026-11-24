@@ -167,6 +167,7 @@ import {
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
+import { MEDIA_APPROVAL_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
@@ -260,6 +261,7 @@ import {
   getHostAuditLog,
   getHostBrowsingMemory,
   getHostMcpAccess,
+  getHostMediaApprovalCredits,
   getHostMemoryReview,
   getHostPersonality,
   getHostReleaseStatus,
@@ -327,6 +329,7 @@ import {
   setHostBrowserProfileProxy,
   setHostBrowsingMemory,
   setHostMcpAccess,
+  setHostMediaApprovalCredits,
   setHostMemoryReview,
   setHostPersonality,
   setHostSignalHome,
@@ -545,6 +548,8 @@ type HostRequestActions = Pick<
   | "setServerSignalHome"
   | "loadAgentMemoryLimit"
   | "setAgentMemoryLimit"
+  | "loadMediaApprovalCredits"
+  | "setMediaApprovalCredits"
   | "loadMemoryReview"
   | "setMemoryReview"
   | "loadSkillLearning"
@@ -843,6 +848,12 @@ export function createHostRequestActions({
     capabilityApi(serverId, HOST_VOICE_MODEL_CAPABILITY, "mobile.server.settings.voiceModelUnsupported");
   const memoryLimitAdmin = (serverId: string) =>
     capabilityApi(serverId, AGENT_MEMORY_LIMIT_CAPABILITY, "mobile.server.settings.memoryLimitUnsupported");
+  const mediaApprovalCreditsAdmin = (serverId: string) =>
+    capabilityApi(
+      serverId,
+      MEDIA_APPROVAL_CREDITS_CAPABILITY,
+      "mobile.server.settings.mediaApprovalCreditsUnsupported",
+    );
   const memoryReviewAdmin = (serverId: string) =>
     capabilityApi(serverId, MEMORY_REVIEW_CAPABILITY, "mobile.server.settings.learningUnsupported");
   const skillLearningAdmin = (serverId: string) =>
@@ -922,6 +933,10 @@ export function createHostRequestActions({
     loadAgentMemoryLimit: async (serverId) => runTeamRequest(getHostAgentMemoryLimit(memoryLimitAdmin(serverId))),
     setAgentMemoryLimit: async (limit, serverId) =>
       runTeamRequest(setHostAgentMemoryLimit(memoryLimitAdmin(serverId), limit)),
+    loadMediaApprovalCredits: async (serverId) =>
+      runTeamRequest(getHostMediaApprovalCredits(mediaApprovalCreditsAdmin(serverId))),
+    setMediaApprovalCredits: async (update, serverId) =>
+      runTeamRequest(setHostMediaApprovalCredits(mediaApprovalCreditsAdmin(serverId), update)),
     loadMemoryReview: async (serverId) => runTeamRequest(getHostMemoryReview(memoryReviewAdmin(serverId))),
     setMemoryReview: async (interval, serverId) =>
       runTeamRequest(setHostMemoryReview(memoryReviewAdmin(serverId), interval)),

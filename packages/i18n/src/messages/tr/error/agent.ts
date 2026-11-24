@@ -185,6 +185,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Ekran yakalama bir Slack, Discord ya da Telegram konuşmasında çalışmaz, çünkü dosyalarını başka kişiler de alır.",
   "error.agent.screenCaptureDeclined": "Kullanıcı bu ekran yakalamaya izin vermedi. Hiçbir şey yakalanmadı.",
+  "error.agent.creditMediaDeclined": "Kullanıcı bu oluşturmaya izin vermedi. Hiç kredi harcanmadı.",
+  "error.agent.creditMediaNotSaved": "Dosya oluşturuldu, ancak OpenBot onu sohbete kaydedemedi.",
   "error.agent.mcpToolDeclined": "Kullanıcı bu MCP aracı çağrısına izin vermedi. Araç çalışmadı.",
   "error.agent.screenCaptureWindowMissing":
     "Bu pencere şu anda açık değil. Geçerli pencere kimliklerini almak için list_capture_sources çağırın.",

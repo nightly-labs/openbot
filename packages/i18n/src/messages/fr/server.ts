@@ -357,6 +357,7 @@ export const messages = {
     "Affiche la page CRM aux propriétaires et administrateurs, permet aux agents de lire le CRM et synchronise Stripe. Si vous le désactivez, les données restent.",
   "server.settings.agentDefaultsTitle": "Valeurs par défaut des agents",
   "server.settings.threadsCard": "Fils et fuseau horaire",
+  "server.settings.creditsCard": "Crédits",
   "server.settings.memoryTitle": "Mémoire",
   "server.settings.memoryDescription": "Choisir ce que les agents de ce serveur retiennent et apprennent.",
   "server.settings.memoriesCard": "Souvenirs",
@@ -431,6 +432,12 @@ export const messages = {
   "server.settings.agentTaskLimitDescription":
     "Le nombre de fils que chaque agent sans limite propre peut exécuter en même temps.",
   "server.settings.agentTaskLimitDefault": "Par défaut ({count})",
+  "server.settings.mediaApprovalCredits": "Demander avant de dépenser plus de",
+  "server.settings.mediaApprovalCreditsUnit": "crédits",
+  "server.settings.mediaApprovalCreditsLoadFailed":
+    "Impossible de charger le seuil d’approbation des crédits de ce serveur.",
+  "server.settings.mediaApprovalAgents": "Les agents peuvent utiliser des crédits",
+  "server.settings.mediaApprovalAsk": "Demander quand des crédits sont nécessaires",
   "server.settings.memoryLimit": "Souvenirs par agent",
   "server.settings.memoryLimitDescription": "Nombre de souvenirs que chaque agent de ce serveur peut conserver.",
   "server.settings.memoryLimitLoadFailed": "Impossible de charger la limite de souvenirs de ce serveur.",

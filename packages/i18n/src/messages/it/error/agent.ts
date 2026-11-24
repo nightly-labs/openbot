@@ -200,6 +200,8 @@ export const messages = {
     "L'acquisizione dello schermo non funziona in una conversazione Slack, Discord o Telegram, perché altre persone ricevono i suoi file.",
   "error.agent.screenCaptureDeclined":
     "L'utente non ha permesso questa acquisizione dello schermo. Non è stato acquisito nulla.",
+  "error.agent.creditMediaDeclined": "L’utente non ha consentito questa generazione. Nessun credito è stato speso.",
+  "error.agent.creditMediaNotSaved": "Il file è stato creato, ma OpenBot non è riuscito a salvarlo nella chat.",
   "error.agent.mcpToolDeclined":
     "L'utente non ha permesso questa chiamata allo strumento MCP. Lo strumento non è stato eseguito.",
   "error.agent.screenCaptureWindowMissing":
