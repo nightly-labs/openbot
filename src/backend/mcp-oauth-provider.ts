@@ -159,7 +159,7 @@ export type McpSignInOffer = "none" | "offered" | "refused";
 
 export interface McpSignIn {
   readonly provider: OAuthClientProvider;
-  begin: () => Effect.Effect<boolean, McpOperationError>;
+  begin: (lookup?: AuthorizationServerLookup) => Effect.Effect<boolean, McpOperationError>;
   complete: () => Effect.Effect<void, McpOperationError>;
   abandon: () => void;
   secrets: () => string[];
@@ -377,14 +377,14 @@ export class McpOAuth implements McpOAuthAuthority {
     attempts.add(attempt);
     return {
       provider,
-      begin: () =>
+      begin: (lookup) =>
         Effect.gen({ self: this }, function* () {
           if (cancelled || abandoned || this.#options.storage.read(key)?.tokens) return false;
           const controller = new AbortController();
           const fetchFn = provider.watchRegistration(this.#fetch(key, controller.signal));
           return yield* withTimeout(
             Effect.gen(function* () {
-              if (!(yield* namesAuthorizationServer(resource, fetchFn))) return false;
+              if (!(yield* namesAuthorizationServer(resource, fetchFn, lookup))) return false;
               return (yield* mcpCall(() => auth(provider, { serverUrl: resource, fetchFn }))) === "REDIRECT";
             }),
             this.#options.refreshTimeoutMs ?? MCP_TOKEN_TIMEOUT_MS,
@@ -1306,7 +1306,23 @@ function mcpOAuthServerUrl(key: string): string {
   return normalizeResource(key) ?? key;
 }
 
-export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
+export type AuthorizationServerLookup = "this-server" | "this-server-or-origin";
+
+function namesThisServer(metadataResource: string, resource: string): boolean {
+  return (
+    URL.canParse(metadataResource) &&
+    checkResourceAllowed({
+      requestedResource: resourceUrlFromServerUrl(resource),
+      configuredResource: metadataResource,
+    })
+  );
+}
+
+export const namesAuthorizationServer = Effect.fnUntraced(function* (
+  resource: string,
+  fetchFn: FetchLike,
+  lookup: AuthorizationServerLookup = "this-server-or-origin",
+) {
   let metadataStatus: number | null = null;
   const metadataFetch: FetchLike = async (input, init) => {
     metadataStatus = null;
@@ -1323,6 +1339,10 @@ export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: s
       return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
     }),
   );
+  if (lookup === "this-server")
+    return metadata && namesThisServer(metadata.resource, resource)
+      ? (metadata.authorization_servers?.[0] ?? null)
+      : null;
   if (metadata) return metadata.authorization_servers?.[0] ?? null;
   const origin = String(new URL("/", resource));
   return yield* mcpCall(() => discoverAuthorizationServerMetadata(origin, { fetchFn })).pipe(

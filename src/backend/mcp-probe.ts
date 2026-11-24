@@ -249,7 +249,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
   if (!signIn) return failure(first.failure.cause);
   if (first.failure.cause instanceof UnauthorizedError) return yield* afterSignIn(signIn);
   if (httpStatus(first.failure.cause) !== 403 || hasCredentialHeader(config)) return failure(first.failure.cause);
-  const begun = yield* Effect.result(signIn.begin());
+  const begun = yield* Effect.result(signIn.begin("this-server"));
   if (Result.isFailure(begun)) return failure(begun.failure.cause);
   return begun.success ? yield* afterSignIn(signIn) : failure(first.failure.cause);
 });
@@ -577,7 +577,7 @@ const offersSignIn = Effect.fnUntraced(function* (url: string, remainingMs: numb
   if (remainingMs <= 0) return false;
   const controller = new AbortController();
   const fetchFn: FetchLike = (input, init) => fetch(input, { ...init, signal: controller.signal });
-  return yield* namesAuthorizationServer(normalizeResource(url) ?? url, fetchFn).pipe(
+  return yield* namesAuthorizationServer(normalizeResource(url) ?? url, fetchFn, "this-server").pipe(
     Effect.map((issuer) => issuer !== null),
     Effect.timeoutOrElse({ duration: remainingMs, orElse: () => Effect.succeed(false) }),
     Effect.catch(() => Effect.succeed(false)),
