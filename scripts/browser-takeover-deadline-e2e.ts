@@ -124,7 +124,7 @@ const registry = new AttentionRegistry({
     },
   },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
   emit: (event) => events.push(event),
   emitError: () => {},
   emitRuntimeSnapshot: () => {},
@@ -352,7 +352,7 @@ try {
           endTakeover: () => {},
         },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
         emit: (event) => events.push(event),
         emitError: () => {},
         emitRuntimeSnapshot: () => {},
@@ -444,7 +444,11 @@ try {
         },
       },
       hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-      routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+      routines: {
+        markNeedsAttention: () => {},
+        markRunningForTurn: () => {},
+        runsTurn: (turnId) => turnId.startsWith("routine-"),
+      },
       emit: (event) => limitedEvents.push(event),
       emitError: () => {},
       emitRuntimeSnapshot: () => {},
@@ -657,6 +661,59 @@ try {
     return { note: result.note, lateAnswer: releasedAnswers.at(-1) };
   });
 
+  await step("a routine question leaves the user's waiting question open", async () => {
+    const noteClient = new NoteClient("/nonexistent/claude");
+    const ask = async (turnId: string, question: string) => {
+      const id = nextRequest++;
+      limited.surfacePrompt(noteClient, {
+        id,
+        method: "item/tool/requestUserInput",
+        params: {
+          threadId: THREAD,
+          turnId,
+          questions: [
+            {
+              id: "pick",
+              header: "Pick",
+              question,
+              options: [
+                { label: "Yes", description: "Do it" },
+                { label: "No", description: "Do not do it" },
+              ],
+            },
+          ],
+        },
+      });
+      await noteClient.answered(id);
+      limited.clearForTurn(THREAD, turnId, true);
+      return String(id);
+    };
+    const open = (ids: string[]) =>
+      limited
+        .runtimeAttention()
+        .pendingPrompts.map((prompt) => String(prompt.requestId))
+        .filter((id) => ids.includes(id));
+    const chatQuestion = await ask("turn-limit-12", "Use the new plan?");
+    const firstRoutineQuestion = await ask("routine-turn-limit-13", "Post the report?");
+    assert.deepEqual(
+      open([chatQuestion, firstRoutineQuestion]),
+      [chatQuestion, firstRoutineQuestion],
+      "the routine question closed the user's question",
+    );
+    const nextRoutineQuestion = await ask("routine-turn-limit-14", "Post the next report?");
+    assert.deepEqual(
+      open([chatQuestion, firstRoutineQuestion, nextRoutineQuestion]),
+      [chatQuestion, nextRoutineQuestion],
+      "a newer routine question did not replace the older routine question",
+    );
+    const late = releasedAnswers.length;
+    await runCauseEffect(limited.respondToPrompt({ requestId: Number(chatQuestion), answers: { pick: ["Yes"] } }));
+    assert.equal(releasedAnswers.length, late + 1, "the user's answer did not reach the agent");
+    assert.match(releasedAnswers.at(-1) ?? "", /Use the new plan\?[\s\S]*Yes/);
+    limited.expireDetached(AGENT, THREAD);
+    return { lateAnswer: releasedAnswers.at(-1) };
+  });
+
   await step("a secret question expires at the limit", async () => {
     const answer = answerOf(await askQuestion(limited, "turn-limit-9", true));
     assert.equal(answer.success, false);
@@ -743,7 +800,7 @@ try {
           endTakeover: () => {},
         },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
         emit: (event) => vaultEvents.push(event),
         emitError: () => {},
         emitRuntimeSnapshot: () => {},
@@ -861,6 +918,7 @@ try {
         routines: {
           markNeedsAttention: (turnId) => attention.push(`needs:${turnId}`),
           markRunningForTurn: (turnId) => attention.push(`running:${turnId}`),
+          runsTurn: () => false,
         },
         emit: (event) => vaultEvents.push(event),
         emitError: () => {},

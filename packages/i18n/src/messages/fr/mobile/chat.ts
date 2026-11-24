@@ -146,6 +146,8 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Fermer",
   "mobile.chat.attachment.sharingUnavailable": "Le partage de fichiers n’est pas disponible sur cet appareil.",
   "mobile.chat.attachment.unavailable": "La pièce jointe n’est pas disponible. Réessayez.",
+  "mobile.chat.attachment.downloadStopped":
+    "Le téléchargement s’est arrêté. Il recommence quand le serveur est connecté.",
   "mobile.chat.attachment.openFailed": "Impossible d’ouvrir la pièce jointe",
   "mobile.chat.attachment.photosNeedUpdate": "L’enregistrement de photos nécessite la dernière version de l’app.",
   "mobile.chat.attachment.photosPermission":
@@ -159,6 +161,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesNeedsUpdate":
     "Le partage de plusieurs fichiers nécessite la dernière version de l’app.",
   "mobile.chat.attachment.preview": "Aperçu de {name}",
+  "mobile.chat.attachment.seeAll": "Touchez pour tout voir",
   "mobile.chat.attachment.displayFailed": "Impossible d’afficher cette image.",
   "mobile.chat.attachment.loadingImage": "Chargement de l’image",
   "mobile.chat.attachment.uploading": "Envoi de {name}",
@@ -236,6 +239,8 @@ export const messages = {
     "Ce serveur ne prend pas en charge GPT Live Voice. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice n’a pas pu démarrer. Réactivez le micro pour réessayer.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice s’est arrêté. Réactivez le micro pour le relancer.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice n’a pas pu démarrer",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice s’est arrêté",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Autorisez OpenBot à utiliser le micro dans Réglages. Puis réactivez le micro pour réessayer.",
   "mobile.chat.composer.addAttachment": "Ajouter une pièce jointe",

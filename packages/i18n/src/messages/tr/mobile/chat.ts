@@ -143,6 +143,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Kapat",
   "mobile.chat.attachment.sharingUnavailable": "Bu cihazda dosya paylaşımı kullanılamıyor.",
   "mobile.chat.attachment.unavailable": "Ek kullanılamıyor. Tekrar deneyin.",
+  "mobile.chat.attachment.downloadStopped": "İndirme durdu. Sunucu bağlandığında yeniden başlar.",
   "mobile.chat.attachment.openFailed": "Ek açılamadı",
   "mobile.chat.attachment.photosNeedUpdate": "Fotoğrafları kaydetmek uygulamanın en son sürümünü gerektirir.",
   "mobile.chat.attachment.photosPermission":
@@ -155,6 +156,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Dosyalar paylaşılamadı",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Birçok dosyayı paylaşmak için uygulamanın en son sürümü gerekir.",
   "mobile.chat.attachment.preview": "{name} önizlemesi",
+  "mobile.chat.attachment.seeAll": "Tümünü görmek için dokunun",
   "mobile.chat.attachment.displayFailed": "Bu görsel görüntülenemedi.",
   "mobile.chat.attachment.loadingImage": "Görsel yükleniyor",
   "mobile.chat.attachment.uploading": "{name} yükleniyor",
@@ -230,6 +232,8 @@ export const messages = {
     "Bu sunucu GPT Live Voice'u desteklemiyor. Onu çalıştıran bilgisayarda OpenBot'u güncelleyin.",
   "mobile.chat.liveVoice.gptFailed": "GPT Live Voice başlatılamadı. Yeniden denemek için mikrofonun sesini açın.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice durdu. Yeniden başlatmak için mikrofonun sesini açın.",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice başlatılamadı",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice durdu",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Ayarlar'da OpenBot'un mikrofonu kullanmasına izin verin. Sonra yeniden denemek için mikrofonun sesini açın.",
   "mobile.chat.composer.addAttachment": "Ek ekle",

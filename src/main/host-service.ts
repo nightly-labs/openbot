@@ -148,6 +148,8 @@ interface HostServiceOptions {
   machine?: ForwardedApiOptions["machine"];
   backgroundProcesses?: ForwardedApiOptions["backgroundProcesses"];
   liveVoice?: ForwardedApiOptions["liveVoice"];
+  voiceTranscription?: ForwardedApiOptions["voiceTranscription"];
+  clientBrowser?: ForwardedApiOptions["clientBrowser"];
   hostedSites?: ForwardedApiOptions["hostedSites"];
   events?: ForwardedApiOptions["events"];
   agentImport?: ForwardedApiOptions["agentImport"];
@@ -201,6 +203,7 @@ interface HostServiceOptions {
   getRemoteDesktopDisplays?: () => RemoteDesktopDisplay[];
   getRemoteDesktopDisplayScreenOrigin?: (displayId: string) => { x: number; y: number } | undefined;
   remoteDesktopScreenLocked?: () => boolean;
+  wakeRemoteDesktopScreen?: () => void;
   getRemoteDesktopIceServers?: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   writeRemoteDesktopClipboard?: (text: string) => void;
   remoteControlPolicy?: RemoteControlPolicyStore;
@@ -344,6 +347,7 @@ export class HostService extends EventEmitter<HostEvents> {
       getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
       sessionDisconnected: windowsSessionDisconnected,
       screenLocked: options.remoteDesktopScreenLocked,
+      wakeScreen: options.wakeRemoteDesktopScreen,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
@@ -487,6 +491,8 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.machine === undefined ? {} : { machine: options.machine }),
       ...(options.backgroundProcesses === undefined ? {} : { backgroundProcesses: options.backgroundProcesses }),
       ...(options.liveVoice === undefined ? {} : { liveVoice: options.liveVoice }),
+      ...(options.voiceTranscription === undefined ? {} : { voiceTranscription: options.voiceTranscription }),
+      ...(options.clientBrowser === undefined ? {} : { clientBrowser: options.clientBrowser }),
       ...(options.hostedSites === undefined ? {} : { hostedSites: options.hostedSites }),
       ...(options.events === undefined ? {} : { events: options.events }),
       ...(options.agentImport === undefined ? {} : { agentImport: options.agentImport }),

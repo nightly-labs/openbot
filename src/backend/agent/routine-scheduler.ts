@@ -918,6 +918,10 @@ export class RoutineScheduler implements RoutineDueSource {
     this.#transitionInteractionWithReconciliation(run, "needs-attention");
   }
 
+  runsTurn(turnId: string): boolean {
+    return this.#mailbox.findDeliveryByTurn(turnId)?.delivery.sender.kind === "routine";
+  }
+
   markRunningForTurn(turnId: string | null): void {
     if (!turnId) return;
     const delivery = this.#mailbox.findDeliveryByTurn(turnId);

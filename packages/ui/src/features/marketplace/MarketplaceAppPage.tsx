@@ -43,6 +43,7 @@ import type { MarketplacePluginApp } from "../settings/marketplace-plugins";
 import { AppAccessSections } from "./MarketplaceAppAccess";
 import { AppAction } from "./MarketplaceCards";
 import { AppMark, TryCard } from "./MarketplaceParts";
+import { MarketplaceXAppPage } from "./MarketplaceXAppPage";
 import { CATEGORY_LABELS } from "./marketplace-listing";
 import {
   appSetup,
@@ -578,6 +579,8 @@ function AppInformation(props: {
   );
 }
 
+const X_WEBSITE = "https://x.com";
+
 interface ConnectorLink {
   label: AppTextKey;
   url: string;
@@ -753,7 +756,7 @@ export function MarketplaceServerPage(props: { scope: MarketplaceScope; id: stri
   );
 }
 
-export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string }) {
+export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string; setup?: boolean }) {
   const { t } = useText();
   const model = () => props.scope.model;
   const app = () =>
@@ -773,6 +776,10 @@ export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string 
   const custom = () => {
     const current = app();
     return current?.kind === "custom" ? current : undefined;
+  };
+  const x = () => {
+    const current = app();
+    return current?.kind === "x" ? current : undefined;
   };
   return (
     <div class="marketplace-view marketplace-app-page">
@@ -800,6 +807,24 @@ export function MarketplaceAppPage(props: { scope: MarketplaceScope; id: string 
         </Match>
         <Match when={plugin()}>{(current) => <PluginAppPage scope={props.scope} app={current()} />}</Match>
         <Match when={custom()}>{(current) => <CustomServerPage scope={props.scope} app={current()} />}</Match>
+        <Match when={x()}>
+          {(current) => (
+            <MarketplaceXAppPage
+              scope={props.scope}
+              app={current()}
+              setup={props.setup === true}
+              details={
+                <AppInformation
+                  description={t("marketplace.xApp.description")}
+                  developer={t("marketplace.xApp.developer")}
+                  category={t(CATEGORY_LABELS[current().category])}
+                  links={[{ label: t("plugin.link.website"), url: X_WEBSITE, text: pluginLinkText(X_WEBSITE) }]}
+                  onOpenUrl={(url) => props.scope.model.openUrl(url)}
+                />
+              }
+            />
+          )}
+        </Match>
       </Switch>
     </div>
   );

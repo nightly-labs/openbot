@@ -597,7 +597,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.home.serversFailed": "Couldn’t load your servers",
   "mobile.agent.home.serversFailedBody": "Check that the desktop app is running and try again.",
   "mobile.agent.home.noServers": "No servers available",
-  "mobile.agent.home.noServersBody": "Connect the desktop app again or join a remote server.",
+  "mobile.agent.home.noServersBody":
+    "Open OpenBot on your computer with this account, and turn on Publish this server in Server settings → Members. Or join a remote server.",
   "mobile.agent.home.chooseServer": "Choose a server",
   "mobile.agent.home.openServers": "Open servers",
   "mobile.agent.home.noChatOpen": "No chat open",

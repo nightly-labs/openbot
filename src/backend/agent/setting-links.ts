@@ -457,7 +457,15 @@ const CHAT_PLACES: readonly SettingLinkEntry[] = [
       "In the agent's chat, the chat header: + (New thread) starts a thread, and the thread menu shows the thread tabs, New thread and All threads. On a message: Branch in new thread. On the phone app: touch the agent's name at the top of the chat for Main chat, New thread and All threads.",
     about:
       "More conversations with the same agent beside its main chat, for example for parallel work. Each thread has its own conversation and context: it does not see the messages of the main chat or of other threads, except the messages that a branch copies. All threads share the agent's memories, skills, settings and working directory.",
-    words: "parallel side tab tabs branch fork session sessions",
+    words: "parallel side tab tabs branch fork session sessions conversation",
+  },
+  {
+    title: "Voice conversation",
+    place:
+      "On a computer: in the agent's chat, with an empty message box, the voice button in place of Send (Start voice conversation). The voice bar has Mute the microphone, Interrupt, End voice conversation, and How you talk: Open microphone or Push to talk. On the phone app: in a chat with an agent or a channel, with an empty message box, the voice button in place of Send (Start a voice conversation). When the phone has no voice yet, it opens Settings > Voice. The button shows only where voice is available.",
+    about:
+      "A continuous spoken conversation with the agent: OpenBot listens, the agent replies aloud, then OpenBot listens again, with no dictation for each message. It uses the voices of Settings > Voice. Codex live voice, an OpenAI voice with a ChatGPT sign-in, is optional, not required.",
+    words: "talk talking speak spoken live realtime continuous handsfree hands call microphone listen",
   },
 ];
 

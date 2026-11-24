@@ -34,6 +34,7 @@ export interface QueueControlsHooks {
   taskThreadId(deliveryId: string): string | null;
   tagReferences(agentId: string, threadId: string | null): TagReferenceSource;
   liveVoiceRelayed(deliveryId: string): LiveVoiceRelayed | null;
+  fromChrome(deliveryId: string): boolean;
 }
 
 export interface QueueControlsOptions {
@@ -323,6 +324,7 @@ export class QueueControls {
               taskReportWaiting: this.#drain.taskReportWaiting(context),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
               liveVoice: this.#hooks.liveVoiceRelayed(input.deliveryId),
+              fromChrome: this.#hooks.fromChrome(input.deliveryId),
               steerFramedAsUser: providerForAgent(agent) === "claude",
               steersQuietTurn,
             }),

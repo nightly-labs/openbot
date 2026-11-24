@@ -491,10 +491,16 @@ export function MessageBody(props: {
     return standaloneAttachments().filter((attachment) => !images.has(attachment) && !isRevealedAgentImage(attachment));
   });
   const loadedImages = new Set<string>();
+  const loadingImages = new Set<string>();
+  let loadingSource = props.mediaSource;
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
       const source = props.mediaSource;
+      if (source !== loadingSource) {
+        loadingImages.clear();
+        loadingSource = source;
+      }
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
@@ -502,13 +508,21 @@ export function MessageBody(props: {
           unloaded(attachment);
           continue;
         }
-        void source?.load(attachment, loadLimit(attachment)).then(
-          (shown) => {
-            if (shown) loadedImages.add(attachment.id);
-            else unloaded(attachment);
-          },
-          () => unloaded(attachment),
-        );
+        if (!source) continue;
+        const limit = loadLimit(attachment);
+        const loading = `${attachment.id}:${limit}`;
+        if (loadingImages.has(loading)) continue;
+        loadingImages.add(loading);
+        void source
+          .load(attachment, limit)
+          .then(
+            (shown) => {
+              if (shown) loadedImages.add(attachment.id);
+              else unloaded(attachment);
+            },
+            () => unloaded(attachment),
+          )
+          .finally(() => loadingImages.delete(loading));
       }
     },
   );

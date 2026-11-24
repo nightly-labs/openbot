@@ -2680,6 +2680,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     else if (event.type === "host-appearance") this.#applyHostAppearance(serverId, event);
     else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
     else if (event.type === "live-voice") this.emit("liveVoice", serverId, event);
+    else if (event.type === "client-browser-command") return;
     else this.#background(this.#owned(this.#refresh.forward(serverId, event)));
   }
 

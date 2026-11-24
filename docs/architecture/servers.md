@@ -251,8 +251,10 @@ sign-in, or the Codex account of the agent, and answers `{ sessionId, sdp }` wit
 Audio goes between the client and OpenAI, never through the host. The member must be able to chat with
 the agent, because each spoken request goes to the agent as the member's message. The start needs an
 open event connection of the same logical session, or it answers 409. A missing Codex sign-in, a
-timeout or a refused call also answers 409 with a sentence for the member. Any other failure answers
-500, and its reason stays in the host log; the phone shows `error.voice.live.hostFailed` for it.
+timeout or a refused call also answers 409 with a sentence for the member. Any other Codex failure
+answers 409 with `error.voice.live.startFailed`: the next step and at most 160 characters of the
+redacted reason. The host log keeps the longer redacted reason. A phone that gets 500 from an older
+host shows `error.voice.live.hostFailed`.
 
 Each member has at most one session; a new start ends the earlier one of that member, and the local
 user's session stays. The host sends the `live-voice` event (transcript parts and the end) only to the
@@ -264,6 +266,20 @@ otherwise the voice transcribes. The mobile app uses it in the voice conversatio
 when the host advertises it, the user turned on GPT live voice in Settings → Voice, and the app binary
 has WebRTC (`react-native-webrtc`); otherwise the phone's own voice conversation runs. The phone sends
 a voice name only when it is one of the contract. The web client does not use it yet.
+
+### Dictation for a member
+
+`voice-transcription-v1` (`team-protocol/voice-transcription-v1.ts`) lets any member have the host turn
+a short recording into text. `POST /v1/voice/transcribe` takes the raw body (over WebRTC, a file upload):
+a WAV file of 16 kHz mono 16-bit PCM, at most `VOICE_AUDIO_LIMITS.maximumWavBytes` (120 seconds). The
+host answers `{ text }`; the text goes to no agent. The host uses its own speech recognition, as a video
+transcription does (`application-services.ts`): its voice server when it dictates, else the model of
+Settings → Voice when it is ready (a model on the host, or Groq with the host's key). When that model is
+a local model that is not on the host, the request starts its download and answers 409
+`error.voice.host.preparing`; any other missing recognizer is 409 `error.voice.host.notSetUp`. A WAV that
+is not valid is 400, and a longer one is 413. The host advertises the capability to protocol 10 clients
+only. The browser extension uses it for the mic of its composer; the desktop on a joined server
+transcribes on its own computer, and the web client and the phone do not use it yet.
 
 ### Agent import from a joined server
 

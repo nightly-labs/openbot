@@ -83,6 +83,14 @@ export function SlackTile() {
   );
 }
 
+export function XTile() {
+  return (
+    <BrandTile background="#000000">
+      <path d={X_MARK_PATH} fill="#FFFFFF" />
+    </BrandTile>
+  );
+}
+
 export function DiscordTile() {
   return (
     <BrandTile background="#5865F2">

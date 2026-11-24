@@ -16,6 +16,7 @@ import {
   ConfirmBody,
   choiceBlockOf,
   confirmBlockOf,
+  formTitleOf,
   PromptStatus,
   QuestionText,
 } from "@/features/chat/components/chat-ui-block-cards";
@@ -74,13 +75,14 @@ export function ChatQuestionPrompt({
     );
   const confirm = confirmBlockOf(prompt, uiBlock);
   const choice = choiceBlockOf(prompt, uiBlock);
+  const formTitle = formTitleOf(uiBlock, prompt.questions[0]?.question);
   if (!prompt.resolution && !controller && onActivate) {
     return (
       <View className={`max-w-[92%] self-start gap-2 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
         {confirm ? (
           <ConfirmBody spec={confirm} compact selectValue={answeredSelect(prompt, null, t)} />
         ) : (
-          <QuestionText question={prompt.questions[0]?.question ?? ""} variant="body" />
+          <QuestionText question={formTitle ?? prompt.questions[0]?.question ?? ""} variant="body" />
         )}
         <Button variant="ghost" onPress={onActivate}>
           <Button.Label>{t("mobile.chat.question.answerForm")}</Button.Label>
@@ -109,6 +111,7 @@ export function ChatQuestionPrompt({
                 : t("mobile.chat.question.formExpired")}
           </Typography>
         </View>
+        {formTitle ? <QuestionText question={formTitle} variant="body" /> : null}
         {confirm ? (
           <ConfirmBody spec={confirm} closed selectValue={answeredSelect(prompt, resolution, t)} />
         ) : (
@@ -147,11 +150,13 @@ export function ChatQuestionPrompt({
     controller;
 
   const described = question.options?.filter((option) => option.description) ?? [];
+  const pageTitle = formTitleOf(uiBlock, question.question);
 
   return (
     <View className="w-full gap-2.5" accessibilityLabel={t("mobile.chat.question.form")}>
       <View className={`max-w-[92%] self-start gap-1 rounded-[20px] ${card.fillClass} px-4 py-3`} style={card.style}>
-        <QuestionText question={question.question} variant="title" />
+        {pageTitle ? <QuestionText question={pageTitle} variant="title" /> : null}
+        <QuestionText question={question.question} variant={pageTitle ? "body" : "title"} />
         {described.length ? (
           <View className="gap-2 pt-1">
             {described.map((option) => (
