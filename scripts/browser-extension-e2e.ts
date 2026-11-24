@@ -549,19 +549,16 @@ try {
     worker.evaluate<string>(
       `chrome.tabs.query({}).then(async (tabs) => { const tab = tabs.find((entry) => entry.url === ${JSON.stringify(shareUrl)}); if (!tab || tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return "null"; const group = await chrome.tabGroups.get(tab.groupId); return JSON.stringify({ id: group.id, title: group.title }); })`,
     );
-  const sharingLine = page.getByText(english("extension.browser.line", { count: 2 }).split(" · ")[0] ?? "", {
-    exact: false,
-  });
-  await sharingLine.waitFor({ timeout: UI_WAIT_MS });
-  const onWithoutSwitch = await sharingLine.isVisible();
-  await waitFor(
-    host.page,
-    "the server accepted the presence",
-    () => readStored(presenceKey),
-    (value) => value.includes('"sharing":true'),
-  );
+  const onWithoutSwitch = (
+    await waitFor(
+      host.page,
+      "the server accepted the presence",
+      () => readStored(presenceKey),
+      (value) => value.includes('"sharing":true'),
+    )
+  ).includes('"sharing":true');
   const ungroupedBeforeUse = (await fixtureGroup()) === "null";
-  await shot(page, "6b-sharing-line");
+  await shot(page, "6b-home-shared");
   await toHome(page);
   await agentButton.click();
   await composer.waitFor({ timeout: UI_WAIT_MS });
@@ -584,7 +581,8 @@ try {
       snapshot.activeTurnId === null && snapshot.messages.some((message) => message.text.includes(shareText)),
   );
   await page.getByRole("button", { name: english("common.back"), exact: true }).click();
-  await page.getByRole("button", { name: english("extension.browser.manage") }).click();
+  await serverTitle.click();
+  await page.getByRole("menuitem", { name: english("extension.browser.title") }).click();
   await shot(page, "6b-shared-tabs-settings");
   await page
     .getByRole("button", { name: english("extension.browser.revokeSite", { site: new URL(xBase).host }) })
@@ -592,7 +590,6 @@ try {
   await page.getByText(english("extension.browser.noSites")).waitFor({ timeout: UI_WAIT_MS });
   const siteRevoked = JSON.parse(await readStored(sitesKey))?.[site] === undefined;
   await page.getByRole("button", { name: english("extension.browser.stop") }).click();
-  await sharingLine.waitFor({ state: "hidden", timeout: UI_WAIT_MS });
   const groupEnded =
     (await waitFor(host.page, "the group ended", fixtureGroup, (value) => value === "null")) === "null";
   await waitFor(
@@ -603,7 +600,6 @@ try {
   );
   await serverTitle.click();
   await page.getByRole("menuitem", { name: english("extension.browser.share") }).click();
-  await sharingLine.waitFor({ timeout: UI_WAIT_MS });
   const sharedAgain = (
     await waitFor(
       host.page,
