@@ -1651,7 +1651,7 @@ export class TurnLifecycle {
           ? sourceText("error.provider.codexAccountSettingsUnreadable")
           : message;
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
-          this.#turnErrors.set(errorTurnId, message);
+          this.#turnErrors.set(errorTurnId, shownMessage);
           this.#turnCauses.set(errorTurnId, causeCode);
           if (refusedSessionFailure(source.provider, message) !== null) return;
           const errorInfo = error?.codexErrorInfo;
