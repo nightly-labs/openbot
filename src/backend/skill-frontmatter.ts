@@ -12,7 +12,7 @@ export function readSkillFrontmatter(
   text: string,
   slug: string,
 ): { description: string; problem?: undefined } | { description?: string; problem: SkillFrontmatterProblem } {
-  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(text)?.[1];
+  const frontmatter = /^﻿?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/u.exec(text)?.[1];
   if (frontmatter === undefined) return { problem: "frontmatterMissing" };
   let metadata: unknown;
   try {
