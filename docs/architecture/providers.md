@@ -450,6 +450,16 @@ folders, then OpenBot's own, then the CLI's folder for a system copy. An app tha
 then run a `#!/usr/bin/env node` CLI. A CLI that exists but does not start reports whether the
 managed copy or the user's copy failed.
 
+A native system Codex with no `codex-code-mode-host` beside it, or in `codex-resources`, is
+`incomplete`: GPT-6 and other code-mode models cannot run tools with it. It runs only when no
+complete Codex starts, and Settings > Providers offers the managed copy. A desktop window waits for
+the user to click Download. A server (hosted, server mode, or a local server child) has no window
+where a user sees that offer, so `createSystemCliTracker` in `src/main/system-cli-tracker.ts`
+downloads the managed copy once per process when an agent uses ChatGPT, the provider is on, the
+managed copy is not downloaded, and the user did not choose "Use installed version". An explicit
+`OPENBOT_CODEX_PATH` is never `incomplete`. The download replaces the CLI as Download in Settings
+does. `scripts/server-incomplete-codex-e2e.ts` checks these cases.
+
 Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
 path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ
 per renderer port and per worktree, so a store inside `userData` started empty in each
