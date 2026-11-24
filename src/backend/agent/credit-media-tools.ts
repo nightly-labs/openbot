@@ -94,12 +94,12 @@ export const CREDIT_MEDIA_TOOL_DEFINITIONS = [
   },
   {
     name: GENERATE_IMAGE_TOOL,
-    description: `Make one image from a prompt, or edit local pictures, and show it in this conversation. Use it when the user asks for a picture and you have no image tool of your own, when the user asks for OpenBot credits, or when the user names a model from list_media_models. ${PAID_RULE} Do not repeat the image in your reply. With tool_call, openbot.list_media_models gives the models and prices.`,
+    description: `Make one image from a prompt, or edit local pictures, and show it in this conversation. Use it when the user asks for a picture and you have no image generation tool of your own, when the user asks for OpenBot credits, or when the user names a model that your own tool cannot make. ${PAID_RULE} Do not repeat the image in your reply. With tool_call, openbot.list_media_models gives the models and prices.`,
     shape: generateImageToolSchema.shape,
   },
   {
     name: GENERATE_VIDEO_TOOL,
-    description: `Make one video from a prompt, a first and last frame, or reference pictures, and show it in this conversation. Use it when the user asks for a video, before you draw frames or use other tools. It can take some minutes. ${PAID_RULE} Do not repeat the video in your reply.`,
+    description: `Make one video from a prompt, a first and last frame, or reference pictures, and show it in this conversation. Use it when the user asks for a video and you have no video generation model of your own, when the user asks for OpenBot credits, or when the user names a model that your own tool cannot make. Use it before you draw frames or use other tools. It can take some minutes. ${PAID_RULE} Do not repeat the video in your reply.`,
     shape: generateVideoToolSchema.shape,
   },
 ];

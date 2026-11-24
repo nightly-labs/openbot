@@ -11,9 +11,9 @@ Claude uses its native question tool instead of `ask_user`. The direct tools are
 `forget_memory`, `react_to_user_message`, `request_api_key`, `routine_no_update`, and
 `routine_report_failure`. `generate_image` and `generate_video` are direct tools too: as a
 deferred tool behind `tool_call`, Claude did not find `generate_video` and made a video with ffmpeg.
-`list_media_models` stays behind `tool_call`. The guidance tells an agent with its own image tool,
-such as Codex `image_gen`, to use that tool, and to use `generate_image` only when the user asks for a
-credits model. External plugin registration stays with each provider adapter.
+`list_media_models` stays behind `tool_call`. The guidance tells an agent with its own image or video tool,
+such as Codex `image_gen`, to use that tool. It uses the credits tools only when the user asks for
+OpenBot credits, or names a model that its own tool cannot make. External plugin registration stays with each provider adapter.
 
 A Claude session of a channel thread also gets `channel_result` and `channel_reply` as direct tools,
 and names them in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Their accepted call tells the agent to end the
