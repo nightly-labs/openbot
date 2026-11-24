@@ -387,6 +387,7 @@ import { PasswordManagersService } from "./password-managers/password-managers-s
 import { managedProtonPassCli } from "./password-managers/proton-pass-cli-installer";
 import { ProtonPassDriver, protonPassRecordSchema } from "./password-managers/proton-pass-driver";
 import { PointerForwardingGate } from "./pointer-forwarding-gate";
+import { ProcessLauncher } from "./process-launcher";
 import { PromptCacheTtlPreferenceStore } from "./prompt-cache-ttl-preference-store";
 import { ProviderAccountsHost } from "./provider-accounts-host";
 import { ProviderCredentialStore } from "./provider-credential-store";
@@ -628,6 +629,7 @@ const TEARDOWN_ORDER = {
   automation: 108,
   storageUsage: 109,
   service: 110,
+  processLauncher: 110.25,
   cuaDriver: 110.5,
   mcpOAuth: 111,
   analytics: 112,
@@ -1990,6 +1992,9 @@ export async function createApplicationServices({
     computerUsePermissionHelp.close();
   });
   const providerTempDirectory = join(app.getPath("userData"), "provider-temp");
+  const processLauncher = process.platform === "win32" ? new ProcessLauncher() : null;
+  if (processLauncher)
+    teardown.push(TEARDOWN_ORDER.processLauncher, "the process launcher", () => processLauncher.dispose());
   performance.mark("openbot:services.computer-use");
   if (process.platform === "win32") await Effect.runPromise(sweepProviderTemp(providerTempDirectory));
   const agentApiKeys = new AgentApiKeys(join(app.getPath("userData"), "agent-api-keys"), vault.items);
@@ -2210,6 +2215,7 @@ export async function createApplicationServices({
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
+      ...(processLauncher ? { launchProcess: processLauncher.launch } : {}),
       serverEnvironment,
       agentEnvironment: (inherited) => ({
         ...agentDisplayEnvironment(process.platform),

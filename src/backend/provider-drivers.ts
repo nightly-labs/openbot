@@ -123,6 +123,7 @@ import {
   piStatePaths,
   type SpawnTarget,
 } from "./process-confinement";
+import type { ProcessLaunch } from "./process-launch";
 import { type AccountReadResult, isCodexLoginType, type ModelListResponse } from "./protocol";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
@@ -433,6 +434,7 @@ export interface ProviderClientContext {
   readonly customAgents?: CustomAgentSource;
   readonly promptCacheTtl?: () => PromptCacheTtl;
   readonly claudeUserSetup?: () => boolean;
+  readonly launchProcess?: ProcessLaunch;
   readonly claudeCompactWindow?: () => number | null;
   readonly codexTurnContext?: TurnContext;
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
@@ -753,6 +755,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         claudeFallbackApiKey(context),
         context.claudeUserSetup,
+        context.launchProcess,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,
