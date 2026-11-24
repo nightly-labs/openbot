@@ -536,6 +536,21 @@ export const messages = {
   "mobile.server.settings.keyOwnerOnly": "Nur der Eigentümer kann den Serverschlüssel ändern.",
   "mobile.server.settings.keyUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seinen Schlüssel hier zu ändern.",
+  "mobile.server.settings.turnLimit": "Threads gleichzeitig",
+  "mobile.server.settings.turnLimitDescription":
+    "Wie viele Agent-Threads auf diesem Server gleichzeitig laufen können. Mehr Threads brauchen mehr Arbeitsspeicher.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatisch (kein Limit)",
+  "mobile.server.settings.turnLimitUnlimited": "Kein Limit",
+  "mobile.server.settings.turnLimitsLoadFailed": "Die Thread-Limits dieses Servers konnten nicht geladen werden.",
+  "mobile.server.settings.turnLimitsSaveFailed":
+    "Das Thread-Limit konnte nicht gespeichert werden. Versuche es erneut.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Aktualisiere OpenBot auf diesem Server, um sein Thread-Limit hier zu ändern.",
+  "mobile.server.settings.agentTaskLimit": "Parallele Threads pro Agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Wie viele Threads jeder Agent gleichzeitig ausführen kann, wenn er kein eigenes Limit hat.",
+  "mobile.server.settings.agentTaskLimitDefault": "Standard ({count})",
   "mobile.server.settings.memoryLimit": "Erinnerungen pro Agent",
   "mobile.server.settings.memoryLimitDescription":
     "Wie viele Erinnerungen jeder Agent auf diesem Server behalten kann.",

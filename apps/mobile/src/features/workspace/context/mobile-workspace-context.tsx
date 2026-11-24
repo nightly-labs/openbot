@@ -53,6 +53,7 @@ import { HOST_RELEASE_CAPABILITY } from "@openbot/contracts/team-protocol/host-r
 import { HOST_RESTART_CAPABILITY } from "@openbot/contracts/team-protocol/host-restart-v1";
 import { HOST_SIGNAL_HOME_CAPABILITY } from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-timezone-v1";
+import { HOST_TURN_LIMITS_CAPABILITY } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "@openbot/contracts/team-protocol/host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
@@ -2545,6 +2546,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           administers(serverId, LOCAL_SERVERS_CAPABILITY),
         canRestartServerItself: (serverId) => administers(serverId, HOST_RESTART_CAPABILITY),
         canManageServerTimezone: (serverId) => administers(serverId, HOST_TIMEZONE_CAPABILITY),
+        canManageServerTurnLimits: (serverId) => administers(serverId, HOST_TURN_LIMITS_CAPABILITY),
         canManageServerVoiceModel: (serverId) => administers(serverId, HOST_VOICE_MODEL_CAPABILITY),
         canManageServerSignalHome: (serverId) => administers(serverId, HOST_SIGNAL_HOME_CAPABILITY),
         servesServerSignalHome: (serverId) => {

@@ -518,6 +518,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Impossibile cambiare la chiave del server. Riprova.",
   "mobile.server.settings.keyOwnerOnly": "Solo il proprietario può cambiare la chiave del server.",
   "mobile.server.settings.keyUnsupported": "Aggiorna OpenBot su questo server per cambiare qui la sua chiave.",
+  "mobile.server.settings.turnLimit": "Thread contemporanei",
+  "mobile.server.settings.turnLimitDescription":
+    "Quanti thread degli agenti possono essere eseguiti contemporaneamente su questo server. Più thread usano più memoria.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatico ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatico (nessun limite)",
+  "mobile.server.settings.turnLimitUnlimited": "Nessun limite",
+  "mobile.server.settings.turnLimitsLoadFailed": "Impossibile caricare i limiti dei thread di questo server.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Impossibile salvare il limite di thread. Riprova.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Aggiorna OpenBot su questo server per cambiarne qui il limite di thread.",
+  "mobile.server.settings.agentTaskLimit": "Thread in parallelo per agente",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Quanti thread può eseguire contemporaneamente ogni agente senza un limite proprio.",
+  "mobile.server.settings.agentTaskLimitDefault": "Predefinito ({count})",
   "mobile.server.settings.memoryLimit": "Memorie per agente",
   "mobile.server.settings.memoryLimitDescription": "Quante memorie può conservare ogni agente su questo server.",
   "mobile.server.settings.memoryLimitLoadFailed": "Impossibile caricare il limite di memorie di questo server.",

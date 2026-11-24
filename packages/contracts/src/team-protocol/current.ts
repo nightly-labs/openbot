@@ -116,6 +116,7 @@ import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
 import { HOST_SIGNAL_HOME_CAPABILITY } from "./host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
+import { HOST_TURN_LIMITS_EVENTS_CAPABILITY } from "./host-turn-limits-events-v1";
 import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
 import { HOST_VOICE_MODEL_CAPABILITY } from "./host-voice-model-v1";
@@ -392,6 +393,7 @@ export {
   HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_EVENTS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -846,6 +848,7 @@ const TEAM_CAPABILITY_REGISTRY = [
   [CHANNEL_PAGE_TASKS_CAPABILITY, V10],
   [PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY, V10],
   [TEAM_PROMPT_DETAIL_CAPABILITY, V10],
+  [HOST_TURN_LIMITS_EVENTS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);

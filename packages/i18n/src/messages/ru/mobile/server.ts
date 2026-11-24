@@ -576,6 +576,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Не удалось сменить ключ сервера. Попробуйте ещё раз.",
   "mobile.server.settings.keyOwnerOnly": "Сменить ключ сервера может только владелец.",
   "mobile.server.settings.keyUnsupported": "Обновите OpenBot на этом сервере, чтобы сменить его ключ здесь.",
+  "mobile.server.settings.turnLimit": "Ветки одновременно",
+  "mobile.server.settings.turnLimitDescription":
+    "Сколько веток агентов может выполняться одновременно на этом сервере. Больше веток — больше памяти.",
+  "mobile.server.settings.turnLimitAutomatic": "Автоматически ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Автоматически (без ограничения)",
+  "mobile.server.settings.turnLimitUnlimited": "Без ограничения",
+  "mobile.server.settings.turnLimitsLoadFailed": "Не удалось загрузить ограничения веток этого сервера.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Не удалось сохранить ограничение веток. Повторите попытку.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Обновите OpenBot на этом сервере, чтобы изменить здесь его ограничение веток.",
+  "mobile.server.settings.agentTaskLimit": "Параллельные ветки на агента",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Сколько веток одновременно может выполнять каждый агент без собственного ограничения.",
+  "mobile.server.settings.agentTaskLimitDefault": "По умолчанию ({count})",
   "mobile.server.settings.memoryLimit": "Записей памяти на агента",
   "mobile.server.settings.memoryLimitDescription": "Сколько записей памяти может хранить каждый агент на этом сервере.",
   "mobile.server.settings.memoryLimitLoadFailed": "Не удалось загрузить лимит памяти этого сервера.",

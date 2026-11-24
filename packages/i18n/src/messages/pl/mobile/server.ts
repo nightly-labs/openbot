@@ -576,6 +576,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Nie udało się zmienić klucza serwera. Spróbuj ponownie.",
   "mobile.server.settings.keyOwnerOnly": "Tylko właściciel może zmienić klucz serwera.",
   "mobile.server.settings.keyUnsupported": "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego klucz.",
+  "mobile.server.settings.turnLimit": "Wątki jednocześnie",
+  "mobile.server.settings.turnLimitDescription":
+    "Ile wątków agentów może działać jednocześnie na tym serwerze. Więcej wątków zużywa więcej pamięci.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatycznie ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatycznie (bez limitu)",
+  "mobile.server.settings.turnLimitUnlimited": "Bez limitu",
+  "mobile.server.settings.turnLimitsLoadFailed": "Nie udało się wczytać limitów wątków tego serwera.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Nie udało się zapisać limitu wątków. Spróbuj ponownie.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Zaktualizuj OpenBot na tym serwerze, aby zmienić tu jego limit wątków.",
+  "mobile.server.settings.agentTaskLimit": "Równoległe wątki na agenta",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Ile wątków może jednocześnie prowadzić każdy agent, który nie ma własnego limitu.",
+  "mobile.server.settings.agentTaskLimitDefault": "Domyślnie ({count})",
   "mobile.server.settings.memoryLimit": "Wspomnienia na agenta",
   "mobile.server.settings.memoryLimitDescription": "Ile wspomnień może przechowywać każdy agent na tym serwerze.",
   "mobile.server.settings.memoryLimitLoadFailed": "Nie udało się wczytać limitu wspomnień tego serwera.",

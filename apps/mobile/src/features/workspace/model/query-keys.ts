@@ -131,6 +131,7 @@ export const queryKeys = {
   serverInvites: (scope: QueryScope, serverId: string) => ["server-invites", ...scope, serverId],
   ownerTransfer: (scope: QueryScope, serverId: string) => ["owner-transfer", ...scope, serverId],
   serverTimezone: (scope: QueryScope, serverId: string) => ["server-timezone", ...scope, serverId],
+  serverTurnLimits: (scope: QueryScope, serverId: string) => ["server-turn-limits", ...scope, serverId],
   serverVoiceModel: (scope: QueryScope, serverId: string) => ["server-voice-model", ...scope, serverId],
   serverSignalHome: (scope: QueryScope, serverId: string) => ["server-signal-home", ...scope, serverId],
   localServers: (scope: QueryScope, serverId: string) => ["local-servers", ...scope, serverId],
