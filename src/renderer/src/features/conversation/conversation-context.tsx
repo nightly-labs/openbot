@@ -66,6 +66,8 @@ type ConversationDeltaEvent = Extract<AgentEvent, { type: "conversation-delta" }
 
 const LATEST_PAGE_SIZE = 50;
 const INACTIVE_SNAPSHOT_TAIL = LATEST_PAGE_SIZE * 4;
+const INTERNAL_CITATION_MARKER = "\uE200";
+const FILE_CITATION_MARKER = ":codex-file-citation{";
 
 function trimToLatestPage(conversation: ConversationState): void {
   if (conversation.messages.length <= LATEST_PAGE_SIZE) return;
@@ -583,18 +585,22 @@ const Conversation = createSimpleContext({
             (thinkingItemIndex >= 0 ? thinking?.items?.[thinkingItemIndex] : "") ??
             "") + event.delta;
         rawAgentMessageBodies.set(messageKey, rawBody);
-        rendererPerfCount("conversation.cleanTextChars", rawBody.length);
+        const cleanBody = (): string => {
+          if (!rawBody.includes(INTERNAL_CITATION_MARKER) && !rawBody.includes(FILE_CITATION_MARKER)) return rawBody;
+          rendererPerfCount("conversation.cleanTextChars", rawBody.length);
+          return cleanAgentMessageText(rawBody);
+        };
         if (existing) {
           updateStored(existing, {
             ...existing,
-            body: cleanAgentMessageText(rawBody),
+            body: cleanBody(),
             streaming: true,
           });
           return;
         }
         if (thinking && thinkingItemIndex >= 0) {
           const items = [...(thinking.items ?? [])];
-          items[thinkingItemIndex] = cleanAgentMessageText(rawBody);
+          items[thinkingItemIndex] = cleanBody();
           updateStored(thinking, { ...thinking, items, streaming: true });
           return;
         }

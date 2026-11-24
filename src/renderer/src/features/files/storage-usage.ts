@@ -73,6 +73,13 @@ interface StorageUsageState {
   error: string | null;
 }
 
+const USAGE_CACHE_LIMIT = 16;
+const usageCache = new Map<string, StorageUsage>();
+
+export function clearStorageUsageCache(): void {
+  usageCache.clear();
+}
+
 export interface StorageFileHandlers {
   onShowInChat: (file: StoredFileRow) => void;
 }
@@ -112,6 +119,20 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
       const input = force ? { ...current.input, force: true } : current.input;
       const usage = await calls().storage.getUsage(input, current.serverId);
       if (id !== request) return;
+      const key = targetKey(current);
+      if (key) {
+        if (usage) {
+          usageCache.delete(key);
+          usageCache.set(key, usage);
+          while (usageCache.size > USAGE_CACHE_LIMIT) {
+            const oldest = usageCache.keys().next().value;
+            if (oldest === undefined) break;
+            usageCache.delete(oldest);
+          }
+        } else {
+          usageCache.delete(key);
+        }
+      }
       setState((draft) => {
         draft.usage = usage;
         draft.loaded = true;
@@ -129,10 +150,11 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
 
   createEffect(
     () => targetKey(target()),
-    () => {
+    (key) => {
+      const cached = key ? usageCache.get(key) : undefined;
       setState((draft) => {
-        draft.usage = null;
-        draft.loaded = false;
+        draft.usage = cached ?? null;
+        draft.loaded = cached !== undefined;
       });
       void untrack(() => refresh());
     },

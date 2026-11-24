@@ -7,6 +7,9 @@ interface PictureShape {
   ratio: number;
 }
 
+const CACHE_LIMIT = 128;
+const shapeCache = new Map<string, Promise<PictureShape | undefined>>();
+
 async function pictureShape(url: string): Promise<PictureShape | undefined> {
   const response = await fetch(url);
   if (!response.ok) return undefined;
@@ -34,6 +37,27 @@ async function pictureShape(url: string): Promise<PictureShape | undefined> {
   }
 }
 
+function cachedPictureShape(url: string): Promise<PictureShape | undefined> {
+  const known = shapeCache.get(url);
+  if (known) return known;
+  const pending = pictureShape(url).then(
+    (shape) => {
+      if (!shape) shapeCache.delete(url);
+      return shape;
+    },
+    (error: unknown) => {
+      shapeCache.delete(url);
+      throw error;
+    },
+  );
+  shapeCache.set(url, pending);
+  if (shapeCache.size > CACHE_LIMIT) {
+    const oldest = shapeCache.keys().next().value;
+    if (oldest !== undefined) shapeCache.delete(oldest);
+  }
+  return pending;
+}
+
 export function usePictureShape(url: () => string | undefined) {
   const [shape, setShape] = createSignal<PictureShape>();
   createEffect(url, (current) => {
@@ -42,7 +66,7 @@ export function usePictureShape(url: () => string | undefined) {
       return;
     }
     let live = true;
-    pictureShape(current).then(
+    cachedPictureShape(current).then(
       (next) => {
         if (live) setShape(next);
       },
