@@ -1,14 +1,24 @@
 import type { ChannelSummary, ClientAgentSummary } from "@openbot/contracts/ipc";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
-import { AppWindow, Bot, Check, ChevronDown, ChevronRight, FolderPlus, Hash, LogOut, Plus, Search } from "@openbot/ui";
+import {
+  AppWindow,
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  FolderPlus,
+  Hash,
+  LogOut,
+  Plus,
+  Search,
+  Settings,
+} from "@openbot/ui";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
 import { ChannelAvatar } from "@openbot/ui/features/channels/ChannelAvatar";
 import { ServerPlushLogo } from "@openbot/ui/server-plush-logo";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, onSettled, Show } from "solid-js";
 import { avatarAgent, byRecent, composerAgents, rowTime } from "./agent-look";
-import { analyticsLinked, setAnalyticsLinked } from "./analytics";
-import { readSession } from "./extension-storage";
 import { createMenuPresence } from "./menu-presence";
 import type { Workspace } from "./workspace";
 import { XOutboxCard } from "./XOutboxCard";
@@ -25,7 +35,7 @@ interface HomeScreenProps {
   onStartThread: (agentId: string, text: string) => void;
   onSelectHost: (hostId: string) => void;
   onSignOut: () => void;
-  onAnalyticsChanged: (enabled: boolean) => void;
+  onOpenSettings: () => void;
   sharing: boolean;
   canShare: boolean;
   onShareTabs: () => void;
@@ -45,19 +55,6 @@ export function HomeScreen(props: HomeScreenProps) {
   const menu = createMenuPresence(menuOpen);
   const [createOpen, setCreateOpen] = createSignal(false);
   const createMenu = createMenuPresence(createOpen);
-  const [linked, setLinked] = createSignal<boolean | null>(null);
-  function toggleMenu() {
-    if (!menuOpen())
-      void readSession()
-        .then(analyticsLinked)
-        .then(setLinked, () => setLinked(null));
-    setMenuOpen((open) => !open);
-  }
-  async function toggleAnalytics(enabled: boolean) {
-    setLinked(enabled);
-    await setAnalyticsLinked(enabled);
-    props.onAnalyticsChanged(enabled);
-  }
   const [closed, setClosed] = createSignal<ReadonlySet<string>>(new Set());
   const host = () => props.hosts.find((entry) => entry.hostId === props.hostId);
   onSettled(() => {
@@ -153,7 +150,7 @@ export function HomeScreen(props: HomeScreenProps) {
           aria-haspopup="menu"
           aria-expanded={menuOpen() ? "true" : "false"}
           aria-label={t("extension.home.serverMenu")}
-          onClick={toggleMenu}
+          onClick={() => setMenuOpen((open) => !open)}
         >
           <ServerPlushLogo seed={props.hostId ?? ""} appearance={host()?.appearance ?? null} class="ph-server-mark" />
           <span class="ph-server-name" dir="auto">
@@ -211,20 +208,18 @@ export function HomeScreen(props: HomeScreenProps) {
                 <AppWindow size={16} aria-hidden="true" />
               </button>
             </Show>
-            <Show when={linked() !== null}>
-              <button
-                type="button"
-                role="menuitemcheckbox"
-                aria-checked={linked() ? "true" : "false"}
-                class="ext-menu-item"
-                onClick={() => void toggleAnalytics(!linked()).catch(() => undefined)}
-              >
-                <span>{t("settings.analytics.title")}</span>
-                <Show when={linked()}>
-                  <Check size={16} aria-hidden="true" />
-                </Show>
-              </button>
-            </Show>
+            <button
+              type="button"
+              role="menuitem"
+              class="ext-menu-item"
+              onClick={() => {
+                setMenuOpen(false);
+                props.onOpenSettings();
+              }}
+            >
+              <span>{t("extension.home.settings")}</span>
+              <Settings size={16} aria-hidden="true" />
+            </button>
             <button
               type="button"
               role="menuitem"

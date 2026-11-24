@@ -884,15 +884,20 @@ try {
     `chrome.storage.local.get("openbot.session.v1").then((items) => items["openbot.session.v1"].user.id)`,
   );
   await serverTitle.click();
-  const analyticsSwitch = page.getByRole("menuitemcheckbox", { name: english("settings.analytics.title") });
+  await page.getByRole("menuitem", { name: english("extension.home.settings") }).click();
+  const analyticsSwitch = page.getByRole("switch", { name: english("settings.analytics.title") });
   await analyticsSwitch.waitFor({ timeout: UI_WAIT_MS });
-  assert.equal(await analyticsSwitch.getAttribute("aria-checked"), "true", "Analytics is not linked at the start.");
-  await analyticsSwitch.click();
+  assert.ok(await analyticsSwitch.isChecked(), "Analytics is not linked at the start.");
+  await shot(page, "9a-settings-analytics-on");
+  await page.getByText(english("settings.analytics.title"), { exact: true }).click();
   const optOut = await capturedEvent(
     (event) => event.name === "analytics_preference_changed",
     "analytics_preference_changed",
   );
-  assert.equal(await analyticsSwitch.getAttribute("aria-checked"), "false", "The switch did not turn off.");
+  assert.ok(!(await analyticsSwitch.isChecked()), "The switch did not turn off.");
+  await shot(page, "9a-settings-analytics-off");
+  await toHome(page);
+  await serverTitle.click();
   await page.getByRole("menuitem", { name: english("extension.home.signOut") }).click();
   await signInButton.waitFor({ timeout: UI_WAIT_MS });
   const signedOut = await capturedEvent(

@@ -35,6 +35,7 @@ import { HomeScreen } from "./HomeScreen";
 import { createHostConnection, type HostConnection } from "./host-connection";
 import { NewAgentScreen } from "./NewAgentScreen";
 import { NewChannelScreen, NewFolderScreen } from "./NewChatItemScreens";
+import { SettingsScreen } from "./SettingsScreen";
 import { SignInScreen } from "./SignInScreen";
 import { createWorkspace, type Workspace } from "./workspace";
 import { type XTarget, xSend, xStatus } from "./x-agent";
@@ -182,7 +183,7 @@ export function App() {
 }
 
 type PushedScreen =
-  | { kind: "chat" | "channel" | "new-agent" | "new-channel" | "new-folder" | "browser-sharing" }
+  | { kind: "chat" | "channel" | "new-agent" | "new-channel" | "new-folder" | "browser-sharing" | "settings" }
   | { kind: "agent-settings"; agentId: string };
 
 interface ServerState {
@@ -415,7 +416,7 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                   onStartThread={startThread}
                   onSelectHost={(hostId) => void open(hostId)}
                   onSignOut={() => props.onSignOut()}
-                  onAnalyticsChanged={(enabled) => void saveAnalyticsAnswer(props.session.token, enabled)}
+                  onOpenSettings={() => push("settings")}
                   sharing={presence().sharing}
                   canShare={canShare()}
                   onShareTabs={() => void startSharing()}
@@ -438,6 +439,12 @@ function ServerView(props: { session: ExtensionSession; onSignOut: () => void; o
                       </Match>
                       <Match when={shown.kind === "browser-sharing"}>
                         <BrowserSharingScreen onBack={back} />
+                      </Match>
+                      <Match when={shown.kind === "settings"}>
+                        <SettingsScreen
+                          onBack={back}
+                          onAnalyticsChanged={(enabled) => void saveAnalyticsAnswer(props.session.token, enabled)}
+                        />
                       </Match>
                       <Match when={shown.kind === "new-folder"}>
                         <NewFolderScreen workspace={current()} onClose={back} onCreated={back} />

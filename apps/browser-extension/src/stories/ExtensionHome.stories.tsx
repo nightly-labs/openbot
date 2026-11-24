@@ -43,7 +43,7 @@ function Home(props: { options?: StoryServerOptions; offline?: boolean; setup?: 
           onStartThread={() => undefined}
           onSelectHost={() => undefined}
           onSignOut={() => undefined}
-          onAnalyticsChanged={() => undefined}
+          onOpenSettings={() => undefined}
           sharing={false}
           canShare
           onShareTabs={() => undefined}

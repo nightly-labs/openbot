@@ -26,6 +26,7 @@ export const messages = defineMessages("extension", {
   "extension.home.noMatch": "No agent matches.",
   "extension.home.noAgents": "This server has no agents yet.",
   "extension.home.serverMenu": "Servers and account",
+  "extension.home.settings": "Settings",
   "extension.home.signOut": "Sign out",
   "extension.home.unread": { one: "{count} unread message", other: "{count} unread messages" },
   "extension.home.emptyFolder": "No chats in this folder.",

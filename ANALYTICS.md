@@ -132,7 +132,7 @@ From extension generation 1, the Chrome extension (`apps/browser-extension`) sen
 (below) with `surface: extension` and `platform: chrome`, from its side panel and its background
 service worker. It sends only from a production build that uses `https://api.openbot.run`; a
 development build sends nothing, or sends to the loopback `OPENBOT_ANALYTICS_CAPTURE_URL` given at
-build time. The extension's **Link analytics to my account** item in the server menu decides the
+build time. The extension's **Link analytics to my account** switch (server menu > **Settings**) decides the
 `profileId`: on, the account ID (with an `identify` that sets the email); off or signed out, a random
 install ID kept in the extension's storage, rotated after 395 days. A choice made in the extension
 wins; with none, the extension follows the account's answer, and with no answer, the same region
