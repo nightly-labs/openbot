@@ -1002,13 +1002,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.forget(sessionId);
     this.#turnContext.forget(sessionId);
     const thread = this.#threads.get(sessionId);
-    if (!thread) return;
-    yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
+    if (thread) yield* this.#threads.close(thread).pipe(toProviderClientOperationError);
+    idleStoppedSessions.delete(sessionId);
   });
 
   #forgetMissingSession(sessionId: string): void {
     this.#threads.forget(sessionId);
     this.#turnContext.forget(sessionId);
+    idleStoppedSessions.delete(sessionId);
     const thread = this.#threads.get(sessionId);
     if (!thread) return;
     this.#threads.detach(thread);
