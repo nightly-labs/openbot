@@ -16,9 +16,9 @@ export function useChatPinToggle() {
       const { pinnedAgentIds, pinnedChannelIds } = workspace();
       if (isPinMotionRunning(chatId) || !canToggleChatPin(pinnedAgentIds, pinnedChannelIds, chatId)) return;
       markPinMotion(chatId, pinned ? "unpin" : "pin");
-      if (options?.haptic !== false) void haptics.selection();
       const save = () => {
         if (commit() === "error") clearPinMotion(chatId);
+        else if (options?.haptic !== false) void haptics.selection();
       };
       if (pinned) save();
       else requestAnimationFrame(save);
