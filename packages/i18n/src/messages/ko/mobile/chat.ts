@@ -508,7 +508,7 @@ export const messages = {
   "mobile.chat.history.connecting": "서버에 연결하는 중",
   "mobile.chat.history.loading": "채팅 기록을 불러오는 중",
   "mobile.chat.history.waiting": "연결을 기다리는 중",
-  "mobile.chat.history.syncing": "새 메시지를 불러오는 중",
+  "mobile.chat.history.syncing": "새 메시지 확인 중",
   "mobile.chat.history.loadFailed": "채팅 기록을 불러올 수 없어요",
   "mobile.chat.scrollToLatest": "최신 메시지로 스크롤",
   "mobile.chat.agentUnavailable.title": "에이전트를 사용할 수 없어요",

@@ -605,7 +605,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Łączenie z serwerem",
   "mobile.chat.history.loading": "Wczytywanie historii czatu",
   "mobile.chat.history.waiting": "Oczekiwanie na połączenie",
-  "mobile.chat.history.syncing": "Wczytywanie nowych wiadomości",
+  "mobile.chat.history.syncing": "Sprawdzanie nowych wiadomości",
   "mobile.chat.history.loadFailed": "Nie udało się wczytać historii czatu",
   "mobile.chat.scrollToLatest": "Przewiń do najnowszej wiadomości",
   "mobile.chat.agentUnavailable.title": "Agent niedostępny",

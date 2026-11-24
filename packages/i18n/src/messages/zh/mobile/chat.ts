@@ -493,7 +493,7 @@ export const messages = {
   "mobile.chat.history.connecting": "正在连接服务器",
   "mobile.chat.history.loading": "正在加载对话记录",
   "mobile.chat.history.waiting": "等待连接",
-  "mobile.chat.history.syncing": "正在加载新消息",
+  "mobile.chat.history.syncing": "正在检查新消息",
   "mobile.chat.history.loadFailed": "无法加载对话记录",
   "mobile.chat.scrollToLatest": "滚动到最新消息",
   "mobile.chat.agentUnavailable.title": "助手不可用",

@@ -6,11 +6,12 @@ import { ConnectionStatusReveal } from "@/features/workspace/components/connecti
 import { useText } from "@/shared/lib/text";
 
 const SYNC_STATUS_DELAY_MS = 1_000;
+const SYNC_STATUS_HIDE_GRACE_MS = 300;
 
 function useShownAfterDelay(active: boolean): boolean {
   const [shown, setShown] = useState(false);
   useEffect(() => {
-    const timer = setTimeout(() => setShown(active), active ? SYNC_STATUS_DELAY_MS : 0);
+    const timer = setTimeout(() => setShown(active), active ? SYNC_STATUS_DELAY_MS : SYNC_STATUS_HIDE_GRACE_MS);
     return () => clearTimeout(timer);
   }, [active]);
   return shown;

@@ -516,7 +516,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Sunucuya bağlanılıyor",
   "mobile.chat.history.loading": "Sohbet geçmişi yükleniyor",
   "mobile.chat.history.waiting": "Bağlantı bekleniyor",
-  "mobile.chat.history.syncing": "Yeni mesajlar yükleniyor",
+  "mobile.chat.history.syncing": "Yeni mesajlar denetleniyor",
   "mobile.chat.history.loadFailed": "Sohbet geçmişi yüklenemedi",
   "mobile.chat.scrollToLatest": "En son mesaja kaydır",
   "mobile.chat.agentUnavailable.title": "Ajan kullanılamıyor",
