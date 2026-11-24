@@ -117,7 +117,14 @@ function readMemoryContext(params: unknown): MemoryContext | null {
       isString(memory.text) &&
       isOneOf(["automatic", "manual"] as const, memory.origin),
   );
-  return { memories, storedCount: context.storedCount, limit: context.limit };
+  return {
+    memories,
+    storedCount: context.storedCount,
+    limit: context.limit,
+    ...(isNumber(context.omittedEssentialCount) && context.omittedEssentialCount > 0
+      ? { omittedEssentialCount: context.omittedEssentialCount }
+      : {}),
+  };
 }
 
 function readSectionTeammates(value: unknown): SectionTeammates | null {
