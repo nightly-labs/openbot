@@ -32,23 +32,6 @@ function storedValue<T>(key: string, decode: (value: unknown) => T, initial: T):
 
 const siteName = (origin: string) => (URL.canParse(origin) ? new URL(origin).host : origin);
 
-export function SharingLine(props: { tabs: number; supported: boolean; serverName: string; onManage: () => void }) {
-  const { t } = useText();
-  return (
-    <section class="ph-sharing" aria-label={t("extension.browser.title")}>
-      <AppWindow size={16} aria-hidden="true" class="ph-sharing-mark" />
-      <span class="ph-sharing-text" role="status">
-        {props.supported
-          ? t("extension.browser.line", { count: props.tabs })
-          : t("extension.browser.unsupported", { server: props.serverName })}
-      </span>
-      <button type="button" class="ph-sharing-manage" onClick={() => props.onManage()}>
-        {t("extension.browser.manage")}
-      </button>
-    </section>
-  );
-}
-
 export async function startSharing(): Promise<void> {
   await chrome.runtime.sendMessage({ kind: BROWSER_SHARE_MESSAGE, on: true }).catch(() => undefined);
 }

@@ -1442,46 +1442,6 @@ textarea:focus-visible {
   }
 }
 
-.ph-sharing {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 10px;
-  margin: 8px 12px 4px;
-  padding: 8px 8px 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--openbot-accent) 30%, transparent);
-  border-radius: var(--openbot-radius-card);
-  background: color-mix(in srgb, var(--openbot-accent) 8%, var(--openbot-bg-surface));
-  font-size: 13px;
-}
-
-.ph-sharing-mark {
-  flex: none;
-  color: var(--openbot-accent);
-}
-
-.ph-sharing-text {
-  min-width: 0;
-  flex: 1;
-  color: var(--openbot-text-primary);
-}
-
-.ph-sharing-manage {
-  flex: none;
-  border: 0;
-  padding: 4px 10px;
-  border-radius: var(--openbot-radius-pill);
-  background: var(--ext-control);
-  color: var(--openbot-text-primary);
-  cursor: pointer;
-  font: inherit;
-  font-weight: 600;
-}
-
-.ph-sharing-manage:hover {
-  background: var(--ext-control-active);
-}
-
 .ext-browser-note {
   display: flex;
   gap: 10px;
