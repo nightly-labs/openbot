@@ -91,6 +91,7 @@ function relayRequest(text: string): string {
 }
 
 const HEARD_LINE_LIMIT = 20;
+const USER_LINE_WAIT_MS = 2_000;
 const oneLine = (text: string) => text.replace(/\s+/gu, " ").trim();
 
 const logger = createOpenBotLogger("live-voice");
@@ -150,6 +151,11 @@ export interface LiveVoiceHooks {
   otherAccounts(agentId: string): boolean;
 }
 
+interface OpenUserLine {
+  text: string;
+  readonly done: Deferred.Deferred<void>;
+}
+
 interface LiveSession {
   readonly id: string;
   readonly agentId: string;
@@ -159,6 +165,8 @@ interface LiveSession {
   threadId: string | null;
   readonly rule: string;
   readonly heard: LiveVoiceLine[];
+  userLine: OpenUserLine | null;
+  userLineGiven: boolean;
   readonly answer: Deferred.Deferred<string, LiveVoiceFailed>;
   readonly onNotification: (notification: AppServerNotification) => void;
   readonly onRequest: (request: AppServerRequest) => void;
@@ -212,6 +220,8 @@ export class LiveVoice {
       threadId: null,
       rule: oneLine(relayVoiceRule(name)),
       heard: [],
+      userLine: null,
+      userLineGiven: false,
       answer: Deferred.makeUnsafe<string, LiveVoiceFailed>(),
       onNotification: (notification) => this.#notification(session, notification),
       onRequest: (request) => this.#request(session, request),
@@ -364,10 +374,12 @@ export class LiveVoice {
             session.owner?.memberId ?? null,
           );
         const line = final ? text?.trim() : undefined;
-        if (line && !(role === "user" && oneLine(line) === session.rule)) {
+        const given = role === "user" && final && session.userLineGiven;
+        if (line && !given && !(role === "user" && oneLine(line) === session.rule)) {
           session.heard.push({ role, text: line });
           if (session.heard.length > HEARD_LINE_LIMIT) session.heard.shift();
         }
+        if (role === "user" && (final || text)) trackUserLine(session, final, text ?? "");
         return;
       }
     }
@@ -391,37 +403,44 @@ export class LiveVoice {
       return;
     }
     const waits = this.#hooks.busy(session.agentId);
-    const heard = session.heard.splice(0);
-    const said = heard.flatMap((line) => (line.role === "user" ? [line.text] : [])).join("\n");
-    Effect.runFork(
-      this.#hooks.send(session.agentId, { shown: said || text, request: text, heard }, session.owner?.sender).pipe(
-        Effect.match({
-          onFailure: (failure) => {
-            session.heard.unshift(...heard);
-            session.heard.splice(0, session.heard.length - HEARD_LINE_LIMIT);
-            this.#respond(session, request.id, {
-              success: false,
-              text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
-            });
-          },
-          onSuccess: (deliveryId) => {
-            if (!this.#sessions.has(session.id)) return;
-            const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };
-            this.#asks.add(ask);
-            request.signal?.addEventListener(
-              "abort",
-              () => {
-                if (!this.#asks.delete(ask)) return;
-                this.#asks.add({ session, requestId: null, deliveryId });
-              },
-              { once: true },
-            );
-            this.#answerSettled();
-            if (waits && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
-          },
-        }),
-      ),
-    );
+    const pending = session.heard.some((line) => line.role === "user") ? null : session.userLine;
+    const settled = pending
+      ? Deferred.await(pending.done).pipe(Effect.timeoutOption(USER_LINE_WAIT_MS), Effect.asVoid)
+      : Effect.void;
+    const send = Effect.suspend(() => {
+      const heard = takeHeard(session, pending);
+      const said = heard.flatMap((line) => (line.role === "user" ? [line.text] : [])).join("\n");
+      return this.#hooks
+        .send(session.agentId, { shown: said || text, request: text, heard }, session.owner?.sender)
+        .pipe(
+          Effect.match({
+            onFailure: (failure) => {
+              session.heard.unshift(...heard);
+              session.heard.splice(0, session.heard.length - HEARD_LINE_LIMIT);
+              this.#respond(session, request.id, {
+                success: false,
+                text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
+              });
+            },
+            onSuccess: (deliveryId) => {
+              if (!this.#sessions.has(session.id)) return;
+              const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };
+              this.#asks.add(ask);
+              request.signal?.addEventListener(
+                "abort",
+                () => {
+                  if (!this.#asks.delete(ask)) return;
+                  this.#asks.add({ session, requestId: null, deliveryId });
+                },
+                { once: true },
+              );
+              this.#answerSettled();
+              if (waits && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
+            },
+          }),
+        );
+    });
+    Effect.runFork(settled.pipe(Effect.andThen(send)));
   }
 
   #answerSettled(): void {
@@ -535,6 +554,27 @@ export class LiveVoice {
     closing.addObserver(() => this.#closing.delete(closing));
     if (announce) this.#hooks.emit({ type: "ended", sessionId: session.id, error }, session.owner?.memberId ?? null);
   }
+}
+
+function trackUserLine(session: LiveSession, final: boolean, text: string): void {
+  if (!final) {
+    session.userLine ??= { text: "", done: Deferred.makeUnsafe<void>() };
+    session.userLine.text += text;
+    return;
+  }
+  if (session.userLine) Deferred.doneUnsafe(session.userLine.done, Effect.void);
+  session.userLine = null;
+  session.userLineGiven = false;
+}
+
+function takeHeard(session: LiveSession, pending: OpenUserLine | null): LiveVoiceLine[] {
+  const heard = session.heard.splice(0);
+  if (!pending || session.userLine !== pending || Deferred.isDoneUnsafe(pending.done)) return heard;
+  session.userLine = null;
+  session.userLineGiven = true;
+  const partial = pending.text.trim();
+  if (partial) heard.push({ role: "user", text: partial });
+  return heard;
 }
 
 function toolResult(reply: LiveVoiceReply): DynamicToolResult {
