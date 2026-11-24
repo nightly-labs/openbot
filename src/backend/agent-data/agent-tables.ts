@@ -371,6 +371,7 @@ export class AgentTables {
       };
       let outcome = yield* this.#supervisor.send(statement);
       if (!outcome.ok && outcome.failure.kind === "missing" && !statement.provision) {
+        yield* this.#supervisor.send({ kind: "close", databasePath: this.#path });
         this.#ready = null;
         const ready = yield* this.#ensure();
         if (!ready.ok) return ready;
