@@ -1424,10 +1424,15 @@ textarea {
   min-width: 0;
   flex: 1 1 auto;
   justify-content: flex-start;
+  overflow: hidden;
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-regular);
   line-height: 18px;
   cursor: pointer;
+}
+
+.sidebar-search-trigger > svg {
+  flex: 0 0 auto;
 }
 
 .sidebar-search-trigger:hover:not(:disabled) {
@@ -1437,6 +1442,10 @@ textarea {
 }
 
 .sidebar-search-placeholder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--openbot-text-muted);
 }
 
