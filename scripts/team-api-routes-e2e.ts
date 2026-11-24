@@ -4225,12 +4225,13 @@ try {
         TEAM_PROTOCOL_V1_WEBSOCKET,
         `openbot-token.${bobToken}`,
       ]);
-      const state = { declared: false, changed: 0 };
+      const state = { declared: false, changed: 0, marked: false };
       const waiters = new Set<() => void>();
       socket.addEventListener("message", (message) => {
         const value = JSON.parse(String(message.data));
         if (isDynamicRecord(value) && value.type === "chat-colors-changed") state.declared = true;
         if (isDynamicRecord(value) && value.type === "host-turn-limits-changed") state.changed++;
+        if (isDynamicRecord(value) && value.type === "library-folders-changed") state.marked = true;
         for (const wake of waiters) wake();
       });
       await new Promise<void>((resolveOpen, reject) => {
@@ -4256,7 +4257,7 @@ try {
         JSON.stringify({
           type: "agent-event-scope",
           includeConversations: false,
-          capabilities: [CHAT_COLORS_CAPABILITY, ...capabilities],
+          capabilities: [CHAT_COLORS_CAPABILITY, LIBRARY_FOLDERS_EVENTS_CAPABILITY, ...capabilities],
         }),
       );
       const ready = await until(() => state.declared);
@@ -4270,11 +4271,13 @@ try {
       ...v9,
     });
     const heard = await listening.until(() => listening.state.changed === 1);
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+    const olderMarked = await older.until(() => older.state.marked);
     listening.socket.close();
     older.socket.close();
     check(
       "a change of the limits reaches a member socket that has the events capability, and not an older socket",
-      listening.ready && older.ready && heard && older.state.changed === 0,
+      listening.ready && older.ready && heard && olderMarked && older.state.changed === 0,
       JSON.stringify({ listening: listening.state, older: older.state }),
     );
     const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);

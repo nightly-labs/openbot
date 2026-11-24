@@ -110,10 +110,10 @@ export function ServerTurnLimitsRows({ serverId }: { serverId: string }) {
     queryFn: () => loadServerTurnLimits(serverId),
   });
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<{ field: keyof HostTurnLimitsInput; text: string } | null>(null);
   const current = query.data;
 
-  function save(limits: HostTurnLimits, change: Partial<HostTurnLimitsInput>) {
+  function save(limits: HostTurnLimits, field: keyof HostTurnLimitsInput, change: Partial<HostTurnLimitsInput>) {
     const input: HostTurnLimitsInput = {
       turnLimit: limits.turnLimit,
       agentTaskLimit: limits.agentTaskLimit,
@@ -131,13 +131,13 @@ export function ServerTurnLimitsRows({ serverId }: { serverId: string }) {
       })
       .catch((cause: unknown) => {
         void haptics.notification("error");
-        setSaveError(errorMessage(cause, t("mobile.server.settings.turnLimitsSaveFailed")));
+        setSaveError({ field, text: errorMessage(cause, t("mobile.server.settings.turnLimitsSaveFailed")) });
       })
       .finally(() => setSaving(false));
   }
 
-  const error =
-    saveError ?? (query.isError ? errorMessage(query.error, t("mobile.server.settings.turnLimitsLoadFailed")) : null);
+  const loadError = query.isError ? errorMessage(query.error, t("mobile.server.settings.turnLimitsLoadFailed")) : null;
+  const errorOf = (field: keyof HostTurnLimitsInput) => (saveError?.field === field ? saveError.text : null);
   const turnLimitLabel = (choice: TurnLimitChoice) => {
     if (choice === "unlimited") return t("mobile.server.settings.turnLimitUnlimited");
     if (choice !== "default") return format.number(choice);
@@ -156,26 +156,26 @@ export function ServerTurnLimitsRows({ serverId }: { serverId: string }) {
         icon={Gauge}
         title={t("mobile.server.settings.turnLimit")}
         description={t("mobile.server.settings.turnLimitDescription")}
-        error={error}
+        error={errorOf("turnLimit") ?? loadError}
         value={current ? (current.turnLimit ?? "default") : undefined}
         choices={TURN_LIMIT_CHOICES}
         label={turnLimitLabel}
         enabled={!saving}
         onChange={(choice) => {
-          if (current) save(current, { turnLimit: choice === "default" ? null : choice });
+          if (current) save(current, "turnLimit", { turnLimit: choice === "default" ? null : choice });
         }}
       />
       <LimitRow<AgentTaskLimitChoice>
         icon={Layers}
         title={t("mobile.server.settings.agentTaskLimit")}
         description={t("mobile.server.settings.agentTaskLimitDescription")}
-        error={null}
+        error={errorOf("agentTaskLimit")}
         value={current ? (current.agentTaskLimit ?? "default") : undefined}
         choices={AGENT_TASK_LIMIT_CHOICES}
         label={agentTaskLimitLabel}
         enabled={!saving}
         onChange={(choice) => {
-          if (current) save(current, { agentTaskLimit: choice === "default" ? null : choice });
+          if (current) save(current, "agentTaskLimit", { agentTaskLimit: choice === "default" ? null : choice });
         }}
       />
     </>

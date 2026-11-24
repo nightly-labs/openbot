@@ -90,11 +90,12 @@ export function ServerTurnLimitsSetting(
           setLoaded(true);
         },
         (error: unknown) => {
-          if (current === generation) {
+          if (current !== generation) return;
+          if (!untrack(loaded)) {
             lastSettings.delete(serverId);
             setSettings(null);
-            setLoadError(errorMessage(error, t("server.settings.turnLimitsLoadFailed")));
           }
+          setLoadError(errorMessage(error, t("server.settings.turnLimitsLoadFailed")));
         },
       );
   }
