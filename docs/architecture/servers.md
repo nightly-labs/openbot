@@ -1952,6 +1952,13 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
   child's `OPENBOT_LOCAL_SERVER_WORKING` line, reason `agent-turn`). After an unexpected exit, the desktop starts the child again
   after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
   and is never logged.
+- **Provider sign-ins.** A server made since #15846 has the folder `provider-homes` in its user
+  data. At each start, `LocalServers` gives the child its own `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
+  `GROK_HOME` and `GEMINI_HOME` there, so its default provider account is its own: a sign-in or a
+  sign-out on one server does not change the others. Claude Code also uses a separate macOS Keychain
+  item when `CLAUDE_CONFIG_DIR` is set. A server without the folder, made by an earlier build, keeps
+  the shared homes (`~/.claude`, `~/.codex` and others): a new home would remove its sign-in and the
+  Claude session files that its agents resume from. An earlier build ignores the folder.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
   with `shell.trashItem`. It never deletes them.
 - **Rename.** The `host-admin` identity route, as on any joined server that the user owns. The child has
