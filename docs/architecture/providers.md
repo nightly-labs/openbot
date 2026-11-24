@@ -460,8 +460,9 @@ managed copy is not downloaded, and the user did not choose "Use installed versi
 again at each provider status and each change to the agent list, so a server's first ChatGPT agent
 starts the download without a restart. An explicit
 `OPENBOT_CODEX_PATH` is never `incomplete`. The download replaces the CLI as Download in Settings
-does. `bun run test:server-incomplete-codex` checks these decisions with the real runtime manager and
-resolver. It calls the tracker directly, so it does not cover the agent-list event or the server kinds.
+does. `bun run test:server-incomplete-codex` (CI runs it in `test:provider-update-busy`) checks
+these decisions with the real runtime manager and resolver. It calls the tracker directly, so it
+does not cover the agent-list event or the server kinds.
 
 Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
 path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ
