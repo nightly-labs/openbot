@@ -676,7 +676,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
           },
         }
       : {};
-  const filesPane = () => (
+  const filesPane = (split: boolean) => (
     <Show when={filesServer()}>
       {(server) => (
         <Show when={filesSource()}>
@@ -693,6 +693,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 calls={props.runtime?.storageCalls}
                 workspaceAgents={workspaceAgents()}
                 onOpenWorkspace={openAgentWorkspace}
+                resizer={paneResizer(split, "conversation-files-panel")}
               />
             </Loading>
           )}
@@ -931,7 +932,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     </>
   );
   const splitPane = (pane: SidePanelPane) => {
-    if (pane === "files") return filesPane();
+    if (pane === "files") return filesPane(true);
     if (pane === "question") return questionPane(true);
     if (pane === "threads") return threadsPane(true);
     if (pane === "subagent") return subagentPane(true);
@@ -1056,7 +1057,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
         }}
       </Show>
 
-      <Show when={activeRightPanel() === "files"}>{filesPane()}</Show>
+      <Show when={activeRightPanel() === "files"}>{filesPane(false)}</Show>
 
       <Show when={activeRightPanel() === "question"}>{questionPane(false)}</Show>
 
