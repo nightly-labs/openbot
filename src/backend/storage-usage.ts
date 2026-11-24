@@ -64,6 +64,16 @@ export interface StorageChannelFile {
 
 export class StorageNotFoundError extends Error {}
 
+export interface HostStoredFiles {
+  scannedAt: string;
+  files: readonly StoredFileRow[];
+}
+
+interface StorageScan {
+  usage: StorageUsage;
+  files: readonly StoredFileRow[];
+}
+
 const STORAGE_WALK_ENTRY_LIMIT = 100_000;
 const STAT_BATCH = 64;
 const LOG_FILE = /\.log(\.\d+)?$/;
@@ -184,7 +194,7 @@ export class StorageUsageScanner {
   scan = Effect.fn("StorageUsage.scan")(function* (
     this: StorageUsageScanner,
     input: GetStorageUsageInput,
-  ): Effect.fn.Return<StorageUsage, StoredStateFailure> {
+  ): Effect.fn.Return<StorageScan, StoredStateFailure> {
     const scannedAt = new Date().toISOString();
     const agents = this.#sources.agents();
     const scopeAgent = input.agentId === undefined ? null : agents.find((agent) => agent.id === input.agentId);
@@ -232,10 +242,11 @@ export class StorageUsageScanner {
       input.scope === "host" && this.#sources.workflowFiles
         ? yield* storedSync(this.#sources.workflowFiles)
         : new Map<string, WorkflowFileOwner>();
-    const fileRows = largestFirst(
-      files.map((file) => ({ bytes: file.bytes, row: this.#fileRow(file, threadById, workflowFiles, scannedAt) })),
-      STORAGE_LIMITS.files,
-    );
+    const allFileRows = files.map((file) => ({
+      bytes: file.bytes,
+      row: this.#fileRow(file, threadById, workflowFiles, scannedAt),
+    }));
+    const fileRows = largestFirst(allFileRows, STORAGE_LIMITS.files);
     truncated ||= conversations.cut || fileRows.cut;
 
     const sum = (source: MailboxStoredFile["source"]) =>
@@ -284,7 +295,7 @@ export class StorageUsageScanner {
       ];
     }
 
-    return {
+    const usage: StorageUsage = {
       scope: input.scope,
       agentId: input.agentId ?? null,
       conversationId: input.conversationId ?? null,
@@ -297,6 +308,7 @@ export class StorageUsageScanner {
       files: fileRows.rows.map((entry) => entry.row),
       truncated,
     };
+    return { usage, files: allFileRows.map((entry) => entry.row) };
   }).bind(this);
 
   #placements = Effect.fn("StorageUsage.placements")(function* (
@@ -518,8 +530,8 @@ export class StorageUsageService {
   readonly #scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> };
   readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">;
   readonly #now: () => number;
-  readonly #cache = new Map<string, { at: number; usage: StorageUsage }>();
-  readonly #running = new Map<string, { token: symbol; fiber: Fiber.Fiber<StorageUsage, StoredStateFailure> }>();
+  readonly #cache = new Map<string, { at: number; scan: StorageScan }>();
+  readonly #running = new Map<string, { token: symbol; fiber: Fiber.Fiber<StorageScan, StoredStateFailure> }>();
   readonly #scope = Scope.makeUnsafe();
   readonly #scanGate = Semaphore.makeUnsafe(1);
   #generation = 0;
@@ -535,19 +547,33 @@ export class StorageUsageService {
   }
 
   readonly usage = Effect.fn("StorageUsage.usage")(function* (this: StorageUsageService, input: GetStorageUsageInput) {
+    return (yield* this.#scan(input)).usage;
+  }).bind(this);
+
+  readonly hostFiles = Effect.fn("StorageUsage.hostFiles")(function* (
+    this: StorageUsageService,
+  ): Effect.fn.Return<HostStoredFiles, StoredStateFailure> {
+    const scan = yield* this.#scan({ scope: "host" });
+    return { scannedAt: scan.usage.scannedAt, files: scan.files };
+  }).bind(this);
+
+  readonly #scan = Effect.fn("StorageUsage.cachedScan")(function* (
+    this: StorageUsageService,
+    input: GetStorageUsageInput,
+  ) {
     const work = yield* this.#scanGate.withPermit(
       Effect.gen({ self: this }, function* () {
         const key = scopeKey(input);
         const cached = this.#cache.get(key);
-        if (!input.force && cached && this.#now() - cached.at < CACHE_TTL_MS) return Effect.succeed(cached.usage);
+        if (!input.force && cached && this.#now() - cached.at < CACHE_TTL_MS) return Effect.succeed(cached.scan);
         const running = this.#running.get(key);
         if (running) return Fiber.join(running.fiber);
         const generation = this.#generation;
         const token = Symbol();
         const fiber = yield* this.#scanner.scan(input).pipe(
-          Effect.tap((usage) =>
+          Effect.tap((scan) =>
             Effect.sync(() => {
-              if (generation === this.#generation) this.#cache.set(key, { at: this.#now(), usage });
+              if (generation === this.#generation) this.#cache.set(key, { at: this.#now(), scan });
             }),
           ),
           Effect.ensuring(

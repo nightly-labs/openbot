@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { AGENT_PROVIDERS, LIBRARY_FOLDER_LIMITS, libraryFolderPath } from "@openbot/contracts/ipc";
+import { AGENT_PROVIDERS, LIBRARY_FOLDER_LIMITS, libraryFolderPath, STORAGE_LIMITS } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
@@ -1016,6 +1016,52 @@ try {
       host.stored().placement[madeShotId] === undefined &&
       workflowGroup(afterUnpick.listing)?.files.some((file) => file.id === madeShotId) === true,
     unpicked.text,
+  );
+
+  const crowded = await startHost(join(root, "user-data-crowded"), true);
+  hosts.push(crowded);
+  const keeper = await crowded.create("Keeper");
+  const largerBytes = new TextEncoder().encode("a larger stored file\n".repeat(8));
+  for (let index = 0; index < STORAGE_LIMITS.files; index += 1)
+    await runCauseEffect(
+      crowded.mailbox.storeGeneratedAttachment({
+        bytes: largerBytes,
+        name: `larger-${index}.txt`,
+        mimeType: "text/plain",
+        ownerAgentId: keeper.id,
+      }),
+    );
+  const notePath = join(keeper.workspacePath, "note.md");
+  await writeFile(notePath, "n\n");
+  const [noteResult] = await crowded.call(
+    "attach a small file on a host with more files than the storage list shows",
+    keeper.id,
+    "attach_files_to_response",
+    { paths: [notePath] },
+    { direct: true },
+  );
+  const noteId = noteResult?.success
+    ? (attachedSchema.parse(JSON.parse(noteResult.text)).attachments[0]?.id ?? "")
+    : "";
+  const [crowdedList] = await crowded.call("list on the crowded host", keeper.id, "list_library_folders", {});
+  const crowdedListing = crowdedList?.success ? listingSchema.parse(JSON.parse(crowdedList.text)) : null;
+  pass(
+    "On a host with more stored files than the storage list shows, list_library_folders counts a small new file",
+    noteId !== "" && crowdedListing?.unfiled?.fileCount === STORAGE_LIMITS.files + 1,
+    crowdedList?.text.slice(0, 400),
+  );
+  const [notePlaced] = await crowded.call("place the small file on the crowded host", keeper.id, "organize_library", {
+    action: "place",
+    to: "Notes",
+    files: [noteId],
+  });
+  const notesFolder = crowded
+    .stored()
+    .folders.find((folder) => folder.agentId === keeper.id && folder.name === "Notes");
+  pass(
+    "organize_library place puts a small new file in a folder on a host with more stored files than the storage list shows",
+    notePlaced?.success === true && notesFolder !== undefined && crowded.stored().placement[noteId] === notesFolder.id,
+    notePlaced?.text,
   );
 
   const bare = await startHost(join(root, "user-data-bare"), false);
