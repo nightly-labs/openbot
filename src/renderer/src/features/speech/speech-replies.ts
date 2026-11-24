@@ -180,24 +180,19 @@ export function followDictatedChannelReply(channel: SpeechAgent, view: ChannelRe
   const sent = view.messages.find((entry) => entry.id === message.messageId);
   const taskId = sent?.taskId;
   if (!sent || !taskId) return;
-  const answer = view.messages.find(
+  const task = view.tasks.find((entry) => entry.id === taskId);
+  if (!task || WORKING_TASK_STATES.has(task.state)) return;
+  const answer = view.messages.findLast(
     (entry) =>
       entry.sequence > sent.sequence &&
       entry.taskId === taskId &&
+      !entry.superseded &&
       entry.author.kind === "agent" &&
       isAgentAnswer(entry.message),
   );
-  if (answer?.message.status === "streaming") return;
-  if (answer) {
-    dictated.delete(key);
-    if (answer.message.status === "completed") void readChannelReply(channel, answer, message);
-    else endAfterReadings(channel);
-    return;
-  }
-  const task = view.tasks.find((entry) => entry.id === taskId);
-  if (!task || WORKING_TASK_STATES.has(task.state)) return;
   dictated.delete(key);
-  endAfterReadings(channel);
+  if (answer?.message.status === "completed") void readChannelReply(channel, answer, message);
+  else endAfterReadings(channel);
 }
 
 function takeDeliveryTurn(message: DictatedMessage): void {
