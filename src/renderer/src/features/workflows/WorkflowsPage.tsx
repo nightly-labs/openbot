@@ -5,6 +5,7 @@ import { Show } from "solid-js";
 import { useTurns } from "../../turns";
 import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
+import { useSetup } from "../onboarding/onboarding-context";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
 import { useUsage } from "../usage/usage-context";
@@ -48,7 +49,8 @@ export function WorkflowsPage(props: { serverId: string }) {
 }
 
 function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; admin: boolean }) {
-  const { agentList, agentStatus, modelOptions } = useAgents();
+  const { agentList, agentStatus, modelOptions, serverSetupChoice } = useAgents();
+  const { setupState } = useSetup();
   const { signedInAccount } = useAuth();
   const { turnProgress, turnStepLines } = useTurns();
   const usage = useUsage();
@@ -68,6 +70,7 @@ function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; a
       models={modelOptions()}
       status={agentStatus()}
       self={signedInAccount()?.name ?? undefined}
+      preference={serverSetupChoice() ?? setupState()}
       request={request}
       agentProgress={(agentId) => workflowAgentProgress(agentId, turnProgress()[agentId], turnStepLines())}
     />

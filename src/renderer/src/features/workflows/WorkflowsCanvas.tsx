@@ -33,6 +33,7 @@ export function WorkflowsCanvas(props: {
   models: WorkflowCatalogs["models"];
   status: WorkflowCatalogs["status"];
   self?: WorkflowCatalogs["self"];
+  preference?: WorkflowCatalogs["preference"];
   request?: WorkflowRequest | undefined;
   serverId?: string | undefined;
   agentProgress?: ((agentId: string) => WorkflowAgentProgress | undefined) | undefined;
@@ -229,6 +230,9 @@ export function WorkflowsCanvas(props: {
     },
     get agentFiles() {
       return props.host.agentFilesSupported();
+    },
+    get preference() {
+      return props.preference;
     },
     get answers() {
       return props.host.answersSupported();
