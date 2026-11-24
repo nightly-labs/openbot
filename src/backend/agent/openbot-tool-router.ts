@@ -2011,10 +2011,12 @@ export class OpenBotToolRouter {
           "This request came from an external chat, and a channel result cannot go back to it. Ask the channel members with send_message instead, then answer the one who asked.",
         );
       const args = sendToChannelToolSchema.parse(params.arguments, { reportInput: true });
+      const senderTaskId = this.#tasks.taskForThread(executionThreadId);
       const channel = yield* this.#channels.handoff({
         operationId: toolCallIdempotencyKey(params),
         channelId: args.channelId,
         senderAgentId,
+        ...(senderTaskId ? { senderTaskId } : {}),
         text: args.text,
         recipientAgentIds: args.recipientAgentIds ?? [],
         sourcePaths: args.paths ?? [],
