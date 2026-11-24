@@ -45,7 +45,7 @@ export interface ChannelReplyView {
 
 interface ChannelReplyWatch {
   view: () => ChannelReplyView;
-  sent: { knownMessageIds: ReadonlySet<string>; knownTaskIds: ReadonlySet<string> } | undefined;
+  sent: { lastSequence: number; knownTaskIds: ReadonlySet<string> } | undefined;
   recipientAgentId: string | null;
   sawWork: boolean;
 }
@@ -157,20 +157,38 @@ export function claimDictatedSend(agent: SpeechAgent, sentText = ""): ((messageI
   const message = dictated.get(agentKey(agent));
   if (!message || message.sending) return undefined;
   message.sending = true;
-  if (message.channel) watchChannelReply(message.channel, sentText);
+  if (message.channel) watchChannelReply(agent, message, message.channel, sentText);
   return (messageId) => {
     message.messageId = messageId;
     takeDeliveryTurn(message);
   };
 }
 
-function watchChannelReply(watch: ChannelReplyWatch, sentText: string): void {
+function watchChannelReply(
+  channel: SpeechAgent,
+  message: DictatedMessage,
+  watch: ChannelReplyWatch,
+  sentText: string,
+): void {
   const view = watch.view();
   watch.sent = {
-    knownMessageIds: new Set(view.messages.map((entry) => entry.id)),
+    lastSequence: Math.max(-1, ...view.messages.map((entry) => entry.sequence)),
     knownTaskIds: new Set(view.activeTaskIds),
   };
   watch.recipientAgentId = leadingAddress(sentText).mentions[0]?.id ?? null;
+  const key = agentKey(channel);
+  setTimeout(
+    () => {
+      if (dictated.get(key) !== message) return;
+      dictated.delete(key);
+      endAfterReadings(channel);
+    },
+    Math.max(0, message.dictatedAt + DICTATION_LIFETIME_MS - Date.now()),
+  );
+}
+
+function endAfterReadings(agent: SpeechAgent): void {
+  void afterReadings(async () => {}).finally(replyEndedUnlessDropped(agent));
 }
 
 export function followDictatedChannelReply(channel: SpeechAgent, view: ChannelReplyView): void {
@@ -178,15 +196,10 @@ export function followDictatedChannelReply(channel: SpeechAgent, view: ChannelRe
   const message = dictated.get(key);
   const watch = message?.channel;
   const sent = watch?.sent;
-  if (!message || !watch || !sent) return;
-  if (Date.now() - message.dictatedAt > DICTATION_LIFETIME_MS) {
-    dictated.delete(key);
-    replyEnded(channel);
-    return;
-  }
+  if (!message || !watch || !sent || !view.messages.length) return;
   const answer = view.messages.find(
     (entry) =>
-      !sent.knownMessageIds.has(entry.id) &&
+      entry.sequence > sent.lastSequence &&
       entry.author.kind === "agent" &&
       (watch.recipientAgentId === null || entry.author.id === watch.recipientAgentId) &&
       isAgentAnswer(entry.message),
@@ -195,7 +208,7 @@ export function followDictatedChannelReply(channel: SpeechAgent, view: ChannelRe
   if (answer) {
     dictated.delete(key);
     if (answer.message.status === "completed") void readChannelReply(channel, answer, message);
-    else void afterReadings(async () => {}).finally(replyEndedUnlessDropped(channel));
+    else endAfterReadings(channel);
     return;
   }
   if (view.activeTaskIds.some((taskId) => !sent.knownTaskIds.has(taskId))) {
@@ -204,7 +217,7 @@ export function followDictatedChannelReply(channel: SpeechAgent, view: ChannelRe
   }
   if (!watch.sawWork) return;
   dictated.delete(key);
-  void afterReadings(async () => {}).finally(replyEndedUnlessDropped(channel));
+  endAfterReadings(channel);
 }
 
 function takeDeliveryTurn(message: DictatedMessage): void {
@@ -303,7 +316,7 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   }
   dictated.delete(key);
   if (event.status === "completed" && !event.quiet) void readReply(agent, event.turnId, message);
-  else void afterReadings(async () => {}).finally(replyEndedUnlessDropped(agent));
+  else endAfterReadings(agent);
 }
 
 function readProgressUpdates(messages: readonly ConversationMessage[], agent: SpeechAgent): void {
