@@ -1081,6 +1081,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     turn.lastActivityAt = Date.now();
     if (record.type === "agent_settled") {
       const failure = turn.stalled ?? turn.failure;
+      thread.heldRecords ??= [];
       this.#background(
         this.#finish(
           thread,
