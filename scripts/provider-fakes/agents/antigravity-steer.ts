@@ -133,6 +133,23 @@ serveFakeAcpAgent(
         answer(peer, request);
         return;
       }
+      if (text === "slow start") {
+        open.set(sessionId, request);
+        setTimeout(
+          () => {
+            logEntry({ event: "first-update", sessionId });
+            peer.update(sessionId, {
+              sessionUpdate: "tool_call",
+              toolCallId: "tool-1",
+              title: "sleep 25",
+              kind: "execute",
+              status: "in_progress",
+            });
+          },
+          Number(process.env.FAKE_FIRST_UPDATE_MS ?? 1000),
+        );
+        return;
+      }
       if (text !== "work") {
         peer.say(sessionId, "ok");
         answer(peer, request);
