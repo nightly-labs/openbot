@@ -86,6 +86,8 @@ describe("redactMcpRecord", () => {
     expect(keyed).toContain(".card-19{color:#fff}");
     const named = JSON.stringify(redactMcpRecord(record('{"name":"api_key","value":"plain-value-1"}'), []));
     expect(named).not.toContain("plain-value-1");
+    for (const tail of ['"tokens": {\n  "prod": "plain-value-2"\n}', "tokens = {'prod': 'plain-value-2'}"])
+      expect(JSON.stringify(redactMcpRecord(record(tail), []))).not.toContain("plain-value-2");
   });
 });
 
