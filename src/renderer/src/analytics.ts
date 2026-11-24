@@ -53,7 +53,7 @@ interface AgentAnalyticsProperties {
 }
 
 const CREDITS_CARD_ACTIONS = ["buy", "enable", "continue", "skip", "mute", "unmute", "allow", "set_default"] as const;
-export type CreditsCardAnalyticsAction = (typeof CREDITS_CARD_ACTIONS)[number];
+type CreditsCardAnalyticsAction = (typeof CREDITS_CARD_ACTIONS)[number];
 
 const WORKFLOW_ACTIONS = [
   "create",

@@ -152,7 +152,7 @@ export type CreditMediaOutcome =
   | "stopped"
   | "unavailable";
 
-export type CreditsHoldOutcome = "continued" | "enabled" | "skipped" | "muted" | "not_asked" | "stopped";
+type CreditsHoldOutcome = "continued" | "enabled" | "skipped" | "muted" | "not_asked" | "stopped";
 
 export interface CreditMediaReport {
   agentId: string;
