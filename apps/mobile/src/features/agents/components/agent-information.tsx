@@ -158,17 +158,17 @@ export function AgentInformation({
   });
   const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
   const shownRoutines = [...allRoutines, ...(onceRoutinesEnabled ? (onceRoutines.data ?? []) : [])];
+  const onceNeeded =
+    onceRoutinesEnabled &&
+    !allRoutines.some((item) => item.id === recordId) &&
+    !eventRoutines.data?.some((item) => item.id === recordId);
   const routineLoad = {
-    pending:
-      routines.isPending ||
-      (eventsEnabled && eventRoutines.isPending) ||
-      (onceRoutinesEnabled && onceRoutines.isPending),
-    failed:
-      routines.isError || (eventsEnabled && eventRoutines.isError) || (onceRoutinesEnabled && onceRoutines.isError),
+    pending: routines.isPending || (eventsEnabled && eventRoutines.isPending) || (onceNeeded && onceRoutines.isPending),
+    failed: routines.isError || (eventsEnabled && eventRoutines.isError) || (onceNeeded && onceRoutines.isError),
     retry: () => {
       void routines.refetch();
       if (eventsEnabled) void eventRoutines.refetch();
-      if (onceRoutinesEnabled) void onceRoutines.refetch();
+      if (onceNeeded) void onceRoutines.refetch();
     },
   };
   const manageSkills = useMobileWorkspaceSelector((current) => current.canManageAgentSkills(agent.serverId));

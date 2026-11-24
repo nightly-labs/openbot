@@ -17,6 +17,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { EventRoutineOwner } from "@openbot/contracts/ipc-events";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
+import { routineOnceInstant } from "@openbot/team-client/routine-schedule";
 import {
   type RoutineScheduleDraft,
   routineDraftProblemCode,
@@ -299,6 +300,11 @@ export function MemoryEditor({
   );
 }
 
+function onceRoutineDone(routine: RoutineRecord, saved: RoutineSchedule): boolean {
+  if (routine.active || saved.kind !== "once") return false;
+  return Date.parse(routine.updatedAt) >= routineOnceInstant(saved, routine.timezone).getTime();
+}
+
 function webhookTriggerInput(trigger: WebhookTriggerFields): EventRoutineTriggerInput {
   return { kind: "webhook", eventType: trigger.eventType, filters: trigger.filters };
 }
@@ -398,7 +404,12 @@ export function RoutineEditor({
         ? { ...current, trigger: "webhook" }
         : choice === scheduleDraft.kind
           ? { ...current, trigger: "schedule" }
-          : { ...current, trigger: "schedule", schedule: switchDraftKind(scheduleDraft, choice, new Date()) },
+          : {
+              ...current,
+              trigger: "schedule",
+              schedule: switchDraftKind(scheduleDraft, choice, new Date()),
+              ...(choice === "once" ? { missedPolicy: "run-once" as const } : {}),
+            },
     );
   const setEventType = (eventType: string) => setEdits((current) => ({ ...current, eventType }));
   const setFilters = (filters: FilterDraft[]) => setEdits((current) => ({ ...current, filters }));
@@ -447,6 +458,13 @@ export function RoutineEditor({
     if (finished) router.back();
   }, [finished]);
   const disabled = !available || action.pending || (!routine && savedDraft !== null);
+  const reopens = Boolean(
+    routine &&
+      trigger === "schedule" &&
+      schedule.kind === "once" &&
+      onceRoutineDone(routine, savedSchedule) &&
+      routineOnceInstant(schedule, routine.timezone).getTime() > Date.now(),
+  );
   const validTrigger =
     trigger === "webhook" ? eventFilterDraftsValid(filters) : scheduleProblem === null && isRoutineSchedule(schedule);
   async function save() {
@@ -456,7 +474,7 @@ export function RoutineEditor({
         owner: eventOwner,
         name: name.trim(),
         instruction: instruction.trim(),
-        active: routine?.active ?? true,
+        active: reopens || (routine?.active ?? true),
         timezone,
         trigger:
           trigger === "webhook"
@@ -489,6 +507,7 @@ export function RoutineEditor({
       if (routine)
         await port.update({
           routineId: routine.id,
+          ...(reopens ? { active: true } : {}),
           ...(nameChanged ? { name: name.trim() } : {}),
           ...(instructionChanged ? { instruction: instruction.trim() } : {}),
           ...(scheduleChanged ? { schedule } : {}),
@@ -501,6 +520,7 @@ export function RoutineEditor({
         {
           agentId: agent.id,
           routineId: routine.id,
+          ...(reopens ? { active: true } : {}),
           ...(nameChanged ? { name: name.trim() } : {}),
           ...(instructionChanged ? { instruction: instruction.trim() } : {}),
           ...(scheduleChanged ? { schedule } : {}),

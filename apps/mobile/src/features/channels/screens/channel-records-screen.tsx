@@ -52,16 +52,17 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
     queryFn: () => store.onceRoutines(serverId, channelId),
   });
   const query = memorySection ? memories : routines;
-  const recordsPending =
-    query.isPending || (eventsEnabled && eventRoutines.isPending) || (onceRoutinesEnabled && onceRoutines.isPending);
-  const recordsError = query.isError || (eventsEnabled && eventRoutines.isError);
   const target = { id: channelId, serverId };
   const memory = memories.data?.find((item) => item.id === recordId);
-  const routine =
-    routines.data?.find((item) => item.id === recordId) ??
-    (onceRoutinesEnabled ? onceRoutines.data?.find((item) => item.id === recordId) : undefined);
+  const releasedRoutine = routines.data?.find((item) => item.id === recordId);
   const eventRoutine = eventRoutines.data?.find((item) => item.id === recordId);
-  const onceFailed = onceRoutinesEnabled && onceRoutines.isError && !routine && !eventRoutine;
+  const onceNeeded = onceRoutinesEnabled && !releasedRoutine && !eventRoutine;
+  const routine =
+    releasedRoutine ?? (onceRoutinesEnabled ? onceRoutines.data?.find((item) => item.id === recordId) : undefined);
+  const recordsPending =
+    query.isPending || (eventsEnabled && eventRoutines.isPending) || (onceNeeded && onceRoutines.isPending);
+  const recordsError = query.isError || (eventsEnabled && eventRoutines.isError);
+  const onceFailed = onceNeeded && onceRoutines.isError && !routine;
   const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
   return (
     <SettingsContent>
