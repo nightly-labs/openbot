@@ -379,7 +379,7 @@ export function createMainWindowController({
     });
     window.webContents.on("did-finish-load", () => {
       const services = getServices();
-      if (services && !windowsKeptHidden) {
+      if (services) {
         Effect.runFork(services.remoteServers.refreshRuntimeSnapshots());
       }
     });

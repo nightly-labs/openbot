@@ -1644,8 +1644,7 @@ if (!hasSingleInstanceLock) {
         built.centralAuthInitialization.pipe(
           Effect.flatMap(() =>
             Effect.sync(() => {
-              if (!serverMode && !hostedServer && built.centralAuth.getState().status === "signed_in")
-                remoteServers.connectActiveServer();
+              if (built.centralAuth.getState().status === "signed_in") remoteServers.connectActiveServer();
             }),
           ),
           Effect.catch(() => Effect.void),
@@ -1790,7 +1789,7 @@ if (!hasSingleInstanceLock) {
       startAttempts?.finished();
       built.startup?.rendererLoaded();
       Effect.runFork(built.prewarmAgentDatabase);
-      if (!serverMode && !hostedServer) await Effect.runPromise(remoteServers.startEventConnections());
+      await Effect.runPromise(remoteServers.startEventConnections());
       screen.on("display-added", reconcileDynamicIsland);
       screen.on("display-removed", reconcileDynamicIsland);
       screen.on("display-metrics-changed", reconcileDynamicIsland);
