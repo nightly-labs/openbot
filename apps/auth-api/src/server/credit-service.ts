@@ -26,6 +26,7 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
+import type { CreditPurchase } from "./billing-purchase";
 import { paymentReversal } from "./billing-sales";
 import { checkoutTax } from "./billing-tax";
 import { creditActivity } from "./credit-activity";
@@ -69,6 +70,7 @@ export interface CreditServiceOptions {
   now: () => number;
   ensureCustomer: (user: { id: string; email: string }) => Effect.Effect<string, Failure>;
   analytics?: AccountAnalytics;
+  onPurchase?: (purchase: CreditPurchase) => void;
 }
 
 export interface CreditCheckoutInput {
@@ -167,6 +169,7 @@ export class CreditService {
   readonly #ensureCustomer: CreditServiceOptions["ensureCustomer"];
   readonly #analytics: AccountAnalytics;
   readonly #audit: CreditAudit;
+  readonly #onPurchase: ((purchase: CreditPurchase) => void) | null;
 
   constructor(options: CreditServiceOptions) {
     this.#database = options.database;
@@ -177,6 +180,7 @@ export class CreditService {
     this.#ensureCustomer = options.ensureCustomer;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
     this.#audit = new CreditAudit(options.database, options.now);
+    this.#onPurchase = options.onPurchase ?? null;
   }
 
   readonly getState = Effect.fn("CreditService.getState")(function* (
@@ -572,6 +576,20 @@ export class CreditService {
       wallet: isDynamicRecord(entry) && typeof entry.server_id === "string" ? "server" : "personal",
       credits: target.credits,
       ...(isBillingCurrency(currency) ? { currency, amount } : {}),
+    });
+    const onPurchase = this.#onPurchase;
+    if (!onPurchase || !isBillingCurrency(currency)) return;
+    const account = yield* billingCall(() =>
+      this.#database.prepare("SELECT email FROM users WHERE id = ?").bind(target.userId).first<{ email: string }>(),
+    ).pipe(Effect.catch(() => Effect.succeed(null)));
+    if (!account) return;
+    onPurchase({
+      email: account.email,
+      credits: target.credits,
+      currency,
+      amount,
+      wallet: isDynamicRecord(entry) && typeof entry.server_id === "string" ? "server" : "personal",
+      serverId: target.serverId,
     });
   }).bind(this);
 

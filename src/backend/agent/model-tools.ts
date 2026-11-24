@@ -454,6 +454,13 @@ export function agentReasoningEffort(
   return model?.reasoningEffortConfigurable === false ? {} : { reasoningEffort: agent.reasoningEffort };
 }
 
+function ownProviderFirst(models: AgentModelOption[], provider: AgentProvider): AgentModelOption[] {
+  return [
+    ...models.filter((model) => model.provider === provider),
+    ...models.filter((model) => model.provider !== provider),
+  ];
+}
+
 export function requestedRuntime(
   target: Pick<AgentSummary, "provider" | "model" | "reasoningEffort">,
   request: ModelRequest,
@@ -462,7 +469,10 @@ export function requestedRuntime(
   if (request.provider === undefined && request.model === undefined && request.reasoningEffort === undefined) {
     return {};
   }
-  const requested = requestedToolModel(request, models);
+  const requested = requestedToolModel(
+    request,
+    request.provider === undefined ? ownProviderFirst(models, target.provider) : models,
+  );
   if (requested) {
     const keptEffort = requested.supportedReasoningEfforts.includes(target.reasoningEffort)
       ? target.reasoningEffort

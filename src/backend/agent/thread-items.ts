@@ -33,6 +33,7 @@ import {
 } from "../protocol";
 import {
   GEMINI_INVALID_ARGUMENT,
+  GEMINI_UNREADABLE_HISTORY,
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
@@ -145,8 +146,8 @@ function isClearedAntigravityHistory(provider: AgentProvider, message: string): 
   );
 }
 
-function isUnencodableAntigravityHistory(provider: AgentProvider, message: string): boolean {
-  return provider === "antigravity" && /\bcontains invalid UTF-8\b/.test(message);
+function isUnreadableAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return provider === "antigravity" && GEMINI_UNREADABLE_HISTORY.test(message);
 }
 
 function isUnsignedAntigravityThinking(provider: AgentProvider, message: string): boolean {
@@ -232,7 +233,7 @@ export function refusedSessionFailure(
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
   if (
     isClearedAntigravityHistory(provider, message) ||
-    isUnencodableAntigravityHistory(provider, message) ||
+    isUnreadableAntigravityHistory(provider, message) ||
     isUnsignedAntigravityThinking(provider, message)
   )
     return sourceText("error.provider.antigravityHistoryUnreadable");

@@ -67,6 +67,7 @@ class SpeechModule : Module() {
   private var playback: Thread? = null
   /** The audio mode before GPT live voice set the call mode; null while no call runs. */
   private var callModeBefore: Int? = null
+  private var callBluetoothScoStarted = false
   /** Only the recognition executor reads and writes it. */
   private var recognizer: OfflineSpeechRecognizer? = null
   private val recognition = Executors.newSingleThreadExecutor()
@@ -202,9 +203,19 @@ class SpeechModule : Module() {
             ?: devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
           if (output != null) audio.setCommunicationDevice(output)
         } else {
-          val headset = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { it.type in CALL_HEADSETS }
+          val outputs = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS).map { it.type }
+          val headset = outputs.any { it in CALL_HEADSETS }
+          val bluetoothOnly = AudioDeviceInfo.TYPE_BLUETOOTH_SCO in outputs &&
+            outputs.none { it in CALL_HEADSETS && it != AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
           @Suppress("DEPRECATION")
           audio.isSpeakerphoneOn = !headset
+          if (bluetoothOnly && !callBluetoothScoStarted) {
+            callBluetoothScoStarted = true
+            @Suppress("DEPRECATION")
+            audio.startBluetoothSco()
+            @Suppress("DEPRECATION")
+            audio.isBluetoothScoOn = true
+          }
         }
       } else {
         val before = callModeBefore ?: return@Function
@@ -214,6 +225,13 @@ class SpeechModule : Module() {
         } else {
           @Suppress("DEPRECATION")
           audio.isSpeakerphoneOn = false
+          if (callBluetoothScoStarted) {
+            callBluetoothScoStarted = false
+            @Suppress("DEPRECATION")
+            audio.isBluetoothScoOn = false
+            @Suppress("DEPRECATION")
+            audio.stopBluetoothSco()
+          }
         }
         audio.mode = before
       }

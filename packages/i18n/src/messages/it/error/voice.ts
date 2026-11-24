@@ -34,6 +34,8 @@ export const messages = {
   "error.voice.live.timedOut": "La voce dal vivo di Codex non si è avviata in tempo. Riprova.",
   "error.voice.live.failed": "La voce dal vivo si è interrotta: {reason}",
   "error.voice.live.disconnected": "La voce dal vivo si è disconnessa.",
+  "error.voice.live.startFailed":
+    "Non è stato possibile avviare la voce dal vivo. Aggiorna Codex e accedi con ChatGPT sul computer che esegue l’agente, poi riprova. Motivo: {reason}",
   "error.voice.live.hostFailed":
     "Codex sul server non è riuscito ad avviare la voce dal vivo. Chiedi al proprietario di aggiornare Codex su quel computer e di accedere con ChatGPT, poi riprova.",
   "error.voice.live.signIn": "Accedi a Codex con il tuo account ChatGPT per usare la voce dal vivo.",

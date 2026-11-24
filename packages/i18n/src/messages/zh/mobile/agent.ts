@@ -579,7 +579,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "无法加载你的服务器",
   "mobile.agent.home.serversFailedBody": "请确认桌面应用正在运行，然后重试。",
   "mobile.agent.home.noServers": "没有可用的服务器",
-  "mobile.agent.home.noServersBody": "请重新连接桌面应用，或加入一个远程服务器。",
+  "mobile.agent.home.noServersBody":
+    "请用这个账号打开电脑上的 OpenBot，并在“服务器设置 → 成员”中打开“发布该服务器”。也可以加入一个远程服务器。",
   "mobile.agent.home.chooseServer": "选择服务器",
   "mobile.agent.home.openServers": "打开服务器列表",
   "mobile.agent.home.noChatOpen": "未打开聊天",

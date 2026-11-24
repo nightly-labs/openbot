@@ -74,14 +74,18 @@ function plainTextOf(cell: { tokens: Token[] }): string {
 function inlineText(tokens: Token[], lineBreak = " "): string {
   let text = "";
   for (const [index, token] of tokens.entries()) {
-    const next = tokens[index + 1];
-    const intraword =
-      token.type === "em" &&
-      token.raw.startsWith("*") &&
-      (WORD_CHARACTER.test(text.at(-1) ?? "") || WORD_CHARACTER.test(next?.raw.at(0) ?? ""));
+    const intraword = isWordStarEmphasis(token, text, tokens[index + 1]?.raw ?? "");
     text += intraword ? token.raw : plainText(token, lineBreak);
   }
   return text;
+}
+
+export function isWordStarEmphasis(token: Token, before: string, after: string): boolean {
+  return (
+    token.type === "em" &&
+    token.raw.startsWith("*") &&
+    (WORD_CHARACTER.test(before.at(-1) ?? "") || WORD_CHARACTER.test(after.at(0) ?? ""))
+  );
 }
 
 export function markdownPreviewText(body: string): string {

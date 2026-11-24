@@ -5,7 +5,12 @@ import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { GEMINI_INVALID_ARGUMENT, GEMINI_INVALID_CREDENTIALS, GOOGLE_RESET_FIELDS } from "./agent/provider-diagnostics";
+import {
+  GEMINI_INVALID_ARGUMENT,
+  GEMINI_INVALID_CREDENTIALS,
+  GEMINI_UNREADABLE_HISTORY,
+  GOOGLE_RESET_FIELDS,
+} from "./agent/provider-diagnostics";
 import { getRecord, getString, isRecord } from "./protocol";
 
 const GEMINI_QUOTA_CHUNK = /^\s*(?:\u26A0 )?Usage Limit Reached\n\n([\s\S]*)$/u;
@@ -121,6 +126,8 @@ function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequ
     return { message: sourceText("error.provider.geminiKeyRefused"), key: null };
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text))
     return { message: sourceText("error.provider.antigravityConnectionLost"), key: null };
+  if (GEMINI_UNREADABLE_HISTORY.test(text))
+    return { message: GEMINI_API_ERROR_MESSAGE.exec(text)?.[1] ?? text, key: null };
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
   const logged = GEMINI_EXECUTOR_ERROR.test(text);
   if (key) {
@@ -148,7 +155,12 @@ const GEMINI_ZERO_LIMIT = /\blimit:\s*0(?!\d|\.\d)/u;
 export function geminiSavedKeyLimitFailure(text: string, error?: unknown): string | null {
   if (error !== undefined && !(error instanceof RequestError)) return null;
   const reason = text.replace(GEMINI_WARNING_ANSWER, "").replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
-  if (geminiAccountLink(reason) !== null || GEMINI_CONNECTION_LOST_ANSWER.test(reason)) return null;
+  if (
+    geminiAccountLink(reason) !== null ||
+    GEMINI_CONNECTION_LOST_ANSWER.test(reason) ||
+    GEMINI_UNREADABLE_HISTORY.test(reason)
+  )
+    return null;
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (key !== "error.provider.antigravityRateLimited") return null;
   return sourceText(
@@ -161,6 +173,7 @@ function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
   const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
   if (GEMINI_VERIFICATION_REQUIRED.test(reason)) return sourceText("error.provider.geminiVerificationRequired");
+  if (GEMINI_UNREADABLE_HISTORY.test(reason)) return detail;
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   return key ? geminiRequestFailureText(key, reason) : detail;
 }

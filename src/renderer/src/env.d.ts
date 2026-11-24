@@ -11,4 +11,17 @@ declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
   }
+
+  interface ExtensionSignInMessage {
+    kind: string;
+    state: string;
+    code?: string;
+    error?: string;
+  }
+
+  interface ExtensionMessaging {
+    sendMessage?(extensionId: string, message: ExtensionSignInMessage): Promise<{ received?: boolean } | undefined>;
+  }
+
+  var chrome: { runtime?: ExtensionMessaging } | undefined;
 }

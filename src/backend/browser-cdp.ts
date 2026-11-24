@@ -429,7 +429,11 @@ export class BrowserCdpEngine {
     singlePassword: boolean,
   ): Effect.fn.Return<
     {
-      enter: (values: readonly string[], vault: boolean) => Effect.Effect<void, BrowserOperationError>;
+      enter: (
+        values: readonly string[],
+        vault: boolean,
+        onSubmitSent: () => void,
+      ) => Effect.Effect<void, BrowserOperationError>;
       clear: (secrets: readonly string[]) => Effect.Effect<boolean, BrowserOperationError>;
       hide: (secret: string, shown: boolean) => void;
       kinds: Array<{ password: boolean; oneTimeCode: boolean }>;
@@ -599,7 +603,7 @@ export class BrowserCdpEngine {
         node.sessionId,
         node.contextId,
       );
-    const enter = (values: readonly string[], vault: boolean) =>
+    const enter = (values: readonly string[], vault: boolean, onSubmitSent: () => void) =>
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
           yield* this.#leaseEffect((send) =>
@@ -706,6 +710,7 @@ export class BrowserCdpEngine {
                 );
                 if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
+                onSubmitSent();
                 yield* dispatchMouseClick(send, point, "left", 1, 0, sessionId);
               } else if (submission === "enter") {
                 const last = nodes.inputs.at(-1);
@@ -722,6 +727,7 @@ export class BrowserCdpEngine {
                 )
                   return yield* browserFailure(new Error("Authentication target changed."));
                 yield* send("DOM.focus", { backendNodeId: last.backendNodeId }, last.sessionId);
+                onSubmitSent();
                 yield* dispatchShortcut(send, "Enter", last.sessionId);
               }
             }),
