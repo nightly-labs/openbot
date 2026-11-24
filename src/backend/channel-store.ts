@@ -40,25 +40,29 @@ import { revokeRoutineWebhooks } from "./webhook-route-store";
 const SHOWN_MESSAGE_SQL =
   "(instr(message_json, '\"deleted\"') = 0 OR json_extract(message_json, '$.deleted') IS NOT 1)";
 
-const LATEST_MESSAGES_SQL = `SELECT channel_id, message_json FROM (
-  SELECT m.channel_id, m.message_json,
-    ROW_NUMBER() OVER (PARTITION BY m.channel_id ORDER BY m.sequence DESC, m.message_id DESC) AS row_number
-  FROM projection_channel_messages AS m
-  WHERE ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}
-    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
-    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
-) WHERE row_number = 1`;
+const CHANNEL_SUMMARY_ROWS_SQL = `SELECT c.channel_id AS channel_id, c.channel_json AS channel_json,
+  (SELECT m.message_json FROM projection_channel_messages AS m
+    WHERE m.channel_id = c.channel_id
+      AND ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}
+      AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
+      AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
+    ORDER BY m.sequence DESC, m.message_id DESC LIMIT 1) AS latest_json,
+  (SELECT COUNT(*) FROM projection_channel_tasks AS t
+    WHERE t.channel_id = c.channel_id
+      AND json_extract(t.task_json, '$.state') = 'running') AS running,
+  (SELECT COUNT(*) FROM projection_channel_tasks AS t
+    WHERE t.channel_id = c.channel_id
+      AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
+  FROM projection_channels AS c ORDER BY c.rowid`;
 
-const TASK_COUNTS_SQL = `SELECT channel_id,
-  SUM(CASE WHEN json_extract(task_json, '$.state') = 'running' THEN 1 ELSE 0 END) AS running,
-  SUM(CASE WHEN json_extract(task_json, '$.state') IN ('queued', 'waiting', 'running') THEN 1 ELSE 0 END) AS open
-  FROM projection_channel_tasks GROUP BY channel_id`;
+const CHANNEL_THREADS_SQL =
+  "SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts ORDER BY channel_id, agent_id";
 
-const UNREAD_COUNTS_SQL = `SELECT c.channel_id, COUNT(m.message_id) AS unread
-  FROM projection_channels AS c
-  LEFT JOIN projection_channel_reads AS r ON r.channel_id = c.channel_id AND r.member_id = ?
-  LEFT JOIN projection_channel_messages AS m ON m.channel_id = c.channel_id
-    AND m.sequence > COALESCE(r.through_sequence, 0)
+const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread FROM projection_channel_messages AS m
+  WHERE m.channel_id = ?
+    AND m.sequence > COALESCE(
+      (SELECT r.through_sequence FROM projection_channel_reads AS r
+        WHERE r.channel_id = ? AND r.member_id = ?), 0)
     AND ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}
     AND json_extract(m.message_json, '$.author.id') IS NOT ?
     AND json_extract(m.message_json, '$.author.id') IS NOT ?
@@ -69,8 +73,7 @@ const UNREAD_COUNTS_SQL = `SELECT c.channel_id, COUNT(m.message_id) AS unread
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
     AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
-    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?
-  GROUP BY c.channel_id`;
+    AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') NOT LIKE ?`;
 
 function deletedChannelMessage(entry: ChannelMessage): ChannelMessage & { deleted: true } {
   return {
@@ -246,24 +249,14 @@ export class ChannelStore {
     return true;
   }
 
-  #unreadCountsForChannels(
-    channelIds: readonly string[],
-    memberId: string,
-    excludedId: string,
-    keep: boolean,
-  ): Map<string, number> {
+  #unreadCount(channelId: string, memberId: string, excludedId: string, keep: boolean): number {
     const key = `${memberId}\n${excludedId}`;
-    const counts = new Map<string, number>();
-    if (keep) {
-      for (const channelId of channelIds) {
-        const count = this.#unreadCounts.get(channelId)?.get(key);
-        if (count === undefined) break;
-        counts.set(channelId, count);
-      }
-      if (counts.size === channelIds.length) return counts;
-    }
-    for (const row of databaseRows(
-      cachedStatement(this.database.connection, UNREAD_COUNTS_SQL).all(
+    const kept = keep ? this.#unreadCounts.get(channelId)?.get(key) : undefined;
+    if (kept !== undefined) return kept;
+    const row = databaseRow(
+      cachedStatement(this.database.connection, UNREAD_COUNT_SQL).get(
+        channelId,
+        channelId,
         memberId,
         memberId,
         excludedId,
@@ -271,17 +264,14 @@ export class ChannelStore {
         `${MCP_SIGN_IN_ITEM_TYPE_PREFIX}%`,
         `${SETTING_LINK_ITEM_TYPE_PREFIX}%`,
       ),
-    )) {
-      const channelId = requiredStringColumn(row, "channel_id");
-      const count = Number(row.unread ?? 0);
-      counts.set(channelId, count);
-      if (keep) {
-        const channelCounts = this.#unreadCounts.get(channelId) ?? new Map<string, number>();
-        channelCounts.set(key, count);
-        this.#unreadCounts.set(channelId, channelCounts);
-      }
+    );
+    const count = Number(row?.unread ?? 0);
+    if (keep) {
+      const counts = this.#unreadCounts.get(channelId) ?? new Map<string, number>();
+      counts.set(key, count);
+      this.#unreadCounts.set(channelId, counts);
     }
-    return counts;
+    return count;
   }
 
   completedMessageChanges(channelId: string): number {
@@ -316,32 +306,10 @@ export class ChannelStore {
 
   list(memberId: string, signedOutMessagesAreTheirs = false): ChannelSummary[] {
     const excludedId = signedOutMessagesAreTheirs ? SIGNED_OUT_CHANNEL_MEMBER_ID : memberId;
-    const rows = databaseRows(
-      this.database.connection.prepare("SELECT channel_id, channel_json FROM projection_channels ORDER BY rowid").all(),
-    );
+    const rows = databaseRows(cachedStatement(this.database.connection, CHANNEL_SUMMARY_ROWS_SQL).all());
     const keepsCounts = this.#keepsUnreadCounts();
-    const channelIds = rows.map((row) => requiredStringColumn(row, "channel_id"));
-    const unreadCounts = this.#unreadCountsForChannels(channelIds, memberId, excludedId, keepsCounts);
-    const latestMessages = new Map(
-      databaseRows(cachedStatement(this.database.connection, LATEST_MESSAGES_SQL).all()).map((row) => [
-        requiredStringColumn(row, "channel_id"),
-        row.message_json,
-      ]),
-    );
-    const taskCounts = new Map(
-      databaseRows(cachedStatement(this.database.connection, TASK_COUNTS_SQL).all()).map((row) => [
-        requiredStringColumn(row, "channel_id"),
-        { running: Number(row.running ?? 0), open: Number(row.open ?? 0) },
-      ]),
-    );
     const threads = new Map<string, ChannelThread[]>();
-    for (const row of databaseRows(
-      this.database.connection
-        .prepare(
-          "SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts ORDER BY channel_id, agent_id",
-        )
-        .all(),
-    )) {
+    for (const row of databaseRows(cachedStatement(this.database.connection, CHANNEL_THREADS_SQL).all())) {
       const channelId = requiredStringColumn(row, "channel_id");
       const thread = {
         agentId: requiredStringColumn(row, "agent_id"),
@@ -351,8 +319,7 @@ export class ChannelStore {
     }
     return rows.map((row) => {
       const channel = decodeChannel(JSON.parse(requiredStringColumn(row, "channel_json")));
-      const latestJson = latestMessages.get(channel.id);
-      const tasks = taskCounts.get(channel.id);
+      const latestJson = row.latest_json;
       const latest =
         typeof latestJson === "string" && latestJson.length > 0
           ? (() => {
@@ -363,9 +330,9 @@ export class ChannelStore {
           : undefined;
       return {
         ...channel,
-        unreadCount: unreadCounts.get(channel.id) ?? 0,
-        activeTasks: tasks?.running ?? 0,
-        openTasks: tasks?.open ?? 0,
+        unreadCount: this.#unreadCount(channel.id, memberId, excludedId, keepsCounts),
+        activeTasks: Number(row.running ?? 0),
+        openTasks: Number(row.open ?? 0),
         lastMessage: latest
           ? {
               authorName: latest.author.name,

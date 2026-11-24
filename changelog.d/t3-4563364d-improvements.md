@@ -4,6 +4,5 @@
 
 ### Changed
 
-- Speed up channel list summaries with batched database queries.
-- Add CI checks and E2E coverage for plugin catalogs and remote protocols.
+- Add CI checks and E2E coverage for plugin catalogs, remote protocols and channel list timing.
 - Add edge-case coverage for released Team protocol decoders.
