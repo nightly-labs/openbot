@@ -2085,7 +2085,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         pendingHidden.current.delete(serverId);
       },
       refreshServer: async (serverId) => {
-        connections.current.get(serverId)?.refresh();
+        connections.current.get(serverId)?.reconnect();
         await refreshHosts();
       },
       hostedServerStarting,
@@ -2180,7 +2180,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         await refreshMemberships().catch(() => undefined);
       },
       refreshServers: async () => {
-        for (const connection of connections.current.values()) connection.refresh();
+        for (const connection of connections.current.values()) connection.reconnect();
         await refreshHosts();
       },
       addRemoteServer: async ({ inviteUrl }) => {
