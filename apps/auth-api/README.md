@@ -299,7 +299,7 @@ sends this JSON:
 ```json
 {
   "email": "person@example.com",
-  "code": "ABCD-EFGH",
+  "code": "ABCDEFGH",
   "expiresAt": 1787060000000
 }
 ```

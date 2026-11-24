@@ -963,16 +963,14 @@ function authValidate<A>(operation: () => A): Effect.Effect<A, AuthServiceError 
 function generateOneTimeCode(): string {
   const bytes = new Uint8Array(ONE_TIME_CODE_LENGTH);
   crypto.getRandomValues(bytes);
-  const raw = [...bytes].map((byte) => ONE_TIME_CODE_ALPHABET[byte & 31]).join("");
-  return `${raw.slice(0, 4)}-${raw.slice(4)}`;
+  return [...bytes].map((byte) => ONE_TIME_CODE_ALPHABET[byte & 31]).join("");
 }
 
 const developmentOneTimeCode = Effect.fn("Auth.developmentCode")(function* (challengeId: string) {
   const digest = yield* sha256(`development-code:${challengeId}`);
-  const raw = [...digest.slice(0, ONE_TIME_CODE_LENGTH)]
+  return [...digest.slice(0, ONE_TIME_CODE_LENGTH)]
     .map((character) => ONE_TIME_CODE_ALPHABET[character.charCodeAt(0) & 31])
     .join("");
-  return `${raw.slice(0, 4)}-${raw.slice(4)}`;
 });
 
 function normalizeOneTimeCode(value: string): string {

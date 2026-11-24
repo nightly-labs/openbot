@@ -116,7 +116,7 @@ const meta = {
   args: {
     width: 640,
     scheme: "light",
-    email: renderSignInCodeEmail({ code: "K7M4-Q2PZ", expiresInMinutes: 10 }),
+    email: renderSignInCodeEmail({ code: "K7M4Q2PZ", expiresInMinutes: 10 }),
   },
 } satisfies Meta<typeof EmailPreview>;
 export default meta;
@@ -210,7 +210,7 @@ export const LicenseEndedCanceledMobile: Story = {
 export const PlainTextBodies: Story = {
   render: () => (
     <div>
-      <PlainTextPreview email={renderSignInCodeEmail({ code: "K7M4-Q2PZ", expiresInMinutes: 10 })} />
+      <PlainTextPreview email={renderSignInCodeEmail({ code: "K7M4Q2PZ", expiresInMinutes: 10 })} />
       <PlainTextPreview
         email={renderTeamInviteEmail({
           inviterEmail: "owner@example.com",

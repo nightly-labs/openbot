@@ -153,7 +153,7 @@ async function runCase(name: string, behaviors: Behavior[], route: Route = "dire
   try {
     const result = await Effect.runPromise(
       Effect.result(
-        prepareEmailCode({ email: "user@example.com", code: "ABCD-EFGH", expiresAt: Date.now() + 10 * 60_000 }).pipe(
+        prepareEmailCode({ email: "user@example.com", code: "ABCDEFGH", expiresAt: Date.now() + 10 * 60_000 }).pipe(
           Effect.flatMap((message) =>
             sendPrivateEmail(
               worker ? { ...CONFIG, relay: worker } : CONFIG,
@@ -197,7 +197,7 @@ async function runFallbackCase(
   name: string,
   behaviors: Behavior[],
   outcome: "accept" | "daily_limit",
-  code = "ABCD-EFGH",
+  code = "ABCDEFGH",
   replyTo?: string,
 ): Promise<FallbackCaseReport & { sent: EmailMessageBuilder[] }> {
   const relay = await startRelay(behaviors);
@@ -306,13 +306,13 @@ try {
   assert(fallbackMessage);
   assert.deepEqual(fallbackMessage.from, { name: "OpenBot", email: CONFIG.from });
   assert.equal(fallbackMessage.to, "user@example.com");
-  assert(fallbackMessage.text?.includes("ABCD-EFGH"), "the fallback must carry the sign-in code");
-  assert(fallbackMessage.html?.includes("ABCD-EFGH"), "the fallback must carry the sign-in code");
+  assert(fallbackMessage.text?.includes("ABCDEFGH"), "the fallback must carry the sign-in code");
+  assert(fallbackMessage.html?.includes("ABCDEFGH"), "the fallback must carry the sign-in code");
   assert.equal(fallbackMessage.headers?.["Auto-Submitted"], "auto-generated");
   assert.equal(fallbackMessage.replyTo, undefined, "with no EMAIL_REPLY_TO, a reply goes to the sender");
 
   const inbox = "inbox@example.com";
-  const withInbox = await runFallbackCase("fallback_reply_to_inbox", ["sender_limit"], "accept", "ABCD-EFGH", inbox);
+  const withInbox = await runFallbackCase("fallback_reply_to_inbox", ["sender_limit"], "accept", "ABCDEFGH", inbox);
   const { sent: inboxMessages, ...withInboxReport } = withInbox;
   report.cases.push(withInboxReport);
   assert.equal(withInbox.result, "sent");

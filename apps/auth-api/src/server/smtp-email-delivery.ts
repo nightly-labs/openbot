@@ -119,7 +119,7 @@ export const prepareEmailCode = Effect.fn("Email.prepareCode")(function* (
 ): Effect.fn.Return<PreparedEmailMessage, SmtpFailure> {
   yield* smtpValidate(() => {
     validateEmail(message.email, "recipient");
-    if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/u.test(message.code)) {
+    if (!/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/u.test(message.code)) {
       throw new Error("smtp_invalid_code");
     }
   });
