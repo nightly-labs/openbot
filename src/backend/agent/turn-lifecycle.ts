@@ -1641,6 +1641,15 @@ export class TurnLifecycle {
           });
           return;
         }
+        const accountSettingsFailure =
+          notification.method === "error" && source.provider === "codex" && isCodexAccountSettingsFailure(message);
+        if (accountSettingsFailure)
+          logger.warn("Codex could not load the settings of its ChatGPT account.", {
+            message: this.#hooks.redactMcp(message),
+          });
+        const shownMessage = accountSettingsFailure
+          ? sourceText("error.provider.codexAccountSettingsUnreadable")
+          : message;
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
           this.#turnErrors.set(errorTurnId, message);
           this.#turnCauses.set(errorTurnId, causeCode);
@@ -1785,7 +1794,7 @@ export class TurnLifecycle {
             isRefusedGeminiToken(source.provider, message) ||
             this.#mayHoldError(agentId, errorTurnId, context.causeCode))
         ) {
-          this.#failoverTurns.set(errorTurnId, { message, context, ...(link ? { link } : {}) });
+          this.#failoverTurns.set(errorTurnId, { message: shownMessage, context, ...(link ? { link } : {}) });
           return;
         }
         if (notification.method === "warning" && userErrorMessage(message, "") === "") {
@@ -1810,16 +1819,7 @@ export class TurnLifecycle {
             model: context.model,
             message: this.#hooks.redactMcp(message),
           });
-        const accountSettingsFailure = source.provider === "codex" && isCodexAccountSettingsFailure(message);
-        if (accountSettingsFailure)
-          logger.warn("Codex could not load the settings of its ChatGPT account.", {
-            message: this.#hooks.redactMcp(message),
-          });
-        const shown = backupsAtLimit
-          ? sourceText("error.agent.backupModelsAtLimit")
-          : accountSettingsFailure
-            ? sourceText("error.provider.codexAccountSettingsUnreadable")
-            : message;
+        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : shownMessage;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
           this.#hooks.taskFailed(taskId, shown);

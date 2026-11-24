@@ -438,7 +438,7 @@ export const messages = {
   "error.provider.codexAudioRefused":
     "Este modelo no puede escuchar audio, por eso no aceptó el sonido de este chat. OpenBot inició una nueva sesión de Codex con el historial del chat. Para continuar, envía tu solicitud de nuevo y pide al agente que trabaje sin el sonido. Para revisar el sonido, selecciona en el menú de modelos del agente un modelo que pueda escuchar audio.",
   "error.provider.codexAccountSettingsUnreadable":
-    "Codex no pudo cargar los ajustes de tu cuenta de ChatGPT, por eso el agente se detuvo. Inténtalo de nuevo. Si se detiene otra vez, selecciona Reconectar para ChatGPT en Ajustes del servidor > Proveedores.",
+    "Codex no pudo cargar los ajustes de tu cuenta de ChatGPT, por eso el agente se detuvo. Inténtalo de nuevo. Si se detiene otra vez, selecciona Reconectar para ChatGPT en Ajustes del servidor → Proveedores.",
   "error.provider.imageTooSmall":
     "El modelo no aceptó una imagen de este chat porque la imagen es demasiado pequeña. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageTooLarge":

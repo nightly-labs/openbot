@@ -435,7 +435,7 @@ export const messages = {
   "error.provider.codexAudioRefused":
     "Bu model ses dinleyemez, bu yüzden bu sohbetteki sesi kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir Codex oturumu başlattı. Devam etmek için isteğinizi yeniden gönderin ve ajandan ses olmadan çalışmasını isteyin. Sesi kontrol etmek için ajanın model menüsünde ses dinleyebilen bir model seçin.",
   "error.provider.codexAccountSettingsUnreadable":
-    "Codex, ChatGPT hesabınızın ayarlarını yükleyemediği için ajan durdu. Tekrar deneyin. Yine durursa Sunucu ayarları > Sağlayıcılar bölümünde ChatGPT için Yeniden bağlan'ı seçin.",
+    "Codex, ChatGPT hesabınızın ayarlarını yükleyemediği için ajan durdu. Tekrar deneyin. Yine durursa Sunucu ayarları → Sağlayıcılar bölümünde ChatGPT için Yeniden bağlan'ı seçin.",
   "error.provider.imageTooSmall":
     "Görsel çok küçük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooLarge":

@@ -288,7 +288,7 @@ export function isRequestBodyLimitDiagnostic(message: string): boolean {
 }
 
 export function isCodexAccountSettingsFailure(message: string): boolean {
-  return /\bfailed to (?:re)?load workspace requirements\b/u.test(message);
+  return /\bfailed to (?:re)?load workspace requirements\b/iu.test(message);
 }
 
 export function isUnreadableContentDiagnostic(message: string): boolean {
