@@ -2761,6 +2761,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn.providerError = sourceText("error.provider.acpToolsNotLoaded", { provider: this.#label });
         thread.needsResume = true;
       }
+      const textToolCallFailure =
+        !turn.providerError && !turn.stopped && !turn.answerOptional && response.stopReason === "end_turn"
+          ? (this.#flavor.textToolCallFailure?.(turn.text) ?? null)
+          : null;
+      if (textToolCallFailure !== null) {
+        turn.failureCause = "empty_answer";
+        turn.providerError = textToolCallFailure;
+      }
       const status =
         turn.stopped || response.stopReason === "cancelled"
           ? "interrupted"
