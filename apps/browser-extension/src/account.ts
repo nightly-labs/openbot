@@ -132,6 +132,11 @@ export async function signInWithWeb(): Promise<ExtensionSession> {
   return exchangeCode(silent ?? (await webCode(false)));
 }
 
+const SIGN_IN_MESSAGE = "openbot.extension-sign-in";
+
+const cancelled = () =>
+  new SignInIssue({ code: "sign_in_cancelled", message: currentText().t("extension.signIn.cancelled") });
+
 async function webCode(silent: boolean): Promise<{ code: string; verifier: string }> {
   const verifier = randomToken(32);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
@@ -140,20 +145,18 @@ async function webCode(silent: boolean): Promise<{ code: string; verifier: strin
   start.searchParams.set("extension", chrome.runtime.id);
   start.searchParams.set("challenge", base64Url(new Uint8Array(digest)));
   start.searchParams.set("state", state);
-  if (silent) start.searchParams.set("silent", "1");
-  const cancelled = () =>
-    new SignInIssue({ code: "sign_in_cancelled", message: currentText().t("extension.signIn.cancelled") });
+  if (!silent) {
+    start.searchParams.set("tab", "1");
+    return { code: await tabCode(start, state), verifier };
+  }
+  start.searchParams.set("silent", "1");
   const finished = await chrome.identity
-    .launchWebAuthFlow(
-      silent
-        ? {
-            url: start.toString(),
-            interactive: false,
-            abortOnLoadForNonInteractive: false,
-            timeoutMsForNonInteractive: SILENT_MS,
-          }
-        : { url: start.toString(), interactive: true },
-    )
+    .launchWebAuthFlow({
+      url: start.toString(),
+      interactive: false,
+      abortOnLoadForNonInteractive: false,
+      timeoutMsForNonInteractive: SILENT_MS,
+    })
     .catch(() => {
       throw cancelled();
     });
@@ -161,6 +164,36 @@ async function webCode(silent: boolean): Promise<{ code: string; verifier: strin
   const code = answer?.searchParams.get("code");
   if (!answer || answer.searchParams.get("state") !== state || !code) throw cancelled();
   return { code, verifier };
+}
+
+async function tabCode(start: URL, state: string): Promise<string> {
+  const [opener] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tab = await chrome.tabs.create({ url: start.toString(), openerTabId: opener?.id });
+  const tabId = tab.id;
+  if (tabId === undefined) throw cancelled();
+  return new Promise((resolve, reject) => {
+    const stop = () => {
+      chrome.runtime.onMessageExternal.removeListener(answered);
+      chrome.tabs.onRemoved.removeListener(closed);
+    };
+    const answered: chrome.runtime.MessageListener = (message, sender, sendResponse) => {
+      if (sender.origin !== new URL(WEB_URL).origin || sender.tab?.id !== tabId) return undefined;
+      if (!isDynamicRecord(message) || message.kind !== SIGN_IN_MESSAGE || message.state !== state) return undefined;
+      stop();
+      sendResponse({ received: true });
+      void chrome.tabs.remove(tabId).catch(() => undefined);
+      if (isString(message.code)) resolve(message.code);
+      else reject(cancelled());
+      return undefined;
+    };
+    const closed = (removed: number) => {
+      if (removed !== tabId) return;
+      stop();
+      reject(cancelled());
+    };
+    chrome.runtime.onMessageExternal.addListener(answered);
+    chrome.tabs.onRemoved.addListener(closed);
+  });
 }
 
 async function exchangeCode({ code, verifier }: { code: string; verifier: string }): Promise<ExtensionSession> {
