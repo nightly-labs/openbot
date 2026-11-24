@@ -136,6 +136,7 @@ prepare_release() {
 copy_release() {
   rm -rf "$2"
   cp -a --no-preserve=ownership "$1" "$2"
+  sync
 }
 
 repair_release_modes() {
@@ -150,6 +151,7 @@ swap_in() {
 }
 
 finish_swap() {
+  sync
   rm -f "$INSTALL/.applying"
   rm -rf "$INSTALL/staged" "$INSTALL/staged.ready"
 }
