@@ -130,6 +130,13 @@ const CODEX_COMPUTER_USE_PLUGINS_OFF = {
   "plugins.unified-computer-use@openai-bundled.enabled": false,
 } as const;
 
+const CODEX_BROWSER_PLUGINS_OFF = {
+  "plugins.browser@openai-bundled.enabled": false,
+  "plugins.chrome@openai-bundled.enabled": false,
+  "plugins.chrome-dev@openai-bundled.enabled": false,
+  "plugins.chrome-internal@openai-bundled.enabled": false,
+} as const;
+
 const CODEX_MCP_STARTUP_GRACE_MS = 10_000;
 
 const CODEX_DIRECT_ONLY_NAMESPACES = [...visibleDynamicTools("codex").map((namespace) => namespace.name), "image_gen"];
@@ -830,6 +837,7 @@ export class ThreadLifecycle {
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
       } & CodexPromptSettings &
+        typeof CODEX_BROWSER_PLUGINS_OFF &
         Partial<typeof CODEX_COMPUTER_USE_PLUGINS_OFF> &
         ReturnType<typeof codexSandboxConfig>;
     },
@@ -848,6 +856,7 @@ export class ThreadLifecycle {
         tools: CODEX_TOOLS_CONFIG,
         ...CODEX_FEATURES_CONFIG,
         ...codexPromptSettings(own.read),
+        ...CODEX_BROWSER_PLUGINS_OFF,
         ...(agentComputerUseEnabled(agent) ? {} : CODEX_COMPUTER_USE_PLUGINS_OFF),
         project_doc_max_bytes: AGENT_INSTRUCTIONS_FILE_BYTES,
         mcp_optional_startup_grace_ms: CODEX_MCP_STARTUP_GRACE_MS,
