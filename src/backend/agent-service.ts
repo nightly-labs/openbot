@@ -7180,7 +7180,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     turnId: string,
     explain: boolean,
   ): Effect.fn.Return<AgentMessageSteer> {
-    return yield* this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId }).pipe(
+    return yield* this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId }, true).pipe(
       Effect.as("steered" as const),
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {

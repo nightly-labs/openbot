@@ -242,7 +242,11 @@ export class QueueControls {
     this.#mailboxSync.emitQueue(input.agentId);
   }, Effect.uninterruptible);
 
-  readonly steer = Effect.fn("QueueControls.steer")(function* (this: QueueControls, input: SteerQueuedMessageInput) {
+  readonly steer = Effect.fn("QueueControls.steer")(function* (
+    this: QueueControls,
+    input: SteerQueuedMessageInput,
+    busyModeSteer = false,
+  ) {
     const agent = yield* this.#store.existing(input.agentId).pipe(toQueueOperationFailed);
     const { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel } = yield* queueStep(
       () => {
@@ -303,6 +307,9 @@ export class QueueControls {
           threadId: session,
           expectedTurnId: turnId,
           clientUserMessageId: input.deliveryId,
+          ...(busyModeSteer && providerForAgent(agent) === "claude" && context.delivery.sender.kind !== "user"
+            ? { waitsForRunningTools: true }
+            : {}),
           input: [
             ...(note ? [{ type: "text" as const, text: note }] : []),
             ...deliveryPromptInput(context, {

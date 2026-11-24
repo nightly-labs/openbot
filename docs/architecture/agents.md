@@ -1171,7 +1171,10 @@ result of the steer's turn completes it. A stop from the person (`stopRequested`
 as interrupted. While a question, an elicitation, a write approval, or a browser sign-in or secret card
 (`request_takeover`, `submit_secret`) waits for the person (`personRequests`), the steer has no
 priority: the open card stays the one that Claude waits for, and the steer arrives after the answer.
-Before, a message during a sign-in card stopped the call and cancelled the card (#15776). A shell
+Before, a message during a sign-in card stopped the call and cancelled the card (#15776). A message
+from another agent or a routine that the busy-message mode steers has no priority either
+(`waitsForRunningTools`, #15730): it waits until the running tool call ends, and does not stop the
+tools or subagents. A message that the person sends or steers from the queue still stops them. A shell
 command that runs one script cannot change its plan: the steer reaches the model when the script is
 done. `scripts/claude-steer-now-e2e.ts` checks the turn with a stand-in CLI, and with
 `--held=takeover` it checks that a sign-in card stays open, `scripts/question-steer-order-e2e.ts` checks the order during a question, and

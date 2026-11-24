@@ -1920,7 +1920,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const messageId = promptUuid(runtime, clientId);
     takePrompt(runtime, messageId);
     runtime.activeTurn.messageIds.add(messageId);
-    const stopsRunningTools = runtime.activeTurn.toolCalls.size > 0 && runtime.activeTurn.personRequests === 0;
+    const waitsForRunningTools = isRecord(params) && params.waitsForRunningTools === true;
+    const stopsRunningTools =
+      !waitsForRunningTools && runtime.activeTurn.toolCalls.size > 0 && runtime.activeTurn.personRequests === 0;
     if (stopsRunningTools) runtime.activeTurn.untakenSteerIds.add(messageId);
     runtime.input.push({
       type: "user",
