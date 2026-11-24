@@ -1,8 +1,10 @@
+import { X_AGENT_LISTING_ID } from "@openbot/contracts/browser-extension-x";
 import {
   AVATAR_HUES,
   type ClientAgentSummary,
   DEFAULT_MCP_SERVER_ACCESS,
   type InstalledSkill,
+  type MarketplaceAgentDetail,
   type MarketplaceAgentSummary,
   type MarketplaceSkillQuery,
   type MarketplaceSkillSummary,
@@ -15,12 +17,14 @@ import type { McpConnectFlow } from "@openbot/contracts/mcp-connect-flows";
 import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
 import { Marketplace } from "@openbot/ui/features/marketplace/Marketplace";
 import { AgentsDialog } from "@openbot/ui/features/marketplace/MarketplaceAgentsDialog";
-import type {
-  MarketplaceApp,
-  MarketplaceAppAccount,
-  MarketplaceAppConnection,
-  MarketplaceAppsBlock,
-  MarketplaceModel,
+import {
+  type MarketplaceAgent,
+  type MarketplaceApp,
+  type MarketplaceAppAccount,
+  type MarketplaceAppConnection,
+  type MarketplaceAppsBlock,
+  type MarketplaceModel,
+  X_APP_ID,
 } from "@openbot/ui/features/marketplace/marketplace-model";
 import {
   createMarketplaceNavigation,
@@ -257,7 +261,54 @@ export interface StoryProps {
   noSkills?: boolean;
   dialogSkill?: string;
   agentStates?: Readonly<Record<string, "added" | "update">>;
+  xAgent?: boolean;
   children?: (context: { model: MarketplaceModel; nav: MarketplaceNavigation }) => JSX.Element;
+}
+
+const X_LISTING: MarketplaceAgentDetail = {
+  id: X_AGENT_LISTING_ID,
+  category: "research",
+  name: "X",
+  title: "Does what you ask in an X reply that mentions @openbot_",
+  description: "Does what you ask in an X reply that mentions @openbot_.",
+  creatorName: "OpenBot",
+  version: 1,
+  installs: 412,
+  featured: false,
+  verified: true,
+  avatarSeed: "x-desk",
+  avatarHue: 280,
+  avatarUrl: null,
+  skillCount: 1,
+  routineCount: 0,
+  activeRoutineCount: 0,
+  updatedAt: "2026-11-20T09:00:00.000Z",
+  versionId: "x-desk-v1",
+  skills: [],
+  routines: [],
+};
+
+const X_AGENT: MarketplaceAgent = {
+  id: "agent-x",
+  name: X_LISTING.name,
+  title: X_LISTING.title,
+  avatarSeed: X_LISTING.avatarSeed,
+  avatarHue: X_LISTING.avatarHue,
+  avatarUrl: null,
+};
+
+function storyXApp(agent: MarketplaceAgent | null): MarketplaceApp {
+  const { t } = currentText();
+  return {
+    kind: "x",
+    id: X_APP_ID,
+    name: t("marketplace.xApp.title"),
+    tagline: t("marketplace.xApp.tagline"),
+    category: "productivity",
+    status: agent ? "connected" : "idle",
+    agent,
+    extensionUrl: "https://chromewebstore.google.com/detail/openbot",
+  };
 }
 
 const APPLE_APPS = MARKETPLACE_PLUGINS.filter((plugin) => plugin.slug === "apple-apps");
@@ -305,6 +356,7 @@ export function MarketplaceStory(props: StoryProps) {
     noSkills,
     dialogSkill,
     agentStates,
+    xAgent,
     children,
   } = untrack(() => ({ ...props }));
   const details = connected ? CONNECTED_CONNECTOR_DETAILS : STORY_CONNECTOR_DETAILS;
@@ -337,6 +389,7 @@ export function MarketplaceStory(props: StoryProps) {
     installed: noSkills ? {} : startSkills(userAgents),
     apps: [
       ...connectorApps,
+      storyXApp(xAgent ? X_AGENT : null),
       ...[
         ...STORY_MARKETPLACE_PLUGINS,
         ...(macOS ? APPLE_APPS : []),
@@ -522,11 +575,13 @@ export function MarketplaceStory(props: StoryProps) {
   };
   const model: MarketplaceModel = {
     listAgents: async (query) => page<MarketplaceAgentSummary>(agents, query),
-    loadAgent: async (id) => STORY_MARKETPLACE_AGENT_DETAILS[id],
+    loadAgent: async (id) => (id === X_AGENT_LISTING_ID ? X_LISTING : STORY_MARKETPLACE_AGENT_DETAILS[id]),
     agentState: (listing) => (member ? null : (state.added[listing.id] ?? "add")),
     agentBusy: (id) => Boolean(state.busy[id]),
     addAgent: async (listing) => {
       setState((draft) => {
+        if (listing.id === X_AGENT_LISTING_ID)
+          draft.apps = draft.apps.map((app) => (app.kind === "x" ? storyXApp(X_AGENT) : app));
         draft.added[listing.id] = "added";
         draft.notice = `${listing.name} added.`;
       });

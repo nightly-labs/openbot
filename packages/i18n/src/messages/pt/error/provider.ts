@@ -567,6 +567,8 @@ export const messages = {
   "error.provider.piSessionBusy": "Aguarde o turno atual do Pi terminar.",
   "error.provider.acpSessionBusy":
     "{provider} ainda está terminando um turno interrompido. Tente novamente em instantes.",
+  "error.provider.acpSettingsConflict":
+    "{provider} alterou este chat enquanto o OpenBot aplicava as configurações. Tente novamente.",
   "error.provider.acpSessionStale":
     "{provider} não conseguiu carregar a versão mais recente desta conversa. Envie sua mensagem novamente.",
   "error.provider.acpModelNotOffered":

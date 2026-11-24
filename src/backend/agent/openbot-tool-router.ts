@@ -2532,6 +2532,12 @@ export class OpenBotToolRouter {
         return yield* marketplaceAppStatus(this.#mcpServers, installed, (config) =>
           toolStep(() => this.#postMcpSignInCard(senderAgentId, executionThreadId, params.turnId, config)),
         );
+      if (this.#servesTeammateRequest(senderAgentId, params.turnId, executionThreadId))
+        return openBotToolResult({
+          status: "ask_requester",
+          app: args.app,
+          next: `In this turn you answer a teammate, not the user, so the user does not read your chat and no card shows. Do not say that a card is in the chat. When you can do the task now another way, do it. Otherwise end your answer: tell the teammate that the user must connect the app, and that the teammate calls openbot.suggest_marketplace_app with app ${args.app} in its own chat, where the user sees the card.`,
+        });
       suggestCard();
       return openBotToolResult({
         status: "suggested",
@@ -3096,6 +3102,15 @@ export class OpenBotToolRouter {
     if (this.#routineRunTurns.size <= ROUTINE_RUN_TURNS) return;
     const [oldest] = this.#routineRunTurns.keys();
     if (oldest !== undefined) this.#routineRunTurns.delete(oldest);
+  }
+
+  #servesTeammateRequest(agentId: string, turnId: string, executionThreadId: string): boolean {
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId).length;
+    return (
+      deliveries > 0 &&
+      !this.#channels.store.channelForThread(executionThreadId) &&
+      this.#mailbox.openTeammateRequestIds(agentId, turnId).length === deliveries
+    );
   }
 
   #requestedByPerson(agentId: string, turnId: string, threadId: string): boolean {

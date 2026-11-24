@@ -1760,19 +1760,21 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress, tapped, wanted) => {
       const download = () =>
-        request(
-          "GET",
-          TEAM_API_ROUTES.attachment(attachmentId),
-          (value) => decodeHostFile(value, largeDownload?.file),
-          undefined,
-          serverId,
-          undefined,
-          undefined,
-          largeDownload,
-          progress,
-        );
+        wanted?.() === false
+          ? Promise.reject(new Error(sourceText("error.remote.downloadStopped")))
+          : request(
+              "GET",
+              TEAM_API_ROUTES.attachment(attachmentId),
+              (value) => decodeHostFile(value, largeDownload?.file),
+              undefined,
+              serverId,
+              undefined,
+              undefined,
+              largeDownload,
+              progress,
+            );
       const queue = largeDownload ? largeAttachmentDownloads : attachmentDownloads;
       return queue.run(attachmentDownloadKey(serverId, attachmentId), download, tapped);
     },

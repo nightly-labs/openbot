@@ -263,6 +263,7 @@ import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protoco
 import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-many-accounts-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
+import { PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-workflows-v1";
 import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/queue-hold-v1";
 import {
   TEAM_REASONING_EFFORTS_CAPABILITY,
@@ -1766,7 +1767,8 @@ export class TeamApiServer {
     memberId?: string,
     agentList?: readonly AgentSummary[],
   ): void {
-    const filteredConversationPayloads = new Map<string, string>();
+    type EncodedPayload = { value: string | null; bytes: number };
+    const filteredConversationPayloads = new Map<string, EncodedPayload>();
     let agents = () => {
       const list = agentList ?? this.#options.agents.listAgents();
       agents = () => list;
@@ -1792,7 +1794,7 @@ export class TeamApiServer {
       }
       return hidden;
     };
-    const encodedPayloads = new Map<string, string | null>();
+    const encodedPayloads = new Map<string, EncodedPayload>();
     const access = new Map<string, { member: AccessMember; blocked: Set<string>; key: string }>();
     const accessFor = (connection: EventClientState) => {
       const known = access.get(connection.memberId);
@@ -1840,7 +1842,10 @@ export class TeamApiServer {
           sharedAs === undefined
             ? undefined
             : `${sharedAs}|${eventEncodingKey(connection.capabilities, options)}|${blockedKey}`;
-        if (key !== undefined && encodedPayloads.has(key)) return encodedPayloads.get(key) ?? null;
+        if (key !== undefined) {
+          const cached = encodedPayloads.get(key);
+          if (cached) return cached;
+        }
         let encoded: string | null;
         perfCount("teamapi.encode");
         try {
@@ -1855,10 +1860,12 @@ export class TeamApiServer {
           (this.#options.logger ?? logger).warn("Team API event could not be encoded:", toLogValue(error));
           encoded = null;
         }
-        if (key !== undefined) encodedPayloads.set(key, encoded);
-        return encoded;
+        const result = { value: encoded, bytes: encoded === null ? 0 : Buffer.byteLength(encoded) };
+        if (key !== undefined) encodedPayloads.set(key, result);
+        return result;
       };
       let outgoing: string;
+      let outgoingBytes: number;
       let optional: OptionalTeamEvent | null;
       try {
         optional =
@@ -1930,6 +1937,7 @@ export class TeamApiServer {
                   }
                 : optional,
         );
+        outgoingBytes = Buffer.byteLength(outgoing);
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
         const conversationInvalidation = encodeEvent(
           {
@@ -1940,16 +1948,18 @@ export class TeamApiServer {
           {},
           "conversation-invalidated",
         );
-        if (!conversationInvalidation) continue;
-        outgoing = conversationInvalidation;
+        if (!conversationInvalidation.value) continue;
+        outgoing = conversationInvalidation.value;
+        outgoingBytes = conversationInvalidation.bytes;
       } else if (event.type === "queue-changed" && supportsRuntimeSnapshots) {
         const queueInvalidation = encodeEvent(
           { type: "queue-invalidated", agentId: event.snapshot.agentId },
           {},
           "queue-invalidated",
         );
-        if (!queueInvalidation) continue;
-        outgoing = queueInvalidation;
+        if (!queueInvalidation.value) continue;
+        outgoing = queueInvalidation.value;
+        outgoingBytes = queueInvalidation.bytes;
       } else if (
         event.type === "conversation" &&
         (!connection.capabilities.has("routine-event-markers") ||
@@ -1960,25 +1970,26 @@ export class TeamApiServer {
         const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(ROUTINE_QUIET_ANSWERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_LOCATION_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
-          filtered =
-            encodeEvent(
-              {
-                ...event,
-                snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
-              },
-              encodingOptions,
-            ) ?? undefined;
+          filtered = encodeEvent(
+            {
+              ...event,
+              snapshot: conversationSnapshotForCapabilities(event.snapshot, connection.capabilities),
+            },
+            encodingOptions,
+          );
           if (filtered) filteredConversationPayloads.set(key, filtered);
         }
-        if (!filtered) continue;
-        outgoing = filtered;
+        if (!filtered?.value) continue;
+        outgoing = filtered.value;
+        outgoingBytes = filtered.bytes;
       } else {
         const payload = encodeEvent(event, encodingOptions, event === broadcast ? "event" : undefined);
-        if (!payload) continue;
-        outgoing = payload;
+        if (!payload.value) continue;
+        outgoing = payload.value;
+        outgoingBytes = payload.bytes;
       }
       const limit = event.type === "runtime-snapshot" ? AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT : JSON_LIMIT;
-      if (Buffer.byteLength(outgoing) > limit) continue;
+      if (outgoingBytes > limit) continue;
       if (client.readyState !== webSockets.WebSocket.OPEN) continue;
       client.send(outgoing);
       perfCount(`teamapi.send ${event.type}`);
@@ -1994,9 +2005,9 @@ export class TeamApiServer {
         encodingOptions,
         "runtime-snapshot",
       );
-      if (!completionSnapshot) continue;
-      if (Buffer.byteLength(completionSnapshot) > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
-      client.send(completionSnapshot);
+      if (!completionSnapshot.value) continue;
+      if (completionSnapshot.bytes > AGENT_RUNTIME_SNAPSHOT_BYTES_LIMIT) continue;
+      client.send(completionSnapshot.value);
       perfCount("teamapi.completionSnapshot");
     }
   }
@@ -2942,6 +2953,8 @@ export class TeamApiServer {
           capability === COMPUTER_ACTIVITY_CAPABILITY
         )
           return this.#options.pushNotifications !== undefined;
+        if (capability === PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY)
+          return this.#options.pushNotifications !== undefined && this.#options.workflows !== undefined;
         if (capability === FOCUS_USE_CAPABILITY) return this.#options.focusUse === true;
         if (capability === AGENT_NOTIFICATION_LEVELS_CAPABILITY)
           return this.#options.agentNotificationLevels !== undefined;

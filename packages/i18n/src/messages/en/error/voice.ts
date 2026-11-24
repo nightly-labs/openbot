@@ -50,6 +50,8 @@ export const messages = defineMessages("error.voice", {
   "error.voice.server.invalidAnswer": "{host} did not send an OpenAI-compatible answer.",
   "error.voice.server.invalidAudio": "{host} sent audio that OpenBot cannot play. Use a server that sends WAV.",
   "error.voice.server.tooLarge": "The answer from {host} is too large.",
+  "error.voice.server.modelUnsupported":
+    "{host} cannot transcribe with {model}. In Settings → Voice, choose a different dictation model for the voice server.",
   "error.voice.host.preparing": "The server is downloading its speech recognition model. Try again in a few minutes.",
   "error.voice.host.notSetUp":
     "Speech recognition is not set up on this server. Ask its owner to set it up in Settings → Voice.",
