@@ -40,6 +40,7 @@ export interface AgentClient {
   readonly structuredOutput?: boolean;
   readonly canReleaseProcess?: () => boolean;
   readonly runsBackgroundWork?: () => boolean;
+  runsTurn?(externalThreadId: string, turnId: string): boolean;
   readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;

@@ -968,6 +968,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return false;
   }
 
+  runsTurn(externalThreadId: string, turnId: string): boolean {
+    return this.#openingTurns.has(externalThreadId) || this.#threads.get(externalThreadId)?.activeTurn?.id === turnId;
+  }
+
   callRelayedMcpTool(
     externalThreadId: string,
     config: McpServerConfig,
