@@ -117,6 +117,13 @@ All notable changes to OpenBot will be documented here. The project follows
   bottom of openbot.run now show the real X logo. Before, they showed a drawn copy with a different shape.
 - An OpenCode agent no longer makes or restarts OpenCode's own automations, which OpenBot cannot show and which can stop with no message. When you ask for a timed or repeated task, the agent makes an OpenBot routine that you see in Routines. The agent can still list, pause and delete automations that it made before. On a joined server, the server must also be on the new version.
 - A Codex agent or routine no longer shows a warning about a 128,000-byte instructions limit when its instructions are large. The warning needed no action, and you could not change the limit. When Codex cannot load the settings of your ChatGPT account, the agent now says so in plain words and tells you to try again or to reconnect ChatGPT in Server settings → Providers. Before, it showed only "failed to load workspace requirements: invalid data". The server must also be on the new version.
+- A phone or browser can connect again to an account with several servers. Before, each server also connected to all other servers of the same account. With about 6 servers these connections used all the connection slots of the account, so the phone showed most servers offline and tried again each minute. A server now connects only as a host. Update each server of the account to this version.
+- When OpenBot updates a provider CLI, such as the Claude CLI, other agents on that provider keep
+  starting new turns and routine runs. Before, one long turn of one agent held the messages and
+  routines of all agents on that provider until the turn ended or the app restarted. The update now
+  runs at the first moment when no turn runs. While it waits, OpenBot no longer ends open questions
+  early: an agent keeps waiting for your answer. A joined server must also be on the new version.
+- On a Mac, agents can now tap and scroll in iPhone Mirroring with Computer Use. Before, each tap and scroll said that it was sent, but the iPhone screen did not change. Now the agent brings iPhone Mirroring to the front and taps on the screen, as a person does.
 
 ## [0.77.0] - 2026-11-23
 
