@@ -73,6 +73,7 @@ import {
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
 import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
+import { SteerUnreadStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
 import {
   MessageSelectionActions,
@@ -953,7 +954,17 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           menu={messageMenu(message())}
                           textAtOnce={plainActivity()}
                           data-chat-search-message={message().id}
-                        />
+                        >
+                          <Show
+                            when={
+                              message().steerUnread &&
+                              props.task?.activeTurnId &&
+                              message().turnId === props.task.activeTurnId
+                            }
+                          >
+                            <SteerUnreadStatus />
+                          </Show>
+                        </ChatMessageRow>
                       }
                     >
                       {card()}
