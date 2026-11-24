@@ -130,6 +130,7 @@ All notable changes to OpenBot will be documented here. The project follows
   used that computer when the app refreshed some data by itself, for example the CRM settings, the
   provider accounts of the server, workflows or connector status, and did not send the notification
   to your phone. The server must also be on this version.
+- When an agent sends work to a channel from a side thread, the channel result now comes back to that side thread, not to the agent's main chat. The main chat no longer starts a second copy of the same work. When the side thread is archived or deleted, the result goes to the main chat as before. The server must also be on the new version.
 
 ## [0.77.0] - 2026-11-23
 
