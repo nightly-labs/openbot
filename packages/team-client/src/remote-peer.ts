@@ -384,6 +384,7 @@ interface PeerState {
   ticketRequest: boolean;
   signalReady: boolean;
   answeredRequest: boolean;
+  probingPath: boolean;
   fullSnapshotRequested: boolean;
   lastAnswerAt: number;
   lastSignalClose: number | null;
@@ -1007,6 +1008,7 @@ export function createRemoteTeamPeer(
         ticketRequest: false,
         signalReady: false,
         answeredRequest: false,
+        probingPath: false,
         fullSnapshotRequested: false,
         lastAnswerAt: 0,
         lastSignalClose: null,
@@ -1852,6 +1854,7 @@ export function createRemoteTeamPeer(
               const error = new Error(sourceText("error.remote.desktopRequestTimeout"));
               reject(error);
               if (checksConnection) failPeer(state, error, actions);
+              else probePathAfterTimeout(state);
             };
             const samples: ProbeSample[] = [];
             const checkPath = () => {
@@ -1939,6 +1942,17 @@ export function createRemoteTeamPeer(
         ),
       );
     })();
+  }
+
+  function probePathAfterTimeout(state: PeerState): void {
+    if (state.probingPath || state.closed || peer !== state || !isPeerOnline(state)) return;
+    state.probingPath = true;
+    diagnose(state, "path-check", "request timeout");
+    void runPeerEffect(requestEffect("GET", TEAM_API_ROUTES.compatibility, null))
+      .catch(() => undefined)
+      .finally(() => {
+        state.probingPath = false;
+      });
   }
 
   function trackUploadDelivery(state: PeerState, onProgress: (sent: number, total: number) => void) {
