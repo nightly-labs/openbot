@@ -71,7 +71,7 @@ export function hostConnection(server: ServerSummary | undefined): number | unde
 }
 
 export interface ProviderCliOwners {
-  systemCliVersion?: (provider: AgentProviderId) => string | null;
+  systemCliVersion?: (provider: AgentProviderId, runtime: ProviderRuntimeStatus) => string | null;
   isLocalServer?: () => boolean;
   managesRuntimes?: () => boolean;
   hostConnection?: () => number | undefined;
@@ -94,7 +94,7 @@ export function createProviderRuntimeStore(
   function providerUpdate(provider: AgentProviderId, snapshot = providerRuntimeSnapshot()): ProviderUpdate {
     if (!isManagedRuntimeProvider(provider)) throw new Error("OpenBot does not manage this provider's CLI.");
     const runtime = snapshot.providers[provider];
-    const systemVersion = owners.systemCliVersion?.(provider) ?? null;
+    const systemVersion = owners.systemCliVersion?.(provider, runtime) ?? null;
     const availableVersion = runtime.availableVersion ?? null;
     return {
       provider,

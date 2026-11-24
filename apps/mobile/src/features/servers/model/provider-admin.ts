@@ -1,4 +1,4 @@
-import { olderVersion } from "@openbot/contracts/cli-version";
+import { providerCliSource } from "@openbot/contracts/cli-version";
 import {
   type AcpRegistryEntry,
   type AcpRegistryInstallInput,
@@ -253,15 +253,6 @@ export interface ProviderRow {
   apiKey: boolean;
 }
 
-function runsSystemCli(agent: AgentProviderStatus, runtime: ProviderRuntimeStatus): boolean {
-  if (agent.cliSource !== undefined) return agent.cliSource === "system";
-  return (
-    runtime.phase === "not-downloaded" &&
-    agent.version !== null &&
-    olderVersion(agent.version, runtime.availableVersion ?? "")
-  );
-}
-
 export function providerRows(
   status: AgentStatus | undefined,
   snapshot: ProviderRuntimeSnapshot | undefined,
@@ -282,7 +273,7 @@ export function providerRows(
         raw &&
         (raw.phase === "ready" || raw.phase === "not-downloaded") &&
         (agent?.state === "available" || agent?.state === "sign-in-required") &&
-        (runsSystemCli(agent, raw) || (raw.phase === "not-downloaded" && !raw.availableVersion))
+        (providerCliSource(agent, raw) === "system" || (raw.phase === "not-downloaded" && !raw.availableVersion))
           ? { ...raw, phase: "ready" as const, version: agent.version ?? null }
           : raw;
       const availableVersion = runtime?.availableVersion ?? null;
