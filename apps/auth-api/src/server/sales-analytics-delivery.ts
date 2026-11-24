@@ -17,11 +17,9 @@ const MAX_BATCH_SIZE = 50;
 const MAX_RATE_LIMIT_RETRIES = 3;
 const RATE_LIMIT_RETRY_DELAY_MS = 60_000;
 
-// The cron runs these statements every five minutes. Migration 0071 gives each one an index.
 export const RECOVER_EXPIRED_CLAIMS_SQL = `UPDATE billing_analytics_events
     SET status = 'uncertain', claimed_at = NULL, claim_token = NULL, last_error = 'claim_expired', updated_at = ?
   WHERE status = 'sending' AND claimed_at IS NOT NULL AND claimed_at <= ?`;
-// Parameters: now, maximum attempts, batch size.
 export const READY_EVENTS_SQL = `SELECT source_key, profile_id, event_name, properties_json, event_timestamp, attempts,
     '' AS claim_token
   FROM billing_analytics_events

@@ -79,8 +79,6 @@ interface Schedule {
 
 const DEFAULT_POLL_MS = 5_000;
 const DEFAULT_GRACE_MS = 1_000;
-// Hosts check for updates every few minutes, so a rollout step reaches all of them at once. Each
-// restart registers the host again and reconnects its clients; a random delay spreads that load.
 const AUTOMATIC_RESTART_SPREAD_MS = 30 * 60 * 1000;
 
 export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreference] }> {
@@ -102,7 +100,6 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #declinedVersion: string | null = null;
   #schedule: Schedule | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
-  // The random wait before an automatic restart. It makes no schedule, so members see no notice yet.
   #spreadTimer: ReturnType<typeof setTimeout> | null = null;
   #spreadVersion: string | null = null;
   #installError: UpdateFailureCode | null = null;

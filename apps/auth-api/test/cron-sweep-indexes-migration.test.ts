@@ -31,7 +31,6 @@ const migration = readFileSync(new URL("../migrations/0071_cron_sweep_indexes.sq
 
 const TABLES = ["site_operation_receipts", "site_creation_events", "hosted_sites", "billing_analytics_events"];
 
-// The released SalesAnalyticsDelivery.#readyEvents query, which READY_EVENTS_SQL replaces.
 const RELEASED_READY = `SELECT source_key, profile_id, event_name, properties_json, event_timestamp, attempts,
     '' AS claim_token
   FROM billing_analytics_events
@@ -101,7 +100,6 @@ describe("cron sweep indexes migration", () => {
     const ready = plan(database, READY_EVENTS_SQL);
     expect(ready).toContain("billing_analytics_events_ready");
     expect(unsynced).not.toContain("TEMP B-TREE");
-    // A partial index scan reads only the rows that its WHERE clause keeps; a table scan reads every row.
     for (const sweep of [receipts, events, unsynced, claims, ready]) expect(sweep).not.toMatch(/^SCAN \w+$/m);
 
     expect(database.prepare(PRUNE_SITE_OPERATION_RECEIPTS_SQL).run(50).changes).toBe(1);

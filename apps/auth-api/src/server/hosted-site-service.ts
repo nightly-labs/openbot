@@ -54,8 +54,6 @@ export interface HostedSiteUploadSession {
 type OperationClaim = { status: "pending"; token: string } | { status: "completed"; response: string };
 
 const CLEANUP_BATCH_SIZE = 50;
-// The five-minute cron runs these statements. Migration 0071 gives each one an index.
-// "+status" stops the status term from choosing hosted_sites_expiry over hosted_sites_route_unsynced.
 export const UNSYNCED_SITES_SQL = `SELECT id, hostname FROM hosted_sites
   WHERE +status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
   ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`;

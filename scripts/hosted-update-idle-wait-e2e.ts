@@ -185,9 +185,6 @@ unlimitedState.browserView = false;
 await until("the install after the browser view closed", () => unlimited.updater.installs === 1);
 await Effect.runPromise(unlimited.requested.dispose());
 
-// A rollout step reaches every host within one update check. The automatic restart waits a random
-// part of the spread before it makes a schedule, so the hosts do not register again all at once,
-// and members see no restart notice during the wait. A required update does not wait.
 const SPREAD_MS = 4 * DEADLINE_MS;
 const spreadState: HostState = { ...unlimitedState, browserView: false, clientInUse: false };
 const spread = hostedServer(spreadState, MAXIMUM_WAIT_MS, { ms: SPREAD_MS, random: () => 0.5 });

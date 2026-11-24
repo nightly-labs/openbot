@@ -1,4 +1,3 @@
--- The five-minute cron pruned and polled these tables with full scans: about 50k rows read per run.
 CREATE INDEX IF NOT EXISTS site_operation_receipts_created_at ON site_operation_receipts(created_at);
 
 CREATE INDEX IF NOT EXISTS site_creation_events_created_at ON site_creation_events(created_at);
