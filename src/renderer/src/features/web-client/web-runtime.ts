@@ -372,6 +372,7 @@ export interface WebWorkspaceRuntime {
   listHosts(): Promise<RemoteTeamHost[]>;
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  setHostHidden?: (hostId: string, hidden: boolean) => Promise<void>;
   ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
@@ -1304,6 +1305,7 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    setHostHidden: (hostId, hidden) => runTeamEffect(directory.setHostHidden(hostId, hidden)),
     ownerTransfers: {
       pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
       start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),

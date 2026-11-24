@@ -249,6 +249,18 @@ Mobile does not read the Android install referrer from Google Play. It never sen
 install-referrer URLs or route identifiers. It does not
 emit host lifecycle events again. Agent/host token and cost reports remain separate local data.
 
+The production Chrome extension records its install and update, side panel opens, sign-in and
+sign-out results, message sends from the side panel (to a chat, a thread or a channel), dictation
+results and lengths, the agents, channels and folders made in it, answers to agent questions, the
+steps of X replies (queued, sent, retried, dropped, notification opened), and shared-tab events
+(a site removed, and the kind of each question and your answer). It labels them
+as extension. It never sends message text, post text, X handles, addresses, sites, tab titles, or
+names. Its **Link analytics to my account** switch (server menu > **Settings**) works as on the web: on, events
+carry your account ID; off, only a random install ID kept in the extension's storage. When your account
+says off, for example after you turn it off on another device, the extension is off too. Else your
+choice in the extension wins; with no choice by your account, it follows your account's answer, and
+with no answer, the same region default as the web app. Development builds of the extension send no analytics.
+
 Analytics events do not contain message or direct-message text, prompts, replies, generated content,
 search queries, embedded-browser URLs, paths or page titles, file names, local paths, commands, raw
 error messages, or local identifiers for agents, threads, turns, messages, servers, and team members.
@@ -316,7 +328,7 @@ the device was offline or signed out goes to the account at the next sign-in, st
 refresh; the account keeps it only if it has no newer answer from another device. Disabling it
 drops pending mobile events; it does not remove previously received events or retract an in-flight
 request. There is no persistent offline analytics queue.
-When a user turns product analytics off on desktop, web or mobile, the app first sends one event
+When a user turns product analytics off on desktop, web, mobile or the Chrome extension, the app first sends one event
 that says analytics was turned off, with the account. After that, events go with the install ID only.
 Turning it on again sends no separate event.
 Development and preview mobile builds do not collect product analytics. Mobile sign-in uses the
@@ -606,8 +618,9 @@ the name with the sandbox.
 
 A new hosted server of each plan starts on a virtual server that OpenBot rents from
 [Leaseweb](https://www.leaseweb.com) when one is free at the purchase. For a purchase in euros or
-złotys, it is in Amsterdam, the Netherlands. For a purchase in US dollars or Brazilian reais, it is
-near Washington, D.C., in the United States, or in Amsterdam when none is free there. When no
+złotys, it is in Amsterdam, the Netherlands, or in Frankfurt, Germany, when none is free in
+Amsterdam. For a purchase in US dollars or Brazilian reais, it is near Washington, D.C., in the
+United States, or in Amsterdam or Frankfurt when none is free there. When no
 virtual server is free, the server starts in a boat sandbox. An operator can also move a
 server from boat to such a virtual server: the operator copies the server's disk over SSH, and
 deletes the copy after the move. The virtual server holds the server's
@@ -1286,24 +1299,24 @@ notification. Nothing goes to OpenBot,
 and nothing is sent when you do not click. To find the parts of the page, the extension
 asks openbot.run once an hour for the newest list of page selectors; that request carries only the hash
 of the list that it has. Except for shared tabs (below), the extension does not read your tabs or the
-pages you visit.
+pages you visit. The extension's product analytics, which "Product analytics" describes,
+go to OpenBot's self-hosted analytics and contain none of this content.
 
-Shared tabs are on while you are signed in, until you press **Stop sharing** in the side panel. Your
+Shared tabs are always on while you are signed in to the extension; to stop them, sign out. Your
 open tabs are shared only with your own agents, and an agent uses them only for a message that you
 send from the side panel; for a message in the OpenBot app, it uses its own browser. The extension tells
 your server the address, title and active state of your open web tabs (at most 50, the tab that you
 look at first), through the same encrypted connection, when they change and every 30 seconds. When an
 agent works in a tab, the tab joins a Chrome tab group named "OpenBot", unless it is in another group. When an agent acts on a site for the
 first time, the side panel asks you (Allow once, Always for this site, Deny); the sites that you allow
-always stay in the browser's extension storage until you remove them in the panel. The extension
+always stay in the browser's extension storage until you remove them in the side panel's Settings. The extension
 always asks again before an agent types into a password or payment field, downloads a file, or acts
 on a page that signs in to an app or gives an app access. To read and use a tab, the extension uses
 Chrome's debugger on that tab, and Chrome shows its own bar while it does. What an agent reads goes
 to your server: the page text and the list of its buttons, links and fields (not the values of
 password or payment fields), screenshots of the visible page, and addresses. Text that an agent types
-goes from your server to the page. Nothing goes to OpenBot. **Stop sharing** ends the group and stops
-the reports; your server forgets the shared tabs at once, or at the latest 75 seconds after the
-extension stops. **Share tabs with agents** turns sharing on again.
+goes from your server to the page. Nothing goes to OpenBot. Your server forgets the shared tabs at the
+latest 75 seconds after the extension stops.
 
 ## Other network connections
 

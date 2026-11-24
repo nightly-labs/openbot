@@ -38,7 +38,7 @@ import type { CustomProviderSource } from "./opencode-config";
 import { PendingServerRequests } from "./pending-server-requests";
 import { createPiCustomEndpointExtension, piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiKeyExtension } from "./pi-key-providers";
-import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
+import { createPiMcpExtension, type PiMcpExtension, piMcpServerKeys, piMcpStartFailures } from "./pi-mcp";
 import { piMessageItems, piPrompt, piShellCommand, piText } from "./pi-messages";
 import { PI_REQUEST_TIMEOUT_MS, PiProcessClosedError, PiRpc } from "./pi-rpc";
 import { piWindowsShellArguments } from "./pi-windows-shell";
@@ -679,8 +679,11 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       extension = yield* createPiMcpExtension(handoff.servers, mcp, this.options.providerStateDirectory, relay);
       for (const secret of extension.secrets) this.#secrets.add(secret);
       keyExtension = yield* this.#keyExtension();
+      const mcpServerKeys = piMcpServerKeys(handoff.servers);
       rpc.on("diagnostic", (text) => this.emit("diagnostic", text, { duringStop: thread?.closed ?? false }));
       rpc.on("record", (record) => {
+        if (record.type === "extension_ui_request" && record.method === "notify")
+          this.#reportMcpStartFailures(mcpServerKeys, getString(record, "message") ?? "");
         if (thread && !thread.closed) this.#record(thread, record);
         else if (
           record.type === "extension_ui_request" &&
@@ -1015,6 +1018,14 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         this.#scope,
       ),
     ).catch(() => undefined);
+  }
+
+  #reportMcpStartFailures(keys: ReadonlyMap<string, string>, message: string): void {
+    for (const failure of piMcpStartFailures(message, keys))
+      this.emit("notification", {
+        method: "mcpServer/startupStatus/updated",
+        params: { ...failure, error: this.#redact(failure.error) },
+      });
   }
 
   #record(thread: PiThread, record: DynamicRecord): void {

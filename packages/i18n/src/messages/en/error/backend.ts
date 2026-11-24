@@ -430,6 +430,8 @@ export const messages = defineMessages("error.backend", {
     "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":
     "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
+  "error.backend.browserNoMemory":
+    "This server is almost out of memory, so the browser cannot open a tab now. Wait for other agents to finish, then try again.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",
   "error.backend.popupSecureInput":
     "Popups are blocked during secure input. Finish or cancel secure input, then retry from the page.",

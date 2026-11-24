@@ -508,7 +508,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
   let agentDefaults: AgentDefaults = { ...DEFAULT_AGENT_DEFAULTS };
-  const hostTurnLimits = createMockHostTurnLimits();
+  const hostTurnLimits = createMockHostTurnLimits(() => emitAgentEvent({ type: "host-turn-limits-changed" }));
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
   let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };

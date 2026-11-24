@@ -123,6 +123,16 @@ serveFakeAcpAgent(
         }, quietMs);
         return;
       }
+      if (text === "tool-hang") {
+        peer.update(sessionId, {
+          sessionUpdate: "tool_call",
+          toolCallId: "tool-hang-1",
+          title: "Read design file",
+          kind: "other",
+          status: "in_progress",
+        });
+        return;
+      }
       if (text === "tool") {
         peer.update(sessionId, {
           sessionUpdate: "tool_call",

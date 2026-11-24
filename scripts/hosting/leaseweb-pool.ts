@@ -1812,7 +1812,7 @@ exit "$status"`;
 
   #moveCandidates(product: string, currency: string | null) {
     const locations: [string, ...string[]] =
-      currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01"] : ["AMS-01"];
+      currency === "usd" || currency === "brl" ? ["WDC-02", "AMS-01", "FRA-01"] : ["AMS-01", "FRA-01"];
     return this.#rows(
       `SELECT p.host_id FROM operator_hosts p
        WHERE p.removed_at IS NULL AND p.product = ${literal(product, PRODUCT_PATTERN)}

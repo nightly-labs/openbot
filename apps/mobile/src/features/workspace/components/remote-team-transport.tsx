@@ -151,6 +151,12 @@ function liveVoiceErrorText(path: string, status: number, body: unknown): string
   return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
 }
 
+function liveVoiceHostFailure(path: string, reference: string | undefined): string | null {
+  return path === LIVE_VOICE_ROUTES.start && reference?.startsWith("host/500/")
+    ? sourceText("error.voice.live.hostFailed")
+    : null;
+}
+
 const BRIDGE_DOM: DOMProps = {
   ...expoGoDomOptions,
   containerStyle: {
@@ -166,6 +172,8 @@ const BRIDGE_DOM: DOMProps = {
   scrollEnabled: false,
   style: { flex: 0, height: 1, width: 1 },
 };
+
+const GATHERING_STALLS_BEFORE_NEW_BRIDGE = 2;
 
 export const RemoteTeamTransport = memo(
   forwardRef<RemoteTeamTransportRef, RemoteTeamTransportProps>(function RemoteTeamTransport(props, ref) {
@@ -334,7 +342,12 @@ export const RemoteTeamTransport = memo(
               `${request} -> ${result.status ?? "no status"} ${time}`,
             );
           if (!result.ok)
-            throw referencedError(result.error ?? sourceText("error.remote.serverRequestFailed"), result.reference);
+            throw referencedError(
+              liveVoiceHostFailure(path, result.reference) ??
+                result.error ??
+                sourceText("error.remote.serverRequestFailed"),
+              result.reference,
+            );
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           if (
@@ -409,6 +422,8 @@ export const RemoteTeamTransport = memo(
     );
 
     const pageLoads = useRef(0);
+    const [bridgeKey, setBridgeKey] = useState(0);
+    const gatheringStalls = useRef(0);
     const handleReady = useCallback(async () => {
       pageLoads.current += 1;
       const outstanding = mailbox.outstanding();
@@ -502,12 +517,25 @@ export const RemoteTeamTransport = memo(
       onConnectionUpdate: async (update: RemoteTeamConnectionUpdate) => latest.current.props.onConnectionUpdate(update),
       onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) => {
         supportLog.add(
-          step === "failed" || step === "stalled" || step === "signal-error" || step === "ice-candidate-error"
+          step === "failed" ||
+            step === "stalled" ||
+            step === "signal-error" ||
+            step === "ice-candidate-error" ||
+            step === "ice-gathering-stalled"
             ? "warn"
             : "info",
           "connection",
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         );
+        if (step === "authenticated") gatheringStalls.current = 0;
+        if (step === "ice-gathering-stalled") {
+          gatheringStalls.current += 1;
+          if (gatheringStalls.current >= GATHERING_STALLS_BEFORE_NEW_BRIDGE) {
+            gatheringStalls.current = 0;
+            supportLog.add("warn", "connection", `${hostId} new page after ICE gathering stalls`);
+            setBridgeKey((key) => key + 1);
+          }
+        }
         latest.current.props.onDiagnostic?.(step, detail);
       },
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
@@ -527,6 +555,7 @@ export const RemoteTeamTransport = memo(
 
     return (
       <RemoteTeamBridge
+        key={bridgeKey}
         ref={bridge}
         active={props.active}
         dom={BRIDGE_DOM}

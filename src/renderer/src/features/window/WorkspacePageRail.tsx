@@ -163,7 +163,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
               onCreateLocal={serverActions.addMenuCreateLocal()}
               onInstallServer={serverActions.addMenuInstallServer()}
               addCreatesServer={serverActions.addCreatesServer()}
-              hiddenLocal={serverActions.hiddenLocal()}
+              hiddenServers={serverActions.hiddenServers()}
               credits={windowPage.creditsMenu()}
               {...serverActions.callbacks}
             />

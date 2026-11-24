@@ -202,6 +202,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Закрыть",
   "mobile.chat.attachment.sharingUnavailable": "На этом устройстве нельзя делиться файлами.",
   "mobile.chat.attachment.unavailable": "Вложение недоступно. Повторите попытку.",
+  "mobile.chat.attachment.downloadStopped": "Скачивание остановилось. Оно начнётся снова, когда сервер подключится.",
   "mobile.chat.attachment.openFailed": "Не удалось открыть вложение",
   "mobile.chat.attachment.photosNeedUpdate": "Для сохранения фото нужна последняя версия приложения.",
   "mobile.chat.attachment.photosPermission":
@@ -214,6 +215,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Не удалось поделиться файлами",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Чтобы поделиться несколькими файлами, обновите приложение.",
   "mobile.chat.attachment.preview": "Просмотр: {name}",
+  "mobile.chat.attachment.seeAll": "Нажмите, чтобы увидеть всё",
   "mobile.chat.attachment.displayFailed": "Не удалось показать это изображение.",
   "mobile.chat.attachment.loadingImage": "Загрузка изображения",
   "mobile.chat.attachment.uploading": "Загрузка: {name}",
@@ -244,6 +246,8 @@ export const messages = {
   "mobile.chat.attachment.damaged": "Вложение повреждено. Выберите его заново.",
   "mobile.chat.attachment.tooLarge": "{name} больше {limit}.",
   "mobile.chat.attachment.cameraPermission": "Чтобы сделать фото, разрешите доступ к камере в настройках.",
+  "mobile.chat.attachment.photoNotLoaded":
+    "Фото не загрузилось. Откройте его в приложении «Фото», пока оно не отобразится полностью, и повторите попытку.",
   "mobile.chat.composer.send": "Отправить сообщение",
   "mobile.chat.composer.stop": "Остановить: {name}",
   "mobile.chat.composer.dictate": "Надиктовать сообщение",
@@ -290,6 +294,8 @@ export const messages = {
     "Этот сервер не поддерживает GPT Live Voice. Обновите OpenBot на компьютере, где он работает.",
   "mobile.chat.liveVoice.gptFailed": "Не удалось запустить GPT Live Voice. Включите микрофон, чтобы повторить.",
   "mobile.chat.liveVoice.gptEnded": "GPT Live Voice остановлен. Включите микрофон, чтобы запустить его снова.",
+  "mobile.chat.liveVoice.gptFailedTitle": "Не удалось запустить GPT Live Voice",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice остановлен",
   "mobile.chat.liveVoice.gptMicrophoneOff":
     "Разрешите OpenBot использовать микрофон в Настройках. Затем включите микрофон, чтобы повторить.",
   "mobile.chat.composer.addAttachment": "Добавить вложение",
@@ -298,6 +304,11 @@ export const messages = {
   "mobile.chat.camera.captureFailed": "Не удалось сделать фото. Повторите попытку.",
   "mobile.chat.camera.startFailed": "Не удалось включить камеру. Закройте её и повторите попытку.",
   "mobile.chat.camera.close": "Закрыть камеру",
+  "mobile.chat.camera.fullScreenTipTitle": "Нужен обзор побольше?",
+  "mobile.chat.camera.fullScreenTipBody":
+    "Используйте полноэкранную камеру с зумом и всеми объективами. Это можно изменить в разделе «Настройки > Диалоги».",
+  "mobile.chat.camera.fullScreenTipUse": "Во весь экран",
+  "mobile.chat.camera.fullScreenTipDismiss": "Скрыть подсказку",
   "mobile.chat.camera.takePhoto": "Сделать фото",
   "mobile.chat.camera.switch": "Переключить камеру",
   "mobile.chat.header.info": "Информация: {name}",
@@ -365,6 +376,8 @@ export const messages = {
   "mobile.chat.message.readAloudSpeed": "Скорость воспроизведения: {speed}×",
   "mobile.chat.message.readAloudSpeedValue": "{speed}×",
   "mobile.chat.message.readAloudFailed": "Не удалось прочитать сообщение вслух",
+  "mobile.chat.message.readAloudModelMissing":
+    "Чтобы слушать сообщения, скачайте голосовую модель в Настройки > Голос.",
   "mobile.chat.message.selectText": "Выделить текст",
   "mobile.chat.message.copyImage": "Скопировать изображение",
   "mobile.chat.message.copyText": "Скопировать текст",
@@ -633,6 +646,7 @@ export const messages = {
   "mobile.chat.queue.emptyTitle": "Очередь пуста",
   "mobile.chat.queue.emptyBody": "Пока агент работает, новые сообщения встают в очередь.",
   "mobile.chat.queue.noLongerQueued": "Это сообщение больше не в очереди.",
+  "mobile.chat.queue.routine": "Регулярная задача: {name}",
   "mobile.chat.queue.position": "Место {position} · {date}",
   "mobile.chat.queue.attachments": "Вложения",
   "mobile.chat.queue.steer": "Направить",

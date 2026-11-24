@@ -315,6 +315,8 @@ export const messages = {
     "OpenCode のモデルが、回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.opencodeReasoningWithoutAnswer":
     "OpenCode のモデルが、推論のあと回答がないままターンを終了しました。もう一度お試しいただくか、別のモデルを選択してください。",
+  "error.provider.opencodeToolCallsAsText":
+    "OpenCode のモデルが操作をテキストとして書き、実行しませんでした。もう一度お試しいただくか、別のモデルを選択してください。",
   "error.provider.acpNoAnswer":
     "{provider} が回答なしでターンを終了しました。メッセージをもう一度送信するか、新しいチャットを開始してください。",
   "error.provider.noAnswerAfterSteps":
@@ -446,6 +448,8 @@ export const messages = {
     "{provider} が安全ルールによりこのメッセージをブロックしました: {reason} 次のメッセージも {provider} にブロックされる場合は、新しいチャットを開始してください。",
   "error.provider.codexAudioRefused":
     "このモデルは音声を聞けないため、このチャットの音声を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい Codex セッションを開始しました。続けるには、リクエストをもう一度送信し、音声を使わずに作業するようエージェントに頼んでください。音声を確認するには、エージェントのモデルメニューで音声を聞けるモデルを選択してください。",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex が ChatGPT アカウントの設定を読み込めなかったため、エージェントが停止しました。もう一度お試しください。再び停止する場合は、サーバー設定 → プロバイダーで ChatGPT の「再接続」を選択してください。",
   "error.provider.imageTooSmall":
     "画像が小さすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooLarge":
@@ -589,6 +593,8 @@ export const messages = {
   "error.provider.piSessionBusy": "現在の Pi のターンが終わるまでお待ちください。",
   "error.provider.acpSessionBusy":
     "{provider} は停止したターンをまだ終了しています。少し待ってからもう一度お試しください。",
+  "error.provider.acpSettingsConflict":
+    "OpenBot が設定を適用している間に {provider} がこのチャットを変更しました。もう一度お試しください。",
   "error.provider.acpSessionStale":
     "{provider} はこのチャットの最新の状態を読み込めませんでした。もう一度メッセージを送信してください。",
   "error.provider.acpModelNotOffered":

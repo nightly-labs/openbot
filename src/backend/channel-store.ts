@@ -40,6 +40,25 @@ import { revokeRoutineWebhooks } from "./webhook-route-store";
 const SHOWN_MESSAGE_SQL =
   "(instr(message_json, '\"deleted\"') = 0 OR json_extract(message_json, '$.deleted') IS NOT 1)";
 
+const CHANNEL_SUMMARY_ROWS_SQL = `SELECT c.channel_json AS channel_json,
+  (SELECT m.message_json FROM projection_channel_messages AS m
+    WHERE m.channel_id = c.channel_id
+      AND ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}
+      AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
+      AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
+      AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
+    ORDER BY m.sequence DESC, m.message_id DESC LIMIT 1) AS latest_json,
+  (SELECT COUNT(*) FROM projection_channel_tasks AS t
+    WHERE t.channel_id = c.channel_id
+      AND json_extract(t.task_json, '$.state') = 'running') AS running,
+  (SELECT COUNT(*) FROM projection_channel_tasks AS t
+    WHERE t.channel_id = c.channel_id
+      AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
+  FROM projection_channels AS c ORDER BY c.rowid`;
+
+const CHANNEL_THREADS_SQL =
+  "SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts ORDER BY channel_id, agent_id";
+
 const UNREAD_COUNT_SQL = `SELECT COUNT(*) AS unread FROM projection_channel_messages AS m
   WHERE m.channel_id = ?
     AND m.sequence > COALESCE(
@@ -288,35 +307,10 @@ export class ChannelStore {
 
   list(memberId: string, signedOutMessagesAreTheirs = false): ChannelSummary[] {
     const excludedId = signedOutMessagesAreTheirs ? SIGNED_OUT_CHANNEL_MEMBER_ID : memberId;
-    const rows = databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT c.channel_json AS channel_json,
-            (SELECT m.message_json FROM projection_channel_messages AS m
-              WHERE m.channel_id = c.channel_id
-                AND ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
-                AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
-              ORDER BY m.sequence DESC, m.message_id DESC LIMIT 1) AS latest_json,
-            (SELECT COUNT(*) FROM projection_channel_tasks AS t
-              WHERE t.channel_id = c.channel_id
-                AND json_extract(t.task_json, '$.state') = 'running') AS running,
-            (SELECT COUNT(*) FROM projection_channel_tasks AS t
-              WHERE t.channel_id = c.channel_id
-                AND json_extract(t.task_json, '$.state') IN ('queued', 'waiting', 'running')) AS open
-            FROM projection_channels AS c ORDER BY c.rowid`,
-        )
-        .all(),
-    );
+    const rows = databaseRows(cachedStatement(this.database.connection, CHANNEL_SUMMARY_ROWS_SQL).all());
     const keepsCounts = this.#keepsUnreadCounts();
     const threads = new Map<string, ChannelThread[]>();
-    for (const row of databaseRows(
-      this.database.connection
-        .prepare(
-          "SELECT channel_id, agent_id, thread_id FROM projection_channel_contexts ORDER BY channel_id, agent_id",
-        )
-        .all(),
-    )) {
+    for (const row of databaseRows(cachedStatement(this.database.connection, CHANNEL_THREADS_SQL).all())) {
       const channelId = requiredStringColumn(row, "channel_id");
       const thread = {
         agentId: requiredStringColumn(row, "agent_id"),

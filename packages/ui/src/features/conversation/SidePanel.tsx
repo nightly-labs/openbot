@@ -1,13 +1,19 @@
 import type { AppTextKey } from "@openbot/i18n";
 import {
   Archive,
+  ArrowDown,
+  ArrowUp,
   Badge,
   Button,
   buttonVariants,
   ChevronDown,
   ContextMenu,
   DropdownMenu,
+  Ellipsis,
   Folder,
+  Globe2,
+  Group,
+  LoaderCircle,
   Maximize2,
   MessageCircleQuestionMark,
   MessageSquare,
@@ -15,9 +21,12 @@ import {
   Minimize2,
   PanelRight,
   Plus,
+  Rows2,
   Settings,
+  SquareArrowOutUpRight,
   Tabs,
   Trash2,
+  Ungroup,
   Workflow,
   X,
 } from "@openbot/ui";
@@ -32,6 +41,7 @@ import { type TextValue, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, For, flush, onSettled, Show, untrack } from "solid-js";
 import { createTabRow } from "../../components/createTabRow";
+import { useBrowserPageCover } from "../browser/browser-page-cover";
 import { ThreadStatusText, ThreadTabIcon, threadAttention } from "./threads/ThreadStatusMark";
 import { ThreadTabGhost } from "./threads/ThreadTabGhost";
 import { carriedThreadTab, setCarriedThreadTab, swallowNextClick } from "./threads/thread-tab-drag";
@@ -39,6 +49,24 @@ import { carriedThreadTab, setCarriedThreadTab, swallowNextClick } from "./threa
 const DRAG_START = 4;
 const THREAD_VALUE = "thread:";
 const FILE_VALUE = "file:";
+const PAGE_VALUE = "page:";
+
+interface CoveringMenu {
+  setOpen: (open: boolean) => void;
+  ref: (element: Element) => void;
+}
+
+function coveringMenu(): CoveringMenu {
+  const [open, setOpen] = createSignal(false);
+  let content: Element | undefined;
+  useBrowserPageCover(open, () => content);
+  return {
+    setOpen,
+    ref: (element) => {
+      content = element;
+    },
+  };
+}
 
 function fileValue(key: string): string {
   return `${FILE_VALUE}${encodeURIComponent(key)}`;
@@ -57,6 +85,14 @@ const SIDE_PANEL_PANES = {
 } as const satisfies Record<string, { label: AppTextKey; icon: () => JSX.Element }>;
 
 export type SidePanelPane = keyof typeof SIDE_PANEL_PANES;
+
+const SIDE_PANEL_MOVES = {
+  split: { label: "conversation.sidePanel.splitDown", icon: () => <Rows2 aria-hidden="true" /> },
+  up: { label: "conversation.sidePanel.moveUp", icon: () => <ArrowUp aria-hidden="true" /> },
+  down: { label: "conversation.sidePanel.moveDown", icon: () => <ArrowDown aria-hidden="true" /> },
+} as const satisfies Record<string, { label: AppTextKey; icon: () => JSX.Element }>;
+
+export type SidePanelMove = keyof typeof SIDE_PANEL_MOVES;
 
 export function isSidePanelPane(value: string): value is SidePanelPane {
   return Object.hasOwn(SIDE_PANEL_PANES, value);
@@ -83,6 +119,14 @@ function PaneBadge(props: { badge: SidePanelPaneBadge | undefined }) {
           <span class="sr-only">{badge().label}</span>
         </>
       )}
+    </Show>
+  );
+}
+
+function PageTabIcon(props: { page: SidePanelBrowserTab }): JSX.Element {
+  return (
+    <Show when={props.page.loading} fallback={<Globe2 aria-hidden="true" />}>
+      <LoaderCircle class="browser-full-spin" aria-hidden="true" />
     </Show>
   );
 }
@@ -157,9 +201,18 @@ export interface SidePanelHeaderProps {
   onClose: (pane: SidePanelPane) => void;
   onToggleMaximized: () => void;
   onCollapse: () => void;
+  outerToggle?: boolean | undefined;
   onNewBrowserTab?: (() => void) | undefined;
   threads?: SidePanelThreads | undefined;
   files?: SidePanelFiles | undefined;
+  browsers?: SidePanelBrowsers | undefined;
+  pageTabs?: SidePanelPageTabs | undefined;
+  split?: boolean | undefined;
+  label?: string | undefined;
+  moves?: readonly SidePanelMove[] | undefined;
+  onMove?: ((pane: SidePanelPane, move: SidePanelMove) => void) | undefined;
+  windows?: Partial<Record<SidePanelPane, () => void>> | undefined;
+  onCloseGroup?: (() => void) | undefined;
 }
 
 export interface SidePanelFileTab {
@@ -175,6 +228,37 @@ export interface SidePanelFiles {
   onSelect: (key: string) => void;
   onClose: (key: string) => void;
   onMove: (key: string, index: number) => void;
+}
+
+export interface SidePanelBrowserTab {
+  id: string;
+  title: string;
+  loading: boolean;
+}
+
+export interface SidePanelBrowsers {
+  items: readonly SidePanelBrowserTab[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onClose: (id: string) => void;
+  onMove: (id: string, index: number) => void;
+}
+
+export interface SidePanelPageTabs {
+  shown: boolean;
+  onChange: (shown: boolean) => void;
+}
+
+function pageTabsText(shown: boolean): AppTextKey {
+  return shown ? "conversation.sidePanel.pagesInOneTab" : "conversation.sidePanel.pagesAsTabs";
+}
+
+function PageTabsIcon(props: { shown: boolean }) {
+  return (
+    <Show when={props.shown} fallback={<Ungroup aria-hidden="true" />}>
+      <Group aria-hidden="true" />
+    </Show>
+  );
 }
 
 export interface SidePanelThreads {
@@ -207,6 +291,7 @@ interface TabHold {
 const TAB_GROUPS = {
   thread: { selector: ":scope > .side-panel-thread-tab", id: (tab: HTMLElement) => tab.dataset.threadId },
   file: { selector: ":scope > .side-panel-file-tab", id: (tab: HTMLElement) => tab.dataset.fileKey },
+  page: { selector: ":scope > .side-panel-page-tab", id: (tab: HTMLElement) => tab.dataset.pageId },
 } as const;
 type TabGroup = keyof typeof TAB_GROUPS;
 
@@ -218,7 +303,7 @@ interface TabEntry {
   select: () => void;
 }
 
-type MenuTab = { pane: SidePanelPane } | { thread: string } | { file: string };
+type MenuTab = { pane: SidePanelPane } | { thread: string } | { file: string } | { page: string };
 
 function tabAt(target: EventTarget | null): MenuTab | null {
   const tab = target instanceof Element ? target.closest<HTMLElement>(".side-panel-tab") : null;
@@ -226,12 +311,14 @@ function tabAt(target: EventTarget | null): MenuTab | null {
   if (pane && isSidePanelPane(pane)) return { pane };
   if (tab?.dataset.threadId) return { thread: tab.dataset.threadId };
   if (tab?.dataset.fileKey) return { file: tab.dataset.fileKey };
+  if (tab?.dataset.pageId) return { page: tab.dataset.pageId };
   return null;
 }
 
 export function SidePanelHeader(props: SidePanelHeaderProps) {
   const { t } = useText();
   const [menuTab, setMenuTab] = createSignal<MenuTab | null>(null);
+  const coverForTabMenu = coveringMenu();
   let menuReturn: { focus: Element | null; header: Element | null } | undefined;
   const pick = (event: Event) => {
     const tab = tabAt(event.target);
@@ -253,6 +340,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     if (!tab) return null;
     if ("pane" in tab) return props.panes.includes(tab.pane) ? tab : null;
     if ("thread" in tab) return props.threads?.items.some((item) => item.id === tab.thread) ? tab : null;
+    if ("page" in tab) return props.browsers?.items.some((item) => item.id === tab.page) ? tab : null;
     return props.files?.items.some((item) => item.key === tab.file) ? tab : null;
   };
   const menuThread = () => {
@@ -263,12 +351,26 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     const id = menuThread();
     return id === undefined ? undefined : props.threads?.items.find((item) => item.id === id);
   };
+  const menuPane = () => {
+    const tab = liveMenuTab();
+    if (tab && "page" in tab) return "browser";
+    return tab && "pane" in tab ? tab.pane : undefined;
+  };
+  const hasPaneActions = (pane: SidePanelPane) =>
+    (props.moves?.length ?? 0) > 0 ||
+    props.windows?.[pane] !== undefined ||
+    (pane === "browser" && props.pageTabs !== undefined);
+  const actionMenuPane = () => {
+    const pane = menuPane();
+    return pane && hasPaneActions(pane) ? pane : undefined;
+  };
   const threadRemovable = () => props.threads?.onArchive !== undefined || props.threads?.onDelete !== undefined;
   const closeMenuTab = () => {
     const tab = liveMenuTab();
     if (!tab) return;
     if ("pane" in tab) props.onClose(tab.pane);
     else if ("thread" in tab) props.threads?.onClose(tab.thread);
+    else if ("page" in tab) props.browsers?.onClose(tab.page);
     else props.files?.onClose(tab.file);
   };
   const returnFocus = (event: Event) => {
@@ -280,10 +382,14 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
     back.focus();
   };
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root onOpenChange={coverForTabMenu.setOpen}>
       <SidePanelTabRow {...props} onTabMenu={pickMenuTab} onTabMenuPress={pickTouchMenuTab} />
       <ContextMenu.Portal>
-        <ContextMenu.Content aria-label={t("conversation.sidePanel.tabActions")} onCloseAutoFocus={returnFocus}>
+        <ContextMenu.Content
+          ref={coverForTabMenu.ref}
+          aria-label={t("conversation.sidePanel.tabActions")}
+          onCloseAutoFocus={returnFocus}
+        >
           <Show when={menuThread()}>
             {(thread) => (
               <>
@@ -291,6 +397,40 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                   <MessageSquare aria-hidden="true" />
                   {t("conversation.threads.toChat")}
                 </ContextMenu.Item>
+                <ContextMenu.Separator />
+              </>
+            )}
+          </Show>
+          <Show when={actionMenuPane()}>
+            {(pane) => (
+              <>
+                <For each={props.moves ?? []}>
+                  {(move) => (
+                    <ContextMenu.Item class="side-panel-menu-item" onSelect={() => props.onMove?.(pane(), move)}>
+                      {SIDE_PANEL_MOVES[move].icon()}
+                      {t(SIDE_PANEL_MOVES[move].label)}
+                    </ContextMenu.Item>
+                  )}
+                </For>
+                <Show when={props.windows?.[pane()]}>
+                  {(open) => (
+                    <ContextMenu.Item class="side-panel-menu-item" onSelect={() => open()()}>
+                      <SquareArrowOutUpRight aria-hidden="true" />
+                      {t("conversation.sidePanel.openWindow")}
+                    </ContextMenu.Item>
+                  )}
+                </Show>
+                <Show when={pane() === "browser" && props.pageTabs}>
+                  {(pageTabs) => (
+                    <ContextMenu.Item
+                      class="side-panel-menu-item"
+                      onSelect={() => pageTabs().onChange(!pageTabs().shown)}
+                    >
+                      <PageTabsIcon shown={pageTabs().shown} />
+                      {t(pageTabsText(pageTabs().shown))}
+                    </ContextMenu.Item>
+                  )}
+                </Show>
                 <ContextMenu.Separator />
               </>
             )}
@@ -338,6 +478,34 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
   );
 }
 
+function pixels(value: string): number {
+  return Number.parseFloat(value.replace(/^\w+\(/, "")) || 0;
+}
+
+function tabWidthFloor(tab: HTMLElement): number {
+  const shrinksToContent = CSS.supports("min-width", "calc-size(max-content, size)");
+  return shrinksToContent ? 0 : pixels(getComputedStyle(tab).minWidth);
+}
+
+function wantedTabWidth(tab: HTMLElement, basis: number): number {
+  const select = tab.querySelector<HTMLElement>(".side-panel-tab-select");
+  const label = tab.querySelector<HTMLElement>(".side-panel-tab-label");
+  if (!select || !label) return tab.offsetWidth;
+  const contentEnd = (select.lastElementChild ?? label).getBoundingClientRect().right;
+  const slack = select.getBoundingClientRect().right - pixels(getComputedStyle(select).paddingInlineEnd) - contentEnd;
+  const content = tab.offsetWidth - Math.max(0, slack) + Math.max(0, label.scrollWidth - label.clientWidth);
+  return Math.max(tabWidthFloor(tab), basis > 0 ? Math.min(basis, content) : content);
+}
+
+function wantedTabsWidth(list: HTMLElement): number {
+  const tabs = [...list.querySelectorAll<HTMLElement>(":scope > .side-panel-tab")];
+  const style = getComputedStyle(list);
+  const gaps = pixels(style.columnGap) * Math.max(0, tabs.length - 1);
+  const padding = pixels(style.paddingInlineStart) + pixels(style.paddingInlineEnd);
+  const basis = pixels(style.getPropertyValue("--side-panel-tab-basis"));
+  return tabs.reduce((sum, tab) => sum + wantedTabWidth(tab, basis), padding + gaps);
+}
+
 function SidePanelTabRow(
   props: SidePanelHeaderProps & {
     onTabMenu: (event: MouseEvent) => void;
@@ -345,24 +513,46 @@ function SidePanelTabRow(
   },
 ) {
   const { t } = useText();
+  const coverForHidden = coveringMenu();
+  const coverForAdd = coveringMenu();
+  const coverForMore = coveringMenu();
+  const coverForAll = coveringMenu();
   let root: HTMLDivElement | undefined;
   let tabList: HTMLDivElement | undefined;
+  let actions: HTMLDivElement | undefined;
+  const [crowded, setCrowded] = createSignal(false);
   const closedPanes = () => inPaneOrder(props.available).filter((pane) => !props.panes.includes(pane));
   const threads = () => props.threads?.items ?? [];
   const files = () => props.files?.items ?? [];
+  const pages = () => props.browsers?.items ?? [];
+  const pageTabs = (pane: SidePanelPane) => pane === "browser" && pages().length > 0;
   const hasTabs = () => props.panes.length + threads().length + files().length > 0;
   const newBrowserTab = () =>
     props.panes.includes("browser") && props.available.includes("browser") ? props.onNewBrowserTab : undefined;
   const labelOf = (pane: SidePanelPane) => paneLabel(t, pane, props.settingsLabel);
+  const actionPane = () =>
+    props.threads?.selectedId == null &&
+    props.files?.selectedKey == null &&
+    props.selected !== null &&
+    props.panes.includes(props.selected)
+      ? props.selected
+      : null;
+  const actionWindow = () => {
+    const pane = actionPane();
+    return pane ? props.windows?.[pane] : undefined;
+  };
+  const actionPageTabs = () => (actionPane() === "browser" ? props.pageTabs : undefined);
   const selectedValue = () => {
     const thread = props.threads?.selectedId;
     if (thread) return `${THREAD_VALUE}${thread}`;
     const file = props.files?.selectedKey;
     if (file) return fileValue(file);
+    const page = props.browsers?.selectedId;
+    if (page) return `${PAGE_VALUE}${page}`;
     return props.selected ?? "__none";
   };
   const tabValues = () => [
-    ...props.panes,
+    ...props.panes.flatMap((pane) => (pageTabs(pane) ? pages().map((page) => `${PAGE_VALUE}${page.id}`) : [pane])),
     ...threads().map((thread) => `${THREAD_VALUE}${thread.id}`),
     ...files().map((file) => fileValue(file.key)),
   ];
@@ -375,10 +565,31 @@ function SidePanelTabRow(
     const next = values[Math.min(index, values.length - 1)];
     if (next) tabList?.querySelector<HTMLElement>(`[data-key="${CSS.escape(next)}"]`)?.focus();
   };
+  const showAdd = () => hasTabs() && (newBrowserTab() !== undefined || closedPanes().length > 0);
+  const showMore = () =>
+    actionPane() !== null &&
+    ((props.moves?.length ?? 0) > 0 || actionWindow() !== undefined || actionPageTabs() !== undefined);
+  const showMaximize = () => hasTabs() && props.onCloseGroup === undefined;
+  const actionCount = () => [showAdd(), showMore(), showMaximize()].filter(Boolean).length;
+  const combined = () => crowded() && actionCount() > 1;
+  const fitActions = () => {
+    const list = tabList;
+    if (!list || !actions) return;
+    const need = wantedTabsWidth(list);
+    if (!crowded()) {
+      if (need > list.clientWidth + 1) setCrowded(true);
+      return;
+    }
+    const trigger = actions.querySelector<HTMLElement>(".side-panel-all-actions");
+    const step = (trigger?.offsetWidth ?? 0) + pixels(getComputedStyle(actions).columnGap);
+    const freed = combined() ? (actionCount() - 1) * step : 0;
+    if (need + freed <= list.clientWidth) setCrowded(false);
+  };
   const tabRow = createTabRow({
     list: () => tabList,
     tabs: (list) => [...list.querySelectorAll<HTMLElement>(":scope > .side-panel-tab")],
     key: (tab) => tab.dataset.value ?? "",
+    measured: fitActions,
   });
   const row = tabRow.row;
   createEffect(createMemo(selectedValue), (value) => tabRow.reveal(value));
@@ -396,13 +607,24 @@ function SidePanelTabRow(
     close();
   };
   const entries = (): TabEntry[] => [
-    ...props.panes.map((pane) => ({
-      value: pane,
-      label: labelOf(pane),
-      icon: () => <PaneIcon pane={pane} />,
-      badge: props.badges?.[pane],
-      select: () => props.onSelect(pane),
-    })),
+    ...props.panes.flatMap((pane): TabEntry[] =>
+      pageTabs(pane)
+        ? pages().map((page) => ({
+            value: `${PAGE_VALUE}${page.id}`,
+            label: page.title,
+            icon: () => <PageTabIcon page={page} />,
+            select: () => props.browsers?.onSelect(page.id),
+          }))
+        : [
+            {
+              value: pane,
+              label: labelOf(pane),
+              icon: () => <PaneIcon pane={pane} />,
+              badge: props.badges?.[pane],
+              select: () => props.onSelect(pane),
+            },
+          ],
+    ),
     ...threads().map((thread) => ({
       value: `${THREAD_VALUE}${thread.id}`,
       label: thread.title,
@@ -417,6 +639,82 @@ function SidePanelTabRow(
     })),
   ];
   const hiddenEntries = () => entries().filter((entry) => row.hidden.includes(entry.value));
+  createEffect(
+    () =>
+      `${actionCount()}|${entries()
+        .map((entry) => entry.label)
+        .join("|")}`,
+    () => tabRow.measure(),
+  );
+  const addItems = (paneText: (pane: SidePanelPane) => string) => (
+    <>
+      <Show when={newBrowserTab() !== undefined}>
+        <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => newBrowserTab()?.()}>
+          <Plus aria-hidden="true" />
+          {t("browser.newTab")}
+        </DropdownMenu.Item>
+        <Show when={closedPanes().length > 0}>
+          <DropdownMenu.Separator />
+        </Show>
+      </Show>
+      <For each={closedPanes()}>
+        {(pane) => (
+          <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => props.onSelect(pane)}>
+            <PaneIcon pane={pane} />
+            {paneText(pane)}
+            <PaneBadge badge={props.badges?.[pane]} />
+          </DropdownMenu.Item>
+        )}
+      </For>
+    </>
+  );
+  const moreItems = () => (
+    <>
+      <For each={props.moves ?? []}>
+        {(move) => (
+          <DropdownMenu.Item
+            class="side-panel-menu-item"
+            onSelectAfterClose={() => {
+              const pane = actionPane();
+              if (pane) props.onMove?.(pane, move);
+            }}
+          >
+            {SIDE_PANEL_MOVES[move].icon()}
+            {t(SIDE_PANEL_MOVES[move].label)}
+          </DropdownMenu.Item>
+        )}
+      </For>
+      <Show when={actionWindow()}>
+        {(open) => (
+          <>
+            <Show when={(props.moves?.length ?? 0) > 0}>
+              <DropdownMenu.Separator />
+            </Show>
+            <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => open()()}>
+              <SquareArrowOutUpRight aria-hidden="true" />
+              {t("conversation.sidePanel.openWindow")}
+            </DropdownMenu.Item>
+          </>
+        )}
+      </Show>
+      <Show when={actionPageTabs()}>
+        {(pageTabs) => (
+          <>
+            <Show when={(props.moves?.length ?? 0) > 0 || actionWindow() !== undefined}>
+              <DropdownMenu.Separator />
+            </Show>
+            <DropdownMenu.Item
+              class="side-panel-menu-item"
+              onSelectAfterClose={() => pageTabs().onChange(!pageTabs().shown)}
+            >
+              <PageTabsIcon shown={pageTabs().shown} />
+              {t(pageTabsText(pageTabs().shown))}
+            </DropdownMenu.Item>
+          </>
+        )}
+      </Show>
+    </>
+  );
   const carriedHere = () => carriedThreadTab()?.from === "chat";
   const keyboardFocus = (event: FocusEvent) =>
     event.relatedTarget !== null &&
@@ -470,6 +768,7 @@ function SidePanelTabRow(
         tab.style.transform = "";
       }
       if (current.group === "thread") props.threads?.onMove(current.id, index);
+      else if (current.group === "page") props.browsers?.onMove(current.id, index);
       else props.files?.onMove(current.id, index);
       flush();
       if (focused instanceof HTMLElement && focused !== document.activeElement) focused.focus({ preventScroll: true });
@@ -544,13 +843,17 @@ function SidePanelTabRow(
       if (event.target.closest(".side-panel-tab-close")) return;
       const threadId = event.target.closest<HTMLElement>(".side-panel-thread-tab")?.dataset.threadId;
       const fileKey = event.target.closest<HTMLElement>(".side-panel-file-tab")?.dataset.fileKey;
+      const pageId = event.target.closest<HTMLElement>(".side-panel-page-tab")?.dataset.pageId;
       const thread = threads().find((item) => item.id === threadId);
       const file = files().find((item) => item.key === fileKey);
+      const page = pages().find((item) => item.id === pageId);
       const held = thread
         ? { group: "thread" as const, id: thread.id, thread }
         : file
           ? { group: "file" as const, id: file.key, thread: null }
-          : null;
+          : page
+            ? { group: "page" as const, id: page.id, thread: null }
+            : null;
       if (!held) return;
       hold = {
         ...held,
@@ -585,7 +888,7 @@ function SidePanelTabRow(
       <Tabs.Root
         as={ContextMenu.Trigger}
         ref={root}
-        class="window-drag side-panel-header"
+        class={props.split ? "side-panel-header" : "window-drag side-panel-header"}
         value={selectedValue()}
         activationMode="automatic"
         onContextMenu={props.onTabMenu}
@@ -594,7 +897,7 @@ function SidePanelTabRow(
         <Tabs.List
           ref={tabList}
           class="side-panel-tabs"
-          aria-label={t("conversation.sidePanel.label")}
+          aria-label={props.label ?? t("conversation.sidePanel.label")}
           data-frozen={row.frozen ? "" : undefined}
           data-fade-start={row.fadeStart ? "" : undefined}
           data-fade-end={row.fadeEnd ? "" : undefined}
@@ -604,49 +907,105 @@ function SidePanelTabRow(
           <For each={props.panes}>
             {(pane) => {
               const label = () => labelOf(pane);
+              const pageTab = (page: () => SidePanelBrowserTab) => {
+                const value = () => `${PAGE_VALUE}${page().id}`;
+                const selected = () => props.browsers?.selectedId === page().id;
+                const select = () => props.browsers?.onSelect(page().id);
+                const close = () => props.browsers?.onClose(page().id);
+                return (
+                  <div
+                    role="presentation"
+                    class="side-panel-tab side-panel-page-tab no-drag"
+                    data-value={value()}
+                    data-page-id={page().id}
+                    data-selected={selected() ? "true" : undefined}
+                  >
+                    <Tabs.Trigger
+                      as="button"
+                      type="button"
+                      value={value()}
+                      class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
+                      aria-keyshortcuts="Delete"
+                      title={page().title}
+                      onClick={select}
+                      onAuxClick={(event: MouseEvent) => {
+                        if (event.button === 1) closeWithPointer(value(), close);
+                      }}
+                      onFocus={(event) => keyboardFocus(event) && !selected() && select()}
+                      onKeyDown={(event) => onTabKeyDown(event, value(), close)}
+                    >
+                      <span class="side-panel-tab-label">{page().title}</span>
+                    </Tabs.Trigger>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="side-panel-tab-close"
+                      tabindex={-1}
+                      aria-hidden="true"
+                      onMouseDown={keepFocus}
+                      title={t("conversation.sidePanel.closePane", { name: page().title })}
+                      onClick={() => closeWithPointer(value(), close)}
+                    >
+                      <span class="side-panel-tab-icon">
+                        <PageTabIcon page={page()} />
+                      </span>
+                      <X class="side-panel-tab-x" aria-hidden="true" />
+                    </Button>
+                  </div>
+                );
+              };
               const selected = () =>
                 props.threads?.selectedId == null && props.files?.selectedKey == null && props.selected === pane;
               const close = () => props.onClose(pane);
               return (
-                <div
-                  role="presentation"
-                  class="side-panel-tab no-drag"
-                  data-value={pane}
-                  data-selected={selected() ? "true" : undefined}
+                <Show
+                  when={!pageTabs(pane)}
+                  fallback={
+                    <For each={pages()} keyed={(page) => page.id}>
+                      {pageTab}
+                    </For>
+                  }
                 >
-                  <Tabs.Trigger
-                    as="button"
-                    type="button"
-                    value={pane}
-                    class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
-                    aria-keyshortcuts="Delete"
-                    title={label()}
-                    onClick={() => props.onSelect(pane)}
-                    onAuxClick={(event: MouseEvent) => {
-                      if (event.button === 1) closeWithPointer(pane, close);
-                    }}
-                    onFocus={(event) => keyboardFocus(event) && !selected() && props.onSelect(pane)}
-                    onKeyDown={(event) => onTabKeyDown(event, pane, close)}
+                  <div
+                    role="presentation"
+                    class="side-panel-tab no-drag"
+                    data-value={pane}
+                    data-selected={selected() ? "true" : undefined}
                   >
-                    <span class="side-panel-tab-label">{label()}</span>
-                    <PaneBadge badge={props.badges?.[pane]} />
-                  </Tabs.Trigger>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    class="side-panel-tab-close"
-                    tabindex={-1}
-                    aria-hidden="true"
-                    onMouseDown={keepFocus}
-                    title={t("conversation.sidePanel.closePane", { name: label() })}
-                    onClick={() => closeWithPointer(pane, close)}
-                  >
-                    <span class="side-panel-tab-icon">
-                      <PaneIcon pane={pane} />
-                    </span>
-                    <X class="side-panel-tab-x" aria-hidden="true" />
-                  </Button>
-                </div>
+                    <Tabs.Trigger
+                      as="button"
+                      type="button"
+                      value={pane}
+                      class={buttonVariants({ variant: "ghost", class: "side-panel-tab-select" })}
+                      aria-keyshortcuts="Delete"
+                      title={label()}
+                      onClick={() => props.onSelect(pane)}
+                      onAuxClick={(event: MouseEvent) => {
+                        if (event.button === 1) closeWithPointer(pane, close);
+                      }}
+                      onFocus={(event) => keyboardFocus(event) && !selected() && props.onSelect(pane)}
+                      onKeyDown={(event) => onTabKeyDown(event, pane, close)}
+                    >
+                      <span class="side-panel-tab-label">{label()}</span>
+                      <PaneBadge badge={props.badges?.[pane]} />
+                    </Tabs.Trigger>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      class="side-panel-tab-close"
+                      tabindex={-1}
+                      aria-hidden="true"
+                      onMouseDown={keepFocus}
+                      title={t("conversation.sidePanel.closePane", { name: label() })}
+                      onClick={() => closeWithPointer(pane, close)}
+                    >
+                      <span class="side-panel-tab-icon">
+                        <PaneIcon pane={pane} />
+                      </span>
+                      <X class="side-panel-tab-x" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </Show>
               );
             }}
           </For>
@@ -752,9 +1111,9 @@ function SidePanelTabRow(
             }}
           </For>
         </Tabs.List>
-        <div class="side-panel-actions no-drag">
+        <div ref={actions} class="side-panel-actions no-drag">
           <Show when={row.hidden.length > 0}>
-            <DropdownMenu.Root modal={false} placement="bottom-end" gutter={4}>
+            <DropdownMenu.Root modal={false} placement="bottom-end" gutter={4} onOpenChange={coverForHidden.setOpen}>
               <DropdownMenu.Trigger
                 class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
                 aria-label={t("browser.tabs.more", { count: row.hidden.length })}
@@ -763,7 +1122,7 @@ function SidePanelTabRow(
                 <ChevronDown aria-hidden="true" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content class="side-panel-hidden-tabs">
+                <DropdownMenu.Content ref={coverForHidden.ref} class="side-panel-hidden-tabs">
                   <For each={hiddenEntries()} keyed={(entry) => entry.value}>
                     {(entry) => (
                       <DropdownMenu.Item
@@ -784,8 +1143,44 @@ function SidePanelTabRow(
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
           </Show>
-          <Show when={hasTabs() && (newBrowserTab() !== undefined || closedPanes().length > 0)}>
-            <DropdownMenu.Root placement="bottom-end" gutter={4}>
+          <Show when={combined()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} onOpenChange={coverForAll.setOpen}>
+              <DropdownMenu.Trigger
+                class={buttonVariants({ variant: "ghost", size: "icon-sm", class: "side-panel-all-actions" })}
+                aria-label={t("conversation.sidePanel.more")}
+                title={t("conversation.sidePanel.more")}
+              >
+                <Ellipsis aria-hidden="true" />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content ref={coverForAll.ref}>
+                  <Show when={showAdd()}>
+                    {addItems((pane) => t("conversation.sidePanel.openPane", { name: labelOf(pane) }))}
+                    <DropdownMenu.Separator />
+                  </Show>
+                  <Show when={showMore()}>
+                    {moreItems()}
+                    <Show when={showMaximize()}>
+                      <DropdownMenu.Separator />
+                    </Show>
+                  </Show>
+                  <Show when={showMaximize()}>
+                    <DropdownMenu.Item
+                      class="side-panel-menu-item"
+                      onSelectAfterClose={() => props.onToggleMaximized()}
+                    >
+                      <Show when={props.maximized} fallback={<Maximize2 aria-hidden="true" />}>
+                        <Minimize2 aria-hidden="true" />
+                      </Show>
+                      {t(props.maximized ? "conversation.sidePanel.restore" : "conversation.sidePanel.maximize")}
+                    </DropdownMenu.Item>
+                  </Show>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </Show>
+          <Show when={!combined() && showAdd()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} onOpenChange={coverForAdd.setOpen}>
               <DropdownMenu.Trigger
                 class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
                 aria-label={t("conversation.sidePanel.add")}
@@ -794,30 +1189,38 @@ function SidePanelTabRow(
                 <Plus aria-hidden="true" />
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content>
-                  <Show when={newBrowserTab() !== undefined}>
-                    <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => newBrowserTab()?.()}>
-                      <Plus aria-hidden="true" />
-                      {t("browser.newTab")}
-                    </DropdownMenu.Item>
-                    <Show when={closedPanes().length > 0}>
-                      <DropdownMenu.Separator />
-                    </Show>
-                  </Show>
-                  <For each={closedPanes()}>
-                    {(pane) => (
-                      <DropdownMenu.Item class="side-panel-menu-item" onSelectAfterClose={() => props.onSelect(pane)}>
-                        <PaneIcon pane={pane} />
-                        {labelOf(pane)}
-                        <PaneBadge badge={props.badges?.[pane]} />
-                      </DropdownMenu.Item>
-                    )}
-                  </For>
-                </DropdownMenu.Content>
+                <DropdownMenu.Content ref={coverForAdd.ref}>{addItems(labelOf)}</DropdownMenu.Content>
               </DropdownMenu.Portal>
             </DropdownMenu.Root>
           </Show>
-          <Show when={hasTabs()}>
+          <Show when={!combined() && showMore()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} onOpenChange={coverForMore.setOpen}>
+              <DropdownMenu.Trigger
+                class={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+                aria-label={t("conversation.sidePanel.more")}
+                title={t("conversation.sidePanel.more")}
+              >
+                <Ellipsis aria-hidden="true" />
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content ref={coverForMore.ref}>{moreItems()}</DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </Show>
+          <Show when={props.onCloseGroup}>
+            {(close) => (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("conversation.sidePanel.closeGroup")}
+                title={t("conversation.sidePanel.closeGroup")}
+                onClick={() => close()()}
+              >
+                <X aria-hidden="true" />
+              </Button>
+            )}
+          </Show>
+          <Show when={!combined() && showMaximize()}>
             <Button
               variant="ghost"
               size="icon-sm"
@@ -831,7 +1234,7 @@ function SidePanelTabRow(
               </Show>
             </Button>
           </Show>
-          <Show when={props.maximized}>
+          <Show when={props.maximized && !props.outerToggle}>
             <Button
               variant="ghost"
               size="icon-sm"

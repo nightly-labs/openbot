@@ -62,6 +62,16 @@ function withoutMention(text: string): string {
     .trim();
 }
 
+function composerText(composer: Element): string {
+  if (composer instanceof HTMLTextAreaElement) return composer.value;
+  return composer instanceof HTMLElement ? composer.innerText : (composer.textContent ?? "");
+}
+
+const X_EPOCH_MS = 1_288_834_974_657;
+const statusId = (href: string) => href.match(/\/status\/(\d{15,20})/u)?.[1] ?? "";
+const permalink = (href: string) => href.match(/^.*?\/status\/\d+/u)?.[0] ?? href;
+const timeOfStatus = (id: string) => (id ? new Date(Number(BigInt(id) >> 22n) + X_EPOCH_MS).toISOString() : "");
+
 function replyButtonFor(composer: Element): HTMLElement | null {
   let node = composer.parentElement;
   for (let depth = 0; node && depth < BUTTON_DEPTH; depth += 1, node = node.parentElement) {
@@ -115,7 +125,7 @@ function schedule() {
 function scan() {
   const armed = new Set<HTMLElement>();
   for (const composer of queryAll(document, "composer")) {
-    if (!mentions(composer.textContent ?? "")) continue;
+    if (!mentions(composerText(composer))) continue;
     refreshStatus();
     const button = replyButtonFor(composer);
     if (!button) {
@@ -164,13 +174,14 @@ function readPost(element: Element): XPost {
   const handle = authorText.match(/@[A-Za-z0-9_]{1,15}/u)?.[0] ?? "";
   const firstLine = (authorText.split("\n")[0] ?? "").replace(handle, "").trim();
   const link = query(element, "postLink");
-  const href = link instanceof HTMLAnchorElement ? link.href : "";
+  const href = link instanceof HTMLAnchorElement ? permalink(link.href) : "";
   const text = query(element, "postText");
   const article = query(element, "article");
+  const time = query(element, "postTime")?.getAttribute("datetime") || timeOfStatus(statusId(href));
   return {
     authorName: clip(firstLine, X_PAYLOAD_LIMITS.name),
     handle: clip(handle, X_PAYLOAD_LIMITS.name),
-    time: clip(query(element, "postTime")?.getAttribute("datetime") ?? "", X_PAYLOAD_LIMITS.name),
+    time: clip(time, X_PAYLOAD_LIMITS.name),
     url: href.length <= X_PAYLOAD_LIMITS.url && webAddress(href) ? href : "",
     text: clip(text instanceof HTMLElement ? text.innerText : "", X_PAYLOAD_LIMITS.text),
     article: clip(article instanceof HTMLElement ? article.innerText : "", X_PAYLOAD_LIMITS.text),
@@ -194,13 +205,19 @@ function readPayload(composer: Element): XReplyPayload | null {
   const target = posts[replyTo];
   if (!target) return null;
   const read = posts.map(readPost);
+  const answered = read[replyTo];
+  const replyToId = new URLSearchParams(location.search).get("in_reply_to") ?? "";
+  if (answered && !answered.url && /^\d{15,20}$/u.test(replyToId)) {
+    answered.url = `${location.origin}/i/web/status/${replyToId}`;
+    answered.time ||= timeOfStatus(replyToId);
+  }
   const author = read[replyTo]?.handle;
   let end = replyTo + 1;
   if (!dialog && author) while (end < read.length && read[end]?.handle === author) end += 1;
   const half = Math.floor(X_PAYLOAD_LIMITS.posts / 2);
   const start = Math.max(0, replyTo - half);
   const kept = read.slice(start, Math.min(end, replyTo + half + 1));
-  const message = composer instanceof HTMLElement ? composer.innerText : (composer.textContent ?? "");
+  const message = composerText(composer);
   return {
     message: clip(withoutMention(message), X_PAYLOAD_LIMITS.message),
     pageUrl: location.href.length <= X_PAYLOAD_LIMITS.url ? location.href : location.origin,

@@ -438,6 +438,8 @@ export const messages = {
     "Het beveiligingscertificaat van deze site wordt niet vertrouwd, dus de pagina is niet geopend.",
   "error.backend.browserLowMemory":
     "Deze server heeft weinig geheugen, dus de browser kan geen tabblad meer openen. Sluit een tabblad, of wacht tot andere agents klaar zijn.",
+  "error.backend.browserNoMemory":
+    "Deze server heeft bijna geen geheugen meer, dus de browser kan nu geen tabblad openen. Wacht tot andere agents klaar zijn en probeer het dan opnieuw.",
   "error.backend.browserOpenFailed": "Kan {url} niet openen: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups worden geblokkeerd tijdens beveiligde invoer. Rond de beveiligde invoer af of annuleer deze, en probeer het opnieuw vanaf de pagina.",

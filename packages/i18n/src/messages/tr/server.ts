@@ -229,6 +229,9 @@ export const messages = {
   "server.rail.delete": "Sunucuyu sil",
   "server.rail.hide": "Sunucuyu gizle",
   "server.rail.showLocal": "{name} sunucusunu göster",
+  "server.rail.hiddenServers": "Gizli sunucular",
+  "server.rail.hideFailed": "{name} gizlenemedi",
+  "server.rail.showFailed": "{name} gösterilemedi",
   "server.plan.daysLeft": {
     one: "{count} gün",
     other: "{count} gün",

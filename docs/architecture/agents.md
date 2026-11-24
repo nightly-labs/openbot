@@ -1109,8 +1109,21 @@ a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 
 `steerByPromptCapability` for a Devin CLI that reports `cognition.ai/midTurnPrompts`, because Devin
 reports the version "0.0.0-dev"). While an approval or a question is open, the message waits in the
 queue, because a new prompt would close it. Devin answers each prompt of the run with the same usage,
-so `AcpFlavor.promptRun` reports it once. `scripts/antigravity-steer-e2e.ts` and
+so `AcpFlavor.promptRun` reports it once. A steer that comes before the first update of the running
+prompt waits for that update, or for the turn end or a stop, up to `ACP_STEER_FIRST_UPDATE_WAIT_MS`
+(10 s). A teammate message and a channel post wait for the steer result, so the limit is short. After
+the limit, the message waits in the queue. Before, it failed at once and the message waited for the end
+of the whole turn. `scripts/antigravity-steer-e2e.ts` and
 `scripts/devin-steer-e2e.ts` check these paths.
+
+A message that comes while a turn starts, before the provider gave the turn id, cannot steer yet and
+stays in the queue. When the mode is "steer" and a delivery of the same lane is starting,
+`AgentService` keeps its delivery id (`#steersAfterTurnStart`) and steers it at `turn-started` of the
+same thread if it is still queued. Before, it ran only after the whole turn. A message to an idle
+agent with a held queue is not kept, so it does not join the next turn. A Stop of a chat or task turn
+that fails or that does not stop the turn records the turn in `#failedStops`. The steers that follow
+then join the running turn. The stop mark stays, so a late interrupted end still counts as a stop.
+`scripts/steer-before-turn-id-e2e.ts` checks both.
 
 A custom agent (`acp`) uses the same extension (#4977). Its descriptor has `steer: "reported"`: each
 agent process reports at `initialize` whether it steers, so the provider alone does not tell.

@@ -299,6 +299,8 @@ export const messages = {
     "Модель OpenCode завершила ход без ответа. Повторите попытку или выберите другую модель.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "Модель OpenCode завершила ход после рассуждения, без ответа. Повторите попытку или выберите другую модель.",
+  "error.provider.opencodeToolCallsAsText":
+    "Модель OpenCode записала свои действия текстом и не выполнила их. Повторите попытку или выберите другую модель.",
   "error.provider.acpNoAnswer":
     "{provider} завершил ход без ответа. Отправьте сообщение ещё раз или начните новый чат.",
   "error.provider.noAnswerAfterSteps":
@@ -423,6 +425,8 @@ export const messages = {
     "{provider} заблокировал это сообщение из-за своих правил безопасности: {reason} Если {provider} блокирует и ваши следующие сообщения, начните новый чат.",
   "error.provider.codexAudioRefused":
     "Эта модель не может слушать аудио, поэтому она не приняла звук в этом чате. OpenBot начал новый сеанс Codex с историей чата. Чтобы продолжить, отправьте запрос снова и попросите агента работать без звука. Чтобы проверить звук, выберите в меню моделей агента модель, которая может слушать аудио.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex не смог загрузить настройки вашего аккаунта ChatGPT, поэтому агент остановился. Повторите попытку. Если он снова остановится, выберите «Переподключить» для ChatGPT в разделе «Настройки сервера → Провайдеры».",
   "error.provider.imageTooSmall":
     "Модель не приняла изображение в этом чате, потому что изображение слишком маленькое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.imageTooLarge":
@@ -558,6 +562,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
   "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
   "error.provider.acpSessionBusy": "{provider} ещё завершает остановленный ход. Повторите попытку чуть позже.",
+  "error.provider.acpSettingsConflict":
+    "{provider} изменил этот чат, пока OpenBot применял его настройки. Повторите попытку.",
   "error.provider.acpSessionStale":
     "{provider} не удалось загрузить последнюю версию этого чата. Отправьте сообщение ещё раз.",
   "error.provider.acpModelNotOffered":

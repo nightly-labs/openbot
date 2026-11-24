@@ -566,6 +566,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Сбор данных начат: {started}. Обновлено: {updated}.",
   "mobile.agent.usage.never": "никогда",
   "mobile.agent.record.time": "Время",
+  "mobile.agent.record.date": "Дата",
   "mobile.agent.section.changeFailed": "Не удалось изменить папку",
   "mobile.agent.section.tryAgain": "Повторите попытку.",
   "mobile.agent.section.moveUp": "Выше",
@@ -667,7 +668,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Не удалось загрузить серверы",
   "mobile.agent.home.serversFailedBody": "Убедитесь, что настольное приложение запущено, и повторите попытку.",
   "mobile.agent.home.noServers": "Нет доступных серверов",
-  "mobile.agent.home.noServersBody": "Подключите настольное приложение снова или присоединитесь к удалённому серверу.",
+  "mobile.agent.home.noServersBody":
+    "Откройте OpenBot на компьютере с этим аккаунтом и включите «Опубликовать этот сервер» в «Настройки сервера» → «Участники». Или присоединитесь к удалённому серверу.",
   "mobile.agent.home.chooseServer": "Выберите сервер",
   "mobile.agent.home.openServers": "Открыть серверы",
   "mobile.agent.home.noChatOpen": "Чат не открыт",

@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Tarayıcı sekmesini kapat",
   "browser.newTab": "Yeni tarayıcı sekmesi",
   "browser.backToChat": "Sohbete dön",
+  "browser.fullView.open": "Tam görünümde aç",
   "browser.goBack": "Geri git",
   "browser.goForward": "İleri git",
   "browser.reload": "Sayfayı yenile",

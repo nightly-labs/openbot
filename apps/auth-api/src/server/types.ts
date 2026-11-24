@@ -40,6 +40,8 @@ export interface WorkerBindings {
   MEDIA_API_TASKS_KEY?: string;
   SITE_OPERATIONS_ADMIN_TOKEN?: string;
   SERVER_CLAIMS_ADMIN_TOKEN?: string;
+  STORE_REVIEW_EMAIL?: string;
+  STORE_REVIEW_CODE?: string;
   SITE_REPORT_HASH_SECRET?: string;
   COMPANY_SIGN_IN_SECRET?: string;
   HOSTED_ARCHIVE_KEY_SECRET?: string;

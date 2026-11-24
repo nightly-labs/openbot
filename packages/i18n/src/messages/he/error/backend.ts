@@ -400,6 +400,8 @@ export const messages = {
   "error.backend.browserCertificateUntrusted": "תעודת האבטחה של האתר הזה אינה מהימנה, ולכן הדף לא נפתח.",
   "error.backend.browserLowMemory":
     "בשרת הזה נותר מעט זיכרון, ולכן הדפדפן אינו יכול לפתוח לשונית נוספת. יש לסגור לשונית או להמתין לסיום העבודה של סוכנים אחרים.",
+  "error.backend.browserNoMemory":
+    "הזיכרון בשרת הזה כמעט נגמר, ולכן הדפדפן אינו יכול לפתוח לשונית כרגע. יש להמתין לסיום העבודה של סוכנים אחרים ולנסות שוב.",
   "error.backend.browserOpenFailed": "לא ניתן לפתוח את {url}: {reason}",
   "error.backend.popupSecureInput":
     "חלונות קופצים חסומים בזמן קלט מאובטח. יש לסיים או לבטל את הקלט המאובטח ולנסות שוב מהדף.",

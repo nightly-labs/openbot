@@ -1,6 +1,7 @@
 import type { CentralAuthIssue, CentralAuthUser } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { currentText } from "@openbot/ui/text";
+import { SIGN_IN_FAILURE_CODES, type SignInFailureCode } from "./analytics";
 import { decodeUser, deviceId, type ExtensionSession } from "./extension-storage";
 
 export const ACCOUNT_API_URL = import.meta.env.VITE_OPENBOT_API_URL;
@@ -23,7 +24,7 @@ export interface EmailChallenge {
 
 async function accountRequest(
   path: string,
-  init: { method: "GET" | "POST" | "DELETE"; body?: object; token?: string; idempotencyKey?: string },
+  init: { method: "GET" | "POST" | "PUT" | "DELETE"; body?: object; token?: string; idempotencyKey?: string },
 ): Promise<{ response: Response; body: DynamicRecord | null }> {
   const response = await fetch(`${ACCOUNT_API_URL}${path}`, {
     method: init.method,
@@ -113,6 +114,19 @@ export async function endSession(token: string): Promise<void> {
   await accountRequest("/v1/mobile-auth/session", { method: "DELETE", token }).catch(() => undefined);
 }
 
+export async function saveAnalyticsAnswer(token: string, enabled: boolean): Promise<void> {
+  await accountRequest("/v1/me/analytics", { method: "PUT", token, body: { enabled, ageMs: 0 } }).catch(
+    () => undefined,
+  );
+}
+
+export function signInOutcome(error: unknown): { result: "failed" | "cancelled"; failure_code?: SignInFailureCode } {
+  if (!(error instanceof SignInIssue)) return { result: "failed", failure_code: "unknown" };
+  if (error.issue.code === "sign_in_cancelled") return { result: "cancelled" };
+  const code = error.issue.code;
+  return { result: "failed", failure_code: isOneOf(SIGN_IN_FAILURE_CODES, code) ? code : "unknown" };
+}
+
 const WEB_URL = import.meta.env.VITE_OPENBOT_WEB_URL;
 
 function base64Url(bytes: Uint8Array): string {
@@ -132,6 +146,11 @@ export async function signInWithWeb(): Promise<ExtensionSession> {
   return exchangeCode(silent ?? (await webCode(false)));
 }
 
+const SIGN_IN_MESSAGE = "openbot.extension-sign-in";
+
+const cancelled = () =>
+  new SignInIssue({ code: "sign_in_cancelled", message: currentText().t("extension.signIn.cancelled") });
+
 async function webCode(silent: boolean): Promise<{ code: string; verifier: string }> {
   const verifier = randomToken(32);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
@@ -140,20 +159,18 @@ async function webCode(silent: boolean): Promise<{ code: string; verifier: strin
   start.searchParams.set("extension", chrome.runtime.id);
   start.searchParams.set("challenge", base64Url(new Uint8Array(digest)));
   start.searchParams.set("state", state);
-  if (silent) start.searchParams.set("silent", "1");
-  const cancelled = () =>
-    new SignInIssue({ code: "sign_in_cancelled", message: currentText().t("extension.signIn.cancelled") });
+  if (!silent) {
+    start.searchParams.set("tab", "1");
+    return { code: await tabCode(start, state), verifier };
+  }
+  start.searchParams.set("silent", "1");
   const finished = await chrome.identity
-    .launchWebAuthFlow(
-      silent
-        ? {
-            url: start.toString(),
-            interactive: false,
-            abortOnLoadForNonInteractive: false,
-            timeoutMsForNonInteractive: SILENT_MS,
-          }
-        : { url: start.toString(), interactive: true },
-    )
+    .launchWebAuthFlow({
+      url: start.toString(),
+      interactive: false,
+      abortOnLoadForNonInteractive: false,
+      timeoutMsForNonInteractive: SILENT_MS,
+    })
     .catch(() => {
       throw cancelled();
     });
@@ -161,6 +178,36 @@ async function webCode(silent: boolean): Promise<{ code: string; verifier: strin
   const code = answer?.searchParams.get("code");
   if (!answer || answer.searchParams.get("state") !== state || !code) throw cancelled();
   return { code, verifier };
+}
+
+async function tabCode(start: URL, state: string): Promise<string> {
+  const [opener] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const tab = await chrome.tabs.create({ url: start.toString(), openerTabId: opener?.id });
+  const tabId = tab.id;
+  if (tabId === undefined) throw cancelled();
+  return new Promise((resolve, reject) => {
+    const stop = () => {
+      chrome.runtime.onMessageExternal.removeListener(answered);
+      chrome.tabs.onRemoved.removeListener(closed);
+    };
+    const answered: chrome.runtime.MessageListener = (message, sender, sendResponse) => {
+      if (sender.origin !== new URL(WEB_URL).origin || sender.tab?.id !== tabId) return undefined;
+      if (!isDynamicRecord(message) || message.kind !== SIGN_IN_MESSAGE || message.state !== state) return undefined;
+      stop();
+      sendResponse({ received: true });
+      void chrome.tabs.remove(tabId).catch(() => undefined);
+      if (isString(message.code)) resolve(message.code);
+      else reject(cancelled());
+      return undefined;
+    };
+    const closed = (removed: number) => {
+      if (removed !== tabId) return;
+      stop();
+      reject(cancelled());
+    };
+    chrome.runtime.onMessageExternal.addListener(answered);
+    chrome.tabs.onRemoved.addListener(closed);
+  });
 }
 
 async function exchangeCode({ code, verifier }: { code: string; verifier: string }): Promise<ExtensionSession> {

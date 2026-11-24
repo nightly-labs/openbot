@@ -51,7 +51,7 @@ export const messages = {
   "app.rail.website": "OpenBot 网站",
   "app.rail.agents": "助手",
   "app.rail.schedule": "日程",
-  "app.rail.tasks": "任务",
+  "app.rail.tasks": "话题",
   "app.rail.workflows": "工作流",
   "app.rail.usage": "用量",
   "app.rail.creditsAsk": "需要积分时询问",

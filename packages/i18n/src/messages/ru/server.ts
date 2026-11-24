@@ -234,6 +234,9 @@ export const messages = {
   "server.rail.delete": "Удалить сервер",
   "server.rail.hide": "Скрыть сервер",
   "server.rail.showLocal": "Показать {name}",
+  "server.rail.hiddenServers": "Скрытые серверы",
+  "server.rail.hideFailed": "Не удалось скрыть {name}",
+  "server.rail.showFailed": "Не удалось показать {name}",
   "server.plan.daysLeft": {
     one: "{count} день",
     few: "{count} дня",

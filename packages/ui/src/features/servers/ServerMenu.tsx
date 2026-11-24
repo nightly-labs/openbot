@@ -9,7 +9,6 @@ import {
   ChevronsUpDown,
   ContextMenu,
   DropdownMenu,
-  Eye,
   Moon,
   MotionTooltip,
   PanelLeft,
@@ -32,7 +31,8 @@ import {
 } from "./ServerPlanEnd";
 import {
   addServerLabel,
-  type HiddenLocalServer,
+  type HiddenServer,
+  HiddenServerFolderItem,
   ServerMark,
   ServerSleepDot,
   serverHostedSleep,
@@ -63,7 +63,7 @@ export interface ServerMenuProps extends ServerActionCallbacks {
   addCreatesServer?: boolean | undefined;
   onCreateLocal?: (() => void) | undefined;
   onInstallServer?: (() => void) | undefined;
-  hiddenLocal?: HiddenLocalServer | undefined;
+  hiddenServers?: HiddenServer[] | undefined;
   compact?: boolean;
   rail?: boolean;
   credits?: CreditsMenu | undefined;
@@ -380,6 +380,7 @@ export function ServerMenu(props: ServerMenuProps) {
                   </DropdownMenu.Sub>
                 )}
               </For>
+              <HiddenServerFolderItem servers={props.hiddenServers ?? []} />
               <Show when={props.onAdd}>
                 <DropdownMenu.Item class="server-menu-add" onSelect={() => props.onAdd?.()}>
                   <span class="server-menu-add-circle" aria-hidden="true">
@@ -405,16 +406,6 @@ export function ServerMenu(props: ServerMenuProps) {
                       <Server />
                     </span>
                     <span>{t("server.install.title")}</span>
-                  </DropdownMenu.Item>
-                )}
-              </Show>
-              <Show when={props.hiddenLocal}>
-                {(hiddenLocal) => (
-                  <DropdownMenu.Item class="server-menu-add" onSelect={() => hiddenLocal().show()}>
-                    <span class="server-menu-add-circle" aria-hidden="true">
-                      <Eye />
-                    </span>
-                    <span>{t("server.rail.showLocal", { name: hiddenLocal().name })}</span>
                   </DropdownMenu.Item>
                 )}
               </Show>

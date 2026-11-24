@@ -528,6 +528,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Raccolta iniziata {started}. Aggiornata {updated}.",
   "mobile.agent.usage.never": "mai",
   "mobile.agent.record.time": "Ora",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Impossibile modificare la cartella",
   "mobile.agent.section.tryAgain": "Riprova.",
   "mobile.agent.section.moveUp": "Sposta su",
@@ -615,7 +616,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Impossibile caricare i tuoi server",
   "mobile.agent.home.serversFailedBody": "Controlla che l'app desktop sia in esecuzione e riprova.",
   "mobile.agent.home.noServers": "Nessun server disponibile",
-  "mobile.agent.home.noServersBody": "Collega di nuovo l'app desktop o unisciti a un server remoto.",
+  "mobile.agent.home.noServersBody":
+    "Apri OpenBot sul tuo computer con questo account e attiva Pubblica questo server in Impostazioni server → Membri. Oppure unisciti a un server remoto.",
   "mobile.agent.home.chooseServer": "Scegli un server",
   "mobile.agent.home.openServers": "Apri i server",
   "mobile.agent.home.noChatOpen": "Nessuna chat aperta",

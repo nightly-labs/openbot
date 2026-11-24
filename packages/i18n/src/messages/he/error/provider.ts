@@ -284,6 +284,8 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "מודל OpenCode סיים את הפעולה בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "מודל OpenCode סיים את הפעולה אחרי החשיבה שלו, בלי תשובה. יש לנסות שוב, או לבחור מודל אחר.",
+  "error.provider.opencodeToolCallsAsText":
+    "מודל OpenCode כתב את הפעולות שלו כטקסט ולא ביצע אותן. יש לנסות שוב, או לבחור מודל אחר.",
   "error.provider.acpNoAnswer": "{provider} סיים את התור בלי תשובה. יש לשלוח את ההודעה שוב, או להתחיל צ'אט חדש.",
   "error.provider.noAnswerAfterSteps":
     "{provider} ביצע כמה צעדים ואז סיים את התור בלי תשובה. יש לשאול את הסוכן מה הוא עשה לפני שליחת אותה בקשה שוב.",
@@ -404,6 +406,8 @@ export const messages = {
     "{provider} חסם את ההודעה הזאת בגלל כללי הבטיחות שלו: {reason} אם {provider} חוסם גם את ההודעות הבאות שלך, התחל צ'אט חדש.",
   "error.provider.codexAudioRefused":
     "המודל הזה לא יכול להאזין לאודיו, ולכן הוא לא קיבל את הצליל בצ'אט הזה. OpenBot התחיל סשן Codex חדש עם היסטוריית הצ'אט. כדי להמשיך, שלח שוב את הבקשה ובקש מהסוכן לעבוד בלי הצליל. כדי לבדוק צליל, בחר בתפריט המודל של הסוכן מודל שיכול להאזין לאודיו.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex לא הצליח לטעון את ההגדרות של חשבון ChatGPT, ולכן הסוכן נעצר. יש לנסות שוב. אם הוא נעצר שוב, יש לבחור חיבור מחדש עבור ChatGPT בהגדרות שרת ← ספקים.",
   "error.provider.imageTooSmall":
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה קטנה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageTooLarge":
@@ -528,6 +532,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "לא ניתן לקרוא את הגרסה של ה-CLI של {provider}.",
   "error.provider.piSessionBusy": "יש להמתין לסיום הפעולה הנוכחית של Pi.",
   "error.provider.acpSessionBusy": "{provider} עדיין מסיים פעולה שנעצרה. יש לנסות שוב בעוד רגע.",
+  "error.provider.acpSettingsConflict":
+    "{provider} שינה את הצ'אט הזה בזמן ש-OpenBot החיל את ההגדרות שלו. יש לנסות שוב.",
   "error.provider.acpSessionStale": "{provider} לא הצליח לטעון את הגרסה האחרונה של הצ'אט הזה. יש לשלוח את ההודעה שוב.",
   "error.provider.acpModelNotOffered": "{provider} לא מציע כעת את {model}. בחרו מודל אחר לסוכן הזה ונסו שוב.",
   "error.provider.piStopped": "Pi אינו פועל. יש לחבר את Pi ולנסות שוב.",

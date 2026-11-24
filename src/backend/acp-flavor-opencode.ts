@@ -30,6 +30,12 @@ const OPENCODE_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
   ["provider.transport", true],
 ]);
 
+const TEXT_TOOL_CALL_TAG = String.raw`(?:[\w.-]+:|[|｜]DSML[|｜])?(?:function_calls?|tool_calls?|invoke)`;
+const TEXT_TOOL_CALL_ENDING = new RegExp(
+  String.raw`(?:^|\n)[ \t]*(?:<${TEXT_TOOL_CALL_TAG}\b[^>]*>[\s\S]*</${TEXT_TOOL_CALL_TAG}>|<｜tool▁calls▁begin｜>[\s\S]*<｜tool▁calls▁end｜>|\[Assistant tool call\]:[ \t]*[\w.-]+\([\s\S]*\))\s*$`,
+  "u",
+);
+
 const OPENCODE_OUT_OF_MEMORY = /\bout of memory\b|\binsufficient memory\b|\bmemory limit exceeded\b/iu;
 
 function openCodeRetryUpdate(update: SessionUpdate): { attempt: number; cause: AcpRetryCause } | null {
@@ -194,7 +200,7 @@ function openCodeRequestFailure(
   const errorName = isRecord(error.data) ? error.data.errorName : undefined;
   const key =
     OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0] ??
-    (errorName === "provider.internal"
+    (errorName === "provider.internal" || errorName === "provider.unknown"
       ? "error.provider.opencodeProviderFailed"
       : errorName === "provider.no-route"
         ? "error.provider.opencodeModelUnavailable"
@@ -264,6 +270,8 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   serverLost: isOpenCodeServerLost,
   emptyAnswerFailure: ({ reasoned }) =>
     sourceText(reasoned ? "error.provider.opencodeReasoningWithoutAnswer" : "error.provider.opencodeNoAnswer"),
+  textToolCallFailure: (answer) =>
+    TEXT_TOOL_CALL_ENDING.test(answer) ? sourceText("error.provider.opencodeToolCallsAsText") : null,
   stillStarting: isOpenCodeStarting,
   restoreFailure: (error, method) => {
     if (method === "resume" && isOpenCodeStarting(error)) return "wait-for-start";
@@ -280,6 +288,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   messagePerId: true,
   mcpServersPerDirectory: true,
   mcpConnectLimitMs: 30_000,
+  openToolStallMs: 30 * 60_000,
   relayStdioMcpServers: true,
   childSessionUpdates: true,
   promptMediaBase64Bytes: OPENCODE_PROMPT_MEDIA_BASE64_BYTES,

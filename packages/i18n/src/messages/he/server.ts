@@ -240,6 +240,9 @@ export const messages = {
   "server.rail.delete": "מחיקת השרת",
   "server.rail.hide": "הסתרת השרת",
   "server.rail.showLocal": "הצגת {name}",
+  "server.rail.hiddenServers": "שרתים מוסתרים",
+  "server.rail.hideFailed": "לא ניתן להסתיר את {name}",
+  "server.rail.showFailed": "לא ניתן להציג את {name}",
   "server.plan.daysLeft": {
     one: "יום אחד",
     two: "יומיים",

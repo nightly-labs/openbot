@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Não foi possível sair de {name}",
   "mobile.server.drawer.removeFailed": "Não foi possível remover {name}",
   "mobile.server.drawer.deleteFailed": "Não foi possível excluir {name}",
+  "mobile.server.drawer.hide": "Ocultar servidor",
+  "mobile.server.drawer.show": "Mostrar servidor",
+  "mobile.server.drawer.hiddenServers": "Servidores ocultos",
+  "mobile.server.drawer.hideFailed": "Não foi possível ocultar {name}",
+  "mobile.server.drawer.showFailed": "Não foi possível mostrar {name}",
   "mobile.server.drawer.actionFailed": "O OpenBot não conseguiu concluir esta ação. Tente novamente.",
   "mobile.server.drawer.moveUp": "Mover para cima",
   "mobile.server.drawer.moveDown": "Mover para baixo",
@@ -272,6 +277,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Isto remove o servidor do serviço de contas para todos os membros. Os arquivos e chats no computador dele continuam. Para usá-lo de novo, registre-o naquele computador.",
   "mobile.server.settings.remove": "Remover servidor",
+  "mobile.server.settings.hide": "Ocultar servidor",
+  "mobile.server.settings.show": "Mostrar servidor",
   "mobile.server.settings.deleteTitle": "Excluir {name}?",
   "mobile.server.settings.deleteBody":
     "O OpenBot para o servidor no computador dele e move os agentes, conversas e arquivos para a lixeira desse computador. O servidor sai da lista de servidores em todos os seus dispositivos.",
@@ -527,6 +534,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Não foi possível alterar a chave do servidor. Tente de novo.",
   "mobile.server.settings.keyOwnerOnly": "Só o proprietário pode alterar a chave do servidor.",
   "mobile.server.settings.keyUnsupported": "Atualize o OpenBot neste servidor para alterar a chave dele aqui.",
+  "mobile.server.settings.turnLimit": "Tópicos ao mesmo tempo",
+  "mobile.server.settings.turnLimitDescription":
+    "Quantos tópicos de agentes podem ser executados ao mesmo tempo neste servidor. Mais tópicos usam mais memória.",
+  "mobile.server.settings.turnLimitAutomatic": "Automático ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automático (sem limite)",
+  "mobile.server.settings.turnLimitUnlimited": "Sem limite",
+  "mobile.server.settings.turnLimitsLoadFailed": "Não foi possível carregar os limites de tópicos deste servidor.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Não foi possível salvar o limite de tópicos. Tente de novo.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Atualize o OpenBot neste servidor para alterar o limite de tópicos aqui.",
+  "mobile.server.settings.agentTaskLimit": "Tópicos em paralelo por agente",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Quantos tópicos cada agente sem limite próprio pode executar ao mesmo tempo.",
+  "mobile.server.settings.agentTaskLimitDefault": "Padrão ({count})",
   "mobile.server.settings.memoryLimit": "Memórias por agente",
   "mobile.server.settings.memoryLimitDescription": "Quantas memórias cada agente neste servidor pode manter.",
   "mobile.server.settings.memoryLimitLoadFailed": "Não foi possível carregar o limite de memórias deste servidor.",
@@ -982,7 +1003,7 @@ export const messages = {
     "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Outras pessoas não recebem resposta. Quando desativado, o OpenBot responde a pessoas desconhecidas com um código.",
   "mobile.server.connectors.whatsapp.workingMessage": "Mensagem “Trabalhando nisso…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Uma solicitação que espera outra anterior também recebe uma mensagem de espera. Desative para enviar só a resposta.",
+    "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Uma solicitação que espera outra anterior também recebe uma mensagem de espera. Em um número pessoal, só o seu chat “Mensagem para você mesmo” recebe essas mensagens. Desative para enviar só a resposta.",
   "mobile.server.connectors.whatsapp.statusReactions": "Reações de status",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "O OpenBot reage com 👀 quando uma mensagem chega e com ✅ quando a resposta está pronta. Desative para não enviar reações.",

@@ -251,8 +251,10 @@ sign-in, or the Codex account of the agent, and answers `{ sessionId, sdp }` wit
 Audio goes between the client and OpenAI, never through the host. The member must be able to chat with
 the agent, because each spoken request goes to the agent as the member's message. The start needs an
 open event connection of the same logical session, or it answers 409. A missing Codex sign-in, a
-timeout or a refused call also answers 409 with a sentence for the member. Any other failure answers
-500, and its reason stays in the host log; the phone shows `error.voice.live.hostFailed` for it.
+timeout or a refused call also answers 409 with a sentence for the member. Any other Codex failure
+answers 409 with `error.voice.live.startFailed`: the next step and at most 160 characters of the
+redacted reason. The host log keeps the longer redacted reason. A phone that gets 500 from an older
+host shows `error.voice.live.hostFailed`.
 
 Each member has at most one session; a new start ends the earlier one of that member, and the local
 user's session stays. The host sends the `live-voice` event (transcript parts and the end) only to the
@@ -851,6 +853,21 @@ closed. The WebRTC host peer encodes the local response and the events again wit
 The iPhone app advertises it through the shared team client, but it still shows the question as a
 single choice.
 
+### Prompt detail
+
+`prompt-detail-v1` (protocol 10) carries the `detail` text under an agent question, such as the
+commands that `ask_user` asks the user to run (see `team-protocol/prompt-detail-v1.ts`). It goes in
+the same places as `prompt-multi-select-v1`. The frozen codecs leave `detail` out. The host adds it
+after the frozen projection, only for a connection that advertises the capability: `team-api-server.ts`
+for HTTP responses and events, and the WebRTC host peer for its responses and event frames. A question
+gets the detail of the source question with the same message id, or, for a `prompt` event and a
+`pendingPrompts` item, the same agent, thread, turn and `requestId`, and the same question `id`. A
+client copies `detail` back from the wire value after it decodes: the shared team client (web client
+and phone) and, on desktop, `remote-server-http.ts`, `remote-server-event-stream.ts` and
+`team-webrtc-client-transport.ts`. Both sides keep only a nonempty string of at most
+`INPUT_LIMITS.promptQuestion` characters. A client or a host without the capability sends and shows the
+question as before. The iPhone app shows the detail under the question in the question card.
+
 ### Reasoning efforts
 
 `reasoning-efforts-v1` lets an agent `reasoningEffort`, a model `defaultReasoningEffort` and each of
@@ -1025,6 +1042,17 @@ after each change that succeeds, and that callback emits the event through `Agen
 computer's windows get it too. A client reads the list again through `browser-profiles-v1`: the
 desktop Browser profiles section and agent setting, the web client and the phone show a change made on
 another device while the page is open.
+
+### Client use
+
+The host counts each authenticated request that is not `GET`, `HEAD` or `OPTIONS` as use of its
+session (`isClientUse` in `src/main/team-api/client-use.ts`), unless its path is in `PASSIVE_ROUTES`
+or `PASSIVE_PATTERNS`. Use from another session of the member stops the phone push for 30 seconds,
+and use keeps a hosted server running. A client sends some `POST` reads by itself: on a timer, on a
+host event such as `runtime-snapshot`, or when a page loads. Put each such read route in
+`PASSIVE_ROUTES` in the change that adds it, so that an open client that nobody uses does not stop the
+phone push. Keep a route that changes data out of the list. `scripts/computer-activity-e2e.ts` checks
+both cases through the Team API.
 
 ### Focus use
 

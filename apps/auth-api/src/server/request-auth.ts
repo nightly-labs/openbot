@@ -10,7 +10,7 @@ import { adminTokenMatches } from "./admin-token";
 import { AgentMarketplace, AgentMarketplaceError } from "./agent-marketplace";
 import { AgentTemplates } from "./agent-templates";
 import { type FcmRelaySender, sharedFcmSender } from "./android-notification-relay";
-import { AuthOperationError, AuthService, AuthServiceError } from "./auth-service";
+import { AuthOperationError, AuthService, AuthServiceError, readStoreReviewSignIn } from "./auth-service";
 import { BillingError, type BillingService } from "./billing-service";
 import { CompanySignInError, CompanySignInService } from "./company-sign-in";
 import type { ContactMessageServices } from "./contact-message";
@@ -88,6 +88,7 @@ export function requestAuthService(): AuthService {
     repository: new D1AuthRepository(bindings.DB),
     delivery: exposeDevelopmentCode ? null : createEmailCodeDelivery(bindings, analytics),
     exposeDevelopmentCode,
+    storeReviewSignIn: readStoreReviewSignIn(bindings.STORE_REVIEW_EMAIL, bindings.STORE_REVIEW_CODE),
     flushSessionRevocations: () => Effect.sync(() => schedule(deliverPendingRemoteAuthEvents(bindings, Date.now()))),
     profileChanged: (userId) => notifyAccountProfileChanged(bindings, userId, schedule),
     analytics,

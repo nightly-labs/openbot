@@ -47,6 +47,7 @@ const OVERSIZED = "FAILED_PRECONDITION (code 400): The message size exceeds 30.0
 const UNENCODABLE = "Agent execution error: agent executor error: generating and executing: proto: field google.protobuf.Value.string_value contains invalid UTF-8";
 const MEDIA = "INVALID_ARGUMENT (code 400): Unable to process input: the file or media data is empty, corrupted, or malformed";
 const UNSIGNED = 'Error 400, Message: {"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0.thinking.signature: Field required"}}, Status: INVALID_ARGUMENT, Details: []';
+const UNLINKED = "Agent execution error: agent executor error: generating and executing: Error 400, Message: The referenced name #/$defs/ModelInputLimits in function_response.response does not match to a display_name in the function_response.parts., Status: INVALID_ARGUMENT, Details: []";
 const answer = (failure) => (failure.startsWith("Agent execution error: ") ? failure : NL + "\\u26A0 " + failure);
 let sessions = 0;
 let tools = 0;
@@ -64,6 +65,7 @@ function handle(message) {
     if (prompt.includes("UNENCODABLE") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, UNENCODABLE);
     if (prompt.includes("MEDIA") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, MEDIA);
     if (prompt.includes("UNSIGNED") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, UNSIGNED);
+    if (prompt.includes("UNLINKED") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, UNLINKED);
     const refused = poisoned.has(params.sessionId);
     const tool = refused && prompt.includes("TOOL") && !prompt.includes("PELICAN");
     log({ sessionId: params.sessionId, refused, tool, text: prompt });
@@ -327,6 +329,34 @@ try {
   assert.notEqual(
     afterUnencodable.prompts[0]?.sessionId,
     unencodableTool.prompts[0]?.sessionId,
+    "The next message runs on a new session.",
+  );
+
+  const unlinked = await send(agent.id, "UNLINKED schema result in this session.");
+  assert.equal(
+    unlinked.status,
+    "completed",
+    `A tool result that Gemini reads as a file link runs again and answers: ${unlinked.error ?? ""}`,
+  );
+  assert.deepEqual(
+    unlinked.prompts.map(({ refused }) => refused),
+    [true, false],
+    "The message ran two times: refused on the old session, then answered.",
+  );
+  assert.notEqual(unlinked.prompts[0]?.sessionId, unlinked.prompts[1]?.sessionId, "It ran on a new session.");
+
+  const unlinkedTool = await send(agent.id, "UNLINKED schema result with a TOOL step.");
+  assert.equal(unlinkedTool.status, "failed", "A refused tool result after a tool step fails the message.");
+  assert.equal(
+    unlinkedTool.error,
+    sourceText("error.provider.antigravityHistoryUnreadable"),
+    "The message shows the unreadable-history text.",
+  );
+  const afterUnlinked = await send(agent.id, "Are you still with me?");
+  assert.equal(afterUnlinked.status, "completed", `The next message answers: ${afterUnlinked.error ?? ""}`);
+  assert.notEqual(
+    afterUnlinked.prompts[0]?.sessionId,
+    unlinkedTool.prompts[0]?.sessionId,
     "The next message runs on a new session.",
   );
   report.passed = true;

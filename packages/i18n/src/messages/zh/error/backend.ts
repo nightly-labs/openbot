@@ -381,6 +381,7 @@ export const messages = {
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",
   "error.backend.browserCertificateUntrusted": "此网站的安全证书不受信任，因此页面没有打开。",
   "error.backend.browserLowMemory": "该服务器内存不足，浏览器无法再打开标签页。请关闭一个标签页，或等其他助手结束。",
+  "error.backend.browserNoMemory": "该服务器内存几乎耗尽，浏览器现在无法打开标签页。请等其他助手结束后再试。",
   "error.backend.browserOpenFailed": "无法打开 {url}：{reason}",
   "error.backend.popupSecureInput": "安全输入期间弹窗被阻止。请完成或取消安全输入，再从页面重试。",
   "error.backend.popupUnsupportedType": "不支持该类弹窗。请使用页面上的普通链接或登录按钮。",

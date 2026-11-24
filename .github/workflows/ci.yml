@@ -135,6 +135,10 @@ jobs:
         if: env.CODE == 'true'
         run: bun run check:assets
 
+      - name: Check plugin catalog
+        if: env.CODE == 'true'
+        run: bun run marketplace:build:plugins -- --check
+
       - name: Check Markdown links and anchors
         run: bun run check:doc-links
 
@@ -272,12 +276,18 @@ jobs:
       - name: Run the Signal E2E test
         run: bun run test:signal
 
+      - name: Run the direct remote protocol E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:remote-protocol
+
       - name: Upload the Signal E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: signal-security-e2e
-          path: .openbot-build/signal-security-e2e/
+          path: |
+            .openbot-build/signal-security-e2e/
+            .openbot-build/remote-protocol-e2e/
           if-no-files-found: ignore
 
   automation-cli-e2e:
@@ -374,6 +384,14 @@ jobs:
       - name: Run the Team API protocol 10 E2E test
         if: ${{ !cancelled() }}
         run: bun run test:team-protocol-v10
+
+      - name: Run the Team protocol decoder E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:team-protocol-decoders
+
+      - name: Run the conversation ownership E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:conversation-ownership
 
       - name: Run the Team WebRTC wire parity E2E test
         if: ${{ !cancelled() }}
@@ -657,6 +675,10 @@ jobs:
       - name: Run the Claude message during a question E2E test
         if: ${{ !cancelled() }}
         run: bun run test:question-steer-order
+
+      - name: Run the steer before the turn id E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:steer-before-turn-id
 
       - name: Run the provider session reuse E2E test
         if: ${{ !cancelled() }}
@@ -960,6 +982,7 @@ jobs:
             .openbot-build/claude-late-steer-e2e/
             .openbot-build/claude-steer-now-e2e/
             .openbot-build/question-steer-order-e2e/
+            .openbot-build/steer-before-turn-id-e2e/
             .openbot-build/provider-session-reuse-e2e/
             .openbot-build/backup-model-failover-e2e/
             .openbot-build/codex-empty-lead-turn-e2e/

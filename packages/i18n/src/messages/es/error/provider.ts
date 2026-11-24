@@ -312,6 +312,8 @@ export const messages = {
     "El modelo de OpenCode terminó el turno sin respuesta. Inténtalo de nuevo o elige otro modelo.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "El modelo de OpenCode terminó el turno después de razonar, sin respuesta. Inténtalo de nuevo o elige otro modelo.",
+  "error.provider.opencodeToolCallsAsText":
+    "El modelo de OpenCode escribió sus acciones como texto y no las hizo. Inténtalo de nuevo o elige otro modelo.",
   "error.provider.acpNoAnswer":
     "{provider} terminó el turno sin respuesta. Envía el mensaje de nuevo o empieza un nuevo chat.",
   "error.provider.noAnswerAfterSteps":
@@ -437,6 +439,8 @@ export const messages = {
     "{provider} bloqueó este mensaje por sus reglas de seguridad: {reason} Si {provider} también bloquea tus próximos mensajes, inicia un nuevo chat.",
   "error.provider.codexAudioRefused":
     "Este modelo no puede escuchar audio, por eso no aceptó el sonido de este chat. OpenBot inició una nueva sesión de Codex con el historial del chat. Para continuar, envía tu solicitud de nuevo y pide al agente que trabaje sin el sonido. Para revisar el sonido, selecciona en el menú de modelos del agente un modelo que pueda escuchar audio.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "Codex no pudo cargar los ajustes de tu cuenta de ChatGPT, por eso el agente se detuvo. Inténtalo de nuevo. Si se detiene otra vez, selecciona Reconectar para ChatGPT en Ajustes del servidor → Proveedores.",
   "error.provider.imageTooSmall":
     "El modelo no aceptó una imagen de este chat porque la imagen es demasiado pequeña. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageTooLarge":
@@ -574,6 +578,8 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "No se pudo leer la versión de la CLI de {provider}.",
   "error.provider.piSessionBusy": "Espera a que termine el turno actual de Pi.",
   "error.provider.acpSessionBusy": "{provider} aún termina un turno detenido. Inténtalo de nuevo en un momento.",
+  "error.provider.acpSettingsConflict":
+    "{provider} cambió este chat mientras OpenBot aplicaba su configuración. Inténtalo de nuevo.",
   "error.provider.acpSessionStale":
     "{provider} no pudo cargar la versión más reciente de este chat. Envía tu mensaje de nuevo.",
   "error.provider.acpModelNotOffered":

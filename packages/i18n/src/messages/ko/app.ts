@@ -51,7 +51,7 @@ export const messages = {
   "app.rail.website": "OpenBot 웹사이트",
   "app.rail.agents": "에이전트",
   "app.rail.schedule": "일정",
-  "app.rail.tasks": "작업",
+  "app.rail.tasks": "스레드",
   "app.rail.usage": "사용량",
   "app.rail.creditsAsk": "크레딧이 필요할 때 묻기",
   "app.rail.creditsAskSaveFailed": "크레딧 확인 설정을 변경하지 못했습니다.",

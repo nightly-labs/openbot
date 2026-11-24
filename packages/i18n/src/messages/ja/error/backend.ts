@@ -437,6 +437,8 @@ export const messages = {
     "このサイトのセキュリティ証明書が信頼されていないため、ページを開けませんでした。",
   "error.backend.browserLowMemory":
     "このサーバーはメモリーが不足しているため、ブラウザーで新しいタブを開けません。タブを閉じるか、ほかのエージェントの作業が終わるまでお待ちください。",
+  "error.backend.browserNoMemory":
+    "このサーバーはメモリーがほぼなくなっているため、今はブラウザーでタブを開けません。ほかのエージェントの作業が終わってから、もう一度お試しください。",
   "error.backend.browserOpenFailed": "{url} を開けません: {reason}",
   "error.backend.popupSecureInput":
     "セキュア入力中はポップアップがブロックされます。セキュア入力を完了またはキャンセルしてから、ページからもう一度お試しください。",

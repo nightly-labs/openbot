@@ -257,6 +257,9 @@ export const messages = {
   "server.rail.delete": "حذف الخادم",
   "server.rail.hide": "إخفاء الخادم",
   "server.rail.showLocal": "إظهار {name}",
+  "server.rail.hiddenServers": "الخوادم المخفية",
+  "server.rail.hideFailed": "تعذر إخفاء {name}",
+  "server.rail.showFailed": "تعذر إظهار {name}",
   "server.plan.daysLeft": {
     zero: "{count} يوم",
     one: "يوم واحد",

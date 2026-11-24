@@ -4,6 +4,7 @@ import { access, lstat, open, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
+import { olderVersion } from "@openbot/contracts/cli-version";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -11,6 +12,8 @@ import { Deferred, Effect, Result } from "effect";
 import { providerCheckTimeoutMs } from "./disk-restore";
 import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
+
+export { compareReleases, isVersion, olderVersion } from "@openbot/contracts/cli-version";
 
 const execFileAsync = promisify(execFile);
 const MINIMUM_CODEX_VERSION = [0, 156, 0] as const;
@@ -713,6 +716,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
   let found = false;
   let outdated: CodexCliError | undefined;
   for (const candidate of candidates) {
+    if (provider === "muse" && isWindowsLauncherScript(candidate.executable)) continue;
     if (!(yield* isExecutable(candidate.executable))) continue;
     found = true;
     const attempt = yield* Effect.result(
@@ -820,19 +824,6 @@ export const NATIVE_VERSION_PARSERS: Readonly<Record<NativeCliProvider, (output:
   mistral: parseMistralVersion,
   antigravity: parseAntigravityVersion,
 };
-
-export function isVersion(value: string): boolean {
-  return /^\d+\.\d+\.\d+(?:(?:-\d{2}-\d{2}-\d{2})?-[0-9a-f]{7,40})?$/u.test(value);
-}
-
-export function olderVersion(installed: string, target: string): boolean {
-  return isVersion(installed) && isVersion(target) && compareReleases(installed, target) < 0;
-}
-
-export function compareReleases(a: string, b: string): number {
-  const release = (version: string) => version.replace(/-[0-9a-f]{7,40}$/u, "").replaceAll("-", ".");
-  return release(a).localeCompare(release(b), "en", { numeric: true });
-}
 
 export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
   resolve: (input: { bundledExecutable?: string | null }) => Effect.Effect<Cli, E>,
@@ -1225,12 +1216,16 @@ function batchArgument(argument: string): string {
   return `${quoted}${"\\".repeat(backslashes)}"`;
 }
 
+function isWindowsLauncherScript(executable: string, platform: NodeJS.Platform = process.platform): boolean {
+  return platform === "win32" && [".bat", ".cmd"].includes(extname(executable).toLowerCase());
+}
+
 export function cliSpawnTarget(
   executable: string,
   argv: readonly string[],
   platform: NodeJS.Platform = process.platform,
 ): { command: string; args: string[]; windowsVerbatimArguments: boolean } {
-  if (platform !== "win32" || ![".bat", ".cmd"].includes(extname(executable).toLowerCase())) {
+  if (!isWindowsLauncherScript(executable, platform)) {
     return { command: executable, args: [...argv], windowsVerbatimArguments: false };
   }
 
@@ -1258,7 +1253,7 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 ) {
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
-  const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
+  const target = isWindowsLauncherScript(candidate);
   const slow = slowVersionReads.has(candidate);
   const firstTimeout = provider === "antigravity" ? ANTIGRAVITY_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS;
   const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : firstTimeout);

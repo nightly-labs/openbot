@@ -224,6 +224,9 @@ export const messages = {
   "server.rail.delete": "サーバーを削除",
   "server.rail.hide": "サーバーを非表示",
   "server.rail.showLocal": "{name} を表示",
+  "server.rail.hiddenServers": "非表示のサーバー",
+  "server.rail.hideFailed": "{name} を非表示にできませんでした",
+  "server.rail.showFailed": "{name} を表示できませんでした",
   "server.plan.daysLeft": {
     other: "{count}日",
   },

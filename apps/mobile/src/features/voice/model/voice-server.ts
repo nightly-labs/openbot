@@ -12,6 +12,7 @@ import {
   decodeVoiceServerWav,
   encodeVoiceServerWav,
   OPENAI_VOICES,
+  shortVoiceServerModel,
   VOICE_SERVER_VOICE_PATHS,
   voiceServerHost,
   voiceServerModelLists,
@@ -132,6 +133,7 @@ async function exchange<T extends string | Uint8Array>(
   limit: number,
   read: (response: Response) => Promise<T>,
   signal?: AbortSignal,
+  refused?: (status: number) => string | null,
 ): Promise<T> {
   const host = voiceServerHost(target.address);
   let url: URL;
@@ -173,6 +175,8 @@ async function exchange<T extends string | Uint8Array>(
       if (signal?.aborted) throw error;
       throw unreachable();
     }
+    const explained = response.ok ? null : (refused?.(response.status) ?? null);
+    if (explained) throw new VoiceServerError("address", explained);
     if (response.status >= 300 && response.status < 400)
       throw new VoiceServerError("address", sourceText("error.provider.discoveryRedirect", { host }));
     if (response.status === 401 || response.status === 403)
@@ -282,6 +286,13 @@ export async function transcribeWithVoiceServer(
         LIST_BODY_LIMIT,
         asText,
         signal,
+        (status) =>
+          status === 404
+            ? sourceText("error.voice.server.modelUnsupported", {
+                host: voiceServerHost(target.address),
+                model: shortVoiceServerModel(model),
+              })
+            : null,
       ),
       (value) => {
         if (!isDynamicRecord(value) || !isString(value.text)) throw invalidAnswer(target);

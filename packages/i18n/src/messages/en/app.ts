@@ -50,7 +50,7 @@ export const messages = defineMessages("app", {
   "app.rail.website": "OpenBot website",
   "app.rail.agents": "Agents",
   "app.rail.schedule": "Schedule",
-  "app.rail.tasks": "Tasks",
+  "app.rail.tasks": "Threads",
   "app.rail.workflows": "Workflows",
   "app.rail.usage": "Usage",
   "app.rail.credits": "Credits",

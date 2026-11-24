@@ -540,6 +540,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Toplama başlangıcı: {started}. Güncellendi: {updated}.",
   "mobile.agent.usage.never": "hiçbir zaman",
   "mobile.agent.record.time": "Zaman",
+  "mobile.agent.record.date": "Tarih",
   "mobile.agent.section.changeFailed": "Klasör değiştirilemedi",
   "mobile.agent.section.tryAgain": "Lütfen tekrar deneyin.",
   "mobile.agent.section.moveUp": "Yukarı taşı",
@@ -625,7 +626,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Sunucularınız yüklenemedi",
   "mobile.agent.home.serversFailedBody": "Masaüstü uygulamasının çalıştığını kontrol edip tekrar deneyin.",
   "mobile.agent.home.noServers": "Kullanılabilir sunucu yok",
-  "mobile.agent.home.noServersBody": "Masaüstü uygulamasını tekrar bağlayın veya uzak bir sunucuya katılın.",
+  "mobile.agent.home.noServersBody":
+    "Bilgisayarınızda OpenBot'u bu hesapla açın ve Sunucu ayarları → Üyeler bölümünde “Bu sunucuyu yayımla” seçeneğini açın. Ya da uzak bir sunucuya katılın.",
   "mobile.agent.home.chooseServer": "Bir sunucu seçin",
   "mobile.agent.home.openServers": "Sunucuları aç",
   "mobile.agent.home.noChatOpen": "Açık sohbet yok",
