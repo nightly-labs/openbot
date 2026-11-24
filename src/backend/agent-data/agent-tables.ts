@@ -9,6 +9,7 @@ import {
   AGENT_DATABASE_METADATA_TABLE,
   type AgentDatabaseParameter,
   type AgentDatabaseRows,
+  type AgentDatabaseStatement,
   type AgentDatabaseValue,
 } from "./agent-database-protocol";
 import { type AgentDatabaseCheck, type AgentSchemaChange, checkAgentSql, schemaChange } from "./agent-database-rules";
@@ -358,7 +359,7 @@ export class AgentTables {
       AgentDatabaseCheck<AgentDatabaseRows>,
       AgentTablesError
     > {
-      const outcome = yield* this.#supervisor.send({
+      const statement: Omit<AgentDatabaseStatement, "id"> = {
         kind: "statement",
         databasePath: this.#path,
         mode: request.mode,
@@ -367,7 +368,14 @@ export class AgentTables {
         sql: request.sql,
         parameters: request.parameters ?? [],
         limits: AGENT_DATABASE_LIMITS,
-      });
+      };
+      let outcome = yield* this.#supervisor.send(statement);
+      if (!outcome.ok && outcome.failure.kind === "missing" && !statement.provision) {
+        this.#ready = null;
+        const ready = yield* this.#ensure();
+        if (!ready.ok) return ready;
+        outcome = yield* this.#supervisor.send(statement);
+      }
       return outcome.ok ? { ok: true, value: outcome.result } : { ok: false, message: outcome.failure.message };
     });
   }
