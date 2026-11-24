@@ -39,6 +39,7 @@ export const messages = defineMessages("browser", {
   "browser.tab.closeUnnamed": "Close browser tab",
   "browser.newTab": "New browser tab",
   "browser.backToChat": "Back to chat",
+  "browser.fullView.open": "Open in full view",
   "browser.goBack": "Go back",
   "browser.goForward": "Go forward",
   "browser.reload": "Reload page",

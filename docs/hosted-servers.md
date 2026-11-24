@@ -1109,6 +1109,7 @@ Leaseweb accounts use one scheme:
 | `custom-<NN> <customer> <owner email>` | A server for one customer, not in the pool. `<NN>` is the next number after the highest on all accounts; `leaseweb-pool.ts custom` sets it. `<customer>` is one word in small letters. | `custom-01 acme jane@example.com` |
 | `openbot-signal-<home>` | A Signal machine (see `docs/remote-session-deployment.md`). | `openbot-signal-us` |
 | `pool-test-<NN>` | A test machine of the operator. | `pool-test-01` |
+| `internal-<purpose>` | A machine of the operators, not in the pool and not for tests. `internal-store-review` is the server of the app store reviewers; see `AGENTS.md`. | `internal-store-review` |
 
 `leaseweb-pool.ts traffic [--from=YYYY-MM-DD] [--to=YYYY-MM-DD]` is read only. It shows the public
 traffic in and out of each VPS on the five accounts, from the first day of this month (UTC) to today,
@@ -1254,10 +1255,11 @@ The Worker cannot connect to a machine, and it has no Leaseweb key. So the machi
 4. At the payment, the Worker reads the ready machines with the product of the plan: `VPS01` for
    Starter, `VPS02` for Standard, `VPS03` for Pro. It never uses a larger or a smaller machine. The
    currency gives the locations (`poolLocations`): a purchase in `usd` or `brl` gets a machine in
-   `WDC-02`, and one in `AMS-01` when `WDC-02` has none. A purchase in `eur` or `pln` gets only a
-   machine in `AMS-01`, so that its data stays in the EU, as on boat. A machine in each other location
-   gets no new server; `PRIVACY.md` names the locations, so change the two together. In a location,
-   the machine that was added first comes first. One `UPDATE` writes `operator_host` and the hash of a host ID
+   `WDC-02`, and one in `AMS-01` or `FRA-01` when `WDC-02` has none. A purchase in `eur` or `pln`
+   gets a machine in `AMS-01`, and one in `FRA-01` when `AMS-01` has none, so that its data stays in
+   the EU, as on boat. A machine in each other location gets no new server; `PRIVACY.md` names the
+   locations, so change the two together. The first location of the list comes first. In the other
+   locations, and in a location, the machine that was added first comes first. One `UPDATE` writes `operator_host` and the hash of a host ID
    claim, and it changes no row when another server has the machine. So two payments in the same second
    never get one machine. After three machines that another payment took, the server starts on boat.
 5. The next request of the machine gets `{"state":"assigned","serverId":…,"claim":…}`. The unit runs

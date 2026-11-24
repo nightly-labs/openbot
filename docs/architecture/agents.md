@@ -1168,11 +1168,16 @@ starts a new turn with the steer. The aborted result does not list the steer's u
 (`untakenSteerIds`), so the client closes the open tool calls, aborts its open host tool calls
 (`hostToolCalls`, so the host removes their approval cards), and keeps the OpenBot turn open. The
 result of the steer's turn completes it. A stop from the person (`stopRequested`) still ends the turn
-as interrupted. While a question, an elicitation or a write approval waits for the person
-(`personRequests`), the steer has no priority: the open card stays the one that Claude waits for, and
-the steer arrives after the answer. A shell command that runs one script cannot change its plan: the
-steer reaches the model when the script is done. `scripts/claude-steer-now-e2e.ts` checks the turn
-with a stand-in CLI, `scripts/question-steer-order-e2e.ts` checks the order during a question, and
+as interrupted. While a question, an elicitation, a write approval, or a browser sign-in or secret card
+(`request_takeover`, `submit_secret`) waits for the person (`personRequests`), the steer has no
+priority: the open card stays the one that Claude waits for, and the steer arrives after the answer.
+Before, a message during a sign-in card stopped the call and cancelled the card (#15776). A message
+from another agent or a routine that the busy-message mode steers has no priority either
+(`waitsForRunningTools`, #15730): it waits until the running tool call ends, and does not stop the
+tools or subagents. A message that the person sends or steers from the queue still stops them. A shell
+command that runs one script cannot change its plan: the steer reaches the model when the script is
+done. `scripts/claude-steer-now-e2e.ts` checks the turn with a stand-in CLI, and with
+`--held=takeover` it checks that a sign-in card stays open, `scripts/question-steer-order-e2e.ts` checks the order during a question, and
 `scripts/steer-framing-bench.ts` measures the real CLIs.
 
 A message from another agent follows the recipient's busy-message mode, as a message from the person

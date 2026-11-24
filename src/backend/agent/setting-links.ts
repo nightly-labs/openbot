@@ -429,6 +429,15 @@ export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
 const SERVER_PLACES: readonly SettingLinkEntry[] = [
   {
+    title: "Add a server",
+    place:
+      "On a computer: the server button at the bottom of the narrow bar on the left, below Settings (Open server menu for <server name>) > Add a server, or Add remote server when no plans show. In the Server rail layout, use the + button at the bottom of the server list instead; with plans, it opens Add a server directly. Add a server opens Run OpenBot 24/7 on an external server, with hosted server plans. In it, Other options > New server on another computer gives one install command for a Linux computer or VPS that the user owns (Ubuntu 24.04 or 26.04). When no plans show, New server on another computer is in that menu itself. New server on another computer is only in the desktop app, not in the browser at openbot.run/app. On the phone app: Servers > Add a server, for a hosted server.",
+    about:
+      "A server that runs 24/7 on another computer, so that agents, routines and chat apps such as WhatsApp keep working while this computer is off. The user runs the install command as root on that computer, then opens the new server and connects a provider and apps there. When the user gives the SSH address, create_server_install_command makes the same command for you to run over SSH.",
+    words:
+      "24 add new another install setup create always online run running keep alive offline off away cloud hosted hosting headless linux ubuntu external own",
+  },
+  {
     title: "Remove server",
     place: `${SERVER_LIST} > Remove server, or ${SERVER_SETTINGS} > General > Remove server. ${PHONE_SERVERS} > Remove server.`,
     about:
@@ -477,7 +486,7 @@ export function searchChatPlaces(query: string, limit = 1): ServerPlace[] {
   }));
 }
 
-const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc"];
+const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc", "vps"];
 
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);

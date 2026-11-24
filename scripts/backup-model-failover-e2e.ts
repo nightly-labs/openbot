@@ -321,6 +321,11 @@ const answer = (request) => {
           if (!current.includes("usage-tool-only")) item({ type: "agentMessage", id: randomUUID(), phase: "commentary", text: "Checkpoint saved for " + caseId + ". Only the final step remains." });
         }
         if (current.includes("usage-wait")) return;
+        if (current.includes("capacity-")) {
+          const error = { message: "Reconnecting... 2/5", codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: null } }, additionalDetails: "Selected model is at capacity. Please try a different model." };
+          write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: true } });
+          if (current.includes("capacity-wait")) return;
+        }
         if (limited) {
           const error = current.includes("usage-spent")
             ? { message: "Your credit balance is too low to continue.", codexErrorInfo: "usageLimitExceeded" }
@@ -1171,6 +1176,42 @@ try {
       return { outcome, backups: backups.map((turn) => turn.model), checkpoint: mode };
     });
   }
+
+  await check("a Codex model at capacity moves to the backup model without waiting for its retries", async () => {
+    await restart();
+    const agent = await createCodex("Codex capacity", automaticBackups);
+    const since = events.length;
+    const beforeCodex = readLog<CodexTurn>(codexLog).length;
+    const beforeClaude = turns().length;
+    const outcome = await send(agent.id, "capacity-wait: answer the question.");
+    assert.equal(outcome.status, "completed", `The message completes on the backup: ${outcome.error}`);
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "Codex gets the message once.");
+    assert.deepEqual(
+      turns()
+        .slice(beforeClaude)
+        .map((turn) => turn.model),
+      [PRIMARY],
+      "The first backup model runs the message.",
+    );
+    const moved = agentOf(agent.id);
+    assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+    assert.equal(moved.usageLimitReturn?.provider, "codex", "The agent can go back to its own model.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No capacity notice or error shows.");
+    return { outcome, model: moved.model };
+  });
+
+  await check("a Codex turn that ends before the capacity hand-off keeps its answer and its model", async () => {
+    await restart();
+    const agent = await createCodex("Codex capacity race", automaticBackups);
+    const since = events.length;
+    const beforeClaude = turns().length;
+    const outcome = await send(agent.id, "capacity-race: answer the question.");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    assert.equal(turns().length, beforeClaude, "No backup model runs the message.");
+    assert.equal(agentOf(agent.id).provider, "codex", "The agent stays on its own model.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No capacity error shows.");
+    return outcome;
+  });
 
   await check("a spent balance names the model it left and what to do", async () => {
     await restart();

@@ -852,6 +852,25 @@ html.panel-resizing {
   user-select: none;
 }
 
+.panel-resizer-vertical {
+  width: 100%;
+  height: 16px;
+  cursor: row-resize;
+  transform: translateY(-50%);
+}
+
+.panel-resizer-vertical::after {
+  inset: 50% 0 auto;
+  width: auto;
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--openbot-text-dim) 50%, transparent);
+  transform: translateY(-50%);
+}
+
+html.panel-resizing:has(.panel-resizer-vertical.panel-resizer-active) {
+  cursor: row-resize;
+}
+
 .right-panel-resizer {
   position: absolute;
   top: 0;

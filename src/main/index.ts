@@ -325,7 +325,8 @@ const systemTimezone =
     ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
     : localTimezone;
 app.enableSandbox();
-if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+if (process.platform === "win32")
+  app.setAppUserModelId(app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev");
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&

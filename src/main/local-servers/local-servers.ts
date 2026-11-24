@@ -130,6 +130,8 @@ const MARKETPLACE_READS: ReadonlyArray<{ method: "GET" | "POST"; download: boole
   { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/content$/u },
   { method: "GET", download: false, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+$/u },
   { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+\/content$/u },
+  { method: "GET", download: false, path: /^\/v1\/agent-templates\/(?!mine$)[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/agent-templates\/[^/]+\/avatar$/u },
   { method: "POST", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/install$/u },
   { method: "POST", download: false, path: /^\/v1\/skills\/[^/]+\/install$/u },
 ];

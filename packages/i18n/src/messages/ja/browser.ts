@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "ブラウザーのタブを閉じる",
   "browser.newTab": "新しいブラウザーのタブ",
   "browser.backToChat": "チャットに戻る",
+  "browser.fullView.open": "全体表示で開く",
   "browser.goBack": "戻る",
   "browser.goForward": "進む",
   "browser.reload": "ページを再読み込み",

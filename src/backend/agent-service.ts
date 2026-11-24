@@ -1050,6 +1050,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         isStopping: () => this.#stopping,
         isProviderBusy: (provider) => this.#isProviderBusy(provider),
         releasePersonWaits: (provider) => this.#attention.detachPromptsOf(provider),
+        endDroppedTurns: (provider) => this.#endDroppedTurns(provider),
         isProviderBusyApartFrom: (provider, agentId) => this.#isProviderBusyApartFrom(provider, agentId),
         isAgentBusy: (agentId) => this.#runsTurn(agentId),
         isProviderAssigned: (provider) => this.#store.list().some((agent) => providerForAgent(agent) === provider),
@@ -7179,7 +7180,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     turnId: string,
     explain: boolean,
   ): Effect.fn.Return<AgentMessageSteer> {
-    return yield* this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId }).pipe(
+    return yield* this.#queue.steer({ agentId: agent.id, deliveryId, expectedTurnId: turnId }, true).pipe(
       Effect.as("steered" as const),
       Effect.catch((failure) =>
         Effect.gen({ self: this }, function* () {
@@ -7365,6 +7366,29 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#conversation.snapshotWithTurn(agentId, turnId) !== undefined
     );
   }
+
+  readonly #endDroppedTurns = Effect.fn("AgentService.endDroppedTurns")(function* (
+    this: AgentService,
+    provider: AgentProvider,
+  ) {
+    const dropped = [...this.#conversation.activeSnapshots()].flatMap(([agentId, snapshot]) => {
+      const turnId = snapshot.activeTurnId;
+      const agent = this.#store.get(agentId);
+      if (!turnId || !agent || providerForAgent(agent) !== provider) return [];
+      if (!this.#turnRunsOnlyInSnapshot(agentId, turnId)) return [];
+      const client = this.#providers.clientForAgent(agent);
+      const session = this.#runningSession(agent, snapshot.threadId);
+      if (!client?.runsTurn || !session || client.runsTurn(session, turnId)) return [];
+      return [{ agentId, threadId: snapshot.threadId, turnId }];
+    });
+    for (const { agentId, threadId, turnId } of dropped) {
+      logger.warn("A provider restart found a turn that its provider does not run. It ends as interrupted.", {
+        agentId,
+        turnId,
+      });
+      yield* this.#turn.settleOrphanedTurn(agentId, threadId, turnId, "interrupted");
+    }
+  });
 
   #routineRunsIn(agent: AgentSummary, threadId: string | null): boolean {
     const publicThreadId = threadId ?? agent.threadId;

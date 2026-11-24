@@ -353,7 +353,7 @@ export interface AcpHistoryPersistence {
 
 const ACP_SESSION_IDLE_RELEASE_MS = 5 * 60_000;
 
-const ACP_SESSION_PROCESS_START_TIMEOUT_MS = 180_000;
+export const ACP_SESSION_PROCESS_START_TIMEOUT_MS = 180_000;
 
 const ACP_INSTRUCTIONS_REFRESH_PROMPTS = 10;
 
@@ -966,6 +966,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (thread && (thread.workHold || this.#heldByBackgroundSubagent(thread))) return true;
     }
     return false;
+  }
+
+  runsTurn(externalThreadId: string, turnId: string): boolean {
+    return this.#openingTurns.has(externalThreadId) || this.#threads.get(externalThreadId)?.activeTurn?.id === turnId;
   }
 
   callRelayedMcpTool(

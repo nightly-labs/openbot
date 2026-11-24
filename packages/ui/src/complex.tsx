@@ -11,7 +11,7 @@ import * as KobalteSelect from "@kobalte/core/select";
 import * as TabsPrimitive from "@kobalte/core/tabs";
 import * as TooltipPrimitive from "@kobalte/core/tooltip";
 import type { ValidComponent } from "@solidjs/web";
-import { createContext, createEffect, merge, onCleanup, untrack, useContext } from "solid-js";
+import { createContext, createEffect, createSignal, merge, onCleanup, onSettled, untrack, useContext } from "solid-js";
 import { useMenuMotion } from "./menu-motion";
 import { createPressedPopupCue } from "./utils";
 
@@ -196,22 +196,36 @@ export function dialogOpen(): boolean {
   return document.querySelector(".ui-dialog-content") !== null;
 }
 
+const [mountedDialogs, setMountedDialogs] = createSignal(0);
+
+export const dialogShown = () => mountedDialogs() > 0;
+
+function countMountedDialog() {
+  onSettled(() => {
+    setMountedDialogs((count) => count + 1);
+    return () => setMountedDialogs((count) => count - 1);
+  });
+}
+
 export const Dialog: DialogApi = {
   Root: (props) => <DialogPrimitive.Root {...props} onOpenChange={focusRestoreHandler(() => props.onOpenChange)} />,
   Portal: (props) => <DialogPrimitive.Portal {...props} />,
   Trigger: (props) => <DialogPrimitive.Trigger data-cuelume-open="" {...props} />,
   Overlay: (props) => <DialogPrimitive.Overlay {...props} class={withBaseClass("ui-dialog-overlay", props.class)} />,
-  Content: (props) => (
-    <DialogPrimitive.Content
-      {...props}
-      class={withBaseClass("ui-dialog-content", props.class)}
-      onInteractOutside={(event) => {
-        props.onInteractOutside?.(event);
-        const target = event.detail.originalEvent.target;
-        if (target instanceof Element && target.closest("[data-kb-top-layer]")) event.preventDefault();
-      }}
-    />
-  ),
+  Content: (props) => {
+    countMountedDialog();
+    return (
+      <DialogPrimitive.Content
+        {...props}
+        class={withBaseClass("ui-dialog-content", props.class)}
+        onInteractOutside={(event) => {
+          props.onInteractOutside?.(event);
+          const target = event.detail.originalEvent.target;
+          if (target instanceof Element && target.closest("[data-kb-top-layer]")) event.preventDefault();
+        }}
+      />
+    );
+  },
   Title: (props) => <DialogPrimitive.Title {...props} />,
   Description: (props) => <DialogPrimitive.Description {...props} />,
   CloseButton: (props) => <DialogPrimitive.CloseButton data-cuelume-close="" {...props} />,
@@ -237,9 +251,10 @@ export const AlertDialog: AlertDialogApi = {
   Overlay: (props) => (
     <AlertDialogPrimitive.Overlay {...props} class={withBaseClass("ui-dialog-overlay", props.class)} />
   ),
-  Content: (props) => (
-    <AlertDialogPrimitive.Content {...props} class={withBaseClass("ui-dialog-content", props.class)} />
-  ),
+  Content: (props) => {
+    countMountedDialog();
+    return <AlertDialogPrimitive.Content {...props} class={withBaseClass("ui-dialog-content", props.class)} />;
+  },
   Title: (props) => <AlertDialogPrimitive.Title {...props} />,
   Description: (props) => <AlertDialogPrimitive.Description {...props} />,
   CloseButton: (props) => <AlertDialogPrimitive.CloseButton data-cuelume-close="" {...props} />,
