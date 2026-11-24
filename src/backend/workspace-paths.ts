@@ -1,6 +1,6 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentSummary,
@@ -217,13 +217,10 @@ const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(functio
     relativePath === null ? [] : [...new Set([relativePath, relativePath.replace(LOCATION_SUFFIX, "")])];
   const inAddedFolder = yield* onlyMatch(allowedRoots, relativePaths, mayAccess);
   if (inAddedFolder !== null) return inAddedFolder;
-  const name = basename(candidatePath);
-  const withoutLocation = name.replace(LOCATION_SUFFIX, "");
   const history = [...(options.fileHistory ?? [])].reverse();
-  const historyPaths = new Set([
-    ...history.filter((path) => basename(path) === name),
-    ...history.filter((path) => basename(path) === withoutLocation),
-  ]);
+  const historyPaths = new Set(
+    relativePaths.flatMap((linkPath) => history.filter((path) => endsWithPath(path, linkPath))),
+  );
   for (const historyPath of historyPaths) {
     const found = yield* Effect.result(attachmentCall(() => realpath(historyPath)));
     if (Result.isSuccess(found) && mayAccess(found.success)) return found.success;
@@ -233,6 +230,11 @@ const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(functio
   const workFolders = [...new Set([...(options.workFolders ?? [])].reverse())].slice(0, WORK_FOLDER_LIMIT);
   return yield* onlyMatch(workFolders, relativePaths, mayAccess);
 });
+
+function endsWithPath(path: string, ending: string): boolean {
+  const normalized = normalize(path);
+  return normalized === ending || normalized.endsWith(`${sep}${ending}`);
+}
 
 const onlyMatch = Effect.fn("Workspace.onlyMatch")(function* (
   folders: readonly string[],
