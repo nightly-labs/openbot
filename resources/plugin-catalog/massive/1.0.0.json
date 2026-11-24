@@ -1,0 +1,33 @@
+{
+  "slug": "massive",
+  "name": "Massive",
+  "tagline": "Stock and crypto market data",
+  "description": "Massive lets agents read stock, options, forex, and crypto market data, such as prices, aggregates, and company details, with the signed-in Massive account. Each user signs in to their own Massive account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Massive",
+  "iconUrl": "https://massive.com/brands/favicon-massive.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-daily-bars", "text": "Show the daily closing prices of AAPL for the last month." },
+    { "id": "prompt-compare", "text": "Compare the year-to-date returns of SPY, QQQ, and IWM." },
+    { "id": "prompt-crypto", "text": "What are the current price and 24-hour volume of Bitcoin?" }
+  ],
+  "apps": [
+    {
+      "id": "app-massive-mcp",
+      "name": "Massive",
+      "description": "Stock, options, forex, and crypto market data, over Massive's MCP server with browser sign-in.",
+      "iconUrl": "https://massive.com/brands/favicon-massive.png",
+      "server": {
+        "name": "massive",
+        "transport": "http",
+        "url": "https://mcp.massive.com",
+        "auth": [{ "id": "massive-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://massive.com",
+  "privacyPolicyUrl": "https://massive.com/legal/privacy",
+  "termsUrl": "https://massive.com/legal/terms",
+  "skills": []
+}

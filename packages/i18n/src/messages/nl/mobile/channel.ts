@@ -41,6 +41,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "Kan dit kanaal niet herstellen. Probeer opnieuw.",
   "mobile.channel.chat.fallbackName": "Kanaal",
   "mobile.channel.chat.deletedNotice": "Verwijderd kanaal. Alleen ter inzage.",
+  "mobile.channel.chat.waitBusy": "Wachten - {name} is bezig in {channel}",
+  "mobile.channel.chat.waitFull": "Wachten - {name} begint als een lopende taak klaar is",
   "mobile.channel.records.connect": "Maak verbinding met de server om dit kanaal te bewerken.",
   "mobile.channel.records.loadFailed": "Kan de kanaalinstellingen niet laden.",
   "mobile.channel.records.gone": "Dit item is niet meer beschikbaar.",
@@ -76,10 +78,40 @@ export const messages = {
   "mobile.channel.form.deselectAll": "Alles deselecteren",
   "mobile.channel.form.memories": "Herinneringen",
   "mobile.channel.form.routines": "Routines",
+  "mobile.channel.folders.description":
+    "Alle leden van {channel} kunnen in deze mappen bestanden wijzigen en opdrachten uitvoeren.",
+  "mobile.channel.folders.removeBody": "Leden van {channel} kunnen geen bestanden in {folder} meer wijzigen",
   "mobile.channel.form.deleteTitle": "Kanaal verwijderen?",
   "mobile.channel.form.deleteBody":
     "Hiermee stopt het kanaal. De geschiedenis blijft alleen ter inzage in Verwijderde kanalen. Je kunt het daar herstellen. Agents die lid zijn, blijven behouden.",
   "mobile.channel.form.delete": "Verwijder kanaal",
+  "mobile.channel.newConversation.title": "Nieuw gesprek",
+  "mobile.channel.newConversation.starting": "Nieuw gesprek starten…",
+  "mobile.channel.newConversation.footer": "De leden vergeten de eerdere berichten. De kanaalinstellingen blijven.",
+  "mobile.channel.newConversation.confirmTitle": "Een nieuw gesprek starten in {name}?",
+  "mobile.channel.newConversation.confirmBody":
+    "De leden vergeten de eerdere berichten van dit kanaal. De berichten blijven zichtbaar boven een scheidingslijn. Leden, instructies, herinneringen en routines veranderen niet.",
+  "mobile.channel.newConversation.confirm": "Nieuw gesprek starten",
+  "mobile.channel.newConversation.failed": "Kan geen nieuw gesprek starten",
+  "mobile.channel.newConversation.failedBody": "De host kan geen nieuw gesprek starten.",
+  "mobile.channel.compact.title": "Context comprimeren",
+  "mobile.channel.compact.compacting": "Comprimeren starten…",
+  "mobile.channel.compact.footer":
+    "De leden houden een korte samenvatting van hun kanaalsessie en gebruiken minder tokens.",
+  "mobile.channel.compact.started":
+    "Comprimeren gestart. De providers van de leden maken de context korter op de host.",
+  "mobile.channel.compact.failed": "Kan de kanaalcontext niet comprimeren",
+  "mobile.channel.compact.failedBody": "De host kon de context niet comprimeren.",
+  "mobile.channel.deleteHistory.title": "Geschiedenis wissen",
+  "mobile.channel.deleteHistory.deleting": "Geschiedenis verwijderen…",
+  "mobile.channel.deleteHistory.footer":
+    "De berichten worden gewist en de leden vergeten ze. De kanaalinstellingen blijven.",
+  "mobile.channel.deleteHistory.confirmTitle": "Geschiedenis van {name} wissen?",
+  "mobile.channel.deleteHistory.confirmBody":
+    "Alle berichten en bestanden van dit kanaal worden uit OpenBot gewist en de leden vergeten ze. Dit kun je niet ongedaan maken. Leden, instructies, herinneringen, routines en taken veranderen niet.",
+  "mobile.channel.deleteHistory.confirm": "Geschiedenis wissen",
+  "mobile.channel.deleteHistory.failed": "Kan de geschiedenis niet wissen",
+  "mobile.channel.deleteHistory.failedBody": "De host kan de geschiedenis niet verwijderen.",
   "mobile.channel.form.unavailable":
     "Maak verbinding met een desktopserver die kanalen ondersteunt om wijzigingen aan te brengen.",
   "mobile.channel.form.invalidName": "Voer een geldige kanaalnaam in.",

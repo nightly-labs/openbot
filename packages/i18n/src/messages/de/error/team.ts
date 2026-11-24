@@ -56,6 +56,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Zu viele Anmeldeversuche. Versuche es später erneut.",
   "error.team.clientUpdateRequired": "Aktualisiere diesen OpenBot-Client, bevor du dich mit diesem Host verbindest.",
   "error.team.hostUpdateRequired": "Aktualisiere OpenBot auf dem Host, bevor du dich verbindest.",
+  "error.team.serverSafeMode": "Dieser Server ist im abgesicherten Modus, weil OpenBot darauf nicht startet.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} auf diesem Server kann seine Daten nicht öffnen, weil eine neuere OpenBot-Version sie gespeichert hat. Ein neueres OpenBot-Release auf dem Server behebt das.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} auf diesem Server wurde angehalten, nachdem der Start mehrmals fehlgeschlagen ist. Ein neueres OpenBot-Release auf dem Server behebt das.",
   "error.team.sidebarLayoutUnavailable": "Die Anordnung der Seitenleiste ist nicht verfügbar.",
   "error.team.providersUnsupported": "Diese Verbindung unterstützt keine Anbietereinstellungen.",
   "error.team.providerNotManaged": "OpenBot verwaltet die CLI dieses Anbieters nicht.",
@@ -76,7 +81,26 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Diese Verbindung unterstützt keine Agentenfarben.",
   "error.team.chatColorsUnsupported": "Diese Verbindung unterstützt keine Chatfarben.",
   "error.team.routineRunPlaceUnsupported": "Diese Verbindung kann nicht ändern, wo eine Routine läuft.",
+  "error.team.routinePauseReasonsUnsupported": "Diese Verbindung kann nicht zeigen, warum eine Routine pausiert ist.",
+  "error.team.activeQueuesUnsupported": "Diese Verbindung kann die Warteschlangen aller Agenten nicht anzeigen.",
+  "error.team.routinesOnceUnsupported": "Diese Verbindung kann keine Routinen speichern, die einmal laufen.",
+  "error.team.routineRunCommandUnsupported": "Diese Verbindung kann den Ausführungsbefehl einer Routine nicht liefern.",
+  "error.team.threadQueueUnsupported": "Diese Verbindung kann die Warteschlange eines Nebenthreads nicht anzeigen.",
+  "error.team.threadRequestsUnsupported":
+    "Diese Verbindung kann die Anfragen eines Nebenthreads an andere Agenten nicht anzeigen.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Diese Verbindung kann die Thread-Limits des Servers nicht anzeigen oder ändern.",
+  "error.team.usageLimitUnsupported":
+    "Diese Verbindung kann die Nutzungslimits von Agenten nicht anzeigen oder ändern.",
+  "error.team.hermesImportUnsupported": "Diese Verbindung kann keine Hermes-Profile vom Server importieren.",
+  "error.team.providerDetectionUnsupported":
+    "Diese Verbindung kann die Modellserver und Agenten des Servers nicht finden.",
+  "error.team.providerModelSourceUnsupported":
+    "Diese Verbindung kann nicht zeigen, woher die Modelle eines Anbieters kommen.",
+  "error.team.routineFlowStopUnsupported": "Diese Verbindung kann keinen Routinelauf stoppen.",
   "error.team.sidebarFoldersUnsupported": "Diese Verbindung unterstützt keine Ordner in Ordnern.",
+  "error.team.libraryFoldersUnsupported": "Diese Verbindung unterstützt keine Bibliotheksordner.",
+  "error.team.workflowFoldersUnsupported": "Diese Verbindung unterstützt keine Workflow-Ordner.",
   "error.team.agentNotificationLevelsUnsupported":
     "Dieser Server kann keine eigene Benachrichtigungsstufe pro Agent speichern. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
   "error.team.sidebarPinsUnsupported":
@@ -90,6 +114,7 @@ export const messages = {
   "error.team.messageDeleteUnsupported": "Diese Verbindung unterstützt das Löschen von Nachrichten nicht.",
   "error.team.workspaceDirectoryUnsupported": "Diese Verbindung unterstützt das Anzeigen von Ordnern nicht.",
   "error.team.conversationFileSearchUnsupported": "Diese Verbindung unterstützt das Suchen von Dateien nicht.",
+  "error.team.threadMessageSearchUnsupported": "Diese Verbindung unterstützt das Suchen in Nebenthreads nicht.",
   "error.team.sideQuestionUnsupported": "Diese Verbindung unterstützt keine Nebenfragen.",
   "error.team.liveVoiceUnsupported":
     "Dieser Server unterstützt keine Codex-Live-Sprache. Aktualisiere OpenBot auf dem Computer, auf dem er läuft.",
@@ -109,15 +134,28 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Diese Verbindung unterstützt keine Änderungen der Serveridentität.",
   "error.team.hostUpdateUnsupported": "Diese Verbindung unterstützt keine Host-Aktualisierungen.",
   "error.team.hostTimezoneUnsupported": "Diese Verbindung unterstützt die Zeitzone des Servers nicht.",
+  "error.team.hostSignalHomeUnsupported": "Diese Verbindung unterstützt die Wahl des Signal-Servers nicht.",
+  "error.team.hostVoiceModelUnsupported":
+    "Das Spracherkennungsmodell des Servers wird von dieser Verbindung nicht unterstützt.",
+  "error.team.hostRestartUnsupported": "Diese Verbindung unterstützt keinen Neustart des Servers.",
+  "error.team.ownerTransferUnsupported": "Die Übertragung des Eigentums wird von diesem Server nicht unterstützt.",
   "error.team.hostKeyRotationUnsupported": "Diese Verbindung unterstützt keine Änderung des Serverschlüssels.",
   "error.team.localServersUnsupported": "Diese Verbindung unterstützt keine Server auf diesem Computer.",
   "error.team.routineResultsUnsupported": "Diese Verbindung unterstützt keine Ziele für Routinen.",
   "error.team.agentMemoryLimitUnsupported": "Diese Verbindung unterstützt das Erinnerungslimit der Agenten nicht.",
   "error.team.agentFoldersUnsupported": "Diese Verbindung unterstützt die Ordner der Agenten nicht.",
+  "error.team.channelFoldersUnsupported": "Diese Verbindung unterstützt die Ordner von Kanälen nicht.",
   "error.team.folderUnavailable": "Dieser Ordner ist auf dem Host-Computer nicht verfügbar.",
   "error.team.memoryReviewUnsupported": "Diese Verbindung unterstützt die Erinnerungsprüfung nicht.",
   "error.team.skillLearningUnsupported": "„Fähigkeiten lernen“ wird von dieser Verbindung nicht unterstützt.",
+  "error.team.browsingMemoryUnsupported": "Lernen aus dem Browsen wird von dieser Verbindung nicht unterstützt.",
   "error.team.promptCacheTtlUnsupported": "Diese Verbindung unterstützt die Prompt-Cache-Dauer nicht.",
+  "error.team.claudeUserSetupUnsupported":
+    "Diese Verbindung unterstützt den Schalter für die Claude-Code-Einrichtung nicht.",
+  "error.team.claudeCompactWindowUnsupported": "Diese Verbindung unterstützt die Claude-Komprimierungsgröße nicht.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Diese Verbindung unterstützt das Komprimieren vor Ablauf des Caches nicht.",
+  "error.team.providerEnvironmentUnsupported": "Diese Verbindung unterstützt keine Anbietervariablen.",
   "error.team.modelVisibilityUnsupported": "Diese Verbindung unterstützt die Modellliste nicht.",
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",
   "error.team.attachmentNameRequired": "Ein sicherer Anhangsname ist erforderlich.",
@@ -129,6 +167,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Diese Verbindung unterstützt keine MCP-Server.",
   "error.team.mcpServerListNeedsUpdate":
     "Aktualisiere OpenBot auf diesem Gerät, um mehr als {limit} MCP-Server auf diesem Server zu nutzen.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Aktualisiere OpenBot auf diesem Gerät, um mehr als {limit} Konten eines Anbieters auf diesem Server zu nutzen.",
   "error.team.storageUnsupported": "Diese Verbindung unterstützt keinen Speicher.",
   "error.team.machineResourcesUnsupported": "Diese Verbindung unterstützt keine Maschinennutzung.",
   "error.team.machineAlertMemberInvalid":
@@ -154,6 +194,8 @@ export const messages = {
   "error.team.secureAuthUnsupported": "Dieser Client unterstützt keine sichere Authentifizierung.",
   "error.team.agentSettingsUnsupported": "Diese Verbindung unterstützt keine Agenteneinstellungen.",
   "error.team.adminRequired": "Administratorzugriff ist erforderlich.",
+  "error.team.mcpAccessStale":
+    "Jemand hat den Zugriff auf diesen MCP-Server geändert. Nimm deine Änderung noch einmal vor.",
   "error.team.mcpServerNotYours":
     "Nur die Person, die diesen MCP-Server hinzugefügt hat, oder ein Admin kann ihn ändern.",
   "error.team.ownerRequired": "Nur der Eigentümer dieses Servers kann das tun.",
@@ -170,4 +212,15 @@ export const messages = {
   "error.team.signInRelayMismatch": "Diese Adresse gehört nicht zu dieser Anmeldung.",
   "error.team.signInRelayLinkUnknown": "Kein Agent auf diesem Server hat diesen Anmeldelink angezeigt.",
   "error.team.hostPersonalityUnsupported": "Diese Verbindung unterstützt die Server-Persönlichkeit nicht.",
+  "error.team.agentWaitsUnsupported": "Offene Wartevorgänge werden von dieser Verbindung nicht unterstützt.",
+  "error.team.pendingApprovalUnsupported": "Diese Verbindung kann keine vollständige Freigabe lesen.",
+  "error.team.pendingPromptsUnsupported": "Diese Verbindung kann die offenen Fragen nicht lesen.",
+  "error.team.phoneFeedbackUnsupported": "Diese Verbindung kann keinen Bericht aus der Telefon-App senden.",
+  "error.team.messagePinsUnsupported": "Diese Verbindung unterstützt angeheftete Nachrichten nicht.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Das Ausführen einer wartenden Nachricht als neuer Thread wird von dieser Verbindung nicht unterstützt.",
+  "error.team.backgroundProcessesUnsupported": "Hintergrundprozesse werden von dieser Verbindung nicht unterstützt.",
+  "error.team.providerUseUnsupported":
+    "Das Ein- und Ausschalten von Anbietern wird von dieser Verbindung nicht unterstützt.",
+  "error.team.providerUseInvalid": "Dieser Anbieter hat keinen Ein-/Aus-Schalter.",
 } as const satisfies PartialTranslation<typeof source>;

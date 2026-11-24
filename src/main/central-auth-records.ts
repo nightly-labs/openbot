@@ -1,3 +1,4 @@
+import { type CustomServerPlan, optionalCustomServerPayment } from "@openbot/contracts/custom-server-plans";
 import { type HostKeyHandover, optionalHostKeyHandovers } from "@openbot/contracts/host-key-handover";
 import { inviteUseCount, isPermanentInvite } from "@openbot/contracts/invite-links";
 import {
@@ -8,8 +9,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
-
-/** The account API's answers, and the decoders that `CentralAuthManager` checks them with. */
+import {
+  optionalServerAppearanceField,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 export interface RegisteredRemoteHost {
   hostId: string;
@@ -23,20 +26,19 @@ export interface RemoteHostSummary {
   hostId: string;
   name: string;
   logoKey: string | null;
+  appearance?: ServerAppearance | null;
   devicePublicKey: string | null;
-  /** The host's signed key handovers. An account server from before handovers sends none. */
   keyHandovers: HostKeyHandover[];
   authEpoch: number;
   membershipId: string;
   role: "owner" | "admin" | "member";
-  /** The active members that the host's plan allows. An account server from before plans sends none. */
   memberLimit?: number;
-  /**
-   * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
-   */
   hosted?: boolean;
-  /** The storage in GB that the plan of a hosted server gives. An older account server sends none. */
+  restartAvailable?: boolean;
   storageGb?: number;
+  paymentRequired?: true;
+  customPlan?: CustomServerPlan;
+  hidden?: true;
 }
 
 export interface RemoteInviteRecord {
@@ -67,7 +69,6 @@ export interface RemoteMemberRecord {
   email: string;
   name: string | null;
   avatarUrl: string | null;
-  /** The member's account chat color. Missing: the account service is older and sends none. */
   chatColor?: AvatarColor | null;
   role: "owner" | "admin" | "member";
   status: "active" | "revoked";
@@ -94,7 +95,6 @@ export function decodeCentralAuthUser(value: unknown): CentralAuthUser {
   const avatarUrl = record.avatarUrl;
   if (name !== null && !isString(name)) throw new Error("Invalid account name.");
   if (avatarUrl !== null && !isString(avatarUrl)) throw new Error("Invalid account avatar.");
-  // An account service from before the analytics answer sends no field: the user never answered.
   const analyticsEnabled = record.analyticsEnabled ?? null;
   if (analyticsEnabled !== null && !isBoolean(analyticsEnabled)) throw new Error("Invalid account analytics answer.");
   return {
@@ -107,10 +107,6 @@ export function decodeCentralAuthUser(value: unknown): CentralAuthUser {
   };
 }
 
-/**
- * The account chat color of a user or a member. An account service from before chat colors sends
- * none, and the field stays missing. A value that is not a color counts as no color.
- */
 function optionalChatColor(value: unknown): { chatColor?: AvatarColor | null } {
   if (value === undefined) return {};
   return { chatColor: isAvatarColor(value) ? value : null };
@@ -149,7 +145,6 @@ function decodeMobileConnectedDevice(value: unknown): MobileConnectedDevice {
     platform,
     connectedAt: record.connectedAt,
     lastActiveAt: record.lastActiveAt,
-    // An account service from before permanent links sends none: its phones all used a one-time code.
     via: record.via === "link" ? "link" : "code",
   };
 }
@@ -179,7 +174,6 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
     if (host.devicePublicKey !== null && !isString(host.devicePublicKey)) throw new Error("Invalid remote host key.");
     if (host.role !== "owner" && host.role !== "admin" && host.role !== "member")
       throw new Error("Invalid remote host role.");
-    // A bad limit drops only the limit, so the host list still loads.
     const memberLimit = host.memberLimit;
     const validLimit = isNumber(memberLimit) && Number.isSafeInteger(memberLimit) && memberLimit >= 1;
     const storageGb = host.storageGb;
@@ -188,15 +182,18 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       hostId: requiredString(host, "hostId"),
       name: requiredString(host, "name"),
       logoKey: host.logoKey,
+      ...optionalServerAppearanceField(host.appearance),
       devicePublicKey: host.devicePublicKey,
       keyHandovers: optionalHostKeyHandovers(host.keyHandovers),
       authEpoch: host.authEpoch,
       membershipId: requiredString(host, "membershipId"),
       role: host.role,
       ...(validLimit ? { memberLimit } : {}),
-      // A bad value drops only the flag, as for the limit.
       ...(isBoolean(host.hosted) ? { hosted: host.hosted } : {}),
+      ...(isBoolean(host.restartAvailable) ? { restartAvailable: host.restartAvailable } : {}),
       ...(validStorage ? { storageGb } : {}),
+      ...optionalCustomServerPayment(host),
+      ...(host.hidden === true ? { hidden: true as const } : {}),
     };
   });
 }

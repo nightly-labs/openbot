@@ -37,32 +37,19 @@ import {
   savedAcpAgentDraft,
 } from "./custom-acp-agent-form";
 
-/** What the host does with the user's own ACP agents. This computer only: each is a command here. */
 export interface CustomAgentSettingsApi {
   agents: readonly CustomAgentSummary[];
-  /** Rejects with the reason, so the form stays open with what the user typed. */
+  host?: boolean | undefined;
   save: (input: SaveCustomAgentInput) => Promise<CustomProviderRestart>;
   remove: (id: string) => Promise<CustomProviderRestart>;
-  /** One trial start. Rejects with the reason the agent did not answer. */
-  check: (input: CheckCustomAgentInput) => Promise<CustomAgentCheckResult>;
-  /**
-   * Restarts the process group of the custom agents after their tasks stop. Without it the section
-   * offers no restart.
-   */
+  check?: ((input: CheckCustomAgentInput) => Promise<CustomAgentCheckResult>) | undefined;
   restart?: (() => Promise<void>) | undefined;
   cancelRestart?: (() => Promise<void>) | undefined;
-  /** A restart waits for the tasks of the custom agents to stop. */
   restartPending?: boolean | undefined;
-  /** The last failure of the custom agents, kept until a model list fetched after it succeeds. */
   lastError?: string | null | undefined;
-  /** What "Copy diagnostics" puts on the clipboard. */
   diagnostics?: string | undefined;
 }
 
-/**
- * The custom agents run in one process group that OpenBot restarts after a change, but not through a
- * turn in progress. The write is durable either way, so none of these is an error.
- */
 const RESTART_NOTE = {
   saved: {
     restarted: "customProvider.agents.saved.restarted",
@@ -76,12 +63,10 @@ const RESTART_NOTE = {
   },
 } as const satisfies Record<"saved" | "removed", Record<CustomProviderRestart, AppTextKey>>;
 
-/** The note after an agent is saved or removed: when the agent list catches up. */
 export function customAgentRestartKey(action: "saved" | "removed", restart: CustomProviderRestart): AppTextKey {
   return RESTART_NOTE[action][restart];
 }
 
-/** The form of one agent: a new one, or a saved one that keeps its ID. */
 type AgentForm = { draft: CustomAcpAgentDraft; saved?: CustomAgentSummary };
 
 export function checkResult(result: CustomAgentCheckResult): AcpAgentCheck {
@@ -95,7 +80,6 @@ export function checkResult(result: CustomAgentCheckResult): AcpAgentCheck {
   };
 }
 
-/** The user's own ACP agents in Settings: the list, and the form that adds or changes one. */
 export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
   const { t, errorMessage, sourceText } = useText();
   const [form, setForm] = createSignal<AgentForm | null>(null);
@@ -127,10 +111,11 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
     }
   }
 
-  async function runCheck(draft: CustomAcpAgentDraft): Promise<void> {
+  async function runCheck(check: CustomAgentSettingsApi["check"], draft: CustomAcpAgentDraft): Promise<void> {
+    if (!check) return;
     setCheck({ status: "checking" });
     try {
-      setCheck(checkResult(await props.api.check(customAgentCheckInput(draft, form()?.saved?.id))));
+      setCheck(checkResult(await check(customAgentCheckInput(draft, form()?.saved?.id))));
     } catch (error) {
       setCheck({ status: "failed", message: errorMessage(error, t("customProvider.acp.checkFailed")) });
     }
@@ -154,6 +139,12 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
     if (agent) void remove(agent);
   }
 
+  function checkHandler(): ((draft: CustomAcpAgentDraft) => void) | undefined {
+    const check = props.api.check;
+    if (!check) return undefined;
+    return (draft) => void runCheck(check, draft);
+  }
+
   const detail = (agent: CustomAgentSummary) => {
     const command = [agent.resolvedCommand ?? agent.command, ...agent.args].join(" ");
     const parts = [agent.resolvedCommand ? command : t("customProvider.agents.commandMissing", { command })];
@@ -161,10 +152,13 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
     return parts.join(" · ");
   };
 
+  const description = () =>
+    t(props.api.host ? "customProvider.agents.hostDescription" : "customProvider.agents.description");
+
   return (
     <SettingsSection
       title={t("customProvider.agents.title")}
-      description={t("customProvider.agents.description")}
+      description={description()}
       actions={
         <>
           <Show when={props.api.restart && (props.api.agents.length > 0 || props.api.restartPending)}>
@@ -281,8 +275,9 @@ export function CustomAgentSettings(props: { api: CustomAgentSettingsApi }) {
         draft={form()?.draft}
         editing={Boolean(form()?.saved)}
         presets={ACP_AGENT_PRESETS}
+        host={props.api.host}
         check={check()}
-        onCheck={(draft) => void runCheck(draft)}
+        onCheck={checkHandler()}
         busy={saving()}
         submitError={submitError()}
         takenAgentIds={props.api.agents.map((agent) => agent.id).filter((id) => id !== form()?.saved?.id)}

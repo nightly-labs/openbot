@@ -1,11 +1,7 @@
-/* Marketplace suggestion: an app or skill an agent suggests in the chat, with its connect action. */
-
-/* The frame is a UiBlockCard (ui-blocks.css). */
 .marketplace-suggestion.ui-block-card {
   max-width: 520px;
 }
 
-/* The listing icon keeps its tile border here, as on a dark chat its own fill meets the card. */
 .marketplace-suggestion .marketplace-suggestion-icon {
   width: var(--openbot-control-lg);
   height: var(--openbot-control-lg);
@@ -20,7 +16,12 @@
   border-radius: inherit;
 }
 
-/* The name and the tagline keep one line each, so the card stays short. */
+.marketplace-suggestion .marketplace-suggestion-icon > .connector-brand-tile {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
 .marketplace-suggestion .ui-block-title,
 .marketplace-suggestion .ui-block-subtitle {
   overflow: hidden;
@@ -41,12 +42,10 @@
   white-space: nowrap;
 }
 
-/* Skip and the action sit in the actions of the card; the wrapper only carries their state. */
 .marketplace-suggestion-controls {
   display: contents;
 }
 
-/* A question to answer with the action: all of it, in the body of the card, with the action in the footer. */
 .marketplace-suggestion-question {
   margin: 0;
   color: var(--openbot-text-secondary);
@@ -61,16 +60,10 @@
   align-items: center;
 }
 
-/*
- * Connect, its busy step and Connected are one button. Both labels share one grid cell; the stage
- * takes the width of the label on screen, and the cell keeps that width, so the wider label
- * overflows on both sides instead of pushing the other one off-centre.
- */
 .marketplace-suggestion .marketplace-suggestion-button {
   overflow: clip;
 }
 
-/* Connected is a status: the success fill holds under the pointer. On-light text keeps AA on the dark-theme fill. */
 .marketplace-suggestion .marketplace-suggestion-button.ui-button[data-state="connected"],
 .marketplace-suggestion .marketplace-suggestion-button.ui-button[data-state="connected"]:hover {
   border-color: transparent;
@@ -79,7 +72,6 @@
   cursor: default;
 }
 
-/* On-light text on the light-theme success fill is 3:1. The darker success-text fill keeps AA. */
 :root[data-openbot-color-scheme="light"]
   .marketplace-suggestion
   .marketplace-suggestion-button.ui-button[data-state="connected"] {
@@ -111,7 +103,6 @@
   height: var(--openbot-icon-sm);
 }
 
-/* The spinner takes no room until the step is busy. */
 .marketplace-suggestion-spinner {
   display: inline-flex;
   width: 0;
@@ -136,12 +127,6 @@
   visibility: hidden;
 }
 
-/*
- * The motion of a change the user started. With reduced motion, only the fill and the labels fade.
- * The busy step: the spinner grows in and the button widens. Connected: the success fill comes in, the
- * old label lifts away as the new one rises, the check draws from its short stroke, and Dismiss
- * folds so the button glides to the edge.
- */
 .marketplace-suggestion-controls[data-motion] .marketplace-suggestion-button.ui-button {
   transition:
     background-color var(--openbot-duration-slow) var(--openbot-ease-out),

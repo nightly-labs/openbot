@@ -6,10 +6,34 @@ import {
   type AttachmentSummary,
   decodeSaveSkillSuggestionResult,
   type SaveSkillSuggestionInput,
+  STORAGE_CAPABILITY,
   type TeamRealtimeEvent,
+  type TestRoutineInput,
 } from "@openbot/contracts/ipc";
-import { decodeSideQuestionResponse, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
+import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
+import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
+import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
+import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
+import {
+  decodeRoutineRunCommandResponse,
+  ROUTINE_RUN_COMMAND_CAPABILITY,
+  ROUTINE_RUN_COMMAND_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-command-v1";
+import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
+import {
+  decodeSideQuestionResponse,
+  SIDE_QUESTION_ROUTES,
+  SIDE_QUESTION_THREADS_CAPABILITY,
+} from "@openbot/contracts/team-protocol/side-question-v1";
 import { SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-agent-secret-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   deleteSharedTable,
@@ -23,6 +47,7 @@ import {
   resetAgentSessionSetting,
   setAgentSessionSetting,
   setAgentSkillEnabled,
+  testMcpServer,
   uninstallAgentSkill,
   unpublishAgentTemplate,
 } from "@openbot/team-client/team-admin-requests";
@@ -30,18 +55,26 @@ import { listInstalledSkills, type TeamApiRequest, teamAgentRoutinesApi } from "
 import { currentText } from "@openbot/ui/text";
 import { Effect } from "effect";
 import { onCleanup } from "solid-js";
+import type { SkillCatalogCalls } from "../../skills-port";
 import type { ConversationRuntime } from "../conversation/conversation-runtime";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
+import type { FilesPort } from "../files/files-port";
+import {
+  webAgentFoldersApi,
+  webAgentInstructionsApi,
+  webAgentMemoriesApi,
+  webAgentMemoryLimit,
+  webRoutineResultsCalls,
+} from "./web-agent-settings";
 import { createWebAttachmentMedia } from "./web-attachment-media";
 import { createWebAttachmentFiles, openWebLink } from "./web-attachments";
 import { webBrowserProfileCalls } from "./web-browser-profiles";
-import { webMessageLinks } from "./web-message-link-relay";
+import { useWebLiveVoice, webLiveVoicePort } from "./web-live-voice";
+import { openWebMessageLink, webMessageLinks } from "./web-message-link-relay";
 import type { WebWorkspaceRuntime } from "./web-runtime";
 
-/** The events of the connected host. */
 type HostEvents = (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void;
 
-/** Skills, shared tables and agent share links on the connected host. The host answers only an owner or admin. */
 function webHostAdmin(
   request: () => TeamApiRequest,
   onHostEvent?: HostEvents,
@@ -51,14 +84,19 @@ function webHostAdmin(
   webhookTestsEnabled?: () => boolean,
   webhookSenderSecretEnabled?: () => boolean,
   routineRunPlaceEnabled?: () => boolean,
+  routinesOnceEnabled?: () => boolean,
+  routinePauseReasonsEnabled?: () => boolean,
+  webhookAgentSecretEnabled?: () => boolean,
 ): NonNullable<ConversationRuntime["admin"]> {
-  // `request()` names the connected host at call time, so a host switch reaches the new host.
   const eventRoutines = webEventRoutinesApi(
     (...args) => request()(...args),
     () => routineRecoveryEnabled?.() === true,
     () => webhookTestsEnabled?.() === true,
     () => webhookSenderSecretEnabled?.() === true,
     () => routineRunPlaceEnabled?.() === true,
+    () => routinesOnceEnabled?.() === true,
+    () => routinePauseReasonsEnabled?.() === true,
+    () => webhookAgentSecretEnabled?.() === true,
   );
   return {
     get sessionSettings() {
@@ -133,14 +171,18 @@ export function createWebConversationRuntime(
   browserProxiesEnabled?: () => boolean,
   routineRunPlaceEnabled?: () => boolean,
   skillLearningEnabled?: () => boolean,
+  hasCapability?: (capability: string) => boolean,
+  canAdminister?: (capability: string) => boolean,
+  storageCalls?: () => FilesPort,
+  skillCatalog?: () => SkillCatalogCalls,
 ): ConversationRuntime {
+  const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
+  const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
+  const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const files = createWebAttachmentFiles(remote, hostId);
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
-  // A new upload cancels the one in flight (`uploadGeneration` in web-runtime.ts), so one import runs
-  // at a time. Each chat sends on its own while another chat imports, so a second import fails, as a
-  // second upload does on desktop. A queued import would land in the chat that is open when it
-  // starts, and the stop button would end the first one.
   let importBusy = false;
   async function runImport<T>(run: () => Promise<T>): Promise<T> {
     importBusy = true;
@@ -156,12 +198,8 @@ export function createWebConversationRuntime(
     importing.cancelled = true;
     try {
       await remote.cancelUpload();
-    } catch {
-      // The in-flight upload reports transport errors through its import event.
-    }
+    } catch {}
   }
-  // One file at a time, so a stop or host change takes effect before the next upload. On a stop,
-  // a host change or a failure, the files already uploaded are discarded if the host is the same.
   async function uploadFiles(
     files: readonly File[],
     serverId: string,
@@ -185,13 +223,8 @@ export function createWebConversationRuntime(
     await discard();
     return null;
   }
-  // The files and host of each failed import, for Retry, until the composer removes the chip.
   const failedImports = new Map<string, { serverId: string; files: readonly File[] }>();
-  // Cancel upload adds one. A pick stops its files that did not start when the value is not the one
-  // it saw at its start, so a later pick cannot hide the earlier one from Cancel.
   let cancelGeneration = 0;
-  // `started` names the chat on screen, so it comes before any wait. A set over the limit names no
-  // files: it has no chips, and the banner says why it failed.
   const announceImport = (requestId: string, serverId: string, files: readonly File[], retryable: boolean) =>
     emit({
       type: "started",
@@ -199,12 +232,7 @@ export function createWebConversationRuntime(
       requestId,
       files: retryable ? files.map((file) => ({ name: file.name, size: file.size })) : [],
     });
-  /**
-   * Each file is its own import, as on desktop, so a failed file does not drop the others. They go
-   * one after another, because the web client uploads one file at a time.
-   */
   async function importPick(files: readonly File[]) {
-    // The pick belongs to the host on screen now. After a host change, its other files go nowhere.
     const serverId = hostId();
     if (files.length > INPUT_LIMITS.attachments) {
       const requestId = crypto.randomUUID();
@@ -221,7 +249,6 @@ export function createWebConversationRuntime(
       else await runImportFiles(item.requestId, serverId, item.files, true);
     }
   }
-  // `uploadFiles` stops when the host is no longer `serverId`, and the import then lands nowhere.
   async function runImportFiles(requestId: string, serverId: string, files: readonly File[], retryable: boolean) {
     failedImports.delete(requestId);
     if (importBusy) {
@@ -260,17 +287,30 @@ export function createWebConversationRuntime(
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
-  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   onCleanup(() => {
     void cancelImportFiles();
     attachmentMedia.dispose();
   });
-  // The host's relay routes are admin only, so only an admin relays a sign-in link.
-  const messageLinks = adminRequest ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true) : {};
+  const messageLinks = adminRequest
+    ? webMessageLinks(adminRequest, () => signInRelayEnabled?.() === true)
+    : {
+        openMessageLink: async ({ url }: { url: string }) => {
+          await openWebMessageLink(url);
+          return null;
+        },
+      };
   const browserProfiles = adminRequest
     ? webBrowserProfileCalls(adminRequest, onHostEvent, () => browserProxiesEnabled?.() === true)
     : undefined;
   const listLevels = remote.listAgentNotificationLevels;
+  const agentMemories = adminRequest
+    ? webAgentMemoriesApi(adminRequest, onHostEvent, (capability) => hasCapability?.(capability) === true)
+    : undefined;
+  const agentFolders = adminRequest ? webAgentFoldersApi(adminRequest) : undefined;
+  const agentInstructions = adminRequest ? webAgentInstructionsApi(adminRequest) : undefined;
+  const routineResults = adminRequest ? webRoutineResultsCalls(adminRequest) : undefined;
+  const agentMemoryLimit = adminRequest ? webAgentMemoryLimit(adminRequest) : undefined;
+  const administers = (capability: string) => canAdminister?.(capability) === true;
   return {
     agent: {
       ...messageLinks,
@@ -279,11 +319,9 @@ export function createWebConversationRuntime(
         return runImport(async () => {
           if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
           const files = data.map((file) => new File([new Uint8Array(file.bytes)], file.name, { type: file.mimeType }));
-          // The composer's stop button reaches a paste through `importing`, as it reaches a picked file.
           const job = { cancelled: false, serverId };
           importing = job;
           try {
-            // A stop ends the upload in flight with an error. uploadFiles has discarded the files then.
             const attachments = await uploadFiles(files, serverId, () => job.cancelled).catch((error: unknown) => {
               if (job.cancelled) return null;
               throw error;
@@ -299,11 +337,9 @@ export function createWebConversationRuntime(
       discardDraftAttachment: (id) => remote.discard(id),
       downloadAttachments: unavailable,
       editQueuedMessage: async (input, serverId) => {
-        // The edit belongs to the host that queued the message. This client talks only to the connected one.
         if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
         return remote.editQueue(input);
       },
-      // The skills store asks only a host that serves `installed-skills`, and the MCP store only as an admin.
       listInstalledSkills: async (agentId) =>
         adminRequest
           ? Effect.runPromise(
@@ -316,6 +352,14 @@ export function createWebConversationRuntime(
           ? runTeamEffect(listMcpServers(adminRequest()).pipe(Effect.mapError((error) => error.cause)))
           : [];
       },
+      ...(adminRequest
+        ? {
+            testMcpServer: async (input, serverId) => {
+              if (serverId !== hostId()) throw new Error(currentText().t("webClient.error.hostChanged"));
+              return runTeamEffect(testMcpServer(adminRequest(), input).pipe(Effect.mapError((error) => error.cause)));
+            },
+          }
+        : {}),
       listWorkspaceDirectory: ({ agentId, path }) => remote.workspaceDirectory(agentId, path),
       onAttachmentImport(listener) {
         listeners.add(listener);
@@ -333,11 +377,11 @@ export function createWebConversationRuntime(
         failedImports.delete(requestId);
       },
       openAttachment: ({ attachmentId }) => files.download(attachmentId),
-      // The browser has no app to open a host file in, so it downloads.
       openSharedFile: ({ path }) => files.saveShared(path),
       openWorkspaceFile: ({ agentId, path }) => files.saveWorkspace(agentId, path),
       previewSharedFile: ({ path }) => files.previewShared(path),
-      previewWorkspaceFile: ({ agentId, path }) => files.previewWorkspace(agentId, path),
+      previewWorkspaceFile: ({ agentId, path, exactPath }) =>
+        files.previewWorkspace(agentId, path, exactPath ? { exactPath } : {}),
       respondToBrowserSecret: remote.respondToBrowserSecret
         ? (input) => remote.respondToBrowserSecret?.(input) ?? Promise.resolve()
         : unavailable,
@@ -346,14 +390,21 @@ export function createWebConversationRuntime(
     browser: {
       capturePreview: remote.browserPreview ?? unavailable,
       closePictureInPicture: async () => {},
+      closeWindow: async () => {},
+      focusWindow: async () => {},
       navigate: (input) => remote.navigateBrowserTab(input),
       onPictureInPictureEvent: () => () => {},
+      onWindowEvent: () => () => {},
       open: (input) => remote.openBrowserTab(input),
       openPictureInPicture: unavailable,
+      openWindow: unavailable,
+      publishWindowModel: async () => {},
       reload: (tabId) => remote.reloadBrowserTab(tabId),
       stop: (tabId) => remote.stopBrowserTab(tabId),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
       releaseControl: (tabId) => remote.releaseBrowserControl(tabId),
+      startTeach: (tabId) => remote.startBrowserTeach(tabId),
+      stopTeach: (input) => remote.stopBrowserTeach(input),
       setVisible: async () => {},
     },
     voice: {
@@ -369,18 +420,38 @@ export function createWebConversationRuntime(
       onStreamTranscript: () => () => {},
     },
     openUrl: openWebLink,
-    // Any member can ask, so the request is not limited to an admin.
+    get liveVoice() {
+      if (!adminRequest || !onHostEvent || hasCapability?.(LIVE_VOICE_CAPABILITY) !== true || !webLiveVoice())
+        return undefined;
+      return webLiveVoicePort(adminRequest, onHostEvent);
+    },
+    get skillCatalog() {
+      return skillCatalog?.();
+    },
     get askSideQuestion() {
       if (!adminRequest || sideQuestionEnabled?.() !== true) return undefined;
-      // Async, so that a host change rejects the promise and the store shows the error.
-      return async (input: AskSideQuestionInput) =>
-        adminRequest()("POST", SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
+      return async (input: AskSideQuestionInput) => {
+        if (input.taskId !== undefined && hasCapability?.(SIDE_QUESTION_THREADS_CAPABILITY) !== true)
+          throw new Error(currentText().t("error.team.sideQuestionUnsupported"));
+        return adminRequest()("POST", SIDE_QUESTION_ROUTES.ask, decodeSideQuestionResponse, {
           agentId: input.agentId,
           question: input.question,
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+          ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
+        });
+      };
+    },
+    get sideQuestionThreads() {
+      return hasCapability?.(SIDE_QUESTION_THREADS_CAPABILITY) === true;
+    },
+    get withdrawFeedback() {
+      if (!adminRequest || hasCapability?.(FEEDBACK_WITHDRAW_CAPABILITY) !== true) return undefined;
+      return async (input: { agentId: string; messageId: string }) =>
+        adminRequest()("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, decodeFeedbackWithdrawResult, {
+          agentId: input.agentId,
+          messageId: input.messageId,
         });
     },
-    // A member who can chat with the agent can press Save; the host checks the level.
     get saveSkillSuggestion() {
       if (!adminRequest || skillLearningEnabled?.() !== true) return undefined;
       return async (input: SaveSkillSuggestionInput) =>
@@ -389,9 +460,31 @@ export function createWebConversationRuntime(
           messageId: input.messageId,
         });
     },
-    // Any member keeps an own level for each agent. The panel asks only a host with the capability.
+    agentMemories,
+    get agentFolders() {
+      return administers(AGENT_FOLDERS_CAPABILITY) ? agentFolders : undefined;
+    },
+    get agentInstructions() {
+      return administers(AGENT_INSTRUCTIONS_CAPABILITY) ? agentInstructions : undefined;
+    },
+    get routineResultCalls() {
+      return administers(ROUTINE_RESULTS_CAPABILITY) ? routineResults : undefined;
+    },
+    get routineRunCommand() {
+      if (!adminRequest || !administers(ROUTINE_RUN_COMMAND_CAPABILITY)) return undefined;
+      return async (input: TestRoutineInput) =>
+        adminRequest()("POST", ROUTINE_RUN_COMMAND_ROUTES.command, decodeRoutineRunCommandResponse, {
+          agentId: input.agentId,
+          routineId: input.routineId,
+        });
+    },
+    get agentMemoryLimit() {
+      return administers(AGENT_MEMORY_LIMIT_CAPABILITY) ? agentMemoryLimit : undefined;
+    },
+    get storageCalls() {
+      return hasCapability?.(STORAGE_CAPABILITY) === true ? storageCalls?.() : undefined;
+    },
     agentNotificationLevels: listLevels ? { list: () => listLevels(hostId()) } : undefined,
-    // Any member reads the tab labels; the panels offer the other calls to an owner or admin only.
     get browserProfiles() {
       return browserProfilesEnabled?.() === true ? browserProfiles : undefined;
     },
@@ -402,12 +495,13 @@ export function createWebConversationRuntime(
       if (files.length > 0) await importPick(files);
     },
     cancelImportFiles,
-    // `request()` names the connected host at call time, so a host switch reaches the new host.
     routines: adminRequest
       ? {
           ...teamAgentRoutinesApi(
             (...args) => adminRequest()(...args),
             () => routineRunPlaceEnabled?.() === true,
+            routinesOnceEnabled,
+            routinePauseReasonsEnabled,
           ),
           onEvent: (listener) =>
             onHostEvent?.((event) => {
@@ -425,6 +519,9 @@ export function createWebConversationRuntime(
           webhookTestsEnabled,
           webhookSenderSecretEnabled,
           routineRunPlaceEnabled,
+          routinesOnceEnabled,
+          routinePauseReasonsEnabled,
+          () => eventsEnabled?.() === true && hasCapability?.(WEBHOOK_AGENT_SECRET_CAPABILITY) === true,
         )
       : undefined,
   };

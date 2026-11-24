@@ -1,10 +1,10 @@
 {
-  "version": "0.66.0",
+  "version": "0.78.0",
   "highlights": [
-    "Agents now learn new skills by themselves after you correct them, and fix their own skills while they work.",
-    "Save two-step codes in the Vault, and let agents sign in with them.",
-    "The Dynamic Island and the agent dock now work on Windows, and the dock can hold channels.",
-    "Agents can watch public videos, such as YouTube or TikTok links, and read what is said in them.",
-    "Channel members answer while they work, and a greeting or an unclear message goes to the lead."
+    "Update your joined servers to this version too, so that channel voice, hidden servers, workflow phone notifications and the connection fixes work there.",
+    "Use voice in channels: dictate a message and hear the agent's answer, or start a voice conversation from the channel's message box.",
+    "Hide a server from the server rail. It stays hidden on your other computers, and the \"Hidden servers\" folder shows it again.",
+    "Streamed replies and parallel workflows use less CPU, and long channels on a joined server open faster.",
+    "A workflow \"Notification\" output or a step that waits for approval now sends a phone notification."
   ]
 }

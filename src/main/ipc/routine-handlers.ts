@@ -1,8 +1,3 @@
-import { Effect } from "effect";
-import type { RemoteWorkflowError } from "../remote-service-effects";
-// Routines: the scheduled standing instructions attached to one agent, and the calendar of every
-// routine of a host.
-
 import {
   CHANNEL_CHATS_CAPABILITY,
   decodeChannelRoutineRuns,
@@ -15,15 +10,40 @@ import {
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import {
+  decodeRoutinePauseReasons,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import {
+  decodeRoutineRunCommandResponse,
+  ROUTINE_RUN_COMMAND_CAPABILITY,
+  ROUTINE_RUN_COMMAND_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-run-command-v1";
+import {
   decodeRoutineRunPlace,
   decodeRoutineRunPlaces,
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
+import {
+  decodeOnceAgentRoutines,
+  decodeOnceChannelRoutines,
+  ROUTINES_ONCE_CAPABILITY,
+  ROUTINES_ONCE_ROUTES,
+} from "@openbot/contracts/team-protocol/routines-once-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
-import { withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import {
+  createOnceAgentRoutine,
+  isOnceSchedule,
+  listOnceAgentRoutines,
+  type RoutinesOncePost,
+  requireReleasedScheduleOn,
+  updateAgentRoutineOnce,
+} from "@openbot/team-client/routines-once";
+import { withRoutinePauseReasons, withRoutineRunPlaces } from "@openbot/team-client/team-api-requests";
+import { Effect } from "effect";
 import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { localRoutineCalendarSource } from "../local-routine-calendar";
@@ -36,6 +56,7 @@ import {
 } from "../remote-agent-decoding";
 import { decodeVoid } from "../remote-host-decoding";
 import type { RemoteServerManager } from "../remote-server-manager";
+import type { RemoteWorkflowError } from "../remote-service-effects";
 import {
   parseAgentId,
   parseCreateRoutine,
@@ -64,47 +85,72 @@ export function routineIpcHandlers({
       listRoutines: scopedHandler(parseAgentId, {
         local: (agentId) => service.listRoutines(agentId),
         remote: (agentId, serverId) =>
-          runCauseEffect(
+          withOnceRoutines(
+            remoteServers,
+            serverId,
             Effect.gen(function* () {
               const routines = remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(agentId), decodeRoutines);
-              if (!remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY)) return yield* routines;
-              const [list, places] = yield* Effect.all(
+              const runPlaces = remoteServers.supportsCapability(serverId, ROUTINE_RUN_PLACE_CAPABILITY);
+              const pauseReasons = remoteServers.supportsCapability(serverId, ROUTINE_PAUSE_REASONS_CAPABILITY);
+              if (!runPlaces && !pauseReasons) return yield* routines;
+              const [list, places, reasons] = yield* Effect.all(
                 [
                   routines,
-                  remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
-                    method: "POST",
-                    body: { agentId },
-                  }),
+                  runPlaces
+                    ? remoteServers.request(serverId, ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, {
+                        method: "POST",
+                        body: { agentId },
+                      })
+                    : Effect.succeed([]),
+                  pauseReasons
+                    ? remoteServers.request(serverId, ROUTINE_PAUSE_REASONS_ROUTES.list, decodeRoutinePauseReasons, {
+                        method: "POST",
+                        body: { agentId },
+                      })
+                    : Effect.succeed([]),
                 ],
                 { concurrency: "unbounded" },
               );
-              return withRoutineRunPlaces(list, places);
+              return withRoutinePauseReasons(withRoutineRunPlaces(list, places), reasons);
             }),
+            (send) => listOnceAgentRoutines(send, agentId),
           ),
       }),
       createRoutine: scopedHandler(parseCreateRoutine, {
         local: (parsed) => service.createRoutine(parsed),
-        remote: ({ runIn, ...parsed }, serverId) =>
-          runCauseEffect(
+        remote: (input, serverId) => {
+          if (isOnceSchedule(input.schedule)) {
+            const once = remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY);
+            requireReleasedScheduleOn(input.schedule, once);
+            return createOnceAgentRoutine(remoteOnceSend(remoteServers, serverId), input);
+          }
+          const { runIn, ...parsed } = input;
+          return runCauseEffect(
             remoteServers
               .request(serverId, TEAM_API_ROUTES.agent.routines(parsed.agentId), decodeRoutine, {
                 method: "POST",
                 body: parsed,
               })
               .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn, true))),
-          ),
+          );
+        },
       }),
       updateRoutine: scopedHandler(parseUpdateRoutine, {
         local: (parsed) => service.updateRoutine(parsed),
-        remote: ({ runIn, ...parsed }, serverId) =>
-          runCauseEffect(
+        remote: (input, serverId) => {
+          if (remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY))
+            return updateAgentRoutineOnce(remoteOnceSend(remoteServers, serverId), input);
+          requireReleasedScheduleOn(input.schedule, false);
+          const { runIn, ...parsed } = input;
+          return runCauseEffect(
             remoteServers
               .request(serverId, TEAM_API_ROUTES.agent.routine(parsed.agentId, parsed.routineId), decodeRoutine, {
                 method: "PATCH",
                 body: parsed,
               })
               .pipe(Effect.flatMap((routine) => withRemoteRunPlace(remoteServers, serverId, routine, runIn))),
-          ),
+          );
+        },
       }),
       deleteRoutine: scopedHandler(parseDeleteRoutine, {
         local: (parsed) => runCauseEffect(service.deleteRoutine(parsed)),
@@ -145,8 +191,15 @@ export function routineIpcHandlers({
       }),
       automationRunCommand: scopedHandler(parseTestRoutine, {
         local: (parsed) => service.automationRunCommand(parsed),
-        remote: () => {
-          throw new Error(sourceText("error.agent.automationLocalOnly"));
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, ROUTINE_RUN_COMMAND_CAPABILITY))
+            throw new Error(sourceText("error.team.routineRunCommandUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, ROUTINE_RUN_COMMAND_ROUTES.command, decodeRoutineRunCommandResponse, {
+              method: "POST",
+              body: { agentId: parsed.agentId, routineId: parsed.routineId },
+            }),
+          );
         },
       }),
       routineCalendar: scopedHandler(parseRoutineCalendar, {
@@ -157,12 +210,6 @@ export function routineIpcHandlers({
   };
 }
 
-/**
- * The released routine routes leave out where a routine runs, so a host with `routine-run-place-v1`
- * gets the place on its own route after the save. A host without it keeps the saved place. The new
- * routine exists, so a failed place does not fail the create: the routine runs in the chat, and a
- * second save does not make a second routine.
- */
 function withRemoteRunPlace(
   remoteServers: RemoteServerManager,
   serverId: string,
@@ -189,21 +236,47 @@ function withRemoteRunPlace(
   );
 }
 
+export function remoteOnceSend(remoteServers: RemoteServerManager, serverId: string): RoutinesOncePost {
+  return (path, decode, body) =>
+    runCauseEffect(remoteServers.request(serverId, path, decode, { method: "POST", body }));
+}
+
+export async function withOnceRoutines<R>(
+  remoteServers: RemoteServerManager,
+  serverId: string,
+  released: Effect.Effect<R[], RemoteWorkflowError>,
+  listOnce: (send: RoutinesOncePost) => Promise<R[]>,
+): Promise<R[]> {
+  if (!remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY)) return runCauseEffect(released);
+  const [list, once] = await Promise.all([runCauseEffect(released), listOnce(remoteOnceSend(remoteServers, serverId))]);
+  return [...list, ...once];
+}
+
 function calendar(input: { from: string; to: string }, source: RoutineCalendarSource<RemoteWorkflowError>) {
   return runCauseEffect(
     buildRoutineCalendar({ from: new Date(input.from), to: new Date(input.to) }, new Date(), source),
   );
 }
 
-/** A remote host answers through the routes its routine settings already use, so no new route is needed. */
 function remoteCalendarSource(
   remoteServers: RemoteServerManager,
   serverId: string,
 ): RoutineCalendarSource<RemoteWorkflowError> {
+  const once = remoteServers.supportsCapability(serverId, ROUTINES_ONCE_CAPABILITY);
+  const withOnce = <R extends { id: string }>(
+    released: Effect.Effect<R[], RemoteWorkflowError>,
+    path: string,
+    decode: (value: unknown) => R[],
+    owner: { kind: "agent" | "channel"; id: string },
+  ): Effect.Effect<R[], RemoteWorkflowError> =>
+    once
+      ? Effect.all([released, remoteServers.request(serverId, path, decode, { method: "POST", body: { owner } })], {
+          concurrency: "unbounded",
+        }).pipe(Effect.map(([list, extra]) => [...list, ...extra]))
+      : released;
   return {
     owners: () =>
       Effect.gen(function* () {
-        // A host from before channels rejects the channel routes; its agents still have routines.
         const [agents, channels] = yield* Effect.all(
           [
             remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries),
@@ -222,11 +295,21 @@ function remoteCalendarSource(
       }),
     routines: (owner) =>
       owner.kind === "agent"
-        ? remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(owner.agentId), decodeRoutines)
-        : remoteServers.request(serverId, CHANNEL_ROUTES.routines, decodeChannelRoutines, {
-            method: "POST",
-            body: { channelId: owner.channelId },
-          }),
+        ? withOnce(
+            remoteServers.request(serverId, TEAM_API_ROUTES.agent.routines(owner.agentId), decodeRoutines),
+            ROUTINES_ONCE_ROUTES.list,
+            (value) => decodeOnceAgentRoutines(value, owner.agentId),
+            { kind: "agent", id: owner.agentId },
+          )
+        : withOnce(
+            remoteServers.request(serverId, CHANNEL_ROUTES.routines, decodeChannelRoutines, {
+              method: "POST",
+              body: { channelId: owner.channelId },
+            }),
+            ROUTINES_ONCE_ROUTES.list,
+            (value) => decodeOnceChannelRoutines(value, owner.channelId),
+            { kind: "channel", id: owner.channelId },
+          ),
     runs: (owner, routineId, limit) =>
       owner.kind === "agent"
         ? remoteServers.request(

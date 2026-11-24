@@ -91,6 +91,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} non è completo",
   "marketplace.app.partialDescription": "Alcune delle sue app o skill non sono installate. Riconnetti le installa.",
   "marketplace.app.notConnected": "Non connessa",
+  "marketplace.app.paused": "In pausa",
   "marketplace.app.custom": "Server MCP",
   "marketplace.app.githubTagline": "Repository, issue e pull request",
   "marketplace.app.onePasswordTagline": "Accedi ai siti con le credenziali che condividi",
@@ -100,6 +101,48 @@ export const messages = {
   "marketplace.app.whatsappTagline": "La tua chat personale e le persone che autorizzi in WhatsApp",
   "marketplace.app.bitwardenTagline": "Accedi ai siti con le credenziali di una cartella condivisa",
   "marketplace.app.protonPassTagline": "Accedi ai siti con le credenziali di una cassaforte condivisa",
+  "marketplace.xApp.title": "X",
+  "marketplace.xApp.tagline": "Rispondi a un post su X con @openbot_ e un agente fa il lavoro",
+  "marketplace.xApp.description":
+    "X aggiunge a questo server un agente, chiamato anch’esso X. Su X, rispondi a un post qualsiasi e menziona @openbot_ con ciò che vuoi: riassumerlo, tradurlo, scrivere una bozza di risposta, salvare una nota o impostare un promemoria. L’estensione OpenBot per Chrome legge il post e lo invia all’agente X, e X pubblica la tua risposta come sempre. La risposta ti aspetta nella chat di X in OpenBot. L’agente X non pubblica, non mette Mi piace, non segue nessuno e non invia messaggi su X.",
+  "marketplace.xApp.developer": "OpenBot",
+  "marketplace.xApp.notSetUp": "Non configurato",
+  "marketplace.xApp.setUp": "Configura",
+  "marketplace.xApp.howTitle": "Come funziona",
+  "marketplace.xApp.howReplyTitle": "Rispondi su X.",
+  "marketplace.xApp.howReply":
+    "Rispondi a un post qualsiasi e menziona @openbot_ con ciò che vuoi, ad esempio «@openbot_ riassumi questo».",
+  "marketplace.xApp.howSendTitle": "L’estensione lo invia.",
+  "marketplace.xApp.howSend":
+    "OpenBot per Chrome legge il post e i post sopra di esso e li invia all’agente X. X pubblica la tua risposta come sempre.",
+  "marketplace.xApp.howWorkTitle": "X fa il lavoro.",
+  "marketplace.xApp.howWork": "La risposta ti aspetta nella chat di X in OpenBot. Su X non compare nulla di OpenBot.",
+  "marketplace.xApp.agentTitle": "Agente",
+  "marketplace.xApp.agentDescription": "X risponde nella propria chat a ogni post che invii da X.",
+  "marketplace.xApp.extensionTitle": "In Chrome",
+  "marketplace.xApp.extensionDescription": "X funziona solo tramite l’estensione OpenBot per Chrome.",
+  "marketplace.xApp.extensionName": "OpenBot per Chrome",
+  "marketplace.xApp.extensionNote":
+    "Apri il suo pannello laterale e accedi a questo server. Legge un post solo quando rispondi con @openbot_.",
+  "marketplace.xApp.getExtension": "Ottieni l’estensione",
+  "marketplace.xApp.stepExtension": "Estensione",
+  "marketplace.xApp.stepAgent": "Agente",
+  "marketplace.xApp.next": "Avanti",
+  "marketplace.xApp.extensionStepTitle": "Aggiungi OpenBot a Chrome",
+  "marketplace.xApp.extensionStepDescription":
+    "L’estensione legge un post su X quando rispondi con @openbot_ e lo invia a questo server.",
+  "marketplace.xApp.extensionStepStore": "Apri la pagina di OpenBot nel Chrome Web Store",
+  "marketplace.xApp.extensionStepAdd": "Fai clic su «Aggiungi a Chrome»",
+  "marketplace.xApp.extensionStepSignIn": "Apri il pannello laterale di OpenBot e accedi a questo server",
+  "marketplace.xApp.agentStepTitle": "Aggiungi l’agente X",
+  "marketplace.xApp.agentStepDescription": "X riceve i post che invii da X. OpenBot lo aggiunge a questo server.",
+  "marketplace.xApp.agentDoesReceive": "Riceve ogni post a cui rispondi su X con @openbot_",
+  "marketplace.xApp.agentDoesWork": "Riassume, traduce, scrive bozze di risposta, salva note e imposta promemoria",
+  "marketplace.xApp.agentDoesNoPost": "Non pubblica mai su X: la risposta ti aspetta nella sua chat",
+  "marketplace.xApp.addAgent": "Aggiungi agente",
+  "marketplace.xApp.doneTitle": "X è pronto",
+  "marketplace.xApp.doneDescription":
+    "Rispondi a un post su X e menziona @openbot_. La risposta ti aspetta nella chat di X.",
   "marketplace.app.onePasswordCategory": "Gestione di accessi e credenziali",
   "marketplace.app.yourApps": "Le tue app",
   "marketplace.app.addCustom": "Aggiungi personalizzata",
@@ -116,7 +159,16 @@ export const messages = {
   "marketplace.app.remove.action": "Rimuovi",
   "marketplace.app.remove.confirmTitle": "Rimuovere {name}?",
   "marketplace.app.remove.keep": "Mantieni",
+  "marketplace.app.replace.title": "Sostituire {server}?",
+  "marketplace.app.replace.description":
+    "Hai già un server chiamato {server}, ma non è {name}. Sostituirlo con {name}? Il suo indirizzo e le chiavi salvate verranno eliminati.",
+  "marketplace.app.replace.action": "Sostituisci",
   "marketplace.app.connection": "Connessione",
+  "marketplace.app.access.use": "Può usare",
+  "marketplace.app.access.noAgents": "Nessun agente",
+  "marketplace.app.access.agentsOf": "Agenti che possono usare {name}",
+  "marketplace.app.access.chooseAgents": "{name}: {summary}. Scegli gli agenti",
+  "marketplace.app.access.level": "Accesso di {role} a {name}",
   "marketplace.app.setup.account": "Accedi con il tuo account {name} nel browser.",
   "marketplace.app.setup.key": "Richiede una chiave API del tuo account {name}.",
   "marketplace.app.setup.keySaved": "{field} si trova su {host}.",
@@ -128,6 +180,7 @@ export const messages = {
     "{host} usa una versione precedente di OpenBot che non può collegare app. Aggiorna OpenBot su {host} o chiedi al proprietario di aggiornarlo.",
   "marketplace.app.blocked.member":
     "Solo un proprietario o un admin di {host} può collegare app lì. Chiedi a uno di loro di collegare {name} o di aggiornare OpenBot su {host}, così i membri potranno collegare app.",
+  "marketplace.app.blocked.mac": "{name} funziona solo su un Mac che esegue OpenBot.",
   "marketplace.app.connectAgain": "Connetti di nuovo",
   "marketplace.app.automation.askOnInstall": "Chiedi accesso a macOS all'installazione",
   "marketplace.app.automation.title": "Accesso alle app Apple",
@@ -250,6 +303,16 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Crea con Higgsfield una foto prodotto di una tazza in ceramica su un tavolo di legno.",
   "marketplace.plugin.higgsfield.prompt.clip": "Crea con Higgsfield un video di 5 secondi di onde al tramonto.",
+  "marketplace.plugin.sunra.tagline": "Immagini, video, audio e 3D con l'IA",
+  "marketplace.plugin.sunra.description":
+    "Sunra permette agli agenti di creare immagini, video, audio e modelli 3D con modelli come GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling e Veo, controllare il saldo dei crediti e leggere i risultati. I risultati finiscono in un progetto dell'account Sunra dell'utente. Ogni utente accede al proprio account Sunra nel browser. Sunra indica prima il costo di ogni generazione e usa i crediti di quell'account solo dopo la conferma.",
+  "marketplace.plugin.sunra.app":
+    "Generazione di immagini, video, audio e 3D, crediti e risultati, tramite il server MCP di Sunra con accesso nel browser.",
+  "marketplace.plugin.sunra.prompt.balance": "Quanti crediti Sunra ho?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Crea con Sunra un poster di un mercato notturno sotto la pioggia, in formato verticale.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Crea con Sunra un video di 5 secondi di una barchetta di carta su un fiume. Dimmi prima quanto costa.",
   "marketplace.plugin.elevenlabs.tagline": "Voce, voci e agenti vocali",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs permette agli agenti di trasformare il testo in voce, lavorare con le voci e creare, testare e rivedere gli agenti vocali di ElevenLabs e le loro conversazioni. L'audio generato torna come link di download di breve durata. Ogni utente accede al proprio account ElevenLabs nel browser, e ogni generazione usa i crediti di quell'account.",
@@ -380,8 +443,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Salva questa decisione come nuova nota nel mio vault.",
   "marketplace.plugin.obsidian.prompt.log":
     "Aggiungi un riepilogo del lavoro di oggi alla mia nota Registro di lavoro.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'In Obsidian, apri Settings > Local REST API. Copia la chiave API e attiva "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "In Obsidian, apri Settings > Local REST API e copia la chiave API.",
   "marketplace.plugin.resend.tagline": "Email transazionali",
   "marketplace.plugin.resend.description":
     "Resend permette agli agenti di inviare email transazionali e controllarne la consegna con una sola API. Una chiave API presa dalla dashboard di Resend viene passata al server locale come variabile d'ambiente.",
@@ -393,9 +455,9 @@ export const messages = {
     "Prepara una bozza di email per reimpostare la password nel nuovo flusso.",
   "marketplace.plugin.omnisend.tagline": "Marketing via email e SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend permette agli agenti di leggere i report di campagne e moduli, trovare contatti e segmenti, e creare e modificare campagne, automazioni, modelli email, moduli e prodotti. Ogni utente accede al proprio account Omnisend nel browser e sceglie il livello di accesso nella schermata di consenso. Con l'accesso in scrittura, gli agenti possono anche inviare campagne ed eliminare dati. Scegli l'accesso in sola lettura quando agli agenti servono solo i report.",
+    "Omnisend permette agli agenti di leggere i report di campagne e moduli, trovare contatti e segmenti, e creare e modificare campagne, automazioni, modelli email, moduli e prodotti. Ogni utente si collega con una chiave API del proprio account Omnisend. Gli agenti possono fare ciò che la chiave consente, compreso inviare campagne ed eliminare dati.",
   "marketplace.plugin.omnisend.app":
-    "Campagne, automazioni, contatti, segmenti, moduli e report, tramite il server MCP di Omnisend con accesso nel browser.",
+    "Campagne, automazioni, contatti, segmenti, moduli e report, tramite il server MCP di Omnisend con una chiave API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Come sono andate le campagne della scorsa settimana rispetto a quella precedente?",
   "marketplace.plugin.omnisend.prompt.segment":
@@ -403,6 +465,7 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prepara una bozza di campagna per la nuova collezione, ma non inviarla.",
   "marketplace.plugin.postiz.tagline": "Pianificazione social",
+  "marketplace.plugin.omnisend.hint.apiKey": "In Omnisend, apri Store settings > API keys e crea una chiave.",
   "marketplace.plugin.postiz.description":
     "Postiz consente agli agenti di elencare i tuoi canali social e di scrivere, programmare e pubblicare post su oltre 30 reti, come X, LinkedIn, Instagram e TikTok. Gli agenti possono anche caricare contenuti multimediali e creare immagini e video con l'IA. Accedi al tuo account Postiz dal browser, oppure incolla la chiave API da Settings › Developers in Postiz. Tutti i piani cloud di Postiz includono l'accesso alle API. Gli agenti possono pubblicare un post subito, quindi controlla ogni post prima di approvarlo.",
   "marketplace.plugin.postiz.app":
@@ -411,6 +474,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Quali post sono programmati per la prossima settimana?",
   "marketplace.plugin.postiz.prompt.draft":
     "Scrivi una bozza di post LinkedIn sulla nostra nuova versione, ma non programmarla.",
+  "marketplace.plugin.trypost.tagline": "Programmazione dei social media",
+  "marketplace.plugin.trypost.description":
+    "TryPost permette agli agenti di elencare i tuoi canali collegati e di scrivere, programmare, mettere in coda e pubblicare post su X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest e altri. Gli agenti possono anche leggere le statistiche, gestire idee e approvazioni e impostare gli orari di pubblicazione. Accedi al tuo account TryPost nel browser e scegli un workspace. Gli agenti possono pubblicare un post subito, quindi controlla ogni post prima di approvarlo.",
+  "marketplace.plugin.trypost.app":
+    "Canali, post, coda, idee e statistiche, tramite il server MCP di TryPost con accesso dal browser.",
+  "marketplace.plugin.trypost.prompt.week": "Quali post sono programmati per questa settimana?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Scrivi una bozza di post LinkedIn sulla nostra nuova versione, ma non programmarlo.",
+  "marketplace.plugin.trypost.prompt.analytics": "Quali dei miei post del mese scorso hanno avuto più interazioni?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub e oltre 1.000 altre app",
   "marketplace.plugin.composio.description":
     "Composio collega i tuoi agenti a Gmail, Slack, GitHub e oltre 1.000 altre app tramite un solo server MCP. Accedi con il tuo account Composio. Quando un agente ha bisogno di un'app, ti chiede di collegarla.",
@@ -571,6 +643,14 @@ export const messages = {
   "marketplace.skills.origin.local": "Creata su questo computer",
   "marketplace.skills.origin.workspace": "Nella cartella di questo agente",
   "marketplace.skills.origin.marketplace": "Dal Marketplace · versione {version}",
+  "marketplace.skills.origin.github": "Da GitHub · {repository}",
+  "marketplace.skills.github.search": "Cerca o incolla un link di GitHub",
+  "marketplace.skills.github.reading": "Ricerca delle skill nel repository",
+  "marketplace.skills.github.trust":
+    "OpenBot non ha verificato le skill di GitHub. Leggi una skill prima di aggiungerla.",
+  "marketplace.skills.github.source": "GitHub · {repository} al commit {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Apri {repository} su GitHub",
   "marketplace.skills.status.notAdded": "Non aggiunta",
   "marketplace.skills.status.on": "Attiva su {agents}",
   "marketplace.skills.agentCount": { one: "{count} agente", other: "{count} agenti" },
@@ -630,6 +710,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Installa {name} sul computer che esegue questi agenti: la sua app richiede un accesso dal browser.",
   "marketplace.error.appInvalid": "Impossibile aggiungere {name}: {reason}",
+  "marketplace.error.appNotConnected": "Impossibile connettere {name}: {reason}",
   "marketplace.error.uninstallNoServer": "Seleziona un server locale per disinstallare un plugin.",
   "marketplace.error.uninstallPartial": "Non è stato possibile rimuovere alcune parti di {name}. {failures}",
   "marketplace.error.actionFailed": "Impossibile completare l'azione del Marketplace. Riprova.",

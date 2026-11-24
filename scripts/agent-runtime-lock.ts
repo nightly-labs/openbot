@@ -19,6 +19,8 @@ const nativeProviderArtifactSchema = z.object({
     "copilot.exe",
     "vibe-acp",
     "vibe-acp.exe",
+    "antigravity",
+    "antigravity.exe",
   ]),
   files: z.record(z.string().min(1), sha256Schema),
 });
@@ -65,12 +67,6 @@ const opencodeArtifactSchema = z.object({
   executable: z.enum(["opencode", "opencode.exe"]),
   platformDirectory: z.enum(["linux", "mac", "win"]),
 });
-/**
- * Bun ships one npm package per target and no `bunx` of its own, so the staged layout makes that
- * name itself. `baseline` on x64: Bun's plain x64 builds need AVX2, and a machine older than that
- * would answer a spawn with an illegal instruction and no message. The baseline build starts
- * slightly slower, which is nothing against launching one MCP server.
- */
 const bunArtifactSchema = z.object({
   package: z
     .string()
@@ -100,32 +96,6 @@ const grokArtifactSchema = z.object({
   platformDirectory: z.enum(["linux", "mac", "win"]),
 });
 
-/**
- * Google ships the Antigravity ACP server as one zip per target with two programs in it: the
- * server, and the harness it finds beside itself. Both are hashed, because either one runs.
- */
-const antigravityArtifactSchema = z.object({
-  asset: z
-    .string()
-    .regex(
-      /^agy-acp-server-\d+\.\d+\.\d+-(?:darwin-arm64|darwin-x86_64|linux-x86_64|linux-arm64|windows-x86_64)\.zip$/u,
-    ),
-  assetSha256: sha256Schema,
-  downloadBytes: z.number().int().positive(),
-  installedBytes: z.number().int().positive(),
-  executable: z.enum(["agy_acp_server.par", "agy_acp_server.exe"]),
-  executableSha256: sha256Schema,
-  harness: z.enum(["localharness_external", "localharness_external.exe"]),
-  harnessSha256: sha256Schema,
-  platformDirectory: z.enum(["macos", "linux", "windows"]),
-});
-
-/**
- * Cursor ships the CLI as one archive per target, with one `dist-package` folder: a Node.js runtime,
- * the bundled JavaScript, and a launcher script. `files` names the hash of the files that start the
- * CLI: the launchers, the runtime and the entry script. The archive hash covers the other files, such
- * as the script chunks and native modules, at download only, as the Codex lock does for its package.
- */
 const cursorArtifactSchema = z.object({
   platformDirectory: z.enum(["darwin", "linux", "windows"]),
   architecture: z.enum(["arm64", "x64"]),
@@ -137,11 +107,6 @@ const cursorArtifactSchema = z.object({
   files: z.record(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u), sha256Schema),
 });
 
-/**
- * Cline ships one npm package per target: a Bun-compiled CLI in `bin/`, and the files it finds beside
- * that folder. `extensions/plugin-sandbox-bootstrap.js` runs the user's plugins, so it is hashed as
- * the program is. The archive hash covers the other files, such as the hub webview, at download.
- */
 const clineArtifactSchema = z.object({
   package: z.string().regex(/^@cline\/cli-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)$/u),
   asset: z.string().regex(/^cli-(?:darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)-\d+\.\d+\.\d+\.tgz$/u),
@@ -153,12 +118,6 @@ const clineArtifactSchema = z.object({
   executable: z.enum(["cline", "cline.exe"]),
 });
 
-/**
- * Kimi ships a PyInstaller folder for each target: the launcher, which holds the Kimi code, and the
- * Python runtime and libraries in `_internal`. `files` hashes the launcher, the Python library and
- * the standard library, by their paths in that folder. The archive hash covers the other files at
- * download only, as the Cursor lock does.
- */
 const kimiArtifactSchema = z.object({
   asset: z
     .string()
@@ -202,21 +161,11 @@ const agentRuntimeLockSchema = z.object({
       "win32-x64": claudeArtifactSchema,
     }),
   }),
-  /**
-   * OpenCode publishes one npm platform package per target, and the CLI reports the npm version
-   * verbatim. There is no `sdkVersion` split like `claude`, so one `version` field is the whole
-   * truth: the tarball name, the `package.json` inside it, and what `opencode --version` prints.
-   */
   opencode: z.object({
     registry: z.literal("https://registry.npmjs.org"),
-    /** Canonical name; `github.com/sst/opencode` now redirects here. */
     repository: z.literal("https://github.com/anomalyco/opencode"),
     version: z.string().regex(/^\d+\.\d+\.\d+$/u),
     license: z.literal("MIT"),
-    /**
-     * The `@opencode/cli` tarballs of OpenCode 2 carry no LICENSE. The `opencode-ai` tarball of
-     * OpenCode 1, from the same repository, carries the same MIT file, so it is the copy installed.
-     */
     licensePackage: z.object({ name: z.literal("opencode-ai"), version: z.string().regex(/^\d+\.\d+\.\d+$/u) }),
     licenseSha256: sha256Schema,
     artifacts: z.object({
@@ -227,13 +176,6 @@ const agentRuntimeLockSchema = z.object({
       "win32-x64": opencodeArtifactSchema,
     }),
   }),
-  /**
-   * The JavaScript runtime OpenBot downloads for the MCP servers, not for a provider CLI.
-   *
-   * `tag` is the source tag the licence is read from; `version` is what `bun --version` prints and
-   * what the npm packages carry. Bun states both as the same number, and the schema keeps them
-   * separate anyway, because a lock that cannot say they disagree cannot notice when they do.
-   */
   bun: z.object({
     registry: z.literal("https://registry.npmjs.org"),
     repository: z.literal("https://github.com/oven-sh/bun"),
@@ -265,32 +207,7 @@ const agentRuntimeLockSchema = z.object({
       "win32-x64": grokArtifactSchema,
     }),
   }),
-  /**
-   * The server that signs in with a Google AI Pro or Ultra plan. It is proprietary, so OpenBot
-   * downloads it on the user's computer and does not ship it in a release. The archive has no licence
-   * file: the terms are at `licenseUrl`.
-   */
-  antigravity: z.object({
-    registry: z.literal(
-      "https://raw.githubusercontent.com/agentclientprotocol/registry/main/antigravity-acp/agent.json",
-    ),
-    distribution: z.literal("https://dl.google.com/agy-extensions/releases"),
-    version: z.string().regex(/^\d+\.\d+\.\d+$/u),
-    license: z.literal("Proprietary"),
-    licenseUrl: z.literal("https://antigravity.google/terms"),
-    artifacts: z.object({
-      "darwin-arm64": antigravityArtifactSchema,
-      "darwin-x64": antigravityArtifactSchema,
-      "linux-x64": antigravityArtifactSchema,
-      "linux-arm64": antigravityArtifactSchema,
-      "win32-x64": antigravityArtifactSchema,
-    }),
-  }),
-  /**
-   * The Cursor CLI, which signs in with a Cursor plan. It is proprietary, so OpenBot downloads it on
-   * the user's computer and does not ship it in a release. The terms are at `licenseUrl`. A version is
-   * a date and a commit, which is also the folder of the download.
-   */
+  antigravity: nativeProviderLockSchema,
   cursor: z.object({
     registry: z.literal("https://raw.githubusercontent.com/agentclientprotocol/registry/main/cursor/agent.json"),
     distribution: z.literal("https://downloads.cursor.com/lab"),
@@ -305,28 +222,10 @@ const agentRuntimeLockSchema = z.object({
       "win32-x64": cursorArtifactSchema,
     }),
   }),
-  /**
-   * The Cline CLI. Its version is the npm version, and its source tag is `cli-v<version>`, which the
-   * licence is read from.
-   */
   pi: nativeProviderLockSchema,
   muse: nativeProviderLockSchema,
-  /**
-   * Cognition's Devin CLI, from its own download site. The licence is proprietary, so OpenBot
-   * downloads the CLI on the user's computer and does not ship it in a release.
-   */
   devin: nativeProviderLockSchema,
-  /**
-   * GitHub's Copilot CLI, from the GitHub releases of `github/copilot-cli`. Its licence lets an app
-   * include it only unchanged, so OpenBot downloads the CLI on the user's computer and does not ship
-   * it in a release.
-   */
   copilot: nativeProviderLockSchema,
-  /**
-   * Mistral Vibe's ACP server, `vibe-acp`, from the GitHub releases of `mistralai/mistral-vibe`. Each
-   * archive is a PyInstaller folder build: the program and the `_internal` folder that holds Python.
-   * The licence is the one in the package metadata of that folder, so `files` holds its hash.
-   */
   mistral: nativeProviderLockSchema,
   cline: z.object({
     registry: z.literal("https://registry.npmjs.org"),
@@ -342,7 +241,6 @@ const agentRuntimeLockSchema = z.object({
       "win32-x64": clineArtifactSchema,
     }),
   }),
-  /** The Kimi Code CLI. Its release tag is the bare version, and the licence is read from that tag. */
   kimi: z.object({
     repository: z.literal("https://github.com/MoonshotAI/kimi-cli"),
     version: z.string().regex(/^\d+\.\d+\.\d+$/u),

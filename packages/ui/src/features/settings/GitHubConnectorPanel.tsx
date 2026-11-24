@@ -29,7 +29,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { GitHubMark } from "./brand-marks";
+import { GitHubTile } from "./brand-marks";
 import {
   DangerZone,
   IntegrationPage,
@@ -41,14 +41,10 @@ import {
 } from "./IntegrationLayout";
 
 export interface GitHubConnectorPanelProps extends IntegrationPageSlots {
-  /** The joined server whose connection this is. Absent: this computer's. */
   hostName?: string | undefined;
   status: GitHubConnectorStatus;
-  /** True while an action runs. Every button waits for it. */
   busy: boolean;
-  /** Null while the first list is read. */
   repositories: GitHubConnectorRepositories | null;
-  /** Why the last list could not be read. */
   repositoriesError: string | null;
   onConnect: () => void;
   onCancel: () => void;
@@ -57,7 +53,6 @@ export interface GitHubConnectorPanelProps extends IntegrationPageSlots {
   onOpenInstall: () => void;
 }
 
-/** What the connect dialog reads and does. */
 export type GitHubConnection = Pick<
   GitHubConnectorPanelProps,
   | "hostName"
@@ -71,10 +66,6 @@ export type GitHubConnection = Pick<
   | "onOpenInstall"
 >;
 
-/**
- * The connect dialog shows one of these. `waiting` is before GitHub sends a code, `failed` is a
- * connect that stopped with no sign-in, and `connected` stays until the user closes the dialog.
- */
 type ConnectStep = "waiting" | "code" | "failed" | "connected";
 
 function connectStep(status: GitHubConnectorStatus, busy: boolean): ConnectStep {
@@ -83,7 +74,6 @@ function connectStep(status: GitHubConnectorStatus, busy: boolean): ConnectStep 
   return busy ? "waiting" : "failed";
 }
 
-/** The status of the connection, as its page header and every list of connectors show it. */
 export const GITHUB_STATUS = {
   disconnected: { status: "idle", label: "marketplace.app.notConnected" },
   pending: { status: "connecting", label: "connector.github.statusConnecting" },
@@ -91,13 +81,6 @@ export const GITHUB_STATUS = {
   expired: { status: "attention", label: "connector.github.statusExpired" },
 } as const satisfies Record<GitHubConnectorStatus["state"], { status: IntegrationStatus; label: AppTextKey }>;
 
-/**
- * The GitHub page of one OpenBot computer. The token never reaches this component: the status holds
- * the account name and, during a sign-in, the code that the user types.
- *
- * Connect opens a dialog that follows the status: the wait for a code, the code, and the result.
- * A sign-in that is pending when the page opens shows the same dialog. Disconnect asks first.
- */
 export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
   const { t } = useText();
   const [connectOpen, setConnectOpen] = createSignal(false);
@@ -132,7 +115,7 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
   return (
     <IntegrationPage
       class="github-connector"
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       name={t("connector.github.title")}
       status={header().status}
       statusLabel={t(header().label)}
@@ -148,7 +131,6 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
           </Button>
         </Show>
       }
-      // The dialog shows a failure while it is open, and the expired alert already tells the user why.
       failure={failure()}
       alert={
         <Show when={props.status.state === "expired"}>
@@ -219,7 +201,6 @@ export function GitHubConnectorPanel(props: GitHubConnectorPanelProps) {
   );
 }
 
-/** GitHub's picture of the account, or its initials when there is none or it does not load. */
 function GitHubAvatar(props: { login: string; avatarUrl: string | null }) {
   return (
     <UserAvatar
@@ -339,16 +320,11 @@ function RepositoriesSection(props: {
   );
 }
 
-/** Closing the dialog during the wait or the code stops the sign-in, as Cancel does. */
 function cancelRunning(connection: GitHubConnection) {
   const step = connectStep(connection.status, connection.busy);
   if (step === "waiting" || step === "code") connection.onCancel();
 }
 
-/**
- * The connect dialog of the GitHub page, for another view that connects GitHub, such as a workflow
- * card. Closing it during the sign-in stops the sign-in.
- */
 export function GitHubConnectDialog(props: GitHubConnection & { open: boolean; onClose: () => void }) {
   const close = () => {
     cancelRunning(props);
@@ -362,7 +338,6 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
   const step = () => connectStep(props.status, props.busy);
   const link = (): WizardLink => (step() === "connected" ? "connected" : step() === "failed" ? "broken" : "connecting");
   const noRepositories = () => props.repositories?.total === 0;
-  /** While the sign-in runs, closing the dialog cancels it. */
   const running = () => step() === "waiting" || step() === "code";
   const title = () => {
     switch (step()) {
@@ -395,7 +370,7 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
       closeLabel={running() ? t("connector.github.cancelConnecting") : t("connector.github.close")}
       dismissible={!running()}
       onClose={props.onClose}
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       link={link()}
       title={title()}
       description={description()}
@@ -523,7 +498,6 @@ function ConnectDialog(props: GitHubConnection & { open: boolean; onClose: () =>
   );
 }
 
-/** The code in large separate characters, because the user types it on another screen. */
 function DeviceCode(props: { code: string }) {
   const { t } = useText();
   return (
@@ -557,7 +531,7 @@ function DisconnectDialog(props: {
       open={props.open}
       closeLabel={t("connector.github.close")}
       onClose={props.onClose}
-      logo={<GitHubMark />}
+      logo={<GitHubTile />}
       link="broken"
       title={t("connector.github.disconnectConfirmTitle")}
       description={

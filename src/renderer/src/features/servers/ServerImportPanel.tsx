@@ -21,25 +21,21 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, createStore, Match, onSettled, Switch } from "solid-js";
 import { actionToast } from "../../action-toast";
 
-/** Product names, the same in each language. */
 const SOURCE_NAMES = {
   "grok-bot": "Grok Bot",
   "hermes-agent": "Hermes Agent",
 } as const satisfies Record<AgentImportSkillSource, string>;
 
-/** The source on screen, so the dialog header reads `Import › Hermes Agent`. */
 export interface ServerImportDetail {
   title: string;
   back: () => void;
 }
 
-/** The way into each app this viewer chose last, so a user who set up the skill starts there. */
 const SETUP_STORAGE_KEYS = {
   "grok-bot": "openbot.agent-import.setup",
   "hermes-agent": "openbot.agent-import.hermes-setup",
 } as const satisfies Record<AgentImportSkillSource, string>;
 
-/** The setups each app offers. Reading the Hermes folder needs this computer. */
 function setupsFor(source: AgentImportSkillSource, folder: boolean): readonly AgentImportSetup[] {
   if (source === "grok-bot") return ["agent", "skill"];
   return folder ? ["folder", "command", "skill"] : ["command", "skill"];
@@ -59,17 +55,16 @@ function readSetup(source: AgentImportSkillSource, folder: boolean): AgentImport
 type HermesCall = "readHermes" | "chooseHermes" | "applyHermes" | "discardHermes";
 
 export type AgentImportCalls = Omit<OpenBotDesktopApi["agentImport"], HermesCall> & {
-  /** Opens the ready export agent's Grok Bot page. */
   openExportAgent(): void;
-  /** The Hermes folder calls, on desktop only: main reads the Hermes folder of this computer. */
-  hermes?: Pick<OpenBotDesktopApi["agentImport"], HermesCall>;
+  hermes?: Pick<OpenBotDesktopApi["agentImport"], Exclude<HermesCall, "chooseHermes">> &
+    Partial<Pick<OpenBotDesktopApi["agentImport"], "chooseHermes">>;
 };
+
+export type HermesFolderPlace = "computer" | "server";
 
 export interface ServerImportOptions {
   onOpenAgent: (agentId: string) => void;
-  /** Closes the settings the panel is in. */
   onClose: () => void;
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: AgentImportCalls;
 }
 
@@ -93,28 +88,20 @@ interface HermesState {
   result: AgentImportResult | null;
 }
 
-/**
- * Server settings > Import. The user chooses where the agents are now: Hermes Agent, Grok Bot, or
- * another OpenBot computer. An export file from Grok Bot or Hermes takes the same steps: main opens
- * the file dialog and the host keeps the export under a token, so the panel holds the preview and
- * never a path. Hermes on this computer can also be read from its folder, item by item. A preview
- * left open when the panel closes is released.
- */
 export function ServerImportPanel(
   props: ServerImportOptions & {
     serverId: string;
-    /** This computer's server: the Hermes folder here can be read with no export. */
-    hermes?: boolean;
-    /** Opens the Transfer section, when the settings have one. */
+    hermes?: HermesFolderPlace | undefined;
+    onServer?: boolean | undefined;
     onOpenTransfer?: (() => void) | undefined;
     onDetailChange?: ((detail: ServerImportDetail | null) => void) | undefined;
   },
 ) {
   const { t, errorMessage } = useText();
   const calls = props.calls ?? desktopCalls();
-  // The server the preview's token belongs to, fixed for the life of the panel.
   const serverId = props.serverId;
   const hermesCalls = props.hermes ? calls.hermes : undefined;
+  const chooseHermes = props.hermes === "computer" ? hermesCalls?.chooseHermes : undefined;
 
   const [source, setSource] = createSignal<AgentImportSkillSource | null>(null);
   const [state, setState] = createStore<ImportState>({ phase: "idle", error: null, preview: null, result: null });
@@ -142,12 +129,9 @@ export function ServerImportPanel(
     });
     try {
       window.localStorage.setItem(SETUP_STORAGE_KEYS[current], next);
-    } catch {
-      // The choice is a convenience. Without storage, the panel opens on the default again.
-    }
+    } catch {}
   };
 
-  // Read once: the skills ship with the app and do not change while it runs.
   const [exportSkills, setExportSkills] = createStore<Record<AgentImportSkillSource, string | null>>({
     "grok-bot": null,
     "hermes-agent": null,
@@ -184,12 +168,9 @@ export function ServerImportPanel(
       draft.error = null;
     });
     try {
-      // Null when the user cancels the dialog. Main keeps the export that was open until then.
       const preview = (await calls.choose(serverId)) ?? open;
       show({ phase: preview ? "review" : "idle", error: null, preview, result: null });
     } catch (error) {
-      // A check before the host read the new export can fail with the old one still open there.
-      // A released token makes the discard do nothing.
       if (open) void calls.discard(open.token, serverId).catch(() => undefined);
       show({ phase: "idle", error: errorMessage(error, t("server.import.readFailed")), preview: null, result: null });
     }
@@ -206,12 +187,10 @@ export function ServerImportPanel(
       const result = await calls.apply({ token: preview.token, keys, channelKeys }, serverId);
       show({ phase: "done", error: null, preview: null, result });
     } catch (error) {
-      // The token is spent either way, so the user chooses the export again.
       show({ phase: "idle", error: errorMessage(error, t("server.import.applyFailed")), preview: null, result: null });
     }
   };
 
-  // Hermes read from its folder on this computer, with the item review instead of an export.
   const [folder, setFolder] = createSignal(false);
   const [hermes, setHermes] = createStore<HermesState>({ phase: "reading", error: null, preview: null, result: null });
   const showHermes = (next: HermesState) =>
@@ -220,7 +199,7 @@ export function ServerImportPanel(
     });
   const releaseHermes = () => {
     const token = hermes.preview?.token;
-    if (token) void hermesCalls?.discardHermes(token).catch(() => undefined);
+    if (token) void hermesCalls?.discardHermes(token, serverId).catch(() => undefined);
   };
   onSettled(() => releaseHermes);
 
@@ -231,7 +210,6 @@ export function ServerImportPanel(
       draft.error = null;
     });
     try {
-      // Null: the folder has no profiles, or the user closed the folder dialog with profiles open.
       const preview = (await read()) ?? (keep ? open : null);
       showHermes({ phase: preview ? "review" : "missing", error: null, preview, result: null });
     } catch (error) {
@@ -259,11 +237,9 @@ export function ServerImportPanel(
       draft.error = null;
     });
     try {
-      const result = await hermesCalls.applyHermes({ token: preview.token, profiles: selection });
+      const result = await hermesCalls.applyHermes({ token: preview.token, profiles: selection }, serverId);
       showHermes({ phase: "done", error: null, preview: null, result });
     } catch (error) {
-      // Main keeps the profiles open when a check fails before anything changes, so the same
-      // folder stays on screen with the reason on top.
       showHermes({
         phase: "review",
         error: errorMessage(error, t("server.import.applyFailed")),
@@ -273,10 +249,14 @@ export function ServerImportPanel(
     }
   };
 
+  const chooseFolder = () => {
+    const choose = chooseHermes;
+    return choose ? () => void readHermes(() => choose(), true) : undefined;
+  };
   const openFolder = () => {
     if (!hermesCalls) return;
     setFolder(true);
-    void readHermes(() => hermesCalls.readHermes(), false);
+    void readHermes(() => hermesCalls.readHermes(serverId), false);
   };
   const closeFolder = () => {
     releaseHermes();
@@ -288,7 +268,6 @@ export function ServerImportPanel(
     reset();
     setSource(null);
   };
-  // The dialog outlives this panel, so the cleanup clears a header that would name a source that is gone.
   createEffect(
     () => source(),
     (current) => {
@@ -303,6 +282,8 @@ export function ServerImportPanel(
       <Match when={source() === null}>
         <AgentImportSources
           transfer={Boolean(props.onOpenTransfer)}
+          hermesFolder={props.hermes}
+          onServer={props.onServer}
           onHermes={() => setSource("hermes-agent")}
           onGrok={() => setSource("grok-bot")}
           onTransfer={() => props.onOpenTransfer?.()}
@@ -316,9 +297,8 @@ export function ServerImportPanel(
           updated={updated()}
           error={hermes.error}
           onBack={closeFolder}
-          onChooseFolder={() => {
-            if (hermesCalls) void readHermes(() => hermesCalls.chooseHermes(), true);
-          }}
+          server={props.hermes === "server"}
+          onChooseFolder={chooseFolder()}
           onImport={(selection) => void applyHermes(selection)}
           onDone={() => {
             backToSources();
@@ -330,7 +310,6 @@ export function ServerImportPanel(
       <Match when={source()}>
         {(current) => (
           <>
-            {/* The header's `Import` goes back to the sources; a review also has Cancel. */}
             <AgentImportView
               source={current()}
               phase={state.phase}
@@ -343,6 +322,7 @@ export function ServerImportPanel(
               onOpenExportAgent={() => calls.openExportAgent()}
               onSaveExportSkill={() => void saveSkill(current())}
               onReadFolder={current() === "hermes-agent" && hermesCalls ? openFolder : undefined}
+              folderOnServer={props.hermes === "server"}
               onChoose={() => void choose()}
               onImport={(keys, channelKeys) => void apply(keys, channelKeys)}
               onCancel={reset}

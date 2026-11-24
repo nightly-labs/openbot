@@ -1,0 +1,33 @@
+{
+  "slug": "wpvibe",
+  "name": "WPVibe",
+  "tagline": "Self-hosted WordPress management",
+  "description": "WPVibe lets agents read and edit posts, media, SEO fields, WooCommerce data, and theme files on a self-hosted WordPress site that runs the WPVibe plugin. Each user signs in to their WPVibe account through the browser and authorizes their site.",
+  "category": "productivity",
+  "creatorName": "SeedProd",
+  "iconUrl": "https://wpvibe.ai/wp-content/uploads/2026/06/cropped-favicon-transparent-192x192.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-seo-audit", "text": "Which published posts have no meta description?" },
+    { "id": "prompt-draft-page", "text": "Draft an About page from these notes and save it as a draft." },
+    { "id": "prompt-low-stock", "text": "List WooCommerce products with fewer than five items in stock." }
+  ],
+  "apps": [
+    {
+      "id": "app-wpvibe-mcp",
+      "name": "WPVibe",
+      "description": "WordPress content, media, and store access, over WPVibe's MCP server with browser sign-in.",
+      "iconUrl": "https://wpvibe.ai/wp-content/uploads/2026/06/cropped-favicon-transparent-192x192.png",
+      "server": {
+        "name": "wpvibe",
+        "transport": "http",
+        "url": "https://mcp.wpvibe.ai/mcp",
+        "auth": [{ "id": "wpvibe-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://wpvibe.ai",
+  "privacyPolicyUrl": "https://wpvibe.ai/privacy/",
+  "termsUrl": "https://wpvibe.ai/terms/"
+}

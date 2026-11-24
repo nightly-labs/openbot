@@ -4,10 +4,6 @@ import { Button, Item, ItemActions, ItemContent, ItemDescription, ItemTitle } fr
 import { createSignal, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 
-/**
- * Linux with Wayland windows: a window above the other apps needs a start on XWayland. The row offers the
- * restart, or says that this start cannot use XWayland. It shows nothing when the window needs no restart.
- */
 export function XWaylandRestartRow(props: {
   support: AboveAppsSupport | undefined;
   keys: { title: AppTextKey; description: AppTextKey; unsupported: AppTextKey; restart: AppTextKey };

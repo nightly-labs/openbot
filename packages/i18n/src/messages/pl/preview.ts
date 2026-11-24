@@ -20,6 +20,11 @@ export const messages = {
   "preview.unsupported.title": "Podgląd niedostępny",
   "preview.unsupported.description": "Ten typ pliku można otworzyć w domyślnej aplikacji.",
   "preview.unsupported.openExternally": "Otwórz zewnętrznie",
+  "preview.tooLarge.title": "Plik jest za duży na podgląd",
+  "preview.tooLarge.description": "Podgląd działa do 100 MB. Możesz otworzyć ten plik w domyślnej aplikacji.",
   "preview.spreadsheet.readFailed": "Nie udało się odczytać tego arkusza kalkulacyjnego.",
   "preview.spreadsheet.truncated": "Podgląd ograniczony do pierwszych wierszy ({rows}) i kolumn ({columns}).",
+  "preview.document.readFailed": "Nie można odczytać tego dokumentu.",
+  "preview.document.empty": "Ten dokument nie zawiera tekstu do wyświetlenia.",
+  "preview.document.truncated": "Podgląd ograniczony do pierwszej części dokumentu.",
 } as const satisfies PartialTranslation<typeof source>;

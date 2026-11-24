@@ -33,19 +33,8 @@ import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 
-/**
- * `idle`: the guide, before an export is chosen. `reading`: main is checking the chosen file.
- * `review`: the export is open and nothing has changed yet. `importing`: agents are being created.
- * `done`: the result of one import.
- */
 export type AgentImportPhase = "idle" | "reading" | "review" | "importing" | "done";
 
-/**
- * How the user starts the export. Grok Bot: `agent` installs the ready export agent from its link,
- * `skill` adds the export skill to a new agent by hand. Hermes: `folder` reads the Hermes folder on
- * this computer with no export, `command` installs the export skill with `/skills install`, and
- * `skill` adds it by hand.
- */
 export type AgentImportSetup = "agent" | "skill" | "folder" | "command";
 
 const SETUPS: readonly AgentImportSetup[] = ["agent", "skill", "folder", "command"];
@@ -56,7 +45,6 @@ const EXPORT_SKILL_ID = "openbot-export";
 type CountKind = "agent" | "channel" | "skill" | "routine" | "memory" | "file";
 
 export interface AgentImportViewProps {
-  /** The app the export comes from. Grok Bot when not set. */
   source?: AgentImportSkillSource;
   phase: AgentImportPhase;
   error?: string | null;
@@ -64,25 +52,19 @@ export interface AgentImportViewProps {
   result?: AgentImportResult | null;
   now?: Date;
   setup: AgentImportSetup;
-  /** The export skill's text, or null while it loads or when it could not be read. */
   exportSkill: string | null;
   onSetupChange: (setup: AgentImportSetup) => void;
   onOpenExportAgent: () => void;
   onSaveExportSkill: () => void;
-  /** Hermes on this computer: reads its folder with no export. Without it, Hermes offers the export only. */
   onReadFolder?: (() => void) | undefined;
+  folderOnServer?: boolean;
   onChoose: () => void;
   onImport: (keys: string[], channelKeys: string[]) => void;
   onCancel: () => void;
-  /** Done on the result: the import is over, so the settings it ran in close. */
   onDone: () => void;
   onOpenAgent: (agentId: string) => void;
 }
 
-/**
- * Server settings > Import: move agents from Grok Bot. The guide names the export agent and what to
- * say to it; the review shows what is in the export before anything changes on this server.
- */
 export function AgentImportView(props: AgentImportViewProps) {
   return (
     <div
@@ -92,7 +74,6 @@ export function AgentImportView(props: AgentImportViewProps) {
       <Show when={props.phase === "done" && props.result}>
         {(result) => <ImportResult result={result()} onOpenAgent={props.onOpenAgent} onDone={props.onDone} />}
       </Show>
-      {/* Keyed, so a newly chosen export starts with every agent selected again. */}
       <Show when={props.phase !== "idle" && props.phase !== "done" && props.preview} keyed>
         {(preview) => (
           <ImportReview
@@ -111,6 +92,7 @@ export function AgentImportView(props: AgentImportViewProps) {
         <ImportGuide
           source={props.source ?? "grok-bot"}
           onReadFolder={props.onReadFolder}
+          folderOnServer={props.folderOnServer === true}
           reading={props.phase === "reading"}
           error={props.error}
           setup={props.setup}
@@ -128,6 +110,7 @@ export function AgentImportView(props: AgentImportViewProps) {
 function ImportGuide(props: {
   source: AgentImportSkillSource;
   onReadFolder?: (() => void) | undefined;
+  folderOnServer: boolean;
   reading: boolean;
   error?: string | null | undefined;
   setup: AgentImportSetup;
@@ -140,7 +123,10 @@ function ImportGuide(props: {
   const { t, format, sourceText } = useText();
   const headingId = `agent-import-${createUniqueId()}`;
   const hermes = () => props.source === "hermes-agent";
-  // Reading the Hermes folder needs no export, so its tab has one step.
+  function hermesLede() {
+    if (!props.onReadFolder) return t("import.guide.hermesLedeExport");
+    return t(props.folderOnServer ? "import.guide.hermesLedeServer" : "import.guide.hermesLede");
+  }
   const exports = () => props.setup !== "folder";
   const prompt = () => (hermes() ? HERMES_EXPORT_PROMPT : AGENT_IMPORT_PROMPT);
   return (
@@ -149,7 +135,7 @@ function ImportGuide(props: {
         <h3 id={headingId} class="agent-import-heading">
           {hermes() ? t("import.guide.hermesTitle") : t("import.guide.title")}
         </h3>
-        <p class="agent-import-lede">{hermes() ? t("import.guide.hermesLede") : t("import.guide.lede")}</p>
+        <p class="agent-import-lede">{hermes() ? hermesLede() : t("import.guide.lede")}</p>
       </header>
 
       <Show when={props.error}>
@@ -178,7 +164,9 @@ function ImportGuide(props: {
                 aria-label={hermes() ? t("import.guide.hermesSetupLabel") : t("import.guide.setupLabel")}
               >
                 <Show when={hermes() && props.onReadFolder}>
-                  <SlidingTabs.Trigger value="folder">{t("import.guide.setupFolder")}</SlidingTabs.Trigger>
+                  <SlidingTabs.Trigger value="folder">
+                    {props.folderOnServer ? t("import.guide.setupServer") : t("import.guide.setupFolder")}
+                  </SlidingTabs.Trigger>
                 </Show>
                 <Show
                   when={hermes()}
@@ -346,7 +334,6 @@ function ImportReview(props: {
     else next.add(key);
     setExcluded(next);
   };
-  // A channel imports with the members that are selected, and needs at least one of them.
   const [excludedChannels, setExcludedChannels] = createSignal<ReadonlySet<string>>(new Set());
   const agentsByKey = createMemo(() => new Map(props.preview.agents.map((agent) => [agent.key, agent])));
   const selectedMembers = (channel: AgentImportPreviewChannel) =>
@@ -373,7 +360,6 @@ function ImportReview(props: {
       selected().map((agent) => agent.key),
       selectedChannels().map((channel) => channel.key),
     );
-  // An agent whose name is already on this server imports as a second, separate agent: the user accepts that first.
   const duplicates = createMemo(() => selected().filter((agent) => agent.nameExists));
   const [confirmingDuplicates, setConfirmingDuplicates] = createSignal(false);
 
@@ -540,7 +526,6 @@ function ImportReview(props: {
   );
 }
 
-/** Which members stay out: an agent that is not selected is not in the channel after import. */
 function ChannelMemberNote(props: {
   channel: AgentImportPreviewChannel;
   selectedMembers: string[];
@@ -562,7 +547,6 @@ function ChannelMemberNote(props: {
   );
 }
 
-/** A second agent with a name already on this server is allowed; the hint says so before import. */
 function NameExistsHint(props: { name: string }) {
   const { t } = useText();
   const text = () => t("import.review.nameExists", { name: props.name });
@@ -575,10 +559,8 @@ function NameExistsHint(props: { name: string }) {
   );
 }
 
-/** The result of one import. A Hermes import names the agents it updated rather than made. */
 export function ImportResult(props: {
   result: AgentImportResult;
-  /** Ids of the agents in the result that existed before the import. */
   updated?: ReadonlySet<string> | undefined;
   onOpenAgent: (agentId: string) => void;
   onDone: () => void;
@@ -769,7 +751,6 @@ function sourceLabel(app: string): string {
 
 function formatDate(value: string, format: AppFormat, now = new Date()): string {
   const date = new Date(value);
-  // Intl throws on an invalid date, where `toLocaleDateString` returns text.
   if (Number.isNaN(date.getTime())) return value;
   return format.date(date, {
     day: "numeric",

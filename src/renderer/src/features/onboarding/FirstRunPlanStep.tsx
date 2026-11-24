@@ -4,11 +4,9 @@ import { SetupProviderPicker, type SetupProviders } from "./SetupProviderPicker"
 export interface FirstRunPlanStepProps {
   providers: SetupProviders;
   disabled: boolean;
-  /** The first-run screen. It sits on the dialog layer, so row menus mount in it. */
   menuMount: HTMLElement | undefined;
 }
 
-/** The plan step of first run: the plan providers to connect. The free provider is not a row. */
 export function FirstRunPlanStep(props: FirstRunPlanStepProps) {
   const { t } = useText();
   return (

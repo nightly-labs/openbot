@@ -1,6 +1,5 @@
 import type { AgentMessage } from "../../data";
 
-/** A finished answer of the agent. A branch copies the conversation through such a message. */
 function branchable(message: AgentMessage): boolean {
   return (
     message.author === "agent" &&
@@ -11,11 +10,6 @@ function branchable(message: AgentMessage): boolean {
   );
 }
 
-/**
- * The messages that show "Branch from here": the last answer of the agent in each finished turn. A
- * message of the person, or an answer of another turn, ends a turn. The last answer of the
- * conversation counts only when its turn does not run and no message after it streams.
- */
 export function branchPointIds(
   messages: readonly AgentMessage[],
   activeTurnId: string | null | undefined,

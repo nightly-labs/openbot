@@ -2,15 +2,16 @@ import {
   type AgentBrowserProfile,
   agentAutomationAllowed,
   agentNotificationLevelMap,
-  assignedSkillCount,
   type BrowserProfileSummary,
   type BrowserProxyComputer,
   type BrowserProxySummary,
   DEFAULT_AGENT_DEFAULTS,
   type FilePreview,
   type ServerNotificationLevel,
+  type TestRoutineInput,
+  userAssignedSkills,
 } from "@openbot/contracts/ipc";
-import { BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
+import { Blocks, BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
 import type { AgentProfile } from "@openbot/ui/data";
 import type { BrowserProfileSelectProfile } from "@openbot/ui/features/browser/BrowserProfileSelect";
@@ -28,90 +29,95 @@ import SharedAgentSettingsPanel, {
   type AgentNotificationLevelOptions,
   type AgentSettingsPanelProps as SharedAgentSettingsPanelProps,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
+import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { createSettingsPanelWidth, saveSettingsPanelWidth } from "../../components/settings-panel-width";
+import { createSidePanelWidth, readSidePanelWidth, saveSidePanelWidth } from "../../components/side-panel-width";
+import type { SkillCatalogCalls } from "../../skills-port";
 import { agentSkillCalls, skillsPort } from "../../skills-port";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
 import { createBrowserProfilesStore } from "../browser/stores/browser-profiles-store";
 import { type AgentFilesOptions, AgentFilesSettings } from "../files/AgentFilesSettings";
+import { filesPort } from "../files/files-port";
 import { createStorageUsage } from "../files/storage-usage";
 import { AgentMemoriesSettings } from "./AgentMemoriesSettings";
-import { AgentRoutinesSettings, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
+import { AgentRoutinesSettings, type DetailLeaveGuard, type RoutineSelectionRequest } from "./AgentRoutinesSettings";
 import { AgentSkillsModal, type AgentSkillsMode, type SkillDetail } from "./AgentSkillsModal";
 import { conversationPort, type SharedTableCalls } from "./conversation-port";
 import type { AgentNotificationLevelCalls, ConversationRuntime } from "./conversation-runtime";
-import { agentMemoriesPort } from "./memories-port";
+import { type AgentMemoriesApi, agentMemoriesPort, type MemoriesPort } from "./memories-port";
 import type { EventRoutinesApi } from "./routine-webhooks-api";
-import { type AgentRoutinesApi, agentRoutinesPort, eventRoutinesPort, type RoutinesPort } from "./routines-port";
+import {
+  type AgentRoutinesApi,
+  agentRoutinesPort,
+  eventRoutinesPort,
+  type RoutineResultsCalls,
+  type RoutinesPort,
+} from "./routines-port";
 import { SharedTablesModal } from "./SharedTablesModal";
 
 interface AgentSettingsPanelProps
   extends Omit<
     SharedAgentSettingsPanelProps,
-    "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children" | "browserProfiles" | "notificationLevel"
+    | "width"
+    | "onResize"
+    | "onResizeEnd"
+    | "links"
+    | "detailOpen"
+    | "children"
+    | "browserProfiles"
+    | "notificationLevel"
+    | "reveal"
   > {
   remoteClient?: boolean;
-  /** Routines can copy local run commands only on the computer that runs the agent. */
+  skillCatalog?: SkillCatalogCalls | undefined;
   localHost?: boolean;
   sessionSettingsEditable?: boolean;
-  /** The memory cap of an agent on this computer. Absent for a remote agent: its host enforces its own. */
   memoryLimit?: number | undefined;
-  /** The web client's host calls for the settings that its server supports. */
   adminCalls?: ConversationRuntime["admin"] | undefined;
   onPublish?: (() => void) | undefined;
   onOpenUsage?: ((trigger: HTMLButtonElement) => void) | undefined;
+  onOpenApps?: (() => void) | undefined;
   onWidthChange: (width: number) => void;
   skillSelectionRequest?: { skillId: string } | null | undefined;
-  /** The instruction file in the agent's workspace. Local-only: the Team API does not carry it. */
+  onSkillsClosed?: (() => void) | undefined;
   instructionsFile?: AgentInstructionsCalls | undefined;
-  /** Opens the Instructions page, from the chat line that says the agent changed the file. */
   instructionsRequest?: { agentId: string } | null | undefined;
+  settingReveal?: AgentSettingReveal | null | undefined;
+  onSettingRevealHandled?: ((nonce: number) => void) | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRoutineRun?: ((messageId: string, routineId?: string) => void) | undefined;
-  /** Opens the side thread where a routine runs. Resolves false when the routine has no thread. */
   onOpenRoutineThread?: ((routineId: string) => Promise<boolean>) | undefined;
   skillsMode?: AgentSkillsMode | undefined;
-  /** The joined server that runs the agent, for the `host` skills mode. */
   skillsServerId?: string | undefined;
   skillsMarketplaceOpen?: boolean | undefined;
-  /** Another page of the window covers the conversation. */
   workspaceCovered?: boolean | undefined;
-  /** The shared data lives on the computer that runs the agents. A joined server shows it to an admin only. */
   tablesVisible?: boolean | undefined;
-  /** Names the agent that keeps each set of records. Threaded like `customProviders`, for the same reason. */
   agents?: readonly AgentProfile[] | undefined;
-  /** Event routine calls for a host that advertises `events-v1`; absent keeps the released schedule API. */
   eventRoutines?: EventRoutinesApi | undefined;
-  /** The released schedule API of a client without the desktop port. Absent, preload sends it. */
   routines?: AgentRoutinesApi | undefined;
-  /** A joined host that advertises `routine-run-place-v1` keeps where each routine runs. */
   routineRunPlace?: boolean | undefined;
+  routinesOnce?: boolean | undefined;
+  routineRunCommand?: ((input: TestRoutineInput) => Promise<string>) | undefined;
+  routineResultsServerId?: string | RoutineResultsCalls | undefined;
+  memoriesApi?: AgentMemoriesApi | undefined;
   onCreateSkill?: (() => void) | undefined;
   onTrySkill?: ((skill: SkillDetail) => void) | undefined;
-  /** Reads a file in the agent workspace, on the computer that runs the agent. */
   previewWorkspaceFile?: ((path: string) => Promise<FilePreview>) | undefined;
   onAddFromMarketplace?: ((agentId: string) => void) | undefined;
-  /** The Files row. Left out for a remote server without `storage-v1`. */
   files?: AgentFilesOptions | undefined;
-  /** The profile calls of the host that runs the agent, for an owner or admin. Absent hides the row. */
   browserProfileCalls?: BrowserProfileCalls | undefined;
-  /** Opens the Browser profiles section of the settings of the server that runs the agent. */
   onManageBrowserProfiles?: ((trigger: HTMLElement) => void) | undefined;
-  /** The user's own level of each agent on the server. Absent when the server cannot keep it. */
   notificationLevelCalls?: AgentNotificationLevelCalls | undefined;
-  /** The level of the server that runs the agent. */
   serverNotificationLevel?: ServerNotificationLevel | undefined;
-  /** Opens the notification settings of the server that runs the agent. Absent hides the row. */
   onOpenNotificationSettings?: ((trigger: HTMLElement) => void) | undefined;
 }
 
 export type { AgentSkillsMode };
 
-/** Each named profile with the name of its proxy, as the server settings show it. */
 function profilesWithProxies(
   state: {
     profiles: readonly BrowserProfileSummary[] | undefined;
@@ -146,7 +152,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         }),
     };
   });
-  const [panelWidth, setPanelWidth] = createSettingsPanelWidth();
+  const [panelWidth, setPanelWidth] = createSidePanelWidth();
   const [draft, setDraft] = createStore({
     tables: { count: 0, open: false },
     memories: { count: 0, open: false },
@@ -155,18 +161,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     instructions: { open: false },
     skills: { count: 0, open: false, reopenAfterMarketplace: false },
   });
-  // One store per host. It goes with the host, so the list of the last server never shows for the next.
   const browserProfiles = createMemo(() => {
     const calls = props.browserProfileCalls;
     return calls ? createBrowserProfilesStore(() => calls) : undefined;
   });
-  // The summary of an agent on a joined server does not carry its profile, so the panel reads it
-  // from the host. Undefined until it arrives, and for an agent on this computer.
   const [hostChoice, setHostChoice] = createSignal<AgentBrowserProfile | undefined>(undefined);
   let choiceRequest = 0;
-  // The settings page covers the conversation while it changes the profiles, so the list loads again
-  // each time the conversation shows. A change made on another device, such as the phone, shows while
-  // the settings are open. The choice of an agent on this computer comes with its summary.
   createEffect(
     () => ({
       store: props.workspaceCovered === true ? undefined : browserProfiles(),
@@ -175,7 +175,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       local: props.localHost === true,
     }),
     ({ store, calls, agentId, local }) => {
-      // A read that an earlier agent or server started does not show.
       ++choiceRequest;
       setHostChoice(undefined);
       if (!store || !calls) return;
@@ -192,7 +191,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       store.refresh().catch(failed);
       if (local) return store.follow();
       readChoice(failed);
-      // A read after a change keeps the shown choice when it fails; the next change reads it again.
       return store.follow(() => readChoice(() => undefined));
     },
   );
@@ -212,15 +210,26 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       onManage: manage,
     };
   };
-  const memoriesPort = createMemo(() => agentMemoriesPort(props.agent.id, props.agent.name, props.memoryLimit ?? null));
+  const memoriesPort = createMemo(() =>
+    agentMemoriesPort(props.agent.id, props.agent.name, props.memoryLimit ?? null, props.memoriesApi),
+  );
+  const memoriesShown = () => !props.remoteClient || props.memoriesApi !== undefined;
+  const routinesShown = () => !props.remoteClient || props.routines !== undefined;
   const legacyRoutinesPort = createMemo(() =>
     agentRoutinesPort(
       props.agent.id,
-      props.localHost === true && agentAutomationAllowed(props.agent, props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS),
-      // Set only for the host on this computer, the one place the policy is kept.
+      (
+        props.localHost === true
+          ? agentAutomationAllowed(props.agent, props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS)
+          : props.agent.allowAutomation === true
+      )
+        ? props.routineRunCommand
+        : undefined,
       props.localHost === true,
       props.routines,
       props.localHost === true || props.routineRunPlace === true,
+      props.routineResultsServerId,
+      props.localHost === true || props.routinesOnce === true,
     ),
   );
   const routinesPort = createMemo(() => {
@@ -230,13 +239,17 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       : legacyRoutinesPort();
   });
   const skillsMode = () => props.skillsMode ?? "mutable";
+  const skillCatalog = () => (props.remoteClient ? (props.skillCatalog ?? null) : undefined);
   const tableCalls = (): SharedTableCalls => props.adminCalls?.sharedTables ?? conversationPort().agent;
   const skillCalls = () =>
     props.adminCalls?.skills ?? agentSkillCalls(skillsMode() === "host" ? props.skillsServerId : undefined);
-  const storage = createStorageUsage(() => {
-    const files = props.files;
-    return files ? { serverId: files.serverId, input: { scope: "agent", agentId: props.agent.id } } : null;
-  });
+  const storage = createStorageUsage(
+    () => {
+      const files = props.files;
+      return files ? { serverId: files.serverId, input: { scope: "agent", agentId: props.agent.id } } : null;
+    },
+    () => props.files?.calls ?? filesPort(),
+  );
   let lastSkillsMarketplaceOpen = untrack(() => props.skillsMarketplaceOpen === true);
   createEffect(
     () => panelWidth(),
@@ -245,12 +258,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     },
   );
 
-  // An effect runs again for an equal value, and each activity of the agent gives a new agent
-  // object. The memo keeps an open view, such as a routine edit, until the agent changes.
   const currentAgentId = createMemo(() => props.agent.id);
 
-  // The user's own level of each agent. Undefined while it loads, and when the read fails: the row
-  // then stays hidden. Another device can change it, so it loads again for each agent.
   const [ownLevels, setOwnLevels] = createSignal<ReadonlyMap<string, ServerNotificationLevel> | undefined>(undefined);
   let levelsRequest = 0;
   let levelsCalls: AgentNotificationLevelCalls | undefined;
@@ -258,7 +267,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     () => ({ calls: props.notificationLevelCalls, agentId: currentAgentId() }),
     ({ calls }) => {
       const request = ++levelsRequest;
-      // The levels of the last server must not show for the next one.
       if (calls !== levelsCalls) {
         levelsCalls = calls;
         setOwnLevels(undefined);
@@ -272,7 +280,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       );
     },
   );
-  // A change on another device of the user shows at once.
   createEffect(
     () => props.notificationLevelCalls,
     (calls) => {
@@ -298,11 +305,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   createEffect(
     () => ({
       agentId: currentAgentId(),
-      // Read here, not in the callback: a prop can be a compiled memo, and the callback has no owner.
       remoteClient: untrack(() => props.remoteClient === true),
       tablesVisible: untrack(() => props.tablesVisible !== false),
+      memories: untrack(memoriesShown),
+      routines: untrack(routinesShown),
     }),
-    ({ agentId, remoteClient, tablesVisible }) => {
+    ({ agentId, remoteClient, tablesVisible, memories, routines }) => {
       setDraft((state) => {
         state.tables.open = false;
         state.memories.open = false;
@@ -323,31 +331,29 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           });
       }
       void untrack(() => loadSkillsCount(agentId));
-      if (!remoteClient) {
-        loadMemoriesCount(agentId);
-        untrack(() => loadRoutinesCount(routinesPort()));
-      }
+      if (memories) untrack(() => loadMemoriesCount(memoriesPort()));
+      if (routines) untrack(() => loadRoutinesCount(routinesPort()));
     },
   );
 
-  // The counts follow a memory or routine change, also one that the agent makes in a turn.
   createEffect(
-    () => (props.remoteClient ? null : ([currentAgentId(), memoriesPort(), routinesPort()] as const)),
-    (sources) => {
-      if (!sources) return;
-      const [agentId, memories, routines] = sources;
-      const stopMemories = memories.subscribe(() => loadMemoriesCount(agentId));
-      const stopRoutines = routines.subscribe(() => loadRoutinesCount(routines));
+    () => ({
+      memories: memoriesShown() ? memoriesPort() : null,
+      routines: routinesShown() ? routinesPort() : null,
+    }),
+    ({ memories, routines }) => {
+      const stopMemories = memories?.subscribe(() => loadMemoriesCount(memories));
+      const stopRoutines = routines?.subscribe(() => loadRoutinesCount(routines));
       return () => {
-        stopMemories();
-        stopRoutines();
+        stopMemories?.();
+        stopRoutines?.();
       };
     },
   );
 
-  function loadMemoriesCount(agentId: string): void {
-    void conversationPort()
-      .agent.listMemories(agentId)
+  function loadMemoriesCount(port: MemoriesPort): void {
+    void port
+      .list()
       .catch(() => [])
       .then((items) => {
         setDraft((state) => {
@@ -367,7 +373,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       });
   }
 
-  // The count follows a skill change made anywhere, as the dialog does.
   createEffect(
     () => [props.agent.id, skillsMode(), skillCalls()] as const,
     ([agentId, mode, calls]) => {
@@ -391,7 +396,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           ? await skillsPort().agent.listInstalledSkills(agentId)
           : await skillCalls().listInstalled(agentId);
       setDraft((state) => {
-        state.skills.count = assignedSkillCount(items);
+        state.skills.count = userAssignedSkills(items).length;
       });
     } catch {
       setDraft((state) => {
@@ -403,12 +408,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   createEffect(
     () => ({
       open: props.skillsMarketplaceOpen === true,
-      // Read here, not in the callback: the prop can be a compiled memo, and the callback has no owner.
       covered: untrack(() => props.workspaceCovered === true),
     }),
     ({ open, covered }) => {
       if (lastSkillsMarketplaceOpen && !open && untrack(() => draft.skills.reopenAfterMarketplace)) {
-        // The Marketplace page can close for another page. The skills dialog then stays closed.
         setDraft((state) => {
           state.skills.reopenAfterMarketplace = false;
           state.skills.open = !covered;
@@ -429,8 +432,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     },
   );
 
-  // The request stays set after the dialog closes, and it is read again at each activity of the agent.
-  // The memo opens the dialog again only for a new request.
   const skillSelectionRequest = createMemo(() => props.skillSelectionRequest);
   createEffect(skillSelectionRequest, (request) => {
     if (request)
@@ -439,7 +440,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       });
   });
 
-  // Like the skill request: a new request object opens the page again.
   const instructionsRequest = createMemo(() => props.instructionsRequest);
   createEffect(instructionsRequest, (request) => {
     if (request)
@@ -448,14 +448,44 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       });
   });
 
+  const settingReveal = createMemo(() => props.settingReveal);
+  const [panelReveal, setPanelReveal] = createSignal<AgentSettingReveal | null>(null);
+  let detailLeaveGuard: DetailLeaveGuard | null = null;
+  createEffect(settingReveal, (request) => {
+    if (!request) return;
+    props.onSettingRevealHandled?.(request.nonce);
+    const guard = detailLeaveGuard;
+    untrack(() => (guard ? guard(() => revealSetting(request)) : revealSetting(request)));
+  });
+  function revealSetting(request: AgentSettingReveal): void {
+    const detail = revealDetail(request.settingId);
+    setDraft((state) => {
+      state.instructions.open = detail === "instructions";
+      state.memories.open = detail === "memories";
+      state.skills.open = detail === "skills";
+      state.routines.open = detail === "routines";
+      state.files.open = false;
+    });
+    setPanelReveal(detail === "skills" ? null : request);
+  }
+  function revealDetail(settingId: AgentSettingLinkId): "instructions" | "memories" | "skills" | "routines" | null {
+    if (settingId === "agent.instructions" && props.instructionsFile) return "instructions";
+    if (settingId === "agent.memories" && memoriesShown()) return "memories";
+    if (settingId === "agent.skills" && skillsMode() !== "hidden") return "skills";
+    if (settingId === "agent.routines" && routinesShown()) return "routines";
+    return null;
+  }
+
   return (
     <SharedAgentSettingsPanel
       {...props}
+      reveal={panelReveal()}
       browserProfiles={browserProfileOptions()}
       notificationLevel={notificationLevelOptions()}
       width={panelWidth()}
       onResize={setPanelWidth}
-      onResizeEnd={saveSettingsPanelWidth}
+      onResizeEnd={saveSidePanelWidth}
+      preferredWidth={readSidePanelWidth}
       onUnshownSaveError={(message) =>
         actionToast.error(message, {
           id: "agent-settings-save-failed",
@@ -476,7 +506,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           </Show>
           <Show
             when={
-              !props.remoteClient ||
+              memoriesShown() ||
               skillsMode() !== "hidden" ||
               props.tablesVisible !== false ||
               props.files ||
@@ -495,7 +525,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }
                 />
               </Show>
-              <Show when={!props.remoteClient}>
+              <Show when={memoriesShown()}>
                 <SettingsLinkRow
                   icon={<BookMarked aria-hidden="true" />}
                   label={t("agentSettings.links.memories")}
@@ -545,9 +575,9 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               </Show>
             </SettingsLinkGroup>
           </Show>
-          <Show when={!props.remoteClient || props.onPublish}>
+          <Show when={routinesShown() || props.onOpenUsage || props.onOpenApps || props.onPublish}>
             <SettingsLinkGroup inset title={t("agentSettings.groups.does")}>
-              <Show when={!props.remoteClient}>
+              <Show when={routinesShown()}>
                 <SettingsLinkRow
                   icon={<CalendarClock aria-hidden="true" />}
                   label={t("agentSettings.links.routines")}
@@ -559,11 +589,19 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   }
                 />
               </Show>
-              <Show when={!props.remoteClient && props.onOpenUsage}>
+              <Show when={props.onOpenUsage}>
                 <SettingsLinkRow
                   icon={<Gauge aria-hidden="true" />}
                   label={t("agentSettings.links.usage")}
                   onClick={(trigger) => props.onOpenUsage?.(trigger)}
+                />
+              </Show>
+              <Show when={props.onOpenApps}>
+                <SettingsLinkRow
+                  icon={<Blocks aria-hidden="true" />}
+                  label={t("agentSettings.links.apps")}
+                  value={t("agentSettings.links.appsScope")}
+                  onClick={() => props.onOpenApps?.()}
                 />
               </Show>
               <Show when={props.onPublish}>
@@ -624,10 +662,14 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
               })
             }
             onClose={props.onClose}
+            registerLeaveGuard={(guard) => {
+              detailLeaveGuard = guard;
+            }}
             selectionRequest={props.routineSelectionRequest}
             onSelectionRequestHandled={props.onRoutineSelectionRequestHandled}
             onOpenRun={props.onOpenRoutineRun}
             onOpenThread={props.onOpenRoutineThread}
+            agentName={props.agent.name}
           />
         </div>
       </Show>
@@ -668,11 +710,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           selectionRequest={props.skillSelectionRequest}
           agentId={props.agent.id}
           agentName={props.agent.name}
+          agentProvider={props.agent.provider}
           open={draft.skills.open}
           skillsMode={skillsMode()}
           serverId={props.skillsServerId}
           calls={props.adminCalls?.skills}
-          catalog={props.remoteClient ? null : undefined}
+          catalog={skillCatalog()}
           onCreateSkill={props.onCreateSkill}
           onTrySkill={props.onTrySkill}
           previewWorkspaceFile={props.previewWorkspaceFile}
@@ -687,11 +730,12 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                 }
               : undefined
           }
-          onOpenChange={(open) =>
+          onOpenChange={(open) => {
             setDraft((state) => {
               state.skills.open = open;
-            })
-          }
+            });
+            if (!open) props.onSkillsClosed?.();
+          }}
           onCountChange={(count) =>
             setDraft((state) => {
               state.skills.count = count;

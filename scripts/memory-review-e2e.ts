@@ -1,55 +1,3 @@
-// Checks the background memory review: after every 20 completed turns of an agent's own chat or of
-// one side thread, after a pause with 3 or more new turns, when the chat is cleared and when a side
-// thread closes, one generation without tools proposes memory changes that the memory tools' checks
-// apply. Runs the real agent service on a temporary profile with a fake Codex app-server. An agent
-// turn calls the OpenBot tools that its input names in `<<CALLS[...]CALLS>>` and answers "Done.". A
-// review generation is logged and answers the text in `control.json`, after its delay.
-// Checks:
-//   1. Nineteen turns start no review. The twentieth starts one, which adds a memory and shows one
-//      memory-changes line with its own turn id.
-//   2. A secret in the chat is not in the review prompt.
-//   3. A review shows every essential memory, and of the searchable ones only those that fit its
-//      budget, the ones that relate to the chat first.
-//   4. A turn in which the agent saves a memory itself starts the count again.
-//   5. A pause after new turns starts a review, which changes the agent's own memory, and not a
-//      memory that the user wrote or chose.
-//   6. A pause after fewer than three turns starts no review. Clearing the chat starts a review of
-//      the chat that the clear ended.
-//   7. Closing a side thread starts a review of that thread only, and its line shows in the thread.
-//   8. An answer that is not JSON changes nothing and shows no error. The next review works.
-//   9. A clear while another review runs is not lost: its review starts when that one ends.
-//  10. An agent on a model that costs more than the provider's default model is reviewed on the
-//      default model. A model with no known price is reviewed on itself.
-//  11. Memory search finds another form of a word: "closing" finds "closes".
-//  12. Off (interval 0): 20 turns, a closed side thread, a clear and a pause start no review.
-//  13. Deleting a side thread or deleting the agent during a slow review applies nothing and shows
-//      no error.
-//  14. A review does not forget a memory that it sees only redacted, and does not add the text of a
-//      saved memory again, which would change the user's inclusion choice.
-//  15. Stopping the service during a slow review applies nothing and shows no error.
-//  16. After a restart, a review reads only the messages after the saved cursor of the last review.
-//      Without a saved cursor, it reads the latest messages again, as before.
-//  17. A review with no memory change can ask the user to save a skill. Its prompt lists the agent's
-//      skills, which of them can take an update, and the work steps. The user's next message brings
-//      the question to the agent; the message after it does not. A later review sees the question.
-//  18. A suggestion is dropped when it updates a skill that is not in the local library or that the
-//      agent does not have, when a new skill takes the name of one the agent has, or when it has a
-//      bad shape. The memory changes of the same answer still apply.
-//  19. When a clear starts the review, the user's next message brings the cleared chat with the
-//      question, so the agent can write the skill from it. Without a clear, the note has no chat.
-//  20. Skill learning "automatic": the review saves a new skill with no question to the user. The
-//      writer reads the lesson and the redacted chat. The chat shows the saved skill, the next
-//      message brings no question, and a later review sees the saved skill.
-//  21. "automatic" revises a local skill from its current text, at its current revision.
-//  22. When the writer answer is not JSON or the save fails, the review asks the user instead.
-//  23. "off": the review prompt asks for no skill, and a skill in the answer shows nothing.
-//  24. When the review looks for skills, a turn in which the agent saved a memory stays in the next
-//      review: the memory does not hold how the agent did the task.
-//  25. "ask": Save writes the skill with the background writer, not in an agent turn. Two presses
-//      save once, a later press sees the saved skill, and the next message brings no question. Save
-//      also revises a local skill. When the writer fails, Save reports false and the yes still works.
-// No provider, account or network is used. `bun run test:memory-review`.
-// Writes .openbot-build/memory-review-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -85,7 +33,6 @@ const REVIEW_SKILLS = [
   { skillId: "docs-style", name: "Docs style", description: "A Marketplace skill." },
 ];
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -95,9 +42,9 @@ const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
+const { USER_BROWSING_RETENTION_MS, UserBrowsingLog } = await import("../src/backend/user-browsing-log");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/** A tool call that the fake makes in an agent turn. */
 interface FakeCall {
   tool: "remember" | "search_memories" | "revise_skill";
   arguments: Record<string, string | number>;
@@ -214,7 +161,6 @@ const report: {
 } = { checks: [], passed: false };
 
 const unused = () => Effect.die(new Error("Not used by this check."));
-/** Only revise works: it returns revision 2 of the local skill, as the library does after a revision. */
 const LOCAL_SKILL_TOOLS: LocalSkillTools = {
   create: unused,
   revise: () =>
@@ -244,17 +190,15 @@ const LOCAL_SKILL_TOOLS: LocalSkillTools = {
 };
 
 const LEARNED_SKILL_ID = "local-skill-00000000-0000-4000-8000-000000000002";
-/** The drafts that the reviews saved, in order. */
 const learned: { agentId: string; draft: LearnedSkillDraft }[] = [];
-/** True makes the next saves fail, as a failed install does. */
 let saveFails = false;
-/** Saves as the local library does: a new skill gets revision 1, a change the next revision. */
+let localSkillInstructions = "Write release notes as a short list.";
 const SKILL_LEARNER: SkillLearner = {
   read: (skillId) =>
     skillId === LOCAL_SKILL_ID
       ? Effect.succeed({
           description: "How the user wants release notes.",
-          instructions: "Write release notes as a short list.",
+          instructions: localSkillInstructions,
           revision: 1,
         })
       : Effect.fail(new Error("No such skill.")),
@@ -271,6 +215,7 @@ const SKILL_LEARNER: SkillLearner = {
 
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -289,7 +234,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service, its database or the fake's log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -309,17 +253,16 @@ function logged(method: string): { text: string; model: string; result: unknown 
   }
   return text
     .split("\n")
+    .slice(0, -1)
     .filter(Boolean)
     .map((line): { method: string; text: string; model: string; result: unknown } => JSON.parse(line))
     .filter((entry) => entry.method === method);
 }
 
-/** The prompts of the generations that write a learned skill. */
 function writers(): string[] {
   return logged("writer").map((entry) => entry.text);
 }
 
-/** The answer of the next skill writer generations. */
 function writer(answer: unknown) {
   writeFileSync(writerPath, JSON.stringify({ answer: typeof answer === "string" ? answer : JSON.stringify(answer) }));
 }
@@ -343,12 +286,13 @@ async function check(name: string, run: () => Promise<unknown>) {
 await writeFile(fakeCodex, FAKE_CODEX, { mode: 0o755 });
 control({ operations: [] });
 writer("Not JSON.");
-/** The app setting, as main reads it at each use. */
 let reviewInterval = 20;
-/** The server setting. "ask" keeps the earlier skill checks as they were. */
 let skillLearningMode: SkillLearningMode = "ask";
 const events: AgentEvent[] = [];
-/** The service on the profile. Check 16 starts it again, as an app restart does. */
+const browsingFile = join(userData, "openbot-browsing-steps-v1.json");
+let browsingNow = Date.now();
+const userBrowsing = new UserBrowsingLog(browsingFile, () => browsingNow);
+
 function open() {
   const database = new OpenBotDatabase(userData);
   const store = new AgentStore(userData, home, database);
@@ -364,13 +308,13 @@ function open() {
     localSkillTools: () => LOCAL_SKILL_TOOLS,
     skillLearning: () => skillLearningMode,
     skillLearner: () => SKILL_LEARNER,
+    userBrowsing,
     offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   });
   service.on("event", (event) => events.push(event));
   return { database, store, mailbox, service };
 }
 let { database, store, mailbox, service } = open();
-/** Stops the service and starts it again on the same profile. */
 async function restart(edit?: () => void) {
   await runCauseEffect(service.stop());
   database.close();
@@ -382,7 +326,6 @@ async function restart(edit?: () => void) {
 const ended = (status: string | undefined) =>
   status === "completed" || status === "failed" || status === "interrupted" || status === "cancelled";
 
-/** Creates an agent; its first message is its first counted turn. */
 async function createAgent(name: string, model?: string) {
   const agent = await runCauseEffect(
     service.createAgent({
@@ -400,7 +343,6 @@ async function createAgent(name: string, model?: string) {
   return agent;
 }
 
-/** Sends a message, to the agent's own chat or to its side thread, and waits for its turn to end. */
 async function send(agentId: string, text: string, taskId?: string) {
   const receipt = await runCauseEffect(
     service.sendMessage({ agentId, text, attachmentDraftIds: [], ...(taskId ? { taskId } : {}) }),
@@ -414,27 +356,28 @@ async function send(agentId: string, text: string, taskId?: string) {
   assert.equal(status, "completed", `"${text}" completes.`);
 }
 
-/** Starts a side thread and waits for its first turn to end. */
 async function startTask(agentId: string, text: string) {
+  const since = events.length;
   const task = await runCauseEffect(service.startTask({ agentId, text }));
   await waitFor(`"${text}" to end`, () =>
+    events.slice(since).some((event) => event.type === "thread-turn-completed" && event.taskId === task.id),
+  );
+  assert.ok(
     service.readTask(agentId, task.id).messages.some((message) => message.text === "Done."),
+    `"${text}" has its answer.`,
   );
   return task;
 }
 
-/** Sends `count` plain messages. */
 async function chat(agentId: string, count: number, prefix: string) {
   for (let index = 1; index <= count; index += 1) await send(agentId, `${prefix} message ${index}.`);
 }
 
-/** Waits for the review count to reach `count`, and for its fiber to end. */
 async function reviewed(count: number) {
   await waitFor(`review ${count}`, () => reviews().length >= count);
   assert.equal(reviews().length, count, "No other review started.");
 }
 
-/** The memory-changes lines of reviews in the agent's chat or side thread, as the database holds them. */
 function memoryLines(agentId: string, sideThreadId?: string) {
   const threadId = sideThreadId ?? store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
   return database
@@ -445,7 +388,6 @@ function memoryLines(agentId: string, sideThreadId?: string) {
     );
 }
 
-/** The skill questions of reviews in the agent's chat, as the database holds them. */
 function suggestionLines(agentId: string) {
   const threadId = store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
   return database
@@ -453,7 +395,6 @@ function suggestionLines(agentId: string) {
     .messages.filter((message) => message.itemType?.startsWith("skill-suggestion:"));
 }
 
-/** The skills that reviews saved, as the chat of the agent shows them. */
 function learnedLines(agentId: string) {
   const threadId = store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
   return database
@@ -463,7 +404,6 @@ function learnedLines(agentId: string) {
     );
 }
 
-/** The prompt of the agent turn that sent `text`. */
 function turnPrompt(text: string) {
   return logged("turn").find((entry) => entry.text.includes(text))?.text ?? "";
 }
@@ -472,9 +412,7 @@ function errorsFor(agentId: string, since: number) {
   return events.slice(since).filter((event) => event.type === "error" && event.agentId === agentId);
 }
 
-/** No review fiber is left; a later turn proves the counts by itself. */
 const settle = () => new Promise((done) => setTimeout(done, 200));
-/** Longer than the pause before an early review. */
 const pause = () => new Promise((done) => setTimeout(done, IDLE_MS + 500));
 
 try {
@@ -789,7 +727,6 @@ try {
     reviewInterval = 3;
     control({ operations: [] });
     const count = reviews().length;
-    // The first message and two more are the three turns of one review.
     const saved = await createAgent("Saved");
     await chat(saved.id, 2, "Saved old");
     await reviewed(count + 1);
@@ -806,7 +743,6 @@ try {
         return null;
       }
     });
-    // The second agent has no saved cursor after the restart, as with the release before this change.
     await restart(() =>
       writeFileSync(
         cursors,
@@ -835,7 +771,7 @@ try {
     const count = reviews().length;
     control({
       operations: [],
-      skill: { action: "create", name: "Cloudflare Worker deploys", message: question },
+      skill: { action: "create", signal: "technique", name: "Cloudflare Worker deploys", message: question },
     });
     await chat(learner.id, 2, "Learner deploy");
     await reviewed(count + 1);
@@ -870,12 +806,19 @@ try {
     const answers = [
       {
         text: "The user deploys on Fridays.",
-        skill: { action: "update", skillId: "docs-style", name: "Docs style", message: "Add it to Docs style?" },
+        skill: {
+          action: "update",
+          signal: "technique",
+          skillId: "docs-style",
+          name: "Docs style",
+          message: "Add it to Docs style?",
+        },
       },
       {
         text: "The user deploys from main.",
         skill: {
           action: "update",
+          signal: "technique",
           skillId: "local-skill-00000000-0000-4000-8000-000000000009",
           name: "Gone",
           message: "Add it to Gone?",
@@ -883,9 +826,28 @@ try {
       },
       {
         text: "The user reads release notes.",
-        skill: { action: "create", name: "release notes", message: "Save it as release notes?" },
+        skill: { action: "create", signal: "technique", name: "release notes", message: "Save it as release notes?" },
       },
       { text: "The user tags releases.", skill: { action: "delete", name: "Bad", message: "Delete it?" } },
+      {
+        text: "The user reads feeds.",
+        skill: {
+          action: "update",
+          skillId: LOCAL_SKILL_ID,
+          name: "Release notes",
+          message: "Not applicable: the skill was not used in this chat. Skip.",
+        },
+      },
+      {
+        text: "The user reads feeds daily.",
+        skill: {
+          action: "update",
+          skillId: LOCAL_SKILL_ID,
+          signal: "none",
+          name: "Release notes",
+          message: "Nothing to add to Release notes. Skip.",
+        },
+      },
     ];
     for (const answer of answers) {
       const count = reviews().length;
@@ -906,7 +868,6 @@ try {
     const before = reviews().length;
     const clearer = await createAgent("Clearer");
     await chat(clearer.id, 2, "Clearer table");
-    /* The interval review must end first: when it starts late, it reads the next turn, and the clear has nothing new. */
     await reviewed(before + 1);
     await send(clearer.id, "Clearer table message 3.");
     const count = reviews().length;
@@ -914,6 +875,7 @@ try {
       operations: [],
       skill: {
         action: "create",
+        signal: "technique",
         name: "CSV tables",
         message: "Should I save the table method as the skill CSV tables?",
       },
@@ -939,6 +901,7 @@ try {
       operations: [],
       skill: {
         action: "update",
+        signal: "technique",
         skillId: LOCAL_SKILL_ID,
         name: "Notes",
         message: "Add the tag rule to Release notes?",
@@ -960,6 +923,7 @@ try {
       operations: [],
       skill: {
         action: "update",
+        signal: "technique",
         skillId: LOCAL_SKILL_ID,
         name: "Release notes",
         message: "Add the tag rule to Release notes?",
@@ -990,7 +954,10 @@ try {
     const asker = await createAgent("Asker");
     let count = reviews().length;
     const lesson = "Should I save the D1 step before a Worker deploy as the skill Worker deploys?";
-    control({ operations: [], skill: { action: "create", name: "Worker deploys", message: lesson } });
+    control({
+      operations: [],
+      skill: { action: "create", signal: "technique", name: "Worker deploys", message: lesson },
+    });
     await send(asker.id, `My deploy token is ${SECRET}.`);
     await chat(asker.id, 1, "Asker deploy");
     await reviewed(count + 1);
@@ -1027,6 +994,7 @@ try {
       operations: [],
       skill: {
         action: "update",
+        signal: "technique",
         skillId: LOCAL_SKILL_ID,
         name: "Notes",
         message: "Tag each release before the notes?",
@@ -1036,7 +1004,10 @@ try {
     await reviewed(count + 1);
     const update = await waitFor("the update question", () => suggestionLines(asker.id)[1]);
     control({ operations: [] });
-    const revised = { description: "How the user wants release notes.", instructions: "Tag each release first." };
+    const revised = {
+      description: "How the user wants release notes.",
+      instructions: "Write release notes as a short list.\nTag each release first.",
+    };
     writer(revised);
     const turnsBeforeUpdate = logged("turn").length;
     assert.deepEqual(await save(update.id), { saved: true });
@@ -1054,7 +1025,7 @@ try {
     count = reviews().length;
     control({
       operations: [],
-      skill: { action: "create", name: "Invoice export", message: "Save the invoice export?" },
+      skill: { action: "create", signal: "technique", name: "Invoice export", message: "Save the invoice export?" },
     });
     await chat(asker.id, 3, "Asker invoice");
     await reviewed(count + 1);
@@ -1075,7 +1046,10 @@ try {
     const writes = writers().length;
     const lesson = "A Worker deploy must wait for the D1 migration.";
     writer(WORKER_SKILL);
-    control({ operations: [], skill: { action: "create", name: "Worker deploys", message: lesson } });
+    control({
+      operations: [],
+      skill: { action: "create", signal: "technique", name: "Worker deploys", message: lesson },
+    });
     await send(auto.id, `My deploy token is ${SECRET}.`);
     await chat(auto.id, 1, "Automatic deploy");
     await reviewed(count + 1);
@@ -1122,6 +1096,7 @@ try {
       operations: [],
       skill: {
         action: "update",
+        signal: "technique",
         skillId: LOCAL_SKILL_ID,
         name: "Notes",
         message: "Tag each release before the notes.",
@@ -1152,7 +1127,13 @@ try {
     writer({ description: "How the user wants release notes.", instructions: "Write release notes as a short list." });
     control({
       operations: [],
-      skill: { action: "update", skillId: LOCAL_SKILL_ID, name: "Notes", message: "Link each issue in the notes." },
+      skill: {
+        action: "update",
+        signal: "technique",
+        skillId: LOCAL_SKILL_ID,
+        name: "Notes",
+        message: "Link each issue in the notes.",
+      },
     });
     await chat(improver.id, 3, "Improver links");
     await reviewed(count + 1);
@@ -1172,7 +1153,12 @@ try {
     writer("Not JSON.");
     control({
       operations: [],
-      skill: { action: "create", name: "Invoice export", message: "Should I save the invoice export as a skill?" },
+      skill: {
+        action: "create",
+        signal: "technique",
+        name: "Invoice export",
+        message: "Should I save the invoice export as a skill?",
+      },
     });
     await chat(fallback.id, 2, "Fallback invoice");
     await reviewed(count + 1);
@@ -1183,7 +1169,12 @@ try {
     saveFails = true;
     control({
       operations: [],
-      skill: { action: "create", name: "Invoice reminders", message: "Should I save the reminders as a skill?" },
+      skill: {
+        action: "create",
+        signal: "technique",
+        name: "Invoice reminders",
+        message: "Should I save the reminders as a skill?",
+      },
     });
     await chat(fallback.id, 3, "Fallback reminder");
     await reviewed(count + 1);
@@ -1196,6 +1187,58 @@ try {
     return { questions: suggestionLines(fallback.id).length };
   });
 
+  await check(
+    "automatic: a revision that drops text or letters, or a skill too long to rewrite, asks the user",
+    async () => {
+      const keeper = await createAgent("Guarded");
+      const saves = learned.length;
+      const turkish =
+        "Kullanıcının düzeltmelerini uygula. Sürüm notlarını kısa bir liste olarak yaz. Önce etiketi oluştur.\n".repeat(
+          10,
+        );
+      localSkillInstructions = turkish;
+      try {
+        const ask = async (index: number, label: string) => {
+          const count = reviews().length;
+          control({
+            operations: [],
+            skill: {
+              action: "update",
+              signal: "technique",
+              skillId: LOCAL_SKILL_ID,
+              name: "Notes",
+              message: `Change the notes (${label})?`,
+            },
+          });
+          await chat(keeper.id, index, `Guarded ${label}`);
+          await reviewed(count + 1);
+          return waitFor(`the question after ${label}`, () => suggestionLines(keeper.id)[index - 2]);
+        };
+        const ascii = turkish
+          .replace(/ı/gu, "i")
+          .replace(/ü/gu, "u")
+          .replace(/ş/gu, "s")
+          .replace(/ğ/gu, "g")
+          .replace(/ö/gu, "o")
+          .replace(/Ö/gu, "O");
+        writer({ description: "How the user wants release notes.", instructions: `${ascii}\nEtiketi kontrol et.` });
+        await ask(2, "ASCII letters");
+        writer({ description: "How the user wants release notes.", instructions: "Kısa liste yaz." });
+        await ask(3, "a summary");
+        localSkillInstructions = "Write release notes as a short list.\n".repeat(400);
+        const writes = writers().length;
+        await ask(4, "a long skill");
+        assert.equal(writers().length, writes, "No writer runs for a skill that is too long to rewrite.");
+        assert.equal(learnedLines(keeper.id).length, 0, "No saved skill shows.");
+        assert.equal(learned.length, saves, "Nothing was saved.");
+        return { questions: suggestionLines(keeper.id).length };
+      } finally {
+        localSkillInstructions = "Write release notes as a short list.";
+        control({ operations: [] });
+      }
+    },
+  );
+
   await check("off: a review does not look for skills", async () => {
     skillLearningMode = "off";
     const quiet = await createAgent("Quiet");
@@ -1203,7 +1246,12 @@ try {
     const writes = writers().length;
     control({
       operations: [{ type: "add", text: "The user exports invoices on Mondays.", inclusion: "searchable" }],
-      skill: { action: "create", name: "Invoice export", message: "Should I save the invoice export as a skill?" },
+      skill: {
+        action: "create",
+        signal: "technique",
+        name: "Invoice export",
+        message: "Should I save the invoice export as a skill?",
+      },
     });
     await chat(quiet.id, 2, "Quiet invoice");
     await reviewed(count + 1);
@@ -1235,6 +1283,94 @@ try {
       "The review reads the turn with the memory save.",
     );
     return { reviews: reviews().length };
+  });
+
+  await check("a review adds a site memory, keeps a fact whose site is bad or null, and shows each site", async () => {
+    const browsing = await createAgent("Browsing");
+    const count = reviews().length;
+    control({
+      operations: [
+        {
+          type: "add",
+          text: "Example login: the Continue button is below the cookie banner.",
+          inclusion: "searchable",
+          site: "https://www.Example.com/login",
+        },
+        { type: "add", text: "The status page lists outages first.", inclusion: "searchable", site: "not a host" },
+        { type: "add", text: "Reports are due on Fridays.", inclusion: "searchable", site: null },
+      ],
+    });
+    await send(
+      browsing.id,
+      `Log in to example.com. ${calls({ tool: "remember", arguments: { text: "Docs search is in the top bar.", site: "docs.example.org" } })}`,
+    );
+    await chat(browsing.id, 3, "Browsing");
+    await reviewed(count + 1);
+    const memories = await waitFor("the memories of the review", () => {
+      const list = service.listMemories(browsing.id);
+      return list.length === 4 ? list : null;
+    });
+    const site = (text: string) => memories.find((memory) => memory.text === text)?.site;
+    assert.equal(site("Example login: the Continue button is below the cookie banner."), "example.com");
+    assert.equal(site("The status page lists outages first."), undefined, "A bad site is dropped, not the fact.");
+    assert.equal(site("Reports are due on Fridays."), undefined, "A null site makes a general memory.");
+    assert.equal(site("Docs search is in the top bar."), "docs.example.org", "The agent's own save keeps its site.");
+    assert.ok((reviews().at(-1) ?? "").includes('"site":"docs.example.org"'), "The review shows the site.");
+    control({ operations: [] });
+    return { memories: memories.length };
+  });
+
+  await check("a review learns from the user's browsing steps, redacted, and deletes them", async () => {
+    const learner = await createAgent("Learner");
+    browsingNow = Date.now() - USER_BROWSING_RETENTION_MS - 24 * 60 * 60 * 1000;
+    await Effect.runPromise(userBrowsing.record(learner.id, { kind: "page", host: "old.example", path: "/gone" }));
+    browsingNow = Date.now();
+    const steps = [
+      { kind: "page", host: "shop.example", path: "/cart", title: "Your cart" },
+      { kind: "click", host: "shop.example", path: "/cart", role: "button", name: "Proceed to checkout" },
+      { kind: "click", host: "shop.example", path: "/checkout", role: "textbox", name: `Code ${SECRET}` },
+    ] as const;
+    for (const step of steps) await Effect.runPromise(userBrowsing.record(learner.id, step));
+    const reloaded = new UserBrowsingLog(browsingFile);
+    const pendingBefore = await Effect.runPromise(reloaded.pending(learner.id));
+    assert.deepEqual(
+      pendingBefore.map((step) => step.host),
+      ["shop.example", "shop.example", "shop.example"],
+      "The step older than 30 days is deleted.",
+    );
+    assert.ok(!readFileSync(browsingFile, "utf8").includes("old.example"), "The file has no old step.");
+    const count = reviews().length;
+    control({
+      operations: [
+        {
+          type: "add",
+          text: "Shop checkout: Proceed to checkout is on the cart page.",
+          inclusion: "searchable",
+          site: "shop.example",
+        },
+      ],
+    });
+    await chat(learner.id, 3, "Learner");
+    await reviewed(count + 1);
+    const prompt = reviews().at(-1) ?? "";
+    assert.ok(prompt.includes("<user_browsing>"), "The review prompt has the browsing steps.");
+    assert.ok(prompt.includes("Proceed to checkout"), "The prompt has the name of the clicked control.");
+    assert.ok(prompt.includes("/cart"), "The prompt has the path.");
+    assert.ok(!prompt.includes(SECRET), "The secret in a step is redacted.");
+    assert.ok(!prompt.includes("old.example"), "The prompt has no old step.");
+    const memory = await waitFor("the site memory from browsing", () =>
+      service.listMemories(learner.id).find((entry) => entry.site === "shop.example"),
+    );
+    assert.equal(memory.text, "Shop checkout: Proceed to checkout is on the cart page.");
+    const pendingAfter = await Effect.runPromise(userBrowsing.pending(learner.id));
+    assert.equal(pendingAfter.length, 0, "The review deletes the steps it read.");
+    assert.ok(!readFileSync(browsingFile, "utf8").includes("shop.example"), "The file has no read step.");
+    await chat(learner.id, 3, "Learner again");
+    await reviewed(count + 2);
+    assert.ok(!(reviews().at(-1) ?? "").includes("<user_browsing>"), "The next review has no browsing steps.");
+    await Effect.runPromise(userBrowsing.clear());
+    control({ operations: [] });
+    return { steps: pendingBefore.length };
   });
 
   report.passed = true;

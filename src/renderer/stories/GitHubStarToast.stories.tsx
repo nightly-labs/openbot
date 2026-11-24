@@ -29,7 +29,6 @@ function raise(): void {
   );
 }
 
-/** The one-time request after the third message to an agent. Star on GitHub changes it to a thank-you. */
 export const AfterThirdMessage: Story = {
   render: () => {
     onCleanup(() => toast.dismiss(TOAST_ID));

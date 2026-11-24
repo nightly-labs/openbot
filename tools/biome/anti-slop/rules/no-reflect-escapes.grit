@@ -2,8 +2,6 @@ language js(typescript)
 
 // scope: global
 
-// One snippet with the method as a metavariable matches the same calls as one snippet per
-// method, and costs about half as much CPU on a full lint.
 `Reflect.$method($args)` as $call where {
   $method <: or { `apply`, `get` },
   register_diagnostic(

@@ -87,6 +87,11 @@ export const messages = {
   "sitePage.pricing.enterprise.body":
     "Większe serwery, ponad {count} członków lub cokolwiek innego, czego potrzebujesz. Ze wsparciem dla firm.",
   "sitePage.pricing.enterprise.contact": "Kontakt ze sprzedażą",
+  "sitePage.pricing.consent.statement": "Oświadczam, że akceptuję {policy}, {terms}.",
+  "sitePage.pricing.consent.policy": "politykę prywatności",
+  "sitePage.pricing.consent.terms": "regulamin i prawo odstąpienia od umowy",
+  "sitePage.pricing.consent.earlyStart":
+    "Żądam rozpoczęcia świadczenia usługi hostingu przed upływem 14-dniowego terminu na odstąpienie od umowy. Przyjmuję do wiadomości, że jeśli odstąpię od umowy przed pełnym wykonaniem usługi, będę musiał(a) zapłacić za usługi świadczone do chwili odstąpienia, a po pełnym wykonaniu usługi utracę prawo odstąpienia od umowy.",
   "sitePage.teams.title": "OpenBot dla zespołów",
   "sitePage.teams.description":
     "Uruchom OpenBot na zarządzanej infrastrukturze albo pozwól nam zaprojektować wdrożenie dopasowane do Twojego zespołu, procesów i istniejących systemów.",
@@ -377,6 +382,31 @@ export const messages = {
   "sitePage.landing.download.appStore": "Pobierz z App Store",
   "sitePage.landing.download.googlePlay": "Pobierz z Google Play",
   "sitePage.landing.download.pages": "Wymagania systemowe i instalacja:",
+  "sitePage.landing.download.apk": "Pobierz APK",
+  "sitePage.referral.invitedBy": "{name} zaprasza cię do OpenBot",
+  "sitePage.referral.invited": "Masz zaproszenie do OpenBot",
+  "sitePage.referral.offer": "{percent} zniżki",
+  "sitePage.referral.offerDetail": "na pierwszą płatność",
+  "sitePage.referral.lead":
+    "Uruchamiaj Codex, Claude, Gemini i Grok jako jeden zespół agentów na swoim komputerze, z planami AI, za które już płacisz.",
+  "sitePage.referral.card.from": "Od: {name}",
+  "sitePage.referral.card.invite": "Zaproszenie",
+  "sitePage.referral.card.offer": "zniżki na pierwszą płatność",
+  "sitePage.referral.card.code": "Kod zaproszenia",
+  "sitePage.referral.keep": {
+    one: "Ta przeglądarka przechowuje kod przez {count} dzień.",
+    few: "Ta przeglądarka przechowuje kod przez {count} dni.",
+    many: "Ta przeglądarka przechowuje kod przez {count} dni.",
+    other: "Ta przeglądarka przechowuje kod przez {count} dnia.",
+  },
+  "sitePage.referral.desktop": "W aplikacji na komputer wklej kod podczas logowania.",
+  "sitePage.referral.prices.title": "Twoja pierwsza płatność ze zniżką {percent}",
+  "sitePage.referral.prices.description":
+    "Płacisz tylko wtedy, gdy potrzebujesz hostowanego serwera lub licencji do pracy.",
+  "sitePage.referral.prices.firstMonth": "pierwszy miesiąc · oszczędzasz {amount}",
+  "sitePage.referral.prices.firstYear": "pierwszy rok · oszczędzasz {amount}",
+  "sitePage.referral.prices.note": "Ceny w {currency}, bez podatku.",
+  "sitePage.referral.prices.all": "Wszystkie plany i funkcje",
   "sitePage.site.download": "Pobierz",
   "sitePage.site.app": "Aplikacja",
   "sitePage.site.primaryNavigation": "Główna nawigacja",

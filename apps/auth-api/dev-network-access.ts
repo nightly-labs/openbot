@@ -7,21 +7,22 @@ const MOBILE_LAN_PATHS = new Set([
   "/v1/me/analytics",
   "/v1/me/chat-color",
   "/v1/me/avatar",
+  "/v1/me/billing/",
+  "/v1/me/credits/",
+  "/v1/me/credits/activity",
+  "/v1/me/credits/transfer",
+  "/v1/me/referrals",
   "/v1/mobile/features",
   "/v1/mobile/changelog",
   "/v2/remote/hosts/",
   "/v2/remote/sessions/",
   "/v2/remote/invites/preview",
   "/v2/remote/invites/accept",
+  "/v2/remote/owner-transfers/",
   "/v2/hosting/plans",
   "/v2/hosting/servers/",
 ]);
 
-/**
- * A public read of the Marketplace catalog: a list, one listing, or its icon or avatar. `mine` and
- * `admin` read the signed-in user's own listings, and `install` counts an install, so they stay on
- * loopback.
- */
 function publicCatalogRead(segments: string[]): boolean {
   const [version, area, ...rest] = segments;
   if (version !== "v1") return false;
@@ -43,11 +44,8 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
   if (MOBILE_LAN_PATHS.has(pathname)) return true;
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 3 && segments[0] === "v1" && segments[1] === "avatars" && segments[2]) return true;
-  // The phone's Marketplace reads the catalog, and the icons of plugin apps from `/plugins/icon/<slug>`.
   if (publicCatalogRead(segments)) return true;
   if (segments.length === 3 && segments[0] === "plugins" && segments[1] === "icon" && segments[2]) return true;
-  // The public preview of one shared agent and its avatar. `mine` lists the user's own templates and
-  // stays on loopback.
   if (
     (segments.length === 3 || (segments.length === 4 && segments[3] === "avatar")) &&
     segments[0] === "v1" &&
@@ -56,7 +54,6 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
     segments[2] !== "mine"
   )
     return true;
-  // The phone buys a hosted server, opens its payment page again, wakes it, and restarts it.
   if (
     segments.length === 5 &&
     segments[0] === "v2" &&
@@ -80,10 +77,21 @@ export function developmentNetworkRequestAllowed(remoteAddress: string | undefin
     segments[1] === "remote" &&
     segments[2] === "hosts" &&
     segments[3] &&
-    segments[4] === "logo"
+    (segments[4] === "logo" ||
+      segments[4] === "appearance" ||
+      segments[4] === "owner-transfer" ||
+      segments[4] === "hidden")
   )
     return true;
-  // The owner removes a host from the account. `register` is for a desktop host only.
+  if (
+    segments.length === 5 &&
+    segments[0] === "v2" &&
+    segments[1] === "remote" &&
+    segments[2] === "owner-transfers" &&
+    segments[3] &&
+    (segments[4] === "accept" || segments[4] === "decline")
+  )
+    return true;
   if (
     segments.length === 4 &&
     segments[0] === "v2" &&

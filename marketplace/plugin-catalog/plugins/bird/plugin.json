@@ -1,0 +1,33 @@
+{
+  "slug": "bird",
+  "name": "Bird",
+  "tagline": "Email, SMS, and WhatsApp APIs",
+  "description": "Bird lets agents send email, SMS, and WhatsApp messages, verify domains, manage numbers, and inspect message delivery in the workspace of the signed-in account. Each user signs in to their own Bird account through the browser.",
+  "category": "automation",
+  "creatorName": "Bird",
+  "iconUrl": "https://bird.com/favicon-light.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-delivery", "text": "Why did the last password reset email to this address fail?" },
+    { "id": "prompt-domain", "text": "Check the DNS records for our sending domain and tell me what is missing." },
+    { "id": "prompt-test-sms", "text": "Send a test SMS to my own number with the new template." }
+  ],
+  "apps": [
+    {
+      "id": "app-bird-mcp",
+      "name": "Bird",
+      "description": "Messaging, domain, number, and delivery tools, over Bird's MCP server with browser sign-in.",
+      "iconUrl": "https://bird.com/favicon-light.png",
+      "server": {
+        "name": "bird",
+        "transport": "http",
+        "url": "https://mcp.bird.com",
+        "auth": [{ "id": "bird-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://bird.com",
+  "privacyPolicyUrl": "https://bird.com/legal/privacy",
+  "termsUrl": "https://bird.com/legal/terms"
+}

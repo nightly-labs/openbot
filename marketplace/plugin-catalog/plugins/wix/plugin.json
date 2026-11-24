@@ -1,0 +1,36 @@
+{
+  "slug": "wix",
+  "name": "Wix",
+  "tagline": "Wix sites and developer docs",
+  "description": "Wix lets agents search the Wix developer documentation, list the sites in the signed-in account, and call Wix APIs on a selected site. Each user signs in to their own Wix account through the browser.",
+  "category": "coding",
+  "creatorName": "Wix",
+  "iconUrl": "https://www.wix.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-list-sites", "text": "List the sites in my Wix account and when each one was last published." },
+    {
+      "id": "prompt-api-docs",
+      "text": "How do I query store products with the Wix REST API? Show an example request."
+    },
+    { "id": "prompt-bookings", "text": "Which Bookings services does my site offer, and what does each one cost?" }
+  ],
+  "apps": [
+    {
+      "id": "app-wix-mcp",
+      "name": "Wix",
+      "description": "Wix documentation search, site lookup, and site API calls, over Wix's MCP server with browser sign-in.",
+      "iconUrl": "https://www.wix.com/favicon.ico",
+      "server": {
+        "name": "wix",
+        "transport": "http",
+        "url": "https://mcp.wix.com/mcp",
+        "auth": [{ "id": "wix-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.wix.com",
+  "privacyPolicyUrl": "https://www.wix.com/about/privacy",
+  "termsUrl": "https://www.wix.com/about/terms-of-use"
+}

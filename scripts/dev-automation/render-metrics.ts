@@ -1,13 +1,5 @@
-// Renderer work and startup marks for `dev:bench`.
-//
-// Layout and style counts come from CDP `Performance.getMetrics`, so they are counts, not times,
-// and repeat from run to run. Long tasks come from a passive `PerformanceObserver`. Two readings
-// change what they measure, so they are opt-in: `--frames` runs a `requestAnimationFrame` loop that
-// keeps the renderer drawing, and `--call-counts` turns on V8 precise coverage, which slows
-// JavaScript down.
-
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import type { Page } from "playwright-core";
+import type { CDPSession, Page } from "playwright-core";
 import type { MetricValues } from "./bench-stats";
 import type { InspectorClient } from "./inspector-client";
 
@@ -23,11 +15,9 @@ export interface FunctionCallCount {
 
 export interface RenderRecording {
   values: MetricValues;
-  /** The functions called most often while the scenario ran, or null without `--call-counts`. */
   topCalls: FunctionCallCount[] | null;
 }
 
-// CDP metric name, the bench metric name, and the factor to its unit (CDP times are seconds).
 const PERFORMANCE_METRICS: readonly [string, string, number][] = [
   ["LayoutCount", "render.layouts", 1],
   ["RecalcStyleCount", "render.styleRecalcs", 1],
@@ -37,7 +27,6 @@ const PERFORMANCE_METRICS: readonly [string, string, number][] = [
 const TOP_CALLS = 25;
 const PAGE_STATE = "__openbotBenchRender";
 
-/** Installs the observers in the app window. A gap over a second is a hidden window, not a slow frame. */
 function installObservers(frames: boolean): string {
   return `(() => {
     const state = { longTasks: 0, longTaskMs: 0, frames: 0, framesOver17ms: 0, framesOver50ms: 0, running: true };
@@ -48,6 +37,17 @@ function installObservers(frames: boolean): string {
       }
     });
     observer.observe({ type: "longtask" });
+    const inputDelays = [];
+    let slowEvents = 0;
+    let slowestEventMs = 0;
+    const events = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.interactionId) inputDelays.push(entry.processingStart - entry.startTime);
+        if (entry.duration > 50) slowEvents += 1;
+        slowestEventMs = Math.max(slowestEventMs, entry.duration);
+      }
+    });
+    events.observe({ type: "event", durationThreshold: 16 });
     let last = 0;
     const frame = (now) => {
       if (!state.running) return;
@@ -65,8 +65,12 @@ function installObservers(frames: boolean): string {
       stop() {
         state.running = false;
         observer.disconnect();
+        events.disconnect();
+        const sorted = inputDelays.sort((left, right) => left - right);
+        const p95 = sorted.length === 0 ? 0 : sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+        const animationsRunning = document.getAnimations().filter((animation) => animation.playState === "running").length;
         const { running, ...values } = state;
-        return values;
+        return { ...values, interactions: sorted.length, inputDelayP95Ms: p95, slowEvents, slowestEventMs, animationsRunning };
       },
     };
   })()`;
@@ -74,11 +78,27 @@ function installObservers(frames: boolean): string {
 
 const STOP_OBSERVERS = `window.${PAGE_STATE}?.stop() ?? null`;
 
+const LAYER_WAIT_MS = 2_000;
+
+async function countLayers(session: CDPSession): Promise<number | null> {
+  const layers = new Promise<number | null>((resolve) => {
+    const timer = setTimeout(() => resolve(null), LAYER_WAIT_MS);
+    session.on("LayerTree.layerTreeDidChange", (event) => {
+      if (!event.layers) return;
+      clearTimeout(timer);
+      resolve(event.layers.length);
+    });
+  });
+  await session.send("LayerTree.enable");
+  const count = await layers;
+  await session.send("LayerTree.disable").catch(() => undefined);
+  return count;
+}
+
 function cdpMetrics(result: { metrics: { name: string; value: number }[] }): Map<string, number> {
   return new Map(result.metrics.map((metric) => [metric.name, metric.value]));
 }
 
-/** Starts recording the app window's work. The returned function stops it and gives the readings. */
 export async function startRenderRecording(
   page: Page,
   options: RenderRecordingOptions,
@@ -100,7 +120,8 @@ export async function startRenderRecording(
         const end = after.get(name);
         if (start !== undefined && end !== undefined) values[metric] = Math.round((end - start) * factor);
       }
-      // The page can reload during a scenario, which removes the observers with it.
+      const layers = await countLayers(session).catch(() => null);
+      if (layers !== null) values["render.layers"] = layers;
       const observed = await page.evaluate(STOP_OBSERVERS).catch(() => null);
       if (isDynamicRecord(observed)) {
         for (const [key, value] of Object.entries(observed)) {
@@ -115,7 +136,6 @@ export async function startRenderRecording(
         const calls = new Map<string, number>();
         let total = 0;
         for (const script of coverage.result) {
-          // Only the app's own bundle: extensions and DevTools scripts are not the app's work.
           if (!script.url.startsWith("openbot-app://")) continue;
           const file = script.url.slice(script.url.lastIndexOf("/") + 1);
           for (const fn of script.functions) {
@@ -149,16 +169,11 @@ function markValues(prefix: string, marks: unknown): MetricValues {
     const [name, startTime]: unknown[] = mark;
     if (!isString(name) || !isNumber(startTime)) continue;
     const key = `${prefix}.${name.slice("openbot:".length)}`;
-    // A mark can repeat, such as when the splash shows again. The first one is the startup.
     values[key] ??= Math.round(startTime);
   }
   return values;
 }
 
-/**
- * Reads the startup marks in milliseconds. Main-process marks count from process start; app
- * window marks count from the start of its navigation.
- */
 export async function readStartupMarks(page: Page, inspector: InspectorClient | null): Promise<MetricValues> {
   const main = inspector ? await inspector.evaluate(READ_MARKS).catch(() => null) : null;
   const renderer = await page.evaluate(READ_MARKS).catch(() => null);

@@ -16,6 +16,10 @@ export const messages = {
   "update.provider.checking": "Updates für {name} werden gesucht",
   "update.provider.available": "Update für {name} verfügbar",
   "update.provider.updating": "{name} wird aktualisiert",
+  "update.provider.downloading": "{name} wird heruntergeladen",
+  "update.provider.downloaded": "{name} ist heruntergeladen",
+  "update.provider.downloadFailed": "Download von {name} fehlgeschlagen",
+  "update.provider.downloadFailedRetry": "Der Download ist fehlgeschlagen. Versuche es erneut.",
   "update.provider.waiting": "Update von {name} wartet",
   "update.provider.failed": "Update für {name} fehlgeschlagen",
   "update.provider.settingUp": "Wird eingerichtet",
@@ -38,6 +42,11 @@ export const messages = {
   "update.idleRestart.description": "Neue Ausführungen von Routinen warten bis zum Neustart.",
   "update.idleRestart.waitingFor": "Warten auf {reasons}.",
   "update.idleRestart.cancel": "Neustart abbrechen",
+  "update.idleRestart.restartNow": "Jetzt neu starten",
+  "update.idleRestart.restartNowTitle": "OpenBot jetzt neu starten?",
+  "update.idleRestart.restartNowDescription":
+    "Nicht beendete Agentendurchläufe und Routinen-Ausführungen werden jetzt gestoppt.",
+  "update.idleRestart.keepWaiting": "Weiter warten",
   "update.idleRestart.cancelFailed": "Der Neustart konnte nicht abgebrochen werden.",
   "update.idleRestart.requestFailed": "Der Neustart konnte nicht geplant werden.",
   "update.idleRestart.failedTitle": "OpenBot wurde nicht neu gestartet",
@@ -64,4 +73,10 @@ export const messages = {
   "update.whatsNew.changelog": "Alle Änderungen",
   "update.whatsNew.changelogFailed": "OpenBot konnte das Änderungsprotokoll nicht öffnen.",
   "update.whatsNew.done": "Verstanden",
+  "update.required.title": "Update erforderlich",
+  "update.required.description":
+    "OpenBot {version} wird nicht mehr unterstützt. Aktualisiere auf {minimum} oder neuer, um fortzufahren.",
+  "update.required.download": "OpenBot herunterladen",
+  "update.required.continue": "Ohne Update fortfahren",
+  "update.required.failed": "Das Update wurde nicht abgeschlossen.",
 } as const satisfies PartialTranslation<typeof source>;

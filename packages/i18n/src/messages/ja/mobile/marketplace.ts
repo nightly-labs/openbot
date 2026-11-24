@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "サインイン",
   "mobile.marketplace.facts.accessLocal": "このコンピューター",
   "mobile.marketplace.facts.accessNone": "サインイン不要",
+  "mobile.marketplace.facts.accessMac": "Mac のみ",
   "mobile.marketplace.permission.admin": "マーケットプレイスからインストールできるのはオーナーと管理者のみです。",
   "mobile.marketplace.permission.unavailable":
     "このサーバーはオフラインか、OpenBot が古すぎます。サーバーを実行しているコンピューターで OpenBot をアップデートしてください。",
@@ -97,6 +98,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "このスキルの使い方を手伝ってください。",
   "mobile.marketplace.app.add": "アプリを追加",
+  "mobile.marketplace.app.addCustom": "カスタムを追加",
   "mobile.marketplace.app.connect": "接続",
   "mobile.marketplace.app.connectTitle": "{name} を接続",
   "mobile.marketplace.app.keyIntro":
@@ -106,6 +108,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "{name} のサインインページを開きます。",
   "mobile.marketplace.app.stepAllow": "サインインしてアクセスを許可します。",
   "mobile.marketplace.app.stepReturn": "ここに戻ります。{name} がサーバーに接続されます。",
+  "mobile.marketplace.app.stepBlank": "最後のページは読み込まれません。これは正常です。",
+  "mobile.marketplace.app.stepCopy": "アドレスバーをタップし、アドレス全体をコピーします。",
+  "mobile.marketplace.app.stepPaste": "OpenBot に戻り、下にアドレスを貼り付けます。",
   "mobile.marketplace.app.openSignIn": "サインインページを開く",
   "mobile.marketplace.app.keySecure": "キーは暗号化された接続で、あなたのサーバーにのみ送られます。",
   "mobile.marketplace.app.connecting": "接続中",
@@ -116,12 +121,12 @@ export const messages = {
   "mobile.marketplace.app.docs": "キーを取得",
   "mobile.marketplace.app.local":
     "このアプリは OpenBot が動作するコンピューターで実行されます。そのコンピューターで設定してください。",
+  "mobile.marketplace.app.needsMac":
+    "このアプリは OpenBot を実行している Mac でのみ動作します。このサーバーは Mac ではありません。",
   "mobile.marketplace.app.relayUnsupported":
     "このアプリにはブラウザーでのサインインが必要です。サーバーの OpenBot をアップデートするか、コンピューターでアプリを接続してください。",
   "mobile.marketplace.app.waiting": "サインインページを待っています…",
   "mobile.marketplace.app.openAgain": "サインインページをもう一度開く",
-  "mobile.marketplace.app.pasteHint":
-    "最後に、ページは読み込まれないアドレスを開きます。そのアドレスをコピーして、下に貼り付けてください。",
   "mobile.marketplace.app.pasteLabel": "サインイン後のアドレス",
   "mobile.marketplace.app.pasteInvalid": "このアドレスはこのサインインの最後のアドレスではありません。",
   "mobile.marketplace.app.finishSignIn": "サインインを完了",

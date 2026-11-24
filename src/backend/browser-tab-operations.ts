@@ -1,7 +1,14 @@
-import type { BrowserDiagnosticEntry, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
-import { Context, Deferred, Effect, Fiber, Result } from "effect";
+import type { BrowserDiagnosticEntry, BrowserSiteMemory, BrowserSnapshot, BrowserTarget } from "@openbot/contracts/ipc";
+import { Context, Deferred, Effect, Fiber, Option, Result } from "effect";
 import type { BrowserDialog, BrowserDialogOwner, BrowserPageStatus, SnapshotReadResult } from "./browser-cdp";
-import { CHALLENGE_POLL_MS, CHALLENGE_WAIT_MS, describeChallenge } from "./browser-challenge";
+import {
+  CHALLENGE_CLICK_WAIT_MS,
+  CHALLENGE_POLL_MS,
+  CHALLENGE_WAIT_MS,
+  type DetectedChallenge,
+  describeChallenge,
+  TURNSTILE_SELF_PASS_MS,
+} from "./browser-challenge";
 import { type BrowserOperationError, browserFailure, browserSync } from "./browser-effects";
 import {
   BrowserFillFieldsFailure,
@@ -15,26 +22,26 @@ import { TimeoutError, withTimeout } from "./with-timeout";
 
 const ACTION_POST_DISPATCH_TIMEOUT_MS = 10_000;
 const OPERATION_UNWIND_GRACE_MS = 1_000;
-// Let an operation report its own deadline before the transport backstop wins.
 const OPERATION_DEADLINE_BACKSTOP_MS = 250;
+const SILENT_PAGE_ADVICE =
+  "The page does not answer because a script on it keeps running. Reload the tab with navigate direction=reload, which ends the stuck page first, or close the tab.";
 
-/**
- * Whether a person controls a tab. Only the agent tool paths provide it, so a person's own actions and
- * the host's internal work still run while the person holds the tab.
- */
 export const BrowserToolHold = Context.Reference<(tabId: string) => boolean>("openbot/BrowserToolHold", {
   defaultValue: () => () => false,
 });
 
-/**
- * The agent turn that runs a tool. Only the agent tool paths provide it: a dialog that opens during the
- * action of a person stays with the person.
- */
+export const BrowserToolQueueWait = Context.Reference<number | undefined>("openbot/BrowserToolQueueWait", {
+  defaultValue: () => undefined,
+});
+
 export const BrowserDialogTurn = Context.Reference<BrowserDialogOwner | undefined>("openbot/BrowserDialogTurn", {
   defaultValue: () => undefined,
 });
 
-/** An action that opened a page dialog returns this in place of its result. */
+export const BrowserSiteMemories = Context.Reference<
+  { turnId: string; recall: (hostname: string) => BrowserSiteMemory[] } | undefined
+>("openbot/BrowserSiteMemories", { defaultValue: () => undefined });
+
 export interface DialogTabResult {
   tabId: string;
   dialog: { id?: string; type: BrowserDialog["type"]; message: string };
@@ -55,7 +62,6 @@ export function dialogTabResult(tabId: string, dialog: BrowserDialog): DialogTab
       };
 }
 
-/** An agent tool operation reached a tab that a person controls. The caller waits for the release. */
 export class BrowserUserControlHeld extends Error {
   readonly tabId: string;
   constructor(tabId: string) {
@@ -65,16 +71,17 @@ export class BrowserUserControlHeld extends Error {
   }
 }
 
-/** Return the response when ready; retain the queue until all owned work drains. */
 export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>(
   tab: BrowserHostTab,
   operation: (tab: BrowserHostTab, keepQueueBlocked: KeepQueueBlocked) => Effect.Effect<A, BrowserOperationError>,
   allowProtected = false,
 ) {
-  // Read in the caller's fiber: the queued work below runs in the tab scope.
   const heldByUser = yield* BrowserToolHold;
+  const queueWaitMs = yield* BrowserToolQueueWait;
+  const dialogTurn = yield* BrowserDialogTurn;
   const previous = tab.queue;
   const drained = Deferred.makeUnsafe<void>();
+  const started = Deferred.makeUnsafe<void>();
   const response = Deferred.makeUnsafe<A, BrowserOperationError>();
   const drains: Effect.Effect<unknown, BrowserOperationError>[] = [];
   let cancelled = false;
@@ -86,8 +93,8 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
       const result = yield* Effect.exit(
         Effect.gen(function* () {
           yield* Deferred.await(previous);
+          yield* Deferred.succeed(started, undefined);
           if (cancelled) return yield* Effect.interrupt;
-          // An operation that was queued before the person took the tab must not act on it.
           if (heldByUser(tab.id)) return yield* browserFailure(new BrowserUserControlHeld(tab.id));
           if (tab.secret?.submitted && !allowProtected) {
             return yield* browserFailure(
@@ -116,27 +123,33 @@ export const enqueueTabOperation = Effect.fn("BrowserTab.enqueue")(function* <A>
     tab.scope,
     { startImmediately: true, uninterruptible: true },
   );
-  return yield* Deferred.await(response).pipe(
-    Effect.onInterrupt(() =>
-      Effect.sync(() => {
-        cancelled = true;
-        if (active) active.interruptUnsafe();
-      }),
-    ),
-  );
+  const cancel = () => {
+    cancelled = true;
+    if (active) active.interruptUnsafe();
+  };
+  return yield* Effect.gen(function* () {
+    if (queueWaitMs !== undefined) {
+      const reached = yield* Deferred.await(started).pipe(Effect.timeoutOption(queueWaitMs));
+      if (Option.isNone(reached)) {
+        cancel();
+        return yield* browserFailure(new Error(queueWaitError(tab, dialogTurn)));
+      }
+    }
+    return yield* Deferred.await(response);
+  }).pipe(Effect.onInterrupt(() => Effect.sync(cancel)));
 });
 
-/**
- * A page also changes with no tool action: live data, timers and late content. An image older than
- * this does not count as current.
- */
+function queueWaitError(tab: BrowserHostTab, turn: BrowserDialogOwner | undefined) {
+  const dialog = tab.engine.dialog;
+  if (dialog && turn && tab.engine.dialogOwnedBy(turn))
+    return `An earlier action on this tab still waits for a page ${dialog.type} dialog. Answer it first with handle_dialog, dialogId ${dialog.id}, then try again.`;
+  if (dialog)
+    return "An earlier action on this tab still waits for a page dialog that only a person can answer. Ask the user to answer it, then read the tab again.";
+  return "An earlier action on this tab did not finish, so this call did not run. Open the page in a new tab, or try again later.";
+}
+
 const CURRENT_IMAGE_MS = 15_000;
 
-/**
- * Call in a queued operation. True when the operation before it gave the agent a full-page image, or
- * passed one on, of the same address, and the page is not loading. No queued operation changed the page
- * since; the page itself can have.
- */
 export function hasCurrentImage(tab: BrowserHostTab): boolean {
   const image = tab.image;
   return (
@@ -148,36 +161,28 @@ export function hasCurrentImage(tab: BrowserHostTab): boolean {
   );
 }
 
-/** Call in a queued operation that gave the agent a full-page image. */
 export function markImageTaken(tab: BrowserHostTab): void {
   tab.image = { operation: tab.operations ?? 0, url: tab.contents.getURL(), taken: Date.now() };
 }
 
-/** Call in a queued operation that sent no image because `hasCurrentImage` was true. */
 export function passImageOn(tab: BrowserHostTab): void {
   if (tab.image) tab.image.operation = tab.operations ?? 0;
 }
 
-/** The time for one snapshot read when the caller gives no timeout. */
 const SNAPSHOT_READ_TIMEOUT_MS = 10_000;
 
-/** The time that a bot check wait leaves for the last read. */
 const SNAPSHOT_READ_RESERVE_MS = 2_000;
 
 export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function* (
   tab: BrowserHostTab,
   revision: number,
   keepQueueBlocked: KeepQueueBlocked,
-  /** The time for the whole read, the bot check wait included. Without it, each read gets 10 s. */
   timeoutMs?: number,
   timeoutMessage = "Browser snapshot timed out.",
-  /**
-   * The last work before the snapshot reaches the agent, such as a policy check or its image. When it
-   * fails, the agent gets no snapshot, so its entries stay undelivered for the next one.
-   */
   release?: (result: SnapshotReadResult) => Effect.Effect<void, BrowserOperationError>,
 ) {
   const heldByUser = yield* BrowserToolHold;
+  const siteMemories = yield* BrowserSiteMemories;
   const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
   const read = (readRevision: number) =>
     Effect.gen(function* () {
@@ -201,34 +206,41 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
       return { result, cursor: history.cursor };
     });
   let current = yield* read(revision);
-  // A check that clears by itself, such as a Cloudflare interstitial, takes a few seconds. Waiting
-  // here saves the agent the turns of a wait, a reload, and a retry. A person who takes the tab, a
-  // secret entry, or a closed tab ends the wait at once.
   const waitStarted = Date.now();
   const waitDocument = tab.documents;
   const priorWaitMs = tab.challengeWait?.document === waitDocument ? tab.challengeWait.waitedMs : 0;
   let waitedVendor: string | null = null;
-  let lastReadFailed = false;
-  while (
-    current.result.challenge?.kind === "non-interactive" &&
-    Date.now() - waitStarted < CHALLENGE_WAIT_MS - priorWaitMs &&
-    // A caller with its own timeout gets the check result, not a timeout.
-    (deadline === undefined || deadline - Date.now() > CHALLENGE_POLL_MS + SNAPSHOT_READ_RESERVE_MS) &&
-    !tab.secret &&
-    !tab.closing &&
-    !tab.contents.isDestroyed() &&
-    !heldByUser(tab.id)
-  ) {
-    waitedVendor = current.result.challenge.vendor;
-    yield* Effect.sleep(CHALLENGE_POLL_MS);
-    if (tab.closing || tab.contents.isDestroyed()) break;
-    // A passed check reloads the page, and a read during that navigation fails. The next poll reads
-    // the new document.
-    const next = yield* Effect.result(read(tab.revision + 1));
-    lastReadFailed = Result.isFailure(next);
-    if (Result.isSuccess(next)) current = next.success;
+  const waitWhile = (waiting: (challenge: DetectedChallenge) => boolean, budgetMs: number) =>
+    Effect.gen(function* () {
+      const started = Date.now();
+      let lastReadFailed = false;
+      while (
+        current.result.challenge !== null &&
+        waiting(current.result.challenge) &&
+        Date.now() - started < budgetMs &&
+        (deadline === undefined || deadline - Date.now() > CHALLENGE_POLL_MS + SNAPSHOT_READ_RESERVE_MS) &&
+        !tab.secret &&
+        !tab.closing &&
+        !tab.contents.isDestroyed() &&
+        !heldByUser(tab.id)
+      ) {
+        waitedVendor = current.result.challenge.vendor;
+        yield* Effect.sleep(CHALLENGE_POLL_MS);
+        if (tab.closing || tab.contents.isDestroyed()) break;
+        const next = yield* Effect.result(read(tab.revision + 1));
+        lastReadFailed = Result.isFailure(next);
+        if (Result.isSuccess(next)) current = next.success;
+      }
+      if (lastReadFailed) current = yield* read(tab.revision + 1);
+    });
+  yield* waitWhile((challenge) => challenge.kind === "non-interactive", CHALLENGE_WAIT_MS - priorWaitMs);
+  const clickOffer = tab.challengeClick?.document === tab.documents ? tab.challengeClick : undefined;
+  if (clickOffer && !clickOffer.waited) {
+    clickOffer.waited = true;
+    yield* waitWhile((challenge) => challenge.kind !== "block" && !challenge.puzzle, CHALLENGE_CLICK_WAIT_MS);
   }
-  if (lastReadFailed) current = yield* read(tab.revision + 1);
+  if (!clickOffer && current.result.challenge?.vendor === "turnstile" && current.result.challenge.checkbox)
+    yield* waitWhile((challenge) => challenge.vendor === "turnstile" && !challenge.puzzle, TURNSTILE_SELF_PASS_MS);
   const { result, cursor } = current;
   if (waitedVendor !== null && result.challenge?.kind === "non-interactive") {
     const waitedMs = Date.now() - waitStarted + (tab.documents === waitDocument ? priorWaitMs : 0);
@@ -241,27 +253,61 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
         : tab.documents === waitDocument
           ? priorWaitMs
           : 0;
+    const checking = CHALLENGE_WAIT_MS - sharedWaitMs > CHALLENGE_POLL_MS;
+    const detected = result.challenge;
+    const origin = URL.canParse(result.snapshot.url) ? new URL(result.snapshot.url).origin : "";
+    if (detected) tab.checkOrigin = origin;
+    else delete tab.checkOrigin;
+    if (!detected || tab.checkAfterTakeover !== origin) delete tab.checkAfterTakeover;
+    const afterTakeover = tab.checkAfterTakeover !== undefined;
+    const clickOnce =
+      detected?.checkbox &&
+      !afterTakeover &&
+      detected.kind !== "block" &&
+      !(detected.kind === "non-interactive" && checking) &&
+      tab.challengeClick?.document !== tab.documents
+        ? detected.checkbox
+        : null;
+    if (clickOnce) tab.challengeClick = { document: tab.documents, waited: false };
     const challenge = describeChallenge(
-      result.challenge,
+      detected,
       waitedVendor,
       waitedVendor === null ? 0 : Date.now() - waitStarted,
-      CHALLENGE_WAIT_MS - sharedWaitMs > CHALLENGE_POLL_MS,
+      checking,
+      clickOnce,
+      afterTakeover,
     );
     if (challenge) result.snapshot.challenge = challenge;
   }
+  const recalled = siteMemories && !tab.secret ? recallSiteMemories(tab, result.snapshot.url, siteMemories) : null;
+  if (recalled?.memories.length) result.snapshot.siteMemories = recalled.memories;
   if (release) yield* release(result);
+  if (recalled) tab.siteRecall = recalled.mark;
   tab.diagnostics.delivered(cursor);
   return result;
 });
 
-/** Reads what an action returns once its input reached the page and the page settled. */
+function recallSiteMemories(
+  tab: BrowserHostTab,
+  url: string,
+  source: { turnId: string; recall: (hostname: string) => BrowserSiteMemory[] },
+): { memories: BrowserSiteMemory[]; mark: { turnId: string; host: string } } | null {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    return null;
+  }
+  if (!host || (tab.siteRecall?.turnId === source.turnId && tab.siteRecall.host === host)) return null;
+  return { memories: source.recall(host), mark: { turnId: source.turnId, host } };
+}
+
 export type ActionResultReader<A> = (
   tab: BrowserHostTab,
   keepQueueBlocked: KeepQueueBlocked,
   timeoutMessage: string,
 ) => Effect.Effect<A, BrowserOperationError>;
 
-/** A `run_script` step reads nothing: the script takes one snapshot at the end. */
 export const skipActionResult: ActionResultReader<null> = () => Effect.succeed(null);
 
 export const readActionSnapshot: ActionResultReader<BrowserSnapshot> = (tab, keepQueueBlocked, timeoutMessage) =>
@@ -269,11 +315,6 @@ export const readActionSnapshot: ActionResultReader<BrowserSnapshot> = (tab, kee
     Effect.map((result) => result.snapshot),
   );
 
-/**
- * What an input action returns unless the model asks for a snapshot. Most actions are not followed by
- * a read of their snapshot, and a full one costs the model thousands of tokens. No snapshot is read,
- * so the revision stays and the refs of the last snapshot still work.
- */
 export interface BrowserActionStatus extends BrowserPageStatus {
   tabId: string;
   revision: number;
@@ -289,7 +330,6 @@ export const readActionStatus: ActionResultReader<BrowserActionStatus> = Effect.
       timeoutMessage,
       keepQueueBlocked,
     );
-    // A page can put a typed card value in an error message, as in a snapshot.
     const errors = tab.diagnostics.takeStatusErrors().map((entry) => ({
       ...entry,
       message: tab.engine.scrubText(entry.message),
@@ -299,7 +339,6 @@ export const readActionStatus: ActionResultReader<BrowserActionStatus> = Effect.
   },
 );
 
-/** A deadline ends the response; the tab queue still owns transport cleanup. */
 export const boundEngineOperation = Effect.fn("BrowserTab.boundOperation")(function* <A>(
   tab: BrowserHostTab,
   operation: Effect.Effect<A, BrowserOperationError>,
@@ -312,16 +351,19 @@ export const boundEngineOperation = Effect.fn("BrowserTab.boundOperation")(funct
     Effect.onInterrupt(() =>
       Effect.sync(() => {
         if (tab.engine.cancelPendingCommands()) completion.interruptUnsafe();
-        // An attached external debugger may still have a command in flight.
         keepQueueBlocked(Fiber.await(completion));
       }),
     ),
-    Effect.catch((error) => {
-      if (isTimeoutError(error instanceof TimeoutError ? error : error.cause)) {
+    Effect.catch((error) =>
+      Effect.gen(function* () {
+        if (!isTimeoutError(error instanceof TimeoutError ? error : error.cause))
+          return yield* Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
         keepQueueBlocked(unwindStalledOperation(tab, completion));
-      }
-      return Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
-    }),
+        const answers = yield* tab.engine.pageAnswers().pipe(Effect.orElseSucceed(() => true));
+        if (!answers) return yield* browserFailure(new Error(`${timeoutMessage} ${SILENT_PAGE_ADVICE}`));
+        return yield* Effect.fail(error instanceof TimeoutError ? browserFailure(error) : error);
+      }),
+    ),
   );
 });
 
@@ -359,13 +401,10 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
               new Error("Browser inspection is protected during authentication. Use takeover."),
             );
           const openDialog = tab.engine.dialog;
-          // The dialog opened after the tool checked the tab. The input would wait for its answer.
           if (dialogTurn && openDialog)
             return dialogTabResult(tab.id, { ...openDialog, agent: tab.engine.dialogOwnedBy(dialogTurn) });
-          // A dialog can open from the input or while the page settles. Drains run after both.
           const watch = dialogTurn ? tab.engine.watchDialogs(dialogTurn) : undefined;
           let watchedInput: Fiber.Fiber<void, BrowserOperationError> | undefined;
-          // Registered before the fork, so an interruption cannot leave the watch on.
           if (watch)
             keepQueueBlocked(
               Effect.suspend(() => (watchedInput ? Fiber.await(watchedInput) : Effect.void)).pipe(
@@ -382,10 +421,8 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           const completion = yield* Effect.forkIn(
             Effect.gen(function* () {
               let highlighted = false;
-              // The input itself reports a failure to attach.
               if (watch) yield* tab.engine.observeDialogs().pipe(Effect.ignore);
               yield* Effect.gen(function* () {
-                // CDP emulates page focus. Native focus would interrupt typing in another chat.
                 if (target && target.kind !== "point")
                   highlighted = yield* tab.engine.highlight(target).pipe(
                     Effect.as(true),
@@ -410,11 +447,9 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
           );
           watchedInput = completion;
           onOperationStarted?.(completion);
-          // Register before waiting, so even an interrupted caller leaves the queue protected.
           keepQueueBlocked(
             Effect.gen(function* () {
               if (!cancellationConfirmed) yield* Fiber.await(completion);
-              // An accepted confirmation often submits a form. Its navigation is the agent's answer.
               if (!dialogReturned && !tab.closing && !tab.contents.isDestroyed() && tab.contents.isLoading())
                 yield* tab.engine.stopLoading().pipe(Effect.ignore);
               if (stalledSettle) yield* unwindStalledOperation(tab, stalledSettle);
@@ -430,7 +465,8 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                 Effect.gen(function* () {
                   if (!(error instanceof TimeoutError)) return yield* error;
                   cancellationConfirmed = tab.engine.cancelPendingCommands();
-                  if (dispatched && !cancellationConfirmed) yield* Fiber.await(completion);
+                  if (cancellationConfirmed) completion.interruptUnsafe();
+                  else if (dispatched) yield* Fiber.await(completion);
                   return yield* browserFailure(error);
                 }),
               ),
@@ -469,7 +505,6 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
             Effect.onInterrupt(() =>
               Effect.sync(() => {
                 cancellationConfirmed = tab.engine.cancelPendingCommands();
-                // Target resolution can issue CDP commands before input dispatch.
                 if (cancellationConfirmed) completion.interruptUnsafe();
                 keepQueueBlocked(Fiber.await(completion));
               }),
@@ -489,8 +524,6 @@ export const runTabAction = Effect.fn("BrowserTab.action")(
                     outcome: "error",
                     detail: String(error.cause),
                   });
-                // The input can have changed the site already. A plain timeout invites a repeat.
-                // Partial typing already says how many characters reached the page.
                 if (dispatched && isTimeoutError(error.cause) && !String(error.cause).includes("reached the page"))
                   return yield* browserFailure(
                     new Error(
@@ -586,7 +619,6 @@ export interface BrowserFillFieldsResult {
   snapshot?: BrowserSnapshot;
 }
 
-/** One queue slot owns all input, one final capture, and any work that survives its deadline. */
 export const runTabFillFields = Effect.fn("BrowserTab.fillFields")(
   (
     tab: BrowserHostTab,
@@ -635,8 +667,6 @@ export const runTabFillFields = Effect.fn("BrowserTab.fillFields")(
             tab.scope,
             { startImmediately: true },
           );
-          // Always await native input cleanup, including an external debugger's unabortable
-          // command. A response deadline must not release this queue slot early.
           keepQueueBlocked(Fiber.await(completion));
           yield* withTimeout(
             Fiber.join(completion),
@@ -675,7 +705,6 @@ export const runTabFillFields = Effect.fn("BrowserTab.fillFields")(
             keepQueueBlocked,
             yield* browserSync(() => remainingTime(deadline, "Browser fill_fields timed out.")),
             "Browser fill_fields timed out.",
-            // A card or takeover that appeared during capture must never release that capture.
             () => browserSync(checkPolicy),
           );
           tab.diagnostics.action({ action: "fill_fields", outcome: "success" });

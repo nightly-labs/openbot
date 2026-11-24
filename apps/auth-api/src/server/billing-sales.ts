@@ -18,7 +18,9 @@ import {
   NO_ACCOUNT_ANALYTICS,
 } from "./account-analytics";
 import { AccountAttribution } from "./account-attribution";
+import { alertAmount, alertCode, alertLine, alertUsers } from "./billing-purchase";
 import { BillingUsd, BillingUsdError } from "./billing-usd";
+import type { HostedPoolAlert } from "./hosted-pool-alert";
 import { SalesAnalyticsDelivery, SalesAnalyticsDeliveryError } from "./sales-analytics-delivery";
 import type { StripeEvent } from "./stripe-client";
 
@@ -41,6 +43,7 @@ export interface BillingSalesOptions {
   clientId: string | undefined;
   clientSecret: string | undefined;
   now?: () => number;
+  saleAlert?: HostedPoolAlert | null;
 }
 
 export interface BillingSalesCheckout {
@@ -52,24 +55,19 @@ export interface BillingSalesCheckout {
   interval: BillingInterval;
   currency: BillingCurrency;
   amount: number;
-  /** The route only. It must be `/app...` or `/billing/return...`. */
   returnUrl: string;
   createdAt: number;
-  /** Where the journey started in the app. A value that is not on the list is left out. */
   entryPoint?: HostedServerEntryPoint;
 }
 
-/** A license Checkout. It has no server and no return token, so only its fact is stored. */
 export interface BillingSalesLicenseCheckout {
   sessionId: string;
   userId: string;
   users: number;
   interval: BillingInterval;
   currency: BillingCurrency;
-  /** The amount of one period of the license. */
   amount: number;
   createdAt: number;
-  /** True for the license of a server order: the page is the server's, and it has its own fact. */
   order?: boolean;
 }
 
@@ -81,7 +79,6 @@ interface BillingSalesSyncedSubscription {
   currency: BillingCurrency;
 }
 
-/** A license that the webhook stored. */
 interface BillingSalesSyncedLicense {
   product: "license";
   userId: string;
@@ -92,28 +89,23 @@ interface BillingSalesSyncedLicense {
 
 export type BillingSalesSynced = BillingSalesSyncedSubscription | BillingSalesSyncedLicense;
 
-/** The invoice and the subscription that a refunded or disputed payment paid. */
 export interface BillingSalesPayment {
   invoiceId: string;
   subscriptionId: string;
+  total?: number | null;
+  totalExcludingTax?: number | null;
 }
 
-/**
- * Money that goes back after a paid invoice. A dispute that is opened moves no money by itself:
- * only a lost dispute does. A refund that fails after it succeeded gives the money back.
- */
 type PaymentReversalType = "payment_refunded" | "refund_failed" | "payment_disputed" | "dispute_lost";
 
 export interface PaymentReversal {
   type: PaymentReversalType;
-  /** The Stripe refund or dispute. */
   objectId: string;
   paymentIntentId: string;
   amount: number;
   currency: BillingCurrency | null;
 }
 
-/** Used by the historical importer when payment action events already exist in OpenPanel. */
 export interface BillingSalesWebhookOptions {
   suppressBillingAction?: boolean;
 }
@@ -140,12 +132,9 @@ interface FactRow {
 }
 
 interface FactAttributes {
-  /** Absent in facts from before generation 11, which are all server plans. */
   product?: BillingProduct;
   plan?: BillingPlanId;
-  /** For a license: the number of users. */
   users?: number;
-  /** On `checkout_started` of a server plan. */
   entryPoint?: HostedServerEntryPoint;
   interval?: BillingInterval;
   currency?: BillingCurrency;
@@ -153,6 +142,40 @@ interface FactAttributes {
   paymentKind?: "first_purchase" | "renewal" | "adjustment";
   failureReason?: string;
   suppressBillingAction?: boolean;
+}
+
+const SALE_EVENT_TEXT: Partial<Record<FactType, string>> = {
+  payment_succeeded: "💵 **Paid**",
+  payment_failed: "⚠️ **Payment failed**",
+  payment_refunded: "↩️ **Refunded**",
+  refund_failed: "❗ **Refund failed**",
+  payment_disputed: "🚨 **Disputed**",
+  dispute_lost: "🚨 **Dispute lost**",
+};
+
+function saleAlertText(type: FactType, event: string, attributes: FactAttributes, email: string | null): string {
+  const license = (attributes.product ?? "server") === "license";
+  const renewal = attributes.paymentKind === "renewal";
+  const paid = type === "payment_succeeded";
+  return alertLine(`${paid && renewal ? "💵 **Renewed**" : event} ${license ? "license" : "server"}`, [
+    email === null ? "unknown account" : alertCode(email),
+    ...(license
+      ? attributes.users === undefined
+        ? []
+        : [alertUsers(attributes.users)]
+      : [attributes.plan ?? "plan not known"]),
+    ...(attributes.currency
+      ? [
+          alertAmount(
+            attributes.amount ?? null,
+            attributes.currency,
+            renewal && (paid || type === "payment_failed") ? attributes.interval : undefined,
+          ),
+        ]
+      : []),
+    ...(paid && (attributes.paymentKind ?? "adjustment") === "adjustment" ? ["adjustment"] : []),
+    ...(type === "payment_failed" && attributes.failureReason ? [attributes.failureReason] : []),
+  ]);
 }
 
 interface CheckoutRow {
@@ -168,19 +191,15 @@ interface CheckoutRow {
   returned_at: number | null;
 }
 
-/**
- * Records checkout and Stripe payment facts before they are sent to OpenPanel.
- *
- * This service does not call OpenPanel while a checkout or webhook is in flight. The immutable
- * facts are written first, and `processPending` later puts them in the durable delivery ledger.
- */
 export class BillingSales {
   readonly #database: D1Database;
   readonly #now: () => number;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
   readonly #delivery: SalesAnalyticsDelivery;
+  readonly #saleAlert: HostedPoolAlert | null;
 
   constructor(options: BillingSalesOptions) {
+    this.#saleAlert = options.saleAlert ?? null;
     this.#database = options.database;
     this.#now = options.now ?? Date.now;
     this.#fetch = options.fetch;
@@ -254,10 +273,6 @@ export class BillingSales {
     );
   }).bind(this);
 
-  /**
-   * Records a started license Checkout. The fact has the same source key as a server Checkout, so a
-   * repeated call for one page records it once.
-   */
   readonly licenseCheckout = Effect.fn("BillingSales.licenseCheckout")(function* (
     this: BillingSales,
     input: BillingSalesLicenseCheckout,
@@ -354,8 +369,6 @@ export class BillingSales {
       currency: row.currency,
       amount: row.amount,
     } satisfies FactAttributes);
-    // Keep the state update and immutable fact in one D1 transaction. A retry after a Worker
-    // crash cannot leave returned_at set while losing the return fact.
     yield* d1(this.#database, () =>
       this.#database.batch([
         this.#database
@@ -400,8 +413,6 @@ export class BillingSales {
     );
     let failed = 0;
     for (const row of rows.results) {
-      // An unknown account cannot receive a profile-scoped event. Tombstone it so one malformed
-      // historical Stripe object cannot block the bounded queue forever.
       if (!validProfileId(row.user_id)) {
         yield* d1(this.#database, () =>
           this.#database
@@ -411,7 +422,6 @@ export class BillingSales {
         );
         continue;
       }
-      // A failed delivery or FX lookup leaves the fact pending for the next bounded cron run.
       const succeeded = yield* this.#emitFact(row).pipe(
         Effect.map(() => true),
         Effect.catch(() => Effect.succeed(false)),
@@ -456,7 +466,6 @@ export class BillingSales {
       );
     }
     const attributes = row ? checkoutAttributes(row) : yield* this.#startedAttributes(sessionId);
-    // A license page that was never reported as started is not reported as ended.
     if (!row && isLicenseSession(metadata) && !attributes) return;
     yield* d1(this.#database, () =>
       this.#database
@@ -514,7 +523,6 @@ export class BillingSales {
       );
     }
     const attributes = row ? checkoutAttributes(row) : yield* this.#startedAttributes(sessionId);
-    // A license page that was never reported as started is not reported as expired.
     if (!row && isLicenseSession(metadata) && !attributes) return;
     yield* d1(this.#database, () =>
       this.#database
@@ -548,8 +556,6 @@ export class BillingSales {
     const object = event.data.object;
     const invoiceId = stringValue(object.id) ?? event.id;
     if (!INVOICE_ID_PATTERN.test(invoiceId)) return yield* new BillingSalesError({ code: "invalid_input" });
-    // The split of a server order makes the license subscription with a first invoice of 0. The order's
-    // invoice already holds that sale.
     if (isOrderSplitInvoice(object)) return;
     const subscriptionId = invoiceSubscriptionId(object);
     const stored = subscriptionId
@@ -585,9 +591,9 @@ export class BillingSales {
     const currency =
       billingCurrency(stringValue(object.currency)) ?? synced?.currency ?? stored?.currency ?? license?.currency;
     const amountValue = event.type === "invoice.paid" ? object.amount_paid : object.amount_due;
-    const amount = isBillingAmount(amountValue) ? amountValue : null;
-    // A server order invoices the server and the license together. Each is its own sale line, with its
-    // share of the amount from the invoice lines.
+    const amount = isBillingAmount(amountValue)
+      ? withoutTax(amountValue, object.total, object.total_excluding_tax)
+      : null;
     const lines = license ? null : orderLicenseLines(object);
     const licenseAmount = lines && amount !== null ? Math.round((amount * lines.amount) / lines.total) : null;
     const paymentKind = yield* this.#paymentKind(object.billing_reason, userId, eventTimestamp, product);
@@ -680,23 +686,23 @@ export class BillingSales {
       : synced?.product === "license"
         ? synced
         : yield* this.#storedLicense(payment.subscriptionId);
-    // A payment of a subscription that is not an OpenBot plan or license is not an OpenBot sale.
     if (!stored && !license) return;
     const syncedPlan = synced?.product === "license" ? null : synced;
+    const amount = withoutTax(reversal.amount, payment.total, payment.totalExcludingTax);
     const attributes: FactAttributes = stored
       ? {
           product: "server",
           plan: syncedPlan?.plan ?? stored.plan,
           interval: syncedPlan?.interval ?? stored.interval,
           ...(reversal.currency ? { currency: reversal.currency } : {}),
-          amount: reversal.amount,
+          amount,
         }
       : {
           product: "license",
           ...(license && isAnalyticsLicenseUsers(license.users) ? { users: license.users } : {}),
           interval: license?.interval ?? "month",
           ...(reversal.currency ? { currency: reversal.currency } : {}),
-          amount: reversal.amount,
+          amount,
         };
     const ownerId = synced?.userId ?? stored?.user_id ?? license?.userId ?? null;
     const prefix = reversal.type === "payment_refunded" || reversal.type === "refund_failed" ? "refund" : "dispute";
@@ -707,8 +713,6 @@ export class BillingSales {
       dispute_lost: "lost",
     }[reversal.type];
     const sourceKey = `${prefix}:${reversal.objectId}:${suffix}`;
-    // Stripe does not keep the event order. A refund that already failed does not count when its
-    // success arrives later; the failed fact is sent only when the success was counted.
     const failed = reversal.type === "payment_refunded" ? `refund:${reversal.objectId}:failed` : null;
     yield* d1(this.#database, () =>
       this.#database
@@ -769,10 +773,6 @@ export class BillingSales {
     if (!attributes) return yield* new BillingSalesError({ code: "invalid_input" });
     const profileId = validProfileId(row.user_id) ? row.user_id : null;
     const eventTimestamp = row.event_timestamp;
-    // Checkout completion only links the Stripe session to its subscription. Stripe can emit it
-    // before payment, and the delivery contract has no checkout_completed action. The durable
-    // fact remains available for conversion queries; paid is emitted from invoice.paid only. A failed
-    // refund that was never counted as succeeded moves no money, so it sends nothing.
     if (
       row.fact_type === "checkout_completed" ||
       (row.fact_type === "refund_failed" && !(yield* this.#refundCounted(row)))
@@ -802,7 +802,6 @@ export class BillingSales {
     };
     if (row.fact_type === "payment_succeeded") {
       const recovery = yield* this.#recovery(row.invoice_id, profileId, eventTimestamp, product);
-      // The source of the account, when it is known at this time. `account_attributed` names it later.
       const firstTouch = profileId
         ? firstTouchProperties(
             yield* new AccountAttribution({ database: this.#database, analytics: NO_ACCOUNT_ANALYTICS })
@@ -842,9 +841,6 @@ export class BillingSales {
         );
       }
     } else if (isReversalFact(row.fact_type)) {
-      // Revenue counts each paid invoice once and is never negative, so money that goes back is a
-      // separate action with its own USD amount. Net revenue subtracts it.
-      // A small partial refund can round to 0 USD. It is sent with no USD amount.
       const converted =
         attributes.amount !== undefined && attributes.amount > 0 && attributes.currency
           ? yield* this.#convert(attributes.amount, attributes.currency, eventTimestamp)
@@ -883,7 +879,7 @@ export class BillingSales {
                 };
       yield* this.#enqueue(`billing:${row.source_key}`, profileId, eventName, eventProperties, eventTimestamp);
     }
-    yield* d1(this.#database, () =>
+    const marked = yield* d1(this.#database, () =>
       this.#database
         .prepare(
           `UPDATE billing_sales_facts SET delivery_enqueued_at = ?
@@ -892,6 +888,20 @@ export class BillingSales {
         .bind(this.#now(), row.source_key)
         .run(),
     );
+    const event = SALE_EVENT_TEXT[row.fact_type];
+    if (!this.#saleAlert || !event || marked.meta.changes !== 1) return;
+    if (attributes.suppressBillingAction) return;
+    if (
+      row.fact_type === "payment_succeeded" &&
+      (attributes.amount === 0 || attributes.paymentKind === "first_purchase")
+    )
+      return;
+    const account = row.user_id
+      ? yield* d1(this.#database, () =>
+          this.#database.prepare("SELECT email FROM users WHERE id = ?").bind(row.user_id).first<{ email: string }>(),
+        ).pipe(Effect.catch(() => Effect.succeed(null)))
+      : null;
+    yield* this.#saleAlert(saleAlertText(row.fact_type, event, attributes, account?.email ?? null));
   }).bind(this);
 
   readonly #usd = Effect.fn("BillingSales.usd")(function* (
@@ -925,7 +935,6 @@ export class BillingSales {
     return converted;
   }).bind(this);
 
-  /** True when the refund of a `refund_failed` fact was counted as succeeded. */
   readonly #refundCounted = Effect.fn("BillingSales.refundCounted")(function* (
     this: BillingSales,
     row: FactRow,
@@ -975,7 +984,6 @@ export class BillingSales {
     return null;
   }).bind(this);
 
-  /** The attributes of the started fact of a Checkout that has no checkout row, or null without one. */
   readonly #startedAttributes = Effect.fn("BillingSales.startedAttributes")(function* (
     this: BillingSales,
     sessionId: string,
@@ -989,7 +997,6 @@ export class BillingSales {
     return started ? parseAttributes(started.attributes_json) : null;
   }).bind(this);
 
-  /** The stored license of a subscription, or null when it is not a license. */
   readonly #storedLicense = Effect.fn("BillingSales.storedLicense")(function* (
     this: BillingSales,
     subscriptionId: string,
@@ -1007,7 +1014,6 @@ export class BillingSales {
     return {
       userId: row.user_id,
       users: row.users,
-      // A license from before the tiers has no interval and is monthly.
       interval: isOneOf(BILLING_INTERVALS, row.billing_interval) ? row.billing_interval : "month",
       currency: billingCurrency(row.currency),
     };
@@ -1033,10 +1039,6 @@ export class BillingSales {
   }).bind(this);
 }
 
-/**
- * The refund or dispute that an event reports, or null for an event that moves no money back. A refund
- * counts when it succeeded; a pending refund counts with the `refund.updated` that ends it.
- */
 export function paymentReversal(event: StripeEvent): PaymentReversal | null {
   const object = event.data.object;
   const status = stringValue(object.status);
@@ -1066,20 +1068,30 @@ export function paymentReversal(event: StripeEvent): PaymentReversal | null {
   };
 }
 
+export function isDisputeInquiry(event: StripeEvent): boolean {
+  return (
+    event.type === "charge.dispute.created" && stringValue(event.data.object.status)?.startsWith("warning_") === true
+  );
+}
+
+export function withoutTax(amount: number, total: unknown, totalExcludingTax: unknown): number {
+  if (!isBillingAmount(total) || total === 0 || !isBillingAmount(totalExcludingTax) || totalExcludingTax >= total)
+    return amount;
+  return Math.round((amount * totalExcludingTax) / total);
+}
+
 function isReversalFact(type: FactType): type is PaymentReversalType {
   return (
     type === "payment_refunded" || type === "refund_failed" || type === "payment_disputed" || type === "dispute_lost"
   );
 }
 
-/** The product of a stored fact. Facts from before generation 11 have none and are all server plans. */
 const PRODUCT_SQL = "COALESCE(json_extract(attributes_json, '$.product'), 'server')";
 
 function checkoutAttributes(row: CheckoutRow): FactAttributes {
   return { product: "server", plan: row.plan, interval: row.interval, currency: row.currency, amount: row.amount };
 }
 
-/** True for the metadata of a license Checkout page. */
 function isLicenseSession(metadata: StripeEvent["data"]["object"] | null): boolean {
   return metadata?.[LICENSE_METADATA.kind] === LICENSE_METADATA_KIND;
 }
@@ -1112,7 +1124,6 @@ function validCheckout(input: BillingSalesCheckout): boolean {
 function validReturnUrl(value: string): boolean {
   if (!value || value.length > 1024 || hasControlCharacter(value)) return false;
   if (!value.startsWith("/")) return false;
-  // `//host/app` and `/\host/app` start with a slash but resolve to another origin.
   const parsed = new URL(value, "https://openbot.invalid");
   return (
     parsed.origin === "https://openbot.invalid" &&
@@ -1168,10 +1179,6 @@ function invoiceSubscriptionId(object: StripeEvent["data"]["object"]): string | 
   return stringValue(details?.subscription);
 }
 
-/**
- * The license lines of a server order's invoice: their amount, the amount of all lines, and the users.
- * Null for an invoice with no license line or with only license lines. The license Product names a line.
- */
 function orderLicenseLines(
   object: StripeEvent["data"]["object"],
 ): { amount: number; total: number; users: number } | null {
@@ -1196,7 +1203,6 @@ function orderLicenseLines(
   return server && amount > 0 && total > 0 ? { amount, total, users } : null;
 }
 
-/** True for the first invoice of a license that the split of a server order made. */
 function isOrderSplitInvoice(object: StripeEvent["data"]["object"]): boolean {
   const details = recordValue(recordValue(object.parent)?.subscription_details);
   return (

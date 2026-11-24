@@ -1,0 +1,13 @@
+diff --git a/build/src/api/updateDevelopmentSession.js b/build/src/api/updateDevelopmentSession.js
+index a85e74fb007651a3df6a5333d877b869cffd0268..e06cdeee753721f9a7b129ad416de3b1b5cbb591 100644
+--- a/build/src/api/updateDevelopmentSession.js
++++ b/build/src/api/updateDevelopmentSession.js
+@@ -48,7 +48,7 @@ function _interop_require_default(obj) {
+ function createSessionInfo({ exp, runtime, url }) {
+     return {
+         session: {
+-            description: `${exp.name} on ${_os().default.hostname()}`,
++            description: process.env.OPENBOT_EXPO_SESSION_NAME || `${exp.name} on ${_os().default.hostname()}`,
+             hostname: _os().default.hostname(),
+             platform: runtime,
+             config: {

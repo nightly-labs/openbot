@@ -1,5 +1,6 @@
 import type {
   AgentEvent,
+  AgentTask,
   AgentTasksSnapshot,
   ConversationMessage,
   ConversationSnapshot,
@@ -10,7 +11,6 @@ import { type QueryScope, queryKeys } from "./query-keys";
 
 type TaskDelta = Extract<AgentEvent, { type: "agent-task-conversation-delta" }>;
 
-/** The conversation with the streamed text of one delta. An older delta changes nothing. */
 function withTaskDelta(conversation: ConversationSnapshot, delta: TaskDelta): ConversationSnapshot {
   if (delta.revision <= conversation.revision) return conversation;
   const index = conversation.messages.findIndex((message) => message.id === delta.messageId);
@@ -33,10 +33,41 @@ function withTaskDelta(conversation: ConversationSnapshot, delta: TaskDelta): Co
   return { ...conversation, revision: delta.revision, messages };
 }
 
-/**
- * The list of an event, with the branch link of each task that the stored list has. The
- * `agent-tasks-v1` events carry no link, and a link does not change.
- */
+interface PendingTaskDeltas {
+  queryClient: QueryClient;
+  queryKey: ReturnType<typeof queryKeys.agentTaskConversation>;
+  deltas: TaskDelta[];
+}
+
+const pendingTaskDeltas = new Map<string, PendingTaskDeltas>();
+let taskDeltaFlushWaits = false;
+
+function flushTaskDeltas(): void {
+  taskDeltaFlushWaits = false;
+  const pending = [...pendingTaskDeltas.values()];
+  pendingTaskDeltas.clear();
+  for (const { queryClient, queryKey, deltas } of pending) {
+    queryClient.setQueryData<ConversationSnapshot>(
+      queryKey,
+      (stored) => stored && deltas.reduce(withTaskDelta, stored),
+    );
+  }
+}
+
+function queueTaskDelta(queryClient: QueryClient, scope: QueryScope, serverId: string, delta: TaskDelta): void {
+  const queryKey = queryKeys.agentTaskConversation(scope, serverId, delta.taskId);
+  const id = JSON.stringify(queryKey);
+  const pending = pendingTaskDeltas.get(id);
+  if (pending && pending.queryClient === queryClient) pending.deltas.push(delta);
+  else {
+    if (pending) flushTaskDeltas();
+    pendingTaskDeltas.set(id, { queryClient, queryKey, deltas: [delta] });
+  }
+  if (taskDeltaFlushWaits) return;
+  taskDeltaFlushWaits = true;
+  requestAnimationFrame(flushTaskDeltas);
+}
+
 function withStoredBranches(snapshot: AgentTasksSnapshot, stored: AgentTasksSnapshot | undefined): AgentTasksSnapshot {
   if (!stored?.tasks.some((task) => task.branch)) return snapshot;
   const links = new Map(stored.tasks.flatMap((task) => (task.branch ? [[task.id, task.branch] as const] : [])));
@@ -49,15 +80,10 @@ function withStoredBranches(snapshot: AgentTasksSnapshot, stored: AgentTasksSnap
   };
 }
 
-/** What a thread's unread count can follow: the threads, their states and their last saved changes. */
 function unreadKey(snapshot: AgentTasksSnapshot): string {
   return snapshot.tasks.map((task) => `${task.id}:${task.state}:${task.outcome}:${task.updatedAt}`).join("|");
 }
 
-/**
- * Writes one task event of `agent-tasks-v1` into the cached reads, as the desktop Tasks page does: the
- * whole task list of one agent, the whole conversation of one task, or streamed text of it.
- */
 export function applyTaskEvent(
   queryClient: QueryClient,
   scope: QueryScope,
@@ -68,34 +94,41 @@ export function applyTaskEvent(
     const key = queryKeys.agentTasks(scope, serverId, event.snapshot.agentId);
     const stored = queryClient.getQueryData<AgentTasksSnapshot>(key);
     queryClient.setQueryData(key, withStoredBranches(event.snapshot, stored));
-    // The event carries no branch link. A task that the list did not have can be a branch from
-    // another device, so the list loads again with the links.
     if (stored && event.snapshot.tasks.some((task) => !stored.tasks.some((entry) => entry.id === task.id)))
       void queryClient.invalidateQueries({ queryKey: key, exact: true });
-    // A new answer in a thread, or a thread that starts or goes, changes what is unread. The host
-    // sends no event when a read mark moves, so the marks load again with the list. Each progress
-    // line sends a list too, and changes no count: as on the desktop, only a change of a thread, its
-    // state, its outcome or its last saved change reads the marks again.
     if (!stored || unreadKey(stored) !== unreadKey(event.snapshot))
       void queryClient.invalidateQueries({
         queryKey: queryKeys.agentThreadReads(scope, serverId, event.snapshot.agentId),
       });
   } else if (event.type === "agent-task-conversation") {
-    // A delta raises the revision, so an older snapshot loses.
+    if (pendingTaskDeltas.size) flushTaskDeltas();
     queryClient.setQueryData<ConversationSnapshot>(
       queryKeys.agentTaskConversation(scope, serverId, event.taskId),
       (stored) => (stored && event.snapshot.revision < stored.revision ? stored : event.snapshot),
     );
   } else if (event.type === "agent-task-conversation-delta") {
-    // A task that did not load its conversation reads it whole when it opens.
-    queryClient.setQueryData<ConversationSnapshot>(
-      queryKeys.agentTaskConversation(scope, serverId, event.taskId),
-      (stored) => stored && withTaskDelta(stored, event),
-    );
+    queueTaskDelta(queryClient, scope, serverId, event);
   }
 }
 
-/** True when `threadId` is the thread of a task of the agent that the phone has read. */
+export async function loadNewestTaskConversation(
+  queryClient: QueryClient,
+  queryKey: ReturnType<typeof queryKeys.agentTaskConversation>,
+  load: () => Promise<ConversationSnapshot>,
+): Promise<ConversationSnapshot> {
+  const fetched = await load();
+  const stored = queryClient.getQueryData<ConversationSnapshot>(queryKey);
+  return stored && stored.revision > fetched.revision ? stored : fetched;
+}
+
+export function addStartedTask(queryClient: QueryClient, scope: QueryScope, serverId: string, task: AgentTask): void {
+  queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(scope, serverId, task.agentId), (stored) =>
+    stored && !stored.tasks.some((entry) => entry.id === task.id)
+      ? { ...stored, tasks: [task, ...stored.tasks] }
+      : stored,
+  );
+}
+
 export function taskThreadCheck(
   queryClient: QueryClient,
   scope: QueryScope,
@@ -107,10 +140,6 @@ export function taskThreadCheck(
       ?.tasks.some((task) => task.threadId === threadId) ?? false;
 }
 
-/**
- * The thread of the side thread of the agent that runs `turnId`, among the tasks that the phone has
- * read, or null when the turn is of the agent's own chat or of a task that the phone does not know.
- */
 export function taskTurnThread(
   queryClient: QueryClient,
   scope: QueryScope,
@@ -125,13 +154,6 @@ export function taskTurnThread(
   );
 }
 
-/**
- * The event as the agent's own chat sees it. A task turn runs on the task's own thread, and the host
- * sends its turn, question, approval and takeover events with that thread, so the chat would show
- * the task's work, or a question it cannot show, as its own. A task that the phone has not read is
- * not known here; its next list event removes its turn from the chat (see `reduceAgentActivity`).
- * `turn-completed` always passes, so an activity that a task turn set before its list arrived ends.
- */
 export function withoutTaskTurns(
   queryClient: QueryClient,
   scope: QueryScope,
@@ -173,10 +195,6 @@ export function withoutTaskTurns(
   }
 }
 
-/**
- * The cached messages of the task that runs on `threadId`, or undefined when the thread is not a
- * task the phone knows. A progress line of a task turn goes after the newest thought of the task.
- */
 export function taskThreadMessages(
   queryClient: QueryClient,
   scope: QueryScope,

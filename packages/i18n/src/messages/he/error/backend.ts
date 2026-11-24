@@ -45,9 +45,14 @@ export const messages = {
   "error.backend.channelDeleteUnsupported": "השרת הזה אינו תומך במחיקת ערוצים.",
   "error.backend.browserNavigateUnsupported": "המארח המרוחק הזה אינו תומך בניווט בשורת הכתובת בלשונית קיימת.",
   "error.backend.browserUserControlBusy": "לשונית הדפדפן הזו ממתינה לסוד. יש לענות קודם על בקשת הסוד.",
+  "error.backend.browserTeachBusy": "אדם אחר שולט בלשונית הדפדפן הזו. נסו שוב כשיסיים.",
+  "error.backend.browserTeachUnavailable": "ללשונית הדפדפן הזו אין סוכן שיכול ללמוד משימה.",
+  "error.backend.browserTeachUnsupported": "המארח המרוחק הזה אינו תומך בהקלטת משימה.",
   "error.backend.browserUserControlUnsupported": "המארח המרוחק הזה אינו תומך בשליטה בלשונית דפדפן.",
   "error.backend.browserSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות מהמחשב הזה.",
   "error.backend.browserSignInOpenFailed": "OpenBot לא הצליח לפתוח את חלון ההתחברות.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot לא הצליח לטעון את הדף בחלון ההתחברות. בדקו את החיבור לאינטרנט, ואז פתחו שוב את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",
@@ -59,6 +64,8 @@ export const messages = {
     "הדחיסה אינה מקטינה את הצ'אט הזה: אחרי שתי דחיסות הוא עדיין תופס {percent}% מחלון ההקשר של המודל, ולכן OpenBot מפסיק לדחוס אותו. כלים והנחיות תופסים את רוב החלון. יש לכבות את שרתי ה-MCP או את השליטה במחשב שהסוכן הזה לא צריך, או לבחור מודל עם חלון גדול יותר. אחר כך יש להתחיל צ'אט חדש.",
   "error.backend.contextCompactionStopped":
     "שתי דחיסות של הצ'אט הזה נכשלו ברצף, ולכן OpenBot מפסיק לדחוס אותו אוטומטית. כל ניסיון שולח את כל הצ'אט למודל וצורך ממגבלת התוכנית שלך. יש לבחור Compact now כדי לנסות שוב, או להתחיל צ'אט חדש.",
+  "error.backend.providerModelAtCapacity":
+    "המודל בעומס מלא. הספק ינסה שוב בעוד כמה דקות. כדי להמשיך עכשיו, עצור את התור ובחר מודל אחר.",
   "error.backend.providerRetrying":
     "הספק נכשל בבקשה הזו {attempts} פעמים ומנסה שוב. אם הסוכן אינו ממשיך, יש לעצור את התור.",
   "error.backend.providerRetryingLargeContext":
@@ -74,7 +81,13 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז מחקו את ההיסטוריה שלו.",
   "error.backend.channelCompactUnavailable":
     "אף חבר בערוץ הזה לא יכול לדחוס את ההקשר שלו כעת. חבר צריך לענות בערוץ קודם, והספק שלו צריך לתמוך בדחיסה.",
+  "error.backend.channelCompactNoSession": "לחברי הערוץ הזה אין עדיין שיחה לדחוס. דחסו אותו אחרי שחבר עונה בערוץ.",
+  "error.backend.channelCompactNotSupported":
+    "אף חבר בערוץ הזה לא יכול לדחוס לפי בקשה. חברים שתומכים בזה דוחסים את ההקשר שלהם אוטומטית כשהוא כמעט מלא.",
+  "error.backend.channelCompactProviderUnavailable":
+    "הספק של חברי הערוץ לא עובד כרגע. יש לרענן את הספקים, ואז לדחוס שוב את הערוץ.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
+  "error.backend.channelArchiveRunning": "יש לעצור את העבודה הפעילה בערוץ הזה ואז למחוק אותו.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",
   "error.backend.channelTaskNotFound": "משימת הערוץ לא נמצאה.",
   "error.backend.channelTaskComplete": "המשימה הזו כבר הושלמה.",
@@ -104,7 +117,13 @@ export const messages = {
   "error.backend.memoryOperationFailed": "פעולת הזיכרון נכשלה. יש לנסות שוב.",
   "error.backend.memoryGone": "הזיכרון הזה כבר אינו קיים.",
   "error.backend.routineGone": "השגרה הזו כבר אינה קיימת.",
+  "error.backend.routineRunGone": "הרצת השגרה הזו כבר אינה קיימת.",
+  "error.backend.routineRunFailedNoReason":
+    "ההרצה נעצרה עם שגיאה, אך לא התקבלה סיבה. פתחו את ההרצה כדי לראות מה הסוכן עשה.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} לא אישר בזמן שהוא התחיל את ההודעה הזו. OpenBot לא שולח אותה שוב, כדי שהעבודה לא תרוץ פעמיים. OpenBot ממתין עד 5 דקות שהסוכן יתחיל.",
+  "error.backend.turnStartAbandoned": "הסוכן לא התחיל את ההודעה הזו תוך 5 דקות. שלחו את ההודעה שוב.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",
   "error.backend.channelMemoryLimit": "בערוץ יכולים להיות עד {limit} זיכרונות.",
@@ -143,12 +162,19 @@ export const messages = {
   "error.backend.mailboxStateCorrupt": "מצב תיבת הדואר פגום או שייך לגרסה חדשה יותר של OpenBot; הוא לא יידרס.",
   "error.backend.recipientDeleting": "הנמען נמחק. יש לנסות שוב אחרי שהמחיקה תסתיים.",
   "error.backend.recipientHidden": "הסוכן הזה מוסתר. יש לשחזר אותו כדי לשלוח הודעות.",
+  "error.backend.agentIdUnknown": "לאף סוכן אין את המזהה {id}. יש לקבל את המזהים מ-openbot.list_agents ולנסות שוב.",
+  "error.backend.agentIdNear":
+    "לאף סוכן אין את המזהה {id}. לסוכן {name} יש את המזהה {nearId}, שהוא כמעט זהה. אם הכוונה לסוכן הזה, יש לנסות שוב עם המזהה שלו.",
   "error.backend.replyReferenceUnknown":
     "replyToMessageId {id} אינו מציין אף הודעה. יש להשתמש ב-Message ID של ההודעה שעונים עליה, או להשמיט את replyToMessageId.",
   "error.backend.replyReferenceRequests": "הודעות מהנמענים האלה בתור הזה: {ids}.",
   "error.backend.attachBetween": "יש לצרף בין קובץ אחד ל-{limit} קבצים.",
   "error.backend.attachmentNotFile": "הקובץ המצורף אינו קובץ: {path}",
   "error.backend.generatedImageTooLarge": "התמונה שנוצרה חורגת ממגבלת 100 MB.",
+  "error.backend.generatedVideoTooLarge": "הסרטון שנוצר חורג ממגבלת 100 MB.",
+  "error.backend.videoGenerationFailed": "יצירת הסרטון נכשלה.",
+  "error.backend.videoGenerationNoVideo": "יצירת הסרטון לא החזירה סרטון.",
+  "error.backend.videoGenerationInterrupted": "יצירת הסרטון הופסקה.",
   "error.backend.attachmentNotRegularFile": "אפשר לצרף רק קבצים רגילים: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot לא הצליח להעתיק את {name}.",
   "error.backend.routineNameRequired": "נדרש שם לשגרה.",
@@ -175,6 +201,8 @@ export const messages = {
   "error.backend.interruptSelf": "סוכן אינו יכול להפסיק את עצמו.",
   "error.backend.interruptOtherWork":
     "הסוכן הזה עובד על משימה שההודעה שלך לא התחילה. רק המשתמש או שולח המשימה יכולים לעצור אותה.",
+  "error.backend.interruptSharedWork":
+    "התור של הסוכן הזה עובד על ההודעה שלך וגם על הודעה מהמשתמש או מסוכן אחר. רק המשתמש יכול לעצור אותו, באמצעות עצירת הסוכן בצ'אט של הסוכן הזה.",
   "error.backend.interruptStarting": "הסוכן הזה עדיין מתחיל תור. יש לנסות שוב אחרי שהתור יתחיל.",
   "error.backend.interruptNoSession": "OpenBot אינו יכול להפסיק את הסוכן הזה כי סשן הספק שלו אינו זמין.",
   "error.backend.memoryTextRequired": "נדרש טקסט לזיכרון.",
@@ -191,28 +219,42 @@ export const messages = {
     "לסוכן הזה כבר יש {count} המתנות פתוחות. יש לסגור המתנה עם openbot.close_wait לפני שפותחים אחרת.",
   "error.backend.agentWaitGone": "ההמתנה הזו אינה פתוחה. הסוכן סגר אותה, או שמישהו ביטל אותה.",
   "error.backend.agentWaitNoRequest": "המתנה צריכה הודעה כדי להמשיך. לתור הזה אין הודעה.",
-  "error.backend.agentWaitOwnChatOnly": "יש לפתוח המתנה רק בצ'אט שלך. משימת ערוץ או הודעות אינה יכולה להמתין.",
+  "error.backend.agentWaitOwnChatOnly":
+    "יש לפתוח המתנה בצ'אט שלך או בשרשור צדדי. שיחת ערוץ או הודעות אינה יכולה להמתין.",
   "error.backend.agentWaitNoteRequired": "יש לכתוב הערה קצרה שאומרת בשביל מה ההמתנה.",
   "error.backend.agentWaitRoutineGone": "לסוכן הזה אין שגרה עם המזהה הזה.",
   "error.backend.agentWaitNoRoutine":
     "רק הרצה של אחת השגרות שלך מעירה המתנה, ואין לך שגרה. יש ליצור אחת עם openbot.create_routine ואז לפתוח את ההמתנה.",
-  "error.backend.agentWaitRemoteUnsupported": "המתנות פתוחות זמינות רק לסוכנים שנמצאים במחשב הזה.",
   "error.backend.markUnreadRemoteUnsupported": "סימון הודעה כלא נקראה זמין רק לסוכנים שנמצאים במחשב הזה.",
   "error.backend.messageDeleteUnsupported": "השרת הזה אינו תומך במחיקת הודעות.",
   "error.backend.messageDeleteNotFound": "ההודעה הזו אינה בצ'אט.",
   "error.backend.messageDeleteBusy": "ההודעה הזו היא חלק מתור שרץ. יש למחוק אותה כשהתור יסתיים.",
   "error.backend.messageDeleteForbidden": "אפשר למחוק רק הודעות ששלחת.",
+  "error.backend.messagePinNotFound": "ההודעה הזו אינה בצ׳אט.",
+  "error.backend.messagePinLimit": "בצ׳אט הזה יש 50 הודעות מוצמדות. בטלו הצמדה של אחת לפני הצמדת הודעה נוספת.",
   "error.backend.routineFlowHandoffFailed": "השגרה לא הצליחה להעביר את העבודה לסוכן הזה.",
   "error.backend.mcpServerLimit": "OpenBot שומר עד {limit} שרתי MCP.",
   "error.backend.mcpServerNameTaken": "כבר קיים שרת MCP בשם {name}.",
   "error.backend.mcpServerInvalid": "OpenBot אינו יכול לשמור את תצורת שרת ה-MCP הזו.",
+  "error.backend.mcpHeaderNameInvalid":
+    "שמות כותרות לא יכולים להכיל רווחים או סמלים כמו : ( ) /. השתמשו בשם כמו Authorization, והזינו את המפתח או האסימון בשדה ערך.",
   "error.backend.mcpServerNoAnswer": "השרת לא ענה תוך {seconds} שניות.",
   "error.backend.mcpSignInNotAccepted": "השרת לא קיבל את ההתחברות הזו.",
+  "error.backend.mcpSignInGrantRefused":
+    "השרת לא קיבל את ההתחברות. התחבר שוב. אם הבעיה נמשכת, ודא שהחשבון שלך נמצא באותו אתר או אזור כמו האפליקציה הזו.",
+  "error.backend.mcpSignInAccountRefused":
+    "השרת דחה את החשבון שאיתו התחברת. יש לוודא שלחשבון הזה יש גישה לשירות. כדי להשתמש בחשבון אחר, יש להתנתק ואז להתחבר שוב.",
   "error.backend.mcpSignInClientRefused":
     "שרת ההתחברות לא קיבל את OpenBot כשהתחברות הושלמה. יש להתחבר שוב: OpenBot ירשום את עצמו שוב בשרת.",
+  "error.backend.mcpSignInAppRefused":
+    "שרת ההתחברות לא קיבל את אפליקציית ההתחברות של השרת הזה. יש לבדוק את ה-Client ID ואת ה-Client secret של אפליקציית ההתחברות, ואז להתחבר שוב.",
   "error.backend.mcpCommandNotFound": "הפקודה לא נמצאה: {command}",
+  "error.backend.mcpProviderLimit":
+    "הסוכן הזה יכול להשתמש רק במספר מוגבל של שרתי MCP. כדי להשתמש בשרת הזה, כבו שרת MCP שהסוכן לא צריך.",
   "error.backend.mcpRegistrationRefused":
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
+  "error.backend.mcpRegistrationUnavailable":
+    "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לשמור את השרת הזה בחנות, אפליקציות, ואחר כך להוסיף לו אפליקציית התחברות.",
   "error.backend.mcpSignInAbandonedGeneric": "ההתחברות ננטשה.",
   "error.backend.mcpSignInForgotten": "התחברות ה-MCP נשכחה בזמן שהיא רצה.",
   "error.backend.mcpSignInAbandoned": "התחברות ה-MCP ננטשה.",
@@ -222,22 +264,44 @@ export const messages = {
   "error.backend.mcpSignInOnHost": "השרת הזה דורש התחברות. יש להתחבר אליו ב-OpenBot במחשב המארח.",
   "error.backend.mcpSignInNeedsHttps":
     "השרת הזה דורש התחברות, ו-OpenBot מתחבר רק דרך https. יש לשנות את הכתובת ל-{url}.",
+  "error.backend.mcpSignInOtherAddress": "השרת הזה מתחבר רק בכתובת {url}. יש לשנות את הכתובת לכתובת הזו ולהתחבר שוב.",
   "error.backend.mcpSignInCancelled": "ההתחברות בוטלה.",
   "error.backend.mcpSignInTimedOut": "ההתחברות לא הושלמה בדפדפן.",
+  "error.backend.mcpSignInRefused": "דף ההתחברות דחה את הגישה. התחבר שוב.",
   "error.backend.mcpSignInResponseTimedOut": "תשובת ההתחברות לא הגיעה בזמן.",
   "error.backend.mcpSignInMetadataUnreadable":
     "OpenBot לא הצליח לקרוא את פרטי ההתחברות של השרת הזה. יש לבדוק את כתובת השרת ולנסות שוב.",
   "error.backend.mcpSignInAnswerUnreadable":
     "שרת ההתחברות שלח תשובה ש-OpenBot לא יכול לקרוא. אם השירות נותן לך מפתח API או טוקן, יש להוסיף אותו להגדרות של השרת הזה ולבדוק שוב את החיבור.",
   "error.backend.mcpServerExited": "השרת נעצר לפני שענה. יש להריץ את הפקודה במסוף כדי לראות את השגיאה שלו.",
+  "error.backend.mcpServerExitedWithOutput": "השרת נעצר לפני שענה. הוא כתב: {detail}",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} הפסיק לחכות לפני שהשרת התחיל, ולכן הסוכנים שלו לא מקבלים את הכלים של השרת הזה.",
+  "error.backend.mcpServerStoppedDuringCall": "שרת ה-MCP נעצר לפני שענה לקריאה הזו.",
+  "error.backend.mcpToolSchemaRefused":
+    "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את הגדרות ה-MCP ולבחור Sign in.",
+    "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Sign in.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש מפתח. יש לפתוח את {name} בחנות, אפליקציות, לבחור עריכה ולהזין את המפתח הנכון בכותרות.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את הגדרות ה-MCP ולבחור Test connection כדי לראות את הסיבה.",
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Test connection כדי לראות את הסיבה.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. הכלים שלו אינם זמינים ל-{provider}. {provider} מפעיל את השרת בעצמו, ולכן בדיקת החיבור ב-OpenBot יכולה לעבור. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא ענה בזמן. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerUnavailableInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא זמין כרגע. יש להמתין כמה דקות ואז להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerUnreachableInProvider":
+    "{provider} לא הצליח להגיע לשרת ה-MCP {name}. יש לפתוח את {name} בחנות, אפליקציות, ולוודא שהכתובת שלו נכונה ושהשרת פועל. לאחר מכן יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.githubToolsNotStarted":
+    "{provider} לא הצליח לקבל את כלי GitHub, כי GitHub לא ענה. יש לפתוח את GitHub בחנות, אפליקציות, ולחבר אותו שוב אם הוא מבקש. לאחר מכן יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot לא הצליח להפעיל את חיבור ההתחברות המקומי שלו עבור השרת הזה. יש להפעיל מחדש את OpenBot ולנסות שוב.",
   "error.backend.mcpOAuthSignInNeeded": "ההתחברות לשרת ה-MCP הזה הסתיימה. המשתמש צריך להתחבר אליו שוב ב-OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot לא הצליח לחדש עכשיו את ההתחברות לשרת ה-MCP הזה. ההתחברות נשמרת, והבקשה הבאה תנסה שוב. אם השגיאה נמשכת, המשתמש יכול להתנתק מהשרת ב-OpenBot ולהתחבר שוב.",
   "error.backend.mcpServerUnreachable": "OpenBot לא הצליח להגיע אל השרת. יש לבדוק את ה-URL ואת הרשת.",
   "error.backend.mcpLocalServerOff":
     "אין שרת שעונה בכתובת {address} במחשב הזה. יש להפעיל את השרת, או להדליק אותו באפליקציה שמריצה אותו, ולנסות שוב.",
@@ -260,6 +324,15 @@ export const messages = {
   "error.backend.sectionNameTooLong": "שם החלק ארוך מדי.",
   "error.backend.sidebarFolderTooDeep": "תיקיות יכולות להיות מקוננות עד שלוש רמות בלבד.",
   "error.backend.sidebarFolderMoveInvalid": "אי אפשר להעביר את התיקייה הזו לשם.",
+  "error.backend.libraryFolderName": "שם תיקייה חייב להכיל בין 1 ל-{limit} תווים.",
+  "error.backend.libraryFolderLimit": "בשרת יכולות להיות לכל היותר {limit} תיקיות בספרייה.",
+  "error.backend.libraryFolderFileLimit": "יש יותר מדי קבצים בתיקיות הספרייה.",
+  "error.backend.libraryFolderTooDeep": "תיקיות הספרייה יכולות להגיע ל-{limit} רמות בלבד.",
+  "error.backend.libraryFolderGone": "התיקייה אינה קיימת או שכבר נמחקה.",
+  "error.backend.libraryFolderOtherAgent": "אפשר להעביר קובץ רק לתיקייה של הסוכן שלו.",
+  "error.backend.libraryFolderMoveInvalid": "אי אפשר להעביר את התיקייה הזו לשם.",
+  "error.backend.workflowFolderLimit": "בשרת יכולות להיות לכל היותר {limit} תיקיות של תהליכי עבודה.",
+  "error.backend.workflowFolderPlacementLimit": "יש יותר מדי תהליכי עבודה בתיקיות.",
   "error.backend.sectionNameDuplicate": "שמות החלקים חייבים להיות ייחודיים.",
   "error.backend.directMessageRequired": "יש לכתוב הודעה קודם.",
   "error.backend.directMessageTooLong": "הודעה ישירה יכולה להכיל עד {limit} תווים.",
@@ -289,12 +362,15 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "רק בעל השרת או מנהל יכולים לבחור בפעולה הזו.",
   "error.backend.approvalInactive": "האישור הזה אינו פעיל עוד.",
   "error.backend.approvalOwnerOnly": "רק בעל השרת יכול לאשר את הפעולה הזו.",
+  "error.backend.feedbackNeedsPhone":
+    "רק אפליקציית OpenBot לטלפון יכולה לשלוח את הדיווח הזה, כי היא מוסיפה את גרסת הטלפון ואת יומן התמיכה. יש לפתוח את הצ'אט הזה בטלפון. אם ההודעה הזו מופיעה שם, יש לעדכן את אפליקציית הטלפון.",
   "error.backend.takeoverInactive": "השתלטות הדפדפן הזו אינה פעילה עוד.",
   "error.backend.authSubmitting": "שליחת האימות כבר מתבצעת.",
+  "error.backend.apiKeyListFailed": "OpenBot לא הצליח לקרוא את מפתחות ה-API השמורים.",
   "error.backend.apiKeySaveFailed": "OpenBot לא הצליח לשמור את מפתח ה-API. יש לנסות שוב.",
-  "error.backend.apiKeyNotAllowed": "רק בעל השרת או מנהל יכולים להזין מפתח API.",
   "error.backend.apiKeySaving": "מפתח ה-API כבר נשמר.",
-  "error.backend.vaultItemNotAllowed": "רק בעל השרת או מנהל יכולים להוסיף פריט לכספת.",
+  "error.backend.apiKeyAnswerUnreadable":
+    "OpenBot לא הצליח לקרוא את מפתח ה-API. יש להזין מפתח של עד 8,000 תווים ולבחור מי יכול להשתמש בו.",
   "error.backend.vaultItemSaving": "פריט הכספת כבר נשמר.",
   "error.backend.authRequestInactive": "בקשת האימות המאובטח הזו אינה פעילה עוד.",
   "error.backend.secureAuthUnavailable": "אימות מאובטח אינו זמין.",
@@ -314,10 +390,16 @@ export const messages = {
   "error.backend.browserProxyChanged": "הפרוקסי הזה השתנה אחרי שפתחת אותו. יש לעיין בו שוב ולנסות שוב.",
   "error.backend.browserProxyUnreachable": "הפרוקסי {name} אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
+  "error.backend.browserSystemProxyFailed":
+    "הפרוקסי בהגדרות של המחשב שמריץ את OpenBot אינו עונה או דחה את החיבור, ולכן הדף לא נפתח. בדקו את הגדרות הפרוקסי של המחשב הזה.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",
   "error.backend.browserCertificateUntrusted": "תעודת האבטחה של האתר הזה אינה מהימנה, ולכן הדף לא נפתח.",
   "error.backend.browserLowMemory":
     "בשרת הזה נותר מעט זיכרון, ולכן הדפדפן אינו יכול לפתוח לשונית נוספת. יש לסגור לשונית או להמתין לסיום העבודה של סוכנים אחרים.",
+  "error.backend.browserNoMemory":
+    "הזיכרון בשרת הזה כמעט נגמר, ולכן הדפדפן אינו יכול לפתוח לשונית כרגע. יש להמתין לסיום העבודה של סוכנים אחרים ולנסות שוב.",
   "error.backend.browserOpenFailed": "לא ניתן לפתוח את {url}: {reason}",
   "error.backend.popupSecureInput":
     "חלונות קופצים חסומים בזמן קלט מאובטח. יש לסיים או לבטל את הקלט המאובטח ולנסות שוב מהדף.",
@@ -328,7 +410,7 @@ export const messages = {
   "error.backend.popupLoadFailed": "החלון הקופץ לא נטען. יש לנסות להתחבר שוב מהדף המקורי.",
   "error.backend.browserTabNotFound": "לשונית הדפדפן לא נמצאה.",
   "error.backend.authActive": "אימות כבר פעיל.",
-  "error.backend.authHttpsRequired": "אימות מאובטח דורש HTTPS.",
+  "error.backend.authWebPageRequired": "אימות מאובטח דורש HTTP/HTTPS.",
   "error.backend.authDigitsRange": "קודי אימות דורשים 4–12 ספרות.",
   "error.backend.authExpired": "תוקף בקשת האימות פג.",
   "error.backend.authDigitsRequired": "יש להזין את מספר הספרות המבוקש.",
@@ -342,6 +424,8 @@ export const messages = {
     "הטקסט נמצא בשדה, אבל הדף העביר את המוקד, ולכן Enter לא נשלח. אין להקליד את הטקסט שוב. יש לצלם snapshot חדש.",
   "error.backend.mcpServerHttpCredentials": "השרת ענה {status}. יש לבדוק את מפתח ה-API או פרטי גישה אחרים.",
   "error.backend.mcpServerHttpUrl": "השרת ענה {status}. יש לבדוק את ה-URL. ייתכן שהקישור שגוי, פג תוקפו או נמחק.",
+  "error.backend.mcpServerBearerKey":
+    "השרת הזה משתמש במפתח API, לא בהתחברות. בכותרות, הגדר את המפתח ל-Authorization ואת הערך ל-Bearer, רווח, ומפתח ה-API שלך.",
   "error.backend.mcpSignInAppUrl": "אפליקציית ההתחברות דורשת כתובת שרת תקינה.",
   "error.backend.mcpSignInAppClientId": "יש להזין את מזהה הלקוח של אפליקציית ההתחברות.",
   "error.backend.mcpSignInAppIssuerChanged":
@@ -362,14 +446,17 @@ export const messages = {
   "error.backend.branchSourceBusy": "יש לעצור את התור הנוכחי לפני שמפצלים את הצ'אט הזה.",
   "error.backend.branchMessageNotFound": "אפשר לפצל רק מתשובה שהסוכן סיים.",
   "error.backend.branchRemoteUnsupported": "פיצולים זמינים רק לסוכנים שנמצאים במחשב הזה.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "כדי להסיר את הדיווח הזה, בקשו מהסוכן להסיר אותו.",
   "error.backend.threadMoveRefused": "רק הודעה ששלחת לסוכן הזה לבדו יכולה לרוץ בשרשור חדש.",
   "error.backend.taskTitleRequired": "יש לתת למשימה כותרת קצרה.",
   "error.backend.taskToolInvalid": "יש לתת למשימה כותרת של עד 120 תווים ותקציר שאומר מה לעשות.",
+  "error.backend.taskControlInvalid": "יש לציין taskId של משימה שהתחלת. הודעה צריכה גם טקסט.",
   "error.backend.taskOwnChatOnly":
     "יש להתחיל משימה רק מהצ'אט שלך. ערוץ, שיחת הודעות או משימה אחרת אינם יכולים להתחיל משימה.",
   "error.backend.taskUnfinishedLimit":
     "לסוכן הזה כבר יש {count} משימות שלא הסתיימו. יש להתחיל משימה נוספת כשאחת מהן תסתיים.",
   "error.backend.taskOpenLimitReached": "לסוכן הזה יש {count} משימות פתוחות. יש לסגור משימה ואז להתחיל או לפתוח אחרת.",
   "error.backend.taskRemoteUnsupported": "משימות זמינות רק לסוכנים שנמצאים במחשב הזה.",
+  "error.backend.taskMessageFailed": "OpenBot לא הצליח לשלוח את ההודעה למשימה. יש לנסות שוב מאוחר יותר.",
   "error.backend.taskStartFailed": "OpenBot לא הצליח להתחיל את המשימה. יש לבצע את העבודה בתור הזה במקום.",
 } as const satisfies PartialTranslation<typeof source>;

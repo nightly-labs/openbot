@@ -9,18 +9,10 @@ import { useOpenAgentTasks } from "../components/use-open-agent-tasks";
 
 const NO_REFERENCES: readonly MentionReference[] = [];
 
-/** The address without the scheme and `www.`, as the desktop picker matches it. */
 function displayUrl(url: string): string {
   return url.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
 }
 
-/**
- * What `@` in one agent's chat can tag beside the agents, as the desktop composer: the agent's own
- * browser tabs, newest first, then its open side threads, newest first. The host shares only a tab
- * that has the agent as its owner, so a tab that only a thread owns is left out. `currentTaskId` is
- * the side thread on the screen, which does not tag itself. Empty on a host that lists no tabs to
- * the member and has no `agent-tasks-v1`.
- */
 export function useAgentMentionReferences(
   serverId: string,
   agentId: string,
@@ -29,7 +21,6 @@ export function useAgentMentionReferences(
   const { t } = useText();
   const untitled = t("mobile.browser.tabs.untitled");
   const liveState = useMobileWorkspaceSelector(selectLiveState);
-  // A text key of this agent's tabs: a change to another agent's tab does not draw the chat again.
   const selectTabs = useCallback(
     () =>
       JSON.stringify(
@@ -50,7 +41,6 @@ export function useAgentMentionReferences(
       ...tabs.reverse().map(([id, name, host, url]) => ({ kind: "tab" as const, id, name, detail: host, search: url })),
       ...tasks
         .filter((task) => task.id !== currentTaskId && referenceName(task.title))
-        // Hermes has no `toSorted`. `filter` already made a new array, so `sort` changes no shared list.
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
         .map((task) => {
           const name = referenceName(task.title);

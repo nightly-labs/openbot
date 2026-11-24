@@ -1,0 +1,33 @@
+{
+  "slug": "northbeam",
+  "name": "Northbeam",
+  "tagline": "Marketing attribution data",
+  "description": "Northbeam lets agents read attributed revenue, spend, and return on ad spend across marketing channels and campaigns. Each user signs in to their own Northbeam account through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Northbeam",
+  "iconUrl": "https://cdn.prod.website-files.com/63ce823acf939e1e64f927c4/63ce8880c8b33a63342faa54_Group%202072747819%20(1).png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-roas", "text": "What was ROAS by channel over the last 30 days?" },
+    { "id": "prompt-campaigns", "text": "Which Meta campaigns drove the most attributed revenue last week?" },
+    { "id": "prompt-spend-trend", "text": "Compare spend and revenue this month with last month." }
+  ],
+  "apps": [
+    {
+      "id": "app-northbeam-mcp",
+      "name": "Northbeam",
+      "description": "Attribution and channel performance reporting, over Northbeam's MCP server with browser sign-in.",
+      "iconUrl": "https://cdn.prod.website-files.com/63ce823acf939e1e64f927c4/63ce8880c8b33a63342faa54_Group%202072747819%20(1).png",
+      "server": {
+        "name": "northbeam",
+        "transport": "http",
+        "url": "https://mcp.northbeam.io",
+        "auth": [{ "id": "northbeam-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.northbeam.io",
+  "privacyPolicyUrl": "https://www.northbeam.io/privacy",
+  "termsUrl": "https://www.northbeam.io/terms-conditions",
+  "skills": []
+}

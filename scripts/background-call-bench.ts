@@ -1,17 +1,3 @@
-// Measures background calls on Claude and on Codex, before and after the background call changes.
-// Runs the real CLIs with the user's own Claude and Codex sign-ins, through the real
-// `generateTextWithoutTools` path, on each provider's default model (the model that
-// `backgroundModel` picks), with two prompts: a channel summary as `channel-history.ts` sends it,
-// and a memory review that asks for a JSON decision.
-//   before: the model's default effort; on Claude, the `claude_code` system prompt preset too.
-//   after:  `withBackgroundEffort`; on Claude, the plain system prompt that `claude-client.ts` now sends.
-// The report holds, for each call: the effort, the system prompt kind, the answer, and the
-// provider's own token counts (the SDK `result` usage on Claude, the last
-// `thread/tokenUsage/updated` total on Codex). On Claude it also holds the `apiKeySource` of the
-// `init` message and the plan limit event, which show the call ran on the Claude subscription.
-// The run fails when a call fails or gives an empty answer.
-// `bun scripts/background-call-bench.ts`; `--provider=claude|codex` runs one provider; `--runs=<n>`
-// repeats each call (default 1, 8 calls). Writes .openbot-build/background-call-bench/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
@@ -54,7 +40,7 @@ const CASES = [
     name: "memory-review",
     prompt: [
       "You keep the long-term memory of the agent. Read the chat below and decide which memories to add, update or forget. You cannot use tools here.",
-      "- Keep only what stays true across chats: preferences, stable facts, standing decisions. Never keep task progress.",
+      "- Keep only what stays true across chats: preferences, stable facts. Never keep lasting rules or task progress.",
       "- Update or merge an existing memory before you add one; forget a memory that the chat shows is wrong.",
       "- Most chats need no change. Then answer an empty list.",
       'Answer only one JSON object: {"operations":[{"type":"add","text":"..."},{"type":"update","memoryId":"...","text":"..."},{"type":"forget","memoryId":"..."}]}.',
@@ -84,12 +70,10 @@ interface Run {
   signIn?: { apiKeySource: string | null; rateLimit: unknown };
   answer: string;
   usage: Usage | null;
-  /** Every input token: new, cache read and cache write. */
   inputTokens: number;
   outputTokens: number;
 }
 
-/** The token counts of one call, in the provider's own names. */
 type Usage = ClaudeUsage | CodexUsage;
 interface ClaudeUsage {
   input_tokens: number;
@@ -108,7 +92,6 @@ const count = (record: unknown, key: string) => {
   return typeof value === "number" ? value : 0;
 };
 
-/** The provider's default model, with the efforts that its `model/list` reports. */
 async function listedModel(client: AgentClient, provider: Provider): Promise<AgentModelOption> {
   const id = agentProviderDescriptor(provider).defaultModel;
   await runCauseEffect(startToolless(client));
@@ -157,7 +140,6 @@ async function claudeRun(
         };
     },
     (options: Options) => {
-      // Before: the system prompt that every Claude query sent until this change.
       const changed: Options =
         variant === "before" && typeof options.systemPrompt === "string"
           ? { ...options, systemPrompt: { type: "preset", preset: "claude_code", append: options.systemPrompt } }

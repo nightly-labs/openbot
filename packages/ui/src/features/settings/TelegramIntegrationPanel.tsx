@@ -4,7 +4,7 @@ import type { AppTextKey } from "@openbot/i18n";
 import { Button, ExternalLink, ItemGroup, SettingsSection } from "@openbot/ui";
 import { createEffect, createSignal, For, Match, Switch } from "solid-js";
 import { useText } from "../../text";
-import { TelegramMark } from "./brand-marks";
+import { TelegramTile } from "./brand-marks";
 import {
   type ChannelAgent,
   ChannelConnectChecklist,
@@ -18,41 +18,29 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import { type IntegrationPageSlots, Stepper, UNKNOWN_STATUS, WizardDialog, type WizardLink } from "./IntegrationLayout";
 import { messagingStateUnknown } from "./SlackIntegrationPanel";
 
 export type TelegramIntegrationAgent = ChannelAgent;
-/** The model of the Telegram Orchestrator that the user picks in the connect dialog. */
 export type TelegramOrchestratorChoice = ChannelOrchestratorChoice;
-/** The catalog behind the model picker. Absent, the orchestrator starts on a new agent's default. */
 export type TelegramOrchestratorModels = ChannelOrchestratorModels;
 export type TelegramChatPlace = ConnectTelegramChatInput["place"];
 
 export interface TelegramIntegrationPanelProps extends IntegrationPageSlots {
-  /** Every agent on this computer. */
   agents: TelegramIntegrationAgent[];
-  /** The linked Telegram chats. */
   connections: MessagingConnection[];
-  /** True while an action runs. Every button waits for it. */
   busy: boolean;
   models?: TelegramOrchestratorModels | undefined;
-  /** Resolves `false` when the link did not open, so nothing waits for Telegram. */
   onConnectChat: (place: TelegramChatPlace) => Promise<boolean>;
   onDisconnectChat: (workspaceId: string) => void;
-  /** Disconnects every chat. */
   onDisconnectAll: () => void;
   onReconnect: (workspaceId: string) => void;
   onSetEnabled: (workspaceId: string, enabled: boolean) => void;
   onAddOrchestrator: (choice: TelegramOrchestratorChoice | null) => void;
-  /** The joined server's name, when the chats are that server's and not this computer's. */
   hostName?: string | undefined;
-  /**
-   * Why the last read of the chats failed. `connections` are from an earlier read; with none, the
-   * state is not known, so the page shows the reason and Retry and offers no connect.
-   */
   loadError?: string | null | undefined;
-  /** Reads the chats again. */
   onRetry?: (() => void) | undefined;
 }
 
@@ -93,17 +81,16 @@ const TELEGRAM_TEXT = {
 const STATE_HELP: Partial<Record<MessagingConnection["state"], AppTextKey>> = {
   removed: "connector.telegram.helpRemoved",
   relay_unavailable: "connector.telegram.helpRelayUnavailable",
+  not_linked: "connector.telegram.helpNotLinked",
   invalid_token: "connector.telegram.helpError",
   secret_storage_unavailable: "connector.telegram.helpError",
   error: "connector.telegram.helpError",
 };
 
-/** Telegram gives a group, a supergroup and a channel a negative ID, and a direct chat a positive one. */
 function isGroupChat(connection: MessagingConnection): boolean {
   return connection.workspaceId.startsWith("-");
 }
 
-/** The one orchestrator agent of all Telegram chats, when it still exists. */
 export function telegramOrchestrator<Agent extends { id: string }>(
   connections: readonly MessagingConnection[],
   agents: readonly Agent[],
@@ -115,7 +102,6 @@ export function telegramOrchestrator<Agent extends { id: string }>(
   return null;
 }
 
-/** The state of the whole Telegram integration, for the page header and the Marketplace. */
 export function telegramIntegrationState(
   connections: readonly MessagingConnection[],
   agents: readonly { id: string }[],
@@ -128,25 +114,19 @@ export function telegramIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: "connector.telegram.statusAttention", attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: "connector.telegram.statusConnected", attention };
+  return (
+    pausedChannelState(connections) ?? { status: "connected", label: "connector.telegram.statusConnected", attention }
+  );
 }
 
-/** Where the connect dialog starts: at the chat link, or at the orchestrator of the linked chats. */
 type DialogStart = "chat" | "agent";
 
-/**
- * Marketplace > Apps > Telegram. Each chat adds the one OpenBot bot, and one Telegram
- * Orchestrator agent receives the messages of all chats, asks the team and answers. A chat links in
- * Telegram, so the chat list follows the connections that the caller reads again.
- */
 export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
   const { t, format } = useText();
   const [dialogOpen, setDialogOpen] = createSignal(false);
-  /** Kept after the dialog closes, so its last step stays while it closes. */
   const [dialogStart, setDialogStart] = createSignal<DialogStart>("chat");
   const [disconnecting, setDisconnecting] = createSignal<MessagingConnection | null>(null);
   const orchestrator = () => telegramOrchestrator(props.connections, props.agents);
-  /** Disconnecting every chat deletes the orchestrator too: no chat uses it after. */
   const disconnectAllSummary = () =>
     t(
       orchestrator() === null
@@ -175,7 +155,7 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
   return (
     <ChannelPage
       text={TELEGRAM_TEXT}
-      logo={<TelegramMark />}
+      logo={<TelegramTile />}
       state={telegramIntegrationState(props.connections, props.agents, props.loadError)}
       connections={props.connections}
       unknown={messagingStateUnknown(props)}
@@ -209,11 +189,10 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
                 {(connection) => (
                   <ChannelConnectionRow
                     text={TELEGRAM_TEXT}
-                    logo={<TelegramMark />}
+                    logo={<TelegramTile />}
                     connection={connection}
                     note={note(connection)}
                     busy={props.busy}
-                    // A removed chat is unlinked from this computer. Only a new link with the bot brings it back.
                     canReconnect={connection.state !== "removed"}
                     onReconnect={() => props.onReconnect(connection.workspaceId)}
                     onSetEnabled={(enabled) => props.onSetEnabled(connection.workspaceId, enabled)}
@@ -247,12 +226,11 @@ export function TelegramIntegrationPanel(props: TelegramIntegrationPanelProps) {
       />
       <ChannelDisconnectDialog
         text={TELEGRAM_TEXT}
-        logo={<TelegramMark />}
+        logo={<TelegramTile />}
         connection={disconnecting()}
         title={t("connector.telegram.disconnectTitle", { chat: disconnectingName() })}
         description={t("connector.telegram.leaveDescription", { chat: disconnectingName() })}
         effect={t("connector.telegram.disconnectEffect", { chat: disconnectingName() })}
-        // The last linked chat: its disconnect deletes the Telegram Orchestrator.
         deletesOrchestrator={props.connections.length === 1 && orchestrator() !== null}
         onConfirm={(workspaceId) => {
           setDisconnecting(null);
@@ -268,15 +246,8 @@ function orchestratorList(agent: TelegramIntegrationAgent | null): TelegramInteg
   return agent ? [agent] : [];
 }
 
-/** 0 links a chat, 1 adds the orchestrator, and 2 is done. */
 type ConnectStep = 0 | 1 | 2;
 
-/**
- * Connects Telegram in two steps. The chat links in Telegram, outside the dialog, so the step follows
- * the connections. From `start` "chat", the dialog waits for a chat that was not there when it opened;
- * from "agent", it adds the orchestrator of the chats that are linked. With a chat and the orchestrator,
- * it is done. The orchestrator shows only on a chat, so the chat comes first.
- */
 export function TelegramConnectDialog(props: {
   open: boolean;
   start: DialogStart;
@@ -291,7 +262,6 @@ export function TelegramConnectDialog(props: {
   const { t } = useText();
   const [waiting, setWaiting] = createSignal(false);
   const [choice, setChoice] = createSignal<TelegramOrchestratorChoice | null>(null);
-  /** The chats when the dialog opened. A chat that is not in it is the one that the user just linked. */
   const [before, setBefore] = createSignal<ReadonlySet<string>>(new Set());
   createEffect(
     () => props.open,
@@ -303,7 +273,6 @@ export function TelegramConnectDialog(props: {
     },
   );
   const linked = () => props.connections.find((connection) => !before().has(connection.workspaceId)) ?? null;
-  /** The chat that the dialog is about: the new one, or the first one for the orchestrator. */
   const current = () => linked() ?? (props.start === "agent" ? (props.connections[0] ?? null) : null);
   const step = (): ConnectStep => {
     if (!current()) return 0;
@@ -339,7 +308,7 @@ export function TelegramConnectDialog(props: {
       open={props.open}
       closeLabel={t("connector.telegram.close")}
       onClose={props.onClose}
-      logo={<TelegramMark />}
+      logo={<TelegramTile />}
       link={dialogLink()}
       title={copy().title}
       description={copy().description}

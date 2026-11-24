@@ -1,7 +1,6 @@
 import { defineMessages } from "../../message";
 
 export const messages = defineMessages("prompt", {
-  "prompt.inputRequired": "Input required",
   "prompt.question.label": "Agent questions",
   "prompt.question.cancelled": "Questions cancelled",
   "prompt.question.expired": "Questions expired",
@@ -11,15 +10,12 @@ export const messages = defineMessages("prompt", {
   "prompt.question.next": "Next",
   "prompt.question.cancel": "Cancel questions",
   "prompt.question.privatePlaceholder": "Enter a private answer",
-  "prompt.customPlaceholder": "Type your own answer",
   "prompt.question.customAnswerFor": "Custom answer for: {question}",
   "prompt.question.skip": "Skip",
   "prompt.question.chooseAll": "Choose all that apply.",
   "prompt.question.somethingElse": "Something else",
   "prompt.question.emptyTitle": "No questions are waiting.",
   "prompt.question.emptyBody": "The agent will continue when it needs another decision.",
-  "prompt.choice.hint": "Pick whatever fits, or type your own.",
-  "prompt.choice.customLabel": "Custom answer",
   "prompt.approval.answerFailed": "Could not answer this approval. Try again.",
   "prompt.approval.grantFailed": "Could not save the standing approval. Try again.",
   "prompt.approval.label": "Agent approval",
@@ -28,10 +24,14 @@ export const messages = defineMessages("prompt", {
   "prompt.approval.allow": "Allow",
   "prompt.approval.alwaysAllow": "Always allow",
   "prompt.approval.deny": "Deny",
+  "prompt.approval.cut":
+    "This card shows only the start of the request, so it offers only Deny. If Allow does not show soon, update OpenBot on the server.",
   "prompt.approval.report.bugHeadline": "Found a bug? Let's get it fixed.",
   "prompt.approval.report.ideaHeadline": "Have an idea? Let's make it real.",
   "prompt.approval.report.dontSend": "Not now",
   "prompt.approval.report.send": "Send to the OpenBot team",
+  "prompt.approval.report.phoneOnly":
+    "Open this chat in the OpenBot phone app and send the report there. The phone adds its version, its system and its support log. If the phone cannot connect, open Settings > Support in the phone app and report the problem on GitHub.",
   "prompt.approval.title.command": "Run a command",
   "prompt.approval.title.fileChange": "Change files",
   "prompt.approval.title.permissions": "Grant permissions",
@@ -44,12 +44,13 @@ export const messages = defineMessages("prompt", {
   "prompt.browser.title.pending": "Complete the step on {host}",
   "prompt.browser.cancelled": "Cancelled",
   "prompt.browser.reload":
-    "Finish sign-in, then reload the browser page before choosing “I’m done”. Page inspection stays blocked until the page reloads.",
+    "OpenBot could not finish entering the password or code. Check the page and enter what is missing. Finish sign-in, then reload the browser page before choosing “I’m done”. Page inspection stays blocked until the page reloads.",
   "prompt.browser.continuing": "{name} is continuing.",
   "prompt.browser.cancelledBody": "The browser step was cancelled.",
   "prompt.browser.pendingBody":
     "Open the page to finish the sign-in, verification, or consent. Then let {name} continue.",
   "prompt.browser.openPage": "Open {title}",
+  "prompt.browser.openFailed": "Could not open the page in the main window. Try again.",
   "prompt.browser.done": "I’m done",
   "prompt.browser.pageFallback": "Browser page",
   "prompt.browser.hostFallback": "the browser",
@@ -57,6 +58,8 @@ export const messages = defineMessages("prompt", {
   "prompt.browser.signInBlocked.cancelledTitle": "Sign-in to {host} cancelled",
   "prompt.browser.signInBlocked.body":
     "Sign in on this computer. OpenBot sends only the {host} sign-in to {server}, and {name} continues.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} does not accept a sign-in from the server. Open this chat in the OpenBot desktop app on your computer, and sign in there. Then {name} continues.",
   "prompt.browser.signInBlocked.cancelledBody": "The sign-in was cancelled.",
   "prompt.browser.signInBlocked.waiting": "Waiting for the sign-in",
   "prompt.browser.signInBlocked.waitingButton": "Waiting for the sign-in…",

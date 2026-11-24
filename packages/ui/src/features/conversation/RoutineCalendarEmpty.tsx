@@ -7,19 +7,15 @@ import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import type { RoutineCalendarAgent } from "./RoutineCalendar";
 
-/** One sample run on the faint month: where it lands, and the note it writes. */
 interface SampleRun {
   name: AppTextKey;
-  /** A wall-clock time, as "17:30". */
   time: string;
-  /** The position of the agent in the agent list, so that each routine keeps one face. */
   agent: number;
   note: AppTextKey;
   row: number;
   column: number;
 }
 
-/** Runs land around the pitch, never behind it, and each one lands far from the last. */
 const SAMPLE_RUNS: SampleRun[] = [
   {
     name: "routine.calendar.sample.pipelineReport",
@@ -79,33 +75,24 @@ const SAMPLE_RUNS: SampleRun[] = [
   },
 ];
 
-/** A new run lands on each step. A run stays for `LIFE` steps, and its CSS animation is as long. */
 const STEP_MS = 2200;
 const LIFE = 3;
-/** The handwriting speed and the pause before it starts, in milliseconds. */
 const WRITE_START_MS = 900;
 const MS_PER_CHAR = 55;
 const LINE_GAP_MS = 160;
 
 export interface RoutineCalendarEmptyProps {
-  /** The whole weeks of the month that the calendar would show. */
   days: CalendarDay[];
   today: CalendarDay;
   agents: RoutineCalendarAgent[];
   onCreateRoutine?: ((agentId: string) => void) | undefined;
 }
 
-/**
- * The calendar before its first routine. A faint month is the backdrop: sample runs land on it one
- * at a time, and each one writes a short note of what it did. Nothing in the backdrop can be opened,
- * and a reader hears only the pitch.
- */
 export function RoutineCalendarEmpty(props: RoutineCalendarEmptyProps) {
   const { t } = useText();
   const [step, setStep] = createSignal(0);
   const [still, setStill] = createSignal(false);
   onSettled(() => {
-    // Less motion keeps one frame with `LIFE` runs and their notes.
     if (prefersReducedMotion()) {
       setStill(true);
       setStep(LIFE - 1);
@@ -177,7 +164,6 @@ export function RoutineCalendarEmpty(props: RoutineCalendarEmptyProps) {
   );
 }
 
-/** The runs on screen at `step`: the newest one and the ones that still fade. */
 function shownRuns(step: number): { key: number; run: SampleRun; slot: number }[] {
   const shown = [];
   for (let index = Math.max(0, step - LIFE + 1); index <= step; index += 1) {
@@ -187,7 +173,6 @@ function shownRuns(step: number): { key: number; run: SampleRun; slot: number }[
   return shown;
 }
 
-/** The faint month and the runs that land on it. It is decoration: no focus, and hidden from a reader. */
 function RoutineCalendarEmptyBoard(props: {
   days: CalendarDay[];
   today: CalendarDay;
@@ -197,7 +182,6 @@ function RoutineCalendarEmptyBoard(props: {
   const { format } = useText();
   const month = () => calendarMonthStart(props.today);
   const rows = () => Math.max(1, Math.ceil(props.days.length / 7));
-  // A short month wraps a low run to the top row, which no run near it in time uses.
   const row = (run: SampleRun) => run.row % rows();
   const shown = createMemo(() => shownRuns(props.step));
   return (
@@ -232,10 +216,8 @@ function RoutineCalendarEmptyBoard(props: {
   );
 }
 
-/** One run card, with the real run styles, and the note it writes below itself. */
 function RoutineCalendarEmptyRun(props: {
   run: SampleRun;
-  /** A narrow pane has one row for each run on screen. A new run takes the row of the run that just left. */
   slot: number;
   row: number;
   day: CalendarDay | undefined;

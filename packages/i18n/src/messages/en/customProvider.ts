@@ -16,7 +16,6 @@ export const messages = defineMessages("customProvider", {
   "customProvider.registry.updateFailed": "Could not update the agent. Try again.",
   "customProvider.registry.removeFailed": "Could not remove the runtime. Try again.",
   "customProvider.registry.cancelFailed": "Could not cancel the install. Try again.",
-  // Form validation. Each message names one field of the custom provider form.
   "customProvider.error.providerIdRequired": "Enter a provider ID.",
   "customProvider.error.providerIdPattern":
     "Use lowercase letters, numbers, hyphens or underscores, starting with a letter or number.",
@@ -46,7 +45,6 @@ export const messages = defineMessages("customProvider", {
   "customProvider.error.baseUrlProtocol": "Use an http:// or https:// URL.",
   "customProvider.error.baseUrlCredential": "Put the credential in a header, not in the URL.",
 
-  // The note after a save or a removal. It tells the user when the provider reads the new list.
   "customProvider.saved.restarted": "Saved. OpenBot is loading the models.",
   "customProvider.saved.skippedBusy": "Saved. The provider reads the list after the current task stops.",
   "customProvider.saved.notRunning": "Saved. The provider reads the list when it next starts.",
@@ -58,7 +56,6 @@ export const messages = defineMessages("customProvider", {
   "customProvider.saveUnavailable": "This build cannot save an endpoint.",
   "customProvider.removeUnavailable": "This build cannot remove an endpoint.",
 
-  // The add dialog.
   "customProvider.form.title": "Add a custom provider",
   "customProvider.form.editTitle": "Edit a custom provider",
   "customProvider.form.description": "Describe an OpenAI-compatible endpoint and the models it serves.",
@@ -76,23 +73,24 @@ export const messages = defineMessages("customProvider", {
   "customProvider.field.apiKeyKeptHint": "A key is saved. Leave this empty to keep it.",
   "customProvider.models": "Models",
   "customProvider.model.id": "Model {number} ID",
+  "customProvider.model.idColumn": "Model ID",
   "customProvider.model.name": "Model {number} display name",
   "customProvider.model.namePlaceholder": "Display Name",
   "customProvider.model.contextWindow": "Model {number} context window",
   "customProvider.model.contextWindowPlaceholder": "Tokens",
+  "customProvider.model.contextWindowColumn": "Context window",
   "customProvider.model.maxOutput": "Model {number} max output",
   "customProvider.model.maxOutputPlaceholder": "Tokens",
+  "customProvider.model.maxOutputColumn": "Max output",
   "customProvider.model.efforts": "Model {number} efforts",
   "customProvider.model.effortsLabel": "Efforts",
-  "customProvider.model.effortsHintOpenCode":
-    "Select the efforts that each model accepts. With none selected, OpenCode offers Low, Medium and High.",
-  "customProvider.model.effortsHintPi":
-    "Select the efforts that each model accepts. With none selected, the model does not reason.",
+  "customProvider.model.effortsDefault": "Default",
+  "customProvider.model.effortsNone": "No reasoning",
   "customProvider.model.inputs": "Model {number} accepts",
   "customProvider.model.inputsLabel": "Accepts",
   "customProvider.model.inputImage": "Images",
   "customProvider.model.inputPdf": "PDF",
-  "customProvider.model.inputsHint": "Select what each model can read beside text.",
+  "customProvider.model.inputsNone": "Text only",
   "customProvider.model.foundValuesHint": "Some values come from the endpoint. You can change them.",
   "customProvider.model.remove": "Remove model {number}",
   "customProvider.model.add": "Add model",
@@ -105,7 +103,6 @@ export const messages = defineMessages("customProvider", {
   "customProvider.header.add": "Add header",
   "customProvider.submit": "Submit",
 
-  // Model discovery. OpenBot asks the endpoint for its model list, and the user picks from it.
   "customProvider.discovery.find": "Find models",
   "customProvider.discovery.refresh": "Find again",
   "customProvider.discovery.loading": "Asking {url} for its models.",
@@ -114,9 +111,12 @@ export const messages = defineMessages("customProvider", {
     other: "The endpoint lists {count} models. Select the models to add.",
   },
   "customProvider.discovery.empty": "The endpoint lists no models. Add the model IDs yourself.",
-  "customProvider.discovery.label": "Models that the endpoint lists",
+  "customProvider.discovery.choose": "Choose models",
+  "customProvider.discovery.search": "Search models",
+  "customProvider.discovery.selectAll": "Select all",
+  "customProvider.discovery.deselectAll": "Deselect all",
+  "customProvider.discovery.noMatch": "No models match your search.",
 
-  // The first step of the add flow: a preset fills the form that comes next.
   "customProvider.preset.title": "Add a provider or an agent",
   "customProvider.preset.description": "Choose a local model server, an endpoint, or an ACP agent.",
   "customProvider.preset.heading": "Add custom",
@@ -134,9 +134,8 @@ export const messages = defineMessages("customProvider", {
   "customProvider.probe.checking": "Checking",
   "customProvider.probe.running": { one: "Running · {count} model", other: "Running · {count} models" },
 
-  // Automatic detection on the provider step and in Settings. OpenBot looks for local model servers
-  // at their default addresses and for known ACP agent commands on the PATH.
   "customProvider.detected.title": "Found on this computer",
+  "customProvider.detected.titleServer": "Found on the server",
   "customProvider.detected.scanning": "Looking for local models and agents.",
   "customProvider.detected.scanAgain": "Scan again",
   "customProvider.detected.empty": "OpenBot found no local model server or ACP agent.",
@@ -154,13 +153,14 @@ export const messages = defineMessages("customProvider", {
   "customProvider.detected.hide": "Hide {name}",
   "customProvider.detected.showHidden": "Show hidden ({count})",
 
-  // Where the scan looks. The default addresses and PATH are always part of it.
   "customProvider.detection.title": "Local detection",
   "customProvider.detection.saveFailed": "Could not save the detection settings.",
   "customProvider.detection.description": "Where OpenBot looks for local model servers and ACP agents.",
   "customProvider.detection.enabled": "Look for local models and agents",
   "customProvider.detection.enabledDescription":
     "OpenBot checks the default addresses of Ollama and LM Studio, and looks for known ACP agents on your PATH.",
+  "customProvider.detection.enabledDescriptionServer":
+    "The server checks the default addresses of Ollama and LM Studio, and looks for known ACP agents on its PATH.",
   "customProvider.detection.addresses": "Other model server addresses",
   "customProvider.detection.address.label": "Address {number}",
   "customProvider.detection.address.remove": "Remove address {number}",
@@ -171,7 +171,6 @@ export const messages = defineMessages("customProvider", {
   "customProvider.detection.folder.add": "Add folder",
   "customProvider.detection.error.folderInvalid": "Enter a full path, such as {example}.",
 
-  // The custom ACP agent form.
   "customProvider.acp.title": "Add a custom ACP agent",
   "customProvider.acp.description": "Describe a command that speaks the Agent Client Protocol.",
   "customProvider.acp.heading": "Custom ACP agent",
@@ -182,6 +181,7 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.agentIdHint": "Lowercase letters, numbers, or hyphens. You cannot change it later.",
   "customProvider.acp.command": "Command",
   "customProvider.acp.commandHint": "The program to start. OpenBot looks for it on your PATH.",
+  "customProvider.acp.commandHintServer": "The program to start. The server looks for it on its PATH.",
   "customProvider.acp.args": "Arguments",
   "customProvider.acp.argsHint": "Separate arguments with spaces. Put quotes around an argument that has spaces.",
   "customProvider.acp.usagePrompt": "Usage command",
@@ -207,6 +207,9 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.trustTitle": "This command runs on your computer",
   "customProvider.acp.trustDescription":
     "OpenBot starts it with your user account. The agent can read and change files and run commands. Add only an agent that you trust.",
+  "customProvider.acp.hostTrustTitle": "This command runs on the server",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot starts it with the server's user account. The agent can read and change files on the server and run commands there. Add only an agent that you trust.",
   "customProvider.acp.submit": "Add agent",
   "customProvider.acp.editTitle": "Edit a custom ACP agent",
   "customProvider.acp.submitEdit": "Save agent",
@@ -222,9 +225,9 @@ export const messages = defineMessages("customProvider", {
   "customProvider.acp.error.agentIdPattern":
     "Use lowercase letters, numbers or hyphens, starting with a letter or number. Use at most 40 characters.",
 
-  // The user's own ACP agents in Settings. Each is a command that OpenBot starts on this computer.
   "customProvider.agents.title": "Custom agents",
   "customProvider.agents.description": "ACP agents that OpenBot starts on this computer.",
+  "customProvider.agents.hostDescription": "ACP agents that OpenBot starts on the server's computer.",
   "customProvider.agents.empty": "No custom agents yet.",
   "customProvider.agents.add": "Add agent",
   "customProvider.agents.restart": "Restart agents",
@@ -244,7 +247,6 @@ export const messages = defineMessages("customProvider", {
   "customProvider.agents.removed.skippedBusy": "Removed. The custom agents restart after the current task stops.",
   "customProvider.agents.removed.notRunning": "Removed. The custom agents read it when they next start.",
 
-  // The list of saved endpoints.
   "customProvider.list.title": "Custom providers",
   "customProvider.list.description": "The endpoints you have saved. Remove the ones you no longer use.",
   "customProvider.list.subtitle": "Your own model endpoints.",

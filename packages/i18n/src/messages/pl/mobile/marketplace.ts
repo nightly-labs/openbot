@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Logowanie",
   "mobile.marketplace.facts.accessLocal": "Ten komputer",
   "mobile.marketplace.facts.accessNone": "Bez logowania",
+  "mobile.marketplace.facts.accessMac": "Tylko Mac",
   "mobile.marketplace.permission.admin": "Tylko właściciele i administratorzy mogą instalować z Marketplace.",
   "mobile.marketplace.permission.unavailable":
     "Ten serwer jest offline lub jego OpenBot jest na to za stary. Zaktualizuj OpenBot na komputerze, na którym działa.",
@@ -95,6 +96,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Pomóż mi użyć tej umiejętności.",
   "mobile.marketplace.app.add": "Dodaj aplikację",
+  "mobile.marketplace.app.addCustom": "Dodaj własną",
   "mobile.marketplace.app.connect": "Połącz",
   "mobile.marketplace.app.connectTitle": "Połącz {name}",
   "mobile.marketplace.app.keyIntro": "Wklej klucz ze swojego konta. Serwer sprawdza go przed zapisaniem aplikacji.",
@@ -103,6 +105,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Otwórz stronę logowania {name}.",
   "mobile.marketplace.app.stepAllow": "Zaloguj się i zezwól na dostęp.",
   "mobile.marketplace.app.stepReturn": "Wróć tutaj. {name} połączy się na Twoim serwerze.",
+  "mobile.marketplace.app.stepBlank": "Ostatnia strona się nie wczyta. To prawidłowe.",
+  "mobile.marketplace.app.stepCopy": "Stuknij pasek adresu i skopiuj cały adres.",
+  "mobile.marketplace.app.stepPaste": "Wróć do OpenBot i wklej adres poniżej.",
   "mobile.marketplace.app.openSignIn": "Otwórz logowanie",
   "mobile.marketplace.app.keySecure": "Klucz trafia tylko do Twojego serwera, przez szyfrowane połączenie.",
   "mobile.marketplace.app.connecting": "Łączenie",
@@ -113,12 +118,12 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "Użyj linku https w domenie {hostname}.",
   "mobile.marketplace.app.docs": "Uzyskaj klucz",
   "mobile.marketplace.app.local": "Ta aplikacja działa na komputerze z OpenBot. Skonfiguruj ją na tym komputerze.",
+  "mobile.marketplace.app.needsMac":
+    "Ta aplikacja działa tylko na Macu, na którym działa OpenBot, a ten serwer nie jest Makiem.",
   "mobile.marketplace.app.relayUnsupported":
     "Ta aplikacja wymaga logowania w przeglądarce. Zaktualizuj OpenBot na serwerze lub połącz aplikację na komputerze.",
   "mobile.marketplace.app.waiting": "Oczekiwanie na stronę logowania…",
   "mobile.marketplace.app.openAgain": "Otwórz ponownie stronę logowania",
-  "mobile.marketplace.app.pasteHint":
-    "Na końcu strona otwiera adres, który się nie wczytuje. Skopiuj ten adres i wklej go poniżej.",
   "mobile.marketplace.app.pasteLabel": "Adres po zalogowaniu",
   "mobile.marketplace.app.pasteInvalid": "Ten adres nie jest końcem tego logowania.",
   "mobile.marketplace.app.finishSignIn": "Zakończ logowanie",

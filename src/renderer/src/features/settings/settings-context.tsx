@@ -1,12 +1,17 @@
+import type { MobilePlatformLogoVariant } from "@openbot/brand";
 import {
-  AGENT_DEFAULT_KEYS,
   type ApprovalAutomationPreference,
   agentAutoApprovalEnabled,
   type DynamicIslandGeometry,
+  type DynamicIslandPreference,
   type ExternalLinkTarget,
+  LOCAL_SERVER_ID,
+  type McpSignInState,
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import type { AppTextKey } from "@openbot/i18n";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
+import type { MobileInstallRequest } from "@openbot/ui/features/settings/SettingsMobileConnectTab";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
 import { isActionSoundEnabled, readActionSoundTheme, setActionSoundChoice } from "../../action-sounds";
@@ -20,21 +25,42 @@ import {
 } from "../../compact-message-actions-preference";
 import { playSoundChoice, readTaskSound, setTaskSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
+import { readRestoreLastWorkspace, writeRestoreLastWorkspace } from "../../restore-workspace-preference";
 import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "../../send-shortcut-preference";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import { mcpSignInRecord } from "../servers/mcp-servers";
+import { desktopMarketplaceCalls } from "./marketplace-calls";
 import { settingsPort } from "./settings-port";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 import type { SettingsTab } from "./settings-tabs";
 
+interface AppSettingRowRequest {
+  tab: SettingsTab;
+  anchor: AppTextKey;
+  nonce: number;
+}
+
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
+
+function islandSettings(preference: DynamicIslandPreference) {
+  return {
+    macBookNotch: preference.enabled,
+    macBookNotchHaptics: preference.hapticsEnabled,
+    macBookNotchIdle: preference.idleVisible,
+    macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
+    macBookNotchWidthPercent: preference.widthPercent,
+    macBookNotchHeightPercent: preference.heightPercent,
+    macBookNotchServers: preference.serverVisibility,
+    macBookNotchNewServers: preference.newServersVisible,
+  } satisfies Partial<GeneralSettingsValue>;
+}
 
 function sameExternalLinkTarget(left: ExternalLinkTarget, right: ExternalLinkTarget): boolean {
   return left.kind === right.kind && (left.kind !== "app" || right.kind !== "app" || left.path === right.path);
 }
 
-/** Compares two settings values field by field. The values hold only JSON data. */
 function samePlainValue(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (typeof left !== "object" || typeof right !== "object" || left === null || right === null) return false;
@@ -47,31 +73,14 @@ function samePlainValue(left: unknown, right: unknown): boolean {
   );
 }
 
-/** Tells the user why a switch went back to its previous value. */
 function showSaveFailure(error: unknown): void {
   const { t, errorMessage } = currentText();
   actionToast.error(errorMessage(error, t("settings.preferences.saveFailed")), {
-    // One save can revert two switches, such as both notification switches. The id shows one toast.
     id: "settings-preference-save-failed",
     report: { operation: "settings", source: "action", cause_code: "unknown" },
   });
 }
 
-/**
- * Application-wide preferences and the two surfaces that edit them: the
- * settings page and the skills marketplace.
- *
- * Ungated - every preference has a default the app runs on, so nothing waits
- * for the three reads below. `analyticsPreferenceLoaded()` is `null` until the
- * first of them resolves, which is what keeps analytics silent rather than
- * opted-in-by-default during startup.
- *
- * Three preferences, three owners in main: analytics, the updater and the
- * Dynamic Island each persist their own, so `updateGeneralSettings` diffs the
- * incoming value field by field and calls only the owners whose fields moved.
- * Each call sets optimistically and reverts its own fields on failure, which is
- * why the reverts are per-branch rather than one restore of `previous`.
- */
 const Settings = createSimpleContext({
   name: "Settings",
   init: () => {
@@ -81,65 +90,56 @@ const Settings = createSimpleContext({
     const { setupState } = useSetup();
 
     const [analyticsPreferenceLoaded, setAnalyticsPreferenceLoaded] = createSignal<boolean | null>(null);
-    /**
-     * The state of the preference reads below. "failed" when one or more reads failed: the rows of
-     * that read show defaults, not the saved values, so the settings page tells the user and offers
-     * a retry.
-     */
     const [preferencesLoad, setPreferencesLoad] = createSignal<"loading" | "loaded" | "failed">("loading");
     const [skillsMarketplaceOpen, setSkillsMarketplaceOpen] = createSignal(false);
-    // Undefined until main answers. The Settings preview then draws the notch it had before.
     const [builtInDisplayGeometry, setBuiltInDisplayGeometry] = createSignal<DynamicIslandGeometry | undefined>();
-    /**
-     * The plugin an `openbot://plugins/<slug>` link asked for, held beside the open flag because the
-     * marketplace is loaded lazily: the slug has to outlive the chunk load that shows it. It is a
-     * slug and never a listing, so the link cannot describe what the user is about to install.
-     */
     const [pendingPluginSlug, setPendingPluginSlug] = createSignal<string | null>(null);
-    /**
-     * Set with the slug when the person pressed Connect on a suggestion card in the chat, so the
-     * page starts the connect step. A link never sets it.
-     */
     const [pendingPluginConnect, setPendingPluginConnect] = createSignal(false);
-    /**
-     * The agent or skill that a Marketplace link named, held as the plugin slug is. It is a kind and
-     * an id, never a listing: the page loads the listing, and only Add on that page adds it.
-     */
+    const [pendingMcpSignIn, setPendingMcpSignIn] = createSignal<string | null>(null);
+    const [mcpSignIns, setMcpSignIns] = createSignal<{
+      serverId: string;
+      states: Readonly<Record<string, McpSignInState>>;
+    } | null>(null);
+    function refreshMcpSignIns(serverId: string | undefined): void {
+      if (!serverId || mcpSignIns()?.serverId !== serverId) return;
+      void desktopMarketplaceCalls()
+        .mcp.listMcpSignIns(serverId)
+        .then(mcpSignInRecord, () => null)
+        .then((states) => {
+          if (states && mcpSignIns()?.serverId === serverId) setMcpSignIns({ serverId, states });
+        });
+    }
     const [pendingMarketplaceListing, setPendingMarketplaceListing] = createSignal<MarketplaceListingLink | null>(null);
-    /**
-     * The template an `openbot://agents/<id>` link named. The install dialog reads the template by
-     * this id and installs only after the user presses Add agent.
-     */
     const [pendingAgentTemplateId, setPendingAgentTemplateId] = createSignal<string | null>(null);
     const [appSettingsOpen, setAppSettingsOpen] = createSignal(false);
-    /** Counts each open request, so the settings page can tell a new request while it is open. */
     const [appSettingsOpenRequest, setAppSettingsOpenRequest] = createSignal(0);
-    /** The tab that the next opening shows. Undefined keeps the tab that was open last. */
     const [appSettingsTab, setAppSettingsTab] = createSignal<SettingsTab | undefined>();
-    /** The server that the Notifications tab shows first. Each nonce moves to it once. */
     const [notificationFocusRequest, setNotificationFocusRequest] = createSignal<{
       serverId: string;
       nonce: number;
     } | null>(null);
     let notificationFocusNonce = 0;
-    // A request moves the tab once. A later opening of the settings shows the tab from the top.
+    const [appSettingRowRequest, setAppSettingRowRequest] = createSignal<AppSettingRowRequest | null>(null);
+    let appSettingRowNonce = 0;
+    const [mobileInstallRequest, setMobileInstallRequest] = createSignal<MobileInstallRequest | null>(null);
+    let mobileInstallNonce = 0;
     createEffect(appSettingsOpen, (open) => {
-      if (!open) setNotificationFocusRequest(null);
+      if (open) return;
+      setNotificationFocusRequest(null);
+      setAppSettingRowRequest(null);
+      setMobileInstallRequest(null);
     });
-    /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
     const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
       serverId: string;
       nonce: number;
     } | null>(null);
     let hostedServerDeleteNonce = 0;
-    // A write of equal values keeps the current object. A new object rebuilds the options of each
-    // Select on the page, and a Select reports its value again for new options. Without this, a
-    // Select that saves the value it reports freezes the window (#5708).
     const [generalSettings, setGeneralSettings] = createSignal<GeneralSettingsValue>(
       {
         ...DEFAULT_GENERAL_SETTINGS,
         taskSound: readTaskSound(),
         sendShortcut: readSendShortcutMode(),
+        restoreLastWorkspace: readRestoreLastWorkspace(),
         showAgentSteps: readShowAgentSteps(),
         compactMessageActions: readCompactMessageActions(),
         soundFeedback: isActionSoundEnabled(),
@@ -147,9 +147,6 @@ const Settings = createSimpleContext({
       },
       { equals: samePlainValue },
     );
-    // The mode also changes outside this dialog: another window, or the web Preferences tab on
-    // the same page. The shared signal carries those changes into the displayed settings value.
-    // Two-arg form: compute tracks the signal, apply writes the store outside tracking.
     const sendShortcutMode = useSendShortcutMode();
     createEffect(
       () => sendShortcutMode(),
@@ -219,11 +216,8 @@ const Settings = createSimpleContext({
               desktopAnalytics.track("app_updated", { from_version: previousVersion, to_version: info.version });
             }
             window.localStorage.setItem(ANALYTICS_APP_VERSION_STORAGE_KEY, info.version);
-          } catch {
-            // Version attribution is optional and must not block startup.
-          }
+          } catch {}
         }
-        // A chat window is not another start of the app.
         if (analyticsOpened || platform.chatWindow) return;
         analyticsOpened = true;
         desktopAnalytics.track("desktop_app_opened", {
@@ -235,10 +229,6 @@ const Settings = createSimpleContext({
 
     let dynamicIslandSaveCount = 0;
 
-    /**
-     * `analyticsChosen` is false for a default that the user did not change, such as the first-run
-     * box left as it was. Only a choice goes to the account.
-     */
     function updateGeneralSettings(value: GeneralSettingsValue, options: { analyticsChosen?: boolean } = {}): void {
       const previous = generalSettings();
       function persistField<Key extends keyof GeneralSettingsValue, Response>(
@@ -265,13 +255,15 @@ const Settings = createSimpleContext({
       if (previous.showAgentSteps !== value.showAgentSteps) {
         setShowAgentSteps(value.showAgentSteps);
       }
+      if (previous.restoreLastWorkspace !== value.restoreLastWorkspace) {
+        writeRestoreLastWorkspace(value.restoreLastWorkspace);
+      }
       if (previous.compactMessageActions !== value.compactMessageActions) {
         setCompactMessageActions(value.compactMessageActions);
       }
       if (previous.soundFeedback !== value.soundFeedback || previous.soundTheme !== value.soundTheme) {
         setActionSoundChoice(value.soundFeedback ? value.soundTheme : "off");
       }
-      // A choice equal to the shown default is still a choice, and the account gets it.
       if (previous.productAnalytics !== value.productAnalytics || options.analyticsChosen === true) {
         desktopAnalytics.setTrackingEnabled(value.productAnalytics, { recordOptOut: true });
         setAnalyticsPreferenceLoaded(value.productAnalytics);
@@ -325,31 +317,11 @@ const Settings = createSimpleContext({
           desktopNotifications: value.desktopNotifications,
           messagePreview: value.notificationPreview,
         });
-        // Each answer writes back only the switch that this change set, so that an older answer does
-        // not undo a later change of the other switch.
         if (previous.desktopNotifications !== value.desktopNotifications)
           persistField("desktopNotifications", saved, (preference) => preference.desktopNotifications);
         if (previous.notificationPreview !== value.notificationPreview)
           persistField("notificationPreview", saved, (preference) => preference.messagePreview);
       }
-      if (previous.busyMessageMode !== value.busyMessageMode) {
-        busyMessageModeChanged = true;
-        persistField(
-          "busyMessageMode",
-          settingsPort().setBusyMessageModePreference({ mode: value.busyMessageMode }),
-          (preference) => preference.mode,
-        );
-      }
-      if (
-        AGENT_DEFAULT_KEYS.some((key) => previous.agentDefaults[key] !== value.agentDefaults[key]) ||
-        previous.agentDefaults.planStartAfterMs !== value.agentDefaults.planStartAfterMs ||
-        previous.agentDefaults.automationRunsPerHour !== value.agentDefaults.automationRunsPerHour ||
-        previous.agentDefaults.commitCoAuthor !== value.agentDefaults.commitCoAuthor
-      ) {
-        agentDefaultsChanged = true;
-        persistField("agentDefaults", settingsPort().setAgentDefaults({ ...value.agentDefaults }), (saved) => saved);
-      }
-      // A hidden switch is null and cannot change.
       if (value.launchAtLogin !== null && previous.launchAtLogin !== value.launchAtLogin) {
         launchAtLoginChanged = true;
         persistField(
@@ -419,8 +391,6 @@ const Settings = createSimpleContext({
         previous.macBookNotchServers !== value.macBookNotchServers ||
         previous.macBookNotchNewServers !== value.macBookNotchNewServers
       ) {
-        // A slider drag sends one save per step. Only the reply to the newest save may change the
-        // form, or an older reply would move the slider back while the user drags.
         const save = ++dynamicIslandSaveCount;
         void settingsPort()
           .dynamicIsland.setPreference({
@@ -437,14 +407,7 @@ const Settings = createSimpleContext({
             if (save !== dynamicIslandSaveCount) return;
             setGeneralSettings((current) => ({
               ...current,
-              macBookNotch: preference.enabled,
-              macBookNotchHaptics: preference.hapticsEnabled,
-              macBookNotchIdle: preference.idleVisible,
-              macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
-              macBookNotchWidthPercent: preference.widthPercent,
-              macBookNotchHeightPercent: preference.heightPercent,
-              macBookNotchServers: preference.serverVisibility,
-              macBookNotchNewServers: preference.newServersVisible,
+              ...islandSettings(preference),
             }));
           })
           .catch((error: unknown) => {
@@ -465,12 +428,10 @@ const Settings = createSimpleContext({
       }
     }
 
-    /** Whether this agent acts without asking at Full access. */
     function agentAutoApproves(agentId: string): boolean {
       return agentAutoApprovalEnabled(approvalAutomation(), agentId);
     }
 
-    /** Remembers what to focus when the dialog closes; the dialog itself restores it. */
     function openAppSettings(trigger?: HTMLElement | null, tab?: SettingsTab): void {
       const target = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
       appSettingsRestoreTarget = target;
@@ -479,27 +440,35 @@ const Settings = createSimpleContext({
       setAppSettingsOpenRequest((count) => count + 1);
     }
 
-    /**
-     * Opens the Notifications tab, the one place where the user changes the level of a server and its
-     * agents. With a server, the tab moves to the row of that server.
-     */
     function openNotificationLevels(serverId?: string, trigger?: HTMLElement | null): void {
       if (serverId) setNotificationFocusRequest({ serverId, nonce: ++notificationFocusNonce });
-      // The modal applies a tab when the requested tab changes, so a repeated request clears it first.
       setAppSettingsTab(undefined);
       flush();
       openAppSettings(trigger, "notifications");
     }
 
-    /** Opens the Hosted servers tab with the delete confirmation of one server. */
+    function openAppSettingRow(tab: SettingsTab, anchor: AppTextKey, trigger?: HTMLElement | null): void {
+      setAppSettingRowRequest({ tab, anchor, nonce: ++appSettingRowNonce });
+      setAppSettingsTab(undefined);
+      flush();
+      openAppSettings(trigger, tab);
+    }
+
     function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
       setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
       openAppSettings(trigger, "hosted-servers");
     }
 
+    function openMobileInstall(platform: MobilePlatformLogoVariant, trigger?: HTMLElement | null): void {
+      setMobileInstallRequest({ platform, nonce: ++mobileInstallNonce });
+      openAppSettings(trigger, "mobile-connect");
+    }
+
+    function clearMobileInstallRequest(): void {
+      setMobileInstallRequest(null);
+    }
+
     onSettled(() => {
-      // The native Preferences menu item sends the same request from main, so the shortcut below only
-      // covers the window itself: both land here, and the dialog owns the open state either way.
       const handleSettingsShortcut = (event: KeyboardEvent) => {
         if (!isOpenSettingsShortcut(event)) return;
         event.preventDefault();
@@ -510,19 +479,15 @@ const Settings = createSimpleContext({
       const unsubscribeUpdateSettings = settingsPort().onOpenUpdateSettings(() =>
         openAppSettings(undefined, "updates"),
       );
-      // A remote owner or admin can change an agent's grant from a phone or the web client.
       const unsubscribeApprovals = settingsPort().onApprovalAutomation(setApprovalAutomation);
-      // Main follows the account's analytics answer from another device.
       const unsubscribeAnalytics = settingsPort().onAnalyticsPreference(({ enabled }) => {
         setAnalyticsPreferenceLoaded(enabled);
         setGeneralSettings((current) => ({ ...current, productAnalytics: enabled }));
       });
-      // An admin of a joined server can change how many memories each agent of this computer keeps.
       const unsubscribeMemoryLimit = settingsPort().onAgentMemoryLimitPreference(({ limit }) => {
         agentMemoryLimitChanged = true;
         setGeneralSettings((current) => ({ ...current, agentMemoryLimit: limit }));
       });
-      // An admin of a joined server can change the update switches of this computer.
       const unsubscribeUpdates = settingsPort().update.onPreference((preference) => {
         autoDownloadUpdatesChanged = true;
         autoInstallUpdatesChanged = true;
@@ -532,7 +497,48 @@ const Settings = createSimpleContext({
           autoInstallUpdates: preference.autoInstall,
         }));
       });
-      // A page can open from main with no click here, such as a sign-in page, so main sends the notice.
+      const unsubscribeIsland = settingsPort().dynamicIsland.onPreference((preference) => {
+        ++dynamicIslandSaveCount;
+        setGeneralSettings((current) => ({
+          ...current,
+          ...islandSettings(preference),
+        }));
+      });
+      let agentDefaultsRead: Promise<void> | null = null;
+      let agentDefaultsReadAgain = false;
+      const readAgentDefaults = (): void => {
+        if (agentDefaultsRead) {
+          agentDefaultsReadAgain = true;
+          return;
+        }
+        agentDefaultsRead = Promise.all([
+          settingsPort()
+            .getAgentDefaults()
+            .then((defaults) => {
+              agentDefaultsChanged = true;
+              setGeneralSettings((current) => ({ ...current, agentDefaults: defaults }));
+            }),
+          settingsPort()
+            .getBusyMessageModePreference()
+            .then((preference) => {
+              busyMessageModeChanged = true;
+              setGeneralSettings((current) => ({ ...current, busyMessageMode: preference.mode }));
+            }),
+        ])
+          .then(
+            () => undefined,
+            () => undefined,
+          )
+          .finally(() => {
+            agentDefaultsRead = null;
+            if (!agentDefaultsReadAgain) return;
+            agentDefaultsReadAgain = false;
+            readAgentDefaults();
+          });
+      };
+      const unsubscribeAgentDefaults = settingsPort().agent.onScopedEvent(({ serverId, event }) => {
+        if (serverId === LOCAL_SERVER_ID && event.type === "agents-changed") readAgentDefaults();
+      });
       const unsubscribeLinkFallback = settingsPort().onExternalLinkFallback(({ name }) => {
         const { t } = currentText();
         actionToast.warning(t("settings.externalLinks.fallback.title", { name }), {
@@ -549,13 +555,11 @@ const Settings = createSimpleContext({
         unsubscribeAnalytics();
         unsubscribeMemoryLimit();
         unsubscribeUpdates();
+        unsubscribeIsland();
+        unsubscribeAgentDefaults();
       };
     });
 
-    /**
-     * Reads the saved preferences. A failed read keeps the default value of its rows, and marks the
-     * load as failed so that the settings page can show the error and read again.
-     */
     function loadPreferences(): void {
       setPreferencesLoad("loading");
       void Promise.allSettled([
@@ -567,8 +571,6 @@ const Settings = createSimpleContext({
               setGeneralSettings((current) => ({ ...current, productAnalytics: preference.enabled }));
             },
             (error: unknown) => {
-              // Analytics stays off until a read or the user turns it on. A retry that fails again
-              // keeps the value that is already shown.
               if (analyticsPreferenceLoaded() === null) {
                 setAnalyticsPreferenceLoaded(false);
                 setGeneralSettings((current) => ({ ...current, productAnalytics: false }));
@@ -579,8 +581,6 @@ const Settings = createSimpleContext({
         settingsPort()
           .update.getPreference()
           .then((preference) => {
-            // A toggle made before this read resolves has already been persisted, so the older value
-            // must not be painted back over it.
             setGeneralSettings((current) => ({
               ...current,
               autoDownloadUpdates: autoDownloadUpdatesChanged ? current.autoDownloadUpdates : preference.autoDownload,
@@ -646,7 +646,6 @@ const Settings = createSimpleContext({
               notificationPreview: preference.messagePreview,
             }));
           }),
-        // Main accepts island calls only from the main window, which owns the island.
         platform.chatWindow
           ? Promise.resolve()
           : settingsPort()
@@ -654,14 +653,7 @@ const Settings = createSimpleContext({
               .then((preference) =>
                 setGeneralSettings((current) => ({
                   ...current,
-                  macBookNotch: preference.enabled,
-                  macBookNotchHaptics: preference.hapticsEnabled,
-                  macBookNotchIdle: preference.idleVisible,
-                  macBookNotchAdditionalDisplays: preference.additionalDisplaysEnabled,
-                  macBookNotchWidthPercent: preference.widthPercent,
-                  macBookNotchHeightPercent: preference.heightPercent,
-                  macBookNotchServers: preference.serverVisibility,
-                  macBookNotchNewServers: preference.newServersVisible,
+                  ...islandSettings(preference),
                 })),
               ),
       ]).then((results) => {
@@ -703,14 +695,24 @@ const Settings = createSimpleContext({
       openAppSettings,
       notificationFocusRequest,
       openNotificationLevels,
+      appSettingRowRequest,
+      openAppSettingRow,
       hostedServerDeleteRequest,
       openHostedServerDelete,
+      mobileInstallRequest,
+      openMobileInstall,
+      clearMobileInstallRequest,
       skillsMarketplaceOpen,
       setSkillsMarketplaceOpen,
       pendingPluginSlug,
       setPendingPluginSlug,
       pendingPluginConnect,
       setPendingPluginConnect,
+      pendingMcpSignIn,
+      setPendingMcpSignIn,
+      mcpSignIns,
+      setMcpSignIns,
+      refreshMcpSignIns,
       pendingMarketplaceListing,
       setPendingMarketplaceListing,
       pendingAgentTemplateId,

@@ -20,10 +20,14 @@ export const messages = {
   "error.host.publishFailed": "Dieser OpenBot konnte nicht veröffentlicht werden.",
   "error.host.mobileConnectPublishFailed": "Dieser OpenBot konnte nicht für die Mobilverbindung veröffentlicht werden.",
   "error.host.mobileConnectHostChanged": "Der Host der Mobilverbindung wurde geändert. Versuche es erneut.",
+  "error.host.mobileConnectHostMismatch":
+    "Dein Konto hat einen anderen Schlüssel für diesen Server. Versuche es erneut.",
   "error.host.noServer": "Dieser Computer hat keinen Server, der geändert werden kann.",
   "error.host.identityLocalOnly":
     "Name und Logo des Servers können nur auf dem Computer geändert werden, auf dem er läuft.",
   "error.host.timezoneInvalid": "Diese Zeitzone ist unbekannt.",
+  "error.host.signalHomeUnknown": "Dieser Signal-Server ist nicht verfügbar.",
+  "error.host.turnLimitInvalid": "Dieses Thread-Limit ist ungültig.",
   "error.host.maintenanceInterrupted":
     "Die Host-Wartung wurde unterbrochen. Prüfe die Anwendung und setze den Host-Zustand zurück, bevor du es erneut versuchst.",
   "error.host.updateFailed":

@@ -12,7 +12,12 @@ import { appPort } from "./app-port";
 import { useAgents } from "./features/agents/agents-context";
 import { useChannels } from "./features/channels/channels-context";
 import { globalSearchChannels } from "./features/channels/global-search-channels";
-import { activeServerHasProviderSettings, serverCanAdminister } from "./features/servers/server-capabilities";
+import {
+  activeServerHasProviderSettings,
+  serverCanAdminister,
+  serverHasAgentDefaults,
+  serverSupportsCapability,
+} from "./features/servers/server-capabilities";
 import { useServerSettings } from "./features/servers/server-settings";
 import { useServers } from "./features/servers/servers-context";
 import { useSettings } from "./features/settings/settings-context";
@@ -23,13 +28,8 @@ import { usePlatform } from "./platform";
 
 const FILE_SEARCH_LIMIT = 50;
 
-/**
- * What global search finds besides agents and messages: channels, routines, files, commands and
- * settings pages. Routines load each time the search opens, as no store keeps every agent's list.
- * Files come from this computer's database, so a joined server shows no Files filter.
- */
 export function useGlobalSearchSources(open: () => boolean) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const platform = usePlatform();
   const channels = useChannels();
   const { agentList, agentSetupOpen, creatingAgent, openAgentSetup, setSettingsRequest } = useAgents();
@@ -42,11 +42,13 @@ export function useGlobalSearchSources(open: () => boolean) {
   const [routinesLoading, setRoutinesLoading] = createSignal(false);
   let routineRequest = 0;
 
-  const local = () => activeServer()?.kind === "local";
+  const filesSearchable = () => {
+    const server = activeServer();
+    return server?.kind === "local" || serverSupportsCapability(server, "conversation-file-search-v1");
+  };
 
-  // Lazy: the overlay reads these only while the search is open.
   const searchChannels = createMemo(
-    () => (channels.supported() ? globalSearchChannels(channels.state.channels) : undefined),
+    () => (channels.supported() ? globalSearchChannels(channels.state.channels, sourceText) : undefined),
     { lazy: true },
   );
 
@@ -101,7 +103,6 @@ export function useGlobalSearchSources(open: () => boolean) {
 
   function selectRoutine(routine: GlobalSearchRoutine): void {
     const agentId = routine.agentId;
-    // As in `editAgent`: the agent cannot change while a new agent is being created.
     if (!agentId || (agentSetupOpen() && creatingAgent())) return;
     selectAgent(agentId);
     setSettingsRequest({ agentId, nonce: Date.now(), routine: { routineId: routine.id, name: routine.name } });
@@ -149,7 +150,6 @@ export function useGlobalSearchSources(open: () => boolean) {
         });
       }
       for (const item of navItems) {
-        // Hosted servers shows only for an account with hosting, which the dialog checks when it opens.
         if (!settingsTabShown(item.value, settingsWindow)) continue;
         list.push({
           id: `settings:${item.value}`,
@@ -179,7 +179,6 @@ export function useGlobalSearchSources(open: () => boolean) {
             run: () => openServerSettings(server.id, globalSearchOpener(), "members"),
           },
         );
-        // General shows the row only to an admin of a host that can set it, and only while it is online.
         if (
           serverCanAdminister(server, "agent-memory-limit-v1") &&
           (server.kind === "local" || server.state === "online")
@@ -190,7 +189,7 @@ export function useGlobalSearchSources(open: () => boolean) {
             detail: server.name,
             group: "settings",
             icon: BookMarked,
-            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+            run: () => openServerSettings(server.id, globalSearchOpener(), "memory"),
           });
         }
         if (serverCanAdminister(server, "memory-review-v1") && (server.kind === "local" || server.state === "online")) {
@@ -200,7 +199,7 @@ export function useGlobalSearchSources(open: () => boolean) {
             detail: server.name,
             group: "settings",
             icon: BookMarked,
-            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+            run: () => openServerSettings(server.id, globalSearchOpener(), "memory"),
           });
         }
         if (
@@ -213,7 +212,17 @@ export function useGlobalSearchSources(open: () => boolean) {
             detail: server.name,
             group: "settings",
             icon: BookMarked,
-            run: () => openServerSettings(server.id, globalSearchOpener(), "general"),
+            run: () => openServerSettings(server.id, globalSearchOpener(), "memory"),
+          });
+        }
+        if (serverHasAgentDefaults(server)) {
+          list.push({
+            id: "server:agents",
+            label: t("server.settings.agentDefaultsTitle"),
+            detail: server.name,
+            group: "settings",
+            icon: Bot,
+            run: () => openServerSettings(server.id, globalSearchOpener(), "agents"),
           });
         }
         if (activeServerHasProviderSettings(server)) {
@@ -237,7 +246,7 @@ export function useGlobalSearchSources(open: () => boolean) {
     routines,
     routinesLoading,
     actions,
-    searchFiles: () => (local() ? searchFiles : undefined),
+    searchFiles: () => (filesSearchable() ? searchFiles : undefined),
     openChannel: (channelId: string) => void channels.open(channelId),
     selectRoutine,
   };

@@ -13,6 +13,7 @@ import type {
   RemoteDesktopTestInput,
   ReorderServersInput,
   SendDirectMessageInput,
+  SetServerHiddenInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
@@ -26,6 +27,7 @@ import {
   SERVER_NOTIFICATION_LEVELS,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type ServerAppearance, serverAppearanceOrNull } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { parseAvatarImage } from "./avatar-inputs";
 import { isObject, requireString } from "./validation";
 
@@ -71,7 +73,7 @@ export function parseHostConfig(value: unknown): ConfigureHostInput {
 
 export function parseHostIdentity(value: unknown): UpdateHostIdentityInput {
   if (!isObject(value)) throw new Error("Host identity is required.");
-  if (value.serverName === undefined && value.logo === undefined) {
+  if (value.serverName === undefined && value.logo === undefined && value.appearance === undefined) {
     throw new Error("A host identity change is required.");
   }
   const serverName =
@@ -82,7 +84,15 @@ export function parseHostIdentity(value: unknown): UpdateHostIdentityInput {
   return {
     ...(serverName === undefined ? {} : { serverName }),
     ...(value.logo === undefined ? {} : { logo: parseAvatarImage(value.logo) }),
+    ...(value.appearance === undefined ? {} : { appearance: parseServerAppearance(value.appearance) }),
   };
+}
+
+function parseServerAppearance(value: unknown): ServerAppearance | null {
+  if (value === null) return null;
+  const appearance = serverAppearanceOrNull(value);
+  if (!appearance) throw new Error("Invalid server appearance.");
+  return appearance;
 }
 
 export function parseJoinServer(value: unknown): JoinServerInput {
@@ -211,11 +221,15 @@ export function parseSetServerMuted(value: unknown): SetServerMutedInput {
   if (!isObject(value) || !isBoolean(value.muted)) throw new Error("Invalid server mute setting.");
   const serverId = requireString(value.serverId, "serverId", INPUT_LIMITS.identifier);
   if (value.durationMs === undefined) return { serverId, muted: value.muted };
-  // Only a mute has an end, and only the menu's durations are accepted.
   if (!value.muted || !isOneOf(SERVER_MUTE_DURATIONS_MS, value.durationMs)) {
     throw new Error("Invalid server mute duration.");
   }
   return { serverId, muted: true, durationMs: value.durationMs };
+}
+
+export function parseSetServerHidden(value: unknown): SetServerHiddenInput {
+  if (!isObject(value) || !isBoolean(value.hidden)) throw new Error("Invalid server hidden setting.");
+  return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), hidden: value.hidden };
 }
 
 export function parseSetServerNotificationLevel(value: unknown): SetServerNotificationLevelInput {

@@ -18,7 +18,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "Присоединитесь к серверу, к которому вам дали доступ.",
   "mobile.onboarding.server.computerTitle": "Подключите компьютер",
   "mobile.onboarding.server.computerSteps":
-    "Выйдите из аккаунта на этом телефоне. Затем откройте OpenBot на компьютере, перейдите в «Настройки» → «Mobile Connect», нажмите «Создать QR-код» и отсканируйте его этим телефоном.",
+    "Выйдите из аккаунта на этом телефоне. Затем откройте OpenBot на компьютере, перейдите в «Настройки» → «Mobile Connect», нажмите «Добавить телефон» → «Да, войти» и отсканируйте код этим телефоном.",
   "mobile.onboarding.server.signOut": "Выйти",
   "mobile.onboarding.server.connecting": "Подключение к серверу {name}…",
   "mobile.onboarding.agent.title": "Выберите первого агента",

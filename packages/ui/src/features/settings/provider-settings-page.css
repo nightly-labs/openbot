@@ -1,12 +1,8 @@
-/* Settings > Providers. The settings card and row classes do the layout; these rules add only what
-   they do not have. */
-
 .provider-settings-stack {
   display: grid;
   gap: var(--openbot-space-6);
 }
 
-/* The select value is a block; the logo and the name center in it. */
 .provider-settings-select {
   width: 168px;
 }
@@ -30,7 +26,6 @@
   color: var(--openbot-danger-text);
 }
 
-/* An account with two lines of text keeps its buttons on the title line. */
 .provider-settings-account.ui-item {
   align-items: flex-start;
 }
@@ -43,7 +38,6 @@
   max-width: 280px;
 }
 
-/* The usage badge is a shared badge that opens the usage popover of the app. */
 .provider-settings-usage-badge {
   cursor: pointer;
   font: inherit;
@@ -62,8 +56,8 @@
   max-width: 320px;
 }
 
-/* Models: one compact row for each model, with a scroll for the long lists of OpenCode. */
 .provider-settings-models.settings-modal-card {
+  grid-template-columns: minmax(0, 1fr);
   max-height: 360px;
   padding: 0;
   overflow-y: auto;
@@ -120,4 +114,63 @@
 
 .provider-settings-models-error {
   color: var(--openbot-danger-text);
+}
+
+.provider-environment-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--openbot-duration-slow) var(--openbot-ease-out),
+    opacity var(--openbot-duration-fast) ease-out;
+}
+
+.provider-environment-fold[data-leaving] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.provider-environment-fold > .ui-item {
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--openbot-space-3) var(--openbot-space-4);
+}
+
+.provider-environment-fold[data-leaving] > .ui-item {
+  padding-block: 0;
+  transition: padding-block var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .provider-environment-fold,
+  .provider-environment-fold[data-leaving] > .ui-item {
+    transition: none;
+  }
+}
+
+.provider-environment-row {
+  align-items: flex-start;
+}
+
+.provider-environment-fields {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: var(--openbot-space-2);
+  min-width: 0;
+}
+
+.provider-environment-fields .ui-item-description {
+  grid-column: 1 / -1;
+}
+
+.provider-environment-mono {
+  font-family: var(--openbot-font-mono);
+}
+
+.provider-environment-sensitive {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
 }

@@ -1,0 +1,33 @@
+{
+  "slug": "postman",
+  "name": "Postman",
+  "tagline": "API collections and workspaces",
+  "description": "Postman lets agents read and update workspaces, collections, environments, and API specifications in the user's Postman account. Each user signs in to their own Postman account through the browser.",
+  "category": "coding",
+  "creatorName": "Postman",
+  "iconUrl": "https://www.postman.com/_mk-www-next/icons/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-collections", "text": "List the collections in my team workspace." },
+    { "id": "prompt-document", "text": "Write documentation for the requests in my Payments API collection." },
+    { "id": "prompt-new-request", "text": "Add a GET request for /users/{id} to my Users collection." }
+  ],
+  "apps": [
+    {
+      "id": "app-postman-mcp",
+      "name": "Postman",
+      "description": "Workspace, collection, environment, and spec access, over Postman's MCP server with browser sign-in.",
+      "iconUrl": "https://www.postman.com/_mk-www-next/icons/apple-touch-icon.png",
+      "server": {
+        "name": "postman",
+        "transport": "http",
+        "url": "https://mcp.postman.com/mcp",
+        "auth": [{ "id": "postman-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.postman.com",
+  "privacyPolicyUrl": "https://www.postman.com/legal/privacy-policy/",
+  "termsUrl": "https://www.postman.com/legal/terms/"
+}

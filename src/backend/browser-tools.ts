@@ -40,16 +40,26 @@ const modifiers = z
   .max(4)
   .optional();
 
+const MAX_TARGET_NTH = 50;
+
+const nth = z
+  .number()
+  .int()
+  .min(0)
+  .max(MAX_TARGET_NTH - 1)
+  .exactOptional();
+
 const browserTargetSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("ref"), ref: identifier, revision }),
+  z.object({ kind: z.literal("ref"), ref: identifier, revision: revision.describe("Required for kind=ref.") }),
   z.object({
     kind: z.literal("role"),
     role: nonBlankString(64),
     name: nonBlankString(500).exactOptional(),
     exact: z.boolean().exactOptional(),
+    nth,
   }),
-  z.object({ kind: z.literal("text"), text: nonBlankString(500), exact: z.boolean().exactOptional() }),
-  z.object({ kind: z.literal("css"), selector: nonBlankString(2_000) }),
+  z.object({ kind: z.literal("text"), text: nonBlankString(500), exact: z.boolean().exactOptional(), nth }),
+  z.object({ kind: z.literal("css"), selector: nonBlankString(2_000), nth }),
   z.object({
     kind: z.literal("point"),
     x: z.number().min(0).max(INPUT_LIMITS.browserCoordinate),
@@ -92,7 +102,6 @@ function browserTool<const Name extends string, Shape extends z.ZodRawShape>(def
   };
 }
 
-// Keep unused legacy fields accepted, but require the fields each action reads.
 const legacyActionFields = {
   ref: identifier.optional(),
   text: z.string().max(INPUT_LIMITS.browserActionText).optional(),
@@ -115,13 +124,10 @@ const legacyActionSchema = z.discriminatedUnion("type", [
   z.object({ ...legacyActionFields, type: z.literal("reload") }),
 ]);
 
-/** Input tools return a short status. The model reads the page with `snapshot` when it needs to. */
 const ACTION_RESULT = "Returns a status; pass snapshot: true for a snapshot.";
 const actionSnapshot = z.boolean().optional();
 const targetAction = { tabId, target: browserTargetSchema, timeoutMs: timeout, snapshot: actionSnapshot };
 
-// The fields of the tools that the `run_script` helpers also take as steps. A step names its tool
-// in `action` and acts on the tab of the call, so these fields leave out `tabId`.
 const navigateFields = {
   url: requiredString(INPUT_LIMITS.browserUrl).optional(),
   direction: z.enum(["back", "forward", "reload"]).optional(),
@@ -174,7 +180,6 @@ export const BROWSER_SCRIPT_MAX_STEPS = 200;
 export const BROWSER_SCRIPT_MAX_SLEEP_MS = 25_000;
 const BROWSER_SCRIPT_MAX_CHARS = 20_000;
 export const BROWSER_SCRIPT_DEFAULT_TIMEOUT_MS = 60_000;
-/** An evaluate step gives its value to the script only, so it can read a whole page, such as its text. */
 export const BROWSER_SCRIPT_EVALUATE_MAX_BYTES = 1024 * 1024;
 const BROWSER_SCRIPT_MAX_TIMEOUT_MS = 120_000;
 
@@ -190,24 +195,25 @@ const browserStepSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("wait_for"), ...waitForFields }),
   z.strictObject({ action: z.literal("evaluate"), ...evaluateFields }),
   z.strictObject({ action: z.literal("snapshot") }),
-  // A script has no timers of its own, so a pause is a step that the host waits out.
   z.strictObject({ action: z.literal("sleep"), ms: z.number().int().min(0).max(BROWSER_SCRIPT_MAX_SLEEP_MS) }),
 ]);
 
 export type BrowserStep = z.infer<typeof browserStepSchema>;
 
-/** Steps from a `run_script` sandbox are untrusted values, so each one is decoded before it runs. */
 export function parseBrowserStep(value: unknown): BrowserStep {
   const result = browserStepSchema.safeParse(isDynamicRecord(value) ? repairBrowserStep(value) : value);
   if (!result.success) throw new Error(`Invalid browser step: ${z.prettifyError(result.error)}`);
   return result.data;
 }
 
-const BROWSER_TOOL_DEFINITIONS = [
+export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "open",
     description: "Open an HTTP(S) URL in a new persistent private-browser tab; returns its first snapshot.",
-    shape: { url: requiredString(INPUT_LIMITS.browserUrl) },
+    shape: {
+      url: requiredString(INPUT_LIMITS.browserUrl),
+      browser: z.literal("chrome").optional(),
+    },
   }),
   browserTool({
     name: "list_tabs",
@@ -229,7 +235,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "submit_secret",
     description:
-      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payment confirmation. Fill saved cards with fill_card.",
+      "Request the secret card for the active authentication step found in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page. Select any login-method option first. The user authorizes one fill-and-submit action to the shown origin. Never pass a secret as an argument. Use takeover if the method or (without loginId) code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or bank app approval. Fill saved cards with fill_card.",
     shape: {
       tabId,
       method: z
@@ -242,7 +248,7 @@ const BROWSER_TOOL_DEFINITIONS = [
         .min(1)
         .max(12)
         .describe(
-          "Only the active step: one password/whole-code field, or all single-digit fields in entry order. Use fresh snapshot refs; exclude username fields.",
+          "Active step only: one password/whole-code field (+ sign-up confirm field, or with loginId its code fields), or each single-digit field in order. Fresh refs; no username field.",
         ),
       digits: z
         .number()
@@ -251,7 +257,7 @@ const BROWSER_TOOL_DEFINITIONS = [
         .max(12)
         .default(6)
         .describe(
-          "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. For passwords, omit digits or use 0; no digit limit applies to the password.",
+          "For codes, the length from the page or the count of single-digit fields, 4–12; do not assume six. Omit it with loginId and one code field: the saved code sets it. For a password alone, omit it.",
         ),
       submission: z
         .enum(["click", "enter", "on_input"])
@@ -276,14 +282,14 @@ const BROWSER_TOOL_DEFINITIONS = [
         .max(VAULT_TEXT_LIMIT)
         .optional()
         .describe(
-          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password in the OpenBot Vault from the card, the login gets this username.",
+          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password to the Vault from the card, the login gets this username.",
         ),
     },
   }),
   browserTool({
     name: "list_logins",
     description:
-      "List password manager and OpenBot Vault logins for the tab's HTTPS site: id, title, username and hasOneTimePassword. No passwords or codes. Type the username, then call submit_secret with loginId.",
+      "List password manager and OpenBot Vault logins for the tab's site: id, title, username and hasOneTimePassword. No passwords or codes. Type the username, then call submit_secret with loginId.",
     shape: { tabId },
   }),
   browserTool({
@@ -301,7 +307,7 @@ const BROWSER_TOOL_DEFINITIONS = [
       id: identifier.optional().describe("The item to change. Omit it to add a contact or a login."),
       label: vaultText.describe("Contact or card: a short name, such as Home or Work card."),
       ...vaultContactShape,
-      website: vaultText.describe("New login: the HTTPS website."),
+      website: vaultText.describe("New login: the website URL."),
       username: vaultText.describe("Login: the username or email."),
       password: z.string().max(VAULT_PASSWORD_LIMIT).optional().describe("Login: the password."),
       twoStepKey: z
@@ -331,7 +337,7 @@ const BROWSER_TOOL_DEFINITIONS = [
       ),
       label: vaultText.describe("Contact or card: a short name, such as Home or Work card."),
       ...vaultContactShape,
-      website: vaultText.describe("Login: the HTTPS website, such as example.com."),
+      website: vaultText.describe("Login: the website URL."),
       username: vaultText.describe("Login: the username or email."),
       nameOnCard: vaultText.describe("Card: the name on the card."),
       expMonth: z.number().int().min(1).max(12).optional().describe("Card: the expiry month."),
@@ -424,7 +430,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "request_takeover",
     description:
-      "Ask the user to take over a tab for unclear OAuth account selection, CAPTCHA, passkeys, payment confirmation such as 3-D Secure, or when secure password/code handoff or card fill is unavailable.",
+      "Ask the user to take over a tab for unclear OAuth account selection, CAPTCHA, passkeys, a payment step that you cannot complete, or when secure password/code handoff or card fill is unavailable.",
     shape: {
       tabId,
       reason: z
@@ -564,16 +570,18 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "screenshot",
     description:
-      "Capture the visible page as a separate image content item. With a ref, capture only that element: a smaller image costs less context.",
-    shape: { tabId, ref: identifier.optional() },
+      "Capture the visible page as an image; with a ref, only that element, which costs less context. save: true also writes a PNG to your workspace and returns its path.",
+    shape: { tabId, ref: identifier.optional(), save: z.boolean().optional() },
   }),
   browserTool({
     name: "run_script",
     description:
-      "Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
+      "Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }) with action as a helper in snake_case. A target is a CSS selector string, role(role, name?), text(text), or a target object; .nth(i), from 0, picks one of several matches, as in text('Delete').nth(1). A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
     shape: {
       tabId,
-      script: requiredString(BROWSER_SCRIPT_MAX_CHARS),
+      script: requiredString(BROWSER_SCRIPT_MAX_CHARS).describe(
+        "JavaScript source text. It runs in the browser sandbox, not in your own code: navigate, click, evaluate, and the other helpers exist only in this text.",
+      ),
       finalSnapshot: z.boolean().optional(),
       timeoutMs: z.number().int().min(1_000).max(BROWSER_SCRIPT_MAX_TIMEOUT_MS).optional(),
     },
@@ -586,7 +594,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "close_tab",
-    description: "Close a browser tab and clean up its CDP leases and recorder.",
+    description: "Close a browser tab.",
     shape: { tabId },
   }),
 ] as const;
@@ -617,7 +625,6 @@ export function parseBrowserToolCall(tool: string, value: unknown): BrowserToolC
   return definition.parse(repairBrowserToolInput(tool, value).value);
 }
 
-// Upload staging parses the same arguments before it resolves and authorizes local files.
 export function parseBrowserToolArguments(tool: "upload_files", value: unknown): BrowserToolArguments<"upload_files">;
 export function parseBrowserToolArguments(tool: string, value: unknown): BrowserToolCall["args"];
 export function parseBrowserToolArguments(tool: string, value: unknown): BrowserToolCall["args"] {

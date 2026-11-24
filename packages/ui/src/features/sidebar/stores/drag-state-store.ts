@@ -1,14 +1,3 @@
-/**
- * The reactive half of the sidebar's drag&drop: what the rows render from while a drag is in
- * flight. The imperative half - the session, the resolved target and the slot caches - stays in
- * `createSidebarDragEngine`, which is handed only the writers below.
- *
- * That asymmetry is the point. The engine reads its own writes inside one tick, and a store
- * publishes a write only at the next flush, so anything deciding where a drag lands has to take the
- * source from `dragSession`. Not giving the engine a way to read `drag.source` is what makes the
- * one-frame-stale read impossible rather than merely discouraged.
- */
-
 import { createMemo, createStore } from "solid-js";
 import {
   type DragOffset,
@@ -19,7 +8,6 @@ import {
 } from "../sidebar-drag-model";
 import type { SidebarPinnedItem } from "../sidebar-pins";
 
-/** Everything `createSidebarDragEngine` may do to the drag store, and deliberately nothing more. */
 export interface SidebarDragWriters {
   beginDrag: (source: SidebarDragSource) => void;
   emptyPinnedDropVisible: () => boolean;
@@ -30,7 +18,6 @@ export interface SidebarDragWriters {
 }
 
 export function createSidebarDragStateStore(deps: {
-  /** Which kind of chat an id names, or null when it names none: an unknown chat cannot be pinned. */
   chatKind: (chatId: string) => "agent" | "channel" | null;
   sectionAcceptsChat: (sectionId: string) => boolean;
 }) {
@@ -43,9 +30,6 @@ export function createSidebarDragStateStore(deps: {
     target: null,
   });
 
-  // The arms of the two unions above. Each one is a memo so that hovering a pinned tile invalidates
-  // the pinned rows only: `drag.target` changes on every hover, these change when their own answer
-  // does. Being derived is also why they can no longer disagree about which drag is in flight.
   const draggedPinnedKey = createMemo(() => {
     const source = drag.source;
     return source?.kind === "pinned" ? source.key : null;
@@ -61,7 +45,6 @@ export function createSidebarDragStateStore(deps: {
     return source?.kind === "section" ? source.id : null;
   });
 
-  /** Which kind of drag the list is in, for the styling that dims everything the drag cannot reach. */
   const draggingKind = createMemo(() => drag.source?.kind);
 
   const dragOverPinnedKey = createMemo(() => {
@@ -69,7 +52,6 @@ export function createSidebarDragStateStore(deps: {
     return target?.kind === "pinned" ? target.key : null;
   });
 
-  /** The section a dragged chat would land in, whether it aims at a row inside it or at the section. */
   const chatDropSectionId = createMemo(() => {
     const target = drag.target;
     if (target?.kind === "chat") return target.target.sectionId;
@@ -82,7 +64,6 @@ export function createSidebarDragStateStore(deps: {
     return target?.kind === "section-order" ? target.target : null;
   });
 
-  /** The folder a dragged folder would go into. */
   const sectionIntoId = createMemo(() => {
     const target = drag.target;
     return target?.kind === "section-into" ? target.sectionId : null;
@@ -94,16 +75,10 @@ export function createSidebarDragStateStore(deps: {
     return chatId && kind ? { kind, id: chatId } : null;
   }
 
-  /**
-   * A plain function, not a memo: `pinnedDropActive` below reads it inside its own tracking scope,
-   * which is what makes that memo depend on the pin count, while `sidebarDropTargetAt` and
-   * `pinDraggedSidebarItem` call it untracked. A memo would answer both, but only one correctly.
-   */
   function canPinDraggedSidebarItem(): boolean {
     return draggedSidebarItem() !== null;
   }
 
-  /** The pinned group highlights only while an agent from the list could actually land in it. */
   const pinnedDropActive = createMemo(() => {
     const source = drag.source;
     const pinningFromSidebar = Boolean(source && "origin" in source && source.origin !== "pinned");
@@ -130,7 +105,6 @@ export function createSidebarDragStateStore(deps: {
 
   const emptyPinnedDropVisible = () => drag.emptyPinnedDropVisible;
 
-  /** A new drag replaces the previous one wholesale; nothing from it survives into this one. */
   function beginDrag(source: SidebarDragSource): void {
     setDrag((state) => {
       state.offsets = {};
@@ -154,10 +128,6 @@ export function createSidebarDragStateStore(deps: {
     });
   }
 
-  /**
-   * Per key rather than by replacing the record: a row re-renders only when its own offset changes,
-   * which is the granularity the four per-item memos used to buy.
-   */
   function setDragOffsets(next: Record<string, DragOffset>): void {
     setDrag((state) => {
       for (const id of Object.keys(state.offsets)) {

@@ -11,7 +11,6 @@ export const AWAIT_EVENT_TOOL = "await_event";
 export const CLOSE_WAIT_TOOL = "close_wait";
 export const LIST_WAITS_TOOL = "list_waits";
 
-/** Close to the limit, a new wait reminds the agent to close the waits it finished. */
 const NEAR_LIMIT_MARGIN = 3;
 
 const waitOwnerSchema = z
@@ -35,12 +34,10 @@ export const listWaitsToolSchema = z.strictObject({ agentId: waitOwnerSchema.opt
 
 export interface AgentWaitsHooks {
   emit(event: AgentEvent): void;
-  /** Whether this agent owns this routine. */
   ownsRoutine(agentId: string, routineId: string): boolean;
-  /** Whether this agent has a routine: only a routine run wakes a wait. */
   hasRoutine(agentId: string): boolean;
-  /** Throws when no local agent has this id. */
   requireKnownAgent(agentId: string): void;
+  isSideThread(agentId: string, taskId: string): boolean;
 }
 
 export interface AgentWaitsOptions {
@@ -49,21 +46,11 @@ export interface AgentWaitsOptions {
   hooks: AgentWaitsHooks;
 }
 
-/** Where a wait was opened, as the tool router knows it. */
 export interface AgentWaitCaller {
   agentId: string;
-  /** A channel or messaging turn: its messages are not in the agent's own chat. */
   inExecutionThread: boolean;
 }
 
-/**
- * Open waits: work an agent stopped because it waits for something outside the turn. The agent
- * opens, lists and closes them with three tools, and another local agent can list and close them
- * with `agentId`; the user cancels them from the chat; a routine run of the agent wakes them. The input of the run that wakes a wait repeats the request and the note, so
- * the agent can continue the request after its context lost it.
- *
- * It never imports the agent service facade.
- */
 export class AgentWaits {
   readonly #store: AgentWaitStore;
   readonly #mailbox: MailboxStore;
@@ -79,39 +66,51 @@ export class AgentWaits {
     return { agentId, waits: this.#store.list(agentId) };
   }
 
-  /** The user cancels a wait. A run that it woke and that has not started no longer names it. */
   cancel(agentId: string, waitId: string): void {
     if (!this.#store.delete(agentId, waitId)) throw new AgentWaitError(sourceText("error.backend.agentWaitGone"));
     this.#changed(agentId);
   }
 
-  /**
-   * Marks the waits that a routine run wakes, after its delivery is queued. A script event that
-   * names a wait wakes only that wait. Any other run wakes every wait of its agent that has no
-   * routine or has this routine. A wait whose last wake has not ended yet stays with that run.
-   */
-  wakeForRun(run: { agentId: string; routineId: string }, deliveryId: string, waitId: string | null): void {
-    const named = waitId ? this.#store.get(run.agentId, waitId) : null;
-    const candidates = waitId ? (named ? [named] : []) : this.#store.forRoutineRun(run.agentId, run.routineId);
-    const woken = candidates
-      .filter((wait) => !wait.wakeDeliveryId || !this.#isPending(wait.wakeDeliveryId))
-      .map((wait) => wait.id);
-    if (woken.length === 0) return;
-    this.#store.markWoken(run.agentId, woken, deliveryId);
-    this.#changed(run.agentId);
+  sideThreadOfWait(agentId: string, waitId: string): string | null {
+    const wait = this.#store.get(agentId, waitId);
+    if (!wait || (wait.wakeDeliveryId && this.#isPending(wait.wakeDeliveryId))) return null;
+    return this.#sideThreadOf(wait);
   }
 
-  /** The number of open waits of each agent that has one. */
+  wakeForRun(
+    run: { agentId: string; routineId: string },
+    deliveryId: string,
+    waitId: string | null,
+    runTaskId: string | null,
+  ): Map<string, string[]> {
+    const named = waitId ? this.#store.get(run.agentId, waitId) : null;
+    const candidates = waitId ? (named ? [named] : []) : this.#store.forRoutineRun(run.agentId, run.routineId);
+    const inRun: string[] = [];
+    const inSideThreads = new Map<string, string[]>();
+    for (const wait of candidates) {
+      if (wait.wakeDeliveryId && this.#isPending(wait.wakeDeliveryId)) continue;
+      const taskId = this.#sideThreadOf(wait);
+      if (taskId === null || taskId === runTaskId) inRun.push(wait.id);
+      else inSideThreads.set(taskId, [...(inSideThreads.get(taskId) ?? []), wait.id]);
+    }
+    this.markWoken(run.agentId, inRun, deliveryId);
+    return inSideThreads;
+  }
+
+  markWoken(agentId: string, waitIds: readonly string[], deliveryId: string): void {
+    if (waitIds.length === 0) return;
+    this.#store.markWoken(agentId, waitIds, deliveryId);
+    this.#changed(agentId);
+  }
+
   countByAgent(): Map<string, number> {
     return this.#store.countByAgent();
   }
 
-  /** The waits that the run of this delivery continues, read when the run starts. */
   wokenBy(deliveryId: string): AgentWait[] {
     return this.#store.wokenBy(deliveryId);
   }
 
-  /** Answers `await_event`, `close_wait` and `list_waits`; null for every other tool. */
   handleTool(params: DynamicToolCallParams, caller: AgentWaitCaller): OpenBotToolResponse | null {
     try {
       if (params.tool === AWAIT_EVENT_TOOL) return this.#awaitEvent(params, caller);
@@ -130,14 +129,12 @@ export class AgentWaits {
     const { note, routineId } = parsed.data;
     if (caller.inExecutionThread) return openBotToolFailure(sourceText("error.backend.agentWaitOwnChatOnly"));
     const deliveries = this.#mailbox.findDeliveriesByTurn(caller.agentId, params.turnId);
-    // A run that continues waits keeps them: leaving a wait open waits for the next run again.
     const continued = deliveries.flatMap((context) => this.#store.wokenBy(context.delivery.id));
     if (continued.length > 0)
       return openBotToolResult({
         waitIds: continued.map((wait) => wait.id),
         note: "This run continues these open waits. To wait again, leave them open and end your turn. Open a new wait only for a different request.",
       });
-    // The user's message comes first; a routine run that waits serves its own instruction.
     const request =
       deliveries.findLast((context) => context.delivery.sender.kind === "user") ?? deliveries.at(0) ?? null;
     if (!request) return openBotToolFailure(sourceText("error.backend.agentWaitNoRequest"));
@@ -156,7 +153,6 @@ export class AgentWaits {
       });
     } catch (error) {
       if (!(error instanceof AgentWaitLimitError)) throw error;
-      // The open waits come with the refusal, so the agent can close the finished ones at once.
       return {
         success: false,
         contentItems: [
@@ -185,7 +181,7 @@ export class AgentWaits {
         ? `The next run of routine ${wait.routineId} wakes this wait, or a script event that names it.`
         : "The next run of any of your routines wakes this wait, or a script event that names it.",
       scriptEvent: `A local script names the wait with "waitId": "${wait.id}" next to "payload" in the body of its routine run request.`,
-      next: "End your turn now. The run that wakes the wait repeats the request and your note. Close the wait with openbot.close_wait when the request is done.",
+      next: "Say in one short sentence what you wait for, then end your turn. The run that wakes the wait repeats the request and your note in the chat where you opened the wait. Close the wait with openbot.close_wait when the request is done.",
     });
   }
 
@@ -210,7 +206,6 @@ export class AgentWaits {
     });
   }
 
-  /** The agent whose waits a tool call reads or closes. An unknown agent is a request the model can correct. */
   #waitOwner(agentId: string | undefined, caller: AgentWaitCaller): string {
     if (agentId === undefined || agentId === caller.agentId) return caller.agentId;
     try {
@@ -219,6 +214,11 @@ export class AgentWaits {
       throw new AgentWaitError(error instanceof Error ? error.message : String(error));
     }
     return agentId;
+  }
+
+  #sideThreadOf(wait: AgentWait): string | null {
+    const taskId = this.#mailbox.taskIdForDelivery(wait.requestMessageId);
+    return taskId !== null && this.#hooks.isSideThread(wait.agentId, taskId) ? taskId : null;
   }
 
   #isPending(deliveryId: string): boolean {
@@ -231,7 +231,6 @@ export class AgentWaits {
   }
 }
 
-/** A wait as the list tools show it. The request text stays out: it can be long, and it is the user's. */
 function waitSummary(wait: AgentWait) {
   return {
     waitId: wait.id,
@@ -242,7 +241,6 @@ function waitSummary(wait: AgentWait) {
   };
 }
 
-/** The part of a run's input that continues its woken waits. */
 export function wokenWaitsPromptText(waits: readonly AgentWait[]): string | null {
   if (waits.length === 0) return null;
   return [

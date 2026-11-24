@@ -5,8 +5,11 @@ export const messages = {
   "error.billing.lifecycleFailed": "تعذّر تغيير خطة الخادم. حدّث صفحة الفوترة وأعد المحاولة.",
   "error.billing.confirmMismatch": "اكتب اسم الخادم لحذفه.",
   "error.billing.restartBusy": "لا يمكن إعادة تشغيل الخادم الآن. أعد المحاولة بعد دقيقة.",
+  "error.billing.restartUnavailable": "لا يمكن إعادة تشغيل هذا الخادم من هنا. تواصل مع الدعم.",
   "error.billing.planRequired": "انتهت خطة هذا الخادم. جدّدها لتشغيل الخادم.",
   "error.billing.planSoldOut": "نفدت هذه الخطة. اختر خطة أخرى.",
+  "error.billing.storageUnavailable": "هذه السعة التخزينية غير متاحة لهذا الخادم.",
+  "error.billing.storagePaymentFailed": "أخفق الدفع مقابل السعة التخزينية. حدّث طريقة الدفع وأعد المحاولة.",
   "error.billing.licenseExists": "لهذا الحساب ترخيص بالفعل. غيّر مستخدميه بدلًا من ذلك.",
   "error.billing.licenseCurrency": "يجب أن يستخدم الترخيص عملة خططك الأخرى.",
   "error.billing.planCurrency": "يجب أن تستخدم الخطة الجديدة عملة خططك الأخرى.",
@@ -16,7 +19,16 @@ export const messages = {
   "error.billing.licenseOneUser": "هذا الترخيص لمستخدم واحد. غيّره إلى Team لإضافة مستخدمين.",
   "error.billing.licensePlanChange": "لا يمكن تغيير هذا الترخيص إلى تلك الخطة. ألغِه واشترِ الخطة الجديدة.",
   "error.billing.noLicense": "لا ترخيص لهذا الحساب.",
+  "error.billing.countryRequired": "حدّد بلد الفوترة قبل الدفع. حدّث OpenBot لتفعل ذلك، ثم أعد المحاولة.",
+  "error.billing.detailsInvalid": "تحقّق من البلد ورقم ضريبة القيمة المضافة. يجب أن يكون الرقم للبلد المختار.",
+  "error.billing.vatIdInvalid":
+    "لا يعرف نظام ضريبة القيمة المضافة في الاتحاد الأوروبي هذا الرقم. تحقّق من الرقم أو تابع بدون رقم ضريبي.",
+  "error.billing.vatIdUnverified":
+    "لا يستطيع نظام ضريبة القيمة المضافة في الاتحاد الأوروبي التحقق من الرقم الآن. أعد المحاولة لاحقًا أو تابع بدون رقم ضريبي.",
+  "error.billing.vatUnavailable": "الدفع غير متاح الآن. أعد المحاولة لاحقًا.",
   "error.billing.invalidRequest": "طلب الفوترة غير صالح.",
   "error.billing.invalidResponse": "استجابة الفوترة غير صالحة.",
   "error.billing.notStripePage": "صفحة الفوترة ليست صفحة Stripe.",
+  "error.billing.customServerOfferMissing": "لا توجد خطة للدفع لهذا الخادم.",
+  "error.billing.checkoutUnavailable": "لا يمكن بدء الدفع الآن. حاول مرة أخرى بعد دقيقة.",
 } as const satisfies PartialTranslation<typeof source>;

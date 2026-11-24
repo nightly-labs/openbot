@@ -13,7 +13,6 @@ export interface AgentPhotoDraft extends RemoteFileUpload {
   uri: string;
 }
 
-// Renders inline icon buttons, so the parent row places them beside the other choices.
 export function AgentPhotoPicker({
   hasPhoto,
   cropRoute,

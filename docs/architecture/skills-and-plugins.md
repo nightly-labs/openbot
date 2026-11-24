@@ -94,14 +94,21 @@ uses it in two places: `openbot_browser.list_logins` returns the logins saved fo
 site (id, title, username), and `AttentionRegistry` answers a `submit_secret` password or
 authenticator request for a saved login by filling it through the same `prepareSecret` path as the
 secure card, with no card. While agent code from `evaluate` can still run in the page,
-`BrowserHost` reports `agentScriptedOrigin` and the card opens instead, because that code could read
-the filled fields. The mark is per document, and it stays until a main-frame navigation or a close.
+`BrowserHost` reports `agentScriptedOrigin`, because that code could read the filled fields. When the
+call names a `loginId`, the agent gets the skip text at once, with no card: a reload of the sign-in page
+lets the saved login fill, and a scheduled routine has nobody to answer a card (#14181). Without a
+`loginId`, the card opens instead, so the agent can still let the user type the password. The mark is per document, and it stays until a main-frame navigation, a close, or an idle unload.
 A script can also write Cache Storage that a service worker serves as page code, also to a page that
 the worker claims after it loaded, so the origin stays tainted in that session. Thus, while a scripted
 page is open, no page of its origin in the same session fills. When it ends, a same-origin page of a
 connected popup or opener keeps that mark, each other open page of the origin must navigate before
-its own fill, and OpenBot clears the origin's Cache Storage and service workers. A fill waits for that purge, and runs it again when no other page of
-the origin is open. A page whose navigation a service worker handled must reload once. Cookies, localStorage and
+its own fill, and OpenBot clears the origin's Cache Storage and service workers. It deletes the service workers when
+no page of the origin loads, after at most 10 seconds, because a deleted worker fails the requests of a page that loads
+(#9981). A fill waits for the Cache Storage purge, and clears both again when no other page of
+the origin is open. A page whose navigation a service worker handled must reload once with `navigate direction=reload`.
+That reload uses `reloadIgnoringCache`, which skips the service worker, also when the page registered it
+again after the purge (#8017). A normal reload, a reload from `evaluate`, or opening the address again
+can go through the worker and refuse the fill again. Cookies, localStorage and
 IndexedDB stay, because clearing them signs the user out and deletes offline data. So a site whose
 own code runs a stored value as code is not protected, as from any other script that the site
 loads. The same rules apply to `fill_card`. A login matches by 1Password's autofill rule, on the registrable domain
@@ -133,7 +140,12 @@ router builds a `form` UI block with one required secret field (`apiKeyFormSpec`
 contract changed. When the Vault is ready, the form also has a segmented "Save for" field: "All agents
 (Vault)", which is selected first, or "Only this agent". For the Vault, `AttentionRegistry` saves the
 value with `VaultItems.saveApiKey` and deletes the asking agent's own key with that name, as
-`save_api_key` does; every agent then reads the `.vault/<NAME>` file. Otherwise, `AttentionRegistry` saves the value with
+`save_api_key` does; `AgentApiKeys.list` then writes the key to `.vault/<agentId>/<NAME>` for each
+agent that can use it. A key for every agent also goes to `.vault/<NAME>`, the path of versions
+before 0.70.0, because scripts, MCP servers and provider configs read it (#8983); a key for chosen
+agents never does. "Only this agent" saves a Vault key for the asking agent. All agents run as
+the same system user, so an agent can read the key files of other agents: the scope controls which
+agents OpenBot gives a key to, not which agents can read it. The Vault text says this. Otherwise, `AttentionRegistry` saves the value with
 `AgentApiKeys` (`src/backend/agent-api-keys.ts`) before the prompt resolves, as
 `<userData>/agent-api-keys/<agentId>/<NAME>`: a 0600 file in a 0700 folder, outside every workspace,
 and not encrypted. A failed save leaves the form open. The agent gets only the name and the path, and
@@ -149,7 +161,11 @@ register a value of 8 or more characters for log redaction when the call arrives
 the Vault registers a shorter value when it saves it. Both work only when a
 person's message in this computer's OpenBot chat started the turn, as for workflow changes: an
 external chat, a team member, a routine, another agent, or a web page cannot replace a key or a
-password. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
+password. In a channel task, `save_api_key` saves only a value that the request of the root task holds
+as a whole token of 8 or more characters, when this computer's user wrote that request
+(`ChannelService.localRequestHolds`, #6369), and only under a name that the agent has no key for
+yet: the agent also reads the lead's and the other members' words there. Otherwise, it tells the
+agent to call `request_api_key`, whose form works in a channel and can replace a key. They return no secret. `save_api_key` replaces a Vault key with the same name and deletes
 the calling agent's own key with that name, because the agent's own key wins in `list_api_keys`.
 Another agent's own key with that name stays and still wins for that agent. The value is in the provider's
 transcript because the agent sent it; OpenBot keeps no tool arguments in its trace. An agent cannot
@@ -185,7 +201,14 @@ and `mcpAuthorization()` gives it a fresh bearer at each hand-off. An enabled se
 with the name `github` wins. For `gh` and `git`, the service writes the token to
 `<userData>/provider-state/github` (mode 0600), and each provider gets `GH_CONFIG_DIR` and a
 `GIT_CONFIG_*` credential helper that reads that file. The environment holds only paths, never the
-token. Codex gets these values through `shell_environment_policy.set` in the thread config.
+token. The helper gives the `openbotgit[bot]` token for a repository that has one. For other
+repositories, it first asks the git credential helpers that the computer had before (with the
+original `GH_CONFIG_DIR` and no prompts), and gives the connector's user token only when they have
+no credential. The OpenBot GitHub App reaches only the repositories where it is installed, so this
+keeps git working on private repositories that the user's own login reaches. The fallback only
+reads: git does not send a store or an erase to the helpers of the computer, and when GitHub refuses
+the computer's credential, git does not try the connector token in the same command. Codex gets
+these values through `shell_environment_policy.set` in the thread config.
 
 A user token makes GitHub show "user with OpenBotGit". To show `openbotgit[bot]`, the desktop sends
 the user token to `POST /v1/github/installation-tokens` on the account Worker
@@ -201,7 +224,8 @@ granted the permission, the proxy adds an explanation to the `create_repository`
 agent can give to the user. With no key it answers 503, and the desktop keeps the user token.
 `src/main/github-bot-tokens.ts` renews the set ten minutes before the first token expires.
 - `git`: the helper runs with `useHttpPath`, and takes the bot token for the repository from
-  `provider-state/github/repositories`, or else the user token.
+  `provider-state/github/repositories`, or else the computer's own git login,
+  or else the user token.
 - MCP: `src/main/github-mcp-proxy.ts` is a loopback MCP server with a secret bearer. It forwards to
   `api.githubcopilot.com/mcp/` with one upstream client for each token, because GitHub binds an MCP
   session to its token. A tool call with `owner` and `repo` arguments uses that repository's bot

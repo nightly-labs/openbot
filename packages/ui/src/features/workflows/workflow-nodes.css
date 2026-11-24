@@ -1,11 +1,3 @@
-/*
- * Workflow node components: the node chrome, the step and control nodes, ports, connections, the
- * result strip, the picker menus and the asset library. The values follow the Higgsfield canvas
- * measurements: the card is one step lighter than the canvas, an inner field is one step lighter
- * than the card, and every edge is a 1px ring, not a shadow. The canvas, its HUD and the story frame
- * keep their own styles.
- */
-
 :where(.wfn-stage, .wfn-menu, .wfn-popover) {
   --wfn-card: var(--openbot-bg-canvas);
   --wfn-field: var(--openbot-bg-surface-raised);
@@ -15,34 +7,29 @@
   --wfn-port: color-mix(in srgb, var(--openbot-text-primary) 10%, var(--openbot-bg-canvas));
   --wfn-glass: color-mix(in srgb, var(--openbot-bg-surface-raised) 75%, transparent);
   --wfn-glass-blur: blur(40px) saturate(1.4);
+  --wfn-glass-clear-blur: blur(16px) saturate(1.6);
   --wfn-radius-card: calc(var(--openbot-radius-lg) + var(--openbot-space-1));
   --wfn-small: calc(var(--openbot-text-sm) - 1px);
-  /* Ten pixels: one step over the control radius, so a row sits concentric in its menu. */
+  --wfn-tiny: calc(var(--openbot-text-sm) - 2px);
   --wfn-radius-row: calc(var(--openbot-radius-sm) + var(--openbot-space-1));
   --wfn-radius-run: calc(var(--openbot-radius-md) + 2px);
-  /* The Title size: 40px, one step over the display size. */
   --wfn-text-title: calc(var(--openbot-text-display) * 1.25);
-  /* Focus is a neutral 1px ring, not the accent halo of the shared token. */
   --openbot-focus-ring: 0 0 0 1px var(--openbot-text-muted);
 }
 
-/*
- * The light palette puts a raised surface only a little above the canvas, so a field on a card
- * almost disappears. There the card is the light surface, and a field is one step darker.
- */
 :root[data-openbot-color-scheme="light"] :where(.wfn-stage, .wfn-menu, .wfn-popover) {
   --wfn-card: var(--openbot-bg-surface);
   --wfn-field: var(--openbot-bg-control-hover);
 }
-
-/* ---------------------------------------------------------------- Node */
 
 .wfn-node {
   position: relative;
   display: grid;
   gap: var(--openbot-space-1-5);
   width: var(--wfn-width);
-  transition: width var(--openbot-duration-slow) var(--openbot-ease-out);
+  transition:
+    width var(--openbot-duration-slow) var(--openbot-ease-out),
+    opacity var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
 .wfn-node[data-kind="prompt"] {
@@ -67,6 +54,7 @@
   display: flex;
   gap: var(--openbot-space-1);
   align-items: center;
+  min-width: 0;
   color: var(--openbot-text-muted);
   font-size: var(--wfn-small);
   font-weight: var(--openbot-weight-semibold);
@@ -77,6 +65,20 @@
 .wfn-label svg {
   width: var(--openbot-icon-xs);
   height: var(--openbot-icon-xs);
+}
+
+.wfn-label > svg {
+  flex: none;
+}
+
+.wfn-stage .wfn-step-name {
+  min-width: 2ch;
+  color: var(--openbot-text-muted);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.wfn-stage .wfn-step-name::placeholder {
+  color: var(--openbot-text-muted);
 }
 
 .wfn-card {
@@ -97,8 +99,6 @@
   padding: 0;
   overflow: hidden;
 }
-
-/* --------------------------------------------------------------- Field */
 
 .wfn-field {
   display: grid;
@@ -122,6 +122,10 @@
   min-height: 150px;
 }
 
+.wfn-field-task:has(> .wfn-media-inputs) {
+  grid-template-rows: auto 1fr auto;
+}
+
 .wfn-stage .wfn-input {
   min-height: 0;
   padding: 0;
@@ -141,7 +145,6 @@
   color: var(--openbot-text-muted);
 }
 
-/* The field box shows the focus, so the shared accent outline goes. */
 .wfn-stage .wfn-input:focus-visible {
   outline: none;
   box-shadow: none;
@@ -168,9 +171,29 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* Why a failed run stopped, in place of its result. The Failed mark and the results carry the colour. */
 .wfn-field-result p[data-failed] {
   color: var(--openbot-text-muted);
+}
+
+.wfn-result-answer,
+.wfn-result-answer-name,
+.wfn-result-answer-value {
+  display: block;
+}
+
+.wfn-result-answer + .wfn-result-answer {
+  margin-top: var(--openbot-space-1);
+}
+
+.wfn-result-answer-name {
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.wfn-result-answer-value {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .wfn-field-head {
@@ -183,7 +206,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* A pill in a field: an agent, a model. Flat until hover, as the Higgsfield model button. */
 .wfn-stage .wfn-pill {
   gap: var(--openbot-space-1-5);
   min-width: 0;
@@ -197,12 +219,15 @@
   font-weight: var(--openbot-weight-medium);
 }
 
-/* A long model name gives up its room first and ends with "…", so it stays in the field. */
 .wfn-stage .wfn-model-pill {
   flex-shrink: 1;
 }
 
-/* An agent next to a model keeps its full name, but leaves 96px: the model logo, a few letters and the arrow. */
+.wfn-stage .wfn-model-pill[data-static] {
+  display: inline-flex;
+  align-items: center;
+}
+
 .wfn-stage .wfn-agent-pill:has(+ .wfn-model-pill) {
   max-width: calc(100% - 96px - var(--openbot-space-2));
 }
@@ -223,7 +248,7 @@
 }
 
 .wfn-stage .wfn-field-foot .provider-model-trigger:is(:hover, [aria-expanded="true"]),
-.wfn-stage .wfn-pill:hover {
+.wfn-stage .wfn-pill:not([data-static]):hover {
   background: var(--wfn-hover);
 }
 
@@ -233,7 +258,10 @@
   color: var(--openbot-text-muted);
 }
 
-/* A provider logo is a filled mark, so it overrides the outline paint of the menu icons. */
+.wfn-media-pill > svg.wfn-model-logo {
+  translate: 0 -1px;
+}
+
 .wfn-pill > svg.wfn-model-logo,
 .wfn-menu.ui-action-menu [role="menuitem"] > svg.wfn-model-logo {
   flex: none;
@@ -258,8 +286,6 @@
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* --------------------------------------------------------------- Ports */
-
 .wfn-ports {
   position: absolute;
   top: 50%;
@@ -274,6 +300,21 @@
 
 .wfn-ports[data-side="out"] {
   left: calc(100% + var(--openbot-space-3));
+}
+
+.wfn-ports::before {
+  position: absolute;
+  inset-block: 0;
+  width: max(0px, var(--openbot-space-3) + var(--wfn-grip-band-out));
+  content: "";
+}
+
+.wfn-ports[data-side="in"]::before {
+  left: 100%;
+}
+
+.wfn-ports[data-side="out"]::before {
+  right: 100%;
 }
 
 .wfn-port-slot {
@@ -309,11 +350,6 @@
   color: var(--openbot-bg-canvas);
 }
 
-/*
- * The port name shows next to the port on hover, as the Higgsfield "Text" chip. The text box is
- * trimmed to the capitals, so a name with no descender is at the vertical centre. The chip keeps
- * its height of one line and 2px above and below.
- */
 .wfn-port-chip {
   position: absolute;
   top: 50%;
@@ -345,13 +381,6 @@
   opacity: 1;
 }
 
-/* ------------------------------------------------------------- Toolbar */
-
-/*
- * The toolbar keeps its screen size at every zoom, as the results strip does. Its shape follows the
- * Infeld IconActionList: a round bar of round icon buttons, muted until the pointer or the focus is
- * on them. Each name shows in a tooltip. A ring, not a shadow, sets it off the canvas.
- */
 .wfn-toolbar {
   position: absolute;
   bottom: calc(100% + var(--openbot-space-3) / var(--wfn-scale, 1));
@@ -372,10 +401,6 @@
   backdrop-filter: var(--wfn-glass-blur);
 }
 
-/*
- * Above the node, the toolbar can cover a node that is near. Then it goes under the node, and under the
- * results strip when the node shows one: 8px gap, 52px strip, 8px gap, as the canvas measures it.
- */
 .wfn-toolbar[data-side="below"] {
   top: calc(100% + var(--openbot-space-3) / var(--wfn-scale, 1));
   bottom: auto;
@@ -386,7 +411,6 @@
   top: calc(100% + (8px + 52px + var(--openbot-space-2)) / var(--wfn-scale, 1));
 }
 
-/* The fill shows the focus, as the hover does, so the toolbar has no focus ring. */
 .wfn-stage .wfn-toolbar :is(.ui-button, .wfn-toolbar-select) {
   border-radius: var(--openbot-radius-pill);
   box-shadow: none;
@@ -409,7 +433,6 @@
   height: var(--openbot-icon-md);
 }
 
-/* Delete takes the danger colour under the pointer or the focus, as are the nodes and the lines that it removes. */
 .wfn-stage .wfn-toolbar .wfn-tool-action[data-tone="danger"]:is(:hover, :focus-visible) {
   background: color-mix(in srgb, var(--openbot-danger) 16%, transparent);
   color: var(--openbot-danger-text);
@@ -422,7 +445,6 @@
   background: var(--wfn-ring-strong);
 }
 
-/* A node with no actions of its own and no Duplicate starts its toolbar with Lock. */
 .wfn-toolbar-separator:first-child {
   display: none;
 }
@@ -439,8 +461,6 @@
   height: var(--openbot-icon-xs);
   color: var(--openbot-text-muted);
 }
-
-/* ---------------------------------------------------------------- Text */
 
 .wfn-text {
   width: auto;
@@ -484,8 +504,6 @@
   box-shadow: none;
 }
 
-/* --------------------------------------------------------------- Media */
-
 .wfn-media {
   display: block;
   width: 100%;
@@ -496,6 +514,28 @@
 .wfn-card[data-media] > .wfn-media {
   position: absolute;
   inset: 0;
+}
+
+.wfn-media-loading {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  border-radius: 0;
+  background: var(--wfn-hover);
+}
+
+.wfn-media-spinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--openbot-text-primary);
+  pointer-events: none;
+  animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out) var(--openbot-duration-fast) both;
+}
+
+.wfn-media-spinner + img {
+  visibility: hidden;
 }
 
 .wfn-media-empty {
@@ -513,29 +553,43 @@
   stroke-width: 1.25;
 }
 
-/*
- * The glass layer on an image: hidden at rest, shown on hover, focus or selection. It never grows
- * past the card, as on Higgsfield: the prompt stops at three lines and scrolls, and on a short card
- * it gives up more of its height.
- */
 .wfn-overlay {
+  --wfn-overlay-opacity: 0;
+
   position: absolute;
   inset: auto 0 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--openbot-space-1);
   max-height: 100%;
-  padding: var(--openbot-space-2);
-  opacity: 0;
+  padding: var(--openbot-space-1-5);
+  pointer-events: none;
   translate: 0 4px;
-  transition:
-    opacity var(--openbot-duration-normal) var(--openbot-ease-out),
-    translate var(--openbot-duration-normal) var(--openbot-ease-out);
+  transition: translate var(--openbot-duration-normal) var(--openbot-ease-out);
+}
+
+.wfn-overlay :is(.wfn-chip, .wfn-elapsed, .wfn-panel) {
+  opacity: var(--wfn-overlay-opacity);
+  transition: opacity var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
 .wfn-node:is(:hover, :focus-within, [data-selected]) .wfn-overlay {
-  opacity: 1;
+  --wfn-overlay-opacity: 1;
+
   translate: 0 0;
+}
+
+.wfn-canvas[data-composer] .wfn-node[data-selected] .wfn-overlay {
+  display: none;
+}
+
+.wfn-stage .wfn-media-overlay :is(.wfn-chip, .wfn-elapsed) {
+  height: calc(var(--openbot-control-xs) - var(--openbot-space-1));
+  cursor: default;
+}
+
+.wfn-media-overlay .wfn-media-pill > svg:last-child {
+  display: none;
 }
 
 .wfn-overlay-bar {
@@ -566,18 +620,82 @@
   height: var(--openbot-icon-xs);
 }
 
-.wfn-stage .wfn-collapse {
-  margin-left: auto;
+.wfn-media-specs {
+  display: inline-flex;
+  gap: var(--openbot-space-1);
+  align-items: center;
+}
+
+.wfn-generating,
+.wfn-generating .image-generation-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.wfn-node:has(.wfn-generating) .wfn-overlay {
+  --wfn-overlay-opacity: 1;
+
+  translate: 0 0;
+}
+
+.wfn-elapsed,
+.wfn-clip-length {
+  display: inline-flex;
+  align-items: center;
+  height: var(--openbot-control-xs);
+  padding: 0 var(--openbot-space-1-5);
   border-radius: var(--openbot-radius-sm);
+  background: var(--wfn-glass);
+  box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
   color: var(--openbot-text-primary);
+  font-size: var(--wfn-small);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfn-node .media-generation-player:not([data-playing], :popover-open) .media-generation-bar {
+  display: none;
+}
+
+.wfn-node .media-generation-player:not(:popover-open) .media-generation-bar {
+  --wfn-bar-zoom: clamp(1, 1 / var(--wfn-scale, 1), 2);
+
+  container: wfn-video-bar / inline-size;
+  right: auto;
+  width: calc(100% / var(--wfn-bar-zoom));
+  transform-origin: bottom left;
+  scale: var(--wfn-bar-zoom);
+  padding: 20px 6px 4px;
+}
+
+@container wfn-video-bar (width < 300px) {
+  .wfn-node .media-generation-time {
+    display: none;
+  }
+}
+
+.wfn-node:has(.media-generation-player[data-playing]) .wfn-overlay {
+  --wfn-overlay-opacity: 0;
+}
+
+.wfn-node:has(.media-generation-player[data-playing]) .wfn-clip-length {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wfn-clip-length {
+  position: absolute;
+  top: var(--openbot-space-2);
+  right: var(--openbot-space-2);
+  pointer-events: none;
 }
 
 .wfn-panel {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: var(--openbot-space-2);
+  gap: var(--openbot-space-1-5);
   min-height: 0;
-  padding: 10px;
+  padding: var(--openbot-space-2);
   border-radius: var(--openbot-radius-md);
   background: var(--wfn-glass);
   box-shadow: inset 0 0 0 1px var(--wfn-ring);
@@ -585,7 +703,7 @@
 }
 
 .wfn-panel .wfn-input {
-  max-height: calc(var(--openbot-leading-sm) * 3);
+  max-height: calc(var(--openbot-leading-sm) * 2);
   overflow-y: auto;
   font-weight: var(--openbot-weight-medium);
   scrollbar-width: none;
@@ -604,12 +722,18 @@
   height: var(--openbot-icon-xs);
 }
 
-/* The spinner takes the place of the play icon, so the pill keeps its width. */
-.wfn-stage .wfn-run-pill[aria-busy="true"] svg {
-  display: none;
+.credit-icon.wfn-run-credits-icon {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
 }
 
-/* --------------------------------------------------------------- Asset */
+.wfn-run-credits-icon .credit-star {
+  fill: currentcolor;
+}
+
+.wfn-stage .wfn-run-pill[aria-busy="true"] :is(svg, .wfn-run-credits-icon) {
+  display: none;
+}
 
 .wfn-stage .wfn-asset-trigger {
   display: grid;
@@ -624,15 +748,17 @@
   cursor: pointer;
 }
 
-/* A taller asset card stretches its file button, and the file row stays in the middle. */
 .wfn-node[data-kind="asset"] .wfn-card {
   align-content: stretch;
 }
 
-/* An image asset with a height the user set fills the card and crops the image. */
 .wfn-node[data-height] .wfn-card[data-media] {
   aspect-ratio: auto;
   height: var(--wfn-height);
+}
+
+.wfn-node .wfn-card[data-media][data-clear] .wfn-media {
+  object-fit: contain;
 }
 
 .wfn-node[data-height] .wfn-card[data-media] .wfn-asset-trigger > .wfn-media {
@@ -651,7 +777,15 @@
   box-shadow: 0 0 0 1px var(--openbot-text-muted);
 }
 
-/* A file from the computer over the card: the card takes the hover fill. */
+.wfn-stage .wfn-card[data-clear],
+.wfn-stage .wfn-card[data-clear] .wfn-asset-trigger:not([data-dropping]) {
+  background: transparent;
+}
+
+.wfn-stage .wfn-card[data-clear] {
+  box-shadow: none;
+}
+
 .wfn-stage .wfn-asset-trigger[data-dropping] {
   background: var(--wfn-hover);
 }
@@ -753,8 +887,6 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* ------------------------------------------------------ Menus, library */
-
 .wfn-menu {
   --ui-menu-bg: var(--wfn-glass);
   --ui-menu-panel-shadow: 0 0 0 1px var(--wfn-ring-strong);
@@ -764,13 +896,6 @@
   backdrop-filter: var(--wfn-glass-blur);
 }
 
-/* ------------------------------------------------------------- Picker */
-
-/*
- * Every choice list on the canvas has this one style: a search field over a divider, group
- * headings, and rows with an icon tile, the name and small chips. The panel, the row and the tile
- * radii are concentric.
- */
 .wfn-picker.ui-action-menu {
   --ui-menu-radius: var(--wfn-radius-card);
 
@@ -814,10 +939,6 @@
   color: var(--openbot-text-muted);
 }
 
-/*
- * The field takes the focus each time the menu opens, so a focus colour on the divider would always
- * show. The caret shows where typing goes, as in the shared search select.
- */
 .wfn-picker .wfn-picker-field:focus-visible {
   outline: none;
   box-shadow: none;
@@ -829,10 +950,9 @@
   padding: var(--openbot-space-1-5);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
-/* An action list groups its rows in a fieldset, which has the group role. */
 fieldset.wfn-picker-group {
   min-width: 0;
   margin: 0;
@@ -881,7 +1001,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-ring-strong);
 }
 
-/* The tile holds the mark of a choice: a logo, an avatar, a swatch or a sample. */
 .wfn-picker-tile {
   display: grid;
   flex: none;
@@ -896,10 +1015,6 @@ fieldset.wfn-picker-group {
   transition: color var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/*
- * A node kind in an add menu is only its icon in the colour of the kind, with no tile, so the
- * twelve kinds fit in short rows. A kind with no colour of its own has a neutral icon.
- */
 .wfn-picker-tile[data-kind] {
   --wfn-kind: var(--openbot-text-secondary);
 
@@ -910,7 +1025,6 @@ fieldset.wfn-picker-group {
   color: var(--wfn-kind);
 }
 
-/* The add menu is a little taller than the other lists, so all its kinds show with no scroll. */
 .wfn-picker.ui-action-menu:has(.wfn-picker-tile[data-kind]) {
   max-height: min(560px, var(--kb-popper-content-available-height, 560px));
 }
@@ -933,11 +1047,17 @@ fieldset.wfn-picker-group {
   stroke-width: var(--openbot-icon-stroke);
 }
 
-/* A provider logo is a filled mark. */
 .wfn-picker.ui-action-menu .wfn-picker-tile > svg.wfn-model-logo,
 .wfn-picker.ui-action-menu .wfn-picker-chip > svg.wfn-model-logo {
   fill: currentcolor;
   stroke: none;
+}
+
+.wfn-picker-tile > .maker-logo {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-icon-md);
 }
 
 .wfn-picker-tile > .wfn-swatch {
@@ -945,7 +1065,6 @@ fieldset.wfn-picker-group {
   height: var(--openbot-icon-md);
 }
 
-/* An avatar has its own shape, so it has no tile box. The offset centres the face, as elsewhere. */
 .wfn-picker-tile:has(> .agent-avatar),
 .wfn-picker-row[data-checked] .wfn-picker-tile:has(> .agent-avatar) {
   overflow: visible;
@@ -964,7 +1083,6 @@ fieldset.wfn-picker-group {
   font-size: var(--openbot-text-lg);
 }
 
-/* A text size shows "Aa" at a size that grows with the choice. */
 .wfn-picker-tile > .wfn-font-sample[data-step="1"] {
   font-size: var(--openbot-text-sm);
 }
@@ -977,15 +1095,6 @@ fieldset.wfn-picker-group {
   font-size: var(--openbot-text-3xl);
 }
 
-/* An aspect ratio shows its frame. The longer side is one icon long. */
-.wfn-picker-aspect {
-  width: calc(var(--openbot-icon-md) * var(--wfn-aspect-w));
-  height: calc(var(--openbot-icon-md) * var(--wfn-aspect-h));
-  border: 1.5px solid currentcolor;
-  border-radius: var(--openbot-radius-xs);
-}
-
-/* An effort shows five bars. The bars up to the level are lit. */
 .wfn-picker-meter {
   display: flex;
   align-items: flex-end;
@@ -1053,7 +1162,6 @@ fieldset.wfn-picker-group {
   padding: 0 var(--openbot-space-1-5);
   border-radius: var(--openbot-radius-xs);
   background: var(--wfn-hover);
-  /* Muted text on the chip's own fill is under 4.5:1 in the light theme. */
   color: var(--openbot-text-secondary);
   font-size: var(--wfn-small);
   font-variant-numeric: tabular-nums;
@@ -1082,10 +1190,6 @@ fieldset.wfn-picker-group {
   text-align: center;
 }
 
-/*
- * The model picker keeps the layout of the one in the conversation header: a rail of provider logos
- * on the left, and the panel of the chosen provider. The panel has the picker style.
- */
 .wfn-model-picker.wfn-picker.ui-action-menu {
   width: min(360px, calc(100vw - var(--openbot-space-4)));
   max-width: none;
@@ -1111,7 +1215,6 @@ fieldset.wfn-picker-group {
   display: flex;
 }
 
-/* The panel radius less the rail padding, so the tab and the panel corners are concentric. */
 .wfn-model-tab {
   display: grid;
   place-items: center;
@@ -1136,7 +1239,6 @@ fieldset.wfn-picker-group {
   box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
 }
 
-/* The shared accent focus outline goes; a neutral ring inside the tab shows the focus. */
 .wfn-model-picker .wfn-model-tab:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 1px var(--openbot-text-muted);
@@ -1181,12 +1283,89 @@ fieldset.wfn-picker-group {
   list-style: none;
 }
 
+.wfn-media-picker.wfn-picker.ui-action-menu {
+  height: min(400px, var(--kb-popper-content-available-height, 400px));
+}
+
+.wfn-media-picker .wfn-model-layout {
+  height: 100%;
+}
+
+.wfn-media-rail {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.wfn-media-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.wfn-model-tab > svg.wfn-media-all-mark {
+  fill: none;
+}
+
+.wfn-media-rail .wfn-model-tab {
+  position: relative;
+  flex: none;
+}
+
+.wfn-media-account-badge {
+  position: absolute;
+  inset-inline-end: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control);
+  box-shadow: 0 0 0 1px var(--wfn-ring-strong);
+  color: var(--openbot-text-primary);
+  font-size: var(--wfn-tiny);
+  font-weight: var(--openbot-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.wfn-field-foot > .wfn-media-pill {
+  position: relative;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.wfn-stage .wfn-media-pill > .wfn-media-account-badge {
+  inset-inline: 13px auto;
+  bottom: -2px;
+  min-width: 11px;
+  height: 11px;
+  padding: 0 2px;
+  overflow: visible;
+  font-size: var(--openbot-glyph-sm);
+}
+
+.wfn-media-pill-name {
+  flex: none;
+}
+
+.wfn-media-pill-account {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--openbot-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .wfn-model-list .wfn-picker-row[role="option"] {
   display: flex;
   align-items: center;
   gap: var(--openbot-space-2);
   min-height: calc(var(--openbot-control-md) + var(--openbot-space-2));
-  /* With the list padding, the name starts on the line of the heading and the search icon. */
   padding-block: var(--openbot-space-1);
   padding-inline: var(--openbot-space-1-5) var(--openbot-space-2);
   border-radius: var(--wfn-radius-row);
@@ -1205,6 +1384,7 @@ fieldset.wfn-picker-group {
 }
 
 .ui-popover-menu-surface.wfn-popover {
+  z-index: var(--openbot-layer-popover);
   display: grid;
   gap: var(--openbot-space-3);
   width: 344px;
@@ -1215,7 +1395,331 @@ fieldset.wfn-picker-group {
   backdrop-filter: var(--wfn-glass-blur);
 }
 
-/* The title of a popover, with one action at the end, such as Upload. */
+.ui-popover-menu-surface.wfn-popover.wfn-name-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 272px;
+  max-height: min(296px, var(--kb-popper-content-available-height, 296px));
+  padding: 0;
+  overflow: hidden;
+}
+
+.wfn-name-popover .wfn-picker-list {
+  padding: var(--openbot-space-1);
+}
+
+.wfn-model-list .wfn-picker-row.wfn-name-row[role="option"] {
+  gap: var(--openbot-space-2);
+  min-height: 0;
+  padding: var(--openbot-space-1) var(--openbot-space-1-5);
+}
+
+.wfn-name-row > .wfn-menu-icon {
+  margin-inline-start: 0;
+}
+
+.wfn-name-text {
+  display: flex;
+  flex: 1;
+  gap: var(--openbot-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.wfn-name-option {
+  overflow: hidden;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-name-row:is(:hover, [data-highlighted], [data-selected]) .wfn-name-option {
+  color: var(--openbot-text-primary);
+}
+
+.wfn-name-match {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.wfn-name-source {
+  flex: 0 1 auto;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-name-empty {
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.wfn-name-box {
+  position: relative;
+  display: grid;
+  min-height: 0;
+}
+
+.wfn-stage :where(.wfn-name-box:has(> .wfn-name-insert)) > .wfn-input {
+  padding-inline-end: var(--openbot-space-6);
+}
+
+.wfn-name-field {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  outline: 0;
+  font-family: var(--openbot-font-sans);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.wfn-name-field:empty::before {
+  position: absolute;
+  inset-inline: 0;
+  color: var(--openbot-text-muted);
+  content: attr(data-placeholder);
+  pointer-events: none;
+}
+
+.wfn-name-field > .wfn-name-chip {
+  display: inline;
+  height: auto;
+  margin-inline: 1px;
+  padding: 1px var(--openbot-space-1);
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+}
+
+.wfn-name-field > .wfn-name-chip[data-problem] {
+  background: var(--openbot-warning-soft);
+  color: var(--openbot-warning-text);
+}
+
+.wfn-name-insert {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  color: var(--openbot-text-muted);
+}
+
+.ui-popover-menu-surface.wfn-popover.wfn-step-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 384px;
+  max-height: min(
+    600px,
+    calc(100vh - var(--openbot-space-8)),
+    max(320px, var(--kb-popper-content-available-height, 600px))
+  );
+  padding: 0;
+  overflow: hidden;
+}
+
+.wfn-step-settings-head {
+  display: flex;
+  flex: none;
+  gap: var(--openbot-space-2);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-2);
+}
+
+.wfn-step-settings-body {
+  display: grid;
+  gap: var(--openbot-space-3);
+  min-height: 0;
+  margin: 0;
+  padding: var(--openbot-space-1) var(--openbot-space-3) var(--openbot-space-3);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.wfn-step-settings-foot {
+  display: grid;
+  flex: none;
+  padding: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
+  border-top: 1px solid var(--wfn-ring);
+}
+
+.wfn-step-settings-when,
+.wfn-step-settings-note {
+  font-size: var(--wfn-small);
+  color: var(--openbot-text-muted);
+  white-space: nowrap;
+}
+
+.wfn-step-settings-note {
+  white-space: normal;
+}
+
+.wfn-step-settings-loading {
+  height: 96px;
+}
+
+.wfn-step-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--openbot-space-1-5);
+  margin: 0;
+}
+
+.wfn-step-fact {
+  display: grid;
+  gap: var(--openbot-space-0-5);
+  min-width: 0;
+  padding: var(--openbot-space-2) calc(var(--openbot-space-2) + var(--openbot-space-0-5));
+  border-radius: var(--wfn-radius-row);
+  background: var(--wfn-field);
+}
+
+.wfn-step-fact:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.wfn-step-fact dt {
+  font-size: var(--wfn-tiny);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-step-fact dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  color: var(--openbot-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-step-block {
+  display: grid;
+  gap: var(--openbot-space-1);
+  min-width: 0;
+}
+
+.wfn-step-block-head {
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wfn-step-block-title {
+  margin: 0;
+  font-size: var(--wfn-small);
+  font-weight: var(--openbot-weight-medium);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-step-block-copy {
+  color: var(--openbot-text-muted);
+  opacity: 0;
+  transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.wfn-step-block:is(:hover, :focus-within) .wfn-step-block-copy,
+.wfn-step-block-copy[data-copied] {
+  opacity: 1;
+}
+
+.wfn-step-text {
+  display: grid;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-2) calc(var(--openbot-space-2) + var(--openbot-space-0-5));
+  border-radius: var(--wfn-radius-row);
+  background: var(--wfn-field);
+}
+
+.wfn-step-text-body {
+  max-height: calc(var(--openbot-leading-sm) * 6);
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  color: var(--openbot-text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wfn-step-text-body[data-open] {
+  max-height: none;
+}
+
+.wfn-step-text[data-clamped] .wfn-step-text-body {
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-text-primary) calc(100% - var(--openbot-leading-sm) * 2),
+    transparent
+  );
+}
+
+.wfn-step-text-toggle {
+  justify-self: start;
+  font-size: var(--wfn-small);
+  font-weight: var(--openbot-weight-medium);
+  color: var(--openbot-text-muted);
+  transition: color var(--openbot-duration-hover) var(--openbot-ease-out);
+}
+
+.wfn-step-text-toggle:hover {
+  color: var(--openbot-text-primary);
+}
+
+.wfn-step-sources {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.wfn-step-sources-title {
+  margin: 0;
+  padding-top: var(--openbot-space-1);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.wfn-step-sources ul {
+  display: grid;
+  gap: calc(var(--openbot-space-2) + var(--openbot-space-0-5));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wfn-step-source {
+  display: grid;
+  gap: var(--openbot-space-1);
+}
+
+.wfn-step-source-head {
+  display: inline-flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+}
+
+.wfn-step-source-head > .lucide {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+}
+
+.wfn-step-source-picture {
+  width: auto;
+  max-width: 100%;
+  height: 96px;
+  border-radius: var(--wfn-radius-row);
+  object-fit: cover;
+}
+
 .wfn-popover-head {
   display: flex;
   gap: var(--openbot-space-2);
@@ -1224,7 +1728,6 @@ fieldset.wfn-picker-group {
   margin-block: calc(var(--openbot-space-1) * -1);
 }
 
-/* The action has the size of the title text. */
 .wfn-popover-head .ui-button {
   font-size: var(--openbot-text-sm);
 }
@@ -1240,7 +1743,6 @@ fieldset.wfn-picker-group {
   gap: var(--openbot-space-3);
 }
 
-/* Filter pills, as the Higgsfield library: a full pill, light text at half strength until active. */
 .wfn-popover .wfn-library-tabs {
   padding: 0;
   background: transparent;
@@ -1257,7 +1759,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-ring-strong);
 }
 
-/* The search field: the quiet fill of the node fields, and the same 1px ring on focus. */
 .wfn-library-search {
   display: flex;
   gap: var(--openbot-space-1-5);
@@ -1296,7 +1797,6 @@ fieldset.wfn-picker-group {
   box-shadow: none;
 }
 
-/* The scroll area: the shared fades mask its edges, and the native bar gives way to the thumb. */
 .wfn-scroll {
   position: relative;
 }
@@ -1327,7 +1827,6 @@ fieldset.wfn-picker-group {
   text-wrap: pretty;
 }
 
-/* The thumb sits in the popover padding, so it never covers a tile. The track is 12px for the pointer. */
 .wfn-scroll-track {
   position: absolute;
   top: 0;
@@ -1360,7 +1859,6 @@ fieldset.wfn-picker-group {
   background: color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
 }
 
-/* One full column: a short name must not shrink the thumb. */
 .wfn-popover .wfn-library-tile {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -1376,7 +1874,6 @@ fieldset.wfn-picker-group {
   box-shadow: inset 0 0 0 1px var(--openbot-text-primary);
 }
 
-/* An inset ring, so the scroll area does not clip it, in the text colour and not the accent. */
 .wfn-popover .wfn-library-tile:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
@@ -1410,10 +1907,29 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* ---------------------------------------------------------- Connections */
-
 .wfn-stage :is(.wfn-node, .wfn-text) {
   z-index: 1;
+}
+
+.wfn-stage .wfn-node:has(> .wfn-ports):is([data-selected], :focus-within),
+.wfn-stage .wfn-node:has(.wfn-port[data-target]) {
+  z-index: 2;
+}
+
+.wfn-edges-focus {
+  z-index: 2;
+}
+
+.wfn-stage .wfn-slot[data-focus] > :is(.wfn-node, .wfn-text) {
+  z-index: 2;
+}
+
+.wfn-stage .wfn-node:has(.wfn-port[data-armed]) {
+  z-index: 1;
+}
+
+.wfn-stage .wfn-slot[data-dim] > :is(.wfn-node, .wfn-text) {
+  opacity: 0.9;
 }
 
 .wfn-edges {
@@ -1440,9 +1956,16 @@ fieldset.wfn-picker-group {
   --wfn-edge: color-mix(in srgb, var(--openbot-text-primary) 72%, transparent);
 }
 
-/* A selected edge is solid and bright, like the selected node ring. */
+.wfn-edge[data-focus] {
+  --wfn-edge: var(--openbot-chart-storage-downloads);
+}
+
 .wfn-edge[data-selected] {
   --wfn-edge: var(--openbot-text-primary);
+}
+
+.wfn-edges:not(.wfn-edges-focus) > .wfn-edge[data-focus] > :is(.wfn-edge-line, .wfn-edge-comet) {
+  visibility: hidden;
 }
 
 .wfn-edge[data-removing] {
@@ -1457,14 +1980,13 @@ fieldset.wfn-picker-group {
   stroke-linecap: round;
 }
 
-/* A connected edge is a thin dashed line, as on the Higgsfield canvas. */
 .wfn-edge-line {
   stroke-width: 1.5;
   stroke-dasharray: 5 5;
   transition: color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-.wfn-edge:is([data-tone="done"], [data-selected]) .wfn-edge-line {
+.wfn-edge:is([data-tone="done"], [data-selected], [data-focus]) .wfn-edge-line {
   stroke-dasharray: none;
 }
 
@@ -1472,8 +1994,12 @@ fieldset.wfn-picker-group {
   animation: wfn-march 1.2s linear infinite;
 }
 
-.wfn-edge:is([data-tone="done"], [data-selected]) .wfn-edge-line {
+.wfn-edge:is([data-tone="done"], [data-selected], [data-focus]) .wfn-edge-line {
   animation: none;
+}
+
+.wfn-edge[data-focus] .wfn-edge-line {
+  stroke-width: 2;
 }
 
 @keyframes wfn-march {
@@ -1482,7 +2008,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* The comet carries the answer of a done step into the step that runs now. */
 .wfn-edge-comet {
   stroke: var(--openbot-text-primary);
   stroke-width: 3;
@@ -1515,7 +2040,6 @@ fieldset.wfn-picker-group {
   transition: color var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-/* On a port that can take it, the line snaps to the port and turns solid. */
 .wfn-edge-draft[data-state="ok"] {
   color: var(--openbot-text-primary);
   stroke-dasharray: none;
@@ -1525,16 +2049,11 @@ fieldset.wfn-picker-group {
   color: var(--openbot-danger);
 }
 
-/* A line back to an earlier node can end here too: it makes a loop. */
 .wfn-edge-draft[data-state="loop"] {
   color: var(--openbot-warning);
   stroke-dasharray: none;
 }
 
-/*
- * Why the line cannot end here, or that it makes a loop, next to the pointer. It keeps its screen
- * size at every zoom.
- */
 .wfn-draft-reason {
   position: absolute;
   z-index: 3;
@@ -1556,13 +2075,9 @@ fieldset.wfn-picker-group {
   color: var(--openbot-warning-text);
 }
 
-/*
- * The remove button of a connection sits on the line at the point nearest to the pointer, and keeps
- * its screen size at every zoom. It takes the danger colour, and so does the line while the pointer is on it.
- */
 .wfn-edge-actions {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   transform-origin: 0 0;
   translate: calc(-50% / var(--wfn-scale, 1)) calc(-50% / var(--wfn-scale, 1));
@@ -1599,9 +2114,27 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* A connected port stays visible; while you connect, the ports that cannot take the line dim. */
+.wfn-stage .wfn-port[data-wfn-port-type="text"] {
+  --wfn-port-tone: var(--openbot-file-teal);
+}
+
+.wfn-stage .wfn-port[data-wfn-port-type="image"] {
+  --wfn-port-tone: var(--openbot-file-pink);
+}
+
+.wfn-stage .wfn-port[data-wfn-port-type="file"] {
+  --wfn-port-tone: var(--openbot-file-orange);
+}
+
 .wfn-stage .wfn-port[data-connected] {
+  background: color-mix(in srgb, var(--wfn-port-tone) 22%, var(--wfn-port));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--wfn-port-tone) 40%, transparent);
+  color: var(--wfn-port-tone);
   opacity: 1;
+}
+
+.wfn-stage .wfn-port[data-connected]:hover {
+  background: color-mix(in srgb, var(--wfn-port-tone) 34%, var(--wfn-port));
 }
 
 .wfn-stage .wfn-port:is([data-armed], [data-target]) {
@@ -1620,17 +2153,12 @@ fieldset.wfn-picker-group {
   opacity: 1;
 }
 
-/* A hidden port waits at half size, so it grows in when it shows, as on Higgsfield. */
 .wfn-stage
   .wfn-node:not(:hover, :focus-within, [data-selected])
   .wfn-port:not([data-connected], [data-armed], [data-target], [data-dim], [data-refused], [data-missing]) {
   scale: 0.5;
 }
 
-/*
- * A step that runs: a faint ring, and a bright arc that goes round the edge of the card, as a comet
- * goes along an edge. The arc is a conic gradient in a 1px frame over the ring; it has no glow.
- */
 .wfn-node[data-status="running"] .wfn-card {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-text-primary) 16%, transparent);
 }
@@ -1641,7 +2169,6 @@ fieldset.wfn-picker-group {
   z-index: 1;
   inset: -1.5px;
   padding: 1.5px;
-  /* Resolved here, so the ring follows the card radius of each node size. */
   --wfn-radius-ring: calc(var(--wfn-radius-card) + 1.5px);
   border-radius: var(--wfn-radius-ring);
   background: conic-gradient(
@@ -1672,9 +2199,9 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* The time of the run, at the end of the label row. When the run ends, it fades out after a moment. */
 .wfn-run-time {
   display: inline-flex;
+  flex: none;
   gap: var(--openbot-space-1);
   align-items: center;
   margin-inline-start: auto;
@@ -1693,7 +2220,6 @@ fieldset.wfn-picker-group {
   animation: wfn-run-time-out 1.8s var(--openbot-ease-out) forwards;
 }
 
-/* A failed step keeps its mark until it runs again. */
 .wfn-run-time[data-failed] {
   color: var(--openbot-danger-text);
 }
@@ -1709,9 +2235,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* Lines that pulse in the result field stand for the result that the run makes. Each line takes the
-   height of one line of text (8 + 8 = 16 px), so a result of three lines does not change the size of
-   the card. */
 .wfn-result-pending {
   display: grid;
   gap: var(--openbot-space-2);
@@ -1733,7 +2256,6 @@ fieldset.wfn-picker-group {
   animation-delay: 240ms;
 }
 
-/* When there is a last result, the lines cover it and it keeps its space. */
 .wfn-result-body {
   position: relative;
 }
@@ -1749,7 +2271,58 @@ fieldset.wfn-picker-group {
   overflow: hidden;
 }
 
-/* An image step that runs: a soft light goes across the picture, or across the empty frame. */
+.wfn-result-body[data-live] .wfn-result-pending {
+  visibility: hidden;
+}
+
+.wfn-result-live {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: var(--openbot-space-2);
+  align-items: flex-start;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.wfn-result-live-avatar {
+  flex: none;
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  margin-block: calc((var(--openbot-leading-sm) - var(--openbot-icon-md)) / 2);
+}
+
+.wfn-result-live-lines {
+  display: grid;
+  flex: 1;
+  gap: var(--openbot-space-0-5);
+  min-width: 0;
+}
+
+.wfn-result-live-text,
+.wfn-result-live-previous {
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-result-live-text {
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-result-live-previous {
+  color: var(--openbot-text-muted);
+}
+
+.wfn-result-count {
+  margin-inline: var(--openbot-space-2) auto;
+  font-weight: var(--openbot-weight-regular);
+  font-variant-numeric: tabular-nums;
+}
+
 .wfn-node[data-status="running"] .wfn-card[data-media]::after {
   content: "";
   position: absolute;
@@ -1775,9 +2348,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* --------------------------------------------------------------- Canvas */
-
-/* The spring goes a little past its end and comes back. The palette has no spring ease. */
 .wfn-art-layer {
   --wfn-art-spring: cubic-bezier(0.34, 1.35, 0.64, 1);
   transform-box: fill-box;
@@ -1855,7 +2425,6 @@ fieldset.wfn-picker-group {
   stop-color: transparent;
 }
 
-/* A cut in the bar colour around each layer keeps the layers apart without a shadow. */
 .wfn-art-cut {
   stroke: color-mix(in srgb, var(--openbot-bg-surface-raised) 75%, var(--wfn-card));
   stroke-width: 2;
@@ -1869,7 +2438,6 @@ fieldset.wfn-picker-group {
   stroke-linejoin: round;
 }
 
-/* The pen and the eraser change places with a small zoom, as the icon of the other mode. */
 .wfn-tool-art [data-layer="eraser"],
 .wfn-tool-art[data-eraser] [data-layer="pen"] {
   opacity: 0;
@@ -1881,7 +2449,6 @@ fieldset.wfn-picker-group {
   scale: 1;
 }
 
-/* At rest the layers at the back turn a little, so the stack reads as a stack. */
 .wfn-tool-art [data-layer="back"] {
   rotate: -10deg;
 }
@@ -1895,9 +2462,6 @@ fieldset.wfn-picker-group {
   padding-inline-start: var(--openbot-space-4);
 }
 
-/* ------------------------------------------------------------ Minimap */
-
-/* Shortcut keys, in tooltips and in menus. */
 .wfn-keys {
   display: inline-flex;
   gap: 2px;
@@ -1920,7 +2484,6 @@ fieldset.wfn-picker-group {
   align-items: center;
 }
 
-/* The canvas tooltips have the 1px ring of the HUD and no shadow. */
 .ui-tooltip.wfn-tooltip {
   border-radius: var(--openbot-radius-md);
   box-shadow: 0 0 0 1px var(--openbot-border-strong);
@@ -1931,9 +2494,6 @@ fieldset.wfn-picker-group {
   padding-inline-end: var(--openbot-space-1-5);
 }
 
-/* The results of the selected step, oldest first, under its card, as on the Higgsfield canvas. The
- * result on view is larger and has a full ring in the colour of its kind. The strip keeps its screen
- * size at every zoom, as the selection frame does. */
 .wfn-strip {
   position: absolute;
   top: calc(100% + 8px / var(--wfn-scale, 1));
@@ -1942,7 +2502,7 @@ fieldset.wfn-picker-group {
   scale: calc(1 / var(--wfn-scale, 1));
   z-index: 2;
   display: flex;
-  gap: var(--openbot-space-1);
+  gap: var(--openbot-space-1-5);
   align-items: center;
   min-inline-size: 0;
   margin: 0;
@@ -1953,20 +2513,36 @@ fieldset.wfn-picker-group {
     calc(var(--wfn-snap-y, 0px) / var(--wfn-scale, 1));
 }
 
-/* Seven results fit. More scroll, and the arrows move through all of them. */
+.wfn-strip > button {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--openbot-radius-pill);
+  background: transparent;
+  box-shadow: 0 0 0 1px var(--wfn-ring-strong);
+  color: var(--openbot-text-primary);
+  -webkit-backdrop-filter: var(--wfn-glass-clear-blur);
+  backdrop-filter: var(--wfn-glass-clear-blur);
+}
+
+.wfn-strip > button:disabled {
+  opacity: 0.5;
+}
+
 .wfn-strip-list {
+  position: relative;
   display: flex;
-  gap: var(--openbot-space-1-5);
+  gap: var(--openbot-space-2);
   align-items: center;
-  max-width: calc(7 * 36px + 6 * var(--openbot-space-1-5) + 16px);
-  height: 52px;
+  max-width: calc(7 * 48px + 6 * var(--openbot-space-2) + 24px);
+  height: 68px;
   overflow-x: auto;
   padding: 0 var(--openbot-space-1);
   scrollbar-width: none;
 }
 
 .wfn-strip-item {
-  --wfn-strip-size: 36px;
+  --wfn-strip-size: 48px;
+  --wfn-strip-ring: color-mix(in srgb, var(--wfn-kind) 45%, transparent);
 
   display: grid;
   flex: none;
@@ -1974,31 +2550,29 @@ fieldset.wfn-picker-group {
   width: var(--wfn-strip-size);
   height: var(--wfn-strip-size);
   overflow: hidden;
-  padding: 2px;
-  border: 2px solid color-mix(in srgb, var(--wfn-kind) 40%, transparent);
+  padding: 0;
+  border: 2px solid var(--wfn-strip-ring);
   border-radius: var(--openbot-radius-pill);
-  background: var(--wfn-glass);
-  color: var(--openbot-text-secondary);
+  background: transparent;
+  color: var(--openbot-text-primary);
   font-size: var(--wfn-small);
   font-variant-numeric: tabular-nums;
   font-weight: var(--openbot-weight-semibold);
   cursor: pointer;
-  backdrop-filter: var(--wfn-glass-blur);
+  -webkit-backdrop-filter: var(--wfn-glass-clear-blur);
+  backdrop-filter: var(--wfn-glass-clear-blur);
   transition-property: width, height, border-color, color, scale;
   transition-duration: var(--openbot-duration-fast);
   transition-timing-function: var(--openbot-ease-out);
 }
 
 .wfn-strip-item:hover {
-  border-color: color-mix(in srgb, var(--wfn-kind) 72%, transparent);
-  color: var(--openbot-text-primary);
+  scale: 1.06;
 }
 
 .wfn-strip-item[aria-pressed="true"] {
-  --wfn-strip-size: 44px;
-
-  border-color: var(--wfn-kind);
-  color: var(--openbot-text-primary);
+  --wfn-strip-size: 58px;
+  --wfn-strip-ring: color-mix(in srgb, var(--wfn-kind) 75%, transparent);
 }
 
 .wfn-strip-item:active {
@@ -2010,14 +2584,50 @@ fieldset.wfn-picker-group {
   outline-offset: 1px;
 }
 
-.wfn-strip-item img {
+.wfn-strip-item:has(.wfn-strip-picture) {
+  position: relative;
+  isolation: isolate;
+  padding: 2px;
+  border: 0;
+}
+
+.wfn-strip-picture {
   width: 100%;
   height: 100%;
   border-radius: var(--openbot-radius-pill);
   object-fit: cover;
 }
 
-/* A failed run has no result, so its item shows a cross in place of an image or a number. */
+.wfn-strip-tint {
+  --wfn-strip-tint-zoom: 2.5;
+  --wfn-strip-tint-edge: calc(100% / var(--wfn-strip-tint-zoom) - 2px / var(--wfn-strip-tint-zoom));
+
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.8;
+  filter: blur(3px) saturate(1.8);
+  scale: var(--wfn-strip-tint-zoom);
+  -webkit-mask-image: radial-gradient(
+    closest-side,
+    transparent var(--wfn-strip-tint-edge),
+    var(--openbot-text-primary) var(--wfn-strip-tint-edge)
+  );
+  mask-image: radial-gradient(
+    closest-side,
+    transparent var(--wfn-strip-tint-edge),
+    var(--openbot-text-primary) var(--wfn-strip-tint-edge)
+  );
+  transition: opacity var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.wfn-strip-item[aria-pressed="true"] .wfn-strip-tint {
+  opacity: 1;
+}
+
 .wfn-strip-item[data-failed] {
   color: var(--openbot-danger-text);
 }
@@ -2025,6 +2635,111 @@ fieldset.wfn-picker-group {
 .wfn-strip-failed {
   width: var(--openbot-icon-sm);
   height: var(--openbot-icon-sm);
+}
+
+.wfn-strip-take {
+  position: relative;
+  overflow: visible;
+  border-color: transparent;
+  background: var(--wfn-glass);
+}
+
+.wfn-take-ring {
+  position: absolute;
+  inset: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  rotate: -90deg;
+  pointer-events: none;
+}
+
+.wfn-take-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.wfn-take-track {
+  stroke: var(--wfn-ring-strong);
+}
+
+.wfn-take-fill {
+  stroke: color-mix(in srgb, var(--wfn-kind) 90%, transparent);
+  stroke-dasharray: 28 72;
+  stroke-linecap: round;
+}
+
+.wfn-strip-take .wfn-take-ring {
+  animation: wfn-take-spin 1.4s linear infinite;
+}
+
+@keyframes wfn-take-spin {
+  from {
+    rotate: -90deg;
+  }
+
+  to {
+    rotate: 270deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-strip-take .wfn-take-ring {
+    animation: none;
+  }
+}
+
+.wfn-take-label {
+  display: grid;
+  place-items: center;
+  color: var(--openbot-text-secondary);
+  font-size: var(--wfn-small);
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfn-run-takes {
+  margin-inline-start: var(--openbot-space-0-5);
+  color: color-mix(in srgb, currentcolor 70%, transparent);
+}
+
+.wfn-media-failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--openbot-space-2);
+  padding: var(--openbot-space-4);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  text-align: center;
+}
+
+.wfn-media-failed-icon {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+  color: var(--openbot-danger-text);
+}
+
+.wfn-media-failed-reason {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--wfn-small);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.wfn-media-retry-price {
+  display: inline-flex;
+  gap: var(--openbot-space-0-5);
+  align-items: center;
+  margin-inline-start: var(--openbot-space-1);
+  padding-inline-start: var(--openbot-space-2);
+  border-inline-start: 1px solid var(--wfn-ring-strong);
+  color: var(--openbot-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 :is(.wfn-menu-icon, .wfn-picker-tile, .wfn-node, .wfn-minimap-node)[data-kind="text"] {
@@ -2052,7 +2767,6 @@ fieldset.wfn-picker-group {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* The arc stops and becomes a full ring; the light on an image stays at the centre. */
   .wfn-node[data-status="running"] .wfn-card-frame::before {
     background: color-mix(in srgb, var(--openbot-text-primary) 56%, transparent);
     animation: none;
@@ -2068,24 +2782,16 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* ------------------------------------------------------------ Selection */
-
 .wfn-card-frame {
   position: relative;
   display: grid;
 }
 
-/*
- * Selection is a neutral ring 3px outside the card, not a colour: the kind colours and the run ring
- * keep their meaning. An outline follows the card radius, so the ring stays concentric. The canvas
- * sets --wfn-scale, so the ring and the grip keep their size at every zoom.
- */
 .wfn-node {
   --wfn-select-line: calc(1.5px / var(--wfn-scale, 1));
   --wfn-select-gap: calc(3px / var(--wfn-scale, 1));
 }
 
-/* A height that changes at once, as a reset or an undo, eases to its place, as the width does. */
 .wfn-node .wfn-card {
   outline: var(--wfn-select-line) solid transparent;
   outline-offset: var(--wfn-select-gap);
@@ -2114,19 +2820,18 @@ fieldset.wfn-picker-group {
   outline-offset: var(--wfn-select-gap);
 }
 
-/*
- * The resize grips: every corner and side resizes, but only the bottom-right corner shows a mark, a
- * short arc on the ring, concentric with the card (card radius + gap). So the card edge stays calm.
- */
-.wfn-grip {
-  --wfn-grip-size: calc(18px / var(--wfn-scale, 1));
+.wfn-grip,
+.wfn-ports {
   --wfn-grip-line: calc(3px / var(--wfn-scale, 1));
   --wfn-grip-out: calc(var(--wfn-select-gap) + var(--wfn-select-line) / 2 + var(--wfn-grip-line) / 2);
-  --wfn-grip-radius: calc(var(--wfn-radius-card) + var(--wfn-grip-out));
-  --wfn-grip-arc: var(--wfn-grip-line) solid var(--wfn-grip-color, transparent);
-  /* The band of a side, centred on the selection ring. */
   --wfn-grip-band: calc(12px / var(--wfn-scale, 1));
   --wfn-grip-band-out: calc(var(--wfn-grip-out) * -1 - var(--wfn-grip-band) / 2);
+}
+
+.wfn-grip {
+  --wfn-grip-size: calc(18px / var(--wfn-scale, 1));
+  --wfn-grip-radius: calc(var(--wfn-radius-card) + var(--wfn-grip-out));
+  --wfn-grip-arc: var(--wfn-grip-line) solid var(--wfn-grip-color, transparent);
 
   position: absolute;
   z-index: 2;
@@ -2136,14 +2841,12 @@ fieldset.wfn-picker-group {
   transition: border-color var(--openbot-duration-fast) var(--openbot-ease-out);
 }
 
-/* A larger target than the arc. */
 .wfn-grip::after {
   position: absolute;
   inset: calc(-6px / var(--wfn-scale, 1));
   content: "";
 }
 
-/* The top corners and the bottom-left corner have no mark: the cursor shows the resize. */
 .wfn-grip[data-corner="nw"] {
   top: calc(var(--wfn-grip-out) * -1);
   left: calc(var(--wfn-grip-out) * -1);
@@ -2167,7 +2870,6 @@ fieldset.wfn-picker-group {
   left: calc(var(--wfn-grip-out) * -1);
 }
 
-/* A side has no mark: the selection ring is the edge, and the cursor shows the resize. */
 .wfn-grip[data-side] {
   z-index: 1;
   width: auto;
@@ -2206,12 +2908,10 @@ fieldset.wfn-picker-group {
   left: var(--wfn-grip-band-out);
 }
 
-/* The ports sit over the side bands, so a press on a port connects and does not resize. */
 .wfn-ports {
   z-index: 1;
 }
 
-/* A text node is small and has no card, so its ring and grip are lighter and shorter. */
 .wfn-text .wfn-grip {
   --wfn-grip-size: calc(12px / var(--wfn-scale, 1));
   --wfn-grip-line: calc(2px / var(--wfn-scale, 1));
@@ -2228,10 +2928,6 @@ fieldset.wfn-picker-group {
   --wfn-grip-color: var(--openbot-text-primary);
 }
 
-/*
- * While a Delete control points at nodes, or the confirmation is open, the nodes that go have a danger
- * ring, and their connections take it too.
- */
 .wfn-node[data-doomed] .wfn-card {
   outline-color: var(--openbot-danger);
 }
@@ -2261,12 +2957,10 @@ fieldset.wfn-picker-group {
   cursor: nesw-resize;
 }
 
-/* A step with a height that the user set gives the extra room to its task. */
 .wfn-node[data-height] .wfn-card:has(> .wfn-field-task) {
   grid-template-rows: 1fr;
 }
 
-/* A locked node shows a lock after its label and takes no drag. */
 .wfn-node[data-locked] :is(.wfn-label, .wfn-card) {
   cursor: default;
 }
@@ -2285,7 +2979,6 @@ fieldset.wfn-picker-group {
   width: 100%;
 }
 
-/* The ring of a selected node shows the focus from the keyboard too. */
 .wfn-node:focus-visible {
   outline: none;
 }
@@ -2293,8 +2986,6 @@ fieldset.wfn-picker-group {
 .wfn-node:not(.wfn-text):focus-visible:not([data-selected]) .wfn-card {
   outline-color: color-mix(in srgb, var(--openbot-text-primary) 40%, transparent);
 }
-
-/* ------------------------------------------------------------ Run status */
 
 .wfn-hud-spin {
   animation: wfn-spin 1s linear infinite;
@@ -2327,15 +3018,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* ---------------------------------------------------------- Scroll fades */
-
-/*
- * Content that scrolls fades out at an edge where more of it is. Each fade grows over the first or the
- * last fade size of the scroll, so an edge at the start or the end stays sharp. The ranges are lengths,
- * not parts of the scroll range: content that fits gets no fade, also where the engine puts a timeline
- * with no scroll range at its end. A browser without scroll timelines shows no fade: there the animation
- * runs on the clock, ends at once, and keeps the start fade on content that does not scroll.
- */
 @property --wfn-fade-start {
   syntax: "<length>";
   inherits: false;
@@ -2349,7 +3031,7 @@ fieldset.wfn-picker-group {
 }
 
 @supports (animation-timeline: scroll()) {
-  .wfn-node :is(textarea, .wfn-field-result p),
+  .wfn-node :is(textarea, .wfn-name-field, .wfn-field-result p),
   .wfn-strip-list {
     --wfn-fade-size: var(--openbot-space-4);
     --wfn-fade-side: to bottom;
@@ -2374,7 +3056,29 @@ fieldset.wfn-picker-group {
     --wfn-fade-size: var(--openbot-space-6);
     --wfn-fade-side: to right;
 
-    animation-timeline: scroll(self inline), scroll(self inline);
+    mask-image: none;
+    animation:
+      wfn-fade-start linear both,
+      wfn-fade-end linear both,
+      wfn-fade-mask linear both;
+    animation-timeline: scroll(self inline), scroll(self inline), scroll(self inline);
+    animation-range:
+      0 var(--wfn-fade-size),
+      calc(100% - var(--wfn-fade-size)) 100%,
+      0 100%;
+  }
+}
+
+@keyframes wfn-fade-mask {
+  from,
+  to {
+    mask-image: linear-gradient(
+      var(--wfn-fade-side),
+      transparent,
+      var(--openbot-text-primary) var(--wfn-fade-start),
+      var(--openbot-text-primary) calc(100% - var(--wfn-fade-end)),
+      transparent
+    );
   }
 }
 
@@ -2398,8 +3102,6 @@ fieldset.wfn-picker-group {
   }
 }
 
-/* ---------------------------------------------------------------- Size */
-
 .wfn-node[data-kind="trigger"],
 .wfn-node[data-kind="output"] {
   --wfn-width: 280px;
@@ -2415,15 +3117,11 @@ fieldset.wfn-picker-group {
   --wfn-height: 240px;
 }
 
-/* The edge of a rectangle, the selection ring and the resize arc share one radius, so they stay
- * concentric. */
 .wfn-node[data-kind="shape"] {
   --wfn-width: 208px;
   --wfn-height: 128px;
   --wfn-radius-card: var(--openbot-radius-md);
 }
-
-/* --------------------------------------------------------------- Kinds */
 
 :is(.wfn-menu-icon, .wfn-picker-tile, .wfn-node, .wfn-minimap-node)[data-kind="trigger"] {
   --wfn-kind: var(--openbot-file-yellow);
@@ -2449,9 +3147,6 @@ fieldset.wfn-picker-group {
   --wfn-kind: var(--openbot-text-secondary);
 }
 
-/* -------------------------------------------------------------- Fields */
-
-/* A pill alone on its row keeps its own width. */
 .wfn-stage .wfn-block-field > .wfn-pill {
   justify-self: start;
 }
@@ -2460,7 +3155,6 @@ fieldset.wfn-picker-group {
   justify-content: flex-start;
 }
 
-/* The model of a condition starts its row, and the effort ends it, as in an LLM step. */
 .wfn-block-field > .wfn-condition-foot {
   justify-content: space-between;
 }
@@ -2471,8 +3165,6 @@ fieldset.wfn-picker-group {
   gap: var(--openbot-space-2);
 }
 
-/* -------------------------------------------------------- Setting rows */
-
 .wfn-github-mark {
   flex: none;
   width: var(--openbot-icon-xs);
@@ -2480,7 +3172,6 @@ fieldset.wfn-picker-group {
   fill: currentcolor;
 }
 
-/* The settings of a card: a list of full-width rows on the field colour. */
 .wfn-settings {
   --wfn-settings-gap: 2px;
 
@@ -2491,15 +3182,12 @@ fieldset.wfn-picker-group {
   background: var(--wfn-field);
 }
 
-/* The type or target is the first row; its settings follow under a hairline. The margin less the grid gap
-   puts the hairline midway between two rows. */
 .wfn-settings-head:not(:last-child) {
   padding-bottom: var(--openbot-space-1);
   border-bottom: 1px solid var(--wfn-ring);
   margin-bottom: calc(var(--openbot-space-1) - var(--wfn-settings-gap));
 }
 
-/* The last event closes the settings under a hairline. */
 .wfn-settings-foot {
   padding-top: var(--openbot-space-1);
   border-top: 1px solid var(--wfn-ring);
@@ -2515,7 +3203,6 @@ fieldset.wfn-picker-group {
   margin: var(--openbot-space-1);
 }
 
-/* A control of its own layout among the rows, such as the schedule picker or a webhook secret. */
 .wfn-settings-block {
   padding: var(--openbot-space-1) var(--openbot-space-2);
 }
@@ -2571,7 +3258,6 @@ fieldset.wfn-picker-group {
   font-weight: var(--openbot-weight-medium);
 }
 
-/* Tags wrap to more lines; one value ends with "…". */
 .wfn-row-value:has(> .wfn-tag) {
   flex-wrap: wrap;
 }
@@ -2601,12 +3287,10 @@ fieldset.wfn-picker-group {
   transition: opacity var(--openbot-duration-hover) var(--openbot-ease-out);
 }
 
-/* A setting row shows its arrow on hover, so the values read as one column. The type row always shows it. */
 :is(.wfn-settings, .wfn-settings-foot) > .wfn-row:not(:hover, :focus-visible, [aria-expanded="true"]) .wfn-row-arrow {
   opacity: 0;
 }
 
-/* The type row has no name: its icon sits on a tile of the kind colour, as in the add menu. */
 .wfn-settings-head .wfn-row {
   grid-template-columns: minmax(0, 1fr) auto;
   min-height: 40px;
@@ -2631,12 +3315,8 @@ fieldset.wfn-picker-group {
   color: var(--wfn-kind);
 }
 
-/* A row that the user types in: the field fills the value and arrow columns, with no border of its own. */
-.wfn-row[data-input] {
-  cursor: text;
-}
-
 .wfn-row[data-input]:focus-within {
+  cursor: text;
   box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
 }
 
@@ -2654,7 +3334,6 @@ fieldset.wfn-picker-group {
   box-shadow: none;
 }
 
-/* An address to copy, such as the URL of a webhook. */
 .wfn-row-code {
   display: block;
   overflow: hidden;
@@ -2665,7 +3344,6 @@ fieldset.wfn-picker-group {
   white-space: nowrap;
 }
 
-/* A value in a list row, such as a label. A GitHub label has its own colour on a tint of it. */
 .wfn-tag {
   display: inline-flex;
   align-items: center;
@@ -2682,7 +3360,6 @@ fieldset.wfn-picker-group {
   white-space: nowrap;
 }
 
-/* A long name ends with "…" inside its tag, so the tag stays in the value column. */
 .wfn-tag-text {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2694,7 +3371,6 @@ fieldset.wfn-picker-group {
   height: var(--openbot-icon-xs);
 }
 
-/* A repository that sends no events. */
 .wfn-tag[data-warning] {
   color: var(--openbot-warning-text);
 }
@@ -2705,7 +3381,6 @@ fieldset.wfn-picker-group {
   color: color-mix(in srgb, var(--wfn-tone) 80%, var(--openbot-text-primary));
 }
 
-/* The colour of a label in its menu. */
 .wfn-dot {
   width: 10px;
   height: 10px;
@@ -2713,7 +3388,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-tone);
 }
 
-/* A value with a count tag at its end, such as the events row: the text ends with "…", the tag stays. */
 .wfn-row-value[data-one-line] {
   flex-wrap: nowrap;
 }
@@ -2726,9 +3400,6 @@ fieldset.wfn-picker-group {
   flex: none;
 }
 
-/* ------------------------------------------------------------ Branches */
-
-/* Each branch row holds its output port on the right edge of the card, as a node holds its output. */
 .wfn-branch {
   position: relative;
   display: flex;
@@ -2766,7 +3437,6 @@ fieldset.wfn-picker-group {
   translate: 0 -50%;
 }
 
-/* The name of a branch rides on its line, at the middle. */
 .wfn-edge-label {
   position: absolute;
   z-index: 1;
@@ -2783,10 +3453,11 @@ fieldset.wfn-picker-group {
   translate: -50% -50%;
 }
 
-/*
- * A loop shows where it goes back under its nodes. With no condition to end it, it takes the warning
- * colour: the run repeats it until the user stops the run.
- */
+.wfn-edge-count {
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+}
+
 .wfn-edge-loop {
   position: absolute;
   z-index: 1;
@@ -2812,19 +3483,11 @@ fieldset.wfn-picker-group {
 }
 
 .wfn-edge-loop[data-endless] {
-  /* The soft warning is translucent, so the card under it hides the line. */
   background: linear-gradient(var(--openbot-warning-soft) 0 0), var(--wfn-card);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 45%, transparent);
   color: var(--openbot-warning-text);
 }
 
-/* ---------------------------------------------------------------- Note */
-
-/*
- * A note is coloured paper, as on Higgsfield. The paper keeps the hue of the note colour at a fixed
- * lightness, so a note is the same pastel in the dark and the light theme, where the palette
- * darkens each colour for text. A 1px edge in a deeper tint frames it.
- */
 :is(.wfn-node, .wfn-ghost)[data-kind="note"] {
   --wfn-note-paper: oklch(from var(--wfn-note) 0.88 calc(c * 0.5) h);
   --wfn-note-edge: oklch(from var(--wfn-note) 0.76 calc(c * 0.6) h);
@@ -2889,7 +3552,6 @@ fieldset.wfn-picker-group {
   user-select: none;
 }
 
-/* The font menu shows each font in itself. */
 .wfn-font-sample {
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-semibold);
@@ -2908,8 +3570,6 @@ fieldset.wfn-picker-group {
   background: var(--wfn-swatch);
   box-shadow: inset 0 0 0 1px var(--wfn-ring-strong);
 }
-
-/* -------------------------------------------------------------- States */
 
 .wfn-alert {
   display: flex;
@@ -2940,6 +3600,163 @@ fieldset.wfn-picker-group {
   -webkit-line-clamp: 3;
 }
 
+.wfn-answer-input {
+  min-height: 96px;
+  font-family: var(--openbot-font-mono);
+}
+
+.ui-popover-menu-surface.wfn-popover.wfn-answer-popover:has(.wfn-answer-fields) {
+  --wfn-answer-icon: 24px;
+  --wfn-answer-glyph: 14px;
+  --wfn-answer-pad: 6px;
+
+  gap: var(--openbot-space-2);
+  width: 400px;
+  padding: var(--openbot-space-3) var(--openbot-space-2) var(--openbot-space-2);
+}
+
+.wfn-answer-popover:has(.wfn-answer-fields) > .wfn-popover-title {
+  padding-inline-start: calc((var(--wfn-answer-icon) - var(--wfn-answer-glyph)) / 2);
+}
+
+.wfn-answer-fields {
+  display: grid;
+  gap: var(--openbot-space-2);
+}
+
+.wfn-answer-rows {
+  display: grid;
+  max-height: min(324px, var(--kb-popper-content-available-height, 324px));
+  overflow-y: auto;
+}
+
+.wfn-answer-row {
+  display: grid;
+  grid-template-columns:
+    var(--wfn-answer-icon) minmax(0, 0.9fr) minmax(0, 1.1fr)
+    var(--wfn-answer-icon);
+  column-gap: var(--openbot-space-2);
+  align-items: center;
+  min-height: 36px;
+}
+
+.wfn-answer-row + .wfn-answer-row {
+  border-block-start: 1px solid var(--wfn-ring);
+}
+
+.wfn-answer-type-item {
+  display: inline-flex;
+  gap: var(--openbot-space-2);
+  align-items: center;
+}
+
+.wfn-answer-type-item > svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-answer-row .wfn-answer-type {
+  grid-column: 1;
+  justify-content: center;
+  width: var(--wfn-answer-icon);
+  height: var(--wfn-answer-icon);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-answer-row .wfn-answer-type:not(:disabled):hover,
+.wfn-answer-row .wfn-answer-type[aria-expanded="true"] {
+  background: var(--wfn-ring-strong);
+  color: var(--openbot-text-primary);
+}
+
+.wfn-answer-row .wfn-answer-type svg {
+  width: var(--wfn-answer-glyph);
+  height: var(--wfn-answer-glyph);
+}
+
+.wfn-answer-row .wfn-answer-type .ui-select-trigger-icon {
+  display: none;
+}
+
+.wfn-answer-row .wfn-answer-name,
+.wfn-answer-row .wfn-answer-values {
+  height: 28px;
+  padding-inline: var(--wfn-answer-pad);
+  overflow: hidden;
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+}
+
+.wfn-answer-row .wfn-answer-values {
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-answer-row .wfn-answer-name:not(:hover, :focus),
+.wfn-answer-row .wfn-answer-values:not(:hover, :focus),
+.wfn-answer-row .wfn-answer-name:read-only,
+.wfn-answer-row .wfn-answer-values:read-only {
+  border-color: transparent;
+  background: transparent;
+}
+
+.wfn-answer-kind {
+  overflow: hidden;
+  padding-inline: calc(var(--wfn-answer-pad) + 1px);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-answer-row .wfn-answer-remove {
+  grid-column: 4;
+  width: var(--wfn-answer-icon);
+  height: var(--wfn-answer-icon);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-answer-row:not(:hover, :focus-within) .wfn-answer-remove {
+  opacity: 0;
+}
+
+.wfn-answer-fields .wfn-answer-add {
+  display: grid;
+  grid-template-columns: var(--wfn-answer-icon) auto;
+  column-gap: var(--openbot-space-2);
+  justify-self: start;
+  height: 28px;
+  padding: 0 var(--wfn-answer-pad) 0 0;
+  border: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: inherit;
+}
+
+.wfn-answer-fields .wfn-answer-add > svg {
+  justify-self: center;
+  width: var(--wfn-answer-glyph);
+  height: var(--wfn-answer-glyph);
+}
+
+.wfn-answer-fields .wfn-answer-add > span {
+  padding-inline-start: calc(var(--wfn-answer-pad) + 1px);
+}
+
+.wfn-answer-names {
+  margin: 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  overflow-wrap: anywhere;
+}
+
 .wfn-alert[data-tone="danger"] {
   background: var(--openbot-danger-soft);
   color: var(--openbot-danger-text);
@@ -2955,12 +3772,10 @@ fieldset.wfn-picker-group {
   color: var(--openbot-success-text);
 }
 
-/* The last answer stays in its place while the step runs again, so the card does not change size. */
 .wfn-alert[data-stale] {
   opacity: 0.5;
 }
 
-/* Before the first answer, a line that pulses holds the place of the answer at the same height. */
 .wfn-alert[data-pending] {
   background: var(--wfn-field);
 }
@@ -2981,12 +3796,10 @@ fieldset.wfn-picker-group {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--openbot-warning) 64%, transparent);
 }
 
-/* A required input with no line stays visible, in the colour of the other ports. */
 .wfn-stage .wfn-port[data-missing]:not([data-target], [data-armed]) {
   opacity: 1;
 }
 
-/* An agent that the user deleted. */
 .wfn-stage .wfn-pill[data-missing] {
   color: var(--openbot-warning-text);
 }
@@ -2999,15 +3812,11 @@ fieldset.wfn-picker-group {
   color: var(--openbot-text-muted);
 }
 
-/* ----------------------------------------------------------- Long text */
-
-/* Long text scrolls inside its field, so the node keeps its layout. */
 .wfn-stage :is(.wfn-field-task, .wfn-field-fill, .wfn-field-system, .wfn-block-field) .wfn-input {
   max-height: 200px;
   overflow-y: auto;
 }
 
-/* A card with a height that the user set gives all its room to the main field. */
 .wfn-stage .wfn-node[data-height] :is(.wfn-field-task, .wfn-field-fill) .wfn-input {
   max-height: none;
 }
@@ -3023,9 +3832,6 @@ fieldset.wfn-picker-group {
   flex: none;
 }
 
-/* --------------------------------------------------------------- Shape */
-
-/* A shape has no label. The lock badge of a locked shape sits above its top-left corner. */
 .wfn-label[data-bare] {
   position: absolute;
   bottom: 100%;
@@ -3043,7 +3849,6 @@ fieldset.wfn-picker-group {
   box-shadow: none;
 }
 
-/* The outline of the shape shows the hover, not the ring of the card. */
 .wfn-stage .wfn-node[data-kind="shape"]:not([data-selected]) .wfn-card-frame:hover .wfn-card {
   box-shadow: none;
 }
@@ -3074,7 +3879,6 @@ svg.wfn-shape-surface {
   stroke-linejoin: round;
 }
 
-/* In the light theme, ink is near the darkest tone. A Default shape takes a soft fill and a thinner edge there. */
 :root[data-openbot-color-scheme="light"] span.wfn-shape-surface[data-color="ink"] {
   background: color-mix(in srgb, var(--wfn-shape) 5%, transparent);
   box-shadow: inset 0 0 0 1.5px var(--wfn-shape);
@@ -3085,7 +3889,6 @@ svg.wfn-shape-surface {
   stroke-width: 1.5;
 }
 
-/* The words sit at the centre of the shape, and the field grows with them. */
 .wfn-stage .wfn-shape-input {
   position: relative;
   width: 100%;
@@ -3116,7 +3919,6 @@ svg.wfn-shape-surface {
   }
 }
 
-/* The emoji of a Discord or Telegram reaction, in the place of an icon. */
 .wfn-emoji {
   display: inline-flex;
   flex: none;
@@ -3124,14 +3926,6 @@ svg.wfn-shape-surface {
   width: var(--openbot-icon-xs);
 }
 
-/* ------------------------------------------------------------ Presence */
-
-/*
- * Another person's cursor: a soft arrowhead with a notch, and a name in the colour of the person's
- * avatar. A ring in paper colour keeps both apart from any canvas or node under them. It is in world
- * pixels, so it pans and zooms with the canvas, and it keeps its screen size at every zoom, as the
- * remove button of a connection does. The cursor eases between two places from the presence feed.
- */
 .wfn-peer-cursor {
   position: absolute;
   top: 0;
@@ -3149,15 +3943,10 @@ svg.wfn-shape-surface {
   animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The cursor of an agent glides from node to node and fades out when the play of its change ends. */
 .wfn-peer-cursor[data-leaving] {
   opacity: 0;
 }
 
-/*
- * While the canvas plays an agent's change, a node or connection that the agent has not reached yet
- * is hidden. It keeps its size, so the view fits the whole change. One that just showed grows in.
- */
 .wfn-slot[data-build="unbuilt"],
 .wfn-edge[data-build="unbuilt"],
 .wfn-edge-label[data-build="unbuilt"] {
@@ -3180,7 +3969,6 @@ svg.wfn-shape-surface {
   }
 }
 
-/* The ring is the stroke under the fill, so half of it shows outside the arrow. */
 .wfn-peer-arrow {
   flex: none;
   width: 19px;
@@ -3204,7 +3992,6 @@ svg.wfn-shape-surface {
   white-space: nowrap;
 }
 
-/* The name sits under the arrow, a little to the right of its point. */
 .wfn-peer-name {
   margin: 17px 0 0 -11px;
   padding: 2px var(--openbot-space-2);
@@ -3213,7 +4000,6 @@ svg.wfn-shape-surface {
   font-weight: var(--openbot-weight-bold);
 }
 
-/* The node that another person selected has a ring in that person's colour, and their name under it. */
 .wfn-slot[data-peer] .wfn-node:not([data-selected]) .wfn-card {
   outline-color: var(--wfn-peer);
 }
@@ -3234,15 +4020,10 @@ svg.wfn-shape-surface {
   animation: wfn-fade-in var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* Your own selection comes first: the results strip of the node takes the place of the tag. */
 .wfn-slot:has(> [data-selected]) .wfn-peer-tag {
   display: none;
 }
 
-/*
- * The avatars of the people on the canvas: round, each on a tint of its cursor colour. The button and
- * your own avatar have the same 32px box, and the avatar is centred in it. A photo fills the circle.
- */
 .wfn-stage .wfn-hud-button.wfn-presence-person,
 .wfn-presence-self {
   display: grid;
@@ -3261,7 +4042,6 @@ svg.wfn-shape-surface {
   background: color-mix(in srgb, var(--wfn-peer, var(--openbot-text-primary)) 16%, transparent);
 }
 
-/* The generated face fills its circle. The bar button rule would make it the size of an icon. */
 .wfn-stage .wfn-hud-presence .wfn-presence-person .person-avatar-generated > svg {
   width: 100%;
   height: 100%;
@@ -3271,13 +4051,11 @@ svg.wfn-shape-surface {
   display: none;
 }
 
-/* The person you follow has a ring in their colour around the avatar. */
 .wfn-presence-person[aria-pressed="true"] .person-avatar {
   outline: 2px solid var(--wfn-peer);
   outline-offset: 0;
 }
 
-/* While you follow a person, a frame in their colour holds the view, with their name at the top. */
 .wfn-follow-frame {
   position: absolute;
   inset: 0;
@@ -3314,4 +4092,489 @@ svg.wfn-shape-surface {
   .wfn-edge-label[data-build] {
     animation: none;
   }
+}
+
+.wfn-composer,
+.wfn-composer-popover,
+.wfn-composer-list {
+  --wfn-composer-ring: color-mix(in srgb, var(--openbot-text-primary) 9%, transparent);
+  --wfn-composer-surface: color-mix(in srgb, var(--openbot-bg-frame) 65%, var(--openbot-bg-surface-raised));
+  --wfn-composer-field: color-mix(in srgb, var(--openbot-text-primary) 4%, transparent);
+  --wfn-composer-field-hover: color-mix(in srgb, var(--openbot-text-primary) 8%, transparent);
+  --wfn-composer-tile: 56px;
+}
+
+.wfn-composer {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--openbot-space-3);
+  width: 540px;
+  max-width: calc(100% - var(--openbot-space-6));
+  padding: calc(var(--openbot-space-3) + var(--openbot-space-0-5));
+  border-radius: var(--openbot-radius-bubble);
+  background: var(--wfn-composer-surface);
+  box-shadow: 0 0 0 1px var(--wfn-composer-ring);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  visibility: hidden;
+}
+
+.wfn-composer[data-placed] {
+  visibility: visible;
+  animation: wfn-composer-in var(--openbot-duration-slow) var(--openbot-ease-out);
+}
+
+@keyframes wfn-composer-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--openbot-space-2) * -1));
+  }
+}
+
+.wfn-composer .wfn-composer-prompt {
+  min-height: calc(1.6em * 2);
+  max-height: calc(1.6em * 5);
+  padding: 0 var(--openbot-space-1) 0 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--openbot-text-md);
+  line-height: 1.6;
+  resize: none;
+  field-sizing: content;
+}
+
+.wfn-composer .wfn-composer-prompt:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.wfn-composer-pictures {
+  display: flex;
+  gap: var(--openbot-space-2);
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wfn-composer-picture {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: var(--wfn-composer-tile);
+  height: var(--wfn-composer-tile);
+  overflow: hidden;
+  border-radius: var(--openbot-radius-md);
+  background: var(--wfn-composer-field);
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-composer-picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wfn-composer-badge {
+  position: absolute;
+  top: var(--openbot-space-0-5);
+  left: var(--openbot-space-0-5);
+  padding: 0 var(--openbot-space-1);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-media-control-scrim);
+  color: var(--openbot-media-control-text);
+  font-size: var(--openbot-text-xs);
+  font-weight: var(--openbot-weight-medium);
+  line-height: 1.6;
+}
+
+.wfn-composer-bar {
+  display: flex;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+}
+
+.wfn-composer-chip {
+  display: inline-flex;
+  flex: none;
+  gap: var(--openbot-space-1-5);
+  align-items: center;
+  height: var(--openbot-control-md);
+  padding: 0 var(--openbot-space-3);
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--wfn-composer-field);
+  color: var(--openbot-text-primary);
+  font: inherit;
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wfn-composer-chip:is(:hover, [data-expanded]) {
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-chip:disabled {
+  background: var(--wfn-composer-field);
+  color: var(--openbot-text-muted);
+  cursor: default;
+}
+
+.wfn-composer-chip svg {
+  width: var(--openbot-icon-sm);
+  height: var(--openbot-icon-sm);
+  color: var(--openbot-text-secondary);
+}
+
+.wfn-stage .wfn-composer-bar :is(.wfn-composer-chip, .wfn-media-pill):focus-visible {
+  outline: none;
+  box-shadow: var(--openbot-focus-ring);
+}
+
+.wfn-composer-bar .wfn-media-pill {
+  flex: 0 1 auto;
+  gap: var(--openbot-space-1-5);
+  min-width: 0;
+  height: var(--openbot-control-md);
+  padding: 0 var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  background: var(--wfn-composer-field);
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+}
+
+.wfn-composer-bar .wfn-media-pill-name {
+  overflow: hidden;
+  flex: 0 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-composer-bar .wfn-media-pill:is(:hover, [aria-expanded="true"]) {
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-bar .wfn-media-pill:disabled {
+  background: var(--wfn-composer-field);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-composer-bar :is(.wfn-composer-arrow, .wfn-media-pill > svg:last-child) {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+  transition: rotate var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.wfn-composer-bar :is(.wfn-composer-chip[data-expanded], .wfn-media-pill[aria-expanded="true"]) > svg:last-child {
+  rotate: 180deg;
+}
+
+.wfn-composer-elapsed {
+  margin-left: auto;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-composer .wfn-composer-generate {
+  flex: none;
+  height: var(--openbot-control-md);
+  margin-left: auto;
+  padding: 0 var(--openbot-space-3);
+  border-radius: var(--openbot-radius-pill);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.wfn-composer .wfn-composer-elapsed + .wfn-composer-generate {
+  margin-left: 0;
+}
+
+.wfn-composer-stop {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  fill: currentcolor;
+}
+
+.wfn-composer-popover {
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-height: min(520px, calc(50vh - var(--openbot-space-8) - var(--openbot-space-1)));
+  border-radius: var(--openbot-radius-xl);
+  background: var(--wfn-composer-surface);
+  box-shadow: 0 0 0 1px var(--wfn-composer-ring);
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  transform-origin: var(--kb-popover-content-transform-origin);
+  animation: wfn-composer-popover-in var(--openbot-duration-fast) var(--openbot-ease-out);
+}
+
+.wfn-composer-popover:focus-visible {
+  outline: none;
+}
+
+@keyframes wfn-composer-popover-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wfn-composer[data-placed],
+  .wfn-composer-popover {
+    animation: none;
+  }
+}
+
+.wfn-composer-scroll {
+  max-height: inherit;
+  border-radius: inherit;
+}
+
+.wfn-composer-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--openbot-space-1-5);
+  padding: var(--openbot-space-2);
+}
+
+.wfn-composer-tile {
+  min-width: 0;
+}
+
+.wfn-composer-settings:not(:has(> .wfn-composer-length)) > :last-child:nth-child(odd),
+.wfn-composer-settings:has(> .wfn-composer-length) > :last-child:nth-child(even) {
+  grid-column: 1 / -1;
+}
+
+.wfn-composer-pick.ui-select-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--openbot-space-0-5) var(--openbot-space-2);
+  height: auto;
+  min-height: calc(var(--openbot-control-lg) + var(--openbot-space-4));
+  padding: var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-2) var(--openbot-space-3);
+  border: 0;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-composer-field);
+  box-shadow: none;
+  font-size: var(--openbot-text-md);
+}
+
+.wfn-composer-pick.ui-select-trigger:hover:not([data-disabled]),
+.wfn-composer-pick.ui-select-trigger[data-expanded] {
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-tile .wfn-composer-pick.ui-select-trigger:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--openbot-text-muted);
+}
+
+.wfn-composer-pick-name,
+.wfn-composer-pick .ui-select-value {
+  grid-column: 1;
+}
+
+.wfn-composer-pick-name {
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wfn-composer-pick .ui-select-trigger-icon {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+}
+
+.wfn-composer-list.ui-select-content {
+  background: var(--wfn-composer-surface);
+  box-shadow: 0 0 0 1px var(--wfn-composer-ring);
+}
+
+.wfn-composer-list-note {
+  color: var(--openbot-text-muted);
+}
+
+.wfn-composer-size {
+  display: grid;
+  align-content: center;
+  gap: var(--openbot-space-0-5);
+  min-width: 0;
+  min-height: calc(var(--openbot-control-lg) + var(--openbot-space-4));
+  margin: 0;
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border: 0;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-composer-field);
+}
+
+.wfn-composer-size > legend {
+  float: left;
+  padding: 0;
+}
+
+.wfn-composer-size:hover {
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-size:has(:focus-visible) {
+  box-shadow: inset 0 0 0 1px var(--openbot-text-muted);
+}
+
+.wfn-composer-size-row {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-1-5);
+}
+
+.wfn-composer-size-input.ui-input {
+  width: 4ch;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  appearance: textfield;
+}
+
+.wfn-composer-size-input.ui-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.wfn-composer-size-input::-webkit-inner-spin-button,
+.wfn-composer-size-input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.wfn-composer-size-by {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+  color: var(--openbot-text-muted);
+}
+
+.wfn-composer-toggle.ui-switch-field {
+  min-height: calc(var(--openbot-control-lg) + var(--openbot-space-4));
+  padding: var(--openbot-space-2) var(--openbot-space-3);
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-composer-field);
+}
+
+.wfn-composer-toggle .ui-switch-label {
+  font-size: var(--openbot-text-sm);
+}
+
+.wfn-composer-length {
+  --wfn-composer-tick: color-mix(in srgb, var(--openbot-text-primary) 22%, transparent);
+  grid-column: 1 / -1;
+  height: calc(var(--openbot-control-lg) + var(--openbot-space-2));
+  overflow: hidden;
+  border-radius: var(--openbot-radius-lg);
+  background: var(--wfn-composer-field);
+}
+
+.wfn-composer-length .ui-slider-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  height: 100%;
+  padding-inline: var(--openbot-space-3);
+}
+
+.wfn-composer-length .ui-slider-header {
+  display: contents;
+}
+
+.wfn-composer-length .ui-slider-label,
+.wfn-composer-length .ui-slider-value {
+  position: relative;
+  z-index: 1;
+  grid-row: 1;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+}
+
+.wfn-composer-length .ui-slider-label {
+  grid-column: 1;
+  font-weight: var(--openbot-weight-medium);
+}
+
+.wfn-composer-length .ui-slider-value {
+  grid-column: 3;
+}
+
+.wfn-composer-length .ui-slider-track {
+  grid-row: 1;
+  grid-column: 2;
+  align-self: stretch;
+  height: auto;
+  margin: 0 var(--openbot-space-3);
+  border-radius: 0;
+  background:
+    repeating-linear-gradient(
+      to right,
+      var(--wfn-composer-tick) 0 1px,
+      transparent 1px calc(100% / var(--wfn-composer-steps))
+    )
+    center / 100% var(--openbot-space-2) no-repeat;
+}
+
+.wfn-composer-length .ui-slider-track::before {
+  inset: 0;
+}
+
+.wfn-composer-length .ui-slider-track::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 100%;
+  width: 100vw;
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-length .ui-slider-fill {
+  border-radius: 0;
+  background: var(--wfn-composer-field-hover);
+}
+
+.wfn-composer-length[data-full] .ui-slider-fill::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 100%;
+  width: 100vw;
+  background: inherit;
+}
+
+.wfn-composer-length .ui-slider-thumb {
+  top: calc(50% - var(--openbot-space-2));
+  width: 3px;
+  height: var(--openbot-space-4);
+  box-shadow: none;
+}
+
+.wfn-composer-length .ui-slider-thumb:focus-visible {
+  box-shadow: 0 0 0 1px var(--openbot-text-muted);
 }

@@ -1,20 +1,8 @@
-// The routine schedule as a person edits it: a frequency, the days and the time. Desktop and the
-// phone edit the same draft and save it with the same conversion, so a routine saved on one reads
-// back the same on the other. Labels stay with each client.
-
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isRoutineDate, type RoutineSchedule } from "@openbot/contracts/ipc";
 
-/*
- * The schedule the trigger row edits. It is a UI shape, not `RoutineSchedule`: it covers
- * kinds the saved schedule cannot hold yet (yearly, an hours window, several days for
- * a daily run), so the design can be judged before the contract changes.
- */
-
-/** "HH:mm" on a 24-hour clock, the same format as `RoutineSchedule` times. */
 export type RoutineClock = string;
 
-/** `null` runs through the whole day. */
 export type RoutineHoursWindow = { start: RoutineClock; end: RoutineClock } | null;
 
 export type RoutineScheduleDraft =
@@ -24,7 +12,6 @@ export type RoutineScheduleDraft =
       everyHours: number;
       days: number[];
       window: RoutineHoursWindow;
-      /** The minute past the hour of a run through the whole day. A window start sets its own. */
       minute?: number;
     }
   | { kind: "daily"; days: number[]; time: RoutineClock }
@@ -35,7 +22,6 @@ export type RoutineScheduleDraft =
 
 export type RoutineDraftKind = RoutineScheduleDraft["kind"];
 
-/** The frequencies in menu order. A cron expression is the last choice. */
 export const ROUTINE_DRAFT_KIND_VALUES: readonly RoutineDraftKind[] = [
   "once",
   "hourly",
@@ -46,16 +32,11 @@ export const ROUTINE_DRAFT_KIND_VALUES: readonly RoutineDraftKind[] = [
   "custom",
 ];
 
-/**
- * The kinds every host saves. Only this computer's host saves `once`: the released Team API
- * cannot carry it, so a remote host never shows it.
- */
 export const ROUTINE_SAVED_DRAFT_KIND_VALUES = ROUTINE_DRAFT_KIND_VALUES.filter((kind) => kind !== "once");
 
 export const ROUTINE_EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
 export const ROUTINE_WORKDAYS = [1, 2, 3, 4, 5];
 
-/** The steps an hourly run can repeat at. */
 export const ROUTINE_EVERY_HOURS = [1, 2, 3, 4, 6, 8, 12];
 
 const DEFAULT_TIME = "09:00";
@@ -72,7 +53,6 @@ export function routineTimeMinutes(value: string): number {
   return hour * 60 + minute;
 }
 
-/** The time the draft runs at, if its kind has one. */
 function routineDraftTime(draft: RoutineScheduleDraft): RoutineClock | null {
   return "time" in draft ? draft.time : null;
 }
@@ -83,10 +63,6 @@ function draftDays(draft: RoutineScheduleDraft): number[] | null {
   return null;
 }
 
-/**
- * Changes the kind and keeps what still applies: a Daily run at 8:20 AM becomes a Weekly run
- * at 8:20 AM, and its first day becomes the weekly day.
- */
 export function switchDraftKind(
   draft: RoutineScheduleDraft,
   kind: RoutineDraftKind,
@@ -97,7 +73,6 @@ export function switchDraftKind(
   const days = draftDays(draft);
   switch (kind) {
     case "once": {
-      // A time that has passed today is for tomorrow, so the new draft can be saved.
       const passed = time <= clock(today.getHours(), today.getMinutes());
       const day = passed ? new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1) : today;
       return { kind, date: routineDateKey(day), time };
@@ -112,17 +87,14 @@ export function switchDraftKind(
       return { kind, day: draft.kind === "yearly" ? draft.day : today.getDate(), time };
     case "yearly": {
       const month = today.getMonth() + 1;
-      // A monthly day 31 has no date in a short month.
       const day = draft.kind === "monthly" ? Math.min(draft.day, routineYearlyDaysInMonth(month)) : today.getDate();
       return { kind, month, day, time };
     }
     case "custom":
-      // Custom starts from the run the person had, so the switch alone does not move it.
       return { kind, expression: routineDraftCron(draft) };
   }
 }
 
-/** The cron expression that runs at the same times as the draft. A one-time run repeats yearly. */
 function routineDraftCron(draft: RoutineScheduleDraft): string {
   switch (draft.kind) {
     case "once": {
@@ -144,11 +116,6 @@ function routineDraftCron(draft: RoutineScheduleDraft): string {
   }
 }
 
-/**
- * `M H1-H2/N * * DAYS`: the window start gives M and H1, and H2 is the last hour not after its end.
- * A window that ends after midnight is `M H1-23/N,H3-H2/N`, where H3 continues the steps after 23.
- * Cron checks the days of each run on its own date, so a run after midnight uses the next day.
- */
 export function routineHourlyCron(draft: Extract<RoutineScheduleDraft, { kind: "hourly" }>): string {
   const minute = routineHourlyMinute(draft);
   const step = draft.everyHours > 1 ? `/${draft.everyHours}` : "";
@@ -164,21 +131,15 @@ export function routineHourlyCron(draft: Extract<RoutineScheduleDraft, { kind: "
   return `${minute} ${hours} * * ${cronDayList(draft.days)}`;
 }
 
-/** The window end in minutes after the start day begins. An end before the start is on the next day. */
 function windowEndMinutes(window: NonNullable<RoutineHoursWindow>): number {
   const end = routineTimeMinutes(window.end);
   return end < routineTimeMinutes(window.start) ? end + 24 * 60 : end;
 }
 
-/**
- * The first hour after midnight of runs that start at `first` and repeat every `everyHours`.
- * Each step in `ROUTINE_EVERY_HOURS` divides 24, so the steps continue at `first % everyHours`.
- */
 function nextDayFirstHour(first: number, everyHours: number): number {
   return first % everyHours;
 }
 
-/** The minute past the hour of each run. */
 export function routineHourlyMinute(draft: Extract<RoutineScheduleDraft, { kind: "hourly" }>): number {
   return draft.window ? routineTimeMinutes(draft.window.start) % 60 : (draft.minute ?? 0);
 }
@@ -195,7 +156,6 @@ function cronDayList(days: number[]): string {
 
 export function toggleRoutineDay(days: number[], day: number): number[] {
   if (!days.includes(day)) return [...days, day].sort((left, right) => left - right);
-  // A run needs at least one day, so the last selected day stays on.
   if (days.length === 1) return days;
   return days.filter((value) => value !== day);
 }
@@ -204,10 +164,6 @@ export function sameRoutineDays(days: number[], expected: number[]): boolean {
   return sameDays(days, expected);
 }
 
-/**
- * How many runs one day gets. The window is inclusive at both ends, so 9:00 to 18:00 hourly is 10,
- * and 20:00 to 10:00 hourly is 15.
- */
 export function routineRunsPerDay(window: RoutineHoursWindow, everyHours: number): number {
   const step = Math.max(1, everyHours) * 60;
   const start = window ? routineTimeMinutes(window.start) : 0;
@@ -215,7 +171,6 @@ export function routineRunsPerDay(window: RoutineHoursWindow, everyHours: number
   return Math.floor((end - start) / step) + 1;
 }
 
-/** A local calendar date as "YYYY-MM-DD". */
 export function routineDateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -225,18 +180,12 @@ export function parseRoutineDateKey(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
-/**
- * A yearly run has a month and a day but no year. The calendar edits it as a date in a leap
- * year, so February 29 can be chosen; the run skips it in the other years.
- */
 export const ROUTINE_YEARLY_CALENDAR_YEAR = 2024;
 
-/** February has 29 days, so a yearly run can be on February 29. */
 export function routineYearlyDaysInMonth(month: number): number {
   return new Date(ROUTINE_YEARLY_CALENDAR_YEAR, month, 0).getDate();
 }
 
-/** Why the draft cannot be saved, or `null`. A save of such a draft would change when it runs. */
 export type RoutineDraftProblem = "invalidDate" | "cronRequired" | "cronTooLong";
 
 export function routineDraftProblemCode(draft: RoutineScheduleDraft): RoutineDraftProblem | null {
@@ -254,13 +203,6 @@ export function routineDraftProblemCode(draft: RoutineScheduleDraft): RoutineDra
       return null;
   }
 }
-
-/*
- * A routine saves a `RoutineSchedule`. The saved kinds are a released Team API contract, so each
- * draft except `once` saves as the simplest saved kind that runs at the same times: a yearly run is an advanced
- * schedule, and an hourly run between two times is a cron expression. Reading a schedule back
- * gives the same draft.
- */
 
 export function routineScheduleFromDraft(draft: RoutineScheduleDraft): RoutineSchedule {
   switch (draft.kind) {
@@ -357,7 +299,6 @@ function advancedDraft(schedule: Extract<RoutineSchedule, { kind: "advanced" }>)
   return { kind: "custom", expression: advancedCron(schedule) };
 }
 
-/** The cron expression that runs at the same times as an advanced schedule. */
 function advancedCron(schedule: Extract<RoutineSchedule, { kind: "advanced" }>): string {
   const time = schedule.time;
   let clock = "0 *";
@@ -375,10 +316,6 @@ function advancedCron(schedule: Extract<RoutineSchedule, { kind: "advanced" }>):
   return `${clock} ${monthDays} ${months} ${weekDays}`;
 }
 
-/**
- * An interval runs from its anchor, which cron cannot say. The nearest cron shows the rate; the
- * saved interval stays until the user changes the schedule.
- */
 function intervalCron(schedule: Extract<RoutineSchedule, { kind: "interval" }>): string {
   if (schedule.unit === "minutes" && schedule.amount < 60) return `*/${schedule.amount} * * * *`;
   const hoursPerUnit = { minutes: 1 / 60, hours: 1, days: 24 }[schedule.unit];
@@ -387,7 +324,6 @@ function intervalCron(schedule: Extract<RoutineSchedule, { kind: "interval" }>):
   return `0 0 */${Math.min(31, Math.round(hours / 24))} * *`;
 }
 
-/** Reads back the cron that `hourlySchedule` writes: `M H1-H2/N * * DAYS` or `M H1-23/N,H3-H2/N * * DAYS`. */
 function hourlyCronDraft(expression: string): RoutineScheduleDraft | null {
   const fields = expression.trim().split(/\s+/);
   if (fields.length !== 5) return null;
@@ -415,7 +351,6 @@ function hourlyCronDraft(expression: string): RoutineScheduleDraft | null {
   return { kind: "hourly", everyHours, days, window: { start: clock(first, minute), end: clock(last, minute) } };
 }
 
-/** The last hour of the `H3-H2/N` part after midnight, or `null` when it does not continue the steps from `first`. */
 function morningLastHour(source: string, first: number, everyHours: number): number | null {
   const range = /^(\d{1,2})-(\d{1,2})(?:\/(\d{1,2}))?$/.exec(source);
   if (!range) return null;
@@ -428,7 +363,6 @@ function morningLastHour(source: string, first: number, everyHours: number): num
   return last;
 }
 
-/** `*`, or days and day ranges from 0 to 7, where 7 is Sunday. */
 function cronWeekDays(field: string): number[] | null {
   if (field === "*") return ROUTINE_EVERY_DAY;
   const days = new Set<number>();

@@ -27,7 +27,7 @@ import {
 } from "@openbot/ui";
 import { createEffect, createSignal, Match, Show, Switch } from "solid-js";
 import { useText } from "../../text";
-import { ProtonPassMark } from "./brand-marks";
+import { ProtonPassTile } from "./brand-marks";
 import {
   IntegrationPage,
   type IntegrationPageSlots,
@@ -46,36 +46,19 @@ import {
 } from "./VaultParts";
 
 export interface ProtonPassConnectorPanelProps extends IntegrationPageSlots {
-  /** The status from the shared password manager engine. It never holds a key or a password. */
   status: PasswordManagerStatus;
-  /** True while an action runs. Every button waits for it. */
   busy: boolean;
-  /** The joined server whose connection this is. Absent: this computer's. */
   hostName?: string | undefined;
-  /**
-   * Why the last status read failed, when no newer status came. The state is not known: the page
-   * shows the reason and Retry, not the setup of a connection that may be there.
-   */
   statusError?: string | null | undefined;
-  /** Reads the status again. */
   onRetry?: (() => void) | undefined;
-  /** Starts the sign-in in the browser. The host makes the shared vault and its read-only key after it. */
   onConnect: () => void;
-  /** Connects with an access key that the user made. */
   onConnectWithKey: (key: string) => void;
-  /** Sends the extra password that Proton Pass asks for during the sign-in. */
   onSubmitExtraPassword: (password: string) => void;
-  /** Stops the sign-in. */
   onCancel: () => void;
   onDisconnect: () => void;
-  /** Opens the sign-in page in the browser again. */
   onOpenSignIn: () => void;
 }
 
-/**
- * The connect dialog shows one of these. `failed` is a sign-in that stopped, and `connected` stays
- * until the user closes the dialog.
- */
 type ConnectStep = "browser" | "extra-password" | "setup" | "connected" | "failed";
 
 function connectStep(status: PasswordManagerStatus): ConnectStep {
@@ -84,19 +67,16 @@ function connectStep(status: PasswordManagerStatus): ConnectStep {
   return "failed";
 }
 
-/** The index of the step in the dialog's stepper. */
 const STEP_INDEX = { browser: 0, "extra-password": 0, setup: 1, connected: 2, failed: 0 } as const satisfies Record<
   ConnectStep,
   number
 >;
 
-/** True when the host's access key expired, so the user connects again. */
 function expired(status: PasswordManagerStatus): boolean {
   if (status.errorCode === "expired") return true;
   return status.state === "connected" && status.expiresAt !== null && status.expiresAt <= Date.now();
 }
 
-/** True while the page shows the shared vault: the connection is there, also with an expired key. */
 function linked(status: PasswordManagerStatus): boolean {
   return status.state === "connected" || expired(status);
 }
@@ -108,7 +88,6 @@ const PROTON_PASS_STATUS = {
   expired: { status: "attention", label: "connector.protonPass.statusExpired" },
 } as const satisfies Record<"disconnected" | "connecting" | "connected" | "expired", VaultStatus>;
 
-/** The status of the connection, as its page header and every list of connectors show it. */
 export function protonPassStatus(props: Pick<ProtonPassConnectorPanelProps, "status" | "statusError">) {
   const status = props.status;
   const state = expired(status)
@@ -121,20 +100,10 @@ export function protonPassStatus(props: Pick<ProtonPassConnectorPanelProps, "sta
   return vaultHeader(props.statusError, PROTON_PASS_STATUS[state]);
 }
 
-/**
- * The Proton Pass page of one OpenBot computer or joined server. The host runs the Proton sign-in,
- * and this computer opens the sign-in page in the browser. Then the host makes the shared vault and a
- * read-only access key for it, and keeps only that key.
- *
- * Connect opens a dialog with the steps. × closes the dialog and the sign-in goes on: the page shows
- * the current step, and "Show steps" opens the dialog again. Cancel stops the sign-in. The ⋯ menu has
- * the other way in, an access key that the user made.
- */
 export function ProtonPassConnectorPanel(props: ProtonPassConnectorPanelProps) {
   const { t, format } = useText();
   const [dialogOpen, setDialogOpen] = createSignal(false);
   const [keyOpen, setKeyOpen] = createSignal(false);
-  // A sign-in that runs when the page opens, or that asks for the extra password, shows its dialog.
   createEffect(
     () => (props.status.state === "signing-in" ? (props.status.step ?? "browser") : null),
     (step) => {
@@ -176,7 +145,7 @@ export function ProtonPassConnectorPanel(props: ProtonPassConnectorPanelProps) {
   return (
     <IntegrationPage
       class="proton-pass-connector"
-      logo={<ProtonPassMark />}
+      logo={<ProtonPassTile />}
       name={t("connector.protonPass.title")}
       subtitle={
         props.hostName
@@ -232,7 +201,6 @@ export function ProtonPassConnectorPanel(props: ProtonPassConnectorPanelProps) {
       tagline={props.tagline}
       intro={props.intro}
       details={props.details}
-      // With the state not known, the page offers neither the setup nor Disconnect.
       danger={
         <VaultDangerZone
           show={!props.statusError && linked(props.status)}
@@ -314,7 +282,6 @@ export function ProtonPassConnectorPanel(props: ProtonPassConnectorPanelProps) {
   );
 }
 
-/** The ⋯ button in the header, with the other way in. */
 function MoreMenu(props: { disabled: boolean; onUseKey: () => void }) {
   const { t } = useText();
   return (
@@ -338,7 +305,6 @@ function MoreMenu(props: { disabled: boolean; onUseKey: () => void }) {
   );
 }
 
-/** The title and the description of the dialog, and of the page row while the sign-in runs. */
 function stepText(
   status: PasswordManagerStatus,
   hostName: string | undefined,
@@ -387,7 +353,6 @@ function stepText(
   }
 }
 
-/** The page row of a sign-in that runs, with the way back to its dialog. */
 function StepRow(props: { status: PasswordManagerStatus; hostName: string | undefined; onShowSteps: () => void }) {
   const text = useText();
   const vaultName = () => props.status.vaultNames[0] ?? text.t("connector.protonPass.vaultName");
@@ -416,9 +381,7 @@ function ConnectDialog(props: {
   busy: boolean;
   hostName: string | undefined;
   vaultName: string;
-  /** Closes the dialog. The sign-in goes on. */
   onClose: () => void;
-  /** Stops the sign-in and closes the dialog. */
   onCancel: () => void;
   onConnect: () => void;
   onOpenSignIn: () => void;
@@ -456,7 +419,7 @@ function ConnectDialog(props: {
       dismissible={false}
       closeLabel={t("connector.protonPass.close")}
       onClose={close}
-      logo={<ProtonPassMark />}
+      logo={<ProtonPassTile />}
       link={link()}
       title={current().title}
       description={current().description}

@@ -1,0 +1,33 @@
+{
+  "slug": "blotato",
+  "name": "Blotato",
+  "tagline": "Social media publishing",
+  "description": "Blotato lets agents draft, schedule, and publish posts to the social accounts that the user connects in Blotato. Each user signs in to their own Blotato account through the browser.",
+  "category": "automation",
+  "creatorName": "Blotato",
+  "iconUrl": "https://www.blotato.com/favicon.webp",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-draft-thread", "text": "Draft a LinkedIn post from this blog article." },
+    { "id": "prompt-schedule", "text": "Schedule this post for Tuesday at 9:00 on my X account." },
+    { "id": "prompt-queue", "text": "What posts are scheduled for this week?" }
+  ],
+  "apps": [
+    {
+      "id": "app-blotato-mcp",
+      "name": "Blotato",
+      "description": "Post drafting, scheduling, and publishing, over Blotato's MCP server with browser sign-in.",
+      "iconUrl": "https://www.blotato.com/favicon.webp",
+      "server": {
+        "name": "blotato",
+        "transport": "http",
+        "url": "https://mcp.blotato.com/mcp",
+        "auth": [{ "id": "blotato-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.blotato.com",
+  "privacyPolicyUrl": "https://www.blotato.com/privacy-policy",
+  "termsUrl": "https://www.blotato.com/terms-of-service"
+}

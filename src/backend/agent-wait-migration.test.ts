@@ -1,11 +1,10 @@
 // @vitest-environment node
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
+import { THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION } from "./migrations/0065-thread-event-compaction";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves the table
-// or its marker; a newer or incomplete history is accepted; a deleted routine deletes its waits
-// or leaves a broken reference. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -38,7 +37,6 @@ function seed(db: DatabaseSync): void {
 
 type Contents = Record<string, Record<string, SQLOutputValue>[]>;
 
-/** Every row of every table, by table name. */
 function contents(db: DatabaseSync): Contents {
   const tables = db
     .prepare(
@@ -50,7 +48,13 @@ function contents(db: DatabaseSync): Contents {
   return Object.fromEntries(tables.map((table) => [table, db.prepare(`SELECT * FROM "${table}"`).all()]));
 }
 
-/** Migration 57 gives each agent routine the chat as the place where it runs. */
+function withNoMemorySite(before: Contents): Contents {
+  return {
+    ...before,
+    projection_agent_memories: (before.projection_agent_memories ?? []).map((row) => ({ ...row, site: null })),
+  };
+}
+
 function withChatRunPlace(tables: Contents): Contents {
   const routines = tables.projection_agent_routines;
   return routines
@@ -68,12 +72,11 @@ describe("agent wait migration", () => {
     (version) => {
       const db = databaseAt(version);
       seed(db);
-      // The earlier migrations run first; the rows after them are what v34 must keep.
       if (version < 33) migrateUpTo(db, 33);
       const before = contents(db);
       migrateOpenBotDatabase(db);
       expect(contents(db)).toEqual({
-        ...withChatRunPlace(before),
+        ...withNoMemorySite(withChatRunPlace(before)),
         agent_waits: [],
         projection_messaging_memories: [],
         routine_result_deliveries: [],
@@ -101,8 +104,12 @@ describe("agent wait migration", () => {
         browser_profile_proxies: [],
         agent_usage_skill_loads: [],
         projection_messaging_pings: [],
+        projection_messaging_history: [],
+        ...CRM_TABLES_AFTER_MIGRATION,
+        ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+        projection_pinned_thread_messages: [],
       });
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 59 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 69 });
       expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
       expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -122,7 +129,7 @@ describe("agent wait migration", () => {
     db.exec("DROP TRIGGER fail_marker");
     migrateOpenBotDatabase(db);
     expect(contents(db)).toEqual({
-      ...withChatRunPlace(before),
+      ...withNoMemorySite(withChatRunPlace(before)),
       agent_waits: [],
       projection_messaging_memories: [],
       routine_result_deliveries: [],
@@ -150,15 +157,19 @@ describe("agent wait migration", () => {
       browser_profile_proxies: [],
       agent_usage_skill_loads: [],
       projection_messaging_pings: [],
+      projection_messaging_history: [],
+      ...CRM_TABLES_AFTER_MIGRATION,
+      ...THREAD_EVENT_COMPACTION_TABLES_AFTER_MIGRATION,
+      projection_pinned_thread_messages: [],
     });
   });
 
   it("rejects newer and incomplete migration histories before it creates the table", () => {
     const db = databaseAtWithSeed(33);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(60,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(70,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=60; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=70; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(waitTables(db)).toEqual([]);

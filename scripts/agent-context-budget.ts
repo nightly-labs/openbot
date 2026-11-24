@@ -7,12 +7,6 @@ import { BUILTIN_TOOL_CATALOG, visibleDynamicTools } from "../src/backend/agent/
 import { toolGuidance } from "../src/backend/agent/tool-guidance";
 import { runDebtRatchet } from "./debt-ratchet";
 
-// Holds the text that OpenBot adds to an agent's context to the byte counts in
-// tools/agent-context/budget.json. `scripts/debt-ratchet.ts` has the rules of the baseline: more bytes
-// fail, fewer bytes fail until `--write` lowers the baseline. The fixture agent has no user data, so
-// the counts measure only OpenBot's own text. Not measured: the schema that the Claude Agent SDK makes
-// from the raw Zod shapes of its visible tools (`claude-client.ts`).
-
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = resolve(ROOT, ".openbot-build/agent-context-budget");
 
@@ -34,13 +28,10 @@ const agent: AgentSummary = {
   avatarUrl: null,
 };
 
-/**
- * The options that `ThreadLifecycle.#instructions` passes, with nothing connected and no section.
- * Both clients send the memories and the section-mates with the turns (`AgentClient.turnContext`).
- */
 function instructions(provider: "claude" | "codex"): string {
   return developerInstructions({ ...agent, provider }, "/shared", [], "/automation", DEFAULT_AGENT_DEFAULTS, {
     computerUseInOwnChat: false,
+    agentCursorDrawn: true,
     sideThread: false,
     passwordVault: false,
     storedMemoryCount: 0,
@@ -51,7 +42,6 @@ function instructions(provider: "claude" | "codex"): string {
   });
 }
 
-/** A large catalog, as OpenRouter or OpenCode report: 180 models for one provider and 20 for another. */
 function syntheticModels(): AgentModelOption[] {
   const model = (provider: AgentModelOption["provider"], index: number): AgentModelOption => ({
     provider,
@@ -75,7 +65,6 @@ function measure(): Map<string, number> {
   return new Map([
     ["instructions.claude", bytes(instructions("claude"))],
     ["instructions.codex", bytes(instructions("codex"))],
-    // Pi has no web search of its own, so its visible tools name the whole catalog.
     ["visible-tools", bytes(visibleDynamicTools("pi"))],
     ["catalog.schemas", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.inputSchema))],
     ["catalog.descriptions", sum(BUILTIN_TOOL_CATALOG.map((entry) => entry.description))],

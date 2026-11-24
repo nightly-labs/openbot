@@ -1,0 +1,33 @@
+{
+  "slug": "apify",
+  "name": "Apify",
+  "tagline": "Web scraping and automation",
+  "description": "Apify lets agents search the Apify Store, run Actors that scrape and extract web data, and read the results. Each user signs in to their own Apify account through the browser.",
+  "category": "research",
+  "creatorName": "Apify",
+  "iconUrl": "https://apify.com/apple-icon.png?apple-icon.1qabm0kj8blk6.png?dpl=a834cddc87",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-actor", "text": "Find an Actor that extracts reviews from Google Maps." },
+    { "id": "prompt-scrape", "text": "Scrape the product names and prices from this category page." },
+    { "id": "prompt-last-run", "text": "Show the results of my last Actor run." }
+  ],
+  "apps": [
+    {
+      "id": "app-apify-mcp",
+      "name": "Apify",
+      "description": "Actor search, runs, and dataset results, over Apify's MCP server with browser sign-in.",
+      "iconUrl": "https://apify.com/apple-icon.png?apple-icon.1qabm0kj8blk6.png?dpl=a834cddc87",
+      "server": {
+        "name": "apify",
+        "transport": "http",
+        "url": "https://mcp.apify.com",
+        "auth": [{ "id": "apify-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://apify.com",
+  "privacyPolicyUrl": "https://docs.apify.com/legal/privacy-policy",
+  "termsUrl": "https://docs.apify.com/legal/general-terms-and-conditions",
+  "skills": []
+}

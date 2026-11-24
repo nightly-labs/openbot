@@ -27,6 +27,7 @@ import {
 } from "@openbot/contracts/signal-protocol/webhook-route";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Context, Deferred, Effect, Exit, Layer, ManagedRuntime, Option, Result, Scope, Semaphore } from "effect";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import WebSocket from "ws";
 import {
   DiscordApiError,
@@ -34,6 +35,7 @@ import {
   type IngressAnswer,
   type IngressHandler,
   type IngressState,
+  type LinkedRoutePlatform,
   MessagingAdapterError,
   type MessagingIngress,
   TelegramCallError,
@@ -45,65 +47,67 @@ import { downloadTelegramFile, signalHttpOrigin, uploadTelegramFile } from "./te
 
 const logger = createOpenBotLogger("signal-ingress");
 
-/** The route of a kept delivery, as Signal keeps its order: one Slack team, Discord guild or Telegram chat. */
 function queuedRoute(message: QueuedSignalMessage): string {
   if (message.type === "slack-delivery") return `slack:${message.teamId}`;
   if (message.type === "discord-delivery") return `discord:${message.guildId}`;
   return `telegram:${message.chatId}`;
 }
 
+interface LinkedRouteTicket {
+  ticket: string;
+  ids: readonly string[] | null;
+}
+
+type LinkedRouteIds = Record<LinkedRoutePlatform, ReadonlySet<string> | null>;
+
+function linkedRouteIds(route: LinkedRouteTicket | null): ReadonlySet<string> | null {
+  return route?.ids ? new Set(route.ids) : null;
+}
+
 const BACKOFF_START_MS = 2_000;
 const BACKOFF_LIMIT_MS = 5 * 60_000;
 const PING_INTERVAL_MS = 30_000;
 const PONG_TIMEOUT_MS = 10_000;
-/** How long a new socket waits for the upgrade and then for Signal's `ready`. */
 const READY_TIMEOUT_MS = 15_000;
-/** How long a Discord call waits for the session of a socket that is still connecting. */
 const DISCORD_SESSION_WAIT_MS = 15_000;
-/** Signal gives a Discord call about 10 seconds, and an upload carries up to 10 MB. */
 const DISCORD_CALL_TIMEOUT_MS = 60_000;
-/** How long a Telegram call waits for the socket to be ready, and then for Signal's answer. */
 const TELEGRAM_READY_TIMEOUT_MS = 10_000;
 const TELEGRAM_CALL_TIMEOUT_MS = 20_000;
 
 export interface SignalIngressOptions {
-  /** The remote host id of this computer, or null before it has a name. */
   hostId(): string | null;
   signedIn(): boolean;
   issueTicket(hostId: string): Effect.Effect<{ ticket: string; signalUrl: string }, RemoteWorkflowError>;
-  /** The Slack route ticket: the workspaces that the account service links to this host. */
-  issueSlackRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
-  /** The Discord route ticket: the guilds that the account service links to this host. */
+  issueSlackRoute(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
   issueDiscordRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
-  /** The generic webhook route ticket: route IDs registered by this host in account metadata. */
   issueWebhookRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
-  /**
-   * The GitHub route ticket: the repositories that this host's GitHub triggers watch, as the account
-   * service confirms them with the GitHub sign-in.
-   */
   issueGitHubRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
-  /**
-   * The Telegram route ticket: the chats that the account service links to this host. A failure, such
-   * as an account service without Telegram, leaves the socket without Telegram chats until it opens
-   * again later.
-   */
-  issueTelegramRoute?(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
-  /**
-   * The lasting queue key of this host, or null. With it, Signal keeps the events of a hosted server
-   * that sleeps, sealed, and sends them when the socket connects.
-   */
+  issueTelegramRoute?(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
   queueKey?(): Effect.Effect<IngressQueueKey | null>;
+  resolveProxy?(url: string): Effect.Effect<string>;
+}
+
+const CHROMIUM_PROXY_RULE = /^(PROXY|HTTPS)\s+(\S+)$/u;
+
+function proxyUrlFromRules(rules: string): string | null {
+  for (const rule of rules.split(";").map((entry) => entry.trim())) {
+    if (rule === "DIRECT") return null;
+    const match = CHROMIUM_PROXY_RULE.exec(rule);
+    const url = match ? `${match[1] === "HTTPS" ? "https" : "http"}://${match[2]}` : null;
+    if (url && URL.canParse(url)) return url;
+  }
+  return null;
 }
 
 class SignalIngressAccount extends Context.Service<
   SignalIngressAccount,
   {
     ticket(hostId: string): Effect.Effect<{ ticket: string; signalUrl: string }, RemoteWorkflowError>;
-    slackRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
+    slackRoute(hostId: string): Effect.Effect<LinkedRouteTicket, RemoteWorkflowError>;
     discordRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
     webhookRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
     githubRoute(hostId: string): Effect.Effect<string, RemoteWorkflowError>;
-    telegramRoute(hostId: string): Effect.Effect<string | null>;
+    telegramRoute(hostId: string): Effect.Effect<LinkedRouteTicket | null>;
   }
 >()("openbot/main/SignalIngressAccount") {
   static layer(options: SignalIngressOptions) {
@@ -133,7 +137,6 @@ class SignalIngressAccount extends Context.Service<
   }
 }
 
-/** The bearer of this socket's Discord calls, and where they go. Valid while the socket is open. */
 interface DiscordSession {
   token: string;
   url: string;
@@ -145,7 +148,6 @@ export interface WebhookIngressDelivery {
   timestamp: string;
   signature: string;
   body: Uint8Array;
-  /** Absent for an `X-OpenBot-Signature` request. */
   format?: WebhookSignatureFormat;
 }
 
@@ -155,7 +157,6 @@ interface WebhookIngressAnswer {
 
 export type WebhookIngressHandler = (delivery: WebhookIngressDelivery) => Effect.Effect<WebhookIngressAnswer, unknown>;
 
-/** One event of the OpenBot GitHub App, with the exact body that GitHub signed. */
 export interface GitHubIngressDelivery {
   event: string;
   deliveryId: string;
@@ -163,31 +164,16 @@ export interface GitHubIngressDelivery {
 }
 
 export interface GitHubIngressHandler {
-  /** 202 saves the event, 404 refuses it because no trigger watches it, 400 refuses a bad body. */
   deliver(delivery: GitHubIngressDelivery): Effect.Effect<{ status: GitHubDeliveryStatus }, unknown>;
-  /**
-   * The GitHub route was lost from `from` to `to`, in epoch milliseconds. Signal keeps no GitHub
-   * event for a host that is offline, so the events of that time are lost.
-   */
   offline(from: number, to: number): Effect.Effect<void>;
 }
 
-/**
- * Owns this host's `ingress` socket to Signal, which brings the Events API requests of the Slack
- * workspaces, the Gateway events of the Discord guilds and the updates of the Telegram chats linked to
- * this host, the requests of its generic webhook routes, and the GitHub events of the repositories
- * that its GitHub triggers watch. It also makes this host's Discord and Telegram calls through
- * Signal, which holds both bot tokens. It needs no WebRTC, so it lives here in main rather than in
- * the hidden peer window. It is open while a connection holds it, and it reconnects with a new ticket
- * and route tickets after every close. It never logs a frame or a call: both carry message text.
- */
 export class SignalIngress implements MessagingIngress {
   readonly #options: SignalIngressOptions;
   readonly #runtime: ManagedRuntime.ManagedRuntime<SignalIngressAccount, never>;
   readonly #scope = Scope.makeUnsafe();
   #disposing = false;
   readonly #listeners = new Set<(state: IngressState) => void>();
-  /** How many connections of each platform hold the socket open. */
   readonly #holders = new Map<MessagingPlatform, number>();
   #state: IngressState = "unavailable";
   #handler: IngressHandler | null = null;
@@ -202,31 +188,31 @@ export class SignalIngress implements MessagingIngress {
   #webhookHolders = 0;
   #webhookHandler: WebhookIngressHandler | null = null;
   #webhookReady = false;
-  /** The open socket serves Slack or Discord without the webhook route, because its ticket failed. */
   #webhookMissing = false;
   #webhookBackoffMs = BACKOFF_START_MS;
   #githubHolders = 0;
   #githubHandler: GitHubIngressHandler | null = null;
   #githubReady = false;
-  /** The open socket serves other routes without the GitHub route, because its ticket failed. */
   #githubMissing = false;
   #githubBackoffMs = BACKOFF_START_MS;
-  /** When a held GitHub route that Signal confirmed was lost, until Signal confirms it again. */
   #githubLostAt: number | null = null;
-  /** The open socket has no Telegram route, because its ticket failed. */
   #telegramMissing = false;
   #telegramBackoffMs = BACKOFF_START_MS;
+  #directNext = false;
   readonly #sessionListeners = new Set<(session: DiscordSession | null) => void>();
   readonly #routeListeners = new Set<(guildIds: ReadonlySet<string>) => void>();
-  /** What the Signal of the open socket can do, from its `ready`. */
+  #discordGuilds: ReadonlySet<string> | null = null;
+  readonly #linkedRouteListeners: Record<LinkedRoutePlatform, Set<(ids: ReadonlySet<string> | null) => void>> = {
+    slack: new Set(),
+    telegram: new Set(),
+  };
+  #pendingLinkedRoutes: LinkedRouteIds = { slack: null, telegram: null };
+  #linkedRoutes: LinkedRouteIds = { slack: null, telegram: null };
   #capabilities = new Set<string>();
-  /** The HTTPS origin of the Signal of the open socket, for Telegram files. */
   #signalOrigin: string | null = null;
   readonly #telegramCalls = new Map<string, (answer: TelegramCallAnswer) => void>();
-  /** `null` until it is loaded, and when this host has none. */
   #queueKey: IngressQueueKey | null = null;
   readonly #queuedOrder = Semaphore.makeUnsafe(1);
-  /** The last kept delivery of each route, by `queuedRoute`. A later one of the route waits for it. */
   readonly #queuedRoutes = new Map<string, Deferred.Deferred<void>>();
 
   readonly #loadQueueKey: Effect.Effect<IngressQueueKey | null>;
@@ -237,10 +223,6 @@ export class SignalIngress implements MessagingIngress {
     this.#runtime = ManagedRuntime.make(SignalIngressAccount.layer(options));
   }
 
-  /**
-   * Whether the last Signal said that it starts this host for a connector event and keeps the event,
-   * and this host sent it a queue key. Only then may a hosted server with a live connection sleep.
-   */
   queueReady(): boolean {
     return Boolean(this.#queueKey) && this.#capabilities.has(INGRESS_QUEUE_CAPABILITY);
   }
@@ -249,8 +231,6 @@ export class SignalIngress implements MessagingIngress {
     const before = this.#holders.get(platform) ?? 0;
     this.#holders.set(platform, before + 1);
     if (this.#held() === 1 && this.#webhookHolders === 0 && this.#githubHolders === 0) this.#run(this.#open());
-    // The socket asks Signal only for the routes of the platforms that hold it, and webhooks can
-    // already hold it.
     else if (before === 0) this.reconnect();
     let released = false;
     return () => {
@@ -261,7 +241,6 @@ export class SignalIngress implements MessagingIngress {
     };
   }
 
-  /** Keeps the ingress relay open while host webhook routes are enabled. */
   acquireWebhooks(): () => void {
     this.#webhookHolders += 1;
     if (this.#held() === 0 && this.#webhookHolders === 1 && this.#githubHolders === 0) this.#run(this.#open());
@@ -275,10 +254,6 @@ export class SignalIngress implements MessagingIngress {
     };
   }
 
-  /**
-   * Keeps the ingress relay open while a GitHub trigger is saved. Call `reconnect` when the watched
-   * repositories change, so the next socket presents a new route ticket.
-   */
   acquireGitHub(): () => void {
     this.#githubHolders += 1;
     if (this.#held() === 0 && this.#webhookHolders === 0 && this.#githubHolders === 1) this.#run(this.#open());
@@ -293,7 +268,6 @@ export class SignalIngress implements MessagingIngress {
     };
   }
 
-  /** Nothing holds the socket open. */
   #unheld(): boolean {
     return this.#held() === 0 && this.#webhookHolders === 0 && this.#githubHolders === 0;
   }
@@ -321,7 +295,6 @@ export class SignalIngress implements MessagingIngress {
     this.#handler = handler;
   }
 
-  /** Sets the handler for generic webhook requests received over the ingress socket. */
   handleWebhooks(handler: WebhookIngressHandler | null): void {
     this.#webhookHandler = handler;
   }
@@ -344,35 +317,24 @@ export class SignalIngress implements MessagingIngress {
       ),
   };
 
-  /** Sets the handler for the GitHub events received over the ingress socket. */
   handleGitHub(handler: GitHubIngressHandler | null): void {
     this.#githubHandler = handler;
   }
 
-  /** True only after Signal confirms the GitHub route ticket on this socket. */
   githubReady(): boolean {
     return this.#githubReady;
   }
 
-  /** True only after Signal confirms the webhook route ticket on this socket. */
   webhookReady(): boolean {
     return this.#webhookReady;
   }
 
-  /**
-   * A socket can be dead without knowing it after the computer sleeps, or the account, the name or
-   * the linked workspaces changed.
-   */
   reconnect(): void {
     if (this.#unheld()) return;
     this.#close();
     this.#run(this.#open());
   }
 
-  /**
-   * One Discord call through Signal. It fails with `unavailable` when no session arrives in time,
-   * such as when this host is signed out or Signal has no Discord bot.
-   */
   readonly discord = Effect.fn("SignalIngress.discord")(function* <A>(
     this: SignalIngress,
     request: DiscordApiRequest,
@@ -415,6 +377,12 @@ export class SignalIngress implements MessagingIngress {
         catch: () => new MessagingAdapterError({ cause: new DiscordApiError(request.op, "invalid_answer") }),
       });
     const refused = Result.getOrNull(Result.try(() => decodeDiscordApiError(JSON.parse(text))));
+    if (
+      refused?.code === "unknown_guild" &&
+      this.#discordSession === session &&
+      this.#discordGuilds?.has(request.guildId)
+    )
+      this.#setDiscordGuilds(new Set([...this.#discordGuilds].filter((guildId) => guildId !== request.guildId)));
     return yield* new MessagingAdapterError({
       cause: new DiscordApiError(request.op, refused?.code ?? `http_${status}`, refused?.retryAfterMs),
     });
@@ -425,10 +393,25 @@ export class SignalIngress implements MessagingIngress {
     return () => this.#routeListeners.delete(listener);
   }
 
-  /**
-   * The session of the open socket, at once or when Signal sends it. Null when nothing holds the
-   * socket open, or when it closes: no session comes then.
-   */
+  #setDiscordGuilds(guildIds: ReadonlySet<string>): void {
+    this.#discordGuilds = guildIds;
+    for (const listener of [...this.#routeListeners]) listener(guildIds);
+  }
+
+  onLinkedRoutes(platform: LinkedRoutePlatform, listener: (ids: ReadonlySet<string> | null) => void): () => void {
+    const listeners = this.#linkedRouteListeners[platform];
+    listeners.add(listener);
+    const ids = this.#linkedRoutes[platform];
+    if (ids) listener(ids);
+    return () => listeners.delete(listener);
+  }
+
+  #setLinkedRoutes(routes: LinkedRouteIds): void {
+    this.#linkedRoutes = routes;
+    for (const platform of ["slack", "telegram"] as const)
+      for (const listener of [...this.#linkedRouteListeners[platform]]) listener(routes[platform]);
+  }
+
   #awaitSession(): Effect.Effect<DiscordSession | null> {
     return Effect.callback<DiscordSession | null>((resume) => {
       const current = this.#discordSession;
@@ -451,6 +434,8 @@ export class SignalIngress implements MessagingIngress {
     this.#close();
     this.#listeners.clear();
     this.#routeListeners.clear();
+    this.#linkedRouteListeners.slack.clear();
+    this.#linkedRouteListeners.telegram.clear();
     this.#webhookHandler = null;
     this.#webhookHolders = 0;
     this.#githubHandler = null;
@@ -476,7 +461,6 @@ export class SignalIngress implements MessagingIngress {
     let webhookTicket: Effect.Effect<string | null, RemoteWorkflowError> = webhooks
       ? account.webhookRoute(hostId)
       : Effect.succeed(null);
-    // A failed webhook ticket must not stop the other routes: the socket then connects without it.
     if (webhooks && (slack || discord || telegram || github))
       webhookTicket = webhookTicket.pipe(
         Effect.catch(() =>
@@ -489,7 +473,6 @@ export class SignalIngress implements MessagingIngress {
     let githubTicket: Effect.Effect<string | null, RemoteWorkflowError> = github
       ? account.githubRoute(hostId)
       : Effect.succeed(null);
-    // A failed GitHub ticket, such as a GitHub sign-in that expired, must not stop the other routes.
     if (github && (slack || discord || telegram || webhooks))
       githubTicket = githubTicket.pipe(
         Effect.catch(() =>
@@ -516,13 +499,13 @@ export class SignalIngress implements MessagingIngress {
     }
     const [bootstrap, slackRoute, discordRoute, webhookRoute, telegramRoute, githubRoute] = issued.success;
     const routes = {
-      ...(slackRoute === null ? {} : { slackRoute }),
+      ...(slackRoute === null ? {} : { slackRoute: slackRoute.ticket }),
       ...(discordRoute === null ? {} : { discordRoute }),
       ...(webhookRoute === null ? {} : { webhookRoute }),
-      ...(telegramRoute === null ? {} : { telegramRoute }),
+      ...(telegramRoute === null ? {} : { telegramRoute: telegramRoute.ticket }),
       ...(githubRoute === null ? {} : { githubRoute }),
     };
-    // Loaded once: two opens at the same time must not make two keys.
+    const proxyUrl = this.#directNext ? null : yield* this.#proxyFor(bootstrap.signalUrl);
     const queueKey = yield* this.#loadQueueKey;
     this.#queueKey = queueKey;
     if (generation !== this.#generation || this.#unheld()) return;
@@ -530,9 +513,9 @@ export class SignalIngress implements MessagingIngress {
     this.#githubMissing = github && githubRoute === null;
     this.#telegramMissing = telegram && telegramRoute === null;
     if (telegram && telegramRoute !== null) this.#telegramBackoffMs = BACKOFF_START_MS;
-    const socket = new WebSocket(bootstrap.signalUrl);
+    this.#pendingLinkedRoutes = { slack: linkedRouteIds(slackRoute), telegram: linkedRouteIds(telegramRoute) };
+    const socket = new WebSocket(bootstrap.signalUrl, proxyUrl ? { agent: new HttpsProxyAgent(proxyUrl) } : {});
     this.#socket = socket;
-    // A socket that stalls before `ready` closes, so that the retry opens a new one.
     this.#clearReadyDeadline();
     this.#readyDeadline = setTimeout(() => {
       this.#readyDeadline = null;
@@ -540,7 +523,9 @@ export class SignalIngress implements MessagingIngress {
     }, READY_TIMEOUT_MS);
     this.#apiUrl = discordApiUrl(bootstrap.signalUrl);
     this.#signalOrigin = signalHttpOrigin(bootstrap.signalUrl);
+    let opened = false;
     socket.on("open", () => {
+      opened = true;
       const hello: SignalClientMessage = {
         type: "hello",
         version: SIGNAL_PROTOCOL_VERSION,
@@ -557,7 +542,10 @@ export class SignalIngress implements MessagingIngress {
     socket.on("close", () => {
       if (socket !== this.#socket) return;
       this.#socket = null;
+      this.#directNext = proxyUrl !== null && !opened;
       this.#discordSession = null;
+      this.#discordGuilds = null;
+      this.#linkedRoutes = { slack: null, telegram: null };
       this.#endTelegram();
       this.#stopPing();
       this.#clearReadyDeadline();
@@ -565,9 +553,7 @@ export class SignalIngress implements MessagingIngress {
       this.#loseGitHub();
       if (!this.#unheld()) this.#wait("unavailable");
     });
-    socket.on("error", () => {
-      // `close` follows and schedules the retry. The error can carry the URL.
-    });
+    socket.on("error", () => {});
   });
 
   readonly #receive = Effect.fn("SignalIngress.receive")(function* (
@@ -588,11 +574,6 @@ export class SignalIngress implements MessagingIngress {
       if (socket === this.#socket) yield* this.#dispatch(socket, message, false);
       return;
     }
-    // A delivery that Signal kept while this host started. Signal already answered the platform, so it
-    // is handled also when this socket closed meanwhile. The kept deliveries are opened one at a time,
-    // in the order that Signal sent them. Signal keeps the order of each route, so a delivery waits only
-    // for the earlier ones of its route: a connection that is not available does not hold back the
-    // others. Each is acknowledged so that Signal stops keeping it.
     const { id, sealed } = message;
     const turn = yield* this.#queuedOrder.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -615,8 +596,6 @@ export class SignalIngress implements MessagingIngress {
         if (turn.previous) yield* Deferred.await(turn.previous);
         yield* this.#dispatch(socket, turn.opened, true);
       } else logger.warn("A kept delivery from Signal could not be opened, and is dropped.");
-      // An acknowledgement that cannot be sent now is not needed: Signal sends the delivery again on
-      // the next hello, and the transports drop an event that they already handled.
       const current = this.#socket;
       if (current?.readyState !== WebSocket.OPEN || !this.#capabilities.has(INGRESS_QUEUE_CAPABILITY)) return;
       const ack: SignalClientMessage = { type: "queued-delivery-ack", version: SIGNAL_PROTOCOL_VERSION, id };
@@ -643,6 +622,7 @@ export class SignalIngress implements MessagingIngress {
       this.#capabilities = new Set(message.capabilities ?? []);
       this.#backoffMs = BACKOFF_START_MS;
       this.#startPing(socket);
+      this.#setLinkedRoutes(this.#pendingLinkedRoutes);
       this.#setState("online");
       if (this.#webhookMissing || this.#githubMissing || this.#telegramMissing) this.#retryRoutes();
       return;
@@ -683,7 +663,6 @@ export class SignalIngress implements MessagingIngress {
       return;
     }
     if (message.type === "error") {
-      // Signal closes the socket after an error that ends it. Only the code is logged.
       logger.warn("Signal refused the ingress socket.", { code: message.code });
       return;
     }
@@ -693,12 +672,10 @@ export class SignalIngress implements MessagingIngress {
       const session = { token: message.token, url };
       this.#discordSession = session;
       for (const listener of [...this.#sessionListeners]) listener(session);
-      const routes = new Set(message.guilds);
-      for (const listener of [...this.#routeListeners]) listener(routes);
+      this.#setDiscordGuilds(new Set(message.guilds));
       return;
     }
     if (message.type === "discord-delivery") {
-      // Discord gets no answer: Signal already acknowledged a button press.
       const handler = this.#handler;
       if (handler)
         yield* handler(message.guildId, { platform: "discord", delivery: message.delivery, queued }).pipe(
@@ -711,7 +688,9 @@ export class SignalIngress implements MessagingIngress {
       return;
     }
     if (message.type === "telegram-delivery") {
-      // Telegram gets no answer: Signal already answered its webhook.
+      const chats = this.#linkedRoutes.telegram;
+      if (message.linked === true && chats && !chats.has(message.chatId))
+        this.#linkedRoutes = { ...this.#linkedRoutes, telegram: new Set([...chats, message.chatId]) };
       const handler = this.#handler;
       if (handler)
         yield* handler(message.chatId, {
@@ -789,11 +768,12 @@ export class SignalIngress implements MessagingIngress {
     }, delay);
   }
 
-  /**
-   * Opens the shared socket again later, with a longer delay each time, so a missing webhook, GitHub
-   * or Telegram route comes back. Each route has its own delay: a confirmed webhook route does not
-   * shorten the delay of a Telegram route that still fails.
-   */
+  #proxyFor(signalUrl: string): Effect.Effect<string | null> {
+    const resolveProxy = this.#options.resolveProxy;
+    if (!resolveProxy) return Effect.succeed(null);
+    return resolveProxy(signalUrl.replace(/^ws/u, "http")).pipe(Effect.map(proxyUrlFromRules));
+  }
+
   #retryRoutes(): void {
     if (this.#retry) return;
     let delay: number;
@@ -813,10 +793,6 @@ export class SignalIngress implements MessagingIngress {
     }, delay);
   }
 
-  /**
-   * One Bot API call through Signal. It waits a short time for the socket to be ready, so a call made
-   * while the socket reconnects does not fail at once.
-   */
   #telegramCall<M extends TelegramCallMethod>(
     botId: string,
     method: M,
@@ -851,7 +827,6 @@ export class SignalIngress implements MessagingIngress {
 
   #telegramReady(): Effect.Effect<void, MessagingAdapterError> {
     if (this.telegram.available()) return Effect.void;
-    // A Signal that answered `ready` without Telegram does not gain it on this socket.
     if (this.#state === "online") return Effect.fail(telegramUnavailable());
     return Effect.callback<void>((resume) => {
       const stop = this.onState(() => {
@@ -865,7 +840,6 @@ export class SignalIngress implements MessagingIngress {
     );
   }
 
-  /** The socket closed: no answer comes for the Telegram calls in flight. */
   #endTelegram(): void {
     this.#capabilities = new Set();
     for (const settle of [...this.#telegramCalls.values()]) settle(TELEGRAM_UNAVAILABLE_ANSWER);
@@ -881,6 +855,8 @@ export class SignalIngress implements MessagingIngress {
     const socket = this.#socket;
     this.#socket = null;
     this.#discordSession = null;
+    this.#discordGuilds = null;
+    this.#linkedRoutes = { slack: null, telegram: null };
     this.#webhookReady = false;
     this.#loseGitHub();
     if (this.#unheld()) for (const listener of [...this.#sessionListeners]) listener(null);
@@ -889,7 +865,6 @@ export class SignalIngress implements MessagingIngress {
     this.#setState("unavailable");
   }
 
-  /** The socket of a confirmed GitHub route closed: GitHub events from now on are lost until it is back. */
   #loseGitHub(): void {
     if (this.#githubReady && this.#githubHolders > 0) this.#githubLostAt ??= Date.now();
     this.#githubReady = false;
@@ -942,7 +917,6 @@ function telegramUnavailable(): MessagingAdapterError {
   return new MessagingAdapterError({ cause: new TelegramCallError(503, "relay_unavailable", null) });
 }
 
-/** Signal's Discord path on the origin of its socket: `wss:` becomes `https:`, and `ws:` (local) `http:`. */
 function discordApiUrl(signalUrl: string): string {
   const url = new URL(signalUrl);
   url.protocol = url.protocol === "ws:" ? "http:" : "https:";

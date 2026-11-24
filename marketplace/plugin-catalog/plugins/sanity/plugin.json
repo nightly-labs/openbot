@@ -1,0 +1,33 @@
+{
+  "slug": "sanity",
+  "name": "Sanity",
+  "tagline": "Content queries and documents",
+  "description": "Sanity lets agents run GROQ queries, read and edit documents, and search the Sanity docs in the projects of the signed-in user. Each user signs in to their own Sanity account through the browser.",
+  "category": "coding",
+  "creatorName": "Sanity",
+  "iconUrl": "https://www.sanity.io/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-recent-posts", "text": "List the blog posts published this month in my production dataset." },
+    { "id": "prompt-groq", "text": "Write a GROQ query for all products that have no image." },
+    { "id": "prompt-draft-doc", "text": "Draft a new article document titled \"Spring release notes\"." }
+  ],
+  "apps": [
+    {
+      "id": "app-sanity-mcp",
+      "name": "Sanity",
+      "description": "GROQ queries, documents, and docs search, over Sanity's MCP server with browser sign-in.",
+      "iconUrl": "https://www.sanity.io/favicon.ico",
+      "server": {
+        "name": "sanity",
+        "transport": "http",
+        "url": "https://mcp.sanity.io",
+        "auth": [{ "id": "sanity-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.sanity.io",
+  "privacyPolicyUrl": "https://www.sanity.io/legal/privacy",
+  "termsUrl": "https://www.sanity.io/legal/tos"
+}

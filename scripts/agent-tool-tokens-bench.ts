@@ -1,14 +1,3 @@
-// Counts the tokens that OpenBot's own tools and instructions add to each Claude and Codex request.
-// Codex: the real `codex app-server` sends one turn to a local fake Responses server, which records the
-// request, so the count is what the model gets. Claude: the in-process MCP server that
-// `claude-client.ts` gives the Claude CLI lists its tools to an in-memory MCP client; the CLI sends
-// these schemas to the model. A `tool_search` result is counted too, because it brings catalog schemas.
-// No account or key is used.
-//
-// `bun scripts/agent-tool-tokens-bench.ts`. Writes .openbot-build/agent-tool-tokens-bench/report.json.
-// Token counts use the o200k encoding when OPENBOT_O200K_TOKENIZER names the
-// `gpt-tokenizer/esm/encoding/o200k_base.js` file of an installed `gpt-tokenizer`. Without it, the
-// report has bytes only. o200k is the Codex encoding; for Claude it is an estimate.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server as HttpServer } from "node:http";
@@ -22,7 +11,8 @@ import { developerInstructions } from "../src/backend/agent/developer-instructio
 import { CODEX_FEATURES_CONFIG } from "../src/backend/agent/thread-lifecycle";
 import { discoverTools, visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
-import { claudeOpenBotTools } from "../src/backend/claude-client";
+import { OPENBOT_BROWSER_NAMESPACE } from "../src/backend/browser-tools";
+import { claudeBrowserTools, claudeOpenBotTools } from "../src/backend/claude-client";
 import { resolveCodexCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { decodeRecordResponse, getRecord, getString } from "../src/backend/protocol";
@@ -59,7 +49,6 @@ const agent: AgentSummary = {
   avatarUrl: null,
 };
 
-/** The options that `ThreadLifecycle.#instructions` passes, with nothing connected and no section. */
 function instructions(provider: "claude" | "codex"): string {
   const inTurns = provider === "claude";
   return developerInstructions({ ...agent, provider }, "/shared", [], "/automation", DEFAULT_AGENT_DEFAULTS, {
@@ -86,7 +75,6 @@ interface OutputItem {
   content: Array<{ type: "output_text"; text: string }>;
 }
 
-/** One server-sent event of a streamed Responses answer. */
 interface StreamEvent {
   type: string;
   output_index?: number;
@@ -167,7 +155,6 @@ function deadline(what: string): Promise<never> {
 
 const OPENBOT_NAMES = new Set(visibleDynamicTools("codex").flatMap((namespace) => [namespace.name]));
 
-/** One Codex turn with OpenBot's visible tools and instructions; returns the largest request. */
 async function codexRequest(root: string) {
   const cli = await runCauseEffect(resolveCodexCli());
   const model = await startFakeModel();
@@ -249,32 +236,34 @@ async function codexRequest(root: string) {
   }
 }
 
-/** The tools that the Claude CLI gets from OpenBot's in-process MCP server. */
 async function claudeTools() {
-  const server = createSdkMcpServer({
-    name: "openbot",
-    version: "0.1.0",
-    tools: claudeOpenBotTools(async () => ({ content: [] })),
-  });
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await server.instance.connect(serverTransport);
-  const client = new Client({ name: "openbot-bench", version: "0.0.0" });
-  await client.connect(clientTransport);
-  try {
-    const { tools } = await client.listTools();
-    await writeFile(join(OUT, "claude-openbot-tools.json"), `${JSON.stringify(tools, null, 2)}${NL}`);
-    const byName = Object.fromEntries(tools.map((tool) => [tool.name, count(tool).tokens ?? count(tool).bytes]));
-    return {
-      tools: count(tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))),
-      byName,
-    };
-  } finally {
-    await client.close();
-    await server.instance.close();
+  const empty = async () => ({ content: [] });
+  const listed = [];
+  for (const [name, tools] of [
+    ["openbot", claudeOpenBotTools(empty)],
+    [OPENBOT_BROWSER_NAMESPACE, claudeBrowserTools(empty)],
+  ] as const) {
+    const server = createSdkMcpServer({ name, version: "0.1.0", tools: [...tools] });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.instance.connect(serverTransport);
+    const client = new Client({ name: "openbot-bench", version: "0.0.0" });
+    await client.connect(clientTransport);
+    try {
+      const { tools: own } = await client.listTools();
+      listed.push(...own.map((tool) => ({ ...tool, name: `mcp__${name}__${tool.name}` })));
+    } finally {
+      await client.close();
+      await server.instance.close();
+    }
   }
+  await writeFile(join(OUT, "claude-openbot-tools.json"), `${JSON.stringify(listed, null, 2)}${NL}`);
+  const byName = Object.fromEntries(listed.map((tool) => [tool.name, count(tool).tokens ?? count(tool).bytes]));
+  return {
+    tools: count(listed.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))),
+    byName,
+  };
 }
 
-/** Searches that an agent often makes. Each result stays in the context for the rest of the task. */
 const SEARCHES = ["create routine", "send email gmail", "list tables", "browser open"];
 
 function searchResults() {
@@ -305,10 +294,8 @@ type Count = ReturnType<typeof count>;
 const report: {
   passed: boolean;
   encoding: "o200k_base" | null;
-  /** Each tool that every request carries: its description and input schema. */
   visibleTools?: Record<string, Count>;
   claude?: { instructions: Count } & Awaited<ReturnType<typeof claudeTools>>;
-  /** A tool_search result stays in the context for the rest of the task. */
   searchResults?: Record<string, Count>;
   codex?: Awaited<ReturnType<typeof codexRequest>>;
   error?: string;

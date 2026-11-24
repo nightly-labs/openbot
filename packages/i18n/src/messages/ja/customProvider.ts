@@ -76,23 +76,24 @@ export const messages = {
   "customProvider.field.apiKeyKeptHint": "キーは保存済みです。そのまま使う場合は、空のままにしてください。",
   "customProvider.models": "モデル",
   "customProvider.model.id": "モデル {number} の ID",
+  "customProvider.model.idColumn": "モデル ID",
   "customProvider.model.name": "モデル {number} の表示名",
   "customProvider.model.namePlaceholder": "表示名",
   "customProvider.model.contextWindow": "モデル {number} のコンテキストウィンドウ",
   "customProvider.model.contextWindowPlaceholder": "トークン",
+  "customProvider.model.contextWindowColumn": "コンテキスト長",
   "customProvider.model.maxOutput": "モデル {number} の最大出力",
   "customProvider.model.maxOutputPlaceholder": "トークン",
+  "customProvider.model.maxOutputColumn": "最大出力",
   "customProvider.model.efforts": "モデル {number} の推論の強さ",
   "customProvider.model.effortsLabel": "推論の強さ",
-  "customProvider.model.effortsHintOpenCode":
-    "各モデルが受け付ける推論の強さを選択します。何も選択しないと、OpenCode は低・中・高を表示します。",
-  "customProvider.model.effortsHintPi":
-    "各モデルが受け付ける推論の強さを選択します。何も選択しないと、モデルは推論しません。",
+  "customProvider.model.effortsDefault": "デフォルト",
+  "customProvider.model.effortsNone": "推論なし",
   "customProvider.model.inputs": "モデル {number} の入力",
   "customProvider.model.inputsLabel": "入力",
   "customProvider.model.inputImage": "画像",
   "customProvider.model.inputPdf": "PDF",
-  "customProvider.model.inputsHint": "各モデルがテキスト以外に読めるものを選択します。",
+  "customProvider.model.inputsNone": "テキストのみ",
   "customProvider.model.foundValuesHint": "一部の値はエンドポイントから取得しました。変更できます。",
   "customProvider.model.remove": "モデル {number} を削除",
   "customProvider.model.add": "モデルを追加",
@@ -111,7 +112,11 @@ export const messages = {
     other: "エンドポイントに {count} 個のモデルがあります。追加するモデルを選んでください。",
   },
   "customProvider.discovery.empty": "エンドポイントにモデルがありません。モデル ID を自分で追加してください。",
-  "customProvider.discovery.label": "エンドポイントにあるモデル",
+  "customProvider.discovery.choose": "モデルを選択",
+  "customProvider.discovery.search": "モデルを検索",
+  "customProvider.discovery.selectAll": "すべて選択",
+  "customProvider.discovery.deselectAll": "選択を解除",
+  "customProvider.discovery.noMatch": "検索に一致するモデルはありません。",
 
   "customProvider.preset.title": "プロバイダーまたはエージェントを追加",
   "customProvider.preset.description":
@@ -132,6 +137,7 @@ export const messages = {
   "customProvider.probe.running": { other: "実行中 · モデル {count} 個" },
 
   "customProvider.detected.title": "このコンピューターで見つかったもの",
+  "customProvider.detected.titleServer": "サーバーで見つかったもの",
   "customProvider.detected.scanning": "ローカルのモデルとエージェントを探しています。",
   "customProvider.detected.scanAgain": "再スキャン",
   "customProvider.detected.empty": "OpenBot はローカルのモデルサーバーも ACP エージェントも見つけられませんでした。",
@@ -152,6 +158,8 @@ export const messages = {
   "customProvider.detection.enabled": "ローカルのモデルとエージェントを探す",
   "customProvider.detection.enabledDescription":
     "OpenBot は Ollama と LM Studio のデフォルトのアドレスを確認し、PATH にある既知の ACP エージェントを探します。",
+  "customProvider.detection.enabledDescriptionServer":
+    "サーバーは Ollama と LM Studio のデフォルトのアドレスを確認し、サーバーの PATH にある既知の ACP エージェントを探します。",
   "customProvider.detection.addresses": "その他のモデルサーバーのアドレス",
   "customProvider.detection.address.label": "アドレス {number}",
   "customProvider.detection.address.remove": "アドレス {number} を削除",
@@ -172,6 +180,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "小文字の英字、数字、ハイフン。あとから変更できません。",
   "customProvider.acp.command": "コマンド",
   "customProvider.acp.commandHint": "起動するプログラムです。OpenBot は PATH からこれを探します。",
+  "customProvider.acp.commandHintServer": "起動するプログラムです。サーバーは自身の PATH からこれを探します。",
   "customProvider.acp.args": "引数",
   "customProvider.acp.argsHint": "引数はスペースで区切ってください。スペースを含む引数は引用符で囲んでください。",
   "customProvider.acp.usagePrompt": "使用量コマンド",
@@ -196,6 +205,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "このコマンドはこのコンピューターで実行されます",
   "customProvider.acp.trustDescription":
     "OpenBot はあなたのユーザーアカウントでこれを起動します。エージェントはファイルの読み取りと変更、コマンドの実行ができます。信頼できるエージェントだけを追加してください。",
+  "customProvider.acp.hostTrustTitle": "このコマンドはサーバーで実行されます",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot はサーバーのユーザーアカウントでこれを起動します。エージェントはサーバー上のファイルの読み取りと変更、コマンドの実行ができます。信頼できるエージェントだけを追加してください。",
   "customProvider.acp.submit": "エージェントを追加",
   "customProvider.acp.editTitle": "カスタム ACP エージェントを編集",
   "customProvider.acp.submitEdit": "エージェントを保存",
@@ -213,6 +225,7 @@ export const messages = {
 
   "customProvider.agents.title": "カスタムエージェント",
   "customProvider.agents.description": "OpenBot がこのコンピューターで起動する ACP エージェントです。",
+  "customProvider.agents.hostDescription": "OpenBot がサーバーのコンピューターで起動する ACP エージェントです。",
   "customProvider.agents.empty": "カスタムエージェントはまだありません。",
   "customProvider.agents.add": "エージェントを追加",
   "customProvider.agents.restart": "エージェントを再起動",

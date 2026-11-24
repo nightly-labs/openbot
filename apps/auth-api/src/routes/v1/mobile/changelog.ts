@@ -4,21 +4,14 @@ import { parseInline } from "../../../lib/changelog";
 import { CHANGELOG_RELEASES } from "../../../lib/changelog-releases";
 import { json } from "../../../server/request-auth";
 
-// The update header shows the versions between the app and the newest one, so a few are enough.
 const MAX_RELEASES = 10;
 
-/** The text of an item without its Markdown: the phone shows plain text. */
 function plainText(item: string): string {
   return parseInline(item)
     .map((segment) => segment.text)
     .join("");
 }
 
-/**
- * The release notes of the mobile app for `?platform=ios&after=1.4.1`: each version that the store of
- * the platform has, newer than `after`, newest first. It comes from apps/mobile/CHANGELOG.md, as the
- * Mobile tab of /changelog does. It needs no session. An unknown platform gets no release.
- */
 export const Route = createFileRoute("/v1/mobile/changelog")({
   server: {
     handlers: {

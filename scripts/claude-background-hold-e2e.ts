@@ -1,14 +1,3 @@
-// Checks the low-memory limit of the Claude background-work hold. Runs the real agent service on a
-// temporary profile, with a stand-in server memory reading. Claude is the real `ClaudeAgentClient`,
-// which the Claude Agent SDK connects to a stand-in `claude` executable. Each turn of the stand-in
-// starts one background task, which stays running and sends nothing. Steps:
-// 1. The turn ends. The task holds the process: the idle release does not close it (#1870).
-// 2. A sample with normal memory does not ask for the quiet release.
-// 3. A low sample asks for it, but the task was quiet for less than 30 minutes: the process stays.
-// 4. A low sample with the quiet time set to 0 closes the process.
-// 5. Memory is back. The next turn resumes the saved session in a new process.
-// Only the quiet time is injected; the memory guard, the provider runtime and the client are real.
-// `bun run test:claude-background-hold`. Writes .openbot-build/claude-background-hold-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -33,7 +22,6 @@ const processLog = join(root, "claude-processes.jsonl");
 const claudeExecutable = join(root, "claude");
 const CLAUDE_MODEL = defaultProviderModel("claude");
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 mkdirSync(home, { recursive: true });
@@ -45,8 +33,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end,
-// and it reports one running background task before the result. It logs its start and its exit.
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
@@ -73,17 +59,42 @@ const exit = (reason) => {
 };
 process.on("SIGTERM", () => exit("SIGTERM"));
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
-const turn = () => {
+const answer = (text) => {
   const id = "msg_" + process.pid + "_" + randomUUID();
   write({ type: "assistant", message: { id, type: "message", role: "assistant", model: ${JSON.stringify(CLAUDE_MODEL)},
-    content: [{ type: "text", text: "Started." }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+    content: [{ type: "text", text }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
     parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
-  write({ type: "system", subtype: "background_tasks_changed", tasks: [{ id: "bg-" + process.pid, type: "local_bash" }],
-    session_id: sessionId, uuid: randomUUID() });
-  write({ type: "result", subtype: "success", is_error: false, result: "Started.", session_id: sessionId, uuid: randomUUID(),
+};
+const result = (text) =>
+  write({ type: "result", subtype: "success", is_error: false, result: text, session_id: sessionId, uuid: randomUUID(),
     duration_ms: 1, duration_api_ms: 1, num_turns: 1, total_cost_usd: 0, usage: { input_tokens: 1, output_tokens: 1 },
     permission_denials: [] });
+const turn = (background) => {
+  const text = background ? "Started." : "Done.";
+  answer(text);
+  if (background)
+    write({ type: "system", subtype: "background_tasks_changed", tasks: [{ id: "bg-" + process.pid, type: "local_bash" }],
+      session_id: sessionId, uuid: randomUUID() });
+  result(text);
 };
+const trigger = (name) => fs.existsSync(${JSON.stringify(root)} + "/" + name + "-" + process.pid);
+let taskEnded = false;
+let answered = false;
+setInterval(() => {
+  if (!taskEnded && trigger("finish")) {
+    taskEnded = true;
+    write({ type: "system", subtype: "task_notification", task_id: "bg-" + process.pid, status: "completed",
+      summary: "Done.", output_file: "", session_id: sessionId, uuid: randomUUID() });
+    write({ type: "system", subtype: "background_tasks_changed", tasks: [], session_id: sessionId, uuid: randomUUID() });
+    log({ event: "task-ended" });
+  }
+  if (taskEnded && !answered && trigger("answer")) {
+    answered = true;
+    answer("Background work done.");
+    result("Background work done.");
+    log({ event: "answered" });
+  }
+}, 25).unref();
 let buffer = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
@@ -97,7 +108,7 @@ process.stdin.on("data", (chunk) => {
     const message = JSON.parse(line);
     if (message.type === "control_request")
       write({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: {} } });
-    else if (message.type === "user") turn();
+    else if (message.type === "user") turn(!line.includes("without background work"));
   }
 });
 process.stdin.on("end", () => exit("stdin"));
@@ -110,16 +121,9 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/** Null uses the client's own quiet time of 30 minutes. */
 let quietForMs: number | null = null;
-/** The quiet releases that completed. */
 let quietReleases = 0;
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. The quiet release goes to the real client, with the
- * injected quiet time.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -149,6 +153,10 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   }
 
   canReleaseProcess = () => this.#real.canReleaseProcess();
+
+  holdsBackgroundWork(threadId: string) {
+    return this.#real.holdsBackgroundWork(threadId);
+  }
 
   releaseThread(externalThreadId: string) {
     return this.#real.releaseThread(externalThreadId);
@@ -191,7 +199,6 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   }
 }
 
-/** A server memory reading that the check sets. A sample runs the service's listeners at once. */
 let level: HostMemoryLevel = "ok";
 const listeners = new Set<() => void>();
 const memory: HostMemory = {
@@ -223,6 +230,7 @@ const report: { steps: Step[]; resumedSession?: string; passed: boolean; error?:
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -241,11 +249,14 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of the stand-in's log. */
-async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
+async function waitFor<T>(
+  label: string,
+  read: () => T | null | undefined | false | Promise<T | null | undefined | false>,
+  timeoutMs = 20_000,
+): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const value = read();
+    const value = await read();
     if (value) return value;
     if (Date.now() > deadline) throw new Error(`Timed out waiting for ${label}.`);
     await new Promise((done) => setTimeout(done, 25));
@@ -254,7 +265,7 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
 
 interface ProcessEntry {
   pid: number;
-  event: "start" | "exit";
+  event: "start" | "exit" | "task-ended" | "answered";
   resume?: string | null;
   sessionId?: string;
 }
@@ -330,6 +341,12 @@ try {
     assert.deepEqual(live(), [first.pid], "The idle release must not close a thread with background work.");
   });
 
+  await runCauseEffect(agents.refreshAllAgentRuntimes("after-background-work"));
+  step("an added MCP server waits for the background work", () => {
+    assert.deepEqual(live(), [first.pid], "An MCP addition must not close a thread with background work (#15198).");
+    assert.equal(standIn.canReleaseProcess(), false, "The client must still hold the background work.");
+  });
+
   sample("ok");
   step("normal memory asks for no quiet release", () => {
     assert.equal(quietReleases, 0);
@@ -365,6 +382,47 @@ try {
     assert.equal(resumed?.resume, first.sessionId, "The new process resumes the saved session.");
   });
   if (resumed?.resume) report.resumedSession = resumed.resume;
+
+  const worker = resumed?.pid;
+  assert.ok(worker, "The resumed process has no pid.");
+  const other = await runCauseEffect(
+    agents.createAgent({
+      name: "Other agent",
+      description: "Ends a turn while the first agent waits for its own turn.",
+      avatarSeed: "other-agent",
+      avatarHue: null,
+      initialMessage: "Reply without background work.",
+      provider: "claude",
+      model: CLAUDE_MODEL,
+    }),
+  );
+  await waitFor("the second agent's process", () => starts().length === 3);
+  await waitFor("the second agent's first turn to end", () => idle(other.id));
+  writeFileSync(join(root, `finish-${worker}`), "");
+  await waitFor("the background task to end", () =>
+    entries().some((entry) => entry.pid === worker && entry.event === "task-ended"),
+  );
+  const otherReceipt = await runCauseEffect(
+    agents.sendMessage({ agentId: other.id, text: "Again without background work." }),
+  );
+  const otherDelivery = otherReceipt.deliveries[0]?.id;
+  assert.ok(otherDelivery, "No delivery for the second agent's message.");
+  await waitFor("the second agent's turn to end", () => {
+    const value = mailbox.getDelivery(otherDelivery)?.delivery.status;
+    return value === "completed" || value === "failed" || value === "interrupted" ? value : null;
+  });
+  step("finished background work keeps its thread until its own turn", () => {
+    assert.ok(live().includes(worker), "The idle limit closed the thread before its own turn (#6557).");
+  });
+  writeFileSync(join(root, `answer-${worker}`), "");
+  await waitFor("the agent's own answer to show", async () =>
+    JSON.stringify((await runCauseEffect(agents.readConversation(agent.id))).messages).includes(
+      "Background work done.",
+    ),
+  );
+  step("the agent's own answer shows", () => {
+    assert.ok(live().includes(worker), "The thread that answered stays open.");
+  });
   report.passed = report.steps.every((entry) => entry.passed);
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

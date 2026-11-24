@@ -3,18 +3,25 @@ import type { messages as source } from "../../en/error/mcp";
 
 export const messages = {
   "error.mcp.redirectByName": "Diese Adresse ist nicht über ihren Namen erreichbar.",
-  "error.mcp.redirectGetOnly": "Diese Adresse beantwortet nur GET.",
   "error.mcp.redirectNotSignIn": "Diese Adresse gehört nicht zu einer Anmeldung.",
   "error.mcp.redirectRefused": "Die Anmeldung wurde abgelehnt. Kehre zu OpenBot zurück und versuche es erneut.",
-  "error.mcp.redirectNoSignIn": "Keine Anmeldung wartet darauf. Sie wurde möglicherweise bereits beendet.",
+  "error.mcp.redirectNoSignIn":
+    "Diese Anmeldung ist nicht mehr aktiv. Geh zurück zu OpenBot und starte die Anmeldung erneut.",
   "error.mcp.redirectSignedIn": "OpenBot ist angemeldet. Du kannst dieses Fenster schließen.",
+  "error.mcp.redirectNotSaved":
+    "Die Anmeldung wurde nicht abgeschlossen. Gehe zurück zu OpenBot, um den Grund zu sehen.",
   "error.mcp.signInFileUnreadable": "Die MCP-Anmeldedatei ist nicht lesbar.",
   "error.mcp.signInFileTooLarge": "Die MCP-Anmeldedatei ist zu groß.",
   "error.mcp.unsupported": "Dieser Server unterstützt keine MCP-Server.",
   "error.mcp.signInOnHost": "Die Anmeldung bei einem MCP-Server funktioniert nur in OpenBot auf dem Host-Computer.",
+  "error.mcp.signInPageOnServer":
+    "Diese Anmeldeseite öffnet sich nur auf dem Server. Bitte einen Eigentümer oder Admin des Servers, sich anzumelden.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Diese Anmeldeseite öffnet sich nur auf dem Server. Wechsle zu diesem Server und wähle dann erneut „Anmelden“.",
   "error.mcp.signInAppUnsupported": "Dieser Server unterstützt keine Anmelde-Apps. Aktualisiere OpenBot auf dem Host.",
   "error.mcp.redirectRelayed": "OpenBot hat die Anmeldung an den Server gesendet. Du kannst dieses Fenster schließen.",
   "error.mcp.relayEnded": "Diese Anmeldung ist beendet. Starte sie erneut.",
+  "error.mcp.signInLinkNotReady": "Die Anmeldeseite ist noch nicht geöffnet. Versuche es gleich noch einmal.",
   "error.mcp.relayNoState":
     "Die Anmeldeseite des Servers schützt ihre Rückkehradresse nicht, darum öffnet OpenBot sie nicht auf diesem Computer.",
   "error.mcp.relayAddressInvalid":

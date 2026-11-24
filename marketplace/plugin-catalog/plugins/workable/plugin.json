@@ -1,0 +1,36 @@
+{
+  "slug": "workable",
+  "name": "Workable",
+  "tagline": "Hiring pipeline and HR",
+  "description": "Workable lets agents look up jobs, candidates, and pipeline stages, and read employee and time-off records in the signed-in account. The signed-in user's Workable permissions limit what the agent can see and do.",
+  "category": "productivity",
+  "creatorName": "Workable",
+  "iconUrl": "https://www.workable.com/static/apple-touch-icon.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-open-jobs", "text": "List our open jobs and how many candidates are in each stage." },
+    {
+      "id": "prompt-candidate-summary",
+      "text": "Summarize the candidates in the interview stage for the backend engineer job."
+    },
+    { "id": "prompt-time-off", "text": "Who on the team is on time off next week?" }
+  ],
+  "apps": [
+    {
+      "id": "app-workable-mcp",
+      "name": "Workable",
+      "description": "Job, candidate, and HR record access, over Workable's MCP server with browser sign-in.",
+      "iconUrl": "https://www.workable.com/static/apple-touch-icon.png",
+      "server": {
+        "name": "workable",
+        "transport": "http",
+        "url": "https://mcp.workable.com/mcp",
+        "auth": [{ "id": "workable-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://www.workable.com",
+  "privacyPolicyUrl": "https://www.workable.com/privacy",
+  "termsUrl": "https://www.workable.com/terms"
+}

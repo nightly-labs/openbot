@@ -13,7 +13,8 @@ import type { BrowserHost } from "../backend/browser-host";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 import type { ResourceMonitor } from "./resource-monitor";
-import type { TraceFile } from "./trace-file";
+import type { StartAttemptsSummary } from "./start-attempts";
+import { TraceFile } from "./trace-file";
 import type { UpdateService } from "./update-service";
 
 const execFileAsync = promisify(execFile);
@@ -64,9 +65,6 @@ export const exportOpenBotData = Effect.fn("Archive.exportOpenBotData")(function
           { concurrency: "unbounded" },
         );
         const manifest = {
-          // 4, not 3: a schema 3 archive a released build wrote spells the roster `bots`, and this one spells
-          // it `agents`. Anything reading the manifest picks its parser by this number, so leaving it at 3
-          // hands a reader the wrong shape under a version that promised the old one.
           schemaVersion: 4,
           exportedAt: new Date().toISOString(),
           application: { name: "OpenBot", version: app.getVersion() },
@@ -158,19 +156,9 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
   const mcpServers = context.service.listMcpServers();
   const update = context.updater.getStatus();
   const diagnostics = {
-    // 4, not 3: schema 3 had a one-time `memory` reading, and this report has the `resources` summaries.
     schemaVersion: 4,
     generatedAt: new Date().toISOString(),
-    application: {
-      version: app.getVersion(),
-      packaged: app.isPackaged,
-      platform: process.platform,
-      architecture: arch(),
-      osRelease: osRelease(),
-      electron: process.versions.electron,
-      chromium: process.versions.chrome,
-      node: process.versions.node,
-    },
+    application: applicationDiagnostics(),
     agent: {
       phase: status.phase,
       cliVersion: status.cliVersion,
@@ -180,8 +168,6 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
       agentCount: agents.length,
       queues: queueCounts,
     },
-    // Ids, transports and whether each one is enabled. A name is user text and a configuration holds
-    // `env` values and headers, so neither one belongs in a report the user mails to somebody else.
     mcpServers: {
       count: mcpServers.length,
       enabledCount: mcpServers.filter((config) => config.enabled).length,
@@ -195,7 +181,6 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
       tabCount: context.browser.listTabs().length,
       activeControlCount: context.browser.getControlState().sessions.length,
     },
-    // Process groups and provider ids with memory, CPU and delays: never a PID, a command or a path.
     resources: context.resources.diagnostics(),
     update: {
       phase: update.phase,
@@ -206,7 +191,6 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
       errorCode: update.errorCode,
       history: context.updater.getDiagnostics(),
     },
-    // IPC channels and turn origins with counts, outcomes and durations, from the local trace file.
     trace: yield* context.trace.summarize(),
     privacy:
       "Contains no conversations, URLs, email addresses, tokens, file contents, file paths, or raw error messages.",
@@ -219,6 +203,48 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
   ).pipe(Effect.uninterruptible);
   return { saved: true };
 });
+
+export const exportStartDiagnostics = Effect.fn("Archive.exportStartDiagnostics")(function* (
+  context: Pick<MaintenanceContext, "parentWindow" | "translate"> & { startAttempts: StartAttemptsSummary },
+): Effect.fn.Return<ExportResult, ArchiveOperationError> {
+  const destination = yield* chooseExportDestinationEffect(
+    context.parentWindow,
+    `OpenBot-start-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
+    [{ name: context.translate("dialog.filter.jsonDocument"), extensions: ["json"] }],
+  );
+  if (!destination) return { saved: false };
+  const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
+  const diagnostics = {
+    schemaVersion: 1,
+    kind: "start-recovery",
+    generatedAt: new Date().toISOString(),
+    application: applicationDiagnostics(),
+    startAttempts: context.startAttempts,
+    trace: yield* trace.summarize(),
+    privacy:
+      "Contains no conversations, URLs, email addresses, tokens, file contents, file paths, or raw error messages.",
+  };
+  yield* archiveCall(() =>
+    writeFile(destination, `${JSON.stringify(diagnostics, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    }),
+  ).pipe(Effect.uninterruptible);
+  return { saved: true };
+});
+
+function applicationDiagnostics() {
+  return {
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    platform: process.platform,
+    architecture: arch(),
+    osRelease: osRelease(),
+    electron: process.versions.electron,
+    chromium: process.versions.chrome,
+    node: process.versions.node,
+  };
+}
 
 const chooseExportDestinationEffect = Effect.fn("Archive.chooseExportDestination")(function* (
   parentWindow: BrowserWindow | null,

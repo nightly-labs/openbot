@@ -1,47 +1,33 @@
-// How an invalidation turns back into state the renderer can show.
-//
-// A host does not send a new conversation page when a message lands. It sends
-// "conversation 42 changed to revision 7", and this file fetches revision 7. That indirection is
-// what keeps a busy agent from pushing a full page down the socket on every token, and it is why
-// the interesting code here is about *not* fetching:
-//
-//   - **Coalescing.** While one refetch is in flight, further invalidations for the same agent
-//     raise the wanted revision instead of starting a second request. One fetch per burst, and the
-//     loop reruns only if the revision moved while it was away.
-//   - **Generations.** A refetch started before a reconnect must not emit after it: its answer
-//     describes a session that is over. Every event bumps the generation, and a slow response
-//     checks it before emitting.
-//
-// The fallback path is for hosts too old to replay events on connect. It reads the whole agent list
-// and one page each, which is expensive, so it runs once per connection rather than per event.
-
-import type {
-  AgentColors,
-  AgentEvent,
-  AvatarColor,
-  BrowserTab,
-  ChatColors,
-  ClientAgentSummary,
-  TeamMemberSummary,
+import {
+  type AgentColors,
+  type AgentEvent,
+  type AgentRuntimeSnapshot,
+  type AgentStatus,
+  type AvatarColor,
+  type BrowserTab,
+  type ChatColors,
+  type ClientAgentSummary,
+  decodeProviderModelSources,
+  type ProviderModelSourceEntry,
+  type TeamMemberSummary,
+  withModelSources,
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_USAGE_LIMIT_ROUTES, type AgentUsageLimits } from "@openbot/contracts/team-protocol/agent-usage-limit-v1";
+import { AGENT_WAITS_ROUTES, decodeAgentWaitsResponse } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import { PROVIDER_MODEL_SOURCE_ROUTES } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { Deferred, Effect, Result } from "effect";
-import { decodeAgentSummaries, decodeQueueSnapshot } from "./remote-agent-decoding";
+import { decodeAgentSummaries, decodeQueueSnapshot, decodeRemoteAgentUsageLimits } from "./remote-agent-decoding";
 import { decodeConversationPageFromHost } from "./remote-conversation-decoding";
 import type { RemoteRequestFn } from "./remote-server-client";
 import { addRemotePreviewUrls, pageQuery } from "./remote-server-urls";
 import type { RemoteWorkflowError } from "./remote-service-effects";
 
-// One in-flight conversation refetch, and the newest revision asked for while it was running.
-// `sequence` counts announcements that did not move the revision: a read on another device changes
-// the page's unread counts without changing its content revision, so the revision alone cannot tell
-// "nothing has happened" from "something happened that this page still has to be refetched for".
 interface ConversationRefresh {
   revision: number;
   sequence: number;
 }
 
-// One in-flight queue refetch. The queue has no revision, so "changed again" is all there is to say.
 interface QueueRefresh {
   dirty: boolean;
 }
@@ -51,49 +37,54 @@ const INVALIDATED_CONVERSATION_LIMIT = 50;
 
 export interface RemoteEventRefreshOptions {
   request: RemoteRequestFn;
-  /** False once the user removes a server. A refetch in flight for it stops emitting. */
   hasServer: (serverId: string) => boolean;
   emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
-  /** The member chat colours of a server changed, so its presence goes to the renderer again. */
+  onReceivedRuntimeSnapshot?: (serverId: string, snapshot: AgentRuntimeSnapshot) => void;
   onMemberChatColors?: (serverId: string) => void;
+  hasUsageLimits?: (serverId: string) => boolean;
+  hasModelSources?: (serverId: string) => boolean;
+  hasAgentWaits?: (serverId: string) => boolean;
 }
 
 export class RemoteEventRefresh {
   readonly #request: RemoteRequestFn;
   readonly #hasServer: (serverId: string) => boolean;
   readonly #emit: (serverId: string, event: AgentEvent, bufferedLive?: boolean) => void;
+  readonly #onReceivedRuntimeSnapshot: (serverId: string, snapshot: AgentRuntimeSnapshot) => void;
   readonly #onMemberChatColors: (serverId: string) => void;
+  readonly #hasUsageLimits: (serverId: string) => boolean;
+  readonly #hasModelSources: (serverId: string) => boolean;
+  readonly #hasAgentWaits: (serverId: string) => boolean;
   readonly #conversations = new Map<string, ConversationRefresh>();
   readonly #queues = new Map<string, QueueRefresh>();
+  readonly #waitReads = new Map<string, QueueRefresh>();
   readonly #generations = new Map<string, number>();
   readonly #rosterLoads = new Map<string, Deferred.Deferred<void, RemoteWorkflowError>>();
-  // The frozen `browser-changed` event has no field for a person's control or the history state, so
-  // `browser-user-control-v1` and `browser-page-state-v1` send them on their own. Each server keeps its
-  // last lists and tabs to merge them here.
   readonly #browserHolds = new Map<string, ReadonlySet<string>>();
   readonly #browserPageStates = new Map<string, ReadonlyMap<string, { canGoBack: boolean; canGoForward: boolean }>>();
   readonly #browserStates = new Map<string, { tabs: BrowserTab[]; activeTabId: string | null }>();
-  // The released agent list has no field for an exact colour, so `agent-colors-v1` sends the colours on
-  // their own. Each server keeps its last colours and its last agent list to merge them here.
   readonly #agentColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
   readonly #agentRosters = new Map<string, ClientAgentSummary[]>();
-  // The released agent and member lists have no field for a chat colour, so `chat-colors-v1` sends the
-  // chat colours on their own. Each server keeps its last chat colours to merge them here.
   readonly #agentChatColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
   readonly #memberChatColors = new Map<string, ReadonlyMap<string, AvatarColor>>();
+  readonly #runtimeSnapshots = new Map<string, AgentRuntimeSnapshot>();
+  readonly #usageLimits = new Map<string, AgentUsageLimits>();
+  readonly #usageLimitReads = new Map<string, QueueRefresh>();
+  readonly #statuses = new Map<string, AgentStatus>();
+  readonly #modelSources = new Map<string, ProviderModelSourceEntry[]>();
+  readonly #modelSourceReads = new Map<string, QueueRefresh>();
 
   constructor(options: RemoteEventRefreshOptions) {
     this.#request = options.request;
     this.#hasServer = options.hasServer;
     this.#emit = options.emit;
+    this.#onReceivedRuntimeSnapshot = options.onReceivedRuntimeSnapshot ?? (() => undefined);
     this.#onMemberChatColors = options.onMemberChatColors ?? (() => undefined);
+    this.#hasUsageLimits = options.hasUsageLimits ?? (() => false);
+    this.#hasModelSources = options.hasModelSources ?? (() => false);
+    this.#hasAgentWaits = options.hasAgentWaits ?? (() => false);
   }
 
-  /**
-   * One event from a host. An invalidation starts a refetch; anything else is already the state and
-   * goes straight out. `bufferedLive` marks an event that arrived while the fallback was loading,
-   * so the renderer can tell it apart from the snapshot it is patching.
-   */
   readonly forward = Effect.fn("RemoteEvents.forward")(function* (
     this: RemoteEventRefresh,
     serverId: string,
@@ -101,16 +92,15 @@ export class RemoteEventRefresh {
     bufferedLive = false,
   ) {
     this.#advance(serverId);
+    if (event.type === "runtime-snapshot") this.#onReceivedRuntimeSnapshot(serverId, event.snapshot);
     if (event.type === "agents-changed") this.#rosterLoads.delete(serverId);
     if (event.type === "conversation-invalidated") {
       yield* this.#refreshConversationPage(serverId, event.agentId, event.revision);
     } else if (event.type === "queue-invalidated") {
       yield* this.#refreshQueue(serverId, event.agentId);
     } else if (event.type === "agent-colors-changed") {
-      // The renderer reads the colours in the agent list, so this event does not go to it.
       this.rememberAgentColors(serverId, event);
     } else if (event.type === "chat-colors-changed") {
-      // The renderer reads the chat colours in the agent list and in the presence, so this event does not go to it.
       this.rememberChatColors(serverId, event);
     } else if (event.type === "agents-changed") {
       this.#emitRoster(serverId, addRemotePreviewUrls(event.agents, serverId), bufferedLive);
@@ -120,6 +110,14 @@ export class RemoteEventRefresh {
       this.#emit(serverId, event);
       const state = this.#browserStates.get(serverId);
       if (state) this.#emit(serverId, addRemotePreviewUrls(this.#withBrowserHolds(serverId, state), serverId));
+    } else if (event.type === "status" && this.#hasModelSources(serverId)) {
+      this.#statuses.set(serverId, event.status);
+      this.#emitStatus(serverId, bufferedLive);
+      yield* this.#refreshModelSources(serverId);
+    } else if (event.type === "runtime-snapshot" && this.#hasUsageLimits(serverId)) {
+      this.#runtimeSnapshots.set(serverId, event.snapshot);
+      this.#emitRuntimeSnapshot(serverId, bufferedLive);
+      yield* this.#refreshUsageLimits(serverId);
     } else {
       if (event.type === "browser-changed")
         this.#browserStates.set(serverId, { tabs: event.tabs, activeTabId: event.activeTabId });
@@ -129,6 +127,9 @@ export class RemoteEventRefresh {
       );
       if (bufferedLive) this.#emit(serverId, remoteEvent, true);
       else this.#emit(serverId, remoteEvent);
+    }
+    if ((event.type === "turn-started" || event.type === "turn-completed") && this.#hasAgentWaits(serverId)) {
+      yield* this.#refreshWaits(serverId, event.agentId);
     }
   }).bind(this);
 
@@ -149,11 +150,6 @@ export class RemoteEventRefresh {
     });
     return { type: "browser-changed", tabs, activeTabId: state.activeTabId };
   }
-
-  /**
-   * Builds the current state from scratch, for a host that cannot replay what was missed. One agent
-   * failing is not the server failing, so each is caught on its own.
-   */
 
   readonly refreshAgentState = Effect.fn("RemoteEvents.refreshAgentState")(function* (
     this: RemoteEventRefresh,
@@ -184,7 +180,6 @@ export class RemoteEventRefresh {
     );
   }).bind(this);
 
-  /** Shared admission keeps a roster response bound to its generation. */
   readonly refreshAgentRoster = Effect.fn("RemoteEvents.refreshAgentRoster")(function* (
     this: RemoteEventRefresh,
     serverId: string,
@@ -207,16 +202,11 @@ export class RemoteEventRefresh {
     );
   }).bind(this);
 
-  /**
-   * The agents with the last colours and chat colours that the server sent. A server without
-   * `agent-colors-v1` or `chat-colors-v1` sends none.
-   */
   withAgentColors(serverId: string, agents: ClientAgentSummary[]): ClientAgentSummary[] {
     if (!this.#agentColors.has(serverId) && !this.#agentChatColors.has(serverId)) return agents;
     return agents.map((agent) => this.agentWithColor(serverId, agent));
   }
 
-  /** One agent with the last colour and chat colour that the server sent. */
   agentWithColor(serverId: string, agent: ClientAgentSummary): ClientAgentSummary {
     const colors = this.#agentColors.get(serverId);
     const chatColors = this.#agentChatColors.get(serverId);
@@ -224,17 +214,11 @@ export class RemoteEventRefresh {
     return chatColors ? withChatColor(colored, chatColors.get(agent.id)) : colored;
   }
 
-  /** The members with the last chat colours that the server sent. A server without `chat-colors-v1` sends none. */
   withMemberChatColors<Member extends TeamMemberSummary>(serverId: string, members: Member[]): Member[] {
     const chatColors = this.#memberChatColors.get(serverId);
     return chatColors ? members.map((member) => withChatColor(member, chatColors.get(member.id))) : members;
   }
 
-  /**
-   * Keeps the chat colours that a read, a change or an event gave. When the agent chat colours changed,
-   * the last agent list goes to the renderer again with them. When the member chat colours changed, the
-   * presence goes again.
-   */
   rememberChatColors(serverId: string, colors: ChatColors): void {
     const agents = new Map(colors.agents.map((entry) => [entry.agentId, entry.color]));
     const members = new Map(colors.members.map((entry) => [entry.memberId, entry.color]));
@@ -248,10 +232,6 @@ export class RemoteEventRefresh {
     if (membersChanged) this.#onMemberChatColors(serverId);
   }
 
-  /**
-   * Keeps the colours that a read, a change or an event gave. When they changed, the last agent list
-   * goes to the renderer again with them.
-   */
   rememberAgentColors(serverId: string, colors: AgentColors): void {
     const next = new Map(colors.agents.map((entry) => [entry.agentId, entry.color]));
     const previous = this.#agentColors.get(serverId);
@@ -260,6 +240,98 @@ export class RemoteEventRefresh {
     const roster = this.#agentRosters.get(serverId);
     if (roster) this.#emit(serverId, { type: "agents-changed", agents: this.withAgentColors(serverId, roster) });
   }
+
+  #emitRuntimeSnapshot(serverId: string, bufferedLive = false): void {
+    const snapshot = this.#runtimeSnapshots.get(serverId);
+    if (!snapshot) return;
+    const limits = this.#usageLimits.get(serverId);
+    const event = addRemotePreviewUrls(
+      { type: "runtime-snapshot" as const, snapshot: limits ? { ...snapshot, ...limits } : snapshot },
+      serverId,
+    );
+    if (bufferedLive) this.#emit(serverId, event, true);
+    else this.#emit(serverId, event);
+  }
+
+  #emitStatus(serverId: string, bufferedLive = false): void {
+    const status = this.#statuses.get(serverId);
+    if (!status) return;
+    const event = { type: "status" as const, status: withModelSources(status, this.#modelSources.get(serverId) ?? []) };
+    if (bufferedLive) this.#emit(serverId, event, true);
+    else this.#emit(serverId, event);
+  }
+
+  readonly #refreshModelSources = Effect.fn("RemoteEvents.refreshModelSources")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
+    const pending = this.#modelSourceReads.get(serverId);
+    if (pending) {
+      pending.dirty = true;
+      return;
+    }
+    const read = { dirty: false };
+    this.#modelSourceReads.set(serverId, read);
+    yield* Effect.gen({ self: this }, function* () {
+      do {
+        read.dirty = false;
+        const result = yield* this.#request(serverId, PROVIDER_MODEL_SOURCE_ROUTES.list, decodeProviderModelSources, {
+          method: "POST",
+          body: {},
+        }).pipe(Effect.result);
+        if (Result.isFailure(result)) {
+          if (read.dirty) continue;
+          return;
+        }
+        if (!this.#hasServer(serverId)) return;
+        const previous = this.#modelSources.get(serverId);
+        this.#modelSources.set(serverId, result.success);
+        if (JSON.stringify(previous ?? []) !== JSON.stringify(result.success)) this.#emitStatus(serverId);
+      } while (read.dirty);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#modelSourceReads.get(serverId) === read) this.#modelSourceReads.delete(serverId);
+        }),
+      ),
+    );
+  });
+
+  readonly #refreshUsageLimits = Effect.fn("RemoteEvents.refreshUsageLimits")(function* (
+    this: RemoteEventRefresh,
+    serverId: string,
+  ) {
+    const pending = this.#usageLimitReads.get(serverId);
+    if (pending) {
+      pending.dirty = true;
+      return;
+    }
+    const read = { dirty: false };
+    this.#usageLimitReads.set(serverId, read);
+    yield* Effect.gen({ self: this }, function* () {
+      do {
+        read.dirty = false;
+        const result = yield* this.#request(serverId, AGENT_USAGE_LIMIT_ROUTES.list, decodeRemoteAgentUsageLimits, {
+          method: "POST",
+          body: {},
+        }).pipe(Effect.result);
+        if (Result.isFailure(result)) {
+          if (read.dirty) continue;
+          return;
+        }
+        if (!this.#hasServer(serverId)) return;
+        const previous = this.#usageLimits.get(serverId);
+        this.#usageLimits.set(serverId, result.success);
+        if (JSON.stringify(previous) !== JSON.stringify(result.success)) this.#emitRuntimeSnapshot(serverId);
+      } while (read.dirty);
+    }).pipe(
+      Effect.ensuring(
+        Effect.sync(() => {
+          if (this.#usageLimitReads.get(serverId) === read) this.#usageLimitReads.delete(serverId);
+        }),
+      ),
+    );
+  });
 
   #emitRoster(serverId: string, agents: ClientAgentSummary[], bufferedLive = false): void {
     this.#agentRosters.set(serverId, agents);
@@ -277,12 +349,21 @@ export class RemoteEventRefresh {
     this.#browserHolds.delete(serverId);
     this.#browserPageStates.delete(serverId);
     this.#browserStates.delete(serverId);
+    this.#runtimeSnapshots.delete(serverId);
+    this.#usageLimits.delete(serverId);
+    this.#usageLimitReads.delete(serverId);
+    this.#statuses.delete(serverId);
+    this.#modelSources.delete(serverId);
+    this.#modelSourceReads.delete(serverId);
     this.#generations.delete(serverId);
     for (const key of this.#conversations.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#conversations.delete(key);
     }
     for (const key of this.#queues.keys()) {
       if (key.startsWith(`${serverId}\0`)) this.#queues.delete(key);
+    }
+    for (const key of this.#waitReads.keys()) {
+      if (key.startsWith(`${serverId}\0`)) this.#waitReads.delete(key);
     }
   }
 
@@ -295,9 +376,13 @@ export class RemoteEventRefresh {
     this.#browserHolds.clear();
     this.#browserPageStates.clear();
     this.#browserStates.clear();
+    this.#runtimeSnapshots.clear();
+    this.#usageLimits.clear();
+    this.#usageLimitReads.clear();
     this.#generations.clear();
     this.#conversations.clear();
     this.#queues.clear();
+    this.#waitReads.clear();
   }
 
   readonly #refreshConversationPage = Effect.fn("RemoteEvents.refreshConversationPage")(function* (
@@ -343,40 +428,63 @@ export class RemoteEventRefresh {
     );
   });
 
-  readonly #refreshQueue = Effect.fn("RemoteEvents.refreshQueue")(function* (
+  readonly #refreshAgentRead = Effect.fn("RemoteEvents.refreshAgentRead")(function* (
     this: RemoteEventRefresh,
+    reads: Map<string, QueueRefresh>,
     serverId: string,
     agentId: string,
+    read: Effect.Effect<AgentEvent, RemoteWorkflowError>,
   ) {
     const key = `${serverId}\0${agentId}`;
-    const pending = this.#queues.get(key);
+    const pending = reads.get(key);
     if (pending) {
       pending.dirty = true;
       return;
     }
     const request = { dirty: false };
-    this.#queues.set(key, request);
+    reads.set(key, request);
     yield* Effect.gen({ self: this }, function* () {
       do {
         request.dirty = false;
-        const result = yield* this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
-          Effect.result,
-        );
+        const result = yield* read.pipe(Effect.result);
         if (Result.isFailure(result)) {
           if (request.dirty) continue;
           return;
         }
         if (!this.#hasServer(serverId)) return;
-        this.#emit(serverId, { type: "queue-changed", snapshot: result.success });
+        this.#emit(serverId, result.success);
       } while (request.dirty);
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
-          if (this.#queues.get(key) === request) this.#queues.delete(key);
+          if (reads.get(key) === request) reads.delete(key);
         }),
       ),
     );
   });
+
+  #refreshQueue(serverId: string, agentId: string) {
+    return this.#refreshAgentRead(
+      this.#queues,
+      serverId,
+      agentId,
+      this.#request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot).pipe(
+        Effect.map((snapshot): AgentEvent => ({ type: "queue-changed", snapshot })),
+      ),
+    );
+  }
+
+  #refreshWaits(serverId: string, agentId: string) {
+    return this.#refreshAgentRead(
+      this.#waitReads,
+      serverId,
+      agentId,
+      this.#request(serverId, AGENT_WAITS_ROUTES.list, decodeAgentWaitsResponse, {
+        method: "POST",
+        body: { agentId },
+      }).pipe(Effect.map((snapshot): AgentEvent => ({ type: "waits-changed", snapshot }))),
+    );
+  }
 
   readonly #conversationPageEffect = Effect.fn("RemoteEvents.conversationPage")(
     (serverId: string, agentId: string, limit: number) =>
@@ -387,10 +495,6 @@ export class RemoteEventRefresh {
       ),
   );
 
-  /**
-   * Marks everything in flight as belonging to a previous session. A response that started before
-   * this call will notice and stay quiet.
-   */
   #advance(serverId: string): number {
     const generation = (this.#generations.get(serverId) ?? 0) + 1;
     this.#generations.set(serverId, generation);
@@ -398,13 +502,11 @@ export class RemoteEventRefresh {
   }
 }
 
-/** The agent with `color`, or without a colour. The released list has none, so `avatarHue` is then the colour. */
 function withAgentColor(agent: ClientAgentSummary, color: AvatarColor | undefined): ClientAgentSummary {
   const { avatarColor: _, ...rest } = agent;
   return color ? { ...rest, avatarColor: color } : rest;
 }
 
-/** The agent or member with `color`, or without a chat colour. The released lists have none. */
 function withChatColor<Item extends { chatColor?: AvatarColor }>(item: Item, color: AvatarColor | undefined): Item {
   const next = { ...item };
   if (color) next.chatColor = color;

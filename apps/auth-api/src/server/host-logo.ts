@@ -9,10 +9,6 @@ export function hostLogoObjectKey(hostId: string, version: string): string {
   return `remote-hosts/${hostId}/logos/${version}`;
 }
 
-/**
- * The stored logo of one host version. The caller checks that the reader is a member and that
- * `version` is the current logo key. Null when the object is missing.
- */
 export const readHostLogo = Effect.fn("HostLogo.read")(function* (bucket: R2Bucket, hostId: string, version: string) {
   const object = yield* Effect.tryPromise({
     try: () => bucket.get(hostLogoObjectKey(hostId, version)),

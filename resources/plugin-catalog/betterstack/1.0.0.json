@@ -1,0 +1,33 @@
+{
+  "slug": "betterstack",
+  "name": "Better Stack",
+  "tagline": "Uptime, logs, and incidents",
+  "description": "Better Stack lets agents check monitors and incidents, query logs and metrics, and read on-call schedules in the signed-in team. Each user signs in to their own Better Stack account through the browser.",
+  "category": "coding",
+  "creatorName": "Better Stack",
+  "iconUrl": "https://betterstack.com/assets/favicon-64296699.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-incidents", "text": "Which incidents are open, and what caused them?" },
+    { "id": "prompt-errors", "text": "Find the most frequent errors in the API logs in the last hour." },
+    { "id": "prompt-on-call", "text": "Who is on call this weekend?" }
+  ],
+  "apps": [
+    {
+      "id": "app-betterstack-mcp",
+      "name": "Better Stack",
+      "description": "Monitor, incident, and log tools, over Better Stack's MCP server with browser sign-in.",
+      "iconUrl": "https://betterstack.com/assets/favicon-64296699.png",
+      "server": {
+        "name": "betterstack",
+        "transport": "http",
+        "url": "https://mcp.betterstack.com",
+        "auth": [{ "id": "betterstack-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://betterstack.com",
+  "privacyPolicyUrl": "https://betterstack.com/privacy",
+  "termsUrl": "https://betterstack.com/terms",
+  "skills": []
+}

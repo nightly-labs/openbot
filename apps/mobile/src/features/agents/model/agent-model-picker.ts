@@ -1,15 +1,11 @@
 import type { AgentModelOption, AgentProviderId } from "@openbot/contracts/ipc";
 import { create } from "zustand";
 
-/**
- * The model list that the Model row opens. The form under it keeps the unsaved provider, model and
- * effort, so the list only names them and gives the pick back to the form.
- */
 export interface AgentModelPickerRequest {
   serverId: string;
   provider: AgentProviderId;
   model: string | undefined;
-  /** Gets the option from the list on the page, which can be newer than the list of the form. */
+  accountModels: readonly AgentModelOption[];
   choose: (option: AgentModelOption) => void;
 }
 
@@ -20,3 +16,11 @@ export const useAgentModelPicker = create<{
   request: null,
   open: (request) => set({ request }),
 }));
+
+export function withAccountModels(
+  options: readonly AgentModelOption[],
+  accountModels: readonly AgentModelOption[],
+): AgentModelOption[] {
+  const listed = new Set(options.map((option) => option.id));
+  return [...options, ...accountModels.filter((option) => !listed.has(option.id))];
+}

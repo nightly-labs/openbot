@@ -115,6 +115,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name}: установка не завершена",
   "marketplace.app.partialDescription": "Часть приложений или навыков не установлена. «Переподключить» установит их.",
   "marketplace.app.notConnected": "Не подключено",
+  "marketplace.app.paused": "Приостановлено",
   "marketplace.app.custom": "Сервер MCP",
   "marketplace.app.githubTagline": "Репозитории, задачи и пул-реквесты",
   "marketplace.app.onePasswordTagline": "Вход на сайты с общими учётными данными",
@@ -124,6 +125,49 @@ export const messages = {
   "marketplace.app.whatsappTagline": "Свой чат и разрешённые люди в WhatsApp",
   "marketplace.app.bitwardenTagline": "Вход на сайты с учётными данными из общей папки",
   "marketplace.app.protonPassTagline": "Вход на сайты с учётными данными из общего хранилища",
+  "marketplace.xApp.title": "X",
+  "marketplace.xApp.tagline": "Ответьте на пост в X с @openbot_, и агент сделает всю работу",
+  "marketplace.xApp.description":
+    "X добавляет на этот сервер одного агента, который тоже называется X. В X ответьте на любой пост и упомяните @openbot_ с тем, что нужно: кратко пересказать, перевести, набросать ответ, сохранить заметку или поставить напоминание. Расширение OpenBot для Chrome читает пост и отправляет его агенту X, а X публикует ваш ответ как обычно. Ответ ждёт в чате X в OpenBot. Агент X никогда не публикует посты, не ставит лайки, не подписывается и не отправляет сообщения в X.",
+  "marketplace.xApp.developer": "OpenBot",
+  "marketplace.xApp.notSetUp": "Не настроено",
+  "marketplace.xApp.setUp": "Настроить",
+  "marketplace.xApp.howTitle": "Как это работает",
+  "marketplace.xApp.howReplyTitle": "Ответьте в X.",
+  "marketplace.xApp.howReply":
+    "Ответьте на любой пост и упомяните @openbot_ с тем, что нужно, например «@openbot_ перескажи кратко».",
+  "marketplace.xApp.howSendTitle": "Расширение отправляет его.",
+  "marketplace.xApp.howSend":
+    "OpenBot для Chrome читает пост и посты над ним и отправляет их агенту X. X публикует ваш ответ как обычно.",
+  "marketplace.xApp.howWorkTitle": "X делает работу.",
+  "marketplace.xApp.howWork": "Ответ ждёт в чате X в OpenBot. В X ничего от OpenBot не появляется.",
+  "marketplace.xApp.agentTitle": "Агент",
+  "marketplace.xApp.agentDescription": "X отвечает на каждый пост, отправленный из X, в своём чате.",
+  "marketplace.xApp.extensionTitle": "В Chrome",
+  "marketplace.xApp.extensionDescription": "X работает только через расширение OpenBot для Chrome.",
+  "marketplace.xApp.extensionName": "OpenBot для Chrome",
+  "marketplace.xApp.extensionNote":
+    "Откройте его боковую панель и войдите на этот сервер. Оно читает пост, только когда вы отвечаете с @openbot_.",
+  "marketplace.xApp.getExtension": "Получить расширение",
+  "marketplace.xApp.stepExtension": "Расширение",
+  "marketplace.xApp.stepAgent": "Агент",
+  "marketplace.xApp.next": "Далее",
+  "marketplace.xApp.extensionStepTitle": "Добавьте OpenBot в Chrome",
+  "marketplace.xApp.extensionStepDescription":
+    "Расширение читает пост в X, когда вы отвечаете с @openbot_, и отправляет его на этот сервер.",
+  "marketplace.xApp.extensionStepStore": "Откройте страницу OpenBot в Chrome Web Store",
+  "marketplace.xApp.extensionStepAdd": "Нажмите «Установить»",
+  "marketplace.xApp.extensionStepSignIn": "Откройте боковую панель OpenBot и войдите на этот сервер",
+  "marketplace.xApp.agentStepTitle": "Добавьте агента X",
+  "marketplace.xApp.agentStepDescription":
+    "X получает посты, которые вы отправляете из X. OpenBot добавит его на этот сервер.",
+  "marketplace.xApp.agentDoesReceive": "Получает каждый пост, на который вы отвечаете в X с @openbot_",
+  "marketplace.xApp.agentDoesWork":
+    "Пересказывает, переводит, пишет черновики ответов, сохраняет заметки и ставит напоминания",
+  "marketplace.xApp.agentDoesNoPost": "Никогда не публикует в X: ответ ждёт в его чате",
+  "marketplace.xApp.addAgent": "Добавить агента",
+  "marketplace.xApp.doneTitle": "X готов",
+  "marketplace.xApp.doneDescription": "Ответьте на пост в X и упомяните @openbot_. Ответ ждёт в чате X.",
   "marketplace.app.onePasswordCategory": "Управление логинами и учётными данными",
   "marketplace.app.yourApps": "Ваши приложения",
   "marketplace.app.addCustom": "Добавить своё",
@@ -140,7 +184,16 @@ export const messages = {
   "marketplace.app.remove.action": "Удалить",
   "marketplace.app.remove.confirmTitle": "Удалить «{name}»?",
   "marketplace.app.remove.keep": "Оставить",
+  "marketplace.app.replace.title": "Заменить {server}?",
+  "marketplace.app.replace.description":
+    "У вас уже есть сервер с именем {server}, но это не {name}. Заменить его на {name}? Его адрес и сохранённые ключи будут удалены.",
+  "marketplace.app.replace.action": "Заменить",
   "marketplace.app.connection": "Подключение",
+  "marketplace.app.access.use": "Может использовать",
+  "marketplace.app.access.noAgents": "Нет агентов",
+  "marketplace.app.access.agentsOf": "Агенты, которые могут использовать «{name}»",
+  "marketplace.app.access.chooseAgents": "«{name}»: {summary}. Выбрать агентов",
+  "marketplace.app.access.level": "Доступ роли {role} к «{name}»",
   "marketplace.app.setup.account": "Войдите в аккаунт {name} в браузере.",
   "marketplace.app.setup.key": "Нужен ключ API из аккаунта {name}.",
   "marketplace.app.setup.keySaved": "{field} хранится на {host}.",
@@ -152,6 +205,7 @@ export const messages = {
     "На {host} работает старая версия OpenBot, которая не может подключать приложения. Обновите OpenBot на {host} или попросите владельца обновить его.",
   "marketplace.app.blocked.member":
     "Подключать приложения на {host} может только владелец или администратор. Попросите одного из них подключить {name} или обновить OpenBot на {host}, чтобы участники могли подключать приложения.",
+  "marketplace.app.blocked.mac": "{name} работает только на Mac, где запущен OpenBot.",
   "marketplace.app.connectAgain": "Подключить снова",
   "marketplace.app.automation.askOnInstall": "Запросить доступ у macOS при установке",
   "marketplace.app.automation.title": "Доступ к приложениям Apple",
@@ -271,6 +325,15 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.productShot":
     "Сделайте в Higgsfield предметное фото керамической кружки на деревянном столе.",
   "marketplace.plugin.higgsfield.prompt.clip": "Сделайте в Higgsfield 5-секундное видео волн на закате.",
+  "marketplace.plugin.sunra.tagline": "ИИ-изображения, видео, аудио и 3D",
+  "marketplace.plugin.sunra.description":
+    "Sunra позволяет агентам создавать изображения, видео, аудио и 3D-модели с помощью таких моделей, как GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling и Veo, проверять баланс кредитов и получать результаты. Результаты сохраняются в проекте в аккаунте Sunra пользователя. Каждый пользователь входит в свой аккаунт Sunra в браузере. Sunra сначала называет стоимость каждой генерации и списывает кредиты этого аккаунта только после подтверждения.",
+  "marketplace.plugin.sunra.app":
+    "Создание изображений, видео, аудио и 3D, кредиты и результаты через MCP-сервер Sunra со входом в браузере.",
+  "marketplace.plugin.sunra.prompt.balance": "Сколько у меня кредитов Sunra?",
+  "marketplace.plugin.sunra.prompt.poster": "Сделайте в Sunra постер ночного рынка под дождём в вертикальном формате.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Сделайте в Sunra 5-секундное видео бумажного кораблика на реке. Сначала скажите, сколько это стоит.",
   "marketplace.plugin.elevenlabs.tagline": "Речь, голоса и голосовые агенты",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs позволяет агентам превращать текст в речь, работать с голосами, а также создавать, тестировать и просматривать голосовых агентов ElevenLabs и их разговоры. Созданное аудио приходит как ссылка для скачивания с коротким сроком действия. Каждый пользователь входит в свой аккаунт ElevenLabs в браузере, и каждая генерация расходует кредиты этого аккаунта.",
@@ -398,8 +461,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "Что сказано в моих заметках о решениях по этому проекту?",
   "marketplace.plugin.obsidian.prompt.save": "Сохраните это решение как новую заметку в моём хранилище.",
   "marketplace.plugin.obsidian.prompt.log": "Добавьте сводку сегодняшней работы в мою заметку «Журнал работы».",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'В Obsidian откройте Settings > Local REST API. Скопируйте API-ключ и включите "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "В Obsidian откройте Settings > Local REST API и скопируйте API-ключ.",
   "marketplace.plugin.resend.tagline": "Транзакционная почта",
   "marketplace.plugin.resend.description":
     "Resend позволяет агентам отправлять транзакционные письма и проверять доставку через один API. Ключ API из панели Resend передаётся локальному серверу в одной переменной окружения.",
@@ -409,14 +471,15 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "Составьте письмо для сброса пароля для нового сценария.",
   "marketplace.plugin.omnisend.tagline": "Email- и SMS-маркетинг",
   "marketplace.plugin.omnisend.description":
-    "Omnisend позволяет агентам читать отчёты по кампаниям и формам, находить контакты и сегменты, а также создавать и изменять кампании, автоматизации, шаблоны писем, формы и товары. Каждый пользователь входит в свой аккаунт Omnisend в браузере и выбирает уровень доступа на экране согласия. С доступом на запись агенты также могут отправлять кампании и удалять данные. Выберите доступ только для чтения, если агентам нужны только отчёты.",
+    "Omnisend позволяет агентам читать отчёты по кампаниям и формам, находить контакты и сегменты, а также создавать и изменять кампании, автоматизации, шаблоны писем, формы и товары. Каждый пользователь подключается с API-ключом из своего аккаунта Omnisend. Агенты могут делать то, что разрешает ключ, в том числе отправлять кампании и удалять данные.",
   "marketplace.plugin.omnisend.app":
-    "Кампании, автоматизации, контакты, сегменты, формы и отчёты через MCP-сервер Omnisend со входом в браузере.",
+    "Кампании, автоматизации, контакты, сегменты, формы и отчёты через MCP-сервер Omnisend с API-ключом.",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "Как прошли кампании прошлой недели по сравнению с позапрошлой?",
   "marketplace.plugin.omnisend.prompt.segment": "Сколько контактов в сегменте VIP и как он изменился за этот месяц?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Подготовь черновик кампании для новой коллекции, но не отправляй его.",
   "marketplace.plugin.postiz.tagline": "Планирование публикаций в соцсетях",
+  "marketplace.plugin.omnisend.hint.apiKey": "В Omnisend откройте Store settings > API keys и создайте ключ.",
   "marketplace.plugin.postiz.description":
     "Postiz позволяет агентам показывать ваши каналы в соцсетях, а также готовить черновики, планировать и публиковать посты в более чем 30 сетях, таких как X, LinkedIn, Instagram и TikTok. Агенты также могут загружать медиафайлы и создавать изображения и видео с помощью ИИ. Войдите в аккаунт Postiz в браузере или вставьте API-ключ из Settings › Developers в Postiz. Доступ к API есть во всех облачных тарифах Postiz. Агенты могут опубликовать пост сразу, поэтому проверяйте каждый пост перед одобрением.",
   "marketplace.plugin.postiz.app":
@@ -425,6 +488,16 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Какие посты запланированы на следующую неделю?",
   "marketplace.plugin.postiz.prompt.draft":
     "Подготовь черновик поста в LinkedIn о нашем новом релизе, но не планируй его.",
+  "marketplace.plugin.trypost.tagline": "Планирование публикаций в соцсетях",
+  "marketplace.plugin.trypost.description":
+    "TryPost позволяет агентам просматривать подключённые каналы, а также готовить, планировать, ставить в очередь и публиковать посты в X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest и других сетях. Агенты также могут читать аналитику, управлять идеями и согласованиями и задавать время публикаций. Войдите в аккаунт TryPost в браузере и выберите рабочее пространство. Агенты могут опубликовать пост сразу, поэтому проверяйте каждый пост перед одобрением.",
+  "marketplace.plugin.trypost.app":
+    "Каналы, посты, очередь, идеи и аналитика через MCP-сервер TryPost со входом в браузере.",
+  "marketplace.plugin.trypost.prompt.week": "Какие посты запланированы на эту неделю?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Подготовь черновик поста в LinkedIn о нашем новом релизе, но не планируй его.",
+  "marketplace.plugin.trypost.prompt.analytics":
+    "Какие из моих постов за прошлый месяц получили больше всего вовлечённости?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub и ещё более 1000 приложений",
   "marketplace.plugin.composio.description":
     "Composio подключает ваших агентов к Gmail, Slack, GitHub и ещё более чем 1000 приложений через один сервер MCP. Войдите с аккаунтом Composio. Когда агенту нужно приложение, он попросит вас подключить его.",
@@ -585,6 +658,13 @@ export const messages = {
   "marketplace.skills.origin.local": "Создан на этом компьютере",
   "marketplace.skills.origin.workspace": "В папке этого агента",
   "marketplace.skills.origin.marketplace": "Из каталога · версия {version}",
+  "marketplace.skills.origin.github": "Из GitHub · {repository}",
+  "marketplace.skills.github.search": "Поиск или ссылка на GitHub",
+  "marketplace.skills.github.reading": "Поиск навыков в репозитории",
+  "marketplace.skills.github.trust": "OpenBot не проверял навыки из GitHub. Прочитайте навык, прежде чем добавить его.",
+  "marketplace.skills.github.source": "GitHub · {repository}, коммит {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "Открыть {repository} на GitHub",
   "marketplace.skills.status.notAdded": "Не добавлен",
   "marketplace.skills.status.on": "Включён: {agents}",
   "marketplace.skills.agentCount": {
@@ -670,6 +750,7 @@ export const messages = {
   "marketplace.error.installOnHost":
     "Установите «{name}» на компьютере, где работают эти агенты: приложению нужен вход через браузер.",
   "marketplace.error.appInvalid": "Не удалось добавить «{name}»: {reason}",
+  "marketplace.error.appNotConnected": "Не удалось подключить «{name}»: {reason}",
   "marketplace.error.uninstallNoServer": "Выберите локальный сервер, чтобы удалить плагин.",
   "marketplace.error.uninstallPartial": "Часть «{name}» удалить не удалось. {failures}",
   "marketplace.error.actionFailed": "Не удалось выполнить действие в каталоге. Повторите попытку.",

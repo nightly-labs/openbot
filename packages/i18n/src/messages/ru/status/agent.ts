@@ -8,9 +8,14 @@ export const messages = {
   "status.agent.instructionsChanged": "Обновил свои инструкции",
   "status.agent.modelSwitchedForLimit": "Лимит использования исчерпан. Переключено на {model}.",
   "status.agent.modelReturnedAfterLimit": "Лимит использования обновился. Снова используется {model}.",
+  "status.agent.routineSkippedRunOpen": "Пропущено: предыдущий запуск ещё не завершился",
+  "status.agent.routineSkippedUsageLimit": "Пропущено: достигнут лимит использования",
   "status.agent.modelSwitchedForError": "Ошибка провайдера. Переключено на {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "У {previous} закончились кредиты. Выполнено переключение на {model}. Чтобы снова использовать эту модель, пополните кредиты и выберите её.",
   "status.agent.modelReturnedAfterError": "После ошибки провайдера снова используется {model}.",
   "status.agent.marketplaceSuggested": "Предложено приложение из каталога: {app}.",
+  "status.agent.settingShown": "Показан параметр: {setting}.",
   "status.agent.channelMemberAdded": "Агент {agent} добавил {member} в канал. Запрос: {person}.",
   "status.agent.channelMemberRemoved": "Агент {agent} удалил {member} из канала. Запрос: {person}.",
   "status.agent.channelInstructionsChanged": "Агент {agent} изменил инструкции канала. Запрос: {person}.",
@@ -21,20 +26,41 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Сделать снимок главного экрана и отправить изображение модели агента.",
   "status.agent.screenCaptureChannel":
     "Изображение появится в канале {channel}, и его увидит каждый участник этого сервера, который читает канал.",
+  "status.agent.screenCapturePermissionNext": "Затем macOS может попросить вас разрешить OpenBot запись экрана.",
   "status.agent.screenCaptureDisplay": "Сделать снимок дисплея {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureWindow": "Сделать снимок окна {name} и отправить изображение модели агента.",
   "status.agent.screenCaptureRegion":
     "Сделать снимок области экрана {x}, {y}, {width} × {height} точек и отправить изображение модели агента.",
   "status.agent.reportProblem":
     "Это станет публичным issue на GitHub с версией приложения и вашей системой. Ваше имя не показывается.",
+  "status.agent.reportPhoneProblem":
+    "Это станет публичным issue на GitHub с версией приложения, вашей системой, а также версией, системой и журналом поддержки вашего телефона. Ваше имя не показывается.",
   "status.agent.sendIdea": "Это станет публичным issue на GitHub. Ваше имя не показывается.",
+  "status.agent.feedbackRecentErrors": "Последние ошибки в чате:",
+  "status.agent.feedbackSameAs": "Добавляется к issue #{issue}",
   "status.agent.feedbackSent": "Отправлено команде OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Удалено с GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Удалить отчёт #{issue} с GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Этот отчёт больше никто не увидит на GitHub. Это нельзя отменить. Чтобы исправить отчёт, агент может отправить исправленный.",
+  "status.agent.feedbackWithdrawing": "Удаление отчёта с GitHub…",
   "status.agent.serverInstallCommand":
     "Создать одноразовую команду, которая устанавливает OpenBot на другой компьютер как сервер {name} и подключает его к вашему аккаунту. Агент запускает её там.",
   "status.agent.serverInstallCard": "Команда установки для сервера {name}",
+  "status.agent.browserProfileNamed":
+    "Перенести {agents} в профиль браузера {profile}. Они получат его входы в аккаунты и файлы cookie. Их открытые вкладки закроются.",
+  "status.agent.commitCoAuthorOff": "Больше не добавлять OpenBot как соавтора в коммиты всех агентов.",
+  "status.agent.commitCoAuthorOn": "Снова добавлять OpenBot как соавтора в коммиты всех агентов.",
+  "status.agent.browserProfileNew":
+    "Создать новый профиль браузера {profile} и перенести в него {agents}. В нём нет входов в аккаунты. Их открытые вкладки закроются.",
+  "status.agent.browserProfileShared":
+    "Перенести {agents} в общий профиль браузера. Они получат его входы в аккаунты и файлы cookie. Их открытые вкладки закроются.",
+  "status.agent.browserProfileOwn":
+    "Дать каждому из {agents} собственный профиль браузера. Их открытые вкладки закроются.",
   "status.agent.feedbackSending": "Отправка отзыва команде OpenBot…",
   "status.agent.workflowDelete":
     "Удалить рабочий процесс {title} вместе с его запусками и версиями. Его открытые шаги остановятся.",
+  "status.agent.deleteAgents": "Удалить {agents} вместе с их чатами и файлами. Это нельзя отменить.",
   "status.agent.screenCaptureProgress": "Запрос снимка экрана…",
   "status.agent.screenCaptureReviewing": "Просмотр снимка экрана…",
   "status.agent.browserOpening": "Открытие веб-страницы…",
@@ -44,6 +70,7 @@ export const messages = {
   "status.agent.browserActing": "Работа с веб-страницей…",
   "status.agent.browserReviewing": "Просмотр веб-страницы…",
   "status.agent.memoriesSearching": "Поиск в памяти…",
+  "status.agent.chatsSearching": "Поиск в прошлых чатах…",
   "status.agent.memoriesSearched": {
     one: "Поиск в памяти: найдено {count}",
     few: "Поиск в памяти: найдено {count}",
@@ -52,6 +79,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Обновление памяти…",
   "status.agent.skillUsing": "Использование навыка {name}…",
+  "status.agent.backdropSetting": "Изменение фона…",
   "status.agent.skillReading": "Чтение навыка…",
   "status.agent.toolStepFailed": "Шаг инструмента завершился ошибкой; просмотр результата и выбор следующего действия…",
   "status.agent.toolResultReviewing": "Просмотр последнего результата инструмента…",
@@ -83,8 +111,17 @@ export const messages = {
   "status.agent.memoryChanges": "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}.",
   "status.agent.memoryChangesWithConflicts":
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
+  "status.agent.mcpToolCall": "Запустить инструмент {tool} MCP-сервера {name}.",
+  "status.agent.uiBlockClosedByMessage": "Закрыто новым сообщением",
   "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
+  "status.agent.planStopped":
+    "Агент остановился, в плане остались незавершённые шаги. Отправьте сообщение, чтобы продолжить.",
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",
+  "status.agent.providerExitContinues": "Агент остановился, не закончив ответ. Агент продолжает.",
   "status.agent.branchTitle": "Ответвлённый чат",
+  "status.agent.location.field": "Ваше местоположение",
+  "status.agent.location.placeholder": "Город, адрес или место",
+  "status.agent.location.submit": "Поделиться",
+  "status.agent.location.shared": "Местоположение отправлено",
 } as const satisfies PartialTranslation<typeof source>;

@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub はこの GitHub App の Client ID を認識していません。",
   "error.connector.githubUnexpected": "GitHub から予期しない応答がありました: {detail}",
   "error.connector.githubUnreachable": "OpenBot は GitHub に接続できません: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot は GitHub に接続できません。OpenBot を実行しているコンピューターまたはサーバーのインターネット接続と DNS 設定を確認してから、もう一度お試しください。",
   "error.connector.githubExpired": "GitHub の接続の有効期限が切れました。もう一度 GitHub に接続してください。",
   "error.connector.githubFileUnreadable": "GitHub の接続ファイルを読み取れません。",
   "error.connector.githubFileTooLarge": "GitHub の接続ファイルが大きすぎます。",
@@ -18,19 +20,37 @@ export const messages = {
     "OpenBot は 1Password CLI をインストールできませんでした。インターネット接続を確認してから、もう一度お試しください。",
   "error.connector.onePasswordCliSignedOut":
     "1Password CLI はサインインしていません。1Password アプリで連携をオンにしてから、もう一度接続してください。",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot が 1Password アプリに接続できません。1Password を開いてロックを解除してください。「設定」>「開発者」で「1Password CLI と連携」がオンになっていることを確認し、もう一度お試しください。",
   "error.connector.onePasswordCliFailed": "1Password CLI が失敗しました: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "この 1Password アカウントには、共有保管庫やサービスアカウントを作成する権限がありません。アカウントのオーナーまたは管理者にこの権限を依頼するか、サービスアカウントのトークンを受け取って「トークンを使う」をクリックしてください。",
   "error.connector.onePasswordUnexpected": "1Password から予期しない応答がありました: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password はサービスアカウントのトークンを受け付けませんでした。",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot は 1Password に接続できませんでした。インターネット接続を確認してから、もう一度お試しください。",
+  "error.connector.onePasswordRateLimited":
+    "1Password へのリクエストが多すぎます。数分待ってから、もう一度お試しください。",
   "error.connector.onePasswordNoVault":
     "サービスアカウントは保管庫を読み取れません。保管庫へのアクセス権を付与してから、もう一度お試しください。",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot は 1Password のログイン情報を読み取れません。1Password を切断してから、もう一度接続してください。",
   "error.connector.onePasswordFileUnreadable": "1Password の接続ファイルを読み取れません。",
   "error.connector.onePasswordFileTooLarge": "1Password の接続ファイルが大きすぎます。",
   "error.connector.bitwardenFailed":
     "Bitwarden を読み取れませんでした。bw CLI をインストールし、サインインしてロックを解除し、Shared with OpenBot という名前のフォルダーを 1 つ作成してください。新しいセッションキーで接続してください。",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot が Bitwarden CLI を見つけられません。bw をインストールし、新しいターミナルで動くことを確認してから、もう一度接続してください。",
+  "error.connector.bitwardenFolderMissing":
+    "Bitwarden には Shared with OpenBot という名前のフォルダーがちょうど 1 つ必要です。作成するか余分なフォルダーを削除してから、もう一度接続してください。",
   "error.connector.bitwardenHostInput":
     "HTTPS のサーバーのアドレス、API キーの client_id と client_secret、マスターパスワードを入力してください。",
   "error.connector.bitwardenHostFailed":
     "このサーバーで Bitwarden を開けませんでした。サーバーのアドレス、API キー、マスターパスワードを確認し、Shared with OpenBot という名前のフォルダーが 1 つあることを確認してから、もう一度接続してください。",
+  "error.connector.bitwardenHostSignInFailed":
+    "このサーバーで Bitwarden にサインインできませんでした。サーバーのアドレスと API キーを確認してから、もう一度接続してください。",
+  "error.connector.bitwardenHostUnlockFailed":
+    "このサーバーで Bitwarden のロックを解除できませんでした。マスターパスワードを確認してから、もう一度接続してください。",
   "error.connector.bitwardenCliInstallFailed":
     "このサーバーに Bitwarden CLI をインストールできませんでした。ネットワーク接続を確認してから、もう一度接続してください。",
   "error.connector.bitwardenFileUnreadable": "Bitwarden の接続ファイルを読み取れません。",
@@ -42,6 +62,8 @@ export const messages = {
     "Proton Pass CLI をインストールできませんでした。ネットワーク接続を確認してから、もう一度接続してください。",
   "error.connector.protonPassPlan":
     "ご利用の Proton プランでは Proton Pass CLI を使用できません。プランを変更してから、もう一度接続してください。",
+  "error.connector.protonPassPlanMissing":
+    "ご利用の Proton プランには Proton Pass CLI が含まれていません。Pass Plus を含む Proton プランが必要です。プランを変更してから、もう一度接続してください。",
   "error.connector.protonPassExpired": "Proton Pass へのアクセスが終了しました。もう一度接続してください。",
   "error.connector.protonPassKeyInvalid": "pst_ で始まる Proton Pass のアクセスキーを入力してください。",
   "error.connector.protonPassExtraPassword": "追加パスワードが正しくありません。もう一度入力してください。",

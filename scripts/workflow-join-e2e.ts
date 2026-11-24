@@ -1,14 +1,3 @@
-// Checks a workflow join on the real SQLite and the real workflow service, on a temporary profile
-// (#5553). Three branches go into a model step, an approval and an output: two prompts, and a model
-// step that fails once. Each join starts only when all three branches end. The model join keeps the
-// place of the failed branch with its error, redacted, and the place of the step after it that was
-// skipped. The approval and the output get only the answers, and so
-// does an output after the approval, because an approval hands its input on. A retry runs the failed
-// branch again and not the others, and the joins run again with all three answers. The run keeps its
-// steps over a restart. The model steps are a fake, so no model, agent, account or network is started.
-//
-// Run: bun scripts/workflow-join-e2e.ts
-// Writes .openbot-build/workflow-join-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -86,7 +75,6 @@ async function open() {
       turnAnswer: () => null,
       sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),
       stopDelivery: () => Effect.void,
-      // The first search fails, as a board that does not answer; the next one answers.
       generateText: (request) => {
         if (request.prompt.includes("Count the jobs")) {
           report.joinPrompts.push(request.prompt);
@@ -115,7 +103,6 @@ async function close() {
   database.close();
 }
 
-/** Waits until the run has a step that waits for a decision. */
 async function waiting(workflows: WorkflowsHandle, runId: string): Promise<WorkflowStep> {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -126,7 +113,6 @@ async function waiting(workflows: WorkflowsHandle, runId: string): Promise<Workf
   }
 }
 
-/** Waits until an attempt of a node ends, and gives its step. */
 async function settled(workflows: WorkflowsHandle, runId: string, nodeId: string, attempt: number) {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -139,7 +125,6 @@ async function settled(workflows: WorkflowsHandle, runId: string, nodeId: string
   }
 }
 
-/** Waits until the run is no longer open. */
 async function ended(workflows: WorkflowsHandle, runId: string): Promise<string> {
   const deadline = Date.now() + WAIT_MS;
   for (;;) {
@@ -150,7 +135,6 @@ async function ended(workflows: WorkflowsHandle, runId: string): Promise<string>
   }
 }
 
-/** The input of a step, as the store keeps it; the public step does not show it. */
 const inputOf = (step: WorkflowStep) => new WorkflowRunStore({ database }).step(step.id)?.input;
 const attempts = async (workflows: WorkflowsHandle, runId: string) =>
   (await runCauseEffect(workflows.run(runId))).steps.map((each) => `${each.nodeId}:${each.attempt}:${each.status}`);

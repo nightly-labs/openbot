@@ -1,0 +1,33 @@
+{
+  "slug": "wordpress",
+  "name": "WordPress.com",
+  "tagline": "WordPress.com sites and posts",
+  "description": "WordPress.com lets agents read posts, pages, comments, and site settings, and draft content on the sites of the signed-in account. Each user signs in to their own WordPress.com account through the browser and chooses full or read-only access.",
+  "category": "productivity",
+  "creatorName": "Automattic",
+  "iconUrl": "https://wordpress.com/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-recent-posts", "text": "List my ten most recent posts and their publish status." },
+    { "id": "prompt-comments", "text": "Which comments on my site are waiting for moderation?" },
+    { "id": "prompt-draft-post", "text": "Draft a post about our spring opening hours, but do not publish it." }
+  ],
+  "apps": [
+    {
+      "id": "app-wordpress-mcp",
+      "name": "WordPress.com",
+      "description": "Site, post, and comment access, over WordPress.com's MCP server with browser sign-in.",
+      "iconUrl": "https://wordpress.com/favicon.ico",
+      "server": {
+        "name": "wordpress",
+        "transport": "http",
+        "url": "https://public-api.wordpress.com/wpcom/v2/mcp/v1",
+        "auth": [{ "id": "wordpress-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://wordpress.com",
+  "privacyPolicyUrl": "https://automattic.com/privacy/",
+  "termsUrl": "https://wordpress.com/tos/",
+  "skills": []
+}

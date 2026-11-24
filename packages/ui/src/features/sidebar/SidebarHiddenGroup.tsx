@@ -1,10 +1,3 @@
-/**
- * "Hidden": the agents that a user hid, after every section. Like "Needs you", it is not a section of
- * the layout: it has no drag target and no section menu, and each agent keeps its own section for a
- * restore. It is collapsed until the user opens it. `SIDEBAR_HIDDEN_GROUP_OPEN_ID` records the open
- * state in the same per-scope storage as the collapsed sections.
- */
-
 import { Button, ChevronDown } from "@openbot/ui";
 import { For, Show } from "solid-js";
 import { useText } from "../../text";

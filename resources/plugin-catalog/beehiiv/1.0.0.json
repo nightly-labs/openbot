@@ -1,0 +1,33 @@
+{
+  "slug": "beehiiv",
+  "name": "beehiiv",
+  "tagline": "Newsletter posts and subscribers",
+  "description": "beehiiv lets agents read posts, subscribers, and performance data, and draft posts in the publications of the signed-in account. Each user signs in to their own beehiiv account through the browser.",
+  "category": "productivity",
+  "creatorName": "beehiiv",
+  "iconUrl": "https://avatars.githubusercontent.com/u/73256842?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-top-posts", "text": "Which of my last ten posts had the best open and click rates?" },
+    { "id": "prompt-growth", "text": "How did my subscriber count change this month, and from which sources?" },
+    { "id": "prompt-draft-post", "text": "Draft a post that announces our new pricing." }
+  ],
+  "apps": [
+    {
+      "id": "app-beehiiv-mcp",
+      "name": "beehiiv",
+      "description": "Post, subscriber, and analytics tools, over beehiiv's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/73256842?s=256&v=4",
+      "server": {
+        "name": "beehiiv",
+        "transport": "http",
+        "url": "https://mcp.beehiiv.com/mcp",
+        "auth": [{ "id": "beehiiv-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.beehiiv.com",
+  "privacyPolicyUrl": "https://www.beehiiv.com/privacy",
+  "termsUrl": "https://www.beehiiv.com/tou",
+  "skills": []
+}

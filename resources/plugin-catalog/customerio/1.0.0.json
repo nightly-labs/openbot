@@ -1,0 +1,33 @@
+{
+  "slug": "customerio",
+  "name": "Customer.io",
+  "tagline": "Customer messaging data",
+  "description": "Customer.io lets agents read people, segments, campaigns, broadcasts and message metrics in the workspaces the user chooses. Each user signs in to their own Customer.io account through the browser, and an admin must turn on MCP for the account first.",
+  "category": "automation",
+  "creatorName": "Customer.io",
+  "iconUrl": "https://customer.io/favicon-96x96.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-campaigns", "text": "How did my active Customer.io campaigns perform last month?" },
+    { "id": "prompt-segment", "text": "How many people are in the trial users segment?" },
+    { "id": "prompt-person", "text": "Show the profile and recent messages of this customer." }
+  ],
+  "apps": [
+    {
+      "id": "app-customerio-mcp",
+      "name": "Customer.io",
+      "description": "People, segments, campaigns, and message metrics, over Customer.io's MCP server with browser sign-in.",
+      "iconUrl": "https://customer.io/favicon-96x96.png",
+      "server": {
+        "name": "customerio",
+        "transport": "http",
+        "url": "https://mcp.customer.io/mcp",
+        "auth": [{ "id": "customerio-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://customer.io",
+  "privacyPolicyUrl": "https://customer.io/legal/privacy-policy",
+  "termsUrl": "https://customer.io/legal/terms-of-service",
+  "skills": []
+}

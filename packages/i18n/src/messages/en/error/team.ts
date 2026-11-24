@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.team", {
-  // Errors that the Team API and the team store send to clients.
   "error.team.ownerNotLinked": "This host is not linked to an OpenBot owner account.",
   "error.team.ownerEmailRequired": "Sign in with the OpenBot email that created this host.",
   "error.team.hostNotConfigured": "The team host is not configured.",
@@ -52,6 +51,11 @@ export const messages = defineMessages("error.team", {
   "error.team.tooManySignInAttempts": "Too many sign-in attempts. Try again later.",
   "error.team.clientUpdateRequired": "Update this OpenBot client before connecting to this host.",
   "error.team.hostUpdateRequired": "Update OpenBot on the host before connecting.",
+  "error.team.serverSafeMode": "This server is in safe mode because OpenBot on it does not start.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} on this server cannot open its data, because a newer OpenBot version saved it. A newer OpenBot release on the server fixes this.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} on this server stopped after it failed to start many times. A newer OpenBot release on the server fixes this.",
   "error.team.sidebarLayoutUnavailable": "Sidebar layout is unavailable.",
   "error.team.providersUnsupported": "Provider settings are not supported by this connection.",
   "error.team.providerNotManaged": "OpenBot does not manage this provider's CLI.",
@@ -72,7 +76,21 @@ export const messages = defineMessages("error.team", {
   "error.team.agentColorsUnsupported": "Agent colors are not supported by this connection.",
   "error.team.chatColorsUnsupported": "Chat colors are not supported by this connection.",
   "error.team.routineRunPlaceUnsupported": "This connection cannot change where a routine runs.",
+  "error.team.routinePauseReasonsUnsupported": "This connection cannot show why a routine is paused.",
+  "error.team.activeQueuesUnsupported": "This connection cannot show the queues of all agents.",
+  "error.team.routinesOnceUnsupported": "This connection cannot save routines that run once.",
+  "error.team.routineRunCommandUnsupported": "This connection cannot give the run command of a routine.",
+  "error.team.threadQueueUnsupported": "This connection cannot show the queue of a side thread.",
+  "error.team.threadRequestsUnsupported": "This connection cannot show the requests of a side thread to other agents.",
+  "error.team.hostTurnLimitsUnsupported": "This connection cannot show or change the thread limits of the server.",
+  "error.team.usageLimitUnsupported": "This connection cannot show or change the usage limits of agents.",
+  "error.team.hermesImportUnsupported": "This connection cannot import Hermes profiles from the server.",
+  "error.team.providerDetectionUnsupported": "This connection cannot find the model servers and agents of the server.",
+  "error.team.providerModelSourceUnsupported": "This connection cannot show where the models of a provider come from.",
+  "error.team.routineFlowStopUnsupported": "This connection cannot stop a routine run.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
+  "error.team.libraryFoldersUnsupported": "Library folders are not supported by this connection.",
+  "error.team.workflowFoldersUnsupported": "Workflow folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
     "This server cannot keep your own notification level for each agent. Update OpenBot on the computer that runs it.",
   "error.team.sidebarPinsUnsupported":
@@ -85,9 +103,15 @@ export const messages = defineMessages("error.team", {
   "error.team.messageDeleteUnsupported": "Deleting messages is not supported by this connection.",
   "error.team.workspaceDirectoryUnsupported": "Showing folders is not supported by this connection.",
   "error.team.conversationFileSearchUnsupported": "Searching files is not supported by this connection.",
+  "error.team.threadMessageSearchUnsupported": "Searching side threads is not supported by this connection.",
   "error.team.sideQuestionUnsupported": "Side questions are not supported by this connection.",
   "error.team.liveVoiceUnsupported":
     "This server does not support Codex live voice. Update OpenBot on the computer that runs it.",
+  "error.team.voiceTranscriptionUnsupported":
+    "This server does not support dictation. Update OpenBot on the computer that runs it.",
+  "error.team.clientBrowserUnsupported":
+    "This server does not support shared Chrome tabs. Update OpenBot on the computer that runs it.",
+  "error.team.clientBrowserCommandUnknown": "The agent no longer waits for this Chrome action.",
   "error.team.routineFlowsUnsupported":
     "This server does not support routine flows. Update OpenBot on the computer that runs it.",
   "error.team.routineCanvasTooLarge":
@@ -104,15 +128,27 @@ export const messages = defineMessages("error.team", {
   "error.team.hostIdentityUnsupported": "Server identity changes are not supported by this connection.",
   "error.team.hostUpdateUnsupported": "Host updates are not supported by this connection.",
   "error.team.hostTimezoneUnsupported": "The server timezone is not supported by this connection.",
+  "error.team.hostSignalHomeUnsupported": "The Signal server choice is not supported by this connection.",
+  "error.team.hostVoiceModelUnsupported":
+    "The speech recognition model of the server is not supported by this connection.",
+  "error.team.hostRestartUnsupported": "Restarting the server is not supported by this connection.",
+  "error.team.ownerTransferUnsupported": "Transferring ownership is not supported by this server.",
   "error.team.hostKeyRotationUnsupported": "Server key changes are not supported by this connection.",
   "error.team.localServersUnsupported": "Servers on this computer are not supported by this connection.",
   "error.team.routineResultsUnsupported": "Routine destinations are not supported by this connection.",
   "error.team.agentMemoryLimitUnsupported": "The agent memory limit is not supported by this connection.",
   "error.team.agentFoldersUnsupported": "The agent folders are not supported by this connection.",
+  "error.team.channelFoldersUnsupported": "The channel folders are not supported by this connection.",
   "error.team.folderUnavailable": "This folder is not available on the host computer.",
   "error.team.memoryReviewUnsupported": "The memory review is not supported by this connection.",
   "error.team.skillLearningUnsupported": "Skill learning is not supported by this connection.",
+  "error.team.browsingMemoryUnsupported": "Learning from browsing is not supported by this connection.",
   "error.team.promptCacheTtlUnsupported": "The prompt cache time is not supported by this connection.",
+  "error.team.claudeUserSetupUnsupported": "This connection does not support the Claude Code setup switch.",
+  "error.team.claudeCompactWindowUnsupported": "This connection does not support the Claude compaction size.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "This connection does not support compaction before the cache expires.",
+  "error.team.providerEnvironmentUnsupported": "This connection does not support provider variables.",
   "error.team.modelVisibilityUnsupported": "The model list is not supported by this connection.",
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",
   "error.team.agentAccessUnsupported": "Roles are not supported by this connection.",
@@ -129,6 +165,8 @@ export const messages = defineMessages("error.team", {
   "error.team.mcpUnsupported": "MCP servers are not supported by this connection.",
   "error.team.mcpServerListNeedsUpdate":
     "Update OpenBot on this device to use more than {limit} MCP servers on this server.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Update OpenBot on this device to use more than {limit} accounts of one provider on this server.",
   "error.team.storageUnsupported": "Storage is not supported by this connection.",
   "error.team.machineResourcesUnsupported": "Machine use is not supported by this connection.",
   "error.team.machineAlertMemberInvalid": "Only an owner or admin of this server can get machine alerts.",
@@ -153,6 +191,7 @@ export const messages = defineMessages("error.team", {
   "error.team.secureAuthUnsupported": "Secure authentication is not supported by this client.",
   "error.team.agentSettingsUnsupported": "Agent settings are not supported by this connection.",
   "error.team.adminRequired": "Administrator access is required.",
+  "error.team.mcpAccessStale": "Someone changed the access to this MCP server. Make your change again.",
   "error.team.mcpServerNotYours": "Only the person who added this MCP server, or an admin, can change it.",
   "error.team.ownerRequired": "Only the owner of this server can do this.",
   "error.team.requestTooLarge": "Request body is too large.",
@@ -168,4 +207,14 @@ export const messages = defineMessages("error.team", {
   "error.team.signInRelayMismatch": "This address is not from this sign-in.",
   "error.team.signInRelayLinkUnknown": "No agent on this server showed this sign-in link.",
   "error.team.hostPersonalityUnsupported": "The server personality is not supported by this connection.",
+  "error.team.agentWaitsUnsupported": "Open waits are not supported by this connection.",
+  "error.team.pendingApprovalUnsupported": "Reading a whole approval is not supported by this connection.",
+  "error.team.pendingPromptsUnsupported": "Reading the open questions is not supported by this connection.",
+  "error.team.phoneFeedbackUnsupported": "Sending a report from the phone app is not supported by this connection.",
+  "error.team.messagePinsUnsupported": "Pinned messages are not supported by this connection.",
+  "error.team.queuedMessageThreadUnsupported":
+    "Running a queued message as a new thread is not supported by this connection.",
+  "error.team.backgroundProcessesUnsupported": "Background processes are not supported by this connection.",
+  "error.team.providerUseUnsupported": "Turning providers on and off is not supported by this connection.",
+  "error.team.providerUseInvalid": "This provider does not have an on/off switch.",
 });

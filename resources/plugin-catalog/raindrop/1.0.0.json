@@ -1,0 +1,33 @@
+{
+  "slug": "raindrop",
+  "name": "Raindrop.io",
+  "tagline": "Bookmarks and highlights",
+  "description": "Raindrop.io lets agents search, save, and organize the bookmarks, collections, tags, and highlights of the signed-in user. The MCP server is in beta and needs a Raindrop.io Pro plan.",
+  "category": "productivity",
+  "creatorName": "Raindrop.io",
+  "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/49/b9/ba/49b9baac-3b05-16fa-3fc4-5cf90840efb0/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-saved", "text": "Find my saved articles about TypeScript performance." },
+    { "id": "prompt-untagged", "text": "Which bookmarks in my Unsorted collection have no tags?" },
+    { "id": "prompt-highlights", "text": "Summarize the highlights I saved this month." }
+  ],
+  "apps": [
+    {
+      "id": "app-raindrop-mcp",
+      "name": "Raindrop.io",
+      "description": "Bookmarks, collections, tags, and highlights, over Raindrop.io's MCP server with browser sign-in.",
+      "iconUrl": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/49/b9/ba/49b9baac-3b05-16fa-3fc4-5cf90840efb0/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+      "server": {
+        "name": "raindrop",
+        "transport": "http",
+        "url": "https://api.raindrop.io/rest/v2/ai/mcp",
+        "auth": [{ "id": "raindrop-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://raindrop.io",
+  "privacyPolicyUrl": "https://help.raindrop.io/privacy",
+  "termsUrl": "https://help.raindrop.io/terms",
+  "skills": []
+}

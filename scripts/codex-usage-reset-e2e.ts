@@ -1,13 +1,3 @@
-// Checks the Codex usage reset (#2859). Runs the real agent service on a temporary profile with a fake
-// Codex app-server that counts usage reset credits in `account/rateLimits/read` and spends one on
-// `account/rateLimitResetCredit/consume`, as Codex 0.160.1 does. The first turn hits the plan limit, so
-// the usage limit gate holds the agent. Cases: the credits are read; a reset answers `reset`, spends one
-// credit with one idempotency key, and the held message runs; a second reset with no spent limit answers
-// `nothingToReset`, spends none, and ends a hold that a refused turn left; a credential change, as when a
-// key is saved, ends a hold; a message from the user tries one turn before the reset, which a spent
-// plan refuses again with no second notice, and which runs the held messages after the account changed
-// outside OpenBot; another provider is refused.
-// `bun scripts/codex-usage-reset-e2e.ts`. Writes .openbot-build/codex-usage-reset-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -25,10 +15,9 @@ const fakeCodex = join(root, "codex");
 const consumeLog = join(root, "consumed.jsonl");
 const refusedLog = join(root, "refused.jsonl");
 const turnLog = join(root, "turns.jsonl");
-/** Its presence makes the next turn find a new account with an unspent plan, as a sign-in in a terminal does. */
+const modelLog = join(root, "models.jsonl");
 const switchedFlag = join(root, "switched");
 
-// Before the service modules load: the Codex process and the stores read the home folder.
 process.env.HOME = home;
 process.env.CODEX_HOME = join(home, ".codex");
 process.env.OPENBOT_CODEX_PATH = fakeCodex;
@@ -40,10 +29,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-/**
- * A Codex app-server with the methods that the service calls. A turn whose text has "limit" spends the
- * plan, and while the plan is spent each turn fails as Codex fails it. A reset credit restores it.
- */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync, readFileSync, rmSync } = require("node:fs");
 if (process.argv.includes("--version")) {
@@ -80,7 +65,7 @@ const answer = (message) => {
       appendFileSync(${JSON.stringify(consumeLog)}, JSON.stringify({ idempotencyKey: params.idempotencyKey, outcome }) + "\\n");
       return write({ id: message.id, result: { outcome } });
     }
-    case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-6-luna", displayName: "GPT-6 Luna" }] } });
+    case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-6-luna", displayName: "GPT-6 Luna" }, { model: "gpt-6-terra", displayName: "GPT-6 Terra" }] } });
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
@@ -91,23 +76,20 @@ const answer = (message) => {
     case "thread/items/list": return write({ id: message.id, result: { data: [], nextCursor: null } });
     case "thread/read": return write({ id: message.id, result: { thread: { id: params.threadId, turns: [] } } });
     case "turn/start": {
-      // Unique across a restart, as Codex turn ids are: the service ignores the end of a turn id it saw end.
       const turnId = "turn-" + process.pid + "-" + (++turns);
-      // The user's message is the last input item. The turn context blocks in front of it have their own text.
       const input = JSON.stringify(params.input[params.input.length - 1]);
       if (!hit && input.includes("limit")) { hit = true; spent = true; }
       if (input.includes("Exhaust")) spent = true;
       if (existsSync(${JSON.stringify(switchedFlag)})) { rmSync(${JSON.stringify(switchedFlag)}); spent = false; }
       appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify(params.input) + "\\n");
-      // A refusal that the plan does not show, as when Codex counted a limit that ended since. Once per
-      // message, also across a restart, so the retry of a released message runs.
+      appendFileSync(${JSON.stringify(modelLog)}, JSON.stringify(params.model) + "\\n");
       const refused = existsSync(${JSON.stringify(refusedLog)}) ? readFileSync(${JSON.stringify(refusedLog)}, "utf8").split("\\n") : [];
       const transient = input.includes("transient") && !refused.includes(input);
       if (transient) appendFileSync(${JSON.stringify(refusedLog)}, input + "\\n");
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
       setTimeout(() => {
-        if (spent || transient) {
+        if ((spent || transient) && params.model !== "gpt-6-terra") {
           const error = { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
           write({ method: "error", params: { threadId: params.threadId, turnId, error, willRetry: false } });
           write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "failed", error } } });
@@ -154,6 +136,7 @@ const report: { cases: CaseReport[]; passed: boolean; error?: string } = { cases
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   resolveUploadTarget: unused,
@@ -172,7 +155,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -186,6 +168,17 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
 function turnInputs(): string[] {
   try {
     return readFileSync(turnLog, "utf8").split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function turnModels(): string[] {
+  try {
+    return readFileSync(modelLog, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
   } catch {
     return [];
   }
@@ -216,7 +209,6 @@ const agents = new AgentService({
 
 try {
   await runCauseEffect(agents.initialize());
-  // The dock's reading starts Codex and counts its credits.
   await runCauseEffect(agents.getUsage());
   const before = await runCauseEffect(agents.providerUsageResets("codex"));
   assert.deepEqual(before, [{ provider: "codex", accountId: DEFAULT_PROVIDER_ACCOUNT_ID, available: 2 }]);
@@ -261,7 +253,6 @@ try {
     passed: true,
   });
 
-  // A refused turn holds the agent, but the plan shows no spent window: the gate waits for its timer.
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "A transient refusal." }));
   await waitFor("the refusal to hold the agent again", () =>
     agents.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id),
@@ -286,7 +277,6 @@ try {
     passed: true,
   });
 
-  // A new key serves the provider's own sign-in, so the old credential's limit no longer applies.
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Another transient refusal." }));
   await waitFor("the refusal to hold the agent before the credential change", () =>
     agents.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id),
@@ -302,7 +292,6 @@ try {
   assert.equal(consumed().length, 2, "A credential change spends no reset credit.");
   report.cases.push({ name: "a credential change ends a hold", details: null, passed: true });
 
-  // The plan is spent and the reading names its reset an hour away, so the gate waits for it.
   const notices: number[] = [];
   const onEvent = (event: AgentEvent) => {
     if (event.type === "usage-limit-reached" && event.agentId === agent.id) notices.push(event.agentCount);
@@ -313,8 +302,6 @@ try {
     agents.getRuntimeSnapshot().usageLimits?.find((limit) => limit.agentId === agent.id && limit.resetsAt !== null),
   );
   await waitFor("the first notice", () => notices.length === 1);
-  // A message from the user tries one turn. The plan is still spent, so the turn is refused, both
-  // messages wait again, and the user is not told about the same limit twice.
   const turnsBefore = turnInputs().length;
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Still spent?" }));
   await waitFor("the user's message to try a turn", () => turnInputs().length > turnsBefore);
@@ -332,8 +319,6 @@ try {
   });
   assert.equal(notices.length, 1, "A refused try does not announce the limit again.");
   assert.equal(turnInputs().length, turnsBefore + 1, "One message from the user tries one turn.");
-  // The user signs Codex in to another account outside OpenBot. Nothing tells the gate, so only a
-  // new message tries again, long before the old account's reset.
   writeFileSync(switchedFlag, "");
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "After the account switch." }));
   await waitFor("the held messages to run on the new account", () =>
@@ -351,8 +336,6 @@ try {
     passed: true,
   });
 
-  // The user deletes an agent that the spent plan holds. Its held message has not started, so it goes
-  // with the agent, and it never starts a turn.
   await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Exhaust the plan again." }));
   const heldForDelete = await waitFor("the spent plan to hold the message before the delete", () => {
     const statuses = agents
@@ -375,6 +358,53 @@ try {
   report.cases.push({
     name: "an agent that a usage limit holds can be deleted",
     details: { heldForDelete },
+    passed: true,
+  });
+
+  await waitFor("the spent plan to hold GPT-6 Luna", () =>
+    agents.getRuntimeSnapshot().usageLimitedModels?.some((limit) => limit.model === "gpt-6-luna"),
+  );
+  const backup = await runCauseEffect(
+    agents.createAgent({
+      name: "Backup",
+      description: "Checks the try before the backup.",
+      avatarSeed: "backup",
+      avatarHue: null,
+      initialMessage: "Start on Terra.",
+      provider: "codex",
+      model: "gpt-6-terra",
+    }),
+  );
+  const done = () => agents.listQueue(backup.id).deliveries.every((delivery) => delivery.status === "completed");
+  const modelOf = () => agents.listAgents().find((candidate) => candidate.id === backup.id)?.model;
+  await waitFor("the first message to run on GPT-6 Terra", done);
+  await runCauseEffect(
+    agents.updateAgent({
+      agentId: backup.id,
+      model: "gpt-6-luna",
+      backupModels: { automatic: true, order: [{ provider: "codex", model: "gpt-6-terra" }] },
+    }),
+  );
+  const triesFrom = turnModels().length;
+  await runCauseEffect(agents.sendMessage({ agentId: backup.id, text: "Still spent on Luna?" }));
+  await waitFor("the message to run on the backup", () => done() && modelOf() === "gpt-6-terra");
+  const tried = turnModels().slice(triesFrom);
+  assert.deepEqual(tried, ["gpt-6-luna", "gpt-6-terra"], "The message tries the held model, then the backup.");
+  writeFileSync(switchedFlag, "");
+  await runCauseEffect(agents.updateAgent({ agentId: backup.id, model: "gpt-6-luna" }));
+  const returnFrom = turnModels().length;
+  await runCauseEffect(agents.sendMessage({ agentId: backup.id, text: "Reset outside OpenBot." }));
+  await waitFor("the message to run on the model that the limit held", done);
+  const returned = turnModels().slice(returnFrom);
+  assert.deepEqual(returned, ["gpt-6-luna"], "After a reset outside OpenBot, the message runs on the held model.");
+  assert.equal(modelOf(), "gpt-6-luna", "The agent stays on the model that it tried.");
+  assert.ok(
+    !agents.getRuntimeSnapshot().usageLimitedModels?.some((limit) => limit.model === "gpt-6-luna"),
+    "A completed try ends the limit.",
+  );
+  report.cases.push({
+    name: "an agent set to switch without asking tries the held model before its backup",
+    details: { tried, returned },
     passed: true,
   });
 

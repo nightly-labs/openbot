@@ -1,32 +1,23 @@
 import type { SettingsCrumb } from "@openbot/ui/features/settings/SettingsDialogShell";
 import type { NearWalletAgent } from "@openbot/ui/features/vault/VaultNearWallet";
-import { VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
+import { type VaultAgentChoice, VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
 import { useText } from "@openbot/ui/text";
-import { onSettled, Show } from "solid-js";
+import { createEffect, createSignal, onSettled, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import type { LinkAccountStore } from "./stores/link-account-store";
 import type { NearWalletStore } from "./stores/near-wallet-store";
 import type { VaultStore } from "./stores/vault-store";
 
 export interface ServerVaultOptions {
-  /** The Vault of this computer, or of a joined server for its owner or admin. */
   store: VaultStore;
-  /** False for a joined server without `vault-v2`: it cannot keep API keys. */
   apiKeys: boolean;
-  /** False for a joined server without `vault-v3`: it cannot keep two-step keys. */
   twoStep: boolean;
-  /** The Link account of this computer. Absent for a joined server: its host has no Link. */
   link?: LinkAccountStore | undefined;
-  /** The NEAR Intents wallet of this computer. Absent for a joined server. */
   near?: NearWalletStore | undefined;
-  /** The agents that the wallet can let pay. */
   nearAgents?: (() => readonly NearWalletAgent[]) | undefined;
+  listAgents?: (() => Promise<readonly VaultAgentChoice[]>) | undefined;
 }
 
-/**
- * The Vault section of the server settings. It lists the items each time it opens, and shows each
- * list that main sends while it is open.
- */
 export function ServerVaultPanel(
   props: ServerVaultOptions & {
     menuMount: HTMLElement | undefined;
@@ -34,6 +25,21 @@ export function ServerVaultPanel(
   },
 ) {
   const { t, errorMessage } = useText();
+  const [agents, setAgents] = createSignal<readonly VaultAgentChoice[]>([]);
+  let request = 0;
+  createEffect(
+    () => props.listAgents,
+    (listAgents) => {
+      const current = ++request;
+      setAgents([]);
+      listAgents?.().then(
+        (list) => {
+          if (current === request) setAgents(list);
+        },
+        () => undefined,
+      );
+    },
+  );
   onSettled(() => {
     const store = props.store;
     const unsubscribe = store.subscribe();
@@ -72,6 +78,7 @@ export function ServerVaultPanel(
         <VaultPanel
           state={vault()}
           apiKeys={props.apiKeys}
+          agents={agents()}
           onCodes={onCodes()}
           onSave={props.store.save}
           onDelete={props.store.remove}

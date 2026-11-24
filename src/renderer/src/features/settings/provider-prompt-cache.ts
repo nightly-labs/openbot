@@ -1,123 +1,75 @@
 import type { OpenBotDesktopApi, PromptCacheTtl } from "@openbot/contracts/ipc";
-import type { ProviderPromptCache } from "@openbot/ui/features/settings/ProviderSettingsPage";
+import type {
+  ProviderCacheExpiryCompaction,
+  ProviderPromptCache,
+} from "@openbot/ui/features/settings/ProviderSettingsPage";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createStore, untrack } from "solid-js";
+import { createHostSetting } from "./host-setting-state";
 
-/** The prompt cache calls of one server's host. The desktop reaches them through main. */
-export type HostPromptCacheTtlCalls = Pick<OpenBotDesktopApi["hostAdmin"], "getPromptCacheTtl" | "setPromptCacheTtl">;
+export type HostPromptCacheTtlCalls = Pick<
+  OpenBotDesktopApi["hostAdmin"],
+  "getPromptCacheTtl" | "setPromptCacheTtl" | "getCacheExpiryCompaction" | "setCacheExpiryCompaction"
+>;
 
 export interface HostPromptCacheTtlOptions {
-  /** The calls of a client with no `window.openbot`, such as the web client. */
   calls?: HostPromptCacheTtlCalls;
 }
 
 export interface ProviderPromptCacheSource extends HostPromptCacheTtlOptions {
   serverId: string;
+  appliesToPi: boolean;
+  compaction: boolean;
 }
 
-/**
- * The Claude page's prompt cache time of this computer or a joined server (`prompt-cache-ttl-v1`).
- * The host checks the role again. Undefined while `source` is.
- *
- * Each new value of `status` reads the time again: the host sends a status event after a change,
- * such as one from the mobile app or another admin.
- */
 export function createProviderPromptCache(
   source: () => ProviderPromptCacheSource | undefined,
   status: () => unknown,
 ): () => ProviderPromptCache | undefined {
-  const { t, errorMessage } = useText();
+  const { t } = useText();
   const calls = (): HostPromptCacheTtlCalls => source()?.calls ?? window.openbot.hostAdmin;
-  const [state, setState] = createStore<{ value: PromptCacheTtl | null; pending: boolean; error: string | null }>({
-    value: null,
-    pending: false,
-    error: null,
+  const setting = createHostSetting<PromptCacheTtl, PromptCacheTtl>({
+    serverId: () => source()?.serverId,
+    status,
+    read: async (serverId) => (await calls().getPromptCacheTtl(serverId)).ttl,
+    save: async (ttl, serverId) => (await calls().setPromptCacheTtl(ttl, serverId)).ttl,
+    loadFailed: () => t("provider.settings.promptCacheLoadFailed"),
   });
-  /** Bumped for each server, so an answer for an earlier one is dropped. */
-  let generation = 0;
-
-  /** Bumped for each read and each save, so only the last answer shows. */
-  let reads = 0;
-
-  function load(serverId: string, request: number): void {
-    const read = ++reads;
-    untrack(calls)
-      .getPromptCacheTtl(serverId)
-      .then(
-        (next) => {
-          if (request === generation && read === reads && !state.pending)
-            setState((draft) => {
-              draft.value = next.ttl;
-            });
-        },
-        (error: unknown) => {
-          if (request === generation && read === reads && !state.pending)
-            setState((draft) => {
-              draft.error = errorMessage(error, t("provider.settings.promptCacheLoadFailed"));
-            });
-        },
-      );
-  }
-
-  createEffect(
-    () => source()?.serverId,
-    (serverId) => {
-      const current = ++generation;
-      setState(() => ({ value: null, pending: false, error: null }));
-      if (serverId !== undefined) load(serverId, current);
-    },
-  );
-
-  let opened = false;
-  createEffect(status, () => {
-    // The effect above reads the time when the page opens.
-    if (!opened) {
-      opened = true;
-      return;
-    }
-    const serverId = untrack(source)?.serverId;
-    if (serverId !== undefined && !untrack(() => state.pending)) load(serverId, generation);
+  const compactionSetting = createHostSetting<boolean, boolean>({
+    serverId: () => (source()?.compaction ? source()?.serverId : undefined),
+    status,
+    read: async (serverId) => (await calls().getCacheExpiryCompaction(serverId)).enabled,
+    save: async (enabled, serverId) => (await calls().setCacheExpiryCompaction(enabled, serverId)).enabled,
+    loadFailed: () => t("provider.settings.cacheExpiryCompactionLoadFailed"),
   });
-
-  async function choose(ttl: PromptCacheTtl): Promise<void> {
-    const serverId = source()?.serverId;
-    if (serverId === undefined || state.pending) return;
-    const request = generation;
-    reads++;
-    setState((draft) => {
-      draft.pending = true;
-      draft.error = null;
-    });
-    try {
-      const next = await calls().setPromptCacheTtl(ttl, serverId);
-      if (request === generation)
-        setState((draft) => {
-          draft.value = next.ttl;
-        });
-    } catch (error) {
-      if (request === generation)
-        setState((draft) => {
-          draft.error = errorMessage(error, t("error.provider.useChangeFailed"));
-        });
-    } finally {
-      if (request === generation)
-        setState((draft) => {
-          draft.pending = false;
-        });
-    }
-  }
-
-  const cache: ProviderPromptCache = {
+  const compaction: ProviderCacheExpiryCompaction = {
     get value() {
-      return state.value;
+      return compactionSetting.state.value;
     },
     get pending() {
-      return state.pending;
+      return compactionSetting.state.pending;
     },
     get error() {
-      return state.error;
+      return compactionSetting.state.error;
     },
-    onChange: (ttl) => void choose(ttl),
+    onChange: (enabled) => void compactionSetting.choose(enabled),
+  };
+  const cache: ProviderPromptCache = {
+    get value() {
+      return setting.state.value;
+    },
+    get appliesToPi() {
+      return source()?.appliesToPi === true;
+    },
+    get pending() {
+      return setting.state.pending;
+    },
+    get error() {
+      return setting.state.error;
+    },
+    get compaction() {
+      return source()?.compaction ? compaction : undefined;
+    },
+    onChange: (ttl) => void setting.choose(ttl),
   };
   return () => (source() ? cache : undefined);
 }

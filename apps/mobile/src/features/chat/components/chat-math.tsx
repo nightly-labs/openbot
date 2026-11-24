@@ -13,7 +13,7 @@ import size1Regular from "katex/dist/fonts/KaTeX_Size1-Regular.ttf";
 import size2Regular from "katex/dist/fonts/KaTeX_Size2-Regular.ttf";
 import typewriterRegular from "katex/dist/fonts/KaTeX_Typewriter-Regular.ttf";
 import { memo, type ReactNode, useCallback, useMemo, useState } from "react";
-import { type ColorValue, type LayoutChangeEvent, ScrollView, View, type ViewStyle } from "react-native";
+import { type ColorValue, type LayoutChangeEvent, View, type ViewStyle } from "react-native";
 import {
   LARGE_OPERATORS,
   type MathElement,
@@ -23,6 +23,7 @@ import {
   mathTree,
   operatorSpacing,
 } from "../model/chat-math";
+import { ChatHorizontalScrollView } from "./chat-swipe-gesture";
 
 const KATEX_FONTS = {
   "KaTeX_AMS-Regular": amsRegular,
@@ -41,10 +42,6 @@ const KATEX_FONTS = {
 
 type MathFont = keyof typeof KATEX_FONTS;
 
-/**
- * The ascender, descender and line gap of each font's `hhea` table, in em. The phone puts a
- * glyph's baseline in its line box from these, so each font's letters sit at a different height.
- */
 const FONT_METRICS: Record<MathFont, readonly [number, number, number]> = {
   "KaTeX_AMS-Regular": [1.003, 0.463, 0.09],
   "KaTeX_Caligraphic-Regular": [0.789, 0.143, 0.09],
@@ -60,24 +57,11 @@ const FONT_METRICS: Record<MathFont, readonly [number, number, number]> = {
   "KaTeX_Typewriter-Regular": [0.694, 0.229, 0.09],
 };
 
-/** TeX's math axis: the height of a fraction bar and of the middle of `+`, above the baseline. */
 const AXIS_HEIGHT = 0.25;
-/**
- * How far the middle of a letter or digit is above the middle of its box, in em. Glyph boxes are
- * centred on the math axis, but a digit's ink runs from its baseline to 0.68em above it. A fraction
- * moves its parts down by this, so the numerator and the denominator are equally far from the bar.
- */
 const INK_OFFSET = 0.09;
-/** How much taller than its font, in em, the line box of a glyph's text is. See `Glyph`. */
 const LINE_BOX_MARGIN = 0.25;
-/** The descender of the system text font. A view inside text has its bottom this far below the baseline. */
 const TEXT_DESCENT = 0.24;
 
-/**
- * How far to move a glyph up, in em, so that its baseline is `AXIS_HEIGHT` below the middle of its
- * line box. The phone centres the font's ascender, descender and line gap in the box, so without
- * this the baseline is half of `ascender - descender + gap` below the middle.
- */
 function baselineCorrection(font: MathFont): number {
   const [ascender, descender, gap] = FONT_METRICS[font];
   return (ascender - descender + gap) / 2 - AXIS_HEIGHT;
@@ -95,28 +79,19 @@ const VARIANT_FONTS: Record<string, MathFont> = {
   monospace: "KaTeX_Typewriter-Regular",
 };
 
-/** KaTeX sets math larger than the text around it, because its fonts have a small x-height. */
 const MATH_SCALE = 1.15;
-/** The size of each script level against the formula's size, as TeX's script and scriptscript styles. */
 const SCRIPT_SCALES = [1, 0.7, 0.5] as const;
 const LINE_HEIGHT = 1.2;
-/** Scripts sit close to their base, so their line is as tall as their font, with no leading. */
 const SCRIPT_LINE_HEIGHT = 1;
 const RULE_THICKNESS = 0.05;
 
 interface MathContext {
-  /** The formula's font size in points, with the phone's text size applied. */
   base: number;
   level: number;
   display: boolean;
   color: ColorValue | undefined;
 }
 
-/**
- * The sizes of one script level in points. Every part of a formula takes its height from these, so
- * the renderer knows each height before layout. A view inside a line of text gets no layout event,
- * so inline math cannot measure itself.
- */
 function metrics(context: MathContext) {
   const size = context.base * (SCRIPT_SCALES[Math.min(context.level, SCRIPT_SCALES.length - 1)] ?? 1);
   const lineHeight = context.level > 0 ? SCRIPT_LINE_HEIGHT : LINE_HEIGHT;
@@ -131,7 +106,6 @@ function isElement(node: MathNode): node is MathElement {
   return typeof node !== "string";
 }
 
-/** A key for each child: its tag and its place among the siblings with the same tag. */
 function keyedElements(nodes: readonly MathNode[]): { node: MathElement; key: string }[] {
   const seen = new Map<string, number>();
   return nodes.filter(isElement).map((node) => {
@@ -153,10 +127,8 @@ function isStretchy(node: MathElement | undefined): node is MathElement {
   return node !== undefined && isLeafOperator(node) && node.attributes.stretchy === "true";
 }
 
-/** U+2061, which KaTeX writes between a function name such as `sin` and its argument. */
 const FUNCTION_APPLICATION = 0x2061;
 
-/** Invisible operators, U+2061 to U+2064, that only add the spacing of their row. */
 function isInvisibleOperator(text: string): boolean {
   const code = text.length === 1 ? text.codePointAt(0) : undefined;
   return code !== undefined && code >= FUNCTION_APPLICATION && code <= 0x2064;
@@ -181,15 +153,11 @@ function leafFont(node: MathElement): MathFont {
   const variant = node.attributes.mathvariant;
   if (variant && VARIANT_FONTS[variant]) return VARIANT_FONTS[variant];
   if (node.tag !== "mi") return "KaTeX_Main-Regular";
-  // A single letter is a variable, set in italic. A name such as `sin` is upright.
   return [...mathText(node)].length === 1 ? "KaTeX_Math-Italic" : "KaTeX_Main-Regular";
 }
 
-// Heights --------------------------------------------------------------------------------------
-
 const heightCache = new WeakMap<MathElement, Map<string, number>>();
 
-/** The height in points of `node` as the components below draw it. */
 function heightOf(node: MathElement, context: MathContext): number {
   const key = `${context.base}:${context.level}:${context.display}`;
   let byContext = heightCache.get(node);
@@ -261,7 +229,6 @@ function scriptsLayout(node: MathElement, context: MathContext) {
   const superscript = node.tag === "msub" ? undefined : node.tag === "msup" ? first : second;
   const subscript = node.tag === "msup" ? undefined : first;
   const baseHeight = base ? heightOf(base, context) : 0;
-  // A tall base, such as a bracketed fraction, raises and lowers its scripts to its edges.
   const gap = Math.max(0, baseHeight - line);
   const reserve = Math.max(
     superscript ? heightOf(superscript, script) : 0,
@@ -275,7 +242,6 @@ function fractionLayout(node: MathElement, context: MathContext) {
   const { size, rule } = metrics(context);
   const part = context.display ? { ...context, display: false } : scriptContext(context);
   const thickness = node.attributes.linethickness === "0px" ? 0 : rule;
-  // TeX leaves about 0.12em between the bar and the parts of an inline fraction, and more in display.
   const margin = size * (context.display ? 0.05 : 0.02);
   const reserve = Math.max(numerator ? heightOf(numerator, part) : 0, denominator ? heightOf(denominator, part) : 0);
   return {
@@ -312,7 +278,6 @@ const ARROWS_RIGHT = new Set([..."→⟶⇒⟹↦⟼"]);
 const ARROWS_LEFT = new Set([..."←⟵⇐⟸"]);
 const ARROWS_BOTH = new Set([..."↔⟷⇔⟺"]);
 const BRACES = new Set([..."⏞⏟⎴⎵"]);
-/** The marks of `\overline` and `\underline`, which are drawn as a rule as wide as the formula. */
 const RULES = new Set([..."‾¯_―─"]);
 
 function isArrow(text: string): boolean {
@@ -337,7 +302,6 @@ function underOverLayout(node: MathElement, context: MathContext) {
     return isStretchy(child) ? stretchyHeight(mathText(child), context) : heightOf(child, script);
   };
   const baseHeight = base ? (isStretchy(base) ? stretchyHeight(mathText(base), context) : heightOf(base, context)) : 0;
-  // An accent such as `\hat` sits on the letter, not a script's height above it.
   const accent = node.attributes.accent === "true" && over !== undefined && isLeafOperator(over) && !isStretchy(over);
   const reserve = accent ? 0 : Math.max(partHeight(over), partHeight(under));
   return { base, over, under, script, accent, reserve, height: baseHeight + 2 * reserve };
@@ -369,15 +333,6 @@ function tableLayout(node: MathElement, context: MathContext) {
   return { rows, columns, columnSpacing, rowSpacing, height };
 }
 
-// Components -----------------------------------------------------------------------------------
-
-/**
- * A LaTeX formula drawn with native views from KaTeX's MathML. A formula that KaTeX cannot parse,
- * or that needs an element the app does not draw, shows `fallback` instead.
- *
- * Inline math sits in a line of text: its middle is moved to the height of the text's math axis.
- * Display math is centred on its own row, and scrolls sideways when it is wider than the message.
- */
 export const ChatMath = memo(function ChatMath({
   tex,
   display,
@@ -389,24 +344,19 @@ export const ChatMath = memo(function ChatMath({
   tex: string;
   display: boolean;
   block: boolean;
-  /** The size of the text around the formula, in points, with the phone's text size applied. */
   textSize: number;
   color: ColorValue | undefined;
   fallback: ReactNode;
 }) {
   const tree = useMemo(() => mathTree(tex, display), [tex, display]);
-  // The app build embeds these fonts with the expo-font plugin in `app.json`, so they are loaded from
-  // the first frame. An older build or Expo Go loads them here.
   const [fontsLoaded, fontError] = useFonts(KATEX_FONTS);
   if (!tree) return fallback;
   const context: MathContext = { base: textSize * MATH_SCALE, level: 0, display, color };
-  // Draw the formula only in its own fonts: a first frame in the system font would change size.
   const ready = fontsLoaded || fontError !== null;
   const formula = ready ? <MathRow nodes={tree.children} context={context} /> : null;
   if (block) {
     return (
-      <ScrollView
-        horizontal
+      <ChatHorizontalScrollView
         alwaysBounceHorizontal={false}
         showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
@@ -415,11 +365,9 @@ export const ChatMath = memo(function ChatMath({
         accessibilityLabel={tex}
       >
         {formula}
-      </ScrollView>
+      </ChatHorizontalScrollView>
     );
   }
-  // The middle of the formula is its math axis. A view inside text has its bottom a descender below
-  // the baseline, so move it down until its axis is `AXIS_HEIGHT` above the text's baseline.
   const height = rowHeight(tree.children, context);
   const shift = height / 2 - TEXT_DESCENT * textSize - AXIS_HEIGHT * metrics(context).size;
   return (
@@ -440,7 +388,6 @@ export const ChatMath = memo(function ChatMath({
 function MathRow({ nodes, context, style }: { nodes: readonly MathNode[]; context: MathContext; style?: ViewStyle }) {
   const keyed = keyedElements(nodes);
   const elements = keyed.map((entry) => entry.node);
-  // Brackets such as `\left(` grow to the height of what they enclose.
   const enclosed = Math.max(0, ...elements.filter((node) => !isFence(node)).map((node) => heightOf(node, context)));
   const { size } = metrics(context);
   return (
@@ -468,21 +415,17 @@ function rowOperatorSpacing(elements: readonly MathElement[], index: number, con
   const { lspace, rspace } = node.attributes;
   if (lspace !== undefined || rspace !== undefined) return { before: mathLength(lspace), after: mathLength(rspace) };
   const text = mathText(node);
-  // Function application, as in `\sin x`: a thin space, but none before a parenthesis.
   if (text === String.fromCodePoint(FUNCTION_APPLICATION)) {
     const next = elements[index + 1];
     return { before: 0, after: next && isLeafOperator(next) && mathText(next) === "(" ? 0 : 0.1667 };
   }
-  // TeX adds no operator spacing in a script.
   if (context.level > 0) return { before: 0, after: 0 };
   const spacing = operatorSpacing(text);
   if (spacing.before === 0.2222) {
-    // A binary operator at the start or after another operator is a sign, as in `-x` or `= -1`.
     const previous = elements[index - 1];
     const closing = previous && isLeafOperator(previous) && /^[)\]}|⟩⌋⌉]$/u.test(mathText(previous));
     if (!previous || (isLeafOperator(previous) && !closing)) return { before: 0, after: 0 };
   }
-  // TeX spaces an operator from its neighbours only, so `$\le$` alone has no space around it.
   return {
     before: index > 0 ? spacing.before : 0,
     after: index < elements.length - 1 ? spacing.after : 0,
@@ -555,16 +498,11 @@ function Glyph({
   font: MathFont;
   context: MathContext;
   lineHeight?: number;
-  /** Stretches a bracket or a radical sign to the height of what it encloses. */
   scaleY?: number;
   style?: ViewStyle;
 }) {
   const { size } = metrics(context);
   const [ascender, descender, gap] = FONT_METRICS[font];
-  // The phone centres the font in a line box only when the box is at least as tall as the font.
-  // In a shorter box it moves the baseline, so the text keeps the font's height, and the box that
-  // the formula lays out with keeps the height given here. The text extends past it, centred.
-  // The phone rounds the font's metrics, so the text box has a margin of `LINE_BOX_MARGIN` over them.
   const textLineHeight = Math.max(lineHeight, ascender + descender + gap + LINE_BOX_MARGIN) * size;
   return (
     <View style={[{ height: size * lineHeight, justifyContent: "center" }, style]}>
@@ -623,10 +561,6 @@ function Space({ node, context }: { node: MathElement; context: MathContext }) {
   );
 }
 
-/**
- * Three parts in a column. `above` and `below` both take `reserve` points, so the middle of
- * `middle` is the middle of the column, which a row lines up with the math axis.
- */
 function Stack({
   above,
   middle,
@@ -730,7 +664,6 @@ function Radical({
   );
 }
 
-/** A stretchy mark over or under a formula: a line, an arrow or a brace as wide as the formula. */
 function StretchyMark({ text, context, over }: { text: string; context: MathContext; over: boolean }) {
   const { size, rule } = metrics(context);
   const line = <View style={{ flexGrow: 1, height: rule, backgroundColor: context.color }} />;
@@ -773,8 +706,6 @@ function StretchyMark({ text, context, over }: { text: string; context: MathCont
       />
     );
   }
-  // Other marks, such as the hat of `\widehat` or the tilde of `\widetilde`, keep their glyph at its
-  // own width, so the notation stays the same.
   return <Glyph text={text} font="KaTeX_Main-Regular" context={context} />;
 }
 
@@ -823,8 +754,6 @@ function Enclose({ node, context }: { node: MathElement; context: MathContext })
   const { size, rule } = metrics(context);
   const notation = node.attributes.notation ?? "";
   const height = rowHeight(node.children, context);
-  // A diagonal strike needs the width, which only layout gives. Before that, and inside a line of
-  // text, where no layout event comes, it is drawn level.
   const [width, setWidth] = useState(0);
   const onLayout = useCallback((event: LayoutChangeEvent) => {
     const next = event.nativeEvent.layout.width;
@@ -871,7 +800,6 @@ function MathTable({ node, context }: { node: MathElement; context: MathContext 
         <View key={column.key} style={{ alignItems: column.align, gap: layout.rowSpacing }}>
           {layout.rows.map((row) => {
             const cell = row.cells[column.index]?.node;
-            // Each column is its own view, so each cell takes the height of the tallest cell in its row.
             return (
               <View key={row.key} style={{ height: row.height, justifyContent: "center", alignItems: column.align }}>
                 {cell ? <MathRow nodes={cell.children} context={context} /> : null}

@@ -1,8 +1,3 @@
-import { Effect } from "effect";
-// Agent import into the local host, or into a joined server with `agent-import-v2` (in parts) or
-// `agent-import-v1`. The file dialog opens here, so the renderer never names a path. For a joined
-// server, main reads the file and sends it.
-
 import { copyFile, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -21,8 +16,14 @@ import {
   AGENT_IMPORT_UPLOAD_BYTES,
 } from "@openbot/contracts/team-protocol/agent-import-v1";
 import { AGENT_IMPORT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/agent-import-v2";
+import {
+  decodeHermesImportReadResponse,
+  HERMES_IMPORT_CAPABILITY,
+  HERMES_IMPORT_ROUTES,
+} from "@openbot/contracts/team-protocol/hermes-import-v1";
 import type { AppTranslate } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect } from "effect";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from "electron";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import type { AgentImportService } from "../agent-import-service";
@@ -43,7 +44,6 @@ export interface AgentImportIpcDependencies {
   >;
   getMainWindow: () => BrowserWindow | null;
   translate: AppTranslate;
-  /** The folder of the export skills a user adds to Grok Bot or Hermes by hand: `<source>/SKILL.md`. */
   exportSkillDirectory: string;
 }
 
@@ -66,7 +66,6 @@ export function agentImportIpcHandlers({
     return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
   };
 
-  // Hermes keeps its profiles in a folder, so the user names the folder and main reads it.
   const chooseHermesFolder = async (): Promise<string | null> => {
     const mainWindow = getMainWindow();
     const options: OpenDialogOptions = {
@@ -81,6 +80,11 @@ export function agentImportIpcHandlers({
   const requireRemoteImport = (serverId: string) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_IMPORT_CAPABILITY))
       throw new Error(sourceText("error.team.agentImportUnsupported"));
+  };
+
+  const requireRemoteHermes = (serverId: string) => {
+    if (!remoteServers.supportsCapability(serverId, HERMES_IMPORT_CAPABILITY))
+      throw new Error(sourceText("error.team.hermesImportUnsupported"));
   };
 
   const stageRemote = async (serverId: string): Promise<AgentImportPreview | null> => {
@@ -152,7 +156,18 @@ export function agentImportIpcHandlers({
         await copyFile(join(exportSkillDirectory, source, "SKILL.md"), result.filePath);
         return { saved: true };
       }),
-      readHermes: handler(() => runCauseEffect(hermesImport.stage(hermesRoot()))),
+      readHermes: scopedQueryHandler({
+        local: () => runCauseEffect(hermesImport.stage(hermesRoot())),
+        remote: async (serverId) => {
+          requireRemoteHermes(serverId);
+          return runCauseEffect(
+            remoteServers.request(serverId, HERMES_IMPORT_ROUTES.read, decodeHermesImportReadResponse, {
+              method: "POST",
+              body: {},
+            }),
+          );
+        },
+      }),
       chooseHermes: handler(async () => {
         const folder = await chooseHermesFolder();
         if (!folder) return null;
@@ -160,8 +175,35 @@ export function agentImportIpcHandlers({
         if (!preview) throw new Error(sourceText("error.import.hermesNoProfiles"));
         return preview;
       }),
-      applyHermes: payloadHandler(parseApplyHermesImportInput, (input) => runCauseEffect(hermesImport.apply(input))),
-      discardHermes: payloadHandler(stringPayload("token"), (token) => Effect.runPromise(hermesImport.discard(token))),
+      applyHermes: scopedHandler(parseApplyHermesImportInput, {
+        local: (input) => runCauseEffect(hermesImport.apply(input)),
+        remote: async (input, serverId) => {
+          requireRemoteHermes(serverId);
+          const result = await runCauseEffect(
+            remoteServers.request(serverId, HERMES_IMPORT_ROUTES.apply, decodeRemoteAgentImportResult, {
+              method: "POST",
+              body: input,
+              timeoutMs: AGENT_IMPORT_UPLOAD_TIMEOUT_MS,
+            }),
+          );
+          return resolveRemoteAgentImportResult(
+            result,
+            await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries)),
+          );
+        },
+      }),
+      discardHermes: scopedHandler(stringPayload("token"), {
+        local: (token) => Effect.runPromise(hermesImport.discard(token)),
+        remote: async (token, serverId) => {
+          requireRemoteHermes(serverId);
+          await runCauseEffect(
+            remoteServers.request(serverId, HERMES_IMPORT_ROUTES.discard, () => undefined, {
+              method: "POST",
+              body: { token },
+            }),
+          );
+        },
+      }),
     },
   };
 }

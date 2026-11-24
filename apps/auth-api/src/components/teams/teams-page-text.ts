@@ -2,15 +2,9 @@ import type { AppTranslate } from "@openbot/i18n";
 import type { TeamsSetupId } from "../../lib/teams-page";
 import { slot } from "../../lib/text-slots";
 
-/*
- * The text of the /teams page, built from `sitePage.teams.*` catalog keys. The routes `/teams`,
- * `/pl/teams` and `/pt/teams` run `teamsPageText` with `loadPageText`. This module has only a type import of the
- * catalogs, so the page does not pull them into the browser bundle.
- */
-
-/** Splits `text` at the last space: the last word stays on one line with what follows it. */
 function splitLastWord(text: string) {
   const space = text.lastIndexOf(" ");
+  if (space < 0) return { lead: "", last: text };
   return { lead: text.slice(0, space), last: text.slice(space + 1) };
 }
 
@@ -44,9 +38,7 @@ export function teamsPageText(t: AppTranslate) {
     description: t("sitePage.teams.description"),
     imageAlt: t("sitePage.teams.imageAlt"),
     hero: {
-      /** The heading before the avatars, without its last word. */
       lead: hero.lead,
-      /** The word before the avatars, which stays on their line. */
       keep: hero.last,
       rest: heroAfter.trim(),
     },
@@ -56,7 +48,6 @@ export function teamsPageText(t: AppTranslate) {
       question: t("sitePage.teams.setups.question"),
       action: t("sitePage.teams.setups.action"),
     },
-    /** In the order of `TEAMS_BENEFIT_ICONS`. */
     benefits: [
       {
         title: t("sitePage.teams.benefits.alwaysOn.title"),
@@ -97,22 +88,27 @@ export function teamsPageText(t: AppTranslate) {
       ],
     },
     closing: {
-      /** The heading in words. Each word has `accent` when it is in the accent key. */
-      words: [
-        ...words(closingBefore, false),
-        ...words(t("sitePage.teams.closing.accent"), true),
-        ...words(closingAfter, false),
-      ],
+      words: headingWords([
+        { text: closingBefore, accent: false },
+        { text: t("sitePage.teams.closing.accent"), accent: true },
+        { text: closingAfter, accent: false },
+      ]),
       action: t("sitePage.teams.closing.action"),
     },
   };
 }
 
-function words(text: string, accent: boolean) {
-  return text
-    .split(" ")
-    .filter((word) => word.length > 0)
-    .map((word) => ({ word, accent }));
+function headingWords(parts: readonly { text: string; accent: boolean }[]) {
+  const full = parts.map((part) => part.text).join("");
+  let offset = 0;
+  return parts.flatMap((part) => {
+    const start = offset;
+    offset += part.text.length;
+    return [...part.text.matchAll(/\S+/gu)].map((match) => {
+      const next = full.charAt(start + match.index + match[0].length);
+      return { word: match[0], accent: part.accent, spaceAfter: /\s/u.test(next) };
+    });
+  });
 }
 
 export type TeamsPageText = ReturnType<typeof teamsPageText>;

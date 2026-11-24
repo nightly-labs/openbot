@@ -1,0 +1,36 @@
+{
+  "slug": "tableau",
+  "name": "Tableau",
+  "tagline": "Tableau Cloud analytics",
+  "description": "Tableau lets agents find published data sources, query them, and read workbooks, views, and Pulse metrics on Tableau Cloud with the permissions of the signed-in user. Each user signs in to their own Tableau Cloud site through the browser.",
+  "category": "data-analytics",
+  "creatorName": "Tableau",
+  "iconUrl": "https://avatars.githubusercontent.com/u/828667?s=128&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    {
+      "id": "prompt-sales-region",
+      "text": "Which region had the highest sales last quarter in the Superstore data source?"
+    },
+    { "id": "prompt-find-dashboard", "text": "Find the dashboards about customer churn and tell me who owns them." },
+    { "id": "prompt-metric-trend", "text": "How did the weekly active users metric change over the last month?" }
+  ],
+  "apps": [
+    {
+      "id": "app-tableau-mcp",
+      "name": "Tableau",
+      "description": "Data source queries, workbook and view lookup, and Pulse metrics, over Tableau's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/828667?s=128&v=4",
+      "server": {
+        "name": "tableau",
+        "transport": "http",
+        "url": "https://mcp.tableau.com",
+        "auth": [{ "id": "tableau-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.tableau.com",
+  "privacyPolicyUrl": "https://www.salesforce.com/company/privacy/",
+  "termsUrl": "https://www.tableau.com/legal",
+  "skills": []
+}

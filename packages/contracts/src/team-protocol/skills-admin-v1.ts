@@ -1,10 +1,3 @@
-// Frozen optional skills-admin-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can list the skills of one agent on the host, install a marketplace skill for it, remove
-// one, and turn one on or off. Only ids cross the wire: the host downloads the skill from the
-// marketplace with its own account, so a client never sends skill files. A member cannot use any
-// route; `requireAdmin` on the host is the only gate. Widening any of it needs a second capability.
 import {
   adminRoute,
   boolean,

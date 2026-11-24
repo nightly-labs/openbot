@@ -111,6 +111,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "לא ניתן לעזוב את {name}",
   "mobile.server.drawer.removeFailed": "לא ניתן להסיר את {name}",
   "mobile.server.drawer.deleteFailed": "לא ניתן למחוק את {name}",
+  "mobile.server.drawer.hide": "הסתרת השרת",
+  "mobile.server.drawer.show": "הצגת השרת",
+  "mobile.server.drawer.hiddenServers": "שרתים מוסתרים",
+  "mobile.server.drawer.hideFailed": "לא ניתן להסתיר את {name}",
+  "mobile.server.drawer.showFailed": "לא ניתן להציג את {name}",
   "mobile.server.drawer.actionFailed": "OpenBot לא הצליח להשלים את הפעולה. אפשר לנסות שוב.",
   "mobile.server.drawer.moveUp": "הזזה למעלה",
   "mobile.server.drawer.moveDown": "הזזה למטה",
@@ -154,14 +159,11 @@ export const messages = {
   "mobile.server.join.inviteLink": "קישור הזמנה",
   "mobile.server.join.joining": "מצטרף…",
   "mobile.server.join.submit": "הצטרפות לשרת",
-  // The cloud server that OpenBot runs for the user, with a paid plan. The phone shows the plans and
-  // the servers of the account; the purchase is in OpenBot on the computer.
   "mobile.server.hosted.loading": "טוען מסלולים…",
   "mobile.server.hosted.loadFailed": "לא ניתן לטעון את המסלולים. אפשר לנסות שוב.",
   "mobile.server.hosted.wakeFailed": "לא ניתן להפעיל את השרת. אפשר לנסות שוב.",
   "mobile.server.hosted.restartFailed": "לא ניתן להפעיל מחדש את השרת. אפשר לנסות שוב.",
   "mobile.server.hosted.unavailable": "שרתי ענן לא זמינים לחשבון הזה.",
-  // The name of a server before the first read of its name.
   "mobile.server.hosted.defaultName": "שרת ענן",
   "mobile.server.hosted.monthly": "חודשי",
   "mobile.server.hosted.yearly": "שנתי",
@@ -182,7 +184,6 @@ export const messages = {
   "mobile.server.hosted.speedFaster": "מהיר פי {factor}",
   "mobile.server.hosted.joinHint": "יש להשתמש בהזמנה מבעלי השרת.",
   "mobile.server.hosted.join": "הצטרפות לשרת",
-  // A new server that the OpenBot desktop app runs on the computer of the server {name}, beside that server.
   "mobile.server.local.option": "שרת מקומי חדש במחשב",
   "mobile.server.local.optionHint": "במחשב שמריץ את {name}, עם סוכנים, צ'אטים וקבצים משלו.",
   "mobile.server.local.title": "שרת חדש",
@@ -208,23 +209,25 @@ export const messages = {
   "mobile.server.hosted.intro.title": "הסוכנים שלך, תמיד פעילים",
   "mobile.server.hosted.intro.description":
     "שרת ענן מריץ את הסוכנים והשגרות שלך גם כשהמחשב כבוי. OpenBot מגדיר אותו ומשאיר אותו פעיל.",
-  // {members}, {storage}, {sites} and {speed} are the texts of the four facts of a plan.
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  // The steps on the desktop app. The names after "Settings" are the desktop Settings tabs and buttons.
-  "mobile.server.hosted.computer.title": "במחשב שלך",
+  "mobile.server.hosted.steps.title": "הוספה במחשב שלך",
+  "mobile.server.hosted.steps.open": "יש לפתוח את OpenBot במחשב שלך.",
+  "mobile.server.hosted.steps.settings": "יש לעבור אל הגדרות ← שרתים מארחים.",
+  "mobile.server.hosted.steps.add": "יש לבחור בהוספת שרת ובמסלול.",
+  "mobile.server.hosted.plansToggle": "מה כולל כל מסלול",
   "mobile.server.hosted.computer.add": "הוספת שרת ענן",
   "mobile.server.hosted.computer.addHint": "ב-OpenBot, יש לפתוח הגדרות ← שרתים מארחים ולבחור בהוספת שרת.",
   "mobile.server.hosted.computer.change": "שינוי מסלול",
   "mobile.server.hosted.computer.changeHint": "ב-OpenBot, יש לפתוח הגדרות ← חיוב.",
   "mobile.server.hosted.yourServers": "השרתים שלך",
-  "mobile.server.hosted.plans": "מסלולים",
   "mobile.server.hosted.currentPlan": "המסלול שלך",
   "mobile.server.hosted.soldOut": "אזל",
-  // The plan and the billing period of one server of the account, such as "Standard · Yearly". {date} is a date.
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · מסתיים ב-{date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · הנתונים נשמרים עד {date}",
   "mobile.server.hosted.state.payment": "ממתין לתשלום",
   "mobile.server.hosted.state.setup": "בהגדרה",
+  "mobile.server.hosted.state.restoring": "משחזר נתונים",
   "mobile.server.hosted.state.starting": "מתחיל",
   "mobile.server.hosted.state.running": "פועל",
   "mobile.server.hosted.state.stopped": "נעצר",
@@ -258,7 +261,6 @@ export const messages = {
   "mobile.server.hosted.detail.signIn": "מתחבר בשמך",
   "mobile.server.hosted.detail.publish": "מוסיף את השרת לחשבון שלך",
   "mobile.server.hosted.detail.check": "בודק את החיבור",
-  // For screen readers, after the name of a setup step.
   "mobile.server.hosted.stepDone": "הושלם",
   "mobile.server.hosted.stepActive": "בתהליך",
   "mobile.server.hosted.stepPending": "לא התחיל",
@@ -348,6 +350,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "ממתין. המארח מריץ כמה תורות שהזיכרון שלו מאפשר.",
   "mobile.server.threads.hold.agentBusy": "ממתין לסיום עבודה אחרת של הסוכן הזה.",
   "mobile.server.threads.hold.oneTurn": "ממתין. הספק של הסוכן הזה מריץ תור אחד בכל פעם.",
+  "mobile.server.threads.hold.signIn": "ממתין. הספק של הסוכן הזה דורש התחברות.",
   "mobile.server.threads.offline": "יש להתחבר לשרת הזה כדי לראות את השרשורים שלו.",
   "mobile.server.threads.loading": "טוען שרשורים…",
   "mobile.server.threads.loadFailed": "לא ניתן לטעון את השרשורים של חלק מהסוכנים.",
@@ -379,6 +382,7 @@ export const messages = {
     "השרת נעצר ומתחיל שוב. זה אורך כדקה. תורות של סוכנים שרצים נעצרים, וחברים מאבדים את החיבור עד שהשרת חוזר. הקבצים והצ'אטים נשמרים.",
   "mobile.server.settings.restartConfirm": "הפעלה מחדש",
   "mobile.server.settings.restarted": "{name} מופעל מחדש",
+  "mobile.server.settings.restartUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי להפעיל אותו מחדש מכאן.",
   "mobile.server.settings.leaveTitle": "לעזוב את {name}?",
   "mobile.server.settings.leaveBody": "כדי להצטרף שוב יהיה צורך בהזמנה אחרת.",
   "mobile.server.settings.leave": "עזיבת השרת",
@@ -386,6 +390,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "הפעולה מסירה את השרת משירות החשבונות עבור כל החברים. הקבצים והצ'אטים במחשב שלו נשמרים. כדי להשתמש בו שוב, יש לרשום אותו מאותו מחשב.",
   "mobile.server.settings.remove": "הסרת השרת",
+  "mobile.server.settings.hide": "הסתרת השרת",
+  "mobile.server.settings.show": "הצגת השרת",
   "mobile.server.settings.deleteTitle": "למחוק את {name}?",
   "mobile.server.settings.deleteBody":
     "OpenBot עוצר את השרת במחשב שלו ומעביר את הסוכנים, הצ'אטים והקבצים שלו לפח של אותו מחשב. השרת נעלם מרשימת השרתים בכל המכשירים שלך.",
@@ -401,6 +407,13 @@ export const messages = {
   "mobile.server.settings.identityNotAllowed": "רק בעלים או מנהל יכולים לשנות את שם השרת והלוגו.",
   "mobile.server.settings.identityUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את השם והלוגו שלו.",
   "mobile.server.settings.identityOffline": "יש להתחבר לשרת הזה כדי לשנות את השם והלוגו שלו.",
+  "mobile.server.settings.appearance": "צורה וצבע",
+  "mobile.server.settings.appearanceShape": "צורה",
+  "mobile.server.settings.appearanceShapeOption": "צורה {number}",
+  "mobile.server.settings.appearanceColor": "צבע השרת",
+  "mobile.server.settings.appearanceAutomatic": "אוטומטי",
+  "mobile.server.settings.appearanceReset": "איפוס",
+  "mobile.server.settings.appearanceSaveFailed": "לא ניתן לשמור את הצורה והצבע של השרת. אפשר לנסות שוב.",
   "mobile.server.route.cropLogo": "חיתוך הלוגו",
   "mobile.server.members.remove": "הסרת חבר",
   "mobile.server.members.invitePeople": "הזמנת אנשים",
@@ -444,6 +457,10 @@ export const messages = {
   "mobile.server.route.invite": "הזמנת אנשים",
   "mobile.server.route.member": "חבר",
   "mobile.server.route.timezone": "אזור זמן",
+  "mobile.server.route.signalHome": "שרת Signal",
+  "mobile.server.route.personality": "אישיות הסוכן",
+  "mobile.server.route.agents": "סוכנים",
+  "mobile.server.route.voiceModel": "זיהוי דיבור",
   "mobile.server.settings.storage": "אחסון",
   "mobile.server.route.storage": "אחסון",
   "mobile.server.route.storageFiles": "כל הקבצים",
@@ -494,11 +511,37 @@ export const messages = {
   "mobile.server.library.noMatches": "אין קבצים תואמים",
   "mobile.server.library.showInChat": "הצגה בצ'אט",
   "mobile.server.library.share": "שיתוף",
+  "mobile.server.library.folders.title": "תיקיות",
+  "mobile.server.library.folders.allFiles": "כל הקבצים",
+  "mobile.server.library.folders.removedAgents": "סוכנים שנמחקו",
+  "mobile.server.library.folders.notInFolder": "לא בתיקייה",
+  "mobile.server.library.folders.path": "תיקייה: {path}",
+  "mobile.server.library.folders.pathHint": "מציג את התיקיות",
+  "mobile.server.library.folders.new": "תיקייה חדשה",
+  "mobile.server.library.folders.name": "שם התיקייה",
+  "mobile.server.library.folders.inFolder": "בתוך {name}",
+  "mobile.server.library.folders.create": "יצירה",
+  "mobile.server.library.folders.rename": "שינוי שם",
+  "mobile.server.library.folders.renameTitle": "שינוי שם התיקייה",
+  "mobile.server.library.folders.save": "שמירה",
+  "mobile.server.library.folders.delete": "מחיקת תיקייה",
+  "mobile.server.library.folders.deleteTitle": "למחוק את ״{name}״?",
+  "mobile.server.library.folders.deleteBody": "גם התיקיות שבתוכה יימחקו. הקבצים נשארים אצל הסוכן.",
+  "mobile.server.library.folders.moveTo": "העברה לתיקייה",
+  "mobile.server.library.folders.actions": "פעולות עבור {name}",
+  "mobile.server.library.folders.expand": "הצגת התיקיות של {name}",
+  "mobile.server.library.folders.collapse": "הסתרת התיקיות של {name}",
+  "mobile.server.library.folders.emptyTitle": "אין קבצים בתיקייה הזו",
+  "mobile.server.library.folders.emptyBody": "{agent} יכול לשמור כאן קבצים עם נתיב התיקייה {path}.",
+  "mobile.server.library.folders.loadFailed": "לא ניתן לטעון את התיקיות",
+  "mobile.server.library.folders.changeFailed": "לא ניתן לשנות את התיקיות",
+  "mobile.server.library.folders.gone": "התיקייה הזו כבר לא נמצאת בשרת.",
+  "mobile.server.library.folders.fileGone": "הקובץ הזה כבר לא נמצא בשרת, או שאי אפשר להעביר אותו.",
+  "mobile.server.library.folders.unsupported": "בשרת הזה אין תיקיות בספרייה. יש לעדכן את השרת כדי להשתמש בהן.",
   "mobile.server.route.providers": "ספקים",
   "mobile.server.route.provider": "ספק",
   "mobile.server.route.providerModels": "מודלים",
   "mobile.server.route.acpRegistry": "רישום ACP",
-  "mobile.server.route.mcp": "שרתי MCP",
   "mobile.server.route.mcpServer": "שרת MCP",
   "mobile.server.members.rowLabel": "{name}, {role}",
   "mobile.server.members.you": "{name} (אני)",
@@ -537,12 +580,43 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "אין אזור זמן שמתאים לחיפוש הזה.",
   "mobile.server.settings.timezoneMore": "יש להקליד עוד מהשם כדי לראות אזורי זמן אחרים.",
   "mobile.server.settings.timezoneDescription":
-    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה לא מציינת את אזור הזמן של השולח.",
+    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה לא מציינת את אזור הזמן של השולח. בשרת, גם הדפדפן משתמש בו אחרי ההפעלה מחדש הבאה.",
   "mobile.server.settings.timezoneLoading": "טוען אזור זמן…",
   "mobile.server.settings.timezoneLoadFailed": "לא ניתן לטעון את אזור הזמן של השרת.",
   "mobile.server.settings.timezoneSaveFailed": "לא ניתן לשמור את אזור הזמן. אפשר לנסות שוב.",
   "mobile.server.settings.timezoneUnavailable": "יש להתחבר לשרת הזה כבעלים או כמנהל כדי לשנות את אזור הזמן שלו.",
   "mobile.server.settings.timezoneUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את אזור הזמן שלו.",
+  "mobile.server.settings.signalHomeAutomatic": "אוטומטי",
+  "mobile.server.settings.signalHomeNearest": "שרת ה-Signal הקרוב ביותר",
+  "mobile.server.settings.signalHomeInUse": "בשימוש: {name}",
+  "mobile.server.settings.signalHomeLoading": "מודד את שרתי ה-Signal…",
+  "mobile.server.settings.signalHomeSaveFailed": "לא ניתן לשנות את שרת ה-Signal. נסה שוב.",
+  "mobile.server.settings.signalHomeUnavailable": "התחבר לשרת הזה כבעלים או כמנהל כדי לשנות את שרת ה-Signal שלו.",
+  "mobile.server.settings.signalHomeUnsupported": "עדכן את OpenBot בשרת הזה כדי לשנות כאן את שרת ה-Signal שלו.",
+  "mobile.server.settings.signalHomeDescription":
+    "חברים מתחברים לשרת הזה דרך שרת ה-Signal הזה. שרת Signal עם השהיה נמוכה יותר נותן חיבורים מהירים יותר.",
+  "mobile.server.settings.signalHomeFallback": "{chosen} אינו עונה. השרת משתמש ב-{name} עד ש-{chosen} יענה שוב.",
+  "mobile.server.settings.signalHomeMoving": "השרת עובר אל {name}. חברים יתחברו שוב בעוד כמה שניות.",
+  "mobile.server.settings.signalHomeLoadFailed": "לא ניתן לטעון את שרתי ה-Signal.",
+  "mobile.server.settings.signalHomeLatency": "{latency} אלפיות שנייה",
+  "mobile.server.settings.signalHomeNoAnswer": "אין תשובה",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "הלסינקי 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "הלסינקי 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "סן חוזה",
+  "mobile.server.settings.signalHomePlaceSydney": "סידני",
+  "mobile.server.settings.signalHomePlaceSingapore": "סינגפור",
+  "mobile.server.settings.voiceModelDescription":
+    "הסוכנים בשרת הזה משתמשים במודל הזה כדי לתמלל את הקול של סרטונים שאין להם כתוביות.",
+  "mobile.server.settings.voiceModelLoading": "טוען את זיהוי הדיבור…",
+  "mobile.server.settings.voiceModelLoadFailed": "לא ניתן לטעון את מודל זיהוי הדיבור של השרת.",
+  "mobile.server.settings.voiceModelSaveFailed": "לא ניתן לשנות את מודל זיהוי הדיבור. יש לנסות שוב.",
+  "mobile.server.settings.voiceModelUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את זיהוי הדיבור שלו.",
+  "mobile.server.settings.voiceModelReady": "מוכן",
+  "mobile.server.settings.voiceModelDownloading": "מוריד: {percent}",
+  "mobile.server.settings.voiceModelSize": "הורדה של {size}",
+  "mobile.server.settings.voiceModelDownload": "הורדה",
+  "mobile.server.settings.voiceModelCancel": "עצירת ההורדה",
+  "mobile.server.settings.voiceModelRemove": "הסרה",
   "mobile.server.settings.keySection": "מפתח השרת",
   "mobile.server.settings.keyChanged": "השינוי האחרון",
   "mobile.server.settings.keyChange": "החלפת מפתח",
@@ -559,13 +633,49 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "לא ניתן להחליף את מפתח השרת. אפשר לנסות שוב.",
   "mobile.server.settings.keyOwnerOnly": "רק הבעלים יכול להחליף את מפתח השרת.",
   "mobile.server.settings.keyUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי להחליף כאן את המפתח שלו.",
+  "mobile.server.settings.turnLimit": "שרשורים בו־זמנית",
+  "mobile.server.settings.turnLimitDescription":
+    "כמה שרשורים של סוכנים יכולים לרוץ בו־זמנית בשרת הזה. יותר שרשורים משתמשים ביותר זיכרון.",
+  "mobile.server.settings.turnLimitAutomatic": "אוטומטי ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "אוטומטי (ללא הגבלה)",
+  "mobile.server.settings.turnLimitUnlimited": "ללא הגבלה",
+  "mobile.server.settings.turnLimitsLoadFailed": "לא ניתן לטעון את מגבלות השרשורים של השרת הזה.",
+  "mobile.server.settings.turnLimitsSaveFailed": "לא ניתן לשמור את מגבלת השרשורים. אפשר לנסות שוב.",
+  "mobile.server.settings.turnLimitsUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את מגבלת השרשורים שלו.",
+  "mobile.server.settings.agentTaskLimit": "שרשורים במקביל לכל סוכן",
+  "mobile.server.settings.agentTaskLimitDescription": "כמה שרשורים כל סוכן ללא מגבלה משלו יכול להריץ בו־זמנית.",
+  "mobile.server.settings.agentTaskLimitDefault": "ברירת מחדל ({count})",
   "mobile.server.settings.memoryLimit": "זיכרונות לכל סוכן",
   "mobile.server.settings.memoryLimitDescription": "כמה זיכרונות כל סוכן בשרת הזה יכול לשמור.",
   "mobile.server.settings.memoryLimitLoadFailed": "לא ניתן לטעון את מגבלת הזיכרונות של השרת הזה.",
   "mobile.server.settings.memoryLimitSaveFailed": "לא ניתן לשמור את מגבלת הזיכרונות. אפשר לנסות שוב.",
   "mobile.server.settings.memoryLimitUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את מגבלת הזיכרונות שלו.",
-  // Server settings › Vault: the logins, cards and contact info of a joined server, for an owner or
-  // admin. {host} is the server name, such as Studio. The phone never shows a saved secret.
+  "mobile.server.settings.memoryReview": "סקירת זיכרון",
+  "mobile.server.settings.memoryReviewDescription":
+    "באיזו תדירות סוכנים בשרת הזה שומרים ברקע עובדות מתמשכות מהצ'אטים שלהם.",
+  "mobile.server.settings.memoryReviewOff": "כבוי",
+  "mobile.server.settings.memoryReviewTurns": { one: "כל תור", two: "כל 2 תורות", other: "כל {count} תורות" },
+  "mobile.server.settings.memoryReviewLoadFailed": "לא ניתן לטעון את הגדרת סקירת הזיכרון.",
+  "mobile.server.settings.skillLearning": "למידת מיומנויות",
+  "mobile.server.settings.skillLearningDescription": "האם הסוכנים בשרת הזה שומרים את מה שהם לומדים כמיומנויות.",
+  "mobile.server.settings.skillLearningAutomatic": "אוטומטי",
+  "mobile.server.settings.skillLearningAsk": "לשאול קודם",
+  "mobile.server.settings.skillLearningOff": "כבוי",
+  "mobile.server.settings.skillLearningLoadFailed": "לא ניתן לטעון את הגדרת למידת המיומנויות.",
+  "mobile.server.settings.browsingMemory": "ללמוד מהגלישה שלי",
+  "mobile.server.settings.browsingMemoryDescription":
+    "כשאתה שולט בדפדפן של סוכן, הסוכן לומד איך אתרים עובדים מהדפים והכפתורים שאתה משתמש בהם. טקסט שהקלדת לא נשמר.",
+  "mobile.server.settings.browsingMemoryLoadFailed": "לא ניתן לטעון את הגדרת הגלישה.",
+  "mobile.server.settings.learningSaveFailed": "לא ניתן לשמור את ההגדרה הזו. אפשר לנסות שוב.",
+  "mobile.server.settings.learningUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את ההגדרה הזו.",
+  "mobile.server.settings.responseStyleDescription":
+    "טבעי: הסוכנים שולחים עדכונים קצרים בזמן העבודה, והצ'אט מציג אותם. קלאסי: הסוכנים עונים פעם אחת, כשהם מסיימים.",
+  "mobile.server.settings.responseStyleNatural": "טבעי",
+  "mobile.server.settings.responseStyleClassic": "קלאסי",
+  "mobile.server.settings.personalityLoadFailed": "לא ניתן לטעון את אישיות השרת.",
+  "mobile.server.settings.personalitySaveFailed": "לא ניתן לשמור את סגנון התגובה. אפשר לנסות שוב.",
+  "mobile.server.settings.personalityUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את סגנון התגובה שלו.",
+  "mobile.server.settings.agentsUnavailable": "יש להתחבר לשרת הזה כבעלים או כמנהל כדי לשנות את הגדרות הסוכנים שלו.",
   "mobile.server.route.browserProfiles": "פרופילי דפדפן",
   "mobile.server.browserProfiles.unavailable": "רק בעלים או מנהל של שרת מקוון יכולים לנהל את פרופילי הדפדפן שלו.",
   "mobile.server.browserProfiles.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי לנהל כאן את פרופילי הדפדפן שלו.",
@@ -596,6 +706,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "הוספת סוכנים",
   "mobile.server.browserProfiles.agentsHint":
     "נגיעה נותנת לסוכן את הפרופיל הזה, או מחזירה אותו לפרופיל המשותף. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
+  "mobile.server.browserProfiles.movedNote":
+    "ההתחברויות לאתרים נשארות בפרופיל הישן. סוכן שהועבר צריך להתחבר שוב לאתרים האלה.",
   "mobile.server.browserProfiles.clear": "ניקוי נתונים",
   "mobile.server.browserProfiles.clearTitle": "לנקות את הנתונים של {name}?",
   "mobile.server.browserProfiles.clearBody":
@@ -607,9 +719,6 @@ export const messages = {
   "mobile.server.browserProfiles.deleteBody":
     "הפעולה מוחקת את ההתחברויות, העוגיות ונתוני האתרים של הפרופיל. הלשוניות הפתוחות שלו נסגרות.",
   "mobile.server.browserProfiles.deleteAgents": "הסוכנים האלה יעברו לפרופיל המשותף: {agents}.",
-  // Server settings › Browser profiles › Proxies: the saved proxies of the named profiles, and the
-  // computers of members that share their internet connection from the desktop app. A phone cannot
-  // share its own connection. {name} is a proxy host, such as proxy.example.com, or a computer name.
   "mobile.server.browserProxies.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי לנהל כאן את הפרוקסי שלו.",
   "mobile.server.browserProxies.loading": "טוען פרוקסי…",
   "mobile.server.browserProxies.loadFailed": "OpenBot לא הצליח לטעון את הפרוקסי.",
@@ -679,7 +788,7 @@ export const messages = {
   "mobile.server.vault.contacts": "פרטי קשר",
   "mobile.server.vault.apiKeys": "מפתחות API",
   "mobile.server.vault.apiKeysFooter":
-    "סוכנים ב-{host} קוראים כל מפתח מקובץ פרטי לפי שם המשתנה שלו. המפתחות נשארים ב-{host}. הטלפון הזה לא יכול להציג אותם.",
+    "סוכנים ב-{host} קוראים כל מפתח מקובץ לפי שם המשתנה שלו. כל הסוכנים פועלים כאותו משתמש מערכת, ולכן סוכן יכול לקרוא גם קובץ מפתח שמיועד לסוכנים אחרים. המפתחות נשארים ב-{host}. הטלפון הזה לא יכול להציג אותם.",
   "mobile.server.vault.empty": "אין פריטים",
   "mobile.server.vault.addLogin": "הוספת התחברות",
   "mobile.server.vault.addCard": "הוספת כרטיס",
@@ -692,7 +801,7 @@ export const messages = {
   "mobile.server.vault.import": "ייבוא סיסמאות מקובץ CSV",
   "mobile.server.vault.importing": "מייבא…",
   "mobile.server.vault.importFooter":
-    "יש להשתמש בייצוא סיסמאות מדפדפן או ממנהל סיסמאות. {host} מוסיף את ההתחברויות. הוא מדלג על שורה שאינה HTTPS, שאין בה סיסמה או שכבר נשמרה. הטלפון הזה מוחק את העותק שלו של הקובץ אחרי הקריאה.",
+    "יש להשתמש בייצוא סיסמאות מדפדפן או ממנהל סיסמאות. {host} מוסיף את ההתחברויות. הוא מדלג על שורה עם כתובת לא נתמכת, שאין בה סיסמה או שכבר נשמרה. הטלפון הזה מוחק את העותק שלו של הקובץ אחרי הקריאה.",
   "mobile.server.vault.importResult": "נוספו: {imported}. דולגו: {skipped}.",
   "mobile.server.vault.importTooLarge": "הקובץ הזה גדול מדי לשליחה מטלפון. יש לייבא אותו ב-OpenBot ב-{host}.",
   "mobile.server.vault.importReadFailed": "לא ניתן לקרוא את הקובץ.",
@@ -706,15 +815,13 @@ export const messages = {
   "mobile.server.vault.saveFailed": "לא ניתן לשמור את הפריט. אפשר לנסות שוב.",
   "mobile.server.vault.gone": "הפריט הזה כבר לא נמצא בכספת.",
   "mobile.server.vault.website": "אתר",
-  "mobile.server.vault.websiteHint": "כתובת HTTPS. סוכנים ממלאים את ההתחברות הזו רק באתר הזה.",
+  "mobile.server.vault.websiteHint": "כתובת אתר, כמו example.com. סוכנים ממלאים את ההתחברות הזו רק באתר הזה.",
   "mobile.server.vault.username": "שם משתמש",
   "mobile.server.vault.password": "סיסמה",
   "mobile.server.vault.notes": "הערות",
   "mobile.server.vault.notesPlaceholder": "חשבון עבודה",
   "mobile.server.vault.secretSaved": "נשמר. יש להקליד ערך חדש כדי להחליף אותו.",
-  // A placeholder in a narrow field of a saved secret, such as the security code.
   "mobile.server.vault.secretSavedShort": "נשמר",
-  // Under the item form: the asterisk marks a required field.
   "mobile.server.vault.requiredNote": "* שדה חובה",
   "mobile.server.vault.contactRequiredNote": "יש למלא לפחות אחד מאלה: שם מלא, כתובת, טלפון או אימייל.",
   "mobile.server.vault.secretHint": "הערך נשלח ל-{host} פעם אחת. הטלפון הזה לא שומר אותו ולא יכול להציג אותו.",
@@ -744,7 +851,6 @@ export const messages = {
   "mobile.server.vault.postalCode": "מיקוד",
   "mobile.server.vault.country": "מדינה",
   "mobile.server.vault.countryNone": "בחירת מדינה",
-  // Country names. Hermes has no Intl.DisplayNames, so the phone names them from the catalog.
   "mobile.server.vault.countryName.AT": "אוסטריה",
   "mobile.server.vault.countryName.AU": "אוסטרליה",
   "mobile.server.vault.countryName.BE": "בלגיה",
@@ -769,17 +875,64 @@ export const messages = {
   "mobile.server.vault.variableNameHint":
     "משתנה הסביבה שתוכנית קוראת: אותיות גדולות באנגלית, ספרות ו-_. סוכנים מוצאים את המפתח לפי השם הזה.",
   "mobile.server.vault.apiKey": "מפתח API",
+  "mobile.server.vault.agents": "סוכנים",
+  "mobile.server.vault.agentsAll": "כל הסוכנים",
+  "mobile.server.vault.agentsAllHint": "„כל הסוכנים” כולל גם כל סוכן שיתווסף בהמשך.",
+  "mobile.server.vault.agentsNone": "יש לבחור לפחות סוכן אחד.",
+  "mobile.server.vault.agentsSome": "{chosen} מתוך {total}",
+  "mobile.server.vault.agentsListed": "סוכנים: {agents}",
+  "mobile.server.vault.searchAgents": "חיפוש סוכנים",
+  "mobile.server.vault.noAgentMatches": "אין סוכנים שתואמים לחיפוש.",
+  "mobile.server.vault.agentOptions": "אפשרויות",
+  "mobile.server.vault.selectAll": "בחירת הכול",
+  "mobile.server.vault.deselectAll": "ביטול הבחירה",
   "mobile.server.vault.delete": "מחיקת פריט",
   "mobile.server.vault.deleteTitle": "למחוק את הפריט הזה?",
   "mobile.server.vault.deleteBody": "סוכנים ב-{host} לא יוכלו עוד להשתמש בו. אי אפשר לבטל את הפעולה.",
   "mobile.server.vault.deleteConfirm": "מחיקה",
-  // Server settings › Connectors: the Slack, Discord, Telegram, GitHub and 1Password connections of a
-  // joined server, for an owner or admin. {host} and {name} are the server name, such as Studio.
+  "mobile.server.vault.twoStep.title": "קוד אימות דו־שלבי",
+  "mobile.server.vault.twoStep.off": "כבוי",
+  "mobile.server.vault.twoStep.offFooter": "הסוכנים מבקשים ממך את הקוד כשאתר מבקש אותו.",
+  "mobile.server.vault.twoStep.onFooter": "הסוכנים ב־{host} מזינים את הקוד הזה בעצמם. המפתח נשאר ב־{host}.",
+  "mobile.server.vault.twoStep.unsavedKey": "יש לשמור את פרטי ההתחברות כדי לשמור את המפתח.",
+  "mobile.server.vault.twoStep.unsavedRemove": "יש לשמור את פרטי ההתחברות כדי להסיר את המפתח.",
+  "mobile.server.vault.twoStep.setUp": "הגדרה",
+  "mobile.server.vault.twoStep.remove": "הסרת הקוד הדו־שלבי",
+  "mobile.server.vault.twoStep.copy": "העתקת הקוד",
+  "mobile.server.vault.twoStep.copied": "הועתק",
+  "mobile.server.vault.twoStep.copyFor": "העתקת הקוד הדו־שלבי של {site}: {code}",
+  "mobile.server.vault.twoStep.codeLabel": "קוד דו־שלבי: {code}",
+  "mobile.server.vault.twoStep.codeLoading": "הקוד נטען…",
+  "mobile.server.vault.twoStep.codeFailed": "לא ניתן לטעון את הקוד. OpenBot ינסה שוב בעוד 30 שניות.",
+  "mobile.server.vault.twoStep.theSite": "האתר",
+  "mobile.server.vault.twoStep.noSetup": "אין הגדרה פעילה. יש לפתוח את פרטי ההתחברות ולבחור „הגדרה” שוב.",
+  "mobile.server.vault.twoStep.setupTitle": "הגדרת קוד דו־שלבי",
+  "mobile.server.vault.twoStep.setupIntro":
+    "ב־{site}, יש להפעיל אימות דו־שלבי עם אפליקציית אימות. כשהאתר מציג קוד QR, יש לסרוק אותו או למסור ל־OpenBot את המפתח שלו.",
+  "mobile.server.vault.twoStep.scan": "סריקת קוד QR",
+  "mobile.server.vault.twoStep.chooseImage": "בחירת צילום מסך",
+  "mobile.server.vault.twoStep.chooseImageHint": "צילום מסך של קוד ה־QR מהתמונות שלך",
+  "mobile.server.vault.twoStep.keyLabel": "מפתח הגדרה או קישור otpauth://",
+  "mobile.server.vault.twoStep.keyHint":
+    "רוב האתרים מציגים אותו מתחת לקוד ה־QR, בתור „לא ניתן לסרוק?” או „הזנת המפתח ידנית”.",
+  "mobile.server.vault.twoStep.keyInvalid": "זה לא מפתח אימות דו־שלבי.",
+  "mobile.server.vault.twoStep.noQrCode": "לא נמצא קוד QR בתמונה הזו.",
+  "mobile.server.vault.twoStep.qrNoKey": "בקוד ה־QR הזה אין מפתח דו־שלבי.",
+  "mobile.server.vault.twoStep.imageFailed": "לא ניתן לקרוא את התמונה הזו.",
+  "mobile.server.vault.twoStep.next": "הבא",
+  "mobile.server.vault.twoStep.checkTitle": "בדיקת הקוד",
+  "mobile.server.vault.twoStep.checkIntro":
+    "יש להזין את הקוד הזה ב־{site} כדי לסיים. כשהאתר מקבל אותו, יש להקיש על „סיום”.",
+  "mobile.server.vault.twoStep.checkHint": {
+    one: "הקוד מתחלף כל שנייה. האתר מקבל גם את הקוד הקודם.",
+    two: "הקוד מתחלף כל {count} שניות. האתר מקבל גם את הקוד הקודם.",
+    other: "הקוד מתחלף כל {count} שניות. האתר מקבל גם את הקוד הקודם.",
+  },
+  "mobile.server.vault.twoStep.done": "סיום",
   "mobile.server.route.connectors": "מחברים",
   "mobile.server.connectors.unavailable": "יש להתחבר לשרת הזה כבעלים או כמנהל כדי לנהל את המחברים שלו.",
   "mobile.server.connectors.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי לנהל כאן את המחברים שלו.",
   "mobile.server.connectors.loading": "טוען מחברים…",
-  // A connector that only the desktop app can set up, such as Bitwarden.
   "mobile.server.connectors.localOnly": "באפליקציית שולחן העבודה בלבד",
   "mobile.server.connectors.statusConnected": "מחובר",
   "mobile.server.connectors.statusAttention": "דורש טיפול",
@@ -789,20 +942,16 @@ export const messages = {
   "mobile.server.connectors.statusExpired": "פג תוקף",
   "mobile.server.connectors.statusPaused": "מושהה",
   "mobile.server.connectors.readFailed": "לא ניתן לקרוא את מצב החיבור הזה.",
-  // {name} is the name of a connector, such as Slack.
   "mobile.server.connectors.actionFailed": "לא ניתן לשנות את החיבור ל-{name}. אפשר לנסות שוב.",
   "mobile.server.connectors.openFailed": "לא ניתן לפתוח את הדף שהשרת סיפק.",
   "mobile.server.connectors.reconnect": "חיבור מחדש",
   "mobile.server.connectors.disconnect": "ניתוק",
-  // {action} is a button, such as Disconnect; {name} is a workspace or chat name.
   "mobile.server.connectors.rowAction": "{action}: {name}",
   "mobile.server.connectors.answerMessages": "מענה להודעות",
   "mobile.server.connectors.noAgent": "עדיין אין סוכן שעונה",
   "mobile.server.connectors.addAgent": "הוספת סוכן",
   "mobile.server.connectors.later": "אחר כך",
   "mobile.server.connectors.bitwarden.title": "Bitwarden",
-  // Bitwarden of a joined server that signs in with its own Bitwarden CLI. Keep "Shared with
-  // OpenBot" as the folder name that the user creates in Bitwarden.
   "mobile.server.connectors.bitwarden.description": "מילוי התחברויות דפדפן ב-{host} מתוך Bitwarden או Vaultwarden.",
   "mobile.server.connectors.bitwarden.howItWorks":
     "{host} מתחבר באמצעות Bitwarden CLI משלו. בכספת שלך יש ליצור תיקייה בשם Shared with OpenBot ולהכניס אליה רק את ההתחברויות שסוכנים רשאים להשתמש בהן. בכספת באינטרנט יש לפתוח הגדרות › אבטחה › מפתחות ולהציג את מפתח ה-API שלך.",
@@ -837,7 +986,6 @@ export const messages = {
     "יש להעתיק את הקוד ולהקליד אותו בדף של GitHub. הדף הזה יציג את החיבור כש-GitHub יסיים.",
   "mobile.server.connectors.github.copyAndOpen": "העתקת הקוד ופתיחת GitHub",
   "mobile.server.connectors.github.accountTitle": "חשבון",
-  // {login} is the GitHub account name, such as octocat.
   "mobile.server.connectors.github.connectedAs": "מחובר בתור @{login}",
   "mobile.server.connectors.github.chooseRepositories": "בחירת מאגרים",
   "mobile.server.connectors.github.repositoriesFooter":
@@ -873,7 +1021,6 @@ export const messages = {
   "mobile.server.connectors.onePassword.vaultTitle": "כספת משותפת",
   "mobile.server.connectors.onePassword.vaultFooter":
     "כדי לאפשר לסוכנים להתחבר עם התחברות מסוימת, יש להעביר אותה לכספת הזו ב-1Password. כדי להפסיק, יש להסיר אותה.",
-  // {count} is a number, such as 3.
   "mobile.server.connectors.onePassword.loginCount": {
     one: "התחברות אחת",
     two: "שתי התחברויות",
@@ -883,15 +1030,14 @@ export const messages = {
   "mobile.server.connectors.onePassword.disconnectTitle": "לנתק את 1Password?",
   "mobile.server.connectors.onePassword.disconnectBody":
     "{host} שוכח את האסימון. הכספת וחשבון השירות נשארים ב-1Password; אם אין בהם עוד צורך, יש להסיר אותם שם.",
-  // Proton Pass: the host signs in with the Proton Pass CLI and reads one shared vault.
   "mobile.server.connectors.protonPass.title": "Proton Pass",
   "mobile.server.connectors.protonPass.description":
     "שיתוף כספת Proton Pass אחת עם OpenBot ב-{host}, כדי שסוכנים ב-{host} יוכלו להתחבר לאתרים בדפדפן שלו.",
   "mobile.server.connectors.protonPass.keyHelp":
     "ב-Proton Pass יש ליצור מפתח גישה שיכול לקרוא רק את הכספת שמשותפת עם OpenBot, ואז להדביק אותו כאן. {host} שומר את המפתח; הטלפון הזה לא.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
-  // A password manager that the host connects through its CLI. {name} is the manager, such as
-  // Proton Pass. {date} is a date, such as 5 Nov 2026.
+  "mobile.server.connectors.protonPass.plan":
+    "המסלול שלך ב-Proton לא כולל את כלי שורת הפקודה של Proton Pass. נדרש מסלול Proton שכולל Pass Plus. מסלולים בתשלום אחרים, כמו Mail Plus, לא כוללים אותו. יש לשנות את מסלול החשבון ולהתחבר שוב.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} לא זמין בשרת הזה.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "יש להתחבר ל-{name} בטלפון הזה. אחר כך {host} יוצר כספת משותפת ומפתח גישה לקריאה בלבד עבורה, ושומר רק את המפתח הזה. סוכנים אף פעם לא רואים סיסמה.",
@@ -914,7 +1060,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.vaultTitle": "כספת משותפת",
   "mobile.server.connectors.passwordManager.vaultFooter":
     "כדי לאפשר לסוכנים להתחבר עם התחברות מסוימת, יש להעביר אותה לכספת הזו ב-{name}. כדי להפסיק, יש להסיר אותה.",
-  // {count} is a number, such as 3.
   "mobile.server.connectors.passwordManager.loginCount": {
     one: "התחברות אחת",
     two: "שתי התחברויות",
@@ -924,8 +1069,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "קריאה בלבד",
   "mobile.server.connectors.passwordManager.keyExpires": "קריאה בלבד. תוקף עד {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "פג תוקף ב-{date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "כלי שורת הפקודה של {name} דורש מסלול בתשלום. יש לשנות את מסלול החשבון ולהתחבר שוב.",
   "mobile.server.connectors.passwordManager.expiredTitle": "תוקף המפתח של {name} פג",
   "mobile.server.connectors.passwordManager.expiredBody":
     "סוכנים ב-{host} לא יוכלו להתחבר עם ההתחברויות המשותפות שלך עד להתחברות מחדש.",
@@ -933,8 +1076,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.disconnectTitle": "לנתק את {name}?",
   "mobile.server.connectors.passwordManager.disconnectBody":
     "{host} מוחק את מפתח הגישה שלו. הכספת וההתחברויות שלה נשארות בחשבון {name} שלך.",
-  // Slack: a workspace installs the one OpenBot app, and the Slack Orchestrator agent answers.
-  // {workspace} is the Slack workspace name.
   "mobile.server.connectors.slack.title": "Slack",
   "mobile.server.connectors.slack.description":
     "אנשים מזכירים את @OpenBot ב-Slack או שולחים לו הודעה ישירה. Slack Orchestrator פונה לסוכן המתאים ועונה.",
@@ -954,10 +1095,8 @@ export const messages = {
   },
   "mobile.server.connectors.slack.workspaceTitle": "סביבת עבודה",
   "mobile.server.connectors.slack.workspaceDescription": "אנשים מזכירים את @OpenBot או שולחים לו הודעה ישירה.",
-  // {scopes} lists Slack permissions, such as "chat:write and users:read".
   "mobile.server.connectors.slack.missingScopes":
     "ל-OpenBot אין את ההרשאות האלה ב-Slack: {scopes}. יש לנתק את סביבת העבודה ולחבר אותה שוב.",
-  // {time} is a time, such as 14:30.
   "mobile.server.connectors.slack.retryAt": "Slack ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.slack.helpInvalidToken":
     "Slack כבר לא מקבל את OpenBot בסביבת העבודה הזו. ייתכן שהוא הוסר. יש לחבר את סביבת העבודה שוב.",
@@ -965,6 +1104,8 @@ export const messages = {
     "OpenBot לא יכול לקרוא את האסימונים השמורים ב-{host}. יש לנתק את סביבת העבודה ולחבר אותה שוב.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל אירועים מ-Slack. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    'סביבת העבודה הזו לא מקושרת ל-{host}. הקישו "חיבור מחדש" כדי לקשר אותה.',
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "הסוכן הזה מקבל כל בקשה מ-Slack. הוא עונה בעצמו על בקשות קצרות, מעביר עבודה אחרת לסוכן המתאים, ומפרסם את התשובה בשרשור.",
@@ -981,8 +1122,6 @@ export const messages = {
   "mobile.server.connectors.slack.agentPromptBody":
     "הסוכן החדש הזה עונה על כל מה שאנשים שולחים אל @OpenBot ב-{workspace}.",
   "mobile.server.connectors.slack.installFailed": "Slack לא סיים את ההתקנה. אפשר לנסות שוב.",
-  // Discord: a Discord server adds the one OpenBot bot. Always write "Discord server": "server" alone
-  // is an OpenBot server. {workspace} is the Discord server name.
   "mobile.server.connectors.discord.title": "Discord",
   "mobile.server.connectors.discord.description":
     "אנשים מזכירים את @OpenBot בערוץ של שרת Discord. Discord Orchestrator פונה לסוכן המתאים ועונה.",
@@ -1002,10 +1141,8 @@ export const messages = {
   },
   "mobile.server.connectors.discord.workspaceTitle": "שרת Discord",
   "mobile.server.connectors.discord.workspaceDescription": "יש להזכיר את @OpenBot בערוץ. כדי להמשיך, משיבים ל-OpenBot.",
-  // {scopes} lists Discord permissions.
   "mobile.server.connectors.discord.missingScopes":
     "ל-OpenBot אין את ההרשאות האלה ב-Discord: {scopes}. יש לנתק את שרת Discord ולחבר אותו שוב.",
-  // {time} is a time, such as 14:30.
   "mobile.server.connectors.discord.retryAt": "Discord ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.discord.helpInvalidToken":
     "Discord כבר לא מקבל את OpenBot בשרת Discord הזה. ייתכן שהוא הוסר. יש לחבר את שרת Discord שוב.",
@@ -1013,6 +1150,8 @@ export const messages = {
     "OpenBot לא יכול לקרוא את האסימונים השמורים ב-{host}. יש לנתק את שרת Discord ולחבר אותו שוב.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל אירועים מ-Discord. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    'שרת ה-Discord הזה לא מקושר ל-{host}. הקישו "חיבור מחדש" כדי לקשר אותו.',
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "הסוכן הזה מקבל כל בקשה מ-Discord. הוא עונה בעצמו על בקשות קצרות, מעביר עבודה אחרת לסוכן המתאים, ומשיב בערוץ עם התשובה.",
@@ -1028,12 +1167,9 @@ export const messages = {
   "mobile.server.connectors.discord.agentPromptBody":
     "הסוכן החדש הזה עונה על כל מה שאנשים שולחים אל @OpenBot ב-{workspace}.",
   "mobile.server.connectors.discord.installFailed": "Discord לא סיים את ההרשאה. אפשר לנסות שוב.",
-  // Telegram: each chat adds the one OpenBot bot, and the Telegram Orchestrator answers all chats.
-  // {chat} is the Telegram chat name.
   "mobile.server.connectors.telegram.title": "Telegram",
   "mobile.server.connectors.telegram.description":
     "אפשר להוסיף את הבוט של OpenBot לקבוצת Telegram או לפתוח איתו צ'אט ישיר. Telegram Orchestrator פונה לסוכן המתאים ועונה.",
-  // {count} is the number of linked Telegram chats.
   "mobile.server.connectors.telegram.attention": {
     one: "צ'אט אחד דורש טיפול",
     two: "שני צ'אטים דורשים טיפול",
@@ -1048,7 +1184,7 @@ export const messages = {
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot ב-{host} לא יכול לקבל הודעות מ-Telegram. ב-{host} יש להתחבר, לתת לשרת שם בהגדרות השרת, ולהשאיר את OpenBot פתוח.",
   "mobile.server.connectors.telegram.helpError": "OpenBot לא מצליח להגיע לצ'אט הזה. אפשר לחבר מחדש, או לנתק את הצ'אט.",
-  // {time} is a time, such as 14:30.
+  "mobile.server.connectors.telegram.helpNotLinked": 'הצ\'אט הזה לא מקושר ל-{host}. הקישו "חיבור מחדש" כדי לקשר אותו.',
   "mobile.server.connectors.telegram.retryAt": "Telegram ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.telegram.linkTitle": "קישור צ'אט",
   "mobile.server.connectors.telegram.linkAnother": "קישור צ'אט נוסף",
@@ -1084,16 +1220,24 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkNumber": "קישור מספר",
   "mobile.server.connectors.whatsapp.ownNumberNote": "הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לפנות ל-OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "האנשים שאישרת יכולים לפנות ל-OpenBot. אנשים אחרים מקבלים קוד למסור לך.",
+    "הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לפנות ל-OpenBot. אנשים אחרים מקבלים קוד למסור לך.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp הסיר את השרת הזה ממכשירים מקושרים. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot לא מצליח להגיע ל-WhatsApp במספר הזה. אפשר לחבר מחדש, או לנתק את המספר.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot לא מצליח לקרוא את המפתחות השמורים של המספר הזה. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "קישור מחדש",
   "mobile.server.connectors.whatsapp.ownNumber": "מספר אישי",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "רק הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לכתוב. יש לכבות עבור מספר ששייך רק ל-OpenBot.",
+    "רק הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לכתוב. אנשים אחרים לא מקבלים תשובה. כשהאפשרות כבויה, OpenBot משיב לאנשים לא מוכרים עם קוד.",
+  "mobile.server.connectors.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
+  "mobile.server.connectors.whatsapp.workingMessageDescription":
+    "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. בקשה שממתינה לבקשה קודמת מקבלת גם הודעת המתנה. במספר אישי, רק הצ'אט ״הודעה לעצמך״ מקבל את ההודעות האלה. יש לכבות כדי לשלוח רק את התשובה.",
+  "mobile.server.connectors.whatsapp.statusReactions": "תגובות סטטוס",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot מגיב עם 👀 כשהודעה מגיעה ועם ✅ כשהתשובה מוכנה. יש לכבות כדי לא לשלוח תגובות.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "הסוכן הזה מקבל את ההודעות ל-OpenBot מכל המספרים המקושרים שלך. הוא עונה בעצמו על הודעות קצרות, מעביר עבודה אחרת לסוכן המתאים, ועונה ב-WhatsApp.",
@@ -1103,16 +1247,15 @@ export const messages = {
   "mobile.server.connectors.whatsapp.note": "במספר האישי שלך יש לכתוב בצ'אט ״הודעה לעצמך״. האנשים שאישרת כותבים למספר.",
   "mobile.server.connectors.whatsapp.linkTitle": "קישור WhatsApp",
   "mobile.server.connectors.whatsapp.linkDescription": "יש לבחור את המספר, ואז לקשר את השרת הזה מ-WhatsApp בטלפון.",
-  // A phone has no QR code image: the WhatsApp app on the same phone cannot scan its own screen.
   "mobile.server.connectors.whatsapp.codeOnly":
     "בטלפון מקשרים באמצעות קוד התאמה. כדי לסרוק קוד QR, יש להשתמש ב-OpenBot במחשב.",
   "mobile.server.connectors.whatsapp.kindLabel": "מספר",
   "mobile.server.connectors.whatsapp.kindPersonal": "המספר האישי שלי",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ שלך ולאנשים שאישרת.",
+    "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ שלך ולאנשים שאישרת. אנשים אחרים לא מקבלים תשובה.",
   "mobile.server.connectors.whatsapp.kindDedicated": "מספר ששייך רק ל-OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "אנשים לא מוכרים מקבלים קוד למסור לך. את האישור נותנים כאן.",
+    "OpenBot משיב מהמספר הזה לכל אדם לא מוכר עם קוד שיש למסור לך. את האישור נותנים כאן.",
   "mobile.server.connectors.whatsapp.phoneLabel": "מספר טלפון",
   "mobile.server.connectors.whatsapp.phoneDescription": "עם קידומת המדינה, למשל +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "יש להקליד את מספר הטלפון עם קידומת המדינה.",
@@ -1149,6 +1292,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "מספר יכול לאשר עד {count} אנשי קשר וקבוצות.",
   "mobile.server.connectors.whatsapp.senderGroup": "קבוצה",
   "mobile.server.connectors.whatsapp.removeSender": "הסרה",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · קריאה בלבד",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "הגדר לקריאה בלבד",
+  "mobile.server.connectors.whatsapp.allowWork": "אפשר לתת משימות",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "קריאה בלבד: סוכנים יכולים לקרוא את הצ'אט הזה, ו-OpenBot אף פעם לא כותב בו.",
   "mobile.server.connectors.whatsapp.addContact": "הוספת איש קשר",
   "mobile.server.connectors.whatsapp.addGroup": "הוספת קבוצה",
   "mobile.server.connectors.whatsapp.contactTitle": "הוספת איש קשר",
@@ -1157,7 +1305,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "אופציונלי. אם השדה ריק, ברשימה יוצג מספר הטלפון.",
   "mobile.server.connectors.whatsapp.add": "הוספה",
   "mobile.server.connectors.whatsapp.groupTitle": "הוספת קבוצה",
-  "mobile.server.connectors.whatsapp.groupDescription": "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "אנשים בקבוצה הזו יכולים לתת עבודה לסוכנים שלך כשהם מתייגים את המספר או עונים להודעות שלו.",
   "mobile.server.connectors.whatsapp.groupSearch": "חיפוש קבוצות",
   "mobile.server.connectors.whatsapp.groupsLoading": "קורא את הקבוצות…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot לא הצליח לקרוא את הקבוצות",
@@ -1173,7 +1322,6 @@ export const messages = {
   "mobile.server.connectors.whatsapp.deny": "דחייה",
   "mobile.server.settings.providers": "ספקים",
   "mobile.server.settings.providersConnected": { one: "אחד מחובר", two: "שניים מחוברים", other: "{count} מחוברים" },
-  // The AI providers of the computer that runs the server. Owners and admins manage them from the phone.
   "mobile.server.providers.description": "ספקי ה-AI של המחשב שמריץ את השרת הזה.",
   "mobile.server.providers.connectedTitle": "מחוברים",
   "mobile.server.providers.otherTitle": "לא מחוברים",
@@ -1266,21 +1414,38 @@ export const messages = {
   "mobile.server.providers.status.ready": "מותקן",
   "mobile.server.providers.status.notInstalled": "לא מותקן",
   "mobile.server.providers.status.checking": "בודק",
-  // The accounts of a provider that can hold more than one. Each agent uses one of them.
   "mobile.server.providers.accounts": "חשבונות",
   "mobile.server.providers.accountsHint":
     "כל סוכן משתמש בחשבון אחד. את החשבון בוחרים בהגדרות הסוכן. חשבון חדש מתחבר בדף שלו בטלפון הזה.",
   "mobile.server.providers.accountsOnComputer":
     "כל סוכן משתמש בחשבון אחד. את החשבון בוחרים בהגדרות הסוכן. חשבון מוסיפים ב-OpenBot במחשב.",
   "mobile.server.providers.addAccount": "הוספת חשבון",
+  "mobile.server.providers.addAccountWithCode": "הוספת חשבון עם קוד",
   "mobile.server.providers.accountGone": "החשבון הזה כבר לא נמצא בשרת הזה.",
   "mobile.server.providers.accountFailed": "לא ניתן לשנות את החשבון הזה. אפשר לנסות שוב.",
   "mobile.server.providers.accountName": "שם",
   "mobile.server.providers.accountNameHint": "מוצג רק לך ולמנהלי השרת הזה. אם השדה ריק, יוצג האימייל.",
   "mobile.server.providers.accountSignInAgain": "התחברות מחדש",
+  "mobile.server.providers.accountSignInWithCode": "התחברות עם קוד",
+  "mobile.server.providers.accountsKeyHint":
+    "כל סוכן משתמש בחשבון אחד. את החשבון בוחרים בהגדרות הסוכן. חשבון חדש צריך מפתח API של אותו חשבון.",
+  "mobile.server.providers.accountChangeKey": "החלפת מפתח",
+  "mobile.server.providers.accountKeyHint":
+    "יש להדביק מפתח API של חשבון {provider}. המפתח נשלח לשרת. הטלפון הזה לא שומר אותו.",
+  "mobile.server.providers.accountKeyChecking": "בודק את המפתח…",
+  "mobile.server.providers.accountKeyAddFailed": "לא ניתן להוסיף את החשבון. אפשר לנסות שוב.",
   "mobile.server.providers.removeAccount": "הסרת החשבון",
   "mobile.server.providers.removeAccountTitle": "להסיר את {name}?",
   "mobile.server.providers.removeAccountBody": "השרת מסיר את החשבון הזה ואת ההתחברות שלו.",
+  "mobile.server.providers.pool": "איגום חשבונות",
+  "mobile.server.providers.poolHint":
+    "הסוכנים משתמשים בחשבון אחד עד שהוא מתקרב למגבלת שימוש, ואז בחשבון שהמגבלה שלו מתאפסת ראשונה.",
+  "mobile.server.providers.accountsPooledHint": "הסוכנים חולקים את החשבונות האלה. חשבון חדש מתחבר בדף שלו בטלפון הזה.",
+  "mobile.server.providers.accountsPooledOnComputer": "הסוכנים חולקים את החשבונות האלה. חשבון מוסיפים ב-OpenBot במחשב.",
+  "mobile.server.providers.inUse": "בשימוש",
+  "mobile.server.providers.notInPool": "מחוץ למאגר",
+  "mobile.server.providers.leaveOutOfPool": "הוצאה מהמאגר",
+  "mobile.server.providers.putBackInPool": "החזרה למאגר",
   "mobile.server.providers.models": "מודלים",
   "mobile.server.providers.modelsCount": "{shown} מתוך {total}",
   "mobile.server.providers.modelsTitle": "המודלים של {name}",
@@ -1301,10 +1466,36 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "לא ניתן לשנות את המודלים. אפשר לנסות שוב.",
   "mobile.server.providers.promptCache": "מטמון פרומפט",
   "mobile.server.providers.promptCacheHint":
-    "כמה זמן Claude שומר את ההקשר של סוכן במטמון בין תורות. שינוי נכנס לתוקף כש-Claude מתחיל שוב.",
-  "mobile.server.providers.promptCacheDefault": "ברירת המחדל של Claude Code",
+    "כמה זמן Claude ו-Pi שומרים את ההקשר של סוכן במטמון בין תורות. שינוי חל כשהספק מתחיל מחדש.",
+  "mobile.server.providers.promptCacheDefault": "ברירת המחדל של הספק",
   "mobile.server.providers.promptCacheHour": "שעה",
   "mobile.server.providers.promptCacheLoadFailed": "לא ניתן לטעון את זמן מטמון הפרומפט של השרת הזה.",
+  "mobile.server.providers.cacheExpiryCompaction": "לכווץ לפני שהמטמון פג",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "כשצ׳אט עם הקשר של 200K טוקנים או יותר לא פעיל עם מטמון של שעה, הסוכן מכווץ את ההקשר לפני שהמטמון פג. כך ההודעה הבאה לא קוראת שוב את כל ההקשר בלי מטמון.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "לא ניתן לטעון את הגדרת הכיווץ של השרת הזה.",
+  "mobile.server.providers.compactWindow": "כיווץ צ׳אטים ב־",
+  "mobile.server.providers.compactWindowHint":
+    "Claude Code מסכם את התורות הישנים של צ׳אט כשהצ׳אט מגיע לגודל הזה. נמוך יותר שומר על תורות מהירים וזולים. גבוה יותר שומר יותר פרטים. מודל עם חלון קטן יותר מכווץ במגבלה שלו.",
+  "mobile.server.providers.compactWindowDefault": "ברירת המחדל של Claude Code",
+  "mobile.server.providers.compactWindowTokens": "{size} טוקנים",
+  "mobile.server.providers.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
+  "mobile.server.environment.row": "משתנים",
+  "mobile.server.environment.title": "סביבה",
+  "mobile.server.environment.hint":
+    "מפתחות API, כתובות בסיס והגדרות אחרות שכל תהליך של {name} מקבל. שינוי חל כשהתורות הנוכחיים מסתיימים.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, עם OPENAI_API_KEY כמפתח שלו, שולח את בקשות המודל של ChatGPT לכתובת הזו.",
+  "mobile.server.environment.shellNote": "הפקודות שסוכנים מריצים יכולות לקרוא את הערכים האלה.",
+  "mobile.server.environment.add": "הוספת משתנה",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "ערך",
+  "mobile.server.environment.saved": "נשמר",
+  "mobile.server.environment.sensitive": "רגיש",
+  "mobile.server.environment.remove": "הסרה",
+  "mobile.server.environment.save": "שמירה",
+  "mobile.server.environment.loadFailed": "לא ניתן לטעון את המשתנים של {name}.",
+  "mobile.server.environment.invalid": "תקנו קודם את השמות.",
   "mobile.server.providers.disconnect": "ניתוק",
   "mobile.server.providers.disconnectTitle": "לנתק את {name}?",
   "mobile.server.providers.disconnectBody":
@@ -1336,6 +1527,8 @@ export const messages = {
   "mobile.server.providers.codexKeyInUse":
     "ChatGPT משתמש במפתח הזה, ולא בתוכנית ChatGPT שלך. OpenAI מחייבת כל בקשה במפתח. השימוש בתוכנית לא מוצג.",
   "mobile.server.providers.codexKeyAlternative": "או להתחבר עם מפתח OpenAI API. OpenAI מחייבת כל בקשה במפתח.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse משתמש במפתח הזה, לא בהתחברות שלך. כדי להשתמש בהתחברות, יש להסיר את המפתח.",
   "mobile.server.providers.sectionUse": "שימוש",
   "mobile.server.providers.unused": "אף סוכן לא משתמש בו",
   "mobile.server.providers.usedByCount": {
@@ -1346,7 +1539,6 @@ export const messages = {
   "mobile.server.providers.defaultForNew": "ברירת מחדל לסוכנים חדשים",
   "mobile.server.providers.startsWith": "סוכנים חדשים מתחילים עם {name}.",
   "mobile.server.providers.connectFirst": "יש לחבר קודם את {name}.",
-  // Custom ACP agents: commands that the host starts and talks to over the Agent Client Protocol.
   "mobile.server.customAgents.addTitle": "הוספת סוכן מותאם",
   "mobile.server.customAgents.addConfirm": "הוספה",
   "mobile.server.customAgents.adding": "מוסיף",
@@ -1394,7 +1586,6 @@ export const messages = {
   "mobile.server.customAgents.removeTitle": "להסיר את {name}?",
   "mobile.server.customAgents.removeBody": "השרת מסיר את הסוכן הזה ואת המשתנים השמורים שלו.",
   "mobile.server.customAgents.removeFailed": "OpenBot לא הצליח להסיר את הסוכן הזה.",
-  // The ACP registry: agents that the host downloads and runs. Owners and admins install them from the phone.
   "mobile.server.acpRegistry.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי להתקין כאן סוכנים מרישום ACP.",
   "mobile.server.acpRegistry.rowDescription": "התקנת סוכנים בשרת הזה, כמו Cursor או Goose.",
   "mobile.server.acpRegistry.description":
@@ -1426,8 +1617,6 @@ export const messages = {
   "mobile.server.acpRegistry.updateFailed": "לא ניתן לעדכן את הסוכן. אפשר לנסות שוב.",
   "mobile.server.acpRegistry.removeFailed": "לא ניתן להסיר את סביבת הריצה. אפשר לנסות שוב.",
   "mobile.server.acpRegistry.cancelFailed": "לא ניתן לבטל את ההתקנה. אפשר לנסות שוב.",
-  // Custom providers: OpenAI-compatible endpoints that the host serves. The Team API has no edit route,
-  // so the phone adds and removes them.
   "mobile.server.customProviders.title": "ספקים מותאמים",
   "mobile.server.customProviders.description":
     "מודלים מנקודת קצה תואמת OpenAI, כמו Ollama או LM Studio במחשב של השרת הזה.",
@@ -1458,6 +1647,7 @@ export const messages = {
   "mobile.server.customProviders.namePlaceholder": "הספק שלי",
   "mobile.server.customProviders.id": "מזהה ספק",
   "mobile.server.customProviders.idHint": "אותיות קטנות באנגלית, מספרים, מקפים או קווים תחתונים. אי אפשר לשנות אחר כך.",
+  "mobile.server.customProviders.idSavedHint": "אי אפשר לשנות את המזהה של נקודת קצה שמורה.",
   "mobile.server.customProviders.idPattern":
     "יש להשתמש באותיות קטנות באנגלית, במספרים, במקפים או בקווים תחתונים, ולהתחיל באות או במספר.",
   "mobile.server.customProviders.idBuiltIn": "ב-OpenBot כבר יש ספק בשם {id}. יש לבחור מזהה אחר.",
@@ -1471,6 +1661,8 @@ export const messages = {
   "mobile.server.customProviders.apiKeyPlaceholder": "אופציונלי",
   "mobile.server.customProviders.apiKeyHint":
     "אם נקודת הקצה לא צריכה מפתח, אפשר להשאיר ריק. המפתח נשלח לשרת, והטלפון הזה לא שומר אותו.",
+  "mobile.server.customProviders.apiKeyKeptHint":
+    "יש מפתח שמור. כדי לשמור אותו, יש להשאיר את השדה ריק. המפתח נשלח לשרת, והטלפון הזה לא שומר אותו.",
   "mobile.server.customProviders.models": "מודלים",
   "mobile.server.customProviders.modelsHint": "מזהי המודלים שנקודת הקצה מספקת. יש להוסיף לפחות אחד.",
   "mobile.server.customProviders.modelName": "שם לתצוגה",
@@ -1484,6 +1676,8 @@ export const messages = {
     "אי אפשר להשתמש במזהה המודל הזה. יש להסיר רווחים, מרכאות וסימני פיסוק אחרים.",
   "mobile.server.customProviders.headers": "כותרות",
   "mobile.server.customProviders.headersHint": "אופציונלי. השרת שולח אותן עם כל בקשה לנקודת הקצה.",
+  "mobile.server.customProviders.headersKeptHint":
+    "כדי לשמור ערך של כותרת שמורה, יש להשאיר אותו ריק. כדי למחוק כותרת מהשרת, יש להסיר אותה.",
   "mobile.server.customProviders.headerValue": "ערך",
   "mobile.server.customProviders.headerNameLabel": "שם כותרת {position}",
   "mobile.server.customProviders.headerValueLabel": "ערך כותרת {position}",
@@ -1494,27 +1688,17 @@ export const messages = {
   "mobile.server.customProviders.headerDuplicate": "הספק הזה כבר מגדיר את {name}.",
   "mobile.server.customProviders.headerValueRequired": "יש להזין ערך לכותרת.",
   "mobile.server.customProviders.saveFailed": "OpenBot לא הצליח להוסיף את נקודת הקצה הזו.",
+  "mobile.server.customProviders.updateFailed": "OpenBot לא הצליח לשמור את נקודת הקצה הזו.",
   "mobile.server.customProviders.runsOn": "רץ ב-",
   "mobile.server.customProviders.editHint": "כדי לשנות את נקודת הקצה הזו, יש להסיר אותה ולהוסיף אותה שוב.",
   "mobile.server.customProviders.remove": "הסרה",
   "mobile.server.customProviders.removeTitle": "להסיר את {name}?",
   "mobile.server.customProviders.removeBody": "סוכנים בשרת הזה לא יוכלו עוד להשתמש במודלים שלה.",
   "mobile.server.customProviders.removeFailed": "OpenBot לא הצליח להסיר את נקודת הקצה הזו.",
-  "mobile.server.settings.mcp": "שרתי MCP",
-  "mobile.server.settings.mcpCount": { one: "שרת אחד", two: "שני שרתים", other: "{count} שרתים" },
   "mobile.server.mcp.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי לנהל כאן את שרתי ה-MCP שלו.",
   "mobile.server.mcp.unavailable": "יש להתחבר לשרת הזה כבעלים או כמנהל כדי לנהל את שרתי ה-MCP שלו.",
-  "mobile.server.mcp.description":
-    "שרתי MCP נותנים לסוכנים של השרת הזה עוד כלים. סוכני Claude ו-Codex מקבלים רק את השרתים שברשימה הזו.",
+  "mobile.server.mcp.accessUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לבחור מי מקבל את שרתי ה-MCP שלו.",
   "mobile.server.mcp.loading": "טוען שרתי MCP…",
-  "mobile.server.mcp.loadFailed": "לא ניתן לטעון את שרתי ה-MCP.",
-  "mobile.server.mcp.empty": "עדיין אין שרתי MCP.",
-  "mobile.server.mcp.retry": "ניסיון חוזר",
-  "mobile.server.mcp.add": "הוספת שרת MCP",
-  "mobile.server.mcp.rowLabel": "{name}, {status}",
-  "mobile.server.mcp.enabled": "פועל",
-  "mobile.server.mcp.disabled": "כבוי",
-  "mobile.server.mcp.signedIn": "מחובר",
   "mobile.server.mcp.gone": "שרת ה-MCP הזה כבר לא נמצא בשרת הזה.",
   "mobile.server.mcp.addTitle": "הוספת שרת MCP",
   "mobile.server.mcp.addConfirm": "הוספה",
@@ -1565,12 +1749,28 @@ export const messages = {
   "mobile.server.mcp.testFailed": "שרת ה-MCP לא ענה.",
   "mobile.server.mcp.connected": { one: "מחובר · כלי אחד", two: "מחובר · שני כלים", other: "מחובר · {count} כלים" },
   "mobile.server.mcp.signInOnComputer": "שרת ה-MCP הזה דורש התחברות. יש להתחבר מ-OpenBot במחשב ואז לבדוק שוב.",
+  "mobile.server.mcp.signIn": "התחברות",
+  "mobile.server.mcp.signInHere": "שרת MCP זה מבקש ממך להתחבר. הקש על התחברות ואז בדוק שוב.",
   "mobile.server.mcp.signedInDescription": "{server} מחובר לשרת ה-MCP הזה.",
   "mobile.server.mcp.signOut": "התנתקות",
   "mobile.server.mcp.saveFailed": "לא ניתן לשמור את השינוי. אפשר לנסות שוב.",
   "mobile.server.mcp.removeTitle": "להסיר את {name}?",
   "mobile.server.mcp.removeBody": "הסוכנים של השרת הזה מפסיקים לקבל את הכלים שלו. ההגדרות לא נשמרות.",
   "mobile.server.mcp.remove": "הסרת שרת MCP",
+  "mobile.server.mcp.access.title": "גישה",
+  "mobile.server.mcp.access.agents": "סוכנים",
+  "mobile.server.mcp.access.agentsOf": "סוכנים שיכולים להשתמש ב-{name}",
+  "mobile.server.mcp.access.allAgents": "כל הסוכנים",
+  "mobile.server.mcp.access.allAgentsHint": "כל הסוכנים כולל גם כל סוכן שיתווסף בהמשך.",
+  "mobile.server.mcp.access.noAgents": "אין סוכנים",
+  "mobile.server.mcp.access.someAgents": "{count} מתוך {total}",
+  "mobile.server.mcp.access.use": "יכול להשתמש",
+  "mobile.server.mcp.access.fromEveryone": "כמו כולם",
+  "mobile.server.mcp.access.level": "הגישה של {role} אל {name}",
+  "mobile.server.mcp.access.hint":
+    "חבר מקבל את הרמה הגבוהה ביותר של כולם ושל התפקידים שלו. בעלים, מנהלים ומי שהוסיף את השרת תמיד יכולים לנהל אותו.",
+  "mobile.server.mcp.access.loadFailed": "לא ניתן לטעון מי מקבל את שרת ה-MCP הזה.",
+  "mobile.server.mcp.access.unavailable": "רק בעלים או מנהל של שרת מחובר יכולים לבחור מי מקבל את שרת ה-MCP הזה.",
   "mobile.server.usage.agents": "סוכנים",
   "mobile.server.usage.agentLine": "{tokens} טוקנים · {cost} · {percent}",
   "mobile.server.usage.noAgents": "לא נרשם שימוש של סוכנים בטווח הזה.",
@@ -1584,7 +1784,6 @@ export const messages = {
   "mobile.server.machine.sizeDetail": "{used} מתוך {total}",
   "mobile.server.machine.unknown": "לא זמין",
   "mobile.server.machine.unsupported": "המארח הזה לא מדווח על השימוש במכונה שלו. יש לעדכן את המארח כדי לראות אותו.",
-  // The plan limits of the host's providers: the rings in the home header, their sheet and the Usage screen. {time} is a date.
   "mobile.server.planLimits.title": "מגבלות המסלול",
   "mobile.server.planLimits.button": "מגבלות המסלול: {summary}",
   "mobile.server.planLimits.left": "נותרו {percent}%",
@@ -1599,7 +1798,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 שעות",
   "mobile.server.planLimits.window.hours": { one: "שעה", two: "שעתיים", other: "{count} שעות" },
   "mobile.server.planLimits.window.minutes": "{minutes} דק׳",
-  // Server settings > Updates: the OpenBot update of the server's host. {name} is the server.
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "עדכונים",
   "mobile.server.settings.updateAvailable": "עדכון זמין",
   "mobile.server.route.updates": "עדכונים",
@@ -1649,7 +1848,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "ממתין ל{reasons}.",
   "mobile.server.update.disabledTitle": "עדכונים מרחוק כבויים",
   "mobile.server.update.disabledDescription":
-    "המשתמש של {name} כיבה עדכונים מחברי השרת. יש לבקש ממנו לעדכן את OpenBot או להפעיל את ההגדרה.",
+    "המשתמש של {name} כיבה עדכונים מחברי השרת. יש לבקש ממנו לעדכן את OpenBot, או לפתוח במחשב שלו הגדרות > עדכונים ולהפעיל את ״אישור עדכונים מחברי שרת״.",
   "mobile.server.update.managedTitle": "Host Manager שולט בעדכונים",
   "mobile.server.update.managedDescription": "OpenBot Host Manager מעדכן את {name}. יש לפנות למנהל המארח.",
   "mobile.server.update.unsupportedTitle": "{name} לא יכול לעדכן את עצמו",
@@ -1732,6 +1931,10 @@ export const messages = {
   "mobile.server.roles.agentCount": { one: "סוכן אחד", two: "שני סוכנים", other: "{count} סוכנים" },
   "mobile.server.roles.memberCount": { one: "חבר אחד", two: "שני חברים", other: "{count} חברים" },
   "mobile.server.roles.agentLevel": "הגישה של {role} אל {agent}",
+  "mobile.server.roles.changeInEveryone": "שינוי בכולם",
+  "mobile.server.roles.setAll": "הגדרת הכול",
+  "mobile.server.roles.setAllLabel": "הגדרת הכול: הגישה של {role} לכל הסוכנים",
+  "mobile.server.roles.mixed": "מעורב",
   "mobile.server.roles.delete": "מחיקת תפקיד",
   "mobile.server.roles.deleteTitle": "למחוק את {name}?",
   "mobile.server.roles.deleteBody": "חברים עם התפקיד הזה מאבדים את הסוכנים שהוא נותן להם.",
@@ -1744,7 +1947,6 @@ export const messages = {
   "mobile.server.roles.level.view": "יכול לצפות",
   "mobile.server.roles.level.chat": "יכול לשוחח",
   "mobile.server.roles.level.manage": "יכול לנהל",
-  // Server settings › Audit log (`server-audit-v1`): the changes to the access of the server.
   "mobile.server.route.audit": "יומן ביקורת",
   "mobile.server.audit.description":
     "שינויים בחברים, בתפקידים ובגישה לסוכנים בשרת הזה, מהחדש לישן. המארח שומר את 500 השינויים האחרונים.",
@@ -1762,7 +1964,6 @@ export const messages = {
   "mobile.server.audit.empty": "עדיין אין שינויים.",
   "mobile.server.audit.noMatch": "אין שינוי שמתאים.",
   "mobile.server.audit.unknownActor": "חבר לא ידוע",
-  // Joins the old and the new value of a change: "Admin to Member".
   "mobile.server.audit.to": "ל-",
   "mobile.server.audit.memberJoined": "{member} הצטרף בתפקיד {role}",
   "mobile.server.audit.memberLeft": "{member} עזב את השרת",
@@ -1774,7 +1975,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} נוסף אל {role}",
   "mobile.server.audit.roleMemberRemoved": "{member} הוסר מ-{role}",
   "mobile.server.audit.agentLevel": "{agent} עבור {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "ייבוא סוכנים",
   "mobile.server.route.import": "ייבוא סוכנים",
   "mobile.server.import.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי לייבא כאן סוכנים.",
@@ -1846,11 +2046,11 @@ export const messages = {
   "mobile.server.import.channel": "ערוץ",
   "mobile.server.import.notImportedTitle": "לא יובאו",
   "mobile.server.import.resultWarnings": "חלק מהפריטים לא הועברו",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "העברה",
   "mobile.server.route.transfer": "העברה",
   "mobile.server.route.transferExport": "ייצוא",
   "mobile.server.route.transferImport": "ייבוא",
+  "mobile.server.route.transferCopy": "העתקה לשרת אחר",
   "mobile.server.transfer.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי להעביר אותו כאן.",
   "mobile.server.transfer.unavailable": "יש להתחבר לשרת הזה כבעלים או כמנהל כדי להעביר אותו.",
   "mobile.server.transfer.title": "העברת השרת הזה למחשב אחר",
@@ -1912,4 +2112,66 @@ export const messages = {
     "הספקים האלה היו מחוברים בשרת האחר ואינם מחוברים כאן. יש להתחבר אליהם בהגדרות שרת › ספקים.",
   "mobile.server.transfer.notImported": "לא יובאו",
   "mobile.server.transfer.warnings": "יש לבדוק את אלה",
+  "mobile.server.transfer.copy": "העתקה לשרת אחר",
+  "mobile.server.transfer.copyNote": "שליחת סוכנים לשרת אחר שלך.",
+  "mobile.server.transfer.copyTo": "אל",
+  "mobile.server.transfer.copyNoAgents": "אין סוכנים בשרת הזה.",
+  "mobile.server.transfer.copyNotMoved":
+    "גם הערוצים שלהם, זרימות השגרה, תהליכי העבודה ותיקיית Shared מועתקים. מפתחות API, התחברויות, מחברים והיסטוריית צ׳אט לא מועתקים. יש להגדיר אותם מחדש בשרת השני.",
+  "mobile.server.transfer.copySubmit": {
+    one: "העתקת סוכן אחד",
+    two: "העתקת שני סוכנים",
+    other: "העתקת {count} סוכנים",
+  },
+  "mobile.server.transfer.copyDuplicatesTitle": "להעתיק סוכנים כפולים?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "ב-{server} כבר יש סוכנים בשמות האלה: {names}. ההעתקה מוסיפה סוכן שני לכל אחד מהם. כל עותק הוא סוכן נפרד עם צ'אטים, קבצים וזיכרונות משלו.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "העתקת כפילויות",
+  "mobile.server.transfer.copying": "מעתיק…",
+  "mobile.server.transfer.copyFailed": "ההעתקה לא הסתיימה.",
+  "mobile.server.transfer.copied": {
+    one: "סוכן אחד הועתק אל {server}.",
+    two: "שני סוכנים הועתקו אל {server}.",
+    other: "{count} סוכנים הועתקו אל {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "סוכנים להעתקה",
+  "mobile.server.transfer.copyNext": "סוכנים מועתקים משתמשים בכללי האישור של {server}.",
+  "mobile.server.transfer.copyNoServer": "יש להתחבר לשרת אחר כבעלים או כמנהל כדי להעתיק אליו סוכנים.",
+  "mobile.server.route.ownerTransfer": "העברת בעלות",
+  "mobile.server.ownerTransfer.unavailable": "יש להתחבר לשרת הזה כבעלים כדי להעביר בעלות.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot מארח את השרת הזה, ולכן אי אפשר להחליף את הבעלים שלו.",
+  "mobile.server.ownerTransfer.lede":
+    "הבעלים החדשים יקבלו אימייל ויצטרכו לאשר בזמן שהם מחוברים עם האימייל הזה. אחר כך הגישה שלך לשרת הזה תוסר.",
+  "mobile.server.ownerTransfer.email": "האימייל של הבעלים החדשים",
+  "mobile.server.ownerTransfer.send": "שליחה",
+  "mobile.server.ownerTransfer.sending": "בשליחה…",
+  "mobile.server.ownerTransfer.stays":
+    "סוכנים, צ'אטים, שגרות, התחברויות לספקים, מפתחות שמורים, פרטי כניסה בכספת, התחברויות בדפדפן ואפליקציות מחוברות נשארים בשרת. הבעלים החדשים יוכלו להשתמש בהם.",
+  "mobile.server.ownerTransfer.expiry": "הבקשה פגה אחרי 7 ימים.",
+  "mobile.server.ownerTransfer.confirmTitle": "להפוך את {email} לבעלים?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "כש־{email} יאשר, הוא יהפוך לבעלים של {server} והגישה שלך תוסר. הנתונים נשארים בשרת. הבקשה פגה אחרי 7 ימים.",
+  "mobile.server.ownerTransfer.confirm": "העברה",
+  "mobile.server.ownerTransfer.sendFailed": "הבקשה לא נשלחה.",
+  "mobile.server.ownerTransfer.loadFailed": "לא ניתן לקרוא את ההעברה הממתינה.",
+  "mobile.server.ownerTransfer.pending": "ממתין לבעלים החדשים",
+  "mobile.server.ownerTransfer.expires": "פג ב־{date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} צריך לאשר בזמן שהוא מחובר עם האימייל הזה. עד אז הבעלות נשארת שלך.",
+  "mobile.server.ownerTransfer.cancel": "ביטול העברה",
+  "mobile.server.ownerTransfer.cancelTitle": "לבטל את ההעברה?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} לא יוכל לאשר אותה יותר.",
+  "mobile.server.ownerTransfer.keep": "השארה",
+  "mobile.server.ownerTransfer.cancelFailed": "ההעברה לא בוטלה.",
+  "mobile.server.ownerTransfer.incomingTitle": "להפוך לבעלים של {server}?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} רוצה להפוך אותך לבעלים של {server}. תהיה לך שליטה מלאה בשרת, והסוכנים, הצ'אטים, השגרות וההתחברויות השמורות נשארים בו. הגישה של {name} תוסר. כל מי שעדיין יכול להתחבר למחשב שמריץ את השרת יכול להשתמש בחשבון OpenBot שלך. כדאי להחליף את הסיסמאות ואת מפתחות ה-SSH שלו.",
+  "mobile.server.ownerTransfer.accept": "אישור",
+  "mobile.server.ownerTransfer.decline": "דחייה",
+  "mobile.server.ownerTransfer.accepted": "עכשיו הבעלות על {server} שלך.",
+  "mobile.server.ownerTransfer.acceptFailed": "לא ניתן לאשר את ההעברה",
+  "mobile.server.ownerTransfer.declineFailed": "לא ניתן לדחות את ההעברה",
+  "mobile.server.ownerTransfer.tryAgain": "אפשר לנסות שוב מאוחר יותר.",
+  "mobile.server.providers.updateAll": "עדכון הכול",
+  "mobile.server.providers.updateAllFailed": "חלק מהעדכונים לא התחילו. נסו שוב.",
 } as const satisfies PartialTranslation<typeof source>;

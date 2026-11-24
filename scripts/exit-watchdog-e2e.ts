@@ -1,13 +1,3 @@
-// Runs the real Electron with the exit watchdog of `src/main/exit-watchdog.ts`:
-// 1. Without a stalled file request, `app.quit`, `app.exit` and `process.exit` end the process with
-//    code 0, and the main log has no watchdog line.
-// 2. With an open on every libuv thread that never finishes, each of the three used to stay in
-//    `node::FreeEnvironment` for ever. Now the watchdog stops the process with SIGKILL after its limit
-//    and adds one line to the main log.
-// 3. A launch after that takes the single-instance lock.
-//
-// Run: bun scripts/exit-watchdog-e2e.ts
-// It writes .openbot-build/exit-watchdog-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, openSync, readFileSync } from "node:fs";
@@ -21,12 +11,10 @@ import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(ROOT, ".openbot-build", "exit-watchdog-e2e");
 const STATE_TIMEOUT_MS = 30_000;
-// The watchdog limit is 10 s; the shell, `ps` and the kill get a few seconds more.
 const STUCK_EXIT_LIMIT_MS = 15_000;
 const CLEAN_EXIT_LIMIT_MS = 5_000;
 const WATCHDOG_LINE = "did not exit within";
 const EXIT_COMMANDS = ["quit", "exit", "process-exit"] as const;
-// The Electron binary itself, not the `.bin/electron` Node wrapper.
 const electronPath = join(
   ROOT,
   "node_modules",
@@ -76,7 +64,6 @@ try {
       const userData = join(root, `user-data-${command}-${stalled ? "stalled" : "clean"}`);
       const app = await launch(userData);
       assert.equal(app.hasLock, true, "the launch has the single-instance lock");
-      // Stdin keeps the order, so the opens start before the exit.
       if (stalled) app.child.stdin?.write("stall\n");
       const startedAt = Date.now();
       app.child.stdin?.write(`${command}\n`);
@@ -96,7 +83,6 @@ try {
       assert.ok(ended, `${command} (${stalled ? "stalled" : "clean"}) did not end within ${limit} ms`);
       if (stalled) {
         assert.equal(result.signal, "SIGKILL", `${command}: the watchdog stops a stuck exit`);
-        // The shell writes the line after the kill.
         result.watchdogLine = await until(
           () => existsSync(mainLog) && readFileSync(mainLog, "utf8").includes(WATCHDOG_LINE),
           `${command}: the watchdog line in the main log`,
@@ -107,15 +93,12 @@ try {
     }
   }
 
-  // The watchdog shell of a clean exit sleeps for its limit before it can write. The stalled exits
-  // above took longer than that limit, so a line that it wrote by mistake is in the log now.
   for (const result of results.exits.filter((exit) => !exit.stalled)) {
     const mainLog = join(root, `user-data-${result.command}-clean`, "logs", "main", "main.log");
     result.watchdogLine = existsSync(mainLog) && readFileSync(mainLog, "utf8").includes(WATCHDOG_LINE);
     assert.equal(result.watchdogLine, false, `${result.command}: a clean exit adds no watchdog line`);
   }
 
-  // The stopped process gave the lock back: a new launch on the same user data takes it.
   const relaunch = await launch(join(root, "user-data-process-exit-stalled"));
   results.relaunchHasLock = relaunch.hasLock;
   assert.equal(relaunch.hasLock, true, "a launch after the stopped exit has the single-instance lock");

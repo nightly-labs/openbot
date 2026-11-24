@@ -1,0 +1,28 @@
+{
+  "slug": "exa",
+  "name": "Exa",
+  "tagline": "Web search for agents",
+  "description": "Exa lets agents search the web and read pages as clean text. It needs no account and no key.",
+  "category": "research",
+  "creatorName": "Exa",
+  "iconUrl": "https://exa.ai/images/favicon-32x32.png",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-find-papers", "text": "Find recent papers on retrieval-augmented generation evaluation." },
+    { "id": "prompt-company-research", "text": "Find the official documentation pages for the Stripe Billing API." },
+    { "id": "prompt-read-page", "text": "Read this blog post and list its key points." }
+  ],
+  "apps": [
+    {
+      "id": "app-exa-mcp",
+      "name": "Exa",
+      "description": "Web search and page reading, over the Exa MCP server with no sign-in.",
+      "iconUrl": "https://exa.ai/images/favicon-32x32.png",
+      "server": { "name": "exa", "transport": "http", "url": "https://mcp.exa.ai/mcp" }
+    }
+  ],
+  "websiteUrl": "https://exa.ai",
+  "privacyPolicyUrl": "https://exa.ai/privacy-policy",
+  "termsUrl": "https://exa.ai/assets/Exa_Labs_Terms_of_Service.pdf",
+  "skills": []
+}

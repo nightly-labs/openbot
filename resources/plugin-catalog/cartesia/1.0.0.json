@@ -1,0 +1,33 @@
+{
+  "slug": "cartesia",
+  "name": "Cartesia",
+  "tagline": "Speech and voices",
+  "description": "Cartesia lets agents turn text into speech, transcribe audio, and list, clone and localize voices. Each user signs in to their own Cartesia account through the browser, and each generation uses credits of that account.",
+  "category": "design",
+  "creatorName": "Cartesia",
+  "iconUrl": "https://www.cartesia.ai/favicon.ico",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-speech", "text": "Read this paragraph aloud with a warm Cartesia voice and give me the audio." },
+    { "id": "prompt-voices", "text": "List the Cartesia voices that speak German." },
+    { "id": "prompt-transcribe", "text": "Transcribe this audio file." }
+  ],
+  "apps": [
+    {
+      "id": "app-cartesia-mcp",
+      "name": "Cartesia",
+      "description": "Text to speech, transcription, and voice management, over Cartesia's MCP server with browser sign-in.",
+      "iconUrl": "https://www.cartesia.ai/favicon.ico",
+      "server": {
+        "name": "cartesia",
+        "transport": "http",
+        "url": "https://mcp.cartesia.ai/mcp",
+        "auth": [{ "id": "cartesia-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://www.cartesia.ai",
+  "privacyPolicyUrl": "https://www.cartesia.ai/legal/privacy",
+  "termsUrl": "https://www.cartesia.ai/legal/terms",
+  "skills": []
+}

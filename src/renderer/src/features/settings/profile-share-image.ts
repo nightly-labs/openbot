@@ -11,12 +11,6 @@ import { usageCompact } from "@openbot/ui/features/usage/usage-format";
 import { currentText } from "@openbot/ui/text";
 import { drawLogo, ellipsize, FONT } from "../agent-templates/agent-template-card";
 
-/*
- * The image of the Share dialog: the account, the last 26 weeks of activity and four numbers, on
- * the light surface of the site's cards. It is drawn here because a picture copies and saves as a
- * file; nothing leaves the computer unless the user sends the file.
- */
-
 const WIDTH = 1200;
 const HEIGHT = 690;
 const PAD = 56;
@@ -60,7 +54,6 @@ export async function renderProfileShareImage(
   return blob;
 }
 
-/** The app's tokens, read from the document so the image follows the brand if it changes. */
 function shareColors(): ShareColors {
   const style = getComputedStyle(document.documentElement);
   const token = (name: string) => {
@@ -123,10 +116,6 @@ async function drawHeader(
   await drawLogo(context, WIDTH - PAD - logoSize, PAD + (AVATAR - logoSize) / 2, logoSize, colors);
 }
 
-/**
- * The account photo comes from the account server. A photo the server sends without permission
- * for other pages would mark the canvas unreadable, so such a photo gives its place to initials.
- */
 async function loadPhoto(url: string): Promise<HTMLImageElement | null> {
   const image = new Image();
   image.crossOrigin = "anonymous";
@@ -139,10 +128,8 @@ async function loadPhoto(url: string): Promise<HTMLImageElement | null> {
   }
 }
 
-/** The opacity of each heatmap level; level 0 is the text colour, the others the accent. */
 const LEVEL_ALPHA = [0.07, 0.32, 0.55, 0.78, 1] as const;
 
-/** The last `WEEKS` columns of the year, Sunday at the top, with the month above its first week. */
 function drawWeeks(context: CanvasRenderingContext2D, days: ProfileDay[], colors: ShareColors): void {
   const { format } = currentText();
   const last = days.at(-1);

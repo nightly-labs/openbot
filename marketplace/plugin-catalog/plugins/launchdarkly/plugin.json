@@ -1,0 +1,36 @@
+{
+  "slug": "launchdarkly",
+  "name": "LaunchDarkly",
+  "tagline": "Feature flags and experiments",
+  "description": "LaunchDarkly lets agents read, create, and update feature flags, segments, and AI configs in the signed-in LaunchDarkly account. Each user signs in through the browser; EU and Federal instances are not supported.",
+  "category": "coding",
+  "creatorName": "LaunchDarkly",
+  "iconUrl": "https://avatars.githubusercontent.com/u/8039656?s=256&v=4",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-stale-flags", "text": "Which feature flags have not changed in 90 days and are safe to clean up?" },
+    { "id": "prompt-flag-status", "text": "Show the targeting rules of the new-checkout flag in production." },
+    {
+      "id": "prompt-new-flag",
+      "text": "Create a boolean flag for the dark mode rollout, turned off in every environment."
+    }
+  ],
+  "apps": [
+    {
+      "id": "app-launchdarkly-mcp",
+      "name": "LaunchDarkly",
+      "description": "Feature flags, segments, and AI configs, over LaunchDarkly's MCP server with browser sign-in.",
+      "iconUrl": "https://avatars.githubusercontent.com/u/8039656?s=256&v=4",
+      "server": {
+        "name": "launchdarkly",
+        "transport": "http",
+        "url": "https://mcp.launchdarkly.com/mcp",
+        "auth": [{ "id": "launchdarkly-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "skills": [],
+  "websiteUrl": "https://launchdarkly.com",
+  "privacyPolicyUrl": "https://launchdarkly.com/policies/privacy/",
+  "termsUrl": "https://launchdarkly.com/terms-of-service/"
+}

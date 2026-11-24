@@ -12,6 +12,10 @@ export const messages = {
   "error.voice.prepareRequired":
     "La transcription vocale locale est indisponible. Exécutez `bun run voice:prepare` et redémarrez OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot n’a pas pu transcrire cet enregistrement.",
+  "error.voice.videoModelMissing":
+    "Aucun modèle de reconnaissance vocale pour les enregistrements n’est configuré dans Réglages → Voix.",
+  "error.voice.videoModelMissingServer":
+    "Aucun modèle de reconnaissance vocale n’est configuré sur ce serveur. Un propriétaire ou un administrateur peut configurer un modèle dans les réglages du serveur, dans Reconnaissance vocale.",
   "error.voice.cloud.keyRequired": "Ajoutez votre clé API {provider} dans Réglages → Voix.",
   "error.voice.cloud.keyRejected": "{provider} n’a pas accepté la clé API. Vérifiez la clé dans Réglages → Voix.",
   "error.voice.cloud.quotaExceeded": "Votre quota {provider} est épuisé.",
@@ -25,14 +29,23 @@ export const messages = {
   "error.voice.speech.modelRequired": "Téléchargez le modèle de synthèse vocale dans Réglages → Voix.",
   "error.voice.speech.timedOut": "La lecture à voix haute de la réponse a expiré.",
   "error.voice.speech.failed": "OpenBot n’a pas pu lire la réponse à voix haute.",
+  "error.voice.speech.providerRefused": "{provider} a refusé de créer l’audio : {reason}",
   "error.voice.recordingNotKept": "OpenBot n’a pas pu conserver l’enregistrement vocal.",
   "error.voice.live.timedOut": "La voix en direct Codex n’a pas démarré à temps. Réessayez.",
   "error.voice.live.failed": "La voix en direct s’est arrêtée : {reason}",
   "error.voice.live.disconnected": "La voix en direct est déconnectée.",
+  "error.voice.live.startFailed":
+    "La voix en direct n’a pas pu démarrer. Mettez à jour Codex et connectez-vous avec ChatGPT sur l’ordinateur qui exécute l’agent, puis réessayez. Raison : {reason}",
   "error.voice.live.hostFailed":
     "Codex sur le serveur n’a pas pu démarrer la voix en direct. Demandez à son propriétaire de mettre à jour Codex sur cet ordinateur et de se connecter avec ChatGPT, puis réessayez.",
   "error.voice.live.signIn": "Connectez-vous à Codex avec votre compte ChatGPT pour utiliser la voix en direct.",
+  "error.voice.live.chooseAccount":
+    "Ce compte ChatGPT ne peut pas utiliser la voix en direct. Dans Réglages → Voix, choisissez un compte dont l'abonnement inclut la voix.",
   "error.voice.live.unavailable":
     "OpenAI n'a pas pu démarrer la voix en direct. Le problème vient d'OpenAI. Réessayez plus tard.",
+  "error.voice.live.refused":
+    "OpenAI a refusé de démarrer la voix en direct. Réessayez plus tard, ou désactivez la voix en direct dans Réglages pour parler à la voix.",
   "error.voice.live.off": "La voix en direct Codex est désactivée. Activez-la dans Réglages → Voix.",
+  "error.voice.server.modelUnsupported":
+    "{host} ne peut pas transcrire avec {model}. Dans Réglages → Voix, choisissez un autre modèle de dictée pour le serveur vocal.",
 } as const satisfies PartialTranslation<typeof source>;

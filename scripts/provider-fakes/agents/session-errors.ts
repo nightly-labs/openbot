@@ -1,9 +1,6 @@
-// The custom agent of `acp-flavor-e2e.ts`. It opens sessions, and `session/load` fails with the error
-// that `FAKE_LOAD_ERROR` names, as an agent does after a restart that lost the session.
 import { type AcpError, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const LOAD_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => AcpError>>> = {
-  // omp 18.8.4 (#1690).
   unsupported: (sessionId) => ({
     code: -32603,
     message: "Internal error",
@@ -15,8 +12,30 @@ const LOAD_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => AcpErr
     data: { details: "Unsupported ACP session: another-session" },
   }),
   "not-found": (sessionId) => ({ code: -32002, message: "Resource not found", data: { uri: sessionId } }),
+  "session-not-found": (sessionId) => ({ code: -32002, message: "Resource not found", data: { sessionId } }),
+  "session-not-found-other": () => ({
+    code: -32002,
+    message: "Resource not found",
+    data: { sessionId: "another-session" },
+  }),
   internal: () => ({ code: -32603, message: "Internal error", data: { details: "database is locked" } }),
+  "invalid-id": (sessionId) => ({
+    code: -32603,
+    message: "Internal error",
+    data: { details: invalidSessionIdentifier(sessionId) },
+  }),
+  "invalid-id-other": () => ({
+    code: -32603,
+    message: "Internal error",
+    data: { details: invalidSessionIdentifier("another-session") },
+  }),
+  "unknown-id": (sessionId) => ({ code: -32602, message: `Session not found: ${sessionId}` }),
+  "unknown-id-other": () => ({ code: -32602, message: "Session not found: another-session" }),
 };
+
+function invalidSessionIdentifier(sessionId: string): string {
+  return `Invalid session identifier "${sessionId}".\n  Searched for sessions in /workspace/.chats.\n  Use --list-sessions to see available sessions.`;
+}
 
 const mode = process.env.FAKE_LOAD_ERROR ?? "";
 let sessions = 0;

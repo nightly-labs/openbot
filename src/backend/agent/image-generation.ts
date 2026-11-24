@@ -1,9 +1,22 @@
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { type ConversationMessage, isImageGenerationAspectRatio } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { getRecord, getString, type ThreadItem } from "../protocol";
 
 export function isImageGenerationItem(item: ThreadItem): boolean {
   return item.type === "image_generation_call" || item.type === "imageGeneration";
+}
+
+export function isVideoGenerationItem(item: ThreadItem): boolean {
+  return item.type === "videoGeneration";
+}
+
+export type GeneratedMediaKind = "image" | "video";
+
+export function generatedMediaKind(item: ThreadItem): GeneratedMediaKind | null {
+  if (isImageGenerationItem(item)) return "image";
+  if (isVideoGenerationItem(item)) return "video";
+  return null;
 }
 
 export function imageGenerationAspectRatio(item: ThreadItem) {
@@ -16,9 +29,27 @@ export function imageGenerationFailure(item: ThreadItem): string | null {
   return getString(failure, "message") ?? getString(item, "error") ?? getString(item, "failure");
 }
 
+export function imageGenerationUsageLimited(item: ThreadItem): boolean {
+  return getString(getRecord(item, "failure"), "type") === "usageLimitExceeded";
+}
+
 export function generatedImageName(savedPath: string): string {
   const extension = savedPath.match(/\.(png|jpe?g|webp|gif|avif)$/i)?.[1]?.toLowerCase() ?? "png";
   return `generated-image.${extension}`;
+}
+
+const VIDEO_NAME_WORDS = 6;
+const VIDEO_NAME_LENGTH = 48;
+
+export function generatedVideoName(savedPath: string, prompt?: string | null): string {
+  const extension = savedPath.match(/\.(mp4|webm|mov)$/i)?.[1]?.toLowerCase() ?? "mp4";
+  const words =
+    (prompt ?? "")
+      .normalize("NFKC")
+      .toLowerCase()
+      .match(/[\p{L}\p{M}\p{N}]+/gu) ?? [];
+  const stem = words.slice(0, VIDEO_NAME_WORDS).join("-").slice(0, VIDEO_NAME_LENGTH).replace(/-+$/, "");
+  return `${stem || "generated-video"}.${extension}`;
 }
 
 export function decodeGeneratedImage(value: string): Uint8Array {
@@ -37,17 +68,37 @@ export function decodeGeneratedImage(value: string): Uint8Array {
   return bytes;
 }
 
-export function markIncompleteImageGeneration(
+export function generatedMediaInfo(
+  message: ConversationMessage,
+): { kind: GeneratedMediaKind; info: { error?: string | undefined } } | null {
+  if (message.itemType === "image_generation" && message.imageGeneration)
+    return { kind: "image", info: message.imageGeneration };
+  if (message.itemType === "video_generation" && message.videoGeneration)
+    return { kind: "video", info: message.videoGeneration };
+  return null;
+}
+
+export function generationInterruptedText(kind: GeneratedMediaKind): string {
+  return kind === "video"
+    ? sourceText("error.backend.videoGenerationInterrupted")
+    : "Image generation was interrupted.";
+}
+
+export function markIncompleteMediaGeneration(
   message: ConversationMessage,
   status: ConversationMessage["status"],
 ): void {
-  if (message.itemType !== "image_generation" || !message.imageGeneration) return;
+  const media = generatedMediaInfo(message);
+  if (!media) return;
   if (status === "interrupted") {
-    message.imageGeneration.error ??= "Image generation was interrupted.";
+    media.info.error ??= generationInterruptedText(media.kind);
     return;
   }
   if (!message.attachments?.length) {
-    message.imageGeneration.error ??= "Image generation did not return an image.";
+    media.info.error ??=
+      media.kind === "video"
+        ? sourceText("error.backend.videoGenerationNoVideo")
+        : "Image generation did not return an image.";
     if (status === "completed") message.status = "failed";
   }
 }

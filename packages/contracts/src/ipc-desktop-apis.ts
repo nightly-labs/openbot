@@ -5,18 +5,10 @@ import type { BrowserLiveViewInput } from "./ipc-browser";
 import type { BridgedDesktopApi, GroupApi, IpcEndpoints, PathApi } from "./ipc-endpoints";
 import type { DirectMessageRealtimeEvent, DirectTypingRealtimeEvent, TeamPresenceSnapshot } from "./ipc-team-host";
 
-/**
- * Every agent group, spread into one namespace. Each scoped method takes its server last; left out,
- * it is the selected server. `onEvent` is `onScopedEvent` filtered to the selected server, and
- * `onAttachmentImport` reports the files the preload imports from a drop or a paste.
- */
 export interface AgentDesktopApi extends PathApi<"agent"> {
-  /** Gives the agent a folder that the user dropped. The preload reads its path; the page never does. */
   addDroppedAgentFolder: (agentId: string, folder: File) => Promise<AgentFolderChange>;
   onAttachmentImport: (listener: (event: AttachmentImportEvent) => void) => () => void;
-  /** Sends the files of a failed import again. Its events keep the same request id. */
   retryAttachmentImport: (requestId: string) => void;
-  /** Forgets the files of an import, so a failed one is no longer kept for a retry. */
   discardAttachmentImport: (requestId: string) => void;
   onEvent: (listener: (event: AgentEvent) => void) => () => void;
 }
@@ -25,20 +17,10 @@ export type AgentTemplatesDesktopApi = GroupApi<IpcEndpoints["agentTemplates"]>;
 
 export type MarketplaceAgentsDesktopApi = GroupApi<IpcEndpoints["marketplaceAgents"]>;
 
-/**
- * `startLiveView` starts a live view of a tab on the active remote server; a local tab is already on
- * screen. `sendLiveViewInput` is the untyped `browserInput` endpoint, so it is written here.
- */
 export interface BrowserDesktopApi extends GroupApi<IpcEndpoints["browser"]> {
   sendLiveViewInput: (input: BrowserLiveViewInput) => Promise<void>;
 }
 
-/**
- * Only the help window may call `startPermissionAppDrag`; main refuses every other sender. Only the
- * overlay surface listens to `onHighlightPlacement`. It is pushed rather than asked for: the overlay
- * carries no control and invokes nothing, so a window that floats over another application's has no
- * channel it could be driven through.
- */
 export type ComputerUseDesktopApi = GroupApi<IpcEndpoints["computerUse"]>;
 
 export type CentralAuthDesktopApi = GroupApi<IpcEndpoints["auth"]>;
@@ -53,21 +35,12 @@ export type MaintenanceDesktopApi = GroupApi<IpcEndpoints["maintenance"]>;
 
 export type DynamicIslandDesktopApi = GroupApi<IpcEndpoints["dynamicIsland"]>;
 
-/**
- * The preload wraps some bridged methods: the server list calls record which server is selected, and
- * `onEvent` does too. The scoped events come from every server; the three methods below keep one.
- */
 export interface ServersDesktopApi extends GroupApi<IpcEndpoints["servers"]> {
-  /** `onScopedPresence` for one server: the selected one when `serverId` is left out. */
   onPresence: (listener: (snapshot: TeamPresenceSnapshot) => void, serverId?: string) => () => void;
   onDirectMessage: (listener: (event: DirectMessageRealtimeEvent) => void) => () => void;
   onDirectTyping: (listener: (event: DirectTypingRealtimeEvent) => void) => () => void;
 }
 
-/**
- * The plugin deep link. Both carry a slug, never a listing: the catalog is already in the renderer,
- * and a link that carried the listing itself would let the address bar describe what gets installed.
- */
 export type PluginsDesktopApi = GroupApi<IpcEndpoints["plugins"]>;
 
 export type HostDesktopApi = GroupApi<IpcEndpoints["host"]>;
@@ -84,55 +57,28 @@ export type LinkAccountDesktopApi = GroupApi<IpcEndpoints["linkAccount"]>;
 export type NearWalletDesktopApi = GroupApi<IpcEndpoints["nearWallet"]>;
 export type OnePasswordConnectorDesktopApi = GroupApi<IpcEndpoints["onePasswordConnector"]>;
 export type BillingDesktopApi = GroupApi<IpcEndpoints["billing"]>;
+export type ReferralDesktopApi = GroupApi<IpcEndpoints["referral"]>;
+export type CreditsDesktopApi = GroupApi<IpcEndpoints["credits"]>;
 export type LicenseDesktopApi = GroupApi<IpcEndpoints["license"]>;
 export type RoutineFeedDesktopApi = GroupApi<IpcEndpoints["routineFeed"]>;
 
 export type HostedServersDesktopApi = GroupApi<IpcEndpoints["hostedServers"]>;
 
-/**
- * The user's own model endpoints. `save` and `delete` both answer with the whole list plus how the
- * provider restart went, so the renderer replaces its snapshot in one write and can say honestly
- * whether the models are on their way.
- */
 export type CustomProvidersDesktopApi = GroupApi<IpcEndpoints["customProviders"]>;
 
-/**
- * Local model servers on this computer, the model list of one endpoint, and where the scan looks.
- * Main makes each request; a scan sends no key.
- */
 export type ProviderDetectionDesktopApi = GroupApi<IpcEndpoints["providerDetection"]>;
 export type CustomAgentsDesktopApi = GroupApi<IpcEndpoints["customAgents"]>;
 
-/**
- * The providers of one server's host: code sign-in, API keys, managed CLI runtimes and custom
- * endpoints. Every method names its server. A remote host answers only an owner or admin, and only
- * when it advertises `providers-v1`.
- */
 export type ProviderAdminDesktopApi = GroupApi<IpcEndpoints["providerAdmin"]>;
 
-/**
- * The server name, logo and app update of one server's host. A remote host answers only an owner or
- * admin, and only when it advertises `host-admin-v1` (name and logo) or `host-update-v1` (update).
- */
 export type HostAdminDesktopApi = GroupApi<IpcEndpoints["hostAdmin"]>;
 
-/** The Slack workspaces where this computer's agents answer. */
 export type MessagingDesktopApi = GroupApi<IpcEndpoints["messaging"]>;
 
-/**
- * Storage and files of one host. Every scoped method names its server, because the settings modal can
- * be open for a server the user has not switched to. A remote host without `storage-v1` answers null.
- */
 export type StorageDesktopApi = GroupApi<IpcEndpoints["storage"]>;
 
-/**
- * Agent import into the local host. `choose` opens the file dialog and answers null when the user
- * cancels. A token is used once: `apply` and `discard` both release the staged archive.
- */
 export type AgentImportDesktopApi = GroupApi<IpcEndpoints["agentImport"]>;
 
-// Each member is at its place in `IPC_GROUP_PATHS`, so a new group needs no line here. Only the
-// members with methods that the preload writes by hand are named.
 export interface OpenBotDesktopApi extends Omit<BridgedDesktopApi, "agent" | "browser" | "servers"> {
   agent: AgentDesktopApi;
   browser: BrowserDesktopApi;

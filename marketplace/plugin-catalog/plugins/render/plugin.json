@@ -5,7 +5,7 @@
   "description": "Render lets agents list workspaces and services, read logs, events and metrics, see the deploy history, trigger deploys, and run read-only SQL on Render Postgres. A Render API key goes into one Authorization header. The key reaches every workspace of the Render account. Agents can create web services, static sites, cron jobs, Postgres databases and Key Value instances, which can cost money, and they can replace the environment variables of a service. The server cannot delete a resource.",
   "category": "coding",
   "creatorName": "Render",
-  "iconUrl": "https://dashboard.render.com/favicon-light.png",
+  "iconUrl": "https://avatars.githubusercontent.com/u/114033652?s=256&v=4",
   "version": "1.0.0",
   "prompts": [
     { "id": "prompt-services", "text": "Which services are in my Render workspace?" },
@@ -17,7 +17,7 @@
       "id": "app-render-mcp",
       "name": "Render",
       "description": "Services, deploys, logs, and metrics, over Render's MCP server with an API key.",
-      "iconUrl": "https://dashboard.render.com/favicon-light.png",
+      "iconUrl": "https://avatars.githubusercontent.com/u/114033652?s=256&v=4",
       "server": {
         "name": "render",
         "transport": "http",

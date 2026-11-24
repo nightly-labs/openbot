@@ -1,31 +1,41 @@
-import * as Clipboard from "expo-clipboard";
+import { agentNotificationLevelMap } from "@openbot/contracts/ipc";
 import { Link, router } from "expo-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { useUniwind } from "uniwind";
-import { useAgentPinTransition } from "@/features/agents/components/agent-pin-transition";
+import { useChatPinToggle } from "@/features/agents/components/use-chat-pin-toggle";
 import { useChatSectionMenu } from "@/features/agents/components/use-chat-section-menu";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
+import {
+  setSyncedNotificationLevels,
+  useSyncedNotificationLevels,
+} from "@/features/settings/model/notification-levels";
 import { useAgentUnread } from "@/features/workspace/components/use-live-workspace";
 import {
   type MobileAgent,
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { canToggleAgentPin } from "@/features/workspace/model/agent-pins";
+import { canToggleChatPin } from "@/features/workspace/model/agent-pins";
 import { type MenuAction, type MenuComponentRef, MenuView } from "@/shared/components/menu-view";
+import { copyWithHaptic } from "@/shared/lib/clipboard";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
 function useAgentMenuActions(agent: MobileAgent) {
   const workspace = useMobileWorkspaceReader();
-  const { toggleAgentPinAnimated } = useAgentPinTransition();
+  const { toggleAgentPin } = useChatPinToggle();
   const sectionMenu = useChatSectionMenu(agent.serverId, agent.id);
   const isPinned = useMobileWorkspaceSelector(({ pinnedAgentIds }) => pinnedAgentIds.includes(agent.id));
   const canPin = useMobileWorkspaceSelector(({ pinnedAgentIds, pinnedChannelIds }) =>
-    canToggleAgentPin([...pinnedAgentIds, ...pinnedChannelIds], agent.id),
+    canToggleChatPin(pinnedAgentIds, pinnedChannelIds, agent.id),
   );
   const isUnread = useAgentUnread(agent.id);
+  const levels = useSyncedNotificationLevels((state) => state.servers[agent.serverId]);
+  const canMute =
+    useMobileWorkspaceSelector(({ canSetAgentNotificationLevel }) => canSetAgentNotificationLevel(agent.serverId)) &&
+    levels !== undefined;
+  const isMuted = levels ? agentNotificationLevelMap(levels).get(agent.id) === "nothing" : false;
   const actionPending = useRef(false);
   const { t } = useText();
 
@@ -50,13 +60,9 @@ function useAgentMenuActions(agent: MobileAgent) {
     }
   }
 
-  const handlePin = () => toggleAgentPinAnimated(agent.id);
+  const handlePin = () => toggleAgentPin(agent.id);
 
-  const handleCopyId = () => {
-    void Clipboard.setStringAsync(agent.id).then(() => {
-      void haptics.notification();
-    });
-  };
+  const handleCopyId = () => copyWithHaptic(agent.id);
 
   const handleDelete = () => {
     Alert.alert(t("mobile.agent.menu.deleteTitle", { name: agent.name }), t("mobile.agent.menu.deleteBody"), [
@@ -76,6 +82,22 @@ function useAgentMenuActions(agent: MobileAgent) {
     else workspace().markAgentUnread(agent.id);
     void haptics.selection();
   };
+  const handleMute = () => {
+    void haptics.selection();
+    workspace()
+      .setAgentNotificationLevel({ agentId: agent.id, level: isMuted ? null : "nothing" }, agent.serverId)
+      .then((snapshot) => setSyncedNotificationLevels(agent.serverId, snapshot))
+      .catch((error: unknown) => {
+        void haptics.notification("error");
+        const text = currentText();
+        showFailureAlert(
+          error,
+          "agent",
+          text.t("mobile.agent.notifications.failed"),
+          text.errorMessage(error, text.t("mobile.agent.notifications.failedBody")),
+        );
+      });
+  };
   const handleHide = () => {
     workspace().hideAgent(agent.id);
     void haptics.impact();
@@ -89,9 +111,12 @@ function useAgentMenuActions(agent: MobileAgent) {
     isPinned,
     isUnread,
     canPin,
+    canMute,
+    isMuted,
     sectionMenu,
     handleRead,
     handlePin,
+    handleMute,
     handleHide,
     handleInfo,
     handleCopyId,
@@ -106,9 +131,12 @@ function useAgentContextMenu(agent: MobileAgent) {
     isPinned,
     isUnread,
     canPin,
+    canMute,
+    isMuted,
     sectionMenu,
     handleRead,
     handlePin,
+    handleMute,
     handleHide,
     handleInfo,
     handleCopyId,
@@ -123,6 +151,11 @@ function useAgentContextMenu(agent: MobileAgent) {
       <Link.MenuAction icon={isPinned ? "pin.slash" : "pin"} isOn={isPinned} onPress={handlePin} disabled={!canPin}>
         {t(isPinned ? "mobile.agent.pin.unpin" : "mobile.agent.pin.pin")}
       </Link.MenuAction>
+      {canMute ? (
+        <Link.MenuAction icon={isMuted ? "bell" : "bell.slash"} onPress={handleMute}>
+          {t(isMuted ? "mobile.agent.menu.unmute" : "mobile.agent.menu.mute")}
+        </Link.MenuAction>
+      ) : null}
       <Link.MenuAction icon="eye.slash" onPress={handleHide}>
         {t("mobile.agent.menu.hide")}
       </Link.MenuAction>
@@ -145,10 +178,6 @@ function useAgentContextMenu(agent: MobileAgent) {
   );
 }
 
-/**
- * The chat link of an agent on iOS, with its long-press preview and context menu. Android drops both
- * elements from a Link, so it does not build the menu and wraps the link in `AgentAndroidMenu`.
- */
 export function AgentContextMenuLink({
   agent,
   preview,
@@ -160,7 +189,7 @@ export function AgentContextMenuLink({
 }) {
   const agentContextMenu = useAgentContextMenu(agent);
   return (
-    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
       <Link.Trigger>{children}</Link.Trigger>
       {preview}
       {agentContextMenu}
@@ -168,23 +197,50 @@ export function AgentContextMenuLink({
   );
 }
 
-/**
- * The long-press menu of an agent on Android, with the actions of the iOS context menu. It opens when
- * it mounts and calls `onClose` when it closes, so the parent mounts it only while it shows: a long
- * list would otherwise keep a menu with every item for each row. It covers its parent, so the menu
- * opens at the row, as it did around the row.
- */
 export function AgentAndroidMenu({ agent, onClose }: { agent: MobileAgent; onClose: () => void }) {
+  return <AndroidRowMenu>{(size) => <OpenAgentMenu agent={agent} size={size} onClose={onClose} />}</AndroidRowMenu>;
+}
+
+export function AndroidRowMenu({ children }: { children: (size: { width: number; height: number }) => ReactNode }) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   return (
     <View
-      // The open menu draws in a portal. The row under it keeps its touches.
       pointerEvents="none"
       style={StyleSheet.absoluteFill}
       onLayout={({ nativeEvent }) => setSize({ width: nativeEvent.layout.width, height: nativeEvent.layout.height })}
     >
-      {size ? <OpenAgentMenu agent={agent} size={size} onClose={onClose} /> : null}
+      {size ? children(size) : null}
     </View>
+  );
+}
+
+export function OpenRowMenu({
+  actions,
+  size,
+  onClose,
+  onAction,
+}: {
+  actions: MenuAction[];
+  size: { width: number; height: number };
+  onClose: () => void;
+  onAction: (id: string) => void;
+}) {
+  const { theme } = useUniwind();
+  const menu = useRef<MenuComponentRef>(null);
+  useEffect(() => {
+    menu.current?.show();
+  }, []);
+  return (
+    <MenuView
+      ref={menu}
+      colorScheme={theme === "dark" ? "dark" : "light"}
+      shouldOpenOnLongPress
+      actions={actions}
+      onCloseMenu={onClose}
+      onPressAction={({ nativeEvent }) => onAction(nativeEvent.event)}
+    >
+      <View style={size} />
+    </MenuView>
   );
 }
 
@@ -198,24 +254,27 @@ function OpenAgentMenu({
   onClose: () => void;
 }) {
   const { t } = useText();
-  const { theme } = useUniwind();
-  const menu = useRef<MenuComponentRef>(null);
-  useEffect(() => {
-    menu.current?.show();
-  }, []);
   const {
     isPinned,
     isUnread,
     canPin,
+    canMute,
+    isMuted,
     sectionMenu,
     handleRead,
     handlePin,
+    handleMute,
     handleHide,
     handleInfo,
     handleCopyId,
     handleDuplicate,
     handleDelete,
   } = useAgentMenuActions(agent);
+  const muteAction: MenuAction = {
+    id: "mute",
+    title: t(isMuted ? "mobile.agent.menu.unmute" : "mobile.agent.menu.mute"),
+    image: isMuted ? "bell" : "bell.slash",
+  };
   const actions: MenuAction[] = [
     {
       id: "read",
@@ -228,6 +287,7 @@ function OpenAgentMenu({
       image: isPinned ? "pin.slash" : "pin",
       attributes: { disabled: !canPin },
     },
+    ...(canMute ? [muteAction] : []),
     { id: "hide", title: t("mobile.agent.menu.hide"), image: "eye.slash" },
     ...sectionMenu.androidActions,
     { id: "info", title: t("mobile.agent.menu.info"), image: "info.circle" },
@@ -245,6 +305,7 @@ function OpenAgentMenu({
   const handlers: Record<string, () => void> = {
     read: handleRead,
     pin: handlePin,
+    mute: handleMute,
     hide: handleHide,
     info: handleInfo,
     copy: handleCopyId,
@@ -252,19 +313,14 @@ function OpenAgentMenu({
     delete: handleDelete,
   };
   return (
-    <MenuView
-      ref={menu}
-      colorScheme={theme === "dark" ? "dark" : "light"}
-      shouldOpenOnLongPress
+    <OpenRowMenu
       actions={actions}
-      onCloseMenu={onClose}
-      onPressAction={({ nativeEvent }) => {
-        sectionMenu.onAction(nativeEvent.event);
-        handlers[nativeEvent.event]?.();
+      size={size}
+      onClose={onClose}
+      onAction={(id) => {
+        sectionMenu.onAction(id);
+        handlers[id]?.();
       }}
-    >
-      {/* The anchor of the menu: the size of the row it covers. */}
-      <View style={size} />
-    </MenuView>
+    />
   );
 }

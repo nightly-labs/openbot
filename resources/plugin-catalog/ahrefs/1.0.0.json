@@ -1,0 +1,33 @@
+{
+  "slug": "ahrefs",
+  "name": "Ahrefs",
+  "tagline": "SEO and keyword data",
+  "description": "Ahrefs lets agents research keywords, backlinks, organic traffic, and competitor sites with Ahrefs data. Each user signs in to their own Ahrefs account through the browser.",
+  "category": "research",
+  "creatorName": "Ahrefs",
+  "iconUrl": "https://static.ahrefs.com/apple-touch-icon.png?v=2",
+  "version": "1.0.0",
+  "prompts": [
+    { "id": "prompt-keywords", "text": "Find low-difficulty keywords about home espresso machines." },
+    { "id": "prompt-competitors", "text": "Which pages bring the most organic traffic to this competitor?" },
+    { "id": "prompt-backlinks", "text": "List the new backlinks to our site in the last 30 days." }
+  ],
+  "apps": [
+    {
+      "id": "app-ahrefs-mcp",
+      "name": "Ahrefs",
+      "description": "Keyword, backlink, and site research, over Ahrefs's MCP server with browser sign-in.",
+      "iconUrl": "https://static.ahrefs.com/apple-touch-icon.png?v=2",
+      "server": {
+        "name": "ahrefs",
+        "transport": "http",
+        "url": "https://api.ahrefs.com/mcp/mcp",
+        "auth": [{ "id": "ahrefs-oauth", "kind": "link", "label": "Sign in" }]
+      }
+    }
+  ],
+  "websiteUrl": "https://ahrefs.com",
+  "privacyPolicyUrl": "https://ahrefs.com/legal/privacy-policy",
+  "termsUrl": "https://ahrefs.com/legal/terms",
+  "skills": []
+}

@@ -3,11 +3,6 @@ import { browserControlAction, browserControlDetailAction, controlSessionId } fr
 import type { BrowserToolCall } from "./browser-tools";
 import type { DynamicToolCallParams } from "./protocol";
 
-/**
- * Owns the record of which agent turn is controlling the browser: one session per thread and turn,
- * `acting` while a browser tool call runs and `waiting` for a short grace after it, so the controls
- * the user sees do not flicker between two calls of the same turn. It never imports `BrowserHost`.
- */
 export class BrowserControlSessions {
   static readonly IDLE_GRACE_MS = 1_200;
   readonly #sessions = new Map<string, BrowserControlSession>();
@@ -44,7 +39,6 @@ export class BrowserControlSessions {
     this.#emitChanged();
   }
 
-  /** Ends every session, then drops the listeners. The host calls it once, on shutdown. */
   dispose(): void {
     this.clear();
     this.#listeners.clear();

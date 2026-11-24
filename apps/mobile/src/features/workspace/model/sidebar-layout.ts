@@ -11,23 +11,54 @@ import type { MobileAgent } from "./workspace-types";
 
 export type MobileSidebarItem =
   | { kind: "waiting"; id: string; count: number }
+  | { kind: "unread"; id: string; count: number }
   | {
       kind: "section";
       id: string;
-      /** The path, such as "Acme / Engineering", for menus and accessibility. */
       name: string;
-      /** The own name of the folder, which the header shows after `parentName`. */
       title: string;
-      /** The name of the folder that holds this one, or null at the top of the list. */
       parentName: string | null;
-      /** The folders that hold this one, from the top folder down. */
       ancestorIds: readonly string[];
-      /** A folder of the user, not the "Agents" group of the chats in no folder. */
       custom: boolean;
       empty: boolean;
     }
   | { kind: "agent"; id: string; agent: MobileAgent }
   | { kind: "channel"; id: string; channel: ChannelSummary };
+
+type MobileChatItem = Extract<MobileSidebarItem, { kind: "agent" | "channel" }>;
+
+export type MobileChatOrder = "manual" | "recent" | "unread-group" | "unread-first";
+
+export const MOBILE_CHAT_ORDERS = [
+  "manual",
+  "recent",
+  "unread-group",
+  "unread-first",
+] as const satisfies readonly MobileChatOrder[];
+
+export function mobileChatOrderSortsSections(order: MobileChatOrder): boolean {
+  return order === "recent" || order === "unread-first";
+}
+
+function chatActivity(chat: MobileChatItem): number {
+  const at = chat.kind === "agent" ? chat.agent.updatedAt : (chat.channel.lastMessage?.at ?? chat.channel.createdAt);
+  const time = at ? Date.parse(at) : Number.NaN;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function byRecent<Item extends MobileChatItem>(chats: readonly Item[]): Item[] {
+  return [...chats].sort((a, b) => chatActivity(b) - chatActivity(a));
+}
+
+function chatItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[], channels: ChannelSummary[]) {
+  const chats: MobileChatItem[] = [
+    ...channels.map((channel) => ({ kind: "channel" as const, id: channel.id, channel })),
+    ...agents.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
+  ];
+  if (!layout) return chats;
+  const positions = new Map(layout.agentOrder.map((id, index) => [id, index]));
+  return chats.sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size));
+}
 
 export function mobileSidebarItems(
   layout: SidebarLayoutSnapshot | null,
@@ -35,14 +66,19 @@ export function mobileSidebarItems(
   channels: ChannelSummary[],
   collapsedSectionIds: ReadonlySet<string> = new Set(),
   t: MobileTranslate = currentText().t,
+  order: { recent?: boolean; unreadFirst?: ReadonlySet<string> | null; aside?: ReadonlySet<string> | null } = {},
 ): MobileSidebarItem[] {
-  const chats: MobileSidebarItem[] = [
-    ...channels.map((channel) => ({ kind: "channel" as const, id: channel.id, channel })),
-    ...agents.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
-  ];
-  if (!layout) return chats;
-  const positions = new Map(layout.agentOrder.map((id, index) => [id, index]));
-  chats.sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size));
+  const { recent, unreadFirst, aside } = order;
+  const sorted = chatItems(layout, agents, channels);
+  const chats = unreadFirst
+    ? [
+        ...byRecent(sorted.filter((chat) => unreadFirst.has(chat.id))),
+        ...byRecent(sorted.filter((chat) => !unreadFirst.has(chat.id))),
+      ]
+    : recent
+      ? byRecent(sorted)
+      : sorted;
+  if (!layout) return aside ? chats.filter((chat) => !aside.has(chat.id)) : chats;
   const names = new Map(layout.sections.map((section) => [section.id, section.name]));
   const groups = new Map<string, MobileSidebarItem[]>();
   for (const chat of chats) {
@@ -52,13 +88,12 @@ export function mobileSidebarItems(
     group.push(chat);
     groups.set(sectionId, group);
   }
-  // As on the desktop, folders do not indent: a folder in a folder shows "Parent / Name", and a closed
-  // folder hides the folders in it too.
   const parents = sidebarFolderParents(layout);
   return layout.order.flatMap((id) => {
     const ancestorIds = sidebarFolderAncestors(parents, id);
     if (ancestorIds.some((ancestorId) => collapsedSectionIds.has(ancestorId))) return [];
-    const group = groups.get(id) ?? [];
+    const all = groups.get(id) ?? [];
+    const group = aside ? all.filter((chat) => !aside.has(chat.id)) : all;
     const custom = names.has(id);
     const title = custom
       ? names.get(id)
@@ -76,19 +111,13 @@ export function mobileSidebarItems(
         parentName: (parentId && names.get(parentId)) ?? null,
         ancestorIds,
         custom,
-        // An open folder with only folders in it is not empty.
-        empty: group.length === 0 && ![...parents.values()].includes(id),
+        empty: all.length === 0 && ![...parents.values()].includes(id),
       },
       ...(collapsedSectionIds.has(id) ? [] : group),
     ];
   });
 }
 
-/**
- * "Needs you": the agents that wait for the user, above the sections, in layout order. As on the
- * desktop, the group is not a section of the layout. The layout keeps each agent's place, so an
- * agent returns to its section when the wait ends.
- */
 export function mobileWaitingItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[]): MobileSidebarItem[] {
   if (agents.length === 0) return [];
   const positions = new Map(layout?.agentOrder.map((id, index) => [id, index]));
@@ -101,10 +130,16 @@ export function mobileWaitingItems(layout: SidebarLayoutSnapshot | null, agents:
   ];
 }
 
-/**
- * The layout after a `move-agent` action, as the host applies it. The phone shows the move before the
- * host answers; the answer of the host then replaces this layout.
- */
+export function mobileUnreadItems(
+  layout: SidebarLayoutSnapshot | null,
+  agents: MobileAgent[],
+  channels: ChannelSummary[],
+): MobileSidebarItem[] {
+  const chats = byRecent(chatItems(layout, agents, channels));
+  if (chats.length === 0) return [];
+  return [{ kind: "unread", id: "unread", count: chats.length }, ...chats];
+}
+
 export function moveSidebarChat(
   layout: SidebarLayoutSnapshot,
   action: Extract<SidebarLayoutAction, { type: "move-agent" }>,

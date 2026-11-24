@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Inloggen",
   "mobile.marketplace.facts.accessLocal": "Deze computer",
   "mobile.marketplace.facts.accessNone": "Geen inlog",
+  "mobile.marketplace.facts.accessMac": "Alleen Mac",
   "mobile.marketplace.permission.admin": "Alleen eigenaren en beheerders kunnen installeren uit de marktplaats.",
   "mobile.marketplace.permission.unavailable":
     "Deze server is offline, of de OpenBot-versie is hiervoor te oud. Werk OpenBot bij op de computer waarop de server draait.",
@@ -96,6 +97,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Help me deze vaardigheid te gebruiken.",
   "mobile.marketplace.app.add": "Voeg app toe",
+  "mobile.marketplace.app.addCustom": "Eigen toevoegen",
   "mobile.marketplace.app.connect": "Verbinden",
   "mobile.marketplace.app.connectTitle": "Verbind {name}",
   "mobile.marketplace.app.keyIntro":
@@ -105,6 +107,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Open de inlogpagina van {name}.",
   "mobile.marketplace.app.stepAllow": "Log in en sta toegang toe.",
   "mobile.marketplace.app.stepReturn": "Kom hier terug. {name} wordt verbonden op je server.",
+  "mobile.marketplace.app.stepBlank": "De laatste pagina laadt niet. Dat is juist.",
+  "mobile.marketplace.app.stepCopy": "Tik op de adresbalk en kopieer het volledige adres.",
+  "mobile.marketplace.app.stepPaste": "Ga terug naar OpenBot en plak het adres hieronder.",
   "mobile.marketplace.app.openSignIn": "Open inlogpagina",
   "mobile.marketplace.app.keySecure": "De sleutel gaat alleen naar je server, via een versleutelde verbinding.",
   "mobile.marketplace.app.connecting": "Verbinden",
@@ -115,12 +120,12 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "Gebruik een https-link op {hostname}.",
   "mobile.marketplace.app.docs": "Vraag een sleutel aan",
   "mobile.marketplace.app.local": "Deze app draait op de computer met OpenBot. Stel de app in op die computer.",
+  "mobile.marketplace.app.needsMac":
+    "Deze app werkt alleen op een Mac waarop OpenBot draait, en deze server is geen Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Voor deze app moet je inloggen in een browser. Werk OpenBot bij op de server, of verbind de app op de computer.",
   "mobile.marketplace.app.waiting": "Wachten op de inlogpagina…",
   "mobile.marketplace.app.openAgain": "Open de inlogpagina opnieuw",
-  "mobile.marketplace.app.pasteHint":
-    "Aan het eind opent de pagina een adres dat niet laadt. Kopieer dat adres en plak het hieronder.",
   "mobile.marketplace.app.pasteLabel": "Adres na het inloggen",
   "mobile.marketplace.app.pasteInvalid": "Dit adres is niet het einde van deze inlog.",
   "mobile.marketplace.app.finishSignIn": "Rond inloggen af",

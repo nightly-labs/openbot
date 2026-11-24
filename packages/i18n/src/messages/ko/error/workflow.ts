@@ -6,19 +6,53 @@ export const messages = {
   "error.workflow.versionMissing": "이 버전의 워크플로는 더 이상 존재하지 않아요.",
   "error.workflow.annotation": "텍스트, 메모, 도형에는 연결을 추가할 수 없어요.",
   "error.workflow.port": "단계가 이 유형의 입력을 받을 수 없어요.",
+  "error.workflow.unknownValue": "이 OpenBot은 단계의 설정을 알지 못합니다. OpenBot을 업데이트한 후 다시 시도하세요.",
   "error.workflow.branch": "‘예’와 ‘아니요’ 연결은 조건에만 있을 수 있어요.",
   "error.workflow.conditionBranch": "조건에서 나가는 각 연결은 ‘예’ 또는 ‘아니요’여야 해요.",
   "error.workflow.duplicateEdge": "이 두 단계에는 이미 이 연결이 있어요.",
   "error.workflow.serverTooOld":
     "이 서버는 워크플로를 지원하지 않아요. 서버를 실행하는 컴퓨터에서 OpenBot을 업데이트하세요.",
+  "error.workflow.newerSteps":
+    "이 워크플로에는 최신 버전 OpenBot의 단계가 있어요. 변경하려면 OpenBot을 업데이트하세요.",
   "error.workflow.nodeUnsupported": "이 버전의 OpenBot은 아직 이미지, 파일, 메시지 단계를 실행할 수 없어요.",
   "error.workflow.interrupted": "이 단계가 실행되는 동안 OpenBot이 중지됐어요. 다시 실행해 주세요.",
   "error.workflow.agentMissing": "이 단계의 에이전트를 선택하세요.",
   "error.workflow.handoffFailed": "OpenBot이 이 단계를 에이전트에 보내지 못했어요.",
   "error.workflow.agentStepEnded": "에이전트가 답하기 전에 이 단계의 메시지가 삭제됐어요.",
+  "error.workflow.agentStepStopped": "에이전트가 이 단계에 답하기 전에 멈췄어요. 단계를 다시 실행해 주세요.",
   "error.workflow.conditionUnclear": "모델이 ‘예’ 또는 ‘아니요’로 답하지 않았어요.",
+  "error.workflow.answerInvalid": "답에 이 단계가 요구하는 필드가 없었어요: {fields}. 단계를 다시 실행해 주세요.",
+  "error.workflow.answerSetup":
+    "이 워크플로의 답변 필드에 여기서 문제가 있습니다: {fields}. 워크플로를 고친 다음 단계를 다시 실행하세요.",
+  "error.workflow.answerSourceEnded":
+    "이 필드를 주는 단계가 끝나지 않아서 값이 없습니다: {fields}. 먼저 그 단계를 다시 실행하세요.",
+  "error.workflow.runInputInvalid":
+    "실행 입력이 트리거의 답변 필드와 맞지 않습니다: {fields}. 이 필드가 있는 JSON 객체 하나를 보내세요.",
+  "error.workflow.sourceNotDone":
+    "이전 단계가 마지막 실행에서 실패했거나 중지되었습니다. 먼저 그 단계를 다시 실행하세요.",
+  "error.workflow.checkInvalid": "이 단계의 확인 조건이 올바르지 않아요. 고친 뒤 단계를 다시 실행해 주세요.",
   "error.workflow.modelFailed": "모델이 답할 수 없었어요. 단계를 다시 실행해 주세요.",
+  "error.workflow.modelTimedOut":
+    "모델이 제때 답하지 않았어요. 이 단계의 강도를 낮추거나 더 빠른 모델을 고른 다음 다시 실행해 주세요.",
+  "error.workflow.modelToolUse":
+    "모델이 도구를 쓰려고 했지만 이 단계는 텍스트로만 답할 수 있어요. 단계를 다시 실행하거나 다른 모델을 골라 주세요.",
+  "error.workflow.modelImageUnsupported":
+    "이 단계의 모델은 이미지를 읽을 수 없습니다. 이미지를 읽을 수 있는 모델을 선택하거나 이미지 연결을 제거하세요.",
+  "error.workflow.modelImageType":
+    "모델 단계는 PNG, JPEG, GIF, WebP 이미지만 읽을 수 있습니다. 이 형식 중 하나의 이미지를 연결하세요.",
+  "error.workflow.modelUnavailable": "이 단계의 모델을 사용할 수 없어요. 이 단계에 다른 모델을 골라 주세요.",
+  "error.workflow.providerBusy": "제공자가 바빠요. 몇 분 기다린 다음 단계를 다시 실행해 주세요.",
+  "error.workflow.providerOffline":
+    "OpenBot이 제공자에 연결할 수 없었어요. 인터넷 연결을 확인한 다음 단계를 다시 실행해 주세요.",
   "error.workflow.modelBusy": "다른 모델 요청이 실행 중이에요. 잠시 후 단계를 다시 실행해 주세요.",
+  "error.workflow.mediaFailed": "모델이 이미지나 동영상을 만들 수 없었어요. 단계를 다시 실행해 주세요.",
+  "error.workflow.mediaNotMade": "모델이 이미지나 동영상을 만들지 않았어요. 모델의 답변: {answer}",
+  "error.workflow.pictureMissing": "이미지가 서버에 더 이상 없어요. 다시 보내 주세요.",
+  "error.workflow.pictureType": "PNG, JPEG 또는 WebP 이미지를 사용해 주세요.",
+  "error.workflow.mediaInputMissing": "이전 단계의 이미지를 사용할 수 없어요. 그 단계를 다시 실행해 주세요.",
+  "error.workflow.mediaEmptyRequest": "설명을 작성하거나 앞 단계를 실행해 텍스트나 이미지가 들어오게 해 주세요.",
+  "error.workflow.mediaInputNotImage": "이 단계는 동영상이 아닌 이미지만 받아요. 동영상에서 오는 연결을 지워 주세요.",
+  "error.workflow.mediaInputNotClip": "이 입력은 동영상과 오디오 파일만 받아요. 파일에서 오는 연결을 지워 주세요.",
   "error.workflow.stepMissing": "이 단계는 더 이상 존재하지 않아요.",
   "error.workflow.nodeMissing": "이 단계는 워크플로에 없어요.",
   "error.workflow.runMissing": "이 실행은 더 이상 존재하지 않아요.",
@@ -64,4 +98,24 @@ export const messages = {
   "error.workflow.githubUncertain":
     "변경이 도중에 멈췄어요. GitHub에 이미 반영됐을 수 있어요. 단계를 다시 실행하기 전에 GitHub를 확인하세요.",
   "error.workflow.githubNoEvent": "이 트리거가 시작할 이슈나 풀 리퀘스트가 GitHub에 없어요.",
+  "error.workflow.sunraSignIn": "Sunra 모델을 사용하려면 앱에서 Sunra에 로그인하세요.",
+  "error.workflow.sunraNoCredits":
+    "Sunra 계정의 크레딧이 부족합니다. sunra.ai/pricing에서 크레딧을 추가한 다음 단계를 다시 실행하세요.",
+  "error.workflow.sunraNeedsPlan":
+    "이 Sunra 모델에는 Sunra 플랜이 필요합니다. sunra.ai/pricing에서 플랜을 선택하거나 다른 모델을 선택하세요.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra는 개인 계정에서만 입력 이미지를 사용합니다. Sunra에서 개인 계정을 선택하거나 이미지 연결을 제거하세요.",
+  "error.workflow.sunraFailed": "Sunra가 파일을 만들지 못했습니다: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra가 제시간에 파일을 완성하지 못했습니다. 단계를 다시 실행하기 전에 sunra.ai의 OpenBot 프로젝트를 확인하세요.",
+  "error.workflow.higgsfieldSignIn": "Higgsfield 모델을 사용하려면 앱에서 Higgsfield에 로그인하세요.",
+  "error.workflow.higgsfieldNoCredits":
+    "Higgsfield 계정의 크레딧이 부족해요. higgsfield.ai/pricing에서 크레딧을 추가한 다음 단계를 다시 실행하세요.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "이 Higgsfield 모델에는 Higgsfield 요금제가 필요해요. higgsfield.ai/pricing에서 요금제를 선택하거나 다른 모델을 선택하세요.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield의 콘텐츠 검사가 막아서 파일을 만들지 않았어요. 프롬프트나 입력 이미지를 바꾼 다음 단계를 다시 실행하세요.",
+  "error.workflow.higgsfieldFailed": "Higgsfield에서 파일을 만들지 못했어요: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield가 제시간에 파일을 완성하지 못했어요. 단계를 다시 실행하기 전에 higgsfield.ai의 기록을 확인하세요.",
 } as const satisfies PartialTranslation<typeof source>;

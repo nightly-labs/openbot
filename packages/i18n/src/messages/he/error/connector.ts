@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub לא מכיר את ה-Client ID של ה-GitHub App הזה.",
   "error.connector.githubUnexpected": "GitHub שלח תשובה לא צפויה: {detail}",
   "error.connector.githubUnreachable": "OpenBot לא מצליח להגיע אל GitHub: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot לא מצליח להגיע אל GitHub. יש לבדוק את החיבור לאינטרנט ואת הגדרות ה-DNS של המחשב או השרת שמריץ את OpenBot, ולנסות שוב.",
   "error.connector.githubExpired": "החיבור ל-GitHub פג תוקף. יש לחבר את GitHub מחדש.",
   "error.connector.githubFileUnreadable": "קובץ החיבור ל-GitHub אינו קריא.",
   "error.connector.githubFileTooLarge": "קובץ החיבור ל-GitHub גדול מדי.",
@@ -27,18 +29,35 @@ export const messages = {
     "OpenBot לא הצליח להתקין את ה-CLI של 1Password. יש לבדוק את החיבור לאינטרנט ולנסות שוב.",
   "error.connector.onePasswordCliSignedOut":
     "ה-CLI של 1Password לא מחובר. יש להפעיל את האינטגרציה שלו באפליקציית 1Password ולהתחבר שוב.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot לא מצליח להתחבר לאפליקציית 1Password. יש לפתוח את 1Password ולבטל את הנעילה. בהגדרות > מפתחים יש לוודא ש״Integrate with 1Password CLI״ מופעל. לאחר מכן יש לנסות שוב.",
   "error.connector.onePasswordCliFailed": "ה-CLI של 1Password נכשל: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "חשבון 1Password שלך לא מאפשר לך ליצור את הכספת המשותפת או חשבון שירות. יש לבקש את ההרשאה הזו מבעלים או ממנהל של החשבון, או לבקש מהם אסימון של חשבון שירות וללחוץ על ״שימוש באסימון״.",
   "error.connector.onePasswordUnexpected": "1Password שלח תשובה לא צפויה: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password לא קיבל את האסימון של חשבון השירות.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot לא הצליח להתחבר ל-1Password. יש לבדוק את החיבור לאינטרנט ולנסות שוב.",
+  "error.connector.onePasswordRateLimited": "1Password קיבל יותר מדי בקשות. יש להמתין כמה דקות ולנסות שוב.",
   "error.connector.onePasswordNoVault": "חשבון השירות לא יכול לקרוא אף כספת. יש לתת לו גישה לכספת ולנסות שוב.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot לא יכול לקרוא את פרטי ההתחברות שלך ב-1Password. יש לנתק את 1Password ולחבר אותו שוב.",
   "error.connector.onePasswordFileUnreadable": "קובץ החיבור ל-1Password אינו קריא.",
   "error.connector.onePasswordFileTooLarge": "קובץ החיבור ל-1Password גדול מדי.",
   "error.connector.bitwardenFailed":
     "לא ניתן לקרוא את Bitwarden. יש להתקין את ה-CLI bw, להתחבר, לבטל את הנעילה וליצור תיקייה אחת בשם Shared with OpenBot. יש להתחבר עם מפתח סשן חדש.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot לא מוצא את ה-CLI של Bitwarden. התקינו את bw, ודאו שהוא פועל בטרמינל חדש ואז התחברו שוב.",
+  "error.connector.bitwardenFolderMissing":
+    "ב-Bitwarden צריכה להיות בדיוק תיקייה אחת בשם Shared with OpenBot. צרו אותה או מחקו את התיקייה העודפת, ואז התחברו שוב.",
   "error.connector.bitwardenHostInput":
     "יש להזין כתובת שרת HTTPS, את client_id ו-client_secret של מפתח ה-API ואת הסיסמה הראשית.",
   "error.connector.bitwardenHostFailed":
     "לא ניתן לפתוח את Bitwarden בשרת הזה. יש לבדוק את כתובת השרת, את מפתח ה-API ואת הסיסמה הראשית, ולוודא שתיקייה אחת נקראת Shared with OpenBot. לאחר מכן יש להתחבר שוב.",
+  "error.connector.bitwardenHostSignInFailed":
+    "לא ניתן להיכנס ל-Bitwarden בשרת הזה. יש לבדוק את כתובת השרת ואת מפתח ה-API ולהתחבר שוב.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "לא ניתן לבטל את הנעילה של Bitwarden בשרת הזה. יש לבדוק את הסיסמה הראשית ולהתחבר שוב.",
   "error.connector.bitwardenCliInstallFailed":
     "לא ניתן להתקין את ה-CLI של Bitwarden בשרת הזה. יש לבדוק את חיבור הרשת שלו ולהתחבר שוב.",
   "error.connector.bitwardenFileUnreadable": "קובץ החיבור ל-Bitwarden אינו קריא.",
@@ -50,6 +69,8 @@ export const messages = {
     "לא ניתן להתקין את ה-CLI של Proton Pass. יש לבדוק את חיבור הרשת ולהתחבר שוב.",
   "error.connector.protonPassPlan":
     "התוכנית שלך ב-Proton לא כוללת את ה-CLI של Proton Pass. יש לשנות תוכנית ולהתחבר שוב.",
+  "error.connector.protonPassPlanMissing":
+    "התוכנית שלך ב-Proton לא כוללת את ה-CLI של Proton Pass. נדרשת תוכנית Proton שכוללת Pass Plus. יש לשנות תוכנית ולהתחבר שוב.",
   "error.connector.protonPassExpired": "הגישה אל Proton Pass הסתיימה. יש להתחבר שוב.",
   "error.connector.protonPassKeyInvalid": "יש להזין מפתח גישה של Proton Pass שמתחיל ב-pst_.",
   "error.connector.protonPassExtraPassword": "הסיסמה הנוספת שגויה. יש להזין אותה שוב.",

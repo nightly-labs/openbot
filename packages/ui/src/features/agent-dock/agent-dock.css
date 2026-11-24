@@ -1,11 +1,5 @@
-/* The liquid agent dock on the right edge of the window. See `AgentDock.tsx`. */
-
-/* The stage sits on the right edge, centred in the window. It lets clicks through where it is empty. */
 .agent-dock {
-  /* The liquid has the window frame colour, so the dock reads as part of the frame. The glass window
-     has a clear frame; overlapping clear shapes would show their seams, so the dock stays solid. */
   --agent-dock-fill: var(--window-solid-frame, var(--openbot-bg-frame));
-  /* The seat badges are cut out of the dock, as the sidebar badges are cut out of the sidebar. */
   --agent-avatar-outline: var(--agent-dock-fill);
   --agent-row-avatar-size: 40px;
 
@@ -14,12 +8,10 @@
   top: 50%;
   right: 0;
   transform: translateY(-50%);
-  /* The motion loop springs `--agent-dock-tuck` when the dock slides into the edge. */
   translate: var(--agent-dock-tuck, 0px) 0;
   pointer-events: none;
 }
 
-/* On the left edge the stage is mirrored. */
 .agent-dock[data-side="left"] {
   right: auto;
   left: 0;
@@ -27,14 +19,11 @@
   translate: calc(-1 * var(--agent-dock-tuck, 0px)) 0;
 }
 
-/* The dock body between the seats. It takes the pointer; only the handle below moves the dock. */
 .agent-dock-hit {
   position: absolute;
   pointer-events: auto;
 }
 
-/* The handle below the dock: an arc in the dock colour beside the bottom tail. It shows only on a dock
-   that the user can move. */
 .agent-dock-handle {
   position: absolute;
   top: -40px;
@@ -55,7 +44,6 @@
     translate var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The handle answers the pointer: it gets thicker and comes nearer to the dock, more while it drags. */
 .agent-dock-handle:has(.agent-dock-handle-hit:hover) .agent-dock-handle-arc {
   stroke-width: 5.5px;
   translate: 0 -2px;
@@ -81,7 +69,6 @@
   position: absolute;
 }
 
-/* The liquid. It runs past the window edge, so the filter does not round the edge off. */
 .agent-dock-liquid {
   position: absolute;
   inset: -40px -60px -40px -40px;
@@ -123,7 +110,6 @@
   transform: scale(0);
 }
 
-/* Seats and the add button. */
 .agent-dock-seats {
   position: absolute;
   inset: 0;
@@ -138,7 +124,6 @@
   transform-origin: 50% 50%;
 }
 
-/* The seats scroll when the dock is full. The motion loop sets the top and the height. */
 .agent-dock-seat-scroll {
   position: absolute;
   top: 0;
@@ -155,13 +140,11 @@
   display: none;
 }
 
-/* The motion loop sets the height, which springs down when a seat goes. */
 .agent-dock-seat-list {
   position: relative;
   overflow: clip;
 }
 
-/* An edge with more seats behind it fades out. The selectors outrank the global .scroll-fade-* masks. */
 .agent-dock-seats .agent-dock-seat-scroll:is(.scroll-fade-top, .scroll-fade-bottom) {
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -204,8 +187,6 @@
     transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The avatar drawing runs past the seat. Only the seat takes the pointer, so a press between the
-   seats lands on the dock body and drags it. */
 .agent-dock-seat-button * {
   pointer-events: none;
 }
@@ -224,20 +205,27 @@
   outline-offset: 2px;
 }
 
-/* The open agent is a little larger; the liquid neck marks it too. */
 .agent-dock-seat-button[data-open] {
   transform: scale(1.12);
 }
 
+.agent-dock-seat[data-dragging] {
+  z-index: 1;
+}
+
+.agent-dock-seat[data-dragging] .agent-dock-seat-button {
+  color: var(--openbot-text-primary);
+  cursor: grabbing;
+  transform: scale(1.12);
+}
+
 .agent-dock-seat-button .agent-avatar {
-  /* The plush art sits low in its box. Every app surface lifts it by 14% of the face size. */
   --agent-avatar-optical-offset: calc(40px * -0.14);
 
   width: 40px;
   height: 40px;
 }
 
-/* The sidebar badge, with the dock colour for its cut-out border. */
 .agent-dock-seat-button .agent-row-agent-status {
   border-color: var(--agent-dock-fill);
 }
@@ -247,22 +235,16 @@
   height: var(--openbot-icon-md);
 }
 
-/* The add menu lists every agent that is not on the dock. With many agents it is taller than the dock
- * window, so it fits the space left and only the agent rows scroll. The search field and Dock
- * settings stay in place. The rows fade at an edge with more agents behind it (the shared
- * .scroll-fade-* masks). */
 .agent-dock-add-menu.ui-action-menu {
   display: flex;
   max-height: min(560px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 560px));
   flex-direction: column;
 }
 
-/* A fixed width, so the menu does not change size while a search removes rows. */
 .agent-dock-add-menu-search.ui-action-menu {
   width: 232px;
 }
 
-/* The list reaches the panel edges, so the separator before the channels does not overflow it. */
 .agent-dock-add-list {
   min-height: 0;
   flex: 1 1 auto;
@@ -273,8 +255,12 @@
   scrollbar-width: none;
 }
 
-/* A Bloub drawing is larger than its avatar box. Without the clip, the last row overflows the list by a
- * few pixels, so a short list scrolls and shows the bottom fade. The list already cut that part. */
+.agent-dock-add-menu.ui-action-menu .agent-dock-add-empty[role="menuitem"] {
+  height: auto;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .agent-dock-add-list > [role="menuitem"] {
   overflow-y: clip;
 }
@@ -283,7 +269,6 @@
   display: none;
 }
 
-/* Kobalte draws the separator as an hr. The menu rule styles only a direct hr, so this one uses the same line. */
 .agent-dock-add-list > hr {
   height: 1px;
   margin: var(--ui-menu-padding) calc(var(--ui-menu-padding) * -1);
@@ -291,12 +276,10 @@
   background: var(--openbot-border);
 }
 
-/* The shared search select row. Its line goes from edge to edge of the menu, as the separator does. */
 .agent-dock-add-search {
   margin: calc(var(--ui-menu-padding) * -1) calc(var(--ui-menu-padding) * -1) var(--openbot-space-1);
 }
 
-/* The field takes the focus each time the menu opens, so it shows no border or focus ring. */
 .agent-dock-add-search .agent-dock-add-search-input {
   border: 0;
   background: transparent;
@@ -322,7 +305,6 @@
   --agent-avatar-outline-width: 1px;
 }
 
-/* The chat, over the liquid panel. */
 .agent-dock-panel {
   position: absolute;
   top: 0;
@@ -421,7 +403,6 @@
   height: var(--openbot-icon-md);
 }
 
-/* The log and its scroll thumb. The thumb stays outside the faded edges of the log. */
 .agent-dock-log {
   position: relative;
   display: flex;
@@ -430,7 +411,6 @@
   flex-direction: column;
 }
 
-/* The system scrollbar stays hidden: the faded edges and the thumb show where the reader is. */
 .agent-dock-messages {
   min-height: 0;
   flex: 1;
@@ -468,7 +448,6 @@
   opacity: 0.5;
 }
 
-/* An edge with more messages behind it fades out. The selectors outrank the global .scroll-fade-* masks. */
 .agent-dock-chat .agent-dock-messages:is(.scroll-fade-top, .scroll-fade-bottom) {
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -516,7 +495,93 @@
   color: var(--openbot-danger-text);
 }
 
-/* The author of a channel message from someone else. */
+.agent-dock-card {
+  flex: none;
+}
+
+.agent-dock-card > :is(.ui-bubble, .ui-bubble-content, .approval-card, .ui-block-card, .browser-secret-card),
+.agent-dock-card :is(.ui-bubble-content, .approval-card) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.agent-dock-card .ui-block-card.ui-bubble > .ui-block-content > .ui-block-card-footer > .ui-block-actions {
+  flex: 1 1 100%;
+}
+
+.agent-dock-card .ui-block-card.ui-bubble > .ui-block-content > .ui-block-card-footer > .ui-block-actions > .ui-button {
+  flex: 1 1 0;
+}
+
+.agent-dock-card .ui-block-footer-select,
+.agent-dock-card .ui-block-footer-select > .ui-select-trigger {
+  width: 100%;
+  flex: 1 1 100%;
+}
+
+.agent-dock-card .question-prompt-footer {
+  padding-inline: var(--openbot-space-2);
+}
+
+.agent-dock-card .ui-block-header > .ui-block-icon {
+  display: none;
+}
+
+.agent-dock-card .ui-block-header:has(> .ui-block-status):has(> .ui-block-icon) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+@container ui-block (width < 360px) {
+  .agent-dock-card
+    .ui-block-card.ui-bubble
+    > .ui-block-content
+    > .ui-block-header:has(> .ui-block-status):has(> .ui-block-icon) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.agent-dock-card .browser-takeover-preview {
+  display: flex;
+  align-items: stretch;
+}
+
+.agent-dock-card .browser-secret-card .browser-takeover-preview,
+.agent-dock-card
+  :is(.browser-takeover-preview-skeleton, .browser-takeover-preview-fallback, .browser-takeover-preview-viewport img) {
+  display: none;
+}
+
+.agent-dock-card .browser-takeover-preview-bar {
+  min-width: 0;
+  flex: 1;
+  border-bottom: 0;
+}
+
+.agent-dock-card .browser-takeover-preview-bar small {
+  display: none;
+}
+
+.agent-dock-card .browser-takeover-preview-open.ui-button {
+  width: auto;
+  flex: none;
+  aspect-ratio: auto;
+  border-inline-start: 1px solid var(--openbot-border);
+  background: var(--openbot-bg-surface-raised);
+}
+
+.agent-dock-card .browser-takeover-preview-open.ui-button:hover {
+  background: var(--openbot-hover);
+}
+
+.agent-dock-card .browser-takeover-preview-open-label {
+  border-radius: 0;
+  background: none;
+  padding: 0 var(--openbot-space-3);
+  opacity: 1;
+}
+
 .agent-dock-author {
   display: block;
   margin-block-end: var(--openbot-space-1);
@@ -530,7 +595,18 @@
   white-space: pre-wrap;
 }
 
-/* The chat's Markdown, a size down to fit the panel. */
+.agent-dock-visual {
+  display: flex;
+  align-items: center;
+  gap: var(--openbot-space-2);
+}
+
+.agent-dock-visual > .agent-dock-text {
+  min-width: 0;
+  flex: 1;
+  font-weight: 500;
+}
+
 .agent-dock-markdown {
   min-width: 0;
   font-size: var(--openbot-text-md);
@@ -579,7 +655,6 @@
   white-space: nowrap;
 }
 
-/* The agent waits for the user. The answer controls are in the main window. */
 .agent-dock-wait {
   display: flex;
   align-items: center;
@@ -614,45 +689,30 @@
   font-size: var(--openbot-text-sm);
 }
 
-/* The composer's wrap places the mention picker above the composer, in the panel. The composer has its
-   own margins, and the editor keeps the dock's height limit. */
 .agent-dock-composer-wrap.composer-wrap {
   --composer-editor-limit: initial;
 
   padding: 0;
 }
 
-/* As in the main chat, the picker is 12px narrower on each side than the composer. */
 .agent-dock-composer-wrap .mention-picker {
   --mention-picker-side-inset: calc(var(--openbot-space-3) + 12px);
 }
 
-/* The app's compact composer, as the side-question and diagram chat panels use it. */
 .agent-dock-composer.composer[data-compact] {
   grid-template-columns: minmax(0, 1fr) auto;
   margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
-}
-
-/* Panel radius 24 = composer radius 12 + gap 12, so the corners are concentric. A focus halo would
-   make the gap 9 px at the corner; the border alone shows focus. */
-.agent-dock-composer.composer[data-compact]:focus-within {
-  box-shadow: none;
 }
 
 .agent-dock-composer.composer[data-compact] > .composer-input-label {
   grid-column: 1;
 }
 
-/* The finished-work shelf beside the dock. See `AgentDockShelf.tsx`. The results drip out of the dock
-   and stand on the line between the last agent and the add button. */
 .agent-dock-shelf {
-  /* The side the results come from and go back to: the dock. */
   --agent-dock-shelf-toward: 1;
 
   position: absolute;
-  display: grid;
-  justify-items: end;
-  gap: var(--openbot-space-2);
+  top: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -663,6 +723,9 @@
 }
 
 .agent-dock-shelf-item {
+  position: absolute;
+  right: 0;
+  width: max-content;
   animation: agent-dock-shelf-drip 560ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
   transition:
     opacity var(--openbot-duration-normal) ease-out,
@@ -682,7 +745,6 @@
   }
 }
 
-/* Over the shared button: its font, gap, hover fill and focus ring are not the shelf look. */
 .agent-dock-shelf :is(.agent-dock-result, .agent-dock-shelf-more) {
   gap: 0;
   border: 0;
@@ -753,7 +815,6 @@
   color: var(--openbot-text-primary);
 }
 
-/* On the left edge the seats and the chat are mirrored back, so they read as usual. */
 .agent-dock[data-side="left"] .agent-dock-seat,
 .agent-dock[data-side="left"] .agent-dock-panel {
   scale: -1 1;
@@ -763,16 +824,11 @@
   transform-origin: 50% 50%;
 }
 
-/* The shelf is mirrored back too. Its results then come from the left, where the dock is. */
-.agent-dock[data-side="left"] .agent-dock-shelf {
-  --agent-dock-shelf-toward: -1;
-
-  justify-items: start;
+.agent-dock[data-side="left"] .agent-dock-shelf :is(.agent-dock-result, .agent-dock-shelf-more) {
   scale: -1 1;
 }
 
-/* The dock is above the other apps. Its loops run only while the user uses the dock. */
-.agent-dock[data-ambient-motion="paused"] :is(.ui-spinner, .agent-row-thinking-dots i) {
+.agent-dock[data-ambient-motion="paused"] :is(.agent-row-thinking-dots i, .agent-dock-typing-dots i) {
   animation-play-state: paused;
 }
 
@@ -797,7 +853,6 @@
   }
 }
 
-/* The dock window at the right edge of the screen: the apps under it show through all of it but the dock. */
 :root[data-surface="agent-dock"],
 :root[data-surface="agent-dock"] body,
 :root[data-surface="agent-dock"] #root {
@@ -807,13 +862,10 @@
   background: transparent;
 }
 
-/* The screen edge is the frame there, so the strip of frame on the right of the dock is past the window. */
 :root[data-surface="agent-dock"] .agent-dock {
   right: -5px;
 }
 
-/* A channel draws its member cluster in the square of an agent face. It is last so that it
- * outranks the face sizes of the rules above. */
 .agent-dock-seat-button .channel-avatar-cluster .agent-avatar,
 .agent-dock-chat-channel .channel-avatar-cluster .agent-avatar,
 .agent-dock-menu-channel .channel-avatar-cluster .agent-avatar {

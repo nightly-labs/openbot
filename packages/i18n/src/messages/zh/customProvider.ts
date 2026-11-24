@@ -16,7 +16,6 @@ export const messages = {
   "customProvider.registry.updateFailed": "无法更新该助手，请重试。",
   "customProvider.registry.removeFailed": "无法移除运行时，请重试。",
   "customProvider.registry.cancelFailed": "无法取消安装，请重试。",
-  // Form validation. Each message names one field of the custom provider form.
   "customProvider.error.providerIdRequired": "请输入服务商 ID。",
   "customProvider.error.providerIdPattern": "只能使用小写字母、数字、连字符或下划线，且以字母或数字开头。",
   "customProvider.error.providerIdLength": "服务商 ID 不能超过 {max} 个字符。",
@@ -44,7 +43,6 @@ export const messages = {
   "customProvider.error.baseUrlProtocol": "请使用 http:// 或 https:// 开头的 URL。",
   "customProvider.error.baseUrlCredential": "请把凭据放在请求头中，不要放在 URL 里。",
 
-  // The note after a save or a removal. It tells the user when the provider reads the new list.
   "customProvider.saved.restarted": "已保存，OpenBot 正在加载模型。",
   "customProvider.saved.skippedBusy": "已保存。当前任务结束后服务商会读取该列表。",
   "customProvider.saved.notRunning": "已保存。服务商下次启动时会读取该列表。",
@@ -56,7 +54,6 @@ export const messages = {
   "customProvider.saveUnavailable": "当前版本无法保存端点。",
   "customProvider.removeUnavailable": "当前版本无法移除端点。",
 
-  // The add dialog.
   "customProvider.form.title": "添加自定义服务商",
   "customProvider.form.editTitle": "编辑自定义服务商",
   "customProvider.form.description": "描述一个兼容 OpenAI 的端点以及它提供的模型。",
@@ -74,21 +71,24 @@ export const messages = {
   "customProvider.field.apiKeyKeptHint": "已保存密钥。留空将保留该密钥。",
   "customProvider.models": "模型",
   "customProvider.model.id": "模型 {number} 的 ID",
+  "customProvider.model.idColumn": "模型 ID",
   "customProvider.model.name": "模型 {number} 的显示名称",
   "customProvider.model.namePlaceholder": "显示名称",
   "customProvider.model.contextWindow": "模型 {number} 的上下文窗口",
   "customProvider.model.contextWindowPlaceholder": "Token",
+  "customProvider.model.contextWindowColumn": "上下文窗口",
   "customProvider.model.maxOutput": "模型 {number} 的最大输出",
   "customProvider.model.maxOutputPlaceholder": "Token",
+  "customProvider.model.maxOutputColumn": "最大输出",
   "customProvider.model.efforts": "模型 {number} 的推理强度",
   "customProvider.model.effortsLabel": "推理强度",
-  "customProvider.model.effortsHintOpenCode": "选择每个模型接受的推理强度。如果不选择，OpenCode 提供低、中、高。",
-  "customProvider.model.effortsHintPi": "选择每个模型接受的推理强度。如果不选择，模型不进行推理。",
+  "customProvider.model.effortsDefault": "默认",
+  "customProvider.model.effortsNone": "不推理",
   "customProvider.model.inputs": "模型 {number} 的输入",
   "customProvider.model.inputsLabel": "接受",
   "customProvider.model.inputImage": "图片",
   "customProvider.model.inputPdf": "PDF",
-  "customProvider.model.inputsHint": "选择每个模型除文本外可以读取的内容。",
+  "customProvider.model.inputsNone": "仅文本",
   "customProvider.model.foundValuesHint": "部分值来自该端点。你可以更改它们。",
   "customProvider.model.remove": "移除模型 {number}",
   "customProvider.model.add": "添加模型",
@@ -101,7 +101,6 @@ export const messages = {
   "customProvider.header.add": "添加请求头",
   "customProvider.submit": "提交",
 
-  // Model discovery. OpenBot asks the endpoint for its model list, and the user picks from it.
   "customProvider.discovery.find": "查找模型",
   "customProvider.discovery.refresh": "重新查找",
   "customProvider.discovery.loading": "正在向 {url} 请求模型列表。",
@@ -110,9 +109,12 @@ export const messages = {
     other: "该端点列出了 {count} 个模型，请选择要添加的模型。",
   },
   "customProvider.discovery.empty": "该端点没有列出模型，请手动填写模型 ID。",
-  "customProvider.discovery.label": "该端点列出的模型",
+  "customProvider.discovery.choose": "选择模型",
+  "customProvider.discovery.search": "搜索模型",
+  "customProvider.discovery.selectAll": "全选",
+  "customProvider.discovery.deselectAll": "取消全选",
+  "customProvider.discovery.noMatch": "没有与搜索匹配的模型。",
 
-  // The first step of the add flow: a preset fills the form that comes next.
   "customProvider.preset.title": "添加服务商或助手",
   "customProvider.preset.description": "选择本地模型服务器、端点或 ACP 助手。",
   "customProvider.preset.heading": "添加自定义项",
@@ -130,9 +132,8 @@ export const messages = {
   "customProvider.probe.checking": "检查中",
   "customProvider.probe.running": { one: "运行中 · {count} 个模型", other: "运行中 · {count} 个模型" },
 
-  // Automatic detection on the provider step and in Settings. OpenBot looks for local model servers
-  // at their default addresses and for known ACP agent commands on the PATH.
   "customProvider.detected.title": "在这台电脑上发现",
+  "customProvider.detected.titleServer": "在服务器上发现",
   "customProvider.detected.scanning": "正在查找本地模型和助手。",
   "customProvider.detected.scanAgain": "重新扫描",
   "customProvider.detected.empty": "OpenBot 没有发现本地模型服务器或 ACP 助手。",
@@ -150,13 +151,14 @@ export const messages = {
   "customProvider.detected.hide": "隐藏 {name}",
   "customProvider.detected.showHidden": "显示已隐藏（{count}）",
 
-  // Where the scan looks. The default addresses and PATH are always part of it.
   "customProvider.detection.title": "本地检测",
   "customProvider.detection.saveFailed": "无法保存检测设置。",
   "customProvider.detection.description": "OpenBot 查找本地模型服务器和 ACP 助手的位置。",
   "customProvider.detection.enabled": "查找本地模型和助手",
   "customProvider.detection.enabledDescription":
     "OpenBot 会检查 Ollama 和 LM Studio 的默认地址，并在 PATH 中查找已知的 ACP 助手。",
+  "customProvider.detection.enabledDescriptionServer":
+    "服务器会检查 Ollama 和 LM Studio 的默认地址，并在其 PATH 中查找已知的 ACP 助手。",
   "customProvider.detection.addresses": "其他模型服务器地址",
   "customProvider.detection.address.label": "地址 {number}",
   "customProvider.detection.address.remove": "移除地址 {number}",
@@ -167,7 +169,6 @@ export const messages = {
   "customProvider.detection.folder.add": "添加文件夹",
   "customProvider.detection.error.folderInvalid": "请输入完整路径，例如 {example}。",
 
-  // The custom ACP agent form.
   "customProvider.acp.title": "添加自定义 ACP 助手",
   "customProvider.acp.description": "描述一个使用 Agent Client Protocol 的命令。",
   "customProvider.acp.heading": "自定义 ACP 助手",
@@ -178,6 +179,7 @@ export const messages = {
   "customProvider.acp.agentIdHint": "小写字母、数字或连字符。创建后无法更改。",
   "customProvider.acp.command": "命令",
   "customProvider.acp.commandHint": "要启动的程序，OpenBot 会在你的 PATH 中查找。",
+  "customProvider.acp.commandHintServer": "要启动的程序。服务器会在它自己的 PATH 中查找。",
   "customProvider.acp.args": "参数",
   "customProvider.acp.argsHint": "参数之间用空格分隔；含空格的参数请加引号。",
   "customProvider.acp.usagePrompt": "用量命令",
@@ -202,6 +204,9 @@ export const messages = {
   "customProvider.acp.trustTitle": "该命令会在这台电脑上运行",
   "customProvider.acp.trustDescription":
     "OpenBot 会以你的用户账号启动它。该助手可以读取和修改文件、执行命令。只添加你信任的助手。",
+  "customProvider.acp.hostTrustTitle": "该命令会在服务器上运行",
+  "customProvider.acp.hostTrustDescription":
+    "OpenBot 会以服务器的用户账号启动它。该助手可以读取和修改服务器上的文件，并在那里执行命令。只添加你信任的助手。",
   "customProvider.acp.submit": "添加助手",
   "customProvider.acp.editTitle": "编辑自定义 ACP 助手",
   "customProvider.acp.submitEdit": "保存助手",
@@ -216,9 +221,9 @@ export const messages = {
   "customProvider.acp.error.usagePromptInvalid": "请填写一行，最多 {max} 个字符。",
   "customProvider.acp.error.agentIdPattern": "只能使用小写字母、数字或连字符，且以字母或数字开头，最多 40 个字符。",
 
-  // The user's own ACP agents in Settings. Each is a command that OpenBot starts on this computer.
   "customProvider.agents.title": "自定义助手",
   "customProvider.agents.description": "OpenBot 在这台电脑上启动的 ACP 助手。",
+  "customProvider.agents.hostDescription": "OpenBot 在服务器的电脑上启动的 ACP 助手。",
   "customProvider.agents.empty": "还没有自定义助手。",
   "customProvider.agents.add": "添加助手",
   "customProvider.agents.restart": "重启助手",
@@ -237,7 +242,6 @@ export const messages = {
   "customProvider.agents.removed.skippedBusy": "已移除。当前任务结束后会重启自定义助手。",
   "customProvider.agents.removed.notRunning": "已移除。自定义助手下次启动时会读取它。",
 
-  // The list of saved endpoints.
   "customProvider.list.title": "自定义服务商",
   "customProvider.list.description": "你已保存的端点。不再使用的可以移除。",
   "customProvider.list.subtitle": "你自己的模型端点。",

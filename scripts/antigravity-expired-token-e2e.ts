@@ -1,12 +1,3 @@
-// A Google token that stops working while Gemini runs (Discord report, OpenBot 0.58.0): each new chat
-// waited five minutes and then failed, and Antigravity then deleted the saved token. Since #3944
-// each Gemini session has a process of its own. That process refreshes the token when it opens the
-// session, and prints Google's sign-in link when Google refuses it. The client then reports the
-// sign-out, and `ProviderRuntime` stops it, but the stop did not end a process whose session was
-// still opening. Runs the real Antigravity driver over a fake server that acts as 1.4.5 does.
-// Cases: a chat answers while the token works; after the token is refused, a new chat fails at once
-// with the Gemini sign-in message, and its process ends.
-// `bun run test:antigravity-expired-token`. Writes .openbot-build/antigravity-expired-token-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,7 +10,6 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-expired-token-e2e");
-/** Far shorter than the five minutes the server waits, and far longer than a stop takes. */
 const FAIL_LIMIT_MS = 20_000;
 
 interface LogEntry {
@@ -40,7 +30,7 @@ interface Report {
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-expired-token-e2e-"));
 const report: Report = { passed: false };
 const clients: AgentClient[] = [];
-/** The process that asked for a sign-in. A failed run ends it, or it keeps the test running. */
+process.env.GEMINI_HOME = join(root, "gemini");
 let refusedPid: number | undefined;
 
 function running(pid: number): boolean {
@@ -61,25 +51,22 @@ async function waitFor(label: string, check: () => boolean): Promise<void> {
 }
 
 try {
-  const executable = join(root, "agy", "bin", "agy_acp_server");
+  const executable = join(root, "agy", "1.5.4", "bin", "antigravity");
   const workspace = join(root, "workspace");
   const refused = join(root, "token-refused");
   const log = join(root, "requests.jsonl");
   await mkdir(workspace, { recursive: true });
   await installFakeAgent(executable, "antigravity-expired-token", { FAKE_LOG: log, FAKE_TOKEN_REFUSED: refused });
-  const cli: AgentCliInfo = { executable, version: "1.4.5", source: "managed" };
+  const cli: AgentCliInfo = { executable, version: "1.5.4", source: "managed" };
   const client = requireProviderDriver("antigravity").createClient(cli, FAIL_LIMIT_MS, NO_PROVIDER_CREDENTIALS);
   clients.push(client);
-  // As `ProviderRuntime.#handleExit` does: a client that reports an exit is stopped.
   client.once("exit", () => void runCauseEffect(client.stop()).catch(() => undefined));
   client.start();
 
-  // 1. The token works: a chat answers.
   const first = await startThread(client, { cwd: workspace });
   report.firstTurn = await runTurn(client, first, { text: "Reply with OK only.", timeoutMs: FAIL_LIMIT_MS });
   assert.equal(report.firstTurn.reply, "OK", "The chat answers while the token works.");
 
-  // 2. Google refuses the token: a new chat fails at once with the sign-in message, not after the wait.
   await writeFile(refused, "");
   const started = Date.now();
   const error = await Promise.race([

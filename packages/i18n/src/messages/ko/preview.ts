@@ -20,6 +20,11 @@ export const messages = {
   "preview.unsupported.title": "미리 볼 수 없음",
   "preview.unsupported.description": "이 파일 형식은 기본 앱에서 열 수 있어요.",
   "preview.unsupported.openExternally": "외부 앱에서 열기",
+  "preview.tooLarge.title": "파일이 너무 커서 미리 볼 수 없음",
+  "preview.tooLarge.description": "미리 보기는 100MB까지 가능해요. 이 파일은 기본 앱에서 열 수 있어요.",
   "preview.spreadsheet.readFailed": "이 스프레드시트를 읽을 수 없어요.",
   "preview.spreadsheet.truncated": "처음 {rows}행, {columns}열까지만 미리 볼 수 있어요.",
+  "preview.document.readFailed": "이 문서를 읽을 수 없어요.",
+  "preview.document.empty": "이 문서에는 표시할 텍스트가 없어요.",
+  "preview.document.truncated": "문서의 앞부분까지만 미리 볼 수 있어요.",
 } as const satisfies PartialTranslation<typeof source>;

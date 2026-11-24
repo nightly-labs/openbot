@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Oturum açma",
   "mobile.marketplace.facts.accessLocal": "Bu bilgisayar",
   "mobile.marketplace.facts.accessNone": "Oturum gerekmez",
+  "mobile.marketplace.facts.accessMac": "Yalnızca Mac",
   "mobile.marketplace.permission.admin": "Pazaryerinden yalnızca sahipler ve yöneticiler kurulum yapabilir.",
   "mobile.marketplace.permission.unavailable":
     "Bu sunucu çevrimdışı veya OpenBot sürümü bunun için çok eski. OpenBot'u, sunucuyu çalıştıran bilgisayarda güncelleyin.",
@@ -94,6 +95,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Bu beceriyi kullanmama yardım et.",
   "mobile.marketplace.app.add": "Uygulama ekle",
+  "mobile.marketplace.app.addCustom": "Özel ekle",
   "mobile.marketplace.app.connect": "Bağlan",
   "mobile.marketplace.app.connectTitle": "{name} uygulamasını bağla",
   "mobile.marketplace.app.keyIntro":
@@ -102,6 +104,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "{name} giriş sayfasını açın.",
   "mobile.marketplace.app.stepAllow": "Giriş yapın ve erişime izin verin.",
   "mobile.marketplace.app.stepReturn": "Buraya dönün. {name} sunucunuzda bağlanır.",
+  "mobile.marketplace.app.stepBlank": "Son sayfa yüklenmez. Bu doğrudur.",
+  "mobile.marketplace.app.stepCopy": "Adres çubuğuna dokunun ve adresin tamamını kopyalayın.",
+  "mobile.marketplace.app.stepPaste": "OpenBot'a dönün ve adresi aşağıya yapıştırın.",
   "mobile.marketplace.app.openSignIn": "Giriş sayfasını aç",
   "mobile.marketplace.app.keySecure": "Anahtar yalnızca sunucunuza, şifreli bir bağlantıyla gider.",
   "mobile.marketplace.app.connecting": "Bağlanıyor",
@@ -113,12 +118,12 @@ export const messages = {
   "mobile.marketplace.app.docs": "Anahtar al",
   "mobile.marketplace.app.local":
     "Bu uygulama OpenBot'un çalıştığı bilgisayarda çalışır. Uygulamayı o bilgisayarda kurun.",
+  "mobile.marketplace.app.needsMac":
+    "Bu uygulama yalnızca OpenBot çalıştıran bir Mac'te çalışır ve bu sunucu bir Mac değil.",
   "mobile.marketplace.app.relayUnsupported":
     "Bu uygulama tarayıcıda oturum açmayı gerektirir. Sunucudaki OpenBot'u güncelleyin veya uygulamayı bilgisayarda bağlayın.",
   "mobile.marketplace.app.waiting": "Oturum açma sayfası bekleniyor…",
   "mobile.marketplace.app.openAgain": "Oturum açma sayfasını yeniden aç",
-  "mobile.marketplace.app.pasteHint":
-    "Sonunda sayfa, yüklenmeyen bir adres açar. Bu adresi kopyalayıp aşağıya yapıştırın.",
   "mobile.marketplace.app.pasteLabel": "Oturum açma sonrası adres",
   "mobile.marketplace.app.pasteInvalid": "Bu adres, bu oturum açma işleminin sonu değil.",
   "mobile.marketplace.app.finishSignIn": "Oturum açmayı bitir",

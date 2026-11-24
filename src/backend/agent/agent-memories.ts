@@ -13,6 +13,7 @@ import type {
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
+import { z } from "zod";
 import {
   type AgentMemoryListPage,
   type AgentMemorySearchResult,
@@ -20,11 +21,11 @@ import {
   AgentMemoryStore,
 } from "../agent-memory-store";
 import type { AgentStore } from "../agent-store";
-import { normalizeMemoryText } from "../memory-store";
+import { normalizeMemorySite, normalizeMemoryText } from "../memory-store";
 import { type DynamicToolCallParams, isRecord } from "../protocol";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { MemoryReviewOperation } from "./memory-review-prompt";
-import { listMemoriesInput, searchMemoriesInput, setMemoryInclusionInput } from "./memory-tool-inputs";
+import { listMemoriesInput, searchMemoriesArguments, setMemoryInclusionInput } from "./memory-tool-inputs";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 
 type PendingMemoryMutation =
@@ -48,6 +49,7 @@ type PendingMemoryMutation =
       expectedSelectionRevision?: number;
       duplicate?: { memoryId: string; expectedRevision: number };
       inclusion: "essential" | "searchable";
+      site?: string;
     }
   | {
       callId: string;
@@ -59,7 +61,13 @@ type PendingMemoryMutation =
       expectedSelectionRevision: number;
     };
 
-/** The memories that a background review read, and the epoch it read them in. */
+interface StagedMemoryFields {
+  memoryId?: string | null;
+  inclusion?: "essential" | "searchable";
+  site?: string;
+  note?: string;
+}
+
 export interface MemoryReviewBase {
   epoch: number;
   limit: number;
@@ -72,20 +80,9 @@ export interface AgentMemoriesOptions {
   conversation: ConversationRuntime;
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
-  /** How many memories one agent can hold: the app setting. Omitted, the default cap. */
   limit?: () => number;
 }
 
-/**
- * What an agent remembers about its work between turns.
- *
- * The staging half is the reason this is a class and not a store wrapper. An agent's `remember` and
- * `forget_memory` calls do not take effect when the model makes them: they are held against the
- * turn and committed only if that turn completes, so a turn the user interrupts or that fails
- * leaves nothing behind. The epoch counter is what makes that safe against a concurrent manual
- * edit — `clearMemories` bumps it, and a staged mutation whose epoch has moved is dropped rather
- * than resurrecting a memory the user just deleted.
- */
 export class AgentMemories {
   readonly #conversation: ConversationRuntime;
   readonly #emit: (event: AgentEvent) => void;
@@ -110,7 +107,6 @@ export class AgentMemories {
     return this.#memories.list(agentId);
   }
 
-  /** Unchecked read for callers that already hold the agent, such as the developer instructions. */
   listFor(agentId: string): AgentMemory[] {
     return this.#memories.list(agentId);
   }
@@ -175,7 +171,6 @@ export class AgentMemories {
     this.#memories.duplicate(sourceAgentId, targetAgentId);
   }
 
-  /** The memories that a background review reads, with the epoch that its changes must still match. */
   reviewBase(agentId: string): MemoryReviewBase {
     const selections = new Map(this.#memories.listSelections(agentId).map((entry) => [entry.memoryId, entry]));
     const memories = this.#memories.list(agentId).map((memory) => ({
@@ -193,12 +188,6 @@ export class AgentMemories {
     };
   }
 
-  /**
-   * Commits the changes of a background review as one turn of the agent, through the checks of the
-   * memory tools: the cap, the essential budget, duplicates and the user's choices. A review changes
-   * only the memories that the agent saved, and only while they hold the text that the review read.
-   * A clear since `reviewBase` drops every change.
-   */
   applyReview(
     agentId: string,
     base: MemoryReviewBase,
@@ -207,7 +196,6 @@ export class AgentMemories {
   ): ConversationMemoryChange[] {
     if (base.epoch !== this.#epoch(agentId)) return [];
     const read = new Map(base.memories.map((entry) => [entry.memory.id, entry]));
-    // Forgets first, so that the adds find the room they free.
     const ordered = [
       ...operations.filter((operation) => operation.type === "forget"),
       ...operations.filter((operation) => operation.type === "update"),
@@ -221,7 +209,6 @@ export class AgentMemories {
         .map((memory) => memory.text),
     );
     ordered.forEach((operation, index) => {
-      // An add of a saved text would only change that memory's inclusion, which can be the user's choice.
       if (operation.type === "add" && saved.has(normalizeMemoryText(operation.text))) return;
       if (operation.type !== "add") {
         const entry = read.get(operation.memoryId);
@@ -245,8 +232,8 @@ export class AgentMemories {
             operation.type === "forget"
               ? { memoryId: operation.memoryId }
               : operation.type === "update"
-                ? { memoryId: operation.memoryId, text: operation.text }
-                : { text: operation.text, inclusion: operation.inclusion },
+                ? { memoryId: operation.memoryId, text: operation.text, ...reviewSite(operation.site) }
+                : { text: operation.text, inclusion: operation.inclusion, ...reviewSite(operation.site) },
         },
         agentId,
       );
@@ -254,14 +241,14 @@ export class AgentMemories {
     return this.finishTurn(turnId, "completed").get(agentId) ?? [];
   }
 
-  /** Return expected memory failures to the agent without exposing database errors or memory text. */
   handleTool(
     params: DynamicToolCallParams,
     senderAgentId: string,
     redact: (value: string) => string = redactSecrets,
+    turnRunning = true,
   ): OpenBotToolResponse | null {
     try {
-      return this.#handleTool(params, senderAgentId, redact);
+      return this.#handleTool(params, senderAgentId, redact, turnRunning);
     } catch (error) {
       const message =
         error instanceof AgentMemorySelectionError ? error.message : sourceText("error.backend.memoryOperationFailed");
@@ -273,10 +260,16 @@ export class AgentMemories {
     params: DynamicToolCallParams,
     senderAgentId: string,
     redact: (value: string) => string,
+    turnRunning: boolean,
   ): OpenBotToolResponse | null {
     if (params.tool === "search_memories") {
-      const parsed = searchMemoriesInput.safeParse(params.arguments);
-      if (!parsed.success) return openBotToolFailure(sourceText("error.backend.memorySearchQuery"));
+      const parsed = searchMemoriesArguments.safeParse(params.arguments);
+      if (!parsed.success)
+        return openBotToolFailure(
+          parsed.error.issues.every(({ path }) => path[0] === "query")
+            ? sourceText("error.backend.memorySearchQuery")
+            : `${z.prettifyError(parsed.error)}\nCorrect the arguments and retry.`,
+        );
       const result = memoryRecallResult(
         this.#memories.search(senderAgentId, parsed.data.query, parsed.data.limit),
         redact,
@@ -317,7 +310,7 @@ export class AgentMemories {
         epoch: this.#epoch(senderAgentId),
         changes: parsed.data.changes,
       });
-      return openBotToolResult({ status: "staged" });
+      return this.#stagedResult(params.turnId, senderAgentId, turnRunning, "saved", {});
     }
     if (params.tool === "remember") {
       const args = params.arguments;
@@ -326,9 +319,14 @@ export class AgentMemories {
       const text = args.text.trim();
       if (!text) return openBotToolFailure(sourceText("error.backend.memoryTextRequired"));
       if (text.length > INPUT_LIMITS.agentMemoryText)
-        return openBotToolFailure(sourceText("error.backend.memoryTextTooLong"));
+        return openBotToolFailure(
+          `${sourceText("error.backend.memoryTextTooLong")} A memory has at most ${INPUT_LIMITS.agentMemoryText} characters, and this text has ${text.length}. Save each fact as its own shorter memory.`,
+        );
       if (args.inclusion !== undefined && args.inclusion !== "essential" && args.inclusion !== "searchable")
         return openBotToolFailure("inclusion must be essential or searchable.");
+      const site = isString(args.site) ? normalizeMemorySite(args.site) : undefined;
+      if ((args.site !== undefined && !isString(args.site)) || site === null)
+        return openBotToolFailure("site must be a host name or a URL.");
       const memoryId = args.memoryId;
       if (
         memoryId !== undefined &&
@@ -337,7 +335,10 @@ export class AgentMemories {
         return openBotToolFailure("memoryId is invalid.");
       }
       const current = memoryId ? this.#memories.get(senderAgentId, memoryId) : null;
-      if (memoryId && !current) return openBotToolFailure("This memory does not belong to the current agent.");
+      if (memoryId && !current)
+        return openBotToolFailure(
+          `${sourceText("error.backend.memoryGone")} Call list_memories to read your current memories. To keep the fact, save it without memoryId.`,
+        );
       const planned = this.#plannedContext(senderAgentId, params.turnId, params.callId);
       const duplicateEntry = [...planned.all].find(([key, memory]) => key !== memoryId && memory.text === text);
       const duplicate = duplicateEntry?.[1];
@@ -369,6 +370,7 @@ export class AgentMemories {
           id: selectedId ?? "00000000-0000-0000-0000-000000000000",
           text,
           origin: duplicate?.origin ?? ("automatic" as const),
+          ...((site ?? current?.site) ? { site: site ?? current?.site } : {}),
         };
         if (essentialMemoryBytes([...others, candidate]) > AGENT_MEMORY_CONTEXT_BUDGET_BYTES) {
           if (current && sourceSelection?.inclusion === "essential")
@@ -376,15 +378,12 @@ export class AgentMemories {
           inclusion = "searchable";
         }
       }
-      // A full agent hears it now, while it can still merge or forget in this turn. Staged anyway,
-      // the save would fail at commit and the memory would be lost.
       if (!memoryId) {
         const projected = this.#projectedMemories(senderAgentId, params.turnId, params.callId);
         const normalized = normalizeMemoryText(text);
         const limit = this.#memories.limit();
         const saved = projected.size;
         if (saved >= limit && ![...projected.values()].some((memory) => memory.text === normalized)) {
-          // Over the limit only when the user lowered it. The agent must not delete memories for that.
           const key =
             saved > limit ? "error.backend.agentMemoryLimitExceeded" : "error.backend.agentMemoryLimitReached";
           return openBotToolFailure(sourceText(key, { saved, limit }));
@@ -404,11 +403,12 @@ export class AgentMemories {
           ? { duplicate: { memoryId: duplicate.id, expectedRevision: duplicateSelection.revision } }
           : {}),
         inclusion,
+        ...(site ? { site } : {}),
       });
-      return openBotToolResult({
-        status: "staged",
+      return this.#stagedResult(params.turnId, senderAgentId, turnRunning, "saved", {
         memoryId: memoryId ?? null,
         inclusion,
+        ...(site ? { site } : {}),
         ...(inclusion !== intendedInclusion ? { note: sourceText("error.backend.memoryEssentialBudget") } : {}),
       });
     }
@@ -424,10 +424,15 @@ export class AgentMemories {
         return openBotToolFailure("memoryId is required.");
       }
       const current = this.#memories.get(senderAgentId, args.memoryId);
-      if (!current) return openBotToolFailure("This memory does not belong to the current agent.");
+      if (!current)
+        return openBotToolFailure(
+          `${sourceText("error.backend.memoryGone")} There is nothing to delete. Call list_memories if you need your current memory IDs.`,
+        );
       const selection = this.#memories.getSelection(senderAgentId, current.id);
       if (selection?.userControlled)
-        return openBotToolFailure(sourceText("error.backend.memorySelectionUserControlled"));
+        return openBotToolFailure(
+          `${sourceText("error.backend.memorySelectionUserControlled")} You cannot delete it. If the user asked to delete it, tell them in one sentence to delete it in your Memories settings: Settings, Memories, then Delete on this memory. Do not try another memory tool.`,
+        );
       this.#stage(params.turnId, {
         callId: params.callId,
         type: "forget",
@@ -437,18 +442,25 @@ export class AgentMemories {
         expectedUpdatedAt: current.updatedAt,
         expectedSelectionRevision: selection?.revision ?? -1,
       });
-      return openBotToolResult({ status: "staged", memoryId: current.id });
+      return this.#stagedResult(params.turnId, senderAgentId, turnRunning, "forgotten", { memoryId: current.id });
     }
 
     return null;
   }
 
-  /**
-   * Commits a turn's staged mutations, or discards them when the turn did not complete. Answers the
-   * memories that the commit saved, updated and forgot, by agent. A mutation that another turn made
-   * stale, such as a change of a memory that a parallel thread changed first, is `notChanged`, so the
-   * thread that made it can show it. A mutation that its text already holds is not in it.
-   */
+  #stagedResult(
+    turnId: string,
+    agentId: string,
+    turnRunning: boolean,
+    applied: "saved" | "forgotten",
+    fields: StagedMemoryFields,
+  ): OpenBotToolResponse {
+    if (turnRunning) return openBotToolResult({ status: "staged", ...fields });
+    const before = this.#storedState(agentId);
+    this.finishTurn(turnId, "completed");
+    return openBotToolResult({ status: this.#storedState(agentId) === before ? "unchanged" : applied, ...fields });
+  }
+
   finishTurn(turnId: string, status: string): Map<string, ConversationMemoryChange[]> {
     const pending = this.#pending.get(turnId) ?? [];
     this.#pending.delete(turnId);
@@ -548,10 +560,6 @@ export class AgentMemories {
     return changes;
   }
 
-  /**
-   * The change that a skipped mutation did not make. A save or update whose text the agent already
-   * holds, and a forget of a memory that is gone, lost nothing.
-   */
   #refusedChanges(mutation: PendingMemoryMutation, previous: AgentMemory | null): ConversationMemoryChange[] {
     if (mutation.type === "selection") return [];
     if (mutation.type === "forget") {
@@ -563,7 +571,6 @@ export class AgentMemories {
     return [{ memoryId: memoryId.slice(0, INPUT_LIMITS.identifier), action: "notChanged", text: mutation.text }];
   }
 
-  /** What one committed mutation did to the memory texts. A change of inclusion only is not shown. */
   #committedChanges(
     mutation: PendingMemoryMutation,
     previous: AgentMemory | null,
@@ -585,7 +592,6 @@ export class AgentMemories {
       .map((memory) => ({ memoryId: memory.id, action: "saved" as const, text: memory.text }));
   }
 
-  /** Reserve prompt space for this turn's staged changes, without making them visible to search. */
   #plannedContext(agentId: string, turnId: string, exceptCallId: string) {
     const all = new Map<string, Pick<AgentMemory, "id" | "text" | "origin">>(
       this.#memories.list(agentId).map((memory) => [memory.id, memory]),
@@ -656,7 +662,6 @@ export class AgentMemories {
           (duplicate && selection.userControlled)
         )
           return;
-        // An explicit move to searchable can make room for a longer corrected text.
         if (mutation.inclusion === "searchable" && selection.inclusion === "essential") {
           this.#memories.setInclusions(
             mutation.agentId,
@@ -670,12 +675,12 @@ export class AgentMemories {
         ...(mutation.memoryId ? { memoryId: mutation.memoryId } : {}),
         text: mutation.text,
         sourceTurnId: mutation.sourceTurnId,
+        ...(mutation.site ? { site: mutation.site } : {}),
       });
       if (!memory) return;
       const selection = this.#memories.getSelection(mutation.agentId, memory.id);
       if (!selection || selection.inclusion === mutation.inclusion || selection.userControlled) return;
       const next = [...this.essentialFor(mutation.agentId), memory];
-      // Another turn may have used the remaining budget. Keep the saved text searchable.
       if (mutation.inclusion === "essential" && essentialMemoryBytes(next) > AGENT_MEMORY_CONTEXT_BUDGET_BYTES) return;
       this.#memories.setInclusions(
         mutation.agentId,
@@ -689,26 +694,12 @@ export class AgentMemories {
     this.#pending.clear();
   }
 
-  /**
-   * A memory change invalidates the developer instructions the provider was started with, so every
-   * thread of the agent is unloaded and the next turn on each of them rebuilds them.
-   */
   stateChanged(agentId: string): void {
     const agent = this.#conversation.requireKnownAgent(agentId);
     this.#conversation.unloadAgentThreads(agent.id);
     this.#emit({ type: "memories-changed", agentId });
   }
 
-  /**
-   * The agent's memories, by id, once this turn's staged changes commit, replayed in staging order
-   * as `finishTurn` applies them. A staged change that commit would skip, such as a forget of a
-   * memory the same turn already updated, is skipped here too.
-   *
-   * Another turn of the agent, such as a channel turn beside its chat, commits apart: before this
-   * one, after it, or never. So its new memories hold a place, and its forgets and updates free none.
-   * A memory that another turn changes counts, but this turn can neither fold into it nor remove it.
-   * A null text never matches.
-   */
   #projectedMemories(
     agentId: string,
     turnId: string,
@@ -753,7 +744,6 @@ export class AgentMemories {
           current.updatedAt !== mutation.expectedUpdatedAt)
       )
         continue;
-      // An update to the text of another memory folds the two into one.
       if (same !== undefined && same !== mutation.memoryId) memories.delete(mutation.memoryId);
       else memories.set(mutation.memoryId, { text, updatedAt: null });
     }
@@ -764,7 +754,6 @@ export class AgentMemories {
     return memories;
   }
 
-  /** A step of the turn's activity, so the chat shows that the agent looked in its memory. */
   #emitRecallProgress(params: DynamicToolCallParams, agentId: string, count: number): void {
     this.#emit({
       type: "turn-progress",
@@ -786,7 +775,6 @@ export class AgentMemories {
   }
 }
 
-/** Redaction can expand text, so bound the final provider payload as well as the store result. */
 function memoryRecallResult(
   result: AgentMemorySearchResult | AgentMemoryListPage,
   redact: (value: string) => string,
@@ -812,4 +800,9 @@ function addChanges(
 ): void {
   if (added.length === 0) return;
   changes.set(agentId, [...(changes.get(agentId) ?? []), ...added]);
+}
+
+function reviewSite(site: string | null | undefined): { site?: string } {
+  const normalized = site ? normalizeMemorySite(site) : null;
+  return normalized ? { site: normalized } : {};
 }

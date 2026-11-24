@@ -1,18 +1,3 @@
-// Smoke test of a real OpenBot Codex agent thread with the prompt settings that `thread-lifecycle.ts`
-// sends. Runs the real `codex app-server` with a copy of the user's Codex login (see
-// `codex-agent-harness.ts`), on GPT-6 Luna, in a temporary git workspace. One thread runs these turns:
-//   1. the core tools: update_plan, a shell command and apply_patch,
-//   2. a subagent: Codex reports the spawn as `subAgentActivity` items,
-//   3. a skill that Codex lists (`skill-creator`),
-//   4. a deferred OpenBot tool: tool_search finds it and tool_call runs it. The smoke answers both,
-//      as the OpenBot tool router does,
-//   5. a web search with Codex's own inline search (a `webSearch` item),
-//   6. a git commit.
-// The checks also confirm, from the thread's rollout file, that the first request declares `web__run`
-// and no `request_plugin_install`, that the OpenBot catalog does not name `openbot.web_search`, and
-// that the prompt lists none of the unfit skills.
-// Costs a few GPT-6 Luna turns. `bun run smoke:codex-agent`; `--model=<id>`
-// replaces GPT-6 Luna. Writes .openbot-build/codex-agent-smoke/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -39,6 +24,9 @@ const MODEL = argument("model") ?? "gpt-6-luna";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/codex-agent-smoke");
 const ECHO_TOOL = "smoke_echo";
 const ECHO_TEXT = "smoke-echo-7341";
+const BROWSER_NAMESPACE = "openbot_browser";
+const TAB_TITLE = "Smoke tab 5512";
+const DIRECT_BROWSER_TOOLS = ["open", "list_tabs", "run_script"];
 
 const TURNS: Array<{ step: string; prompt: string; expect: string[] }> = [
   {
@@ -71,6 +59,13 @@ const TURNS: Array<{ step: string; prompt: string; expect: string[] }> = [
     expect: ["dynamicToolCall:tool_search", "dynamicToolCall:tool_call"],
   },
   {
+    step: "browser tool",
+    prompt:
+      "List the tabs of the OpenBot browser with its list_tabs tool. Do not open a page. " +
+      "Reply with the title of the first tab.",
+    expect: ["dynamicToolCall:list_tabs"],
+  },
+  {
     step: "web search",
     prompt:
       "Search the web: what is the latest release of the OpenAI Codex CLI? Reply with its version and a source URL.",
@@ -95,13 +90,11 @@ interface TurnLog {
   error?: string;
 }
 
-/** True when `label` has the type of `expected` and holds the text after its first colon. */
 function matches(label: string, expected: string): boolean {
   const [type = "", ...rest] = expected.split(":");
   return label.split(":")[0] === type && label.includes(rest.join(":"));
 }
 
-/** A short label of an item: its type, and the tool or the command. A `tool_call` adds the tool that it calls. */
 function itemLabel(item: DynamicRecord): string {
   const type = getString(item, "type") ?? "?";
   if (type === "commandExecution") return `${type}:${(getString(item, "command") ?? "").slice(0, 200)}`;
@@ -110,8 +103,16 @@ function itemLabel(item: DynamicRecord): string {
   return tool ? `${type}:${tool}${called ? `:${called}` : ""}` : type;
 }
 
-/** Answers `tool_search` and `tool_call` as the OpenBot tool router does, with the fixed echo tool added. */
+const browserCalls: string[] = [];
+
 async function answerTool(params: DynamicRecord): Promise<{ text: string; success: boolean }> {
+  if (getString(params, "namespace") === BROWSER_NAMESPACE) {
+    const tool = getString(params, "tool") ?? "";
+    browserCalls.push(tool);
+    return tool === "list_tabs"
+      ? { text: JSON.stringify([{ tabId: "tab-1", title: TAB_TITLE, url: "https://example.com/" }]), success: true }
+      : { text: "Not available here.", success: false };
+  }
   const call = toolCallParams(params);
   const named = JSON.stringify(call.arguments).includes(ECHO_TOOL);
   if (call.tool === "tool_search" && named)
@@ -120,7 +121,6 @@ async function answerTool(params: DynamicRecord): Promise<{ text: string; succes
       success: true,
     };
   if (call.tool === "tool_call" && named) return { text: ECHO_TEXT, success: true };
-  // The catalog of a Codex agent has no `openbot.web_search`, so no call reaches the search.
   return answerCatalogTool(call, () => Promise.reject(new Error("A Codex agent has no openbot.web_search.")));
 }
 
@@ -155,6 +155,7 @@ const prompt: {
   requestPluginInstall: boolean;
   webRun: boolean;
   catalogWebSearch: boolean;
+  browserTools: string[];
   toolNames: string[];
   unfitSkills: string[];
   skillCreatorListed: boolean;
@@ -162,6 +163,7 @@ const prompt: {
   requestPluginInstall: false,
   webRun: false,
   catalogWebSearch: false,
+  browserTools: [],
   toolNames: [],
   unfitSkills: [],
   skillCreatorListed: false,
@@ -191,6 +193,9 @@ try {
   prompt.webRun = contents.tools.includes("web__run");
   prompt.catalogWebSearch = contents.tools.includes("openbot.web_search");
   prompt.toolNames = [...new Set(Array.from(contents.tools.matchAll(/"name":"([^"]+)"/g), (match) => match[1] ?? ""))];
+  const declared: Array<{ name?: string; tools?: Array<{ name?: string }> }> = JSON.parse(contents.tools);
+  const browserNamespace = declared.find((tool) => tool.name === BROWSER_NAMESPACE);
+  prompt.browserTools = (browserNamespace?.tools ?? []).map((tool) => tool.name ?? "");
   prompt.unfitSkills = CODEX_UNFIT_SKILLS.filter((skill) => listsSkill(contents.context, skill));
   prompt.skillCreatorListed = listsSkill(contents.context, "skill-creator");
   commitMessage = git("log", "-1", "--format=%B").trim();
@@ -207,6 +212,13 @@ const failures = [
   ...(turns.find((turn) => turn.step === "deferred tool")?.reply.includes(ECHO_TEXT)
     ? []
     : ["deferred tool: wrong reply"]),
+  ...(turns.find((turn) => turn.step === "browser tool")?.reply.includes(TAB_TITLE)
+    ? []
+    : ["browser tool: wrong reply"]),
+  ...(browserCalls.includes("list_tabs") ? [] : [`browser tool: no direct ${BROWSER_NAMESPACE}.list_tabs call`]),
+  ...(DIRECT_BROWSER_TOOLS.every((tool) => prompt.browserTools.includes(tool))
+    ? []
+    : [`the prompt declares ${BROWSER_NAMESPACE} tools ${JSON.stringify(prompt.browserTools)}`]),
   ...(commitMessage === "Add hello" ? [] : [`commit: last message is ${JSON.stringify(commitMessage)}`]),
   ...(prompt.requestPluginInstall ? ["the prompt declares request_plugin_install"] : []),
   ...(prompt.webRun ? [] : ["the prompt declares no web__run"]),
@@ -220,6 +232,7 @@ const report = {
   passed: failures.length === 0,
   failures,
   prompt,
+  browserCalls,
   commitMessage,
   turns,
 };
