@@ -1050,7 +1050,7 @@ export class TurnLifecycle {
   #awaitsTeammateInOwnLane(agentId: string, threadId: string, publicThreadId: string | null): boolean {
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId === null && this.#conversation.isExecutionThread(publicThreadId)) return false;
-    return this.#mailbox.awaitsTeammate(agentId, taskId, null) || this.#teammateWorksInBackground(agentId, taskId);
+    return this.#mailbox.teammateStillWorks(agentId, taskId);
   }
 
   #channelTask(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {

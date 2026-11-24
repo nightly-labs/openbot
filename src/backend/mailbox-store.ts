@@ -1130,19 +1130,39 @@ export class MailboxStore {
   awaitsTeammate(agentId: string, taskId: string | null, turnIds: ReadonlySet<string> | null): boolean {
     const messages = this.#messagesById();
     const sourceTurnIds = this.#sourceTurnIds();
-    return this.#state.deliveries.some((delivery) => {
-      const held = delivery.status === "completed";
-      if ((!held && !isActiveDelivery(delivery)) || delivery.recipientAgentId === agentId) return false;
-      const request = messages.get(delivery.messageId);
-      return (
-        request?.sender.kind === "agent" &&
-        request.sender.agentId === agentId &&
-        request.expectsReply !== false &&
-        (request.senderTaskId ?? null) === taskId &&
-        (turnIds === null || turnIds.has(sourceTurnIds.get(request.id) ?? "")) &&
-        (!held || this.heldByTask(delivery.recipientAgentId, request.id))
-      );
-    });
+    return this.#state.deliveries.some(
+      (delivery) =>
+        this.#awaitsTeammateDelivery(agentId, taskId, delivery, messages) &&
+        (turnIds === null || turnIds.has(sourceTurnIds.get(delivery.messageId) ?? "")),
+    );
+  }
+
+  teammateStillWorks(agentId: string, taskId: string | null): boolean {
+    const messages = this.#messagesById();
+    return this.#state.deliveries.some(
+      (delivery) =>
+        delivery.status !== "queued" &&
+        this.#awaitsTeammateDelivery(agentId, taskId, delivery, messages) &&
+        !this.hasReplyFrom(delivery.recipientAgentId, delivery.messageId),
+    );
+  }
+
+  #awaitsTeammateDelivery(
+    agentId: string,
+    taskId: string | null,
+    delivery: StoredDelivery,
+    messages: ReadonlyMap<string, StoredMessage>,
+  ): boolean {
+    const held = delivery.status === "completed";
+    if ((!held && !isActiveDelivery(delivery)) || delivery.recipientAgentId === agentId) return false;
+    const request = messages.get(delivery.messageId);
+    return (
+      request?.sender.kind === "agent" &&
+      request.sender.agentId === agentId &&
+      request.expectsReply !== false &&
+      (request.senderTaskId ?? null) === taskId &&
+      (!held || this.heldByTask(delivery.recipientAgentId, request.id))
+    );
   }
 
   taskRequesterIds(taskId: string): string[] {
