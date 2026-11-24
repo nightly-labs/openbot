@@ -46,6 +46,7 @@ const CHANNEL_SUMMARY_ROWS_SQL = `SELECT c.channel_json AS channel_json,
       AND ${SHOWN_MESSAGE_SQL.replaceAll("message_json", "m.message_json")}
       AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'plan'
       AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'subagents'
+      AND COALESCE(json_extract(m.message_json, '$.message.itemType'), '') != 'commentary'
     ORDER BY m.sequence DESC, m.message_id DESC LIMIT 1) AS latest_json,
   (SELECT COUNT(*) FROM projection_channel_tasks AS t
     WHERE t.channel_id = c.channel_id
