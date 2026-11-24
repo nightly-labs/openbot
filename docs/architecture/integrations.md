@@ -793,7 +793,7 @@ There are three parts:
 
 The E2E (`scripts/browser-extension-e2e.ts`, step 7) uses a local copy of an X post page whose reply
 button has a test id that only the served selectors know, then a local page in the markup of the new X
-web app that the built-in selectors must find.
+web app that only the new selectors find.
 
 ## Agents on the member's Chrome (host side)
 

@@ -35,8 +35,8 @@ export const X_PAGE_RULES_DEFAULT: XPageRules = {
   selectors: {
     composer: [
       '[data-testid="tweetTextarea_0"]',
-      'div[role="textbox"][contenteditable="true"]',
       'textarea[aria-multiline="true"]',
+      'div[role="textbox"][contenteditable="true"]',
     ],
     replyButton: [
       '[data-testid="tweetButtonInline"]',
