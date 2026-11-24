@@ -652,6 +652,7 @@ try {
     .click();
   await page.getByText(english("extension.browser.noSites")).waitFor({ timeout: UI_WAIT_MS });
   const siteRevoked = JSON.parse(await readStored(sitesKey))?.[site] === undefined;
+  await toHome(page);
   report.sharedTabs = {
     onWithoutSwitch,
     ungroupedBeforeUse,
