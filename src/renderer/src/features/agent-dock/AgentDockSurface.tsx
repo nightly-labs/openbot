@@ -187,7 +187,7 @@ export function AgentDockSurface() {
     const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
     if (menuOpen()) menuWanted = false;
     const extent =
-      dockShape === null || menuWanted || menuOpen() || (pointerIn && !fitted())
+      dockShape === null || chatOpen || menuWanted || menuOpen() || (pointerIn && !fitted())
         ? null
         : windowExtent(
             isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
