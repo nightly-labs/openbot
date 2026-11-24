@@ -157,6 +157,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "Impossibile condividere i file",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "Per condividere più file serve l’ultima versione dell’app.",
   "mobile.chat.attachment.preview": "Anteprima di {name}",
+  "mobile.chat.attachment.seeAll": "Tocca per vedere tutto",
   "mobile.chat.attachment.displayFailed": "Impossibile mostrare questa immagine.",
   "mobile.chat.attachment.loadingImage": "Caricamento dell'immagine",
   "mobile.chat.attachment.uploading": "Caricamento di {name}",

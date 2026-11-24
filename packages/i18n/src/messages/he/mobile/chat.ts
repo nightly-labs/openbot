@@ -160,6 +160,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "לא ניתן לשתף את הקבצים",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "שיתוף קבצים רבים דורש את הגרסה העדכנית של האפליקציה.",
   "mobile.chat.attachment.preview": "תצוגה מקדימה של {name}",
+  "mobile.chat.attachment.seeAll": "יש להקיש כדי לראות הכול",
   "mobile.chat.attachment.displayFailed": "לא ניתן להציג את התמונה הזו.",
   "mobile.chat.attachment.loadingImage": "טוען תמונה",
   "mobile.chat.attachment.uploading": "מעלה את {name}",

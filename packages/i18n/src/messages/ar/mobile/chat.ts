@@ -237,6 +237,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "تعذّرت مشاركة الملفات",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "تتطلب مشاركة ملفات كثيرة أحدث إصدار من التطبيق.",
   "mobile.chat.attachment.preview": "معاينة {name}",
+  "mobile.chat.attachment.seeAll": "اضغط لعرض الكل",
   "mobile.chat.attachment.displayFailed": "تعذّر عرض هذه الصورة.",
   "mobile.chat.attachment.loadingImage": "جارٍ تحميل الصورة",
   "mobile.chat.attachment.uploading": "جارٍ رفع {name}",

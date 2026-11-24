@@ -152,6 +152,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesFailed": "无法分享文件",
   "mobile.chat.attachment.shareFilesNeedsUpdate": "分享多个文件需要最新版本的应用。",
   "mobile.chat.attachment.preview": "预览 {name}",
+  "mobile.chat.attachment.seeAll": "轻点查看全部",
   "mobile.chat.attachment.displayFailed": "无法显示该图片。",
   "mobile.chat.attachment.loadingImage": "正在加载图片",
   "mobile.chat.attachment.uploading": "正在上传 {name}",
