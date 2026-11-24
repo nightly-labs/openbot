@@ -243,7 +243,11 @@ function replyEndedUnlessDropped(agent: SpeechAgent): () => void {
   };
 }
 
-export function readDictatedReplies(event: AgentEvent, serverId: string): void {
+export function readDictatedReplies(
+  event: AgentEvent,
+  serverId: string,
+  isMainThread: (agentId: string, threadId: string) => boolean,
+): void {
   if (event.type === "conversation") {
     readProgressUpdates(event.snapshot.messages, { serverId, agentId: event.snapshot.agentId });
     return;
@@ -270,9 +274,8 @@ export function readDictatedReplies(event: AgentEvent, serverId: string): void {
   const agent = { serverId, agentId: event.agentId };
   const key = agentKey(agent);
   if (event.type === "turn-started") {
-    if (event.origin === "routine" || event.origin === "agent") return;
-    if (isSpoken(agent)) stopSpokenReply();
-    if (event.origin === "unknown") return;
+    if (event.origin === "routine" || event.origin === "agent" || event.origin === "unknown") return;
+    if (isSpoken(agent) && isMainThread(event.agentId, event.threadId)) stopSpokenReply();
     const message = dictated.get(key);
     if (!message || message.turnId) return;
     if (Date.now() - message.dictatedAt > DICTATION_LIFETIME_MS) {
