@@ -40,11 +40,15 @@ const BACKGROUND_REFUSAL_RULE =
 const MACOS_UNRESOLVED_WINDOW_RULE =
   " When a read has degraded_reason ax_window_unresolved, or a pixel action is refused with reason window_never_read, the driver kept no screenshot frame for that window: call get_window_state on it again with include_accessibility_tree false and include_screenshot true, and take x,y from that screenshot.";
 
+const MACOS_IPHONE_MIRRORING_RULE =
+  " iPhone Mirroring ignores clicks and scrolls sent to its window, in both delivery modes, and still answers unverifiable. To tap or scroll on the mirrored iPhone, call bring_to_front on iPhone Mirroring, take x,y from get_desktop_state, use click or scroll with scope desktop and no pid or window_id, then read the window again.";
+
 const WAYLAND_FOREGROUND_REFUSAL_RULE =
   " When an action with delivery_mode foreground, or bring_to_front, answers foreground_unavailable with reason unsupported_operation, OpenBot cannot send keys or clicks to any app on this desktop for the rest of this conversation. Do not send typing, a key or a click again, in any delivery mode or with scope desktop: desktop input goes to whichever window is in front. Where a window offers an accessibility action, such as set_value on a text field, use it. Otherwise tell the user in one plain sentence, without the driver's reason, that OpenBot cannot type or click in apps on this desktop, and say that you can still read windows and take screenshots.";
 
 function inputRefusalRules(onWayland: boolean): string {
-  if (process.platform === "darwin") return MACOS_UNRESOLVED_WINDOW_RULE + BACKGROUND_REFUSAL_RULE;
+  if (process.platform === "darwin")
+    return MACOS_UNRESOLVED_WINDOW_RULE + MACOS_IPHONE_MIRRORING_RULE + BACKGROUND_REFUSAL_RULE;
   return onWayland ? BACKGROUND_REFUSAL_RULE + WAYLAND_FOREGROUND_REFUSAL_RULE : BACKGROUND_REFUSAL_RULE;
 }
 

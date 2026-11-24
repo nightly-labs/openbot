@@ -94,6 +94,19 @@ screenshot-only read (`include_accessibility_tree: false`, `include_screenshot: 
 accessibility result to fail, so the driver keeps its frame. The agent instructions name that read
 on macOS. When a driver release with trycua/cua#8117 is pinned, the rule can go.
 
+iPhone Mirroring (`com.apple.ScreenContinuity`) drops the window routes of driver 0.52.9 on macOS 26,
+and the driver answers `unverifiable` (#14837). A background click stamps the screen point, which
+the mirror does not map to the phone (upstream trycua/cua#4920; #5492 changes this only on macOS 27).
+A foreground window click is posted to the pid, and the mirror takes no pid-posted tap. Only the
+desktop scope reaches it: a click and a scroll at a `get_desktop_state` point go through the global
+HID queue, and a scroll first posts real `MouseMoved` events at the point. So the macOS agent
+instructions name `bring_to_front` and the desktop scope for iPhone Mirroring. The mirror samples
+HID report state and misses a press shorter than one report, so the daemon gets
+`CUA_DRIVER_CLICK_GAP_MS=60` on macOS, in place of the driver's 28 ms. oh-my-pi holds 60 ms and
+mirroir-mcp 50 ms for the same reason. A longer hold also suits an `NSButton` tracking loop, which
+the driver's own note says can miss a shorter one. When a driver release fixes the window routes,
+the rule can go.
+
 ### Agent display on a server
 
 A self-hosted server and the container start two Xvfb displays, and name the agent display in
