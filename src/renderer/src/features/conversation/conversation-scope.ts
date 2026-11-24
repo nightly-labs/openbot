@@ -15,7 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
-import { toast } from "@openbot/ui";
+import { dialogShown, toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { AgentMessage } from "@openbot/ui/data";
 import { awaitingReplyEnded } from "@openbot/ui/features/conversation/AwaitingReplies";
@@ -2210,6 +2210,7 @@ export function createConversationViewScope(props: ConversationProps) {
     Boolean(shownBrowserSurface()) &&
     !props.browserVisibilitySuspended &&
     !props.globalOverlayOpen &&
+    !dialogShown() &&
     !props.remoteDesktopVisible;
   createEffect(
     () =>
