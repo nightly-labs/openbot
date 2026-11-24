@@ -704,14 +704,14 @@ export class TurnLifecycle {
     this.#waitingThreads.delete(threadId);
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId !== null && this.#hooks.taskOpen(taskId)) this.#hooks.taskBackgroundLost(taskId);
-    else if (waker?.wakeAfterLostWork)
+    else if (taskId === null && waker?.wakeAfterLostWork)
       Effect.runFork(
         waker.wakeAfterLostWork(threadId).pipe(
-          Effect.catch((failure) =>
+          Effect.catchCause((cause) =>
             Effect.sync(() =>
               logger.warn("The agent got no turn after its provider process stopped its background work.", {
                 provider: waker.provider,
-                error: failure.cause,
+                error: Cause.squash(cause),
               }),
             ),
           ),

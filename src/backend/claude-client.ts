@@ -696,7 +696,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #modelSdkValues = new Map<string, string>();
   readonly #turnContext = new TurnContext();
   readonly #threadResumes = new Map<string, Deferred.Deferred<void, ProviderClientOperationError>>();
-  readonly #lostWork = new Map<string, LostBackgroundWork>();
+  readonly #lostWork = new Map<string, { runtime: ThreadRuntime; work: LostBackgroundWork }>();
   #running = false;
   #scope = Scope.makeUnsafe();
   #weeklyLimitKey = "seven_day";
@@ -852,9 +852,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         threadId: runtime.id,
         running: runtime.backgroundTasks > 0,
         ...(closed ? { closed } : {}),
-        ...(closed && this.#lostWork.has(runtime.id) ? { lost: true } : {}),
+        ...(closed && this.#claimsLostWork(runtime) ? { lost: true } : {}),
       },
     });
+  }
+
+  #claimsLostWork(runtime: ThreadRuntime): boolean {
+    const lost = this.#lostWork.get(runtime.id);
+    if (lost && lost.runtime !== runtime) this.#lostWork.delete(runtime.id);
+    return lost?.runtime === runtime;
   }
 
   wakesAfterBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
@@ -869,7 +875,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#lostWork.delete(threadId);
     if (!lost || !this.#running || !this.#threads.isReleased(threadId)) return;
     yield* this.#threads
-      .startTurn(threadId, () => this.#openLostWorkTurn(threadId, lost))
+      .startTurn(threadId, () => this.#openLostWorkTurn(threadId, lost.work))
       .pipe(toProviderClientOperationError);
   });
 
@@ -881,7 +887,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     const runtime = this.#threads.get(threadId);
     if (!runtime || runtime.activeTurn) return;
-    runtime.endedTaskTurns = [...lost.origins];
+    runtime.endedTaskTurns = [...runtime.endedTaskTurns, ...lost.origins];
     const turnId = randomUUID();
     const turn = this.#beginTurn(runtime, turnId, true);
     takePrompt(runtime, turnId);
@@ -2004,7 +2010,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       { threadId: runtime.id, error: redactText(String(error)) },
     );
     const lost = lostBackgroundWork(runtime);
-    if (lost) this.#lostWork.set(runtime.id, lost);
+    if (lost) this.#lostWork.set(runtime.id, { runtime, work: lost });
     yield* runtime.config.persistSession
       ? this.#threads.releaseNow(runtime)
       : Effect.forkIn(this.#threads.close(runtime), this.#scope, { startImmediately: true });
