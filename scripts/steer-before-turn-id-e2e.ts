@@ -219,10 +219,10 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
 
 const report: {
   standInEvents?: string[];
-  steerStatusWhileStarting?: string;
+  steerStatusWhileStarting?: string | null;
   activeTurnWhileStarting?: string | null;
   turnStarts?: number;
-  steerStatus?: string;
+  steerStatus?: string | null;
   steerFallback?: string | null;
   failedStop?: { refused: string; standInEvents: string[]; turnStarts: number; steerFallback: string | null };
   passed: boolean;
@@ -317,7 +317,7 @@ try {
   const steer = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: STEER }));
   const steerId = steer.deliveries[0]?.id;
   assert.ok(steerId, "The second message has a delivery.");
-  report.steerStatusWhileStarting = delivery(steerId)?.status;
+  report.steerStatusWhileStarting = delivery(steerId)?.status ?? null;
   report.activeTurnWhileStarting = (await live()).activeTurnId;
   assert.equal(report.steerStatusWhileStarting, "queued", "The second message waits while the turn starts.");
   assert.equal(report.activeTurnWhileStarting, null, "The turn has no id while it starts.");
@@ -334,7 +334,7 @@ try {
     "The second message joins the running turn.",
   );
   report.turnStarts = turnStarts;
-  report.steerStatus = delivery(steerId)?.status;
+  report.steerStatus = delivery(steerId)?.status ?? null;
   report.steerFallback = delivery(steerId)?.steerFallback ?? null;
   assert.equal(report.turnStarts, 2, "The second message starts no turn of its own.");
   assert.equal(report.steerFallback, null, "The second message does not fall back to the queue.");
