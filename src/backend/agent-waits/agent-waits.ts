@@ -217,8 +217,10 @@ export class AgentWaits {
   }
 
   #requestChatOf(wait: AgentWait): string | null | undefined {
-    if (this.#mailbox.taskIdForDelivery(wait.requestMessageId) === null) return null;
-    return this.#sideThreadOf(wait) ?? undefined;
+    if (!this.#mailbox.getDelivery(wait.requestMessageId)) return undefined;
+    const taskId = this.#mailbox.taskIdForDelivery(wait.requestMessageId);
+    if (taskId === null) return null;
+    return this.#hooks.isSideThread(wait.agentId, taskId) ? taskId : undefined;
   }
 
   #sideThreadOf(wait: AgentWait): string | null {

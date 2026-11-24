@@ -1138,7 +1138,7 @@ export class RoutineScheduler implements RoutineDueSource {
         this.#waits.wakeForRun(run, deliveryId, waitId, thread?.taskId ?? null),
       );
       for (const [taskId, waitIds] of inRequestChats)
-        yield* this.#wakeInRequestChat(run, agent.id, taskId, waitIds, deliveryId);
+        yield* this.#wakeInRequestChat(run, agent, taskId, waitIds, deliveryId);
       if (thread) {
         yield* routineStep(() => {
           this.#hooks.emitQueue(agent.id);
@@ -1175,11 +1175,12 @@ export class RoutineScheduler implements RoutineDueSource {
   readonly #wakeInRequestChat = Effect.fn("RoutineScheduler.wakeInRequestChat")(function* (
     this: RoutineScheduler,
     run: RoutineRun,
-    agentId: string,
+    agent: { id: string; threadId: string | null },
     taskId: string | null,
     waitIds: readonly string[],
     runDeliveryId: string,
   ) {
+    const agentId = agent.id;
     const keepInRun = (failure: { cause: unknown }) =>
       Effect.sync(() => {
         logger.warn("Could not continue open waits in the chat of their request.", { agentId, error: failure.cause });
@@ -1208,6 +1209,11 @@ export class RoutineScheduler implements RoutineDueSource {
     yield* routineStep(() => {
       this.#waits.markWoken(agentId, waitIds, wokenIn);
       if (wokenIn === runDeliveryId) return;
+      if (taskId === null) {
+        const snapshot = this.#conversation.ensureSnapshot(agentId, agent.threadId);
+        this.#hooks.syncMailboxMessages(snapshot);
+        this.#conversation.emitConversation(snapshot);
+      }
       this.#hooks.emitQueue(agentId);
       this.#hooks.scheduleDrain(agentId);
     }).pipe(Effect.catch(keepInRun));
