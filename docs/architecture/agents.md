@@ -1170,9 +1170,9 @@ starts a new turn with the steer. The aborted result does not list the steer's u
 result of the steer's turn completes it. A stop from the person (`stopRequested`) still ends the turn
 as interrupted. While a question, an elicitation or a write approval waits for the person
 (`personRequests`), the steer has no priority: the open card stays the one that Claude waits for, and
-the steer arrives after the answer. A steer from another agent or a routine has no priority either
-(`waitsForRunningTools`, #15730): only the person's message stops the running tools and subagents,
-and a teammate message waits until the running tool call ends. A shell command that runs one script cannot change its plan: the
+the steer arrives after the answer. A message from another agent or a routine that the busy-message mode steers has no priority either
+(`waitsForRunningTools`, #15730): it waits until the running tool call ends, and does not stop the
+tools or subagents. A message that the person sends or steers from the queue still stops them. A shell command that runs one script cannot change its plan: the
 steer reaches the model when the script is done. `scripts/claude-steer-now-e2e.ts` checks the turn
 with a stand-in CLI, `scripts/question-steer-order-e2e.ts` checks the order during a question, and
 `scripts/steer-framing-bench.ts` measures the real CLIs.
