@@ -2697,7 +2697,9 @@ export class BrowserHost {
       const call = yield* browserSync(() => parseBrowserToolCall(params.tool, params.arguments));
       if ("tabId" in call.args) calledTabId = call.args.tabId;
       yield* browserSync(() => this.#controls.begin(params, call));
-      return { result: yield* runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks) };
+      const run = runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks);
+      if (calledTabId === undefined || call.tool === "run_script") return { result: yield* run };
+      return { result: yield* Effect.raceFirst(run, this.#pageCrashFailure(calledTabId)) };
     })
       .pipe(
         Effect.provideService(BrowserToolHold, (tabId: string) => this.#heldByUser(tabId)),
@@ -4271,12 +4273,29 @@ export class BrowserHost {
       const contents = this.#tabs.get(tabId)?.contents;
       if (!contents || contents.isDestroyed()) return;
       const gone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails) => {
-        if (details.reason !== "clean-exit" && !this.#tabs.get(tabId)?.endingSilentPage)
+        const tab = this.#tabs.get(tabId);
+        if (details.reason !== "clean-exit" && tab && !tab.closing && !tab.endingSilentPage)
           resume(Effect.succeed({ status: "page_crashed" }));
       };
       contents.on("render-process-gone", gone);
       return Effect.sync(() => contents.off("render-process-gone", gone));
     });
+  }
+
+  #pageCrashFailure(tabId: string): Effect.Effect<never, BrowserOperationError> {
+    return this.#rendererGone(tabId).pipe(
+      Effect.flatMap(() =>
+        Effect.fail(
+          browserFailure(
+            new Error(
+              this.#tabs.get(tabId)?.pendingRestore === undefined
+                ? BROWSER_PAGE_CRASH_KEPT
+                : BROWSER_PAGE_CRASH_RELOADED,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   readonly #requireTab = Effect.fn("BrowserHost.requireTab")(function* (this: BrowserHost, tabId: string) {
