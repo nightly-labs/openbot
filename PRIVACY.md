@@ -618,8 +618,9 @@ the name with the sandbox.
 
 A new hosted server of each plan starts on a virtual server that OpenBot rents from
 [Leaseweb](https://www.leaseweb.com) when one is free at the purchase. For a purchase in euros or
-złotys, it is in Amsterdam, the Netherlands. For a purchase in US dollars or Brazilian reais, it is
-near Washington, D.C., in the United States, or in Amsterdam when none is free there. When no
+złotys, it is in Amsterdam, the Netherlands, or in Frankfurt, Germany, when none is free in
+Amsterdam. For a purchase in US dollars or Brazilian reais, it is near Washington, D.C., in the
+United States, or in Amsterdam or Frankfurt when none is free there. When no
 virtual server is free, the server starts in a boat sandbox. An operator can also move a
 server from boat to such a virtual server: the operator copies the server's disk over SSH, and
 deletes the copy after the move. The virtual server holds the server's
