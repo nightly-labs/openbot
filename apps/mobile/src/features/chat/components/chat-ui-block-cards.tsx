@@ -90,6 +90,11 @@ export function QuestionText({ question, variant }: { question: string; variant:
   );
 }
 
+export function QuestionDetail({ detail }: { detail: string }) {
+  const secondaryColor = useCSSVariable("--openbot-text-secondary");
+  return <ChatMarkdown body={detail} color={String(secondaryColor)} compact finished />;
+}
+
 export function PromptStatus({ controller, canSend }: { controller: QuestionPromptController; canSend: boolean }) {
   const { t } = useText();
   const { pending, failedAnswers, disabled, submit } = controller;
