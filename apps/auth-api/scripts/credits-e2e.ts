@@ -1828,6 +1828,16 @@ async function creditCodes() {
     (await failure(redeem(busy, open, { from: network(31) }))).code === "credit_code_attempts" &&
       (await limitedBy("account_tries")) === 1,
   );
+  for (let attempt = 0; attempt < CREDIT_CODE_LIMITS.network_tries; attempt += 1) {
+    await failure(redeem(busy, open, { from: busyNetwork }));
+  }
+  const [busyNeighbour] = addUsers("busy-neighbour", 1);
+  const busyNeighbourWon = await Effect.runPromise(redeem(busyNeighbour ?? "", open, { from: busyNetwork }));
+  check(
+    "tries that an account limit refuses do not count against the network",
+    busyNeighbourWon.credits === 1,
+    busyNeighbourWon,
+  );
 
   clearLimits();
   const flood = addUsers("flood", CREDIT_CODE_LIMITS.network_tries / CREDIT_CODE_LIMITS.account_tries + 1);

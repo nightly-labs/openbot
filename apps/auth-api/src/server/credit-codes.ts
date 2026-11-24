@@ -137,6 +137,13 @@ const BUMP_SQL = `INSERT INTO credit_code_limits(key_hash, window_start, count) 
 
 const COUNT_SQL = "SELECT count FROM credit_code_limits WHERE key_hash = ?1 AND window_start = ?2";
 
+const NETWORK_TRIES_SQL = `INSERT INTO credit_code_limits(key_hash, window_start, count)
+  SELECT ?1, ?2, 1
+   WHERE COALESCE((SELECT count FROM credit_code_limits WHERE key_hash = ?3 AND window_start = ?2), 0) <= ?5
+     AND COALESCE((SELECT count FROM credit_code_limits WHERE key_hash = ?4 AND window_start = ?2), 0) < ?6
+  ON CONFLICT(key_hash, window_start) DO UPDATE SET count = count + 1
+  RETURNING count`;
+
 function codeSql(match: "code_hash" | "code_id"): string {
   return `SELECT c.code_id, c.credits_tenths, c.max_redemptions, c.redemptions, c.expires_at, c.disabled_at, c.campaign,
          EXISTS (SELECT 1 FROM credit_code_redemptions r WHERE r.code_id = c.code_id AND r.user_id = ?2) AS redeemed
@@ -201,11 +208,21 @@ export const redeemCreditCode = Effect.fn("CreditCodes.redeem")(function* (
   const bump = (keyHash: string) => database.prepare(BUMP_SQL).bind(keyHash, window);
   const counted = (keyHash: string) => database.prepare(COUNT_SQL).bind(keyHash, window);
 
-  const [accountTries, networkTries, accountWrong, networkWrong] = yield* billingCall(() =>
+  const networkTriesBump = database
+    .prepare(NETWORK_TRIES_SQL)
+    .bind(
+      keys.networkTries,
+      window,
+      keys.accountTries,
+      keys.accountWrong,
+      CREDIT_CODE_LIMITS.account_tries,
+      CREDIT_CODE_LIMITS.account_wrong,
+    );
+  const [accountTries, accountWrong, networkTries, networkWrong] = yield* billingCall(() =>
     database.batch<{ count: number }>([
       bump(keys.accountTries),
-      bump(keys.networkTries),
       counted(keys.accountWrong),
+      networkTriesBump,
       counted(keys.networkWrong),
     ]),
   );
