@@ -860,7 +860,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         (server.kind !== "remote" ||
           Boolean(server.compatibility?.capabilities.includes(TEAM_MESSAGE_CLIENT_ID_CAPABILITY))));
     const voiceRecordingDraftId = voice?.recordingDraftId ?? null;
-    const dictatedSent = claimDictatedSend(target, text);
+    const dictatedSent = claimDictatedSend(target);
     deps.pendingSends.add(target, { draft, text, retrySafe, voiceRecordingDraftId, queued }, async (pending) => {
       rememberAttachmentKinds(pending.draft.attachments);
       const result = await send(

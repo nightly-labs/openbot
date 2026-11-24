@@ -47,7 +47,7 @@ interface VoiceSubmitHooks {
 
 type VoiceStoreProps = Pick<ConversationProps, "runtime"> & {
   agent: Pick<NonNullable<ConversationProps["agent"]>, "id"> | undefined;
-  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id" | "replyView"> | undefined;
+  channel?: Pick<NonNullable<ConversationProps["channel"]>, "id"> | undefined;
   server: Pick<NonNullable<ConversationProps["server"]>, "id"> | undefined;
 };
 
@@ -421,11 +421,10 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
       const draft = submitRequest?.draft ?? deps.drafts()[composerDraftKey(recordingTarget)] ?? EMPTY_DRAFT;
       const transcribedDraft = { ...draft, text: appendVoiceTranscript(draft.text, result.text) };
       const spokenReply = !deps.props.runtime;
-      const channelReplies = (agentId: string) =>
-        deps.props.channel?.id === agentId ? { channelReplies: deps.props.channel.replyView } : undefined;
+      const inChannel = (agentId: string) => ({ channel: deps.props.channel?.id === agentId });
       if (submitRequest) {
         const target = { agentId: submitRequest.agentId, serverId: submitRequest.serverId };
-        if (spokenReply) noteDictatedMessage(target, result.text, channelReplies(target.agentId));
+        if (spokenReply) noteDictatedMessage(target, result.text, inChannel(target.agentId));
         let delivered: boolean;
         if (submitRequest.queuedEdit) {
           delivered = await deps.hooks.saveEdit(
@@ -444,7 +443,7 @@ export function createVoiceStore(deps: VoiceStoreDeps) {
           deps.hooks.restoreTranscript(target, result.text);
         }
       } else {
-        if (spokenReply) noteDictatedMessage(recordingTarget, result.text, channelReplies(targetAgentId));
+        if (spokenReply) noteDictatedMessage(recordingTarget, result.text, inChannel(targetAgentId));
         const key = composerDraftKey(recordingTarget);
         deps.setDrafts((current) => ({ ...current, [key]: transcribedDraft }));
         if (atLimit) deps.setVoiceLimitReached?.(recordingTarget, true);

@@ -2540,7 +2540,7 @@ export function createConversationViewScope(props: ConversationProps) {
       serverOnline: () => props.server?.kind !== "remote" || props.server.state === "online",
       progressUpdate: (message) => !channel && isNarrationItemId(message.id, props.agent?.provider),
       keepsRecording: !channel,
-      channelReplies: channel?.replyView,
+      inChannel: Boolean(channel),
     });
 
   return {

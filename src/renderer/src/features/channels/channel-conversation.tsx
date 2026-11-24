@@ -146,7 +146,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
     const current = page();
     return current ? activeChannelRuns(current) : [];
   });
-  const replyView = createMemo(() => ({ messages: page()?.messages ?? [], activeTaskIds: activeRuns() }));
+  const replyView = createMemo(() => ({ messages: page()?.messages ?? [], tasks: page()?.tasks ?? [] }));
   const voiceAgent = createMemo(() => {
     const current = page();
     if (!current) return undefined;

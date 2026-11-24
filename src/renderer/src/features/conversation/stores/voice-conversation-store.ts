@@ -18,7 +18,6 @@ import { desktopAnalytics } from "../../../analytics";
 import { holdSpeech, releaseSpeech, SPEECH_LEVEL_COUNT, speechReading } from "../../speech/speech-playback";
 import { speechPort } from "../../speech/speech-port";
 import {
-  type ChannelReplyView,
   dropDictatedReply,
   forgetDictatedMessage,
   noteDictatedMessage,
@@ -90,7 +89,7 @@ export interface VoiceConversationDeps {
   serverOnline: () => boolean;
   progressUpdate: (message: ConversationMessage) => boolean;
   keepsRecording: boolean;
-  channelReplies?: (() => ChannelReplyView) | undefined;
+  inChannel: boolean;
 }
 
 interface Recording {
@@ -682,7 +681,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       noteDictatedMessage(target, text, {
         always: true,
         progressUpdate: deps.progressUpdate,
-        channelReplies: deps.channelReplies,
+        channel: deps.inChannel,
       });
       delivered = await deps.submit({ ...EMPTY_DRAFT, text }, target, EMPTY_DRAFT, {
         recordingDraftId: recordingId,
