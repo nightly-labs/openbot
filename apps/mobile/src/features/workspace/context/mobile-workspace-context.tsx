@@ -1601,13 +1601,13 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     setActiveServerId(online.id);
   }, [servers, activeServerId, startupWaitOver, sortByPreference, conversationStore]);
 
-  const finishedChatLoads = useRef({ queue: Promise.resolve(), waiting: new Set<string>() });
+  const finishedChatLoads = useRef({ queues: new Map<string, Promise<void>>(), waiting: new Set<string>() });
   const loadFinishedChat = useCallback(
     (agentId: string, serverId: string) => {
       const loads = finishedChatLoads.current;
       if (loads.waiting.has(agentId)) return;
       loads.waiting.add(agentId);
-      loads.queue = loads.queue
+      const queue = (loads.queues.get(serverId) ?? Promise.resolve())
         .then(() => {
           loads.waiting.delete(agentId);
           if (!foregroundRef.current || !conversationStore.get(agentId) || conversationStore.isUpToDate(agentId))
@@ -1615,6 +1615,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return loadConversation(agentId, serverId).then(() => undefined);
         })
         .catch(() => undefined);
+      loads.queues.set(serverId, queue);
     },
     [conversationStore, loadConversation],
   );
