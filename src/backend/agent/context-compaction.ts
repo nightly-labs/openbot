@@ -14,6 +14,7 @@ import { causeHelpers } from "../effect-boundary";
 import { decodeRecordResponse, getRecord } from "../protocol";
 import { finiteNumberOrNull } from "./account-usage";
 import { CacheExpiryCompaction } from "./cache-expiry-compaction";
+import type { FailureContext } from "./failure-signal";
 import type { ProviderPort } from "./provider-runtime";
 import type { ThreadOperationFailed } from "./thread-lifecycle";
 
@@ -77,7 +78,7 @@ export interface ContextCompactionOptions {
   cacheExpiryEnabled?: (() => boolean) | undefined;
   store: AgentStore;
   providers: ProviderPort;
-  emitError(code: string, error: unknown, agentId?: string): void;
+  emitError(code: string, error: unknown, agentId?: string, context?: FailureContext): void;
   scheduleDrain(agentId: string): void;
   rotateSession(
     agentId: string,
@@ -123,7 +124,7 @@ interface RefusalHold {
 export class ContextCompaction {
   readonly #store: AgentStore;
   readonly #providers: ProviderPort;
-  readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #emitError: (code: string, error: unknown, agentId?: string, context?: FailureContext) => void;
   readonly #scheduleDrain: (agentId: string) => void;
   readonly #rotateSession: ContextCompactionOptions["rotateSession"];
   readonly #loadSession: ContextCompactionOptions["loadSession"];
@@ -615,7 +616,11 @@ export class ContextCompaction {
     const deadline = this.#deadlines.get(threadId);
     if (deadline === undefined || deadline - Date.now() > this.#retryTimeoutMs)
       this.#armDeadline(agentId, threadId, hold.client, this.#retryTimeoutMs);
-    this.#emitError("context_compaction_retrying", sourceText("error.backend.contextCompactionRetrying"), agentId);
+    this.#emitError("context_compaction_retrying", sourceText("error.backend.contextCompactionRetrying"), agentId, {
+      provider: hold.client.provider,
+      turnId,
+      severity: "warning",
+    });
     return true;
   }
 
@@ -633,6 +638,7 @@ export class ContextCompaction {
     if (budget && status !== "completed") {
       budget.lastCompactedTokens = budget.usedTokens;
       if (budget.phase !== "stopping") {
+        logger.warn("A compaction turn did not complete.", { status });
         this.#emitError("context_compaction_failed", sourceText("error.backend.contextCompactionFailed"), agentId);
         this.#countFailure(threadId, agentId);
       }
