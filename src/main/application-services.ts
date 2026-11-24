@@ -2321,6 +2321,7 @@ export async function createApplicationServices({
     updateAgent: (input) => service.updateAgent(input),
     clearAgentContext: (agentId) => service.clearAgentContext(agentId),
   });
+  await Effect.runPromise(automation.removeStaleFiles());
   service.on("event", (event) => {
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });

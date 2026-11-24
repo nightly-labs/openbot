@@ -125,6 +125,10 @@ export class AutomationServer {
     yield* Effect.forkIn(this.sync(), this.#scope, { startImmediately: true });
   }).bind(this);
 
+  readonly removeStaleFiles = Effect.fn("AutomationServer.removeStaleFiles")(function* (this: AutomationServer) {
+    yield* this.#step(Effect.suspend(() => (this.#server ? Effect.void : this.#close())));
+  }).bind(this);
+
   readonly stop = Effect.fn("AutomationServer.stop")(function* (this: AutomationServer) {
     this.#stopped = true;
     yield* Scope.close(this.#scope, Exit.void);
