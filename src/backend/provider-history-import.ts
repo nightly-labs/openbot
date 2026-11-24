@@ -204,9 +204,21 @@ export function compactImportedProviderHistory(
   return Effect.gen(function* () {
     const result = { rows: 0, bytes: 0, batches: 0 };
     let afterRowId = 0;
+    let busyRetries = 0;
     for (;;) {
       const batch = yield* providerSync(() => database.compactImportedProviderHistory(afterRowId));
       if (batch.lastRowId === null) return result;
+      if (batch.lastRowId === afterRowId) {
+        if (busyRetries >= 20) {
+          return yield* Effect.fail(
+            providerFailure(new Error("Provider history compaction could not acquire the SQLite write lock.")),
+          );
+        }
+        busyRetries++;
+        yield* Effect.sleep(Duration.millis(250));
+        continue;
+      }
+      busyRetries = 0;
       result.rows += batch.rows;
       result.bytes += batch.bytes;
       result.batches += 1;
