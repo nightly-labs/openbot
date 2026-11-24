@@ -275,7 +275,16 @@ function AuthenticatedStack() {
     },
     [targetSources],
   );
-  useNotificationTaps(openTarget, onScreen);
+  const openWorkflows = useCallback(
+    (serverId: string) =>
+      whenUnlocked(() => {
+        closeDrawer();
+        if (router.canDismiss()) router.dismissAll();
+        router.push({ pathname: "/server-workflows", params: { serverId } });
+      }),
+    [closeDrawer],
+  );
+  useNotificationTaps(openTarget, onScreen, openWorkflows);
 
   return (
     <Stack

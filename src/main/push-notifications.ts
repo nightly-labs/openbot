@@ -5,6 +5,7 @@ import {
   type ConversationMessage,
   latestTurnAnswer,
   type ServerNotificationLevel,
+  type WorkflowGraph,
 } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
 import {
@@ -15,6 +16,7 @@ import {
 } from "@openbot/contracts/notification-relay";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
+import { PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-workflows-v1";
 import { resolveLocale, translateFor } from "@openbot/i18n";
 import { redactText, toLogValue } from "@openbot/logging";
 import {
@@ -25,6 +27,7 @@ import {
   notificationForAgentEvent,
   notificationForSignInWait,
   type ProviderSignInWaitNotice,
+  plainPreview,
   teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
@@ -43,6 +46,7 @@ import { Effect, Exit, Fiber, Result, Schema, Scope } from "effect";
 import type { ProviderSignInWait, ProviderSignInWaits } from "../backend/agent/provider-sign-in-waits";
 import { isNoUpdateAnswer } from "../backend/agent/routine-quiet-runs";
 import type { AgentService } from "../backend/agent-service";
+import type { WorkflowNotice } from "../backend/workflows/workflows";
 import type { PushNotificationStore, PushTarget, StoredPushRegistration } from "./push-notification-store";
 import type { TeamApiAgents } from "./team-api/dependencies";
 import { markerExclusionsForCapabilities } from "./team-api/request-helpers";
@@ -64,11 +68,26 @@ type PushNotificationAgents = Pick<
 > &
   Pick<AgentService, "readTask">;
 
-type PushNotice = AgentEvent | ProviderSignInWaitNotice;
+interface WorkflowPushNotice {
+  type: "workflow-notice";
+  notice: WorkflowNotice;
+}
+
+type PushNotice = AgentEvent | ProviderSignInWaitNotice | WorkflowPushNotice;
+
+export type WorkflowPushNeed = "view" | "chat";
+
+export interface WorkflowNoticeSource {
+  on(event: "notice", listener: (notice: WorkflowNotice) => void): unknown;
+  off(event: "notice", listener: (notice: WorkflowNotice) => void): unknown;
+}
 
 interface PushNotificationOptions {
   agents: PushNotificationAgents;
   signInWaits?: Pick<ProviderSignInWaits, "on" | "off">;
+  workflowNotices?: WorkflowNoticeSource;
+  workflowGraph?(workflowId: string): Effect.Effect<WorkflowGraph | null>;
+  workflowAllows?(viewer: PushNotificationViewer, graph: WorkflowGraph, need: WorkflowPushNeed): boolean;
   store: Pick<PushNotificationStore, "list" | "replace">;
   send(request: NotificationRelayRequest): Effect.Effect<"sent" | "gone", PushNotificationSendFailure>;
   hiddenAgentIds(protocol: number, capabilities: ReadonlySet<string>, memberId: string): ReadonlySet<string>;
@@ -92,7 +111,7 @@ interface PushNotificationOptions {
   logger?: { warn(message: string, ...values: unknown[]): void };
 }
 
-interface PushNotificationViewer {
+export interface PushNotificationViewer {
   memberId: string;
   protocol: number;
   capabilities: ReadonlySet<string>;
@@ -131,6 +150,10 @@ export class PushNotificationService {
   readonly #signInListener = (wait: ProviderSignInWait) => {
     const notice: ProviderSignInWaitNotice = { type: "provider-sign-in-wait", ...wait };
     Effect.runFork(this.#deliver(notice).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
+  };
+  readonly #workflowListener = (notice: WorkflowNotice) => {
+    const received: WorkflowPushNotice = { type: "workflow-notice", notice };
+    Effect.runFork(this.#deliver(received).pipe(Effect.forkIn(this.#scope, { startImmediately: true })));
   };
   #scope = Scope.makeUnsafe();
   #listening = false;
@@ -227,6 +250,7 @@ export class PushNotificationService {
     if (this.#listening) {
       this.#options.agents.off("event", this.#listener);
       this.#options.signInWaits?.off("signInWait", this.#signInListener);
+      this.#options.workflowNotices?.off("notice", this.#workflowListener);
     }
     this.#listening = false;
     for (const registration of this.#registrations.values()) this.#dropHeld(registration);
@@ -258,6 +282,7 @@ export class PushNotificationService {
     only?: Registration,
   ) {
     if (received.type === "provider-sign-in-wait") return yield* this.#deliverSignInWait(received, only);
+    if (received.type === "workflow-notice") return yield* this.#deliverWorkflowNotice(received, only);
     if (teammateTurnCompleted(received)) return;
     const thread = received.type === "thread-turn-completed" ? received : null;
     const event = thread ? thread.turn : received;
@@ -376,10 +401,49 @@ export class PushNotificationService {
     }
   });
 
+  #deliverWorkflowNotice = Effect.fn("PushNotifications.deliverWorkflowNotice")(function* (
+    this: PushNotificationService,
+    received: WorkflowPushNotice,
+    only?: Registration,
+  ) {
+    const { notice } = received;
+    const graph = yield* this.#options.workflowGraph?.(notice.workflowId) ?? Effect.succeed(null);
+    const allows = this.#options.workflowAllows;
+    if (!graph || !allows) return;
+    const approval = notice.kind === "approval";
+    const now = this.#now();
+    const targets = (only ? [only] : [...this.#registrations.values()]).filter((registration) => {
+      const { memberId, protocol } = registration.stored;
+      return (
+        registration.capabilities.has(PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY) &&
+        allows({ memberId, protocol, capabilities: registration.capabilities }, graph, approval ? "chat" : "view") &&
+        this.#reaches(registration, received, null, { desktopNotifies: true, hostEvent: null, now, only })
+      );
+    });
+    for (const registration of targets) {
+      const { stored } = registration;
+      const { value, memberId } = stored;
+      if (stored.platform !== "android" && value.token === null) continue;
+      const level = this.#options.memberLevels?.(memberId).server ?? value.level;
+      if (approval ? level === "nothing" : level !== "all") continue;
+      const translate = translateFor(resolveLocale("system", value.locale));
+      const fallback = approval ? translate("notification.workflowApproval") : translate("notification.workflowOutput");
+      const content: PushNotificationContent = {
+        serverId: value.serverId,
+        agentId: notice.workflowId,
+        threadId: null,
+        kind: "workflow",
+        title: redactText(notice.workflowTitle).trim(),
+        body: (value.preview && plainPreview(redactText(notice.text))) || fallback,
+      };
+      yield* this.#send(registration, content, fallback).pipe(Effect.forkIn(this.#scope, { startImmediately: true }));
+    }
+  });
+
   #reaches(
     registration: Registration,
     received: PushNotice,
-    agentId: string,
+    agentId: string | null,
     delivery: { desktopNotifies: boolean; hostEvent: AgentEvent | null; now: number; only: Registration | undefined },
   ): boolean {
     const { value, memberId, protocol, sessionId } = registration.stored;
@@ -393,7 +457,8 @@ export class PushNotificationService {
       this.remove(sessionId);
       return false;
     }
-    if (this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(agentId)) return false;
+    if (agentId !== null && this.#options.hiddenAgentIds(protocol, registration.capabilities, memberId).has(agentId))
+      return false;
     const used = delivery.desktopNotifies
       ? this.#lastUseElsewhere(memberId, sessionId)
       : this.#options.lastUseElsewhere(memberId, sessionId);
@@ -538,6 +603,7 @@ export class PushNotificationService {
     if (this.#listening) return;
     this.#options.agents.on("event", this.#listener);
     this.#options.signInWaits?.on("signInWait", this.#signInListener);
+    this.#options.workflowNotices?.on("notice", this.#workflowListener);
     this.#listening = true;
   }
 }

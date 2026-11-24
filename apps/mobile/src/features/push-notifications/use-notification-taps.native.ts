@@ -5,6 +5,7 @@ import type { NotificationTarget } from "./push-notifications-native.types";
 type UseNotificationTaps = (
   open: (target: NotificationTarget) => void,
   onScreen: (target: NotificationTarget) => boolean,
+  openWorkflows: (serverId: string) => void,
 ) => void;
 
 function load(): { installNotificationHandler: () => void; useNotificationTaps: UseNotificationTaps } {
