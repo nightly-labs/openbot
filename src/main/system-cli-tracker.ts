@@ -23,7 +23,6 @@ export function createSystemCliTracker({
   hosted,
   server,
 }: SystemCliTrackerDependencies): (status: Pick<AgentStatus, "providers">) => void {
-  const started = new Set<ManagedProviderId>();
   const resolvesAsMissing = (provider: "claude" | "codex") =>
     (provider === "claude" ? resolveClaudeCli : resolveCodexCli)({
       bundledExecutable: runtimes.executablePath(provider),
@@ -41,37 +40,49 @@ export function createSystemCliTracker({
       return resolvesAsMissing(provider.id);
     return null;
   };
+  const hostedStarted = new Set<ManagedProviderId>();
+  const incompleteStarted = new Set<ManagedProviderId>();
   const replacesIncompleteCli = (
     provider: AgentProviderStatus,
     runtime: ManagedProviderId,
-    used: ReadonlySet<string>,
+    used: () => ReadonlySet<string>,
   ) =>
     provider.cliIncomplete === true &&
-    used.has(runtime) &&
+    !incompleteStarted.has(runtime) &&
     !providerUse.installed().includes(runtime) &&
-    runtimes.getStatus().providers[runtime].phase === "not-downloaded";
-  const serverCliDownload = (provider: AgentProviderStatus, runtime: ManagedProviderId, used: ReadonlySet<string>) => {
-    if (replacesIncompleteCli(provider, runtime, used)) return Effect.succeed(true);
-    return hosted ? hostedCliDownload(provider, used) : null;
+    runtimes.getStatus().providers[runtime].phase === "not-downloaded" &&
+    used().has(runtime);
+  const startDownload = (runtime: ManagedProviderId, needsDownload: Effect.Effect<boolean>) => {
+    Effect.runFork(
+      needsDownload.pipe(
+        Effect.flatMap((download) => (download ? runtimes.download(runtime) : Effect.void)),
+        Effect.ignore,
+      ),
+    );
   };
   return (status) => {
     let copyInUse = false;
-    const used = server ? agentProviders() : null;
+    let usedProviders: ReadonlySet<string> | null = null;
+    const used = () => {
+      usedProviders ??= agentProviders();
+      return usedProviders;
+    };
     for (const provider of status.providers ?? []) {
       if (!isManagedRuntimeProvider(provider.id)) continue;
+      const runtime = provider.id;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      if (runtimes.setSystemVersion(provider.id, version, provider.cliIncomplete === true)) copyInUse = true;
-      const needsDownload = used === null ? null : serverCliDownload(provider, provider.id, used);
-      if (needsDownload !== null && !started.has(provider.id) && !providerUse.off().includes(provider.id)) {
-        started.add(provider.id);
-        const runtime = provider.id;
-        Effect.runFork(
-          needsDownload.pipe(
-            Effect.flatMap((download) => (download ? runtimes.download(runtime) : Effect.void)),
-            Effect.ignore,
-          ),
-        );
+      if (runtimes.setSystemVersion(runtime, version, provider.cliIncomplete === true)) copyInUse = true;
+      if (!server || providerUse.off().includes(runtime)) continue;
+      if (replacesIncompleteCli(provider, runtime, used)) {
+        incompleteStarted.add(runtime);
+        startDownload(runtime, Effect.succeed(true));
+        continue;
       }
+      if (!hosted || hostedStarted.has(runtime)) continue;
+      const needsDownload = hostedCliDownload(provider, used());
+      if (needsDownload === null) continue;
+      hostedStarted.add(runtime);
+      startDownload(runtime, needsDownload);
     }
     if (copyInUse) Effect.runFork(runtimes.providerUseChanged());
   };
