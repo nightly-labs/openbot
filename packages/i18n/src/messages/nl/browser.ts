@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Browsertabblad sluiten",
   "browser.newTab": "Nieuw browsertabblad",
   "browser.backToChat": "Terug naar chat",
+  "browser.fullView.open": "Openen in volledige weergave",
   "browser.goBack": "Terug",
   "browser.goForward": "Vooruit",
   "browser.reload": "Pagina opnieuw laden",

@@ -30,7 +30,7 @@ export function SettingsPanel(props: SettingsPanelProps): JSX.Element {
   const { t } = useText();
   let panel!: HTMLElement;
   onSettled(() => {
-    const conversation = panel.closest(".conversation-panel");
+    const conversation = panel.closest("[data-side-split]") ? null : panel.closest(".conversation-panel");
     return conversation ? holdFlag(conversation, "settings-panel") : undefined;
   });
   return (

@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "关闭浏览器标签页",
   "browser.newTab": "新建浏览器标签页",
   "browser.backToChat": "返回聊天",
+  "browser.fullView.open": "在完整视图中打开",
   "browser.goBack": "后退",
   "browser.goForward": "前进",
   "browser.reload": "刷新页面",
