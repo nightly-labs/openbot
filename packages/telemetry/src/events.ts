@@ -262,7 +262,7 @@ export function classifyFailure(error: unknown): CauseCode {
   )
     return "provider_unavailable";
   if (
-    /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|maximum context length|prompt is too long|too many (?:input )?tokens(?![^.]{0,40}\b(?:wait|per (?:minute|second|day)))|input token count\b.{0,80}\bexceeds)\b/iu.test(
+    /\b(?:context[ _-]?(?:length|window)[ _-]?exceeded|context[ _-]overflow|exceeds the context window|maximum context length|prompt is too long|too many (?:input )?tokens(?![^.]{0,40}\b(?:wait|per (?:minute|second|day)))|input token count\b.{0,80}\bexceeds)\b/iu.test(
       message,
     )
   )
