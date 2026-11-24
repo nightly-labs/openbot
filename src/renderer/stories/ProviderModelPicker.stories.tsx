@@ -366,11 +366,11 @@ interface PoolChoice {
   account: string | undefined;
 }
 
-function PoolPicker(props: { leftOut: string[]; account?: string }) {
+function PoolPicker(props: { leftOut: string[] }) {
   const [choice, setChoice] = createSignal<PoolChoice>({
     provider: "claude",
     model: "claude-opus-5-5",
-    account: props.account,
+    account: undefined,
   });
   const nextAccount = (provider: AgentProviderId, accountId: string | null | undefined) => {
     if (accountId === undefined) return provider === choice().provider ? choice().account : undefined;
