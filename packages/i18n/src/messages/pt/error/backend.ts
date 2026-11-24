@@ -438,6 +438,8 @@ export const messages = {
     "O certificado de segurança deste site não é confiável, por isso a página não abriu.",
   "error.backend.browserLowMemory":
     "Este servidor está com pouca memória, por isso o navegador não pode abrir outra aba. Feche uma aba ou aguarde os outros agentes terminarem.",
+  "error.backend.browserNoMemory":
+    "Este servidor está quase sem memória, por isso o navegador não pode abrir uma aba agora. Aguarde os outros agentes terminarem e tente novamente.",
   "error.backend.browserOpenFailed": "Não foi possível abrir {url}: {reason}",
   "error.backend.popupSecureInput":
     "Pop-ups são bloqueados durante a entrada segura. Conclua ou cancele a entrada segura e tente novamente na página.",

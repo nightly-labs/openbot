@@ -441,6 +441,8 @@ export const messages = {
     "Le certificat de sécurité de ce site n’est pas fiable, la page ne s’est donc pas ouverte.",
   "error.backend.browserLowMemory":
     "Ce serveur manque de mémoire : le navigateur ne peut pas ouvrir un autre onglet. Fermez un onglet, ou attendez la fin du travail des autres agents.",
+  "error.backend.browserNoMemory":
+    "Ce serveur n'a presque plus de mémoire : le navigateur ne peut pas ouvrir d'onglet pour le moment. Attendez la fin du travail des autres agents, puis réessayez.",
   "error.backend.browserOpenFailed": "Impossible d’ouvrir {url} : {reason}",
   "error.backend.popupSecureInput":
     "Les fenêtres contextuelles sont bloquées pendant une saisie sécurisée. Terminez ou annulez la saisie sécurisée, puis réessayez depuis la page.",

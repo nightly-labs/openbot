@@ -409,6 +409,8 @@ export const messages = {
   "error.backend.browserCertificateUntrusted": "이 사이트의 보안 인증서를 신뢰할 수 없어 페이지를 열지 못했어요.",
   "error.backend.browserLowMemory":
     "이 서버의 메모리가 부족해서 브라우저에서 탭을 더 열 수 없어요. 탭을 닫거나 다른 에이전트가 끝날 때까지 기다리세요.",
+  "error.backend.browserNoMemory":
+    "이 서버의 메모리가 거의 없어서 지금은 브라우저에서 탭을 열 수 없어요. 다른 에이전트가 끝난 뒤 다시 시도하세요.",
   "error.backend.browserOpenFailed": "{url}을(를) 열 수 없어요: {reason}",
   "error.backend.popupSecureInput":
     "보안 입력 중에는 팝업이 차단돼요. 보안 입력을 마치거나 취소한 후 페이지에서 다시 시도하세요.",
