@@ -170,6 +170,7 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "empty_answer",
   "model_not_found",
   "invalid_request",
+  "provider_internal_error",
 ]);
 
 const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
