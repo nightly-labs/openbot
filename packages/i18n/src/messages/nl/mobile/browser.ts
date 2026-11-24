@@ -80,7 +80,7 @@ export const messages = {
   "mobile.browser.help.pointer": "Als een aanwijzer makkelijker is",
   "mobile.browser.help.trackpad.title": "Trackpadmodus",
   "mobile.browser.help.trackpad.body":
-    "Staat aan als de browser opent. Je vinger beweegt de aanwijzer; tik om daar te klikken, tik twee keer en houd vast om te slepen. Kies Centreer aanwijzer als die wegdrijft. Zet de modus uit in het ···-menu om te klikken waar je tikt.",
+    "Staat uit als de browser opent. Zet de modus aan in het ···-menu om met je vinger een aanwijzer te bewegen; tik om daar te klikken, tik twee keer en houd vast om te slepen. Kies Centreer aanwijzer als die wegdrijft.",
   "mobile.browser.help.handingBack": "Teruggeven",
   "mobile.browser.help.handBack.title": "Geef terug",
   "mobile.browser.help.handBack.body":

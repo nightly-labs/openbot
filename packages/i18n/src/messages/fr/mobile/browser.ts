@@ -80,7 +80,7 @@ export const messages = {
   "mobile.browser.help.pointer": "Quand un pointeur est plus simple",
   "mobile.browser.help.trackpad.title": "Mode trackpad",
   "mobile.browser.help.trackpad.body":
-    "Activé à l’ouverture du navigateur. Votre doigt déplace le pointeur ; touchez pour cliquer à cet endroit, touchez deux fois et maintenez pour faire glisser. Recentrez le pointeur s’il s’éloigne. Désactivez-le dans le menu ··· pour cliquer là où vous touchez.",
+    "Désactivé à l’ouverture du navigateur. Activez-le dans le menu ··· pour déplacer un pointeur avec votre doigt ; touchez pour cliquer à cet endroit, touchez deux fois et maintenez pour faire glisser. Recentrez le pointeur s’il s’éloigne.",
   "mobile.browser.help.handingBack": "Rendre la main",
   "mobile.browser.help.handBack.title": "Rendre la main",
   "mobile.browser.help.handBack.body":

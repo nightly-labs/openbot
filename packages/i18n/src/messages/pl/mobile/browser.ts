@@ -84,7 +84,7 @@ export const messages = {
   "mobile.browser.help.pointer": "Gdy wskaźnik jest wygodniejszy",
   "mobile.browser.help.trackpad.title": "Tryb gładzika",
   "mobile.browser.help.trackpad.body":
-    "Włączony po otwarciu przeglądarki. Palec przesuwa wskaźnik; stuknij, aby kliknąć w jego miejscu, stuknij dwukrotnie i przytrzymaj, aby przeciągnąć. Użyj „Wyśrodkuj wskaźnik”, jeśli wskaźnik się przesunie. Wyłącz tryb w menu ···, aby klikać tam, gdzie stukasz.",
+    "Wyłączony po otwarciu przeglądarki. Włącz tryb w menu ···, aby przesuwać wskaźnik palcem; stuknij, aby kliknąć w jego miejscu, stuknij dwukrotnie i przytrzymaj, aby przeciągnąć. Użyj „Wyśrodkuj wskaźnik”, jeśli wskaźnik się przesunie.",
   "mobile.browser.help.handingBack": "Oddawanie sterowania",
   "mobile.browser.help.handBack.title": "Oddaj sterowanie",
   "mobile.browser.help.handBack.body":

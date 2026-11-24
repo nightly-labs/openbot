@@ -79,7 +79,7 @@ export const messages = {
   "mobile.browser.help.pointer": "포인터가 더 편할 때",
   "mobile.browser.help.trackpad.title": "트랙패드 모드",
   "mobile.browser.help.trackpad.body":
-    "브라우저를 열면 켜져 있어요. 손가락으로 포인터를 움직이고, 탭하면 그 위치를 클릭하고, 두 번 탭한 채 누르면 드래그해요. 포인터가 밀리면 포인터 가운데로를 사용하세요. ··· 메뉴에서 끄면 탭한 위치를 바로 클릭해요.",
+    "브라우저를 열면 꺼져 있어요. ··· 메뉴에서 켜면 손가락으로 포인터를 움직이고, 탭하면 그 위치를 클릭하고, 두 번 탭한 채 누르면 드래그해요. 포인터가 밀리면 포인터 가운데로를 사용하세요.",
   "mobile.browser.help.handingBack": "돌려주기",
   "mobile.browser.help.handBack.title": "돌려주기",
   "mobile.browser.help.handBack.body":

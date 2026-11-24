@@ -79,7 +79,7 @@ export const messages = {
   "mobile.browser.help.pointer": "İşaretçi daha kolay olduğunda",
   "mobile.browser.help.trackpad.title": "İzleme dörtgeni modu",
   "mobile.browser.help.trackpad.body":
-    "Tarayıcı açıldığında açıktır. Parmağınız işaretçiyi hareket ettirir; oraya tıklamak için dokunun, sürüklemek için iki kez dokunup basılı tutun. İşaretçi kayarsa ortalayın. Dokunduğunuz yere tıklamak için ··· menüsünden kapatın.",
+    "Tarayıcı açıldığında kapalıdır. İşaretçiyi parmağınızla hareket ettirmek için ··· menüsünden açın; oraya tıklamak için dokunun, sürüklemek için iki kez dokunup basılı tutun. İşaretçi kayarsa ortalayın.",
   "mobile.browser.help.handingBack": "Kontrolü geri verme",
   "mobile.browser.help.handBack.title": "Kontrolü geri ver",
   "mobile.browser.help.handBack.body":

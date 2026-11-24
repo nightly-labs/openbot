@@ -76,7 +76,7 @@ const NO_SUPPORT: MobileBrowserViewSupport = {
   navigation: false,
 };
 
-let rememberedMode: LiveViewMode = "trackpad";
+let rememberedMode: LiveViewMode = "direct";
 
 export function BrowserScreen() {
   const { agentId, serverId, tabId, agentIds } = useLocalSearchParams<{

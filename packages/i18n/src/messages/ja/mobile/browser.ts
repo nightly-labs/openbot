@@ -78,7 +78,7 @@ export const messages = {
   "mobile.browser.help.pointer": "ポインターのほうが簡単なとき",
   "mobile.browser.help.trackpad.title": "トラックパッドモード",
   "mobile.browser.help.trackpad.body":
-    "ブラウザーを開くとオンになります。指でポインターを動かし、タップでその位置をクリック、ダブルタップして長押しでドラッグします。ポインターがずれたら「ポインターを中央に戻す」を使います。タップした位置をクリックするには、··· メニューでオフにします。",
+    "ブラウザーを開くとオフになっています。指でポインターを動かすには、··· メニューでオンにします。タップでその位置をクリック、ダブルタップして長押しでドラッグします。ポインターがずれたら「ポインターを中央に戻す」を使います。",
   "mobile.browser.help.handingBack": "操作を戻す",
   "mobile.browser.help.handBack.title": "操作を戻す",
   "mobile.browser.help.handBack.body":

@@ -75,7 +75,7 @@ export const messages = {
   "mobile.browser.help.pointer": "需要指针时",
   "mobile.browser.help.trackpad.title": "触控板模式",
   "mobile.browser.help.trackpad.body":
-    "浏览器打开时默认开启。手指移动指针，轻点即在该处点击，双击并按住则为拖拽。指针偏移时可让它回到中心。在 ··· 菜单中关闭后，即为点哪里就在哪里点击。",
+    "浏览器打开时默认关闭。在 ··· 菜单中开启后，手指移动指针，轻点即在该处点击，双击并按住则为拖拽。指针偏移时可让它回到中心。",
   "mobile.browser.help.handingBack": "交还控制",
   "mobile.browser.help.handBack.title": "交还",
   "mobile.browser.help.handBack.body": "当助手请你接管时，在 ··· 菜单中选择“我已完成”，助手会在该标签页中继续。",

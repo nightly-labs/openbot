@@ -79,7 +79,7 @@ export const messages = {
   "mobile.browser.help.pointer": "Quando um ponteiro é mais fácil",
   "mobile.browser.help.trackpad.title": "Modo trackpad",
   "mobile.browser.help.trackpad.body":
-    "Fica ativado quando o navegador abre. Seu dedo move o ponteiro; toque para clicar ali, toque duas vezes e segure para arrastar. Recentralize o ponteiro se ele se afastar. Desative no menu ··· para clicar onde você tocar.",
+    "Fica desativado quando o navegador abre. Ative no menu ··· para mover um ponteiro com o dedo; toque para clicar ali, toque duas vezes e segure para arrastar. Recentralize o ponteiro se ele se afastar.",
   "mobile.browser.help.handingBack": "Devolver o controle",
   "mobile.browser.help.handBack.title": "Devolver o controle",
   "mobile.browser.help.handBack.body":

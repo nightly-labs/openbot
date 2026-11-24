@@ -76,7 +76,7 @@ export const messages = defineMessages("mobile.browser", {
   "mobile.browser.help.pointer": "When a pointer is easier",
   "mobile.browser.help.trackpad.title": "Trackpad mode",
   "mobile.browser.help.trackpad.body":
-    "On when the browser opens. Your finger moves the pointer; tap to click there, double-tap and hold to drag. Recenter pointer if it drifts. Turn it off in the ··· menu to click where you tap.",
+    "Off when the browser opens. Turn it on in the ··· menu to move a pointer with your finger; tap to click there, double-tap and hold to drag. Recenter pointer if it drifts.",
   "mobile.browser.help.handingBack": "Handing it back",
   "mobile.browser.help.handBack.title": "Hand it back",
   "mobile.browser.help.handBack.body":

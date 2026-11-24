@@ -84,7 +84,7 @@ export const messages = {
   "mobile.browser.help.pointer": "عندما يكون المؤشر أسهل",
   "mobile.browser.help.trackpad.title": "وضع لوحة اللمس",
   "mobile.browser.help.trackpad.body":
-    "يكون مفعّلًا عند فتح المتصفح. يحرّك إصبعك المؤشر؛ اضغط للنقر هناك، واضغط مرتين مع الإمساك للسحب. استخدم «إعادة المؤشر إلى المنتصف» إذا انحرف. أوقفه من القائمة ··· للنقر في مكان الضغط.",
+    "يكون متوقفًا عند فتح المتصفح. فعّله من القائمة ··· لتحريك مؤشر بإصبعك؛ اضغط للنقر هناك، واضغط مرتين مع الإمساك للسحب. استخدم «إعادة المؤشر إلى المنتصف» إذا انحرف.",
   "mobile.browser.help.handingBack": "إعادته",
   "mobile.browser.help.handBack.title": "إعادة المتصفح",
   "mobile.browser.help.handBack.body":

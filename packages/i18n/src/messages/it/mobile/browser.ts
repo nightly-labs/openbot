@@ -79,7 +79,7 @@ export const messages = {
   "mobile.browser.help.pointer": "Quando un puntatore è più comodo",
   "mobile.browser.help.trackpad.title": "Modalità trackpad",
   "mobile.browser.help.trackpad.body":
-    "È attiva all'apertura del browser. Il dito muove il puntatore; tocca per fare clic lì, tocca due volte e tieni premuto per trascinare. Usa «Ricentra il puntatore» se si sposta. Disattivala nel menu ··· per fare clic dove tocchi.",
+    "È disattivata all'apertura del browser. Attivala nel menu ··· per muovere un puntatore con il dito; tocca per fare clic lì, tocca due volte e tieni premuto per trascinare. Usa «Ricentra il puntatore» se si sposta.",
   "mobile.browser.help.handingBack": "Restituirlo",
   "mobile.browser.help.handBack.title": "Restituisci il browser",
   "mobile.browser.help.handBack.body":

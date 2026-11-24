@@ -79,7 +79,7 @@ export const messages = {
   "mobile.browser.help.pointer": "Wenn ein Zeiger einfacher ist",
   "mobile.browser.help.trackpad.title": "Trackpad-Modus",
   "mobile.browser.help.trackpad.body":
-    "Beim Öffnen des Browsers eingeschaltet. Dein Finger bewegt den Zeiger. Tippe, um dort zu klicken; tippe zweimal und halte, um zu ziehen. Wähle „Zeiger zentrieren“, wenn er abdriftet. Schalte ihn im Menü ··· aus, um dort zu klicken, wo du tippst.",
+    "Beim Öffnen des Browsers ausgeschaltet. Schalte ihn im Menü ··· ein, um mit dem Finger einen Zeiger zu bewegen. Tippe, um dort zu klicken; tippe zweimal und halte, um zu ziehen. Wähle „Zeiger zentrieren“, wenn er abdriftet.",
   "mobile.browser.help.handingBack": "Zurückgeben",
   "mobile.browser.help.handBack.title": "Zurückgeben",
   "mobile.browser.help.handBack.body":

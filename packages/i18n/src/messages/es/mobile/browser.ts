@@ -79,7 +79,7 @@ export const messages = {
   "mobile.browser.help.pointer": "Cuando un puntero es más fácil",
   "mobile.browser.help.trackpad.title": "Modo trackpad",
   "mobile.browser.help.trackpad.body":
-    "Está activado al abrir el navegador. Tu dedo mueve el puntero; toca para hacer clic ahí y toca dos veces y mantén pulsado para arrastrar. Elige «Centrar puntero» si se desvía. Desactívalo en el menú ··· para hacer clic donde tocas.",
+    "Está desactivado al abrir el navegador. Actívalo en el menú ··· para mover un puntero con el dedo; toca para hacer clic ahí y toca dos veces y mantén pulsado para arrastrar. Elige «Centrar puntero» si se desvía.",
   "mobile.browser.help.handingBack": "Devolver el control",
   "mobile.browser.help.handBack.title": "Devolver el control",
   "mobile.browser.help.handBack.body":
