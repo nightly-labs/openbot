@@ -1,5 +1,38 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Aggiorna anche ogni server a cui ti sei unito a questa versione. Molte delle correzioni qui sotto funzionano su un server solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Usa la voce nei canali. Quando detti un messaggio a un canale, l’app legge ad alta voce la risposta di un agente. Puoi anche avviare una conversazione vocale dalla casella dei messaggi del canale.",
+          "Nascondi un server dalla barra dei server. Il server è nascosto anche sugli altri tuoi computer. Selezionalo nella cartella «Server nascosti» per mostrarlo di nuovo."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "La pagina Attività ora si chiama Thread, come nell’app per il telefono e nel pannello laterale della chat.",
+          "Le risposte in streaming e i flussi di lavoro che girano nello stesso momento usano meno CPU, e il client web apre un server più in fretta."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Su Mac, Connetti e Aggiungi account per Claude ora aprono la pagina di accesso di Claude da OpenBot.",
+          "Quando la connessione a un server a cui ti sei unito smette di inviare dati, l’app si riconnette da sola.",
+          "I canali lunghi di un server a cui ti sei unito si aprono e si aggiornano più in fretta.",
+          "Un output «Notifica» di un flusso di lavoro o un passaggio che aspetta un’approvazione ora invia una notifica sul telefono.",
+          "Una chat con Gemini continua dopo che Google rifiuta un risultato di uno strumento. Prima, ogni messaggio successivo falliva."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [

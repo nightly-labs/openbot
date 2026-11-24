@@ -1,5 +1,38 @@
 [
   {
+    "version": "0.78.0",
+    "date": "2026-11-24",
+    "notices": [
+      "Update each joined server to this version too. Many of the fixes below work on a server only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Use voice in channels. When you dictate a message to a channel, the app reads the answer of an agent aloud. You can also start a voice conversation from the channel's message box.",
+          "Hide a server from the server rail. The server is also hidden on your other computers. Select it in the \"Hidden servers\" folder to show it again."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "The Tasks page is now called Threads, as in the phone app and in the chat side panel.",
+          "Streamed replies and workflows that run at the same time use less CPU, and the web client opens a server faster."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "On a Mac, Connect and Add account for Claude now open the Claude sign-in page from OpenBot.",
+          "When the connection to a joined server stops sending data, the app now connects again by itself.",
+          "Long channels on a joined server open and update faster.",
+          "A workflow \"Notification\" output or a step that waits for approval now sends a phone notification.",
+          "A Gemini chat continues after Google refuses a tool result. Before, each later message failed."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.77.0",
     "date": "2026-11-23",
     "notices": [
