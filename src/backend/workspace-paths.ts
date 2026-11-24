@@ -94,7 +94,13 @@ export const resolveSharedFile = Effect.fn("Workspace.resolveSharedFile")(functi
 ): Effect.fn.Return<ResolvedSharedFile, AttachmentOperationError> {
   const sharedRoot = yield* attachmentCall(() => realpath(sharedRootPath));
   const candidatePath = resolve(sharedPathFromInput(sharedRootPath, inputPath));
-  const resolvedPath = yield* attachmentCall(() => realpath(candidatePath));
+  const resolvedPath = yield* attachmentCall(() => realpath(candidatePath)).pipe(
+    Effect.catch((error) => {
+      const withoutLocation = candidatePath.replace(LOCATION_SUFFIX, "");
+      if (!isMissing(error) || withoutLocation === candidatePath) return Effect.fail(error);
+      return attachmentCall(() => realpath(withoutLocation));
+    }),
+  );
   const writtenInside =
     options.followLinks === true && [sharedRootPath, sharedRoot].some((root) => isWithin(resolve(root), candidatePath));
   if (!writtenInside && !isWithin(sharedRoot, resolvedPath)) {
