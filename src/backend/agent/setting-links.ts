@@ -431,7 +431,7 @@ const SERVER_PLACES: readonly SettingLinkEntry[] = [
   {
     title: "Add a server",
     place:
-      "On a computer: the + button at the bottom of the server list on the left > Add a server opens Run OpenBot 24/7 on an external server, with hosted server plans. In it, Other options > New server on another computer gives one install command for a Linux computer or VPS that the user owns (Ubuntu 24.04 or 26.04). When no plans show, New server on another computer is in the + menu itself. On the phone app: Servers > Add a server, for a hosted server.",
+      "On a computer: the server button at the bottom of the narrow bar on the left, below Settings (Open server menu for <server name>) > Add a server, or Add remote server when no plans show. In the Server rail layout, use the + button at the bottom of the server list instead; with plans, it opens Add a server directly. Add a server opens Run OpenBot 24/7 on an external server, with hosted server plans. In it, Other options > New server on another computer gives one install command for a Linux computer or VPS that the user owns (Ubuntu 24.04 or 26.04). When no plans show, New server on another computer is in that menu itself. New server on another computer is only in the desktop app, not in the browser at openbot.run/app. On the phone app: Servers > Add a server, for a hosted server.",
     about:
       "A server that runs 24/7 on another computer, so that agents, routines and chat apps such as WhatsApp keep working while this computer is off. The user runs the install command as root on that computer, then opens the new server and connects a provider and apps there. When the user gives the SSH address, create_server_install_command makes the same command for you to run over SSH.",
     words:
