@@ -1,6 +1,7 @@
 import { Typography } from "heroui-native";
 import type { ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
+import { useTextScale } from "@/features/settings/model/text-size-store";
 import { typeScale } from "@/shared/lib/type-scale";
 
 export const CHAT_ROW_AVATAR_SIZE = 62;
@@ -19,7 +20,7 @@ export function ChatRowHeading({
   leading?: ReactNode;
   trailing: ReactNode;
 }) {
-  const { fontScale } = useWindowDimensions();
+  const textScale = useWindowDimensions().fontScale * useTextScale();
   return (
     <View className="flex-row items-center gap-2">
       {leading}
@@ -27,7 +28,7 @@ export function ChatRowHeading({
         style={{
           flex: 1,
           minWidth: 0,
-          height: Math.ceil(typeScale.chatName.lineHeight * fontScale),
+          height: Math.ceil(typeScale.chatName.lineHeight * textScale),
           flexDirection: "row",
           flexWrap: "wrap",
           alignItems: "baseline",
@@ -46,7 +47,7 @@ export function ChatRowHeading({
           <Typography.Paragraph
             className="text-muted"
             numberOfLines={1}
-            style={[typeScale.chatDetail, { flexGrow: 1, flexBasis: 0, minWidth: TITLE_MIN_WIDTH * fontScale }]}
+            style={[typeScale.chatDetail, { flexGrow: 1, flexBasis: 0, minWidth: TITLE_MIN_WIDTH * textScale }]}
           >
             {title}
           </Typography.Paragraph>
