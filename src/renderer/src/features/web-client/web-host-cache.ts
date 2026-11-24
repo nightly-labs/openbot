@@ -1,4 +1,6 @@
+import { optionalCustomServerPayment } from "@openbot/contracts/custom-server-plans";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { optionalServerAppearanceField } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { RemoteTeamHost } from "@openbot/team-client/remote-directory";
 
 function cacheKey(accountId: string): string {
@@ -28,13 +30,14 @@ function decodeHost(value: unknown): RemoteTeamHost | null {
     devicePublicKey,
     membershipId,
     role,
+    ...optionalServerAppearanceField(value.appearance),
+    ...optionalCustomServerPayment(value),
   };
   if (isNumber(value.memberLimit)) host.memberLimit = value.memberLimit;
   if (isBoolean(value.hosted)) host.hosted = value.hosted;
   if (isBoolean(value.restartAvailable)) host.restartAvailable = value.restartAvailable;
   if (isNumber(value.storageGb)) host.storageGb = value.storageGb;
   if (isNumber(value.keyChangedAt)) host.keyChangedAt = value.keyChangedAt;
-  if (value.paymentRequired === true) host.paymentRequired = true;
   return host;
 }
 
