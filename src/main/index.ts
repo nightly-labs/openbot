@@ -151,7 +151,9 @@ import {
   createMainWindowHolder,
   hideWindowsForQuit,
   keepWindowsHidden,
+  openWindowsInBackground,
   showMainWindow,
+  windowsOpenWithoutFocus,
 } from "./main-window";
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openMessageLink } from "./message-link-relay";
@@ -286,6 +288,7 @@ const localServerControl = localServerChild
   : null;
 if (serverMode || hostedServer || localServerChild) hideExceptionErrorBox();
 if (serverMode || hostedServer || localServerChild) keepWindowsHidden();
+if (developmentProfile && process.env.OPENBOT_DEV_WINDOW_FOCUS === "background") openWindowsInBackground();
 if (localServerChild && process.platform === "darwin") app.dock?.hide();
 const inviteLinkOptions = {
   allowLocalDevelopmentApiUrl: developmentRemoteRole !== null,
@@ -1201,7 +1204,8 @@ async function presentApplication(): Promise<void> {
   await ensureMacApplicationPresence(
     process.platform,
     (policy) => app.setActivationPolicy(policy),
-    () => app.dock?.show() ?? Promise.resolve(),
+    () =>
+      windowsOpenWithoutFocus() && app.dock?.isVisible() ? Promise.resolve() : (app.dock?.show() ?? Promise.resolve()),
   );
   await Effect.runPromise(
     installLinuxDesktopEntry({ platform: process.platform, environment: process.env, iconPath: appIconPath }),
