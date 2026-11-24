@@ -1043,6 +1043,17 @@ computer's windows get it too. A client reads the list again through `browser-pr
 desktop Browser profiles section and agent setting, the web client and the phone show a change made on
 another device while the page is open.
 
+### Client use
+
+The host counts each authenticated request that is not `GET`, `HEAD` or `OPTIONS` as use of its
+session (`isClientUse` in `src/main/team-api/client-use.ts`), unless its path is in `PASSIVE_ROUTES`
+or `PASSIVE_PATTERNS`. Use from another session of the member stops the phone push for 30 seconds,
+and use keeps a hosted server running. A client sends some `POST` reads by itself: on a timer, on a
+host event such as `runtime-snapshot`, or when a page loads. Put each such read route in
+`PASSIVE_ROUTES` in the change that adds it, so that an open client that nobody uses does not stop the
+phone push. Keep a route that changes data out of the list. `scripts/computer-activity-e2e.ts` checks
+both cases through the Team API.
+
 ### Focus use
 
 `focus-use-v1` adds `POST /v1/client/focus` with an empty body. Only a hosted server advertises it
