@@ -5622,9 +5622,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  startProviderCodeLogin(provider: AgentProvider): Effect.Effect<ProviderCodeLoginStart, AgentLifecycleFailed> {
+  startProviderCodeLogin(
+    provider: AgentProvider,
+    onThisComputer = false,
+  ): Effect.Effect<ProviderCodeLoginStart, AgentLifecycleFailed> {
     return this.#providers
-      .startProviderCodeLogin(provider)
+      .startProviderCodeLogin(provider, onThisComputer)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "startProviderCodeLogin", cause: failure.cause }),

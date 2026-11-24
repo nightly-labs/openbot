@@ -95,6 +95,8 @@ export const messages = {
   "provider.codeLogin.relayStarting": "正在 {host} 上启动 {name} 登录…",
   "provider.codeLogin.pageOpening": "正在 {host} 上打开 {name} 登录页面…",
   "provider.codeLogin.linkStep": "登录 {name}，OpenBot 会自动继续。",
+  "provider.codeLogin.thisComputerDescription": "请在这台电脑的浏览器中打开此链接。OpenBot 会在这里等待。",
+  "provider.codeLogin.copyLink": "复制链接",
   "provider.codeLogin.chatgptDeviceSetting":
     "在电脑上的 ChatGPT 中打开安全设置，为 Codex 开启设备代码登录。工作账号由工作区管理员开启。",
 

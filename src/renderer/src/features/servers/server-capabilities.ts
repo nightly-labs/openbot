@@ -263,7 +263,7 @@ export function localCodeSignInProviders(platform: string | undefined): readonly
     return (
       codeSignIn === "device" ||
       (codeSignIn === "paste" && paste) ||
-      (platform === "win32" && descriptor.windowsCodeSignIn === "paste")
+      (platform === "win32" && descriptor.windowsCodeSignIn !== undefined)
     );
   });
 }
