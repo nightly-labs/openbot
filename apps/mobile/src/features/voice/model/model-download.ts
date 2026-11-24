@@ -1,5 +1,5 @@
 import type { SpeechModelFile } from "@openbot/contracts/speech-models";
-import { Directory, File } from "expo-file-system";
+import { Directory, type DownloadTask, File } from "expo-file-system";
 import { create } from "zustand";
 import { speechNative } from "./speech-native";
 
@@ -55,6 +55,11 @@ export function createModelDownload(options: {
       download = controller;
       useModel.setState({ phase: "downloading", progress: 0, failure: null });
       let done = 0;
+      let finished: DownloadTask | null = null;
+      const releaseFinished = () => {
+        finished?.acknowledgeBackgroundCompletionAsync().catch(() => {});
+        finished = null;
+      };
       try {
         directory.create({ intermediates: true, idempotent: true });
         if (markerOf(directory).exists) markerOf(directory).delete();
@@ -63,11 +68,16 @@ export function createModelDownload(options: {
           if (!(file.exists && file.size === item.bytes && (await file.digest("SHA-256")) === item.sha256)) {
             const partial = new File(directory, `${item.name}.download`);
             if (partial.exists) partial.delete();
-            await File.downloadFileAsync(item.url, partial, {
-              idempotent: true,
+            const task = File.createDownloadTask(item.url, partial, {
+              sessionType: "background",
+              deferBackgroundSessionCompletion: true,
               signal: controller.signal,
               onProgress: ({ bytesWritten }) => useModel.setState({ progress: (done + bytesWritten) / bytes }),
             });
+            const transfer = task.downloadAsync();
+            releaseFinished();
+            await transfer;
+            finished = task;
             if ((await partial.digest("SHA-256")) !== item.sha256) {
               partial.delete();
               useModel.setState({ phase: "error", failure: "verify" });
@@ -86,6 +96,7 @@ export function createModelDownload(options: {
           controller.signal.aborted ? { phase: "missing", progress: 0 } : { phase: "error", failure: "download" },
         );
       } finally {
+        releaseFinished();
         download = null;
       }
     },
