@@ -804,7 +804,7 @@ export class HostedSiteService {
           database
             .prepare(
               `SELECT id, hostname FROM hosted_sites
-           WHERE status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
+           WHERE +status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
            ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`,
             )
             .all<{ id: string; hostname: string }>(),

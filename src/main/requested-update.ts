@@ -55,6 +55,8 @@ export interface RequestedUpdateOptions {
   announce?: (state: HostRestartState, version: string | null) => void;
   pollMs?: number;
   graceMs?: number;
+  automaticSpreadMs?: number;
+  random?: () => number;
   clientInUse?: (() => boolean) | undefined;
   maximumIdleWait?: RequestedUpdateMaximumIdleWait | undefined;
 }
@@ -77,6 +79,9 @@ interface Schedule {
 
 const DEFAULT_POLL_MS = 5_000;
 const DEFAULT_GRACE_MS = 1_000;
+// Hosts check for updates every few minutes, so a rollout step reaches all of them at once. Each
+// restart registers the host again and reconnects its clients; a random delay spreads that load.
+export const AUTOMATIC_RESTART_SPREAD_MS = 30 * 60 * 1000;
 
 export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreference] }> {
   readonly #updater: RequestedUpdateUpdater;
@@ -87,6 +92,8 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #announced: { state: HostRestartState; version: string | null } = { state: "none", version: null };
   readonly #pollMs: number;
   readonly #graceMs: number;
+  readonly #automaticSpreadMs: number;
+  readonly #random: () => number;
   #allowed: boolean;
   #autoInstall: boolean;
   readonly #clientInUse: (() => boolean) | null;
@@ -116,6 +123,8 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     this.#maximumIdleWait = options.maximumIdleWait ?? null;
     this.#pollMs = options.pollMs ?? DEFAULT_POLL_MS;
     this.#graceMs = options.graceMs ?? DEFAULT_GRACE_MS;
+    this.#automaticSpreadMs = options.automaticSpreadMs ?? AUTOMATIC_RESTART_SPREAD_MS;
+    this.#random = options.random ?? Math.random;
     this.#updater.on("status", this.#onStatus);
     this.#onStatus(this.#updater.getStatus());
   }
@@ -215,6 +224,10 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
       return;
     }
     if (status.managedByHost || status.phase === "unsupported") return;
+    if (this.#schedule?.memberId === null && this.#timer && !this.#restarting()) {
+      this.#scheduleAttempt(this.#graceMs);
+      return;
+    }
     if (status.phase === "idle" || status.phase === "up-to-date" || status.errorCode === "check_failed")
       yield* Effect.forkIn(this.#updater.checkForUpdates(), this.#workScope, { startImmediately: true });
     else yield* this.#advance(status);
@@ -268,10 +281,11 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     if (status.phase === "available")
       yield* Effect.forkIn(this.#updater.downloadUpdate(), this.#workScope, { startImmediately: true });
     else if (status.phase === "ready") {
+      const spreadMs = this.#required ? 0 : Math.floor(this.#random() * this.#automaticSpreadMs);
       this.#schedule = newSchedule(null, null, "when-idle");
-      this.#log(`Scheduled the automatic restart into ${status.availableVersion}.`);
+      this.#log(`Scheduled the automatic restart into ${status.availableVersion} in ${Math.round(spreadMs / 1000)} s.`);
       this.#publish();
-      this.#scheduleAttempt(this.#graceMs);
+      this.#scheduleAttempt(this.#graceMs + spreadMs);
     }
   });
 

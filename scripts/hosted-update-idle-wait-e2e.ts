@@ -78,7 +78,7 @@ function readinessInput(state: HostState): RestartReadinessInput {
   };
 }
 
-function hostedServer(state: HostState, maximumWaitMs: number | null) {
+function hostedServer(state: HostState, maximumWaitMs: number | null, spread = { ms: 0, random: Math.random }) {
   const updater = new StagedReleaseUpdater();
   const log: string[] = [];
   const announced: HostRestartState[] = [];
@@ -99,6 +99,8 @@ function hostedServer(state: HostState, maximumWaitMs: number | null) {
     announce: (restartState) => announced.push(restartState),
     pollMs: POLL_MS,
     graceMs: 0,
+    automaticSpreadMs: spread.ms,
+    random: spread.random,
     clientInUse: () => state.clientInUse,
     maximumIdleWait:
       maximumWaitMs === null
@@ -183,6 +185,18 @@ unlimitedState.browserView = false;
 await until("the install after the browser view closed", () => unlimited.updater.installs === 1);
 await Effect.runPromise(unlimited.requested.dispose());
 
+// A rollout step reaches every host within one update check. The automatic restart waits a random
+// part of the spread, so the hosts do not register again all at once. A required update does not wait.
+const SPREAD_MS = 4 * DEADLINE_MS;
+const spreadState: HostState = { ...unlimitedState, browserView: false, clientInUse: false };
+const spread = hostedServer(spreadState, MAXIMUM_WAIT_MS, { ms: SPREAD_MS, random: () => 0.5 });
+await until("the spread automatic restart", () => hasLine(spread.log, `into ${RELEASE} in ${SPREAD_MS / 2000} s.`));
+assert.equal(spread.updater.installs, 0, "The automatic restart did not wait for its spread.");
+assert.equal(spread.readinessChecks(), 0, "The automatic restart checked readiness before its spread ended.");
+spread.requested.setRequired(true);
+await until("the required install that skips the spread", () => spread.updater.installs === 1);
+await Effect.runPromise(spread.requested.dispose());
+
 const report = {
   ok: true,
   checkedAt: new Date().toISOString(),
@@ -191,6 +205,7 @@ const report = {
   hosted: { installs: hosted.updater.installs, announced: hosted.announced, log: hosted.log },
   providerOperation: { installs: provider.updater.installs, log: provider.log },
   withoutMaximum: { installs: unlimited.updater.installs, log: unlimited.log },
+  spread: { spreadMs: SPREAD_MS, installs: spread.updater.installs, log: spread.log },
 };
 writeFileSync(resolve(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 logger.info(`Passed. Report: ${resolve(OUT, "report.json")}`);

@@ -382,7 +382,8 @@ export class SalesAnalyticsDelivery {
       .prepare(
         `SELECT source_key, profile_id, event_name, properties_json, event_timestamp, attempts, '' AS claim_token
            FROM billing_analytics_events
-          WHERE status = 'pending' OR (status = 'rejected' AND next_attempt_at > 0 AND next_attempt_at <= ? AND attempts < ?)
+          WHERE status IN ('pending', 'rejected')
+            AND (status = 'pending' OR (next_attempt_at > 0 AND next_attempt_at <= ? AND attempts < ?))
           ORDER BY created_at ASC LIMIT ?`,
       )
       .bind(now, MAX_RATE_LIMIT_RETRIES, MAX_BATCH_SIZE)
