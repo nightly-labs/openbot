@@ -136,6 +136,7 @@ export const messages = {
   "mobile.chat.backdrop.dismiss": "Sluiten",
   "mobile.chat.attachment.sharingUnavailable": "Bestanden delen is niet beschikbaar op dit apparaat.",
   "mobile.chat.attachment.unavailable": "De bijlage is niet beschikbaar. Probeer opnieuw.",
+  "mobile.chat.attachment.downloadStopped": "De download is gestopt. Hij start opnieuw zodra de server verbonden is.",
   "mobile.chat.attachment.openFailed": "Kan bijlage niet openen",
   "mobile.chat.attachment.photosNeedUpdate": "Voor het bewaren van foto’s is de nieuwste versie van de app nodig.",
   "mobile.chat.attachment.photosPermission":
@@ -149,6 +150,7 @@ export const messages = {
   "mobile.chat.attachment.shareFilesNeedsUpdate":
     "Voor het delen van veel bestanden is de nieuwste versie van de app nodig.",
   "mobile.chat.attachment.preview": "Bekijk {name}",
+  "mobile.chat.attachment.seeAll": "Tik om alles te zien",
   "mobile.chat.attachment.displayFailed": "Kan deze afbeelding niet tonen.",
   "mobile.chat.attachment.loadingImage": "Afbeelding laden",
   "mobile.chat.attachment.uploading": "{name} uploaden",
@@ -197,6 +199,8 @@ export const messages = {
   "mobile.chat.composer.messageAgent": "Bericht aan {name}",
   "mobile.chat.composer.pasteFailed": "Kan geplakte tekst niet bijvoegen",
   "mobile.chat.voice.listening": "Luisteren…",
+  "mobile.chat.liveVoice.gptFailedTitle": "GPT Live Voice kon niet starten",
+  "mobile.chat.liveVoice.gptEndedTitle": "GPT Live Voice is gestopt",
   "mobile.chat.composer.addAttachment": "Voeg bijlage toe",
   "mobile.chat.composer.ask": "Vraag {name}",
   "mobile.chat.composer.stopFailed": "Kan de agent niet stoppen. Misschien is die al klaar.",

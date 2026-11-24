@@ -611,7 +611,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "No se pudieron cargar tus servidores",
   "mobile.agent.home.serversFailedBody": "Comprueba que la app de escritorio está abierta e inténtalo de nuevo.",
   "mobile.agent.home.noServers": "No hay servidores disponibles",
-  "mobile.agent.home.noServersBody": "Vuelve a conectar la app de escritorio o únete a un servidor remoto.",
+  "mobile.agent.home.noServersBody":
+    "Abre OpenBot en tu equipo con esta cuenta y activa Publicar este servidor en Ajustes del servidor → Miembros. O únete a un servidor remoto.",
   "mobile.agent.home.chooseServer": "Elige un servidor",
   "mobile.agent.home.openServers": "Abrir servidores",
   "mobile.agent.home.noChatOpen": "Ningún chat abierto",

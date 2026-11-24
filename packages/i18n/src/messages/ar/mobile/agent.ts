@@ -675,7 +675,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "تعذّر تحميل خوادمك",
   "mobile.agent.home.serversFailedBody": "تحقّق من أن تطبيق سطح المكتب يعمل وحاول مرة أخرى.",
   "mobile.agent.home.noServers": "لا خوادم متاحة",
-  "mobile.agent.home.noServersBody": "اربط تطبيق سطح المكتب مرة أخرى أو انضم إلى خادم بعيد.",
+  "mobile.agent.home.noServersBody":
+    "افتح OpenBot على حاسوبك بهذا الحساب، وفعّل «نشر هذا الخادم» في إعدادات الخادم → الأعضاء. أو انضم إلى خادم بعيد.",
   "mobile.agent.home.chooseServer": "اختر خادمًا",
   "mobile.agent.home.openServers": "فتح الخوادم",
   "mobile.agent.home.noChatOpen": "لا دردشة مفتوحة",

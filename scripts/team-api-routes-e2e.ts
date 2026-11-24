@@ -36,6 +36,7 @@ import {
   type Channel,
   type ChannelMessage,
   type ChannelRoutine,
+  type ChannelTask,
   type ConversationMessage,
   type CustomAgentResult,
   type CustomAgentSummary,
@@ -264,6 +265,7 @@ import {
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import {
   AGENT_HIDDEN_WORK_CAPABILITY,
+  CHANNEL_PAGE_TASKS_CAPABILITY,
   decodeTeamProtocolSupportExpanded,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_USAGE_GROUPS_CAPABILITY,
@@ -560,6 +562,7 @@ import { canConfineProcesses } from "../src/backend/process-confinement";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
+import { resolveSharedFile as resolveSharedFileOnDisk } from "../src/backend/workspace-paths";
 import type { AgentAccessState } from "../src/main/agent-access-store";
 import { createAgentDefaultsPreferenceStore } from "../src/main/agent-defaults-preference-store";
 import { createAgentDefaultsSettings } from "../src/main/agent-defaults-settings";
@@ -1471,10 +1474,17 @@ const fakeAgents: TeamApiAgents = {
   resolveSharedFile: (path) =>
     Effect.sync(() => {
       record("resolveSharedFile", path);
-      return path === "big.bin"
-        ? { path: sharedPath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1 }
-        : { path: sharedPath, name: "shared.txt", size: readFileSync(sharedPath).length };
-    }),
+    }).pipe(
+      Effect.flatMap(() =>
+        path === "big.bin"
+          ? Effect.succeed({ path: sharedPath, name: "big.bin", size: ATTACHMENT_LIMITS.fileBytes + 1 })
+          : resolveSharedFileOnDisk(files, path).pipe(
+              Effect.mapError(
+                (failure) => new AgentLifecycleFailed({ operation: "resolveSharedFile", cause: failure.cause }),
+              ),
+            ),
+      ),
+    ),
   resolveWorkspaceFile: (agentId, path) =>
     Effect.sync(() => {
       record("resolveWorkspaceFile", agentId, path);
@@ -2488,6 +2498,13 @@ const liveVoice: TeamApiLiveVoice = {
         new AgentLifecycleFailed({
           operation: "startLiveVoice",
           cause: new Error(sourceText("error.voice.live.signIn")),
+        }),
+      );
+    if (input.sdp === "offer-codex-failed")
+      return Effect.fail(
+        new AgentLifecycleFailed({
+          operation: "startLiveVoice",
+          cause: new Error(sourceText("error.voice.live.startFailed", { reason: "realtime session failed" })),
         }),
       );
     liveVoiceStarts += 1;
@@ -9920,6 +9937,54 @@ try {
         logged.slice(alertLogStart).every((line) => !line.includes("Team API request failed")),
       [heldSequence, shownSequence, summary(readAfterDelete), summary(readPastHistory), field(alertRow, "unreadCount")],
     );
+
+    const pageTask = (id: string, requestMessageId: string, state: ChannelTask["state"]): ChannelTask => ({
+      id,
+      channelId,
+      parentTaskId: null,
+      rootTaskId: id,
+      ownerAgentId: "agent-ada",
+      requestMessageId,
+      instruction: id,
+      attachmentDraftIds: [],
+      expectedResult: id,
+      sourceMessageIds: [requestMessageId],
+      dependencies: [],
+      resources: [],
+      state,
+      revision: 1,
+      assignmentCount: 1,
+      error: null,
+    });
+    pictures.store.commit("page-tasks", {
+      channel: pictures.store.get(channelId),
+      messages: [],
+      tasks: [
+        pageTask("task-history", "message-not-in-channel", "completed"),
+        pageTask("task-open", "message-not-in-channel", "running"),
+        pageTask("task-shown", "alert-first", "completed"),
+      ],
+      assignments: [],
+    });
+    const taskIds = (reply: Reply) =>
+      list(field(reply.body, "tasks"))
+        .map((task) => field(task, "id"))
+        .filter((id) => typeof id === "string" && id.startsWith("task-"))
+        .sort();
+    const fullTasks = await call("POST", CHANNEL_ROUTES.read, { ...use, json: { channelId } });
+    const windowTasks = await call("POST", CHANNEL_ROUTES.read, {
+      ...use,
+      capabilities: [...pictured, CHANNEL_PAGE_TASKS_CAPABILITY],
+      json: { channelId },
+    });
+    check(
+      "a client with channel-page-tasks-v1 gets only open runs and the tasks of shown messages, and an older client keeps every task",
+      fullTasks.status === 200 &&
+        windowTasks.status === 200 &&
+        taskIds(fullTasks).join() === "task-history,task-open,task-shown" &&
+        taskIds(windowTasks).join() === "task-open,task-shown",
+      [taskIds(fullTasks), taskIds(windowTasks)],
+    );
   }
 
   {
@@ -13426,6 +13491,16 @@ try {
         ]),
       [summary(noSignIn), callsOf("startLiveVoice").at(-1)],
     );
+    const codexFailed = await call("POST", LIVE_VOICE_ROUTES.start, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", sdp: "offer-codex-failed" },
+    });
+    check(
+      "a host whose Codex cannot start the voice answers 409 with the reason and the next step for the member",
+      errorIs(codexFailed, 409, sourceText("error.voice.live.startFailed", { reason: "realtime session failed" })),
+      summary(codexFailed),
+    );
     const revoked = await call("POST", LIVE_VOICE_ROUTES.start, {
       token: bobToken,
       ...v9,
@@ -13637,6 +13712,28 @@ try {
         shared.headers.get("content-disposition") === "attachment; filename*=UTF-8''shared.txt" &&
         errorIs(sharedBig, 413, sourceText("error.team.sharedFileTooLarge")),
       [summary(sharedMissing), summary(shared), summary(sharedBig)],
+    );
+    const sharedAtLine = await call(
+      "GET",
+      `${TEAM_API_ROUTES.sharedFiles}?path=${encodeURIComponent("shared.txt:26")}`,
+      {
+        token: bobToken,
+      },
+    );
+    const sharedAtAnchor = await call(
+      "GET",
+      `${TEAM_API_ROUTES.sharedFiles}?path=${encodeURIComponent("Shared/shared.txt#L26")}`,
+      { token: bobToken },
+    );
+    check(
+      "shared files: a link with a line number gives the bytes of the file without the line number",
+      [sharedAtLine, sharedAtAnchor].every(
+        (response) =>
+          response.status === 200 &&
+          response.text === "shared file bytes\n" &&
+          response.headers.get("content-disposition") === "attachment; filename*=UTF-8''shared.txt",
+      ),
+      [summary(sharedAtLine), summary(sharedAtAnchor)],
     );
     const workspaceMissing = await call("GET", `${TEAM_API_ROUTES.workspaceFiles}?path=notes.md`, { token: bobToken });
     const workspace = await call("GET", `${TEAM_API_ROUTES.workspaceFiles}?botId=agent-ada&path=notes.md`, {

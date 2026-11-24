@@ -3,6 +3,7 @@ import {
   type ManagedProviderId,
   pasteCodeSignInSupported,
 } from "@openbot/contracts/agent-providers";
+import { providerCliSource } from "@openbot/contracts/cli-version";
 import {
   type AgentProviderId,
   type AgentStatus,
@@ -11,6 +12,7 @@ import {
   isManagedRuntimeProvider,
   LOCAL_SERVER_ID,
   type ProviderRuntimeDownload,
+  type ProviderRuntimeStatus,
 } from "@openbot/contracts/ipc";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
@@ -65,9 +67,9 @@ const Providers = createSimpleContext({
     const { activeServer } = useServers();
     const { appInfo } = usePlatform();
     const [refreshingProviders, setRefreshingProviders] = createSignal(false);
-    function systemCliVersion(provider: AgentProviderId): string | null {
+    function systemCliVersion(provider: AgentProviderId, runtime: ProviderRuntimeStatus): string | null {
       const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
-      return row?.cliSource === "system" && !row.cliIncomplete ? (row.version ?? null) : null;
+      return row && providerCliSource(row, runtime) === "system" && !row.cliIncomplete ? row.version : null;
     }
     const providerAdminServerId = createMemo(() => remoteAdminServer(activeServer(), "providers-v1")?.id);
     const providerAdmin = () => providersPort().providerAdmin;

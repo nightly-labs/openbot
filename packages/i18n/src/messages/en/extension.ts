@@ -81,12 +81,7 @@ export const messages = defineMessages("extension", {
   "extension.x.message.pictures": "Pictures:",
   "extension.x.message.link": "Link to the post:",
   "extension.browser.share": "Share tabs with agents",
-  "extension.browser.line": {
-    one: "Agents can use your open tabs · {count} tab",
-    other: "Agents can use your open tabs · {count} tabs",
-  },
   "extension.browser.unsupported": "{server} cannot use shared tabs yet. Update the server.",
-  "extension.browser.manage": "Manage",
   "extension.browser.title": "Shared tabs",
   "extension.browser.about":
     "Your agents read and use your open tabs only for what you ask in this side panel. In the OpenBot app, they use their own browser. A tab joins the OpenBot group when an agent works in it.",

@@ -67,11 +67,16 @@ import {
   remoteAgentFolderCalls,
 } from "./agent-folders-port";
 import { conversationPort } from "./conversation-port";
+import { conversationOwnerId } from "./stores/composer-store";
 
 function VoiceConversationPane(pill: VoicePillPresence) {
   const controller = useConversationController();
-  const { props } = useConversationViewScope();
-  const running = untrack(() => (props.agent ? controller.voiceSessions.running(props.agent.id) : null));
+  const { props, channel } = useConversationViewScope();
+  const running = untrack(() => {
+    const ownerId = conversationOwnerId(props);
+    return ownerId ? controller.voiceSessions.running(ownerId) : null;
+  });
+  if (channel) return <VoiceConversation kind={running ?? "transcribed"} open={pill.open} onClosed={pill.onClosed} />;
   const runtimeLive = untrack(() => props.runtime?.liveVoice);
   if (runtimeLive) {
     const liveKind: VoiceConversationKind = running ?? "codex-live";
@@ -104,8 +109,8 @@ interface VoicePillPresence {
 
 function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversationKind; port?: CodexLivePort }) {
   const controller = useConversationController();
-  const { props, startVoiceConversation, endVoiceConversation } = useConversationViewScope();
-  const agentId = untrack(() => props.agent?.id);
+  const { props, channel, startVoiceConversation, endVoiceConversation } = useConversationViewScope();
+  const agentId = untrack(() => conversationOwnerId(props));
   if (!agentId) return null;
   const serverId = untrack(() => props.server?.id ?? LOCAL_SERVER_ID);
   const kind = untrack(() => paneProps.kind);
@@ -121,8 +126,9 @@ function VoiceConversation(paneProps: VoicePillPresence & { kind: VoiceConversat
   const transcribed = kind === "transcribed";
   const replySpeed = () => (transcribed ? speechSpeed() : undefined);
   const cycleSpeed = transcribed ? cycleSpeechSpeed : undefined;
+  const pillAgent = () => (channel ? channel.voiceAgent() : props.agent);
   return (
-    <Show when={props.agent}>
+    <Show when={pillAgent()}>
       {(agent) => (
         <VoicePill
           agent={agent()}
@@ -238,8 +244,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     replyJump,
   } = useConversationViewScope();
   const { t, errorMessage } = useText();
-  const chatAgentKey = () => (props.agent ? `${props.server?.id ?? "local"}:${props.agent.id}` : null);
-  const voiceKey = () => (voiceConversationOpen() && !channel && chatAgentKey()) || null;
+  const chatAgentKey = () => {
+    const ownerId = conversationOwnerId(props);
+    return ownerId ? `${props.server?.id ?? "local"}:${ownerId}` : null;
+  };
+  const voiceKey = () => (voiceConversationOpen() && chatAgentKey()) || null;
   const [voicePill, setVoicePill] = createSignal<{ key: string } | null>(null);
   const [voicePillClosing, setVoicePillClosing] = createSignal(false);
   createEffect(
