@@ -4,6 +4,7 @@ import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { MOBILE_ATTACHMENT_BYTES, type RemoteFileUpload } from "@openbot/team-client/remote-peer";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
+import { randomUUID } from "expo-crypto";
 import { Directory, File, FileMode, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as Sharing from "expo-sharing";
@@ -140,6 +141,16 @@ export function copiesToClipboard(attachment: Pick<AttachmentSummary, "kind" | "
 
 function safeFileName(name: string) {
   return name.replace(/[/\\\p{Cc}]/gu, "_");
+}
+
+function newShareFolder() {
+  const folder = new Directory(Paths.cache, `share-${randomUUID()}`);
+  folder.create({ intermediates: true });
+  return folder;
+}
+
+function shareCopy(folder: Directory, name: string) {
+  return new File(folder, safeFileName(name) || "file");
 }
 
 async function fileText(data: RemoteFileUpload & { fileUri?: string }) {
@@ -292,14 +303,14 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
   async function share() {
     requestLargeFile(serverId, attachment.id);
     setSharing(true);
-    let file: File | null = null;
+    let folder: Directory | null = null;
     try {
       if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
       const result = query.data ? { data: query.data, error: null } : await query.refetch();
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
-      const name = safeFileName(attachment.name);
-      file = new File(Paths.cache, `${Date.now()}-${name}`);
+      folder = newShareFolder();
+      const file = shareCopy(folder, attachment.name);
       await writeFileData(file, result.data);
       await Sharing.shareAsync(file.uri, {
         ...shareTypeOptions(file.uri, result.data.mimeType),
@@ -308,7 +319,7 @@ export function useAttachmentFile(serverId: string, attachment: AttachmentSummar
     } catch (error) {
       showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
     } finally {
-      if (file?.exists) file.delete();
+      if (folder?.exists) folder.delete();
       setSharing(false);
     }
   }
@@ -446,11 +457,12 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
 
   async function shareFile(attachment: AttachmentSummary) {
     setBusy(true);
-    let file: File | null = null;
+    let folder: Directory | null = null;
     try {
       if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
       const data = await load(attachment);
-      file = new File(Paths.cache, `${Date.now()}-${safeFileName(attachment.name)}`);
+      folder = newShareFolder();
+      const file = shareCopy(folder, attachment.name);
       await writeFileData(file, data);
       await Sharing.shareAsync(file.uri, {
         ...shareTypeOptions(file.uri, data.mimeType),
@@ -459,7 +471,7 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
     } catch (error) {
       fail(error, t("mobile.chat.attachment.openFailed"));
     } finally {
-      if (file?.exists) file.delete();
+      if (folder?.exists) folder.delete();
       setBusy(false);
     }
   }
@@ -521,13 +533,14 @@ export function showFileFailure(error: unknown, title: string, text: Pick<Mobile
 export async function shareLocalAttachment(file: { name: string; mimeType: string; base64?: string; uri?: string }) {
   const text = currentText();
   const { t } = text;
-  let temporary: File | null = null;
+  let folder: Directory | null = null;
   try {
     if (!(await Sharing.isAvailableAsync())) throw new Error(t("mobile.chat.attachment.sharingUnavailable"));
     let uri = file.uri;
     if (!uri) {
       if (!file.base64) throw new Error(t("mobile.chat.attachment.unavailable"));
-      temporary = new File(Paths.cache, `${Date.now()}-${safeFileName(file.name)}`);
+      folder = newShareFolder();
+      const temporary = shareCopy(folder, file.name);
       temporary.writeSync(file.base64, { encoding: "base64" });
       uri = temporary.uri;
     }
@@ -535,6 +548,6 @@ export async function shareLocalAttachment(file: { name: string; mimeType: strin
   } catch (error) {
     showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
   } finally {
-    if (temporary?.exists) temporary.delete();
+    if (folder?.exists) folder.delete();
   }
 }
