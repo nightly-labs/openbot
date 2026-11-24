@@ -13,7 +13,13 @@ import {
   type MessagingIngress,
   TelegramCallError,
 } from "../src/backend/messaging/messaging-types";
+import { TelegramChatState } from "../src/backend/messaging/telegram/telegram-chats";
 import { telegramDriver } from "../src/backend/messaging/telegram/telegram-driver";
+import {
+  telegramPlacement,
+  telegramThreadKey,
+  telegramUpdateEvent,
+} from "../src/backend/messaging/telegram/telegram-updates";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/messaging-telegram-mentions-e2e");
 const BOT = "7000000001";
@@ -203,6 +209,78 @@ try {
     const made = await callsOf(() => runCauseEffect(adapter.post(target, { text: "Ask @alice_bob" })));
     assert.ok(textOf(made[0]).includes(`@${WORD_JOINER}alice_bob`), "A status post made a live @username.");
     return { text: textOf(made[0]) };
+  });
+
+  await step("in a forum topic, only the bot's reply chain is its conversation", async () => {
+    const forum = new TelegramChatState("E2E forum", "openbot_e2e_bot");
+    const chat = { id: Number(CHAT), type: "supergroup", is_forum: true, title: "E2E forum" };
+    interface RepliedMessage {
+      message_id: number;
+      from: { id: number; is_bot: boolean; first_name?: string };
+      chat: typeof chat;
+      forum_topic_created?: { name: string };
+    }
+    const person = (id: number) => ({ id, is_bot: false, first_name: `Person ${id}` });
+    const topicRoot = (topic: number): RepliedMessage => ({
+      message_id: topic,
+      from: person(1),
+      chat,
+      forum_topic_created: { name: `Topic ${topic}` },
+    });
+    const inTopic = (topic: number, messageId: number, text: string, replyTo: RepliedMessage) => {
+      const mention = text.indexOf("@openbot_e2e_bot");
+      const event = telegramUpdateEvent(
+        {
+          message: {
+            message_id: messageId,
+            message_thread_id: topic,
+            is_topic_message: true,
+            date: 1_800_000_000 + messageId,
+            chat,
+            from: person(messageId),
+            text,
+            reply_to_message: replyTo,
+            ...(mention >= 0 ? { entities: [{ type: "mention", offset: mention, length: 16 }] } : {}),
+          },
+        },
+        BOT,
+        CHAT,
+        forum,
+      );
+      assert.ok(event?.type === "message", `Message ${messageId} did not reach the agent.`);
+      return event.message;
+    };
+
+    const asked = inTopic(77, 1000, "@openbot_e2e_bot what broke?", topicRoot(77));
+    assert.equal(asked.requiresLink, false);
+    const conversation = asked.threadKey;
+    assert.deepEqual(telegramPlacement(asked.target), {
+      message_thread_id: 77,
+      reply_parameters: { message_id: 1000, allow_sending_without_reply: true },
+    });
+    forum.rememberThread(1001, telegramThreadKey(asked.target));
+
+    const chatter = inTopic(77, 1002, "is this your bot?", topicRoot(77));
+    assert.equal(chatter.requiresLink, true);
+    assert.notEqual(chatter.threadKey, conversation, "A plain message in the topic joined the bot's conversation.");
+
+    const replyToBot = inTopic(77, 1003, "thanks", { message_id: 1001, from: { id: Number(BOT), is_bot: true }, chat });
+    assert.equal(replyToBot.requiresLink, false);
+    assert.equal(replyToBot.threadKey, conversation, "A reply to the bot left its conversation.");
+
+    const replyInChain = inTopic(77, 1004, "same here", { message_id: 1000, from: person(1000), chat });
+    assert.equal(replyInChain.threadKey, conversation, "A reply in the bot's chain left its conversation.");
+
+    const otherTopic = inTopic(88, 1005, "@openbot_e2e_bot and here?", topicRoot(88));
+    assert.equal(telegramPlacement(otherTopic.target).message_thread_id, 88);
+    assert.notEqual(otherTopic.threadKey, conversation);
+
+    const context = forum.history(otherTopic.threadKey, null, "1005").map((entry) => entry.id);
+    assert.ok(!context.includes("1002"), "Another topic's messages were given as context.");
+    const sameTopicContext = forum.history(chatter.threadKey, null, "1002").map((entry) => entry.id);
+    assert.ok(sameTopicContext.includes("1000"), "The topic's earlier messages were not given as context.");
+
+    return { conversation, chatter: chatter.threadKey, otherTopic: otherTopic.threadKey };
   });
 
   report.passed = true;

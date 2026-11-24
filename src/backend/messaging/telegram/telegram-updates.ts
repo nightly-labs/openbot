@@ -4,7 +4,7 @@ import {
   type TelegramReplyParameters,
 } from "@openbot/contracts/signal-protocol/telegram-route";
 import type { InboundAction, InboundFile, InboundMessage, MessageTarget } from "../messaging-types";
-import type { TelegramChatState } from "./telegram-chats";
+import { forumThreadKey, forumTopicOf, type TelegramChatState } from "./telegram-chats";
 
 export const TELEGRAM_CALLBACK_PREFIXES = { accept: "a:", decline: "d:", stop: "s:" } as const;
 
@@ -192,11 +192,19 @@ function threadKeyOf(message: DynamicRecord, state: TelegramChatState): string {
   const chat = isDynamicRecord(message.chat) ? message.chat : {};
   if (chat.type === "private") return TELEGRAM_DIRECT_THREAD;
   const threadId = isNumber(message.message_thread_id) ? message.message_thread_id : null;
-  if (chat.is_forum === true) return `t${message.is_topic_message === true && threadId ? threadId : 0}`;
+  if (chat.is_forum === true) return forumMessageThreadKey(message, threadId, state);
   if (threadId) return String(threadId);
   const reply = isDynamicRecord(message.reply_to_message) ? message.reply_to_message : null;
   if (reply && isNumber(reply.message_id)) return state.threadOf(reply.message_id) ?? String(reply.message_id);
   return String(message.message_id);
+}
+
+function forumMessageThreadKey(message: DynamicRecord, threadId: number | null, state: TelegramChatState): string {
+  const topic = message.is_topic_message === true && threadId ? threadId : 0;
+  const reply = isDynamicRecord(message.reply_to_message) ? message.reply_to_message : null;
+  const repliedId = reply && isNumber(reply.message_id) && reply.message_id !== threadId ? reply.message_id : null;
+  if (repliedId !== null) return state.threadOf(repliedId) ?? forumThreadKey(topic, repliedId);
+  return forumThreadKey(topic, isNumber(message.message_id) ? message.message_id : 0);
 }
 
 export function telegramPlacement(target: MessageTarget): {
@@ -204,7 +212,7 @@ export function telegramPlacement(target: MessageTarget): {
   reply_parameters?: TelegramReplyParameters;
 } {
   const [threadKey = "", replyTo = ""] = (target.replyThreadId ?? "").split(":");
-  const topic = threadKey.startsWith("t") ? Number(threadKey.slice(1)) : 0;
+  const topic = forumTopicOf(threadKey) ?? 0;
   const replyId = /^[0-9]+$/u.test(replyTo) ? Number(replyTo) : /^[0-9]+$/u.test(threadKey) ? Number(threadKey) : 0;
   return {
     ...(Number.isSafeInteger(topic) && topic > 0 ? { message_thread_id: topic } : {}),

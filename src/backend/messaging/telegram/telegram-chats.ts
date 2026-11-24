@@ -8,6 +8,20 @@ const RECENT_MESSAGES = 200;
 const THREAD_ENTRIES = 2_000;
 const PRECEDING_MESSAGES = 10;
 const PRECEDING_WINDOW_MS = 15 * 60_000;
+const FORUM_THREAD_KEY = /^t([0-9]+)(?:-([0-9]+))?$/u;
+
+export function forumThreadKey(topic: number, rootMessageId: number): string {
+  return `t${topic}-${rootMessageId}`;
+}
+
+export function forumTopicOf(threadKey: string): number | null {
+  const topic = FORUM_THREAD_KEY.exec(threadKey)?.[1];
+  return topic === undefined ? null : Number(topic);
+}
+
+function threadRootOf(threadKey: string): string {
+  return FORUM_THREAD_KEY.exec(threadKey)?.[2] ?? threadKey;
+}
 
 export interface TelegramMessage extends ThreadedEntry {
   authorId: string;
@@ -91,12 +105,14 @@ export class TelegramChatState {
   }
 
   history(threadKey: string, afterId: string | null, beforeId: string): ContextEntry[] {
-    if (threadKey === beforeId) {
+    if (threadRootOf(threadKey) === beforeId) {
       const first = this.#recent.find((entry) => entry.id === beforeId);
       const since = Date.parse(first?.sentAt ?? new Date().toISOString()) - PRECEDING_WINDOW_MS;
+      const topic = forumTopicOf(threadKey);
       return this.#recent
         .filter(
           (entry) =>
+            (topic === null || forumTopicOf(entry.threadKey) === topic) &&
             Number(entry.id) < Number(beforeId) &&
             Date.parse(entry.sentAt) >= since &&
             (afterId === null || Number(entry.id) > Number(afterId)),
