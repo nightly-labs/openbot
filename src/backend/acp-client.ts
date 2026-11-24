@@ -164,6 +164,8 @@ const ACP_MODEL_RETRY_GRACE = 1.2;
 
 const ACP_FIRST_UPDATE_MS = 3 * 60_000;
 
+const ACP_STEER_FIRST_UPDATE_WAIT_MS = 10_000;
+
 const MCP_TOOL_CALL_ANSWER_MARGIN_MS = 15_000;
 
 const SILENT_PROMPT = Symbol("silent prompt");
@@ -1299,7 +1301,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (!steer && !turn.answered)
           yield* Effect.raceFirst(
             Deferred.await(turn.answer),
-            Effect.sleep(this.options.firstUpdateMs ?? ACP_FIRST_UPDATE_MS),
+            Effect.sleep(Math.min(this.options.firstUpdateMs ?? ACP_FIRST_UPDATE_MS, ACP_STEER_FIRST_UPDATE_WAIT_MS)),
           );
         if (turnChanged() || (!steer && !turn.answered))
           return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));

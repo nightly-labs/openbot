@@ -1110,8 +1110,10 @@ a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 
 reports the version "0.0.0-dev"). While an approval or a question is open, the message waits in the
 queue, because a new prompt would close it. Devin answers each prompt of the run with the same usage,
 so `AcpFlavor.promptRun` reports it once. A steer that comes before the first update of the running
-prompt waits for that update, or for the turn end or a stop, up to `ACP_FIRST_UPDATE_MS`. Before, it
-failed at once and the message waited for the end of the whole turn. `scripts/antigravity-steer-e2e.ts` and
+prompt waits for that update, or for the turn end or a stop, up to `ACP_STEER_FIRST_UPDATE_WAIT_MS`
+(10 s). A teammate message and a channel post wait for the steer result, so the limit is short. After
+the limit, the message waits in the queue. Before, it failed at once and the message waited for the end
+of the whole turn. `scripts/antigravity-steer-e2e.ts` and
 `scripts/devin-steer-e2e.ts` check these paths.
 
 A message that comes while a turn starts, before the provider gave the turn id, cannot steer yet and
