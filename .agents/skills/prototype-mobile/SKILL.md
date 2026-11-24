@@ -156,7 +156,7 @@ Keep one zustand store in `<feature>-prototype-data.ts`:
 
 ```ts
 type PrototypeVariant = "current" | "a" | "b" | "c";
-type PrototypeDataState = "ready" | "loading" | "empty" | "error" | "refreshing" | "refreshFailed" | "offline" | "long";
+type PrototypeDataState = "ready" | "loading" | "empty" | "error" | "refreshing" | "refreshFailed" | "offline" | "long" | "liveChange";
 type PrototypeActionResult = "succeeds" | "fails" | "slow";
 
 export const useAgentPickerPrototype = create<{
