@@ -46,15 +46,12 @@
 }
 
 .server-mcp-sign-in-link {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  justify-items: start;
   gap: var(--openbot-space-2);
-  margin-top: var(--openbot-space-2);
 }
 
 .server-mcp-sign-in-link > .mcp-sign-in-relay-form {
-  align-self: stretch;
+  justify-self: stretch;
   margin-top: var(--openbot-space-2);
 }
 

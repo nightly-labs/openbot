@@ -200,24 +200,11 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                 </Show>
                 <Show when={waiting()}>
                   {(pending) => (
-                    <>
-                      <div class="server-mcp-row-next">
-                        <Button type="button" size="sm" variant="outline" onClick={() => cancelSignIn(pending().url)}>
-                          {t("mcp.panel.cancelSignIn")}
-                        </Button>
-                      </div>
-                      <Show when={props.tools.signIn()?.copyLink}>
-                        {(copy) => (
-                          <div class="server-mcp-sign-in-link">
-                            <McpSignInLinkCopy
-                              onCopy={copy()}
-                              onPaste={props.tools.signIn()?.pasteAddress}
-                              waitingNote={false}
-                            />
-                          </div>
-                        )}
-                      </Show>
-                    </>
+                    <div class="server-mcp-row-next">
+                      <Button type="button" size="sm" variant="outline" onClick={() => cancelSignIn(pending().url)}>
+                        {t("mcp.panel.cancelSignIn")}
+                      </Button>
+                    </div>
                   )}
                 </Show>
               </ItemContent>
@@ -275,6 +262,19 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
                 />
               </ItemActions>
             </Item>
+            <Show when={waiting() ? props.tools.signIn()?.copyLink : undefined}>
+              {(copy) => (
+                <Item class="settings-modal-row">
+                  <ItemContent class="server-mcp-sign-in-link">
+                    <McpSignInLinkCopy
+                      onCopy={copy()}
+                      onPaste={props.tools.signIn()?.pasteAddress}
+                      waitingNote={false}
+                    />
+                  </ItemContent>
+                </Item>
+              )}
+            </Show>
           </ItemGroup>
           <Show when={state.error}>
             <Text class="server-mcp-runtime-note" variant="caption" tone="danger" role="alert">
