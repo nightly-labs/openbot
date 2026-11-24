@@ -65,7 +65,7 @@ const RailAgent = memo(function RailAgent({ agent }: { agent: MobileAgent }) {
   const activity = useAgentListActivity(agent.id);
   const waitReason = agentListWaitReason(activity);
   return (
-    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
       <ChatLinkPressable
         chatId={agent.id}
         accessibilityRole="button"

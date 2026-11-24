@@ -109,6 +109,12 @@ export class ProviderSessionBusyError extends ProviderTurnActiveError {
   }
 }
 
+export class ProviderSettingsConflictError extends Error {
+  constructor(readonly providerName: string) {
+    super(sourceText("error.provider.acpSettingsConflict", { provider: providerName }));
+  }
+}
+
 export class ProviderStoppedError extends Error {
   constructor(
     readonly providerName: string,

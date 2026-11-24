@@ -28,7 +28,7 @@ import {
 } from "../model/large-files";
 import { shareTypeOptions } from "../model/share-file-type";
 import { shareFilesNative } from "../model/share-files-native";
-import { mediaFile, writeMediaFile } from "./use-media-file";
+import { fileWantedOrDropped, mediaFile, requestFile, writeMediaFile } from "./use-media-file";
 
 const dimensionCache = createImageDimensionCache({
   read: () => {
@@ -240,7 +240,7 @@ function attachmentFileQuery(
 ) {
   return queryOptions({
     queryKey: queryKeys.chatAttachment(serverId, attachment.id),
-    queryFn: async (): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
+    queryFn: async ({ client, queryKey }): Promise<RemoteFileUpload & { localUri?: string; fileUri?: string }> => {
       if (attachment.size > MOBILE_LARGE_FILE_BYTES) throw new Error(tooLarge);
       const kept = keptFile(serverId, attachment);
       if (kept) return kept;
@@ -251,6 +251,7 @@ function attachmentFileQuery(
         largeDownloadOf(attachment, large ? mediaTarget(serverId, attachment) : undefined),
         undefined,
         tapped,
+        fileWantedOrDropped(client, queryKey),
       );
       if (data.file) return { ...data, base64: "", fileUri: data.file.ref };
       const fileUri =
@@ -320,7 +321,9 @@ export function useAttachmentFile(
   const loadTapped = async () => {
     if (query.data) return query.data;
     prioritizeAttachmentDownload(serverId, attachment.id);
-    return queryClient.fetchQuery(fileQuery(true));
+    return requestFile(queryKeys.chatAttachment(serverId, attachment.id), () =>
+      queryClient.fetchQuery(fileQuery(true)),
+    );
   };
   async function share() {
     requestLargeFile(serverId, attachment.id);
@@ -400,13 +403,15 @@ export function useAttachmentFiles(serverId: string, attachments: readonly Attac
   const { t } = text;
   const [busy, setBusy] = useState(false);
   const load = (attachment: AttachmentSummary) =>
-    queryClient.fetchQuery(
-      attachmentFileQuery(
-        serverId,
-        attachment,
-        downloadAttachment,
-        t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
-        true,
+    requestFile(queryKeys.chatAttachment(serverId, attachment.id), () =>
+      queryClient.fetchQuery(
+        attachmentFileQuery(
+          serverId,
+          attachment,
+          downloadAttachment,
+          t("mobile.chat.attachment.tooLargeForMobile", { limit: fileLimitText(text, MOBILE_LARGE_FILE_BYTES) }),
+          true,
+        ),
       ),
     );
   const fail = (error: unknown, title: string) => showFileFailure(error, title, text);

@@ -1601,6 +1601,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     setActiveServerId(online.id);
   }, [servers, activeServerId, startupWaitOver, sortByPreference, conversationStore]);
 
+  const finishedChatLoads = useRef({ queues: new Map<string, Promise<void>>(), waiting: new Set<string>() });
+  const loadFinishedChat = useCallback(
+    (agentId: string, serverId: string) => {
+      const loads = finishedChatLoads.current;
+      if (loads.waiting.has(agentId)) return;
+      loads.waiting.add(agentId);
+      const queue = (loads.queues.get(serverId) ?? Promise.resolve())
+        .then(() => {
+          loads.waiting.delete(agentId);
+          if (!foregroundRef.current || !conversationStore.get(agentId) || conversationStore.isUpToDate(agentId))
+            return;
+          return loadConversation(agentId, serverId).then(() => undefined);
+        })
+        .catch(() => undefined);
+      loads.queues.set(serverId, queue);
+    },
+    [conversationStore, loadConversation],
+  );
+
   const handleTeamEvent = useCallback(
     (serverId: string, event: RemoteTeamEvent) => {
       if (removedServers.current.has(serverId)) return;
@@ -1735,8 +1754,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         )
           void loadConversation(event.agentId, serverId, true).catch(() => undefined);
       } else if (event.type === "turn-completed") {
-        if (conversationStore.get(event.agentId) && conversationStore.invalidate(event.agentId))
-          void loadConversation(event.agentId, serverId).catch(() => undefined);
+        if (conversationStore.get(event.agentId)) {
+          if (conversationStore.invalidate(event.agentId))
+            void loadConversation(event.agentId, serverId).catch(() => undefined);
+          else if (!event.quiet && !event.continues) loadFinishedChat(event.agentId, serverId);
+        }
       } else if (event.type === "team-identity") {
         setServers((current) =>
           current.map((server) =>
@@ -1756,6 +1778,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       applyHostHidden,
       applyHostColors,
       loadConversation,
+      loadFinishedChat,
       refreshOpenExchanges,
       replaceServerAgents,
       conversationStore,

@@ -185,8 +185,8 @@ function MarketplaceWindow(props: MarketplaceProps) {
                 <Match when={view.kind === "appGroup" && view.category} keyed>
                   {(category) => <AppGroupPage scope={scope} category={category} />}
                 </Match>
-                <Match when={view.kind === "app" && view.id} keyed>
-                  {(id) => <MarketplaceAppPage scope={scope} id={id} />}
+                <Match when={view.kind === "app" ? view : undefined} keyed>
+                  {(app) => <MarketplaceAppPage scope={scope} id={app.id} setup={app.setup === true} />}
                 </Match>
                 <Match when={view.kind === "skillGroup" && view.group} keyed>
                   {(group) => <SkillGroupPage scope={scope} group={group} />}

@@ -27,6 +27,7 @@ import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { AgentDragPreview, useChatDrag, useHoldMenu } from "@/features/agents/components/chat-drag";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
 import { useChatRowBackground } from "@/features/agents/components/chat-list-pane-context";
+import { CHAT_ROW_AVATAR_SIZE, ChatRowHeading, ChatRowTime } from "@/features/agents/components/chat-row";
 import { useWaitingChannel } from "@/features/channels/components/use-waiting-channel";
 import {
   agentListWaitReason,
@@ -139,7 +140,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
       color={agent.avatarColor}
       seed={agent.avatarSeed}
       avatarUrl={agent.avatarUrl}
-      size={54}
+      size={CHAT_ROW_AVATAR_SIZE}
       animateIdle={false}
       rings
       activityMood={agentActivityMood(activity)}
@@ -148,10 +149,10 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
   const waitBadge = waitReason ? (
     <AgentWaitBadge reason={waitReason} />
   ) : unreadCount > 0 || unreadThreads ? (
-    <AgentUnreadBadge count={unreadCount} avatarSize={54} ringColor={background} />
+    <AgentUnreadBadge count={unreadCount} avatarSize={CHAT_ROW_AVATAR_SIZE} ringColor={background} />
   ) : null;
   const avatar = (
-    <AgentPinAvatar agentId={agent.id} location="row" size={54}>
+    <AgentPinAvatar agentId={agent.id} location="row" size={CHAT_ROW_AVATAR_SIZE}>
       {bloub}
       {waitBadge}
     </AgentPinAvatar>
@@ -177,7 +178,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
     >
       {({ pressed }) => (
         <View
-          className="min-h-20 w-full flex-row items-center gap-3 py-1"
+          className="min-h-21 w-full flex-row items-center gap-3.5 py-1"
           style={{
             backgroundColor: background,
             opacity: pressed ? 0.58 : 1,
@@ -188,31 +189,17 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
           {avatar}
           <AgentRowTextReveal active={isUnpinTarget}>
             <View className="min-w-0 flex-1 gap-0.5">
-              <View className="flex-row items-center gap-2">
-                <Typography.Paragraph
-                  className="font-semibold min-w-0 flex-1"
-                  numberOfLines={1}
-                  style={typeScale.rowTitle}
-                >
-                  {agent.name}
-                </Typography.Paragraph>
-                {waitReason ? (
-                  <AgentWaitChip reason={waitReason} />
-                ) : (
-                  <Typography.Paragraph className="text-muted" style={typeScale.caption}>
-                    {agent.updatedLabel}
-                  </Typography.Paragraph>
-                )}
-              </View>
-              {agent.title.trim() ? (
-                <Typography.Paragraph className="text-muted" numberOfLines={1} style={typeScale.caption}>
-                  {agent.title.trim()}
-                </Typography.Paragraph>
-              ) : null}
+              <ChatRowHeading
+                name={agent.name}
+                title={agent.title.trim()}
+                trailing={
+                  waitReason ? <AgentWaitChip reason={waitReason} /> : <ChatRowTime label={agent.updatedLabel} />
+                }
+              />
               <Typography.Paragraph
                 className="text-text-secondary"
                 numberOfLines={1}
-                style={[typeScale.preview, lineDirectionStyle(previewLine)]}
+                style={[typeScale.chatDetail, lineDirectionStyle(previewLine)]}
               >
                 {previewLine}
               </Typography.Paragraph>
@@ -232,7 +219,7 @@ export const AgentListRow = memo(function AgentListRow({ agent, leftInset = 20, 
     >
       {isAndroid ? (
         <View>
-          <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+          <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
             <Link.Trigger>{row}</Link.Trigger>
           </Link>
           {menuKey > 0 ? <AgentAndroidMenu key={menuKey} agent={agent} onClose={() => setMenuKey(0)} /> : null}
