@@ -2,6 +2,10 @@ import { X_AGENT_LISTING_ID, X_EXTENSION_URL } from "@openbot/contracts/browser-
 import type { MarketplaceAgentDetail } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
+  Alert,
+  AlertContent,
+  AlertDescription,
+  AlertIcon,
   Button,
   Check,
   ExternalLink,
@@ -13,6 +17,7 @@ import {
   ItemMedia,
   ItemTitle,
   MessageCircle,
+  OctagonX,
   Puzzle,
   SettingsSection,
   Spinner,
@@ -20,7 +25,7 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { XTile } from "../settings/brand-marks";
 import { IntegrationPage, LogoTile, Stepper, WizardDialog } from "../settings/IntegrationLayout";
@@ -63,31 +68,45 @@ export function MarketplaceXAppPage(props: {
 }) {
   const { t } = useText();
   const model = () => props.scope.model;
-  const [open, setOpen] = createSignal(props.setup && props.app.agent === null);
+  const [open, setOpen] = createSignal(untrack(() => props.setup && props.app.agent === null));
   const [step, setStep] = createSignal<SetupStep>(0);
   const [listing, setListing] = createSignal<MarketplaceAgentDetail | undefined>();
   const busy = () => model().agentBusy(X_AGENT_LISTING_ID);
+  const loadListing = () =>
+    model()
+      .loadAgent(X_AGENT_LISTING_ID)
+      .then((detail) => {
+        if (detail) setListing(detail);
+      });
+  onSettled(() => {
+    if (props.app.agent) void loadListing();
+  });
+  const canUpdate = () => {
+    const detail = listing();
+    return detail !== undefined && props.app.agent !== null && model().agentState(detail) === "update";
+  };
   const begin = () => {
+    model().clearError();
     setStep(0);
     setOpen(true);
   };
   const showAgentStep = () => {
     setStep(1);
-    if (listing()) return;
-    void model()
-      .loadAgent(X_AGENT_LISTING_ID)
-      .then((detail) => {
-        if (detail) setListing(detail);
-        else setStep(0);
-      });
+    if (!listing()) void loadListing();
   };
   const add = (detail: MarketplaceAgentDetail) => {
+    const state = model().agentState(detail);
+    if (state === "added" || state === "update") {
+      setStep(2);
+      return;
+    }
     void model()
       .addAgent(detail)
       .then((added) => {
         if (added) setStep(2);
       });
   };
+  const update = (detail: MarketplaceAgentDetail) => void model().addAgent(detail, true);
   const openExtension = () => model().openUrl(X_EXTENSION_URL);
   return (
     <IntegrationPage
@@ -147,6 +166,13 @@ export function MarketplaceXAppPage(props: {
                     <ItemDescription>{agent().title}</ItemDescription>
                   </ItemContent>
                   <ItemActions>
+                    <Show when={canUpdate() && listing()}>
+                      {(detail) => (
+                        <Button type="button" size="sm" loading={busy()} onClick={() => update(detail())}>
+                          {t("marketplace.agent.update")}
+                        </Button>
+                      )}
+                    </Show>
                     <Button
                       type="button"
                       size="sm"
@@ -234,6 +260,18 @@ export function MarketplaceXAppPage(props: {
           </Switch>
         }
       >
+        <Show when={model().error()}>
+          {(message) => (
+            <Alert tone="danger" role="alert">
+              <AlertIcon>
+                <OctagonX />
+              </AlertIcon>
+              <AlertContent>
+                <AlertDescription>{message()}</AlertDescription>
+              </AlertContent>
+            </Alert>
+          )}
+        </Show>
         <Switch>
           <Match when={step() === 0}>
             <ol class="channel-checklist">
@@ -251,9 +289,11 @@ export function MarketplaceXAppPage(props: {
             <Show
               when={listing()}
               fallback={
-                <div class="channel-waiting">
-                  <Spinner size="sm" />
-                </div>
+                <Show when={!model().error()}>
+                  <div class="channel-waiting">
+                    <Spinner size="sm" />
+                  </div>
+                </Show>
               }
             >
               {(detail) => (

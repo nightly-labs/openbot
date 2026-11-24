@@ -748,7 +748,12 @@ Use `bun run dev:automation` for snapshots and screenshots. Do not drive another
 
 The extension (`apps/browser-extension`) sends a post from X to the user's X agent
 (`X_AGENT_LISTING_ID` in `packages/contracts/src/browser-extension-x.ts`, a Marketplace Agent in
-`marketplace/production-catalog`). There are three parts:
+`marketplace/production-catalog`). On desktop and web, the user adds this agent with the X app of
+the Marketplace (`MarketplaceXAppPage` in `packages/ui/src/features/marketplace`), not from the Agents
+tab. Its setup has two steps, as a chat app has: get the extension (`X_EXTENSION_URL`), then add the
+agent through the usual Marketplace install. The X app shows on this computer, and on a joined server
+only for an admin that can install agents (`agent-install-v1`), as Discord and the other chat apps do.
+There are three parts:
 
 - **Content script** (`src/x-content.ts`, built as one IIFE file, `x-content.js`). It finds the parts of
   an X page with CSS selectors only. When a reply mentions @OpenBot_ and the server answers `ready`, it
