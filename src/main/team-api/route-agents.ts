@@ -193,6 +193,7 @@ export async function routeAgents(
     return json(200, capabilities.has(TEAM_USAGE_READ_FAILED_CAPABILITY) ? signIns : usageWithoutReadFailed(signIns));
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.models) {
+    agents.requestModelsRefresh?.();
     const modelId = context.protocol < 6 ? V5_AGENT_MODEL : V6_AGENT_MODEL;
     const models = (await agents.listModels())
       .filter((model) => modelId.test(model.id))

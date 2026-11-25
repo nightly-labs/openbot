@@ -179,6 +179,7 @@ export interface AgentSettingsPanelProps {
   onConnectProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   canConnectProvider?: ((provider: AgentProviderId) => boolean) | undefined;
   onManageProviders?: ((trigger: HTMLElement) => void) | undefined;
+  onOpenModelPicker?: (() => void) | undefined;
   maxWidth: () => number;
   onClose: () => void;
   width: number;
@@ -1326,6 +1327,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   onConnectProvider={props.onConnectProvider}
                   canConnectProvider={props.canConnectProvider}
                   onManageProviders={props.onManageProviders}
+                  onOpen={props.onOpenModelPicker}
                   disabledReason={t("agentSettings.runtime.modelUnavailable")}
                   accountChoice
                   providerAccountId={agentNextProviderAccountId(props.agent)}

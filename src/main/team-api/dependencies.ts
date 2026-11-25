@@ -210,6 +210,7 @@ type TeamApiAgentMethods = Pick<
 >;
 
 export type TeamApiAgents = TeamApiAgentMethods & {
+  requestModelsRefresh?: () => void;
   on: (event: "event", listener: (event: AgentEvent, memberId?: string) => void) => void;
   off: (event: "event", listener: (event: AgentEvent, memberId?: string) => void) => void;
 };

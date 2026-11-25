@@ -217,6 +217,7 @@ const PROVIDER_RESTART_POLL_MS = 1_000;
 const PROVIDER_BACKGROUND_WORK_WAIT_MS = 4 * 60 * 60_000;
 const FAILED_MODEL_LIST_RETRY_DELAYS_MS = [2_000, 15_000];
 const MODEL_LIST_REREAD_MS = PROVIDER_IDLE_RELEASE_MS;
+const MODEL_LIST_ON_DEMAND_REREAD_MS = 15_000;
 const OPENCODE_NEWER_DATABASE = /\bDatabase is not empty and has no session table\b/u;
 const CODEX_STATE_BUSY = /\btimed out waiting for state db backfill\b/u;
 const KILLED_BY_SYSTEM = /\(signal SIGKILL\)/u;
@@ -346,6 +347,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #emitError: (code: string, error: unknown, agentId?: string, context?: FailureContext) => void;
   readonly #requestTimeoutMs: number;
   readonly #longStartTimeoutMs: number;
+  readonly #onDemandModelRereadMs: number;
   readonly #clientFactory: AgentClientFactory | null;
   readonly #bundledExecutables: BundledProviderExecutables;
   readonly #credentials: ProviderClientContext;
@@ -384,9 +386,11 @@ export class ProviderRuntime implements ProviderPort {
   readonly #lastErrors = new Map<AgentProvider, { message: string; at: number; serial: number }>();
   #errorSerial = 0;
   readonly #relisting = new Set<AgentProvider>();
+  readonly #relistWaiters = new Map<AgentProvider, Deferred.Deferred<void>>();
   readonly #lateRelists = new Set<AgentProvider>();
   readonly #heldListTimeouts = new Map<AgentProvider, unknown>();
   #modelsReadAt = 0;
+  readonly #providerModelsReadAt = new Map<AgentProvider, number>();
   readonly #relistedAfterFailure = new WeakSet<AgentClient>();
   readonly #reportedMcpFailures = new Set<string>();
   readonly #lastUsage = new Map<AgentProvider, AccountUsage["limits"][number]>();
@@ -447,6 +451,7 @@ export class ProviderRuntime implements ProviderPort {
     emitError: (code: string, error: unknown, agentId?: string, context?: FailureContext) => void;
     requestTimeoutMs: number;
     longStartTimeoutMs?: number;
+    onDemandModelRereadMs?: number;
     preferredProvider: AgentProvider;
     preferredModel?: AgentModelId | null;
     clientFactory: AgentClientFactory | null;
@@ -468,6 +473,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#emitError = options.emitError;
     this.#requestTimeoutMs = options.requestTimeoutMs;
     this.#longStartTimeoutMs = options.longStartTimeoutMs ?? LONG_START_TIMEOUT_MS;
+    this.#onDemandModelRereadMs = options.onDemandModelRereadMs ?? MODEL_LIST_ON_DEMAND_REREAD_MS;
     this.#preferredProvider = options.preferredProvider;
     this.#preferredModel = options.preferredModel ?? null;
     this.#clientFactory = options.clientFactory;
@@ -966,6 +972,28 @@ export class ProviderRuntime implements ProviderPort {
     const fresh = yield* this.#refreshModelCatalog();
     this.#setStatus({});
     return fresh;
+  }).bind(this);
+
+  requestModelsRefresh(): void {
+    if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    Effect.runFork(this.rereadModels().pipe(Effect.ignore, Effect.forkIn(this.#scope)));
+  }
+
+  readonly rereadModels = Effect.fn("ProviderRuntime.rereadModels")(function* (
+    this: ProviderRuntime,
+    only?: AgentProvider,
+  ) {
+    if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    const onlyWaiter = only ? this.#relistWaiters.get(only) : undefined;
+    const inflight = only
+      ? onlyWaiter
+        ? [onlyWaiter]
+        : []
+      : [...this.#relistWaiters.values()];
+    yield* this.#rereadProviders(only, this.#onDemandModelRereadMs, false);
+    for (const waiter of inflight) {
+      yield* Deferred.await(waiter).pipe(Effect.ignore);
+    }
   }).bind(this);
 
   createProfileClient(provider: AgentProvider, accountId?: string): AgentClient {
@@ -2983,6 +3011,9 @@ export class ProviderRuntime implements ProviderPort {
     this.#signInCheck = null;
     this.#signInFiles.clear();
     this.#released.clear();
+    this.#providerModelsReadAt.clear();
+    for (const waiter of this.#relistWaiters.values()) Deferred.doneUnsafe(waiter, Effect.void);
+    this.#relistWaiters.clear();
     const loginClient = this.#codexLogin.dispose();
     const stopCliLogins = this.#cliLogin.dispose();
     this.#providerConnectionCommands.clear();
@@ -4330,6 +4361,7 @@ export class ProviderRuntime implements ProviderPort {
     const { fresh, timedOut, failed, sourceChanged } = yield* this.#modelCatalog.refresh();
     let changed = false;
     for (const provider of fresh) {
+      this.#providerModelsReadAt.set(provider, this.#modelsReadAt);
       const lastError = this.#lastErrors.get(provider);
       if (!lastError || lastError.serial > errorSerialAtStart) continue;
       this.#lastErrors.delete(provider);
@@ -4340,7 +4372,7 @@ export class ProviderRuntime implements ProviderPort {
     if (changed || sourceChanged) this.#setStatus({});
     for (const provider of timedOut.keys()) {
       if (this.#relisting.has(provider)) continue;
-      this.#relisting.add(provider);
+      this.#beginRelisting(provider);
       yield* this.#relistModels(provider).pipe(
         Effect.ensuring(Effect.sync(() => this.#releaseRelisting(provider))),
         Effect.forkIn(this.#scope),
@@ -4367,6 +4399,7 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const errorSerialAtStart = this.#errorSerial;
     if (!(yield* this.#modelCatalog.relist(provider))) return false;
+    this.#providerModelsReadAt.set(provider, Date.now());
     const lastError = this.#lastErrors.get(provider);
     if (lastError && lastError.serial <= errorSerialAtStart) this.#lastErrors.delete(provider);
     this.#setStatus({});
@@ -4380,12 +4413,31 @@ export class ProviderRuntime implements ProviderPort {
     const now = Date.now();
     if (now - this.#modelsReadAt < MODEL_LIST_REREAD_MS) return;
     this.#modelsReadAt = now;
-    const providers = [...this.#clients.keys()].filter(
-      (provider) =>
-        BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog?.relistWhileRunning &&
-        !this.#off.has(provider) &&
-        !this.#relisting.has(provider),
-    );
+    yield* this.#rereadProviders(undefined, MODEL_LIST_REREAD_MS, true);
+  });
+
+  readonly #rereadProviders = Effect.fn("ProviderRuntime.rereadProviders")(function* (
+    this: ProviderRuntime,
+    only: AgentProvider | undefined,
+    minAgeMs: number,
+    periodic: boolean,
+  ) {
+    if (this.#hooks.isStopping() || this.#status.phase !== "ready") return;
+    const now = Date.now();
+    const candidates = only ? [only] : BUILT_IN_PROVIDER_DRIVERS.map((driver) => driver.id);
+    const providers = candidates.filter((provider) => {
+      const catalog = BUILT_IN_PROVIDER_DRIVERS.find((driver) => driver.id === provider)?.catalog;
+      if (!catalog?.relistWhileRunning || this.#off.has(provider) || this.#relisting.has(provider)) return false;
+      const readAt = this.#providerModelsReadAt.get(provider) ?? this.#modelsReadAt;
+      if (now - readAt < minAgeMs) return false;
+      if (this.#clients.has(provider)) return true;
+      return (
+        this.#released.has(provider) &&
+        this.#cli.has(provider) &&
+        !this.#providerInUse(provider) &&
+        (!periodic || catalog.relistWhenReleased === true)
+      );
+    });
     if (providers.length === 0) return;
     const errorSerialAtStart = this.#errorSerial;
     const listOf = (provider: AgentProvider) =>
@@ -4394,7 +4446,10 @@ export class ProviderRuntime implements ProviderPort {
         this.#modelCatalog.source(provider) ?? null,
       ]);
     let changed = false;
-    for (const provider of providers) this.#relisting.add(provider);
+    for (const provider of providers) {
+      this.#providerModelsReadAt.set(provider, now);
+      this.#beginRelisting(provider);
+    }
     yield* Effect.forEach(
       providers,
       (provider) =>
@@ -4405,7 +4460,11 @@ export class ProviderRuntime implements ProviderPort {
             this.#recordProviderError(provider, this.#heldListTimeouts.get(provider));
             changed = true;
           };
-          if (!(yield* this.#modelCatalog.relist(provider, { quiet: true, onQuietFailure: showHeldTimeout }))) return;
+          const fresh = this.#clients.has(provider)
+            ? yield* this.#modelCatalog.relist(provider, { quiet: true, onQuietFailure: showHeldTimeout })
+            : yield* this.#relistReleasedProvider(provider, showHeldTimeout);
+          if (!fresh) return;
+          this.#providerModelsReadAt.set(provider, Date.now());
           if (listOf(provider) !== before) changed = true;
           const lastError = this.#lastErrors.get(provider);
           if (lastError && lastError.serial <= errorSerialAtStart) {
@@ -4418,6 +4477,32 @@ export class ProviderRuntime implements ProviderPort {
     if (changed) this.#setStatus({});
   });
 
+  readonly #relistReleasedProvider = Effect.fn("ProviderRuntime.relistReleasedProvider")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    onQuietFailure: () => void,
+  ) {
+    const cli = this.#cli.get(provider);
+    if (!cli || this.#clients.has(provider) || this.#off.has(provider)) return false;
+    return yield* Effect.acquireUseRelease(
+      this.#authenticateClient(provider, cli, { interruptibleStart: true }),
+      ({ client }) => this.#modelCatalog.relist(provider, { client, quiet: true, onQuietFailure }),
+      ({ client }) =>
+        client.stop().pipe(Effect.ignore, Effect.andThen(this.#hooks.onClientStopped(client)), Effect.ignore),
+    ).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() => {
+          onQuietFailure();
+          logger.warn("A released provider did not list its models.", {
+            provider,
+            message: error.cause instanceof Error ? this.#redactMcp(error.cause.message) : "unknown",
+          });
+          return false;
+        }),
+      ),
+    );
+  });
+
   #relistLateModels(client: AgentClient): void {
     const provider = client.provider;
     if (this.#clients.get(provider) !== client) return;
@@ -4425,7 +4510,7 @@ export class ProviderRuntime implements ProviderPort {
       this.#lateRelists.add(provider);
       return;
     }
-    this.#relisting.add(provider);
+    this.#beginRelisting(provider);
     Effect.runFork(
       this.#relistModels(provider).pipe(
         Effect.ensuring(Effect.sync(() => this.#releaseRelisting(provider))),
@@ -4434,9 +4519,19 @@ export class ProviderRuntime implements ProviderPort {
     );
   }
 
+  #beginRelisting(provider: AgentProvider): void {
+    this.#relisting.add(provider);
+    if (!this.#relistWaiters.has(provider)) this.#relistWaiters.set(provider, Deferred.makeUnsafe<void>());
+  }
+
   #releaseRelisting(provider: AgentProvider): void {
     this.#relisting.delete(provider);
     this.#heldListTimeouts.delete(provider);
+    const waiter = this.#relistWaiters.get(provider);
+    if (waiter) {
+      this.#relistWaiters.delete(provider);
+      Deferred.doneUnsafe(waiter, Effect.void);
+    }
     const client = this.#clients.get(provider);
     if (this.#lateRelists.delete(provider) && client) this.#relistLateModels(client);
   }

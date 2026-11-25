@@ -142,6 +142,7 @@ export interface ConversationProps {
   availableRoutineIds?: readonly string[] | undefined;
   routines?: readonly RoutineFields[] | undefined;
   modelOptions: ClientAgentModelOption[];
+  onOpenModelPicker?: (() => void) | undefined;
   messages: readonly AgentMessage[];
   messageReferences?: Record<string, AgentMessage> | undefined;
   missingMessageReferences?: Readonly<Record<string, true>> | undefined;

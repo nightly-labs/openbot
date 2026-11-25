@@ -104,6 +104,7 @@ interface ProviderModelPickerProps {
   accountUsage?: AccountUsage | null | undefined;
   workspaceOnly?: boolean | undefined;
   foreignProvider?: ForeignProviderId | undefined;
+  onOpen?: (() => void) | undefined;
   onChange: (
     model: AgentModelId,
     provider: AgentProviderId,
@@ -468,6 +469,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   function setPickerOpen(next: boolean): void {
     if (props.disabled) return;
     if (next) {
+      if (!open()) props.onOpen?.();
       setNow(Date.now());
       setOpenedKeys(untrack(() => railKeys().filter(entryUsable)));
       const key = activeKey();

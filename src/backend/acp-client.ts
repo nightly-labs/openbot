@@ -616,6 +616,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #initialization: InitializeResponse | null = null;
   #startTimeoutMs: number | null = null;
   #models: AcpModel[] = [];
+  #modelsListed = false;
   #lastTurnStartedAt = 0;
   #signedIn = false;
   readonly #subagents = newSubagentState();
@@ -636,25 +637,43 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.emit("exit", error);
     });
     this.#requestTimeoutMs = requestTimeoutMs;
-    this.#configuration = new AcpConfiguration({
-      connection: () => this.#requireConnection(),
-      scope: () => this.#scope,
-      label: () => this.#label,
-      provider: options.provider,
-      requestTimeoutMs,
-      discoveryCwd: options.discoveryCwd,
-      processWideModel: options.flavor.processWideModel === true,
-      setsConfigOnlyOnChange: options.flavor.setsConfigOnlyOnChange === true,
-      modelSetUnsaved: options.flavor.modelSetUnsaved,
-      modelConfigId: options.flavor.modelConfigId,
-      configSetUnsaved: options.flavor.configSetUnsaved,
-      configConflict: options.flavor.configConflict,
+    this.#configuration = this.#newConfiguration(() => this.#requireConnection(), requestTimeoutMs, {
       keepProbeSession: () => options.flavor.closeKeepsSession === true && this.#supportsSessionResume,
       probeCloseDelayMs: options.flavor.probeCloseDelayMs,
       deletesSessions: () => this.#deletesSessions,
       discarded: (sessionId) => this.#discardedSessions.add(sessionId),
-      effortCategories: options.flavor.effortCategories,
-      stillStarting: options.flavor.stillStarting,
+    });
+  }
+
+  #newConfiguration(
+    connection: () => ClientSideConnection,
+    requestTimeoutMs: number,
+    probe: {
+      keepProbeSession: () => boolean;
+      probeCloseDelayMs?: number | undefined;
+      deletesSessions?: () => boolean;
+      discarded?: (sessionId: string) => void;
+    },
+  ): AcpConfiguration {
+    return new AcpConfiguration({
+      connection,
+      scope: () => this.#scope,
+      label: () => this.#label,
+      provider: this.options.provider,
+      requestTimeoutMs,
+      discoveryCwd: this.options.discoveryCwd,
+      processWideModel: this.options.flavor.processWideModel === true,
+      setsConfigOnlyOnChange: this.options.flavor.setsConfigOnlyOnChange === true,
+      modelSetUnsaved: this.options.flavor.modelSetUnsaved,
+      modelConfigId: this.options.flavor.modelConfigId,
+      configSetUnsaved: this.options.flavor.configSetUnsaved,
+      configConflict: this.options.flavor.configConflict,
+      keepProbeSession: probe.keepProbeSession,
+      ...(probe.probeCloseDelayMs !== undefined ? { probeCloseDelayMs: probe.probeCloseDelayMs } : {}),
+      ...(probe.deletesSessions ? { deletesSessions: probe.deletesSessions } : {}),
+      ...(probe.discarded ? { discarded: probe.discarded } : {}),
+      effortCategories: this.options.flavor.effortCategories,
+      stillStarting: this.options.flavor.stillStarting,
     });
   }
 
@@ -843,6 +862,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (this.running) return;
     this.#scope = Scope.makeUnsafe();
     this.#promptAnswered = false;
+    this.#modelsListed = false;
     this.#transport.start();
   }
 
@@ -1255,9 +1275,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         yield* this.#ensureInitializedEffect();
         if (this.#signedIn && !asksForStartModels(params)) {
           try {
-            const models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
+            const discover =
+              this.#modelsListed && this.#flavor.rereadModelsInNewProcess
+                ? this.#discoverModelsInNewProcess(timeoutMs)
+                : this.#discoverModels(timeoutMs);
+            const models = providerResult(yield* Effect.result(discover));
             if (models.length === 0 && this.#flavor.keepModelsOnRefreshFailure && !this.options.allowNoModels)
               throw new Error(sourceText("error.provider.acpNoModels"));
+            this.#modelsListed = true;
             this.#models = models;
           } catch (error) {
             if (!this.#flavor.keepModelsOnRefreshFailure || this.#models.length === 0 || isAuthenticationError(error))
@@ -1456,8 +1481,51 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
     timeoutMs?: number,
   ): Effect.fn.Return<AcpModel[], ProviderClientOperationError> {
+    return yield* this.#discoverModelsWith(this.#configuration, timeoutMs);
+  });
+
+  readonly #discoverModelsInNewProcess = Effect.fn("AcpAgentClient.discoverModelsInNewProcess")(function* (
+    this: AcpAgentClient,
+    timeoutMs?: number,
+  ): Effect.fn.Return<AcpModel[], ProviderClientOperationError> {
+    const effectiveTimeoutMs = timeoutMs ?? this.#requestTimeoutMs;
+    const transport = this.#newTransport(() => undefined);
+    return yield* Effect.acquireUseRelease(
+      Effect.gen({ self: this }, function* () {
+        yield* providerSync(() => {
+          if (!this.running) throw new Error("ACP client is not running.");
+          this.#openingSessionProcesses.add(transport);
+          transport.start();
+        });
+        const connection = yield* providerSync(() => transport.requireConnection());
+        const startTimeout = this.#startTimeout(effectiveTimeoutMs);
+        const initialization = yield* this.#initializeConnection(connection).pipe(startTimeout);
+        yield* (this.options.authenticate?.(connection, initialization) ?? Effect.void).pipe(startTimeout);
+        return connection;
+      }).pipe(
+        Effect.catch((failure) => this.#explainSessionEnd(transport, failure.cause).pipe(Effect.flatMap(Effect.fail))),
+      ),
+      (connection) =>
+        this.#discoverModelsWith(
+          this.#newConfiguration(() => connection, effectiveTimeoutMs, { keepProbeSession: () => true }),
+          effectiveTimeoutMs,
+        ).pipe(
+          Effect.catch((failure) => this.#explainSessionEnd(transport, failure.cause).pipe(Effect.flatMap(Effect.fail))),
+        ),
+      () =>
+        Effect.sync(() => {
+          this.#openingSessionProcesses.delete(transport);
+        }).pipe(Effect.andThen(transport.stop(Effect.void).pipe(Effect.ignore))),
+    );
+  });
+
+  readonly #discoverModelsWith = Effect.fn("AcpAgentClient.discoverModelsWith")(function* (
+    this: AcpAgentClient,
+    configuration: AcpConfiguration,
+    timeoutMs?: number,
+  ): Effect.fn.Return<AcpModel[], ProviderClientOperationError> {
     const [listed, additional] = yield* Effect.all(
-      [this.#configuration.discoverModels(timeoutMs), this.options.additionalModels?.() ?? Effect.succeed([])],
+      [configuration.discoverModels(timeoutMs), this.options.additionalModels?.() ?? Effect.succeed([])],
       { concurrency: "unbounded" },
     );
     if (listed.length === 0) return listed;

@@ -513,11 +513,13 @@ export function agentIpcHandlers({
         },
       }),
       listModels: scopedQueryHandler({
-        local: async () =>
-          withWorkspaceOnlyLimit(
+        local: async () => {
+          service.requestModelsRefresh();
+          return withWorkspaceOnlyLimit(
             await runCauseEffect(modelVisibility.picker(logRejectedModels(service.listModels(), "local"))),
             !canConfineProcesses(),
-          ),
+          );
+        },
         remote: (serverId) => {
           const models = remoteServers.request(serverId, TEAM_API_ROUTES.agents.models, (value) =>
             decodeAgentModelOptions(logRejectedModels(value, "remote")),

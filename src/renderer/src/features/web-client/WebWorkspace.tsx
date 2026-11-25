@@ -505,15 +505,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     modelsShown = request;
     setModels(list);
   }
+  function refreshModels(): void {
+    const request = ++modelsRequest;
+    workspace.runtime.models().then(
+      (list) => showModels(request, list),
+      () => undefined,
+    );
+  }
   const workspace = createWebWorkspace(props, {
     onStatus: (next) => {
       setStatus(next);
       if (next.phase !== "ready") return;
-      const request = ++modelsRequest;
-      workspace.runtime.models().then(
-        (list) => showModels(request, list),
-        () => undefined,
-      );
+      refreshModels();
     },
   });
   const notifications = createWebServerNotifications(props.accountId);
@@ -3937,6 +3940,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   preference={serverSetupChoice()}
                   customProviders={providerSettings()?.customProviders}
                   onManageProviders={providerSettings() ? openProviderSettings : undefined}
+                  onOpenModelPicker={refreshModels}
                   liveModels={models()}
                   liveStatus={providerAdmin.status()}
                   accountChoice={agentAccountChoice()}
@@ -4136,6 +4140,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   availableRoutineIds={availableRoutineIds()}
                   routines={routineSnapshot()?.routines}
                   modelOptions={models()}
+                  onOpenModelPicker={refreshModels}
                   threads={threads()}
                   messages={view.messages}
                   messageReferences={view.messageReferences()}

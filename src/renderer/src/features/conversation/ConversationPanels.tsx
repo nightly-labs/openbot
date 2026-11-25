@@ -892,6 +892,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               onConnectProvider={props.onConnectProvider}
               canConnectProvider={props.canConnectProvider}
               onManageProviders={props.onManageProviders}
+              onOpenModelPicker={props.onOpenModelPicker}
               browserProfileCalls={
                 serverCanAdminister(props.server, BROWSER_PROFILES_CAPABILITY) ? browserProfileCalls() : undefined
               }

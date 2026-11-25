@@ -449,6 +449,7 @@ const MAC_PERMISSION_NAMES: Record<MacPermissionId, string> = {
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
   listModels(): AgentModelOption[];
+  refreshStaleModels?(provider?: AgentProvider): Effect.Effect<void>;
   hiddenModels?(provider: AgentProvider): ReadonlySet<string> | undefined;
   agentModels(choice: Pick<AgentModelChoice, "provider" | "providerAccountId">): AgentModelOption[];
   providerAccounts: ProviderAccountRows;
@@ -2205,6 +2206,7 @@ export class OpenBotToolRouter {
 
     if (params.tool === "list_models") {
       const args = listModelsToolSchema.parse(params.arguments ?? {});
+      if (this.#hooks.refreshStaleModels) yield* this.#hooks.refreshStaleModels(args.provider);
       const payload = listModelsPayload(
         this.#hooks.listModels(),
         this.#hooks.preferredProvider(),

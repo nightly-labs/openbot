@@ -7,12 +7,12 @@ if (process.argv.includes("--version")) {
 }
 
 let sessions = 0;
+const initialIds: string[] = JSON.parse(readFileSync(process.env.FAKE_CONTROL ?? "", "utf8")).models;
 
 function setup(request: AcpRequest, peer: AcpPeer, sessionId: string): void {
-  const ids: string[] = JSON.parse(readFileSync(process.env.FAKE_CONTROL ?? "", "utf8")).models;
-  logEntry({ event: "setup", method: request.method, sessionId, models: ids });
-  const availableModels = ids.map((modelId) => ({ modelId, name: modelId }));
-  peer.reply(request, { sessionId, models: { availableModels, currentModelId: ids[0] } });
+  logEntry({ event: "setup", method: request.method, pid: process.pid, sessionId, models: initialIds });
+  const availableModels = initialIds.map((modelId) => ({ modelId, name: modelId }));
+  peer.reply(request, { sessionId, models: { availableModels, currentModelId: initialIds[0] } });
 }
 
 serveFakeAcpAgent({
