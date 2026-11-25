@@ -56,6 +56,12 @@ function isElicitationOptionAnswer(text: string, answer: string | undefined): bo
 }
 
 function elicitationOptions(property: DynamicRecord): Array<{ label: string; description: string }> | null {
+  if (property.type === "array") {
+    const items = getRecord(property, "items");
+    return items && (Array.isArray(items.anyOf) || Array.isArray(items.enum))
+      ? elicitationOptions({ oneOf: items.anyOf, enum: items.enum })
+      : null;
+  }
   if (Array.isArray(property.oneOf)) {
     return property.oneOf.filter(isRecord).flatMap((option) => {
       const value = getString(option, "const");
@@ -82,7 +88,13 @@ function elicitationOptions(property: DynamicRecord): Array<{ label: string; des
 
 export function elicitationValue(property: DynamicRecord | undefined, answers: string[]): ElicitationFieldValue {
   if (!property) return answers[0] ?? "";
-  if (property.type === "array") return answers;
+  if (property.type === "array") {
+    const items = getRecord(property, "items") ?? {};
+    return answers.map((answer) => {
+      const value = elicitationValue({ oneOf: items.anyOf, enum: items.enum }, [answer]);
+      return typeof value === "string" ? value : answer;
+    });
+  }
   if (property.type === "boolean") return /^(yes|true|1)$/i.test(answers[0] ?? "");
   if (Array.isArray(property.oneOf)) {
     const selected = property.oneOf
@@ -178,6 +190,7 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
         ...(detail ? { detail: detail.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
         isSecret: secretElicitationField(id, property),
         options: options?.slice(0, INPUT_LIMITS.promptOptions) ?? null,
+        ...(property.type === "array" && options?.length ? { multiSelect: true } : {}),
       },
     ];
   });
