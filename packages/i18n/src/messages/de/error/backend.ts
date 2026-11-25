@@ -70,6 +70,12 @@ export const messages = {
     "Die Komprimierung macht diesen Chat nicht kleiner: Nach zwei Komprimierungen nutzt er noch {percent}% des Kontextfensters des Modells, daher komprimiert OpenBot ihn nicht mehr. Tools und Anweisungen nutzen den größten Teil des Fensters. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, oder wähle ein Modell mit größerem Fenster. Starte dann einen neuen Chat.",
   "error.backend.contextCompactionStopped":
     "Zwei Komprimierungen dieses Chats sind nacheinander fehlgeschlagen, daher komprimiert OpenBot ihn nicht mehr automatisch. Jeder Versuch sendet den ganzen Chat an das Modell und verbraucht dein Planlimit. Wähle „Jetzt komprimieren“, um es erneut zu versuchen, oder starte einen neuen Chat.",
+  "error.backend.contextCompactionRetrying":
+    "Der Anbieter konnte diesen Chat nicht komprimieren und versucht es erneut. Neue Nachrichten in diesem Chat warten, bis die Komprimierung endet. Wenn sie nicht bald endet, stoppt OpenBot sie und sendet deine Nachrichten.",
+  "error.backend.contextCompactionFailed":
+    "Die Komprimierung dieses Chats ist fehlgeschlagen. Der Chat wurde nicht geändert. Wartende Nachrichten gehen jetzt an den Agenten.",
+  "error.backend.contextCompactionTimedOut":
+    "Die Komprimierung dieses Chats hat zu lange gedauert, daher hat OpenBot sie gestoppt. Der Chat wurde nicht geändert. Wartende Nachrichten gehen jetzt an den Agenten.",
   "error.backend.providerModelAtCapacity":
     "Das Modell ist ausgelastet. Der Anbieter versucht es in einigen Minuten erneut. Um sofort weiterzumachen, stoppe den Durchlauf und wähle ein anderes Modell.",
   "error.backend.providerRetrying":

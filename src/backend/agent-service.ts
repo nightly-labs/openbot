@@ -1207,7 +1207,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       changed: () => this.#emitRuntimeSnapshot(),
       store,
       providers: this.#providers,
-      emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+      emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
       scheduleDrain: (agentId) => this.#drain.scheduleDrain(agentId),
       rotateSession: (agentId, client, threadId) => this.#threads.rotateProviderSession(agentId, client, threadId),
       loadSession: (agentId, client, threadId) => this.#threads.loadSessionForCompaction(agentId, client, threadId),

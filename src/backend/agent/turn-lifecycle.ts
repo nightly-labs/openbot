@@ -1634,6 +1634,14 @@ export class TurnLifecycle {
           return;
         }
         if (isRecord(params) && params.willRetry === true) {
+          const retriedTurnId = getString(params, "turnId");
+          if (
+            agentId &&
+            threadId &&
+            retriedTurnId &&
+            this.#compaction.providerRetried(agentId, threadId, retriedTurnId)
+          )
+            return;
           const details = getString(error, "additionalDetails");
           this.#providerRetried(
             agentId,

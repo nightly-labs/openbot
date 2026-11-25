@@ -65,6 +65,12 @@ export const messages = defineMessages("error.backend", {
     "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
   "error.backend.contextCompactionStopped":
     "Two compactions of this chat failed in a row, so OpenBot stops compacting it automatically. Each try sends the whole chat to the model and uses your plan limit. Select Compact now to try again, or start a new chat.",
+  "error.backend.contextCompactionRetrying":
+    "The provider could not compact this chat and tries again. New messages in this chat wait until the compaction ends. If it does not end soon, OpenBot stops it and sends your messages.",
+  "error.backend.contextCompactionFailed":
+    "Compacting this chat failed. The chat did not change. Messages that wait go to the agent now.",
+  "error.backend.contextCompactionTimedOut":
+    "Compacting this chat timed out, so OpenBot stopped it. The chat did not change. Messages that wait go to the agent now.",
   "error.backend.providerModelAtCapacity":
     "The model is at capacity. The provider tries again in a few minutes. To continue now, stop the turn and choose a different model.",
   "error.backend.providerRetrying":

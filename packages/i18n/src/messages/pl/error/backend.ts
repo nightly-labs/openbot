@@ -68,6 +68,12 @@ export const messages = {
     "Kompaktowanie nie zmniejsza tego czatu: po dwóch kompaktowaniach nadal zajmuje {percent}% okna kontekstu modelu, więc OpenBot przestaje go kompaktować. Narzędzia i instrukcje zajmują większość okna. Wyłącz serwery MCP lub sterowanie komputerem, których ten agent nie potrzebuje, albo wybierz model z większym oknem. Potem zacznij nowy czat.",
   "error.backend.contextCompactionStopped":
     "Dwa kompaktowania tego czatu z rzędu się nie udały, więc OpenBot przestaje go kompaktować automatycznie. Każda próba wysyła cały czat do modelu i zużywa limit planu. Wybierz „Kompaktuj”, aby spróbować ponownie, albo zacznij nowy czat.",
+  "error.backend.contextCompactionRetrying":
+    "Dostawca nie mógł skompaktować tego czatu i próbuje ponownie. Nowe wiadomości w tym czacie czekają, aż kompaktowanie się skończy. Jeśli nie skończy się wkrótce, OpenBot je zatrzyma i wyśle Twoje wiadomości.",
+  "error.backend.contextCompactionFailed":
+    "Kompaktowanie tego czatu nie powiodło się. Czat się nie zmienił. Oczekujące wiadomości trafiają teraz do agenta.",
+  "error.backend.contextCompactionTimedOut":
+    "Kompaktowanie tego czatu trwało zbyt długo, więc OpenBot je zatrzymał. Czat się nie zmienił. Oczekujące wiadomości trafiają teraz do agenta.",
   "error.backend.providerModelAtCapacity":
     "Model jest przeciążony. Dostawca spróbuje ponownie za kilka minut. Aby kontynuować od razu, zatrzymaj turę i wybierz inny model.",
   "error.backend.providerRetrying":

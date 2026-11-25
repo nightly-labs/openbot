@@ -67,6 +67,12 @@ export const messages = {
     "압축해도 이 채팅이 작아지지 않아요. 두 번 압축한 뒤에도 모델 컨텍스트 창의 {percent}%를 사용해서 OpenBot이 압축을 멈춰요. 창의 대부분은 도구와 지침이 사용해요. 이 에이전트에 필요 없는 MCP 서버나 컴퓨터 사용을 끄거나, 창이 더 큰 모델을 선택하세요. 그런 다음 새 채팅을 시작하세요.",
   "error.backend.contextCompactionStopped":
     '이 채팅의 압축이 두 번 연속 실패하여 OpenBot이 자동 압축을 중지합니다. 시도할 때마다 채팅 전체가 모델로 전송되어 요금제 한도를 사용합니다. 다시 시도하려면 "지금 압축"을 선택하거나 새 채팅을 시작하세요.',
+  "error.backend.contextCompactionRetrying":
+    "공급자가 이 채팅을 압축하지 못해 다시 시도하고 있습니다. 압축이 끝날 때까지 이 채팅의 새 메시지는 대기합니다. 곧 끝나지 않으면 OpenBot이 압축을 중지하고 메시지를 보냅니다.",
+  "error.backend.contextCompactionFailed":
+    "이 채팅을 압축하지 못했습니다. 채팅은 변경되지 않았습니다. 대기 중인 메시지가 이제 에이전트로 전송됩니다.",
+  "error.backend.contextCompactionTimedOut":
+    "이 채팅의 압축 시간이 너무 오래 걸려 OpenBot이 중지했습니다. 채팅은 변경되지 않았습니다. 대기 중인 메시지가 이제 에이전트로 전송됩니다.",
   "error.backend.providerModelAtCapacity":
     "모델 용량이 가득 찼습니다. 제공업체가 몇 분 후에 다시 시도합니다. 지금 계속하려면 턴을 중지하고 다른 모델을 선택하세요.",
   "error.backend.providerRetrying":

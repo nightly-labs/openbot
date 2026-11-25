@@ -67,6 +67,12 @@ export const messages = {
     "La compattazione non riduce questa chat: dopo due compattazioni usa ancora il {percent}% della finestra di contesto del modello, quindi OpenBot smette di compattarla. Strumenti e istruzioni usano la maggior parte della finestra. Disattiva i server MCP o l'uso del computer che questo agente non usa, oppure scegli un modello con una finestra più grande. Poi avvia una nuova chat.",
   "error.backend.contextCompactionStopped":
     "Due compattazioni di fila di questa chat non sono riuscite, quindi OpenBot smette di compattarla automaticamente. Ogni tentativo invia l'intera chat al modello e consuma il limite del tuo piano. Seleziona «Compatta ora» per riprovare, oppure avvia una nuova chat.",
+  "error.backend.contextCompactionRetrying":
+    "Il provider non è riuscito a compattare questa chat e riprova. I nuovi messaggi di questa chat attendono la fine della compattazione. Se non termina presto, OpenBot la interrompe e invia i tuoi messaggi.",
+  "error.backend.contextCompactionFailed":
+    "La compattazione di questa chat non è riuscita. La chat non è cambiata. I messaggi in attesa vanno ora all’agente.",
+  "error.backend.contextCompactionTimedOut":
+    "La compattazione di questa chat ha richiesto troppo tempo, quindi OpenBot l’ha interrotta. La chat non è cambiata. I messaggi in attesa vanno ora all’agente.",
   "error.backend.providerModelAtCapacity":
     "Il modello è al limite della capacità. Il provider riproverà tra qualche minuto. Per continuare ora, interrompi il turno e scegli un altro modello.",
   "error.backend.providerRetrying":
