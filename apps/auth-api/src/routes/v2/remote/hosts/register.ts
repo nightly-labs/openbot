@@ -41,8 +41,6 @@ export const Route = createFileRoute("/v2/remote/hosts/register")({
               machineToken: body.machineToken,
               automatic: body.automatic,
             });
-            // Sites this computer published before it was a server join the server's list. The host is
-            // registered either way, so a failure here does not refuse the registration.
             yield* requestAdoptUnlinkedHostedSites(user.id, registered.hostId).pipe(
               Effect.catch(() => Effect.sync(() => console.warn("hosted sites: unlinked site adoption failed"))),
             );

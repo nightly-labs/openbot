@@ -12,9 +12,6 @@ import { Option, Schema } from "effect";
 import { writeClipboardText } from "../../clipboard";
 import { keptSpaces } from "../../selection-copy";
 
-// Follows T3's context-fragment design: keep file bytes outside the clipboard payload and retain
-// the latest copy independently of the source draft. No source paths or URLs come from a paste.
-// The clipboard gets readable text and an HTML copy ID; the references stay in memory with the files.
 const HTML_ATTRIBUTE = "data-openbot-composer-fragment";
 const decodeFragment = Schema.decodeUnknownOption(
   Schema.fromJsonString(
@@ -27,7 +24,6 @@ const decodeFragment = Schema.decodeUnknownOption(
 type PreviewAttachment = (attachment: AttachmentSummary) => Promise<FilePreview>;
 interface CopiedAttachment {
   attachment: AttachmentSummary;
-  /** Reads the bytes on the first call only. A draft copy or cut reads them at once; a message copy reads them at paste. */
   file: () => Promise<File>;
 }
 interface ComposerCopy {
@@ -35,7 +31,6 @@ interface ComposerCopy {
   text: string;
   files: CopiedAttachment[];
 }
-/** The text of a pasted copy, with references to `sourceIds`. The paste replaces them with `files`, in order. */
 export interface PastedComposerCopy {
   text: string;
   sourceIds: string[];
@@ -63,7 +58,6 @@ function attachmentFile(attachment: AttachmentSummary, preview?: PreviewAttachme
     return new File([new Uint8Array(result.bytes)], attachment.name, { type: attachment.mimeType });
   })();
   attachmentFiles.set(attachment, file);
-  // Copy events cannot await disk/network reads. A later paste reports the retained failure.
   void file.catch(() => attachmentFiles.delete(attachment));
   return file;
 }
@@ -85,7 +79,6 @@ function createCopy(text: string, attachments: AttachmentSummary[], preview?: Pr
   return copy;
 }
 
-/** Settles when the latest copy has read the file, so that a removal does not delete it before the read. */
 export function copiedFileRead(id: string): Promise<void> {
   const entry = latestCopy?.files.find((file) => file.attachment.id === id);
   return entry
@@ -96,8 +89,6 @@ export function copiedFileRead(id: string): Promise<void> {
     : Promise.resolve();
 }
 
-// The async clipboard API writes no custom MIME type, so the copy ID is in the HTML for both copy paths.
-// A `div` with line breaks and kept spaces, not a `pre`, so that another app pastes normal text, not code.
 function fragmentHtml(copy: ComposerCopy, plainText: string): string {
   const element = document.createElement("div");
   element.setAttribute(HTML_ATTRIBUTE, encodeURIComponent(JSON.stringify({ version: 1, copyId: copy.id })));
@@ -108,10 +99,6 @@ function fragmentHtml(copy: ComposerCopy, plainText: string): string {
   return element.outerHTML;
 }
 
-/**
- * Reads the bytes of the files at once, because the source draft can remove them before the paste.
- * The result gives the IDs of the files that it could read. A cut removes only those from the source.
- */
 export function copyComposerSelection(
   clipboard: DataTransfer,
   text: string,
@@ -145,7 +132,6 @@ export async function copyMessageWithAttachments(
       }),
     ]);
   } catch {
-    // Without the async clipboard, as on a web client over HTTP, the text alone is copied.
     await writeClipboardText(plainText);
   }
 }
@@ -165,7 +151,6 @@ export function readComposerCopy(clipboard: DataTransfer): PastedComposerCopy | 
   const value = Option.getOrNull(decodeFragment(raw));
   if (!value) return null;
   const copy = latestCopy;
-  // A copy from another window, or one that a later copy replaced, pastes as its plain text.
   if (!copy || value.copyId !== copy.id) return null;
   return {
     text: copy.text,

@@ -1,6 +1,3 @@
-// The text of the privacy policy. Legal wording: change it only from the approved source text,
-// and move `PRIVACY_POLICY_UPDATED_AT` with it.
-
 import { Link } from "@tanstack/solid-router";
 
 const PRIVACY_EMAIL = "privacy@openbot.run";
@@ -413,7 +410,7 @@ export function PrivacyPolicy() {
           <strong>Service Providers</strong> – third-party providers that support the operation, maintenance, and
           security of the Services, including cloud infrastructure, hosted servers, authentication, payment processing,
           email delivery, technical support, and communication services. These providers include Cloudflare, Dedale AI,
-          Corp. (operating as boat), and Stripe.
+          Corp. (operating as boat), Leaseweb, Backblaze, and Stripe.
         </li>
         <li>
           <strong>Third-Party AI Providers</strong> – external AI providers, including OpenAI, Anthropic, Google, xAI,
@@ -473,6 +470,14 @@ export function PrivacyPolicy() {
         <li>
           <strong>Dedale AI, Corp. (operating as boat)</strong> – provides cloud-based virtual server infrastructure
           used to host OpenBot Hosted Server environments.
+        </li>
+        <li>
+          <strong>Leaseweb Netherlands B.V. and Leaseweb USA, Inc.</strong> – provide virtual servers in the Netherlands
+          and in the United States used to host OpenBot Hosted Server environments.
+        </li>
+        <li>
+          <strong>Backblaze, Inc.</strong> – stores encrypted archives of Hosted Servers whose subscription ended, in
+          its European Union region, until the archive is deleted. Backblaze does not receive the key to the archive.
         </li>
         <li>
           <strong>Stripe</strong> – processes payments and manages subscriptions for paid Services.
@@ -738,7 +743,8 @@ export function PrivacyPolicy() {
       <h2>International Data Transfers</h2>
       <p>
         OpenBot is established in Poland and processes personal data primarily within the European Economic Area (EEA),
-        including data stored on hosted servers located in the European Union.
+        including data stored on hosted servers located in the European Union. A hosted server bought in US dollars or
+        Brazilian reais can be located in the United States.
       </p>
       <p>
         However, the provision of the Services may involve transfers of personal data outside the EEA, particularly

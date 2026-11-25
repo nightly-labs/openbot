@@ -52,7 +52,6 @@ describe("hosted storage tier migration", () => {
   it("accepts the writes of the Worker that runs before the deploy", () => {
     const database = beforeMigration();
     database.exec(migration(MIGRATION));
-    // The deployed Worker does not name the column in its insert, its plan change or its delete.
     database.exec(`
       INSERT INTO hosted_servers(
         server_id, owner_user_id, name, size, plan, billing_interval, currency, desired_state, observed_state,

@@ -3,6 +3,7 @@
 import type {
   AgentDockAction,
   AgentDockDragPhase,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockPresentation,
   SetAgentDockInteractiveInput,
@@ -11,8 +12,6 @@ import { Effect } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { agentDockIpcHandlers } from "./agent-dock-handlers";
 
-// Same reason as define-ipc-group.test.ts: electron cannot be imported outside an Electron process, so
-// registrations are captured.
 const { registrations } = vi.hoisted(() => ({
   registrations: new Map<string, (event: unknown, payload?: unknown) => unknown>(),
 }));
@@ -105,6 +104,7 @@ function register() {
   const interactive: Array<[number, SetAgentDockInteractiveInput]> = [];
   const drags: Array<[number, AgentDockDragPhase]> = [];
   const regions: Array<[number, AgentDockInputRect[]]> = [];
+  const extents: Array<[number, AgentDockExtent | null]> = [];
   const xwayland: boolean[] = [];
   const { agentDock } = agentDockIpcHandlers({
     agentDock: {
@@ -125,6 +125,9 @@ function register() {
       setInputRegion: (rendererId, rects) => {
         regions.push([rendererId, rects]);
       },
+      setExtent: (rendererId, extent) => {
+        extents.push([rendererId, extent]);
+      },
       listDisplays: () => DISPLAYS,
       drag: (rendererId, phase) => {
         drags.push([rendererId, phase]);
@@ -141,7 +144,7 @@ function register() {
     if (!listener) throw new Error(`No handler for ${name}.`);
     return listener(event(senderId), payload);
   };
-  return { published, actions, interactive, drags, regions, xwayland, call };
+  return { published, actions, interactive, drags, regions, extents, xwayland, call };
 }
 
 beforeEach(() => registrations.clear());
@@ -239,6 +242,28 @@ describe("agent dock handlers", () => {
     ]);
   });
 
+  it("takes the window extent only from the dock window, with whole px inside the limits", () => {
+    const { extents, call } = register();
+    const extent = { inward: 120, above: 180, below: 200 };
+    expect(() => call("setExtent", MAIN_ID, extent)).toThrow("outside the agent dock window");
+    expect(() => call("setExtent", OTHER_ID, extent)).toThrow("outside the agent dock window");
+    const wrong = [
+      { inward: -1, above: 0, below: 0 },
+      { inward: 0.5, above: 0, below: 0 },
+      { inward: 0, above: 100_001, below: 0 },
+      { inward: 0, above: 0 },
+      undefined,
+      [],
+    ];
+    for (const value of wrong) expect(() => call("setExtent", DOCK_ID, value)).toThrow("extent is invalid");
+    call("setExtent", DOCK_ID, extent);
+    call("setExtent", DOCK_ID, null);
+    expect(extents).toEqual([
+      [DOCK_ID, extent],
+      [DOCK_ID, null],
+    ]);
+  });
+
   it("starts on XWayland only for the main renderer, with a boolean state", async () => {
     const { xwayland, call } = register();
     expect(() => call("setXWayland", DOCK_ID, { enabled: true })).toThrow("outside the main renderer");
@@ -266,13 +291,30 @@ describe("agent dock handlers", () => {
     expect(() => call("getPresentation", MAIN_ID)).toThrow("outside the agent dock window");
     expect(call("getPresentation", DOCK_ID)).toEqual(PRESENTATION);
     const channelSend: AgentDockAction = { ...SEND, seat: { kind: "channel", id: "channel-1" } };
+    const threadSend: AgentDockAction = { ...SEND, taskId: "task-1" };
+    const threadActions: AgentDockAction[] = [
+      { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "main" },
+      { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "task-2", started: true },
+      { type: "new-thread", serverId: "local", agentId: "agent-1" },
+      {
+        type: "start-thread",
+        serverId: "local",
+        agentId: "agent-1",
+        text: "Plan the offsite",
+        clientMessageId: "draft-2",
+      },
+    ];
     await call("performAction", DOCK_ID, SEND);
     await call("performAction", DOCK_ID, channelSend);
+    await call("performAction", DOCK_ID, threadSend);
+    for (const action of threadActions) await call("performAction", DOCK_ID, action);
     await call("performAction", DOCK_ID, { type: "open-settings" });
     call("setInteractive", DOCK_ID, { interactive: true, keyboard: true });
     expect(actions).toEqual([
       [DOCK_ID, SEND],
       [DOCK_ID, channelSend],
+      [DOCK_ID, threadSend],
+      ...threadActions.map((action) => [DOCK_ID, action]),
       [DOCK_ID, { type: "open-settings" }],
     ]);
     expect(interactive).toEqual([[DOCK_ID, { interactive: true, keyboard: true }]]);
@@ -284,6 +326,31 @@ describe("agent dock handlers", () => {
     expect(() => call("performAction", DOCK_ID, { ...SEND, seat: { kind: "group", id: "agent-1" } })).toThrow(
       "action is invalid",
     );
+    expect(() => call("performAction", DOCK_ID, { ...SEND, taskId: "" })).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, { type: "open-thread", serverId: "local", agentId: "agent-1", threadId: "" }),
+    ).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, {
+        type: "open-thread",
+        serverId: "local",
+        agentId: "agent-1",
+        threadId: "task-2",
+        started: "yes",
+      }),
+    ).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, {
+        type: "start-thread",
+        serverId: "local",
+        agentId: "agent-1",
+        text: "   ",
+        clientMessageId: "draft-3",
+      }),
+    ).toThrow("action is invalid");
+    expect(() =>
+      call("performAction", DOCK_ID, { ...SEND, seat: { kind: "channel", id: "channel-1" }, taskId: "task-1" }),
+    ).toThrow("action is invalid");
     expect(() => call("performAction", DOCK_ID, { type: "open-link", url: "x".repeat(8193) })).toThrow(
       "action is invalid",
     );

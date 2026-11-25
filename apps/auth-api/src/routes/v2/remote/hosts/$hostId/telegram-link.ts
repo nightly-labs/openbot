@@ -10,7 +10,6 @@ import {
   requestRemoteControlPlane,
 } from "../../../../../server/request-auth";
 
-// A one-use code that links a Telegram chat to the host that proves its machine token.
 export const Route = createFileRoute("/v2/remote/hosts/$hostId/telegram-link")({
   server: {
     handlers: {

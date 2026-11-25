@@ -251,15 +251,10 @@ export function isHostedSiteConversationEventUrl(value: unknown, hostname: unkno
 
 export const CHANNEL_ROUTING_EVENT_ITEM_TYPE_PREFIX = "channel-routing-event:";
 
-/**
- * `assigned` is the first owner a lead chose for a request. `continued` is the same request handed
- * to work that is already under way, so the reader sees that nothing new was started.
- */
 export type ChannelRoutingConversationEventAction = "assigned" | "continued";
 
 export interface ChannelRoutingConversationEvent {
   action: ChannelRoutingConversationEventAction;
-  /** The member the request went to. The roster resolves the name, avatar and colour of the row. */
   agentId: string;
 }
 
@@ -282,38 +277,20 @@ export function parseChannelRoutingConversationEventItemType(
   return { action, agentId };
 }
 
-/**
- * A routing receipt of a channel, not a message a member sent.
- *
- * Unlike the routine and hosted-site events, this one carries no `source`: a channel writes its
- * rows through `ChannelService`, which stamps the author alone. The text stays the readable
- * sentence, so a client that does not know this item type still shows the user what happened.
- */
 export function channelRoutingConversationEvent(message: ConversationMessage): ChannelRoutingConversationEvent | null {
   if (message.author !== "system" || message.status !== "completed") return null;
   return parseChannelRoutingConversationEventItemType(message.itemType);
 }
 
-/**
- * The item type of the marker that clears the context of an agent's own thread.
- *
- * The messages before the marker stay visible, but a new provider session takes only the messages
- * after it. The text is a readable sentence, so a client that does not know this item type still
- * shows the user what happened.
- */
 export const CONTEXT_RESET_ITEM_TYPE = "context-reset";
 
-/**
- * The item types of the markers that show a switch of model for a plan's usage limit or a provider
- * error: one when the agent leaves its model, one when it goes back. The text is a readable sentence
- * that names the model, as for the context reset.
- */
 export const MODEL_SWITCH_ITEM_TYPE_PREFIX = "model-switch:";
 export const MODEL_SWITCH_ITEM_TYPES = {
   "usage-limit": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}usage-limit`,
   "usage-limit-ended": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}usage-limit-ended`,
   "provider-error": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}provider-error`,
   "provider-error-ended": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}provider-error-ended`,
+  "model-removed": `${MODEL_SWITCH_ITEM_TYPE_PREFIX}model-removed`,
 } as const;
 export type ModelSwitchReason = keyof typeof MODEL_SWITCH_ITEM_TYPES;
 
@@ -323,14 +300,10 @@ export function modelSwitchReason(message: ConversationMessage): ModelSwitchReas
   if (message.itemType === MODEL_SWITCH_ITEM_TYPES["usage-limit-ended"]) return "usage-limit-ended";
   if (message.itemType === MODEL_SWITCH_ITEM_TYPES["provider-error"]) return "provider-error";
   if (message.itemType === MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]) return "provider-error-ended";
+  if (message.itemType === MODEL_SWITCH_ITEM_TYPES["model-removed"]) return "model-removed";
   return null;
 }
 
-/**
- * The item type of the note that a member agent changed its channel at a person's request: a
- * member, the instructions or a routine. The text is a readable sentence that names the agent, the
- * change and the person, as for the model switch.
- */
 export const CHANNEL_CHANGE_ITEM_TYPE = "channel-change";
 
 export function isChannelChangeMarker(message: ConversationMessage): boolean {
@@ -342,10 +315,6 @@ export function isChannelChangeMarker(message: ConversationMessage): boolean {
   );
 }
 
-/**
- * The item type of the note that an agent added, changed or deleted a Vault item. The text is a
- * readable sentence that names the item, never a secret.
- */
 export const VAULT_CHANGE_ITEM_TYPE = "vault-change";
 
 export function isVaultChangeMarker(message: ConversationMessage): boolean {
@@ -357,11 +326,6 @@ export function isVaultChangeMarker(message: ConversationMessage): boolean {
   );
 }
 
-/**
- * The item type of the note that a turn ended with open steps in the agent's plan, and that the agent
- * continues by itself. The text says which automatic continuation this is. The note that the agent
- * stopped with open steps and no answer has the same type; its text says that the agent stopped.
- */
 export const PLAN_CONTINUATION_ITEM_TYPE = "plan-continuation";
 
 export function isPlanContinuationMarker(message: ConversationMessage): boolean {
@@ -373,15 +337,19 @@ export function isPlanContinuationMarker(message: ConversationMessage): boolean 
   );
 }
 
-/**
- * The item type of the note that a turn of the agent's own chat failed because the sign-in of its
- * provider expired, followed by the provider. The banner above the composer goes when the user types,
- * so this note keeps the reason in the chat (#11815). The text is the readable reason, so a client that
- * does not know this item type still shows it.
- */
+export const NO_ANSWER_NOTICE_ITEM_TYPE = "no-answer-notice";
+
+export function isNoAnswerNotice(message: ConversationMessage): boolean {
+  return (
+    message.author === "system" &&
+    message.source === "system" &&
+    message.status === "completed" &&
+    message.itemType === NO_ANSWER_NOTICE_ITEM_TYPE
+  );
+}
+
 export const SIGN_IN_FAILURE_ITEM_TYPE_PREFIX = "sign-in-failure:";
 
-/** The provider whose expired sign-in failed the turn of this note, or null for another message. */
 export function signInFailureProvider(message: ConversationMessage): AgentProviderId | null {
   if (message.author !== "system" || message.source !== "system" || message.status !== "completed") return null;
   if (!message.itemType?.startsWith(SIGN_IN_FAILURE_ITEM_TYPE_PREFIX)) return null;
@@ -389,10 +357,6 @@ export function signInFailureProvider(message: ConversationMessage): AgentProvid
   return isAgentProvider(provider) ? provider : null;
 }
 
-/**
- * The item type of a message that one agent sends to another, in the sender's thread and in the
- * recipient's thread. It is traffic between agents, not a message to the user.
- */
 export const AGENT_EXCHANGE_ITEM_TYPE = "agent-exchange";
 
 export function isContextResetMarker(message: ConversationMessage): boolean {

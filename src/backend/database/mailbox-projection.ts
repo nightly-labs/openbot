@@ -67,39 +67,20 @@ export interface MailboxProjectionState {
   reactions: MailboxProjectionReaction[];
 }
 
-/**
- * The keys of the rows that changed since the last committed write. A key whose row is still in the
- * state is written again, and a key whose row is gone is deleted, so one set serves both.
- */
 export interface MailboxProjectionChanges {
   messageIds: ReadonlySet<string>;
   deliveryIds: ReadonlySet<string>;
   draftIds: ReadonlySet<string>;
   generatedAttachmentIds: ReadonlySet<string>;
-  /** Each key is {@link mailboxReactionRowKey}. */
   reactionKeys: ReadonlySet<string>;
 }
 
-/** The queue-state row that holds the idempotency keys. */
 const MAILBOX_METADATA_ROW = "__mailbox__";
 
 export interface MailboxProjectionOptions {
   core: DatabaseCore;
 }
 
-/**
- * The mailbox read model: messages, deliveries, drafts, generated attachments, reactions, per-agent
- * queue state, and the outbox of files still to be deleted from disk.
- *
- * Owns `projection_mailbox_messages`, `projection_deliveries`, `projection_queue_state`,
- * `projection_attachments`, `projection_reactions` and `file_deletion_outbox`. Finished deliveries
- * stay as chat history, so a write that touched every row grew with that history. A normal write
- * therefore receives the keys that changed and writes or deletes only those rows. The full replace
- * stays for the legacy import and for deletions that drop many rows: it deletes the rows that the
- * state no longer has and writes only the rows that are new or changed. Each write compacts the
- * `mailbox` aggregate down to its newest event, and that event records only counts, not the state.
- * The class never imports the facade.
- */
 export class MailboxProjection {
   readonly #core: DatabaseCore;
   #statements: MailboxStatements | null = null;
@@ -117,8 +98,6 @@ export class MailboxProjection {
   ): boolean {
     return this.#write(commandId, state, eventType, fileDeletions, (db, statements, sequence) => {
       const attachments = mailboxAttachmentRows(state);
-      // Deliveries go before their messages, as in the full rewrite this replaced, so no row
-      // depends on the cascade of the foreign key.
       deleteRowsNotIn(
         db,
         "projection_deliveries",
@@ -151,11 +130,6 @@ export class MailboxProjection {
     });
   }
 
-  /**
-   * Writes only the rows that `changes` names. It gives the same rows as {@link replaceMailboxState}
-   * when every row that changed since the last write is in `changes`. Returns false when the command
-   * was already applied, because then no row was written.
-   */
   applyMailboxChanges(
     commandId: string,
     state: MailboxProjectionState,
@@ -172,10 +146,7 @@ export class MailboxProjection {
         String(attachment.id),
       );
 
-      // Deliveries go before their messages, as in the full replace, so no row depends on the
-      // cascade of the foreign key.
       for (const id of absentKeys(changes.deliveryIds, deliveries)) statements.deliveryDelete.run(id);
-      // The stored message names its attachment rows. A key scan would grow with all attachments.
       for (const id of changes.messageIds) {
         const kept = messages.get(id);
         const keptIds = new Set(kept?.attachments.map((attachment) => String(attachment.id)));
@@ -211,7 +182,6 @@ export class MailboxProjection {
     fileDeletions: string[],
     writeRows: (db: DatabaseSync, statements: MailboxStatements, sequence: number) => void,
   ): boolean {
-    // A command that already has a receipt returns that result and runs no projection.
     let wrote = false;
     this.#core.dispatch(
       commandId,
@@ -220,7 +190,6 @@ export class MailboxProjection {
           aggregateType: "mailbox",
           aggregateId: "mailbox",
           eventType,
-          // The rows hold the state. A copy of all of it here made each write grow with the history.
           payload: { messages: state.messages.length, deliveries: state.deliveries.length },
         },
       ],
@@ -231,10 +200,7 @@ export class MailboxProjection {
           requiredStringColumn(row, "command_id"),
         );
         deleteReceiptsOf(db, olderCommandIds);
-        // Each upsert writes a row only when its content changed. An unchanged row keeps the
-        // sequence of the write that last changed it.
         writeRows(db, statements, sequence);
-        // The queue state is one metadata row and the paused agents, so each write replaces it.
         statements.queueStateDelete.run(JSON.stringify([MAILBOX_METADATA_ROW, ...state.pausedAgentIds]));
         statements.queueUpsert.run(
           MAILBOX_METADATA_ROW,
@@ -253,7 +219,6 @@ export class MailboxProjection {
     return wrote;
   }
 
-  /** Each statement is compiled once per connection. A new connection after `close` compiles them again. */
   #statementsFor(db: DatabaseSync): MailboxStatements {
     if (this.#statements?.db !== db) this.#statements = prepareMailboxStatements(db);
     return this.#statements;
@@ -469,8 +434,6 @@ function prepareMailboxStatements(db: DatabaseSync): MailboxStatements {
       `DELETE FROM projection_reactions
        WHERE agent_id = ? AND message_id = ? AND actor_kind = ? AND actor_agent_id = ?`,
     ),
-    // `created_at` is not compared: a generated attachment has no time of its own, so the write
-    // that first stores it sets the time.
     attachmentUpsert: db.prepare(`
       INSERT INTO projection_attachments
         (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
@@ -489,7 +452,6 @@ function prepareMailboxStatements(db: DatabaseSync): MailboxStatements {
         OR projection_attachments.path IS NOT excluded.path
         OR projection_attachments.metadata_json IS NOT excluded.metadata_json
     `),
-    // The owner is part of the key, so a delete never takes a row that another owner now holds.
     attachmentDelete: db.prepare(
       "DELETE FROM projection_attachments WHERE attachment_id = ? AND owner_kind = ? AND owner_id = ?",
     ),
@@ -533,7 +495,6 @@ function writeReaction(statements: MailboxStatements, reaction: MailboxProjectio
   statements.reactionUpsert.run(...reactionKey(reaction), String(reaction.emoji), String(reaction.updatedAt), sequence);
 }
 
-/** The attachment ids that the stored copy of a message holds. A message with no row has none. */
 function storedAttachmentIds(statements: MailboxStatements, messageId: string): string[] {
   const row = databaseRow(statements.messageJson.get(messageId));
   if (!row) return [];
@@ -545,7 +506,6 @@ function storedAttachmentIds(statements: MailboxStatements, messageId: string): 
   );
 }
 
-/** The rows of `rows` whose key is in `keys`, by key. */
 function changedRows<T>(rows: readonly T[], keys: ReadonlySet<string>, keyOf: (row: T) => string): Map<string, T> {
   const changed = new Map<string, T>();
   if (keys.size === 0) return changed;
@@ -560,7 +520,6 @@ function absentKeys(keys: ReadonlySet<string>, present: ReadonlyMap<string, unkn
   return [...keys].filter((key) => !present.has(key));
 }
 
-/** The key that {@link MailboxProjectionChanges.reactionKeys} holds for one reaction row. */
 export function mailboxReactionRowKey(
   agentId: string,
   messageId: string,
@@ -595,7 +554,6 @@ function rowKey(values: readonly string[]): string {
   return JSON.stringify(values);
 }
 
-/** Deletes each row whose key is not in `kept`. Reading the keys writes nothing. */
 function deleteRowsNotIn(
   db: DatabaseSync,
   table: string,

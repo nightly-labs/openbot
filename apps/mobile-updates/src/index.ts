@@ -1,13 +1,3 @@
-// The update server of the OpenBot mobile app. It answers the Expo Updates protocol, version 1, for
-// the `expo-updates` client in each store binary: `GET /manifest` says which update a phone must
-// run, and `GET /assets/<hash>` sends a bundle or an asset.
-//
-// The Worker only reads. `scripts/mobile-ota.ts` writes the bucket and signs each manifest and
-// directive with a key that the Worker does not have, so a write to the bucket cannot put new code on
-// a phone: the phone refuses a manifest whose signature the certificate in the binary does not accept.
-//
-// A request has the last fatal error text of the app in `Expo-Fatal-Error`, and a random install ID
-// in `EAS-Client-ID`. The Worker does not log or store a request header.
 import { Context, Effect, Layer, Schema } from "effect";
 import {
   ASSET_HASH_PATTERN,
@@ -25,7 +15,6 @@ import {
   updateKey,
 } from "./protocol";
 
-/** The parts of an R2 object that the Worker reads. */
 export interface UpdateObject {
   readonly body: ReadableStream;
   readonly size: number;
@@ -47,9 +36,7 @@ export interface MobileUpdatesRuntime {
   schedule(work: Effect.Effect<void>): void;
 }
 
-/** A new publish, a rollout change or a rollback reaches all phones after this time at the latest. */
 const POINTER_CACHE_SECONDS = 30;
-/** An update object never changes after the publish script wrote it. */
 const UPDATE_CACHE_SECONDS = 24 * 60 * 60;
 const ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
@@ -150,7 +137,6 @@ const manifestResponse = Effect.fn("MobileUpdates.manifestResponse")(function* (
     return textResponse(400, "The expo-runtime-version header is missing or not valid.");
   }
   if (!CHANNEL_PATTERN.test(channel)) return textResponse(400, "The expo-channel-name header is missing or not valid.");
-  // Version 0 has no directives and no empty answer. No OpenBot binary sends it.
   if (headers.get("expo-protocol-version") !== "1") return textResponse(400, "Use expo-protocol-version 1.");
 
   const pointer = yield* readJson(
@@ -167,7 +153,6 @@ const manifestResponse = Effect.fn("MobileUpdates.manifestResponse")(function* (
   const target = pointer.target;
   if (target.kind === "embedded") {
     const embeddedId = headers.get("expo-embedded-update-id")?.toLowerCase() ?? null;
-    // A phone that runs the bundle of its binary has nothing to go back to.
     if (!embeddedId || embeddedId === currentId) return noUpdateResponse();
     return partResponse("directive", target.directive, signed) ?? unsignedResponse("directive", channel, platform);
   }
@@ -175,7 +160,6 @@ const manifestResponse = Effect.fn("MobileUpdates.manifestResponse")(function* (
   const inRollout =
     target.rollout === 100 || (yield* isInRollout(headers.get("eas-client-id"), target.id, target.rollout));
   const id = inRollout ? target.id : target.baseId;
-  // The phone runs the update already, or the update failed on this phone a short time ago.
   if (!id || id === currentId || failedUpdateIds(headers.get("expo-recent-failed-update-ids")).has(id)) {
     return noUpdateResponse();
   }
@@ -199,13 +183,11 @@ const isInRollout = Effect.fn("MobileUpdates.isInRollout")(function* (
   updateId: string,
   rollout: number,
 ) {
-  // An install with no ID waits for the full rollout.
   if (!clientId) return false;
   const bucket = yield* Effect.promise(() => rolloutBucket(clientId.toLowerCase(), updateId));
   return bucket < rollout;
 });
 
-/** The update IDs of a structured header list, such as `"<id>", "<id>"`. */
 function failedUpdateIds(header: string | null): Set<string> {
   const ids = new Set<string>();
   for (const part of header?.toLowerCase().split(",") ?? []) {
@@ -215,10 +197,6 @@ function failedUpdateIds(header: string | null): Set<string> {
   return ids;
 }
 
-/**
- * One JSON object of the bucket. The Cache API keeps the text, also the text `null` of an object
- * that does not exist: most requests are for a binary that has no update.
- */
 const readJson = Effect.fn("MobileUpdates.readJson")(function* <A>(
   url: URL,
   key: string,
@@ -301,16 +279,10 @@ function protocolHeaders(): Headers {
   });
 }
 
-/** The answer for "keep what you run". The client reads an empty 204 answer of protocol 1 so. */
 function noUpdateResponse(): Response {
   return new Response(null, { status: 204, headers: protocolHeaders() });
 }
 
-/**
- * A `multipart/mixed` answer with one manifest or one directive. A manifest also has the
- * `extensions` part, which gives no asset a request header. Null when the phone needs a signature
- * and the stored part has none.
- */
 function partResponse(name: "manifest" | "directive", part: StoredDirective, signed: boolean): Response | null {
   if (signed && part.signature === null) return null;
   const boundary = `openbot-${crypto.randomUUID()}`;
@@ -337,7 +309,6 @@ function partResponse(name: "manifest" | "directive", part: StoredDirective, sig
   return new Response(lines.join("\r\n"), { status: 200, headers });
 }
 
-/** A phone that checks signatures gets no part that has none. The publish script signs all parts. */
 function unsignedResponse(name: string, channel: string, platform: string): Response {
   console.error(JSON.stringify({ event: "mobile_updates_unsigned_part", part: name, channel, platform }));
   return noUpdateResponse();

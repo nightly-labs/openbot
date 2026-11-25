@@ -1,24 +1,16 @@
-/** Whether a picture on the canvas has clear pixels, so its card can let the canvas show through. */
-
 import { createEffect, createSignal } from "solid-js";
 
-/** The longest side, in pixels, of the copy of a picture that the alpha check reads. */
 const ALPHA_SAMPLE = 96;
 
-/** A picture with clear pixels, and its width over its height. */
 interface PictureShape {
   clear: boolean;
   ratio: number;
 }
 
-/**
- * Reads a small copy of the picture and finds clear pixels. A JPEG has none. A picture that the
- * canvas cannot read, as one from an origin without CORS, counts as opaque, so it keeps its card.
- */
-async function pictureShape(url: string): Promise<PictureShape | undefined> {
-  const response = await fetch(url);
-  if (!response.ok) return undefined;
-  const blob = await response.blob();
+const CACHE_LIMIT = 128;
+const shapeCache = new Map<string, Promise<PictureShape | undefined>>();
+
+async function blobShape(blob: Blob): Promise<PictureShape | undefined> {
   if (blob.type === "image/jpeg") return undefined;
   const bitmap = await createImageBitmap(blob);
   try {
@@ -42,10 +34,32 @@ async function pictureShape(url: string): Promise<PictureShape | undefined> {
   }
 }
 
-/**
- * The shape of the picture at the URL, once it is known; on a failure, none. While the next picture
- * loads, the last shape stays, so the card does not flash between two clear results.
- */
+function cachedPictureShape(url: string): Promise<PictureShape | undefined> {
+  const known = shapeCache.get(url);
+  if (known) {
+    shapeCache.delete(url);
+    shapeCache.set(url, known);
+    return known;
+  }
+  const forget = () => {
+    if (shapeCache.get(url) === pending) shapeCache.delete(url);
+  };
+  const pending = fetch(url).then(async (response) => {
+    if (!response.ok) {
+      forget();
+      return undefined;
+    }
+    return blobShape(await response.blob());
+  });
+  pending.catch(forget);
+  shapeCache.set(url, pending);
+  if (shapeCache.size > CACHE_LIMIT) {
+    const oldest = shapeCache.keys().next().value;
+    if (oldest !== undefined) shapeCache.delete(oldest);
+  }
+  return pending;
+}
+
 export function usePictureShape(url: () => string | undefined) {
   const [shape, setShape] = createSignal<PictureShape>();
   createEffect(url, (current) => {
@@ -54,7 +68,7 @@ export function usePictureShape(url: () => string | undefined) {
       return;
     }
     let live = true;
-    pictureShape(current).then(
+    cachedPictureShape(current).then(
       (next) => {
         if (live) setShape(next);
       },

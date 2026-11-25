@@ -4,17 +4,12 @@ import { createIsomorphicFn } from "@tanstack/solid-start";
 import { getCookie, getRequestHeader } from "@tanstack/solid-start/server";
 import { chosenSiteLocale, SITE_LOCALE_COOKIE } from "./site-paths";
 
-/** One language range of an `Accept-Language` header, with its quality. */
 interface LanguageRange {
   tag: string;
   quality: number;
   order: number;
 }
 
-/**
- * The language tags of an `Accept-Language` header, best first. Ranges with `q=0`, the `*` range
- * and ranges that do not parse are not included. Equal qualities keep the order of the header.
- */
 function acceptedLanguages(header: string | undefined): string[] {
   if (!header) return [];
   const ranges: LanguageRange[] = [];
@@ -28,7 +23,6 @@ function acceptedLanguages(header: string | undefined): string[] {
   return ranges.sort((a, b) => b.quality - a.quality || a.order - b.order).map((range) => range.tag);
 }
 
-/** The first tag whose language has a catalog, matched on the language subtag, or English. */
 function firstTranslated(tags: readonly string[]): TranslatedLocale {
   for (const tag of tags) {
     const subtag = tag.split("-")[0]?.toLowerCase() ?? "";
@@ -37,7 +31,6 @@ function firstTranslated(tags: readonly string[]): TranslatedLocale {
   return "en";
 }
 
-/** The value of the cookie `name` in a `document.cookie` string. */
 function cookieValue(cookies: string, name: string): string | undefined {
   for (const part of cookies.split(";")) {
     const [key, ...value] = part.trim().split("=");
@@ -46,17 +39,6 @@ function cookieValue(cookies: string, name: string): string | undefined {
   return undefined;
 }
 
-/**
- * The language of the public pages that show catalog text. The root route reads it in
- * `beforeLoad`, and each page takes it from `match.context`. The language that the visitor chose in
- * the header (`SITE_LOCALE_COOKIE`) comes first. Without it, the server reads the request's
- * `Accept-Language` header. Hydration does not run `beforeLoad` again: the browser keeps the
- * server's value from the dehydrated context, so the first render matches the server HTML. On a
- * later navigation the browser reads the cookie and `navigator.languages`, the list that it sends as
- * that header.
- *
- * Only the root route imports this, for the same reason as `servingSiteUrl`.
- */
 export const requestLocale = createIsomorphicFn()
   .server(
     (): TranslatedLocale =>

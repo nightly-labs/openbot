@@ -1,10 +1,10 @@
 {
-  "version": "0.73.0",
+  "version": "0.78.0",
   "highlights": [
-    "Update your joined servers to this version too, so that custom image sizes and the Sunra and Higgsfield models work there.",
-    "See the side threads of each agent in the sidebar, and filter the sidebar by agents, channels, unread chats or folders.",
-    "Edit one workflow together with other people at the same time.",
-    "OpenBot uses much less CPU while many agents work, and its database uses much less space.",
-    "Agents finish a checkout when the bank asks for a 3-D Secure code that they can read in your email or SMS."
+    "Update your joined servers to this version too, so that channel voice, hidden servers, workflow phone notifications and the connection fixes work there.",
+    "Use voice in channels: dictate a message and hear the agent's answer, or start a voice conversation from the channel's message box.",
+    "Hide a server from the server rail. It stays hidden on your other computers, and the \"Hidden servers\" folder shows it again.",
+    "Streamed replies and parallel workflows use less CPU, and long channels on a joined server open faster.",
+    "A workflow \"Notification\" output or a step that waits for approval now sends a phone notification."
   ]
 }

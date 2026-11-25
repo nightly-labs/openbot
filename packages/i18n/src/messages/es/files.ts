@@ -81,6 +81,8 @@ export const messages = {
   "files.library.agents": "Agentes",
   "files.library.allAgents": { one: "{count} agente", other: "Los {count} agentes" },
   "files.library.folders": "Carpetas",
+  "files.library.workflows": "Flujos",
+  "files.library.workflowsOf": "Flujos de {name}",
   "files.library.favorite": "Marcar {name} como favorito",
   "files.folder.new": "Nueva carpeta",
   "files.folder.name": "Nombre de la carpeta",
@@ -213,6 +215,8 @@ export const messages = {
   "files.conversation.title": "Archivos",
   "files.conversation.summary": "{files} · chat {size}",
   "files.conversation.close": "Cerrar archivos",
+  "files.conversation.workspace": "Carpeta del espacio de trabajo",
+  "files.conversation.workspaces": "Carpetas de espacios de trabajo",
   "files.conversation.emptyTitle": "No hay archivos en este chat",
   "files.conversation.emptyDescription": "Aquí aparecen los archivos que adjuntas y los que crea el agente.",
 } as const satisfies PartialTranslation<typeof source>;

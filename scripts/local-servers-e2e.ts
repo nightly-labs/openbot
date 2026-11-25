@@ -1,13 +1,3 @@
-// Creates two servers on this computer in a running dev app, and checks that each one is a separate
-// workspace in its own child process. The first server comes from the add menu, as a user creates it;
-// the second from the same IPC call. The check then switches between Local and both
-// servers with Cmd+1..9, stops one child the hard way and waits for the supervisor to start it again,
-// restarts the other one, fills this computer up to its limit and checks that one more is refused, and
-// deletes them all. A deleted server's user data and agent folder must be in
-// the Trash, not removed. Records the child process ids and their memory.
-// Needs `--allow-mutations`, because it creates and deletes servers in the dev profile.
-// Run: `bun scripts/local-servers-e2e.ts --allow-mutations`.
-// Writes .openbot-build/local-servers-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
@@ -20,7 +10,6 @@ import type { Page } from "playwright-core";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -29,11 +18,8 @@ declare global {
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/local-servers-e2e");
 const NAMES = ["E2E studio one", "E2E studio two"] as const;
-// A child's first start opens its database and its Team API. A bound on failure only.
 const START_DEADLINE_MS = 90_000;
-/** `STOPPED_LOCAL_SERVER_URL` in `src/main/remote-server-manager.ts`. */
 const STOPPED_API_URL = "http://127.0.0.1:0";
-/** `RESTART_LIMIT` in `src/main/local-servers/local-servers.ts`: the stop after these many does not restart. */
 const SUPERVISOR_RESTARTS = 3;
 const MODIFIER = process.platform === "darwin" ? "Meta" : "Control";
 
@@ -71,11 +57,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   }
 }
 
-/**
- * The main processes of servers on this computer, found by their `--user-data-dir` under `local-servers`.
- * The path can hold spaces ("Application Support"); the server id at its end does not. Their Chromium
- * helpers carry the same flag and a `--type=`; they are not servers.
- */
 function children(): Child[] {
   const lines = execFileSync("ps", ["-axww", "-o", "pid=,rss=,command="], { encoding: "utf8" }).split("\n");
   return lines.flatMap((line) => {
@@ -102,12 +83,7 @@ async function waitForServer(page: Page, serverId: string, state: ServerSummary[
   );
 }
 
-/**
- * A server on this computer that stopped has the stopped address and is offline; a started one has its
- * new port and is online. The state alone is not enough: it reads online until the stop is seen.
- */
 async function waitForLocalServer(page: Page, serverId: string, phase: "stopped" | "started"): Promise<void> {
-  // Polled here: `waitForFunction` takes the promise of an async predicate as a true value at once.
   const deadline = Date.now() + START_DEADLINE_MS;
   for (;;) {
     const server = (await servers(page)).find((item) => item.id === serverId);
@@ -127,7 +103,6 @@ async function waitForActive(page: Page, serverId: string): Promise<void> {
   );
 }
 
-/** Waits until the child of a server runs with a process id other than `previous`. */
 async function waitForChild(entryId: string, previous: number | null): Promise<Child> {
   const deadline = Date.now() + START_DEADLINE_MS;
   for (;;) {
@@ -138,11 +113,6 @@ async function waitForChild(entryId: string, previous: number | null): Promise<C
   }
 }
 
-/**
- * With hosted servers, the add button opens their plans, and the item is in the "Other options" menu
- * of the plans. Without them, the add button opens a menu with the item. The rail shows only with two
- * or more servers; before that, the add item is in the server menu.
- */
 async function openCreateLocalServer(page: Page): Promise<void> {
   const item = page.getByRole("menuitem", { name: en["server.local.createTitle"], exact: true });
   const otherOptions = page.getByRole("button", { name: en["server.add.otherOptions"], exact: true });
@@ -160,10 +130,6 @@ async function openCreateLocalServer(page: Page): Promise<void> {
   await item.click();
 }
 
-/**
- * The names in the Trash, or null when macOS privacy control does not let this terminal read it. The
- * terminal then needs Full Disk Access.
- */
 function trashEntries(): string[] | null {
   try {
     return readdirSync(join(homedir(), ".Trash"));
@@ -173,7 +139,6 @@ function trashEntries(): string[] | null {
   }
 }
 
-/** The Trash holds a moved folder under its name, or its name with a number when the name is in use. */
 function inTrash(entries: readonly string[], path: string): boolean {
   const name = basename(path);
   return entries.some((entry) => entry === name || entry.startsWith(`${name} `));
@@ -278,13 +243,10 @@ try {
     return { stoppedPid: stopped, newPid: next.pid };
   });
 
-  // #7209: the supervisor starts a child again a few times only. After that the server stays stopped,
-  // and Retry on its connection screen must start it, not connect again to the stopped address.
   await step("Retry starts a server that stopped too often", async () => {
     const [first] = created;
     assert.ok(first);
     const stoppedPids: number[] = [];
-    // The step above stopped the child once already.
     for (let stop = 2; stop <= SUPERVISOR_RESTARTS; stop += 1) {
       stoppedPids.push(first.child.pid);
       process.kill(first.child.pid, "SIGKILL");
@@ -385,8 +347,6 @@ try {
 
   report.passed = true;
 } finally {
-  // A failed step leaves its servers, also one that it did not record yet: delete each server on this
-  // computer that was not there before, so the dev profile has only what it had before.
   const known = new Set(before.map((server) => server.id));
   const left = (await servers(page).catch(() => [])).filter((server) => server.thisComputer && !known.has(server.id));
   for (const server of left)

@@ -11,23 +11,16 @@ import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
-/** The room that the capsule takes at the bottom of the Library, so the last tiles scroll above it. */
 export function useLibraryCapsuleRoom(): number {
   const { height, bottomGap } = useBottomFieldMetrics();
   return height + bottomGap + 12;
 }
 
-/**
- * The folder capsule at the bottom of the Library, where the thumb reaches it, as home search: the
- * path of the place that the page shows. A tap opens the folder sheet. The "+" beside it makes a
- * folder in the place, when the place is an agent or a folder that this person organizes.
- */
 export function LibraryPathCapsule({
   segments,
   onOpen,
   onAdd,
 }: {
-  /** "Nova", "Reports", "2026": the agent and the folders down to the place. */
   segments: readonly string[];
   onOpen: () => void;
   onAdd?: (() => void) | undefined;
@@ -58,7 +51,6 @@ export function LibraryPathCapsule({
             }}
           >
             <FolderIcon color={String(foreground)} size={18} strokeWidth={2} />
-            {/* The end of a long path is the place, so the start is cut. */}
             <Typography.Paragraph
               numberOfLines={1}
               ellipsizeMode="head"

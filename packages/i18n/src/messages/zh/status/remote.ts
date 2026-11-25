@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/remote";
 
 export const messages = {
-  // Status lines of remote desktop setup and remote connection recovery.
   "status.remote.setupMacOnly": "权限设置仅在 macOS 上可用。",
   "status.remote.setupInstallHost": "请先安装远程桌面主机组件，然后重新检查。",
   "status.remote.setupUpdateRuntime": "请更新远程桌面运行时以检查 macOS 权限。",

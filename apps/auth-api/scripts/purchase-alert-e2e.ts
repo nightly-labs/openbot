@@ -1,18 +1,9 @@
-// Runs the real account server billing (`createHostedBilling`) on a migrated SQLite database with a fake
-// Stripe API and a fake operator webhook. Signed Stripe events go through `BillingService.handleWebhook`.
-// A new server plan and a new license each send one operator message with the account email, the
-// product, the amount, the currency and the period. A cancelled renewal, a resumed renewal and the end of
-// a subscription each send one message too. A repeated event, a second event of the same state, two
-// events at the same time of one cancel, and a renewal send none, and a deployment with no webhook URL
-// sends none.
-//
-// Run: bun run test:purchase-alert
-// It writes .openbot-build/purchase-alert-e2e/report.json and exits non-zero on a failure.
 import { createHmac } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { CREDIT_METADATA, CREDIT_METADATA_KIND } from "@openbot/contracts/credits";
 import { licensePeriodAmount } from "@openbot/contracts/license";
 import { Effect } from "effect";
 import { createHostedBilling } from "../src/server/hosted-billing";
@@ -25,6 +16,7 @@ const ALERT_URL = "https://alerts.example/webhook";
 const WEBHOOK_SECRET = "whsec_test";
 const SERVER_BUYER = { id: "server-buyer", email: "server.buyer@example.test" };
 const LICENSE_BUYER = { id: "license-buyer", email: "license.buyer@example.test" };
+const CREDIT_BUYER = { id: "credit-buyer", email: "credit.buyer@example.test" };
 const SERVER_ID = "0b0f6f0e-6f0f-4a55-9a51-2f5a4e7b8c01";
 
 const checks: { name: string; passed: boolean; detail?: unknown }[] = [];
@@ -36,7 +28,7 @@ function migratedDatabase(): DatabaseSync {
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
   for (const name of readdirSync(MIGRATIONS).sort()) database.exec(readFileSync(join(MIGRATIONS, name), "utf8"));
-  for (const user of [SERVER_BUYER, LICENSE_BUYER]) {
+  for (const user of [SERVER_BUYER, LICENSE_BUYER, CREDIT_BUYER]) {
     database
       .prepare("INSERT INTO users(id, identity_key, email, created_at, updated_at) VALUES (?, ?, ?, 1, 1)")
       .run(user.id, `email:${user.email}`, user.email);
@@ -44,7 +36,6 @@ function migratedDatabase(): DatabaseSync {
   return database;
 }
 
-/** The subscriptions that the fake Stripe API gives. */
 function subscriptions(periodEnd: number) {
   return new Map<string, object>(
     Object.entries({
@@ -105,7 +96,6 @@ async function run(alertUrl: string | undefined) {
   const stored = subscriptions(Math.floor(clock.now / 1000) + 30 * 24 * 3600);
   const alerts: string[] = [];
   const work: Promise<void>[] = [];
-  /** While set, each subscription read waits until this many reads wait, so the events read the same state. */
   const gate: { reads: number; waiting: (() => void)[] } = { reads: 0, waiting: [] };
   const { billing } = createHostedBilling(
     {
@@ -144,11 +134,7 @@ async function run(alertUrl: string | undefined) {
   );
   if (!billing) throw new Error("Billing is off.");
   let sent = 0;
-  const deliver = async (
-    type: string,
-    object: { id: string; subscription?: string; amount_paid?: number; currency?: string },
-    eventId?: string,
-  ) => {
+  const deliver = async (type: string, object: { id: string; [key: string]: unknown }, eventId?: string) => {
     sent += 1;
     const created = Math.floor(Date.now() / 1000);
     const payload = JSON.stringify({ id: eventId ?? `evt_${sent}`, type, created, data: { object } });
@@ -156,12 +142,10 @@ async function run(alertUrl: string | undefined) {
     await Effect.runPromise(billing.handleWebhook(payload, `t=${created},v1=${signature}`));
     await Promise.all(work.splice(0));
   };
-  /** Changes a subscription in the fake Stripe API, as a cancel in the Customer Portal does. */
   const change = (
     id: string,
     patch: { cancel_at_period_end?: boolean; cancel_at?: number; canceled_at?: number; status?: string },
   ) => stored.set(id, { ...stored.get(id), ...patch });
-  /** Delivers events at the same time, after each one read the subscription from Stripe. */
   const deliverTogether = (events: Parameters<typeof deliver>[]) => {
     gate.reads = events.length;
     return Promise.all(events.map((event) => deliver(...event)));
@@ -169,7 +153,6 @@ async function run(alertUrl: string | undefined) {
   return { database, alerts, deliver, deliverTogether, change };
 }
 
-/** The `canceled_at` times of the cancel requests, in seconds. */
 const FIRST_CANCEL = 1_790_000_000;
 const SECOND_CANCEL = 1_790_000_100;
 const LICENSE_CANCEL = 1_790_000_200;
@@ -207,11 +190,23 @@ async function purchasesAlertTheOperator() {
 
   await deliver("customer.subscription.updated", { id: "sub_license" });
   check("a second event of the license sends no message", alerts.length === 2, alerts);
+  const licenseGrants = database
+    .prepare(
+      "SELECT credits_tenths / 10.0 AS credits, remaining_tenths / 10.0 AS remaining, starts_at, expires_at FROM credit_grants WHERE user_id = ?",
+    )
+    .all(LICENSE_BUYER.id);
+  const licenseGrant = licenseGrants[0];
+  check(
+    "a paid yearly Team license with 7 users gives its owner 400 free credits for the current month at once, one time",
+    licenseGrants.length === 1 &&
+      licenseGrant?.credits === 400 &&
+      licenseGrant.remaining === 400 &&
+      Number(licenseGrant.expires_at) - Number(licenseGrant.starts_at) <= 31 * 24 * 3600 * 1000,
+    licenseGrants,
+  );
 
   const serverTerms = `server · \`${SERVER_BUYER.email}\` · standard · $35/mo`;
-  // Stripe sets `canceled_at` to the time of each cancel request and keeps it after a resume.
   change("sub_server", { cancel_at_period_end: true, canceled_at: FIRST_CANCEL });
-  // Stripe can send two events of one cancel at the same time, and each one can see the old state.
   await deliverTogether([
     ["customer.subscription.updated", { id: "sub_server" }],
     ["customer.subscription.updated", { id: "sub_server" }],
@@ -254,7 +249,6 @@ async function purchasesAlertTheOperator() {
   );
 
   const licenseTerms = `license · \`${LICENSE_BUYER.email}\` · team · 7 users · ${amount}/yr`;
-  // A cancel date from the Dashboard is not the end of the paid period.
   change("sub_license", { cancel_at: Date.UTC(2027, 0, 31) / 1000, canceled_at: LICENSE_CANCEL });
   await deliver("customer.subscription.updated", { id: "sub_license" });
   change("sub_license", { status: "past_due" });
@@ -266,6 +260,30 @@ async function purchasesAlertTheOperator() {
     alerts.length === 9 &&
       alerts[7] === `🚪 **Cancelled** ${licenseTerms} · ends 2027-01-31` &&
       alerts[8] === `⛔ **Ended** ${licenseTerms} · not paid`,
+    alerts,
+  );
+
+  await deliver(
+    "checkout.session.completed",
+    {
+      id: "cs_credit",
+      mode: "payment",
+      payment_status: "paid",
+      payment_intent: "pi_credit",
+      amount_total: 1000,
+      currency: "eur",
+      metadata: {
+        [CREDIT_METADATA.kind]: CREDIT_METADATA_KIND,
+        [CREDIT_METADATA.userId]: CREDIT_BUYER.id,
+        [CREDIT_METADATA.credits]: "167",
+      },
+    },
+    "evt_credit_purchase",
+  );
+  check(
+    "a credit purchase sends one message with the email, credits and amount",
+    alerts.length === 10 &&
+      alerts[9] === `💳 **Credits purchased** · \`${CREDIT_BUYER.email}\` · 167 credits · €10 · personal wallet`,
     alerts,
   );
 

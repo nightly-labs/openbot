@@ -6,20 +6,17 @@ import {
   pasteCodeSignInSupported,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
+import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/antigravity-code-sign-in-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
+import { providerSignInRelayProviders } from "@openbot/contracts/team-protocol/provider-sign-in-relays";
 import { PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
 import { PROVIDERS_V4_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v4";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 
-/**
- * Whether a server can be asked for a capability-gated feature. A local server
- * can do everything; a remote one that never negotiated compatibility is given
- * the benefit of the doubt, except for features that require explicit support.
- */
 export function serverSupportsCapability(
   server: ServerSummary | undefined,
   capability: TeamCurrentCapability,
@@ -38,6 +35,7 @@ export function serverSupportsCapability(
       capability === "browser-view-clipboard" ||
       capability === "browser-user-control" ||
       capability === "browser-sign-in" ||
+      capability === "browser-http-sign-in" ||
       capability === "mcp-servers-v1" ||
       capability === "mcp-sign-in-v1" ||
       capability === "mcp-sign-in-app-v1" ||
@@ -46,6 +44,7 @@ export function serverSupportsCapability(
       capability === "mcp-access-v1" ||
       capability === "live-voice-v1" ||
       capability === "sign-in-relay-v1" ||
+      capability === "provider-sign-in-relay-v2" ||
       capability === "connectors-v1" ||
       capability === "onepassword-connector-v1" ||
       capability === "bitwarden-connector-v1" ||
@@ -58,6 +57,7 @@ export function serverSupportsCapability(
       capability === "vault-v2" ||
       capability === "vault-v3" ||
       capability === "browser-secret-vault-v1" ||
+      capability === "vault-member-save-v1" ||
       capability === "provider-host-sign-in-v1" ||
       capability === "storage-v1" ||
       capability === "storage-disk-v1" ||
@@ -68,6 +68,7 @@ export function serverSupportsCapability(
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
       capability === "agent-plan-card-v1" ||
+      capability === "agent-builtin-memory-v1" ||
       capability === "agent-defaults-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||
@@ -90,6 +91,7 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-signal-home-v1" ||
       capability === "host-turn-limits-v1" ||
       capability === "host-restart-v1" ||
       capability === "host-appearance-v1" ||
@@ -99,10 +101,14 @@ export function serverSupportsCapability(
       capability === "browsing-memory-v1" ||
       capability === "browser-teach-v1" ||
       capability === "prompt-cache-ttl-v1" ||
+      capability === "prompt-cache-ttl-pi-v1" ||
+      capability === "cache-expiry-compaction-v1" ||
+      capability === "media-approval-credits-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
       capability === "mistral-code-sign-in-v1" ||
+      capability === "antigravity-code-sign-in-v1" ||
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
@@ -113,8 +119,6 @@ export function serverSupportsCapability(
       capability === "whatsapp-status-reactions-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
-      capability === "routine-flows-v1" ||
-      capability === "routine-flow-stop-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||
@@ -133,6 +137,7 @@ export function serverSupportsCapability(
       capability === "agent-thread-replies-v1" ||
       capability === "channel-task-cancel-v1" ||
       capability === "side-question-v1" ||
+      capability === "side-question-threads-v1" ||
       capability === "workflows-github-v1" ||
       capability === "agent-notification-levels-v1" ||
       capability === "sidebar-pins-v1" ||
@@ -153,6 +158,8 @@ export function serverSupportsCapability(
       capability === "workflows-chats-v1" ||
       capability === "workflows-channels-v1" ||
       capability === "workflows-media-v1" ||
+      capability === "workflows-agent-files-v1" ||
+      capability === "workflow-folders-v1" ||
       capability === "vault-import-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||
@@ -164,7 +171,9 @@ export function serverSupportsCapability(
       capability === "provider-environment-v1" ||
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
-      capability === "provider-detection-v1") &&
+      capability === "owner-transfer-v1" ||
+      capability === "provider-detection-v1" ||
+      capability === "workspace-directory-v1") &&
     server?.kind === "remote"
   ) {
     return server.compatibility?.capabilities.includes(capability) === true;
@@ -172,44 +181,28 @@ export function serverSupportsCapability(
   return server?.kind !== "remote" || !server.compatibility || server.compatibility.capabilities.includes(capability);
 }
 
-/**
- * Whether the routine editor sends a joined server's routines through `routine-recovery-v1`, which
- * keeps `missedPolicy` and the missed-run history. This computer's host keeps them through IPC.
- */
 export function remoteRoutineRecovery(server: ServerSummary | undefined): boolean {
   return server?.kind === "remote" && serverCanAdminister(server, "routine-recovery-v1");
 }
 
-/** Whether the routine editor can ask the host for a test event: this computer, or a joined server with `webhook-tests-v1`. */
 export function serverSendsWebhookTests(server: ServerSummary | undefined): boolean {
   return serverCanAdminister(server, "webhook-tests-v1");
 }
 
-/** Whether a webhook routine can use a secret that the sender made: this computer, or a joined server with `webhook-sender-secret-v1`. */
 export function serverSetsWebhookSenderSecret(server: ServerSummary | undefined): boolean {
   return serverCanAdminister(server, "webhook-sender-secret-v1");
 }
 
-/** Whether a person can give the signing secret of an agent's webhook routine to that agent: this computer, or a joined server with `webhook-agent-secret-v1`. */
 export function serverGivesWebhookSecretToAgent(server: ServerSummary | undefined): boolean {
   return serverCanAdminister(server, "webhook-agent-secret-v1");
 }
 
-/**
- * Whether the Marketplace can sign in to a joined server's MCP server for this computer: the user
- * manages the host's MCP servers, and the host relays its sign-ins (`sign-in-relay-v1`), so the page
- * opens in this computer's browser and the callback is relayed to the host.
- */
 export function remoteMcpSignIn(server: ServerSummary | undefined): boolean {
   return (
     server?.kind === "remote" && serverCanManageMcp(server) && serverSupportsCapability(server, "sign-in-relay-v1")
   );
 }
 
-/**
- * The providers a joined server signs in on a page in its own browser, which the live view shows
- * here. Only a Linux host advertises it, and the live view streams the active server only.
- */
 export function hostSignInProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
   return server?.kind === "remote" &&
     server.active &&
@@ -219,36 +212,21 @@ export function hostSignInProviders(server: ServerSummary | undefined): readonly
     : [];
 }
 
-/**
- * The providers a joined server signs in on a page in this computer's browser, with the callback
- * relayed to the host (`sign-in-relay-v1`). The user's own browser keeps their sessions, so these win
- * over the host's code and live view.
- */
 export function relaySignInProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
-  return server?.kind === "remote" && serverSupportsCapability(server, "sign-in-relay-v1")
-    ? SIGN_IN_RELAY_PROVIDERS
+  return server?.kind === "remote"
+    ? providerSignInRelayProviders((capability) => serverSupportsCapability(server, capability))
     : [];
 }
 
-/**
- * Whether Settings can change the server key: this computer's, or a joined server's when the account
- * owns it and the host serves `host-key-rotation-v1`. The host refuses an admin or a member.
- */
 export function serverRotatesHostKey(server: ServerSummary | undefined): server is ServerSummary {
   if (server?.kind === "local") return true;
   return server?.role === "owner" && serverSupportsCapability(server, "host-key-rotation-v1");
 }
 
-/** An owner or admin of a joined server. This computer is always its own administrator. */
 export function serverRoleCanAdminister(server: Pick<ServerSummary, "kind" | "role"> | undefined): boolean {
   return server?.kind === "local" || canAdministerServer(server?.role);
 }
 
-/**
- * Whether this window may manage the host behind `server`: this computer, or a joined server where
- * the account is an owner or admin and the host serves `capability`. The host checks the role again
- * on every admin route; this only decides what the UI offers.
- */
 export function serverCanAdminister(
   server: ServerSummary | undefined,
   capability?: TeamCurrentCapability,
@@ -258,19 +236,6 @@ export function serverCanAdminister(
   return serverRoleCanAdminister(server) && (!capability || serverSupportsCapability(server, capability));
 }
 
-/**
- * The providers that the host's own code route signs in on `server`: a device code, a pasted code
- * or a link. A host with `providers-v4` signs in its providers, and the pasted-code ones only when
- * it also has `providers-v3`, which only a host that can run a pasted code advertises. A host with
- * `providers-v3` alone signs in its own list, and a host with `providers-v1` alone Codex only. The
- * providers that a host signs in on a page are in `hostSignInProviders` and `relaySignInProviders`.
- *
- * A host with `providers-v8` also signs in each later provider that has a device code, such as Kimi
- * and Hermes: it takes any provider id, and the descriptor's `localCodeSignIn` mirrors the driver's
- * code sign-in. A provider that the relay already signs in, such as Muse, keeps the relay. Mistral's
- * code sign-in is a page, not a device code, so it needs `mistral-code-sign-in-v1`. The mobile app's
- * `codeSignInProviders` uses the same rule.
- */
 export function serverCodeRouteProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
   if (server?.kind !== "remote") return [];
   if (serverSupportsCapability(server, "providers-v4")) {
@@ -284,37 +249,32 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
       (provider) =>
         v4.includes(provider) ||
         (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)) ||
-        (provider === "mistral" && serverSupportsCapability(server, MISTRAL_CODE_SIGN_IN_CAPABILITY)),
+        (provider === "mistral" && serverSupportsCapability(server, MISTRAL_CODE_SIGN_IN_CAPABILITY)) ||
+        (provider === "antigravity" && serverSupportsCapability(server, ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY)),
     );
   }
   if (serverSupportsCapability(server, "providers-v3")) return PROVIDERS_SIGN_IN_V3_PROVIDERS;
   return serverSupportsCapability(server, "providers-v1") ? PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS : [];
 }
 
-/**
- * The providers that a code sign-in reaches on this computer, for when the browser callback cannot
- * reach OpenBot: each provider whose driver has one. A pasted code needs a terminal that only some
- * platforms give it.
- */
 export function localCodeSignInProviders(platform: string | undefined): readonly AgentProviderId[] {
   const paste = platform !== undefined && pasteCodeSignInSupported(platform);
   return AGENT_PROVIDERS.filter((provider) => {
-    const codeSignIn = agentProviderDescriptor(provider).localCodeSignIn;
-    return codeSignIn === "device" || (codeSignIn === "paste" && paste);
+    const descriptor = agentProviderDescriptor(provider);
+    const codeSignIn = descriptor.localCodeSignIn;
+    return (
+      codeSignIn === "device" ||
+      (codeSignIn === "paste" && paste) ||
+      (platform === "win32" && descriptor.windowsCodeSignIn !== undefined)
+    );
   });
 }
 
-/**
- * Whether this window may manage the MCP servers of `server`: as for `serverCanAdminister` with
- * `mcp-servers-v1`, or as a member of a joined server with `mcp-member-access-v1`. The host lets a
- * member change only the servers that the member added, and refuses the others.
- */
 export function serverCanManageMcp(server: ServerSummary | undefined): server is ServerSummary {
   if (!server || !serverSupportsCapability(server, "mcp-servers-v1")) return false;
   return serverRoleCanAdminister(server) || serverSupportsCapability(server, "mcp-member-access-v1");
 }
 
-/** `server` when it is a joined server this account may manage through `capability`, otherwise undefined. */
 export function remoteAdminServer(
   server: ServerSummary | undefined,
   capability: TeamCurrentCapability,
@@ -322,26 +282,18 @@ export function remoteAdminServer(
   return server?.kind === "remote" && serverCanAdminister(server, capability) ? server : undefined;
 }
 
-/**
- * Whether the settings of the active server show Providers: this computer, or a joined host that the
- * account administers with `providers-v1`. `providerSettings` in `WorkspaceOverlays.tsx` has the same rule.
- */
 export function activeServerHasProviderSettings(server: ServerSummary): boolean {
   return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
 }
 
-/**
- * Server Settings > Agents shows: this computer, or an online joined server that this account
- * administers and whose host serves `agent-defaults-v1`.
- */
+export const PROVIDER_SEARCH_NAMES: readonly string[] = AGENT_PROVIDERS.filter((provider) => provider !== "acp").map(
+  (provider) => agentProviderDescriptor(provider).displayName,
+);
+
 export function serverHasAgentDefaults(server: ServerSummary): boolean {
   return serverCanAdminister(server, "agent-defaults-v1") && (server.kind === "local" || server.state === "online");
 }
 
-/**
- * Which side of a connection runs the older OpenBot release, so a version notice can say what to
- * update. Only the release numbers count. `null` when they are equal or one does not parse.
- */
 export function olderAppSide(clientVersion: string, hostVersion: string): "client" | "host" | null {
   const parse = (version: string) => /^v?(\d+)\.(\d+)\.(\d+)/u.exec(version)?.slice(1).map(Number) ?? null;
   const [client, host] = [parse(clientVersion), parse(hostVersion)];
@@ -353,7 +305,6 @@ export function olderAppSide(clientVersion: string, hostVersion: string): "clien
   return null;
 }
 
-/** A joined server with member update access, or the released administrator update API. */
 export function remoteUpdateServer(server: ServerSummary | undefined): ServerSummary | undefined {
   if (server?.kind !== "remote") return undefined;
   return serverSupportsCapability(server, "host-member-update-v1")

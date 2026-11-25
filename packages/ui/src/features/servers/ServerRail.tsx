@@ -3,9 +3,11 @@ import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
   BellOff,
   buttonVariants,
+  ChevronRight,
   ContextMenu,
   DropdownMenu,
   Eye,
+  Folder,
   Plus,
   Server,
   ServerPlushLogo,
@@ -16,6 +18,7 @@ import { createScrollFades } from "../../components/createScrollFades";
 import { createVerticalDragPreview } from "../../components/createVerticalDragPreview";
 import { useText } from "../../text";
 import { type ServerActionCallbacks, ServerActionItems, serverMuteDescription } from "./ServerActionItems";
+import { ServerPlanCount, serverPlanDaysLeft, serverPlanStatusLabels } from "./ServerPlanEnd";
 
 const SERVER_RAIL_TOOLTIP_OPEN_DELAY = 150;
 
@@ -32,12 +35,10 @@ const HOSTED_SLEEP_LABELS = {
   waking: "server.state.waking",
 } as const satisfies Record<HostedServerSleep, AppTextKey>;
 
-/** Whether a hosted server that is not connected sleeps or wakes. It replaces the connection state word. */
 export function serverHostedSleep(server: Pick<ServerSummary, "hostedSleep" | "state">): HostedServerSleep | null {
   return server.state === "online" ? null : (server.hostedSleep ?? null);
 }
 
-/** The muted and connection state words that a server's accessible name adds after its name. */
 export function serverStatusLabels(
   server: Pick<ServerSummary, "hostedSleep" | "notificationsMuted" | "state">,
   t: AppTranslate,
@@ -50,10 +51,6 @@ export function serverStatusLabels(
   ];
 }
 
-/**
- * The add item. It names the hosted server plans only when it is the one way to add a server: beside
- * a server on this computer, both the plans and an invite give a remote server.
- */
 export function addServerLabel(props: {
   addCreatesServer?: boolean | undefined;
   onCreateLocal?: (() => void) | undefined;
@@ -61,7 +58,6 @@ export function addServerLabel(props: {
   return props.addCreatesServer && !props.onCreateLocal ? "server.rail.add" : "server.rail.addRemote";
 }
 
-/** A small dot on a server's logo while its hosted server sleeps or wakes. */
 export function ServerSleepDot(props: { server: Pick<ServerSummary, "hostedSleep" | "state">; class: string }) {
   return (
     <Show when={serverHostedSleep(props.server)}>
@@ -70,26 +66,117 @@ export function ServerSleepDot(props: { server: Pick<ServerSummary, "hostedSleep
   );
 }
 
-/** The server on this computer while the user hides it from the server list, and the action that shows it again. */
-export interface HiddenLocalServer {
-  name: string;
+export interface HiddenServer extends Pick<ServerSummary, "id" | "name" | "logoUrl" | "appearance"> {
   show: () => void;
+}
+
+const HIDDEN_FOLDER_PREVIEW_COUNT = 4;
+
+function HiddenServerShowItem(props: { server: HiddenServer }) {
+  const { t } = useText();
+  return (
+    <DropdownMenu.Item
+      class="server-menu-row server-menu-hidden-row"
+      aria-label={t("server.rail.showLocal", { name: props.server.name })}
+      onSelectAfterClose={props.server.show}
+    >
+      <span class="server-menu-mark" aria-hidden="true">
+        <ServerMark server={props.server} />
+      </span>
+      <span class="server-menu-name">{props.server.name}</span>
+      <Eye class="server-menu-hidden-show size-4" aria-hidden="true" />
+    </DropdownMenu.Item>
+  );
+}
+
+function HiddenServerShowItems(props: { servers: HiddenServer[] }) {
+  return <For each={props.servers}>{(server) => <HiddenServerShowItem server={server} />}</For>;
+}
+
+export function HiddenServerFolderItem(props: { servers: HiddenServer[] }) {
+  const { t } = useText();
+  return (
+    <Show when={props.servers.length > 0}>
+      <DropdownMenu.Sub>
+        <DropdownMenu.SubTrigger class="server-menu-row server-menu-hidden-folder">
+          <span class="server-menu-hidden-folder-icon" aria-hidden="true">
+            <Folder class="size-4" />
+          </span>
+          <span class="server-menu-name">{t("server.rail.hiddenServers")}</span>
+          <span class="server-menu-hidden-count">{props.servers.length}</span>
+          <ChevronRight class="agent-context-submenu-chevron size-4" aria-hidden="true" />
+        </DropdownMenu.SubTrigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.SubContent
+            class="ui-action-menu agent-context-menu"
+            aria-label={t("server.rail.hiddenServers")}
+          >
+            <HiddenServerShowItems servers={props.servers} />
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Sub>
+    </Show>
+  );
+}
+
+function HiddenServerFolder(props: { servers: HiddenServer[] }) {
+  const { t } = useText();
+  const [tooltipOpen, setTooltipOpen] = createSignal(false);
+  const [menuOpen, setMenuOpen] = createSignal(false);
+  return (
+    <Tooltip.Root
+      open={tooltipOpen() && !menuOpen()}
+      onOpenChange={setTooltipOpen}
+      placement="right"
+      gutter={10}
+      openDelay={SERVER_RAIL_TOOLTIP_OPEN_DELAY}
+      closeDelay={0}
+      skipDelayDuration={300}
+    >
+      <Tooltip.Trigger as="div" class="server-rail-tooltip-trigger">
+        <DropdownMenu.Root placement="right-start" gutter={10} onOpenChange={setMenuOpen}>
+          <DropdownMenu.Trigger
+            class={buttonVariants({ variant: "ghost", class: "server-rail-button server-rail-folder" })}
+            aria-label={t("server.rail.hiddenServers")}
+            data-cuelume-open=""
+            data-cuelume-emphasis="subtle"
+          >
+            <span class="server-rail-folder-grid" aria-hidden="true">
+              <For each={props.servers.slice(0, HIDDEN_FOLDER_PREVIEW_COUNT)}>
+                {(server) => (
+                  <span class="server-rail-folder-mark">
+                    <ServerMark server={server} />
+                  </span>
+                )}
+              </For>
+            </span>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content class="agent-context-menu" aria-label={t("server.rail.hiddenServers")}>
+              <div class="ui-menu-label" aria-hidden="true">
+                {t("server.rail.hiddenServers")}
+              </div>
+              <HiddenServerShowItems servers={props.servers} />
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content class="server-rail-tooltip">{t("server.rail.hiddenServers")}</Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
+  );
 }
 
 interface ServerRailProps extends ServerActionCallbacks {
   servers: ServerSummary[];
   onSelect: (serverId: string) => void;
   onReorder: (serverIds: string[]) => void;
-  /** Without it, the rail has no add button. */
   onAdd?: (() => void) | undefined;
-  /** True when the plus button opens the hosted server plans, where the user can also join with an invite. */
   addCreatesServer?: boolean | undefined;
-  /** Opens the dialog that creates a server on this computer. With it, the plus button opens a menu. */
   onCreateLocal?: (() => void) | undefined;
-  /** Opens the dialog with the command that installs a server on another computer. With it, the plus button opens a menu. */
   onInstallServer?: (() => void) | undefined;
-  /** The server on this computer while the user hides it. With it, the plus button opens a menu. */
-  hiddenLocal?: HiddenLocalServer | undefined;
+  hiddenServers?: HiddenServer[] | undefined;
 }
 
 interface DragSlot {
@@ -305,6 +392,7 @@ export function ServerRail(props: ServerRailProps) {
               canHide={props.canHide}
               onSetMuted={props.onSetMuted}
               onOpenNotificationSettings={props.onOpenNotificationSettings}
+              deleteAt={props.planDeletesAt?.(server().id) ?? null}
             />
           )}
         </For>
@@ -359,6 +447,7 @@ export function ServerRail(props: ServerRailProps) {
                     canHide={props.canHide}
                     onSetMuted={props.onSetMuted}
                     onOpenNotificationSettings={props.onOpenNotificationSettings}
+                    deleteAt={props.planDeletesAt?.(server().id) ?? null}
                     onMove={(direction) => moveServer(server().id, direction)}
                   />
                 </li>
@@ -366,9 +455,12 @@ export function ServerRail(props: ServerRailProps) {
             </For>
           </ul>
         </Show>
+        <Show when={props.hiddenServers?.length ? props.hiddenServers : null}>
+          {(hiddenServers) => <HiddenServerFolder servers={hiddenServers()} />}
+        </Show>
         <Show when={props.onAdd}>
           <Show
-            when={props.onCreateLocal || props.onInstallServer || props.hiddenLocal}
+            when={props.onCreateLocal || props.onInstallServer}
             fallback={
               <Tooltip.Root
                 placement="right"
@@ -398,7 +490,6 @@ export function ServerRail(props: ServerRailProps) {
               onAdd={() => props.onAdd?.()}
               onCreateLocal={props.onCreateLocal}
               onInstallServer={props.onInstallServer}
-              hiddenLocal={props.hiddenLocal}
             />
           </Show>
         </Show>
@@ -410,16 +501,11 @@ export function ServerRail(props: ServerRailProps) {
   );
 }
 
-/**
- * The plus button when a server can also run on this computer, or when the user hides the server on this
- * computer: a menu with the ways to add a server, and the item that shows the hidden server again.
- */
 function ServerRailAddMenu(props: {
   addLabel: AppTextKey;
   onAdd: () => void;
   onCreateLocal?: (() => void) | undefined;
   onInstallServer?: (() => void) | undefined;
-  hiddenLocal?: HiddenLocalServer | undefined;
 }) {
   const { t } = useText();
   const [tooltipOpen, setTooltipOpen] = createSignal(false);
@@ -472,16 +558,6 @@ function ServerRailAddMenu(props: {
                   </DropdownMenu.Item>
                 )}
               </Show>
-              <Show when={props.hiddenLocal}>
-                {(hiddenLocal) => (
-                  <DropdownMenu.Item class="server-menu-add" onSelectAfterClose={hiddenLocal().show}>
-                    <span class="server-menu-add-circle" aria-hidden="true">
-                      <Eye />
-                    </span>
-                    <span>{t("server.rail.showLocal", { name: hiddenLocal().name })}</span>
-                  </DropdownMenu.Item>
-                )}
-              </Show>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -496,6 +572,7 @@ function ServerRailAddMenu(props: {
 function ServerRailButton(
   props: ServerActionCallbacks & {
     server: ServerSummary;
+    deleteAt: number | null;
     onSelect: (serverId: string) => void;
     onMove?: (direction: -1 | 1) => void;
   },
@@ -504,7 +581,12 @@ function ServerRailButton(
   const [overlay, setOverlay] = createStore({ tooltipOpen: false, menuOpen: false });
   let trigger: HTMLElement | null = null;
   const buttonLabel = () =>
-    [t("server.rail.buttonLabel", { name: props.server.name }), ...serverStatusLabels(props.server, t)].join(", ");
+    [
+      t("server.rail.buttonLabel", { name: props.server.name }),
+      ...serverStatusLabels(props.server, t),
+      ...planLabels(),
+    ].join(", ");
+  const planLabels = () => serverPlanStatusLabels(props.server, props.deleteAt, t, format);
   const muteDescription = () => serverMuteDescription(props.server, t, format);
   const sleepLabel = () => {
     const sleep = serverHostedSleep(props.server);
@@ -580,6 +662,9 @@ function ServerRailButton(
             <Show when={props.server.notificationsMuted}>
               <BellOff class="server-rail-muted size-3" aria-hidden="true" />
             </Show>
+            <Show when={props.deleteAt}>
+              {(deleteAt) => <ServerPlanCount count={serverPlanDaysLeft(deleteAt())} class="server-plan-rail-count" />}
+            </Show>
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content class="agent-context-menu" aria-label={t("server.rail.actions")}>
@@ -610,6 +695,7 @@ function ServerRailButton(
           {props.server.thisComputer ? ` · ${t("server.rail.thisComputer")}` : ""}
           {sleepLabel() ? ` · ${sleepLabel()}` : ""}
           {props.server.notificationsMuted ? ` · ${muteDescription()}` : ""}
+          {planLabels().length > 0 ? ` · ${planLabels().join(", ")}` : ""}
         </Tooltip.Content>
       </Tooltip.Portal>
     </Tooltip.Root>

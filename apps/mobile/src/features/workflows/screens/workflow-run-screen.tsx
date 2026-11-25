@@ -30,10 +30,6 @@ import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/**
- * Drawer > Workflows > a workflow > a run: each step with its status and output. The person approves
- * or declines a step that waits, retries a step that failed, and stops a run that goes on.
- */
 export function WorkflowRunScreen() {
   const { t, format, errorMessage } = useText();
   const { serverId, workflowId, runId } = useLocalSearchParams<{
@@ -50,15 +46,10 @@ export function WorkflowRunScreen() {
   const busy = steps.busy;
 
   const run = runDetail?.run;
-  /** The issue or the pull request of a run that a GitHub event started. */
   const githubItem = run ? github.data?.runs.find((entry) => entry.runId === run.id)?.item : undefined;
   const title = run ? t("mobile.workflow.run.title", { number: run.number }) : t("mobile.app.route.workflowRun");
   const latest = latestSteps(runDetail?.steps ?? []);
   const graph = detail.data?.graph;
-  // The steps of the graph in reading order, then any step whose node the workflow no longer has.
-  // The steps in the order that a run goes, each path of a split under its label, as the List of the
-  // workflow page shows them.
-  // Built once for each graph: a running run updates the page each time a step changes.
   const rows = useMemo(() => (graph ? flowRows(workflowFlowTree(graph)) : []), [graph]);
   const byId = new Map(graph?.nodes.map((node) => [node.id, node]) ?? []);
   const known = new Set(rows.flatMap((row) => (row.type === "step" ? [row.id] : [])));
@@ -66,17 +57,13 @@ export function WorkflowRunScreen() {
     const node = byId.get(id);
     return node ? stepLabel(node, serverAgents, t) : "";
   };
-  // The run follows the layout that the person chose on the workflow page and in the editor.
   const view = useWorkflowEditorView((state) => state.view);
   const [chosen, setChosen] = useState<string | null>(null);
-  // Without a choice, the flow selects the step that needs the person most, as the desktop status pill
-  // does: one that waits, then one that failed, then one that runs.
   const runOrder = rows.flatMap((row) => (row.type === "step" ? [row.id] : []));
   const attention = (status: WorkflowStep["status"]) =>
     runOrder.find((id) => latest.get(id)?.status === status) ?? null;
   const selectedId = chosen ?? attention("approval") ?? attention("failed") ?? attention("running");
   const selectedNode = selectedId ? byId.get(selectedId) : undefined;
-  /** The steps of the run whose node the workflow no longer has. */
   const removed = [...latest.values()].filter((step) => !known.has(step.nodeId));
   const canStop = run ? isActiveRun(run.status) && run.status !== "stopping" : false;
   const stop = () => {
@@ -173,6 +160,7 @@ export function WorkflowRunScreen() {
                     {t("mobile.workflow.detail.stepsTitle")}
                   </Typography>
                   <WorkflowFlowView
+                    serverId={serverId}
                     graph={graph}
                     agents={serverAgents}
                     run={{

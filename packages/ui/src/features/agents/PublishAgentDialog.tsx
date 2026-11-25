@@ -25,24 +25,17 @@ import { TemplateInstructions, TemplateRoutines, TemplateSkills } from "./AgentT
 export interface PublishAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** The agent as it would be published, with its current publication. Null while it loads. */
   preview: AgentTemplatePreview | null;
   loading: boolean;
   onPublish: () => Promise<void>;
   onUnpublish: () => Promise<void>;
   onCopyLink: () => Promise<void>;
-  /** Opens a link from the instructions. */
   onOpenLink: (url: string) => void;
 }
 
 type View = "summary" | "context" | "routines";
 type Pending = "publish" | "unpublish" | null;
 
-/**
- * Publishes one agent as a link-only template: its instructions, skills and routines. Files and
- * memories stay on this computer. After a publish the same dialog can copy, update or remove the
- * link. The caller reports a finished action in a toast; a failed one is reported here.
- */
 export function PublishAgentDialog(props: PublishAgentDialogProps) {
   const { t, format, errorMessage } = useText();
   const [view, setView] = createSignal<View>("summary");
@@ -52,12 +45,6 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
   let closeButton: HTMLButtonElement | undefined;
   let primaryButton: HTMLButtonElement | undefined;
 
-  /**
-   * Only the button of the running action is disabled; the others stay as they are and ignore clicks
-   * until it ends, so no button dims and comes back for nothing. A disabled button drops the focus to
-   * the page, and the focus trap would pull it back and move the focus ring, so the panel holds the
-   * focus while the action runs and the main button takes it back afterwards.
-   */
   async function run(kind: Exclude<Pending, null>, action: () => Promise<void>, fallback: string): Promise<void> {
     if (pending()) return;
     content?.focus({ preventScroll: true });
@@ -77,7 +64,6 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
     }
   }
 
-  /** A copy takes no time and changes nothing, so it has no pending state that could dim the buttons. */
   async function copyLink(): Promise<void> {
     if (pending()) return;
     try {
@@ -104,7 +90,6 @@ export function PublishAgentDialog(props: PublishAgentDialogProps) {
             class="agent-template-dialog"
             aria-busy={pending() ? "true" : undefined}
             onOpenAutoFocus={(event) => {
-              // Unpublish is the first control in the corner; the first focus must not land on it.
               event.preventDefault();
               closeButton?.focus({ preventScroll: true });
             }}

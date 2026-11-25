@@ -1,26 +1,11 @@
-import { type Dirent, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { type Dirent, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Effect, Option, Schema } from "effect";
 
-/**
- * A small file in the user data folder that tells the next start how this run ended. It is written
- * at the start, once a minute while the run is alive, at sleep and wake, when a quit starts and when
- * the teardown is done. A run that left it in `running` or `quitting` ended without a clean quit: a
- * crash, a force quit, a kill that cannot be caught, or a power loss.
- *
- * The file has times, the app version and a few states only. It never leaves the computer; the next
- * start makes one `system_unclean_exit` event from it (`ANALYTICS.md`).
- *
- * All writes are synchronous: the quit writes must land before the process ends, and an async write
- * that lands late must not replace a later state. Each write is about 200 bytes.
- */
-
 export const RUN_MARKER_FILE = "openbot-run-marker-v1.json";
-/** How often a live run writes its last sign of life. */
 const RUN_HEARTBEAT_MS = 60_000;
-/** More dumps than this are sent as this count. */
 const MAX_CRASH_DUMPS = 10;
-/** Crashpad keeps reports in `new`, `pending` and `completed`, or one level deeper on Linux. */
 const CRASH_DUMP_DEPTH = 3;
 
 const UPTIME_CLASSES = [
@@ -36,10 +21,6 @@ export const UNCLEAN_EXIT_ENUMS = {
   host_kind: ["desktop", "server"],
 } as const;
 
-/**
- * Quits that end the run although the teardown can stop before it is done: an update install hands
- * the process to the installer, and Windows ends the process a few seconds after a session end.
- */
 const CLEAN_QUIT_REASONS: ReadonlySet<string> = new Set(["update", "session_end"]);
 
 const RunMarkerRecord = Schema.Struct({
@@ -56,7 +37,6 @@ const RunMarkerRecord = Schema.Struct({
 type RunMarkerRecord = typeof RunMarkerRecord.Type;
 const decodeRunMarker = Schema.decodeUnknownOption(RunMarkerRecord);
 
-/** The properties of one `system_unclean_exit` event. Fixed names, times and counts only. */
 export interface UncleanExitProperties {
   phase: (typeof UNCLEAN_EXIT_ENUMS.phase)[number];
   previous_app_version: string;
@@ -70,12 +50,10 @@ export interface UncleanExitProperties {
 
 export interface RunMarkerOptions {
   userDataPath: string;
-  /** `app.getPath("crashDumps")`. Only file names and times are read there, never a dump. */
   crashDumpsPath: string;
   appVersion: string;
   server: boolean;
   now: number;
-  /** When the operating system started, in epoch milliseconds. */
   bootedAt: number;
 }
 
@@ -87,17 +65,15 @@ export class RunMarker {
   readonly #path: string;
   #record: RunMarkerRecord;
   #heartbeat: ReturnType<typeof setInterval> | null = null;
+  #sequence = 0;
+  #written = 0;
+  #writing = false;
 
   private constructor(path: string, record: RunMarkerRecord) {
     this.#path = path;
     this.#record = record;
   }
 
-  /**
-   * Reads how the previous run ended, then marks this run as running. Call it only in the process
-   * that holds the single-instance lock. `previous` is null after a clean quit, an update, an OS
-   * shutdown, or when there is no readable file.
-   */
   static start(options: RunMarkerOptions): { marker: RunMarker; previous: UncleanExitProperties | null } {
     const path = join(options.userDataPath, RUN_MARKER_FILE);
     const read = Effect.runSync(
@@ -118,8 +94,8 @@ export class RunMarker {
       slept: false,
       osShutdown: false,
     });
-    marker.#write();
-    marker.#heartbeat = setInterval(() => marker.#update({}), RUN_HEARTBEAT_MS);
+    marker.#writeNow();
+    marker.#heartbeat = setInterval(() => marker.#updateLater({}), RUN_HEARTBEAT_MS);
     marker.#heartbeat.unref();
     return { marker, previous };
   }
@@ -129,32 +105,32 @@ export class RunMarker {
   }
 
   resume(): void {
-    this.#update({ sleeping: false });
+    this.#updateLater({ sleeping: false });
   }
 
-  /** The operating system said that it shuts down or restarts. The run then counts as clean. */
   osShutdown(): void {
     this.#update({ osShutdown: true });
   }
 
-  /** A quit started. The first reason stays. */
   quitting(reason: string): void {
     if (this.#record.state !== "running") return;
     this.#stopHeartbeat();
     this.#update({ state: "quitting", quitReason: reason });
   }
 
-  /** The teardown did not end within its deadline, and OpenBot exits itself. */
   quitTimedOut(): void {
     if (this.#record.state === "clean") return;
     this.#stopHeartbeat();
     this.#update({ state: "quit_timeout" });
   }
 
-  /** The teardown is done. */
   clean(): void {
     this.#stopHeartbeat();
     this.#update({ state: "clean" });
+  }
+
+  get #pendingPath(): string {
+    return `${this.#path}.pending`;
   }
 
   #stopHeartbeat(): void {
@@ -163,18 +139,25 @@ export class RunMarker {
   }
 
   #update(change: Partial<RunMarkerRecord>): void {
-    if (this.#record.state === "clean") return;
-    this.#record = { ...this.#record, ...change, heartbeatAt: Date.now() };
-    this.#write();
+    if (this.#change(change)) this.#writeNow();
   }
 
-  /**
-   * A failed write only loses this sign: the next start then reads an older state or nothing. The
-   * rename replaces the file in one step, so a kill during the write never leaves a torn marker.
-   */
-  #write(): void {
-    const content = `${JSON.stringify(this.#record)}\n`;
+  #updateLater(change: Partial<RunMarkerRecord>): void {
+    if (this.#change(change)) this.#writeLater();
+  }
+
+  #change(change: Partial<RunMarkerRecord>): boolean {
+    if (this.#record.state === "clean") return false;
+    this.#record = { ...this.#record, ...change, heartbeatAt: Date.now() };
+    this.#sequence += 1;
+    return true;
+  }
+
+  #writeNow(): void {
+    this.#written = this.#sequence;
+    const content = recordContent(this.#record);
     const temporaryPath = `${this.#path}.tmp`;
+    if (this.#writing) this.#removePending();
     Effect.runSync(
       Effect.try({
         try: () => {
@@ -185,6 +168,64 @@ export class RunMarker {
       }).pipe(Effect.ignore),
     );
   }
+
+  #removePending(): void {
+    Effect.runSync(
+      Effect.try({
+        try: () => rmSync(this.#pendingPath, { force: true }),
+        catch: (cause) => new RunMarkerFailure({ cause }),
+      }).pipe(Effect.ignore),
+    );
+  }
+
+  #writeLater(): void {
+    if (this.#writing) return;
+    this.#writing = true;
+    Effect.runFork(
+      this.#flush().pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            this.#writing = false;
+            if (this.#written < this.#sequence) this.#writeLater();
+          }),
+        ),
+      ),
+    );
+  }
+
+  readonly #flush = Effect.fn("RunMarker.flush")(function* (this: RunMarker) {
+    while (this.#written < this.#sequence) {
+      const sequence = this.#sequence;
+      const replaced = yield* this.#replace(sequence, recordContent(this.#record)).pipe(
+        Effect.orElseSucceed(() => false),
+      );
+      yield* Effect.sync(() => {
+        if (replaced && this.#written >= sequence) this.#writeNow();
+        this.#written = Math.max(this.#written, sequence);
+      });
+    }
+  });
+
+  readonly #replace = Effect.fn("RunMarker.replace")(function* (this: RunMarker, sequence: number, content: string) {
+    const pendingPath = this.#pendingPath;
+    yield* Effect.tryPromise({
+      try: () => writeFile(pendingPath, content, { mode: 0o600 }),
+      catch: (cause) => new RunMarkerFailure({ cause }),
+    });
+    if (this.#written >= sequence) {
+      yield* Effect.promise(() => rm(pendingPath, { force: true }).catch(() => undefined));
+      return false;
+    }
+    yield* Effect.tryPromise({
+      try: () => rename(pendingPath, this.#path),
+      catch: (cause) => new RunMarkerFailure({ cause }),
+    });
+    return true;
+  });
+}
+
+function recordContent(record: RunMarkerRecord): string {
+  return `${JSON.stringify(record)}\n`;
 }
 
 function uncleanExit(record: RunMarkerRecord, options: RunMarkerOptions): UncleanExitProperties | null {
@@ -196,22 +237,17 @@ function uncleanExit(record: RunMarkerRecord, options: RunMarkerOptions): Unclea
     phase: record.state,
     previous_app_version: record.appVersion,
     uptime_class: UPTIME_CLASSES.find(([, limit]) => uptime < limit)?.[0] ?? "ge24h",
-    // A dump of the main process is written after its last sign of life. A renderer or GPU crash in
-    // the last minute of the run counts too.
     crash_dump_count: Math.min(
       MAX_CRASH_DUMPS,
       countCrashDumps(options.crashDumpsPath, record.heartbeatAt, options.now),
     ),
     slept: record.slept,
     ended_asleep: record.sleeping,
-    // The computer started again after the run's last sign of life: a power loss, a forced restart,
-    // or an end of the run and then a restart.
     os_restarted: options.bootedAt > record.heartbeatAt,
     host_kind: options.server ? "server" : "desktop",
   };
 }
 
-/** Counts `.dmp` files with a time in `[from, to)`. Reads names and times only. */
 export function countCrashDumps(directory: string, from: number, to: number, depth = 0): number {
   if (depth >= CRASH_DUMP_DEPTH) return 0;
   const entries = Effect.runSync(

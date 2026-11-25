@@ -1,13 +1,3 @@
-import type { AgentLifecycleFailed } from "../backend/agent-service";
-import type { CentralAuthOperationError } from "./central-auth-effects";
-import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
-// Link-only agent templates on the account Worker.
-//
-// Publishing sends the agent's instructions, routines and skills - never workspace files or
-// memories - and one template exists per local agent, so a second publish updates it. Installing
-// creates a new local agent through the same services the marketplace install and the agent
-// import use; a failure removes that agent again.
-
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -39,15 +29,17 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { redactText } from "@openbot/logging";
+import { containsSecret } from "@openbot/logging";
 import { Effect, Result, Schema } from "effect";
+import type { AgentLifecycleFailed } from "../backend/agent-service";
 import { causeHelpers } from "../backend/effect-boundary";
 import { imageMimeType, localSchedule, toArrayBuffer, validTimezone } from "./agent-marketplace-service";
+import type { CentralAuthOperationError } from "./central-auth-effects";
 import type { LocalSkillLibrary } from "./local-skill-library";
 import { MANAGED_SKILL_SLUGS } from "./managed-skill-service";
+import type { SkillMarketplaceFailure } from "./skill-marketplace-service";
 import { inspectSkillMarkdown, normalizedFiles } from "./skill-package";
 
-/** The words for a snapshot problem. The English is the text the contract sent before. */
 function snapshotProblemText(problem: AgentTemplateSnapshotProblem): string {
   switch (problem.kind) {
     case "name":
@@ -78,7 +70,6 @@ function snapshotProblemText(problem: AgentTemplateSnapshotProblem): string {
   }
 }
 
-/** Embedded skills are written here in the new agent's workspace, added to the library, and removed. */
 const SKILL_STAGING = ".openbot/template-skills";
 
 interface AgentTemplateAuth {
@@ -91,6 +82,8 @@ interface AgentTemplateAuth {
   downloadAuthorized(path: string): Effect.Effect<Uint8Array, CentralAuthOperationError>;
   resolveApiUrl(path: string): string;
 }
+
+type AgentTemplateCatalog = Pick<AgentTemplateAuth, "requestAuthorized" | "downloadAuthorized">;
 
 interface AgentTemplateAgents {
   listAgents(): AgentSummary[];
@@ -138,7 +131,6 @@ interface AgentTemplateSkills {
   }): Effect.Effect<unknown, SkillMarketplaceFailure>;
 }
 
-/** What the Worker keeps about one template the signed-in user published. */
 interface OwnedTemplate {
   id: string;
   sourceAgentId: string;
@@ -150,15 +142,12 @@ export class AgentTemplateService {
     private readonly auth: AgentTemplateAuth,
     private readonly agents: AgentTemplateAgents,
     private readonly skills: AgentTemplateSkills,
+    private readonly catalog: AgentTemplateCatalog = auth,
   ) {}
 
   preview(agentId: string): Effect.Effect<AgentTemplatePreview, AgentTemplateFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentTemplatePreview, AgentTemplateFailure> {
       const agent = yield* templateSync(() => this.requireAgent(agentId));
-      // Signed out or offline, the agent still previews; it reads as not published.
-      // A skill that cannot be published must not hide the dialog: it is where a published agent is
-      // unpublished. The preview shows the error, and publishing refuses with it. The three reads do
-      // not depend on each other, so they run together.
       const [owned, skills, avatarImage] = yield* Effect.all(
         [
           this.owned(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
@@ -169,7 +158,6 @@ export class AgentTemplateService {
               Effect.map((value) => ({ value, error: null })),
               Effect.catch((error) => Effect.succeed({ value: [], error: message(error.cause) })),
             ),
-          // An avatar file that cannot be read is shown as no avatar: it must not hide the dialog.
           this.readAvatar(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
         ],
         { concurrency: "unbounded" },
@@ -193,7 +181,6 @@ export class AgentTemplateService {
         return yield* new AgentTemplateFailure({ cause: new Error(sourceText("error.marketplace.shareCardInvalid")) });
       const agent = yield* templateSync(() => this.requireAgent(agentId));
       const snapshot = yield* this.snapshot(agent);
-      // The first real cause, so the owner knows what to change.
       const problem = agentTemplateSnapshotProblem(snapshot);
       if (problem) return yield* new AgentTemplateFailure({ cause: new Error(snapshotProblemText(problem)) });
       if (!isAgentTemplateSnapshot(snapshot))
@@ -226,7 +213,7 @@ export class AgentTemplateService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentTemplateDetail, AgentTemplateFailure> {
       if (!isAgentTemplateId(templateId))
         return yield* new AgentTemplateFailure({ cause: new Error(sourceText("error.marketplace.linkInvalid")) });
-      const detail = yield* this.auth
+      const detail = yield* this.catalog
         .requestAuthorized(
           `/v1/agent-templates/${encodeURIComponent(templateId)}`,
           { method: "GET" },
@@ -235,8 +222,6 @@ export class AgentTemplateService {
         .pipe(toAgentTemplateFailure);
       return {
         ...detail,
-        // A template published before its owner's copy of a managed skill was recognized carries that
-        // copy. The new agent gets OpenBot's own, and installing the copy would fail on its folder.
         skills: detail.skills.filter((skill) => skill.kind !== "embedded" || !MANAGED_SKILL_SLUGS.has(skill.slug)),
         avatarUrl: detail.avatarUrl ? this.auth.resolveApiUrl(detail.avatarUrl) : null,
       };
@@ -248,14 +233,10 @@ export class AgentTemplateService {
       if (!validTimezone(input.timezone))
         return yield* new AgentTemplateFailure({ cause: new Error(sourceText("error.marketplace.timezoneInvalid")) });
       const detail = yield* this.get(input.templateId);
-      // The owner can republish while the dialog is open; only the version the user read is installed.
       if (detail.updatedAt !== input.expectedUpdatedAt)
         return yield* new AgentTemplateFailure({
           cause: new Error(sourceText("error.marketplace.changedSinceOpened")),
         });
-      // Every embedded skill is checked before the agent exists, so a bad one creates nothing. A local
-      // skill with the same name is reused when its text is the same. Otherwise the template's text
-      // becomes its next revision: earlier revisions stay, and other agents keep the one they installed.
       const library = yield* templateSync(() => this.skills.library());
       const localSkills = yield* library.list().pipe(toAgentTemplateFailure);
       const existingSkills = new Map<string, { id: string; revision: number; sameText: boolean }>();
@@ -272,7 +253,7 @@ export class AgentTemplateService {
       let avatar: AvatarImageInput | null = null;
       if (detail.avatarUrl) {
         const avatarUrl = detail.avatarUrl;
-        const bytes = yield* this.auth.downloadAuthorized(avatarUrl).pipe(toAgentTemplateFailure);
+        const bytes = yield* this.catalog.downloadAuthorized(avatarUrl).pipe(toAgentTemplateFailure);
         const mimeType = imageMimeType(bytes);
         if (!mimeType)
           return yield* new AgentTemplateFailure({ cause: new Error(sourceText("error.marketplace.avatarInvalid")) });
@@ -311,7 +292,6 @@ export class AgentTemplateService {
               yield* Effect.gen({ self: this }, function* () {
                 yield* templateIO(() => mkdir(target, { recursive: true }));
                 yield* templateIO(() => writeFile(join(target, "SKILL.md"), skill.markdown, { flag: "wx" }));
-                // Recorded in the same step, so a failed install can always withdraw what it published.
                 const revision = yield* Effect.gen(function* () {
                   const revision = yield* (
                     existing
@@ -352,7 +332,6 @@ export class AgentTemplateService {
         if (Result.isFailure(outcome)) {
           const error = outcome.failure.cause;
           yield* this.agents.deleteAgent(agent.id).pipe(Effect.catch(() => Effect.void));
-          // A failed install leaves the shared library as it was.
           for (const skill of published.reverse())
             yield* library.withdraw(skill.id, skill.revision).pipe(Effect.catch(() => Effect.void));
           return yield* new AgentTemplateFailure({ cause: error });
@@ -376,10 +355,13 @@ export class AgentTemplateService {
       avatarSeed: agent.avatarSeed,
       avatarHue: agent.avatarHue,
       skills,
-      routines: this.agents.listRoutines(agent.id).flatMap(({ name, instruction, active, trigger }) =>
-        // A `once` routine names one date, so it is not part of a template.
-        isReleasedRoutineSchedule(trigger.schedule) ? [{ name, instruction, active, schedule: trigger.schedule }] : [],
-      ),
+      routines: this.agents
+        .listRoutines(agent.id)
+        .flatMap(({ name, instruction, active, trigger }) =>
+          isReleasedRoutineSchedule(trigger.schedule)
+            ? [{ name, instruction, active, schedule: trigger.schedule }]
+            : [],
+        ),
     });
   }
 
@@ -400,7 +382,6 @@ export class AgentTemplateService {
     });
   }
 
-  /** A share link on the Worker this app uses, so a development publish opens the local page. */
   private publication(owned: OwnedTemplate): AgentTemplatePublication {
     const origin = agentTemplateShareOrigin(new URL(this.auth.resolveApiUrl("/")).origin);
     return {
@@ -417,12 +398,7 @@ export class AgentTemplateService {
   }
 }
 
-/**
- * A template is public to anyone with its link, so a secret in it is refused rather than redacted:
- * a silently changed instruction would publish an agent that does not do what its owner wrote.
- */
 function assertNoSecrets(snapshot: AgentTemplateSnapshot): void {
-  // Each pair is the error message for the field, then the field text.
   const fields: Array<[string, string]> = [
     [sourceText("error.marketplace.secretInName"), snapshot.name],
     [sourceText("error.marketplace.secretInTitle"), snapshot.title],
@@ -441,7 +417,7 @@ function assertNoSecrets(snapshot: AgentTemplateSnapshot): void {
           : [],
     ),
   ];
-  for (const [message, text] of fields) if (redactText(text) !== text) throw new Error(message);
+  for (const [message, text] of fields) if (containsSecret(text)) throw new Error(message);
 }
 
 function isOwnedTemplate(value: unknown): value is OwnedTemplate {

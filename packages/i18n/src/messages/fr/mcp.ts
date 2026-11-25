@@ -30,6 +30,8 @@ export const messages = {
   "mcp.signIn.pageDescription": "Cette page est ouverte dans le navigateur de {host}. Connectez-vous ici.",
   "mcp.signIn.copyHint": "Si la page ne se charge pas, copiez le lien et ouvrez-le dans un autre navigateur.",
   "mcp.signIn.copyLink": "Copier le lien",
+  "mcp.signIn.pasteHint":
+    "Si vous vous connectez sur un autre appareil, copiez l’adresse que son navigateur affiche à la fin et collez-la ici.",
   "mcp.test.connected": { one: "Connecté · {count} outil", other: "Connecté · {count} outils" },
   "mcp.status.testing": "Test…",
   "mcp.status.failed": "Échec",
@@ -38,6 +40,7 @@ export const messages = {
   "mcp.status.signedIn": "Connecté",
   "mcp.status.signingIn": "Connexion…",
   "mcp.status.signInNeeded": "Connexion requise",
+  "mcp.status.signInAppNeeded": "App de connexion requise",
   "mcp.status.refused": "Refusé",
   "mcp.status.checkUrl": "Vérifiez l’URL",
   "mcp.status.noAnswer": "Pas de réponse",
@@ -99,6 +102,7 @@ export const messages = {
   "mcp.panel.signIn": "Se connecter",
   "mcp.panel.signOut": "Se déconnecter",
   "mcp.panel.cancelSignIn": "Annuler la connexion",
+  "mcp.panel.useAddress": "Utiliser cette adresse",
   "mcp.panel.signInTo": "Se connecter à {name}",
   "mcp.panel.signInWaiting": {
     one: "Terminez la connexion dans votre navigateur. OpenBot cesse d’attendre après {count} minute.",

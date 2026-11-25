@@ -9,6 +9,7 @@ import {
   FlowLanes,
 } from "@/features/workflows/components/workflow-flow-canvas";
 import { FlowStepCard } from "@/features/workflows/components/workflow-flow-view";
+import { type NodeCredits, useMediaCredits } from "@/features/workflows/model/use-media-credits";
 import { openAddStep, openStep, useWorkflowStepMenu } from "@/features/workflows/model/use-workflow-step-menu";
 import type { WorkflowDraft } from "@/features/workflows/model/workflow-draft";
 import type { FlowList, WorkflowOutline } from "@/features/workflows/model/workflow-outline";
@@ -16,25 +17,22 @@ import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** A place between two steps of the outline: a tap adds a step there. */
 function AddHere({ list, index }: { list: FlowList; index: number }) {
   return <FlowAddButton onPress={() => openAddStep(list, index)} />;
 }
 
-/**
- * A step of the outline flow: a tap opens its page, a long press opens the same menu as the list. The
- * card is the card of every flow; the trigger has no menu.
- */
 function FlowStep({
   node,
   draft,
   agents,
   problem,
+  credits,
 }: {
   node: WorkflowNode;
   draft: WorkflowDraft;
   agents: readonly MobileAgent[];
   problem: string | undefined;
+  credits: NodeCredits | undefined;
 }) {
   const { t } = useText();
   const { structural, actions, onAction } = useWorkflowStepMenu(node, draft);
@@ -43,6 +41,7 @@ function FlowStep({
       node={node}
       agents={agents}
       problem={problem}
+      credits={credits}
       press={{
         kind: "edit",
         actions: structural ? actions : [],
@@ -54,12 +53,6 @@ function FlowStep({
   );
 }
 
-/**
- * The flow view of the editor, on the canvas of the workflow page: the trigger, the steps before the
- * condition, its two paths one under the other and the steps after they join, from left to right. A "+" between two steps adds a
- * step at that place. The steps that the trigger does not reach are not part of the flow; the editor
- * lists them below it.
- */
 export function WorkflowFlow({
   draft,
   outline,
@@ -73,11 +66,13 @@ export function WorkflowFlow({
 }) {
   const { t } = useText();
   const byId = new Map(draft.graph.nodes.map((node) => [node.id, node]));
+  const { byNode } = useMediaCredits(draft.serverId, draft.graph.nodes);
   const step = (id: string) => {
     const node = byId.get(id);
-    return node ? <FlowStep node={node} draft={draft} agents={agents} problem={problems.get(id)} /> : null;
+    return node ? (
+      <FlowStep node={node} draft={draft} agents={agents} problem={problems.get(id)} credits={byNode.get(id)} />
+    ) : null;
   };
-  /** The steps of a list with a place to add before, between and after them. */
   const list = (name: FlowList) => (
     <>
       {outline[name].map((id, index) => (

@@ -1,6 +1,3 @@
-// The `Text` and `TextInput` that the Uniwind wrappers render (see `uniwind-react-native.js`), so every
-// text takes the text size of Settings › Appearance. Native chrome, such as navigation bars and system
-// menus, keeps the text size of the phone settings.
 import {
   Text as NativeText,
   TextInput as NativeTextInput,
@@ -13,11 +10,6 @@ import {
 } from "openbot-original-react-native";
 import { useTextSize } from "@/features/settings/model/text-size-store";
 
-/**
- * The multiplier for a text, as the phone applies its own text size: none with
- * `allowFontScaling={false}`, and with `maxFontSizeMultiplier` the phone and app sizes together stay
- * under the limit.
- */
 function useScale(allowFontScaling: boolean | undefined, maxFontSizeMultiplier: number | null | undefined) {
   const percent = useTextSize((state) => state.percent);
   if (percent === 100 || allowFontScaling === false) return 1;
@@ -48,5 +40,4 @@ function ScaledTextInput(props: TextInputProps) {
   return <NativeTextInput {...props} style={scaledStyle(props.style, scale)} />;
 }
 
-// Libraries read the focused field from `TextInput.State`, which the Uniwind wrapper copies from here.
 export const TextInput = Object.assign(ScaledTextInput, { State: NativeTextInput.State });

@@ -1,5 +1,5 @@
 import type { BrowserDisplayState } from "@openbot/contracts/ipc";
-import BrowserLiveView from "@openbot/ui/features/browser/BrowserLiveView";
+import BrowserLiveView, { browserPageSite } from "@openbot/ui/features/browser/BrowserLiveView";
 import { useText } from "@openbot/ui/text";
 import { render } from "@solidjs/web";
 import { createSignal, onCleanup, onSettled, Show } from "solid-js";
@@ -8,7 +8,6 @@ import { syncAppearance } from "../../appearance-choice";
 import { I18nProvider } from "../../i18n-context";
 import { browserPort } from "./browser-port";
 
-/** Main opens the window on a host's tab with `view=live`: the page is drawn here, not placed over it. */
 const page = new URLSearchParams(window.location.search);
 const liveView = page.get("view") === "live";
 const liveViewClipboard = page.get("clipboard") === "1";
@@ -73,7 +72,13 @@ function BrowserPictureInPicture() {
       <div class="browser-surface browser-pip-surface" ref={surface}>
         <Show when={liveView && state().activeTabId}>
           {(tabId) => (
-            <BrowserLiveView runtime={browserPort().browser} tabId={tabId()} active clipboard={liveViewClipboard} />
+            <BrowserLiveView
+              runtime={browserPort().browser}
+              tabId={tabId()}
+              active
+              clipboard={liveViewClipboard}
+              site={browserPageSite(state().tabs.find((entry) => entry.id === tabId())?.url)}
+            />
           )}
         </Show>
         <Show when={state().tabs.length === 0}>

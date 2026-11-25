@@ -15,36 +15,23 @@ import type { MarketplaceApp, MarketplaceModel } from "./marketplace-model";
 
 export type MarketplaceView =
   | { kind: "browse" }
-  /**
-   * `detail`: the listing a Marketplace link loaded. The page shows it and does not read the catalog
-   * again, because the catalog has no agent that waits for its first review.
-   */
   | { kind: "agent"; listing: MarketplaceAgentSummary; detail?: MarketplaceAgentDetail | undefined }
-  /** The catalog agents of one category, on their own page. */
   | { kind: "agentGroup"; category: SkillCategory }
   | { kind: "skill"; listing: MarketplaceSkillSummary }
-  | { kind: "app"; id: string }
-  /** The apps of one category, on their own page. */
+  | { kind: "app"; id: string; setup?: boolean }
   | { kind: "appGroup"; category: SkillCategory }
-  /** "Your skills" or one catalog category, on its own page. */
   | { kind: "skillGroup"; group: SkillGroup }
-  /** A skill made on this computer. It has no catalog listing. */
   | { kind: "localSkill"; skillId: string }
-  /** The form of a custom MCP server: a new one when `id` is null, else the server with this id. */
   | { kind: "server"; id: string | null };
 
-/** "Your skills", or a catalog category. */
 export type SkillGroup = "yours" | SkillCategory;
 
-/** Which catalog skills the Skills tab shows. No source shows all of them. */
 export type SkillSource = "verified" | "public";
 
 export type MarketplaceTab = "apps" | "agents" | "skills";
 
-/** The kinds, in the order of the side panel. */
 export const MARKETPLACE_TABS: readonly MarketplaceTab[] = ["apps", "agents", "skills"];
 
-/** The name of each tab. The header names the browse view after its tab. */
 export const MARKETPLACE_TAB_LABEL = {
   agents: "marketplace.tab.agents",
   apps: "marketplace.tab.apps",
@@ -52,27 +39,17 @@ export const MARKETPLACE_TAB_LABEL = {
 } as const satisfies Record<MarketplaceTab, string>;
 
 export interface MarketplaceNavigationState {
-  /** The views the user went through. The first is always the browse view. */
   stack: MarketplaceView[];
   tab: MarketplaceTab;
   query: string;
-  /** Verified or Public on the Agents tab. No source shows all agents. */
   agentSource: SkillSource | null;
-  /** The order of a skill group page. */
   skillSort: MarketplaceSkillSort;
   skillSource: SkillSource | null;
-  /** The slug of a link that names no app of this catalog. */
   missingApp: string | null;
-  /** A link named an agent or a skill that the Marketplace does not have. */
   missingListing: MarketplaceListingKind | null;
-  /**
-   * The category whose page the user opened last. Its title and first rows move between the Apps tab
-   * and the category page (`moveView`).
-   */
   appGroup: SkillCategory | null;
 }
 
-/** The `verified` value of a catalog query for a source. */
 export function sourceVerified(source: SkillSource | null): boolean | undefined {
   if (source === null) return undefined;
   return source === "verified";
@@ -83,11 +60,8 @@ export interface MarketplaceNavigation {
   set: (change: (draft: MarketplaceNavigationState) => void) => void;
   go: (view: MarketplaceView) => void;
   back: () => void;
-  /** Goes back to the view at `index` of the stack. */
   backTo: (index: number) => void;
-  /** The list of a kind, or a page on top of it. The search stays. */
   show: (tab: MarketplaceTab, view?: MarketplaceView) => void;
-  /** The browse view on its first tab, with no search and no filter. */
   reset: () => void;
 }
 
@@ -105,7 +79,6 @@ function initialState(): MarketplaceNavigationState {
   };
 }
 
-/** What each part of the window reads: the data and actions, where the user is, and the two listings. */
 export interface MarketplaceScope {
   model: MarketplaceModel;
   nav: MarketplaceNavigation;
@@ -137,7 +110,6 @@ export function createMarketplaceNavigation(): MarketplaceNavigation {
         draft.tab = tab;
         draft.missingApp = null;
         draft.missingListing = null;
-        // The list stays the same element, so it keeps its place.
         if (view) draft.stack = [draft.stack[0] ?? { kind: "browse" }, view];
         else draft.stack = draft.stack.slice(0, 1);
       }),
@@ -149,10 +121,6 @@ export function isMarketplaceTab(value: string): value is MarketplaceTab {
   return value === "apps" || value === "agents" || value === "skills";
 }
 
-/**
- * Where the server answers, with no secret: the command without its arguments, or the address
- * without its query. Arguments, headers, query and environment can hold keys.
- */
 export function serverAddress(server: McpServerConfig): string {
   if (server.transport === "stdio") return server.command;
   try {
@@ -163,13 +131,11 @@ export function serverAddress(server: McpServerConfig): string {
   }
 }
 
-/** Whether an app matches the search. */
 export function matchesApp(app: MarketplaceApp, query: string): boolean {
   const text = query.trim().toLowerCase();
   return !text || app.name.toLowerCase().includes(text) || app.tagline.toLowerCase().includes(text);
 }
 
-/** The apps of each category, in the catalog order. A server that the user added is in Other. */
 export function appCategories(apps: readonly MarketplaceApp[]): { category: SkillCategory; apps: MarketplaceApp[] }[] {
   const categoryOf = (app: MarketplaceApp): SkillCategory => (app.kind === "custom" ? "other" : app.category);
   return SKILL_CATEGORIES.map((category) => ({
@@ -178,15 +144,10 @@ export function appCategories(apps: readonly MarketplaceApp[]): { category: Skil
   })).filter((group) => group.apps.length > 0);
 }
 
-/** The apps that the user connected, and the ones that need attention. */
 export function ownedApps(apps: readonly MarketplaceApp[]): MarketplaceApp[] {
   return apps.filter((app) => app.status === "connected" || app.status === "attention");
 }
 
-/**
- * The full listing of a page. `load` reports its own failure and then gives undefined. A page that
- * closes before the answer drops it.
- */
 export function createDetail<T>(load: () => Promise<T | undefined>) {
   const [state, setState] = createStore<{
     value: T | undefined;
@@ -206,7 +167,6 @@ export function createDetail<T>(load: () => Promise<T | undefined>) {
       draft.status = "loading";
       draft.reference = null;
     });
-    // A page belongs to one listing, so a later change of the props does not load again.
     void untrack(load).then(
       (value) => {
         if (!alive) return;
@@ -224,7 +184,6 @@ export function createDetail<T>(load: () => Promise<T | undefined>) {
       },
     );
   };
-  // `load` can write the owner's state, such as an error, and a component body refuses writes.
   onSettled(() => run());
   return { value: () => state.value, status: () => state.status, reference: () => state.reference, retry: run };
 }

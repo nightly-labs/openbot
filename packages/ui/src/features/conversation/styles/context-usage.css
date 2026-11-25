@@ -1,10 +1,3 @@
-/*
- * Context usage: the composer ring, its popover, and the conversation row where a thread was
- * compacted. The breakdown hues reuse the chart palette in a fixed order, as the storage bar does.
- */
-
-/* Ring ------------------------------------------------------------------- */
-
 .context-meter-trigger {
   color: var(--openbot-text-muted);
 }
@@ -26,7 +19,6 @@
   --ui-radial-progress-color: var(--openbot-text-secondary);
 }
 
-/* The colour of the compaction notice above the input, so one state keeps one colour. */
 .context-meter-ring[data-compacting] {
   --ui-radial-progress-color: var(--openbot-warning);
 }
@@ -41,8 +33,6 @@
   }
 }
 
-/* Popover ---------------------------------------------------------------- */
-
 .context-meter-popover {
   z-index: var(--openbot-layer-popover);
   display: flex;
@@ -56,7 +46,6 @@
   animation: ui-menu-in var(--ui-menu-duration) var(--ui-menu-ease) both;
 }
 
-/* The copy that ContentExitMotion leaves in the place of the closed popover plays the exit. */
 .context-meter-popover:not([data-expanded]) {
   animation: ui-menu-out var(--ui-menu-duration) var(--ui-menu-ease) both;
 }
@@ -102,7 +91,6 @@
   line-height: var(--openbot-leading-sm);
 }
 
-/* The New chat and Compact rows sit under a full-width divider, in the shape of menu items. */
 .context-meter-footer {
   display: flex;
   flex-direction: column;
@@ -139,14 +127,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Bar -------------------------------------------------------------------- */
-
 .context-usage-bar {
   position: relative;
   display: flex;
   height: var(--openbot-space-2);
   gap: var(--openbot-space-0-5);
-  /* A meter: the script places the compaction tick with a physical `left`, so the bar stays LTR. */
   direction: ltr;
 }
 
@@ -174,9 +159,6 @@
   background: var(--openbot-border);
 }
 
-/* Breakdown -------------------------------------------------------------- */
-
-/* The storage bar hues in its order; the conversation itself stays neutral. */
 .context-meter-popover [data-category="systemPrompt"] {
   --context-color: var(--openbot-chart-storage-workspaces);
 }
@@ -240,7 +222,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The automatic compaction point: a tick that stands just past the bar's edges. */
 .context-usage-threshold {
   position: absolute;
   top: calc(-1 * var(--openbot-space-1));
@@ -251,19 +232,11 @@
   transform: translateX(-50%);
 }
 
-/* Composer notice ------------------------------------------------------- */
-
-/* The end is a result, not a wait, so it takes the tone the conversation row gives a completed compaction. */
 .context-compaction-notice[data-tone="success"] {
   --notice-accent: var(--openbot-success-text);
   --notice-surface: var(--openbot-success-soft);
 }
 
-/*
- * The way out reverses the way in: the slab drops behind the composer, which stacks above it, so it
- * reads as going back into the input. Reduced motion keeps a 1ms fade, because `onDone` waits for
- * the animation to end.
- */
 .context-compaction-notice[data-leaving] {
   animation: context-compaction-notice-out var(--openbot-duration-toast-exit) var(--openbot-ease-in-out) forwards;
 }
@@ -310,10 +283,6 @@
   font-weight: 600;
 }
 
-/*
- * The failed state keeps the one-line height of the other states: the inset stays at the no-button
- * value, and a smaller close button overhangs it rather than pushing the slab taller.
- */
 .context-compaction-notice:has(.composer-notice-dismiss) {
   --notice-inset: 8px;
 }
@@ -334,8 +303,6 @@
   font-variant-numeric: tabular-nums;
   line-height: 1.35;
 }
-
-/* Conversation row -------------------------------------------------------- */
 
 .context-compaction-body {
   display: flex;

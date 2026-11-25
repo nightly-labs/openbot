@@ -13,7 +13,6 @@ import {
   formatUsageResetIn,
 } from "./account-usage-view";
 
-/** The reset countdown shows minutes, so a half-minute tick keeps it current. */
 const RESET_CLOCK_MS = 30_000;
 
 export function AccountUsageDetails(props: {
@@ -31,7 +30,6 @@ export function AccountUsageDetails(props: {
   const [now, setNow] = createSignal(Date.now());
   const clock = window.setInterval(() => setNow(Date.now()), RESET_CLOCK_MS);
   onCleanup(() => window.clearInterval(clock));
-  /* A card with a height limit scrolls the list, and the header stays. The fades show where more rows are. */
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
   createEffect(
@@ -96,7 +94,9 @@ export function AccountUsageDetails(props: {
                             ? t("account.usage.providerNotReported")
                             : props.loading
                               ? t("account.usage.window.limit")
-                              : t("account.usage.notReported")}
+                              : row().readFailed
+                                ? t("account.usage.readFailed")
+                                : t("account.usage.notReported")}
                         </span>
                       </span>
                       <strong class="account-usage-provider-remaining">
@@ -122,7 +122,6 @@ export function AccountUsageDetails(props: {
   );
 }
 
-/** The limit windows of one account: a bar with a pace mark, the amount left and the time to the reset of each. */
 export function AccountUsageWindowList(props: { windows: readonly AccountUsageWindowRow[]; now: number }) {
   const text = useText();
   const { t } = text;
@@ -146,7 +145,6 @@ export function AccountUsageWindowList(props: { windows: readonly AccountUsageWi
               </span>
               <span class="account-usage-window-bar" aria-hidden="true">
                 <span class="account-usage-window-fill" style={{ "inline-size": `${usageWindow.remainingPercent}%` }} />
-                {/* The amount left at an even pace. A fill that ends before the mark runs out before the reset. */}
                 <Show when={usagePaceRemainingPercent(usageWindow.durationMins, usageWindow.resetsAt, props.now)}>
                   {(pace) => <span class="account-usage-window-pace" style={{ "inset-inline-start": `${pace()}%` }} />}
                 </Show>

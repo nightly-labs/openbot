@@ -1,41 +1,17 @@
-// Adapted from the report in nightly-labs/openbot#3824: "Gemini shows MCP errors for cloudflare and
-// higgsfield servers". An agent saved an http MCP server that asks for a sign-in OpenBot does not
-// hold. OpenBot gives such a row to the provider as written, the server answers 401, and Antigravity
-// ends every turn with "The MCP server 'higgsfield' failed to initialize". Other providers start
-// without that server. Runs the real Antigravity driver for CLI 1.5.4 over a fake that sends the
-// failure as 1.4.4 does, a form that OpenBot still accepts.
-// Cases: the turn resumes the session without the server and answers, the server is reported as a
-// drop, a new session gets the server again (a sign-in or a fix can have changed it) and leaves it
-// out the same way, and a failed server that OpenBot did not give
-// (the user's own `mcp_config.json`) stays the turn's error. A last case sends the failure message
-// before the stderr line: the turn still goes on, and the message is not shown as an answer.
-// From #7785: the user's own `mcp_config.json` has a server with the name of one that OpenBot gives.
-// The CLI then starts only its own entry, so OpenBot's server travels as `openbot_<name>`.
-// From #7228: the CLI 1.5.6 refuses a tool schema of a server that started, names the tool only in
-// its own log, and keeps the server after a resume in the same process. The session opens again on a
-// new process without the server, and the turn answers. A refused tool of the user's own server
-// leaves out no server of OpenBot's, also when an OpenBot server name is the start of its name.
-// From #9568: the CLI 1.5.9 names the refused tool in its answer, and no longer answers with the
-// short text after which OpenBot reads the log. The server is left out the same way.
-// From #11063: the CLI refuses the tool again from the second prompt after the resume. Each later
-// turn leaves the server out again, and answers.
-// From #7482: Google refuses a tool schema (an array with no `items`, an empty `enum` value) and names the
-// tool only by its place in the request. OpenBot finds the tool in the schemas that the CLI saved, leaves
-// out its server, and the turn answers.
-// From #11746: Google refuses `items` on a field that is not an array. Its server is left out the same way.
-// From #12358: the CLI sends a number `enum`, such as Aave's `limit: [10, 50]`, as empty values. Its
-// server is left out the same way.
-// `bun run test:antigravity-mcp-load-failure`. Writes
-// .openbot-build/antigravity-mcp-load-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
+import { isCauseCode } from "@openbot/telemetry";
+import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
+import { FAILOVER_CAUSES } from "../src/backend/agent/turn-lifecycle";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
+import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { McpServerDrop } from "../src/backend/mcp-provider-shapes";
-import { getString } from "../src/backend/protocol";
+import { getRecord, getString } from "../src/backend/protocol";
 import { requireProviderDriver } from "../src/backend/provider-drivers";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients, type TurnResult } from "./provider-fakes/host";
 
@@ -68,13 +44,13 @@ interface Report {
   googleDrops?: McpServerDrop[];
   blingDrops?: McpServerDrop[];
   aaveDrops?: McpServerDrop[];
+  openmotionDrops?: McpServerDrop[];
   error?: string;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-antigravity-mcp-load-failure-e2e-"));
 const report: Report = { passed: false, turns: {} };
 const clients: AgentClient[] = [];
-// The driver reads and writes the sign-in in the Gemini home. Keep it off the user's `~/.gemini`.
 process.env.GEMINI_HOME = join(root, "gemini");
 
 function httpServer(id: string, name: string, url: string): McpServerConfig {
@@ -115,14 +91,12 @@ try {
     reportMcpDrops: (_provider, dropped) => drops.push(...dropped),
   });
   clients.push(client);
-  // The fake answers a failed prompt once the client has read its stderr line.
   client.on("diagnostic", (message: string) => {
     const session = /error processing prompt for session (\S+)/u.exec(message)?.[1];
     if (session) void writeFile(join(release, session), "");
   });
   client.start();
 
-  // 1. The server that OpenBot gave fails: the session opens again without it, and the turn answers.
   const thread = await startThread(client, { cwd: workspace });
   const first = await runTurn(client, thread, { text: "Reply with OK only.", timeoutMs: 30_000 });
   report.turns.first = first;
@@ -136,7 +110,6 @@ try {
   );
   assert.match(drops[0]?.detail ?? "", /Unauthorized/u, "The report gives the server's reason.");
 
-  // 2. A new session gets the server again, and leaves it out again when it still fails.
   const second = await startThread(client, { cwd: workspace });
   const secondTurn = await runTurn(client, second, { text: "Reply with OK only.", timeoutMs: 30_000 });
   report.turns.second = secondTurn;
@@ -148,12 +121,10 @@ try {
     "Each session reports the server that it left out.",
   );
 
-  // 3. A server that OpenBot did not give is not OpenBot's to leave out: the turn fails as before.
   const foreign = await runTurn(client, thread, { text: "fail cloudflare", timeoutMs: 30_000 });
   report.turns.foreign = foreign;
   assert.equal(foreign.status, "failed", "The turn fails.");
   assert.match(foreign.error ?? "", /cloudflare/u, "The error names the server.");
-  // The server's own reason is runtime output, such as a traceback with a path (#7046).
   assert.doesNotMatch(foreign.error ?? "", /Unauthorized|Fix the MCP server/u, "The error has no raw server output.");
 
   const requests = await readJsonl<LogEntry>(log);
@@ -170,8 +141,6 @@ try {
     [opened[0]?.sessionId, opened[1]?.sessionId],
     "Each failed turn resumes its own session once.",
   );
-  // Only one idle thread keeps its process, so the first thread can stop when the second goes idle.
-  // Its next turn then resumes its session one more time.
   assert.deepEqual(
     resumed.slice(2).map((request) => request.sessionId),
     resumed.length > 2 ? [opened[0]?.sessionId] : [],
@@ -191,7 +160,6 @@ try {
     "The failed prompt is sent once more, and only once.",
   );
 
-  // 4. The failure message comes before the stderr line.
   const stdoutFirst = join(root, "agy-stdout-first", "bin", "antigravity");
   await installFakeAgent(stdoutFirst, "antigravity-mcp-load-failure", {
     FAKE_LOG: join(root, "stdout-first.jsonl"),
@@ -216,7 +184,6 @@ try {
   assert.equal(lateTurn.reply, "OK", "The turn answers when the message comes first.");
   assert.deepEqual(deltas, ["OK"], "The failure message is not shown as an answer.");
 
-  // 5. The CLI's own files name `docs` (user file) and `notes` (workspace file).
   await mkdir(join(root, "gemini", "config"), { recursive: true });
   await writeFile(join(root, "gemini", "config", "mcp_config.json"), JSON.stringify({ mcpServers: { docs: {} } }));
   const ownWorkspace = join(root, "own-workspace");
@@ -250,7 +217,6 @@ try {
     assert.ok(ownNames?.includes(name), `The session gets ${name}.`);
   }
   assert.ok(!ownNames?.includes("docs") && !ownNames?.includes("notes"), "No server has a name from the CLI's files.");
-  // 6. The CLI refuses the tool schema of a server that started (#7228).
   const refusedLog = join(root, "refused.jsonl");
   const refusedExecutable = join(root, "agy-refused", "bin", "antigravity");
   await installFakeAgent(refusedExecutable, "antigravity-refused-tool", { FAKE_LOG: refusedLog });
@@ -298,7 +264,6 @@ try {
   assert.ok(!refusedResume?.names?.includes("resend"), "The resumed session does not get the server.");
   assert.ok(refusedResume?.names?.includes("wiki"), "The resumed session keeps the other servers.");
 
-  // 7. A refused tool of the user's own server `wiki_extra` does not leave out OpenBot's `wiki`.
   await mkdir(join(refusedWorkspace, ".agents"), { recursive: true });
   await writeFile(
     join(refusedWorkspace, ".agents", "mcp_config.json"),
@@ -311,9 +276,21 @@ try {
   report.turns.ownRefusedTool = ownRefused;
   assert.equal(ownRefused.status, "failed", "The turn fails.");
   assert.equal(refusedDrops.length, 1, "No server of OpenBot is left out.");
+  const stopped = sourceText("error.provider.antigravityTurnStopped");
+  assert.equal(ownRefused.error, stopped, "The turn shows the plain message, not the CLI's text.");
 
-  // 8. The CLI 1.5.9 names the refused tool in its answer (#9568). The fake writes no log line for
-  // it, so only the answer can name the tool.
+  const failures: Record<string, TurnResult> = {};
+  for (const word of ["FAIL_KEY", "FAIL_OTHER", "FAIL_QUIET"]) {
+    const turn = await runTurn(refusedClient, refusedThread, { text: word, timeoutMs: 30_000 });
+    failures[word] = turn;
+    report.turns[word] = turn;
+    assert.equal(turn.status, "failed", `The ${word} turn fails.`);
+  }
+  assert.equal(failures.FAIL_KEY?.error, sourceText("error.provider.geminiKeyRefused"), "A refused key is named.");
+  assert.equal(failures.FAIL_OTHER?.error, stopped, "An unknown cause gives the plain message.");
+  assert.equal(failures.FAIL_QUIET?.error, stopped, "A log with no cause gives the plain message.");
+  assert.equal(refusedDrops.length, 1, "No server is left out for these failures.");
+
   const dropsBefore = refusedDrops.length;
   const answerThread = await startThread(refusedClient, { cwd: refusedWorkspace });
   const answerTurn = await runTurn(refusedClient, answerThread, {
@@ -337,8 +314,6 @@ try {
     "The prompt runs once more, and then without the refused tool.",
   );
 
-  // 8b. The CLI refuses the tool again from the second prompt after the resume (#11063). Each later
-  // turn leaves the server out again, and answers.
   for (const name of ["refusedToolAgain", "refusedToolThird"]) {
     const again = await runTurn(refusedClient, answerThread, {
       text: "CLI_1_5_9 SERVERS_RETURN Reply with OK only.",
@@ -357,7 +332,6 @@ try {
     "Each turn runs once more, and then without the refused tool.",
   );
 
-  // 9. Google refuses a tool schema and names the tool only by its place in the request (#7482).
   const googleLog = join(root, "google.jsonl");
   const googleExecutable = join(root, "agy-google", "bin", "antigravity");
   await installFakeAgent(googleExecutable, "antigravity-refused-tool", { FAKE_LOG: googleLog });
@@ -397,7 +371,6 @@ try {
     ["ticktick", null],
     "The prompt runs once more, and then without the refused server.",
   );
-  // The same refusal in the answer of the CLI 1.5.9, on a new session that gets the server again.
   const googleAnswerThread = await startThread(googleClient, { cwd: googleWorkspace });
   const googleAnswer = await runTurn(googleClient, googleAnswerThread, {
     text: "CLI_1_5_9 Reply with OK only.",
@@ -412,8 +385,6 @@ try {
     "The server is left out of the new session too.",
   );
 
-  // 10. Google refuses `items` on a field that is not an array (#11746). `atlas` has a field with the same
-  // name that is an array, which Google accepts.
   const blingDrops: McpServerDrop[] = [];
   const blingClient = requireProviderDriver("antigravity").createClient(
     { executable: googleExecutable, version: "1.5.6", source: "managed" },
@@ -453,8 +424,6 @@ try {
     "The prompt runs once more, and then without the refused server.",
   );
 
-  // 11. The CLI sends a number `enum` as empty values, and Google refuses them (#12358). `atlas` has a
-  // field with the same name and a text `enum`, which Google accepts.
   const aaveDrops: McpServerDrop[] = [];
   const aaveClient = requireProviderDriver("antigravity").createClient(
     { executable: googleExecutable, version: "1.5.6", source: "managed" },
@@ -485,6 +454,122 @@ try {
     "Only the server whose enum holds numbers is left out.",
   );
   assert.match(aaveDrops[0]?.detail ?? "", /get_reserve_holders/u, "The report names the tool.");
+
+  const openmotionDrops: McpServerDrop[] = [];
+  const openmotionClient = requireProviderDriver("antigravity").createClient(
+    { executable: googleExecutable, version: "1.5.6", source: "managed" },
+    20_000,
+    {
+      apiKey: () => null,
+      customProviders: () => [],
+      mcpServers: () => [
+        httpServer("atlas", "atlas", "https://atlas.example/mcp"),
+        httpServer("openmotion", "openmotion", "https://openmotion.example/mcp"),
+      ],
+      reportMcpDrops: (_provider, dropped) => openmotionDrops.push(...dropped),
+    },
+  );
+  clients.push(openmotionClient);
+  openmotionClient.start();
+  const openmotionWorkspace = join(root, "openmotion-workspace");
+  await mkdir(openmotionWorkspace, { recursive: true });
+  report.openmotionDrops = openmotionDrops;
+  for (const [name, text] of [
+    ["googleRefusedTypelessEnum", "Reply with OK only."],
+    ["googleRefusedTypelessEnumAnswer", "CLI_1_5_9 Reply with OK only."],
+  ] as const) {
+    const dropsBefore = openmotionDrops.length;
+    const openmotionThread = await startThread(openmotionClient, { cwd: openmotionWorkspace });
+    const openmotionTurn = await runTurn(openmotionClient, openmotionThread, { text, timeoutMs: 30_000 });
+    report.turns[name] = openmotionTurn;
+    assert.equal(openmotionTurn.error, null, "The turn that Google refused for an enum with no type has no error.");
+    assert.equal(openmotionTurn.reply, "OK", "The turn answers without the server.");
+    assert.deepEqual(
+      openmotionDrops.slice(dropsBefore).map((drop) => drop.name),
+      ["openmotion"],
+      "Only the server of the tool that Google names is left out.",
+    );
+    assert.match(openmotionDrops.at(-1)?.detail ?? "", /openmotion_restore_version/u, "The report names the tool.");
+    const openmotionPrompts = (await readJsonl<RefusedEntry>(googleLog)).filter(
+      (entry) => entry.method === "session/prompt" && entry.sessionId === openmotionThread,
+    );
+    assert.deepEqual(
+      openmotionPrompts.map((entry) => entry.refused),
+      ["openmotion", null],
+      "The prompt runs once more, and then without the refused server.",
+    );
+  }
+
+  const listCauses = new Map<string, string | null>();
+  const listAgent = async (name: string, env: Record<string, string>) => {
+    const executable = join(root, `agy-list-${name}`, "bin", "antigravity");
+    const workspace = join(root, `list-${name}`);
+    await mkdir(workspace, { recursive: true });
+    await installFakeAgent(executable, "antigravity-mcp-list", { FAKE_LOG: join(root, `list-${name}.jsonl`), ...env });
+    const listClient = requireProviderDriver("antigravity").createClient(
+      { executable, version: env.FAKE_VERSION ?? "1.5.12", source: "managed" },
+      20_000,
+      { apiKey: () => null, customProviders: () => [], mcpServers: () => [] },
+    );
+    clients.push(listClient);
+    listClient.on("notification", (notification: { method: string; params?: unknown }) => {
+      if (notification.method !== "error") return;
+      const threadId = getString(notification.params, "threadId");
+      if (threadId) listCauses.set(threadId, getString(notification.params, "causeCode") ?? null);
+    });
+    listClient.start();
+    const response = await runCauseEffect(
+      listClient.request(
+        "thread/start",
+        { cwd: workspace, dynamicTools: visibleDynamicTools("antigravity") },
+        (value) => value,
+      ),
+    );
+    const threadId = getString(getRecord(response, "thread"), "id");
+    assert.ok(threadId, "The thread opens.");
+    return { listClient, threadId, log: join(root, `list-${name}.jsonl`) };
+  };
+  const plain = { text: "Reply with OK only.", timeoutMs: 30_000 };
+
+  const onTime = await listAgent("now", { FAKE_OPEN_LIST: "now" });
+  const onTimeTurn = await runTurn(onTime.listClient, onTime.threadId, plain);
+  report.turns.toolsListedOnTime = onTimeTurn;
+  assert.equal(onTimeTurn.status, "completed", "A turn with OpenBot's tools completes.");
+  assert.equal(onTimeTurn.error, null, "A turn with OpenBot's tools has no error.");
+  const onTimeLog = await readJsonl<{ method: string; listed: number | null }>(onTime.log);
+  assert.ok(
+    onTimeLog.some((entry) => entry.method === "session/new" && (entry.listed ?? 0) > 0),
+    "The fake listed OpenBot's tools over the bridge.",
+  );
+
+  const never = await listAgent("never", { FAKE_OPEN_LIST: "never" });
+  const missed = await runTurn(never.listClient, never.threadId, plain);
+  report.turns.toolsNotListed = missed;
+  assert.equal(missed.status, "failed", "A turn without OpenBot's tools fails.");
+  assert.match(missed.error ?? "", /without OpenBot's tools/u, "The error says that the tools were missing.");
+  assert.doesNotMatch(missed.error ?? "", /MCP|policy|admin/u, "The error has no protocol words.");
+  assert.equal(missed.reply, "OK", "The answer of the turn stays.");
+  const missedCause = listCauses.get(never.threadId) ?? null;
+  assert.equal(missedCause, "unknown", "The cause is one that does not start a backup model.");
+  assert.ok(
+    missedCause !== null && isCauseCode(missedCause) && !FAILOVER_CAUSES.has(missedCause),
+    "No backup model runs the prompt again.",
+  );
+  const resumes = async () =>
+    (await readJsonl<{ method: string }>(never.log)).filter((entry) => entry.method === "session/resume").length;
+  const resumesBefore = await resumes();
+  const listedTurn = await runTurn(never.listClient, never.threadId, { ...plain, text: "list the tools" });
+  report.turns.toolsListedAtPrompt = listedTurn;
+  assert.equal(listedTurn.status, "completed", "A prompt that lists the tools in time completes.");
+  assert.equal(await resumes(), resumesBefore + 1, "The turn after the failure opens the session again.");
+  const keptTurn = await runTurn(never.listClient, never.threadId, plain);
+  report.turns.toolsKept = keptTurn;
+  assert.equal(keptTurn.status, "completed", "The session keeps the tools for the next prompt.");
+
+  const older = await listAgent("older", { FAKE_OPEN_LIST: "never", FAKE_VERSION: "1.5.10" });
+  const olderTurn = await runTurn(older.listClient, older.threadId, plain);
+  report.turns.toolsOlderCli = olderTurn;
+  assert.equal(olderTurn.status, "completed", "An older CLI's turn completes as before.");
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

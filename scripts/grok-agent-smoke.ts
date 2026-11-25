@@ -1,12 +1,3 @@
-// Runs one real Grok agent session through `GrokAgentClient` with the settings that `grok-client.ts`
-// sends, to check that an OpenBot agent can still do its work: a skill, the file and terminal
-// tools, a subagent and a git commit. It uses a copy of the user's Grok login (see
-// `grok-live-harness.ts`), Grok Build Fast and a temporary git workspace, and it checks that each
-// request leaves out the features that OpenBot turns off. A second session sets
-// `features.turn_summary = true` in `config.toml`, and checks that OpenBot keeps the user's value.
-// Each session has a second short turn, so that a late turn summary falls in its session.
-// Costs two Grok Build Fast sessions. `bun run smoke:grok-agent`; `--model=<id>` replaces Grok
-// Build Fast. Writes .openbot-build/grok-agent-smoke/report.json.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -41,7 +32,6 @@ const TASK = [
   "Then reply with one line: the garden word, the number and the title of notes.md.",
 ].join("\n");
 const FOLLOW_UP = "Reply with the single word DONE.";
-/** Tools that OpenBot turns off. */
 const REMOVED = ["send_feedback", "workflow"];
 
 interface SessionReport {
@@ -52,7 +42,6 @@ interface SessionReport {
   followUpStatus: string | null;
   requests: GrokRequest[];
   calls: string[];
-  /** The methods of the requests that the agent sent to OpenBot, such as tool approvals. */
   serverRequests: string[];
   result?: string;
   commits?: string[];
@@ -82,7 +71,6 @@ async function session(name: string, config: Record<string, boolean>, text: stri
   const client = requireProviderDriver("grok").createClient(cli, 120_000, NO_PROVIDER_CREDENTIALS);
   clients.push(client);
   const serverRequests: string[] = [];
-  // As the app does when the user allows a tool. The ACP client reads `accept`, not `acceptForSession`.
   client.on("request", (request) => {
     serverRequests.push(request.method);
     if (request.method === "item/permissions/requestApproval") {
@@ -100,11 +88,8 @@ async function session(name: string, config: Record<string, boolean>, text: stri
     developerInstructions: "You are Ada, a careful assistant in an end-to-end smoke test.",
   });
   const turn = await runTurn(client, thread, { model: MODEL, text, timeoutMs: 300_000 });
-  // Grok sends the turn summary after the turn ends. A second turn holds the session open until it
-  // is sent, so that the requests of this session include it.
   const next = await runTurn(client, thread, { model: MODEL, text: FOLLOW_UP, timeoutMs: 120_000 });
   await proxy.idle();
-  // Stop Grok before the next session changes the environment that the client reads at each spawn.
   await stopClients([client]);
   process.env = { ...saved };
   const requests = proxy.requests.slice(first);
@@ -116,15 +101,12 @@ async function session(name: string, config: Record<string, boolean>, text: stri
     error: turn.error,
     followUpStatus: next.status,
     requests,
-    // The last main request of the agent holds the whole history; a subagent's requests hold their own.
     calls: [...new Set(main.flatMap((request) => request.calls))],
     serverRequests,
   };
   try {
     result.result = readFileSync(join(workspace, "result.txt"), "utf8");
-  } catch {
-    // The agent did not write it; the check below fails.
-  }
+  } catch {}
   result.commits = execFileSync("git", ["log", "--format=%s"], { cwd: workspace, encoding: "utf8" })
     .split("\n")
     .filter(Boolean);
@@ -148,7 +130,6 @@ try {
     for (const tool of REMOVED) assert.ok(!request.tools.includes(tool), `A request declares ${tool}.`);
   assert.ok(!work.requests.some((request) => request.kind === "summary"), "Grok wrote a turn summary.");
 
-  // The user's own `config.toml` value wins over OpenBot's setting.
   const kept = await session("user-config", { "features.turn_summary": true }, "Reply with the single word OK.");
   assert.equal(kept.status, "completed", `The turn ended ${kept.status}: ${kept.error ?? ""}`);
   assert.equal(kept.followUpStatus, "completed", `The second turn ended ${kept.followUpStatus}.`);

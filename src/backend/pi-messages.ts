@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import { withoutTurnContext } from "./agent/developer-instructions";
@@ -14,7 +15,13 @@ export function piText(content: unknown): string {
     .join("\n");
 }
 
-/** Converts the authoritative Pi message, never a cumulative streaming snapshot. */
+const PI_SHELL_TOOLS = new Set(["bash", "powershell"]);
+
+export function piShellCommand(tool: string | null, args: unknown): { command?: string } {
+  const command = tool !== null && PI_SHELL_TOOLS.has(tool) ? getString(args, "command") : null;
+  return command ? { command: command.slice(0, INPUT_LIMITS.messageText) } : {};
+}
+
 export function piMessageItems(message: unknown, id: string): ThreadItem[] {
   const role = getString(message, "role");
   if (role === "user")
@@ -38,8 +45,6 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
   if (role !== "assistant") return [];
   const items: ThreadItem[] = [];
   const content = getArray(message, "content");
-  // Pi runs the tool calls of a message whatever its stop reason is, and some hosts, such as
-  // OpenRouter, send `stop` with tool calls. The text before them is then a step, not a reply (#12114).
   const step =
     getString(message, "stopReason") === "toolUse" ||
     content.some((block) => isRecord(block) && block.type === "toolCall");
@@ -57,17 +62,19 @@ export function piMessageItems(message: unknown, id: string): ThreadItem[] {
         id: `${id}:thinking:${index}`,
         type: "reasoning",
         text: block.thinking,
-        // `reasoningText` reads a list of strings, as Codex sends it. An object here made the text empty (#9669).
         summary: [block.thinking],
       });
-    if (block.type === "toolCall")
+    if (block.type === "toolCall") {
+      const tool = getString(block, "name");
       items.push({
         id: getString(block, "id") ?? `${id}:tool:${index}`,
         type: "dynamicToolCall",
-        tool: getString(block, "name"),
+        tool,
         arguments: block.arguments,
+        ...piShellCommand(tool, block.arguments),
         status: "inProgress",
       });
+    }
   }
   return items;
 }

@@ -1,11 +1,3 @@
-// Frozen optional providers-v2 wire contract.
-//
-// It adds Gemini (`antigravity`) to the managed CLI runtimes of `providers-v1`, and nothing else:
-// an owner or admin of a server can read the host's runtimes, and download or cancel the host's
-// Gemini runtime as for the other providers. Sign-in, API keys and custom endpoints stay on
-// `providers-v1`. Gemini signs in through a browser on the host, so no route here signs it in.
-// The same `requireAdmin` gate applies on the host. A runtime message longer than 1024 characters is
-// cut by the host before it is sent.
 import { adminRoute, count, empty, fields, nullable, type OptionalRouteCodec, oneOf, string } from "./admin-wire";
 
 export const PROVIDERS_RUNTIMES_V2_CAPABILITY = "providers-v2";

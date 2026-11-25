@@ -59,7 +59,6 @@ describe("operator host assignment migration", () => {
   it("accepts the writes of the pool script and the reads of the Worker that run before the deploy", () => {
     const database = beforeMigration();
     database.exec(migration(MIGRATION));
-    // `leaseweb-pool.ts add` and `remove` of the release before: they name no new column.
     database.exec(`
       INSERT INTO operator_hosts(host_id, location, product, added_at, removed_at)
       VALUES ('leaseweb:12728112', 'AMS-01', 'VPS01', 30, NULL)
@@ -69,7 +68,6 @@ describe("operator host assignment migration", () => {
       UPDATE operator_hosts SET removed_at = 32 WHERE host_id = 'leaseweb:12728111' AND removed_at IS NULL
         AND NOT EXISTS(SELECT 1 FROM hosted_servers WHERE operator_host = 'leaseweb:12728111');
     `);
-    // The pool snapshot of the Worker before.
     expect(
       database
         .prepare(

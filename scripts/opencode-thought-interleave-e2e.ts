@@ -1,8 +1,3 @@
-// Runs turns on the real OpenCode driver against a fake `opencode acp` that streams thoughts between
-// the sub-word tokens of one answer, as OpenCode does for such an endpoint (#3351). Checks that the
-// answer stays one item with whole words, and that a harness error report still ends the partial
-// answer, so the retried answer replaces it (#1471).
-// `bun run test:opencode-thought-interleave`. Writes .openbot-build/opencode-thought-interleave-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,7 +24,6 @@ const root = await mkdtemp(join(tmpdir(), "openbot-opencode-thought-interleave-e
 const report: Report = { passed: false, turns: {} };
 const clients: AgentClient[] = [];
 
-/** The completed agent items of one turn, in order. */
 async function turnItems(client: AgentClient, thread: string, text: string): Promise<CompletedItem[]> {
   const items: CompletedItem[] = [];
   const listener = (notification: { method: string; params?: unknown }) => {

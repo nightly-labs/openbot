@@ -1,15 +1,3 @@
-// One record per server for everything the app knows about its connection: state, negotiated
-// compatibility, current issue, and how many times it has reconnected.
-//
-// These were four parallel `Map`s on the manager, keyed by the same ids and always written together.
-// Every read had to remember each map's own default, forgetting one silently reported a server as
-// healthier than it was, and clearing a server meant remembering to delete from all four -- which is
-// why the old `#clearServerConnectionState` was a twenty-line ritual and is now `forget`.
-//
-// `remote-server-connection-status.ts` decides what a failure means; this file decides what is
-// remembered about it. Keeping those apart is what lets the whole error table be tested without a
-// manager, a socket or a disk.
-
 import type { ServerCompatibility, ServerConnectionIssue, ServerSummary } from "@openbot/contracts/ipc";
 import {
   checkingCompatibility,
@@ -23,11 +11,7 @@ import {
 
 export interface RemoteServerConnectionsOptions {
   appVersion: string | null;
-  // Called once per reported failure, matching where the manager used to emit `changed` from its
-  // error paths. The plain setters stay silent: their callers write several fields in a row and emit
-  // once at the end, and moving the event into each setter would multiply what the renderer sees.
   onChanged: () => void;
-  // A failure no retry fixes. The event stream stops reconnecting until the user does something.
   onReconnectSuspended: (serverId: string) => void;
 }
 
@@ -57,8 +41,6 @@ export class RemoteServerConnections {
     this.#onReconnectSuspended = options.onReconnectSuspended;
   }
 
-  // What the renderer sees, with every default already applied -- a server nothing has been recorded
-  // about is offline and still being checked, not absent.
   statusFor(serverId: string): RemoteServerConnectionStatus {
     const status = this.#statuses.get(serverId);
     return {
@@ -78,7 +60,6 @@ export class RemoteServerConnections {
     this.#mutable(serverId).hostedIssue = issue;
   }
 
-  /** The step of a hosted start in progress. Answers whether it changed. */
   setHostedStart(serverId: string, start: ServerSummary["hostedStart"]): boolean {
     const status = this.#mutable(serverId);
     if (status.hostedStart?.step === start?.step && status.hostedStart?.startedAt === start?.startedAt) return false;
@@ -90,7 +71,6 @@ export class RemoteServerConnections {
     return this.#statuses.get(serverId)?.hostedSleep ?? null;
   }
 
-  /** Whether the account service stopped this hosted server for no use, or starts it now. Answers whether it changed. */
   setHostedSleep(serverId: string, hostedSleep: HostedSleep): boolean {
     const status = this.#mutable(serverId);
     if (status.hostedSleep === hostedSleep) return false;
@@ -98,8 +78,6 @@ export class RemoteServerConnections {
     return true;
   }
 
-  // Raw, unlike `statusFor`: negotiation has to be able to tell "never asked the host" from "asked
-  // and it told us nothing", because only the first is worth a request.
   compatibilityFor(serverId: string): ServerCompatibility | null {
     return this.#statuses.get(serverId)?.compatibility ?? null;
   }
@@ -120,7 +98,6 @@ export class RemoteServerConnections {
     return this.#statuses.get(serverId)?.hostRestart ?? null;
   }
 
-  /** What the host said about its restart into an update. Answers whether it changed. */
   setHostRestart(serverId: string, hostRestart: ServerSummary["hostRestart"]): boolean {
     const status = this.#mutable(serverId);
     if (status.hostRestart?.state === hostRestart?.state && status.hostRestart?.version === hostRestart?.version)
@@ -141,27 +118,15 @@ export class RemoteServerConnections {
     this.setCompatibility(serverId, checkingCompatibility(this.#appVersion));
   }
 
-  clearCompatibility(serverId: string): void {
-    this.#mutable(serverId).compatibility = null;
-  }
-
   clearIssue(serverId: string): void {
     this.#mutable(serverId).issue = null;
   }
 
-  /**
-   * Clears the issue only while it is still the one the caller saw. A question asked before a
-   * failure was recorded must not erase that failure when its answer comes back: negotiation and a
-   * request race here, and the newer of the two is the one the user has to be told about.
-   */
   clearStaleIssue(serverId: string, issue: { code: string; message: string } | null): void {
     const status = this.#mutable(serverId);
     if (status.issue === issue) status.issue = null;
   }
 
-  // A connection that just came up: online, no issue, nothing known about the host yet, and a new
-  // sequence number so the renderer treats it as a reconnect rather than a continuing session. A host
-  // that still waits to restart says so again when the client declares its capabilities.
   markConnected(serverId: string): void {
     const status = this.#mutable(serverId);
     status.state = "online";
@@ -175,42 +140,31 @@ export class RemoteServerConnections {
     status.capabilitiesPending = false;
   }
 
-  // The capability read of a new connection starts. The renderer waits for its end before it loads
-  // the workspace, so that one load reads all the data the host can give. Returns the connection
-  // that the read belongs to.
   startCapabilityRead(serverId: string): number {
     const status = this.#mutable(serverId);
     status.capabilitiesPending = true;
     return status.connectionSequence;
   }
 
-  // Silent, as the plain setters are. A read of an older connection must not end the wait of a newer one.
   endCapabilityRead(serverId: string, connectionSequence: number): void {
     const status = this.#mutable(serverId);
     if (status.connectionSequence === connectionSequence) status.capabilitiesPending = false;
   }
 
-  // `fallbackState` is what to show when the error is one this app has no specific word for -- the
-  // caller knows whether that means "still blocked" or "just failed".
   reportError(serverId: string, error: unknown, fallbackState: ServerSummary["state"] | null = null): void {
     if (this.#apply(serverId, classifyRemoteConnectionError(error), fallbackState).changed) this.#onChanged();
   }
 
-  // The WebRTC transport's own failures. Returns whether reconnecting is now suspended, because the
-  // caller schedules the retry and this is the one thing that stops it.
   reportTransportError(serverId: string, code: string, message: string): boolean {
     const { changed, suspended } = this.#apply(serverId, classifyTransportError(code, message), null);
     if (changed) this.#onChanged();
     return suspended;
   }
 
-  // A connection that never got through, with no error object worth classifying. Silent, so the
-  // caller can fold it into one emission with whatever else the failure changed.
   reportUnreachable(serverId: string, reference?: string): void {
     this.#apply(serverId, hostUnreachable(reference), null);
   }
 
-  // A WebRTC attempt to connect that failed with no transport error event. Silent, as above.
   reportConnectFailure(serverId: string, failure: unknown): void {
     this.#apply(serverId, classifyConnectFailure(failure), null);
   }
@@ -226,8 +180,6 @@ export class RemoteServerConnections {
   ): { changed: boolean; suspended: boolean } {
     const status = this.#mutable(serverId);
     let changed = false;
-    // The host told us what it speaks on its way to refusing us. Recording it is what lets the app
-    // say "update the host" instead of "something went wrong".
     if (outcome.hostSupport) {
       const compatibility = {
         ...checkingCompatibility(this.#appVersion),
@@ -238,10 +190,6 @@ export class RemoteServerConnections {
       changed ||= !sameCompatibility(status.compatibility, compatibility);
       status.compatibility = compatibility;
     }
-    // The issue object is replaced even when it says the same thing, because `clearStaleIssue`
-    // withdraws a complaint by identity -- but an identical complaint is not news, and reporting it
-    // as one is what turns a host answering 401 into a broadcast storm: every refused request would
-    // wake every window, and a window that reacts by asking again closes the loop.
     if (outcome.issue) {
       changed ||= !sameIssue(status.issue, outcome.issue);
       status.issue = outcome.issue;

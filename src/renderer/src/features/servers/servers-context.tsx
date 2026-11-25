@@ -4,11 +4,13 @@ import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/cur
 import { WAKE_RECONNECT_STATES } from "@openbot/team-client/hosted-server-wake";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
+import { serverPlanDeletionDates } from "@openbot/ui/features/servers/ServerPlanEnd";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onSettled, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { FALLBACK_HOST_STATUS } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
+import { refreshEndedPlansOnFocus } from "./ServerPlanReminder";
 import {
   olderAppSide,
   remoteUpdateServer,
@@ -18,7 +20,6 @@ import {
 import { checkServerUpdate, offerServerUpdate, type ServerUpdateTarget } from "./server-update-flow";
 import { serversPort } from "./servers-port";
 
-/** "true" while the user hides the server on this computer from the server list. */
 const LOCAL_SERVER_HIDDEN_STORAGE_KEY = "openbot:local-server-hidden";
 
 function readLocalServerHidden(): boolean {
@@ -29,36 +30,6 @@ function readLocalServerHidden(): boolean {
   }
 }
 
-/**
- * The workspaces the user can switch between - the local one this computer
- * hosts and every remote team server joined - plus the status of the host this
- * computer runs itself.
- *
- * Two things are deliberately *not* here, and both are the same rule: a domain
- * never reaches into one nested under it.
- *
- * - **`selectServer` stays in the controller.** It tears down and refetches
- *   agents, conversation, direct messages, turns, browser tabs and the sidebar -
- *   every domain that sits below this one. It moves here (or into the keyed
- *   scope that replaces it) once those domains own their own teardown, which is
- *   what the scoped-provider step does.
- * - **`serverLoadRequest` is how this domain asks for that anyway.** A retried
- *   incompatible host, or a remote that only just reported its version, has to
- *   be loaded again the moment the summaries say so. Rather than call downward,
- *   `applyServerSummaries` publishes the request and the active server scope reloads its data.
- *   It uses the same `{ id, nonce }` shape the renderer already uses for
- *   `settingsRequest` and `messageFocusRequest`. The nonce is load-bearing: the
- *   same server can need loading twice in a row.
- *
- * `initialServersReady` exists for the same reason. The first `list()` read is
- * this domain's, but the per-server bootstrap that runs after it belongs to the
- * domains below, so they get the promise instead of the read.
- *
- * Ungated - see `app-providers.tsx` for why no provider gates during the
- * migration. `activeServerId()` answers `"local"` before the list arrives, which
- * is the same answer it gives for the local workspace, so nothing below has to
- * distinguish "not loaded yet" from "local".
- */
 const Servers = createSimpleContext({
   name: "Servers",
   init: () => {
@@ -67,52 +38,27 @@ const Servers = createSimpleContext({
     const [servers, setServers] = createSignal<ServerSummary[]>([]);
     const [hostStatus, setHostStatus] = createSignal<HostStatus>(FALLBACK_HOST_STATUS);
     const [joinServerOpen, setJoinServerOpen] = createSignal(false);
-    /** The dialog that creates a server on this computer. */
     const [createLocalServerOpen, setCreateLocalServerOpen] = createSignal(false);
-    /** The dialog with the command that installs a server on another computer. */
     const [installServerOpen, setInstallServerOpen] = createSignal(false);
-    /** Where the user opened the hosted server plans, or null while they are closed. */
     const [addServerEntryPoint, setAddServerEntryPoint] = createSignal<HostedServerEntryPoint | null>(null);
     const addServerOpen = () => addServerEntryPoint() !== null;
     const setAddServerOpen = (...args: [open: false] | [open: true, entryPoint: HostedServerEntryPoint]) =>
       setAddServerEntryPoint(args[0] ? args[1] : null);
-    // True when the account can create hosted servers. The plus button then opens the plans.
     const [hostedServersAvailable, setHostedServersAvailable] = createSignal(false);
-    /** The hosted servers of this account. The server menu can delete these. */
     const [hostedServerIds, setHostedServerIds] = createSignal<ReadonlySet<string>>(new Set());
-    /** True after the hosted servers were read once. Until then, an owned server can be a hosted one. */
     const [hostedServersLoaded, setHostedServersLoaded] = createSignal(false);
+    const [planDeletesAtById, setPlanDeletesAtById] = createSignal<ReadonlyMap<string, number>>(new Map());
+    const planDeletesAt = (serverId: string) => planDeletesAtById().get(serverId) ?? null;
     const [serverLoadRequest, setServerLoadRequest] = createSignal<{
       serverId: string;
       nonce: number;
-      /** Set unless the user asked for a retry. The scope's own load of that connection answers the request. */
       connectionSequence?: number;
     } | null>(null);
-    /**
-     * The user's choice to hide the server on this computer. The server menus show the server again
-     * while it is open or while no other server exists; `localServerHidden` keeps only the choice.
-     */
     const [localServerHidden, setLocalServerHiddenSignal] = createSignal(readLocalServerHidden());
     let loadRequestNonce = 0;
     let pendingCompatibilityRetryServerId: string | null = null;
     let serverSelectionGeneration = 0;
 
-    /**
-     * A token for "no other server selection has started since this point".
-     *
-     * The counter lives here because two unrelated callers need the same
-     * answer: whoever runs the switch, and `closeBrowserTab`, which must not
-     * apply a close that raced a switch. Neither can read the other's local, and
-     * `activeServerId()` alone is not enough - it only changes once
-     * `servers.select()` resolves, so it says "unchanged" for the whole window
-     * in which a switch is already under way.
-     *
-     * `beginServerSelection` claims the next generation and invalidates every
-     * predicate handed out before it; `currentServerSelection` only observes.
-     * Both return the predicate rather than the number so no caller can compare
-     * generations across owners - a comparison that stops meaning anything once
-     * the counter lives inside a keyed scope.
-     */
     function beginServerSelection(): () => boolean {
       const generation = ++serverSelectionGeneration;
       return () => generation === serverSelectionGeneration;
@@ -130,8 +76,6 @@ const Servers = createSimpleContext({
       return serverSupportsCapability(activeServer(), capability);
     }
 
-    // The account service stops a hosted server that nobody uses. The selected server starts again on the
-    // user's next key or pointer press, not when the app only shows it.
     createEffect(
       () => {
         const server = activeServer();
@@ -150,7 +94,6 @@ const Servers = createSimpleContext({
         };
         const wake = () => {
           removeListeners();
-          // A wake that does not start the server leaves it asleep, so the next input asks again.
           void serversPort()
             .hostedServers.wake(serverId)
             .then(
@@ -169,15 +112,12 @@ const Servers = createSimpleContext({
       },
     );
 
-    /** Opens Server Settings > Updates. The settings context below this one sets it. */
     let openHostUpdate: ((serverId: string) => void) | undefined;
     function setHostUpdateOpener(opener: ((serverId: string) => void) | undefined): void {
       openHostUpdate = opener;
     }
 
-    /** The connection of each server whose update status was read, so each connection reads it once. */
     const updateChecks = new Map<string, number>();
-    /** The server that the user entered last, and whether its update was offered while they stay on it. */
     let entry: { id: string; offered: boolean } | null = null;
 
     function updateTarget(server: ServerSummary): ServerUpdateTarget {
@@ -214,7 +154,6 @@ const Servers = createSimpleContext({
             clientVersion: compatibility.localAppVersion,
             hostVersion: compatibility.hostAppVersion,
           };
-          // The host action does not help when this app is the older side.
           const offerUpdate = opener && canUpdate && older !== "client";
           toast.warning(t("server.compatibility.versionMismatchTitle", { name: server.name }), {
             ...{
@@ -232,18 +171,15 @@ const Servers = createSimpleContext({
             report: { operation: "team", source: "system", cause_code: "unknown" },
           });
         }
-        // Each connection reads the update status once, so the sidebar header shows a new version.
         if (canUpdate && server.state === "online" && updateChecks.get(server.id) !== sequence) {
           updateChecks.set(server.id, sequence);
-          // The entry offer reads the status of the server that the user enters.
           if (!server.active || (entry?.id === server.id && entry.offered))
             void checkServerUpdate(updateTarget(server));
         }
       }
       setServers(value);
-      // Without another server, the server on this computer is the only one. A server that the user
-      // joins later must not hide it.
       if (!value.some((server) => server.kind === "remote") && untrack(localServerHidden)) setLocalServerHidden(false);
+      moveLocalServerHiddenToAccount(value.find((server) => server.kind === "local"));
       const retryTarget = value.find(
         (server) => server.id === pendingCompatibilityRetryServerId && server.active && server.state === "online",
       );
@@ -285,9 +221,26 @@ const Servers = createSimpleContext({
       try {
         if (hidden) window.localStorage.setItem(LOCAL_SERVER_HIDDEN_STORAGE_KEY, "true");
         else window.localStorage.removeItem(LOCAL_SERVER_HIDDEN_STORAGE_KEY);
-      } catch {
-        // Blocked storage keeps the choice until the app restarts.
+      } catch {}
+    }
+
+    let localServerHiddenMoveStarted = false;
+    function moveLocalServerHiddenToAccount(local: ServerSummary | undefined): void {
+      if (!local || local.hidden === undefined || !untrack(localServerHidden)) return;
+      if (local.hidden) {
+        setLocalServerHidden(false);
+        return;
       }
+      if (localServerHiddenMoveStarted) return;
+      localServerHiddenMoveStarted = true;
+      void serversPort()
+        .servers.setHidden({ serverId: local.id, hidden: true })
+        .then(applyServerSummaries)
+        .catch(() => undefined);
+    }
+
+    async function setServerHidden(serverId: string, hidden: boolean): Promise<void> {
+      applyServerSummaries(await serversPort().servers.setHidden({ serverId, hidden }));
     }
 
     async function refreshServers(): Promise<void> {
@@ -307,17 +260,12 @@ const Servers = createSimpleContext({
     onSettled(() => {
       const unsubscribeServers = serversPort().servers.onEvent((value) => flush(() => applyServerSummaries(value)));
       const unsubscribeHost = serversPort().host.onEvent((status) => flush(() => setHostStatus(status)));
-      // One `then` rather than a `then`/`catch`/`finally` chain: every extra link
-      // is another microtask between the summaries arriving and the per-server
-      // bootstrap that waits on this promise, and that gap is long enough for the
-      // view to paint a first pass from stale state.
       void refreshServers().finally(markServersLoaded);
       void serversPort()
         .host.getStatus()
         .then(setHostStatus)
         .catch(() => undefined);
       void refreshHostedServersAvailable();
-      // Another account can sign in after the start, so the plus button reads its access again.
       let signedInUserId: string | null = null;
       const unsubscribeAuth = serversPort().auth.onEvent((state) => {
         if (state.status !== "signed_in" && state.status !== "signed_out") return;
@@ -328,34 +276,46 @@ const Servers = createSimpleContext({
         else {
           setHostedServersAvailable(false);
           setHostedServerIds(new Set<string>());
+          setPlanDeletesAtById(new Map());
           setHostedServersLoaded(false);
         }
       });
+      const stopPlanRefresh = refreshEndedPlansOnFocus(
+        () => untrack(planDeletesAtById).size > 0,
+        refreshHostedServersAvailable,
+      );
       return () => {
         unsubscribeServers();
         unsubscribeHost();
         unsubscribeAuth();
+        stopPlanRefresh();
       };
     });
 
-    /**
-     * Reads again whether the account can create hosted servers, and which hosted servers it has. The
-     * account can change after the start.
-     */
+    let hostedListRequest = 0;
     async function refreshHostedServersAvailable(): Promise<boolean> {
-      // A failed read keeps the last answer: a network error does not turn the plans off.
+      const request = ++hostedListRequest;
       const list = await serversPort()
         .hostedServers.list()
         .catch(() => null);
       if (!list) return hostedServersAvailable();
+      if (request !== hostedListRequest) return list.available;
       setHostedServersAvailable(list.available);
       setHostedServerIds(new Set(list.servers.map((server) => server.serverId)));
+      setPlanDeletesAtById(serverPlanDeletionDates(list.servers));
       setHostedServersLoaded(true);
       return list.available;
     }
 
-    // Each time the user enters a server that has a new version, the update dialog opens. A selection
-    // writes the list without `applyServerSummaries`, so this follows the list. A reconnect does not offer again.
+    createEffect(
+      () =>
+        hostedServersLoaded() &&
+        servers().some((server) => server.hostedIssue === "plan_ended" && !planDeletesAtById().has(server.id)),
+      (dateMissing) => {
+        if (dateMissing) void refreshHostedServersAvailable();
+      },
+    );
+
     createEffect(
       () => {
         const active = servers().find((server) => server.active);
@@ -373,8 +333,6 @@ const Servers = createSimpleContext({
       },
     );
 
-    // A server that the add server dialog creates comes into the list as an owned remote server. Each
-    // owned server is read once, so a server that another computer of this account runs is not read again.
     const readOwnedServerIds = new Set<string>();
     createEffect(
       () =>
@@ -389,7 +347,6 @@ const Servers = createSimpleContext({
     );
 
     async function retryServerConnection(serverId: string): Promise<void> {
-      // A server that stays online needs no new load. A replaced connection loads as a reconnection.
       if (servers().find((server) => server.id === serverId)?.state !== "online")
         pendingCompatibilityRetryServerId = serverId;
       try {
@@ -405,7 +362,6 @@ const Servers = createSimpleContext({
       }
     }
 
-    // No duration mutes until the user unmutes.
     async function setServerMuted(serverId: string, muted: boolean, durationMs?: number): Promise<void> {
       try {
         applyServerSummaries(
@@ -449,8 +405,6 @@ const Servers = createSimpleContext({
       try {
         setServers(await serversPort().servers.reorder({ serverIds }));
       } catch (error) {
-        // The connection state can have changed during the call. The copy from before the call
-        // is the fallback only.
         setServers(
           await serversPort()
             .servers.list()
@@ -484,10 +438,12 @@ const Servers = createSimpleContext({
       hostedServersAvailable,
       hostedServerIds,
       hostedServersLoaded,
+      planDeletesAt,
       refreshHostedServersAvailable,
       reorderServers,
       localServerHidden,
       setLocalServerHidden,
+      setServerHidden,
       setServerMuted,
       setServerNotificationLevel,
       retryServerConnection,

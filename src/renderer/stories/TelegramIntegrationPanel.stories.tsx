@@ -67,23 +67,18 @@ const args = (connections: MessagingConnection[], busy = false) => ({
   onAddOrchestrator: fn(),
 });
 
-/** No chat yet: Connect Telegram opens the dialog. */
 export const NotSetUp: Story = { args: args([]) };
 
-/** A group and a direct chat are linked, and the Telegram Orchestrator answers both. Link a chat opens the dialog. */
 export const Connected: Story = { args: args([chat(), DIRECT]) };
 
-/** A chat is linked, and no agent answers yet. */
 export const NoOrchestrator: Story = { args: args([chat({ orchestratorAgentId: null })]) };
 
 export const Paused: Story = { args: args([chat({ enabled: false, state: "paused" }), DIRECT]) };
 
-/** The bot is no longer in the group. */
 export const Removed: Story = { args: args([chat({ state: "removed" }), DIRECT]) };
 
 export const RelayUnavailable: Story = { args: args([chat({ state: "relay_unavailable" })]) };
 
-/** Signal sends the chat's updates to a different server: Reconnect links it to this one. */
 export const NotLinked: Story = { args: args([chat({ state: "not_linked" }), DIRECT]) };
 
 export const RateLimited: Story = {
@@ -103,25 +98,21 @@ const dialogArgs = (connections: MessagingConnection[], start: "chat" | "agent")
   onClose: fn(),
 });
 
-/** Step 1: Telegram opens in the browser, to add the bot to a group or to a direct chat. */
 export const LinkChat: DialogStory = {
   render: (props) => <TelegramConnectDialog {...props} />,
   args: dialogArgs([], "chat"),
 };
 
-/** Link a chat on a page that has chats: the dialog waits for a new chat. */
 export const LinkAnotherChat: DialogStory = {
   render: (props) => <TelegramConnectDialog {...props} />,
   args: dialogArgs([chat(), DIRECT], "chat"),
 };
 
-/** Step 2: the chat is linked, and the Telegram Orchestrator is added next. */
 export const AddOrchestrator: DialogStory = {
   render: (props) => <TelegramConnectDialog {...props} />,
   args: dialogArgs([chat({ orchestratorAgentId: null })], "agent"),
 };
 
-/** Done: the chat has the Telegram Orchestrator. */
 export const ConnectDone: DialogStory = {
   render: (props) => <TelegramConnectDialog {...props} />,
   args: dialogArgs([chat()], "agent"),

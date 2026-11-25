@@ -22,8 +22,6 @@ const telegramLinkSchema = z.object({
   code: z.string().regex(TELEGRAM_LINK_CODE_PATTERN),
 });
 
-// Signal asks this when a chat sends `/start <code>`: it links the chat to the host that asked for
-// the code, and Signal routes the chat to that host at once.
 export const Route = createFileRoute("/v2/remote/telegram-route/link")({
   server: {
     handlers: {

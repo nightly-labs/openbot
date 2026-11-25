@@ -84,6 +84,8 @@ export const messages = {
   "mobile.channel.form.deselectAll": "إلغاء التحديد",
   "mobile.channel.form.memories": "الذكريات",
   "mobile.channel.form.routines": "المهام الدورية",
+  "mobile.channel.folders.description": "يمكن لجميع أعضاء {channel} تغيير الملفات وتشغيل الأوامر في هذه المجلدات.",
+  "mobile.channel.folders.removeBody": "لم يعد بإمكان أعضاء {channel} تغيير الملفات في {folder}",
   "mobile.channel.form.deleteTitle": "حذف القناة؟",
   "mobile.channel.form.deleteBody":
     "يؤدي هذا إلى إيقاف القناة. يبقى سجلها في القنوات المحذوفة للمعاينة فقط. يمكنك استعادتها من هناك. يتم الاحتفاظ بالوكلاء الأعضاء.",

@@ -14,39 +14,24 @@ import { detectMobilePlatform, MOBILE_APP_ORDER, MOBILE_APPS, type MobilePlatfor
 import { LandingIcon } from "./LandingIcon";
 import { useLandingText } from "./LandingText";
 
-/** The Android app as an APK: a second Android download, with no store. */
 const ANDROID_APK = "android-apk";
 
-/** The Intel Mac installer: a second macOS download. The main macOS entry is the Apple silicon one. */
 const MAC_INTEL = "macos-intel";
 
 type HeroPlatform = DownloadPlatform | MobilePlatform | typeof ANDROID_APK | typeof MAC_INTEL;
 
-/**
- * The desktop apps of the menu. macOS is two entries, because a browser cannot reliably tell an
- * Intel Mac from an Apple silicon Mac, and the Apple silicon installer does not open on an Intel Mac.
- * "Apple silicon" and "Intel" are names, so they have no translation.
- */
 const HERO_DESKTOP_APPS: readonly HeroPlatform[] = DOWNLOAD_PLATFORM_ORDER.flatMap<HeroPlatform>((platform) =>
   platform === "macos" ? [platform, MAC_INTEL] : [platform],
 );
 const MAC_SILICON_LABEL = "macOS · Apple silicon";
 const MAC_INTEL_LABEL = "macOS · Intel";
 
-/**
- * The phone apps of the menu. While a version has an APK, Android is two entries, and each one
- * names its source. "Google Play" and "APK" are names, so they have no translation.
- */
 const HERO_PHONE_APPS: readonly HeroPlatform[] = ANDROID_APK_AVAILABLE
   ? [...MOBILE_APP_ORDER, ANDROID_APK]
   : MOBILE_APP_ORDER;
 const ANDROID_PLAY_LABEL = "Android · Google Play";
 const ANDROID_APK_LABEL = "Android · APK";
 
-/**
- * The system of an entry, for its logo and for analytics: the APK is the Android app too, and the
- * Intel installer is the macOS app too.
- */
 function heroSystem(platform: HeroPlatform): DownloadPlatform | MobilePlatform {
   if (platform === ANDROID_APK) return "android";
   if (platform === MAC_INTEL) return "macos";
@@ -55,11 +40,9 @@ function heroSystem(platform: HeroPlatform): DownloadPlatform | MobilePlatform {
 
 interface HeroOffer {
   action: string;
-  /** Missing while the installer is not out yet. */
   href?: string;
   label: string;
   status: string;
-  /** A store page on another site, which opens in a new tab. */
   external: boolean;
 }
 
@@ -86,7 +69,6 @@ function heroOffer(platform: HeroPlatform, text: LandingPageText): HeroOffer {
     return { ...MOBILE_APPS[platform], ...phone[platform], label, status: available, external: true };
   }
   const { href, ...details } = DOWNLOAD_PLATFORMS[platform];
-  // A platform that is not out yet keeps its English status: no catalog key names it.
   if (!details.available || !href) return { ...details, external: false };
   const label = platform === "macos" ? MAC_SILICON_LABEL : details.label;
   return { ...details, label, action: desktop[platform], status: available, href, external: false };
@@ -198,12 +180,9 @@ export function HeroDownloadSelector() {
   }
 
   onSettled(() => {
-    // A phone cannot run the desktop app, so a visitor on one is offered the phone app.
     const detected = detectMobilePlatform(globalThis.navigator) ?? detectDownloadPlatform(globalThis.navigator);
     if (detected) {
       setPlatform(detected);
-      // Reported separately from the click, so the offer the visitor was given can be compared with
-      // the one they took.
       landingAnalytics.trackDownloadSelected(detected, true);
     }
 

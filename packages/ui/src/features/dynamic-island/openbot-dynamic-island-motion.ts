@@ -12,7 +12,6 @@ const MODE_SWAP_OUTGOING_SCALE = 0.985;
 const MODE_SWAP_INCOMING_SCALE = 0.965;
 const MODE_SWAP_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const MODE_SWAP_SPRING_SAMPLE_COUNT = 24;
-/** A critically damped spring over the whole animation: keyframe offsets are its time. */
 const MODE_SWAP_SPRING = { response: 1, dampingFraction: 1 } as const;
 
 export type IslandModeSwapSlot = "compact-leading" | "compact-trailing" | "expanded";

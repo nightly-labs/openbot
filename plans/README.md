@@ -19,6 +19,13 @@ changes, and respect the `STOP` conditions.
 | 009 | An HTTPS sign-out or session revoke also closes the browser views of that session | P2 | S | — | DONE |
 | 010 | Branch a conversation from a message | P1 | L | — | IN PROGRESS |
 | 011 | Upgrades, migrations and team protocol stay safe for the long term | P1 | L | — | IN PROGRESS |
+| 012 | A pool server whose plan ended goes to an archive in B2 | P2 | L | — | IN PROGRESS |
+| 013 | Workflows are typed, portable and future proof | P1 | L | — | DONE |
+| 014 | Enforce agent ownership in conversation reads | P1 | S | — | DONE |
+| 015 | Check generated plugin catalogs in CI | P1 | S | — | DONE |
+| 016 | Batch channel summary queries | P1 | M | — | PARTIAL: batched unread counts were 2-100x slower; reverted |
+| 017 | Add direct remote protocol coverage | P1 | M | — | DONE |
+| 018 | Pin contract decoder edge behavior | P2 | M | — | DONE |
 
 Allowed states: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED: <reason>`,
 `REJECTED: <reason>`.
@@ -106,3 +113,38 @@ Direction options (for the maintainer, not ranked against bugs):
     need irreversible migrations; listed above as options only.
   - Reopening plan 003 for `mcp-remote` text: the remaining references convert
     old configurations only, so plan 003 stays DONE.
+
+## Run of 2026-11-23
+
+This run audited correctness, security, performance, test coverage, architecture, dependencies,
+DX, docs, and product direction at commit `20d1cd63d9`. The five plans above are the default
+selection by leverage. The audit did not modify source code.
+
+### Vetted findings
+
+| Finding | Category | Impact | Effort | Risk | Evidence |
+|---|---|---|---|---|---|
+| Conversation reads do not enforce thread ownership | security | A mismatched agent/thread pair can return another agent's message bodies | S | LOW | `src/backend/database/conversation-queries.ts:66-96,301-350` |
+| Generated plugin catalog has no CI freshness check | dx | Renderer, Worker, mobile, and snapshot listings can drift | S | LOW | `scripts/build-plugin-catalog.ts:634-636`, `docs/plugin-distribution.md:470-473` |
+| Channel summary listing repeats correlated database scans | perf | Large channel lists can block sidebar refreshes | M | MED | `src/backend/channel-store.ts:289-340` |
+| Remote API and team-client lack direct package protocol tests | tests | Standalone Signal or client regressions can bypass desktop E2E coverage | M | LOW/MED | `remote/api/package.json`, `packages/team-client/package.json` |
+| Contract decoders lack direct edge-case fixtures | tests | Malformed or legacy wire behavior can change without a boundary failure | M | LOW | `packages/contracts/src/team-protocol/v1.ts`, `provider-aware-codec.ts` |
+
+### Direction options
+
+- Complete remote plugin catalog distribution. `docs/plugin-distribution.md:474-482` leaves the Worker JSON route, contracts, cache, and client integration open. This would let clients receive catalog updates without a desktop or mobile release, at the cost of public-cache and offline-fallback work.
+- Split the high-churn `src/backend/agent-service.ts` after characterization coverage. The file is 7,564 lines and has 493 commits in the last 90 days. This can reduce change risk, but it is a high-risk ownership change and is not in the five default plans.
+- Generate the Team API compatibility table from `packages/contracts/src/team-protocol/current.ts` to prevent stale manual protocol claims such as `docs/architecture/team-api.md:5`. This is low risk but lower leverage than the selected plans.
+
+### Findings considered and rejected
+
+- Stale Team API introductory wording: real and high confidence, but a docs-only fix with lower leverage than the five selected plans. Keep it as a small follow-up.
+- Agent service decomposition: real architectural pressure, but medium confidence and high fix risk. Require characterization coverage and a separate maintainer decision before planning.
+
+### Execution notes
+
+- Plan 014 landed in commit `6e8482570f`. Focused related tests passed with 238 tests.
+- Plan 015 landed in commit `eb2d4c7928`. The generated catalog check passes and CI now runs it.
+- Plan 016 landed in commit `a0cac6b8b4` and was reverted. The batched queries read every message row on each call and recounted all channels when one changed: 64 channels × 500 messages went from 1 ms to 44 ms on a repeated list. The per-channel unread query and its cache are back, as on `main`; the list queries now use cached statements. `scripts/channel-list-bench-e2e.ts` times cold, repeated and one-changed lists.
+- Plan 017 landed in commit `79772b6f48`. The direct remote protocol E2E passed 6 checks.
+- Plan 018 landed in commit `8e1e789e64`. Decoder E2E passed 9 checks.

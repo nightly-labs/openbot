@@ -1,53 +1,72 @@
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 
-/** What a text value can become: a number, a boolean, null, or a JSON array or object. */
 type TypedText = number | boolean | null | readonly unknown[] | DynamicRecord;
 
-/**
- * Some model paths see the untyped values of `tool_call.arguments` as text, so their models send `3` as
- * `"3"` and `true` as `"true"`, and the target tool refuses the call (#9980; Kimi had the same, #5742).
- * The target's schema says which type the value must have, so a text value changes to that type only
- * when the schema does not accept text and the text is an exact number, boolean, `null` or JSON array
- * or object. All other values stay as the model sent them, and the target tool still checks them.
- */
 export function withSchemaTypes(args: DynamicRecord, schema: DynamicRecord): DynamicRecord {
   const typed = typedValue(args, schema);
   return isDynamicRecord(typed) ? typed : args;
 }
 
-/** The value, or the typed value of a text value and of the parts of an array or object. */
 function typedValue<Value>(value: Value, schema: DynamicRecord): Value | TypedText {
   const typed = typeof value === "string" ? typedText(value, acceptedTypes(schema)) : value;
   if (Array.isArray(typed)) {
-    const items = subschema(schema, (branch) => (isDynamicRecord(branch.items) ? [branch.items] : []));
+    const items = itemsSchema(schema);
     return items === undefined ? typed : typed.map((item) => typedValue(item, items));
   }
   if (!isDynamicRecord(typed)) return typed;
   return Object.fromEntries(
     Object.entries(typed).map(([key, item]) => {
-      const property = subschema(schema, (branch) => {
-        if (isDynamicRecord(branch.properties) && Object.hasOwn(branch.properties, key))
-          return [branch.properties[key]];
-        if (isDynamicRecord(branch.additionalProperties)) return [branch.additionalProperties];
-        // An object branch that does not close its keys takes this key with any value, so it stays as sent.
-        return isDynamicRecord(branch.properties) && branch.additionalProperties !== false ? [{}] : [];
-      });
+      const property = propertySchema(schema, key);
       return [key, property === undefined ? item : typedValue(item, property)];
     }),
   );
 }
 
-/** The `anyOf` and `oneOf` branches of a schema. */
+export function nullStructuredItemPaths(args: DynamicRecord, schema: DynamicRecord): string[] {
+  return nullPaths(args, schema, []);
+}
+
+function needsStructure(schema: DynamicRecord): boolean {
+  const types = acceptedTypes(schema);
+  return types !== null && !types.has("null") && (types.has("object") || types.has("array"));
+}
+
+function nullPaths(value: unknown, schema: DynamicRecord, path: readonly string[]): string[] {
+  if (Array.isArray(value)) {
+    const items = itemsSchema(schema);
+    if (items === undefined) return [];
+    return value.flatMap((item, index) => {
+      const itemPath = [...path, String(index)];
+      return item === null ? (needsStructure(items) ? [itemPath.join(".")] : []) : nullPaths(item, items, itemPath);
+    });
+  }
+  if (!isDynamicRecord(value)) return [];
+  return Object.entries(value).flatMap(([key, item]) => {
+    const property = propertySchema(schema, key);
+    return property === undefined ? [] : nullPaths(item, property, [...path, key]);
+  });
+}
+
+function itemsSchema(schema: DynamicRecord): DynamicRecord | undefined {
+  return subschema(schema, (branch) => (isDynamicRecord(branch.items) ? [branch.items] : []));
+}
+
+function propertySchema(schema: DynamicRecord, key: string): DynamicRecord | undefined {
+  return subschema(schema, (branch) => {
+    if (isDynamicRecord(branch.properties) && Object.hasOwn(branch.properties, key)) return [branch.properties[key]];
+    if (isDynamicRecord(branch.additionalProperties)) return [branch.additionalProperties];
+    return isDynamicRecord(branch.properties) && branch.additionalProperties !== false ? [{}] : [];
+  });
+}
+
 function unionOf(schema: DynamicRecord): unknown[] {
   return [schema.anyOf, schema.oneOf].flatMap((list) => (Array.isArray(list) ? list : []));
 }
 
-/** The schema and the branches of its `anyOf` and `oneOf`, also nested ones. */
 function branches(schema: DynamicRecord): DynamicRecord[] {
   return [schema, ...unionOf(schema).filter(isDynamicRecord).flatMap(branches)];
 }
 
-/** The schema of a part of a value, from each branch that has one, or undefined when no branch has one. */
 function subschema(schema: DynamicRecord, part: (branch: DynamicRecord) => unknown[]): DynamicRecord | undefined {
   const found = branches(schema).flatMap(part);
   if (found.length === 0) return undefined;
@@ -55,7 +74,6 @@ function subschema(schema: DynamicRecord, part: (branch: DynamicRecord) => unkno
   return found.length === 1 && isDynamicRecord(only) ? only : { anyOf: found };
 }
 
-/** The JSON types that a schema accepts, or null when a branch accepts a type that it does not name. */
 function acceptedTypes(schema: DynamicRecord): Set<string> | null {
   const union = unionOf(schema);
   if (schema.type === undefined && union.length === 0) return null;
@@ -74,7 +92,6 @@ function typedText<Text extends string>(text: Text, types: Set<string> | null): 
   if (types === null || types.has("string")) return text;
   const trimmed = text.trim();
   if ((types.has("number") || types.has("integer")) && NUMBER_TEXT.test(trimmed)) {
-    // A whole number past the safe range changes its digits, so it stays text, and the tool refuses it.
     const number = Number(trimmed);
     if (Number.isInteger(number) ? Number.isSafeInteger(number) : Number.isFinite(number) && types.has("number"))
       return number;
@@ -85,9 +102,7 @@ function typedText<Text extends string>(text: Text, types: Set<string> | null): 
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed) ? types.has("array") : isDynamicRecord(parsed) && types.has("object")) return parsed;
-    } catch {
-      // Text that is not JSON stays text, and the target tool refuses it.
-    }
+    } catch {}
   }
   return text;
 }

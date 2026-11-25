@@ -1,9 +1,3 @@
-// The `cursor-agent` of `cursor-key-accounts-e2e.ts`. It acts as Cursor 2026.10.01-e373342 does with
-// `AGENT_CLI_CREDENTIAL_STORE=memory`: the process does not read the sign-in of the computer user, so
-// a session opens only with an accepted `CURSOR_API_KEY`. With an empty key the session answers
-// "Authentication required" (-32000), and with a refused key an internal error (-32603), as the real
-// CLI does. With the default store, the process is signed in as the computer user. Each start is
-// logged to `FAKE_LOG`, with the kind of key and never the key itself.
 import { type LogValue, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const key = process.env.CURSOR_API_KEY;

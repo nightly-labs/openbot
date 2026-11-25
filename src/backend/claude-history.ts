@@ -45,7 +45,6 @@ export interface ClaudeSessionMessage {
   parent_tool_use_id: string | null;
   parent_agent_id: string | null;
   timestamp?: string;
-  /** The task run whose end this task notification reports (`origin.runId`). */
   task_run_id?: string;
 }
 
@@ -128,7 +127,6 @@ const SCHEMA = `
 const MAX_TRANSCRIPT_RECORD_BYTES = 256 * 1024 * 1024;
 const MAX_TURN_FRAGMENT_ITEMS = 50;
 
-/** Reads Claude JSONL through a disk index. Message payloads are read one at a time per turn. */
 export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadProviderHistory {
   return (request, consume) =>
     Effect.tryPromise({
@@ -137,19 +135,20 @@ export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadPro
     });
 }
 
-/**
- * The turn ID of a turn that Claude Code starts by itself to answer the end of a background task.
- * The live stream gives no ID of the transcript entry for that turn, so the live client and the history
- * import both make this ID from the task run that ended. Then the import finds the turn that the live
- * client stored and does not add its messages again.
- */
+export const CLAUDE_NO_RESPONSE_TEXT = "No response requested.";
+
+export function isClaudeNoResponsePlaceholder(message: unknown): boolean {
+  if (!isRecord(message) || message.model !== "<synthetic>" || !Array.isArray(message.content)) return false;
+  const [block, ...rest] = message.content;
+  return rest.length === 0 && isRecord(block) && block.type === "text" && block.text === CLAUDE_NO_RESPONSE_TEXT;
+}
+
 export function claudeTaskTurnId(sessionId: string, taskId: string, runId: string): string {
   const hex = createHash("sha256").update(`claude-task-turn\n${sessionId}\n${taskId}\n${runId}`).digest("hex");
   const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-/** Explicit test boundary for an injected SDK history reader. Production uses claudeHistoryReader. */
 export function claudeHistoryFromMessages(
   readMessages: (threadId: string, options?: { dir?: string }) => Promise<readonly ClaudeSessionMessage[]>,
 ): ReadProviderHistory {
@@ -241,10 +240,6 @@ async function scanClaudeHistory(
   });
 }
 
-/**
- * The last scan of each index. A scan holds a write transaction while it awaits transcript reads, so
- * a second scan of the same session waits for it and does not fail with "database is locked".
- */
 const indexScans = new Map<string, Promise<unknown>>();
 
 async function oneScanAtATime(indexPath: string, scan: () => Promise<void>): Promise<void> {
@@ -266,8 +261,6 @@ async function buildIndex(
   identity: FileIdentity,
   signal: AbortSignal,
 ): Promise<number> {
-  // A transcript can write one record more than once (#11557). Keep the first copy: an indexed row
-  // never changes, because a resumed read does not send the turns before its resume point again.
   const insert = database.prepare(
     `INSERT INTO entries
       (uuid, type, offset, length, parent_uuid, timestamp, session_id, parent_tool_use_id,
@@ -574,7 +567,7 @@ async function findFinalAnswer(
     if (signal.aborted) throw signal.reason;
     const row = decodeTranscriptRow(raw);
     const message = await readMessage(file, row);
-    if (message?.type !== "assistant") continue;
+    if (message?.type !== "assistant" || isClaudeNoResponsePlaceholder(message.message)) continue;
     const text = messageText(message.message);
     const thinking = messageThinking(message.message);
     const endsStep = messageToolCalls(message.message).length > 0;
@@ -618,7 +611,6 @@ async function emitMetadata(
   }
 }
 
-/** Sends the turns that start at `fromSeq` or later, newest first. False when the consumer stopped. */
 async function emitTurns(
   database: DatabaseSync,
   filePath: string,
@@ -645,16 +637,9 @@ const RESUME_POINT_KEY = "resume_point";
 interface TurnListDigest {
   turns: number;
   digest: string;
-  /** The start of the newest turn. It is sent again, because new records can add to it. */
   lastStart: number;
 }
 
-/**
- * The first `limit` turns of the index as one hash. Each turn adds its id, range and final answer, and
- * the last one only its id and start: its end and answer move when records come after it. The hash
- * also counts the selected records before the last turn. A changed branch, a compaction or a
- * rewritten transcript changes an earlier turn or that count, so the hash changes too.
- */
 function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest | null {
   const rows = [
     ...database
@@ -681,11 +666,6 @@ function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest |
   return { turns: rows.length, digest: hash.digest("hex"), lastStart: last[1] };
 }
 
-/**
- * Where a read with `resumeKey` starts. After a full read with the same key, the turns before the
- * newest turn of that read did not change when the hash of the turn list is the same, so they are
- * not sent again. Any other case sends all turns.
- */
 function resumeStartSeq(database: DatabaseSync, resumeKey: string): number {
   const raw = database.prepare("SELECT value FROM history_meta WHERE key = ?").get(RESUME_POINT_KEY);
   const row = raw === undefined ? null : databaseRow(raw);
@@ -701,7 +681,6 @@ function resumeStartSeq(database: DatabaseSync, resumeKey: string): number {
   return current && current.turns === stored.turns && current.digest === stored.digest ? current.lastStart : 0;
 }
 
-/** Saves the turn list of a read that sent every turn to a consumer with this key. */
 function writeResumePoint(database: DatabaseSync, resumeKey: string): void {
   const current = turnListDigest(database, -1);
   const value = current ? JSON.stringify({ key: resumeKey, turns: current.turns, digest: current.digest }) : null;
@@ -801,7 +780,7 @@ async function emitTurnFragments(
           break;
         continue;
       }
-      if (message.type !== "assistant") continue;
+      if (message.type !== "assistant" || isClaudeNoResponsePlaceholder(message.message)) continue;
       const thinking = messageThinking(message.message);
       const endsStep = messageToolCalls(message.message).length > 0;
       if (!thinking && !text && !endsStep) continue;
@@ -845,10 +824,6 @@ async function emitTurnFragments(
   }
 }
 
-/**
- * The ID that the live client gave the turn that this task notification started. A notice can report
- * more than one task; the live client takes the last task that ended before the turn.
- */
 function taskNotificationTurnId(message: ClaudeSessionMessage): string | null {
   const taskId = [...messageText(message.message).matchAll(/<task-id>([^<]+)<\/task-id>/g)].at(-1)?.[1];
   return taskId && message.task_run_id && message.session_id
@@ -956,7 +931,7 @@ function historyFragments(messages: readonly ClaudeSessionMessage[], includeItem
         });
       continue;
     }
-    if (message.type !== "assistant" || skippingCompaction) continue;
+    if (message.type !== "assistant" || skippingCompaction || isClaudeNoResponsePlaceholder(message.message)) continue;
     const thinking = messageThinking(message.message);
     const endsStep = messageToolCalls(message.message).length > 0;
     if (!thinking && !text && !endsStep) continue;
@@ -1083,7 +1058,6 @@ function messageText(message: unknown): string {
       (block) =>
         block.type === "text" &&
         typeof block.text === "string" &&
-        // OpenBot's memory block is not text that the user wrote.
         !(message.role === "user" && isTurnContextBlock(block.text)),
     )
     .map((block) => String(block.text))

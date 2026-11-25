@@ -32,7 +32,6 @@ import { markdownPreviewText } from "@openbot/contracts/markdown-preview-text";
 import { sourceText } from "@openbot/i18n/source";
 import { avatarImageDataUrl } from "@openbot/ui/avatar-image";
 
-/** A save keeps the picture, as the host does: the draft carries the icon only when it changes. */
 function storedPicture(channel: Channel | undefined): Pick<Channel, "icon" | "imageUrl"> {
   return {
     ...(channel?.icon === undefined ? {} : { icon: channel.icon }),
@@ -40,12 +39,10 @@ function storedPicture(channel: Channel | undefined): Pick<Channel, "icon" | "im
   };
 }
 
-/** A draft without `browser` keeps the stored setting, as the service does. */
 function storedBrowser(channel: Channel | undefined): Pick<Channel, "browser"> {
   return channel?.browser === undefined ? {} : { browser: channel.browser };
 }
 
-/** A channel that exists when the preview starts, with its history. */
 export interface MockChannelSeed {
   channel: Channel;
   messages: ChannelMessage[];
@@ -102,7 +99,6 @@ export function createMockChannels(
         input.type === "save"
           ? {
               ...storedPicture(channels.get(input.channelId)),
-              // A draft without `isolated` keeps the stored value, as the service does.
               ...(channels.get(input.channelId)?.isolated ? { isolated: true } : {}),
               ...storedBrowser(channels.get(input.channelId)),
               ...input.draft,
@@ -112,10 +108,8 @@ export function createMockChannels(
               createdAt: channels.get(input.channelId)?.createdAt ?? new Date().toISOString(),
             }
           : requireChannel(input.channelId);
-      // The service refuses to delete a channel while a task runs there.
       if (input.type === "archive" && (tasks.get(input.channelId) ?? []).some((task) => task.state === "running"))
         throw new Error(sourceText("error.backend.channelArchiveRunning"));
-      // A browser member that left the channel turns the setting to no member, as the service does.
       channel = withBrowserMember({ ...channel, revision: channel.revision + 1 });
       if (input.type === "archive" || input.type === "restore") channel.archived = input.type === "archive";
       const work = tasks.get(channel.id) ?? [];
@@ -144,11 +138,6 @@ export function createMockChannels(
         const list = messages.get(channel.id) ?? [];
         const id = crypto.randomUUID();
         const taskId = crypto.randomUUID();
-        // The real service routes a request with no recipient through the lead's model and posts the
-        // choice as a channel message. It skips both when the answer is already known: a named
-        // recipient, or a channel with one member. The preview has no model, so it keeps assigning
-        // the lead, but it reproduces which requests get a visible dispatch row and which do not.
-        // As in the real service, each member that the message opens with gets a task of its own.
         const address = leadingAddress(input.text);
         const recipients = [
           ...new Set([
@@ -217,7 +206,6 @@ export function createMockChannels(
         });
         if (routed && channel.leadAgentId) {
           const dispatchId = crypto.randomUUID();
-          // The name is resolved from the agent roster by the timeline, so the id stands in for it.
           list.push({
             id: dispatchId,
             channelId: channel.id,
@@ -438,7 +426,6 @@ export function createMockChannels(
   };
 }
 
-/** One fire an hour from now is enough for the preview: nothing here evaluates a schedule. */
 function nextTrigger(routineId: string, schedule: RoutineSchedule, now: string): RoutineTrigger {
   return {
     id: crypto.randomUUID(),

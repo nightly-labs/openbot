@@ -48,6 +48,7 @@ export const messages = {
     other: "אפשר להוסיף {count} תיקיות לכל היותר",
   },
   "agentSettings.folders.browse.places": "מעבר אל",
+  "agentSettings.folders.browse.path": "נתיב התיקייה",
   "agentSettings.folders.browse.home": "תיקיית הבית",
   "agentSettings.folders.browse.parent": "למעלה אל {folder}",
   "agentSettings.folders.browse.failed": "לא ניתן לפתוח את התיקייה הזו.",
@@ -100,6 +101,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "מגבלת השימוש הושגה · מדולג",
   "agentSettings.backupModels.unavailable": "אינו זמין כעת · מדולג",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "כשמגבלת שימוש עוצרת את {name} אחרי שהתחיל לעבוד, {name} ממשיך באותה עבודה במודל הזמין הראשון לפי הסדר. הוא חוזר ל-{model} כשהמגבלה מסתיימת, או 10 דקות אחרי שגיאת ספק.",
   "agentSettings.groups.brain": "מוח",
@@ -181,13 +183,14 @@ export const messages = {
     "הבחירה הזו היא רק שלך וחלה בכל המכשירים שלך. כשהשרת מושתק או מוגדר ל״ללא״, גם הסוכן הזה שותק.",
 
   "agentSettings.newChat.title": "צ'אט חדש",
-  "agentSettings.newChat.description": "הסוכן שוכח את הצ'אט הזה. ההגדרות שלו נשארות.",
+  "agentSettings.newChat.description": "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההגדרות שלו נשארות.",
   "agentSettings.newChat.button": "התחלה",
   "agentSettings.newChat.confirmTitle": "להתחיל צ'אט חדש עם {name}?",
   "agentSettings.newChat.confirmDescription":
-    "הסוכן שוכח את הצ'אט הזה. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
+    "הסוכן מתחיל מחדש ויכול לחפש בצ'אט הזה כשצריך. ההודעות נשארות גלויות מעל קו מפריד. ההנחיות, המודל, הכלים, הזיכרונות, סביבת העבודה והדפדפן לא משתנים.",
   "agentSettings.newChat.confirm": "התחלת צ'אט חדש",
   "agentSettings.newChat.failed": "לא ניתן להתחיל צ'אט חדש.",
+  "agentSettings.newChat.busy": "הסוכן עובד עכשיו. כדי להתחיל צ'אט חדש, צריך לחכות שיסיים או לעצור אותו.",
   "agentSettings.deleteHistory.title": "מחיקת היסטוריה",
   "agentSettings.deleteHistory.description": "ההודעות בצ'אט הזה נמחקות והסוכן שוכח אותן. ההגדרות שלו נשארות.",
   "agentSettings.deleteHistory.button": "מחיקה",
@@ -196,6 +199,9 @@ export const messages = {
     "כל ההודעות והקבצים של הצ'אט הזה יימחקו מ-OpenBot, והסוכן ישכח אותם. אי אפשר לבטל את הפעולה. שרשורים צדדיים, הוראות, מודל, כלים, זיכרונות, סביבת עבודה ודפדפן לא משתנים.",
   "agentSettings.deleteHistory.confirm": "מחיקת היסטוריה",
   "agentSettings.deleteHistory.failed": "לא ניתן למחוק את ההיסטוריה.",
+  "agentSettings.deleteAgent.title": "מחיקת הסוכן",
+  "agentSettings.deleteAgent.description": "הסוכן, השיחה שלו, הזיכרונות, השגרות וסביבת העבודה שלו נמחקים מ-OpenBot.",
+  "agentSettings.deleteAgent.button": "מחיקה",
 
   "agentSettings.fullAccess.title": "לתת לסוכן הזה גישה מלאה?",
   "agentSettings.fullAccess.askTitle": "לאפשר לסוכן הזה לעבוד מחוץ לסביבת העבודה שלו?",
@@ -233,6 +239,9 @@ export const messages = {
   "agentSettings.agentNewChat.description": "לאפשר לסוכן להתחיל צ'אט חדש כשהצ'אט שלו מתארך. קודם הוא שומר הערות.",
   "agentSettings.quickAcknowledgement.title": "הצגת התוכנית לפני משימות ארוכות",
   "agentSettings.quickAcknowledgement.description": "לפני משימה ארוכה, הסוכן מציג את התוכנית שלו.",
+  "agentSettings.builtinMemory.title": "הזיכרון של OpenBot",
+  "agentSettings.builtinMemory.description":
+    "הסוכן שומר וקורא את הזיכרונות שלו. כבו כדי להשתמש רק באפליקציית זיכרון, כמו Mem0. הזיכרונות השמורים נשארים.",
   "agentSettings.browserProfile.label": "פרופיל דפדפן",
   "agentSettings.browserProfile.shared": "משותף",
   "agentSettings.browserProfile.agent": "רק הסוכן הזה",
@@ -242,6 +251,7 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "כל פרופיל שומר התחברויות ועוגיות משלו. שינוי סוגר את הלשוניות הפתוחות של הסוכן.",
   "agentSettings.browserProfile.manage": "ניהול",
+  "agentSettings.browserProfile.movedNote": "ההתחברויות לאתרים נשארות בפרופיל הישן. הסוכן צריך להתחבר שוב לאתרים האלה.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "כל התהליך של {provider} פועל בארגז חול, ולכן כתיבה בחוץ נכשלת. זמין רק ב-macOS.",
 } as const satisfies PartialTranslation<typeof source>;

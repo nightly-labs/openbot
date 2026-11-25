@@ -1,10 +1,3 @@
-// The Vault of this computer, for Server settings of the local server. Main opens the CSV file dialog
-// and writes the clipboard, so a copied secret does not pass through the renderer. The `host*`
-// endpoints do the same for one server: a joined server answers through `vault-v4`, through `vault-v3`
-// without the agents of each item, through `vault-v2` without two-step keys, or through `vault-v1`
-// without API keys when it is older. `hostImportCsv` opens
-// the file dialog on this computer and sends the text to a host that serves `vault-import-v1`.
-
 import { readFile, stat } from "node:fs/promises";
 import {
   decodeHostVaultCodes,
@@ -82,13 +75,10 @@ export function vaultIpcHandlers({
     if (!routes) throw new Error(sourceText("error.team.vaultUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, routes[route], decode, { method: "POST", body }));
   }
-  /** Only a `vault-v4` host keeps the agents of each item. */
   const hostState =
     (serverId: string): ResponseDecoder<VaultState> =>
     (value) =>
       decodeHostVaultState(value, remoteServers.supportsCapability(serverId, VAULT_V4_CAPABILITY));
-  // A secret from a joined server is redacted from logs here as well, as on its host. The security
-  // code is not: a three-digit pattern would remove numbers from every log line.
   const remoteReveal = async (request: VaultSecretRequest, serverId: string): Promise<string> => {
     const secret = await post(serverId, "reveal", decodeHostVaultSecret, request);
     if (request.field !== "securityCode")
@@ -107,7 +97,6 @@ export function vaultIpcHandlers({
     return result.canceled || !result.filePaths[0] ? null : result.filePaths[0];
   };
 
-  /** The text of the CSV file that the user chose, or null when the dialog was closed. */
   const readCsv = async (limit: number): Promise<string | null> => {
     const path = await chooseCsv();
     if (!path) return null;
@@ -117,15 +106,9 @@ export function vaultIpcHandlers({
     return readFile(path, "utf8");
   };
 
-  /**
-   * The passwords and two-step keys of the export cross this computer on their way to the host, so
-   * they are redacted here as well. A file that is not a password export stops here, with the
-   * sentence that the host would send.
-   */
   const remoteImportCsv = async (serverId: string): Promise<VaultImportResult> => {
     if (!remoteServers.supportsCapability(serverId, VAULT_IMPORT_CAPABILITY))
       throw new Error(sourceText("error.team.vaultUnsupported"));
-    // Each character takes at least one byte, so a larger file cannot fit.
     const csv = await readCsv(VAULT_IMPORT_CSV_LIMIT * 4);
     if (csv === null) return null;
     if (csv.length > VAULT_IMPORT_CSV_LIMIT) throw new Error(sourceText("error.vault.csvTooLarge"));
@@ -146,7 +129,7 @@ export function vaultIpcHandlers({
 
   return {
     vault: {
-      list: handler(() => vault.state()),
+      list: handler(() => runCauseEffect(vault.reload())),
       save: payloadHandler(decodeVaultSaveInput, (input) => runCauseEffect(vault.save(input))),
       delete: payloadHandler(stringPayload("id", 64), (id) => runCauseEffect(vault.delete(id))),
       reveal: payloadHandler(decodeVaultSecretRequest, (request) => vault.reveal(request)),
@@ -167,13 +150,12 @@ export function vaultIpcHandlers({
       reset: handler(() => runCauseEffect(vault.reset())),
       codes: handler(() => runCauseEffect(vault.codes())),
       hostList: scopedQueryHandler({
-        local: () => vault.state(),
+        local: () => runCauseEffect(vault.reload()),
         remote: (serverId) => post(serverId, "list", hostState(serverId)),
       }),
       hostSave: scopedHandler(decodeVaultSaveInput, {
         local: (input) => runCauseEffect(vault.save(input)),
         remote: (input, serverId) => {
-          // A new password, card number or API key crosses this computer too, so it is redacted here as well.
           if (input.kind === "login" && input.password !== null)
             registerSecretValue(input.password, { allowShort: true });
           if (input.kind === "card" && input.number !== null) registerSecretValue(input.number);
@@ -199,7 +181,6 @@ export function vaultIpcHandlers({
           clipboard.writeText(await remoteReveal(request, serverId));
         },
       }),
-      // A host without `vault-v3` keeps no two-step keys, so it has no codes.
       hostCodes: scopedQueryHandler({
         local: () => runCauseEffect(vault.codes()),
         remote: (serverId) =>

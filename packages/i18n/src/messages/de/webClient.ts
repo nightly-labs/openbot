@@ -9,6 +9,9 @@ export const messages = {
   "webClient.loadingLine.prompts": "Prompts werden entwirrt…",
   "webClient.loadingLine.sleepy": "Der schläfrige Agent wird nett gebeten…",
   "webClient.loadingLine.almost": "Fast geschafft. Wahrscheinlich.",
+  "webClient.slowLoad.title": "OpenBot braucht länger als üblich",
+  "webClient.slowLoad.body": "Prüfe deine Internetverbindung und lade die Seite dann neu.",
+  "webClient.slowLoad.reload": "Neu laden",
   "webClient.login.failed": "Anmeldung fehlgeschlagen.",
   "webClient.login.requestFailed": "Die Kontoanfrage ist fehlgeschlagen.",
   "webClient.login.sessionFailed": "Diese Sitzung konnte nicht geprüft werden.",
@@ -17,7 +20,6 @@ export const messages = {
   "webClient.login.responseInvalid": "Die Anmeldeantwort ist ungültig.",
   "webClient.pane.navigation": "Arbeitsbereich-Navigation",
   "webClient.pane.chat": "Chat",
-  "webClient.pane.routines": "Routinen",
   "webClient.pane.workspace": "Arbeitsbereich",
   "webClient.phoneApp.title": "Nutze die OpenBot-App",
   "webClient.phoneApp.description":
@@ -35,7 +37,8 @@ export const messages = {
     "Erstelle einen gehosteten Server, um über diesen Browser mit deinen Agenten zu chatten. Du kannst OpenBot auch auf deinem Computer starten oder mit einer Einladung einem Server beitreten.",
   "webClient.connect.stepInstall": "Installiere und öffne OpenBot auf deinem Computer.",
   "webClient.connect.stepSignIn": "Melde dich mit deiner E-Mail-Adresse an.",
-  "webClient.connect.stepRemote": "Aktiviere den Fernzugriff.",
+  "webClient.connect.stepRemote":
+    "Öffne in OpenBot Servereinstellungen > Mitglieder und aktiviere Server veröffentlichen.",
   "webClient.notice.download": "OpenBot herunterladen",
   "webClient.notice.createServer": "Gehosteten Server erstellen",
   "webClient.notice.join": "Mit Einladung beitreten",

@@ -21,10 +21,6 @@ type AttentionCandidate =
   | { mode: "question"; item: DynamicIslandPromptItem }
   | { mode: "failed"; item: DynamicIslandFailureItem };
 
-/**
- * The island text in the interface language. Each app builds it from its own catalog, so
- * `team-client` stays free of UI, catalogs, and application state.
- */
 export interface DynamicIslandText {
   taskWorking: string;
   questionHeader: string;
@@ -37,7 +33,6 @@ export interface DynamicIslandText {
   approvalCommand: string;
   approvalFileChange: string;
   approvalPermissions: string;
-  /** `userErrorMessage` in the interface language. `fallback` is already translated. */
   errorMessage: (error: unknown, fallback: string) => string;
 }
 
@@ -88,7 +83,6 @@ export function selectDynamicIslandPresentation(
   return { ...selected, remainingCount: islandCount(attentionCount - 1) };
 }
 
-/** A count that main accepts. Main rejects a presentation with more than 10,000 unread replies, so the island stopped updating. */
 function islandCount(count: number): number {
   return Math.min(DYNAMIC_ISLAND_MAX_COUNT, Math.max(0, count));
 }
@@ -293,10 +287,10 @@ function normalizeQuestions(questions: PromptEvent["questions"], text: DynamicIs
     id: normalizeTechnical(question.id, `question-${questionIndex + 1}`, INPUT_LIMITS.identifier),
     header: normalizeRequired(question.header, text.questionHeader, INPUT_LIMITS.promptHeader),
     question: normalizeRequired(question.question, text.questionText, INPUT_LIMITS.promptQuestion),
+    ...questionDetail(question.detail),
     isSecret: question.isSecret,
     options:
       question.options?.slice(0, INPUT_LIMITS.promptOptions).map((option, optionIndex) => {
-        // The technical label is the answer the agent reads, so it stays in English.
         const fallback = `Option ${optionIndex + 1}`;
         const label = normalizeTechnical(option.label, fallback, INPUT_LIMITS.promptOptionLabel);
         const displayLabel = normalizeRequired(
@@ -310,6 +304,11 @@ function normalizeQuestions(questions: PromptEvent["questions"], text: DynamicIs
         };
       }) ?? null,
   }));
+}
+
+function questionDetail(detail: string | undefined): { detail?: string } {
+  const text = detail?.trim();
+  return text ? { detail: truncate(text, INPUT_LIMITS.promptQuestion) } : {};
 }
 
 function normalizeTechnical(value: string, fallback: string, length: number): string {
@@ -331,7 +330,7 @@ function approvalTitle(approval: AgentApproval, text: DynamicIslandText) {
   return text.approvalPermissions;
 }
 
-function presentationPriority(mode: DynamicIslandPresentation["mode"]): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+export function presentationPriority(mode: DynamicIslandPresentation["mode"]): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
   if (mode === "question") return 0;
   if (mode === "approval") return 1;
   if (mode === "takeover") return 2;

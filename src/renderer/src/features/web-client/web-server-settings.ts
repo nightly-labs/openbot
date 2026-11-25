@@ -28,20 +28,11 @@ interface WebServerSettingsState {
   error: string | null;
 }
 
-/**
- * The settings dialog of the connected host, as the desktop `server-settings.tsx` shows it for a
- * remote server. The web connects to one host at a time, so the dialog is for that host only.
- *
- * Every mutation ends in a new read rather than a patch of the lists: the account service and the
- * host are the authority, and a failed write must not leave a row that they did not accept.
- */
-
 export function createWebServerSettings(options: {
   server: () => ServerSummary | undefined;
   admin: () => WebAdminRuntime | undefined;
   presence: () => TeamPresenceSnapshot | null;
   refreshHosts: () => Promise<void>;
-  /** Shows a plush look on the server before the host confirms it. */
   setAppearance: (hostId: string, appearance: ServerAppearance | null) => void;
 }) {
   const [state, setState] = createStore<WebServerSettingsState>({
@@ -51,7 +42,6 @@ export function createWebServerSettings(options: {
     loading: false,
     error: null,
   });
-  /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
   let request = 0;
   let restoreTarget: HTMLElement | null = null;
 
@@ -63,8 +53,6 @@ export function createWebServerSettings(options: {
     return { server, admin };
   }
 
-  // Typing updates do not read the account service again. Membership and online changes are enough
-  // to show an accepted invitation.
   let previousPresence = "";
   createEffect(
     () => (state.open ? options.presence() : null),
@@ -79,7 +67,6 @@ export function createWebServerSettings(options: {
     },
   );
 
-  // A member change revokes every session on the host, this one too. Load again after it reconnects.
   let previousState: ServerSummary["state"] | undefined;
   createEffect(
     () => (state.open ? options.server()?.state : undefined),
@@ -155,10 +142,6 @@ export function createWebServerSettings(options: {
     await refresh();
   }
 
-  /**
-   * Sets the plush look through `host-appearance-v1`. The look shows at the click, and a failure
-   * puts the previous one back; the host's `host-appearance` event then confirms it.
-   */
   async function saveAppearance(appearance: ServerAppearance | null): Promise<void> {
     const { server, admin } = requireAdmin();
     if (!serverCanAdminister(server, "host-appearance-v1"))
@@ -173,10 +156,6 @@ export function createWebServerSettings(options: {
     }
   }
 
-  /**
-   * Changes the server key through `host-key-rotation-v1`, which only the owner may use. As on the
-   * desktop, the server list is read again, because only its signed handover makes the new key trusted.
-   */
   async function rotateHostKey(): Promise<void> {
     const { server, admin } = requireAdmin();
     if (!serverRotatesHostKey(server)) throw new Error(currentText().t("server.settings.hostKeyOwnerOnly"));

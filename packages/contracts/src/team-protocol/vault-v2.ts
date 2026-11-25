@@ -1,14 +1,3 @@
-// Frozen optional vault-v2 wire contract. Keep IPC types and limits out of this file.
-//
-// What it grants, recorded here because freezing it makes it permanent: all that `vault-v1` grants, and
-// API keys as a fourth item kind. An owner or admin of a joined server lists, adds, changes and deletes
-// the host's API keys, and sees one saved key when they ask for it. A member cannot use any route;
-// `requireAdmin` on the host is the only gate. `vault-v1` stays as it is: the host leaves API keys out
-// of its answers, so a client without this capability still reads the other items.
-//
-// A list item never carries a password, a card number, a security code or an API key. Only `reveal`
-// answers with one, and the client asks for it each time the user shows or copies it. Changes are
-// announced by the `vault-changed` event of `vault-v1`. Widening any of it needs a third capability.
 import {
   type AdminDecoder,
   adminRoute,
@@ -34,15 +23,12 @@ export const VAULT_V2_ROUTES = {
   reset: "/v1/admin/vault/v2/reset",
 } as const;
 
-/** The most items that one list carries. The host sends the first ones. */
 export const VAULT_V2_WIRE_ITEM_LIMIT = 5_000;
-/** The longest agent name in `addedBy`. The host cuts a longer one. */
 export const VAULT_V2_WIRE_NAME_LIMIT = 512;
 
 const id = string(64);
 const text = string(512);
 const notes = string(4_096);
-/** An environment variable name: A-Z, 0-9 and _, up to 64 characters. The host checks the pattern. */
 const apiKeyName = string(64);
 const origin = { addedBy: string(VAULT_V2_WIRE_NAME_LIMIT) };
 const month: AdminDecoder = (value) => {
@@ -90,7 +76,6 @@ const state = fields({
   items: list(item, VAULT_V2_WIRE_ITEM_LIMIT),
 });
 
-/** A new item when `id` is null. A null secret keeps the saved value. */
 const saveInput = variant({
   login: fields({
     kind: oneOf("login"),

@@ -2,7 +2,7 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { type PlanLimits, withUsageEvent } from "@openbot/team-client/plan-limits";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { type QueryClient, replaceEqualDeep } from "@tanstack/react-query";
-import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import { decodeMobileBrowserTabs, mobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 import { AGENT_SETTINGS_PARTS, type QueryScope, queryKeys } from "./query-keys";
 import { applyMobileQueueEvent } from "./queue-cache";
@@ -10,7 +10,6 @@ import { applyTaskEvent } from "./task-cache";
 
 export type WorkspaceTeamEvent = AgentEvent | TeamRealtimeEvent;
 
-/** The browser takeover requests and the browser tabs of a server that one host event changes. */
 export function applyBrowserEvent(liveState: LiveWorkspaceStore, serverId: string, event: WorkspaceTeamEvent): void {
   if (event.type === "runtime-snapshot") {
     liveState.update("browserRequests", (current) => {
@@ -43,10 +42,13 @@ export function applyBrowserEvent(liveState: LiveWorkspaceStore, serverId: strin
       ...current,
       [serverId]: { tabs, activeTabId: event.activeTabId },
     }));
+  } else if (event.type === "browser-permissions-changed") {
+    liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: event.requests }));
+  } else if (event.type === "browser-http-sign-in-changed") {
+    liveState.update("browserHttpSignIns", (current) => ({ ...current, [serverId]: mobileHttpSignIns(event.tabs) }));
   }
 }
 
-/** Updates or invalidates the cached reads that one host event makes old. */
 export function syncEventQueries(
   queryClient: QueryClient,
   scope: QueryScope,
@@ -67,11 +69,9 @@ export function syncEventQueries(
     event.type === "routines-changed" ||
     event.type === "channel-routines-changed" ||
     event.type === "agents-changed" ||
-    // A routine run ends as a turn: its slot changes from planned to its outcome.
     (event.type === "turn-completed" && event.origin === "routine")
   ) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverRoutines(scope, serverId) });
-    // Webhook history: a host also sends a routine change when it ignores a request.
     void queryClient.invalidateQueries({ queryKey: queryKeys.routineWebhooks(serverId) });
   }
   if (
@@ -89,7 +89,6 @@ export function syncEventQueries(
       queryKey: part
         ? queryKeys.channelInfo(scope, serverId, event.channelId, part)
         : queryKeys.channelInfo(scope, serverId, event.channelId),
-      // Message streaming also sends channels-changed. Only settings events need an immediate settings read.
       refetchType: event.type === "channels-changed" ? "none" : "active",
     });
     return;
@@ -109,16 +108,17 @@ export function syncEventQueries(
     });
   }
   if (event.type === "library-folders-changed") {
-    // A folder change on the desktop, on another phone, or by an agent that saved a file into a folder.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverLibraryFolders(scope, serverId) });
   }
+  if (event.type === "host-turn-limits-changed") {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverTurnLimits(scope, serverId) });
+    return;
+  }
   if (event.type === "usage-credits-changed") {
-    // The usage event does not say whether an account works on credits, so the plan limits read again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.planLimits(scope, serverId) });
     return;
   }
   if (event.type === "browser-profiles-changed") {
-    // A change on the desktop or another phone: the profiles, their proxies and each agent's choice read again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProfiles(scope, serverId) });
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverBrowserProxies(scope, serverId) });
     void queryClient.invalidateQueries({
@@ -127,23 +127,18 @@ export function syncEventQueries(
     });
   }
   if (event.type === "status") {
-    // The host sends a status event after a change to its providers, the models that its picker
-    // shows, the prompt cache time, the Claude compaction size or a provider's variables, such as one
-    // on the desktop app.
-    // Open provider pages read again.
     for (const queryKey of [
       queryKeys.providerStatus(scope, serverId),
       queryKeys.providerModels(scope, serverId),
       queryKeys.providerPromptCache(scope, serverId),
+      queryKeys.providerCacheExpiryCompaction(scope, serverId),
       queryKeys.providerCompactWindow(scope, serverId),
       queryKeys.agentModels(scope, serverId),
     ])
       void queryClient.invalidateQueries({ queryKey });
-    // Each provider has its own variables; the prefix reads every open one again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.providerEnvironment(scope, serverId, "").slice(0, -1) });
   }
   if (event.type === "message-pins-changed") {
-    // A pin of the agent changed on another device, by the agent, or by a deleted message: read the list again.
     void queryClient.invalidateQueries({ queryKey: queryKeys.messagePins(scope, serverId, event.agentId) });
   }
   if (event.type === "workflows-changed") {
@@ -151,12 +146,8 @@ export function syncEventQueries(
     void queryClient.invalidateQueries({ queryKey: queryKeys.workflow(scope, serverId, event.workflowId) });
   }
   if (event.type === "agents-changed") {
-    // The access of this member to the agents of a workflow can change, so it can see other workflows.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverWorkflows(scope, serverId) });
-    // The host also sends this event when the roles change, and this client does not get `agent-access-changed`.
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverRoles(scope, serverId) });
-    // The admin, host and new-chat settings and the provider account of an agent are not in the agent summary.
-    // The host sends this event when one of them changes, so an open settings page reads them again.
     void queryClient.invalidateQueries({
       queryKey: queryKeys.agentInfo(scope, serverId),
       predicate: (query) => AGENT_SETTINGS_PARTS.includes(String(query.queryKey.at(-1))),

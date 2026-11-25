@@ -15,11 +15,6 @@ import Animated, {
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { isAndroid } from "@/shared/lib/platform";
 
-/**
- * Text in the foreground colour with a muted band that moves across it, as the desktop activity
- * label does. The text is ordinary content and sets the size. The band is drawn above it, only where
- * the text is, so the text stays visible when the band cannot draw.
- */
 export function ThinkingTextGradient({
   text,
   enabled,
@@ -33,7 +28,6 @@ export function ThinkingTextGradient({
   foreground: ColorValue;
   muted: ColorValue;
   type?: "body" | "body-sm";
-  /** The most lines the text shows; the last shown line ends with an ellipsis. */
   numberOfLines?: number;
 }) {
   const [width, setWidth] = useState(0);
@@ -86,10 +80,6 @@ export function ThinkingTextGradient({
     >
       {copy(foreground)}
       {enabled && width > 0 ? (
-        // iOS masks with a layer, so a moving mask costs nothing. Android draws the mask into a new
-        // bitmap each time a view in it changes, so there the band moves under a still text mask.
-        // Android also gives the masked view its layer only when it first draws, so that frame masks
-        // the screen itself and shows black. A layer from the props exists before that frame.
         <MaskedView
           pointerEvents="none"
           style={StyleSheet.absoluteFill}
