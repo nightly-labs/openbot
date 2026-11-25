@@ -228,6 +228,11 @@ interface HeldProviderError {
   movesToBackup?: true;
 }
 
+interface ImageLimitChat {
+  key: string;
+  model: string | null;
+}
+
 function accountLink(params: unknown): string | undefined {
   const link = getString(params, "link");
   if (!link || !URL.canParse(link)) return undefined;
@@ -2236,7 +2241,9 @@ export class TurnLifecycle {
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
       this.#retryNotices.delete(turnId);
-      const imageLimitRepeated = this.#noteImageLimit(agentId, threadId, turnId, status, reportedError);
+      const imageLimitChat = this.#imageLimitChat(agentId, threadId, turnId);
+      const imageLimitRepeated =
+        imageLimitChat !== null && this.#imageLimitedChats.get(imageLimitChat.key) === imageLimitChat.model;
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
           ? refusedSessionFailure(
@@ -2314,6 +2321,7 @@ export class TurnLifecycle {
         yield* this.#retryRefusedTurn(agentId, threadId, turnId, snapshot, deliveries);
         return;
       }
+      this.#noteImageLimit(imageLimitChat, status, reportedError);
       const channelTurn = !taskTurn && this.#conversation.isExecutionThread(snapshot.threadId);
       const laneTaskId = taskTurn ? this.#taskForThread(agentId, threadId) : null;
       const compactionContinuation =
@@ -2980,28 +2988,23 @@ export class TurnLifecycle {
     this.#imageLimitedChats.delete(`${agentId}\u0000${threadId}`);
   }
 
-  #noteImageLimit(
-    agentId: string,
-    threadId: string,
-    turnId: string,
-    status: string,
-    reportedError: string | undefined,
-  ): boolean {
+  #imageLimitChat(agentId: string, threadId: string, turnId: string): ImageLimitChat | null {
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     if (this.#conversation.isExecutionThread(publicThreadId) || this.#conversation.isRoutineSession(threadId))
-      return false;
-    const chat = `${agentId}\u0000${publicThreadId}`;
-    const model = this.#hooks.turnModel(agentId, turnId) ?? null;
-    const repeated = this.#imageLimitedChats.has(chat) && this.#imageLimitedChats.get(chat) === model;
-    if (status === "completed") this.#imageLimitedChats.delete(chat);
-    if (status !== "failed" || reportedError === undefined || !isImageCountDiagnostic(reportedError)) return repeated;
-    this.#imageLimitedChats.delete(chat);
-    this.#imageLimitedChats.set(chat, model);
+      return null;
+    return { key: `${agentId}\u0000${publicThreadId}`, model: this.#hooks.turnModel(agentId, turnId) ?? null };
+  }
+
+  #noteImageLimit(chat: ImageLimitChat | null, status: string, reportedError: string | undefined): void {
+    if (chat === null) return;
+    if (status === "completed") this.#imageLimitedChats.delete(chat.key);
+    if (status !== "failed" || reportedError === undefined || !isImageCountDiagnostic(reportedError)) return;
+    this.#imageLimitedChats.delete(chat.key);
+    this.#imageLimitedChats.set(chat.key, chat.model);
     if (this.#imageLimitedChats.size > ENDED_TURN_LIMIT) {
       const [oldest] = this.#imageLimitedChats.keys();
       if (oldest !== undefined) this.#imageLimitedChats.delete(oldest);
     }
-    return repeated;
   }
 
   readonly #dropFailingSession = Effect.fn("TurnLifecycle.dropFailingSession")(function* (
