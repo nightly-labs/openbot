@@ -2512,7 +2512,7 @@ export class BrowserHost {
     if (onCursor) tab.contents.on("cursor-changed", cursorChanged);
     reportDialog();
     return yield* Effect.gen({ self: this }, function* () {
-      stopStream = yield* this.#startViewStream(tabId, () => openStream(generation));
+      stopStream = yield* this.#startViewStream(tab, () => openStream(generation));
       const stopOnce = () =>
         Effect.gen({ self: this }, function* () {
           tab.viewInvalidations.delete(invalidate);
@@ -4733,18 +4733,30 @@ export class BrowserHost {
     return { title: tab.engine.scrubText(title), url: tab.engine.scrubText(url) };
   }
 
-  readonly #startViewStream = Effect.fn("BrowserHost.startViewStream")(function* <A>(
+  readonly #startViewStream = Effect.fn("BrowserHost.startViewStream")(function* (
     this: BrowserHost,
-    tabId: string,
-    open: () => Effect.Effect<A, BrowserOperationError>,
+    tab: BrowserHostTab,
+    open: () => Effect.Effect<() => Effect.Effect<void>, BrowserOperationError>,
   ) {
     const start = yield* Effect.forkChild(open(), { startImmediately: true });
-    const started = yield* Fiber.await(start).pipe(Effect.timeoutOption(VIEW_START_CHECK_MS));
-    if (Option.isSome(started) && Exit.isSuccess(started.value)) return started.value.value;
-    if (!(yield* this.#leaveSilentPage(tabId))) return yield* Fiber.join(start);
+    for (;;) {
+      const done = yield* Fiber.await(start).pipe(Effect.timeoutOption(VIEW_START_CHECK_MS));
+      if (Option.isSome(done) && Exit.isSuccess(done.value)) return done.value.value;
+      const agentOperationRuns = tab.pendingOperations > (tab.previewCapture ? 1 : 0);
+      if (agentOperationRuns && Option.isNone(done)) continue;
+      if (agentOperationRuns || !(yield* this.#pageStopped(tab))) return yield* Fiber.join(start);
+      break;
+    }
     yield* Fiber.interrupt(start);
-    yield* this.#reloadPage(tabId).pipe(Effect.ignore);
+    const late = yield* Fiber.await(start);
+    if (Exit.isSuccess(late)) yield* late.value();
+    yield* this.#reloadPage(tab.id).pipe(Effect.timeoutOption(CRASH_RELOAD_TIMEOUT_MS), Effect.ignore);
     return yield* open();
+  });
+
+  readonly #pageStopped = Effect.fn("BrowserHost.pageStopped")(function* (this: BrowserHost, tab: BrowserHostTab) {
+    if (tab.endingSilentPage || (!tab.contents.isDestroyed() && tab.contents.isCrashed())) return true;
+    return yield* this.#leaveSilentPage(tab.id);
   });
 
   readonly #leaveSilentPage = Effect.fn("BrowserHost.leaveSilentPage")(function* (
