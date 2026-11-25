@@ -2,7 +2,6 @@ import { Pressable } from "react-native";
 
 import type { ServerDrawerIconButtonProps } from "./server-drawer-icon-button.types";
 
-/** The round buttons of the drawer: the plain fill of the other Android buttons, as iOS draws a circle for each. */
 export function ServerDrawerIconButton({ accessibilityLabel, children, onPress }: ServerDrawerIconButtonProps) {
   return (
     <Pressable

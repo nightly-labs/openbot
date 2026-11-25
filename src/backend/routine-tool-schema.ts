@@ -62,10 +62,6 @@ export const routineScheduleZodSchema = z
   ])
   .describe("Routine schedule. Weekdays use 0 for Sunday through 6 for Saturday; clock values use HH:mm local time.");
 
-/**
- * Each run starts a new provider session that reads only the newest chat messages, so an instruction
- * that leans on the chat ("check the mail as before") leaves the run without the way to do it.
- */
 export const ROUTINE_INSTRUCTION_RULE =
   "Each run starts a new session that sees only the newest chat messages, so write an instruction that a reader with no chat can follow. Name the service and the tool to use, such as openbot_browser for a website with the site and its signed-in tab, or the MCP tool or teammate. Also name the account, the steps, what to report and where, and when to report nothing. Do not write 'as before' or refer to the chat.";
 
@@ -90,7 +86,6 @@ export const routineMissedPolicyZodSchema = z
     `${ROUTINE_MISSED_POLICY_MEANING} With no value, a one-time schedule uses run-once and other schedules use skip.`,
   );
 
-/** The update tools already say that a field left out keeps its saved value. */
 export const routineMissedPolicyUpdateZodSchema = z
   .enum(ROUTINE_MISSED_POLICIES)
   .describe(ROUTINE_MISSED_POLICY_MEANING);

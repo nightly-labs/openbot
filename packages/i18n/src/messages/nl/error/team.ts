@@ -54,6 +54,11 @@ export const messages = {
   "error.team.tooManySignInAttempts": "Te veel inlogpogingen. Probeer het later opnieuw.",
   "error.team.clientUpdateRequired": "Werk deze OpenBot-client bij voordat je verbinding maakt met deze host.",
   "error.team.hostUpdateRequired": "Werk OpenBot bij op de host voordat je verbinding maakt.",
+  "error.team.serverSafeMode": "Deze server staat in de veilige modus, omdat OpenBot er niet start.",
+  "error.team.serverSafeModeNewerDatabase":
+    "OpenBot {version} op deze server kan de gegevens niet openen, omdat een nieuwere OpenBot-versie ze heeft opgeslagen. Een nieuwere OpenBot-release op de server lost dit op.",
+  "error.team.serverSafeModeStartFailed":
+    "OpenBot {version} op deze server is gestopt nadat het starten vaak is mislukt. Een nieuwere OpenBot-release op de server lost dit op.",
   "error.team.sidebarLayoutUnavailable": "De indeling van de zijbalk is niet beschikbaar.",
   "error.team.providersUnsupported": "Deze verbinding ondersteunt geen instellingen voor aanbieders.",
   "error.team.providerNotManaged": "OpenBot beheert de CLI van deze aanbieder niet.",
@@ -90,6 +95,7 @@ export const messages = {
   "error.team.routineFlowStopUnsupported": "Deze verbinding kan een routine-uitvoering niet stoppen.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.libraryFoldersUnsupported": "Deze verbinding ondersteunt geen bibliotheekmappen.",
+  "error.team.workflowFoldersUnsupported": "Deze verbinding ondersteunt geen workflowmappen.",
   "error.team.agentNotificationLevelsUnsupported":
     "Deze server kan geen eigen meldingsniveau per agent bewaren. Werk OpenBot bij op de computer waarop de server draait.",
   "error.team.sidebarPinsUnsupported":
@@ -122,12 +128,16 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Deze verbinding ondersteunt het wijzigen van de serveridentiteit niet.",
   "error.team.hostUpdateUnsupported": "Deze verbinding ondersteunt geen updates van de host.",
   "error.team.hostTimezoneUnsupported": "Deze verbinding ondersteunt de tijdzone van de server niet.",
+  "error.team.hostSignalHomeUnsupported": "Deze verbinding ondersteunt het kiezen van de Signal-server niet.",
+  "error.team.hostVoiceModelUnsupported": "Deze verbinding ondersteunt het spraakherkenningsmodel van de server niet.",
   "error.team.hostRestartUnsupported": "Deze verbinding ondersteunt het herstarten van de server niet.",
+  "error.team.ownerTransferUnsupported": "Deze server ondersteunt het overdragen van eigendom niet.",
   "error.team.hostKeyRotationUnsupported": "Deze verbinding ondersteunt het wijzigen van de serversleutel niet.",
   "error.team.localServersUnsupported": "Deze verbinding ondersteunt geen servers op deze computer.",
   "error.team.routineResultsUnsupported": "Deze verbinding ondersteunt geen bestemmingen voor routines.",
   "error.team.agentMemoryLimitUnsupported": "Deze verbinding ondersteunt de geheugenlimiet van agents niet.",
   "error.team.agentFoldersUnsupported": "Deze verbinding ondersteunt de mappen van agents niet.",
+  "error.team.channelFoldersUnsupported": "Deze verbinding ondersteunt de mappen van kanalen niet.",
   "error.team.folderUnavailable": "Deze map is niet beschikbaar op de hostcomputer.",
   "error.team.memoryReviewUnsupported": "Deze verbinding ondersteunt de geheugencontrole niet.",
   "error.team.skillLearningUnsupported": "Vaardigheden leren wordt niet ondersteund door deze verbinding.",
@@ -136,6 +146,10 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported":
     "Deze verbinding ondersteunt de schakelaar voor de Claude Code-instellingen niet.",
   "error.team.claudeCompactWindowUnsupported": "Deze verbinding ondersteunt de compressiegrootte van Claude niet.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Deze verbinding ondersteunt comprimeren voordat de cache verloopt niet.",
+  "error.team.mediaApprovalCreditsUnsupported": "Deze verbinding ondersteunt de creditgoedkeuringsgrens niet.",
+  "error.team.mediaApprovalCreditsInvalid": "Voer een geheel aantal credits in van 0 tot 100.000.",
   "error.team.providerEnvironmentUnsupported": "Deze verbinding ondersteunt geen providervariabelen.",
   "error.team.modelVisibilityUnsupported": "Deze verbinding ondersteunt de modellijst niet.",
   "error.team.providerDefaultUnsupported": "Deze verbinding ondersteunt de standaardaanbieder niet.",
@@ -153,6 +167,8 @@ export const messages = {
   "error.team.mcpUnsupported": "Deze verbinding ondersteunt geen MCP-servers.",
   "error.team.mcpServerListNeedsUpdate":
     "Werk OpenBot op dit apparaat bij om meer dan {limit} MCP-servers op deze server te gebruiken.",
+  "error.team.providerAccountListNeedsUpdate":
+    "Werk OpenBot op dit apparaat bij om meer dan {limit} accounts van één provider op deze server te gebruiken.",
   "error.team.storageUnsupported": "Deze verbinding ondersteunt geen opslag.",
   "error.team.machineResourcesUnsupported": "Deze verbinding ondersteunt geen machinegebruik.",
   "error.team.machineAlertMemberInvalid":
@@ -197,6 +213,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Deze verbinding ondersteunt de persoonlijkheid van de server niet.",
   "error.team.agentWaitsUnsupported": "Deze verbinding ondersteunt geen open wachtpunten.",
   "error.team.pendingApprovalUnsupported": "Deze verbinding kan geen volledige goedkeuring lezen.",
+  "error.team.pendingPromptsUnsupported": "Deze verbinding kan de open vragen niet lezen.",
   "error.team.phoneFeedbackUnsupported": "Deze verbinding kan geen rapport vanuit de telefoon-app sturen.",
   "error.team.messagePinsUnsupported": "Deze verbinding ondersteunt geen vastgemaakte berichten.",
   "error.team.queuedMessageThreadUnsupported":
@@ -204,4 +221,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "Deze verbinding ondersteunt geen achtergrondprocessen.",
   "error.team.providerUseUnsupported": "Deze verbinding ondersteunt het aan- en uitzetten van aanbieders niet.",
   "error.team.providerUseInvalid": "Deze aanbieder heeft geen aan/uit-schakelaar.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Deze server ondersteunt geen modelkeuze bij mediagoedkeuringen. Werk OpenBot op de server bij.",
+  "error.team.mediaApprovalChoiceInvalid": "De keuze voor de mediagoedkeuring is ongeldig.",
 } as const satisfies PartialTranslation<typeof source>;

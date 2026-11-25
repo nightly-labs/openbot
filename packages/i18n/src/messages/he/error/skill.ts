@@ -42,7 +42,8 @@ export const messages = {
   "error.skill.publishNeedsRepair": "ב-{name} יש שינויים מקומיים או שהוא דורש תיקון לפני הפרסום.",
   "error.skill.publishUntracked": "{name} הותקן לפני מעקב אחר גרסה מדויקת. יש לעדכן או לתקן אותו לפני הפרסום.",
   "error.skill.tooManySkills": "לסוכן יכולות להיות עד {limit} מיומנויות.",
-  "error.skill.unmanagedExists": "כבר קיימת מיומנות לא מנוהלת ב-{path}.",
+  "error.skill.ownSkillExists":
+    "לסוכן הזה כבר יש מיומנות משלו בשם {slug}. יש לבקש מהסוכן לשנות את שם המיומנות הזו או למחוק אותה, ואז להוסיף את המיומנות הזו שוב.",
   "error.skill.managedSlug": "OpenBot נותן לכל סוכן מיומנות {slug} משלו. יש לתת למיומנות הזו שם אחר.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md גדול מ-64 KB. יש לקצר אותו לפני הפרסום.",
   "error.skill.localNoRevisions": "למיומנות מקומית אין גרסאות שפורסמו.",

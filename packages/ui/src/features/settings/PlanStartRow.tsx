@@ -26,10 +26,6 @@ function isPreset(ms: number): boolean {
   return PRESETS.some((preset) => preset === ms);
 }
 
-/**
- * The menu items. A saved custom time is an item of its own, so the select never has "custom" as
- * its value, and choosing "Custom…" again is a change that opens the panel.
- */
 function choices(value: number | null): PlanStartChoice[] {
   const custom = value !== null && !isPreset(value) ? [`${value}` as const] : [];
   return ["wait", ...PRESETS.map((ms) => `${ms}` as const), ...custom, "custom"];
@@ -38,7 +34,6 @@ function choices(value: number | null): PlanStartChoice[] {
 type CustomUnit = "s" | "min";
 const UNIT_MS: Record<CustomUnit, number> = { s: 1_000, min: 60_000 };
 
-/** The typed time in ms, or null when it is not a whole number in the allowed range. */
 function typedMs(amount: string, unit: CustomUnit): number | null {
   if (!/^\d+$/.test(amount.trim())) return null;
   const ms = Number(amount) * UNIT_MS[unit];
@@ -56,21 +51,14 @@ interface CustomState {
 }
 
 export interface PlanStartRowProps {
-  /** `null` waits until a person presses Start. */
   value: number | null;
-  /** The dialog element that the menus portal into. */
   menuMount: HTMLElement | undefined;
   onChange: (value: number | null) => void;
 }
 
-/**
- * "Start the work", under the default of "Show the plan before long tasks": when the plan card
- * starts the work by itself, for all agents. Custom opens a small panel at the select.
- */
 export function PlanStartRow(props: PlanStartRowProps) {
   const { t, format } = useText();
   const [state, setState] = createStore<CustomState>({ open: false, amount: "90", unit: "s" });
-  // The same array while the items stay the same: the select builds its list again for a new one.
   const options = createMemo(() => choices(props.value), { equals: (a, b) => a.join() === b.join() });
   let trigger: HTMLButtonElement | undefined;
 

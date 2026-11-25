@@ -1,6 +1,3 @@
-// The text of the commercial license agreement. Legal wording: change it only from the approved source text,
-// and move `COMMERCIAL_LICENSE_UPDATED_AT` with it.
-
 import { Link } from "@tanstack/solid-router";
 
 const LICENSES_EMAIL = "licenses@openbot.run";

@@ -13,11 +13,6 @@ if (platform !== "linux" && platform !== "linux-arm64" && platform !== "macos" &
   throw new Error("Usage: bun scripts/verify-update-artifacts.ts <linux|linux-arm64|macos|windows>");
 }
 
-/**
- * The artifact electron-updater downloads, and the manifest that names it, for each platform.
- * electron-updater on Linux arm64 reads `latest-linux-arm64.yml`, so each Linux architecture has its
- * own manifest and its own unpacked directory.
- */
 const UPDATE_ARTIFACTS = {
   linux: { extension: ".AppImage", manifest: "latest-linux.yml" },
   "linux-arm64": { extension: ".AppImage", manifest: "latest-linux-arm64.yml" },
@@ -40,8 +35,6 @@ if (platform === "macos") {
   await verifyMaximumSize(join(distRoot, dmg), 750 * MIB);
 }
 const embeddedBlockMapBytes = await verifyManifest(manifestPath, artifactPath);
-// An AppImage carries its block map inside the file, so the size the manifest records is what proves
-// a differential update is possible. The other targets write the block map beside the artifact.
 if (platform === "linux" || platform === "linux-arm64") {
   if (embeddedBlockMapBytes === null) {
     throw new Error(`The manifest records no embedded block map for ${basename(artifactPath)}.`);
@@ -50,12 +43,10 @@ if (platform === "linux" || platform === "linux-arm64") {
   throw new Error(`Missing blockmap for ${basename(artifactPath)}.`);
 }
 
-// Each macOS job builds its own architecture, and electron-builder writes x64 to `dist/mac`.
 const resourcesRoot =
   platform === "macos"
     ? join(distRoot, process.arch === "arm64" ? "mac-arm64" : "mac", "OpenBot.app", "Contents", "Resources")
     : join(distRoot, platform === "windows" ? "win-unpacked" : `${platform}-unpacked`, "resources");
-// Every platform ships the voice runtime and downloads the model on first use.
 if (!existsSync(join(resourcesRoot, "voice", "runtime", "sherpa-onnx.node"))) {
   throw new Error("The packaged application has no voice runtime.");
 }
@@ -87,12 +78,6 @@ async function verifyMaximumSize(path: string, maximumBytes: number): Promise<vo
   }
 }
 
-/**
- * Checks the manifest describes the artifact on disk, and reports the size of the block map the
- * manifest records inside it, or `null` when it records none. A `stagingPercentage` is optional: the
- * publish job writes it later (scripts/update-rollout.ts). When it is there, it must be a whole number
- * from 0 to 100, because electron-updater offers the release to every install for a value it cannot read.
- */
 async function verifyManifest(path: string, artifact: string): Promise<number | null> {
   const manifest = readUpdateManifest(await readFile(path, "utf8"));
   const artifactName = basename(artifact);

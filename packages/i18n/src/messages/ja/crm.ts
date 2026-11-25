@@ -220,7 +220,7 @@ export const messages = {
   "crm.customer.paidOn": "{date} に支払い済み",
   "crm.customer.billing": "請求",
   "crm.customer.details": "詳細",
-  "crm.customer.since": "顧客になった日",
+  "crm.customer.added": "追加日",
   "crm.customer.activity": "アクティビティ",
   "crm.customer.loading": "読み込み中…",
 

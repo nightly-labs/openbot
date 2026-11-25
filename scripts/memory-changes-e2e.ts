@@ -1,7 +1,3 @@
-// Runs the `memory-changes-v1` wire on the real Team API codecs: a stored conversation with a
-// `memory-changes` message goes out as a host sends it over HTTP and WebRTC, with and without the
-// capability, and comes back as each client reads it. No provider, account or network is used.
-// `bun scripts/memory-changes-e2e.ts`. Writes .openbot-build/memory-changes-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -65,7 +61,6 @@ function memoryMessage(id: string, changes: unknown = memoryChanges): Conversati
     status: "completed",
     itemType: CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   };
-  // A cast-free way to put a value that the type refuses on the message: the malformed case needs it.
   return Object.assign(message, { memoryChanges: changes });
 }
 
@@ -104,7 +99,6 @@ function withoutMemoryChanges(value: ConversationPage): ConversationPage {
 
 const hasMemoryChanges = (json: string) => json.includes('"memoryChanges"');
 
-/** The event as the host event stream sends it to the WebRTC host peer for a client with the capability. */
 function hostWireEvent(event: Parameters<typeof encodeTeamProtocolV8BaseCurrentEvent>[0]): string {
   const encoded = encodeTeamProtocolV8BaseCurrentEvent(event, { memoryChanges: true });
   assert.ok(encoded);
@@ -113,7 +107,6 @@ function hostWireEvent(event: Parameters<typeof encodeTeamProtocolV8BaseCurrentE
   return encoded;
 }
 
-/** The messages of a decoded page, each checked against the IPC contract. */
 function decodedMessages(value: unknown): ConversationMessage[] {
   assert.ok(isDynamicRecord(value));
   const { messages } = value;
@@ -157,7 +150,6 @@ try {
     const encoded = httpV9.encodeResponse("GET", PAGE_PATH, 200, current, {});
     assert.equal(encoded, httpV9.encodeResponse("GET", PAGE_PATH, 200, released, {}));
     assert.ok(!hasMemoryChanges(encoded));
-    // The released fallback: the system message keeps its item type and its count text.
     const [, memory] = decodedMessages(httpV9.decodeResponse("GET", PAGE_PATH, 200, JSON.parse(encoded)));
     assert.equal(memory?.itemType, CONVERSATION_MEMORY_CHANGES_ITEM_TYPE);
     assert.equal(memory?.text, current.messages[1]?.text);

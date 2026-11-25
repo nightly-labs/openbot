@@ -65,7 +65,6 @@ export const messages = {
   "connector.github.disconnectEffectRevoke":
     "Danach öffnet sich GitHub. Dort kannst du den Zugriff von OpenBot widerrufen.",
   "connector.github.disconnectEffectKept": "Chats, Dateien und Agentenspeicher bleiben auf diesem Computer erhalten.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "Alle Agenten auf {host} können deine GitHub-Repositories, Issues und Pull Requests sowie gh und git verwenden.",
   "connector.github.connectedSummaryHost": {
@@ -366,7 +365,7 @@ export const messages = {
   "connector.whatsapp.ownNumberNote":
     "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "Die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
+    "Dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, erreichen OpenBot. Andere Personen bekommen einen Code, den sie dir geben.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp hat diesen Computer aus den verknüpften Geräten entfernt. Verknüpfe die Nummer erneut.",
   "connector.whatsapp.helpLoggedOutHost":
@@ -392,7 +391,7 @@ export const messages = {
     "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Andere bekommen keine Antwort. Wenn es aus ist, antwortet OpenBot unbekannten Personen mit einem Code.",
   "connector.whatsapp.workingMessage": "Nachricht „Wird bearbeitet…“",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Schalte sie aus, um nur die Antwort zu senden.",
+    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Bei einer privaten Nummer bekommt nur dein Chat „Nachricht an dich selbst“ diese Meldungen. Schalte sie aus, um nur die Antwort zu senden.",
   "connector.whatsapp.statusReactions": "Status-Reaktionen",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reagiert mit 👀, wenn eine Nachricht ankommt, und mit ✅, wenn die Antwort fertig ist. Schalte sie aus, um keine Reaktionen zu senden.",
@@ -472,6 +471,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Eine Nummer kann bis zu {count} Kontakte und Gruppen zulassen.",
   "connector.whatsapp.senderGroup": "Gruppe",
   "connector.whatsapp.removeSender": "Entfernen",
+  "connector.whatsapp.senderAccess": "Zugriff für {name}",
+  "connector.whatsapp.senderReplies": "Kann Aufgaben geben",
+  "connector.whatsapp.senderReadOnly": "Nur lesen",
   "connector.whatsapp.addContact": "Kontakt hinzufügen",
   "connector.whatsapp.addGroup": "Gruppe hinzufügen",
   "connector.whatsapp.contactTitle": "Kontakt hinzufügen",
@@ -480,7 +482,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Optional. Ohne Namen zeigt die Liste die Telefonnummer.",
   "connector.whatsapp.add": "Hinzufügen",
   "connector.whatsapp.groupTitle": "Gruppe hinzufügen",
-  "connector.whatsapp.groupDescription": "Personen in dieser Gruppe können deinen Agenten Aufgaben geben.",
+  "connector.whatsapp.groupDescription":
+    "Personen in dieser Gruppe können deinen Agenten Aufgaben geben, wenn sie die Nummer erwähnen oder auf ihre Nachrichten antworten.",
   "connector.whatsapp.groupSearch": "Gruppen suchen",
   "connector.whatsapp.groupsLoading": "Gruppen werden gelesen…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot konnte die Gruppen nicht lesen",
@@ -640,9 +643,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agents können sich erst wieder mit Ihren geteilten Zugangsdaten anmelden, wenn Sie sich erneut anmelden.",
   "connector.protonPass.reconnect": "Neu verbinden",
-  "connector.protonPass.planTitle": "Proton Pass braucht einen bezahlten Plan",
+  "connector.protonPass.planTitle": "Proton Pass braucht einen Plan mit Pass Plus",
   "connector.protonPass.planDescription":
-    "Die Proton Pass CLI funktioniert nur mit einem bezahlten Proton-Plan. Ändern Sie Ihren Plan und verbinden Sie dann erneut.",
+    "Die Proton Pass CLI braucht einen Proton-Plan, der Pass Plus enthält. Andere bezahlte Pläne wie Mail Plus enthalten sie nicht. Ändern Sie Ihren Plan und verbinden Sie dann erneut.",
   "connector.protonPass.vaultTitle": "Geteilter Tresor",
   "connector.protonPass.vaultDescription":
     "Agents können sich mit den Zugangsdaten in diesem Tresor anmelden. Verschieben Sie Zugangsdaten hinein, um sie zu teilen.",

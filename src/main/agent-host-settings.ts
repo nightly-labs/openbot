@@ -1,13 +1,6 @@
-import { Effect, Schema } from "effect";
-// Computer Use, local scripts, the busy-message mode, the backup models, the task limit, the agent's
-// own new chats, the plan card and the fast mode of one agent, as this computer holds them. The
-// `agent-host-settings-v1`, `agent-backup-models-v1`, `agent-task-limit-v1`, `agent-new-chat-v1`,
-// `agent-plan-card-v1`, `agent-fast-mode-v1` and `agent-speed-v1` host routes use this, and they write through `AgentService.updateAgent`, the
-// writer of the local window, so a remote admin changes the same state. The `model-steering-v1` route
-// only reads the steering models.
-
 import {
   type AgentBackupModelSettings,
+  type AgentBuiltinMemorySettings,
   type AgentFastModel,
   type AgentFastModeSettings,
   type AgentHostSettings,
@@ -20,10 +13,12 @@ import {
   agentAutomationAllowed,
   agentComputerUseEnabled,
   agentFastModeSettings,
+  agentMemoryEnabled,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
   agentSpeed,
   type UpdateAgentBackupModelsInput,
+  type UpdateAgentBuiltinMemoryInput,
   type UpdateAgentFastModeInput,
   type UpdateAgentHostSettingsInput,
   type UpdateAgentNewChatInput,
@@ -32,6 +27,7 @@ import {
   type UpdateAgentTaskLimitInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { Effect, Schema } from "effect";
 import type { AgentService } from "../backend/agent-service";
 import { causeHelpers } from "../backend/effect-boundary";
 import { AgentNotFoundError } from "./agent-admin-settings";
@@ -57,15 +53,16 @@ export interface AgentHostSettingsService {
   updateNewChat(input: UpdateAgentNewChatInput): Effect.Effect<AgentNewChatSettings, AgentHostSettingsFailure>;
   readPlanCard(agentId: string): AgentPlanCardSettings;
   updatePlanCard(input: UpdateAgentPlanCardInput): Effect.Effect<AgentPlanCardSettings, AgentHostSettingsFailure>;
+  readBuiltinMemory(agentId: string): AgentBuiltinMemorySettings;
+  updateBuiltinMemory(
+    input: UpdateAgentBuiltinMemoryInput,
+  ): Effect.Effect<AgentBuiltinMemorySettings, AgentHostSettingsFailure>;
   readFastMode(agentId: string): AgentFastModeSettings;
   updateFastMode(input: UpdateAgentFastModeInput): Effect.Effect<AgentFastModeSettings, AgentHostSettingsFailure>;
-  /** The models of this computer that have a fast service tier. The released model list drops the tier. */
   listFastModels(): AgentFastModel[];
   readSpeed(agentId: string): AgentSpeedSettings;
   updateSpeed(input: UpdateAgentSpeedInput): Effect.Effect<AgentSpeedSettings, AgentHostSettingsFailure>;
-  /** `listFastModels` with the Ultrafast tiers and the Claude models, for `agent-speed-v1`. */
   listSpeedModels(): AgentFastModel[];
-  /** The models of this computer whose custom agent steers a running turn, for `model-steering-v1`. */
   listSteeringModels(): AgentSteeringModel[];
 }
 
@@ -153,7 +150,18 @@ export function createAgentHostSettings({
     const agent = yield* agents.updateAgent({ agentId, quickAcknowledgement }).pipe(toAgentHostSettingsFailure);
     return planCard(agent);
   });
-  // `agent-fast-mode-v1` answers only `fastMode`: its frozen response has no other field.
+  const builtinMemory = (agent: AgentSummary): AgentBuiltinMemorySettings => ({ memory: agentMemoryEnabled(agent) });
+  const updateBuiltinMemory = Effect.fn("AgentHostSettings.updateBuiltinMemory")(function* ({
+    agentId,
+    memory,
+  }: UpdateAgentBuiltinMemoryInput) {
+    yield* Effect.try({
+      try: () => requireAgent(agentId),
+      catch: (cause) => new AgentHostSettingsFailure({ cause }),
+    });
+    const agent = yield* agents.updateAgent({ agentId, memory }).pipe(toAgentHostSettingsFailure);
+    return builtinMemory(agent);
+  });
   const fastMode = (agent: AgentSummary): AgentFastModeSettings => ({ fastMode: agent.fastMode ?? null });
   const writeFastMode = Effect.fn("AgentHostSettings.writeFastMode")(function* (
     agentId: string,
@@ -164,7 +172,6 @@ export function createAgentHostSettings({
       try: () => requireAgent(agentId),
       catch: (cause) => new AgentHostSettingsFailure({ cause }),
     });
-    // A `fastMode` change without `ultrafast: true` turns Ultrafast off, as in the local picker.
     return yield* agents
       .updateAgent({ agentId, fastMode: next, ...(next && ultrafast ? { ultrafast: true } : {}) })
       .pipe(toAgentHostSettingsFailure);
@@ -194,9 +201,10 @@ export function createAgentHostSettings({
     updateNewChat: (input) => updateNewChat(input).pipe(Effect.uninterruptible),
     readPlanCard: (agentId) => planCard(requireAgent(agentId)),
     updatePlanCard: (input) => updatePlanCard(input).pipe(Effect.uninterruptible),
+    readBuiltinMemory: (agentId) => builtinMemory(requireAgent(agentId)),
+    updateBuiltinMemory: (input) => updateBuiltinMemory(input).pipe(Effect.uninterruptible),
     readFastMode: (agentId) => fastMode(requireAgent(agentId)),
     updateFastMode: (input) => updateFastMode(input).pipe(Effect.uninterruptible),
-    // Claude fast mode needs the price confirmation, and released member apps show the switch without it.
     listFastModels: () =>
       agents
         .listModels()
@@ -205,7 +213,6 @@ export function createAgentHostSettings({
         ),
     readSpeed: (agentId) => speed(requireAgent(agentId)),
     updateSpeed: (input) => updateSpeed(input).pipe(Effect.uninterruptible),
-    // A client with `agent-speed-v1` asks for the Claude price confirmation, so Claude models are listed.
     listSpeedModels: () =>
       agents
         .listModels()

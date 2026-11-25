@@ -15,23 +15,18 @@ import { createStore, Show } from "solid-js";
 import { useText } from "../../text";
 import { BrowserProfileDot } from "./BrowserProfileColor";
 
-/** `shared`, `agent`, or the id of a named profile: ids are 32 hex characters, so they never match. */
 export type BrowserProfileChoice = string;
 
-/** The last option. It is never a value: choosing it opens the name field in the list. */
 const NEW_PROFILE = "new";
 
-/** `proxy`: the name of the profile's proxy. Absent for Automatic, and when the user cannot see proxies. */
 export type BrowserProfileSelectProfile = Pick<BrowserProfileSummary, "id" | "name" | "hue"> & {
   proxy?: string | undefined;
 };
 
 interface BrowserProfileSelectProps {
   value: BrowserProfileChoice;
-  /** Undefined while the profiles load. */
   profiles: readonly BrowserProfileSelectProfile[] | undefined;
   onChange: (choice: BrowserProfileChoice) => void;
-  /** Makes the profile and returns its id. The select then chooses it. */
   onCreate: (name: string) => Promise<string>;
 }
 
@@ -58,24 +53,16 @@ function BrowserProfileProxy(props: { name: string | undefined }) {
   );
 }
 
-/**
- * The browser profile row of the agent settings. "New profile" at the end of the list changes into a
- * name field in the same list, so the user makes a profile and gives it to the agent in one step.
- */
 export function BrowserProfileSelect(props: BrowserProfileSelectProps) {
   const { t, errorMessage } = useText();
   const [state, setState] = createStore<BrowserProfileSelectState>({ ...CLOSED });
-  // Kobalte closes the list after each choice. The choice of "New profile" keeps it open.
   let keepOpen = false;
   let trigger: HTMLButtonElement | undefined;
 
   const choices = (): BrowserProfileChoice[] => {
     const ids = (props.profiles ?? []).map((profile) => profile.id);
-    // A profile that is not in the list stays a choice, so the select can show it.
     const missing = props.value !== "shared" && props.value !== "agent" && !ids.includes(props.value);
-    // "Only this agent" is not offered any more. An agent that uses it keeps it, with its sign-ins, until the user changes it.
     const own = props.value === "agent" ? ["agent"] : [];
-    // "New profile" stays an option while the name field shows: a change of the options makes Kobalte choose again.
     return ["shared", ...own, ...ids, ...(missing ? [props.value] : []), NEW_PROFILE];
   };
 
@@ -92,7 +79,6 @@ export function BrowserProfileSelect(props: BrowserProfileSelectProps) {
   const hue = (choice: BrowserProfileChoice): AvatarHue | "shared" | undefined =>
     choice === "shared" ? "shared" : props.profiles?.find((profile) => profile.id === choice)?.hue;
 
-  // Kobalte reads its state when a focused option goes away. Focus leaves the list first, in the event.
   function releaseFocus(): void {
     trigger?.focus();
   }
@@ -149,7 +135,6 @@ export function BrowserProfileSelect(props: BrowserProfileSelectProps) {
           when={item.item.rawValue === NEW_PROFILE}
           fallback={
             <SelectItem item={item.item} class="browser-profile-select-option">
-              {/* Every row has the mark column, so the names line up with "New profile". */}
               <span class="browser-profile-select-mark">
                 <Show when={hue(item.item.rawValue)}>{(current) => <BrowserProfileDot hue={current()} />}</Show>
               </span>

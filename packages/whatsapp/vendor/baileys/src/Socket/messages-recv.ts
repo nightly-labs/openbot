@@ -1949,12 +1949,26 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		}
 	}
 
+	// OPENBOT PATCH: the socket emits 'openbot:node' with `true` when the handler of a node starts and with
+	// `false` when it ends, so the app can find a node whose handling stalled. A stalled handler holds the
+	// ack, and WhatsApp then stops delivering messages while keep-alives still pass (upstream #2491).
+	const trackNode =
+		(handler: (node: BinaryNode) => Promise<void>) =>
+		async (node: BinaryNode): Promise<void> => {
+			ws.emit('openbot:node', node, true)
+			try {
+				await handler(node)
+			} finally {
+				ws.emit('openbot:node', node, false)
+			}
+		}
+
 	const offlineNodeProcessor = makeOfflineNodeProcessor(
 		new Map<MessageType, (node: BinaryNode) => Promise<void>>([
-			['message', handleMessage],
-			['call', handleCall],
-			['receipt', handleReceipt],
-			['notification', handleNotification]
+			['message', trackNode(handleMessage)],
+			['call', trackNode(handleCall)],
+			['receipt', trackNode(handleReceipt)],
+			['notification', trackNode(handleNotification)]
 		]),
 		{
 			isWsOpen: () => ws.isOpen,
@@ -1992,7 +2006,8 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		if (isOffline) {
 			offlineNodeProcessor.enqueue(type, node)
 		} else {
-			await processNodeWithBuffer(node, identifier, exec)
+			// OPENBOT PATCH: see trackNode.
+			await processNodeWithBuffer(node, identifier, trackNode(exec))
 		}
 	}
 

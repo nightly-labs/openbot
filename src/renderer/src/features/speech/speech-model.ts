@@ -1,25 +1,34 @@
-import type { SpeechModelStatus } from "@openbot/contracts/ipc";
+import { cloudSpeechModel, type SpeechModelStatus } from "@openbot/contracts/ipc";
 import { createSignal } from "solid-js";
 import { speechPort } from "./speech-port";
 import { voiceServer } from "./voice-server";
 
-const [status, setStatus] = createSignal<SpeechModelStatus["phase"] | null>(null);
+const [status, setStatus] = createSignal<SpeechModelStatus | null>(null, {
+  equals: (before, after) => before?.phase === after?.phase && before?.modelId === after?.modelId,
+});
 let following = false;
 
-/**
- * Whether a reply can be read aloud: the speech model is on this computer, or the user's own voice
- * server speaks. The first read starts to follow the model status; the answer is false until main
- * tells it.
- */
+export function followSpeechModel(): void {
+  if (following) return;
+  following = true;
+  const voice = speechPort().voice;
+  voice.onSpeechModelStatus((next) => setStatus(next));
+  void voice.getSpeechModelStatus().then(
+    (next) => setStatus((current) => current ?? next),
+    () => undefined,
+  );
+}
+
+function speechModelStatus(): SpeechModelStatus | null {
+  followSpeechModel();
+  return status();
+}
+
 export function speechModelReady(): boolean {
-  if (!following) {
-    following = true;
-    const voice = speechPort().voice;
-    voice.onSpeechModelStatus((next) => setStatus(next.phase));
-    void voice.getSpeechModelStatus().then(
-      (next) => setStatus((current) => current ?? next.phase),
-      () => undefined,
-    );
-  }
-  return status() === "ready" || voiceServer()?.routes.speech === true;
+  return speechModelStatus()?.phase === "ready" || voiceServer()?.routes.speech === true;
+}
+
+export function speechModelFindsLanguage(): boolean {
+  const modelId = speechModelStatus()?.modelId;
+  return modelId !== undefined && cloudSpeechModel(modelId) !== undefined;
 }

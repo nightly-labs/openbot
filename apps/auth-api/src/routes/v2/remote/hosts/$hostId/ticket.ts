@@ -1,3 +1,4 @@
+import { isSignalHomeId } from "@openbot/contracts/ipc-host-signal-home";
 import { isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
@@ -20,10 +21,10 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
             const body = yield* readJsonObject(request);
             if (!isString(body.machineToken))
               return apiError(400, "invalid_remote_request", "The host credential is invalid.");
-            // Only the host peer gateway asks for its home Signal. A released host sends neither field.
             if (
               (body.signalHome !== undefined && !isBoolean(body.signalHome)) ||
-              (body.failedSignalUrl !== undefined && !isString(body.failedSignalUrl))
+              (body.failedSignalUrl !== undefined && !isString(body.failedSignalUrl)) ||
+              (body.preferredSignalHome !== undefined && !isSignalHomeId(body.preferredSignalHome))
             )
               return apiError(400, "invalid_remote_request", "The Signal home request is invalid.");
             const signalHome = isBoolean(body.signalHome) ? body.signalHome : null;
@@ -33,6 +34,8 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
                 failedSignalUrl: signalHome === true && isString(body.failedSignalUrl) ? body.failedSignalUrl : null,
                 location: signalHome === true ? requestLocation(request) : null,
                 country: signalHome === true ? requestCountry(request) : null,
+                preferredSignalHome:
+                  signalHome === true && isSignalHomeId(body.preferredSignalHome) ? body.preferredSignalHome : null,
               }),
             );
           }),
@@ -42,13 +45,11 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
   },
 });
 
-/** Where Cloudflare puts the host request, so the host gets a Signal home near it. */
 function requestLocation(request: Request): SignalLocation | null {
   const cf = request.cf;
   return cf && "latitude" in cf && "longitude" in cf ? signalLocation(cf.latitude, cf.longitude) : null;
 }
 
-/** The Cloudflare country code of the host request, for `REMOTE_SIGNAL_HOME_COUNTRIES`. */
 function requestCountry(request: Request): string | null {
   const country = request.cf?.country;
   return typeof country === "string" && country ? country : null;

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/billing";
 
 export const messages = {
-  // The Billing tab in Settings and the Billing dialog in the web client.
   "billing.title": "Facturation",
   "billing.description": "Chaque serveur a sa propre offre. Stripe gère le paiement.",
   "billing.loading": "Chargement de la facturation…",
@@ -80,7 +79,6 @@ export const messages = {
   "billing.lifecycle.deleted": "{name} a été supprimé. Son abonnement a pris fin.",
   "billing.lifecycle.label": "Aperçu de conception · Actions fictives uniquement",
   "billing.lifecycle.reset": "Réinitialiser l’aperçu",
-  // The commercial license of the account, above the server plans.
   "billing.license.title": "Licence",
   "billing.license.description": "Pour le travail en entreprise. Elle n’inclut pas de serveur.",
   "billing.license.loadFailed": "Impossible de charger la licence.",
@@ -154,7 +152,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "La licence prend fin à la fin de la période payée. Vos serveurs ne sont pas concernés.",
   "billing.license.cancel.keep": "Garder la licence",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Période de facturation",
   "billing.order.currency": "Devise",
   "billing.order.monthly": "Mensuel",
@@ -207,7 +204,6 @@ export const messages = {
   "billing.order.cta.license": "Acheter une licence",
   "billing.order.cta.download": "Télécharger",
   "billing.order.cta.keepComputer": "Rester sur cet ordinateur",
-  // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "Ajouter un utilisateur à la licence ?",
   "billing.license.invite.description":
     "Cette invitation ajoute 1 utilisateur à votre licence : {price} de plus par mois.",
@@ -226,4 +222,30 @@ export const messages = {
   "billing.details.vatIdInvalid": "Ce n’est pas un numéro de TVA du pays choisi.",
   "billing.details.countryMissing": "Choisissez votre pays de facturation.",
   "billing.details.saveFailed": "Impossible d’enregistrer les informations de facturation",
+  "billing.credits.explainer.title": "Que sont les crédits ?",
+  "billing.credits.explainer.page": "{page} sur {total}",
+  "billing.credits.explainer.pages": "Pages",
+  "billing.credits.explainer.mediaTitle": "Les crédits paient les médias",
+  "billing.credits.explainer.mediaText":
+    "Quand un agent crée une image, une vidéo ou une voix, il utilise des crédits.",
+  "billing.credits.explainer.chatTitle": "Les chats restent gratuits",
+  "billing.credits.explainer.chatText":
+    "Les chats utilisent votre propre fournisseur d’IA. Parler à vos agents n’utilise pas de crédits.",
+  "billing.credits.explainer.chatFree": "0 crédit",
+  "billing.credits.explainer.modelsTitle": "Chaque modèle a un prix",
+  "billing.credits.explainer.modelsText":
+    "Les meilleurs modèles coûtent plus cher. Une image utilise {pictureMin}–{pictureMax} crédits, une vidéo de {seconds} s {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ image",
+  "billing.credits.explainer.perClip": "/ vidéo de {seconds} s",
+  "billing.credits.explainer.getTitle": "Obtenir des crédits",
+  "billing.credits.explainer.getText":
+    "Achetez un pack quand il vous en faut plus. Les gros packs offrent un meilleur prix par crédit.",
+  "billing.credits.explainer.freeEnd": "Les crédits gratuits mensuels ont une date de fin",
+  "billing.credits.explainer.welcome":
+    "Les nouveaux comptes reçoivent {amount} crédits gratuits pour essayer certains modèles",
+  "billing.credits.welcomeIncluded": "Crédits gratuits : {amount}",
+  "billing.credits.explainer.allPrices": "Les {count} modèles",
+  "billing.credits.explainer.next": "Suivant",
+  "billing.credits.explainer.gotIt": "Compris",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

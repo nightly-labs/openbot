@@ -6,12 +6,6 @@ import Animated from "react-native-reanimated";
 import { EASE_OUT_CSS, useOnboardingMotion } from "@/features/onboarding/components/onboarding-motion";
 import { useLiquidGlass } from "@/shared/lib/use-liquid-glass";
 
-/**
- * The entrance of a glass surface. Until its delay has passed, the surface has no glass and its
- * content is hidden; then the glass forms with the system's animation while the content fades in
- * and the surface grows a little. Only the content fades: glass does not draw under a parent with
- * no opacity, and does not recover after it.
- */
 export function useGlassEntrance(delay: number) {
   const motion = useOnboardingMotion();
   const [ready, setReady] = useState(delay <= 0);
@@ -38,11 +32,6 @@ export function useGlassEntrance(delay: number) {
   };
 }
 
-/**
- * A glass surface for content: Liquid Glass on iOS when the system has it, and a soft solid
- * surface elsewhere (Android, older iOS, Reduce Transparency). A chosen or focused surface takes
- * the agent's colour.
- */
 function Surface({
   radius,
   color,
@@ -79,7 +68,6 @@ function Surface({
               style={[StyleSheet.absoluteFill, tinted && color ? { backgroundColor: `${color}33` } : null]}
             />
           )}
-          {/* A coloured edge marks the choice where there is no tinted glass to show it. */}
           {!glass && tinted && color ? (
             <View style={[StyleSheet.absoluteFill, { borderRadius: radius, borderWidth: 1.5, borderColor: color }]} />
           ) : null}
@@ -90,7 +78,6 @@ function Surface({
   );
 }
 
-/** A choice that can hold a sentence: a reply, or a row with an icon and two lines. */
 export function GlassChoice({
   label,
   hint,
@@ -102,7 +89,6 @@ export function GlassChoice({
   appearDelay = 0,
   children,
 }: {
-  /** The accessible name of the choice. */
   label: string;
   hint?: string;
   onPress: () => void;
@@ -110,7 +96,6 @@ export function GlassChoice({
   disabled?: boolean;
   color?: string;
   radius?: number;
-  /** See `glassAfter`: when the surface appears. */
   appearDelay?: number;
   children: ReactNode;
 }) {

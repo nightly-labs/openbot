@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/connector";
 
 export const messages = {
-  // Sunucu ayarları > Bağlayıcılar: bu bilgisayarın yerleşik GitHub bağlantısı.
   "connector.github.title": "GitHub",
   "connector.github.description":
     "Bu bilgisayardaki her ajan GitHub depolarınızı, sorunlarınızı (issues), çekme isteklerinizi (pull requests), gh ve git araçlarını kullanabilir.",
@@ -22,12 +21,10 @@ export const messages = {
   "connector.github.repositoriesLoading": "Depolar GitHub'dan okunuyor",
   "connector.github.repositoriesFailed": "OpenBot depoları GitHub'dan okuyamadı.",
   "connector.github.noRepositories": "OpenBot GitHub Uygulaması henüz bir depoya yüklenmedi.",
-  // {count} bir sayıdır (örneğin 12).
   "connector.github.moreRepositories": {
     one: "Ve {count} depo daha",
     other: "Ve {count} depo daha",
   },
-  // Yalnızca üyelerinin görebileceği bir deponun yanındaki rozet.
   "connector.github.private": "Özel",
   "connector.github.disconnect": "Bağlantıyı kes",
   "connector.github.disconnectTitle": "GitHub bağlantısını kes",
@@ -36,41 +33,33 @@ export const messages = {
   "connector.github.expiredDescription": "Ajanlara yeniden GitHub erişimi vermek için @{login} olarak tekrar bağlanın.",
   "connector.github.reconnect": "Yeniden bağlan",
   "connector.github.actionFailed": "OpenBot GitHub bağlantısını değiştiremedi.",
-  // GitHub sayfasının üst kısmındaki adın yanındaki durum.
   "connector.github.statusConnected": "Bağlandı",
   "connector.github.statusConnecting": "Bağlanıyor",
   "connector.github.statusExpired": "Süresi doldu",
   "connector.github.accountTitle": "Hesap",
-  // {count} listedeki depo sayısıdır (örneğin 12).
   "connector.github.filterPlaceholder": {
     one: "{count} depoyu filtrele",
     other: "{count} depoyu filtrele",
   },
   "connector.github.filterLabel": "Depoları filtrele",
-  // {query} kullanıcının filtreye yazdığı metindir.
   "connector.github.noMatch": "“{query}” ile eşleşen depo bulunamadı.",
-  // Bağlanma iletişim kutusu. Adımlar sayı olarak gösterilir; ekran okuyucular adları okur.
   "connector.github.stepSignIn": "Oturum aç",
   "connector.github.stepConnected": "Bağlandı",
   "connector.github.requestingCode": "OpenBot GitHub'dan bir kod istiyor.",
-  // {code} GitHub'a yazılacak koddur (örneğin WDJB-MJHT).
   "connector.github.codeLabel": "Kod {code}",
   "connector.github.failedTitle": "GitHub bağlanamadı",
   "connector.github.cancelConnecting": "GitHub bağlantısını iptal et",
-  // {count} ajanların kullanabileceği depo sayısıdır.
   "connector.github.connectedSummary": {
     one: "{count} depo · bu bilgisayardaki her ajan",
     other: "{count} depo · bu bilgisayardaki her ajan",
   },
   "connector.github.done": "Bitti",
   "connector.github.later": "Daha sonra",
-  // Bağlantıyı kesme öncesi onay. {login} GitHub hesap adıdır (örneğin octocat).
   "connector.github.disconnectConfirmTitle": "GitHub bağlantısı kesilsin mi?",
   "connector.github.disconnectConfirmDescription": "Bağlantıyı kesmek @{login} oturumunu bu bilgisayardan kaldırır.",
   "connector.github.disconnectEffectTools": "Tüm ajanlar GitHub araçlarını, gh ve git erişimini kaybeder.",
   "connector.github.disconnectEffectRevoke": "Ardından OpenBot yetkisini kaldırabileceğiniz GitHub açılır.",
   "connector.github.disconnectEffectKept": "Sohbetler, dosyalar ve ajan belleği bu bilgisayarda kalır.",
-  // The same text for the connection of a joined server. {host} is the server name, such as Studio.
   "connector.github.descriptionHost":
     "{host} sunucusundaki her ajan GitHub depolarınızı, sorunlarınızı (issues), çekme isteklerinizi (pull requests), gh ve git araçlarını kullanabilir.",
   "connector.github.connectedSummaryHost": {
@@ -82,21 +71,15 @@ export const messages = {
   "connector.github.disconnectEffectKeptHost": "Sohbetler, dosyalar ve ajan belleği {host} sunucusunda kalır.",
   "connector.github.keepConnected": "Bağlı tut",
   "connector.github.close": "Kapat",
-  // Bir entegrasyon sayfasının onu kaldıran eylemi içeren son bölümü.
   "connector.dangerZone": "Tehlikeli bölge",
   "connector.statusUnknown": "Bilinmiyor",
   "connector.readFailed": "OpenBot bu bağlantının durumunu okuyamadı.",
 
-  // Sunucu ayarları > Bağlayıcılar: entegrasyonlar listesi. Her satır kendi sayfasını açar.
-
-  // Sunucu ayarları > Bağlayıcılar > Slack: bir çalışma alanı tek OpenBot uygulamasını yükler ve Slack
-  // Düzenleyicisi ajanı her isteği alır, ekibe sorar ve yanıtlar.
   "connector.slack.title": "Slack",
   "connector.slack.description":
     "Kullanıcılar Slack'te @OpenBot'tan bahseder veya doğrudan mesaj gönderir. Slack Düzenleyicisi doğru ajana sorar ve yanıtlar.",
   "connector.slack.statusConnected": "Bağlandı",
   "connector.slack.statusAttention": "Dikkat gerekiyor",
-  // {workspace} Slack çalışma alanı adıdır.
   "connector.slack.summaryConnected": "{workspace} · Slack Düzenleyicisi yanıtlıyor",
   "connector.slack.summaryNoAgent": "{workspace} · Henüz yanıt veren bir ajan yok",
   "connector.slack.attentionTitle": {
@@ -121,7 +104,6 @@ export const messages = {
   "connector.slack.reconnect": "Yeniden bağlan",
   "connector.slack.pause": "Duraklat",
   "connector.slack.resume": "Sürdür",
-  // {action} Pause gibi bir düğmedir; {name} çalışma alanı adıdır.
   "connector.slack.rowAction": "{action}: {name}",
   "connector.slack.orchestratorTitle": "Slack Düzenleyicisi",
   "connector.slack.orchestratorDescription":
@@ -130,7 +112,6 @@ export const messages = {
   "connector.slack.orchestratorNoneDescription": "Slack Düzenleyicisini ekleyin, aksi takdirde Slack yanıt alamaz.",
   "connector.slack.inviteNote":
     "OpenBot her genel kanala ve her yeni kanala kendiliğinden katılır. Özel bir kanal için onu davet edin: /invite @OpenBot.",
-  // Bağlanma iletişim kutusu. Adımlar sayı olarak gösterilir; ekran okuyucular adları okur.
   "connector.slack.stepWorkspace": "Çalışma alanı",
   "connector.slack.stepAgent": "Ajan",
   "connector.slack.connectTitle": "Bir Slack çalışma alanına bağlanın",
@@ -142,7 +123,6 @@ export const messages = {
   "connector.slack.connectInSlack": "Slack'te bağlan",
   "connector.slack.connectWaiting": "Slack bekleniyor. Kurulumu tarayıcınızda tamamlayın.",
   "connector.slack.agentStepTitle": "Slack Düzenleyicisini ekleyin",
-  // {workspace} Slack çalışma alanı adıdır.
   "connector.slack.agentStepDescription": "Bu yeni ajan, {workspace} içinde @OpenBot'a gönderilen her şeyi yanıtlar.",
   "connector.slack.orchestratorName": "Slack Düzenleyicisi",
   "connector.slack.orchestratorRole": "Slack'te yanıt verir ve ekibe sorar",
@@ -173,14 +153,11 @@ export const messages = {
     other: "{count} çalışma alanı · Slack Düzenleyicisi yanıtlıyor",
   },
 
-  // Sunucu ayarları > Bağlayıcılar > Discord: bir Discord sunucusu tek OpenBot botunu ekler ve Discord
-  // Düzenleyicisi ajanı her isteği alır, ekibe sorar ve yanıtlar. Her zaman "Discord sunucusu" yazın.
   "connector.discord.title": "Discord",
   "connector.discord.description":
     "Kullanıcılar bir Discord sunucusunun kanalında @OpenBot'tan bahseder. Discord Düzenleyicisi doğru ajana sorar ve yanıtlar.",
   "connector.discord.statusConnected": "Bağlandı",
   "connector.discord.statusAttention": "Dikkat gerekiyor",
-  // {workspace} Discord sunucusunun adıdır.
   "connector.discord.summaryConnected": "{workspace} · Discord Düzenleyicisi yanıtlıyor",
   "connector.discord.summaryNoAgent": "{workspace} · Henüz yanıt veren bir ajan yok",
   "connector.discord.attentionTitle": {
@@ -206,7 +183,6 @@ export const messages = {
   "connector.discord.reconnect": "Yeniden bağlan",
   "connector.discord.pause": "Duraklat",
   "connector.discord.resume": "Sürdür",
-  // {action} Pause gibi bir düğmedir; {name} Discord sunucusunun adıdır.
   "connector.discord.rowAction": "{action}: {name}",
   "connector.discord.orchestratorTitle": "Discord Düzenleyicisi",
   "connector.discord.orchestratorDescription":
@@ -215,7 +191,6 @@ export const messages = {
   "connector.discord.orchestratorNoneDescription":
     "Discord Düzenleyicisini ekleyin, aksi takdirde Discord yanıt alamaz.",
   "connector.discord.channelsNote": "OpenBot, rolünün görebildiği kanalları görür.",
-  // Bağlanma iletişim kutusu. Adımlar sayı olarak gösterilir; ekran okuyucular adları okur.
   "connector.discord.stepWorkspace": "Discord sunucusu",
   "connector.discord.stepAgent": "Ajan",
   "connector.discord.connectTitle": "Bir Discord sunucusuna bağlanın",
@@ -226,7 +201,6 @@ export const messages = {
   "connector.discord.connectInDiscord": "Discord'da bağlan",
   "connector.discord.connectWaiting": "Discord bekleniyor. Yetkilendirmeyi tarayıcınızda tamamlayın.",
   "connector.discord.agentStepTitle": "Discord Düzenleyicisini ekleyin",
-  // {workspace} Discord sunucusunun adıdır.
   "connector.discord.agentStepDescription": "Bu yeni ajan, {workspace} içinde @OpenBot'a gönderilen her şeyi yanıtlar.",
   "connector.discord.orchestratorName": "Discord Düzenleyicisi",
   "connector.discord.orchestratorRole": "Discord'da yanıt verir ve ekibe sorar",
@@ -272,14 +246,11 @@ export const messages = {
   "connector.discord.accessRoleDeleted": "{role} (silindi)",
   "connector.discord.accessSave": "Kaydet",
   "connector.discord.accessHostUpdate": "Rol seçmek için {host} üzerindeki OpenBot'u güncelleyin.",
-  // Sunucu ayarları > Bağlayıcılar > Telegram: her sohbet tek OpenBot botunu ekler ve Telegram
-  // Düzenleyicisi ajanı tüm sohbetlerin mesajlarını alır, ekibe sorar ve yanıtlar.
   "connector.telegram.title": "Telegram",
   "connector.telegram.description":
     "OpenBot botunu bir Telegram grubuna ekleyin veya botla doğrudan bir sohbet açın. Telegram Düzenleyicisi doğru ajana sorar ve yanıtlar.",
   "connector.telegram.statusConnected": "Bağlandı",
   "connector.telegram.statusAttention": "Dikkat gerekiyor",
-  // {count} bağlı Telegram sohbetlerinin sayısıdır.
   "connector.telegram.summaryConnected": {
     one: "{count} sohbet · Telegram Düzenleyicisi yanıtlıyor",
     other: "{count} sohbet · Telegram Düzenleyicisi yanıtlıyor",
@@ -317,7 +288,6 @@ export const messages = {
     "Tüm sohbetlerin bağlantısı kesilir. Kimse ajanlarınıza artık OpenBot botu üzerinden ulaşamaz.",
   "connector.telegram.disconnectAllSummaryOrchestrator":
     "Tüm sohbetlerin bağlantısı kesilir. Telegram Düzenleyicisi ve sohbetleri OpenBot'tan silinir.",
-  // {action} Pause gibi bir düğmedir; {name} sohbet adıdır.
   "connector.telegram.rowAction": "{action}: {name}",
   "connector.telegram.linkChat": "Sohbet bağla",
   "connector.telegram.addToGroup": "Bir gruba ekle",
@@ -330,7 +300,6 @@ export const messages = {
     "Telegram Düzenleyicisini ekleyin, aksi takdirde Telegram yanıt alamaz.",
   "connector.telegram.mentionNote":
     "Bir grupta bottan bahsedin veya mesajlarını yanıtlayın. Doğrudan sohbette her mesaj bota gider.",
-  // Bağlanma iletişim kutusu. Adımlar sayı olarak gösterilir; ekran okuyucular adları okur.
   "connector.telegram.stepChat": "Sohbet",
   "connector.telegram.stepAgent": "Ajan",
   "connector.telegram.connectTitle": "Bir Telegram sohbeti bağlayın",
@@ -341,7 +310,6 @@ export const messages = {
   "connector.telegram.connectStepReturn": "Sohbet bağlandığında bu iletişim kutusu devam eder",
   "connector.telegram.connectWaiting": "Telegram bekleniyor. Telegram'da sohbeti seçin.",
   "connector.telegram.agentStepTitle": "Telegram Düzenleyicisini ekleyin",
-  // {chat} Telegram sohbetinin adıdır.
   "connector.telegram.agentStepDescription":
     "Bu yeni ajan, {chat} içinde ve daha sonra bağladığınız her sohbette OpenBot'a gelen mesajları yanıtlar.",
   "connector.telegram.orchestratorName": "Telegram Düzenleyicisi",
@@ -362,8 +330,6 @@ export const messages = {
     "Bu son sohbet olduğundan Telegram Düzenleyicisi ve konuşmaları OpenBot'tan silinir.",
   "connector.telegram.keep": "Bağlı tut",
   "connector.telegram.close": "Kapat",
-  // Market > Uygulamalar > WhatsApp: bir WhatsApp numarası bu bilgisayarı cihaz olarak bağlar ve WhatsApp
-  // Düzenleyicisi ajanı tüm numaraların mesajlarını alır, ekibe sorar ve yanıtlar.
   "connector.whatsapp.title": "WhatsApp",
   "connector.whatsapp.description":
     "Bir WhatsApp numarasını bu bilgisayara bağlayın. WhatsApp Düzenleyicisi doğru ajana sorar ve yanıtlar.",
@@ -371,7 +337,6 @@ export const messages = {
     "Bir WhatsApp numarasını bu sunucuya bağlayın. WhatsApp Düzenleyicisi doğru ajana sorar ve yanıtlar.",
   "connector.whatsapp.statusConnected": "Bağlandı",
   "connector.whatsapp.statusAttention": "Dikkat gerekiyor",
-  // {count} bağlı WhatsApp numaralarının sayısıdır.
   "connector.whatsapp.summaryConnected": {
     one: "{count} numara · WhatsApp Düzenleyicisi yanıtlıyor",
     other: "{count} numara · WhatsApp Düzenleyicisi yanıtlıyor",
@@ -392,7 +357,7 @@ export const messages = {
   "connector.whatsapp.linkNumber": "Numara bağla",
   "connector.whatsapp.ownNumberNote": "“Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler OpenBot'a ulaşır.",
   "connector.whatsapp.dedicatedNote":
-    "İzin verdiğiniz kişiler OpenBot'a ulaşır. Diğer kişiler size iletmeleri için bir kod alır.",
+    "“Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler OpenBot'a ulaşır. Diğer kişiler size iletmeleri için bir kod alır.",
   "connector.whatsapp.helpLoggedOut": "WhatsApp bu bilgisayarı bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "connector.whatsapp.helpError":
@@ -410,14 +375,13 @@ export const messages = {
     "Tüm numaraların bağlantısı kesilir. Kimse ajanlarınıza artık WhatsApp üzerinden ulaşamaz.",
   "connector.whatsapp.disconnectAllSummaryOrchestrator":
     "Tüm numaraların bağlantısı kesilir. WhatsApp Düzenleyicisi ve sohbetleri OpenBot'tan silinir.",
-  // {action} Pause gibi bir düğmedir; {name} WhatsApp numarası veya bir kişinin adıdır.
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "Kişisel numara",
   "connector.whatsapp.ownNumberDescription":
     "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "connector.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Kişisel numarada bu mesajları yalnızca “Kendine mesaj gönder” sohbetiniz alır. Yalnızca yanıtı göndermek için kapatın.",
   "connector.whatsapp.statusReactions": "Durum tepkileri",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
@@ -429,7 +393,6 @@ export const messages = {
     "WhatsApp Düzenleyicisini ekleyin, aksi takdirde WhatsApp yanıt alamaz.",
   "connector.whatsapp.note":
     "Kişisel numaranızda “Kendine mesaj gönder” sohbetinize yazın. İzin verdiğiniz kişiler numaraya yazar.",
-  // Bağlama iletişim kutusu. Adımlar sayı olarak gösterilir; ekran okuyucular adları okur.
   "connector.whatsapp.stepNumber": "Numara",
   "connector.whatsapp.stepAgent": "Ajan",
   "connector.whatsapp.connectTitle": "WhatsApp'ı bağlayın",
@@ -461,7 +424,6 @@ export const messages = {
   "connector.whatsapp.codeStepDevices": "WhatsApp'ta Bağlı cihazlar'ı açın ve Cihaz bağla'ya dokunun",
   "connector.whatsapp.codeStepPhone": "“Bunun yerine telefon numarasıyla bağla” öğesine dokunun",
   "connector.whatsapp.codeStepType": "Bu kodu telefona yazın",
-  // {code} eşleme kodudur, karakter karakter okunur.
   "connector.whatsapp.codeLabel": "Eşleme kodu {code}",
   "connector.whatsapp.copyCode": "Kodu kopyala",
   "connector.whatsapp.codeWaiting": "Telefon bekleniyor.",
@@ -472,7 +434,6 @@ export const messages = {
   "connector.whatsapp.failedUnavailable": "OpenBot WhatsApp'a ulaşamıyor. İnternet bağlantısını kontrol edin.",
   "connector.whatsapp.tryAgain": "Tekrar dene",
   "connector.whatsapp.agentStepTitle": "WhatsApp Düzenleyicisini ekleyin",
-  // {number} WhatsApp numarası veya adıdır.
   "connector.whatsapp.agentStepDescription":
     "Bu yeni ajan, {number} üzerinde ve daha sonra bağladığınız her numarada OpenBot'a gelen mesajları yanıtlar.",
   "connector.whatsapp.orchestratorName": "WhatsApp Düzenleyicisi",
@@ -492,13 +453,15 @@ export const messages = {
     "Bu son numara olduğundan WhatsApp Düzenleyicisi ve konuşmaları OpenBot'tan silinir.",
   "connector.whatsapp.keep": "Bağlı tut",
   "connector.whatsapp.close": "Kapat",
-  // Bir numara üzerinden iş verebilecek kişiler: telefon numarasıyla kişiler ve gruplar.
   "connector.whatsapp.sendersTitle": "{number} için kimler yazabilir",
   "connector.whatsapp.sendersDescription": "Bu kişiler ve gruplar ajanlarınıza iş verebilir.",
   "connector.whatsapp.sendersEmpty": "Yalnızca siz yazabilirsiniz. Bir kişi veya grup ekleyin.",
   "connector.whatsapp.sendersLimit": "Bir numara en fazla {count} kişiye ve gruba izin verebilir.",
   "connector.whatsapp.senderGroup": "Grup",
   "connector.whatsapp.removeSender": "Kaldır",
+  "connector.whatsapp.senderAccess": "{name} erişimi",
+  "connector.whatsapp.senderReplies": "İş verebilir",
+  "connector.whatsapp.senderReadOnly": "Salt okunur",
   "connector.whatsapp.addContact": "Kişi ekle",
   "connector.whatsapp.addGroup": "Grup ekle",
   "connector.whatsapp.contactTitle": "Bir kişi ekleyin",
@@ -507,19 +470,18 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "İsteğe bağlı. Boş bırakılırsa listede telefon numarası gösterilir.",
   "connector.whatsapp.add": "Ekle",
   "connector.whatsapp.groupTitle": "Bir grup ekleyin",
-  "connector.whatsapp.groupDescription": "Bu gruptaki kişiler ajanlarınıza iş verebilir.",
+  "connector.whatsapp.groupDescription":
+    "Bu gruptaki kişiler numarayı etiketlediğinde veya mesajlarını yanıtladığında ajanlarınıza iş verebilir.",
   "connector.whatsapp.groupSearch": "Grup ara",
   "connector.whatsapp.groupsLoading": "Gruplar okunuyor…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot grupları okuyamadı",
   "connector.whatsapp.groupsEmpty": "Bu numara hiçbir grupta değil.",
   "connector.whatsapp.groupsNoMatch": "Bu adda bir grup yok.",
   "connector.whatsapp.groupAdded": "Eklendi",
-  // Yalnızca OpenBot için olan bir numaraya yazan ve sahibine vermek için kod alan kişiler.
   "connector.whatsapp.requestsTitle": "{number} için istekler",
   "connector.whatsapp.requestsDescription":
     "Bu kişiler numaraya yazdı ve bir kod aldı. Bir kişiyi yalnızca size aynı kodu verdiyse onaylayın.",
   "connector.whatsapp.requestsEmpty": "İstek yok.",
-  // {code} 6 karakterli koddur; {number} kişinin kısmen gizlenmiş telefon numarasıdır.
   "connector.whatsapp.requestDetail": "Kod {code} · {number}",
   "connector.whatsapp.approve": "Onayla",
   "connector.whatsapp.deny": "Reddet",
@@ -669,9 +631,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Siz yeniden oturum açana kadar ajanlar paylaşılan oturum bilgilerinizle oturum açamaz.",
   "connector.protonPass.reconnect": "Yeniden bağla",
-  "connector.protonPass.planTitle": "Proton Pass ücretli bir plan gerektirir",
+  "connector.protonPass.planTitle": "Proton Pass, Pass Plus içeren bir plan gerektirir",
   "connector.protonPass.planDescription":
-    "Proton Pass CLI yalnızca ücretli bir Proton planıyla çalışır. Planınızı değiştirin, sonra yeniden bağlanın.",
+    "Proton Pass CLI, Pass Plus içeren bir Proton planı gerektirir. Mail Plus gibi diğer ücretli planlar bunu içermez. Planınızı değiştirin, sonra yeniden bağlanın.",
   "connector.protonPass.vaultTitle": "Paylaşılan kasa",
   "connector.protonPass.vaultDescription":
     "Ajanlar bu kasadaki oturum bilgileriyle oturum açabilir. Paylaşmak için bir oturum bilgisini buraya taşıyın.",

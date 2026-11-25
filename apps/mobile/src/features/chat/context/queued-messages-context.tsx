@@ -16,23 +16,13 @@ interface QueuedChat {
 
 interface QueuedMessages {
   publish: (chatId: string, chat: QueuedChat | null) => void;
-  /** The waiting rows that the person closed. They stay closed when the chat opens again. */
   hiddenReplyIds: ReadonlySet<string>;
   hideReplies: (ids: readonly string[]) => void;
 }
 
 const QueuedMessagesContext = createContext<QueuedMessages | null>(null);
-/**
- * The published queues, apart from the actions above. Each chat publishes its queue and reads the
- * closed rows, and only the queue sheet reads the queues. In one context, each publish rendered
- * every mounted chat again, which then published again.
- */
 const QueuedChatsContext = createContext<ReadonlyMap<string, QueuedChat> | null>(null);
 
-// The queue sheet is a native route, so the controller cannot travel in navigation
-// params. Each chat stays mounted behind the sheet and publishes its live controller
-// here under its own identity; the sheet reads the one it was opened for, and a second
-// chat that the native stack keeps mounted cannot take its place.
 export function QueuedMessagesProvider({ children }: PropsWithChildren) {
   const [chats, setChats] = useState<ReadonlyMap<string, QueuedChat>>(() => new Map());
   const publish = useCallback((chatId: string, chat: QueuedChat | null) => {
@@ -66,7 +56,6 @@ function useQueuedMessagesContext(): QueuedMessages {
   return context;
 }
 
-/** Publishes one chat's live queue for its own sheet, and removes only that entry on unmount. */
 export function usePublishedQueuedChat(
   chatId: string,
   queue: ChatQueueController | null,
@@ -79,13 +68,11 @@ export function usePublishedQueuedChat(
   useEffect(() => () => publish(chatId, null), [chatId, publish]);
 }
 
-/** The waiting rows that the person closed, and the action that closes more. */
 export function useHiddenReplies(): Pick<QueuedMessages, "hiddenReplyIds" | "hideReplies"> {
   const { hiddenReplyIds, hideReplies } = useQueuedMessagesContext();
   return { hiddenReplyIds, hideReplies };
 }
 
-/** The queue of the chat that opened the sheet. The route carries its identity. */
 export function useQueuedChat(chatId: string | undefined): {
   queue: ChatQueueController | null;
   pending: QueuedUpload | null;

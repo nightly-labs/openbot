@@ -16,6 +16,8 @@ export const messages = {
   "error.messaging.telegramUnsupported": "Dieser Computer kann keine Verbindung zu Telegram herstellen.",
   "error.messaging.telegramRelayUnavailable":
     "OpenBot kann Telegram auf diesem Computer nicht erreichen. Melde dich an, gib diesem Computer einen Namen und versuche es erneut.",
+  "error.messaging.telegramRelayUnreachable":
+    "OpenBot kann von diesem Computer aus keine Verbindung zu seinem Dienst herstellen. Prüfe die Internetverbindung, das VPN, den Proxy oder die Firewall und versuche es erneut.",
   "error.messaging.telegramServiceUnavailable":
     "OpenBot kann Telegram gerade nicht verbinden. Versuche es später erneut.",
   "error.messaging.whatsappNotConnected": "Diese WhatsApp-Nummer ist nicht verbunden.",
@@ -23,6 +25,7 @@ export const messages = {
   "error.messaging.whatsappTooManySenders": "Eine WhatsApp-Nummer kann bis zu 200 Kontakte und Gruppen zulassen.",
   "error.messaging.whatsappNumberNotFound":
     "Diese Nummer hat kein WhatsApp-Konto. Gib sie mit der Ländervorwahl ein, zum Beispiel +44 7700 900123.",
+  "error.messaging.whatsappSenderNotFound": "Dieser Kontakt oder diese Gruppe ist nicht mehr in der Liste.",
   "error.messaging.whatsappRequestEnded":
     "Diese Anfrage ist beendet. Bitte die Person, erneut zu schreiben, um einen neuen Code zu bekommen.",
   "error.messaging.memoryLimit":

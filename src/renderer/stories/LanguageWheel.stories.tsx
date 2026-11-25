@@ -7,12 +7,10 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
 interface WheelArgs {
-  /** The computer's language. The wheel opens on it, and it picks the flag of a shared language. */
   systemLocale: string;
   onContinue: () => void;
 }
 
-/** The wheel as the app runs it: the screen redraws in the centred language as it turns. */
 function LiveWheel(props: WheelArgs) {
   const [language, setLanguage] = createSignal<TranslatedLocale>(
     untrack(() => resolveLocale("system", props.systemLocale)),

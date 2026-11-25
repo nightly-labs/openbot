@@ -1,19 +1,3 @@
-// The `opencode acp` of `opencode-background-turn-e2e.ts`. OpenCode 2.2.0 sends session updates only
-// for the execution that a prompt starts. When a background subagent ends, OpenCode answers it in a
-// turn of its own: that turn reaches only its store, the session's `updatedAt` in `session/list`
-// changes, and `session/load` replays it (#3406). This fake keeps each session's history the same way.
-//
-// A prompt with `steps` writes text, calls a tool, and then writes the answer in two steps, each a
-// message of its own with no tool call between them, as OpenCode 2.2.0 can. A prompt with
-// `background` also starts a subagent that stays running, or with `shell` a shell command in the
-// background, whose result has a `shellID` and no `sessionID`, as in OpenCode 2.2.7 (#7713). Its turn comes in parts, each at a
-// `session/list`: first a tool call that runs, then, after the test creates the file named after the
-// session in the folder `FAKE_RELEASE`, the tool's end and an answer with no text yet. The answer's
-// text then comes in two more parts, as a replay can find a message that grows. A prompt with
-// `child` starts a background subagent that reports in `opencode/session/child_update` and works on
-// for `FAKE_CHILD_MS`. As OpenCode 2.2.7 and 2.3.0 do, the fake sends no more updates of that
-// subagent after a `session/load` (#8352). The background turn starts when the subagent ends. Any
-// other prompt answers `pong`.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
@@ -21,7 +5,6 @@ import { type AcpPeer, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODEL = "opencode/big-pickle";
 const RELEASE = process.env.FAKE_RELEASE ?? "";
-/** Longer than two polls of the watch, so that a watch that loads the session does it in this time. */
 const CHILD_MS = Number(process.env.FAKE_CHILD_MS ?? 5_000);
 const CHILD_METHOD = "opencode/session/child_update";
 const NL = "\n";
@@ -31,10 +14,8 @@ interface Session {
   cwd: string;
   history: SessionUpdate[];
   updatedAt: number;
-  /** The next part of the background turn that a `session/list` adds: 0 none. */
   pending: 0 | 1 | 2 | 3 | 4;
   prompts: number;
-  /** False after a `session/load`: OpenCode then sends no more updates of the session's subagents. */
   followsChildren: boolean;
 }
 
@@ -54,7 +35,6 @@ function text(messageId: string, value: string) {
   } satisfies SessionUpdate;
 }
 
-/** The background answer, which the later parts fill in. */
 const ANSWER = ["", "The background task", "The background task finished: DONE."] as const;
 
 function tool(toolCallId: string, status: "in_progress" | "completed", rawOutput?: unknown): SessionUpdate[] {
@@ -64,7 +44,6 @@ function tool(toolCallId: string, status: "in_progress" | "completed", rawOutput
   ];
 }
 
-/** A subagent's status, for a session that still follows its subagents. */
 function childStatus(session: Session, childSessionId: string, status: "created" | "completed"): void {
   if (!session.followsChildren) return;
   const params = {
@@ -79,7 +58,6 @@ function childStatus(session: Session, childSessionId: string, status: "created"
   process.stdout.write(`${JSON.stringify({ jsonrpc: "2.0", method: CHILD_METHOD, params })}${NL}`);
 }
 
-/** Sends the updates of a prompt's own execution and keeps them in the history. */
 function send(peer: AcpPeer, session: Session, updates: SessionUpdate[]): void {
   for (const update of updates) {
     session.history.push(update);
@@ -87,7 +65,6 @@ function send(peer: AcpPeer, session: Session, updates: SessionUpdate[]): void {
   }
 }
 
-/** Adds the background turn's part to the history only, as OpenCode 2.2.0 does. */
 function advance(session: Session): void {
   if (session.pending === 1) {
     session.history.push(

@@ -1,12 +1,3 @@
-// The article artwork of every collection: which images there are, where they
-// live, and the build step that ships them.
-//
-// The card gradients come from a WebGL shader. A Cloudflare Worker has no WebGL
-// and a CI runner has no GPU, so neither can draw them. `bun run api:images`
-// (render-content-images.ts) draws them on a developer's machine into
-// `content-art/`, which is committed. The build copies that folder into the site
-// and fails when it does not match the articles.
-
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -23,20 +14,13 @@ import { articleArtPath, CONTENT_ART_SHAPES, type ContentCollection } from "./sr
 const require = createRequire(import.meta.url);
 const appRoot = path.dirname(fileURLToPath(import.meta.url));
 
-/** The committed images, at the same paths they have in the site. */
 export const CONTENT_ART_DIRECTORY = path.join(appRoot, "content-art");
-/** File name to input hash, for every image in `CONTENT_ART_DIRECTORY`. Not shipped. */
 export const CONTENT_ART_MANIFEST = path.join(CONTENT_ART_DIRECTORY, "manifest.json");
 
-/** Change this when the drawing changes but the article does not, so every image is drawn again. */
 const GENERATOR_VERSION = 1;
 
-/** The social card. Fixed by Open Graph, which crops anything else. */
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
-/** The card artwork on an index. The title sits over it as real text, not pixels.
-    One size per frame, at that frame's own aspect ratio, so the image a reader
-    sees before the shader starts is the frame the shader opens on. */
 const CARD_SIZES = {
   featured: { width: 1216, height: 640 },
   card: { width: 1200, height: 600 },
@@ -44,29 +28,22 @@ const CARD_SIZES = {
 } as const;
 
 export interface ContentImageJob {
-  /** Path inside the client bundle, for example `news/og/some-article.png`. */
   fileName: string;
   slug: string;
   title: string;
-  /** The kicker drawn above the title. Ignored unless `withTitle`. */
   eyebrow: string;
   width: number;
   height: number;
-  /** Draw the title into the image. False for the card, which has live text over it. */
   withTitle: boolean;
-  /** The two marks side by side, over the title. Only on the social card of a comparison. */
   lockup?: ContentImageLockup | undefined;
-  /** The mark of each app, in one row over the title. Only on the social card of a roundup. */
   markRow?: readonly ContentImageMark[] | undefined;
 }
 
-/** A compared product's mark, or OpenBot's own logo. */
 export type ContentImageMark = RivalMarkName | "openbot";
 
 export interface ContentImageLockup {
   rivalMark: RivalMarkName;
   rivalName: string;
-  /** The left side when it is not OpenBot: a matchup of two other products. */
   left?: { mark: RivalMarkName; name: string } | undefined;
 }
 
@@ -112,8 +89,6 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
       markRow: roundupMarkRow(collection, article.slug),
     },
     ...CONTENT_ART_SHAPES.map((shape) => ({
-      // The one path builder, so the file written here and the file the page
-      // asks for cannot drift apart. It is a URL, and a bundle name is relative.
       fileName: articleArtPath(collection, article.slug, shape).slice(1),
       slug: article.slug,
       title: article.title,
@@ -125,8 +100,6 @@ function collectionJobs(collection: ContentCollection): ContentImageJob[] {
   ]);
 }
 
-// A field that is not given is left out of the hashed JSON, so the images of the
-// first comparisons keep their keys.
 function comparisonLockup(collection: ContentCollection, slug: string): ContentImageLockup | undefined {
   const page = collection.id === "compare" ? COMPARISONS[slug] : undefined;
   switch (page?.kind) {
@@ -147,11 +120,6 @@ function roundupMarkRow(collection: ContentCollection, slug: string): ContentIma
   return page?.kind === "roundup" ? page.apps.map((app) => app.mark) : undefined;
 }
 
-/**
- * The hash of everything that can change the pixels: the gradient itself, the
- * size, the drawing code and the shader library version. An image whose hash in
- * the manifest differs was drawn for an older version of its article.
- */
 export function contentImageKey(job: ContentImageJob): string {
   const gradient = articleGradient(job.title);
   const digest = createHash("sha256")
@@ -167,14 +135,11 @@ export function contentImageKey(job: ContentImageJob): string {
   return digest.slice(0, 32);
 }
 
-// The shader version is pinned in the workspace catalog. Hash the resolved
-// version so moving a dependency into the catalog does not invalidate artwork.
 function shadersVersion(): string {
   const manifest: { workspaces: { catalog: Record<string, string> } } = require("../../package.json");
   return manifest.workspaces.catalog["@paper-design/shaders"] ?? "unknown";
 }
 
-/** Each way the committed artwork differs from the articles. Empty when it matches. */
 export async function contentArtProblems(): Promise<string[]> {
   const manifest = await readContentArtManifest();
   const jobs = contentImageJobs();
@@ -208,10 +173,8 @@ export async function readContentArtManifest(): Promise<ContentArtManifest> {
   return manifest;
 }
 
-/** Both formats, so an image left over in the other one is reported and deleted. */
 const CONTENT_ART_FILE = /\.(png|webp)$/;
 
-/** Every image in `CONTENT_ART_DIRECTORY`, as a bundle path. */
 export async function listContentArt(): Promise<string[]> {
   let entries: string[];
   try {

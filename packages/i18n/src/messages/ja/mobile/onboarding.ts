@@ -19,7 +19,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "ほかの人から共有されたサーバーに参加します。",
   "mobile.onboarding.server.computerTitle": "コンピューターを接続",
   "mobile.onboarding.server.computerSteps":
-    "このスマートフォンでサインアウトします。次に、コンピューターで OpenBot を開き、設定 → Mobile Connect に移動して「QR コードを生成」を選択し、このスマートフォンでスキャンします。",
+    "このスマートフォンでサインアウトします。次に、コンピューターで OpenBot を開き、設定 → Mobile Connect に移動して「スマートフォンを追加」→「はい、サインイン」を選択し、このスマートフォンでコードをスキャンします。",
   "mobile.onboarding.server.signOut": "サインアウト",
   "mobile.onboarding.server.connecting": "{name} に接続しています…",
   "mobile.onboarding.agent.title": "最初のエージェントを選びましょう",

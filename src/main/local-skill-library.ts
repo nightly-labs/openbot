@@ -22,7 +22,6 @@ import {
 
 const logger = createOpenBotLogger("local-skill-library");
 
-/** Owns immutable local revisions. A revision exists only after its directory is published. */
 export class LocalSkillLibrary {
   readonly #writes = Semaphore.makeUnsafe(1);
   constructor(
@@ -34,10 +33,6 @@ export class LocalSkillLibrary {
     return this.listWithUnreadable().pipe(Effect.map(({ skills }) => skills));
   }
 
-  /**
-   * Every skill that reads, and the skills whose latest revision does not read. One bad skill does not
-   * hide the others or stop a new skill from saving (#7883).
-   */
   listWithUnreadable(): Effect.Effect<LocalSkillListing, LocalSkillFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<LocalSkillListing, LocalSkillFailure> {
       yield* localIO(() => mkdir(this.root, { recursive: true, mode: 0o700 }));
@@ -59,12 +54,10 @@ export class LocalSkillLibrary {
           continue;
         }
         const skillId = published[index] ?? "";
-        // The cause can quote the skill text, so the log has only the ID.
         logger.warn(`OpenBot skipped local skill ${skillId}: its latest revision could not be read.`);
         const cause = result.failure.cause;
         unreadable.push({ skillId, error: cause instanceof Error ? cause.message : String(cause) });
       }
-      // An older version took a skill with the name of an OpenBot skill. It can never install, so it stays hidden.
       return {
         skills: skills
           .filter((skill) => !MANAGED_SKILL_SLUGS.has(skill.slug))
@@ -79,10 +72,6 @@ export class LocalSkillLibrary {
     return join(this.root, id);
   }
 
-  /**
-   * The requested revision, or the latest when none is requested. A skill or revision that the library
-   * does not have fails with text that names it, so an agent can correct its call (#7193).
-   */
   private revision(id: string, requested?: number): Effect.Effect<number, LocalSkillFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number, LocalSkillFailure> {
       if (requested !== undefined && (!Number.isSafeInteger(requested) || requested < 1))
@@ -102,7 +91,6 @@ export class LocalSkillLibrary {
     });
   }
 
-  /** Every saved revision of a skill. */
   revisions(id: string): Effect.Effect<number[], LocalSkillFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<number[], LocalSkillFailure> {
       const listed = yield* Effect.result(localIO(() => readdir(this.directory(id), { withFileTypes: true })));
@@ -169,7 +157,6 @@ export class LocalSkillLibrary {
     );
   }
 
-  /** Saves a new skill from a bundle that OpenBot built, as the memory review does when it learns one. */
   createFromBundle(bytes: Uint8Array): Effect.Effect<MarketplaceSkillDetail, LocalSkillFailure> {
     return this.serialize(Effect.suspend(() => this.publishNew(bytes)));
   }
@@ -188,7 +175,6 @@ export class LocalSkillLibrary {
     );
   }
 
-  /** Saves the next revision from a bundle that OpenBot built, as the memory review does when it learns. */
   reviseFromBundle(
     id: string,
     expectedRevision: number,
@@ -209,7 +195,6 @@ export class LocalSkillLibrary {
           cause: new Error(sourceText("error.skill.managedSlug", { slug: info.slug })),
         });
       const taken = (yield* this.list()).find((skill) => skill.slug === info.slug);
-      // A different name can give the same slug, as two names that differ only in Chinese text do (#8693).
       if (taken)
         return yield* new LocalSkillFailure({
           cause: new Error(
@@ -247,7 +232,6 @@ export class LocalSkillLibrary {
     });
   }
 
-  /** Removes a revision a failed import published. A skill left with no revision is removed too. */
   withdraw(id: string, revision: number): Effect.Effect<void, LocalSkillFailure> {
     return this.serialize(
       Effect.gen({ self: this }, function* () {
@@ -316,9 +300,7 @@ export class LocalSkillLibrary {
   }
 }
 
-/** A top-level `key: value` line. */
 const TOP_LEVEL_VALUE = /^([A-Za-z][\w-]*):[ \t]+(\S.*)$/u;
-/** The first character of a value that is not plain YAML text. */
 const NOT_PLAIN = /^["'|>[{&*!%@`#]/u;
 
 function parsesAsYaml(text: string): boolean {
@@ -330,12 +312,6 @@ function parsesAsYaml(text: string): boolean {
   }
 }
 
-/**
- * An agent often writes `description: Use when: ...`, which YAML refuses. When the frontmatter of the
- * `SKILL.md` in `bytes` does not parse, each top-level plain value with a colon gets quotes. When it
- * then parses, the bundle has the quoted `SKILL.md`; otherwise it is unchanged and fails as before.
- * The folder in the workspace does not change.
- */
 function withQuotedFrontmatter(bytes: Uint8Array): Uint8Array {
   const { files, executable } = readSkillArchive(bytes);
   const skillFile = files["SKILL.md"];
@@ -344,7 +320,6 @@ function withQuotedFrontmatter(bytes: Uint8Array): Uint8Array {
   return quoted ? zipSync(skillZippable({ ...files, "SKILL.md": quoted }, executable), { level: 6 }) : bytes;
 }
 
-/** The `SKILL.md` as `withQuotedFrontmatter` saves it, or null when a save keeps it unchanged. */
 export function quotedSkillMarkdown(skillFile: Uint8Array): Uint8Array | null {
   const text = new TextDecoder("utf-8", { fatal: true }).decode(skillFile);
   const match = SKILL_FRONTMATTER.exec(text);
@@ -357,7 +332,6 @@ export function quotedSkillMarkdown(skillFile: Uint8Array): Uint8Array | null {
       const key = value?.[1];
       const plain = value?.[2];
       if (key === undefined || plain === undefined || NOT_PLAIN.test(plain) || !/:(?:\s|$)/u.test(plain)) return line;
-      // A JSON string is also a YAML double-quoted string.
       return `${key}: ${JSON.stringify(plain)}`;
     })
     .join("\n");
@@ -368,8 +342,6 @@ export function quotedSkillMarkdown(skillFile: Uint8Array): Uint8Array | null {
 
 const rejectLinks = Effect.fn("LocalSkill.rejectLinks")(function* (root: string, path: string) {
   let current = root;
-  if ((yield* localIO(() => lstat(root))).isSymbolicLink())
-    return yield* new LocalSkillFailure({ cause: new Error(sourceText("error.skill.pathSymlink")) });
   for (const part of relative(root, path).split(sep).filter(Boolean)) {
     current = join(current, part);
     if ((yield* localIO(() => lstat(current))).isSymbolicLink())

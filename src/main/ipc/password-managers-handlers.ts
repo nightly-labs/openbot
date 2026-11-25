@@ -1,7 +1,3 @@
-// The password managers of this computer and of a joined server (`password-managers-v1`): list,
-// connect, cancel a sign-in, and disconnect. An access key or an extra password goes from the
-// renderer to main or to the host once; no answer carries it.
-
 import {
   decodeHostPasswordManagerList,
   decodeHostPasswordManagerStatus,
@@ -40,7 +36,6 @@ export interface PasswordManagersIpcDependencies {
       init?: RemoteRequestInit,
     ): Effect.Effect<T, RemoteWorkflowError>;
   };
-  /** Opens a sign-in page in this computer's browser. */
   openExternal: (url: string) => Promise<void>;
 }
 
@@ -70,10 +65,6 @@ function decodeConnectInput(value: unknown): PasswordManagerConnectInput {
   return { manager: decodeManager(value.manager), method: decodeMethod(value.method) };
 }
 
-/**
- * The renderer names a manager only, never a URL: main opens the sign-in page that the driver or the
- * host reports, and only an `https:` page on one of the driver's sign-in hosts.
- */
 export function passwordManagersIpcHandlers({
   passwordManagers,
   remoteServers,
@@ -121,7 +112,6 @@ export function passwordManagersIpcHandlers({
         remote: (manager, serverId) =>
           post(serverId, PASSWORD_MANAGERS_ROUTES.disconnect, decodeHostPasswordManagerStatus, { manager }),
       }),
-      // The host names the page; this computer opens it only on the sign-in hosts of its own driver.
       hostOpenSignIn: scopedHandler(decodeManager, {
         local: openLocal,
         remote: async (manager, serverId) => {

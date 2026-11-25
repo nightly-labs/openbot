@@ -4,6 +4,7 @@ import type { messages as source } from "../en/dialog";
 export const messages = {
   "dialog.chooseSiteDirectory": "בחירת תיקייה של אתר סטטי",
   "dialog.chooseAgentFolder": "בחירת תיקייה עבור {agent}",
+  "dialog.chooseChannelFolder": "בחירת תיקייה עבור {channel}",
   "dialog.chooseAgentExclusion": "בחירת תיקייה ש-{agent} אינו רשאי לשנות",
   "dialog.chooseSkill": "בחירת תיקיית מיומנות או קובץ ZIP",
   "dialog.filter.skillPackages": "חבילות מיומנויות",
@@ -21,6 +22,8 @@ export const messages = {
   "dialog.saveTransfer": "שמירת קובץ ההעברה",
   "dialog.chooseTransfer": "בחירת קובץ העברה",
   "dialog.filter.transfer": "קובצי העברה של OpenBot",
+  "dialog.saveWorkflow": "שמירת קובץ תהליך העבודה",
+  "dialog.filter.workflow": "קובצי תהליכי עבודה של OpenBot",
   "dialog.chooseExternalLinkApp": "בחירת דפדפן",
   "dialog.filter.applications": "אפליקציות",
 } as const satisfies PartialTranslation<typeof source>;

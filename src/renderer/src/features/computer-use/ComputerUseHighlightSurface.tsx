@@ -4,18 +4,6 @@ import { ComputerUseAgentCursor } from "./ComputerUseAgentCursor";
 import { ComputerUseWindowHighlight } from "./ComputerUseWindowHighlight";
 import { computerUsePort } from "./computer-use-port";
 
-/**
- * The whole content of the overlay window OpenBot lays over the desktop while an agent works.
- *
- * The window covers the whole desktop and stays where it is; this surface draws the rim at the
- * place main sends, so following a window the user drags costs a repaint rather than a window move
- * on every frame. The same message carries the agent cursor, which is drawn here wherever the
- * driver draws none.
- *
- * The window is transparent, click-through and never focused, so this surface holds no control and
- * invokes nothing: the placement arrives on a one-way channel. That keeps a window which floats
- * over another application free of any channel it could be driven through.
- */
 export function ComputerUseHighlightSurface() {
   const [placement, setPlacement] = createSignal<ComputerUseHighlightPlacement | null>(null);
   onSettled(() => computerUsePort().computerUse.onHighlightPlacement(setPlacement));
@@ -37,8 +25,6 @@ export function ComputerUseHighlightSurface() {
               cornerRadius={current().cornerRadius}
               width={current().width}
               height={current().height}
-              // In the rim's own pixels: main sends them on the overlay, and the rim sits at the
-              // window, so the window's own corner comes off each of them.
               covered={current().covered.map((area) => ({
                 ...area,
                 x: area.x - current().x,
@@ -48,11 +34,6 @@ export function ComputerUseHighlightSurface() {
           </div>
         )}
       </Show>
-      {/*
-       * Outside the frame, because the cursor is placed on the overlay and not on the window: an
-       * agent aims at a point the window it works in does not always hold, and a cursor cut off at
-       * the edge of that window would say the action stopped there.
-       */}
       <Show when={placement()?.cursor}>{(point) => <ComputerUseAgentCursor x={point().x} y={point().y} />}</Show>
     </div>
   );

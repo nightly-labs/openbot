@@ -1,27 +1,3 @@
-/**
- * Tests scripts/hosting/leaseweb-bootstrap.sh on a Leaseweb VPS that has OpenBot installed and an
- * SSH key for root:
- *
- *   bun scripts/hosting/leaseweb-bootstrap-e2e.ts --host=root@<address> [--restart=yes]
- *
- * It runs the bootstrap two times and checks that OpenBot keeps its process. The first run adds a
- * temporary key to the operator keys of the server: that key must sign in as root and not as the
- * service user, and a key that is not in the list must not sign in. A list with a bad line must
- * change nothing. At the end, a run with the list from before the test must remove the temporary
- * key. Then it checks on the
- * server that the service user cannot connect to the CloudStack router, to a private address or to
- * the metadata address, that root can still connect to the router, that no user can connect to port
- * 25, that the service user can connect to a public address, and that SSH offers keys only.
- *
- * `--restart=yes` also runs the checks that stop OpenBot. It puts a wrong router in the state file
- * and stops the rules: OpenBot must stop, and its next start must load the rules with the router of
- * the DHCP lease. Then it restarts the server: the rules must load before the network starts, and
- * the server state of `openbot status` must come back, and the server must run its newest kernel
- * with the boot arguments that it had.
- *
- * The report is in .openbot-build/leaseweb-bootstrap/.
- */
-
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -35,17 +11,10 @@ const REPORT_DIRECTORY = join(process.cwd(), ".openbot-build", "leaseweb-bootstr
 const SSH_OPTIONS = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "ServerAliveInterval=15"];
 const STATE_FILE = "/etc/openbot/egress-router";
 const OPERATOR_KEYS = "/etc/ssh/openbot-operator-keys/root";
-/** A documentation address (RFC 5737): never the router of a server. */
 const WRONG_ROUTER = "192.0.2.1";
 const COMMAND_DEADLINE_MS = 300_000;
 const WAIT_DEADLINE_MS = 420_000;
 
-/**
- * Prints one `key=value` line for each fact. A connection result is `connected`, `refused` (the
- * rules reject with a port-unreachable message, which gives the same error as a closed port),
- * `unreachable` (no route), `timeout` (no answer in 6 seconds) or `other`. The same connection as
- * root shows that a `refused` of the service user comes from the rules and not from the network.
- */
 const PROBE = `
 set -u
 export LC_ALL=C
@@ -96,7 +65,10 @@ done
 if [ -n "$(ip -6 route show default)" ]; then
   echo "userPrivate6=$(as_user fd00::1 80)"
   echo "rootPrivate6=$(as_root fd00::1 80)"
+  echo "userGoogle6=$(as_user 2001:4860:4860::8888 443)"
+  echo "rootGoogle6=$(as_root 2001:4860:4860::8888 443)"
 fi
+echo "userGoogle=$(as_user generativelanguage.googleapis.com 443)"
 echo "sshd=$(sshd -T | grep -E '^(passwordauthentication|kbdinteractiveauthentication|permitrootlogin|allowtcpforwarding) ' | sort | paste -sd, -)"
 echo "updatePeriod=$(apt-config dump | sed -n 's/^APT::Periodic::Unattended-Upgrade "\\(.*\\)";$/\\1/p')"
 echo "updateReboot=$(apt-config dump | sed -n 's/^Unattended-Upgrade::Automatic-Reboot "\\(.*\\)";$/\\1/p')"
@@ -151,7 +123,6 @@ async function main(): Promise<void> {
     const operator = await temporaryKey(keyDirectory, "operator");
     const stranger = await temporaryKey(keyDirectory, "stranger");
     const withOperator = `${operatorsBefore}\n${operator.publicKey}\n`;
-    // Run 1 gives the list. Run 2 has no argument and must keep it.
     for (const [index, list] of [withOperator, undefined].entries()) {
       const result = await bootstrapRun(options.host, bootstrap, list);
       expect(`bootstrap run ${index + 1} exit code`, String(result.code), "0");
@@ -187,7 +158,6 @@ async function main(): Promise<void> {
       operatorsBefore,
     );
   } finally {
-    // A second restore after a failure in the test. It changes nothing after a good run.
     await restoreOperators(options.host, bootstrap, operatorsBefore);
     await rm(keyDirectory, { recursive: true, force: true });
   }
@@ -210,7 +180,6 @@ async function main(): Promise<void> {
 
 type Expect = (name: string, actual: string | undefined, expected: string) => void;
 
-/** The checks that stop OpenBot: a stop of the rules, and a restart of the server. */
 async function restartChecks(host: string, expect: Expect, hardened: Facts, server: string): Promise<void> {
   await sshOk(host, `echo ${WRONG_ROUTER} >${STATE_FILE} && systemctl stop openbot-egress-firewall.service`);
   const stopped = await sshOk(
@@ -222,7 +191,6 @@ async function restartChecks(host: string, expect: Expect, hardened: Facts, serv
   await waitForServer(host, server);
   expectHardened(expect, "start after a stop of the rules", await probe(host), server);
 
-  // The connection ends with the server, so the exit code says nothing.
   await ssh(host, "systemctl reboot");
   const restarted = await waitForBoot(host, hardened.bootId ?? "");
   await waitForServer(host, server);
@@ -248,7 +216,6 @@ function expectHardened(expect: Expect, phase: string, facts: Facts, server: str
   expect(name("openbot-egress-firewall.service"), facts.rules, "active");
   expect(name("unattended-upgrades.service"), facts.updates, "active");
   expect(name("the state file names the DHCP server"), facts.routerState, facts.routerLease ?? "");
-  // Without this, a router that answers nobody would pass the checks of the service user.
   expect(name("root connects to the router"), facts.rootRouter, "connected");
   expect(name("the service user cannot connect to the router"), facts.userRouter, "refused");
   const refusedByRules = (text: string, user: string | undefined, root: string | undefined) => {
@@ -262,14 +229,15 @@ function expectHardened(expect: Expect, phase: string, facts: Facts, server: str
   refusedByRules("the password port of the router", facts.userRouterPassword, facts.rootRouterPassword);
   refusedByRules("the metadata address", facts.userMetadata, facts.rootMetadata);
   refusedByRules("a private address", facts.userPrivate, facts.rootPrivate);
-  // A server with no IPv6 route has no IPv6 facts.
   if (facts.userPrivate6 !== undefined)
     refusedByRules("a private IPv6 address", facts.userPrivate6, facts.rootPrivate6);
+  if (facts.userGoogle6 !== undefined)
+    refusedByRules("an IPv6 address of Google", facts.userGoogle6, facts.rootGoogle6);
+  expect(name("the service user connects to Google"), facts.userGoogle, "connected");
   expect(name("the service user connects to a public address"), facts.userPublic, "connected");
   expect(name("the service user connects to a mail submission port"), facts.userSubmission, "connected");
   expect(name("root cannot connect to port 25"), facts.rootMail, "refused");
   expect(name("the rules count the connection to port 25"), String(Number(facts.mailRejects) >= 1), "true");
-  // OpenSSH before 10 (Ubuntu 24.04) prints the old name of this value.
   expect(
     name("sshd settings"),
     facts.sshd?.replace("without-password", "prohibit-password"),
@@ -277,7 +245,6 @@ function expectHardened(expect: Expect, phase: string, facts: Facts, server: str
   );
   expect(name("updates install each day"), facts.updatePeriod, "1");
   expect(name("updates do not restart the server"), facts.updateReboot, "false");
-  // The value that needrestart reads for the unit: 0 keeps it out of the restarts after an update.
   expect(name("updates do not restart OpenBot"), facts.updateServiceRestart, "0");
   const origins = (facts.updateOrigins ?? "").split(",");
   expect(
@@ -289,7 +256,6 @@ function expectHardened(expect: Expect, phase: string, facts: Facts, server: str
   expect(name("server state"), facts.server, server);
 }
 
-/** The lines of a key list that the bootstrap keeps: no empty line and no comment. */
 function keyLines(list: string): string {
   const lines = list.split("\n").filter((line) => line !== "" && !line.startsWith("#"));
   return lines.map((line) => `${line}\n`).join("");
@@ -300,7 +266,6 @@ function bootstrapRun(host: string, bootstrap: string, operatorKeys?: string): P
   return ssh(host, `bash -s${argument}`, bootstrap);
 }
 
-/** Gives the server the operator keys that it had before the test. The bootstrap accepts no empty list. */
 async function restoreOperators(host: string, bootstrap: string, before: string): Promise<void> {
   if (keyLines(before) === "") await sshOk(host, `rm -f ${OPERATOR_KEYS}`);
   else if ((await bootstrapRun(host, bootstrap, before)).code !== 0)
@@ -314,10 +279,6 @@ async function temporaryKey(directory: string, name: string): Promise<{ path: st
   return { path, publicKey: (await readFile(`${path}.pub`, "utf8")).trim() };
 }
 
-/**
- * Signs in with one key and nothing else: no configuration file, no agent and no shared connection
- * of the developer. Gives the user name on the server, or `refused`.
- */
 async function signIn(target: string, keyPath: string): Promise<string> {
   const only = ["-F", "/dev/null", "-i", keyPath, "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none"];
   const result = await run("ssh", [...only, ...SSH_OPTIONS, "-o", "ControlPath=none", target, "id -un"]);
@@ -334,7 +295,6 @@ async function probe(host: string): Promise<Facts> {
   return facts;
 }
 
-/** The login methods that sshd names when it refuses a login with no key. */
 async function offeredLoginMethods(host: string): Promise<string> {
   const result = await run("ssh", [
     ...SSH_OPTIONS,
@@ -346,7 +306,6 @@ async function offeredLoginMethods(host: string): Promise<string> {
     "true",
   ]);
   const denied = /Permission denied \(([^)]*)\)/u.exec(result.stderr)?.[1];
-  // The last line of the ssh error tells why it did not get to the login, such as a reset connection.
   return denied ?? `exit ${result.code}: ${result.stderr.trim().split("\n").at(-1) ?? ""}`;
 }
 
@@ -361,7 +320,6 @@ async function waitForBoot(host: string, lastBootId: string): Promise<string> {
   throw new Error("The server did not start again.");
 }
 
-/** Waits until `openbot status` shows the server state that it had before the test. */
 async function waitForServer(host: string, server: string): Promise<void> {
   const deadline = Date.now() + WAIT_DEADLINE_MS;
   const command = `runuser -u "$(</opt/OpenBot/hosted/service-user)" -- openbot status 2>/dev/null | sed -n 's/^Server: //p'`;

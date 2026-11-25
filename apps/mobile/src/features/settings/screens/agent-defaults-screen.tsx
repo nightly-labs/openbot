@@ -23,12 +23,6 @@ import { useText } from "@/shared/lib/text";
 
 const SERVER_AVATAR_SIZE = 32;
 
-/**
- * Settings > Agents: the agent defaults of the servers where this member is an owner or admin, as
- * the Agents tab of the desktop Settings. With one such server the page shows it at once; with more,
- * it lists them first. A server that is not connected shows its state, and its page disables the
- * controls.
- */
 export function AgentDefaultsScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId?: string }>();
@@ -59,11 +53,6 @@ export function AgentDefaultsScreen() {
   );
 }
 
-/**
- * The agent defaults of one server: a row for each setting with its default and the agents that
- * have it on, the commit co-author switch, which applies to all agents, and the programs that the
- * agents left running.
- */
 function AgentDefaultsServerPage({ serverId, titled }: { serverId: string; titled: boolean }) {
   const { t, format } = useText();
   const { theme } = useUniwind();

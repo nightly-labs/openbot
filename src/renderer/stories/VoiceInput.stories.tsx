@@ -20,7 +20,6 @@ import { CONVERSATION_STORY_ARGS, StoryAppProviders } from "./conversation-story
 import { STORY_AGENT_STATUS } from "./fixtures";
 import { createMockOpenBot } from "./mock-openbot";
 
-/** A fixed stretch of speech, so the waveform looks the same in each screenshot. */
 const SPEECH_LEVELS = Array.from({ length: VOICE_LEVEL_COUNT }, (_, index) =>
   Math.max(0, Math.sin(index * 0.9) * 0.5 + Math.sin(index * 2.3) * 0.3),
 );
@@ -37,7 +36,6 @@ interface VoiceInputState {
   draft?: string;
   liveText?: string;
   error?: () => string;
-  /** The recording stopped at the time limit. */
   limitReached?: boolean;
   props?: Partial<ConversationProps>;
 }
@@ -89,10 +87,7 @@ const STATES: VoiceInputState[] = [
   { title: "No speech detected", error: () => currentText().t("composer.voice.noSpeechDetected") },
 ];
 
-/** Only the message box, set to one voice state through the same controller signals the app uses. */
 function VoiceInputComposer(props: { state: VoiceInputState }) {
-  // No messages: the story messages ask another agent, and its "Waiting for replies" panel would
-  // sit above every input.
   const conversationProps: ConversationProps = { ...CONVERSATION_STORY_ARGS, messages: [], ...props.state.props };
   const scope = createConversationViewScope(conversationProps);
   const controller = useConversationController();
@@ -149,10 +144,6 @@ function VoiceInputStates() {
   );
 }
 
-/**
- * Plays the morph in a loop: the microphone melts into the recording bar, a made-up voice moves
- * the waveform, and the bar melts back. Toggle stops the loop and switches by hand.
- */
 function VoiceMorphLoop() {
   const controller = useConversationController();
   const [looping, setLooping] = createSignal(true);

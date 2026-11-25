@@ -15,11 +15,6 @@ import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
 
 const ignoreResponse = (): void => {};
 
-/**
- * The `browser-profiles-v1` routes of the connected host. Only the tab route answers a member. A host
- * with `browser-profiles-events-v1` reports each change with an event, which `onChanged` passes on.
- * The proxy routes are asked only while `proxies` says the host has `browser-proxies-v1`.
- */
 export function webBrowserProfileCalls(
   request: () => TeamApiRequest,
   onHostEvent?: (listener: (event: AgentEvent | TeamRealtimeEvent) => void) => () => void,

@@ -28,6 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Oczekiwanie na przeglądarkę…",
   "mcp.signIn.continue": "Przejdź do {name}",
   "mcp.signIn.pageDescription": "Ta strona jest otwarta w przeglądarce na: {host}. Zaloguj się tutaj.",
+  "mcp.signIn.copyHint": "Jeśli strona się nie wczytuje, skopiuj link i otwórz go w innej przeglądarce.",
+  "mcp.signIn.copyLink": "Kopiuj link",
+  "mcp.signIn.pasteHint":
+    "Jeśli logujesz się na innym urządzeniu, skopiuj na końcu adres z jego przeglądarki i wklej go tutaj.",
   "mcp.test.connected": {
     one: "Połączono · {count} narzędzie",
     few: "Połączono · {count} narzędzia",
@@ -41,6 +45,7 @@ export const messages = {
   "mcp.status.signedIn": "Zalogowano",
   "mcp.status.signingIn": "Logowanie…",
   "mcp.status.signInNeeded": "Wymaga logowania",
+  "mcp.status.signInAppNeeded": "Wymaga aplikacji logowania",
   "mcp.status.refused": "Odmowa",
   "mcp.status.checkUrl": "Sprawdź URL",
   "mcp.status.noAnswer": "Brak odpowiedzi",
@@ -102,6 +107,7 @@ export const messages = {
   "mcp.panel.signIn": "Zaloguj się",
   "mcp.panel.signOut": "Wyloguj się",
   "mcp.panel.cancelSignIn": "Anuluj logowanie",
+  "mcp.panel.useAddress": "Użyj tego adresu",
   "mcp.panel.signInTo": "Zaloguj się do {name}",
   "mcp.panel.signInWaiting": {
     one: "Dokończ logowanie w przeglądarce. OpenBot przestanie czekać po {count} minucie.",

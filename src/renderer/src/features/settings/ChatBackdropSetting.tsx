@@ -6,16 +6,12 @@ import { actionToast } from "../../action-toast";
 import { setChatBackdrop, useChatBackdrop } from "../../chat-backdrop-preference";
 import {
   addCustomBackdrop,
-  CUSTOM_BACKDROP_IMAGE_TYPES,
+  CUSTOM_BACKDROP_UPLOAD_TYPES,
   customBackdropKind,
   removeCustomBackdrop,
   useCustomBackdrops,
 } from "../../custom-backdrops";
 
-/**
- * The backdrop control in Settings on the desktop and in the web client. It keeps an uploaded picture
- * in this browser's store (`custom-backdrops.ts`) and removes a backdrop that the user added.
- */
 export function ChatBackdropSetting(props: { mount?: HTMLElement | undefined }) {
   const { t } = useText();
   const choice = useChatBackdrop();
@@ -23,7 +19,8 @@ export function ChatBackdropSetting(props: { mount?: HTMLElement | undefined }) 
   const [busy, setBusy] = createSignal(false);
 
   const upload = async (file: File) => {
-    if (customBackdropKind(file.type, file.size) !== "image") {
+    const kind = customBackdropKind(file.type, file.size);
+    if (kind !== "image" && kind !== "video") {
       actionToast.error(t("settings.chatBackdrop.uploadRefused"));
       return;
     }
@@ -60,7 +57,7 @@ export function ChatBackdropSetting(props: { mount?: HTMLElement | undefined }) 
       value={choice()}
       onChange={setChatBackdrop}
       custom={custom()}
-      accept={CUSTOM_BACKDROP_IMAGE_TYPES.join(",")}
+      accept={CUSTOM_BACKDROP_UPLOAD_TYPES.join(",")}
       onUpload={(file) => void upload(file)}
       onRemove={(id) => void remove(id)}
       busy={busy()}

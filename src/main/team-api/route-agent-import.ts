@@ -17,13 +17,6 @@ import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { pathIdentifier, readBinary, readJson, stringField } from "./request-helpers";
 
-/**
- * Agents imported from a Grok Bot export sent from a joined server. Any member can import, as any
- * member can create an agent; the token is the member's own. The response codec of `agent-import-v1`
- * leaves out the avatars of the preview. Frozen by `agent-import-v1`, and `agent-import-v2` for an
- * export sent in parts. `newAgentHidden` says that a new agent would start on a provider that the
- * caller does not see.
- */
 export async function routeAgentImport(
   context: TeamApiRequestContext,
   agentImport: TeamApiAgentImport | undefined,
@@ -82,7 +75,6 @@ export async function routeAgentImport(
       });
     return json(200, await answer(() => runCauseEffect(agentImport.stageUpload(read, member.id)), 400));
   }
-  // `readJson` has already run the body through the agent-import wire codec.
   const body = await readJson(request);
   if (newAgentHidden()) throw new HttpError(400, sourceText("error.team.newAgentProviderLocalOnly"));
   let input: ReturnType<typeof parseApplyAgentImportInput>;
@@ -97,7 +89,6 @@ export async function routeAgentImport(
         agentImport.apply(input, {
           owner: member.id,
           actor: { id: member.id, name: member.name ?? "Team member" },
-          // The service checks the zone and uses the host's own when it is not valid.
           ...(typeof body.timezone === "string" ? { timezone: body.timezone } : {}),
           reviseSkills: canAdministerServer(member.role),
         }),
@@ -110,10 +101,6 @@ export async function routeAgentImport(
   });
 }
 
-/**
- * An export the host cannot read, or a closed token, is a sentence for the member, not a host fault.
- * A system error, such as a full disk, names host paths: it goes to the logger and answers 500.
- */
 export async function answer<T>(run: () => Promise<T>, status: number): Promise<T> {
   try {
     return await run();

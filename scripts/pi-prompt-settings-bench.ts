@@ -1,20 +1,3 @@
-// Measures what each Pi feature and OpenBot tool costs in each request of a Pi agent. Runs the real
-// Pi CLI through the real `inception` driver (`PiAgentClient`) on Mercury 3, with the OpenBot tools,
-// in a temporary git workspace and an isolated Pi agent folder (`PI_CODING_AGENT_DIR`), so the user's
-// `~/.pi/agent` is not read or changed. The user's home skills in `~/.agents/skills` stay, as in the
-// app. `current` is what the driver sends; each other variant changes one thing and runs these turns,
-// each in a new session:
-//   1. a one-word reply: the request prompt is the fixed prefix of every request (system prompt,
-//      tools, skills) plus a short message,
-//   2. a small task with tools, which makes several requests.
-// A measuring extension records, for each request, the system prompt sections, the tool names and
-// sizes, and the usage that Inception reports. It adds no tool and no prompt text. Mercury's prompt
-// count changes by up to 300 tokens between requests with the same text, so compare the characters
-// first.
-// `INCEPTION_API_KEY=… bun run bench:pi-prompt-settings`; `--variant=<name>[,<name>…]` runs those variants;
-// `--model=<id>` replaces Mercury 3; `--budget=<tokens>` stops before a run when the tokens used so
-// far reach it (default 500,000). One run of all variants used about 300,000 Mercury tokens.
-// Writes .openbot-build/pi-prompt-settings-bench/report.json.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -33,12 +16,10 @@ const TASK_PROMPT =
   "Read notes.md and count.txt. Then reply with one line: the title of notes.md and the number in count.txt. " +
   "Use the read tool, not bash.";
 
-/** The keys of Pi's `settings.json` that a variant sets. */
 interface PiSettings {
   extensions?: string[];
 }
 
-/** Values that replace those of the OpenBot bridge's MCP settings; `null` removes a value. */
 interface BridgeChange {
   exposure?: "direct" | "deferred";
   description?: string;
@@ -47,19 +28,12 @@ interface BridgeChange {
 
 interface Variant {
   name: string;
-  /** Pi `settings.json` of the isolated agent folder. */
   settings?: PiSettings;
-  /** Pi flags added after the driver's own. */
   flags?: string[];
-  /** Source of an extension that the variant adds after the driver's own. */
   extension?: string;
   bridge?: BridgeChange;
 }
 
-/**
- * Gives back Pi's `<docs>` section, which the driver's extension removes from each request. It copies
- * the section from the prompt that Pi renders and puts it after `rules`, where Pi puts it.
- */
 const DOCS_EXTENSION = String.raw`export default function (pi) {
   let docs;
   pi.on("before_agent_start", (event) => {
@@ -83,38 +57,21 @@ const DEFERRED = (...tools: string[]): BridgeChange => ({
   description: "OpenBot",
 });
 
-/**
- * Results on 2026-11-07, Pi 1.5.0, Mercury 3, with five home skills. `current` before this change was
- * 32,347 characters of system prompt and tools, and 8,630 to 8,930 tokens per reply.
- * - `<docs>`: 1,353 characters, about 340 tokens. Removed.
- * - `request_api_key` and `suggest_marketplace_app`: 2,686 characters, about 700 tokens. Hidden; the
- *   agent reaches them through OpenBot's tool_search. Deferred to Pi's `tool_search`, they save only
- *   1,758 characters, because Pi then adds its `tool_search` and an `<mcp_servers>` line.
- * - `ask_ui` too: about 2,400 tokens with the two above. Kept, for the confirm card.
- * - All OpenBot tools deferred: 3,183 tokens per reply (−63%). Kept direct: the OpenBot catalog is
- *   the way to every other tool.
- * - Pi's `llama.cpp`, `codemode` and `tool-search` extensions and the prompt templates: 0 characters.
- * - The user's home skills: 6,157 characters, about 1,300 tokens. Kept; they are the user's.
- */
 const VARIANTS: Variant[] = [
   { name: "current" },
-  // The settings of this change, each given back.
   { name: "with-pi-docs-section", extension: DOCS_EXTENSION },
   { name: "with-all-openbot-tools", bridge: { toolExposure: null } },
   { name: "before", extension: DOCS_EXTENSION, bridge: { toolExposure: null } },
-  // Pi features that add nothing to the prompt.
   { name: "no-llama-cpp", settings: { extensions: ["-builtin:llama.cpp"] } },
   { name: "no-codemode", settings: { extensions: ["-builtin:codemode"] } },
   { name: "no-tool-search", settings: { extensions: ["-builtin:tool-search"] } },
   { name: "no-prompt-templates", flags: ["--no-prompt-templates"] },
-  // References: what OpenBot keeps.
   { name: "no-skills", flags: ["--no-skills"] },
   { name: "two-openbot-tools-deferred", bridge: DEFERRED("request_api_key", "suggest_marketplace_app") },
   { name: "ask-ui-deferred-too", bridge: DEFERRED("ask_ui", "request_api_key", "suggest_marketplace_app") },
   { name: "all-openbot-tools-deferred", bridge: { exposure: "deferred", toolExposure: null, description: "OpenBot" } },
 ];
 
-/** Records each request; writes one JSON line per request and per assistant message. */
 const MEASURE_EXTENSION = `import { appendFileSync } from "node:fs";
 export default function (pi) {
   const file = process.env.OPENBOT_BENCH_MEASURE_FILE;
@@ -154,9 +111,7 @@ interface TurnReport {
   step: string;
   reply: string;
   requests: RequestReport[];
-  /** input + cache read + cache write of the first request: the prompt that each request repeats. */
   firstRequestPrompt: number;
-  /** The same sum over all requests of the turn. */
   totalPrompt: number;
   output: number;
 }
@@ -196,10 +151,6 @@ function git(cwd: string, ...args: string[]): void {
 
 const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
 
-/**
- * Changes the OpenBot bridge in the MCP server list that the driver gives Pi. The bridge is the only
- * server with direct exposure.
- */
 const BRIDGE_SCRIPT = `const changes = JSON.parse(process.argv[2]);
 const servers = JSON.parse(process.env.OPENBOT_PI_MCP_SERVERS || "[]").map((server) => {
   if (server.config.exposure !== "direct") return server;
@@ -210,7 +161,6 @@ const servers = JSON.parse(process.env.OPENBOT_PI_MCP_SERVERS || "[]").map((serv
 process.stdout.write(JSON.stringify(servers));
 `;
 
-/** A Pi wrapper that adds the variant's flags and extensions to the driver's RPC run only. */
 async function wrapper(folder: string, extra: string[], bridge?: BridgeChange): Promise<string> {
   const path = join(folder, "pi");
   const added = extra.map(quote).join(" ");

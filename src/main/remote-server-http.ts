@@ -1,23 +1,13 @@
-// Putting one Team API call on the wire, and reading what came back off it.
-//
-// HTTP uses the adapter for the negotiated protocol: V6 adds Cursor and Cline, V5 adds Gemini and
-// custom ACP agents, V4 adds OpenCode, V3 adds duplication, and V1 serves older hosts. The WebRTC
-// transport retains its released V2 framing.
-//
-// Nothing here knows a server exists. It takes a URL, a token and a protocol number, and it either
-// returns a decoded value or throws one of `remote-server-errors.ts`. Deciding what a throw means for
-// the user is `remote-server-connection-status.ts`; deciding which server to ask is the caller's.
-
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { type TeamCurrentCapability, teamCapabilityHeaders } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import {
+  addPromptQuestionDetails,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
+} from "@openbot/contracts/team-protocol/prompt-detail-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { addSkillSuggestionNames, SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
-import {
-  TEAM_APP_VERSION_HEADER,
-  TEAM_CAPABILITIES_HEADER,
-  TEAM_PROTOCOL_VERSION_HEADER,
-} from "@openbot/contracts/team-protocol/v1";
+import { TEAM_APP_VERSION_HEADER, TEAM_PROTOCOL_VERSION_HEADER } from "@openbot/contracts/team-protocol/v1";
 import { decodeTeamProtocolV1CurrentHttpResponse } from "@openbot/contracts/team-protocol/v1-adapter";
 import { decodeTeamProtocolV2Json, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -62,6 +52,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               channelIsolation: true,
               channelPicture: true,
               channelBrowser: true,
+              providerManyAccounts: true,
             }),
           )
         : codec.encodeRequest(method, path, options.body, {
@@ -85,13 +76,12 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
         ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
         ...(options.protocol ? { [TEAM_PROTOCOL_VERSION_HEADER]: String(options.protocol) } : {}),
         ...(options.appVersion ? { [TEAM_APP_VERSION_HEADER]: options.appVersion } : {}),
-        ...(options.capabilities ? { [TEAM_CAPABILITIES_HEADER]: options.capabilities.join(",") } : {}),
+        ...(options.capabilities ? teamCapabilityHeaders(options.protocol, options.capabilities) : {}),
       },
       ...(body === undefined ? {} : { body }),
     },
     options.timeoutMs,
   );
-  // Only a development profile reads the body twice: the host sends no length for a JSON body.
   if (profile)
     profile.responded(
       yield* Effect.tryPromise(() => response.clone().arrayBuffer()).pipe(
@@ -103,10 +93,6 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
     const decoded = yield* Effect.result(
       Effect.tryPromise({
         try: () => response.json(),
-        // The host labels every reply JSON. A reply that is not labeled JSON and does not parse came
-        // from something between this app and the host, such as a Wi-Fi sign-in page. That is a
-        // network fault that a retry can fix, not a host that sends bad data. It fails as `fetch` does
-        // when it cannot reach the host, with a `TypeError`.
         catch: (cause) =>
           isJsonContentType(response.headers.get("content-type"))
             ? new RemoteProtocolError("protocol_error", sourceText("error.remote.invalidData"), null, { cause })
@@ -132,13 +118,16 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               channelSeenSubtasks: true,
               channelTaskWaits: true,
               mcpManyServers: true,
+              providerManyAccounts: true,
+              routineResultsWhatsApp: true,
+              storageWorkflowFiles: true,
             })
           : codec.decodeResponse(method, path, response.status, input),
       catch: (cause) =>
         new RemoteProtocolError("protocol_error", sourceText("error.remote.unsafeData"), null, { cause }),
     });
-    // The frozen response codec leaves the skill name of a skill question out; the wire body has it.
     if (options.capabilities?.includes(SKILL_LEARNING_CAPABILITY)) addSkillSuggestionNames(decodedValue, input);
+    if (options.capabilities?.includes(TEAM_PROMPT_DETAIL_CAPABILITY)) addPromptQuestionDetails(decodedValue, input);
     value = decodedValue;
   }
   if (!response.ok) {
@@ -178,10 +167,6 @@ export function webRtcRequestBody(
   }
 }
 
-// The `!response.ok` half of a raw fetch, split out so the authenticated fetch in the manager and
-// `requestJson` above agree on what a failing host response means. A host that answers with a JSON
-// error envelope produces a `RemoteRequestError` carrying its own message and code; a host that
-// claims JSON and does not send it is a protocol failure, not a request failure.
 export const throwRemoteResponseError = Effect.fn("RemoteHttp.responseError")(function* (
   response: Response,
   method: string,

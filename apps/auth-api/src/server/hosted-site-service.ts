@@ -40,6 +40,7 @@ import {
   type HostedSiteScope,
   type HostedSiteSlots,
   hostedSiteSlots,
+  idleNewSiteUploadsSql,
   resolveHostedSiteBucket,
   scopeServerId,
 } from "./hosted-site-server";
@@ -53,6 +54,11 @@ export interface HostedSiteUploadSession {
 type OperationClaim = { status: "pending"; token: string } | { status: "completed"; response: string };
 
 const CLEANUP_BATCH_SIZE = 50;
+export const UNSYNCED_SITES_SQL = `SELECT id, hostname FROM hosted_sites
+  WHERE +status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
+  ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`;
+export const PRUNE_SITE_CREATION_EVENTS_SQL = "DELETE FROM site_creation_events WHERE created_at < ?";
+export const PRUNE_SITE_OPERATION_RECEIPTS_SQL = "DELETE FROM site_operation_receipts WHERE created_at < ?";
 const CLEANUP_RUNTIME_BUDGET_MS = 20_000;
 
 export class HostedSiteService {
@@ -63,8 +69,6 @@ export class HostedSiteService {
     private readonly reportHashSecret?: string,
     private readonly localSiteOrigin?: string,
   ) {}
-
-  /** The sites of the scope, with the limit and slot count of the server that new sites go to. */
 
   readonly list = Effect.fn("HostedSites.list")(
     { self: this },
@@ -89,7 +93,6 @@ export class HostedSiteService {
       const bucket = yield* resolveHostedSiteBucket(database, scope.userId, serverId, now);
       const { limit, used, reason } = yield* hostedSiteSlots(database, scope.userId, bucket, now);
       const sites = rows.results.map((row) => mapSite(row, this.localSiteOrigin));
-      // `limitReason` is optional: released desktops read only `sites`, `limit` and `used`.
       return reason === null ? { sites, limit, used } : { sites, limit, used, limitReason: reason };
     },
     (operation) => operation.pipe(Effect.provide(HostedSiteStorage.layer(this.database, this.bucket))),
@@ -116,7 +119,6 @@ export class HostedSiteService {
           .first<{ count: number }>(),
       );
       const uploads = concurrent?.count ?? 0;
-      // A replace of a full account can free the idle replaces of its site, after the site checks below.
       if (uploads >= HOSTED_SITE_LIMITS.concurrentUploads && !request.siteId) {
         return yield* new HostedSiteInputError(
           429,
@@ -132,7 +134,6 @@ export class HostedSiteService {
         const site = yield* this.requireOwnedSiteEffect(userId, request.siteId);
         yield* siteDecode(() => requireSiteInBucket(site, serverId));
         if (!site.expires_at || site.expires_at <= now) return yield* inactiveSiteError("expired");
-        // Only a full account frees idle replaces of this site: with a free slot, they stay for a retry.
         const needed = uploads - HOSTED_SITE_LIMITS.concurrentUploads + 1;
         if (needed > 0 && (yield* this.abandonSupersededUploadsEffect(userId, site.id, now, needed)) < needed) {
           return yield* new HostedSiteInputError(
@@ -209,6 +210,9 @@ export class HostedSiteService {
 
       yield* this.enforceCreationRateEffect(userId, now);
       const bucket = yield* resolveHostedSiteBucket(database, userId, serverId, now);
+      if (!(yield* this.bucketHasRoomEffect(userId, bucket, null, now))) {
+        yield* this.abandonIdleNewSiteUploadsEffect(userId, bucket, now);
+      }
       const room = bucketHasRoomSql(bucket, userId, null, now);
       const siteId = crypto.randomUUID();
       const hostname = yield* this.uniqueHostnameEffect(`${request.title} ${request.description}`);
@@ -802,13 +806,7 @@ export class HostedSiteService {
         }
 
         const unsyncedSites = yield* siteCall(() =>
-          database
-            .prepare(
-              `SELECT id, hostname FROM hosted_sites
-           WHERE status IN ('active', 'blocked', 'deleted', 'expired') AND route_synced_at IS NULL
-           ORDER BY updated_at, id LIMIT ${CLEANUP_BATCH_SIZE}`,
-            )
-            .all<{ id: string; hostname: string }>(),
+          database.prepare(UNSYNCED_SITES_SQL).all<{ id: string; hostname: string }>(),
         );
         hasMore ||= unsyncedSites.results.length === CLEANUP_BATCH_SIZE;
         for (const site of unsyncedSites.results) {
@@ -921,13 +919,13 @@ export class HostedSiteService {
       }
       yield* siteCall(() =>
         database
-          .prepare("DELETE FROM site_creation_events WHERE created_at < ?")
+          .prepare(PRUNE_SITE_CREATION_EVENTS_SQL)
           .bind(now - 2 * 24 * 60 * 60_000)
           .run(),
       );
       yield* siteCall(() =>
         database
-          .prepare("DELETE FROM site_operation_receipts WHERE created_at < ?")
+          .prepare(PRUNE_SITE_OPERATION_RECEIPTS_SQL)
           .bind(now - 90 * 24 * 60 * 60_000)
           .run(),
       );
@@ -957,7 +955,6 @@ export class HostedSiteService {
       const { database } = yield* HostedSiteStorage;
 
       const previousDeployment = deployment.base_deployment_id;
-      // The site keeps the server it was created for, so the activation counts against that server's bucket.
       const bucket = yield* resolveHostedSiteBucket(database, userId, site.server_id, now);
       const room = bucketHasRoomSql(bucket, userId, site.id, now);
       const results = yield* siteCall(() =>
@@ -1201,7 +1198,6 @@ export class HostedSiteService {
     },
   );
 
-  /** True when the bucket has a free slot for one more site, not counting `excludeSiteId`. */
   private readonly bucketHasRoomEffect = Effect.fn("HostedSites.bucketHasRoom")(
     { self: this },
     function* (
@@ -1257,13 +1253,23 @@ export class HostedSiteService {
            AND (
              SELECT COUNT(*) FROM site_deployments
              WHERE user_id = ? AND activation_authorized_at >= ?
-           ) < 20
+           ) < ?
            AND (
              SELECT COUNT(*) FROM site_deployments
              WHERE user_id = ? AND activation_authorized_at >= ?
-           ) < 100`,
+           ) < ?`,
           )
-          .bind(now, deployment.id, userId, userId, hour, userId, day)
+          .bind(
+            now,
+            deployment.id,
+            userId,
+            userId,
+            hour,
+            HOSTED_SITE_LIMITS.activationsPerHour,
+            userId,
+            day,
+            HOSTED_SITE_LIMITS.activationsPerDay,
+          )
           .run(),
       );
       if (claim.meta.changes === 1) {
@@ -1283,10 +1289,26 @@ export class HostedSiteService {
           .bind(deployment.id, userId)
           .run(),
       );
+      const counts = yield* siteCall(() =>
+        database
+          .prepare(
+            `SELECT
+               (SELECT COUNT(*) FROM site_deployments WHERE user_id = ? AND activation_authorized_at >= ?) AS hour_count,
+               (SELECT COUNT(*) FROM site_deployments WHERE user_id = ? AND activation_authorized_at >= ?) AS day_count`,
+          )
+          .bind(userId, hour, userId, day)
+          .first<{ hour_count: number; day_count: number }>(),
+      );
+      if ((counts?.day_count ?? 0) >= HOSTED_SITE_LIMITS.activationsPerDay) {
+        return yield* activationRateLimitError(true, now);
+      }
+      if ((counts?.hour_count ?? 0) >= HOSTED_SITE_LIMITS.activationsPerHour) {
+        return yield* activationRateLimitError(false, now);
+      }
       return yield* new HostedSiteInputError(
-        429,
-        "activation_rate_limit",
-        "The publish limit for this account was reached.",
+        409,
+        "operation_in_progress",
+        "This site operation is already in progress.",
       );
     },
   );
@@ -1659,12 +1681,6 @@ export class HostedSiteService {
     },
   );
 
-  /**
-   * A failed upload keeps its slot until it expires. Two replaces of one site cannot both publish: the first
-   * activation makes the other one stale. So a new replace of a full account frees up to `count` older replaces of
-   * the same site that no file upload uses now, the oldest first. The first upload of a new site has no base
-   * deployment and stays. Returns the number of slots freed.
-   */
   private readonly abandonSupersededUploadsEffect = Effect.fn("HostedSites.abandonSupersededUploads")(
     { self: this },
     function* (
@@ -1702,6 +1718,41 @@ export class HostedSiteService {
         yield* this.deleteDeploymentEffect(siteId, upload.id);
       }
       return freed;
+    },
+  );
+
+  private readonly abandonIdleNewSiteUploadsEffect = Effect.fn("HostedSites.abandonIdleNewSiteUploads")(
+    { self: this },
+    function* (
+      userId: string,
+      siteBucket: HostedSiteBucket,
+      now: number,
+    ): Effect.fn.Return<void, HostedSiteFailure, HostedSiteStorage> {
+      const { database } = yield* HostedSiteStorage;
+
+      const idleBefore = now - HOSTED_SITE_LIMITS.idleUploadMs;
+      const idle = idleNewSiteUploadsSql(siteBucket, userId, now, idleBefore, 1);
+      const uploads = yield* siteCall(() =>
+        database
+          .prepare(idle.sql)
+          .bind(...idle.binds)
+          .all<{ id: string; site_id: string }>(),
+      );
+      for (const upload of uploads.results) {
+        const claim = yield* siteCall(() =>
+          database
+            .prepare(
+              `UPDATE site_deployments SET status = 'abandoned'
+           WHERE id = ? AND user_id = ? AND status = 'uploading' AND in_flight_uploads = 0
+             AND NOT EXISTS (
+               SELECT 1 FROM site_upload_files f WHERE f.deployment_id = site_deployments.id AND f.uploaded_at > ?
+             )`,
+            )
+            .bind(upload.id, userId, idleBefore)
+            .run(),
+        );
+        if (claim.meta.changes === 1) yield* this.deleteDeploymentEffect(upload.site_id, upload.id);
+      }
     },
   );
 
@@ -1807,10 +1858,25 @@ export class HostedSiteService {
   );
 }
 
-/** A request changes only the sites of its own server, or unlinked sites when it proved no server. */
 function requireSiteInBucket(site: SiteRow, serverId: string | null): void {
   if ((site.server_id ?? null) === serverId) return;
   throw new HostedSiteInputError(409, "site_other_server", "This site belongs to another server.");
+}
+
+function activationRateLimitError(daily: boolean, now: number): HostedSiteInputError {
+  const window = daily ? 86_400_000 : 3_600_000;
+  const retryAfterSeconds = Math.ceil((window - (now % window)) / 1000);
+  const minutes = Math.max(1, Math.ceil(retryAfterSeconds / 60));
+  const wait = minutes < 90 ? (minutes === 1 ? "1 minute" : `${minutes} minutes`) : `${Math.ceil(minutes / 60)} hours`;
+  const limit = daily
+    ? `${HOSTED_SITE_LIMITS.activationsPerDay} site publishes and replaces in one day (UTC)`
+    : `${HOSTED_SITE_LIMITS.activationsPerHour} site publishes and replaces in one clock hour`;
+  return new HostedSiteInputError(
+    429,
+    "activation_rate_limit",
+    `This account reached its limit of ${limit}. This is not the limit on the number of sites. Try again in about ${wait}.`,
+    retryAfterSeconds,
+  );
 }
 
 function siteLimitError(bucket: HostedSiteBucket, slots: HostedSiteSlots): HostedSiteInputError {

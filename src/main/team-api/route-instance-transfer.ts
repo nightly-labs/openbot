@@ -24,12 +24,6 @@ const ROUTES: ReadonlySet<string> = new Set([
   INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply,
 ]);
 
-/**
- * The server's agents and server settings to or from an OpenBot transfer file. Only an owner or an
- * admin: an export holds every agent's memories and files, and an import adds server settings. The
- * token is the caller's own. Frozen by `instance-transfer-v1`; the apply that also replaces the
- * server preferences by `instance-transfer-full-copy-v1`.
- */
 export async function routeInstanceTransfer(
   context: TeamApiRequestContext,
   instanceTransfer: TeamApiInstanceTransfer | undefined,
@@ -81,12 +75,10 @@ export async function routeInstanceTransfer(
       await Effect.runPromise(instanceTransfer.discard(stringField(await readJson(request), "token"), member.id));
       return json(200, {});
     default: {
-      // `readJson` has already run the body through the instance-transfer wire codec.
       const body = await readJson(request);
       if (newAgentHidden()) throw new HttpError(400, sourceText("error.team.newAgentProviderLocalOnly"));
       let input: ReturnType<typeof parseApplyInstanceTransferInput>;
       try {
-        // The v1 apply never replaces the server preferences, whatever its body says.
         const { includeServerPreferences, ...v1 } = body;
         input = parseApplyInstanceTransferInput(
           url.pathname === INSTANCE_TRANSFER_FULL_COPY_ROUTES.apply ? { ...v1, includeServerPreferences } : v1,
@@ -94,7 +86,6 @@ export async function routeInstanceTransfer(
       } catch (error) {
         throw new HttpError(400, error instanceof Error ? error.message : "Invalid transfer.");
       }
-      // The service checks the zone and uses the host's own when it is not valid.
       const timezone = typeof body.timezone === "string" ? body.timezone : undefined;
       const result = await answer(
         () =>

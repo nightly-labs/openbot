@@ -52,19 +52,6 @@ export function pinRemoteDesktopRuntime(
   });
 }
 
-/**
- * Puts a pin into the lock file's own text, editing the two keys it owns and copying out everything
- * else byte for byte.
- *
- * `native-runtime.lock.json` answers to two schemas: `codex`, `claude` and `grok` belong to
- * `agent-runtime-lock.ts`, and `native-runtime-lock.ts` declares only `cloudflared` and
- * `remoteDesktop`. Zod keeps what its schema names and drops the rest, which is harmless while
- * reading and destroys the file on the way back out -- serializing the parsed lock over it deletes
- * every provider runtime pin, the assets and digests and licence hashes
- * `src/main/provider-runtime-manager.ts` reads to bundle the CLIs. Nothing downstream caught it: the
- * pin written was correct, and the publish job's guard counts the files a pin changed rather than
- * the keys it lost, so eighty deleted lines left every check green.
- */
 export function pinRuntimeLockDocument(source: string, pinned: NativeRuntimeLock["remoteDesktop"]): string {
   const document = JSON.parse(source);
   document.remoteDesktop.artifactRelease = pinned.artifactRelease;
@@ -81,6 +68,5 @@ if (import.meta.main) {
   const manifestBytes = await readFile(resolve(manifestPath));
   const updated = pinRemoteDesktopRuntime(lock, JSON.parse(manifestBytes.toString("utf8")), sha256(manifestBytes));
   await writeFile(lockPath, pinRuntimeLockDocument(await readFile(lockPath, "utf8"), updated.remoteDesktop));
-  // Machine-readable: tooling parses the pinned tag from stdout.
   process.stdout.write(`Pinned ${updated.remoteDesktop.artifactRelease?.tag}.\n`);
 }

@@ -50,6 +50,7 @@ export const messages = {
     other: "En fazla {count} klasör ekleyebilirsiniz",
   },
   "agentSettings.folders.browse.places": "Git",
+  "agentSettings.folders.browse.path": "Klasör yolu",
   "agentSettings.folders.browse.home": "Ana klasör",
   "agentSettings.folders.browse.parent": "Yukarı: {folder}",
   "agentSettings.folders.browse.failed": "Bu klasör açılamadı.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Kullanım sınırına ulaşıldı · atlandı",
   "agentSettings.backupModels.unavailable": "Şu an uygun değil · atlandı",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Bir kullanım sınırı {name} işe başladıktan sonra onu durdurursa, {name} aynı işe sıradaki ilk kullanılabilir modelle devam eder. Sınır bittiğinde veya bir sağlayıcı hatasından 10 dakika sonra {model} modeline geri döner.",
   "agentSettings.groups.brain": "Beyin",
@@ -172,13 +174,16 @@ export const messages = {
   "agentSettings.notificationLevel.note":
     "Bu seçim yalnızca sizin için geçerlidir ve tüm cihazlarınızda uygulanır. Sunucu sessize alınmışsa veya “Hiçbir şey” seçiliyse bu ajan da sessiz kalır.",
   "agentSettings.newChat.title": "Yeni sohbet",
-  "agentSettings.newChat.description": "Ajan bu sohbeti unutur. Yapılandırması kalır.",
+  "agentSettings.newChat.description":
+    "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Yapılandırması kalır.",
   "agentSettings.newChat.button": "Başlat",
   "agentSettings.newChat.confirmTitle": "{name} ile yeni bir sohbet başlatılsın mı?",
   "agentSettings.newChat.confirmDescription":
-    "Ajan bu sohbeti unutur. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
+    "Ajan sıfırdan başlar ve gerektiğinde bu sohbette arama yapabilir. Mesajlar bir ayırıcının üzerinde görünür kalır. Talimatlar, model, araçlar, bellekler, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.newChat.confirm": "Yeni sohbet başlat",
   "agentSettings.newChat.failed": "Yeni bir sohbet başlatılamadı.",
+  "agentSettings.newChat.busy":
+    "Ajan çalışıyor. Yeni bir sohbet başlatmak için bitmesini bekleyin veya ajanı durdurun.",
   "agentSettings.deleteHistory.title": "Geçmişi sil",
   "agentSettings.deleteHistory.description": "Bu sohbetin mesajları silinir ve ajan onları unutur. Kurulumu kalır.",
   "agentSettings.deleteHistory.button": "Sil",
@@ -187,6 +192,9 @@ export const messages = {
     "Bu sohbetin tüm mesajları ve dosyaları OpenBot'tan silinir ve ajan onları unutur. Bu işlem geri alınamaz. Yan konular, talimatlar, model, araçlar, anılar, çalışma alanı ve tarayıcı değişmez.",
   "agentSettings.deleteHistory.confirm": "Geçmişi sil",
   "agentSettings.deleteHistory.failed": "Geçmiş silinemedi.",
+  "agentSettings.deleteAgent.title": "Ajanı sil",
+  "agentSettings.deleteAgent.description": "Ajan, sohbeti, bellekleri, rutinleri ve çalışma alanı OpenBot’tan silinir.",
+  "agentSettings.deleteAgent.button": "Sil",
   "agentSettings.fullAccess.title": "Bu ajana tam erişim verilsin mi?",
   "agentSettings.fullAccess.askTitle": "Bu ajan çalışma alanının dışında çalışabilsin mi?",
   "agentSettings.fullAccess.description":
@@ -196,6 +204,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Tam erişime izin ver",
   "agentSettings.fullAccess.askConfirm": "Önce sor",
   "agentSettings.links.usage": "Kullanım",
+  "agentSettings.links.apps": "Uygulamalar",
+  "agentSettings.links.appsScope": "Tüm ajanlar",
   "agentSettings.links.memories": "Bellekler",
   "agentSettings.links.memoriesCount": { one: "{count} kayıtlı", other: "{count} kayıtlı" },
   "agentSettings.links.skills": "Beceriler",
@@ -222,6 +232,9 @@ export const messages = {
     "Sohbeti uzadığında ajanın yeni bir sohbet başlatmasına izin verir. Önce notlarını kaydeder.",
   "agentSettings.quickAcknowledgement.title": "Uzun görevlerden önce planı göster",
   "agentSettings.quickAcknowledgement.description": "Uzun bir görevden önce ajan planını gösterir.",
+  "agentSettings.builtinMemory.title": "OpenBot belleği",
+  "agentSettings.builtinMemory.description":
+    "Ajan kendi belleklerini kaydeder ve okur. Yalnızca Mem0 gibi bir bellek uygulaması kullanmak için kapatın. Kayıtlı bellekler kalır.",
   "agentSettings.browserProfile.label": "Tarayıcı profili",
   "agentSettings.browserProfile.shared": "Paylaşılan",
   "agentSettings.browserProfile.agent": "Yalnızca bu ajan",
@@ -231,6 +244,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Her profil kendi oturum açma bilgilerini ve çerezlerini tutar. Bir değişiklik ajanın açık sekmelerini kapatır.",
   "agentSettings.browserProfile.manage": "Yönet",
+  "agentSettings.browserProfile.movedNote":
+    "Sitelerdeki oturumlar eski profilde kalır. Ajanın bu sitelerde yeniden oturum açması gerekir.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Tüm {provider} süreci bir korumalı alanda (sandbox) çalışır, bu nedenle dışarıya yazma işlemi başarısız olur. Yalnızca macOS'ta kullanılabilir.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -149,7 +149,6 @@ export const messages = {
   "billing.license.cancel.descriptionNow":
     "Die Lizenz endet mit dem bezahlten Zeitraum. Deine Server sind nicht betroffen.",
   "billing.license.cancel.keep": "Lizenz behalten",
-  // The order form: a hosted server and a license in one order. The pricing page and Billing show it.
   "billing.order.billing": "Abrechnungszeitraum",
   "billing.order.currency": "Währung",
   "billing.order.monthly": "Monatlich",
@@ -219,4 +218,29 @@ export const messages = {
   "billing.details.vatIdInvalid": "Das ist keine USt-IdNr. des gewählten Landes.",
   "billing.details.countryMissing": "Wähle dein Rechnungsland.",
   "billing.details.saveFailed": "Rechnungsdaten konnten nicht gespeichert werden",
+  "billing.credits.explainer.title": "Was sind Credits?",
+  "billing.credits.explainer.page": "{page} von {total}",
+  "billing.credits.explainer.pages": "Seiten",
+  "billing.credits.explainer.mediaTitle": "Credits bezahlen Medien",
+  "billing.credits.explainer.mediaText":
+    "Wenn ein Agent ein Bild, ein Video oder eine Stimme erstellt, verbraucht er Credits.",
+  "billing.credits.explainer.chatTitle": "Chats bleiben kostenlos",
+  "billing.credits.explainer.chatText":
+    "Chats nutzen deinen eigenen KI-Anbieter. Gespräche mit deinen Agents kosten keine Credits.",
+  "billing.credits.explainer.chatFree": "0 Credits",
+  "billing.credits.explainer.modelsTitle": "Jedes Modell hat einen Preis",
+  "billing.credits.explainer.modelsText":
+    "Bessere Modelle kosten mehr. Ein Bild kostet {pictureMin}–{pictureMax} Credits, ein Video von {seconds} s {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ Bild",
+  "billing.credits.explainer.perClip": "/ {seconds}-s-Video",
+  "billing.credits.explainer.getTitle": "Credits erhalten",
+  "billing.credits.explainer.getText":
+    "Kaufe ein Paket, wenn du mehr brauchst. Größere Pakete bieten einen besseren Preis pro Credit.",
+  "billing.credits.explainer.freeEnd": "Monatliche kostenlose Credits laufen ab",
+  "billing.credits.explainer.welcome": "Neue Konten erhalten {amount} kostenlose Credits zum Testen einiger Modelle",
+  "billing.credits.welcomeIncluded": "Kostenlose Credits: {amount}",
+  "billing.credits.explainer.allPrices": "Alle {count} Modelle",
+  "billing.credits.explainer.next": "Weiter",
+  "billing.credits.explainer.gotIt": "Verstanden",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

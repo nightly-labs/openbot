@@ -1,9 +1,3 @@
-// Runs the real central auth manager against a local account server. The first startup request
-// blocks the event loop for longer than the startup window, as a slow database check does at start
-// (#2228). Sign-in must retry after the block, not fail because its timers fired late.
-//
-// Run: bun scripts/central-auth-startup-stall-e2e.ts
-// It writes .openbot-build/central-auth-startup-stall-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -26,8 +20,6 @@ const server = createServer((request, response) => {
     response.end(JSON.stringify({ status: "ok" }));
   };
   if (requests.length > 1) return answer();
-  // Block the event loop past the request timeout and the startup window, then answer after the
-  // late abort timer has run.
   const blockedUntil = Date.now() + BLOCK_MS;
   while (Date.now() < blockedUntil) {}
   setTimeout(answer, 100);

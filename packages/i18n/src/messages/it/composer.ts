@@ -7,6 +7,13 @@ export const messages = {
   "composer.feedbackFix.body":
     "Correzione della segnalazione #{number}. Invia la richiesta, oppure annulla per lasciare la segnalazione com'è.",
   "composer.feedbackFix.cancel": "Annulla",
+  "composer.browserTab.opened": "{name} ha aperto {title} nel browser.",
+  "composer.browserTab.openedMany": {
+    one: "{name} ha aperto {count} pagina nel browser.",
+    other: "{name} ha aperto {count} pagine nel browser.",
+  },
+  "composer.browserTab.open": "Apri pagina",
+  "composer.browserTab.hide": "Nascondi",
   "composer.providerWait.offlineTitle": "Nessuna connessione a Internet",
   "composer.providerWait.offline": "{provider} non può rispondere finché questo computer non torna online.",
   "composer.providerWait.silent": "{provider} non invia nulla da {duration}.",
@@ -53,6 +60,7 @@ export const messages = {
   "composer.picker.noSkills": "Questo agente non ha skill.",
   "composer.picker.noSkillMatch": "Nessuna skill corrisponde a «{query}».",
   "composer.picker.skillsLoadFailed": "Impossibile caricare le skill.",
+  "composer.picker.skillProblem": "{name} non è disponibile. {problem} Chiedi all’agente di correggerla.",
   "composer.token.attachment": "Apri il file allegato {name}",
   "composer.token.agent": "Agente {name}",
   "composer.token.skill": "Skill {name}",
@@ -64,6 +72,7 @@ export const messages = {
   "composer.voice.stop": "Interrompi la registrazione vocale",
   "composer.voice.cancel": "Annulla la registrazione vocale",
   "composer.voice.preparing": "Download del modello vocale",
+  "composer.voice.starting": "Avvio della registrazione vocale",
   "composer.voice.requesting": "Richiesta di accesso al microfono",
   "composer.voice.transcribing": "Trascrizione del prompt vocale",
   "composer.voice.start": "Crea un prompt con la voce",
@@ -71,6 +80,8 @@ export const messages = {
     "L'accesso al microfono è bloccato. Consenti a OpenBot di usare il microfono nelle impostazioni di sistema.",
   "composer.voice.noMicrophone": "Nessun microfono disponibile.",
   "composer.voice.startFailed": "OpenBot non è riuscito ad avviare la registrazione vocale.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot non è riuscito ad aprire il microfono. Chiudi le altre app che lo usano, verifica che sia collegato e consentito nelle impostazioni di sistema, poi riprova.",
   "composer.voice.transcribeFailed": "OpenBot non è riuscito a trascrivere questa registrazione.",
   "composer.reply.toYou": "Risposta al tuo messaggio",
   "composer.reply.toAgent": "Risposta all'agente",
@@ -100,7 +111,10 @@ export const messages = {
   "composer.voice.recording": "Registrazione vocale",
   "composer.voice.limitSoon": "La registrazione si ferma tra {seconds} secondi.",
   "composer.voice.limitReached":
-    "La registrazione si è fermata al limite di 2 minuti. Quello che hai detto è nel messaggio.",
+    "La registrazione si è fermata al limite di 10 minuti. Quello che hai detto è nel messaggio.",
+  "composer.voice.languageNotice":
+    "La dettatura conosce 25 lingue europee, come l’inglese. Le altre lingue richiedono un modello più grande ({size}) e il testo appare dopo lo stop.",
+  "composer.voice.languageNotice.action": "Parlo un’altra lingua",
   "composer.send.saveQueued": "Salva messaggio in coda",
   "composer.send.voice": "Invia messaggio vocale",
   "composer.send.message": "Invia messaggio",
@@ -132,6 +146,8 @@ export const messages = {
   "composer.voice.noSpeechRecorded": "Nessuna voce registrata.",
   "composer.voice.noSpeechDetected": "Nessuna voce rilevata.",
   "composer.voice.readFailed": "Impossibile leggere la risposta ad alta voce.",
+  "composer.voice.languageUnsupported":
+    "Impossibile leggere la risposta ad alta voce. Questa lingua non è ancora disponibile.",
   "composer.error.saveEditTryAgain": "Impossibile salvare questa modifica su questo computer. Riprova.",
   "composer.error.saveUnconfirmed": "Il salvataggio non è confermato. Riprova a salvare per controllare il risultato.",
   "composer.error.changeModel": "Impossibile cambiare modello. Riprova.",

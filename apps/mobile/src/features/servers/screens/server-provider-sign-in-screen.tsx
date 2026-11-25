@@ -6,9 +6,10 @@ import ExternalLink from "lucide-react-native/icons/external-link";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Linking, View } from "react-native";
+import { Linking } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { PasteButton } from "@/features/servers/components/paste-button";
+import { SignInSteps } from "@/features/servers/components/sign-in-steps";
 import { type ProviderAdmin, relayPage } from "@/features/servers/model/provider-admin";
 import { useRefreshProviderAccounts, useServerProviders } from "@/features/servers/model/use-server-providers";
 import {
@@ -23,34 +24,15 @@ import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/** How often the host is asked how a relayed sign-in is, as on the web. */
 const RELAY_POLL_MS = 1000;
 
-/**
- * A sign-in that runs on the host while this page shows it. `accountId` is the account of an
- * `account-code` sign-in (`provider-account-code-v1`), once the host named it: its status, its code
- * and its cancel name that account.
- */
 type SignIn =
   | { kind: "starting"; accountId?: string }
-  /** A device code that the user types on the provider's page. */
   | { kind: "code"; userCode: string; url: string; accountId?: string }
-  /** The provider's page shows a code that the user pastes back here. */
   | { kind: "paste"; url: string; accountId?: string }
-  /** The provider sees the sign-in on the page by itself. */
   | { kind: "link"; url: string; accountId?: string }
-  /** `sign-in-relay-v1`: the host waits for its page; `paste` pages return to the host's loopback address. */
   | { kind: "relay"; flowId: string; page: { url: string; state: string | null; paste: boolean } | null };
 
-/**
- * Server settings > Providers > a provider > Connect, Reconnect or Add account: one sign-in of the
- * host's provider. The sign-in starts when the page opens and the page closes when it ends. Leaving
- * the page cancels it. A code goes to the host only, and the phone does not keep it.
- *
- * `account` signs in that account of the provider again and `add` adds an account: with `relay` on
- * the page that the host relays, and with `account-code` with the code sign-in of the account. The
- * phone shows no QR code: it opens the page itself.
- */
 export function ServerProviderSignInScreen() {
   const { t, sourceText, errorMessage } = useText();
   const params = useLocalSearchParams<{
@@ -66,7 +48,6 @@ export function ServerProviderSignInScreen() {
     params.method === "code" || params.method === "relay" || params.method === "account-code" ? params.method : null;
   const account = params.account ? params.account : params.add === "1" ? null : undefined;
   const [signIn, setSignIn] = useState<SignIn | null>(null);
-  // The provider's own status does not say how a sign-in of one account ended, so it is not watched.
   const providers = useServerProviders(serverId, {
     watchStatus: signIn !== null && signIn.kind !== "relay" && method !== "account-code",
   });
@@ -95,15 +76,12 @@ export function ServerProviderSignInScreen() {
     }
   }
 
-  /** Back to the page that opened the sign-in, or to the provider page when this page is the first. */
   const close = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace({ pathname: "/server-settings/provider", params: { serverId, provider: params.provider } });
   }, [serverId, params.provider]);
 
-  // The host keeps a sign-in open until it ends or is cancelled, so leaving the page cancels it.
   const active = useRef<{ admin: ProviderAdmin; signIn: SignIn; provider: AgentProviderId } | null>(null);
-  /** The sign-in ended well: the page closes, and the provider page shows the new status. */
   const finished = useRef(false);
   const finish = useCallback(() => {
     if (finished.current) return;
@@ -115,9 +93,6 @@ export function ServerProviderSignInScreen() {
     close();
   }, [refreshStatus, refreshAccounts, close]);
 
-  // A code sign-in ends on the provider's page. The host then reports the provider connected. A
-  // Reconnect starts while the provider is connected, so it ends only after the host reported the
-  // sign-in as running: the host marks the provider `connecting` until the sign-in ends.
   const state = row?.status?.state;
   const connecting = row?.status?.connectionState === "connecting";
   const [reconnecting, setReconnecting] = useState(false);
@@ -139,8 +114,6 @@ export function ServerProviderSignInScreen() {
         ? { admin, signIn, provider }
         : null;
   }, [admin, provider, signIn]);
-  // A start that answers after the page closed is cancelled where it resolves, in `startSignIn`. The
-  // page under this one shows the status that the cancel answers, and a cancelled new account goes.
   const afterCancel = useRef({ applyStatus, refreshAccounts });
   afterCancel.current = { applyStatus, refreshAccounts };
   const mounted = useRef(true);
@@ -188,13 +161,9 @@ export function ServerProviderSignInScreen() {
             return;
           }
           setSignIn({ kind: "relay", flowId: relayFlow, page });
-          // The user asked for the sign-in with Connect, so a page that finishes by itself opens
-          // without a second tap. A page whose address the user brings back opens only after the
-          // steps show, because the browser hides them.
           if (!page.paste)
             void Linking.openURL(page.url).catch(() => setError(currentText().t("mobile.server.providers.openFailed")));
         },
-        // The host forgets a flow that expired or that a restart ended, and refuses its status.
         (cause: unknown) => {
           if (!current) return;
           setSignIn(null);
@@ -210,7 +179,6 @@ export function ServerProviderSignInScreen() {
     };
   }, [admin, relayFlow, relayReady, sourceText, applyStatus, refreshStatus, refreshAccounts, finish]);
 
-  // An account's code sign-in ends when its own status says so, as on desktop and the web.
   const accountCode = admin?.accounts?.code ?? null;
   const accountCodeId = signIn && signIn.kind !== "relay" ? (signIn.accountId ?? null) : null;
   useEffect(() => {
@@ -232,7 +200,6 @@ export function ServerProviderSignInScreen() {
         },
         (cause: unknown) => {
           if (!current) return;
-          // Nobody watches the sign-in any more, so it must not stay open until the code expires.
           void accountCode
             .cancel(provider, accountCodeId)
             .catch(() => undefined)
@@ -281,7 +248,6 @@ export function ServerProviderSignInScreen() {
               .finally(() => void refreshAccounts());
             return;
           }
-          // A new account shows in the list under this page at once.
           void refreshAccounts();
           if (start.kind === "connected") setSignIn({ kind: "starting", accountId });
           else if (start.kind === "code")
@@ -320,8 +286,6 @@ export function ServerProviderSignInScreen() {
     });
   }
 
-  // The user asked for the sign-in on the provider page, so it starts once, when the host answers.
-  // It waits for the status, which tells a Reconnect from a first Connect.
   const started = useRef(false);
   const ready = Boolean(admin && row && status.data);
   useEffect(() => {
@@ -375,8 +339,6 @@ export function ServerProviderSignInScreen() {
           }
           onSubmitCode={() =>
             void run("submit", async () => {
-              // The host only gives the code to the CLI. The sign-in stays open, so the status is
-              // read until the host reports the provider or the account connected.
               if (signIn.kind === "paste" && signIn.accountId !== undefined) {
                 if (!admin.accounts?.code) return;
                 await admin.accounts.code.submit(provider, signIn.accountId, code.trim());
@@ -394,7 +356,6 @@ export function ServerProviderSignInScreen() {
               if (relay.result) finish();
             })
           }
-          // Leaving the page cancels the sign-in on the host.
           onCancel={close}
         />
       ) : (
@@ -413,7 +374,6 @@ export function ServerProviderSignInScreen() {
   );
 }
 
-/** Asks the host to end a sign-in. It answers with its status after it. */
 function cancelSignIn(admin: ProviderAdmin, provider: AgentProviderId, signIn: SignIn) {
   if (signIn.kind === "relay") return admin.cancelRelay(signIn.flowId);
   const accountId = signIn.accountId;
@@ -440,7 +400,6 @@ function SignInSection({
   onCancel,
 }: {
   signIn: SignIn;
-  /** ChatGPT signs in with a code only when the account turned that on. */
   chatgpt: boolean;
   busy: boolean;
   code: string;
@@ -455,7 +414,6 @@ function SignInSection({
 }) {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
-  // The host needs a moment to start the sign-in and to get the page. The row says what it waits for.
   const waiting =
     signIn.kind === "starting"
       ? t("mobile.server.providers.starting")
@@ -463,7 +421,6 @@ function SignInSection({
         ? t("mobile.server.providers.relayWaiting")
         : null;
   const url = signIn.kind === "starting" ? null : signIn.kind === "relay" ? (signIn.page?.url ?? null) : signIn.url;
-  // The steps show before the page opens: in the browser, the user cannot see this screen.
   const steps =
     signIn.kind === "code"
       ? [
@@ -563,23 +520,6 @@ function SignInSection({
   );
 }
 
-/** The numbered steps of a sign-in, in the order that the user does them. */
-function SignInSteps({ steps }: { steps: readonly string[] }) {
-  return (
-    <View className="gap-3 px-4 py-3">
-      {steps.map((step, index) => (
-        <View key={step} className="flex-row gap-3">
-          <View className="size-6 items-center justify-center rounded-full bg-control">
-            <Typography.Paragraph type="body-xs">{index + 1}</Typography.Paragraph>
-          </View>
-          <Typography.Paragraph className="min-w-0 flex-1">{step}</Typography.Paragraph>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/** A code or an address that the user pastes back from the provider's page. */
 function PastedValue({
   label,
   placeholder,

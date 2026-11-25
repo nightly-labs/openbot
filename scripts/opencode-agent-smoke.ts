@@ -1,12 +1,3 @@
-// Checks that an OpenCode agent still does its work with the rules of `opencode-agent-defaults.ts`.
-// Runs the real `opencode` provider driver and the real OpenCode binary against a fake model on
-// loopback (`opencode-agent-harness.ts`), with the OpenBot tools of a real agent. In one turn the model
-// calls `write`, `read`, `edit`, `shell`, `glob`, `grep`, a `general` subagent, and `execute` with the
-// OpenBot `ask_user` tool, which the Code Mode catalog does not show. Then a second process starts
-// with the user's own rules: a global config with the catch-all `"*": "allow"`, a pattern that allows
-// `opencode_read_mcp_resource` and a pattern that allows the `report` skill, and a project rule that
-// allows `question`. The user's rules must win, and OpenBot's other rules must stay.
-// `OPENCODE_CLI=<opencode> bun run smoke:opencode-agent`. Writes .openbot-build/opencode-agent-smoke/report.json.
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -32,7 +23,6 @@ const ANSWER = "Blue, please.";
 
 interface StepReport {
   tool: string;
-  /** The tool result that OpenCode sent back to the model, shortened. */
   result: string;
 }
 
@@ -73,7 +63,6 @@ const steps: ModelAnswer[] = [
   },
 ];
 
-/** The text of the last tool result in a request. */
 function lastToolResult(request: ModelRequest): string {
   const tool = getArray(request.body, "messages")
     .filter((message) => getString(message, "role") === "tool")
@@ -91,7 +80,6 @@ function answerHost(client: AgentClient): void {
       client.respond(request.id, { success: true, contentItems: [{ type: "inputText", text: ANSWER }] });
       return;
     }
-    // A permission request: OpenBot's own approval flow is not under test here.
     client.respond(request.id, { decision: "accept" });
   });
 }
@@ -119,7 +107,6 @@ try {
   delete process.env.OPENCODE_CONFIG;
   await harness.writeGlobalConfig({});
 
-  // Part 1: OpenBot's rules, and every core tool in one turn.
   harness.script = (request) => {
     if (request.lastUser.includes(SUBAGENT_MARKER)) {
       report.subagentRequests += 1;
@@ -172,7 +159,6 @@ try {
   assert.ok(result("execute").includes(ANSWER), `execute did not return the answer: ${result("execute")}`);
   await runCauseEffect(client.stop());
 
-  // Part 2: the user's own rules win.
   await harness.writeGlobalConfig({
     permission: { "*": "allow", "opencode_read_mcp_*": "allow", skill: { "rep*": "allow" } },
   });
@@ -201,7 +187,6 @@ try {
     report.userRules.catalog.opencode.includes("read_mcp_resource"),
     "The global pattern did not keep opencode.read_mcp_resource.",
   );
-  // The catch-all `"*"` does not count as a choice about these rules.
   assert.ok(!report.userRules.skills.includes("opencode"), "OpenBot's rule for the opencode skill is gone.");
   assert.ok(
     !report.userRules.catalog.opencode.includes("list_mcp_resources"),

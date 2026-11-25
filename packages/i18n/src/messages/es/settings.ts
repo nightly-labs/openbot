@@ -30,6 +30,8 @@ export const messages = {
   "settings.movingFaces.title": "Caras de agentes en movimiento",
   "settings.movingFaces.description":
     "Las caras de los agentes parpadean y se mueven. Empiezan quietas en un equipo sin GPU.",
+  "settings.startupAnimation.title": "Animación de inicio",
+  "settings.startupAnimation.description": "Muestra la animación de agentes mientras se abre OpenBot.",
   "settings.logoColor.title": "Color del logotipo",
   "settings.logoColor.description": "Se muestra en el Dock, la barra de tareas y Dynamic Island.",
   "settings.logoColor.buildNote":
@@ -52,15 +54,17 @@ export const messages = {
   "settings.chatBackground.default": "Predeterminado",
   "settings.chatBackdrop.title": "Fondo de la ventana",
   "settings.chatBackdrop.description":
-    "Una escena, imagen o GIF detrás de toda la ventana en este dispositivo. Pide una escena a un agente y luego elige «Usar como fondo» en su respuesta.",
+    "Una escena, imagen, GIF o vídeo detrás de toda la ventana en este dispositivo. Pide una escena a un agente y luego elige «Usar como fondo» en su respuesta.",
   "settings.chatBackdrop.none": "Ninguno",
   "settings.chatBackdrop.pond": "Estanque koi",
   "settings.chatBackdrop.jellyfish": "Medusas",
   "settings.chatBackdrop.sunset": "Atardecer retro",
   "settings.chatBackdrop.snowfall": "Nevada",
   "settings.chatBackdrop.fireflies": "Luciérnagas",
-  "settings.chatBackdrop.upload": "Subir imagen…",
-  "settings.chatBackdrop.uploadRefused": "Usa una imagen PNG, JPEG, GIF, WebP o AVIF de 20 MB como máximo.",
+  "settings.chatBackdrop.coast": "Costa de neón",
+  "settings.chatBackdrop.upload": "Subir…",
+  "settings.chatBackdrop.uploadRefused":
+    "Usa una imagen PNG, JPEG, GIF, WebP o AVIF de 20 MB como máximo, o un vídeo MP4 o WebM de 100 MB como máximo.",
   "settings.chatBackdrop.saveFailed": "El fondo no se guardó.",
   "settings.chatBackdrop.removeFailed": "El fondo no se quitó.",
   "settings.chatColor.title": "Color del chat",
@@ -279,6 +283,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "En Wayland sin XWayland, el dock no puede aparecer sobre otras apps. Aparece en la ventana de OpenBot.",
   "settings.agentDock.xwayland.restart": "Reiniciar",
+  "settings.agentDock.noCompositor.title": "En la ventana de OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "Tu escritorio no puede mostrar ventanas transparentes, así que el dock aparece en la ventana de OpenBot. Para verlo sobre otras apps, activa los efectos de escritorio (un compositor) en los ajustes del sistema y reinicia OpenBot.",
   "settings.agentDock.display.title": "Pantalla",
   "settings.agentDock.display.description":
     "Si esa pantalla no está conectada, el dock pasa a la pantalla de la ventana de OpenBot.",
@@ -477,7 +484,6 @@ export const messages = {
   "settings.profile.share.copyFailed": "No se pudo copiar la imagen.",
   "settings.profile.share.createFailed": "No se pudo crear la imagen.",
   "settings.profile.share.fileName": "openbot-activity.png",
-  // The text in the image to share.
   "settings.profile.share.caption": "Mis últimos seis meses con OpenBot",
   "settings.profile.activity.title": "Actividad en este equipo",
   "settings.profile.activity.activeDays": {
@@ -487,7 +493,6 @@ export const messages = {
   "settings.profile.activity.empty": "Aún no hay actividad",
   "settings.profile.activity.loading": "Cargando actividad…",
   "settings.profile.activity.loadFailed": "No se pudo cargar tu actividad.",
-  // {tokens} is a short number, such as 1.2M.
   "settings.profile.activity.heatmapLabel": {
     one: "{tokens} tokens en {count} día activo en el último año",
     other: "{tokens} tokens en {count} días activos en el último año",
@@ -615,6 +620,7 @@ export const messages = {
   "settings.hostedServers.state.planEnded": "Plan finalizado",
   "settings.hostedServers.state.creating": "Creando",
   "settings.hostedServers.state.starting": "Iniciando",
+  "settings.hostedServers.state.restoring": "Restaurando datos",
   "settings.hostedServers.state.running": "En ejecución",
   "settings.hostedServers.state.stopping": "Deteniendo",
   "settings.hostedServers.state.stopped": "Detenido",
@@ -625,6 +631,8 @@ export const messages = {
   "settings.hostedServers.paymentDescription": "La configuración comienza cuando Stripe confirma el pago.",
   "settings.hostedServers.planEndedDescription":
     "El plan finalizó y el servidor se detuvo. Sus datos se conservan. Renueva el plan para iniciarlo.",
+  "settings.hostedServers.planEndedKeptUntil":
+    "El plan finalizó y el servidor se detuvo. Sus datos se conservan hasta el {date}. Renueva el plan antes para iniciarlo.",
   "settings.hostedServers.pay": "Abrir página de pago",
   "settings.hostedServers.payLabel": "Abrir página de pago de {name}",
   "settings.hostedServers.renew": "Renovar plan",
@@ -667,7 +675,6 @@ export const messages = {
   "settings.hostedServers.plan.standard.summary": "Para un equipo pequeño con rutinas diarias.",
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Para muchos agentes y trabajo intensivo con el navegador.",
-  // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictado",
   "settings.voice.model.parakeet.description":
     "Rápido. Detecta el idioma hablado por sí mismo, en 25 idiomas europeos.",
@@ -736,7 +743,44 @@ export const messages = {
   "settings.voice.speech.sample": "Hola. Así sonarán tus respuestas.",
   "settings.voice.speech.listenFailed": "No se pudo reproducir la muestra.",
   "settings.voice.live.section": "Voz en directo",
+  "settings.voice.talk.section": "Conversación por voz",
+  "settings.voice.talkKey.title": "Tecla para hablar",
+  "settings.voice.talkKey.description": "Mantén pulsadas estas teclas para hablar en una conversación por voz.",
+  "settings.voice.talkKey.change": "Cambiar la tecla para hablar",
+  "settings.voice.talkKey.recording": "Pulsa las teclas",
+  "settings.voice.talkKey.refused": "Añade otra tecla",
+  "settings.voice.talkKey.reset": "Restablecer",
+  "settings.tab.keyboard.title": "Teclado",
+  "settings.tab.keyboard.description": "Cambia los atajos de teclado en este dispositivo.",
+  "settings.shortcuts.section": "Atajos",
+  "settings.shortcuts.fixed.section": "Atajos fijos",
+  "settings.shortcuts.command.newThread": "Nuevo hilo",
+  "settings.shortcuts.command.previousThread": "Hilo anterior",
+  "settings.shortcuts.command.nextThread": "Hilo siguiente",
+  "settings.shortcuts.command.newAgent": "Nuevo agente",
+  "settings.shortcuts.command.globalSearch": "Buscar en todo",
+  "settings.shortcuts.command.searchChat": "Buscar en el chat",
+  "settings.shortcuts.command.focusComposer": "Ir al cuadro de mensaje",
+  "settings.shortcuts.command.back": "Atrás",
+  "settings.shortcuts.command.forward": "Adelante",
+  "settings.shortcuts.command.toggleSidebar": "Mostrar u ocultar la barra lateral",
+  "settings.shortcuts.command.showShortcuts": "Mostrar atajos de teclado",
+  "settings.shortcuts.command.openSettings": "Abrir ajustes",
+  "settings.shortcuts.command.stopAllAgents": "Detener todos los agentes",
+  "settings.shortcuts.command.switchServer": "Cambiar de servidor",
+  "settings.shortcuts.command.zoom": "Zoom",
+  "settings.shortcuts.refused.invalid": "Añade una tecla modificadora",
+  "settings.shortcuts.refused.reserved": "El sistema usa este atajo",
+  "settings.shortcuts.refused.taken": "Lo usa {command}",
+  "settings.shortcuts.recording": "Pulsa las teclas",
+  "settings.shortcuts.change": "Cambiar el atajo de {command}",
+  "settings.shortcuts.reset": "Restablecer",
+  "settings.shortcuts.resetAll": "Restablecer todo",
   "settings.voice.live.signIn": "Inicia sesión en Codex con tu cuenta de ChatGPT para usar la voz en directo.",
+  "settings.voice.live.account": "Cuenta",
+  "settings.voice.live.accountAutomatic": "Automática",
+  "settings.voice.live.accountDescription":
+    "La cuenta de ChatGPT que usa la voz en directo. Elige una cuenta cuyo plan incluya voz.",
   "settings.transfer.title": "Trasladar este servidor a otro equipo",
   "settings.transfer.lede": "Tus agentes, sus habilidades, rutinas, recuerdos y archivos van en un solo archivo.",
   "settings.transfer.flow.label": "Cómo funciona una transferencia",
@@ -840,6 +884,10 @@ export const messages = {
   "settings.transfer.copy.notCopied":
     "Sus canales, flujos de rutinas, flujos de trabajo y la carpeta compartida también se copian. Las claves de API, los inicios de sesión, los conectores y el historial de chats no se copian. Configúralos de nuevo en el otro servidor.",
   "settings.transfer.copy.submit": { one: "Copiar {count} agente", other: "Copiar {count} agentes" },
+  "settings.transfer.copy.duplicatesTitle": "¿Copiar agentes duplicados?",
+  "settings.transfer.copy.duplicatesDescription":
+    "{server} ya tiene agentes con estos nombres: {names}. La copia añade un segundo agente por cada uno. Cada copia es un agente independiente con sus propios chats, archivos y recuerdos.",
+  "settings.transfer.copy.duplicatesConfirm": "Copiar duplicados",
   "settings.transfer.copy.copying": "Copiando…",
   "settings.transfer.copy.done": {
     one: "{count} agente copiado a {server}.",
