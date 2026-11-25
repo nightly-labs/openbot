@@ -80,15 +80,13 @@ const summaryPrompt = (answer: string) =>
   `A voice says your reply aloud. The answer below is too long for the voice: reply with ${SUMMARY_RULES}` +
   `Reply with the summary only.\n\nAnswer:\n${answer}`;
 const SAME_TURN_REPLY = "The agent answered this request together with the previous one.";
-const RELAY_DELEGATION = /^<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/;
+const RELAY_DELEGATION = /<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/g;
 
 function relayRequest(text: string): string {
-  const input = RELAY_DELEGATION.exec(text)?.[1]
-    ?.replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&")
-    .trim();
-  return input || text;
+  const inputs = [...text.matchAll(RELAY_DELEGATION)]
+    .map((match) => (match[1] ?? "").replaceAll("&lt;", "<").replaceAll("&gt;", ">").replaceAll("&amp;", "&").trim())
+    .filter(Boolean);
+  return inputs.at(-1) || text;
 }
 
 const HEARD_LINE_LIMIT = 20;
