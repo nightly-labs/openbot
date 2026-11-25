@@ -9,13 +9,15 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 import { installFakeAgent, readJsonl, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-steer-e2e");
-const TURN_TIMEOUT_MS = 20_000;
+const TURN_TIMEOUT_MS = 30_000;
+const COMMAND_ANSWER = "The build finished: 42 files.";
 
 interface LogEntry {
   event: string;
   sessionId?: string;
   text?: string;
   steer?: boolean;
+  wake?: boolean;
 }
 
 interface Finished {
@@ -23,6 +25,12 @@ interface Finished {
   status: string | null;
   started: number;
   usage: number;
+}
+
+interface CommandWake {
+  status: string | null;
+  answers: number;
+  wakePrompts: number;
 }
 
 interface Report {
@@ -37,6 +45,7 @@ interface Report {
   oldCli?: { refused: string; prompts: number; status: string | null };
   heldWork?: { status: string | null; releasable: boolean | undefined; closedSessions: number; daemonRuns: boolean };
   reloadNote?: { afterIdleStop: boolean; secondPrompt: boolean; heldSession: boolean };
+  commandWake?: { agentReplies: CommandWake; silentAgent: CommandWake };
   failure?: string;
 }
 
@@ -48,10 +57,11 @@ const clients: AgentClient[] = [];
 async function open(
   name: string,
   env: Readonly<Record<string, string>>,
+  agent = "antigravity-steer",
 ): Promise<{ client: AgentClient; log: string }> {
   const executable = join(root, name, "bin", "antigravity");
   const log = join(root, name, "agent.jsonl");
-  await installFakeAgent(executable, "antigravity-steer", { FAKE_LOG: log, ...env });
+  await installFakeAgent(executable, agent, { FAKE_LOG: log, ...env });
   const client = requireProviderDriver("antigravity").createClient(
     { executable, version: "1.5.4", source: "managed" },
     10_000,
@@ -153,6 +163,18 @@ async function waitForExit(pid: number): Promise<void> {
     if (Date.now() > deadline) throw new Error(`The session process ${pid} did not end.`);
     await new Promise((settle) => setTimeout(settle, 25));
   }
+}
+
+async function commandWake(name: string, env: Readonly<Record<string, string>>): Promise<CommandWake> {
+  const run = await open(name, env, "antigravity-command-wake");
+  run.client.start();
+  const thread = await startThread(run.client, { cwd: root });
+  const finished = await (await startTurn(run.client, thread, run.log, "build it")).done;
+  return {
+    status: finished.status,
+    answers: finished.reply.split(COMMAND_ANSWER).length - 1,
+    wakePrompts: (await prompts(run.log)).filter((entry) => entry.wake).length,
+  };
 }
 
 async function refusal(operation: Promise<string | null>): Promise<string> {
@@ -350,6 +372,16 @@ try {
   assert.ok(report.reloadNote.afterIdleStop, "A session that OpenBot stopped as idle must get the reload note.");
   assert.ok(!report.reloadNote.secondPrompt, "The reload note must come only once.");
   assert.ok(!report.reloadNote.heldSession, "A session whose work held its process must not get the reload note.");
+
+  const agentReplies = await commandWake("command-wake-reply", {});
+  const silentAgent = await commandWake("command-wake-silent", { FAKE_SILENT_WAKE: "1" });
+  report.commandWake = { agentReplies, silentAgent };
+  assert.equal(agentReplies.status, "completed");
+  assert.equal(agentReplies.answers, 1, "The agent's own answer to a finished command must show once.");
+  assert.equal(agentReplies.wakePrompts, 0, "An agent that replied by itself must get no wake prompt.");
+  assert.equal(silentAgent.status, "completed");
+  assert.equal(silentAgent.wakePrompts, 1, "An agent that stays silent must still get one wake prompt.");
+  assert.equal(silentAgent.answers, 1, "The answer to the wake prompt must show once.");
 
   report.passed = true;
 } catch (error) {
