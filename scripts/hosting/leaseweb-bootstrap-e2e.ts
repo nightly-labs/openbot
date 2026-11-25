@@ -65,7 +65,10 @@ done
 if [ -n "$(ip -6 route show default)" ]; then
   echo "userPrivate6=$(as_user fd00::1 80)"
   echo "rootPrivate6=$(as_root fd00::1 80)"
+  echo "userGoogle6=$(as_user 2001:4860:4860::8888 443)"
+  echo "rootGoogle6=$(as_root 2001:4860:4860::8888 443)"
 fi
+echo "userGoogle=$(as_user generativelanguage.googleapis.com 443)"
 echo "sshd=$(sshd -T | grep -E '^(passwordauthentication|kbdinteractiveauthentication|permitrootlogin|allowtcpforwarding) ' | sort | paste -sd, -)"
 echo "updatePeriod=$(apt-config dump | sed -n 's/^APT::Periodic::Unattended-Upgrade "\\(.*\\)";$/\\1/p')"
 echo "updateReboot=$(apt-config dump | sed -n 's/^Unattended-Upgrade::Automatic-Reboot "\\(.*\\)";$/\\1/p')"
@@ -228,6 +231,9 @@ function expectHardened(expect: Expect, phase: string, facts: Facts, server: str
   refusedByRules("a private address", facts.userPrivate, facts.rootPrivate);
   if (facts.userPrivate6 !== undefined)
     refusedByRules("a private IPv6 address", facts.userPrivate6, facts.rootPrivate6);
+  if (facts.userGoogle6 !== undefined)
+    refusedByRules("an IPv6 address of Google", facts.userGoogle6, facts.rootGoogle6);
+  expect(name("the service user connects to Google"), facts.userGoogle, "connected");
   expect(name("the service user connects to a public address"), facts.userPublic, "connected");
   expect(name("the service user connects to a mail submission port"), facts.userSubmission, "connected");
   expect(name("root cannot connect to port 25"), facts.rootMail, "refused");

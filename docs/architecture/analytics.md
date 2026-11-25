@@ -21,6 +21,17 @@ A final SDK filter replaces properties to remove SDK-added Android referrers and
 The SDK's optional persistent queue and screen tracking are not enabled. Configuration, event
 semantics and native verification steps are in [the mobile README](../../apps/mobile/README.md#openpanel-product-analytics).
 
+## Chrome extension analytics
+
+`apps/browser-extension/src/analytics.ts` owns the extension's events, their allowlists and the
+link preference. The side panel and the background service worker call it; the offscreen page does
+not, because it has no `chrome.storage`. Each event posts straight to the OpenPanel `/track` route
+with the public client ID, with no SDK and no queue, so a send never blocks a UI action and a failed
+send is dropped. The build sets `VITE_OPENBOT_ANALYTICS_URL`: OpenPanel for a production build
+against `https://api.openbot.run`, the loopback `OPENBOT_ANALYTICS_CAPTURE_URL` when that is set,
+and empty (no sends) otherwise. `scripts/browser-extension-e2e.ts` builds with a capture server and
+checks the event names, the surface, the opt-out and that no user content is sent.
+
 ## Website analytics
 
 Public website tracking lives in `apps/auth-api/src/lib/analytics.ts`. It runs only on the

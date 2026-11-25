@@ -1,10 +1,13 @@
 import {
   type CreditActivity,
   type CreditCheckoutRequest,
+  type CreditRedeemRequest,
+  type CreditRedeemResult,
   type CreditsState,
   type CreditTransferRequest,
   parseCreditActivity,
   parseCreditCheckoutUrl,
+  parseCreditRedeemResult,
   parseCreditsState,
 } from "@openbot/contracts/credits";
 import { sourceText } from "@openbot/i18n/source";
@@ -37,6 +40,10 @@ export class CreditsDesktopService {
   transfer(request: CreditTransferRequest): Effect.Effect<CreditsState, AccountServiceFailure> {
     return transferCredits(request).pipe(Effect.provide(this.#platform));
   }
+
+  redeem(request: CreditRedeemRequest): Effect.Effect<CreditRedeemResult, AccountServiceFailure> {
+    return redeemCreditCode(request).pipe(Effect.provide(this.#platform));
+  }
 }
 
 const readCreditsState = Effect.fn("CreditsDesktop.getState")(function* () {
@@ -60,7 +67,12 @@ const transferCredits = Effect.fn("CreditsDesktop.transfer")(function* (request:
   return yield* platform.request("/v1/me/credits/transfer", jsonPost(request), decodeCreditsState);
 });
 
-function jsonPost(body: CreditCheckoutRequest | CreditTransferRequest): RequestInit {
+const redeemCreditCode = Effect.fn("CreditsDesktop.redeem")(function* (request: CreditRedeemRequest) {
+  const platform = yield* AccountServicePlatform;
+  return yield* platform.request("/v1/me/credits/redeem", jsonPost(request), decodeCreditRedeemResult);
+});
+
+function jsonPost(body: CreditCheckoutRequest | CreditTransferRequest | CreditRedeemRequest): RequestInit {
   return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
 
@@ -68,6 +80,12 @@ function decodeCreditsState(value: unknown): CreditsState {
   const state = parseCreditsState(value);
   if (!state) throw new Error(sourceText("error.billing.invalidResponse"));
   return state;
+}
+
+function decodeCreditRedeemResult(value: unknown): CreditRedeemResult {
+  const result = parseCreditRedeemResult(value);
+  if (!result) throw new Error(sourceText("error.billing.invalidResponse"));
+  return result;
 }
 
 function decodeCreditActivity(value: unknown): CreditActivity {

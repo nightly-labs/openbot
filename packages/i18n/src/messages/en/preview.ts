@@ -22,6 +22,8 @@ export const messages = defineMessages("preview", {
   "preview.tooLarge.title": "File too large to preview",
   "preview.tooLarge.description": "Previews stop at 100 MB. You can open this file in its default application.",
   "preview.spreadsheet.readFailed": "Could not read this spreadsheet.",
+  "preview.spreadsheet.tooLarge":
+    "This spreadsheet is too large to preview. Open or download the file to see all of it.",
   "preview.spreadsheet.truncated": "Preview limited to the first {rows} rows and {columns} columns.",
   "preview.document.readFailed": "Could not read this document.",
   "preview.document.empty": "This document has no text to show.",

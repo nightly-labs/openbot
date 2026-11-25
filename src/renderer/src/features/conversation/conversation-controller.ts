@@ -446,6 +446,7 @@ export function createServerConversationState(keepSidePanelFiles = false) {
   } | null>(null);
   const [sidePanels, setSidePanels] = createStore<SidePanelsState>({
     side: storedSidePanels.side,
+    splits: {},
     subagents: {},
     threads: {},
   });

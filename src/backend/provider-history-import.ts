@@ -73,6 +73,7 @@ export interface ProviderHistoryImportInput {
   quietTeammateThread?: boolean;
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
   requestAnswered?(deliveryId: string): boolean;
+  followsUpOwnAnswer?(delivery: DeliveryContext["delivery"]): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -334,6 +335,7 @@ function routineTurnAnswers(
   input: ProviderHistoryImportInput,
   turnId: string,
 ): Effect.Effect<RoutineTurnAnswers, ProviderClientOperationError> {
+  const followsUpOwnAnswer = (delivery: DeliveryContext["delivery"]) => input.followsUpOwnAnswer?.(delivery) === true;
   return Effect.gen(function* () {
     let routine: boolean | undefined;
     let requestsOnly = true;
@@ -359,7 +361,11 @@ function routineTurnAnswers(
           routine =
             delivery !== undefined &&
             ((input.quietTeammateThread === true &&
-              quietTeammateTurnDelivery(delivery, (request) => input.requestAnswered?.(request.id) === true)) ||
+              quietTeammateTurnDelivery(
+                delivery,
+                (request) => input.requestAnswered?.(request.id) === true,
+                followsUpOwnAnswer,
+              )) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
           requestsOnly &&= delivery !== undefined && teammateRequest(delivery);

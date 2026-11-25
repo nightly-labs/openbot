@@ -150,6 +150,7 @@ export const messages = {
   "workflow.image.descriptionPlaceholder": "Décrivez l’image",
   "workflow.image.models": "Modèles d’image",
   "workflow.image.chooseModel": "Choisir un modèle",
+  "workflow.image.modelUnavailable": "Modèle indisponible",
   "workflow.media.subscription": "Abonnement {name}",
   "workflow.media.apiKey": "Clé API {name}",
   "workflow.media.credits": "Crédits {name}",
@@ -546,8 +547,36 @@ export const messages = {
   "workflow.canvas.presence.follow": "Suivre {name}",
   "workflow.canvas.presence.you": "{name} (vous)",
   "workflow.canvas.presence.following": "Vous suivez {name}",
-  "workflow.canvas.empty.title": "Commencez par un déclencheur",
-  "workflow.canvas.empty.add": "Ajouter un déclencheur",
+  "workflow.canvas.start.title": "Commencer avec un modèle",
+  "workflow.canvas.start.blank": "Canevas vide",
+  "workflow.template.morningBrief.title": "Brief du matin",
+  "workflow.template.morningBrief.brief": "Chaque matin à 08:00, recevez 5 lignes d’actualités sur vos sujets.",
+  "workflow.template.morningBrief.task":
+    "Trouve les actualités du dernier jour sur ces sujets : IA, startups. Écris les 5 plus importantes, une ligne chacune, avec un lien.",
+  "workflow.template.answerIssues.title": "Répondre aux nouvelles issues",
+  "workflow.template.answerIssues.brief": "Quand quelqu’un ouvre une issue GitHub, répondez-y et ajoutez un label.",
+  "workflow.template.answerIssues.task":
+    "Lis l’issue. Trouve la cause probable dans le code. Écris une réponse courte et aimable, et choisis un label.",
+  "workflow.template.weeklyReport.title": "Rapport hebdomadaire",
+  "workflow.template.weeklyReport.brief":
+    "Chaque vendredi à 16:00, résumez la semaine. Vous l’approuvez avant l’envoi.",
+  "workflow.template.weeklyReport.task":
+    "Résume ce que l’équipe a fait cette semaine : travail terminé, problèmes ouverts et prochaines étapes. Utilise des listes courtes.",
+  "workflow.template.weeklyReport.question": "Envoyer ce rapport hebdomadaire ?",
+  "workflow.template.priceWatch.title": "Surveiller un prix",
+  "workflow.template.priceWatch.brief":
+    "Chaque matin à 09:00, vérifiez le prix d’un produit. Recevez une notification quand il passe sous votre limite.",
+  "workflow.template.priceWatch.task":
+    "Ouvre cette page produit et lis le prix : https://example.com/product. Écris seulement le prix et le lien.",
+  "workflow.template.priceWatch.rule": "Le prix est inférieur à 100.",
+  "workflow.template.priceWatch.alert": "Baisse de prix",
+  "workflow.template.socialPost.title": "Publication avec image",
+  "workflow.template.socialPost.brief":
+    "Écrivez une idée. Obtenez une courte publication et une image carrée pour elle.",
+  "workflow.template.socialPost.idea": "Nous ouvrons maintenant le dimanche, de 10:00 à 16:00.",
+  "workflow.template.socialPost.prompt":
+    "Écris une publication pour les réseaux sociaux sur cette nouvelle en moins de 280 caractères. Utilise une première ligne claire et pas de hashtags.",
+  "workflow.template.socialPost.picture": "Une image nette et lumineuse pour cette publication.",
   "workflow.canvas.tool.label": "Outils du canevas",
   "workflow.canvas.tool.select": "Sélection",
   "workflow.canvas.tool.pan": "Déplacer",

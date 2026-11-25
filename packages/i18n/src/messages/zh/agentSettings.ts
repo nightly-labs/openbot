@@ -45,6 +45,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder} 不是此电脑上的文件夹",
   "agentSettings.folders.limit": { one: "最多可添加 {count} 个文件夹", other: "最多可添加 {count} 个文件夹" },
   "agentSettings.folders.browse.places": "前往",
+  "agentSettings.folders.browse.path": "文件夹路径",
   "agentSettings.folders.browse.home": "主文件夹",
   "agentSettings.folders.browse.parent": "向上：{folder}",
   "agentSettings.folders.browse.failed": "无法打开此文件夹。",
@@ -87,6 +88,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "额度已用完 · 已跳过",
   "agentSettings.backupModels.unavailable": "当前不可用 · 已跳过",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "{name} 开始工作后若因用量上限停止，会用顺序中第一个可用的模型继续同一项工作。额度重置后会回到 {model}；出现服务商错误时，则在 10 分钟后回到 {model}。",
   "agentSettings.groups.brain": "核心",

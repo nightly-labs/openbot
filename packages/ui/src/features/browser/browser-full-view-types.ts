@@ -2,6 +2,7 @@ import type { BrowserControlSession, BrowserTab, BrowserTabAgent, BrowserTabLabe
 import type { AppTranslate } from "@openbot/i18n";
 import type { JSX } from "@solidjs/web";
 import type { BrowserViewRuntime } from "./BrowserLiveView";
+import type { BrowserPageMenu } from "./browser-page-cover";
 import type { BrowserHistoryEntry } from "./browser-suggestions";
 import type { BrowserShortcutPlatform } from "./browser-view-shortcuts";
 
@@ -18,6 +19,9 @@ export interface BrowserTeachBarProps {
 
 export interface BrowserFullViewProps {
   open: boolean;
+  pane?: boolean | undefined;
+  coveringMenus?: readonly (BrowserPageMenu | undefined)[] | undefined;
+  onOpenFullView?: (() => void) | undefined;
   tabs: readonly BrowserTab[];
   activeTab: BrowserTab | undefined;
   history: readonly BrowserHistoryEntry[];

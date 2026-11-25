@@ -1,11 +1,13 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
 const RATE_LIMIT_WINDOW_MS = 15 * 60_000;
+const CREDIT_CODE_LIMIT_WINDOW_MS = 60 * 60_000;
 
 export interface AuthRetentionResult {
   challenges: number;
   sessions: number;
   rateLimits: number;
+  creditCodeLimits: number;
   teamTickets: number;
   remoteSessions: number;
   remoteInvites: number;
@@ -36,6 +38,11 @@ function authRetentionOperations(now: number): AuthRetentionOperation[] {
       name: "rateLimits",
       sql: "DELETE FROM auth_rate_limits WHERE window_start <= ?",
       cutoff: now - RATE_LIMIT_WINDOW_MS,
+    },
+    {
+      name: "creditCodeLimits",
+      sql: "DELETE FROM credit_code_limits WHERE window_start <= ?",
+      cutoff: now - CREDIT_CODE_LIMIT_WINDOW_MS,
     },
     {
       name: "teamTickets",
@@ -109,6 +116,7 @@ const prune = Effect.fn("AuthRetention.prune")(function* (now: number) {
     challenges: 0,
     sessions: 0,
     rateLimits: 0,
+    creditCodeLimits: 0,
     teamTickets: 0,
     remoteSessions: 0,
     remoteInvites: 0,

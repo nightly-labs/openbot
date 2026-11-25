@@ -126,6 +126,8 @@ export const messages = {
   "mobile.workflow.media.unsupported": "יש לעדכן את OpenBot בשרת הזה כדי ליצור תמונות וסרטונים בתהליכי עבודה.",
   "mobile.workflow.media.settings": "הגדרות",
   "mobile.workflow.media.automatic": "אוטומטי",
+  "mobile.workflow.media.modelUnavailable": "המודל לא זמין",
+  "mobile.workflow.media.unavailableModelLabel": "{name} · לא זמין",
   "mobile.workflow.media.modelLabel": "{name} · {source}",
   "mobile.workflow.media.creditModelLabel": "{name} · קרדיטים של {source}",
   "mobile.workflow.media.price": "מחיר לכל הרצה",

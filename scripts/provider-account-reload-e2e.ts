@@ -143,6 +143,7 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
             interrupt: async () => undefined,
             supportedModels: async () => [],
             setModel: async () => undefined,
+            setPermissionMode: async () => undefined,
             applyFlagSettings: async () => undefined,
             close: () => undefined,
             usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET: async () => {

@@ -56,6 +56,31 @@ function piSkillReadNote(): string {
   return ` is an MCP resource, not a file, so read cannot open it. Load read_mcp_resource with tool_search, then call it with this uri and the server that lists it. The Computer Use guide ${COMPUTER_USE_GUIDE_URI} is on server ${piMcpServerName("external", COMPUTER_USE_MCP_SERVER_NAME)}.`;
 }
 
+const PI_MCP_ATTENTION = "MCP servers need attention:";
+const PI_MCP_ATTENTION_LINE = /^\s+(\S+): (?:failed(?:: (.*))?|(needs sign-in))$/u;
+
+export interface PiMcpStartFailure {
+  name: string;
+  status: "failed";
+  error: string;
+  failureReason?: "reauthenticationRequired";
+}
+
+export function piMcpServerKeys(servers: Readonly<Record<string, ClaudeMcpServer>>): ReadonlyMap<string, string> {
+  return new Map(Object.keys(servers).map((name) => [piMcpServerName("external", name), name]));
+}
+
+export function piMcpStartFailures(message: string, keys: ReadonlyMap<string, string>): PiMcpStartFailure[] {
+  if (!message.startsWith(PI_MCP_ATTENTION)) return [];
+  return message.split("\n").flatMap((line): PiMcpStartFailure[] => {
+    const match = PI_MCP_ATTENTION_LINE.exec(line);
+    const name = match?.[1] ? keys.get(match[1]) : undefined;
+    if (!match || !name) return [];
+    if (match[3]) return [{ name, status: "failed", error: "", failureReason: "reauthenticationRequired" }];
+    return [{ name, status: "failed", error: match[2] ?? "" }];
+  });
+}
+
 export interface PiMcpExtension {
   path: string;
   environment: Record<string, string>;

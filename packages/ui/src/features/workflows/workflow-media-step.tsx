@@ -265,6 +265,12 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     asString,
   );
   const model = () => models().find((candidate) => candidate.id === modelId());
+  const modelMissing = () => board.catalogs().imageModelsReady === true && modelId() !== "" && model() === undefined;
+  const savedModelName = () =>
+    model() === undefined
+      ? board.catalogs().unavailableModels?.find((entry) => entry.id === modelId() && entry.kinds.includes(kind()))
+          ?.name
+      : undefined;
   const aspects = () => workflowMediaAspects(model(), kind()).filter((value) => hostAspect(value) !== "");
   const [account] = useField(key, "account", "", asString);
   const specs = () =>
@@ -328,7 +334,7 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     isShort ? [t("billing.credits.notEnough"), label].join(", ") : label;
   const runLabel = () => {
     const credits = total();
-    return credits === null
+    return credits === null || modelMissing()
       ? undefined
       : priced(t("workflow.node.runPriceLabel", { credits: format.number(credits) }), short());
   };
@@ -389,6 +395,8 @@ export function useMediaStep(id: string, defaults: { prompt?: string | undefined
     setBackground,
     models,
     model,
+    modelMissing,
+    savedModelName,
     account,
     specs,
     resolutions,
@@ -430,10 +438,10 @@ export type MediaStep = ReturnType<typeof useMediaStep>;
 
 export const resolutionName = (value: string) => value.replace(/k$/u, "K");
 
-export function RunContent(props: { credits: number | null; takes?: number }) {
+export function RunContent(props: { credits: number | null; takes?: number; modelMissing?: boolean }) {
   const { t, format } = useText();
   return (
-    <>
+    <Show when={!props.modelMissing} fallback={t("workflow.image.modelUnavailable")}>
       <Show
         when={props.credits !== null}
         fallback={
@@ -449,6 +457,6 @@ export function RunContent(props: { credits: number | null; takes?: number }) {
       <Show when={(props.takes ?? 1) > 1}>
         <span class="wfn-run-takes">{t("workflow.media.batchCount", { value: String(props.takes) })}</span>
       </Show>
-    </>
+    </Show>
   );
 }

@@ -87,6 +87,8 @@ import type {
   HostSignalHomeSettings,
   HostSkillLearning,
   HostTimezoneSettings,
+  HostTurnLimits,
+  HostTurnLimitsInput,
   HostUpdateSettingsChange,
   HostUpdateStatus,
   HostVoiceModel,
@@ -146,6 +148,7 @@ import type {
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppSenderReadOnlyInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SetWorkflowPausedInput,
@@ -187,6 +190,7 @@ import type {
   WorkflowGraph,
   WorkflowMediaModel,
   WorkflowMediaPriceRequest,
+  WorkflowMediaUnavailableModel,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowSaveResult,
@@ -233,6 +237,7 @@ import type { PendingApproval } from "./pending-approvals";
 
 export interface WorkflowMediaModels {
   models: readonly WorkflowMediaModel[];
+  unavailable?: readonly WorkflowMediaUnavailableModel[];
   partial: boolean;
 }
 
@@ -269,6 +274,7 @@ export interface MobileServer {
   role: "owner" | "admin" | "member";
   memberLimit?: number;
   hosted?: boolean;
+  hidden?: true;
   storageGb?: number;
   restartAvailable?: boolean;
   keyChangedAt?: number;
@@ -384,8 +390,10 @@ export interface MobileWorkspaceContextValue {
   selectServer: (serverId: string) => void;
   leaveServer: (serverId: string) => Promise<void>;
   removeServer: (serverId: string) => Promise<void>;
+  setServerHidden: (serverId: string, hidden: boolean) => Promise<void>;
   refreshServers: () => Promise<void>;
   refreshServer: (serverId: string) => Promise<void>;
+  reconnectServer: (serverId: string) => Promise<void>;
   hostedServerStarting: (serverId: string) => void;
   knownServerChecks: (serverId: string) => ServerChecks | null;
   canEditServerIdentity: (serverId: string) => boolean;
@@ -420,6 +428,9 @@ export interface MobileWorkspaceContextValue {
   canManageServerTimezone: (serverId: string) => boolean;
   loadServerTimezone: (serverId: string) => Promise<HostTimezoneSettings>;
   setServerTimezone: (timezone: string | null, serverId: string) => Promise<HostTimezoneSettings>;
+  canManageServerTurnLimits: (serverId: string) => boolean;
+  loadServerTurnLimits: (serverId: string) => Promise<HostTurnLimits>;
+  setServerTurnLimits: (input: HostTurnLimitsInput, serverId: string) => Promise<HostTurnLimits>;
   canManageServerVoiceModel: (serverId: string) => boolean;
   canManageServerSignalHome: (serverId: string) => boolean;
   servesServerSignalHome: (serverId: string) => boolean;
@@ -536,6 +547,7 @@ export interface MobileWorkspaceContextValue {
   setWhatsAppOwnNumber: (input: SetWhatsAppOwnNumberInput, serverId: string) => Promise<void>;
   setWhatsAppWorkingMessage: (input: SetWhatsAppWorkingMessageInput, serverId: string) => Promise<void>;
   setWhatsAppStatusReactions: (input: SetWhatsAppStatusReactionsInput, serverId: string) => Promise<void>;
+  setWhatsAppSenderReadOnly: (input: SetWhatsAppSenderReadOnlyInput, serverId: string) => Promise<void>;
   serverUpdateAccess: (serverId: string) => ServerUpdateAccess | null;
   canReadServerRelease: (serverId: string) => boolean;
   loadServerUpdate: (serverId: string, access: ServerUpdateAccess) => Promise<HostUpdateStatus>;
@@ -585,6 +597,7 @@ export interface MobileWorkspaceContextValue {
   testAgentRoutine: (agentId: string, routineId: string, serverId: string) => Promise<void>;
   canManageEvents: (serverId: string) => boolean;
   canManageMissedRuns: (serverId: string) => boolean;
+  canUseOnceRoutines: (serverId: string) => boolean;
   canManageRoutineResults: (serverId: string) => boolean;
   canGiveWebhookSecretToAgent: (serverId: string) => boolean;
   loadRoutineResultOptions: (serverId: string) => Promise<RoutineResultConnectionOption[]>;
@@ -611,6 +624,7 @@ export interface MobileWorkspaceContextValue {
   ) => Promise<AgentMemorySelectionState>;
   loadAgentMemories: (agentId: string, serverId: string) => Promise<AgentMemory[]>;
   loadAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
+  loadOnceAgentRoutines: (agentId: string, serverId: string) => Promise<Routine[]>;
   loadRoutineCalendar: (
     input: RoutineCalendarInput,
     serverId: string,
@@ -804,7 +818,10 @@ export interface MobileWorkspaceContextValue {
     attachmentId: string,
     largeDownload?: RemoteLargeDownload,
     progress?: RemoteDownloadWatch,
+    tapped?: boolean,
+    wanted?: () => boolean,
   ) => Promise<RemoteFileUpload>;
+  prioritizeAttachmentDownload: (serverId: string, attachmentId: string) => void;
   downloadMessageFile: (serverId: string, file: MessageFileTarget) => Promise<RemoteFileUpload>;
   discardAttachment: (agentId: string, attachmentId: string, serverId?: string) => Promise<void>;
   hidesAgentsOnServer: (serverId: string) => boolean;
@@ -870,6 +887,7 @@ type ServerCheckKey =
   | "canCreateLocalServers"
   | "canRestartServerItself"
   | "canManageServerTimezone"
+  | "canManageServerTurnLimits"
   | "canManageServerVoiceModel"
   | "canManageServerSignalHome"
   | "servesServerSignalHome"
@@ -911,6 +929,7 @@ type ServerCheckKey =
   | "canUpdateMarketplaceAgents"
   | "canManageEvents"
   | "canManageMissedRuns"
+  | "canUseOnceRoutines"
   | "canManageRoutineResults"
   | "canGiveWebhookSecretToAgent"
   | "canManageAgentSkills"

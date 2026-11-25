@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "סגירת לשונית דפדפן",
   "browser.newTab": "לשונית דפדפן חדשה",
   "browser.backToChat": "חזרה לצ'אט",
+  "browser.fullView.open": "פתיחה בתצוגה מלאה",
   "browser.goBack": "חזרה",
   "browser.goForward": "קדימה",
   "browser.reload": "טעינת הדף מחדש",

@@ -50,6 +50,7 @@ export const messages = {
     other: "Vous pouvez ajouter {count} dossiers au maximum",
   },
   "agentSettings.folders.browse.places": "Aller à",
+  "agentSettings.folders.browse.path": "Chemin du dossier",
   "agentSettings.folders.browse.home": "Dossier personnel",
   "agentSettings.folders.browse.parent": "Remonter à {folder}",
   "agentSettings.folders.browse.failed": "Impossible d’ouvrir ce dossier.",
@@ -96,6 +97,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Limite d’utilisation atteinte · ignoré",
   "agentSettings.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Si une limite d’utilisation arrête {name} après le début du travail, {name} poursuit le même travail avec le premier modèle disponible dans l’ordre. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "agentSettings.groups.brain": "Cerveau",

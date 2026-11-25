@@ -315,7 +315,12 @@ export class AgentDockWindowController {
       }
       return Effect.gen({ self: this }, function* () {
         const window = yield* this.#ensureMainWindow();
-        if (action.type === "open-agent" || action.type === "open-channel" || action.type === "open-settings") {
+        if (
+          action.type === "open-agent" ||
+          action.type === "open-browser-takeover" ||
+          action.type === "open-channel" ||
+          action.type === "open-settings"
+        ) {
           this.#options.presentMainWindow(window);
         }
         if (!sendToRenderer(window, IPC_ENDPOINTS.agentDock.action, action)) {

@@ -335,7 +335,7 @@ export const messages = {
     "只有你的“给自己发消息”聊天和你允许的人可以发消息。其他人不会收到回复。关闭后，OpenBot 会给陌生人回复一个代码。",
   "connector.whatsapp.workingMessage": "“正在处理…”消息",
   "connector.whatsapp.workingMessageDescription":
-    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。关闭后只发送回答。",
+    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。使用个人号码时，只有你的“给自己发消息”聊天会收到这些消息。关闭后只发送回答。",
   "connector.whatsapp.statusReactions": "状态表情回应",
   "connector.whatsapp.statusReactionsDescription":
     "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
@@ -408,6 +408,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "一个号码最多可允许 {count} 个联系人和群组。",
   "connector.whatsapp.senderGroup": "群组",
   "connector.whatsapp.removeSender": "移除",
+  "connector.whatsapp.senderAccess": "{name} 的权限",
+  "connector.whatsapp.senderReplies": "可以分配工作",
+  "connector.whatsapp.senderReadOnly": "只读",
   "connector.whatsapp.addContact": "添加联系人",
   "connector.whatsapp.addGroup": "添加群组",
   "connector.whatsapp.contactTitle": "添加联系人",

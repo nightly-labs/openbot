@@ -48,6 +48,8 @@ export function hostUnreachable(
 }
 
 export function classifyConnectFailure(failure: unknown): RemoteConnectionOutcome {
+  if (failure instanceof DOMException && failure.name === "TimeoutError")
+    return hostUnreachable("auth/timeout", sourceText("error.remote.directoryTimeout"));
   const reference = errorReference(failure);
   const message =
     failure instanceof Error && isSafeConnectionError(failure.message)

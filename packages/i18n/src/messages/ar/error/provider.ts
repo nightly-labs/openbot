@@ -227,6 +227,8 @@ export const messages = {
     "انتهت صلاحية مفتاح OpenCode API الخاص بك. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
   "error.provider.opencodeKeyRefused":
     "رفض OpenCode Go مفتاح API المحفوظ. ربما انتهت صلاحية المفتاح. أنشئ مفتاحًا جديدًا في OpenCode Console، والصقه في إعدادات OpenCode، ثم أعد المحاولة.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "لم يستخدم OpenCode المفتاح الذي حفظته في OpenBot. استخدم مفتاح OpenCode Go آخر يحتفظ به OpenCode بنفسه، ورفض OpenCode Go هذا المفتاح. لإزالة هذا المفتاح، شغّل `opencode auth logout opencode-go` في طرفية على الكمبيوتر الذي يشغّل الوكيل، واختر المفتاح. ثم حاول مرة أخرى.",
   "error.provider.opencodeGoRequestRefused":
     "رفض OpenCode Go الطلب. لا يحل مفتاح API جديد هذه المشكلة. قد لا تكون خطة OpenCode Go نشطة، أو قد يحظر OpenCode Go شبكتك: بعض الخدمات تحظر شبكات VPN أو الخوادم الوكيلة أو بعض البلدان. تأكد من أن خطتك نشطة في OpenCode Console، أو أوقف VPN، ثم حاول مرة أخرى. يمكنك أيضًا اختيار نموذج آخر.",
   "error.provider.opencodeServiceFailure":
@@ -269,6 +271,10 @@ export const messages = {
   "error.provider.realtimeLimitZero":
     "أوقف Linux المزوّد لأن حد وقت المعالج في الوقت الحقيقي لدى OpenBot هو 0. يأتي هذا الحد من نظامك. ثبّت rtkit وشغّله (`rtkit-daemon`)، ثم نفّذ `systemctl --user restart xdg-desktop-portal`، ثم أعد تشغيل OpenBot. إعادة تشغيل xdg-desktop-portal وحدها لا تكفي ما دام rtkit غير مثبّت.",
   "error.provider.cpuUnsupported": "لا يمكن لمعالج هذا الكمبيوتر تشغيل هذا المزوّد. استخدم مزوّدًا آخر.",
+  "error.provider.largeMemoryPages":
+    "لا يمكن تشغيل هذا المزوّد على نواة Linux هذه، لأن النواة تستخدم صفحات ذاكرة أكبر من 4 KiB، كما في Raspberry Pi 5 أو Asahi Linux. استخدم نواة بصفحات 4 KiB أو مزوّدًا آخر.",
+  "error.provider.ipv6Missing":
+    "يحتاج هذا المزوّد إلى IPv6، وIPv6 متوقف على هذا الكمبيوتر. شغّل IPv6 ثم حاول مرة أخرى. في WSL، احذف ipv6.disable=1 من .wslconfig وشغّل wsl --shutdown.",
   "error.provider.windowsBlocked":
     "منعت إعدادات أمان Windows، مثل التحكم الذكي في التطبيقات، هذا المزوّد من البدء. استخدم مزوّدًا آخر.",
   "error.provider.opencodeDatabaseNewer":
@@ -278,6 +284,8 @@ export const messages = {
   "error.provider.opencodeNoAnswer": "أنهى نموذج OpenCode الدور بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.opencodeReasoningWithoutAnswer":
     "أنهى نموذج OpenCode الدور بعد الاستدلال، بدون إجابة. أعد المحاولة، أو اختر نموذجًا آخر.",
+  "error.provider.opencodeToolCallsAsText":
+    "كتب نموذج OpenCode إجراءاته كنص ولم ينفّذها. أعد المحاولة، أو اختر نموذجًا آخر.",
   "error.provider.acpNoAnswer": "أنهى {provider} الدور بدون إجابة. أرسل الرسالة مرة أخرى، أو ابدأ دردشة جديدة.",
   "error.provider.noAnswerAfterSteps":
     "نفّذ {provider} بعض الخطوات، ثم أنهى الدور بدون إجابة. اسأل الوكيل عمّا فعله قبل أن ترسل الطلب نفسه مرة أخرى.",
@@ -340,6 +348,8 @@ export const messages = {
   "error.provider.cursorSignIn": "سجّل الدخول باستخدام Cursor أو عيّن CURSOR_API_KEY لاستخدام Cursor.",
   "error.provider.cursorSignInUnusable":
     "تعذّر على Cursor الاتصال بخادمه باستخدام تسجيل دخولك. تحقّق من اتصالك بالإنترنت، ثم سجّل الدخول إلى Cursor مرة أخرى.",
+  "error.provider.cursorNoModels":
+    "لم يرسل Cursor قائمة النماذج. اختر «اتصال» لتسجيل الدخول إلى Cursor مرة أخرى. إذا بقيت هذه الرسالة، فتحقق من أن خطة Cursor تتضمن نماذج.",
   "error.provider.clineArchivePath": "يحتوي أرشيف Cline على مسار غير متوقع.",
   "error.provider.clinePackageMismatch": "لا تطابق حزمة Cline كتالوج بيئات التشغيل.",
   "error.provider.clineChecksum": "عدم تطابق المجموع الاختباري لبيئة تشغيل Cline.",
@@ -373,6 +383,8 @@ export const messages = {
     "فقد Hermes اتصاله أثناء هذه الرسالة، لذا لا يعرف ما إذا كان العمل قد اكتمل. تحقق مما فعله الوكيل قبل أن ترسل الرسالة مرة أخرى.",
   "error.provider.copilotThinkingRejected":
     "تعذّر على GitHub Copilot استخدام هذا النموذج: لم يقبل النموذج إعداد التفكير. اختر نموذجًا آخر لهذا الوكيل، ثم أرسل رسالتك مرة أخرى.",
+  "error.provider.copilotAnswerIncomplete":
+    "توقف النموذج قبل أن تكتمل إجابته. أرسل رسالتك مرة أخرى، أو اختر نموذجًا آخر لهذا الوكيل.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
   "error.provider.claudeContextFull":
     "أصبحت هذه الدردشة طويلة جدًا على Claude. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
@@ -380,6 +392,8 @@ export const messages = {
     "لا يوجد رصيد API في مفتاح Anthropic API. لا تدفع خطة Claude مقابل الطلبات التي تستخدم مفتاح API. أضف رصيدًا في Anthropic Console، أو سجّل الدخول إلى Claude في الإعدادات واختر حساب Claude في قائمة نموذج الوكيل.",
   "error.provider.claudeAccountNoCredit":
     "رصيد حسابك على Claude منخفض جدًا. بعض الطلبات، مثل الوضع السريع، تستخدم أرصدة الاستخدام حتى إذا بقي استخدام في خطة Claude. أضف أرصدة استخدام في حسابك على Claude، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.",
+  "error.provider.claudeCustomEndpointBilling":
+    "يرسل Claude Code الطلبات إلى {host}، لا إلى Anthropic: إعدادات Claude Code أو متغيرات البيئة تحدد عنوان API هذا. رفض {host} الطلب بسبب رصيد الحساب، لا بسبب خطة Claude. أضف رصيدًا إلى حسابك على {host}، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "حظرت خدمة Claude هذا الطلب. عادةً تكون هذه مشكلة قصيرة من جهة Claude، وليست مشكلة في حسابك. أرسل الرسالة مرة أخرى بعد بضع دقائق.",
   "error.provider.foreignReasoning":
@@ -396,6 +410,8 @@ export const messages = {
     "حظر {provider} هذه الرسالة بسبب قواعد الأمان الخاصة به: {reason} إذا حظر {provider} رسائلك التالية أيضًا، فابدأ دردشة جديدة.",
   "error.provider.codexAudioRefused":
     "لا يستطيع هذا النموذج الاستماع إلى الصوت، لذلك لم يقبل الصوت في هذه الدردشة. بدأ OpenBot جلسة Codex جديدة مع سجل الدردشة. للمتابعة، أرسل طلبك مرة أخرى واطلب من الوكيل أن يعمل بدون الصوت. لفحص الصوت، اختر في قائمة نموذج الوكيل نموذجًا يستطيع الاستماع إلى الصوت.",
+  "error.provider.codexAccountSettingsUnreadable":
+    "لم يتمكن Codex من تحميل إعدادات حساب ChatGPT، لذلك توقف الوكيل. أعد المحاولة. إذا توقف مرة أخرى، فاختر إعادة الاتصال لـ ChatGPT في إعدادات الخادم ← المزوّدون.",
   "error.provider.imageTooSmall":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooLarge":
@@ -417,8 +433,11 @@ export const messages = {
   "error.provider.claudeSessionMissing":
     "لم يعثر Claude Code على الجلسة المحفوظة لهذه الدردشة. بدأ OpenBot جلسة Claude Code جديدة بسجل الدردشة. أعد المحاولة.",
   "error.provider.grokSignIn": "شغّل `grok login` أو عيّن XAI_API_KEY لاستخدام Grok.",
+  "error.provider.acpSignInNoStart": "لم يبدأ المزوّد، لذلك لم يبدأ تسجيل الدخول. حاول مرة أخرى، أو أعد تشغيل OpenBot.",
   "error.provider.acpSignInTimedOut": "انتهت مهلة تسجيل الدخول.",
   "error.provider.acpSignInStopped": "توقف تسجيل الدخول قبل اكتماله.",
+  "error.provider.geminiNoBrowserUseCode":
+    "لا يوجد متصفح على هذا الكمبيوتر لتسجيل الدخول إلى Google. اختر «تسجيل الدخول برمز»، وافتح الرابط على أي جهاز، ثم الصق الرمز.",
   "error.provider.geminiBrowserUnavailable":
     "تعذّر على Gemini فتح صفحة تسجيل الدخول. ثبّت متصفحًا وxdg-utils، ثم اتصل من جلسة سطح مكتب على هذا المضيف. لا يمكن لخادم بلا سطح مكتب إكمال تسجيل الدخول هذا.",
   "error.provider.geminiBrowserOpenFailed":
@@ -518,6 +537,7 @@ export const messages = {
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
   "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",
+  "error.provider.acpSettingsConflict": "غيّر {provider} هذه الدردشة أثناء تطبيق OpenBot لإعداداتها. حاول مرة أخرى.",
   "error.provider.acpSessionStale": "تعذّر على {provider} تحميل أحدث نسخة من هذه المحادثة. أرسل رسالتك مرة أخرى.",
   "error.provider.acpModelNotOffered":
     "لا يوفّر {provider} النموذج {model} الآن. اختر نموذجًا آخر لهذا الوكيل، ثم حاول مرة أخرى.",

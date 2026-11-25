@@ -51,7 +51,7 @@ export const messages = {
   "app.rail.website": "OpenBot 웹사이트",
   "app.rail.agents": "에이전트",
   "app.rail.schedule": "일정",
-  "app.rail.tasks": "작업",
+  "app.rail.tasks": "스레드",
   "app.rail.usage": "사용량",
   "app.rail.library": "라이브러리",
   "app.rail.providers": "제공자",

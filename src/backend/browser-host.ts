@@ -225,6 +225,7 @@ const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status
 const VIEW_CONTEXT_MENU_MS = 1_500;
 const DIALOG_ACTION_WAIT_MS = 10_000;
 const OPEN_REDIRECT_WAIT_MS = 5_000;
+const AGENT_OPEN_LOAD_TIMEOUT_MS = 30_000;
 const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
 const SERVICE_WORKER_CLEAR_WAIT_MS = 10_000;
 const OPEN_REDIRECT_READS = 2;
@@ -345,6 +346,7 @@ const USES_BACKGROUND_WINDOW =
   process.platform === "darwin" || process.platform === "win32" || process.platform === "linux";
 
 const SHOWS_VIEWS_IN_BACKGROUND = process.platform === "linux";
+const PAGE_ALERT_ACCEPTED = "The page showed an alert. OpenBot pressed OK so the app stays usable. Alert text: ";
 
 function createBackgroundWindow(): BaseWindow {
   const window = new BaseWindow({
@@ -558,6 +560,7 @@ export class BrowserHost {
     { ownerThreadId: string | null; ownerAgentId: string | null; sharedThreadIds: ReadonlySet<string> }
   >();
   readonly #memoryLow: () => boolean;
+  readonly #memoryCritical: () => boolean;
   readonly #tabLimit: () => number;
   readonly #idleTabSweep: NodeJS.Timeout;
   readonly #awakeTabGraceMs: number;
@@ -573,6 +576,7 @@ export class BrowserHost {
       recordingMaxConcurrent?: number;
       recordingMaxAggregateBytes?: number;
       memoryLow?: () => boolean;
+      memoryCritical?: () => boolean;
       tabLimit?: () => number;
       browserProfile?: (agentId: string) => AgentBrowserProfile;
       profileExists?: (profileId: string) => boolean;
@@ -600,6 +604,7 @@ export class BrowserHost {
       window.once("closed", () => this.#closeBackgroundWindow());
     }
     this.#memoryLow = options.memoryLow ?? (() => false);
+    this.#memoryCritical = options.memoryCritical ?? (() => false);
     this.#tabLimit = options.tabLimit ?? (() => INPUT_LIMITS.browserTabs);
     this.#awakeTabGraceMs = options.tabSleep?.awakeGraceMs ?? AWAKE_TAB_GRACE_MS;
     this.#idleTabFreezeMs = options.tabSleep?.freezeMs ?? IDLE_TAB_FREEZE_MS;
@@ -720,6 +725,24 @@ export class BrowserHost {
       if (now - tab.lastUsedAt >= this.#awakeTabGraceMs) yield* this.#sleep(tab);
     }
   });
+
+  readonly releaseIdleTabs = Effect.fn("BrowserHost.releaseIdleTabs")(function* (
+    this: BrowserHost,
+    runningThreadIds: ReadonlySet<string>,
+  ) {
+    for (const tab of [...this.#tabs.values()]) {
+      if (tab.pendingRestore || tab.ownerThreadId === null || !this.#maySleep(tab) || this.#tabInUse(tab)) continue;
+      if ([tab.ownerThreadId, ...(tab.sharedThreadIds ?? [])].some((threadId) => runningThreadIds.has(threadId))) {
+        continue;
+      }
+      yield* this.#sleep(tab).pipe(
+        Effect.tapError((error) =>
+          Effect.sync(() => logger.warn("Unable to sleep a browser tab to free memory", { error: toLogValue(error) })),
+        ),
+        Effect.ignore,
+      );
+    }
+  }).bind(this);
 
   #throttleHiddenTabs(now: number): void {
     for (const tab of this.#tabs.values()) {
@@ -967,7 +990,7 @@ export class BrowserHost {
     ownerAgentId: string | null = null,
     focus = false,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
-    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus, false);
+    return yield* this.#open(url, ownerThreadId, ownerAgentId, focus, false, null);
   }).bind(this);
 
   readonly openPrivate = Effect.fn("BrowserHost.openPrivate")(function* (
@@ -976,7 +999,7 @@ export class BrowserHost {
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     const privateSession = session.fromPartition(`openbot-private-${randomUUID()}`, { cache: false });
     this.#configureSession(privateSession);
-    return yield* this.#open(url, null, null, false, true, privateSession);
+    return yield* this.#open(url, null, null, false, true, null, privateSession);
   }).bind(this);
 
   readonly #open = Effect.fn("BrowserHost.openTab")(function* (
@@ -986,12 +1009,18 @@ export class BrowserHost {
     ownerAgentId: string | null,
     focus: boolean,
     closeOnFailure: boolean,
+    firstLoadTimeoutMs: number | null,
     privateSession?: Session,
   ): Effect.fn.Return<BrowserTab, BrowserOperationError> {
     if (!this.#hasTabCapacity(ownerThreadId, ownerAgentId)) {
       return yield* browserFailure(new Error(sourceText("error.backend.browserTabLimit", { limit: this.#tabLimit() })));
     }
-    if (this.#memoryLow()) return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
+    if (this.#memoryLow()) {
+      if (this.#ownedTabs(ownerThreadId, ownerAgentId).some((tab) => !tab.pendingRestore)) {
+        return yield* browserFailure(new Error(sourceText("error.backend.browserLowMemory")));
+      }
+      if (this.#memoryCritical()) return yield* browserFailure(new Error(sourceText("error.backend.browserNoMemory")));
+    }
     const normalizedUrl = yield* browserSync(() => normalizeBrowserUrl(url));
     const previouslyFocused = focus ? null : this.#focusedContentsOutsideTabs();
     const tabSession = privateSession || !ownerAgentId ? undefined : yield* this.#agentTabSession(ownerAgentId);
@@ -1024,7 +1053,7 @@ export class BrowserHost {
         yield* navigateAndWait(
           tab.contents,
           () => tab.contents.loadURL(normalizedUrl, browserLoadOptions()),
-          null,
+          firstLoadTimeoutMs,
         ).pipe(
           Effect.catchIf(isCommittedNavigationTimeout, () => Effect.void),
           Effect.ensuring(Effect.sync(() => (tab.opening = false))),
@@ -1069,14 +1098,17 @@ export class BrowserHost {
   }).bind(this);
 
   #hasTabCapacity(ownerThreadId: string | null, ownerAgentId: string | null): boolean {
-    const tabs = [...this.#tabs.values()].filter(
+    return this.#ownedTabs(ownerThreadId, ownerAgentId).length < this.#tabLimit();
+  }
+
+  #ownedTabs(ownerThreadId: string | null, ownerAgentId: string | null): BrowserHostTab[] {
+    return [...this.#tabs.values()].filter(
       (tab) =>
         !tab.closing &&
         !tab.contents.isDestroyed() &&
         tab.ownerThreadId === ownerThreadId &&
         (tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId),
     );
-    return tabs.length < this.#tabLimit();
   }
 
   readonly activate = Effect.fn("BrowserHost.activate")(function* (
@@ -1599,6 +1631,7 @@ export class BrowserHost {
             let shown = false;
             let leaked = false;
             let stopWaiting = () => {};
+            let submitSent = false;
             const contents = tab.contents;
             const blockLeak = (event: ElectronEvent<WebContentsWillFrameNavigateEventParams>) => {
               if (!secrets.some((value) => urlCarriesSecret(event.url, value))) return;
@@ -1614,10 +1647,18 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(values, vault),
+                      entry.enter(values, vault, () => {
+                        submitSent = true;
+                      }),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,
+                    ).pipe(
+                      Effect.catch((error) =>
+                        submitSent && protection.replaced && isTimeoutError(error.cause)
+                          ? Effect.void
+                          : Effect.fail(error),
+                      ),
                     );
                     if (!protection.replaced && !leaked) {
                       yield* Effect.callback<void>((resume) => {
@@ -2352,7 +2393,14 @@ export class BrowserHost {
   readonly #toolHandlers: BrowserToolHandlers = {
     open: ({ args }, params) =>
       Effect.gen({ self: this }, function* () {
-        const tab = yield* this.#open(args.url, params.threadId, params.ownerAgentId ?? null, false, true);
+        const tab = yield* this.#open(
+          args.url,
+          params.threadId,
+          params.ownerAgentId ?? null,
+          false,
+          true,
+          AGENT_OPEN_LOAD_TIMEOUT_MS,
+        );
         this.#controls.updateTab(params, tab.id);
         let read = yield* Effect.result(this.#finalStepsSnapshot(params, tab.id));
         for (
@@ -2688,7 +2736,9 @@ export class BrowserHost {
       const call = yield* browserSync(() => parseBrowserToolCall(params.tool, params.arguments));
       if ("tabId" in call.args) calledTabId = call.args.tabId;
       yield* browserSync(() => this.#controls.begin(params, call));
-      return { result: yield* runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks) };
+      const run = runBrowserTool(this.#toolHandlers, call.tool, call, params, hooks);
+      if (calledTabId === undefined || call.tool === "run_script") return { result: yield* run };
+      return { result: yield* Effect.raceFirst(run, this.#pageCrashFailure(calledTabId)) };
     })
       .pipe(
         Effect.provideService(BrowserToolHold, (tabId: string) => this.#heldByUser(tabId)),
@@ -3610,9 +3660,23 @@ export class BrowserHost {
     });
   }
 
+  #agentRunsTab(tab: BrowserHostTab): boolean {
+    return (
+      (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
+      !tab.secret &&
+      !this.#takeoverTabIds.has(tab.id) &&
+      !this.#userControlTabIds.has(tab.id)
+    );
+  }
+
   #bindTabEvents(tab: BrowserHostTab): void {
     const contents = tab.contents;
     const changed = () => this.#emitChanged();
+    tab.engine.acceptPageAlerts((message) => {
+      if (tab.closing || !this.#agentRunsTab(tab)) return false;
+      tab.diagnostics.add({ kind: "console", level: "warning", message: `${PAGE_ALERT_ACCEPTED}${message}` });
+      return true;
+    });
     if (this.#tabProxy(tab)) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp");
     let proxySignIns = 0;
     contents.on("login", (event, _details, authInfo, callback) => {
@@ -3751,13 +3815,7 @@ export class BrowserHost {
     contents.on("did-start-loading", changed);
     contents.on("dom-ready", () => {
       void contents.insertCSS(":where(html) { scrollbar-gutter: stable; }").catch(() => undefined);
-      if (
-        (tab.ownerThreadId !== null || tab.ownerAgentId !== null) &&
-        !tab.secret &&
-        !this.#takeoverTabIds.has(tab.id) &&
-        !this.#userControlTabIds.has(tab.id)
-      )
-        refuseCookieBanners(contents);
+      if (this.#agentRunsTab(tab)) refuseCookieBanners(contents);
     });
     contents.on("did-stop-loading", () => {
       if (tab.closing || tab.contents !== contents || contents.isDestroyed()) return;
@@ -4262,12 +4320,29 @@ export class BrowserHost {
       const contents = this.#tabs.get(tabId)?.contents;
       if (!contents || contents.isDestroyed()) return;
       const gone = (_event: Electron.Event, details: Electron.RenderProcessGoneDetails) => {
-        if (details.reason !== "clean-exit" && !this.#tabs.get(tabId)?.endingSilentPage)
+        const tab = this.#tabs.get(tabId);
+        if (details.reason !== "clean-exit" && tab && !tab.closing && !tab.endingSilentPage)
           resume(Effect.succeed({ status: "page_crashed" }));
       };
       contents.on("render-process-gone", gone);
       return Effect.sync(() => contents.off("render-process-gone", gone));
     });
+  }
+
+  #pageCrashFailure(tabId: string): Effect.Effect<never, BrowserOperationError> {
+    return this.#rendererGone(tabId).pipe(
+      Effect.flatMap(() =>
+        Effect.fail(
+          browserFailure(
+            new Error(
+              this.#tabs.get(tabId)?.pendingRestore === undefined
+                ? BROWSER_PAGE_CRASH_KEPT
+                : BROWSER_PAGE_CRASH_RELOADED,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   readonly #requireTab = Effect.fn("BrowserHost.requireTab")(function* (this: BrowserHost, tabId: string) {

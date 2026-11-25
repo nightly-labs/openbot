@@ -1507,6 +1507,12 @@ export function AgentDock(props: AgentDockProps) {
                       closeChat(false);
                       props.onOpenInMain(refOfKey(id));
                     }}
+                    onOpenTakeover={(takeover) => {
+                      closeChat(false);
+                      const openTakeover = props.answers?.openTakeover;
+                      if (openTakeover) openTakeover(takeover);
+                      else props.onOpenInMain(refOfKey(id));
+                    }}
                     onOpenWindow={openWindowFor(id)}
                     voice={chatVoice(id)}
                     agents={props.agents}

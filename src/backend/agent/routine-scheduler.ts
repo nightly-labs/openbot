@@ -122,6 +122,10 @@ function queuedRunReason(hold: string): string {
   return QUEUED_RUN_REASONS[hold] ?? `Waiting in the agent's queue (${hold}).`;
 }
 
+function waitWakeKey(runDeliveryId: string, taskId: string | null): string {
+  return `routine-wait:${runDeliveryId}:${taskId ?? "chat"}`;
+}
+
 function skippedRuns(scheduledFor: string, missed: RoutineMissedRuns) {
   return {
     scheduledFor,
@@ -251,9 +255,12 @@ export class RoutineScheduler implements RoutineDueSource {
 
   continuesWait(deliveryId: string): boolean {
     const delivery = this.#mailbox.getDelivery(deliveryId)?.delivery;
-    if (delivery?.sender.kind !== "routine" || this.#mailbox.taskIdForDelivery(deliveryId) === null) return false;
+    if (delivery?.sender.kind !== "routine") return false;
     const run = this.#routines.run(delivery.sender.runId);
-    return run?.agentId === delivery.recipientAgentId && run.deliveryId !== null && run.deliveryId !== deliveryId;
+    if (run?.agentId !== delivery.recipientAgentId || run.deliveryId === null || run.deliveryId === deliveryId)
+      return false;
+    if (this.#mailbox.taskIdForDelivery(deliveryId) !== null) return true;
+    return this.#mailbox.deliveryForKey(waitWakeKey(run.deliveryId, null))?.delivery.id === deliveryId;
   }
 
   linkedRunForDelivery(deliveryId: string): RoutineRun | null {
@@ -918,6 +925,10 @@ export class RoutineScheduler implements RoutineDueSource {
     this.#transitionInteractionWithReconciliation(run, "needs-attention");
   }
 
+  runsTurn(turnId: string): boolean {
+    return this.#mailbox.findDeliveryByTurn(turnId)?.delivery.sender.kind === "routine";
+  }
+
   markRunningForTurn(turnId: string | null): void {
     if (!turnId) return;
     const delivery = this.#mailbox.findDeliveryByTurn(turnId);
@@ -1123,11 +1134,11 @@ export class RoutineScheduler implements RoutineDueSource {
         yield* routineStep(() => this.#hooks.emitQueue(agent.id));
         return queued ?? { ...run, status: "cancelled" as const };
       }
-      const inSideThreads = yield* routineStep(() =>
+      const inRequestChats = yield* routineStep(() =>
         this.#waits.wakeForRun(run, deliveryId, waitId, thread?.taskId ?? null),
       );
-      for (const [taskId, waitIds] of inSideThreads)
-        yield* this.#wakeInSideThread(run, agent.id, taskId, waitIds, deliveryId);
+      for (const [taskId, waitIds] of inRequestChats)
+        yield* this.#wakeInRequestChat(run, agent, taskId, waitIds, deliveryId);
       if (thread) {
         yield* routineStep(() => {
           this.#hooks.emitQueue(agent.id);
@@ -1161,24 +1172,25 @@ export class RoutineScheduler implements RoutineDueSource {
     );
   }, Effect.uninterruptible);
 
-  readonly #wakeInSideThread = Effect.fn("RoutineScheduler.wakeInSideThread")(function* (
+  readonly #wakeInRequestChat = Effect.fn("RoutineScheduler.wakeInRequestChat")(function* (
     this: RoutineScheduler,
     run: RoutineRun,
-    agentId: string,
-    taskId: string,
+    agent: { id: string; threadId: string | null },
+    taskId: string | null,
     waitIds: readonly string[],
     runDeliveryId: string,
   ) {
+    const agentId = agent.id;
     const keepInRun = (failure: { cause: unknown }) =>
       Effect.sync(() => {
-        logger.warn("Could not continue open waits in their side thread.", { agentId, error: failure.cause });
+        logger.warn("Could not continue open waits in the chat of their request.", { agentId, error: failure.cause });
         return runDeliveryId;
       });
     const wokenIn = yield* Effect.gen({ self: this }, function* () {
-      const thread = yield* routineStep(() => this.#hooks.waitThread(agentId, taskId));
-      if (!thread) return runDeliveryId;
+      const sideThread = taskId === null ? null : yield* routineStep(() => this.#hooks.waitThread(agentId, taskId));
+      if (taskId !== null && !sideThread) return runDeliveryId;
       const receipt = yield* this.#mailbox.enqueue({
-        taskId: thread.taskId,
+        ...(taskId === null ? {} : { taskId }),
         sender: {
           kind: "routine",
           routineId: run.routineId,
@@ -1190,13 +1202,18 @@ export class RoutineScheduler implements RoutineDueSource {
         text: run.instruction,
         draftIds: [],
         replyToMessageId: null,
-        idempotencyKey: `routine-wait:${runDeliveryId}:${thread.taskId}`,
+        idempotencyKey: waitWakeKey(runDeliveryId, taskId),
       });
       return receipt.deliveries[0]?.id ?? runDeliveryId;
     }).pipe(Effect.catch(keepInRun));
     yield* routineStep(() => {
       this.#waits.markWoken(agentId, waitIds, wokenIn);
       if (wokenIn === runDeliveryId) return;
+      if (taskId === null) {
+        const snapshot = this.#conversation.ensureSnapshot(agentId, agent.threadId);
+        this.#hooks.syncMailboxMessages(snapshot);
+        this.#conversation.emitConversation(snapshot);
+      }
       this.#hooks.emitQueue(agentId);
       this.#hooks.scheduleDrain(agentId);
     }).pipe(Effect.catch(keepInRun));

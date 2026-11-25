@@ -66,6 +66,7 @@ export interface AgentDockChatAnswers {
   prompt: (prompt: AgentDockPrompt, answers: Record<string, string[]>) => Promise<boolean>;
   takeover: (takeover: AgentDockTakeover, decision: "complete" | "cancel") => Promise<boolean>;
   takeoverDone?: ((takeover: AgentDockTakeover) => boolean) | undefined;
+  openTakeover?: ((takeover: AgentDockTakeover) => void) | undefined;
   secret: (takeover: AgentDockTakeover, input: LocalBrowserSecretResponse) => Promise<void>;
   usageLimitSend: (limit: AgentDockUsageLimit, option: AgentDockBackupModel, remember: boolean) => Promise<void>;
   usageLimitWait: (limit: AgentDockUsageLimit) => void;
@@ -127,6 +128,7 @@ export function AgentDockChat(props: {
   onRemove: () => void;
   onAdd: () => void;
   onOpenInMain: () => void;
+  onOpenTakeover: (takeover: AgentDockTakeover) => void;
   onOpenWindow?: (() => void) | undefined;
   voice?: AgentDockChatVoice | undefined;
   agents: ComposerAgent[];
@@ -505,7 +507,7 @@ export function AgentDockChat(props: {
                         tab={takeoverTab(current())}
                         preview={null}
                         previewStatus="idle"
-                        onOpen={() => props.onOpenInMain()}
+                        onOpen={() => props.onOpenTakeover(current())}
                         onComplete={
                           props.answers?.takeoverDone?.(current()) === false
                             ? undefined
