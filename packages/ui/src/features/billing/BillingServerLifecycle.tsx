@@ -124,6 +124,7 @@ export function BillingServerLifecycle(props: BillingServerLifecycleProps) {
                 </Show>
                 <DropdownMenu.Item
                   class="ui-action-menu-danger"
+                  disabled={props.scheduled}
                   onSelect={() => {
                     setDialogTrigger(menuButton);
                     deleteRequested = true;
