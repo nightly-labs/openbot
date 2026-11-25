@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Login",
   "mobile.marketplace.facts.accessLocal": "Este computador",
   "mobile.marketplace.facts.accessNone": "Sem login",
+  "mobile.marketplace.facts.accessMac": "Só Mac",
   "mobile.marketplace.permission.admin": "Só proprietários e administradores podem instalar da loja.",
   "mobile.marketplace.permission.unavailable":
     "Este servidor está offline, ou o OpenBot dele é antigo demais para isso. Atualize o OpenBot no computador que o executa.",
@@ -92,6 +93,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Ajude-me a usar esta habilidade.",
   "mobile.marketplace.app.add": "Adicionar app",
+  "mobile.marketplace.app.addCustom": "Adicionar personalizado",
   "mobile.marketplace.app.connect": "Conectar",
   "mobile.marketplace.app.connectTitle": "Conectar {name}",
   "mobile.marketplace.app.keyIntro": "Cole a chave da sua conta. O servidor a testa antes de salvar o app.",
@@ -99,6 +101,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Abra a página de login do {name}.",
   "mobile.marketplace.app.stepAllow": "Entre e permita o acesso.",
   "mobile.marketplace.app.stepReturn": "Volte aqui. O {name} se conecta no seu servidor.",
+  "mobile.marketplace.app.stepBlank": "A última página não carrega. Isso é o esperado.",
+  "mobile.marketplace.app.stepCopy": "Toque na barra de endereço e copie o endereço completo.",
+  "mobile.marketplace.app.stepPaste": "Volte ao OpenBot e cole o endereço abaixo.",
   "mobile.marketplace.app.openSignIn": "Abrir login",
   "mobile.marketplace.app.keySecure": "A chave vai só para o seu servidor, por uma conexão criptografada.",
   "mobile.marketplace.app.connecting": "Conectando",
@@ -109,12 +114,12 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "Use um link https em {hostname}.",
   "mobile.marketplace.app.docs": "Obter chave",
   "mobile.marketplace.app.local": "Este app roda no computador com o OpenBot. Configure-o nesse computador.",
+  "mobile.marketplace.app.needsMac":
+    "Este app só funciona em um Mac que executa o OpenBot, e este servidor não é um Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Este app precisa de login no navegador. Atualize o OpenBot no servidor ou conecte o app no computador.",
   "mobile.marketplace.app.waiting": "Aguardando a página de login…",
   "mobile.marketplace.app.openAgain": "Abrir a página de login de novo",
-  "mobile.marketplace.app.pasteHint":
-    "No final, a página abre um endereço que não carrega. Copie esse endereço e cole abaixo.",
   "mobile.marketplace.app.pasteLabel": "Endereço após o login",
   "mobile.marketplace.app.pasteInvalid": "Este endereço não é o final deste login.",
   "mobile.marketplace.app.finishSignIn": "Concluir login",

@@ -7,7 +7,6 @@ interface JsonObject {
 }
 type ObjectBranch = JsonObject & { properties: JsonObject };
 
-/** The keys of a union branch that a merge can keep. A branch with any other key stays a union. */
 const MERGEABLE_KEYS = new Set(["type", "properties", "required", "additionalProperties"]);
 
 const isObject = (value: JsonValue | undefined): value is JsonObject =>
@@ -22,11 +21,6 @@ const isObjectBranch = (value: JsonValue): value is ObjectBranch =>
   isObject(value.properties) &&
   Object.keys(value).every((key) => MERGEABLE_KEYS.has(key));
 
-/**
- * Keywords that only validate a value. OpenBot decodes each call with the Zod schema again, so they tell
- * the model nothing that a rejected call does not. Codex already drops them from its direct tools. A
- * limit that the model must know goes in the description.
- */
 const VALIDATION_KEYS = new Set([
   "pattern",
   "minLength",
@@ -43,10 +37,8 @@ const VALIDATION_KEYS = new Set([
   "maxProperties",
 ]);
 
-/** Keys whose value maps property names to schemas, so a property can have a keyword's name. */
 const SCHEMA_MAPS = new Set(["properties", "patternProperties", "definitions", "$defs"]);
 
-/** The one string value of a tag property, written by Zod as `const` or as a one-value `enum`. */
 function tagValue(property: JsonValue | undefined): string | undefined {
   if (!isObject(property)) return undefined;
   if (typeof property.const === "string") return property.const;
@@ -55,10 +47,6 @@ function tagValue(property: JsonValue | undefined): string | undefined {
     : undefined;
 }
 
-/**
- * One object for a union of objects that a tag property tells apart: each property once, the tag with
- * every value. Returns undefined when the branches are not such a union.
- */
 function mergeTaggedObjects(branches: readonly JsonValue[]): JsonObject | undefined {
   const objects = branches.filter(isObjectBranch);
   const [first] = objects;
@@ -98,10 +86,8 @@ function mergeTaggedObjects(branches: readonly JsonValue[]): JsonObject | undefi
   };
 }
 
-/** Keys whose value is data, not a schema: it stays whole. */
 const VALUE_KEYS = new Set(["const", "enum", "default", "examples"]);
 
-/** A copy of a JSON value. Values that are not JSON are left out. */
 function plainJson(value: unknown): JsonValue | undefined {
   if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string")
     return value;
@@ -115,7 +101,6 @@ function plainJson(value: unknown): JsonValue | undefined {
   return result;
 }
 
-/** The schemas of a property map, each compacted. The names stay, also a name such as `pattern`. */
 function compactMap(map: unknown): JsonValue | undefined {
   if (!isDynamicRecord(map)) return compact(map);
   const result: JsonObject = {};
@@ -126,7 +111,6 @@ function compactMap(map: unknown): JsonValue | undefined {
   return result;
 }
 
-/** Branches without exact copies; validation keywords that are gone can leave two branches the same. */
 function uniqueBranches(branches: readonly JsonValue[]): JsonValue[] {
   const seen = new Set<string>();
   return branches.filter((branch) => {
@@ -137,17 +121,6 @@ function uniqueBranches(branches: readonly JsonValue[]): JsonValue[] {
   });
 }
 
-/** The JSON key that `ADVERTISE_AS_UNION` writes and `compact` removes. */
-const KEEP_UNION_KEY = "x-openbot-keep-union";
-
-/**
- * Zod metadata for a union of objects: advertise it as a union, not as one merged object. Use it when
- * the branches are strict and have different properties: a merged object shows the model properties
- * that its branch rejects. Such as `z.discriminatedUnion(…).meta(ADVERTISE_AS_UNION)`.
- */
-export const ADVERTISE_AS_UNION = { [KEEP_UNION_KEY]: true };
-
-/** The JSON of a schema without the parts that tell the model nothing. Values that are not JSON are left out. */
 function compact(schema: unknown): JsonValue | undefined {
   if (schema === null || typeof schema === "boolean" || typeof schema === "number" || typeof schema === "string")
     return schema;
@@ -171,19 +144,10 @@ function compact(schema: unknown): JsonValue | undefined {
       result = { ...only, ...rest };
     }
   }
-  const { [KEEP_UNION_KEY]: keep, ...unmarked } = result;
-  if (keep === true) {
-    // As `anyOf`: Kimi Code CLI types a schema with no `type` as `string`, but keeps an `anyOf`. The tags
-    // differ, so one branch at most matches, as with `oneOf`.
-    const { oneOf, ...rest } = unmarked;
-    return Array.isArray(oneOf) && rest.anyOf === undefined ? { ...rest, anyOf: oneOf } : unmarked;
-  }
-  result = unmarked;
   for (const union of ["oneOf", "anyOf"] as const) {
     const branches = result[union];
     if (!Array.isArray(branches)) continue;
     const merged = mergeTaggedObjects(branches);
-    // A merge that writes more than the union saves nothing, so the union stays.
     if (merged !== undefined && JSON.stringify(merged).length < JSON.stringify(branches).length) {
       const { [union]: _union, ...rest } = result;
       result = { ...merged, ...rest };
@@ -193,24 +157,12 @@ function compact(schema: unknown): JsonValue | undefined {
   return result;
 }
 
-/**
- * The input schema that OpenBot advertises for a tool. It leaves out JSON that each request pays for
- * and that tells the model nothing: `$schema`, validation-only keywords and nested or repeated `anyOf`. A union of
- * objects that a tag tells apart becomes one object, except a union with `ADVERTISE_AS_UNION`. Calls are still
- * decoded with the Zod schema, so the rules of each branch still apply. `null` branches stay: a `null` value can mean "clear".
- */
 export function advertisedJsonSchema(schema: z.ZodType): JsonObject {
   const advertised = compact(z.toJSONSchema(schema, { target: "draft-7", unrepresentable: "any" }));
   if (!isObject(advertised)) throw new Error("A tool input schema must be an object.");
   return advertised;
 }
 
-/**
- * A Zod shape whose JSON Schema is the advertised schema, for an SDK that takes a shape and makes the JSON
- * Schema itself. Each property is `z.unknown()` with its advertised JSON as metadata, which Zod writes in
- * place of the empty schema. The shape accepts any value, so the caller must decode the call with the
- * full schema.
- */
 export function advertisedZodShape(schema: z.ZodType): Record<string, z.ZodType> {
   const advertised = advertisedJsonSchema(schema);
   const properties = isObject(advertised.properties) ? advertised.properties : {};

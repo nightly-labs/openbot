@@ -1,4 +1,4 @@
-import { Host, Switch } from "@expo/ui";
+import { Host } from "@expo/ui";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
@@ -19,11 +19,12 @@ import { Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { AppSwitch } from "@/shared/components/app-switch";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
 import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
-import { RoutineTimePicker } from "./routine-schedule-time";
+import { RoutineDatePicker, RoutineTimePicker } from "./routine-schedule-time";
 
 const PROBLEM_TEXT = {
   invalidDate: "mobile.agent.record.problem.invalidDate",
@@ -31,15 +32,10 @@ const PROBLEM_TEXT = {
   cronTooLong: "mobile.agent.record.problem.cronTooLong",
 } as const satisfies Record<RoutineDraftProblem, MobileTextKey>;
 
-/** The week as a person reads it, from Monday. 0 is Sunday, as in the saved schedule. */
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const DEFAULT_WINDOW = { start: "09:00", end: "18:00" };
 
-/**
- * The schedule as the desktop asks for it: on which days and at what time. The trigger picker in
- * `header` sets how often; a cron expression is its last frequency, for a schedule the others cannot say.
- */
 export function RoutineScheduleFields({
   draft,
   disabled,
@@ -49,9 +45,7 @@ export function RoutineScheduleFields({
 }: {
   draft: RoutineScheduleDraft;
   disabled: boolean;
-  /** The first row of the group: the picker that changes the trigger and its frequency. */
   header: ReactNode;
-  /** Rows after the schedule, in the same group, such as the time zone. */
   footer?: ReactNode;
   onChange: (draft: RoutineScheduleDraft) => void;
 }) {
@@ -111,7 +105,7 @@ export function RoutineScheduleFields({
           <SettingsRow
             trailing={
               <Host matchContents colorScheme={colorScheme}>
-                <Switch
+                <AppSwitch
                   label={t("mobile.agent.record.allDay")}
                   value={draft.window === null}
                   disabled={disabled}
@@ -236,6 +230,12 @@ export function RoutineScheduleFields({
       hint = t("mobile.agent.record.cronHint");
       break;
     case "once":
+      fields = (
+        <>
+          <RoutineDatePicker date={draft.date} disabled={disabled} onChange={(date) => onChange({ ...draft, date })} />
+          {timeRow(draft.time, (time) => onChange({ ...draft, time }))}
+        </>
+      );
       break;
   }
 
@@ -251,7 +251,6 @@ export function RoutineScheduleFields({
   );
 }
 
-/** The days of a run: seven toggles from Monday, with the name of a common set beside the label. */
 function RoutineDayChips({
   days,
   disabled,

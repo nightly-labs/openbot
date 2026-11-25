@@ -9,6 +9,8 @@ export const messages = {
   "error.connector.githubClientUnknown": "GitHub no reconoce el Client ID de esta GitHub App.",
   "error.connector.githubUnexpected": "GitHub envió una respuesta inesperada: {detail}",
   "error.connector.githubUnreachable": "OpenBot no puede acceder a GitHub: {detail}",
+  "error.connector.githubOffline":
+    "OpenBot no puede acceder a GitHub. Comprueba la conexión a internet y la configuración DNS del ordenador o servidor donde se ejecuta OpenBot y vuelve a intentarlo.",
   "error.connector.githubExpired": "La conexión con GitHub caducó. Conecta GitHub de nuevo.",
   "error.connector.githubFileUnreadable": "El archivo de conexión de GitHub no se puede leer.",
   "error.connector.githubFileTooLarge": "El archivo de conexión de GitHub es demasiado grande.",
@@ -18,19 +20,37 @@ export const messages = {
     "OpenBot no pudo instalar la CLI de 1Password. Comprueba la conexión a Internet e inténtalo de nuevo.",
   "error.connector.onePasswordCliSignedOut":
     "La CLI de 1Password no tiene una sesión iniciada. Activa su integración en la aplicación 1Password y vuelve a conectar.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot no puede comunicarse con la aplicación de 1Password. Abre 1Password y desbloquéalo. En Ajustes > Desarrollador, comprueba que «Integrar con la CLI de 1Password» está activado. Luego vuelve a intentarlo.",
   "error.connector.onePasswordCliFailed": "La CLI de 1Password falló: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Tu cuenta de 1Password no te permite crear la bóveda compartida ni una cuenta de servicio. Pide este permiso a un propietario o administrador de la cuenta, o pídele un token de cuenta de servicio y haz clic en «Usar token».",
   "error.connector.onePasswordUnexpected": "1Password envió una respuesta inesperada: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password no aceptó el token de cuenta de servicio.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot no pudo conectarse a 1Password. Comprueba la conexión a Internet e inténtalo de nuevo.",
+  "error.connector.onePasswordRateLimited":
+    "1Password recibió demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo.",
   "error.connector.onePasswordNoVault":
     "La cuenta de servicio no puede leer ninguna bóveda. Dale acceso a una bóveda e inténtalo de nuevo.",
+  "error.connector.onePasswordReadFailed":
+    "OpenBot no puede leer tus inicios de sesión de 1Password. Desconecta 1Password y vuelve a conectarlo.",
   "error.connector.onePasswordFileUnreadable": "El archivo de conexión de 1Password no se puede leer.",
   "error.connector.onePasswordFileTooLarge": "El archivo de conexión de 1Password es demasiado grande.",
   "error.connector.bitwardenFailed":
     "No se pudo leer Bitwarden. Instala la CLI bw, inicia sesión, desbloquéala y crea una carpeta llamada Shared with OpenBot. Conecta con una nueva clave de sesión.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot no encuentra la CLI de Bitwarden. Instala bw, comprueba que funciona en una terminal nueva y vuelve a conectar.",
+  "error.connector.bitwardenFolderMissing":
+    "Bitwarden debe tener exactamente una carpeta llamada Shared with OpenBot. Créala o elimina la carpeta adicional y vuelve a conectar.",
   "error.connector.bitwardenHostInput":
     "Introduce una dirección de servidor HTTPS, el client_id y el client_secret de la clave de API y la contraseña maestra.",
   "error.connector.bitwardenHostFailed":
     "No se pudo abrir Bitwarden en este servidor. Comprueba la dirección del servidor, la clave de API y la contraseña maestra, y asegúrate de que una carpeta se llama Shared with OpenBot. Después, conecta de nuevo.",
+  "error.connector.bitwardenHostSignInFailed":
+    "No se pudo iniciar sesión en Bitwarden en este servidor. Comprueba la dirección del servidor y la clave de API, y conecta de nuevo.",
+  "error.connector.bitwardenHostUnlockFailed":
+    "No se pudo desbloquear Bitwarden en este servidor. Comprueba la contraseña maestra y conecta de nuevo.",
   "error.connector.bitwardenCliInstallFailed":
     "No se pudo instalar la CLI de Bitwarden en este servidor. Comprueba su conexión de red y conecta de nuevo.",
   "error.connector.bitwardenFileUnreadable": "El archivo de conexión de Bitwarden no se puede leer.",
@@ -42,6 +62,8 @@ export const messages = {
     "No se pudo instalar la CLI de Proton Pass. Comprueba la conexión de red y vuelve a conectar.",
   "error.connector.protonPassPlan":
     "Tu plan de Proton no permite la CLI de Proton Pass. Cambia el plan y vuelve a conectar.",
+  "error.connector.protonPassPlanMissing":
+    "Tu plan de Proton no incluye la CLI de Proton Pass. Necesita un plan de Proton que incluya Pass Plus. Cambia el plan y vuelve a conectar.",
   "error.connector.protonPassExpired": "El acceso a Proton Pass ha terminado. Vuelve a conectar.",
   "error.connector.protonPassKeyInvalid": "Introduce una clave de acceso de Proton Pass que empiece por pst_.",
   "error.connector.protonPassExtraPassword": "La contraseña adicional no es correcta. Introdúcela de nuevo.",

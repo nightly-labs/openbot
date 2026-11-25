@@ -1,18 +1,15 @@
 import { useText } from "@openbot/ui/text";
 import { Loading, Match, Show, Switch } from "solid-js";
-import { AgentUsagePanel, LibraryPanel, WorkflowsPage } from "../../lazy-views";
+import { AgentUsagePanel, CrmPage, LibraryPanel, WorkflowsPage } from "../../lazy-views";
 import { SkillsMarketplace } from "../../WorkspaceOverlays";
 import { SchedulePanel } from "../schedule/SchedulePanel";
 import { useServers } from "../servers/servers-context";
 import { UsageMachine } from "../usage/UsageMachine";
 import { useUsage } from "../usage/usage-context";
+import { CreditsPage } from "./CreditsPage";
 import { SettingsPage } from "./SettingsPage";
 import { type SettingsKind, useWindowPage } from "./window-page-context";
 
-/**
- * The page of the desktop window that covers the conversation: a settings page, usage, schedule,
- * workflows, the Library or the Marketplace. The tasks page shows in the middle pane, in `WorkspaceShell`.
- */
 export function WindowPageView() {
   const { t } = useText();
   const windowPage = useWindowPage();
@@ -27,42 +24,54 @@ export function WindowPageView() {
     servers().find((server) => server.id === serverId)?.name ?? t("app.page.serverFallback");
   return (
     <Show
-      when={settingsKind() ? null : usage.state.serverId}
-      fallback={
-        <Show when={settingsKind()} keyed fallback={<SkillsMarketplace />}>
-          {(kind) => <SettingsPage kind={kind} />}
-        </Show>
-      }
+      when={windowPage.page() !== "pricing"}
+      fallback={<div class="window-page-portal" ref={windowPage.setPricingMount} />}
     >
-      {(serverId) => (
-        <Switch
+      <Show when={windowPage.page() !== "credits"} fallback={<CreditsPage />}>
+        <Show
+          when={settingsKind() ? null : usage.state.serverId}
           fallback={
-            <Loading>
-              <AgentUsagePanel
-                serverId={serverId()}
-                hostName={hostName(serverId())}
-                agentId={usage.state.agentId}
-                onBack={usage.closeUsage}
-                machine={<UsageMachine serverId={serverId()} />}
-              />
-            </Loading>
+            <Show when={settingsKind()} keyed fallback={<SkillsMarketplace />}>
+              {(kind) => <SettingsPage kind={kind} />}
+            </Show>
           }
         >
-          <Match when={usage.state.view === "schedule"}>
-            <SchedulePanel serverId={serverId()} hostName={hostName(serverId())} onBack={usage.closeUsage} />
-          </Match>
-          <Match when={usage.state.view === "workflows"}>
-            <Loading>
-              <WorkflowsPage serverId={serverId()} />
-            </Loading>
-          </Match>
-          <Match when={usage.state.view === "library"}>
-            <Loading>
-              <LibraryPanel serverId={serverId()} />
-            </Loading>
-          </Match>
-        </Switch>
-      )}
+          {(serverId) => (
+            <Switch
+              fallback={
+                <Loading>
+                  <AgentUsagePanel
+                    serverId={serverId()}
+                    hostName={hostName(serverId())}
+                    agentId={usage.state.agentId}
+                    onBack={usage.closeUsage}
+                    machine={<UsageMachine serverId={serverId()} />}
+                  />
+                </Loading>
+              }
+            >
+              <Match when={usage.state.view === "schedule"}>
+                <SchedulePanel serverId={serverId()} hostName={hostName(serverId())} onBack={usage.closeUsage} />
+              </Match>
+              <Match when={usage.state.view === "workflows"}>
+                <Loading>
+                  <WorkflowsPage serverId={serverId()} />
+                </Loading>
+              </Match>
+              <Match when={usage.state.view === "library"}>
+                <Loading>
+                  <LibraryPanel serverId={serverId()} />
+                </Loading>
+              </Match>
+              <Match when={usage.state.view === "crm"}>
+                <Loading>
+                  <CrmPage serverId={serverId()} />
+                </Loading>
+              </Match>
+            </Switch>
+          )}
+        </Show>
+      </Show>
     </Show>
   );
 }

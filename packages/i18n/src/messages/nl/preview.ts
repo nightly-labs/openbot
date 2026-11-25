@@ -20,6 +20,13 @@ export const messages = {
   "preview.unsupported.title": "Voorvertoning niet beschikbaar",
   "preview.unsupported.description": "Dit bestandstype kan worden geopend in de standaardapp.",
   "preview.unsupported.openExternally": "Extern openen",
+  "preview.tooLarge.title": "Bestand te groot voor voorvertoning",
+  "preview.tooLarge.description": "Voorvertoningen stoppen bij 100 MB. Je kunt dit bestand openen in de standaardapp.",
   "preview.spreadsheet.readFailed": "Kan deze spreadsheet niet lezen.",
+  "preview.spreadsheet.tooLarge":
+    "Deze spreadsheet is te groot voor een voorvertoning. Open of download het bestand om alles te zien.",
   "preview.spreadsheet.truncated": "Voorvertoning beperkt tot de eerste {rows} rijen en {columns} kolommen.",
+  "preview.document.readFailed": "Dit document kan niet worden gelezen.",
+  "preview.document.empty": "Dit document bevat geen tekst om te tonen.",
+  "preview.document.truncated": "Voorvertoning beperkt tot het eerste deel van het document.",
 } as const satisfies PartialTranslation<typeof source>;

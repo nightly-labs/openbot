@@ -42,9 +42,7 @@ const PLUGIN_SLUGS = new Set(MARKETPLACE_PLUGINS.map((plugin) => plugin.slug));
 
 type ServerKind = "local" | "remote" | "unknown";
 type AnalyticsResult = "succeeded" | "failed";
-/** For a step that the user can stop before it ends. */
 type AnalyticsOutcome = AnalyticsResult | "cancelled";
-/** Where the words are heard: a model on this computer, or a cloud model. */
 type TranscriptionKind = "local" | "cloud" | "server";
 
 interface AgentAnalyticsProperties {
@@ -123,7 +121,6 @@ interface DesktopAnalyticsEvents {
   };
   workflow_action: {
     action: WorkflowAnalyticsAction;
-    /** Only on `run_step`: the kind of the node that runs alone. */
     node_kind?: WorkflowNodeKind;
     duration_ms: number;
     result: AnalyticsResult;
@@ -183,7 +180,6 @@ interface DesktopAnalyticsEvents {
     action: "view" | "install" | "update" | "uninstall" | "publish" | "enable" | "disable";
     result: AnalyticsResult;
     failure_code?: string;
-    /** A listing id or plugin slug. Only OpenBot's own curated listings and plugins are sent. */
     listing_slug?: string;
   };
   memory_action: {
@@ -220,10 +216,8 @@ interface DesktopAnalyticsEvents {
     action: "start" | "end" | "interrupt" | "mute" | "unmute";
     server_kind: ServerKind;
     result: AnalyticsResult;
-    /** For `interrupt`: the Stop button, or the user's voice over the agent. */
     trigger?: "button" | "voice";
     transcription?: TranscriptionKind;
-    /** For `start`: until the first listen, with the speech model download. For `end`: the whole conversation. */
     duration_ms?: number;
     turn_count?: number;
     failure_code?: string;
@@ -233,7 +227,6 @@ interface DesktopAnalyticsEvents {
     transcription: TranscriptionKind;
     result: AnalyticsResult;
     audio_duration_seconds: number;
-    /** The time to transcribe the turn. */
     duration_ms?: number;
     recording_kept?: boolean;
     failure_code?: string;
@@ -241,7 +234,6 @@ interface DesktopAnalyticsEvents {
   speech_reply: {
     trigger: "voice_conversation" | "progress_update" | "dictation" | "read_aloud";
     result: AnalyticsResult;
-    /** False when the user or a new turn stopped the reading. */
     completed?: boolean;
     first_audio_ms?: number;
     audio_duration_seconds?: number;
@@ -344,17 +336,16 @@ interface DesktopAnalyticsEvents {
     failure_code?: string;
   };
   server_transfer_action: {
-    action: "export" | "import";
+    action: "export" | "import" | "copy";
     result: AnalyticsOutcome;
     failure_code?: string;
   };
   usage_viewed: { scope: "agent" | "server"; range?: "7d" | "30d" | "90d" | "1y"; filtered?: boolean };
-  /** Sent once, before tracking stops. A user who turns analytics on again sends nothing for it. */
   analytics_preference_changed: { enabled: false };
 }
 
-type OnboardingStep = "choose" | "plan" | "computer" | "language";
-type OnboardingPath = "free" | "plan";
+type OnboardingStep = "existing" | "choose" | "plan" | "computer" | "language";
+type OnboardingPath = "free" | "plan" | "existing";
 type AttachmentKind = "image" | "document" | "spreadsheet" | "zip" | "other";
 const ATTACHMENT_KINDS: readonly AttachmentKind[] = ["image", "document", "spreadsheet", "zip", "other"];
 
@@ -463,7 +454,6 @@ type SanitizedAnalyticsProperties = Partial<Record<AnalyticsPropertyName, Analyt
 type PendingEvent = {
   name: AnalyticsEventName;
   properties: SanitizedAnalyticsProperties;
-  /** The account ID, or null for an event that goes with the install ID. */
   profileId: string | null;
   timestamp: string;
 };
@@ -554,6 +544,10 @@ const SAFE_FAILURE_CODES = new Set([
   "archive_invalid",
   "checksum_failed",
   "version_mismatch",
+  "cpu_unsupported",
+  "large_memory_pages",
+  "ipv6_missing",
+  "windows_blocked",
   "cli_update_failed",
   "cli_activate_failed",
   "cli_select_failed",
@@ -641,10 +635,9 @@ const EVENT_ACTIONS: Partial<Record<AnalyticsEventName, readonly string[]>> = {
   connector_action: ["connect_started", "connected", "disconnected", "enabled", "disabled"],
   computer_use_action: ["permission_opened"],
   channel_action: ["created", "archived", "member_added"],
-  server_transfer_action: ["export", "import"],
+  server_transfer_action: ["export", "import", "copy"],
 };
 
-/** Enum values that differ by event. A key that is not here uses PROPERTY_ENUMS. */
 const EVENT_ENUMS: Partial<Record<AnalyticsEventName, Readonly<Record<string, readonly string[]>>>> = {
   account_sign_in_started: { result: ["code_sent", "company_sign_in", "failed"] },
   agent_input_action: { kind: ["prompt", "approval"] },
@@ -679,8 +672,8 @@ const PROPERTY_ENUMS: Readonly<Record<string, readonly string[]>> = {
   currency: BILLING_CURRENCIES,
   direction: ["up", "down"],
   outcome: ["completed", "cancelled"],
-  step: ["choose", "plan", "computer", "language"],
-  path: ["free", "plan"],
+  step: ["existing", "choose", "plan", "computer", "language"],
+  path: ["free", "plan", "existing"],
   connector: ["slack", "discord", "telegram", "whatsapp", "github", "onepassword", "bitwarden", "protonpass"],
   permission: ["screen-recording", "accessibility"],
   method: ["browser", "code", "api_key"],
@@ -739,7 +732,6 @@ function sanitizeDesktopAnalyticsEvent(
   properties: DesktopAnalyticsEvents[AnalyticsEventName],
 ): SanitizedAnalyticsProperties {
   const allowed = EVENT_PROPERTY_ALLOWLIST[name];
-  // A custom agent's model id starts with the id the user gave it, so only the kind is sent.
   const customAgent = "provider" in properties && properties.provider === "acp";
   const customTarget = "to_provider" in properties && properties.to_provider === "acp";
   return Object.fromEntries(
@@ -754,16 +746,10 @@ function sanitizeDesktopAnalyticsEvent(
   );
 }
 
-/**
- * An OpenCode custom provider puts the id the user gave it before the model, so that model is sent as
- * "custom". The main process uses the same rule.
- */
 function reportedModel(value: string): string {
-  // Hermes names a model of the user's own endpoint `custom:<endpoint name>:<model>`.
   if (value.startsWith("custom:")) return "custom";
   const separator = value.indexOf("/");
   if (separator < 0) return value;
-  // A key-only provider never puts its own id before a model id, so that prefix comes from OpenCode.
   const prefix = value.slice(0, separator);
   return isOneOf(AGENT_PROVIDERS, prefix) && !isKeyOnlyProvider(prefix) ? value : "custom";
 }
@@ -817,7 +803,6 @@ function sanitizeDesktopProperty(
   return safeEnum(value, EVENT_ENUMS[name]?.[key] ?? PROPERTY_ENUMS[key]);
 }
 
-/** The slug of a curated skill, agent or plugin. A community listing's id or slug is the author's. */
 function listingSlug(value: string): string | undefined {
   if (PLUGIN_SLUGS.has(value)) return value;
   return CURATED_LISTING_PATTERN.exec(value)?.[1];
@@ -841,9 +826,7 @@ class DesktopAnalytics {
   #client: OpenPanelClient | null = null;
   #anonymousClient: OpenPanelClient | null = null;
   #disabled = false;
-  /** The user shares analytics with their account. Off: events go with the install ID only. */
   #trackingEnabled = true;
-  /** The random install ID, for events that do not go with the account. */
   #installId: string | null = null;
   #identity: AnalyticsIdentity | null = null;
   #pending: PendingEvent[] = [];
@@ -894,10 +877,6 @@ class DesktopAnalytics {
     }
   }
 
-  /**
-   * Starts product analytics in the web client. It sends only from the production site, like the web
-   * failure reports, and the web preference controls both.
-   */
   configureWeb(options: { version: string; user: AnalyticsIdentity | null; enabled: boolean }): boolean {
     if (!this.#client && (!this.#productionBuild || window.location.origin !== "https://openbot.run")) {
       this.#disabled = true;
@@ -956,11 +935,6 @@ class DesktopAnalytics {
     this.setUser(null);
   }
 
-  /**
-   * `recordOptOut` is for the user's own change from on to off: one last event records it. A value
-   * loaded at start, a reverted save or another tab's change records nothing. After "off", events
-   * go with the install ID, never with the account.
-   */
   setTrackingEnabled(enabled: boolean, options: { recordOptOut?: boolean } = {}): void {
     if (this.#trackingEnabled === enabled) return;
     this.#trackingEnabled = enabled;
@@ -969,7 +943,6 @@ class DesktopAnalytics {
       this.#pending = [];
       this.#clientQueue.operations = [];
       this.#anonymousQueue.operations = [];
-      // The last event records the opt-out. The clear below waits for it.
       if (options.recordOptOut && !this.#disabled) {
         const profileId = this.#identity?.id ?? null;
         this.#send("analytics_preference_changed", { enabled: false }, profileId);
@@ -1018,11 +991,6 @@ class DesktopAnalytics {
     this.#send(name, sanitized, profileId);
   }
 
-  /**
-   * `profileId` is the account ID. A user who does not share analytics sends with the install ID,
-   * and nothing when there is no install ID. A signed-out user who shares analytics sends with no
-   * ID, so the install ID never shows next to an account.
-   */
   #send(
     name: AnalyticsEventName,
     properties: SanitizedAnalyticsProperties,
@@ -1078,9 +1046,7 @@ class DesktopAnalytics {
       try {
         const result = operation.run();
         if (isPromiseLike(result)) await result;
-      } catch {
-        // Analytics must never change application behavior or stop later events.
-      }
+      } catch {}
     }
     queue.active = false;
   }

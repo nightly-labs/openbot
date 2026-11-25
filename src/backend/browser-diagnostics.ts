@@ -3,23 +3,11 @@ import { redactText } from "@openbot/logging";
 
 const DIAGNOSTIC_LIMIT = 100;
 const ACTION_LIMIT = 100;
-/**
- * A snapshot takes only the entries that no earlier snapshot delivered, and at most the most recent
- * of them: a single-page application that logs on each render would otherwise send the same network
- * log with every read. Each message is cut to a length that still names the failure.
- */
 const SNAPSHOT_DIAGNOSTICS = 20;
 const SNAPSHOT_ACTIONS = 10;
-/** An action that returns a status, not a snapshot, reports this many new errors. */
 const STATUS_ERRORS = 5;
 const MAX_ENTRY_TEXT = 500;
 
-/**
- * The bounded console/network/load and action rings for one browser tab. Every string here is
- * page-controlled text that `snapshot()` hands to a provider, so redaction happens on the way in
- * rather than at each reader: a page that logs `Authorization: Bearer …` never gets a secret into
- * the ring, and no later caller can forget to strip one.
- */
 export class BrowserDiagnostics {
   readonly #diagnostics: BrowserDiagnosticEntry[] = [];
   readonly #actions: BrowserActionHistoryEntry[] = [];
@@ -52,11 +40,6 @@ export class BrowserDiagnostics {
     this.#addedActions += 1;
   }
 
-  /**
-   * The entries no delivered snapshot has carried yet. Pass the cursor to `delivered` once the snapshot is
-   * read. A successful request or a plain successful action tells the model nothing, so it is left out
-   * before the limit: on a busy page they would fill the window and push out the error that matters.
-   */
   snapshot(): {
     diagnostics: BrowserDiagnosticEntry[];
     actions: BrowserActionHistoryEntry[];
@@ -73,10 +56,6 @@ export class BrowserDiagnostics {
     };
   }
 
-  /**
-   * The newest errors that no snapshot and no earlier status delivered. The snapshot cursor stays, so the
-   * next snapshot lists them too.
-   */
   takeStatusErrors(): BrowserDiagnosticEntry[] {
     const undelivered = this.#addedDiagnostics - Math.max(this.#deliveredDiagnostics, this.#statusDiagnostics);
     this.#statusDiagnostics = this.#addedDiagnostics;
@@ -85,7 +64,6 @@ export class BrowserDiagnostics {
       .slice(-STATUS_ERRORS);
   }
 
-  /** A failed snapshot read does not call this, so the next snapshot still carries its entries. */
   delivered(cursor: BrowserHistoryCursor): void {
     this.#deliveredDiagnostics = Math.max(this.#deliveredDiagnostics, cursor.diagnostics);
     this.#deliveredActions = Math.max(this.#deliveredActions, cursor.actions);
@@ -109,7 +87,6 @@ function newest<T>(entries: T[], undelivered: number, limit: number): T[] {
   return undelivered > 0 ? entries.slice(-Math.min(undelivered, limit)) : [];
 }
 
-// Redact before cutting, so a cut cannot split a secret into a prefix the redactor no longer knows.
 function boundedText(value: string): string {
   const redacted = redactText(value);
   return redacted.length > MAX_ENTRY_TEXT ? `${redacted.slice(0, MAX_ENTRY_TEXT)}…` : redacted;

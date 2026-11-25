@@ -1,9 +1,3 @@
-/**
- * The model and effort pills of the LLM and agent steps. The models come from the catalogs of the
- * board. The list offers only the providers that the host can run now or soon, and the provider of
- * the step.
- */
-
 import { ProviderLogo } from "@openbot/brand";
 import {
   type AgentModelId,
@@ -28,12 +22,19 @@ import {
 } from "@openbot/ui";
 import { createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import { type PickerChip, PickerMenu, type PickerOption, PickerRow, pickerMatches } from "./WorkflowPicker";
+import {
+  createPickerFades,
+  type PickerChip,
+  PickerMenu,
+  type PickerOption,
+  PickerRow,
+  pickerMatches,
+} from "./WorkflowPicker";
 import { Hint, useBoard } from "./workflow-board";
 import { type WorkflowCatalogs, workflowModelProviders } from "./workflow-model";
 import { type WfProvider, wfProviderLogo } from "./workflow-node-parts";
 
-const EFFORT_LABEL = {
+export const EFFORT_LABEL = {
   none: "provider.effort.none",
   minimal: "provider.effort.minimal",
   low: "provider.effort.low",
@@ -44,16 +45,13 @@ const EFFORT_LABEL = {
   ultra: "provider.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, AppTextKey>;
 
-/** The model with this id in a list of models. */
 export function modelOption(models: readonly ClientAgentModelOption[], id: AgentModelId) {
   return models.find((option) => option.id === id);
 }
 
-/** The name of a provider. A provider that this build does not know has the name that its host sends. */
 const providerName = (catalogs: WorkflowCatalogs, provider: AgentProviderRef) =>
   providerDisplayName(provider, catalogs.status.providers?.find((status) => status.id === provider)?.displayName);
 
-/** The facts of a model that the picker shows: the efforts that it supports, and the fast tier. */
 function modelChips(t: AppTranslate, option: ClientAgentModelOption): PickerChip[] {
   const efforts = option.supportedReasoningEfforts;
   const first = efforts[0];
@@ -72,15 +70,9 @@ function modelChips(t: AppTranslate, option: ClientAgentModelOption): PickerChip
   return chips;
 }
 
-/**
- * The model of a step, in the layout of the model picker in the conversation header: a rail of
- * provider logos, and beside it the name, the search field and the models of the chosen provider.
- * The rows have the style of every other list on the canvas.
- */
 export function ModelPill(props: {
   provider: WfProvider;
   value: AgentModelId;
-  /** The text of the pill while the step saves no model (`value` is empty) and the host chooses one. */
   placeholder?: string;
   disabled?: boolean;
   onChange: (model: AgentModelId, provider: WfProvider) => void;
@@ -94,10 +86,10 @@ export function ModelPill(props: {
   const [tab, setTab] = createSignal<AgentProviderRef>(untrack(() => props.provider));
   const [query, setQuery] = createSignal("");
   const current = () => modelOption(models(), props.value);
-  /** The placeholder, while the step saves no model. */
   const placeholder = () => (props.value === "" ? props.placeholder : undefined);
   const label = () => placeholder() ?? current()?.name ?? props.value;
   let panel: HTMLDivElement | undefined;
+  const fades = createPickerFades();
   let opening = false;
   const rows = (provider: AgentProviderRef) => {
     const text = query().trim().toLowerCase();
@@ -116,7 +108,6 @@ export function ModelPill(props: {
       open={open()}
       onOpenChange={(next) => {
         if (next) {
-          // Each open starts on the provider of the step, with no filter.
           setTab(props.provider);
           setQuery("");
           opening = true;
@@ -146,8 +137,6 @@ export function ModelPill(props: {
           class="ui-action-menu wfn-menu wfn-picker wfn-model-picker"
           data-wfn-portal=""
           onFocusIn={() => {
-            // The popover focuses its first control once it opens. Then the chosen row scrolls
-            // into view, and the search field takes the focus, as in every other list with a search.
             if (!opening) return;
             opening = false;
             panel?.querySelector("[role=option][data-selected]")?.scrollIntoView({ block: "nearest" });
@@ -194,7 +183,6 @@ export function ModelPill(props: {
                         if (event.key !== "ArrowDown" && event.key !== "Enter") return;
                         event.preventDefault();
                         const [first] = rows(provider);
-                        // Enter takes the first match; the down arrow moves to the rows.
                         if (event.key === "Enter") {
                           if (first) choose(first.value);
                           return;
@@ -209,7 +197,7 @@ export function ModelPill(props: {
                   >
                     <Listbox.Root<PickerOption<AgentModelId>>
                       ref={(element: HTMLUListElement) => {
-                        // A letter typed on a row goes back to the field, so typing always searches.
+                        fades.bind(element);
                         element.addEventListener(
                           "keydown",
                           (event) => {
@@ -220,7 +208,8 @@ export function ModelPill(props: {
                           true,
                         );
                       }}
-                      class="wfn-picker-list wfn-model-list"
+                      class={["wfn-picker-list wfn-model-list", fades.classes()]}
+                      onScroll={fades.measure}
                       aria-label={t("workflow.model.providerModels", { name: name(provider) })}
                       options={[...rows(provider)]}
                       optionValue={(option) => option.value}
@@ -253,7 +242,6 @@ export function ModelPill(props: {
   );
 }
 
-/** The label tells `minimal` from `low` and `ultra` from `max`; the meter keeps its five bars. */
 const EFFORT_LEVEL: Record<AgentReasoningEffort, number> = {
   none: 0,
   minimal: 1,
@@ -265,7 +253,6 @@ const EFFORT_LEVEL: Record<AgentReasoningEffort, number> = {
   ultra: 5,
 };
 
-/** Five bars, lit up to the level of an effort. */
 function EffortMeter(props: { effort: AgentReasoningEffort }) {
   return (
     <span class="wfn-picker-meter" aria-hidden="true">
@@ -274,7 +261,6 @@ function EffortMeter(props: { effort: AgentReasoningEffort }) {
   );
 }
 
-/** How long the model thinks. The menu lists only the efforts that the chosen model supports. */
 export function EffortPill(props: {
   efforts: readonly AgentReasoningEffort[];
   value: AgentReasoningEffort;

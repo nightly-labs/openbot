@@ -1,5 +1,3 @@
-// The commercial license of the account.
-
 import {
   type LicenseCheckoutRequest,
   parseLicenseCheckoutRequest,

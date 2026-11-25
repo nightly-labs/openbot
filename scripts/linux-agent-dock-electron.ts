@@ -1,10 +1,3 @@
-// Electron side of `scripts/linux-agent-dock-e2e.ts`. It runs the real agent dock of the app: the window
-// controller, the dock window of `main-window.ts`, the agent dock IPC handlers, the preload and the
-// built dock renderer. This process plays the main renderer: it publishes a presentation, and its own
-// full-screen window lies under the dock and counts the clicks that go through the dock.
-//
-// It reads one JSON command for each line of stdin and writes one answer line, `@@{...}`, to stdout.
-// The end of stdin quits the app.
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
@@ -19,11 +12,9 @@ import { registerIpcGroup } from "../src/main/ipc/define-ipc-group";
 import { aboveAppsWindowKind, usesX11Windows } from "../src/main/linux-wayland-output";
 import { createAgentDockWindow, loadAgentDockRenderer } from "../src/main/main-window";
 
-// A closed output must not stop the test app with an error dialog.
 process.stdout.on("error", () => undefined);
 process.stderr.on("error", () => undefined);
 
-// The bundle is `out/linux-agent-dock-e2e/harness.cjs`: the dock window loads `out/preload/index.cjs`.
 const RENDERER_ROOT = resolve(__dirname, "..", "renderer");
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html",
@@ -59,7 +50,7 @@ const PRESENTATION: AgentDockPresentation = {
   edgeStrip: false,
   sizePercent: 100,
   offsets: [],
-  seats: AGENTS.map((item) => ({ kind: "agent", agent: item, mood: "idle", state: null })),
+  seats: AGENTS.map((item) => ({ kind: "agent", agent: item, mood: "idle", state: null, temporary: false })),
   available: [],
   availableChannels: [],
   agents: AGENTS,
@@ -78,6 +69,10 @@ const PRESENTATION: AgentDockPresentation = {
     ],
     working: false,
     wait: null,
+    approval: null,
+    prompt: null,
+    takeover: null,
+    usageLimit: null,
   })),
   results: [],
 };
@@ -87,7 +82,6 @@ const regions: { at: number; rects: AgentDockInputRect[] }[] = [];
 const rendererErrors: string[] = [];
 const unhandled = new Set<string>();
 
-/** Serves the built renderer as the development server does, so the trusted-origin check applies. */
 function serveRenderer(): Promise<string> {
   const server = createServer((request, response) => {
     const path = decodeURIComponent(new URL(request.url ?? "/", "http://localhost").pathname);
@@ -107,10 +101,6 @@ function serveRenderer(): Promise<string> {
   );
 }
 
-/**
- * The helper renderer also reads the language: the answer that a fresh profile gets. Other calls fail,
- * and the report lists them.
- */
 function registerOtherHandlers(): void {
   ipcMain.handle(IPC_ENDPOINTS.app.getAppLanguagePreference.channel, () => ({ language: "en" }));
 }
@@ -122,7 +112,6 @@ function dockWindow(): BrowserWindow | undefined {
   return BrowserWindow.getAllWindows().find((window) => window !== mainWindow && !window.isDestroyed());
 }
 
-/** The windows of the controller: the dock windows of all displays. */
 function aboveAppsWindows(): number {
   return BrowserWindow.getAllWindows().filter((window) => window !== mainWindow && !window.isDestroyed()).length;
 }
@@ -140,7 +129,6 @@ const CommandSchema = Schema.Union([
 type Command = typeof CommandSchema.Type;
 const decodeCommand = Schema.decodeUnknownSync(Schema.fromJsonString(CommandSchema));
 
-/** Answers one command of the driver. */
 async function run(command: Command): Promise<void> {
   switch (command.op) {
     case "dock": {
@@ -180,7 +168,6 @@ function answer(id: number, value: unknown): void {
   process.stdout.write(`@@${JSON.stringify({ id, ok: true, value: value ?? null })}\n`);
 }
 
-// No top-level await: Electron does not get ready until the main module has run to its end.
 void app
   .whenReady()
   .then(start)
@@ -193,7 +180,6 @@ async function start(): Promise<void> {
   process.env.ELECTRON_RENDERER_URL = await serveRenderer();
   registerOtherHandlers();
   const primary = screen.getPrimaryDisplay();
-  // The "other app" under the dock: it counts the clicks that the dock lets through.
   mainWindow = new BrowserWindow({ ...primary.bounds, frame: false, show: false, backgroundColor: "#3b4252" });
   await mainWindow.loadURL(
     `data:text/html,${encodeURIComponent(
@@ -204,7 +190,6 @@ async function start(): Promise<void> {
   );
   mainWindow.showInactive();
   controller = new AgentDockWindowController({
-    // `OPENBOT_E2E_SERVER=1` plays a self-hosted or hosted server: no window may open.
     windowKind: aboveAppsWindowKind(process.env.OPENBOT_E2E_SERVER === "1"),
     createWindow: (bounds) => {
       const window = createAgentDockWindow(bounds);
@@ -242,6 +227,7 @@ async function start(): Promise<void> {
         regions.push({ at: Date.now(), rects });
         controller.setInputRegion(rendererId, rects);
       },
+      setExtent: (rendererId, extent) => controller.setExtent(rendererId, extent),
       listDisplays: () => controller.listDisplays(),
       drag: (rendererId, phase) => controller.drag(rendererId, phase),
     },

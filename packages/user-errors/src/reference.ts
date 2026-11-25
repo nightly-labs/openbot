@@ -1,16 +1,8 @@
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 
-// No import of `@openbot/logging` or the catalogs here: `@openbot/team-client` runs in a browser and
-// in React Native, and builds references with this module only.
-
 export const NETWORK_MESSAGE =
   /^(?:TypeError: )?(?:Failed to fetch|fetch failed|Network request failed|Load failed|NetworkError when attempting to fetch resource\.)$/iu;
 
-/**
- * What Electron and the error classes put in front of a message: `Error invoking remote method
- * 'x': RemoteRequestError: …`. A built-in `TypeError:` and the like stays, because it marks runtime
- * output that is never shown.
- */
 export const MESSAGE_PREFIX =
   /^(?:(?:Error invoking remote method '[^']+':|(?!(?:Type|Syntax|Reference|Range)Error:)(?:[A-Z]\w*)?Error(?:\[ref:[^\]\s]*\])?:)\s*)+/u;
 
@@ -23,27 +15,15 @@ export function errnoCode(message: string): string | undefined {
   return message.match(/^(?:[a-z]+\s+)?(E[A-Z_]+)(?=[:\s]|$)/u)?.[1];
 }
 
-/**
- * A short code that says where a failure came from, such as `signal/host_busy`,
- * `http/403/session_inactive` or `errno/ECONNREFUSED`. A user can copy it into a report.
- *
- * A reference is built only from fixed identifiers: protocol codes, HTTP statuses, errno and SQLite
- * tokens, and error class names. Anything else fails this pattern, so a path, a URL, a token or a
- * sentence from a server can never become one.
- */
 const REFERENCE = /^(?=.{3,64}$)[a-z][a-z0-9_-]{0,15}(?:\/[A-Za-z0-9_.-]{1,40}){1,3}$/u;
-/** One part of a reference: no `/` or `:`, so a part cannot add levels or carry a URL. */
 const REFERENCE_PART = /^[A-Za-z0-9_.-]{1,40}$/u;
 
-/** The name the main process gives an error that crosses IPC, so its reference survives the trip. */
 const REFERENCE_CARRIER = /(?:^|\s)(?:[A-Z]\w*)?Error\[ref:([^\]\s]{1,64})\]:/u;
 
-/** `value` when it is a valid reference, otherwise null. */
 export function safeReference(value: unknown): string | null {
   return typeof value === "string" && REFERENCE.test(value) ? value : null;
 }
 
-/** Join parts into a reference. An unsafe or empty part is left out. */
 export function referenceFrom(...parts: readonly (string | number | null | undefined)[]): string | null {
   const safe = parts
     .map((part) => (typeof part === "number" ? String(part) : part))
@@ -51,7 +31,6 @@ export function referenceFrom(...parts: readonly (string | number | null | undef
   return safe.length > 0 ? safeReference(safe.join("/")) : null;
 }
 
-/** The name an error must have to carry `reference` across Electron IPC. */
 export function referenceCarrierName(reference: string): string {
   return `Error[ref:${reference}]`;
 }
@@ -72,11 +51,6 @@ function codeReference(code: string): string | null {
   return referenceFrom("code", code);
 }
 
-/**
- * The reference of a failure, or null when nothing safe identifies it. Read in order: an explicit
- * `reference` field, the IPC carrier, a typed `status` and `code`, a token in the message, a leading
- * HTTP status, the cause, and the error class.
- */
 export function errorReference(error: unknown, depth = 0): string | null {
   const explicit = safeReference(stringField(error, "reference"));
   if (explicit) return explicit;
@@ -98,7 +72,6 @@ export function errorReference(error: unknown, depth = 0): string | null {
   if (httpStatus) return referenceFrom("http", httpStatus);
   if (NETWORK_MESSAGE.test(message)) return "network/fetch";
 
-  // A wrapper such as `RemoteWorkflowError` names the step; its cause names the failure.
   const cause = error instanceof Error ? error.cause : undefined;
   if (cause !== undefined && cause !== error && depth < 3) {
     const caused = errorReference(cause, depth + 1);

@@ -3,7 +3,6 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
 import { Effect, Semaphore } from "effect";
 import { writeFileAtomically } from "../backend/atomic-json-file";
 
-/** A logical remote session of the account service, kept so that the next start only asks for a ticket. */
 export interface CachedRemoteSession {
   readonly sessionId: string;
   readonly expiresAt: number;
@@ -14,34 +13,17 @@ export interface RemoteSessionCacheOptions {
   canPersist: () => boolean;
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
-  /** The user's choice to keep sessions between runs. Off, no file is read or written. */
   enabled?: boolean;
 }
 
 interface CacheState {
   principalId: string;
-  /** The Signal address of the last ticket. The next start opens its socket while the ticket is made. */
   signalUrl: string | null;
   sessions: Map<string, CachedRemoteSession>;
 }
 
 const CACHE_VERSION = 1;
 
-/**
- * The remote sessions of the signed-in account, one for each host, between two runs of the app.
- *
- * A session ID is not a credential: the account service gives a ticket for it only with the account's
- * own session token, and only while that device sign-in is not revoked. The file is encrypted with
- * the operating-system storage all the same, as the other account records are. It holds one
- * account; a record of another account is not used.
- *
- * The user can turn this off in the settings. Off, the file is removed and nothing is kept: each
- * start makes a new session, and quitting ends it, as before this cache. The open sessions are still
- * followed in memory, so that the setting, turned on again during the run, keeps them at once.
- *
- * Every failure is ignored. A missing or unreadable file only means that the next connect starts a
- * new session, as it did before this cache.
- */
 export class RemoteSessionCache {
   readonly #options: RemoteSessionCacheOptions;
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -54,7 +36,6 @@ export class RemoteSessionCache {
     this.#enabled = options.enabled ?? true;
   }
 
-  /** Whether a session kept now can be read by the next run. */
   canPersist(): boolean {
     if (!this.#enabled) return false;
     try {
@@ -64,10 +45,6 @@ export class RemoteSessionCache {
     }
   }
 
-  /**
-   * Applies the user's choice at once. Off removes the file. On writes the sessions that are open
-   * now, so that a session of this run stays open at quit too.
-   */
   setEnabled(enabled: boolean): Effect.Effect<void> {
     return this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
@@ -78,7 +55,6 @@ export class RemoteSessionCache {
     );
   }
 
-  /** Reads the file once. Later calls wait for the same read. */
   load(): Effect.Effect<void> {
     this.#loaded ??= Effect.runSync(Effect.cached(this.#read()));
     return this.#loaded;
@@ -115,7 +91,6 @@ export class RemoteSessionCache {
     });
   }
 
-  /** Forgets every session, such as at sign-out or when another account signs in. */
   clear(): Effect.Effect<void> {
     return this.#change(() => {
       this.#state = null;
@@ -123,7 +98,6 @@ export class RemoteSessionCache {
   }
 
   #read(): Effect.Effect<void> {
-    // Off at start: a file of an earlier run, when the setting was on, goes now.
     if (!this.#enabled) return this.#remove();
     return Effect.tryPromise(() => readFile(this.#options.path, "utf8")).pipe(
       Effect.flatMap((encrypted) =>
@@ -131,7 +105,6 @@ export class RemoteSessionCache {
       ),
       Effect.tap((state) =>
         Effect.sync(() => {
-          // A change made while the file was read is newer than the file.
           this.#state ??= state;
         }),
       ),
@@ -139,12 +112,10 @@ export class RemoteSessionCache {
     );
   }
 
-  /** Applies `update` after the file was read, and writes the result. `false` means nothing changed. */
   #change(update: () => boolean | undefined): Effect.Effect<void> {
     return this.#writes.withPermit(
       Effect.gen({ self: this }, function* () {
         yield* this.load();
-        // Off, the sessions are still followed in memory, but not written. On again, they are written.
         if (update() === false || !this.#enabled) return;
         yield* this.#write();
       }),

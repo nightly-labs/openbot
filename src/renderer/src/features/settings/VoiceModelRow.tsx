@@ -1,9 +1,12 @@
 import {
+  ELEVENLABS_VOICE_MODEL_ID,
   type SpeechModelStatus,
   VOICE_KEY_PROVIDER_NAMES,
   type VoiceKeyProvider,
+  type VoiceModelInfo,
   type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
+import type { AppTextKey } from "@openbot/i18n";
 import {
   Button,
   Download,
@@ -28,14 +31,23 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createRoot, createStore, getOwner, onCleanup, runWithOwner, Show, untrack } from "solid-js";
 
-/** Where a model runs: on this computer, or at a provider with the user's own key. */
+export const MODEL_DESCRIPTION = {
+  "parakeet-tdt-0.6b-v3": "settings.voice.model.parakeet.description",
+  "parakeet-unified-en-0.6b": "settings.voice.model.parakeetUnified.description",
+  "bark-3.0-plus": "settings.voice.model.bark.description",
+  "whisper-turbo": "settings.voice.model.whisper.description",
+  "cohere-transcribe-03-2026": "settings.voice.model.cohere.description",
+  [ELEVENLABS_VOICE_MODEL_ID]: "settings.voice.model.elevenlabs.description",
+  "groq-whisper-large-v3-turbo": "settings.voice.model.groqTurbo.description",
+  "groq-whisper-large-v3": "settings.voice.model.groqLarge.description",
+} as const satisfies Record<VoiceModelInfo["id"], AppTextKey>;
+
 export type ModelPlace = "local" | VoiceKeyProvider;
 
 const PLACE_ORDER: readonly ModelPlace[] = ["local", "elevenlabs", "groq", "xai"];
 
 export interface ModelChoice<Id extends string> {
   id: Id;
-  /** The product name. It is not translated. */
   name: string;
   place: ModelPlace;
 }
@@ -45,21 +57,12 @@ interface ModelGroup<Id extends string> {
   ids: Id[];
 }
 
-/** The name under the provider in the menu: the provider name is the group name, so it is not repeated. */
-function shortName(choice: ModelChoice<string>): string {
-  if (choice.place === "local") return choice.name;
-  const provider = `${VOICE_KEY_PROVIDER_NAMES[choice.place]} `;
-  return choice.name.startsWith(provider) ? choice.name.slice(provider.length) : choice.name;
-}
-
-/** The name on the menu button: the provider name and the model name. */
 function fullName(choice: ModelChoice<string>): string {
   if (choice.place === "local") return choice.name;
   const provider = VOICE_KEY_PROVIDER_NAMES[choice.place];
   return choice.name.startsWith(`${provider} `) ? choice.name : `${provider} ${choice.name}`;
 }
 
-/** The file of a model on this computer, and its download size. */
 export interface ModelFile {
   bytes: number;
   status: VoiceModelStatus | SpeechModelStatus | null;
@@ -70,23 +73,16 @@ interface VoiceModelRowProps<Id extends string> {
   value: Id | null;
   onChoose: (id: Id) => void;
   description: string;
-  /** A second line, such as "the voice server takes dictation". */
   note?: string | undefined;
-  /** The file of the chosen model, or null for a cloud model. */
   file: ModelFile | null;
   onDownload: () => void;
   onRemove: () => void;
-  /** A button before the Download or Remove button, such as Use. */
   action?: JSX.Element | undefined;
   disabled: boolean;
   mount: HTMLElement | undefined;
+  onServer?: boolean;
 }
 
-/**
- * The one Model row of a section: a menu with the models, grouped by provider, and one button for
- * the chosen model. A model on this computer has Download, Try again, or Remove; its download shows
- * in a toast. A cloud model has no button: its key row follows.
- */
 export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) {
   const { t, format, errorMessage } = useText();
   const chosen = () => props.choices.find((choice) => choice.id === props.value);
@@ -97,7 +93,11 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
       ids: props.choices.filter((choice) => choice.place === place).map((choice) => choice.id),
     })).filter((group) => group.ids.length > 0);
   const groupName = (place: ModelPlace) =>
-    place === "local" ? t("settings.voice.model.group.local") : VOICE_KEY_PROVIDER_NAMES[place];
+    place !== "local"
+      ? VOICE_KEY_PROVIDER_NAMES[place]
+      : props.onServer
+        ? t("server.settings.voiceModel.group")
+        : t("settings.voice.model.group.local");
   const phase = () => props.file?.status?.phase;
   const fileText = (): string | null => {
     const file = props.file;
@@ -148,7 +148,11 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
               variant="ghost"
               size="sm"
               type="button"
-              aria-label={t("settings.voice.model.removeLabel", { name: name() })}
+              aria-label={
+                props.onServer
+                  ? t("server.settings.voiceModel.removeLabel", { name: name() })
+                  : t("settings.voice.model.removeLabel", { name: name() })
+              }
               onClick={() => props.onRemove()}
             >
               {t("common.remove")}
@@ -167,7 +171,7 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
               <SelectSection>{groupName(sectionProps.section.rawValue.place)}</SelectSection>
             )}
             itemComponent={(selectProps) => (
-              <SelectItem item={selectProps.item}>{modelShortName(choiceOf(selectProps.item.rawValue))}</SelectItem>
+              <SelectItem item={selectProps.item}>{modelFullName(choiceOf(selectProps.item.rawValue))}</SelectItem>
             )}
           >
             <SelectTrigger size="sm" aria-label={t("settings.voice.model.title")}>
@@ -181,10 +185,6 @@ export function VoiceModelRow<Id extends string>(props: VoiceModelRowProps<Id>) 
   );
 }
 
-function modelShortName(choice: ModelChoice<string> | undefined): string {
-  return choice ? shortName(choice) : "";
-}
-
 function modelFullName(choice: ModelChoice<string> | undefined): string {
   return choice ? fullName(choice) : "";
 }
@@ -192,16 +192,10 @@ function modelFullName(choice: ModelChoice<string> | undefined): string {
 interface VoiceKeyRowProps {
   provider: VoiceKeyProvider;
   saved: boolean;
-  /** Saves the key. The answer is false when main could not save it. */
   onSave: (key: string) => Promise<boolean>;
   onRemove: () => void;
 }
 
-/**
- * The key row of a cloud model, under the Model row. With no key, the row says so in the warning
- * color and has the key field; Save key shows when the field has text. With a key, it has Remove key.
- * The key is never read back: main has no getter for it, and the field clears once it is saved.
- */
 export function VoiceKeyRow(props: VoiceKeyRowProps) {
   const { t } = useText();
   const [key, setKey] = createStore({ draft: "", saving: false });
@@ -279,25 +273,20 @@ export function VoiceKeyRow(props: VoiceKeyRowProps) {
   );
 }
 
-/** A model file that downloads now. */
 export interface ModelDownload {
-  /** The model ID. It names the toast. */
   id: string;
   name: string;
   progress: number;
-  /** True when the download ended with the model on this computer. */
   ready: boolean;
 }
 
 interface ModelDownloadToastsProps {
-  /** Each model whose file is on its way or was on its way, by model ID. */
+  scope?: string;
   downloads: readonly ModelDownload[];
-  /** The IDs of the downloads that run now. */
   running: readonly string[];
   onCancel: (id: string) => void;
 }
 
-/** The bar and the percent of one download in its toast. */
 function DownloadProgress(props: { name: string; progress: () => number }) {
   const { t, format } = useText();
   return (
@@ -310,17 +299,12 @@ function DownloadProgress(props: { name: string; progress: () => number }) {
   );
 }
 
-/**
- * One toast for each model download. It stays open while the file downloads and has Cancel. At the
- * end it changes to "<model> is ready". A cancelled or failed download closes its toast; the Model
- * row shows a failure.
- */
 export function ModelDownloadToasts(props: ModelDownloadToastsProps) {
   const { t } = useText();
   const owner = getOwner();
   const open = new Map<string, () => void>();
   const cancelled = new Set<string>();
-  const toastId = (id: string) => `voice-model-${id}`;
+  const toastId = (id: string) => (props.scope ? `voice-model-${props.scope}-${id}` : `voice-model-${id}`);
   const download = (id: string) => props.downloads.find((entry) => entry.id === id);
 
   const raise = (id: string) => {
@@ -340,7 +324,6 @@ export function ModelDownloadToasts(props: ModelDownloadToastsProps) {
       action: {
         label: t("common.cancel"),
         onClick: (event: MouseEvent) => {
-          // The toast stays until the download ends, so it closes with its status.
           event.preventDefault();
           cancelled.add(id);
           props.onCancel(id);

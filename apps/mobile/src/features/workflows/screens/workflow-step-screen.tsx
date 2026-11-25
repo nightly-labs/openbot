@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import Check from "lucide-react-native/icons/check";
-import { Alert } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
@@ -15,6 +14,7 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
+import { AssetFields } from "@/features/workflows/components/workflow-asset-fields";
 import {
   SlackOutputFields,
   TelegramOutputFields,
@@ -22,6 +22,8 @@ import {
 } from "@/features/workflows/components/workflow-chat-fields";
 import { DiscordOutputFields } from "@/features/workflows/components/workflow-discord-fields";
 import { GitHubOutputFields } from "@/features/workflows/components/workflow-github-fields";
+import { MediaFields } from "@/features/workflows/components/workflow-media-fields";
+import { confirmRemove } from "@/features/workflows/model/use-workflow-step-menu";
 import { useWorkflowGitHubSupported } from "@/features/workflows/model/use-workflows";
 import {
   SLACK_OUTPUT_DEFAULTS,
@@ -31,9 +33,10 @@ import {
 } from "@/features/workflows/model/workflow-chats";
 import { useWorkflowDraft, type WorkflowDraft } from "@/features/workflows/model/workflow-draft";
 import { GITHUB_OUTPUT_DEFAULTS } from "@/features/workflows/model/workflow-github";
+import { fieldText } from "@/features/workflows/model/workflow-node-fields";
 import { canMove, outlineListOf } from "@/features/workflows/model/workflow-outline";
 import { draftProblems } from "@/features/workflows/model/workflow-problems";
-import { kindLabel } from "@/features/workflows/model/workflow-steps";
+import { addKeyLabel, kindLabel } from "@/features/workflows/model/workflow-steps";
 import {
   useMobileWorkspaceActions,
   useMobileWorkspaceSelector,
@@ -42,7 +45,7 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { haptics } from "@/shared/lib/haptics";
-import { currentText, useText } from "@/shared/lib/text";
+import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 const EFFORT_LABEL = {
@@ -56,15 +59,8 @@ const EFFORT_LABEL = {
   ultra: "mobile.agent.runtime.effort.ultra",
 } as const satisfies Record<AgentReasoningEffort, MobileTextKey>;
 
-/** The longest text of a field that `workflows-v1` carries. */
 const FIELD_LIMIT = 20_000;
 
-const text = (node: WorkflowNode, name: string) => {
-  const value = node.fields[name];
-  return typeof value === "string" ? value : "";
-};
-
-/** The text of a step: its task, prompt, question or text, in one field. */
 function TextField({
   node,
   name,
@@ -84,18 +80,17 @@ function TextField({
       maxLength={FIELD_LIMIT}
       autoCapitalize="sentences"
       placeholder={placeholder}
-      value={text(node, name)}
+      value={fieldText(node, name)}
       onChangeText={(value) => setFields(node.id, { [name]: value })}
     />
   );
 }
 
-/** The agents of the server, one of which does an agent step. */
 function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly MobileAgent[] }) {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
   const setFields = useWorkflowDraft((state) => state.setFields);
-  const selected = text(node, "agentId");
+  const selected = fieldText(node, "agentId");
   return (
     <SettingsSection
       title={t("mobile.workflow.step.agent")}
@@ -130,10 +125,6 @@ function AgentChoice({ node, agents }: { node: WorkflowNode; agents: readonly Mo
   );
 }
 
-/**
- * The model of a model step or a condition, and its effort. Without a model, the host uses its
- * preferred model, as the desktop does for a step whose model is gone.
- */
 function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -145,13 +136,13 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
     queryFn: () => loadAgentModels(serverId),
     retry: false,
   });
-  const provider = text(node, "provider");
-  const model = text(node, "model");
+  const provider = fieldText(node, "provider");
+  const model = fieldText(node, "model");
   const value = provider && model ? `${provider}:${model}` : "";
   const options = models.data ?? [];
   const current = options.find((option) => option.provider === provider && option.id === model);
   const efforts = current && current.reasoningEffortConfigurable !== false ? current.supportedReasoningEfforts : [];
-  const effort = text(node, "effort") || current?.defaultReasoningEffort || "";
+  const effort = fieldText(node, "effort") || current?.defaultReasoningEffort || "";
   return (
     <SettingsSection
       title={t("mobile.workflow.step.model")}
@@ -166,7 +157,6 @@ function ModelChoice({ node, serverId }: { node: WorkflowNode; serverId: string 
             label={t("mobile.workflow.step.model")}
             options={[
               { value: "", label: t("mobile.workflow.step.defaultModel") },
-              // A model that the host does not list now stays a choice, so the picker shows it.
               ...(value && !current ? [{ value, label: model }] : []),
               ...options.map((option) => ({ value: `${option.provider}:${option.id}`, label: option.name })),
             ]}
@@ -211,7 +201,6 @@ const SHOWN_TARGET_LABEL = {
   discord: "mobile.workflow.output.discord",
 } as const satisfies Record<string, MobileTextKey>;
 
-/** The output targets that act as the host's GitHub App or messaging bot, with the fields a new one stores. */
 const HOST_TARGETS = ["github", "discord", "telegram", "slack"];
 const TARGET_DEFAULTS = {
   github: GITHUB_OUTPUT_DEFAULTS,
@@ -219,12 +208,6 @@ const TARGET_DEFAULTS = {
   slack: SLACK_OUTPUT_DEFAULTS,
 } as const;
 
-/**
- * Where an output sends its result. The phone does not choose a messaging place, an OpenBot channel or a
- * Discord server: only the computer that runs OpenBot chooses them. An owner or admin adds a GitHub
- * output on a host that runs it, and a Telegram or Slack output on a host that has a linked chat or
- * workspace, as on desktop.
- */
 function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraft }) {
   const { t } = useText();
   const accent = String(useCSSVariable("--openbot-accent"));
@@ -234,7 +217,7 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
   );
   const githubSupported = useWorkflowGitHubSupported(draft.serverId);
   const chats = useChatAccess(draft);
-  const target = text(node, "target");
+  const target = fieldText(node, "target");
   const shown =
     target === "channel" || target === "chat-channel" || target === "file" || target === "discord" ? target : null;
   const notify = shown === null && target !== "github" && target !== "telegram" && target !== "slack";
@@ -248,8 +231,6 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
       setFields(node.id, { target: "notify", connectionId: undefined, placeId: undefined });
       return;
     }
-    // A GitHub, Discord, Telegram or Slack output keeps an `action`, so a change from one to another writes
-    // the defaults again.
     setFields(node.id, {
       target: next,
       ...(node.fields.action === undefined || HOST_TARGETS.includes(target) ? TARGET_DEFAULTS[next] : {}),
@@ -305,7 +286,6 @@ function OutputChoice({ node, draft }: { node: WorkflowNode; draft: WorkflowDraf
   );
 }
 
-/** The editor sheet > a step: its settings, and where it goes in the workflow. */
 export function WorkflowStepScreen() {
   const { t } = useText();
   const { nodeId } = useLocalSearchParams<{ nodeId: string }>();
@@ -325,33 +305,22 @@ export function WorkflowStepScreen() {
   const problem = draftProblems(draft, serverAgents, t).steps.get(node.id);
   const loose = list === "loose";
 
-  const removeStep = () => {
-    const text = currentText();
-    const deleteNow = () => {
-      remove(node.id);
+  const removeStep = () =>
+    confirmRemove(node, draft, (id) => {
+      remove(id);
       router.back();
-    };
-    if (node.kind !== "condition") {
-      void haptics.selection();
-      deleteNow();
-      return;
-    }
-    const count = outline ? outline.yes.length + outline.no.length : 0;
-    Alert.alert(
-      text.t("mobile.workflow.editor.deleteConditionTitle"),
-      count > 0
-        ? text.t("mobile.workflow.editor.deleteConditionPaths", { count })
-        : text.t("mobile.workflow.editor.deleteConditionBody"),
-      [
-        { text: text.t("common.cancel"), style: "cancel" },
-        { text: text.t("mobile.workflow.editor.delete"), style: "destructive", onPress: deleteNow },
-      ],
-    );
-  };
+    });
 
   return (
     <SettingsContent>
-      <Stack.Screen options={{ title: kindLabel(node.kind, t) }} />
+      <Stack.Screen
+        options={{
+          title:
+            node.kind === "image" && fieldText(node, "media") === "video"
+              ? addKeyLabel("video", t)
+              : kindLabel(node.kind, t),
+        }}
+      />
       {problem ? (
         <Typography.Paragraph className="px-4 font-medium text-danger-text" style={typeScale.caption}>
           {problem}
@@ -376,6 +345,12 @@ export function WorkflowStepScreen() {
             name="prompt"
             label={t("mobile.workflow.step.prompt")}
             placeholder={t("mobile.workflow.step.promptDefault")}
+          />
+          <TextField
+            node={node}
+            name="system"
+            label={t("mobile.workflow.step.system")}
+            placeholder={t("mobile.workflow.step.systemPlaceholder")}
           />
         </>
       ) : null}
@@ -410,23 +385,25 @@ export function WorkflowStepScreen() {
           placeholder={t("mobile.workflow.step.textPlaceholder")}
         />
       ) : null}
+      {node.kind === "image" ? <MediaFields node={node} draft={draft} /> : null}
+      {node.kind === "asset" ? <AssetFields node={node} draft={draft} /> : null}
       {node.kind === "output" ? (
         <>
           <OutputChoice node={node} draft={draft} />
-          {text(node, "target") === "github" ? <GitHubOutputFields node={node} draft={draft} /> : null}
-          {text(node, "target") === "discord" ? <DiscordOutputFields node={node} /> : null}
-          {text(node, "target") === "telegram" ? <TelegramOutputFields node={node} draft={draft} /> : null}
-          {text(node, "target") === "slack" ? <SlackOutputFields node={node} draft={draft} /> : null}
+          {fieldText(node, "target") === "github" ? <GitHubOutputFields node={node} draft={draft} /> : null}
+          {fieldText(node, "target") === "discord" ? <DiscordOutputFields node={node} /> : null}
+          {fieldText(node, "target") === "telegram" ? <TelegramOutputFields node={node} draft={draft} /> : null}
+          {fieldText(node, "target") === "slack" ? <SlackOutputFields node={node} draft={draft} /> : null}
         </>
       ) : null}
       {outline && (list || node.kind === "condition") ? (
         <SettingsSection>
-          {list && canMove(outline, node.id, -1) ? (
+          {list && canMove(draft.graph, outline, node.id, -1) ? (
             <SettingsRow disclosure={false} onPress={() => move(node.id, -1)}>
               <Typography.Paragraph>{t("mobile.workflow.editor.moveUp")}</Typography.Paragraph>
             </SettingsRow>
           ) : null}
-          {list && canMove(outline, node.id, 1) ? (
+          {list && canMove(draft.graph, outline, node.id, 1) ? (
             <SettingsRow disclosure={false} onPress={() => move(node.id, 1)}>
               <Typography.Paragraph>{t("mobile.workflow.editor.moveDown")}</Typography.Paragraph>
             </SettingsRow>

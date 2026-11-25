@@ -5,6 +5,7 @@ import { Image } from "expo-image";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Check from "lucide-react-native/icons/check";
+import Copy from "lucide-react-native/icons/copy";
 import Download from "lucide-react-native/icons/download";
 import Share from "lucide-react-native/icons/share";
 import X from "lucide-react-native/icons/x";
@@ -32,9 +33,9 @@ import { useUniwind } from "uniwind";
 import { haptics } from "@/shared/lib/haptics";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
+import { clamp } from "@/shared/lib/worklet-math";
 import type { ImageDimensions } from "../model/image-dimensions";
 import {
-  clamp,
   coverSize,
   dragFade,
   dragScale,
@@ -52,41 +53,26 @@ import {
 import { knownImageDimensions, useAttachmentFile } from "./attachment-preview";
 import { ChatGlassIconButton, ChatGlassLabel } from "./chat-glass-icon-button";
 
-// Out of the chat: just short of critically damped, so the picture arrives rather than stops.
 const OPEN_SPRING = { damping: 30, stiffness: 260, mass: 1 } as const;
-// Back into the chat: clamped, because a frame that overshoots its thumbnail shrinks past it
-// and grows back at the one moment it should be settling.
 const CLOSE_SPRING = { damping: 32, stiffness: 300, mass: 1, overshootClamping: true } as const;
-// Zoom settling and a drag that snaps back: firm, so it lands without drifting.
 const SETTLE_SPRING = { damping: 34, stiffness: 320, mass: 1 } as const;
-// The next picture slides in and stops: a page that bounces past its place reads as loose.
 const PAGE_SPRING = { damping: 36, stiffness: 300, mass: 1, overshootClamping: true } as const;
-// The open picture keeps this margin to the screen and the safe area, so the blur shows on every
-// side and the photo reads as held up over the chat, not as a new screen.
 const INSET = 16;
-// The buttons: 48 points high, 8 points under the safe area. The picture stays clear of them.
 const HEADER_OFFSET = 8;
 const HEADER_HEIGHT = 48;
-// The space between the controls and the picture.
 const CHROME_GAP = 12;
-// The strip of small pictures at the bottom, one tile for each page.
 const THUMB_SIZE = 40;
 const THUMB_GAP = 6;
 const THUMB_STEP = THUMB_SIZE + THUMB_GAP;
 const THUMB_RADIUS = 8;
 const STRIP_OFFSET = 8;
-// The tiles this far from the page on screen mount. The strip shows about nine.
 const THUMB_WINDOW = 8;
-// The space between two pictures of the carousel while a swipe moves them.
 const PAGE_GAP = 24;
-// The pictures either side of the one on screen stay mounted, so a quick second swipe finds its
-// picture drawn even when the JS thread is late to hear about the first.
 const PAGE_WINDOW = 2;
 const CORNER_RADIUS = 16;
 const BLUR_INTENSITY = 50;
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
-// The shape a picture takes until its size is known: a portrait phone photo.
 const UNKNOWN_SIZE = { width: 3, height: 4 } as const;
 
 const PHASE_OPENING = 0;
@@ -96,12 +82,10 @@ const MODE_NONE = 0;
 const MODE_PAN = 1;
 const MODE_DISMISS = 2;
 const MODE_PAGE = 3;
-// A one-finger drag on an unzoomed photo whose direction is not known yet.
 const MODE_UNDECIDED = 4;
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
-// The device's answer outlives one viewer, so only the first viewer of a launch waits for it.
 let knownReduceTransparency: boolean | null = null;
 function useReduceTransparency() {
   const [enabled, setEnabled] = useState(knownReduceTransparency);
@@ -122,19 +106,12 @@ function useReduceTransparency() {
 }
 
 export interface ImageViewerPage {
-  /** The attachment id. `hiddenSource` holds it while the viewer shows this picture. */
   key: string;
   attachment: AttachmentSummary;
-  /**
-   * The chat's copy of the picture, measured on the UI thread where each flight starts and ends.
-   * Null for a row the list has not drawn: that picture fades away instead.
-   */
   origin: AnimatedRef | null;
-  /** The corner radius of the chat's copy. */
   originRadius: number;
 }
 
-/** The shared values every page reads to place its frame. */
 interface ViewerMotion {
   t: SharedValue<number>;
   origin: SharedValue<Rect | null>;
@@ -148,13 +125,6 @@ interface ViewerMotion {
   dragY: SharedValue<number>;
 }
 
-/**
- * Photos from the chat, opened over a blur of the chat. The picture on screen is the one that
- * was tapped: its frame grows from the thumbnail's rectangle and corners to the fitted photo,
- * and the crop opens out to the whole image. Swipe sideways for the other photos of the message,
- * pinch or double-tap to zoom; drag it up or down, or tap beside it, to put it back where it came
- * from. Every step of that runs on the UI thread, from the first measurement to the landing.
- */
 export function ImageViewer({
   serverId,
   pages,
@@ -162,6 +132,7 @@ export function ImageViewer({
   hiddenSource,
   busy,
   onShare,
+  onCopy,
   onSave,
   onIndexChange,
   onDismissed,
@@ -169,19 +140,12 @@ export function ImageViewer({
   serverId: string;
   pages: readonly ImageViewerPage[];
   initialIndex: number;
-  /**
-   * The key of the page whose chat copy hides. The viewer sets it in the frame its flight leaves
-   * the thumbnail and clears it in the frame the flight lands, so the chat never shows an empty
-   * frame or a second copy, however busy the JS thread is.
-   */
   hiddenSource: SharedValue<string | null>;
-  /** The actions of the page on screen. */
   busy: boolean;
   onShare: () => void;
-  /** Absent for a picture that the photo library does not take, such as an SVG. */
+  onCopy?: (() => Promise<boolean>) | undefined;
   onSave?: (() => Promise<boolean>) | undefined;
   onIndexChange?: (index: number) => void;
-  /** Called once the picture is back in its place. */
   onDismissed: () => void;
 }) {
   const { width: W, height: H } = useWindowDimensions();
@@ -191,32 +155,24 @@ export function ImageViewer({
   const { theme } = useUniwind();
   const [foreground, fallbackBackground] = useThemeColor(["foreground", "default"]);
   const text = useText();
-  // The same glass as the chat header's buttons. Without Liquid Glass, or with Reduce
-  // Transparency on, they fall back to the theme's solid control colour.
   const liquidGlassAvailable = isLiquidGlassAvailable() && reduceTransparency === false;
   const count = pages.length;
-  // The picture never sits under the buttons or the strip. It stays centred on the screen, so a
-  // pinch scales it about the middle of the screen, where the zoom arithmetic puts its centre.
   const vertical =
     Math.max(insets.top + HEADER_OFFSET + HEADER_HEIGHT, insets.bottom + (count > 1 ? STRIP_OFFSET + THUMB_SIZE : 0)) +
     CHROME_GAP;
   const box = { x: INSET, y: vertical, width: Math.max(W - INSET * 2, 1), height: Math.max(H - vertical * 2, 1) };
   const step = W + PAGE_GAP;
-  // A page learns its size when its image loads. Until then the chat's record of it, or a guess.
   const [sizes, setSizes] = useState<Readonly<Record<string, ImageDimensions>>>({});
   const sizeOf = (page: ImageViewerPage) => sizes[page.key] ?? knownImageDimensions(page.key) ?? UNKNOWN_SIZE;
   const fits = pages.map((page) => fitWithin(sizeOf(page), box));
   const keys = pages.map((page) => page.key);
   const origins = pages.map((page) => page.origin);
 
-  // The flight: 0 in the chat, 1 on the screen.
   const t = useSharedValue(0);
   const phase = useSharedValue(PHASE_OPENING);
   const origin = useSharedValue<Rect | null>(null);
-  // The carousel: the page on screen, and how far a swipe has moved the strip from it.
   const index = useSharedValue(initialIndex);
   const pageOffset = useSharedValue(0);
-  // Zoom, measured from the screen's centre.
   const scale = useSharedValue(1);
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
@@ -228,7 +184,6 @@ export function ImageViewer({
   const lastFocalX = useSharedValue(0);
   const lastFocalY = useSharedValue(0);
   const pinching = useSharedValue(false);
-  // Dragging the picture away.
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
   const shrink = useSharedValue(1);
@@ -236,19 +191,18 @@ export function ImageViewer({
   const gestureMode = useSharedValue(MODE_NONE);
   const chrome = useSharedValue(0);
   const chromeOn = useSharedValue(true);
-  // A finger on the strip: the page it points at, as a fraction, while it moves.
   const scrub = useSharedValue(0);
   const scrubStart = useSharedValue(0);
   const scrubbing = useSharedValue(false);
-  // The page on screen as a fraction: the strip follows a swipe of the pictures, and a scrub of itself.
   const stripPosition = useDerivedValue(() => (scrubbing.get() ? scrub.get() : index.get() - pageOffset.get() / step));
-  // React hears which page is on screen only to mount its neighbours and label the controls.
   const [shown, setShown] = useState(initialIndex);
   const [savedKeys, setSavedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const backdrop = useDerivedValue(() => clamp(t.get(), 0, 1) * fade.get());
   const motion: ViewerMotion = { t, origin, index, pageOffset, scale, shrink, tx, ty, dragX, dragY };
   const current = pages[shown] ?? pages[0];
   const saved = current ? savedKeys.has(current.key) : false;
+  const copied = current !== undefined && copiedKey === current.key;
   const name = current?.attachment.name ?? "";
   const position = text.t("mobile.chat.imageViewer.position", { current: shown + 1, total: count });
 
@@ -259,7 +213,6 @@ export function ImageViewer({
     });
   }, []);
 
-  // The viewer owns the hidden copy only while it is open. A viewer that leaves early gives it back.
   useEffect(() => () => hiddenSource.set(null), [hiddenSource]);
 
   function currentFit() {
@@ -267,7 +220,6 @@ export function ImageViewer({
     return fits[index.get()] ?? box;
   }
 
-  /** Reads where the current page's thumbnail is now. One scrolled out of view gives nothing to fly to. */
   function measureOrigin() {
     "worklet";
     const ref = origins[index.get()];
@@ -285,7 +237,6 @@ export function ImageViewer({
     origin.set({ x: measured.pageX, y: measured.pageY, width: measured.width, height: measured.height });
   }
 
-  /** Starts once the modal is on screen, from wherever the thumbnail is at that moment. */
   function open() {
     "worklet";
     measureOrigin();
@@ -303,7 +254,6 @@ export function ImageViewer({
     if (phase.get() === PHASE_CLOSING) return;
     phase.set(PHASE_CLOSING);
     gestureMode.set(MODE_NONE);
-    // The chat may have moved since the viewer opened, so the flight goes to where it is now.
     measureOrigin();
     chrome.set(withTiming(0, { duration: 120 }));
     const done = (finished?: boolean) => {
@@ -327,7 +277,6 @@ export function ImageViewer({
     ty.set(withSpring(0, CLOSE_SPRING));
   }
 
-  /** A close from a button or the back action. */
   function requestClose() {
     scheduleOnUI(startClose, 0, 0);
   }
@@ -337,10 +286,6 @@ export function ImageViewer({
     onIndexChange?.(next);
   }
 
-  /**
-   * Makes `target` the page on screen and slides the strip to it. The index changes at once and
-   * the offset takes up the difference, so the pictures do not move in the frame it changes.
-   */
   function turnTo(target: number, velocity: number) {
     "worklet";
     const from = index.get();
@@ -393,10 +338,6 @@ export function ImageViewer({
     void haptics.selection();
   }
 
-  // Which gesture a touch is gets decided when it starts: two fingers zoom, one finger on a
-  // zoomed photo pans it, a sideways drag turns the page, and any other drag takes the photo
-  // away. Deciding once keeps a drag from changing its mind halfway, which is what makes a
-  // viewer feel loose.
   const pinch = Gesture.Pinch()
     .onStart((event) => {
       if (phase.get() !== PHASE_OPEN || gestureMode.get() === MODE_PAGE) return;
@@ -426,11 +367,6 @@ export function ImageViewer({
       settleZoom();
     });
 
-  /**
-   * Turns an unzoomed drag into a page swipe or a drag away, from the way it has moved. Android
-   * starts the pan before it reports a translation, so a drag that has no direction yet waits for
-   * the next update.
-   */
   function decideDrag(translationX: number, translationY: number) {
     "worklet";
     if (!(Math.abs(translationX) + Math.abs(translationY) > 0)) {
@@ -476,7 +412,6 @@ export function ImageViewer({
         tx.set(rubberBandClamp(startX.get() + event.translationX, -boundX, boundX, W));
         ty.set(rubberBandClamp(startY.get() + event.translationY, -boundY, boundY, H));
       } else if (mode === MODE_PAGE) {
-        // The first and last pictures resist a swipe toward nothing.
         const lower = index.get() < count - 1 ? -step : 0;
         const upper = index.get() > 0 ? step : 0;
         pageOffset.set(rubberBandClamp(startX.get() + event.translationX, lower, upper, W));
@@ -544,7 +479,6 @@ export function ImageViewer({
     .maxDistance(10)
     .onEnd((event, success) => {
       if (!success || phase.get() !== PHASE_OPEN) return;
-      // Beside the photo puts it back; on it, the controls come and go.
       if (!hitsRect(event.x, event.y, currentFit(), scale.get(), tx.get(), ty.get())) {
         startClose(0, 0);
         return;
@@ -555,8 +489,6 @@ export function ImageViewer({
 
   const gesture = Gesture.Race(Gesture.Simultaneous(pinch, pan), Gesture.Exclusive(doubleTap, singleTap));
 
-  // A drag along the strip scrubs through the pages: the page under the strip's centre is on
-  // screen at once, and the pictures slide with the finger between two pages.
   const stripPan = Gesture.Pan()
     .maxPointers(1)
     .minDistance(4)
@@ -605,8 +537,6 @@ export function ImageViewer({
     transform: [{ translateX: W / 2 - THUMB_SIZE / 2 - stripPosition.get() * THUMB_STEP }],
   }));
 
-  // Glass stops rendering under a parent with zero opacity, so the buttons are never faded from
-  // here. The worklets still decide when they show; React hears only when that flips.
   const [chromeVisible, setChromeVisible] = useState(false);
   useAnimatedReaction(
     () => chrome.get() > 0.5 && t.get() > 0.5,
@@ -617,7 +547,6 @@ export function ImageViewer({
   const blurProps = useAnimatedProps(() => ({ intensity: backdrop.get() * BLUR_INTENSITY }));
   const fadeStyle = useAnimatedStyle(() => ({ opacity: backdrop.get() }));
 
-  // Android draws no live blur here and Reduce Transparency asks for none, so both dim instead.
   const blur = Platform.OS === "ios" && reduceTransparency === false;
   const mounted = pages
     .map((page, slot) => ({ page, slot }))
@@ -641,7 +570,6 @@ export function ImageViewer({
               animatedProps={blurProps}
               style={StyleSheet.absoluteFill}
             />
-            {/* A faint dim under the frost, which alone is nearly invisible over a dark chat. */}
             <Animated.View style={[StyleSheet.absoluteFill, fadeStyle]} className="bg-black/10" />
           </View>
         ) : (
@@ -652,8 +580,6 @@ export function ImageViewer({
         )}
         <GestureDetector gesture={gesture}>
           <View
-            // The pictures are placed in screen points, from the chat's thumbnails and the fingers. A
-            // right-to-left layout would swap their `left` but not their transforms.
             style={[StyleSheet.absoluteFill, { direction: "ltr" }]}
             collapsable={false}
             accessible
@@ -691,10 +617,6 @@ export function ImageViewer({
             ))}
           </View>
         </GestureDetector>
-        {/* A native safe area view in a modal reads no inset the first time the modal opens, so the
-            buttons take the insets the picture is placed with. The viewer covers the window, and the
-            chat can be one column of it: the sides also keep the window's insets, so the buttons keep
-            clear of the rail of iPhone Duo on either side. */}
         <View
           pointerEvents="box-none"
           style={[
@@ -707,8 +629,6 @@ export function ImageViewer({
           ]}
         >
           <View pointerEvents="box-none" className="flex-row items-center justify-between px-4 pt-2">
-            {/* Close at the leading edge, where the platform puts the way out of a full-screen view,
-                and the position beside it on the same glass. */}
             <View className="flex-row items-center gap-2">
               <ChatGlassIconButton
                 accessibilityLabel={text.t("common.close")}
@@ -723,7 +643,6 @@ export function ImageViewer({
                 <X size={22} color={String(foreground)} />
               </ChatGlassIconButton>
               {count > 1 ? (
-                // The container above reads the position to a screen reader, as its value.
                 <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                   <ChatGlassLabel
                     hidden={!chromeVisible}
@@ -751,6 +670,32 @@ export function ImageViewer({
               >
                 <Share size={20} color={String(foreground)} />
               </ChatGlassIconButton>
+              {onCopy ? (
+                <ChatGlassIconButton
+                  accessibilityLabel={
+                    copied ? text.t("mobile.chat.imageViewer.copied") : text.t("mobile.chat.imageViewer.copy", { name })
+                  }
+                  hidden={!chromeVisible}
+                  disabled={busy}
+                  fallbackBackground={fallbackBackground}
+                  liquidGlassAvailable={liquidGlassAvailable}
+                  onPress={() => {
+                    const key = current?.key;
+                    void haptics.impact("soft");
+                    void onCopy().then((done) => {
+                      if (!done || key === undefined) return;
+                      void haptics.notification("success");
+                      setCopiedKey(key);
+                    });
+                  }}
+                >
+                  {copied ? (
+                    <Check size={21} color={String(foreground)} />
+                  ) : (
+                    <Copy size={20} color={String(foreground)} />
+                  )}
+                </ChatGlassIconButton>
+              ) : null}
               {onSave ? (
                 <ChatGlassIconButton
                   accessibilityLabel={
@@ -780,7 +725,6 @@ export function ImageViewer({
           </View>
         </View>
         {count > 1 ? (
-          // The container's value and actions already page through the pictures for a screen reader.
           <GestureDetector gesture={stripGesture}>
             <Animated.View
               accessibilityElementsHidden
@@ -794,15 +738,12 @@ export function ImageViewer({
                   bottom: insets.bottom,
                   height: THUMB_SIZE + STRIP_OFFSET * 2,
                   paddingVertical: STRIP_OFFSET,
-                  // The strip follows the pages, which stay left to right.
                   direction: "ltr",
                 },
                 stripStyle,
               ]}
             >
               <Animated.View style={[{ height: THUMB_SIZE, width: count * THUMB_STEP }, stripRowStyle]}>
-                {/* Only the tiles near the page on screen mount, as the pictures do: the strip shows
-                    about nine, and each tile runs a style on the UI thread in every frame. */}
                 {pages.map((page, slot) =>
                   Math.abs(slot - shown) <= THUMB_WINDOW ? (
                     <ViewerThumbnail
@@ -823,10 +764,6 @@ export function ImageViewer({
   );
 }
 
-/**
- * One tile of the strip. The tile of the page on screen is whole; the others are smaller and dim,
- * and a tile grows as a swipe brings its page to the screen.
- */
 function ViewerThumbnail({
   serverId,
   attachment,
@@ -873,10 +810,6 @@ function ViewerThumbnail({
   );
 }
 
-/**
- * One picture of the carousel. The one on screen flies, zooms and drags; the others wait fitted,
- * one step to each side, and move with the swipe.
- */
 function ViewerPicture({
   serverId,
   attachment,
@@ -900,8 +833,7 @@ function ViewerPicture({
   motion: ViewerMotion;
   onSize: (key: string, size: ImageDimensions) => void;
 }) {
-  // The query the chat uses, so a picture the chat has shown is not downloaded again.
-  const file = useAttachmentFile(serverId, attachment, true);
+  const file = useAttachmentFile(serverId, attachment, true, true);
   const [loaded, setLoaded] = useState(false);
   const knownWidth = file.dimensions?.width;
   const knownHeight = file.dimensions?.height;
@@ -926,7 +858,6 @@ function ViewerPicture({
     const flies = from !== null && !reduced;
     const rect = flies ? lerpRect(from, fit, progress) : fit;
     const visualScale = motion.scale.get() * motion.shrink.get() * (flies ? 1 : lerp(0.92, 1, settled));
-    // The corners are drawn inside the scale, so a zoomed photo keeps corners of the same size.
     const corner = flies ? lerp(originRadius, CORNER_RADIUS, progress) : CORNER_RADIUS;
     return {
       left: rect.x,
@@ -942,7 +873,6 @@ function ViewerPicture({
       ],
     };
   });
-  // The picture covers its frame at every step, so the chat's crop opens out to the whole photo.
   const pictureStyle = useAnimatedStyle(() => {
     const from = motion.origin.get();
     const flies = slot === motion.index.get() && from !== null && !reduced;
@@ -958,7 +888,6 @@ function ViewerPicture({
   return (
     <Animated.View pointerEvents="none" style={[{ position: "absolute", overflow: "hidden" }, frameStyle]}>
       <Animated.View style={[{ position: "absolute" }, pictureStyle]}>
-        {/* Until the picture is on the phone, its frame holds its place. */}
         {loaded ? null : <View style={StyleSheet.absoluteFill} className="bg-control" />}
         {file.uri ? (
           <Image

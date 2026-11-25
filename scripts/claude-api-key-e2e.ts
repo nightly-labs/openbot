@@ -1,12 +1,3 @@
-// Checks where a saved Anthropic API key reaches the Claude CLI, through the real Claude driver,
-// client, account store and accounts. A fake `claude` CLI records the environment of each process it
-// starts and answers `auth status --json` as Claude Code 2.1.310 does: with `ANTHROPIC_API_KEY` set it
-// reports `authMethod: "api_key"` and no email, also when a claude.ai login exists. Cases: with a
-// claude.ai login, the own sign-in never gets the key; with no login, its account check and SDK
-// process get the key; the key account gets the key in its own folder, and its row shows only while
-// the own sign-in has a login, and a sign-in or a peer removal on it is refused; an added account never
-// gets the key; no saved key keeps the login.
-// `bun scripts/claude-api-key-e2e.ts`. Writes .openbot-build/claude-api-key-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -26,14 +17,10 @@ const KEY = "sk-ant-e2e-0f3c9a71";
 const root = await mkdtemp(join(tmpdir(), "openbot-claude-api-key-"));
 const executable = join(root, "claude.cjs");
 const logPath = join(root, "claude.jsonl");
-// A key in the shell would reach the CLI in every case.
 delete process.env.ANTHROPIC_API_KEY;
-// The own sign-in reads its stored login before it asks the CLI. An empty folder keeps the login of
-// this computer out, so the fake CLI answers each account check.
 process.env.CLAUDE_CONFIG_DIR = join(root, "own-sign-in");
 process.env.FAKE_CLAUDE_LOG = logPath;
 
-/** Records each start, never the key itself: only whether it is the expected one. */
 const FAKE_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -84,7 +71,6 @@ interface CaseResult {
   readonly starts: readonly LogEntry[];
 }
 
-/** Runs the account check and a model probe through a client built from `apiKey` and `accountEnvironment`. */
 async function runCase(
   name: string,
   apiKey: string | null,
@@ -102,7 +88,6 @@ async function runCase(
   client.start();
   try {
     const account = await runCauseEffect(client.request("account/read", {}, (value) => value));
-    // The probe fails, because the fake CLI is no SDK process. Only its start matters.
     await runCauseEffect(Effect.ignore(client.request("model/list", {}, (value) => value, 5_000)));
     const starts = readLog().slice(before);
     assert.ok(
@@ -115,8 +100,6 @@ async function runCase(
   }
 }
 
-/** A host for `environment` and `rows` only. The other calls fail the run. */
-/** A call that the case must not make. */
 function unused(name: string) {
   return () => {
     throw new Error(`unexpected call: ${name}`);
@@ -126,6 +109,8 @@ function unused(name: string) {
 function accountsHost(key: Pick<ProviderAccountsHost, "apiKey" | "defaultUsesApiKey">): ProviderAccountsHost {
   return {
     ...key,
+    accountKey: () => null,
+    saveAccountKey: unused("saveAccountKey"),
     scope: unused("scope"),
     cli: () => ({ executable, version: "2.1.310" }),
     defaultLogin: () => null,
@@ -195,7 +180,6 @@ try {
     "key without a saved key",
   );
 
-  // The key account and an added account, from the real store and accounts.
   let defaultUsesApiKey = false;
   const store = new ProviderAccountStore(join(root, "accounts.json"), join(root, "accounts"));
   const accounts = new ProviderAccounts(
@@ -220,12 +204,11 @@ try {
     "the added account got the key or another folder",
   );
 
-  const rowIds = () => accounts.rows("claude", null)?.map((row) => row.id) ?? [];
+  const rowIds = () => accounts.rows("claude", null, null)?.map((row) => row.id) ?? [];
   assert.deepEqual(rowIds(), ["default", CLAUDE_API_KEY_ACCOUNT_ID, added.id], "the key account row is missing");
   defaultUsesApiKey = true;
   assert.deepEqual(rowIds(), ["default", added.id], "the key account row shows while the own sign-in uses the key");
 
-  // A client without claude-api-key-v1 shows the key account as signed out and can offer a sign-in.
   const startsBeforeSignIn = readLog().length;
   const refusal = await runCauseEffect(
     accounts
@@ -240,7 +223,6 @@ try {
   assert.ok(store.get("claude", CLAUDE_API_KEY_ACCOUNT_ID), "a refused sign-in removed the key account");
   report.keyAccountSignIn = "refused";
 
-  // The same client can offer Remove on it. Only the key dialog removes the key account.
   const peerAccounts = new PeerAccountsHost({
     service: {
       getStatus: unused("getStatus"),
@@ -248,8 +230,16 @@ try {
       listAgents: unused("listAgents"),
       updateAgent: unused("updateAgent"),
       signInProviderAccountOnHost: unused("signInProviderAccountOnHost"),
+      connectProviderAccountKey: unused("connectProviderAccountKey"),
+      startProviderAccountCodeLogin: unused("startProviderAccountCodeLogin"),
+      submitProviderAccountCodeLogin: unused("submitProviderAccountCodeLogin"),
+      providerAccountCodeLoginStatus: unused("providerAccountCodeLoginStatus"),
+      cancelProviderAccountSignIn: unused("cancelProviderAccountSignIn"),
       renameProviderAccount: unused("renameProviderAccount"),
       removeProviderAccount: unused("removeProviderAccount"),
+      setProviderAccountPool: unused("setProviderAccountPool"),
+      setLiveVoiceAccount: unused("setLiveVoiceAccount"),
+      liveVoiceAccount: () => null,
     },
     browser: { openPrivate: unused("openPrivate"), privateTab: unused("privateTab"), close: unused("close") },
   });

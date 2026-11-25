@@ -1,45 +1,34 @@
-/**
- * The runs of one workflow as the canvas shows them. The host sends pages of runs and, after each
- * change, the new state of a run or of a step that ran alone; these functions join them without
- * the database. `indexRunView` gives each node its status, its error, its results and the step that
- * Stop, Retry and an approval act on.
- */
-
 import type { WorkflowRunDetail, WorkflowRunStatus, WorkflowStep, WorkflowStepStatus } from "@openbot/contracts/ipc";
 
 export interface WorkflowRunView {
-  /** Newest first. */
   runs: readonly WorkflowRunDetail[];
-  /** The steps that ran alone, newest first. */
   soloSteps: readonly WorkflowStep[];
-  /** Pass as `before` to read older runs; null on the last page. */
   nextBefore: string | null;
 }
 
 export const EMPTY_WORKFLOW_RUN_VIEW: WorkflowRunView = { runs: [], soloSteps: [], nextBefore: null };
 
-/** The status a node shows. A stopped or skipped step shows none. */
 export type WorkflowNodeRunStatus = "waiting" | "running" | "done" | "failed" | "approval";
 
-/** One result of a node, from a run or from a run of the node alone. */
 export interface WorkflowNodeResult {
-  /** The step that made it. */
   id: string;
-  /** The number of the run that made it. A step that ran alone has none. */
   run?: number;
-  /** When the step ended, as an ISO time. */
   at: string;
-  /** The answer, or why the step failed. */
   value: string;
   failed?: boolean;
+  branch?: string;
+}
+
+export interface WorkflowNodePending {
+  id: string;
+  at: string;
 }
 
 export interface WorkflowNodeRunState {
   status: WorkflowNodeRunStatus | undefined;
   error: string | undefined;
-  /** Oldest first. */
   results: readonly WorkflowNodeResult[];
-  /** The newest step of the node, which Stop, Retry and an approval act on. */
+  pending: readonly WorkflowNodePending[];
   step: WorkflowStep;
 }
 
@@ -57,33 +46,29 @@ const NODE_STATUS = {
 const byStartNewestFirst = (left: { startedAt: string | null }, right: { startedAt: string | null }) =>
   (right.startedAt ?? "").localeCompare(left.startedAt ?? "");
 
-/** The newest run that has not ended. */
 export function activeRun(view: WorkflowRunView): WorkflowRunDetail | undefined {
   return view.runs.find(isOpenRun);
 }
 
-/** Whether a run has not ended. GitHub runs on different items can be open at the same time. */
 export function isOpenRun(entry: WorkflowRunDetail): boolean {
   return OPEN_RUN_STATUSES.includes(entry.run.status);
 }
 
-/**
- * The run state of each node that has a step. A node shows the status of its newest step in the
- * focused run, or of its newest step that ran alone after that run started. The focused run is the
- * newest run when `focusRunId` names none of them.
- */
 export function indexRunView(view: WorkflowRunView, focusRunId?: string): ReadonlyMap<string, WorkflowNodeRunState> {
   const numbers = new Map(view.runs.map((entry) => [entry.run.id, entry.run.number]));
   const all = [...view.runs.flatMap((entry) => entry.steps), ...view.soloSteps];
-  // Oldest first, so the last step of a node is its newest.
   all.sort((left, right) => -byStartNewestFirst(left, right) || left.attempt - right.attempt);
   const focused = view.runs.find((entry) => entry.run.id === focusRunId) ?? view.runs[0];
   const results = new Map<string, WorkflowNodeResult[]>();
   const shown = new Map<string, WorkflowStep>();
+  const pending = new Map<string, WorkflowNodePending[]>();
   for (const step of all) {
     const result = resultOf(step, step.runId ? numbers.get(step.runId) : undefined);
     if (result) results.set(step.nodeId, [...(results.get(step.nodeId) ?? []), result]);
-    if (step.runId === null || step.runId === focused?.run.id) shown.set(step.nodeId, step);
+    if (step.runId !== null && step.runId !== focused?.run.id) continue;
+    shown.set(step.nodeId, step);
+    if (step.status === "running" && step.startedAt)
+      pending.set(step.nodeId, [...(pending.get(step.nodeId) ?? []), { id: step.id, at: step.startedAt }]);
   }
   const index = new Map<string, WorkflowNodeRunState>();
   for (const [nodeId, step] of shown) {
@@ -91,6 +76,7 @@ export function indexRunView(view: WorkflowRunView, focusRunId?: string): Readon
       status: NODE_STATUS[step.status],
       error: step.status === "failed" ? (step.error ?? undefined) : undefined,
       results: results.get(nodeId) ?? [],
+      pending: pending.get(nodeId) ?? [],
       step,
     });
   }
@@ -101,7 +87,51 @@ function resultOf(step: WorkflowStep, run: number | undefined): WorkflowNodeResu
   const at = step.endedAt ?? step.startedAt;
   if (!at) return undefined;
   const base = run === undefined ? { id: step.id, at } : { id: step.id, run, at };
-  if (step.status === "done" && step.output !== null) return { ...base, value: step.output };
+  if (step.status === "done" && step.output !== null)
+    return step.branch ? { ...base, value: step.output, branch: step.branch } : { ...base, value: step.output };
   if (step.status === "failed") return { ...base, value: step.error ?? "", failed: true };
   return undefined;
 }
+
+export const sameWorkflowStep = (left: WorkflowStep, right: WorkflowStep): boolean =>
+  left.id === right.id &&
+  left.workflowId === right.workflowId &&
+  left.runId === right.runId &&
+  left.nodeId === right.nodeId &&
+  left.attempt === right.attempt &&
+  left.agentId === right.agentId &&
+  left.status === right.status &&
+  left.output === right.output &&
+  left.branch === right.branch &&
+  left.error === right.error &&
+  left.startedAt === right.startedAt &&
+  left.endedAt === right.endedAt &&
+  left.waiting === right.waiting;
+
+const sameResult = (left: WorkflowNodeResult, right: WorkflowNodeResult | undefined): boolean =>
+  left.id === right?.id &&
+  left.run === right.run &&
+  left.at === right.at &&
+  left.value === right.value &&
+  left.failed === right.failed &&
+  left.branch === right.branch;
+
+const samePending = (left: WorkflowNodePending, right: WorkflowNodePending | undefined): boolean =>
+  left.id === right?.id && left.at === right.at;
+
+export const sameNodeRunState = (
+  left: WorkflowNodeRunState | undefined,
+  right: WorkflowNodeRunState | undefined,
+): boolean => {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  return (
+    left.status === right.status &&
+    left.error === right.error &&
+    sameWorkflowStep(left.step, right.step) &&
+    left.results.length === right.results.length &&
+    left.pending.length === right.pending.length &&
+    left.results.every((result, index) => sameResult(result, right.results[index])) &&
+    left.pending.every((pending, index) => samePending(pending, right.pending[index]))
+  );
+};

@@ -62,6 +62,7 @@ export const messages = {
   "mobile.marketplace.facts.accessSignIn": "Вход",
   "mobile.marketplace.facts.accessLocal": "Этот компьютер",
   "mobile.marketplace.facts.accessNone": "Без входа",
+  "mobile.marketplace.facts.accessMac": "Только Mac",
   "mobile.marketplace.permission.admin": "Устанавливать из каталога могут только владельцы и администраторы.",
   "mobile.marketplace.permission.unavailable":
     "Этот сервер не в сети, или его версия OpenBot слишком старая для этого. Обновите OpenBot на компьютере, где он работает.",
@@ -93,6 +94,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Помогите мне использовать этот навык.",
   "mobile.marketplace.app.add": "Добавить",
+  "mobile.marketplace.app.addCustom": "Добавить своё",
   "mobile.marketplace.app.connect": "Подключить",
   "mobile.marketplace.app.connectTitle": "Подключить {name}",
   "mobile.marketplace.app.keyIntro":
@@ -102,6 +104,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Откройте страницу входа {name}.",
   "mobile.marketplace.app.stepAllow": "Войдите и разрешите доступ.",
   "mobile.marketplace.app.stepReturn": "Вернитесь сюда. {name} подключится на вашем сервере.",
+  "mobile.marketplace.app.stepBlank": "Последняя страница не загрузится. Так и должно быть.",
+  "mobile.marketplace.app.stepCopy": "Нажмите на адресную строку и скопируйте весь адрес.",
+  "mobile.marketplace.app.stepPaste": "Вернитесь в OpenBot и вставьте адрес ниже.",
   "mobile.marketplace.app.openSignIn": "Открыть вход",
   "mobile.marketplace.app.keySecure": "Ключ передаётся только на ваш сервер по зашифрованному соединению.",
   "mobile.marketplace.app.connecting": "Подключение",
@@ -112,12 +117,12 @@ export const messages = {
   "mobile.marketplace.app.linkInvalid": "Используйте ссылку https на {hostname}.",
   "mobile.marketplace.app.docs": "Получить ключ",
   "mobile.marketplace.app.local": "Это приложение работает на компьютере с OpenBot. Настройте его на этом компьютере.",
+  "mobile.marketplace.app.needsMac":
+    "Это приложение работает только на Mac, где запущен OpenBot, а этот сервер — не Mac.",
   "mobile.marketplace.app.relayUnsupported":
     "Этому приложению нужен вход в браузере. Обновите OpenBot на сервере или подключите приложение на компьютере.",
   "mobile.marketplace.app.waiting": "Ожидание страницы входа…",
   "mobile.marketplace.app.openAgain": "Снова открыть страницу входа",
-  "mobile.marketplace.app.pasteHint":
-    "В конце страница открывает адрес, который не загружается. Скопируйте этот адрес и вставьте его ниже.",
   "mobile.marketplace.app.pasteLabel": "Адрес после входа",
   "mobile.marketplace.app.pasteInvalid": "Этот адрес не является концом этого входа.",
   "mobile.marketplace.app.finishSignIn": "Завершить вход",

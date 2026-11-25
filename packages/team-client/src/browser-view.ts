@@ -4,6 +4,8 @@ import {
   BROWSER_VIEW_CURSOR_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
   BROWSER_VIEW_FRAME_SIZE_QUERY,
+  BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
+  BROWSER_VIEW_PAGE_COPY_QUERY,
   BROWSER_VIEW_VIEWPORT_QUERY,
   type BrowserViewCopied,
   type BrowserViewFrame,
@@ -17,6 +19,7 @@ import {
   decodeBrowserViewHostMessage,
   decodeBrowserViewSessionResponse,
   encodeBrowserViewInput,
+  isBrowserViewUserAction,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   decodeRemoteDesktopSignalBinary,
@@ -42,33 +45,25 @@ interface View {
   streamId: string;
   sessionId: string;
   ready: boolean;
-  /** Set once the stream close and the session delete are sent, or the host ended the stream. */
   released: boolean;
   frame: (frame: BrowserViewFrame) => void;
   ended: (reason?: string) => void;
   copied: (message: BrowserViewCopied) => void;
-  /** Hears the cursor and the context menus, for a client that asked for them. */
+  lastActionAt: number;
   message?: (message: Exclude<BrowserViewHostMessage, BrowserViewCopied>) => void;
 }
-/** What else the host advertises and this client asks of it. Each one is read when a view opens. */
 export interface RemoteBrowserViewFeatures {
-  /** `browser-view-cursor`: the client draws the pointer and asks for the page's cursor. */
   cursor: boolean;
-  /** `browser-view-context-menu`: the client shows the menus of its own right-clicks. */
   contextMenu: boolean;
-  /** `browser-view-viewport`: the page size the client asks the host to hold while the view is open. */
   viewport: BrowserViewViewport | null;
-  /** `browser-view-frame-size`: the screen pixels the client draws a frame at. */
+  pageCopy?: boolean;
   frameSize?: BrowserViewViewport | null;
 }
 const NO_FEATURES: RemoteBrowserViewFeatures = { cursor: false, contextMenu: false, viewport: null };
-/** One browser tab view per client. All paths still pass the host's stream allowlist. */
 export function createRemoteBrowserView(
   send: (data: string) => Promise<void>,
   request: (method: string, path: string, body?: { tabId: string }) => Promise<unknown>,
-  /** Whether the host advertises `browser-view-frame-point`. An older host closes a view on an input it does not know. */
   namesFrames: () => boolean,
-  /** Whether the host advertises `browser-view-clipboard`. The same holds for a paste and a copy. */
   clipboard: () => boolean,
   features: () => RemoteBrowserViewFeatures = () => NO_FEATURES,
 ) {
@@ -80,10 +75,6 @@ export function createRemoteBrowserView(
     view = null;
     current?.ended(reason);
   }
-  /**
-   * Closes one view's stream and host session. A view can be detached before its handle closes it:
-   * `disconnect()` during the open handshake leaves both open on the host.
-   */
   const sendFrame = (data: string) => Effect.tryPromise({ try: () => send(data), catch: viewFailure });
   const requestHost = (method: string, path: string, body?: { tabId: string }) =>
     Effect.tryPromise({
@@ -93,7 +84,6 @@ export function createRemoteBrowserView(
   const release = Effect.fn("RemoteBrowserView.release")(function* (target: View) {
     if (target.released) return;
     target.released = true;
-    // Deleting the session still runs when stream close fails or is interrupted.
     const closed = yield* Effect.acquireUseRelease(
       Effect.void,
       () => Effect.result(sendFrame(encodeRemoteDesktopSignalControl({ type: "close", streamId: target.streamId }))),
@@ -115,7 +105,6 @@ export function createRemoteBrowserView(
     frame: (frame: BrowserViewFrame) => void,
     ended: (reason?: string) => void,
     copied: (message: BrowserViewCopied) => void,
-    /** Hears the cursor and the context menus. Without it, the client asks for neither. */
     message?: (message: Exclude<BrowserViewHostMessage, BrowserViewCopied>) => void,
   ): Effect.fn.Return<RemoteBrowserView, BrowserViewError> {
     yield* close().pipe(Effect.catch(() => Effect.void));
@@ -128,13 +117,13 @@ export function createRemoteBrowserView(
     }
     const next: View = {
       sessionId: session.id,
-      // `crypto.randomUUID` needs a secure context. The phone's peer page in development is not one.
       streamId: createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size))),
       ready: false,
       released: false,
       frame,
       ended,
       copied,
+      lastActionAt: 0,
       ...(message ? { message } : {}),
     };
     view = next;
@@ -144,6 +133,7 @@ export function createRemoteBrowserView(
     if (acksFrames) path.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
     if (asked.cursor && message) path.searchParams.set(BROWSER_VIEW_CURSOR_QUERY, "1");
     if (asked.contextMenu && message) path.searchParams.set(BROWSER_VIEW_CONTEXT_MENU_QUERY, "1");
+    if (asked.pageCopy && message) path.searchParams.set(BROWSER_VIEW_PAGE_COPY_QUERY, "1");
     if (asked.viewport) path.searchParams.set(BROWSER_VIEW_VIEWPORT_QUERY, browserViewViewportQuery(asked.viewport));
     if (asked.frameSize)
       path.searchParams.set(BROWSER_VIEW_FRAME_SIZE_QUERY, browserViewFrameSizeQuery(asked.frameSize));
@@ -165,6 +155,7 @@ export function createRemoteBrowserView(
         return yield* new BrowserViewError({ message: sourceText("error.remote.browserViewNotConnected") });
       const wire = browserViewInputForHost(value, acksFrames, clipboard());
       if (!wire) return;
+      if (isBrowserViewUserAction(wire)) next.lastActionAt = Date.now();
       yield* sendFrame(
         encodeRemoteDesktopSignalControl({ type: "text", streamId: next.streamId, data: encodeBrowserViewInput(wire) }),
       ).pipe(
@@ -195,12 +186,15 @@ export function createRemoteBrowserView(
           const control = decodeRemoteDesktopSignalControl(data);
           if (control.streamId !== current.streamId) return;
           if (control.type === "opened") current.ready = true;
-          // Text from the host is the answer to a copy, or a cursor or a menu this client asked for.
-          // A message of a newer host that this client cannot name is left alone.
           if (control.type === "text" && current.ready) {
             const hostMessage = decodeBrowserViewHostMessage(control.data);
             if (hostMessage?.type === "copied" || hostMessage?.type === "copyTooLarge") current.copied(hostMessage);
-            else if (hostMessage) current.message?.(hostMessage);
+            else if (
+              hostMessage &&
+              (hostMessage.type !== "pageCopied" ||
+                Date.now() - current.lastActionAt <= BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS)
+            )
+              current.message?.(hostMessage);
           }
           if (control.type === "close" || control.type === "error") {
             current.released = true;

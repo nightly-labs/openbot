@@ -1,18 +1,3 @@
-// Checks that a provider error moves an agent set to switch without asking to its next backup model,
-// and that read_agent shows the move (#2834). Runs the real agent service on a temporary profile. Claude is the real `ClaudeAgentClient`,
-// which the Claude Agent SDK connects to a stand-in `claude` executable. The stand-in answers each
-// message on its current model, and fails it with the CLI's report of an Anthropic overload (529)
-// when that model is in `failing.json`. A message with `act-then-fail` writes text before it fails.
-// Checks:
-//   1. A turn that wrote text before the error does not move: it fails with its error, as before.
-//   2. An agent with no backup models fails with its error, as before.
-//   3. A turn that did nothing yet runs again on the backup model, with a note and no error. The
-//      stand-in, as Claude Code, does not run a uuid again, and history import keeps one request.
-//   4. read_agent shows the backup model, and the model to go back to with the provider error as cause.
-//   5. After a restart, the agent goes back to its own model, with a note.
-// Also checks continuation after a usage limit interrupts partial work: on a backup, or with no
-// ready backup on the same model when its limit ends (#6660).
-// `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
@@ -45,6 +30,7 @@ const userData = join(root, "user-data");
 const home = join(root, "home");
 const turnLog = join(root, "claude-turns.jsonl");
 const failingFile = join(root, "failing.json");
+const refusedModelsFile = join(root, "refused-models.json");
 const claudeExecutable = join(root, "claude");
 const codexExecutable = join(root, "codex");
 const codexLog = join(root, "codex-turns.jsonl");
@@ -52,11 +38,15 @@ const workLog = join(root, "work.jsonl");
 const CODEX_MODEL = defaultProviderModel("codex");
 const PRIMARY: AgentModelId = defaultProviderModel("claude");
 const BACKUP: AgentModelId = PRIMARY === "claude-sonnet-5-5" ? "claude-opus-5-5" : "claude-sonnet-5-5";
-// The text the Claude CLI writes in an outage. It names no HTTP status phrase, only the 529 and its type.
 const PROVIDER_ERROR =
   'API Error: 529 {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"},"request_id":"req_e2e"}';
+const CONNECTION_ERROR = "API Error: Connection error.";
+const REFUSED_MODEL_SWITCH =
+  "API error: 429 This request would exceed your account's rate limit. Please try again later \u00b7 model not changed";
+const REFUSED_REQUEST =
+  'API Error: 400 {"type":"error","error":{"type":"invalid_request_error","message":"This model requires Responses for tool calls; this account only supports Chat Completions"}}';
+const MODEL_NOT_OFFERED = `There's an issue with the selected model (${PRIMARY}). It may not exist or you may not have access to it.`;
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 process.env.CLAUDE_CONFIG_DIR = join(home, ".claude");
@@ -73,8 +63,6 @@ const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { importProviderHistory } = await import("../src/backend/provider-history-import");
 
-// The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end,
-// and logs the model and the outcome of each turn.
 const STAND_IN_CLAUDE = `#!/usr/bin/env node
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
@@ -120,17 +108,110 @@ const turn = (message) => {
   const failing = JSON.parse(fs.readFileSync(${JSON.stringify(failingFile)}, "utf8"));
   const fails = failing.includes(model);
   const input = JSON.stringify(message);
-  const acts = input.includes("act-then-fail");
-  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input }) + "\\n");
+  const drops = input.includes("drop-then-fail");
+  const acts = drops || input.includes("act-then-fail");
+  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid }) + "\\n");
+  if (input.includes("usage-relay") && model === ${JSON.stringify(PRIMARY)}) {
+    const startHelper = (description) => {
+      const callId = "toolu_" + randomUUID().replaceAll("-", "");
+      write({ type: "assistant", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+        content: [{ type: "tool_use", id: callId, name: "Agent", input: { description, prompt: "Research.", run_in_background: true } }],
+        stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } }, parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+      write({ type: "system", subtype: "task_started", task_id: "task-" + callId, tool_use_id: callId, description,
+        session_id: sessionId, uuid: randomUUID() });
+      return callId;
+    };
+    const finishHelper = (callId, summary) =>
+      write({ type: "system", subtype: "task_notification", task_id: "task-" + callId, tool_use_id: callId,
+        status: "completed", summary, session_id: sessionId, uuid: randomUUID() });
+    const first = startHelper("Background research");
+    assistant("A helper works in the background.");
+    result({ is_error: false, result: "A helper works in the background." });
+    setTimeout(() => {
+      finishHelper(first, "Found three sources.");
+      fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: false, input: "first report", pid: process.pid }) + "\\n");
+      const second = startHelper("Source check");
+      assistant("A second helper checks the sources.");
+      result({ is_error: false, result: "A second helper checks the sources." });
+      setTimeout(() => {
+        finishHelper(second, "Two sources hold.");
+        fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "second report", pid: process.pid }) + "\\n");
+        const limit = "You've hit your limit. Try again later.";
+        write({ type: "assistant", error: "rate_limit", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+          content: [{ type: "text", text: limit }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+          parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+        result({ is_error: true, result: limit });
+      }, 200);
+    }, 200);
+    return;
+  }
+  if ((input.includes("usage-background") || input.includes("usage-report-read") || input.includes("usage-subagent")) && model === ${JSON.stringify(PRIMARY)}) {
+    const callId = "toolu_" + randomUUID().replaceAll("-", "");
+    write({ type: "assistant", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "tool_use", id: callId, name: "Agent", input: { description: "Background research", prompt: "Research.", run_in_background: true } }],
+      stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } }, parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    assistant("A helper works in the background.");
+    result({ is_error: false, result: "A helper works in the background." });
+    setTimeout(() => {
+      const limit = "You've hit your limit. Try again later.";
+      if (input.includes("usage-subagent")) {
+        process.stdout.write(JSON.stringify({ type: "assistant", error: "rate_limit", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+          content: [{ type: "text", text: "You've hit your 5-hour limit · resets 7:50pm" }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+          parent_tool_use_id: callId, session_id: sessionId, uuid: randomUUID() }) + "\\n");
+        process.stdout.write(JSON.stringify({ type: "system", subtype: "task_notification", task_id: "task-" + callId, tool_use_id: callId,
+          status: "failed", summary: "You've hit your 5-hour limit · resets 7:50pm", session_id: sessionId, uuid: randomUUID() }) + "\\n");
+        fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "background report", pid: process.pid }) + "\\n");
+        assistant("");
+        write({ type: "rate_limit_event", rate_limit_info: { status: "rejected", rateLimitType: "five_hour", resetsAt: Math.floor(Date.now() / 1000) + 3600 },
+          session_id: sessionId, uuid: randomUUID() });
+        result({ is_error: false, result: "" });
+        return;
+      }
+      process.stdout.write(JSON.stringify({ type: "system", subtype: "task_notification", task_id: "task-" + callId, tool_use_id: callId,
+        status: "completed", summary: "Found three sources.", session_id: sessionId, uuid: randomUUID() }) + "\\n");
+      fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "background report", pid: process.pid }) + "\\n");
+      const refuse = () => {
+        write({ type: "assistant", error: "rate_limit", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+          content: [{ type: "text", text: limit }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+          parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+        result({ is_error: true, result: limit });
+      };
+      if (!input.includes("usage-report-read")) return refuse();
+      assistant("Read the report.");
+      result({ is_error: false, result: "Read the report." });
+      setTimeout(refuse, 200);
+    }, 200);
+    return;
+  }
   if ((input.includes("usage-work") || input.includes("usage-chain") || input.includes("usage-exhausted")) &&
       (model === ${JSON.stringify(PRIMARY)} || input.includes("usage-exhausted"))) {
     if (!input.includes("usage-chain-empty")) assistant("Checkpoint saved. Only the final step remains.");
     result({ is_error: true, result: "You've hit your limit. Try again later." });
     return;
   }
+  if (input.includes("refused-key") && model === ${JSON.stringify(PRIMARY)}) {
+    const refused = "Invalid API key · Please run /login";
+    write({ type: "assistant", error: "authentication_failed", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "text", text: refused }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+      parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    result({ is_error: true, result: refused });
+    return;
+  }
+  if (input.includes("model-not-offered") && model === ${JSON.stringify(PRIMARY)}) {
+    write({ type: "assistant", error: "model_not_found", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+      content: [{ type: "text", text: ${JSON.stringify(MODEL_NOT_OFFERED)} }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+      parent_tool_use_id: null, session_id: sessionId, uuid: randomUUID() });
+    result({ is_error: true, result: ${JSON.stringify(MODEL_NOT_OFFERED)} });
+    return;
+  }
+  if (input.includes("refused-request") && model === ${JSON.stringify(PRIMARY)}) {
+    if (input.includes("refused-request-after-work")) assistant("Partial answer.");
+    result({ is_error: true, result: ${JSON.stringify(REFUSED_REQUEST)} });
+    return;
+  }
   if (fails) {
     if (acts) assistant("Partial answer.");
-    result({ is_error: true, result: ${JSON.stringify(PROVIDER_ERROR)} });
+    result({ is_error: true, result: drops ? ${JSON.stringify(CONNECTION_ERROR)} : ${JSON.stringify(PROVIDER_ERROR)} });
     return;
   }
   const caseId = /case:([a-z-]+)/.exec(input)?.[1];
@@ -143,8 +224,11 @@ const turn = (message) => {
   assistant("Done.");
   result({ is_error: false, result: "Done." });
 };
-// As in Claude Code, a message whose uuid this process already took does not run, and gets no result (#6676).
 const taken = new Set();
+const saved = new Set(previous.map((row) => row.uuid));
+let heldOnce = false;
+const lifecycle = (uuid, state) =>
+  process.stdout.write(JSON.stringify({ type: "command_lifecycle", command_uuid: uuid, state, uuid: randomUUID(), session_id: sessionId }) + "\\n");
 let buffer = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
@@ -157,26 +241,36 @@ process.stdin.on("data", (chunk) => {
     if (!line) continue;
     const message = JSON.parse(line);
     if (message.type === "control_request") {
+      const refusedModels = fs.existsSync(${JSON.stringify(refusedModelsFile)}) ? JSON.parse(fs.readFileSync(${JSON.stringify(refusedModelsFile)}, "utf8")) : [];
+      if (message.request?.subtype === "set_model" && refusedModels.includes(message.request.model)) {
+        write({ type: "control_response", response: { subtype: "error", request_id: message.request_id, error: ${JSON.stringify(REFUSED_MODEL_SWITCH)} } });
+        continue;
+      }
       if (message.request?.subtype === "set_model") model = message.request.model ?? model;
       write({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: {} } });
     } else if (message.type === "user" && !taken.has(message.uuid)) {
       taken.add(message.uuid);
+      const held = !heldOnce && line.includes("session-holds");
+      if (held) heldOnce = true;
+      if (held || saved.has(message.uuid) || line.includes("session-skips")) {
+        lifecycle(message.uuid, "completed");
+        continue;
+      }
+      lifecycle(message.uuid, "started");
       turn(message);
+      lifecycle(message.uuid, "completed");
     }
   }
 });
 process.stdin.on("end", () => process.exit(0));
 `;
 
-// Codex's app-server reports a plan refusal through the nested usageLimitExceeded error. The
-// process writes a checkpoint before the refusal and serves it from the paged rollout endpoints.
 const STAND_IN_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
 if (process.argv.includes("--version")) { console.log("codex-cli 0.160.1"); process.exit(0); }
 const threads = new Map();
 const active = new Map();
-// A spent reset credit ends the limit, so later turns run.
 let reset = false;
 const write = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 const config = { config: { mcp_servers: {} }, layers: [{ name: { type: "user", file: "/fake/.codex/config.toml", profile: null }, version: "1", config: { mcp_servers: {} } }] };
@@ -227,8 +321,15 @@ const answer = (request) => {
           if (!current.includes("usage-tool-only")) item({ type: "agentMessage", id: randomUUID(), phase: "commentary", text: "Checkpoint saved for " + caseId + ". Only the final step remains." });
         }
         if (current.includes("usage-wait")) return;
+        if (current.includes("capacity-")) {
+          const error = { message: "Reconnecting... 2/5", codexErrorInfo: { responseStreamDisconnected: { httpStatusCode: null } }, additionalDetails: "Selected model is at capacity. Please try a different model." };
+          write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: true } });
+          if (current.includes("capacity-wait")) return;
+        }
         if (limited) {
-          const error = { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
+          const error = current.includes("usage-spent")
+            ? { message: "Your credit balance is too low to continue.", codexErrorInfo: "usageLimitExceeded" }
+            : { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
           turn.error = error;
           write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: false } });
           finish("failed");
@@ -270,19 +371,19 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. It also records the provider thread of the last turn, and
- * keeps the answers to the tool calls this check sends as the provider would.
- */
+const TWO_EFFORTS = {
+  defaultReasoningEffort: "medium",
+  supportedReasoningEfforts: [{ reasoningEffort: "medium" }, { reasoningEffort: "low" }],
+};
+
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
   readonly #real: InstanceType<typeof ClaudeAgentClient>;
   readonly readHistory: ReadProviderHistory;
-  /** The provider thread of the last turn that started. */
   lastThread: string | null = null;
   readonly toolAnswers = new Map<RequestId, unknown>();
+  readonly #started = new Set<string>();
 
   constructor(cli: ClaudeCliInfo) {
     super();
@@ -333,11 +434,20 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
         return providerSync(() =>
           decoder({
             data: [
-              { model: PRIMARY, displayName: "Primary" },
-              { model: BACKUP, displayName: "Backup" },
+              { model: PRIMARY, displayName: "Primary", ...TWO_EFFORTS },
+              { model: BACKUP, displayName: "Backup", ...TWO_EFFORTS },
             ],
           }),
         );
+      case "turn/start": {
+        const messageId = isDynamicRecord(params) ? params.clientUserMessageId : undefined;
+        const again = typeof messageId === "string" && this.#started.has(messageId);
+        if (typeof messageId === "string") this.#started.add(messageId);
+        if (!again || !closeBeforeRunAgain) return this.#real.request(method, params, decoder, timeoutMs);
+        return this.#real
+          .releaseIdleThreads()
+          .pipe(Effect.andThen(this.#real.request(method, params, decoder, timeoutMs)));
+      }
       default:
         return this.#real.request(method, params, decoder, timeoutMs);
     }
@@ -381,6 +491,7 @@ const report: {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -399,7 +510,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of its database. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -410,7 +520,7 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-function turns(): { model: string; failed: boolean; input: string }[] {
+function turns(): { model: string; failed: boolean; input: string; pid: number }[] {
   try {
     return readFileSync(turnLog, "utf8")
       .split("\n")
@@ -422,6 +532,9 @@ function turns(): { model: string; failed: boolean; input: string }[] {
 }
 
 const failing = (models: string[]) => writeFileSync(failingFile, JSON.stringify(models));
+const refuseModelSwitch = (models: string[]) => writeFileSync(refusedModelsFile, JSON.stringify(models));
+
+let closeBeforeRunAgain = false;
 
 function readLog<T>(path: string): T[] {
   try {
@@ -481,7 +594,6 @@ function errorsFor(agentId: string, since: number) {
   return events.slice(since).filter((event) => event.type === "error" && event.agentId === agentId);
 }
 
-/** Sends a message and waits for its delivery to end. */
 async function send(agentId: string, text: string, sourcePaths?: string[]) {
   const attachments = await runCauseEffect(mailbox.prepareAttachments(sourcePaths ?? []));
   const receipt = await runCauseEffect(
@@ -496,7 +608,6 @@ async function send(agentId: string, text: string, sourcePaths?: string[]) {
   return { deliveryId, status, error: mailbox.getDelivery(deliveryId)?.delivery.error ?? null };
 }
 
-/** The name the service lists for a model, which the switch notes show. */
 function modelName(model: string): string {
   return service.listModels().find((option) => option.provider === "claude" && option.id === model)?.name ?? model;
 }
@@ -506,7 +617,6 @@ async function markers(agentId: string, itemType: string) {
   return snapshot.messages.filter((message) => message.itemType === itemType).map((message) => message.text);
 }
 
-/** Calls an OpenBot tool from the thread of the last turn, as its provider would, and returns the answer. */
 let toolCalls = 0;
 async function callTool(tool: string, args: unknown) {
   const client = clients.at(-1);
@@ -593,8 +703,13 @@ async function verifyHistoryKeepsRequests(agentId: string) {
       quietRoutineDelivery: () => false,
     }),
   );
-  assert.ok(imported.turns > 0, "The provider's saved transcript was read and imported.");
+  assert.ok(
+    imported.turns > 0 || database.providerHistoryImport(session.id)?.state === "complete",
+    "The provider's saved transcript was read and imported.",
+  );
   assert.deepEqual(users(), before, "History import keeps one user request after independent continuation turn IDs.");
+  const texts = users().map((message) => message.text);
+  assert.equal(new Set(texts).size, texts.length, "History import adds no second copy of a user request.");
 }
 
 try {
@@ -632,15 +747,6 @@ try {
   );
   failing([PRIMARY]);
 
-  await check("a turn that wrote text does not move", async () => {
-    const since = events.length;
-    const outcome = await send(mover.id, "act-then-fail");
-    assert.equal(outcome.status, "failed", "The turn fails.");
-    assert.equal(agentOf(mover.id).model, PRIMARY, "The agent stays on its own model.");
-    assert.ok(errorsFor(mover.id, since).length > 0, "The error shows.");
-    return outcome;
-  });
-
   await check("an agent with no backup models fails as before", async () => {
     const since = events.length;
     const outcome = await send(stayer.id, "work");
@@ -668,12 +774,10 @@ try {
     assert.deepEqual(errorsFor(mover.id, since), [], "No error shows for the moved turn.");
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) })]);
-    // The same Claude process took the message, so it ran again with a new uuid (#6676).
     await verifyHistoryKeepsRequests(mover.id);
     return { ran, notes };
   });
 
-  // `agent-profile-accounts-e2e.ts` checks that update_profile sets and clears the order.
   await check("read_agent shows that a provider error moved the agent", async () => {
     const read = await callTool("read_agent", { agentId: mover.id });
     assert.ok(read.success, read.text);
@@ -683,6 +787,27 @@ try {
     assert.equal(setup.usageLimitReturn?.cause, "provider-error", "read_agent names the provider error.");
     return { model: setup.model, usageLimitReturn: setup.usageLimitReturn };
   });
+
+  const effortOnBackup = await (async () => {
+    const efforts = (model: AgentModelId) =>
+      service.listModels().find((option) => option.provider === "claude" && option.id === model)
+        ?.supportedReasoningEfforts ?? [];
+    const effort = efforts(PRIMARY).find(
+      (one) => one !== agentOf(mover.id).reasoningEffort && efforts(BACKUP).includes(one),
+    );
+    assert.ok(effort, "The own model and the backup share another effort.");
+    await check("an effort chosen on the backup model is the effort to go back with", async () => {
+      const update = await callTool("update_profile", { agentId: mover.id, reasoningEffort: effort });
+      assert.ok(update.success, update.text);
+      const agent = agentOf(mover.id);
+      assert.equal(agent.model, BACKUP, "The agent stays on the backup model.");
+      assert.equal(agent.reasoningEffort, effort, "The backup model takes the chosen effort.");
+      assert.equal(agent.usageLimitReturn?.model, PRIMARY, "The agent keeps its own model to go back to.");
+      assert.equal(agent.usageLimitReturn?.reasoningEffort, effort, "The own model goes back with the chosen effort.");
+      return { effort };
+    });
+    return effort;
+  })();
 
   await check("after a restart the agent goes back to its own model", async () => {
     await runCauseEffect(service.stop());
@@ -701,10 +826,291 @@ try {
     );
     const agent = agentOf(mover.id);
     assert.equal(agent.model, PRIMARY, "The agent is back on its own model.");
+    assert.equal(agent.reasoningEffort, effortOnBackup, "The agent keeps the effort chosen on the backup.");
     assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelReturnedAfterError", { model: modelName(PRIMARY) })]);
     return { notes };
+  });
+
+  const withBackup = async (name: string) => {
+    const agent = await create(name);
+    await waitFor(`the first turn of ${name} to end`, () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    return agent;
+  };
+
+  await check("a turn that wrote text continues on the backup model", async () => {
+    const continuer = await withBackup("Continuer");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(continuer.id, "act-then-fail");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The backup continues the work.");
+    assert.equal(agentOf(continuer.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(continuer.id, since), [], "No error shows for the moved turn.");
+    const shown = (await runCauseEffect(service.readConversation(continuer.id))).messages
+      .filter((message) => message.text.trim())
+      .slice(-4)
+      .map((message) => message.text);
+    assert.deepEqual(
+      shown,
+      [
+        "act-then-fail",
+        "Partial answer.",
+        sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) }),
+        "Done.",
+      ],
+      "The chat shows the stopped text, the switch and then the backup's answer.",
+    );
+    failing([]);
+    await restart();
+    return { ran: ran.map((turn) => turn.model), shown };
+  });
+
+  await check("a request that the model refuses before work moves the agent to its backup model", async () => {
+    const refused = await withBackup("Refuser");
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(refused.id, "refused-request");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.equal(agentOf(refused.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(refused.id, since), [], "No error shows for the moved turn.");
+    await restart();
+    return { ran: ran.map((turn) => turn.model) };
+  });
+
+  await check("a model that the account cannot use moves the agent to its backup model", async () => {
+    const denied = await withBackup("Denied");
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(denied.id, "model-not-offered");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.equal(agentOf(denied.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(denied.id, since), [], "No error shows for the moved turn.");
+    await restart();
+    return { ran: ran.map((turn) => turn.model) };
+  });
+
+  await check("a model that the account cannot use shows the error with no backup model", async () => {
+    const lone = await create("Unbacked");
+    await waitFor("the first turn of Unbacked to end", () =>
+      service.listQueue(lone.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const since = events.length;
+    const outcome = await send(lone.id, "model-not-offered");
+    assert.equal(outcome.status, "failed", "The message fails.");
+    assert.equal(agentOf(lone.id).model, PRIMARY, "The agent keeps its model.");
+    assert.ok(
+      errorsFor(lone.id, since).some((event) => JSON.stringify(event).includes("may not have access")),
+      "The provider's reason shows.",
+    );
+    await restart();
+    return { status: outcome.status };
+  });
+
+  await check("a model switch that the provider refuses at a limit moves the agent to its backup model", async () => {
+    const switcher = await withBackup("Switcher");
+    failing([PRIMARY]);
+    const moved = await send(switcher.id, "work");
+    assert.equal(moved.status, "completed", `The message completes: ${moved.error}`);
+    assert.equal(agentOf(switcher.id).model, BACKUP, "The provider error moved the agent to its backup.");
+    failing([]);
+    refuseModelSwitch([PRIMARY]);
+    await runCauseEffect(service.updateAgent({ agentId: switcher.id, provider: "claude", model: PRIMARY }));
+    const since = events.length;
+    const before = turns().length;
+    const results = [];
+    for (const text of ["first after the switch", "second after the switch"]) {
+      const outcome = await send(switcher.id, text);
+      assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+      results.push(outcome);
+    }
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [BACKUP, BACKUP], "The backup answers each message.");
+    assert.equal(agentOf(switcher.id).model, BACKUP, "The agent is on its backup model.");
+    assert.equal(agentOf(switcher.id).usageLimitReturn?.model, PRIMARY, "The agent keeps its own model to go back to.");
+    assert.deepEqual(errorsFor(switcher.id, since), [], "No error shows for the refused switch.");
+    refuseModelSwitch([]);
+    await restart();
+    return { ran, results };
+  });
+
+  await check("a model switch that the provider refuses at a limit shows the error with no backup model", async () => {
+    const lone = await create("Lone");
+    await waitFor("the first turn of Lone to end", () =>
+      service.listQueue(lone.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    refuseModelSwitch([BACKUP]);
+    await runCauseEffect(service.updateAgent({ agentId: lone.id, provider: "claude", model: BACKUP }));
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(lone.id, "no backup to take it");
+    assert.equal(outcome.status, "failed", "The message fails.");
+    assert.equal(outcome.error, REFUSED_MODEL_SWITCH, "The provider's reason shows.");
+    assert.equal(turns().length, before, "No model runs the message.");
+    assert.equal(agentOf(lone.id).model, BACKUP, "The agent keeps the chosen model.");
+    assert.ok(errorsFor(lone.id, since).length > 0, "The error shows.");
+    refuseModelSwitch([]);
+    await restart();
+    return { status: outcome.status };
+  });
+
+  await check("a request that the model refuses after it wrote text shows the error", async () => {
+    const refused = await withBackup("Halfway");
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(refused.id, "refused-request-after-work");
+    assert.equal(outcome.status, "failed", "The turn fails.");
+    assert.deepEqual(
+      turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      [PRIMARY],
+      "No backup runs the work again.",
+    );
+    assert.equal(agentOf(refused.id).model, PRIMARY, "The agent stays on its own model.");
+    assert.ok(errorsFor(refused.id, since).length > 0, "The error shows.");
+    await restart();
+    return { status: outcome.status };
+  });
+
+  await check("a turn that wrote text before a dropped connection continues on the backup model", async () => {
+    const dropper = await withBackup("Dropper");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(dropper.id, "drop-then-fail");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The backup continues the work.");
+    assert.equal(agentOf(dropper.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(dropper.id, since), [], "No error shows for the moved turn.");
+    failing([]);
+    await restart();
+    return { ran: ran.map((turn) => turn.model) };
+  });
+
+  await check("a thread turn moves to the backup model", async () => {
+    const threader = await withBackup("Threader");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "work" }));
+    await waitFor("the thread to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [PRIMARY, BACKUP], "The thread ran on the own model, then on the backup.");
+    assert.equal(agentOf(threader.id).model, BACKUP, "The agent is on the backup model.");
+    failing([]);
+    await restart();
+    return { taskId: task.id, ran };
+  });
+
+  await check("a WhatsApp conversation turn moves to the backup model", async () => {
+    const replier = await withBackup("Replier");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const ends: { status: string; answer: string | null }[] = [];
+    const stopListening = service.messaging.onActivity((activity) => {
+      if (activity.type === "finished" && activity.link.platformChannelId === "failover@g.us")
+        ends.push({ status: activity.status, answer: activity.answer });
+    });
+    try {
+      const connection = service.messaging.store.ensureConnection("whatsapp", "48100000000", "Phone");
+      service.messaging.store.updateConnection(connection.connectionId, { enabled: true });
+      const received = await runCauseEffect(
+        service.messaging.receive({
+          connectionId: connection.connectionId,
+          agentId: replier.id,
+          platformChannelId: "failover@g.us",
+          threadKey: "failover",
+          isDirect: false,
+          title: "Group",
+          text: "work",
+          sourcePaths: [],
+          origin: { authorId: "48200000000", authorName: "Client", platformMessageId: "failover-message" },
+          idempotencyKey: "whatsapp:failover",
+        }),
+      );
+      assert.equal(received.status, "queued");
+      const linkId = received.status === "queued" ? received.link.linkId : "";
+      await waitFor("the conversation's request to end", () => ends.length > 0);
+      await waitFor(
+        "the conversation's requests to settle",
+        () => mailbox.unresolvedMessagingDeliveries(linkId).length === 0,
+      );
+    } finally {
+      stopListening();
+    }
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [PRIMARY, BACKUP], "The message ran on the own model, then on the backup.");
+    assert.deepEqual(ends, [{ status: "completed", answer: "Done." }], "The conversation gets the backup's answer.");
+    assert.equal(agentOf(replier.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(replier.id, since), [], "No error shows for the moved turn.");
+    failing([]);
+    await restart();
+    return { ran, ends };
+  });
+
+  await check("a thread turn that wrote text continues on the backup model", async () => {
+    const threader = await withBackup("Weaver");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "act-then-fail" }));
+    await waitFor("the thread with work to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const order = () =>
+      service
+        .readTask(threader.id, task.id)
+        .messages.filter((message) => message.author !== "system" && message.text.trim())
+        .map((message) => message.text);
+    const expected = ["act-then-fail", "Partial answer.", "Done."];
+    assert.deepEqual(order(), expected, "The thread shows the stopped text, then the backup's answer.");
+    assert.ok(turns().slice(before).at(-1)?.input.includes("Continue the unfinished task"));
+    failing([]);
+    await restart();
+    assert.deepEqual(order(), expected, "The thread keeps the order after a restart.");
+    return { taskId: task.id, order: order() };
   });
 
   await check("a usage limit after partial work continues on the backup", async () => {
@@ -798,6 +1204,74 @@ try {
     });
   }
 
+  await check("a Codex model at capacity moves to the backup model without waiting for its retries", async () => {
+    await restart();
+    const agent = await createCodex("Codex capacity", automaticBackups);
+    const since = events.length;
+    const beforeCodex = readLog<CodexTurn>(codexLog).length;
+    const beforeClaude = turns().length;
+    const outcome = await send(agent.id, "capacity-wait: answer the question.");
+    assert.equal(outcome.status, "completed", `The message completes on the backup: ${outcome.error}`);
+    assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "Codex gets the message once.");
+    assert.deepEqual(
+      turns()
+        .slice(beforeClaude)
+        .map((turn) => turn.model),
+      [PRIMARY],
+      "The first backup model runs the message.",
+    );
+    const moved = agentOf(agent.id);
+    assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+    assert.equal(moved.usageLimitReturn?.provider, "codex", "The agent can go back to its own model.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No capacity notice or error shows.");
+    return { outcome, model: moved.model };
+  });
+
+  await check("a Codex turn that ends before the capacity hand-off keeps its answer and its model", async () => {
+    await restart();
+    const agent = await createCodex("Codex capacity race", automaticBackups);
+    const since = events.length;
+    const beforeClaude = turns().length;
+    const outcome = await send(agent.id, "capacity-race: answer the question.");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    assert.equal(turns().length, beforeClaude, "No backup model runs the message.");
+    assert.equal(agentOf(agent.id).provider, "codex", "The agent stays on its own model.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No capacity error shows.");
+    return outcome;
+  });
+
+  await check("a spent balance names the model it left and what to do", async () => {
+    await restart();
+    const agent = await createCodex("Spent balance", automaticBackups);
+    const outcome = await send(agent.id, "usage-spent case:spent");
+    assert.equal(outcome.status, "completed", `The task completes on its backup: ${outcome.error}`);
+    const moved = agentOf(agent.id);
+    assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+    assert.equal(moved.usageLimitReturn ?? null, null, "The agent does not go back to a spent balance by itself.");
+    const spent =
+      service.listModels().find((option) => option.provider === "codex" && option.id === CODEX_MODEL)?.name ??
+      CODEX_MODEL;
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
+    assert.deepEqual(
+      notes,
+      [sourceText("status.agent.modelSwitchedForSpentBalance", { previous: spent, model: modelName(moved.model) })],
+      "The note names the spent model, the backup, and what to do.",
+    );
+    return { notes };
+  });
+
+  await check("without a backup, a spent balance shows its reason in the chat", async () => {
+    await restart();
+    const agent = await createCodex("Spent balance alone");
+    const since = events.length;
+    const outcome = await send(agent.id, "usage-spent case:spent-alone");
+    assert.equal(outcome.status, "failed", "The message fails.");
+    assert.equal(agentOf(agent.id).provider, "codex", "The agent stays on its own model.");
+    const shown = errorsFor(agent.id, since).map((event) => (event.type === "error" ? event.message : ""));
+    assert.deepEqual(shown, ["Your credit balance is too low to continue."], "The chat shows the reason once.");
+    return { shown };
+  });
+
   await check("without a backup, partial work waits and continues when the limit ends", async () => {
     await restart();
     const agent = await createCodex("No fallback", { automatic: true, order: [] });
@@ -821,7 +1295,6 @@ try {
       service.getRuntimeSnapshot().usageLimits?.some((limit) => limit.agentId === agent.id),
     );
     assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1, "The held work does not run again.");
-    // A spent reset credit ends the limit as its reset time does.
     await runCauseEffect(service.resetProviderUsage("codex", DEFAULT_PROVIDER_ACCOUNT_ID));
     const status = await waitFor("the work to continue", () => {
       const value = mailbox.getDelivery(deliveryId)?.delivery.status;
@@ -891,7 +1364,6 @@ try {
     );
     assert.equal(readLog<CodexTurn>(codexLog).length, beforeCodex + 1);
     assert.ok(mailbox.getDelivery(deliveryId)?.resumeAfterUsageLimit, "The waiting work keeps its continuation.");
-    // The user can remove waiting work from the queue. Later checks start with no work held here.
     await runCauseEffect(service.cancelQueuedMessage(agent.id, deliveryId));
     return { deliveryId, status: mailbox.getDelivery(deliveryId)?.delivery.status };
   });
@@ -917,7 +1389,6 @@ try {
     return { status: mailbox.getDelivery(deliveryId)?.delivery.status };
   });
 
-  // In the chain, the first backup's plan refuses the continuation before any work.
   for (const { mode, caseId, models } of [
     { mode: "tool-only", caseId: "channel", models: [PRIMARY] },
     { mode: "chain-empty", caseId: "channel-chain", models: [PRIMARY, BACKUP] },
@@ -1051,6 +1522,307 @@ try {
       return outcome;
     });
   }
+
+  await check("a message runs again after its Claude process closed", async () => {
+    await restart();
+    const agent = await create("Reopened");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    failing([PRIMARY]);
+    closeBeforeRunAgain = true;
+    const before = turns().length;
+    const outcome = await send(agent.id, "work after close");
+    closeBeforeRunAgain = false;
+    failing([]);
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+    );
+    assert.notEqual(ran[0]?.pid, ran[1]?.pid, "The message ran again in a new process that resumed the session.");
+    await verifyHistoryKeepsRequests(agent.id);
+    return { ran };
+  });
+
+  await check("a message whose uuid the saved session holds runs with a new uuid", async () => {
+    const agent = await create("Holder");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-holds");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    assert.equal(turns().length, before + 1, "The message runs once.");
+    await verifyHistoryKeepsRequests(agent.id);
+    return outcome;
+  });
+
+  await check("a message that Claude skips with each uuid fails with a reason", async () => {
+    const agent = await create("Skipper");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-skips");
+    assert.equal(outcome.status, "failed", "The turn ends.");
+    assert.equal(outcome.error, sourceText("error.provider.acpNoAnswer", { provider: "Claude" }));
+    assert.equal(turns().length, before, "The message did not run.");
+    return outcome;
+  });
+
+  await check("a usage limit after Claude read a subagent report runs nothing again", async () => {
+    await restart();
+    const agent = await create("Reader");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "usage-report-read: research in the background, then report.");
+    assert.equal(outcome.status, "completed", "The request that starts the subagent completes.");
+    await waitFor("the limit to hold the agent", () =>
+      events.slice(since).some((event) => event.type === "usage-limit-reached"),
+    );
+    assert.equal(
+      mailbox.getDelivery(outcome.deliveryId)?.delivery.status,
+      "completed",
+      "The request whose report a turn read does not go back to the queue.",
+    );
+    assert.ok(
+      turns()
+        .slice(before)
+        .every((turn) => turn.model === PRIMARY),
+      "Nothing runs on the backup.",
+    );
+    return {
+      models: turns()
+        .slice(before)
+        .map((turn) => turn.model),
+    };
+  });
+
+  await check("a usage limit on Claude's own turn for a subagent report continues on the backup", async () => {
+    await restart();
+    const agent = await create("Lead");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "usage-background: research in the background, then report.");
+    assert.equal(outcome.status, "completed", "The request that starts the subagent completes.");
+    const continued = await waitFor("the request to continue on the backup", () =>
+      turns()
+        .slice(before)
+        .find((turn) => turn.model === BACKUP),
+    );
+    assert.ok(continued.input.includes("Continue the unfinished task"), "The backup gets a continuation request.");
+    assert.ok(
+      continued.input.includes('Background subagent \\"Background research\\" completed: Found three sources.'),
+      "The backup gets the subagent's report.",
+    );
+    assert.ok(continued.input.includes("usage-background"), "The backup gets the original request.");
+    await waitFor(
+      "the continuation to end",
+      () => mailbox.getDelivery(outcome.deliveryId)?.delivery.status === "completed",
+    );
+    assert.deepEqual(
+      turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      [PRIMARY, PRIMARY, BACKUP],
+      "The request ran, Claude's own turn was refused, and the backup continued.",
+    );
+    assert.equal(agentOf(agent.id).model, BACKUP, "The agent is on its backup model.");
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);
+    assert.equal(notes.length, 1, "The chat says that the agent switched.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No error shows.");
+    return {
+      models: turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      notes,
+    };
+  });
+
+  await check(
+    "a usage limit on a report of a helper that Claude's own turn started continues the request",
+    async () => {
+      await restart();
+      const agent = await create("Relay");
+      await waitFor("the first turn to end", () =>
+        service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+      );
+      await runCauseEffect(
+        service.updateAgent({
+          agentId: agent.id,
+          backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+        }),
+      );
+      const since = events.length;
+      const before = turns().length;
+      const outcome = await send(agent.id, "usage-relay: research in the background, then check the sources.");
+      assert.equal(outcome.status, "completed", "The request that starts the first subagent completes.");
+      const continued = await waitFor("the request to continue on the backup", () =>
+        turns()
+          .slice(before)
+          .find((turn) => turn.model === BACKUP),
+      );
+      assert.ok(continued.input.includes("Continue the unfinished task"), "The backup gets a continuation request.");
+      assert.ok(
+        continued.input.includes('Background subagent \\"Source check\\" completed: Two sources hold.'),
+        "The backup gets the second subagent's report.",
+      );
+      assert.ok(continued.input.includes("usage-relay"), "The backup gets the original request.");
+      await waitFor(
+        "the continuation to end",
+        () => mailbox.getDelivery(outcome.deliveryId)?.delivery.status === "completed",
+      );
+      assert.deepEqual(
+        turns()
+          .slice(before)
+          .map((turn) => turn.model),
+        [PRIMARY, PRIMARY, PRIMARY, BACKUP],
+        "The request ran, Claude's own turns ran and were refused, and the backup continued.",
+      );
+      assert.equal(agentOf(agent.id).model, BACKUP, "The agent is on its backup model.");
+      const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);
+      assert.equal(notes.length, 1, "The chat says that the agent switched.");
+      assert.deepEqual(errorsFor(agent.id, since), [], "No error shows.");
+      return {
+        models: turns()
+          .slice(before)
+          .map((turn) => turn.model),
+        notes,
+      };
+    },
+  );
+
+  await check("a usage limit that refuses only a background subagent continues on the backup", async () => {
+    await restart();
+    const agent = await create("Lead");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "usage-subagent: research in the background, then report.");
+    assert.equal(outcome.status, "completed", "The request that starts the subagent completes.");
+    const continued = await waitFor("the request to continue on the backup", () =>
+      turns()
+        .slice(before)
+        .find((turn) => turn.model === BACKUP),
+    );
+    assert.ok(continued.input.includes("Continue the unfinished task"), "The backup gets a continuation request.");
+    assert.ok(
+      continued.input.includes('Background subagent \\"Background research\\" failed'),
+      "The backup gets the subagent's failure.",
+    );
+    assert.ok(continued.input.includes("usage-subagent"), "The backup gets the original request.");
+    await waitFor(
+      "the continuation to end",
+      () => mailbox.getDelivery(outcome.deliveryId)?.delivery.status === "completed",
+    );
+    assert.equal(agentOf(agent.id).model, BACKUP, "The agent is on its backup model.");
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);
+    assert.equal(notes.length, 1, "The chat says that the agent switched.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No error shows.");
+    return {
+      models: turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      notes,
+    };
+  });
+
+  await check("a model chosen again during a provider error hold gets one try", async () => {
+    await restart();
+    const chooser = await withBackup("Chooser");
+    failing([PRIMARY]);
+    const moved = await send(chooser.id, "work");
+    assert.equal(moved.status, "completed", `The message completes: ${moved.error}`);
+    assert.equal(agentOf(chooser.id).model, BACKUP, "The provider error moved the agent to its backup.");
+    const choose = () =>
+      runCauseEffect(service.updateAgent({ agentId: chooser.id, provider: "claude", model: PRIMARY }));
+
+    await choose();
+    let before = turns().length;
+    const failedTry = await send(chooser.id, "try the chosen model");
+    assert.equal(failedTry.status, "completed", `The message completes: ${failedTry.error}`);
+    const failedModels = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(failedModels, [PRIMARY, BACKUP], "The chosen model gets one try, then the backup answers.");
+    assert.equal(agentOf(chooser.id).model, BACKUP, "The agent is on its backup again.");
+    assert.equal(agentOf(chooser.id).usageLimitReturn?.model, PRIMARY, "The agent keeps its own model to go back to.");
+
+    failing([]);
+    await choose();
+    before = turns().length;
+    const worked = await send(chooser.id, "use the chosen model");
+    assert.equal(worked.status, "completed", `The message completes: ${worked.error}`);
+    const workedModels = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(workedModels, [PRIMARY], "The message runs on the chosen model.");
+    const agent = agentOf(chooser.id);
+    assert.equal(agent.model, PRIMARY, "The agent stays on the chosen model.");
+    assert.equal(agent.usageLimitReturn, undefined, "Nothing is left to go back to.");
+    return { failedModels, workedModels };
+  });
+
+  await check("a refused sign-in moves to the backup and tells the user", async () => {
+    await restart();
+    const agent = await withBackup("Refuser");
+    failing([]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "refused-key work");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const models = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(models, [PRIMARY, BACKUP], "The refused model fails once, then the backup answers.");
+    assert.equal(agentOf(agent.id).model, BACKUP, "The refused sign-in moved the agent to its backup.");
+    const shown = errorsFor(agent.id, since).map((event) => (event.type === "error" ? event.message : ""));
+    assert.equal(shown.length, 1, "The user sees why the agent left its model.");
+    assert.ok(shown[0], "The shown reason has text.");
+
+    const next = turns().length;
+    const again = await send(agent.id, "refused-key again");
+    assert.equal(again.status, "completed", `The next message completes: ${again.error}`);
+    const nextModels = turns()
+      .slice(next)
+      .map((turn) => turn.model);
+    assert.deepEqual(nextModels, [BACKUP], "The next message does not try the refused sign-in again.");
+    return { models, shown, nextModels };
+  });
 
   report.passed = true;
 } catch (error) {

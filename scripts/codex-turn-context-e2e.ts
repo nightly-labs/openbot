@@ -1,20 +1,3 @@
-// Runs the real `codex app-server` against a fake Responses server, to check that a Codex agent gets
-// its saved memories, section-mates and saved-logins rule with the user turns, and that a memory
-// change keeps the cached prompt prefix and the Codex session. A login saved after the session start
-// comes with that change, so the turn after it must carry the saved-logins rule. A local server
-// stands in for the model and records each request, so no account or key is used. The fake model
-// reports no real token counts, so the report estimates them from the request text (4 characters a
-// token). The cacheable part of a request is the part before its first difference from the request
-// before it, with the same `prompt_cache_key`.
-//
-// Two variants, with the same agent, memories and turns:
-// - `before`: the memories and the section-mates are in the developer instructions, as before this
-//   change. Codex ignores the instructions of `thread/resume`, so a changed memory reaches the model
-//   only in a new session.
-// - `after`: they go with the turns. The changed memory goes as a small block in the resumed session.
-// The `after` variant then restarts the app-server (no new blocks) and the client (one full block
-// again), and reads the history back (no blocks in the user messages).
-// `bun scripts/codex-turn-context-e2e.ts`. Writes .openbot-build/codex-turn-context-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server as HttpServer } from "node:http";
@@ -41,7 +24,6 @@ const MEMORY_FULL = "<openbot_saved_memories>";
 const MEMORY_UPDATE = "<openbot_saved_memories_update>";
 const TEAMMATES = "<openbot_section_teammates>";
 const SAVED_LOGINS = "<openbot_saved_logins>";
-/** Text of the saved-logins rule only. */
 const LOGIN_RULE = "before request_takeover for a signed-out site, call openbot_browser.list_logins";
 const CHANGED_MARKER = "MARKER-CHANGED-MEMORY";
 
@@ -67,10 +49,8 @@ interface StreamEvent {
 }
 
 interface Recorded {
-  /** The prompt in model order: tools, instructions, then the conversation. */
   prompt: string;
   cacheKey: string | undefined;
-  /** The text of each user message part. */
   userTexts: string[];
 }
 
@@ -204,7 +184,6 @@ const SECTION: SectionTeammates = {
   ],
 };
 
-/** The params that `ThreadLifecycle.#instructions` gives, for these memories. */
 function instructionParams(memories: AgentMemory[], inTurns: boolean, savedLogins = false) {
   const options = {
     computerUseInOwnChat: false,
@@ -273,13 +252,11 @@ class Session {
     this.client.notify("initialized");
   }
 
-  /** Stops the app-server and starts it again, with the same client. */
   async restartAppServer(): Promise<void> {
     await runCauseEffect(this.client.stop());
     await this.open();
   }
 
-  /** A new client, as after an OpenBot restart. */
   async restartClient(): Promise<void> {
     await runCauseEffect(this.client.stop());
     this.client = this.#newClient();
@@ -367,7 +344,6 @@ class Session {
     return result;
   }
 
-  /** The user message texts of the thread, as the OpenBot history import reads them. */
   async historyUserTexts(): Promise<string[]> {
     const texts: string[] = [];
     await runCauseEffect(
@@ -427,13 +403,9 @@ try {
     await session.start(instructionParams(MEMORIES, inTurns));
     await session.turn("turn 1", "What is on my list today?");
     await session.turn("turn 2", "And tomorrow?");
-    // A memory change unloads the session (`ConversationRuntime.unloadAgentThreads`), and the next
-    // turn resumes it with the current instructions. The user saved a login in the Vault too, which
-    // also resumes the session (`ThreadLifecycle.#turnContextChanged`).
     await session.resume(instructionParams(CHANGED_MEMORIES, inTurns, true));
     await session.turn("turn 3, after a memory change", "When is the weekly review?");
     if (name === "before") {
-      // Codex ignored the new instructions; only a new session gives the model the changed memory.
       await session.start(instructionParams(CHANGED_MEMORIES, false, true));
       await session.turn("turn 4, in a new session", "When is the weekly review?");
       report.before = session.steps;
@@ -471,7 +443,6 @@ try {
   assert.equal(a2.savedLoginBlocks, 0, "Turn 2 sent a saved-logins block.");
   assert.equal(a3.loginRuleReachedModel, true, "A login saved after the session start did not reach the model.");
   assert.equal(a3.savedLoginBlocks, 1, "The saved login sent no saved-logins block, or more than one.");
-  // All of turn 2 but the closing brackets of the prompt.
   assert.ok(a3.estimatedCachedTokens >= Math.floor((a2.promptBytes - 2) / 4), "Turn 3 lost the cached prefix.");
   assert.equal(a4.memoryUpdateBlocks + a4.fullMemoryBlocks + a4.teammateBlocks, 1 + 1 + 1, "Turn 4 added blocks.");
   assert.equal(a4.savedLoginBlocks, 1, "The app-server restart sent the saved-logins block again.");
@@ -480,7 +451,6 @@ try {
     a4.estimatedCachedTokens >= Math.floor((a3.promptBytes - 2) / 4),
     "The app-server restart lost the prefix.",
   );
-  // A new client has no record of what the thread holds: one full block, the same as Claude.
   assert.equal(a5.fullMemoryBlocks, 2, "An OpenBot restart sent no full memory block, or more than one.");
   assert.equal(a5.teammateBlocks, 2, "An OpenBot restart sent no section-mates block, or more than one.");
   assert.equal(a5.savedLoginBlocks, 2, "An OpenBot restart sent no saved-logins block, or more than one.");

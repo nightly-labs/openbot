@@ -61,6 +61,7 @@ export const messages = {
     other: "Możesz dodać maksymalnie {count} folderu",
   },
   "agentSettings.folders.browse.places": "Przejdź do",
+  "agentSettings.folders.browse.path": "Ścieżka folderu",
   "agentSettings.folders.browse.home": "Folder domowy",
   "agentSettings.folders.browse.parent": "W górę: {folder}",
   "agentSettings.folders.browse.failed": "Nie można otworzyć tego folderu.",
@@ -116,6 +117,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Osiągnięto limit użycia · pominięto",
   "agentSettings.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "agentSettings.groups.brain": "Mózg",
@@ -169,8 +171,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Dostęp agenta",
   "agentSettings.runtime.busyMessage": "Podczas pracy",
   "agentSettings.runtime.busyMessageLabel": "Wiadomości podczas pracy agenta",
-  "agentSettings.runtime.taskLimit": "Równoległe wątki",
-  "agentSettings.runtime.taskLimitLabel": "Wątki, które działają w tym samym czasie",
   "agentSettings.runtime.workingDirectory": "Katalog roboczy",
   "agentSettings.runtime.notAvailable": "Jeszcze niedostępne",
   "agentSettings.runtime.fullAccessNote":
@@ -189,20 +189,20 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Pokieruj",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} nie może kierować trwającą turą. Wiadomości wysłane w trakcie pracy czekają w kolejce.",
-  "agentSettings.taskLimit.default": "Domyślnie ({count})",
-  "agentSettings.taskLimit.oneTurn": "{provider} wykonuje jedną turę naraz. Wątki tego agenta czekają na siebie.",
   "agentSettings.notificationLevel.title": "Powiadamiaj mnie",
   "agentSettings.notificationLevel.server": "Domyślne serwera ({level})",
   "agentSettings.notificationLevel.note":
     "Ten wybór dotyczy tylko ciebie, na wszystkich twoich urządzeniach. Gdy serwer jest wyciszony lub ustawiony na „Nic”, ten agent też milczy.",
   "agentSettings.newChat.title": "Nowy czat",
-  "agentSettings.newChat.description": "Agent zapomni ten czat. Jego konfiguracja zostanie.",
+  "agentSettings.newChat.description":
+    "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Jego konfiguracja zostanie.",
   "agentSettings.newChat.button": "Rozpocznij",
   "agentSettings.newChat.confirmTitle": "Rozpocząć nowy czat z agentem {name}?",
   "agentSettings.newChat.confirmDescription":
-    "Agent zapomni ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
+    "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "agentSettings.newChat.confirm": "Rozpocznij nowy czat",
   "agentSettings.newChat.failed": "Nie udało się rozpocząć nowego czatu.",
+  "agentSettings.newChat.busy": "Agent pracuje. Aby rozpocząć nowy czat, poczekaj, aż skończy, albo go zatrzymaj.",
   "agentSettings.deleteHistory.title": "Usuń historię",
   "agentSettings.deleteHistory.description":
     "Wiadomości tego czatu znikają, a agent o nich zapomina. Jego konfiguracja zostaje.",
@@ -212,6 +212,9 @@ export const messages = {
     "Wszystkie wiadomości i pliki tego czatu znikną z OpenBot, a agent o nich zapomni. Nie można tego cofnąć. Wątki poboczne, instrukcje, model, narzędzia, wspomnienia, przestrzeń robocza i przeglądarka się nie zmienią.",
   "agentSettings.deleteHistory.confirm": "Usuń historię",
   "agentSettings.deleteHistory.failed": "Nie udało się usunąć historii.",
+  "agentSettings.deleteAgent.title": "Usuń agenta",
+  "agentSettings.deleteAgent.description": "Agent, jego czat, wspomnienia, rutyny i obszar roboczy znikają z OpenBot.",
+  "agentSettings.deleteAgent.button": "Usuń",
   "agentSettings.fullAccess.title": "Dać temu agentowi pełny dostęp?",
   "agentSettings.fullAccess.askTitle": "Pozwolić temu agentowi pracować poza obszarem roboczym?",
   "agentSettings.fullAccess.description":
@@ -221,6 +224,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Zezwól na pełny dostęp",
   "agentSettings.fullAccess.askConfirm": "Najpierw pytaj",
   "agentSettings.links.usage": "Użycie",
+  "agentSettings.links.apps": "Aplikacje",
+  "agentSettings.links.appsScope": "Wszyscy agenci",
   "agentSettings.links.memories": "Wspomnienia",
   "agentSettings.links.memoriesCount": {
     one: "Zapisane: {count}",
@@ -268,6 +273,9 @@ export const messages = {
     "Agent może rozpocząć nowy czat, gdy jego czat staje się długi. Najpierw zapisuje notatki.",
   "agentSettings.quickAcknowledgement.title": "Pokaż plan przed długimi zadaniami",
   "agentSettings.quickAcknowledgement.description": "Przed długim zadaniem agent pokazuje swój plan.",
+  "agentSettings.builtinMemory.title": "Pamięć OpenBot",
+  "agentSettings.builtinMemory.description":
+    "Agent zapisuje i czyta własne wspomnienia. Wyłącz, aby używać tylko aplikacji pamięci, takiej jak Mem0. Zapisane wspomnienia zostają.",
   "agentSettings.browserProfile.label": "Profil przeglądarki",
   "agentSettings.browserProfile.shared": "Wspólny",
   "agentSettings.browserProfile.agent": "Tylko ten agent",
@@ -277,6 +285,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Każdy profil ma własne logowania i pliki cookie. Zmiana zamyka otwarte karty agenta.",
   "agentSettings.browserProfile.manage": "Zarządzaj",
+  "agentSettings.browserProfile.movedNote":
+    "Logowania do witryn zostają w starym profilu. Agent musi ponownie zalogować się na tych witrynach.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Cały proces {provider} działa w piaskownicy, więc zapis poza tymi folderami się nie powiedzie. Dostępne tylko w macOS.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -4,23 +4,18 @@ import { PLAN_LIMIT_TONE_TEXT, PlanLimitRing } from "@/features/servers/componen
 import {
   lowestPlanLimitsFirst,
   PLAN_LIMIT_RESET_FORMAT,
+  planLimitListedWindowLabel,
   planLimitName,
   planLimitResetDate,
   planLimitWindowKey,
-  planLimitWindowLabel,
   usePlanLimits,
 } from "@/features/servers/model/plan-limits";
 import { SettingsSection } from "@/features/settings/components/settings-content";
 import { useText } from "@/shared/lib/text";
 
 const RING_SIZE = 34;
-/** The space between the ring and the text, as in a settings row. */
 const RING_GAP = 12;
 
-/**
- * The plan limits of a server on its Usage screen: one row for each provider that reports a window, the
- * provider with the least left first. The section is not there when no provider reports a window.
- */
 export function PlanLimitsSummary({ serverId }: { serverId: string }) {
   const { t, format } = useText();
   const { rows, accounts } = usePlanLimits(serverId);
@@ -29,7 +24,6 @@ export function PlanLimitsSummary({ serverId }: { serverId: string }) {
     <SettingsSection title={t("mobile.server.planLimits.title")} footer={t("mobile.server.usage.planLimitsNote")}>
       {lowestPlanLimitsFirst(rows).map((row) => (
         <View key={`${row.provider}-${row.accountId ?? ""}`} className="gap-1 px-4 py-3">
-          {/* The name stands over the windows, so the ring is centred on the window lines. */}
           <Typography.Paragraph
             className="font-semibold"
             numberOfLines={1}
@@ -40,7 +34,7 @@ export function PlanLimitsSummary({ serverId }: { serverId: string }) {
           <View className="flex-row items-center" style={{ gap: RING_GAP }}>
             <PlanLimitRing row={row} size={RING_SIZE} />
             <View className="min-w-0 flex-1 gap-1">
-              {row.windows.map((window, index) => {
+              {row.listedWindows.map((window, index) => {
                 const resetsAt = planLimitResetDate(window);
                 return (
                   <View
@@ -53,7 +47,7 @@ export function PlanLimitsSummary({ serverId }: { serverId: string }) {
                       style={{ fontVariant: ["tabular-nums"] }}
                     >
                       {t("mobile.server.planLimits.windowLeft", {
-                        window: planLimitWindowLabel(window.durationMins, t),
+                        window: planLimitListedWindowLabel(window, t),
                         percent: window.remainingPercent,
                       })}
                     </Typography>

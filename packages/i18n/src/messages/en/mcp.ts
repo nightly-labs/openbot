@@ -27,7 +27,10 @@ export const messages = defineMessages("mcp", {
   "mcp.signIn.waiting": "Waiting for the browser…",
   "mcp.signIn.continue": "Continue to {name}",
   "mcp.signIn.pageDescription": "This page is open in the browser on {host}. Sign in here.",
-  "mcp.server.loadFailed": "The MCP servers could not load.",
+  "mcp.signIn.copyHint": "If the page does not load, copy the link and open it in another browser.",
+  "mcp.signIn.copyLink": "Copy link",
+  "mcp.signIn.pasteHint":
+    "If you sign in on another device, copy the address that its browser shows at the end and paste it here.",
   "mcp.test.connected": { one: "Connected · {count} tool", other: "Connected · {count} tools" },
   "mcp.status.testing": "Testing…",
   "mcp.status.failed": "Failed",
@@ -53,12 +56,6 @@ export const messages = defineMessages("mcp", {
   "mcp.panel.noAnswer": "That server did not answer.",
   "mcp.panel.connectTitle": "Connect to a custom MCP",
   "mcp.panel.editTitle": "Edit MCP server",
-  "mcp.panel.changesNotSaved": "Changes not saved",
-  "mcp.panel.title": "MCP servers",
-  "mcp.panel.description":
-    "Model Context Protocol servers give this server’s agents extra tools. Claude and Codex agents get only the servers in this list; OpenCode and Grok agents can also start servers from their own configuration files.",
-  "mcp.panel.connectCustom": "Connect a custom MCP",
-  "mcp.panel.empty": "No MCP servers yet.",
   "mcp.panel.enable": "Enable {name}",
   "mcp.panel.detailsTitle": "Details",
   "mcp.panel.detailsDescription": "Name this server and choose how OpenBot reaches it.",
@@ -100,16 +97,11 @@ export const messages = defineMessages("mcp", {
     "Connects once with these settings and reports the tools it offers. Nothing is saved or kept.",
   "mcp.panel.testConnection": "Test connection",
   "mcp.panel.notTested": "Not tested yet.",
-  "mcp.panel.removeTitle": "Remove {name}?",
-  "mcp.panel.removeDescription": "Its tools stop being offered to this server’s agents. The configuration is not kept.",
-  "mcp.panel.removeConfirm": "Remove MCP server",
-  "mcp.panel.actionsFor": "Actions for {name}",
-  "mcp.panel.testUnavailable": "This server cannot be tested here.",
   "mcp.panel.signIn": "Sign in",
   "mcp.panel.signOut": "Sign out",
   "mcp.panel.cancelSignIn": "Cancel sign-in",
+  "mcp.panel.useAddress": "Use this address",
   "mcp.panel.signInTo": "Sign in to {name}",
-  "mcp.panel.cancelSignInTo": "Cancel sign-in to {name}",
   "mcp.panel.signInWaiting": {
     one: "Finish the sign-in in your browser. OpenBot stops waiting after {count} minute.",
     other: "Finish the sign-in in your browser. OpenBot stops waiting after {count} minutes.",
@@ -149,6 +141,7 @@ export const messages = defineMessages("mcp", {
   "mcp.signIn.relayDeviceDescription":
     "Sign in on {page} in your browser and finish there. {host} sees the sign-in by itself.",
   "mcp.signIn.relayOpen": "Open sign-in page",
+  "mcp.signIn.relayCopy": "Copy link",
   "mcp.signIn.relayPasteHint":
     "If the browser does not come back to OpenBot, copy the address that it shows and paste it here.",
   "mcp.signIn.relayPasteRequired":

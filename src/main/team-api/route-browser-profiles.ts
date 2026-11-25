@@ -30,12 +30,6 @@ const ADMIN_ROUTES = new Set<string>([
   BROWSER_PROFILES_ROUTES.updateAgent,
 ]);
 
-/**
- * The named browser profiles of this computer, changed from a joined server. A profile holds the
- * sign-ins of its agents, so only an owner or admin can list or change profiles, or move an agent
- * between them. Any member reads the profile label of each tab they can see. Frozen by
- * `browser-profiles-v1`.
- */
 export async function routeBrowserProfiles(
   context: TeamApiRequestContext,
   profiles: TeamApiBrowserProfiles | undefined,
@@ -49,12 +43,10 @@ export async function routeBrowserProfiles(
     throw new HttpError(400, sourceText("error.team.agentSettingsUnsupported"));
   if (tabs) {
     await readJson(request);
-    // A private tab holds an administrator's MCP sign-in; to a member it does not exist.
     const hidden = (tabId: string) => !canAdministerServer(member.role) && browser.isPrivate(tabId);
     return json(200, { tabs: profiles.tabProfiles().filter((tab) => !hidden(tab.tabId)) });
   }
   requireAdmin(member);
-  // `readJson` has already run the body through the browser-profiles wire codec.
   const body = await readJson(request);
   requireVisibleBodyAgent(body, hiddenAgentIds);
   const visible = (agentIds: readonly string[]) => agentIds.filter((agentId) => !hiddenAgentIds.has(agentId));
@@ -94,8 +86,6 @@ export async function routeBrowserProfiles(
     }
   } catch (error) {
     if (error instanceof AgentNotFoundError) throw new HttpError(404, error.message);
-    // A name in use or a missing profile is catalog text for the admin. Any other failure stays
-    // private: the server answers it with its generic error.
     if (error instanceof BrowserProfileRejectedError) throw new HttpError(409, error.message);
     throw error;
   }

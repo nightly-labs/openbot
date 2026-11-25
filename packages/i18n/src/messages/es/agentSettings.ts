@@ -49,6 +49,7 @@ export const messages = {
     other: "Puedes añadir {count} carpetas como máximo",
   },
   "agentSettings.folders.browse.places": "Ir a",
+  "agentSettings.folders.browse.path": "Ruta de la carpeta",
   "agentSettings.folders.browse.home": "Carpeta de inicio",
   "agentSettings.folders.browse.parent": "Subir a {folder}",
   "agentSettings.folders.browse.failed": "No se puede abrir esta carpeta.",
@@ -95,6 +96,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Límite de uso alcanzado · omitido",
   "agentSettings.backupModels.unavailable": "No disponible ahora · omitido",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Si un límite de uso detiene a {name} después de empezar a trabajar, {name} continúa el mismo trabajo con el primer modelo disponible del orden. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
   "agentSettings.groups.brain": "Cerebro",
@@ -148,8 +150,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Acceso del agente",
   "agentSettings.runtime.busyMessage": "Durante el trabajo",
   "agentSettings.runtime.busyMessageLabel": "Mensajes mientras el agente trabaja",
-  "agentSettings.runtime.taskLimit": "Hilos en paralelo",
-  "agentSettings.runtime.taskLimitLabel": "Hilos que se ejecutan a la vez",
   "agentSettings.runtime.workingDirectory": "Directorio de trabajo",
   "agentSettings.runtime.notAvailable": "Todavía no disponible",
   "agentSettings.runtime.fullAccessNote":
@@ -168,21 +168,21 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Orientar",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} no puede orientar un turno en curso. Los mensajes enviados mientras trabaja esperan en la cola.",
-  "agentSettings.taskLimit.default": "Predeterminado ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} ejecuta un turno a la vez. Los hilos de este agente se esperan entre sí.",
   "agentSettings.notificationLevel.title": "Avisarme",
   "agentSettings.notificationLevel.server": "Predeterminado del servidor ({level})",
   "agentSettings.notificationLevel.note":
     "Esta opción es solo para ti y se aplica en todos tus dispositivos. Si el servidor está silenciado o en «Nada», este agente también queda en silencio.",
   "agentSettings.newChat.title": "Nuevo chat",
-  "agentSettings.newChat.description": "El agente olvida este chat. Se conserva su configuración.",
+  "agentSettings.newChat.description":
+    "El agente empieza de cero y puede consultar este chat cuando lo necesite. Se conserva su configuración.",
   "agentSettings.newChat.button": "Iniciar",
   "agentSettings.newChat.confirmTitle": "¿Iniciar un nuevo chat con {name}?",
   "agentSettings.newChat.confirmDescription":
-    "El agente olvida este chat. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
+    "El agente empieza de cero y puede consultar este chat cuando lo necesite. Los mensajes permanecen visibles sobre un separador. Las instrucciones, el modelo, las herramientas, los recuerdos, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.newChat.confirm": "Iniciar nuevo chat",
   "agentSettings.newChat.failed": "No se pudo iniciar un nuevo chat.",
+  "agentSettings.newChat.busy":
+    "El agente está trabajando. Para iniciar un nuevo chat, espera a que termine o detenlo.",
   "agentSettings.deleteHistory.title": "Eliminar historial",
   "agentSettings.deleteHistory.description":
     "Los mensajes de este chat se eliminan y el agente los olvida. Su configuración se mantiene.",
@@ -192,6 +192,10 @@ export const messages = {
     "Todos los mensajes y archivos de este chat se eliminan de OpenBot y el agente los olvida. No se puede deshacer. Los hilos secundarios, las instrucciones, el modelo, las herramientas, las memorias, el espacio de trabajo y el navegador no cambian.",
   "agentSettings.deleteHistory.confirm": "Eliminar historial",
   "agentSettings.deleteHistory.failed": "No se pudo eliminar el historial.",
+  "agentSettings.deleteAgent.title": "Eliminar agente",
+  "agentSettings.deleteAgent.description":
+    "El agente, su chat, sus recuerdos, sus rutinas y su espacio de trabajo se eliminan de OpenBot.",
+  "agentSettings.deleteAgent.button": "Eliminar",
   "agentSettings.fullAccess.title": "¿Dar acceso completo a este agente?",
   "agentSettings.fullAccess.askTitle": "¿Dejar que este agente trabaje fuera de su espacio de trabajo?",
   "agentSettings.fullAccess.description":
@@ -201,6 +205,8 @@ export const messages = {
   "agentSettings.fullAccess.confirm": "Permitir acceso completo",
   "agentSettings.fullAccess.askConfirm": "Usar Preguntar antes",
   "agentSettings.links.usage": "Uso",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "Todos los agentes",
   "agentSettings.links.memories": "Recuerdos",
   "agentSettings.links.memoriesCount": {
     one: "{count} guardado",
@@ -239,6 +245,9 @@ export const messages = {
     "Permite que el agente inicie un chat nuevo cuando su chat sea largo. Antes guarda notas.",
   "agentSettings.quickAcknowledgement.title": "Mostrar el plan antes de tareas largas",
   "agentSettings.quickAcknowledgement.description": "Antes de una tarea larga, el agente muestra su plan.",
+  "agentSettings.builtinMemory.title": "Memoria de OpenBot",
+  "agentSettings.builtinMemory.description":
+    "El agente guarda y lee sus propios recuerdos. Desactívala para usar solo una app de memoria, como Mem0. Los recuerdos guardados se mantienen.",
   "agentSettings.browserProfile.label": "Perfil del navegador",
   "agentSettings.browserProfile.shared": "Compartido",
   "agentSettings.browserProfile.agent": "Solo este agente",
@@ -248,6 +257,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Cada perfil guarda sus propios inicios de sesión y cookies. Un cambio cierra las pestañas abiertas del agente.",
   "agentSettings.browserProfile.manage": "Gestionar",
+  "agentSettings.browserProfile.movedNote":
+    "Los inicios de sesión en sitios se quedan en el perfil anterior. El agente debe iniciar sesión de nuevo en esos sitios.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "Todo el proceso de {provider} se ejecuta en un entorno aislado, por lo que la escritura fuera falla. Solo disponible en macOS.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -12,8 +12,8 @@ import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-w
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { Divider, GroupLabel } from "./routine-trigger-picker";
 
-/** A place to send to. The host adds the connection's name and platform when it saves. */
 export interface RoutineResultChoice {
   connectionId: string;
   placeId: string;
@@ -24,33 +24,12 @@ interface PlaceGroup {
   connectionId: string;
   connectionName: string;
   places: RoutineResultChoice[];
-  /** False for a saved place that its connection does not offer now. */
   available: boolean;
 }
 
 const samePlace = (left: RoutineResultChoice | null, right: RoutineResultChoice | null) =>
   left?.connectionId === right?.connectionId && left?.placeId === right?.placeId;
 
-function Divider() {
-  return <View className="ml-4 h-px bg-grouped-border" />;
-}
-
-function GroupLabel({ children }: { children: string }) {
-  return (
-    <View className="px-4 pb-1 pt-3">
-      <Typography type="body-xs" className="text-grouped-secondary">
-        {children}
-      </Typography>
-    </View>
-  );
-}
-
-/**
- * Where an agent routine sends each answer, as well as to its chat, as on desktop. For a saved
- * routine, a press on a place saves it at once: the destination is a record of its own, apart from
- * the routine's draft. A new routine has no id yet, so `draft` keeps the choice until the routine
- * is created.
- */
 export function RoutineResultDestinationSection({
   agentId,
   routineId,
@@ -94,9 +73,7 @@ export function RoutineResultDestinationSection({
     return <SettingsNote>{t("mobile.agent.record.resultDestination.loadFailed")}</SettingsNote>;
   const value = draft ? draft.value : destination.data;
   if (!options.data || value === undefined) return null;
-  // Typed here, so the handlers below keep the check above.
   const saved: RoutineResultChoice | null = value;
-  /** Only a saved destination has the connection's name; a draft choice is always one that is offered. */
   const savedDestination = draft ? null : destination.data;
   const groups: PlaceGroup[] = options.data.map((connection) => ({
     connectionId: connection.connectionId,
@@ -116,7 +93,6 @@ export function RoutineResultDestinationSection({
       places: [savedDestination],
       available: false,
     });
-  // As on desktop: with no connection and no saved place, there is nothing to choose.
   if (!groups.some((group) => group.places.length) && !saved) return null;
   const failed = options.data.filter((connection) => connection.placesFailed);
   const shown = open && !disabled && !pending;

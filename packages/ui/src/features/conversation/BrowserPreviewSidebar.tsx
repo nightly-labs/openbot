@@ -1,53 +1,43 @@
 import type { BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
 import { Button, Maximize2, Monitor, Skeleton, X } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
+import { SETTINGS_PANEL_DEFAULT } from "@openbot/ui/components/SettingsPanel";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
+import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 
-const BROWSER_PANEL_MIN = 220;
-const BROWSER_PANEL_MAX = 1600;
-/** How often the preview of a tab that loads, or that an agent acts in, shows the page again. */
+const BROWSER_PANEL_MIN = SETTINGS_PANEL_DEFAULT;
 const BUSY_CAPTURE_INTERVAL = 3000;
-/** How often the preview of another tab shows the page again. */
 const IDLE_CAPTURE_INTERVAL = 20_000;
 
 interface BrowserPreviewSidebarProps {
   capturePreview?: ((tabId: string) => Promise<BrowserPreview>) | undefined;
-  readWidth: (fallback: number, min: number, max: number) => number;
-  readCustomWidth: () => number;
+  readWidth: () => number;
   saveWidth: (width: number) => void;
   resetWidth: () => void;
   tabs: BrowserTab[];
-  /** The tabs that an agent acts in now. */
   busyTabIds?: ReadonlySet<string> | undefined;
   hidden: boolean;
   suspended: boolean;
   contextKey: string;
-  defaultWidth: () => number;
   maxWidth: () => number;
   onWidthChange: (width: number) => void;
   onOpenTab: (tabId: string, trigger: HTMLButtonElement) => void;
   onCloseTab?: (tabId: string) => void;
   onNewTab?: () => void;
+  pageShown?: boolean | undefined;
+  children?: JSX.Element;
 }
 
 export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps) {
   const { t } = useText();
   let panel!: HTMLElement;
-  // The chat beside the panel makes room for it, also while the full view hides it (`panel-layout.css`).
   onSettled(() => {
-    const conversation = panel.closest(".conversation-panel");
+    const conversation = panel.closest("[data-side-split]") ? null : panel.closest(".conversation-panel");
     return conversation ? holdFlag(conversation, "browser-side-panel") : undefined;
   });
-  const defaultPanelWidth = () =>
-    Math.round(Math.min(BROWSER_PANEL_MAX, Math.max(BROWSER_PANEL_MIN, props.defaultWidth())));
-  const storedPanelWidth = props.readCustomWidth();
-  let customPanelWidth = Number.isFinite(storedPanelWidth);
-  let savedCustomPanelWidth = customPanelWidth ? storedPanelWidth : null;
-  const [panelWidth, setPanelWidth] = createSignal(
-    props.readWidth(defaultPanelWidth(), BROWSER_PANEL_MIN, BROWSER_PANEL_MAX),
-  );
+  const [panelWidth, setPanelWidth] = createSignal(props.readWidth());
   createEffect(
     () => panelWidth(),
     (width) => {
@@ -59,23 +49,13 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
     setPanelWidth(width);
   };
 
-  const saveCustomPanelWidth = (width: number) => {
-    customPanelWidth = true;
-    savedCustomPanelWidth = width;
-    props.saveWidth(width);
-  };
-
   const resizeDefaultPanel = () => {
-    const preferredWidth =
-      customPanelWidth && savedCustomPanelWidth !== null ? savedCustomPanelWidth : defaultPanelWidth();
-    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(BROWSER_PANEL_MIN, preferredWidth))));
+    setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(BROWSER_PANEL_MIN, props.readWidth()))));
   };
 
   const resetPanelWidth = () => {
     props.resetWidth();
-    customPanelWidth = false;
-    savedCustomPanelWidth = null;
-    setPanelWidth(defaultPanelWidth());
+    setPanelWidth(props.readWidth());
   };
 
   return (
@@ -92,41 +72,43 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
         controls="browser-side-panel"
         direction="right"
         value={panelWidth()}
-        defaultValue={defaultPanelWidth()}
+        defaultValue={BROWSER_PANEL_MIN}
         min={BROWSER_PANEL_MIN}
         max={props.maxWidth}
         onResize={resizePanel}
-        onResizeEnd={saveCustomPanelWidth}
+        onResizeEnd={props.saveWidth}
         onParentResize={resizeDefaultPanel}
         onReset={resetPanelWidth}
       />
 
-      <div class="browser-preview-list">
-        <For each={props.tabs} keyed={(tab) => tab.id}>
-          {(tab) => (
-            <BrowserPreviewCard
-              capturePreview={props.capturePreview}
-              tab={tab()}
-              busy={props.busyTabIds?.has(tab().id) === true}
-              contextKey={props.contextKey}
-              enabled={!props.hidden && !props.suspended}
-              onOpen={props.onOpenTab}
-              onClose={props.onCloseTab}
-            />
-          )}
-        </For>
-        <Show when={props.tabs.length === 0}>
-          <div class="browser-empty-state">
-            <Monitor aria-hidden="true" />
-            <strong>{t("browser.previews.empty")}</strong>
-            <Show when={props.onNewTab}>
-              <Button variant="secondary" size="sm" onClick={() => props.onNewTab?.()}>
-                {t("browser.previews.openPage")}
-              </Button>
-            </Show>
-          </div>
-        </Show>
-      </div>
+      <Show when={props.pageShown !== true} fallback={props.children}>
+        <div class="browser-preview-list">
+          <For each={props.tabs} keyed={(tab) => tab.id}>
+            {(tab) => (
+              <BrowserPreviewCard
+                capturePreview={props.capturePreview}
+                tab={tab()}
+                busy={props.busyTabIds?.has(tab().id) === true}
+                contextKey={props.contextKey}
+                enabled={!props.hidden && !props.suspended}
+                onOpen={props.onOpenTab}
+                onClose={props.onCloseTab}
+              />
+            )}
+          </For>
+          <Show when={props.tabs.length === 0}>
+            <div class="browser-empty-state">
+              <Monitor aria-hidden="true" />
+              <strong>{t("browser.previews.empty")}</strong>
+              <Show when={props.onNewTab}>
+                <Button variant="secondary" size="sm" onClick={() => props.onNewTab?.()}>
+                  {t("browser.previews.openPage")}
+                </Button>
+              </Show>
+            </div>
+          </Show>
+        </div>
+      </Show>
     </aside>
   );
 }
@@ -134,7 +116,6 @@ export default function BrowserPreviewSidebar(props: BrowserPreviewSidebarProps)
 export function BrowserPreviewCard(props: {
   capturePreview?: ((tabId: string) => Promise<BrowserPreview>) | undefined;
   tab: BrowserTab;
-  /** An agent acts in the tab now. */
   busy?: boolean | undefined;
   contextKey: string;
   enabled: boolean;
@@ -150,7 +131,6 @@ export function BrowserPreviewCard(props: {
   const [documentVisible, setDocumentVisible] = createSignal(!document.hidden);
   let element: HTMLDivElement | undefined;
   let pending: Promise<void> | undefined;
-  /** Captures the page now instead of at the end of a slow wait. Set while captures run. */
   let wake: (() => void) | undefined;
   const title = () => props.tab.title || props.tab.url || t("browser.preview.pageFallback");
 
@@ -173,18 +153,14 @@ export function BrowserPreviewCard(props: {
   createEffect(
     () => {
       captureKey();
-      // Read here, not in the callback: a prop can be a compiled memo, and the callback has no owner.
       return untrack(() => ({ capturePreview: props.capturePreview, enabled: props.enabled, id: props.tab.id }));
     },
     ({ capturePreview, enabled, id }) => {
       if (!capturePreview || !enabled || !visible() || !documentVisible()) return;
       let disposed = false;
       let timer: ReturnType<typeof setTimeout> | undefined;
-      // Read when the next capture is set: the agent can start or stop in the tab between captures.
       const interval = () =>
         untrack(() => (props.tab.loading || props.busy ? BUSY_CAPTURE_INTERVAL : IDLE_CAPTURE_INTERVAL));
-      // A page that is still loading often cannot be captured yet. Keep the skeleton until the load
-      // ends; the end of the load starts a new capture.
       const failed = () => {
         if (!disposed) setState(() => ({ preview: null, failed: !(props.tab.loading && !state.preview) }));
       };
@@ -223,7 +199,6 @@ export function BrowserPreviewCard(props: {
       };
     },
   );
-  // A tab that an agent starts to act in does not wait for the slow capture.
   createEffect(
     () => props.busy === true,
     (busy) => {

@@ -1,16 +1,9 @@
 import { Effect, Exit, Scope } from "effect";
 import type { HostEventsService } from "./host-events-service";
 
-/** A failed sync runs again after this delay. The delay doubles up to the cap until a sync succeeds. */
 const RETRY_FIRST_MS = 30_000;
 const RETRY_MAX_MS = 15 * 60_000;
 
-/**
- * Owns the background route syncs of this host. One sync runs at a time. The requests that come
- * while it runs become one more sync, which registers every route when one of them asked for that.
- * A sync that leaves route work (a relay outage) runs again later, so an idle host does not keep a
- * pending URL or an unsent revocation.
- */
 export class HostEventsRuntime {
   readonly #service: HostEventsService;
   readonly #scope = Scope.makeUnsafe();
@@ -32,10 +25,6 @@ export class HostEventsRuntime {
     });
   }
 
-  /**
-   * Revokes deleted routes and registers new ones. `all` registers every route again, for example
-   * after the account or the host ID changed.
-   */
   syncRoutes(options: { all: boolean }): void {
     if (!this.#running) return;
     this.#queued = { all: options.all || this.#queued?.all === true };
@@ -46,7 +35,6 @@ export class HostEventsRuntime {
         Effect.ensuring(
           Effect.sync(() => {
             this.#active = false;
-            // A request that came after the last check starts its own sync.
             if (this.#queued) this.syncRoutes(this.#queued);
           }),
         ),

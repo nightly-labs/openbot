@@ -1,3 +1,4 @@
+import { agentProviderDescriptor, isAgentProvider } from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type ClientAgentModelOption,
@@ -9,41 +10,28 @@ import {
 import { CLAUDE_API_KEY_ACCOUNT_ID } from "@openbot/contracts/team-protocol/claude-api-key-v1";
 import type { AppTranslate } from "@openbot/i18n";
 
-/** One account of a provider row, with the agents that use it. */
 export interface ProviderPickerAccount extends ProviderAccountStatus {
   usedBy?: readonly string[] | undefined;
 }
 
-/**
- * The account actions of the computer that runs the providers. Each answer is the new status; a
- * rejection is shown beside the account.
- */
 export interface ProviderAccountActions {
-  /** Signs a new account in when `accountId` is null, or signs that account in again. */
   connect: (provider: AgentProviderId, accountId: string | null) => Promise<void>;
-  /** Stops a `connecting` account's sign-in. A new account goes; another one shows as signed out. */
+  connectKey?: ((provider: AgentProviderId, accountId: string | null, key: string) => Promise<void>) | undefined;
+  connectWithCode?: ((provider: AgentProviderId, accountId: string | null) => Promise<void>) | undefined;
+  pasteCodeSignIn?: boolean | undefined;
+  windowsCodeSignIn?: boolean | undefined;
   cancel: (provider: AgentProviderId, accountId: string) => Promise<void>;
-  /** A null label returns the account to its email. */
   rename: (provider: AgentProviderId, accountId: string, label: string | null) => Promise<void>;
-  /** Removes the account and its credentials. Its agents move to the provider's first account. */
   remove: (provider: AgentProviderId, accountId: string) => Promise<void>;
-  /**
-   * The usage reset credits of each connected account of a provider that gives them. Absent where
-   * the computer that runs the providers cannot spend one.
-   */
   usageResets?: ((provider: AgentProviderId) => Promise<readonly ProviderUsageResets[]>) | undefined;
-  /** Spends one usage reset credit of an account, and answers what the provider did. */
   resetUsage?: ((provider: AgentProviderId, accountId: string) => Promise<ProviderUsageResetOutcome>) | undefined;
-  /**
-   * Signs the provider's own sign-in out. Its agents wait until it connects again. Absent where the
-   * computer that runs the providers cannot.
-   */
   signOut?: ((provider: AgentProviderId) => Promise<void>) | undefined;
-  /** True for this computer's providers, whose own sign-in a terminal CLI shares. */
+  setPool?: ((provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) => Promise<void>) | undefined;
+  setLiveVoiceAccount?: ((accountId: string | null) => Promise<void>) | undefined;
+  maxAccounts?: number | undefined;
   local?: boolean | undefined;
 }
 
-/** The name an account shows: the user's name for it, its email, "API key", or its place in the list. */
 export function providerAccountName(
   t: AppTranslate,
   accounts: readonly Pick<ProviderAccountStatus, "id" | "label" | "email">[],
@@ -62,20 +50,35 @@ export function providerAccountName(
   );
 }
 
-/** Whether an agent's account is this one. An agent with no account uses the provider's first. */
 export function isAgentAccount(agentAccountId: string | undefined | null, accountId: string): boolean {
   return (agentAccountId || DEFAULT_PROVIDER_ACCOUNT_ID) === accountId;
 }
 
-/** Whether the account is the one of the saved Claude key: it has no sign-in and no plan usage. */
-export function isApiKeyAccount(accountId: string): boolean {
-  return accountId === CLAUDE_API_KEY_ACCOUNT_ID;
+export function isApiKeyAccount(accountId: string, provider?: string): boolean {
+  return (
+    accountId === CLAUDE_API_KEY_ACCOUNT_ID || (provider !== undefined && isProviderKeyAccount(provider, accountId))
+  );
 }
 
-/**
- * A model of a provider: from the list of models, or one that only an account after the first
- * serves. A plan can serve models that the provider's own sign-in does not (#5217).
- */
+export function hasKeyAccounts(provider: string): boolean {
+  return isAgentProvider(provider) && agentProviderDescriptor(provider).accountSignIn === "key";
+}
+
+export function accountCodeSignInOffered(provider: string, actions: ProviderAccountActions | undefined): boolean {
+  if (!actions?.connectWithCode || !isAgentProvider(provider)) return false;
+  const descriptor = agentProviderDescriptor(provider);
+  const codeSignIn = descriptor.accountCodeSignIn;
+  return (
+    codeSignIn === "device" ||
+    (codeSignIn === "paste" && actions.pasteCodeSignIn === true) ||
+    (descriptor.windowsCodeSignIn === "paste" && actions.windowsCodeSignIn === true)
+  );
+}
+
+export function isProviderKeyAccount(provider: string, accountId: string): boolean {
+  return accountId !== DEFAULT_PROVIDER_ACCOUNT_ID && hasKeyAccounts(provider);
+}
+
 export function findModelOption(
   options: readonly ClientAgentModelOption[],
   providers: readonly { id: string; accounts?: readonly ProviderAccountStatus[] | undefined }[] | undefined,

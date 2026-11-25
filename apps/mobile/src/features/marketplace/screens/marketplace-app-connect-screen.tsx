@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Linking, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { RELAY_PASTE_PLACEHOLDER } from "@/features/servers/model/use-mcp-sign-in-relay";
 import { SettingsNote, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
@@ -21,13 +22,6 @@ import { appListings } from "../model/marketplace-listings";
 import { pluginConnectMethod } from "../model/plugin-connect";
 import { usePluginConnect } from "../model/use-plugin-connect";
 
-/** The address that the sign-in page opens at its end: a local address with the code. */
-const PASTE_PLACEHOLDER = "http://localhost/callback?code=…";
-
-/**
- * The second page of an app's sheet: the key the app asks for, or its browser sign-in. The server
- * tests the key before it saves the app; a sign-in ends on the server, which keeps the grant.
- */
 export function MarketplaceAppConnectScreen() {
   const { t } = useText();
   const [muted] = useThemeColor(["muted"]);
@@ -45,7 +39,6 @@ export function MarketplaceAppConnectScreen() {
   const phase = connect.state.phase;
   const working = phase === "working" || phase === "waiting";
   usePreventRemove(phase === "working", () => undefined);
-  // Back to the listing, which now shows the app as connected, after the guard is released.
   useEffect(() => {
     if (phase === "done") router.back();
   }, [phase]);
@@ -63,7 +56,6 @@ export function MarketplaceAppConnectScreen() {
 
   const ready = method.kind === "link" || mcpFlowComplete(method.flow, values);
   const signingIn = connect.state.phase === "signIn" ? connect.state : null;
-  // The step the browser sign-in is on: 0 before the page opens, 1 while the user signs in.
   const step = signingIn ? 1 : 0;
 
   return (
@@ -136,33 +128,36 @@ export function MarketplaceAppConnectScreen() {
               label={t("mobile.marketplace.app.stepOpen", { name: listing.name })}
             />
             <ConnectStep index={1} current={step} label={t("mobile.marketplace.app.stepAllow")} />
-            <ConnectStep
-              index={2}
-              current={step}
-              label={t("mobile.marketplace.app.stepReturn", { name: listing.name })}
-            />
+            {signingIn?.paste ? (
+              <>
+                <ConnectStep index={2} current={step} label={t("mobile.marketplace.app.stepBlank")} />
+                <ConnectStep index={3} current={step} label={t("mobile.marketplace.app.stepCopy")} />
+                <ConnectStep index={4} current={step} label={t("mobile.marketplace.app.stepPaste")} />
+              </>
+            ) : (
+              <ConnectStep
+                index={2}
+                current={step}
+                label={t("mobile.marketplace.app.stepReturn", { name: listing.name })}
+              />
+            )}
           </SettingsSection>
           {signingIn?.paste ? (
-            <View className="gap-3">
-              <Typography.Paragraph type="body-sm" className="px-1 text-grouped-secondary">
-                {t("mobile.marketplace.app.pasteHint")}
-              </Typography.Paragraph>
-              <SheetFormField
-                label={t("mobile.marketplace.app.pasteLabel")}
-                placeholder={PASTE_PLACEHOLDER}
-                value={address}
-                autoCapitalize="none"
-                autoCorrect={false}
-                inputMode="url"
-                onChangeText={setAddress}
-              />
-            </View>
+            <SheetFormField
+              label={t("mobile.marketplace.app.pasteLabel")}
+              placeholder={RELAY_PASTE_PLACEHOLDER}
+              value={address}
+              autoCapitalize="none"
+              autoCorrect={false}
+              inputMode="url"
+              onChangeText={setAddress}
+            />
           ) : null}
           {signingIn?.paste ? (
             <Button
               className="bg-action"
               feedbackVariant="scale"
-              isDisabled={!address.trim()}
+              isDisabled={!address.trim() || connect.pasting}
               onPress={() => void connect.paste(address)}
             >
               <Button.Label className="text-action-foreground">{t("mobile.marketplace.app.finishSignIn")}</Button.Label>
@@ -201,7 +196,6 @@ export function MarketplaceAppConnectScreen() {
   );
 }
 
-/** One step of a browser sign-in: a done step has a check, the current one the accent, the rest wait. */
 function ConnectStep({ index, current, label }: { index: number; current: number; label: string }) {
   const [accent, muted, control] = useThemeColor(["accent", "muted", "surface-secondary"]);
   const done = index < current;

@@ -8,6 +8,7 @@ export const messages = {
   "menu.actualSize": "Dimensioni effettive",
   "menu.zoomIn": "Ingrandisci",
   "menu.zoomOut": "Riduci",
+  "menu.closeDeveloperTools": "Chiudi Strumenti per sviluppatori",
   "menu.copyLink": "Copia link",
   "menu.copyImage": "Copia immagine",
   "menu.quit": "Esci da OpenBot",
@@ -15,6 +16,13 @@ export const messages = {
   "menu.quitConfirmBody": "Agenti e routine si fermano finché non riapri OpenBot.",
   "menu.quitConfirm": "Esci",
   "menu.quitHint": "Tieni premuto ⌘Q o premilo due volte per uscire",
+  "menu.closeWorkingTitle": {
+    one: "{count} agente sta ancora lavorando",
+    other: "{count} agenti stanno ancora lavorando",
+  },
+  "menu.closeWorkingBody":
+    "Se esci da OpenBot, gli agenti si fermano. Lascialo in esecuzione per farli finire. Per mostrare di nuovo la finestra, apri OpenBot.",
+  "menu.closeKeepRunning": "Continua",
   "menu.trayOpen": "Apri OpenBot",
   "menu.trayQuit": "Esci da OpenBot",
   "menu.trayTooltip": "OpenBot",

@@ -1,8 +1,3 @@
-// What main answers for the Dynamic Island: its preference, geometry, presentation and actions.
-//
-// Each decoder checks every field the contract type requires and keeps each optional field it
-// carries, so a value the renderer reads always has the shape its type says.
-
 import {
   type DynamicIslandAction,
   type DynamicIslandGeometry,

@@ -19,7 +19,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "Word lid van een server die iemand met je heeft gedeeld.",
   "mobile.onboarding.server.computerTitle": "Verbind je computer",
   "mobile.onboarding.server.computerSteps":
-    "Log uit op deze telefoon. Open dan OpenBot op je computer, ga naar Instellingen → Mobile Connect, kies Genereer QR-code en scan die met deze telefoon.",
+    "Log uit op deze telefoon. Open dan OpenBot op je computer, ga naar Instellingen → Mobile Connect, kies Voeg telefoon toe → Ja, log in en scan de code met deze telefoon.",
   "mobile.onboarding.server.signOut": "Uitloggen",
   "mobile.onboarding.server.connecting": "Verbinden met {name}…",
   "mobile.onboarding.agent.title": "Kies je eerste agent",

@@ -1,22 +1,8 @@
-// `bun run dev:bench`: repeatable RAM, CPU and renderer-work scenarios on the
-// built app.
-//
-// Each run seeds the bench's own profile, starts the built app on it, samples
-// the process tree from spawn to exit, reads the startup marks, drives one
-// scenario over CDP while it records the app window's work (see
-// `render-metrics.ts`), collects garbage, reads the settled state and stops
-// the app. Several runs reduce to a
-// median with its spread, and `--compare` prints the deltas against an earlier
-// report, which is what a fix PR quotes.
-//
-// Everything this touches is the bench profile (`OpenBot Dev wt-<hash of
-// this worktree>#bench`) and the process group it started. It never reaches a
-// dev instance, another worktree, or the developer's own profile.
-
 import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { type Browser, chromium, type Page } from "playwright-core";
 import { developmentInstanceIdForWorktree, developmentUserDataName } from "../../src/main/development-profile";
@@ -24,7 +10,9 @@ import { resolveDevelopmentAppDataRoot } from "../development-state-paths";
 import { readScriptArguments } from "../script-arguments";
 import { cleanupSeedOwnedTransfers, seedDevelopmentState } from "../seed-dev-state";
 import { ensureBenchAuthApi, signInBenchAccount } from "./bench-auth";
+import { checkBudget, parseBudget } from "./bench-budget";
 import { type BenchApp, launchBenchApp } from "./bench-launch";
+import { assertBenchBuild, PROBES_ENVIRONMENT, startProbes } from "./bench-probes";
 import { SCENARIOS, type Scenario, SECOND, type SeedPlan } from "./bench-scenarios";
 import {
   type BenchReport,
@@ -48,22 +36,16 @@ const logger = createOpenBotLogger("dev-bench", (line) => process.stderr.write(`
 const PROJECT_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BENCH_ROOT = join(PROJECT_ROOT, ".openbot-build", "dev-automation", "bench");
 const READY_TIMEOUT_MS = 90_000;
-// The signed-in session, encrypted with the OS keychain. A reseed keeps it, so
-// each run opens the workspace the way a returning user does, without a new
-// sign-in inside the measured window.
 const CENTRAL_AUTH_FILE = "openbot-central-auth-v1.bin";
 
-// The bench profile. Its own instance id, so a bench never seeds over the
-// isolated dev profile of this worktree.
 const INSTANCE_ID = developmentInstanceIdForWorktree(`${PROJECT_ROOT}#bench`);
 
-// Seeded agents run on Claude: the bench never starts Codex, and a turn
-// scenario switches the agent to the provider it measures.
-const BENCH_AGENT_MODEL = { provider: "claude", model: "claude-sonnet-5", reasoningEffort: "low" } as const;
+const BENCH_AGENT_MODEL = { provider: "claude", model: "claude-opus-5-5", reasoningEffort: "low" } as const;
 
-// How long `--cpu-profile` records the app window once a scenario has settled.
 const CPU_PROFILE_MS = 15 * SECOND;
 const TRACE_MS = 5 * SECOND;
+const ACT_TRACE_DELAY_MS = 5 * SECOND;
+const ACT_TRACE_MS = 8 * SECOND;
 const TRACE_CATEGORIES = ["devtools.timeline", "disabled-by-default-devtools.timeline", "blink", "cc", "v8.execute"];
 
 const wait = (milliseconds: number) => new Promise<void>((resolveWait) => setTimeout(resolveWait, milliseconds));
@@ -96,7 +78,6 @@ async function replaceProfile(plan: SeedPlan): Promise<void> {
     });
     return;
   }
-  // The bench's own profile, named from this worktree: nothing else writes it.
   try {
     await lstat(profile);
   } catch {
@@ -112,9 +93,7 @@ async function waitFor<T>(what: string, timeoutMs: number, probe: () => Promise<
     try {
       const value = await probe();
       if (value !== null) return value;
-    } catch {
-      // Not up yet.
-    }
+    } catch {}
     if (Date.now() > deadline) throw new Error(`Timed out after ${timeoutMs} ms waiting for ${what}.`);
     await wait(250);
   }
@@ -137,25 +116,30 @@ async function connect(app: BenchApp): Promise<{ browser: Browser; page: Page }>
     const response = await fetch(`http://127.0.0.1:${app.remoteDebuggingPort}/json/version`);
     return response.ok ? true : null;
   });
+  await waitFor("the app page", READY_TIMEOUT_MS, async () => {
+    const response = await fetch(`http://127.0.0.1:${app.remoteDebuggingPort}/json/list`);
+    const targets = response.ok ? await response.json() : null;
+    if (!Array.isArray(targets)) return null;
+    return targets.some((target) => isDynamicRecord(target) && isString(target.url) && isAppWindowUrl(target.url))
+      ? true
+      : null;
+  });
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${app.remoteDebuggingPort}`);
   if (!(await verifyBrowserOwnership(browser, app.pid))) {
     await browser.close();
     throw new Error(`The browser on :${app.remoteDebuggingPort} is not the bench app this run started.`);
   }
   const page = await waitFor("the app window", READY_TIMEOUT_MS, () => findAppPage(browser));
-  // Ready means the backend answers, not only that the window painted.
   const agentCount = await waitFor("the agent list", READY_TIMEOUT_MS, () =>
     page.evaluate<number>("window.openbot.agent.listAgents().then((agents) => agents.length)"),
   );
   await signInBenchAccount(page, logger);
-  // The workspace, not the sign-in or connecting screen, is what a run measures.
   if (agentCount > 0) {
-    await page.locator("[data-chat-id]").first().waitFor({ state: "attached", timeout: READY_TIMEOUT_MS });
+    await page.locator(".sidebar-agent-item").first().waitFor({ state: "attached", timeout: READY_TIMEOUT_MS });
   }
   return { browser, page };
 }
 
-/** Counts the running animations in the page by name and element, such as `3× pulse on span.dot`. */
 const RUNNING_ANIMATIONS = `(() => {
   const counts = new Map();
   for (const animation of document.getAnimations()) {
@@ -168,8 +152,6 @@ const RUNNING_ANIMATIONS = `(() => {
   return [...counts].map(([key, count]) => count + "× " + key);
 })()`;
 
-/** Counts the `requestAnimationFrame` calls in one second. A loop that asks for a frame each time keeps the
- * renderer drawing at the display rate even when nothing changes on screen. */
 const ANIMATION_FRAME_REQUESTS = `new Promise((resolve) => {
   const original = window.requestAnimationFrame;
   let count = 0;
@@ -183,7 +165,6 @@ const ANIMATION_FRAME_REQUESTS = `new Promise((resolve) => {
   }, 1000);
 })`;
 
-/** Records what the app window's JavaScript does while the scenario is otherwise idle. */
 async function writeCpuProfile(browser: Browser, page: Page, path: string): Promise<void> {
   const session = await page.context().newCDPSession(page);
   try {
@@ -194,15 +175,32 @@ async function writeCpuProfile(browser: Browser, page: Page, path: string): Prom
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, JSON.stringify(profile));
     logger.info(`CPU profile written to ${path}`);
-    // Compositor and style work for an animation shows in the profile only as "(program)".
     const animations = await page.evaluate<string[]>(RUNNING_ANIMATIONS);
     logger.info(`running animations: ${animations.length === 0 ? "none" : animations.join(", ")}`);
-    // A timeline trace names the native work: style, layout, paint, observers and timers.
     const tracePath = path.replace(/\.cpuprofile$/u, ".trace.json");
     await browser.startTracing(page, { path: tracePath, categories: TRACE_CATEGORIES });
     await wait(TRACE_MS);
     await browser.stopTracing();
     logger.info(`timeline trace written to ${tracePath}`);
+  } finally {
+    await session.detach().catch(() => undefined);
+  }
+}
+
+async function writeActTrace(browser: Browser, page: Page, base: string, actDone: Promise<void>): Promise<void> {
+  const started = await Promise.race([wait(ACT_TRACE_DELAY_MS).then(() => true), actDone.then(() => false)]);
+  if (!started) return;
+  const session = await page.context().newCDPSession(page);
+  try {
+    await mkdir(dirname(base), { recursive: true });
+    await session.send("Profiler.enable");
+    await session.send("Profiler.start");
+    await browser.startTracing(page, { path: `${base}-act.trace.json`, categories: TRACE_CATEGORIES });
+    await Promise.race([wait(ACT_TRACE_MS), actDone]);
+    await browser.stopTracing();
+    const { profile } = await session.send("Profiler.stop");
+    await writeFile(`${base}-act-renderer.cpuprofile`, JSON.stringify(profile));
+    logger.info(`act trace and CPU profile written to ${base}-act.trace.json and ${base}-act-renderer.cpuprofile`);
   } finally {
     await session.detach().catch(() => undefined);
   }
@@ -214,20 +212,56 @@ interface RunOptions {
   cpuProfile: boolean;
   frames: boolean;
   callCounts: boolean;
+  probes: boolean;
+  solidCauses: boolean;
+  mainProfile: boolean;
+  traceAct: boolean;
+}
+
+async function startMainProfile(inspector: InspectorClient): Promise<() => Promise<unknown>> {
+  await inspector.send("Profiler.enable");
+  await inspector.send("Profiler.start");
+  return async () => {
+    const result = await inspector.send("Profiler.stop");
+    await inspector.send("Profiler.disable").catch(() => undefined);
+    return isDynamicRecord(result) ? result.profile : null;
+  };
+}
+
+async function writeFailureScreenshot(page: Page, path: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const written = await page
+    .screenshot({ path, timeout: 10 * SECOND })
+    .then(() => true)
+    .catch(() => false);
+  if (written) logger.info(`failure screenshot written to ${path}`);
+  const rows = await page
+    .evaluate<string[]>(
+      `[...document.querySelectorAll(".sidebar-agent-item")].map((row) => row.getAttribute("data-chat-id") ?? "(none)")`,
+    )
+    .catch(() => []);
+  logger.info(`sidebar rows: ${rows.join(", ")}`);
 }
 
 async function runOnce(
   scenario: Scenario,
   index: number,
-  { label, authApiUrl, cpuProfile, frames, callCounts }: RunOptions,
+  { label, authApiUrl, cpuProfile, frames, callCounts, probes, solidCauses, mainProfile, traceAct }: RunOptions,
 ): Promise<RunResult> {
   await prepareProfile(scenario.seed);
+  const scenarioEnvironment = scenario.prepare
+    ? await scenario.prepare(join(BENCH_ROOT, "scenarios", `${label}-${scenario.id}`))
+    : {};
   const spawnedAt = Date.now();
   const app = await launchBenchApp({
     projectRoot: PROJECT_ROOT,
     instanceId: INSTANCE_ID,
     logger,
-    environment: { OPENBOT_AUTH_API_URL: authApiUrl },
+    environment: {
+      ...scenarioEnvironment,
+      ...(probes ? PROBES_ENVIRONMENT : {}),
+      OPENBOT_AUTH_API_URL: authApiUrl,
+    },
     logPath: join(BENCH_ROOT, "logs", `${label}-${scenario.id}-${index + 1}.log`),
   });
   let browser: Browser | null = null;
@@ -246,8 +280,6 @@ async function runOnce(
     browser = connected.browser;
     page = connected.page;
     const readyMs = Date.now() - spawnedAt;
-    // A render error can leave the window empty, which reads as a large saving. Count errors, so
-    // the report shows a broken run.
     const pageErrors: string[] = [];
     page.on("console", (message) => {
       if (message.type() === "error") pageErrors.push(message.text());
@@ -260,22 +292,35 @@ async function runOnce(
     const appWindow = page;
     const startup = await readStartupMarks(appWindow, inspector);
     const recorded: MetricValues = {};
+    const probeRecording = probes ? await startProbes(inspector, connected.browser, logger, { solidCauses }) : null;
+    const stopMainProfile = mainProfile && index === 0 && inspector ? await startMainProfile(inspector) : null;
     const stopRenderRecording = await startRenderRecording(appWindow, { frames, callCounts });
     const actStarted = Date.now();
-    await scenario.act({
-      app,
-      browser,
-      page: appWindow,
-      inspector,
-      logger,
-      evaluate: <T>(expression: string) => appWindow.evaluate<T>(expression),
-      wait,
-      record: (values) => Object.assign(recorded, values),
+    let finishAct = () => {};
+    const actDone = new Promise<void>((resolve) => {
+      finishAct = resolve;
     });
+    const actTrace =
+      traceAct && index === 0
+        ? writeActTrace(connected.browser, appWindow, join(BENCH_ROOT, "snapshots", `${label}-${scenario.id}`), actDone)
+        : null;
+    await scenario
+      .act({
+        app,
+        browser,
+        page: appWindow,
+        inspector,
+        logger,
+        evaluate: <T>(expression: string) => appWindow.evaluate<T>(expression),
+        wait,
+        record: (values) => Object.assign(recorded, values),
+      })
+      .finally(finishAct);
+    await actTrace;
     const actMs = Date.now() - actStarted;
     const renderWork = await stopRenderRecording();
-    // A click leaves the pointer on its target, and a hovered avatar animates until the pointer leaves.
-    // A user who waits does not usually keep the pointer on a row, so the settled numbers must not count it.
+    const mainCpuProfile = stopMainProfile ? await stopMainProfile() : null;
+    const probeReport = probeRecording ? await probeRecording.stop(recorded) : null;
     await appWindow.mouse.move(-1, -1);
     const samples = await sampler.stop();
     const settled: MetricValues = {
@@ -283,6 +328,7 @@ async function runOnce(
       ...recorded,
       ...startup,
       ...renderWork.values,
+      ...probeReport?.metrics,
       "time.readyMs": readyMs,
       "time.actMs": actMs,
       "errors.page": pageErrors.length,
@@ -294,6 +340,17 @@ async function runOnce(
       await mkdir(dirname(base), { recursive: true });
       await writeFile(`${base}-call-counts.json`, `${JSON.stringify(renderWork.topCalls, null, 2)}\n`);
       for (const call of renderWork.topCalls.slice(0, 10)) logger.info(`calls: ${call.calls}× ${call.function}`);
+    }
+    if (mainCpuProfile) {
+      await mkdir(dirname(base), { recursive: true });
+      await writeFile(`${base}-main.cpuprofile`, JSON.stringify(mainCpuProfile));
+      logger.info(`main CPU profile written to ${base}-main.cpuprofile`);
+    }
+    if (probeReport) {
+      const probePath = join(BENCH_ROOT, "probes", `${label}-${scenario.id}-${index + 1}-probes.json`);
+      await mkdir(dirname(probePath), { recursive: true });
+      await writeFile(probePath, `${JSON.stringify(probeReport, null, 2)}\n`);
+      logger.info(`probe report written to ${probePath}`);
     }
     if (cpuProfile && index === 0) await writeCpuProfile(connected.browser, appWindow, `${base}-renderer.cpuprofile`);
     if (scenario.snapshots && index === 0) {
@@ -309,6 +366,13 @@ async function runOnce(
       series: seriesStats(samples.map((sample) => sample.values)),
       settled,
     };
+  } catch (error) {
+    if (page)
+      await writeFailureScreenshot(
+        page,
+        join(BENCH_ROOT, "snapshots", `${label}-${scenario.id}-${index + 1}-failed.png`),
+      );
+    throw error;
   } finally {
     await sampler.stop();
     inspector?.close();
@@ -317,11 +381,11 @@ async function runOnce(
   }
 }
 
-// --- command line ----------------------------------------------------------
-
 const USAGE = [
   "Usage: bun run dev:bench --scenario=<id|prefix|all> [--runs=<n>] [--label=<name>] [--compare=<report.json>]",
-  "                         [--cpu-profile] [--frames] [--call-counts]",
+  "                         [--cpu-profile] [--frames] [--call-counts] [--probes] [--solid-causes] [--main-profile]",
+  "                         [--trace-act]",
+  "                         [--budget=<perf-budgets.json>]",
   "",
   "Scenarios:",
   ...SCENARIOS.map((one) => `- ${one.id}: ${one.description}`),
@@ -335,6 +399,11 @@ const OPTIONS = {
   "cpu-profile": { type: "boolean" },
   frames: { type: "boolean" },
   "call-counts": { type: "boolean" },
+  probes: { type: "boolean" },
+  "solid-causes": { type: "boolean" },
+  "main-profile": { type: "boolean" },
+  "trace-act": { type: "boolean" },
+  budget: { type: "string" },
 } as const;
 
 function selectScenarios(selector: string): Scenario[] {
@@ -364,6 +433,15 @@ async function main(): Promise<void> {
   const cpuProfile = parsed.values["cpu-profile"] ?? false;
   const frames = parsed.values.frames ?? false;
   const callCounts = parsed.values["call-counts"] ?? false;
+  const probes = parsed.values.probes ?? false;
+  const mainProfile = parsed.values["main-profile"] ?? false;
+  const solidCauses = parsed.values["solid-causes"] ?? false;
+  const traceAct = parsed.values["trace-act"] ?? false;
+  if (solidCauses && !probes) throw new Error("--solid-causes needs --probes.");
+  if (probes) assertBenchBuild(PROJECT_ROOT);
+  const budgetPath = parsed.values.budget;
+  const budget = budgetPath ? parseBudget(JSON.parse(await readFile(budgetPath, "utf8"))) : null;
+  if (budgetPath && !budget) throw new Error(`${budgetPath} is not a perf budget file.`);
   const baseline = comparePath ? parseBenchReport(JSON.parse(await readFile(comparePath, "utf8"))) : null;
   if (comparePath && !baseline) throw new Error(`${comparePath} is not a dev:bench report.`);
 
@@ -371,13 +449,12 @@ async function main(): Promise<void> {
   const report = (): BenchReport => ({
     label,
     createdAt: new Date().toISOString(),
-    build: "built bundle (out/), unpackaged Electron",
+    build: probes ? "bench bundle (out/, probes on), unpackaged Electron" : "built bundle (out/), unpackaged Electron",
     scenarios,
   });
   await mkdir(BENCH_ROOT, { recursive: true });
   const jsonPath = join(BENCH_ROOT, `${label}.json`);
   const authApi = await ensureBenchAuthApi(PROJECT_ROOT, BENCH_ROOT, logger);
-  // A long `all` run continues past a scenario that fails, and names it at the end.
   const failed: string[] = [];
   try {
     for (const scenario of selectScenarios(selector)) {
@@ -386,7 +463,17 @@ async function main(): Promise<void> {
         for (let index = 0; index < runs; index += 1) {
           logger.info(`${scenario.id}: run ${index + 1} of ${runs}`);
           results.push(
-            await runOnce(scenario, index, { label, authApiUrl: authApi.url, cpuProfile, frames, callCounts }),
+            await runOnce(scenario, index, {
+              label,
+              authApiUrl: authApi.url,
+              cpuProfile,
+              frames,
+              callCounts,
+              probes,
+              solidCauses,
+              mainProfile,
+              traceAct,
+            }),
           );
         }
       } catch (error) {
@@ -400,7 +487,6 @@ async function main(): Promise<void> {
         runs: results,
         metrics: summarizeRuns(results),
       });
-      // After each scenario, so a long `all` run that fails late keeps what it measured.
       await writeFile(jsonPath, `${JSON.stringify(report(), null, 2)}\n`);
     }
   } finally {
@@ -415,6 +501,12 @@ async function main(): Promise<void> {
     process.stdout.write(`\n${comparison}\n`);
   }
   logger.info(`report written to ${jsonPath}`);
+  if (budget) {
+    const result = checkBudget(budget, report());
+    await writeFile(join(BENCH_ROOT, `${label}.budget.md`), `${result.markdown}\n`);
+    process.stdout.write(`\n${result.markdown}\n`);
+    if (result.failures > 0) process.exitCode = 1;
+  }
   if (failed.length > 0) {
     logger.error(`scenarios with no report: ${failed.join(", ")}`);
     process.exitCode = 1;

@@ -1,7 +1,3 @@
-import { Effect } from "effect";
-// App identity, first-run setup, the analytics preference, external links and the data and
-// diagnostics exports.
-
 import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import { HOSTED_SERVER_CONTACT_URL } from "@openbot/contracts/hosted-servers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
@@ -18,6 +14,7 @@ import {
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { analyticsOnByDefault } from "@openbot/telemetry";
+import { Effect } from "effect";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, type WebContents } from "electron";
 import { version as developmentVersion } from "../../../package.json";
 import type { AgentService } from "../../backend/agent-service";
@@ -47,14 +44,12 @@ import { readSetupState, writeSetupState } from "../setup-store";
 import { systemHourCycle } from "../system-hour-cycle";
 import type { UpdateService } from "../update-service";
 import {
-  parseAgentDefaults,
   parseAnalyticsPreference,
   parseAppAppearancePreference,
   parseAppBehaviorPreferenceChange,
   parseAppInterfaceSizePreference,
   parseAppLanguagePreference,
   parseAppLogoColorPreference,
-  parseBusyMessageModePreference,
   parseChatWindowTarget,
   parseExternalDestination,
   parseExternalLinkPreference,
@@ -67,22 +62,10 @@ import { stringPayload } from "./validation";
 
 const OPENBOT_SITE = "https://openbot.run";
 
-/** The first post that the social toast offers, encoded for a query string. */
 function draftPost(translate: AppTranslate): string {
   return encodeURIComponent(translate("app.socialFollow.draftPost", { site: "openbot.run" }));
 }
 
-/**
- * Every destination `openExternal` may reach, as a closed table.
- *
- * Exported because the addresses are a product contract the checker cannot judge: a wrong one sends
- * a user who asked for an OpenCode Go key to some other site, and the type only says "a string".
- *
- * `mac-screen-recording` is not a web page. macOS opens a settings pane from a URL, and the table is
- * what keeps that address out of the renderer. It is the same pane the Computer Use panel opens, so
- * it is read from `mac-permission-urls.ts` rather than written twice. `hosted-server-contact` is a
- * `mailto:` address, which `openUrl` refuses; the web client opens the same constant.
- */
 const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: AppTranslate) => string)> = {
   "agent-setup": "https://github.com/nightly-labs/openbot/blob/main/docs/TROUBLESHOOTING.md",
   "opencode-install": "https://opencode.ai/docs/",
@@ -94,7 +77,6 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
   message: "https://x.com/norbertbodziony",
   changelog: "https://openbot.run/changelog",
   guides: "https://openbot.run/guides",
-  // A Redirect Rule in the openbot.run Cloudflare zone sends this to the current Discord invite.
   discord: "https://discord.openbot.run",
   github: "https://github.com/nightly-labs/openbot",
   x: "https://x.com/OpenBot_",
@@ -104,8 +86,6 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
   facebook: "https://www.facebook.com/profile.php?id=61595425259628",
   linkedin: "https://www.linkedin.com/company/openbot-si/",
   reddit: "https://www.reddit.com/r/OpenBot_/",
-  // A post page that takes text opens with the first post in the app language. LinkedIn and Facebook
-  // take only a link; Instagram and TikTok take nothing, so the renderer copies the post first.
   "x-post": (translate) => `https://x.com/intent/post?text=${draftPost(translate)}`,
   "threads-post": (translate) => `https://www.threads.com/intent/post?text=${draftPost(translate)}`,
   "linkedin-post": `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(OPENBOT_SITE)}`,
@@ -116,10 +96,12 @@ const EXTERNAL_DESTINATIONS: Record<ExternalDestination, string | ((translate: A
   "tiktok-post": "https://www.tiktok.com/upload",
   "grok-bot-export": GROK_BOT_EXPORT_URL,
   "hosted-server-contact": HOSTED_SERVER_CONTACT_URL,
+  download: DOWNLOAD_URL,
   "mac-screen-recording": MAC_PERMISSION_URLS["screen-recording"],
 };
 
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { DOWNLOAD_URL } from "../download-url";
 import { openHttpLink } from "../message-link-relay";
 import type { ResourceMonitor } from "../resource-monitor";
 import type { StartupTiming } from "../startup-timing";
@@ -139,12 +121,10 @@ export interface AppIpcDependencies {
   agentMemoryLimit: AgentMemoryLimitSetting;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
   remoteNetworkRoute: RemoteNetworkRoutePreferenceStore;
-  /** Applies a changed network route to the devices that are connected to this computer now. */
   applyRemoteNetworkRoute: () => Promise<void>;
   remoteSessionCache: RemoteSessionCache;
   externalLinkPreference: ExternalLinkPreferenceStore;
   externalLinks: ExternalLinkOpener;
-  /** Opens a web page in the program that the user chose in Settings. */
   openLink: (url: string) => Promise<void>;
   appBehavior: AppBehaviorService;
   language: LanguageService;
@@ -155,14 +135,13 @@ export interface AppIpcDependencies {
   appVariant: AppVariant;
   analyticsCaptureUrl: string | null;
   analyticsInstallId: string | null;
+  dynamicIslandAvailable: boolean;
   getMainWindow: () => BrowserWindow | null;
-  /** True for the main window's own `webContents`, not a chat window's. */
   isMainWindow: (sender: WebContents) => boolean;
   openChatWindow: (target: ChatWindowTarget) => void;
   chatWindowTargets: () => ChatWindowTarget[];
   trace: TraceFile;
   resources: ResourceMonitor;
-  /** Null for a local server child, which reports no start. */
   startup: StartupTiming | null;
 }
 
@@ -193,6 +172,7 @@ export function appIpcHandlers({
   appVariant,
   analyticsCaptureUrl,
   analyticsInstallId,
+  dynamicIslandAvailable,
   getMainWindow,
   isMainWindow,
   openChatWindow,
@@ -208,11 +188,7 @@ export function appIpcHandlers({
         if (platform !== "darwin" && platform !== "win32" && platform !== "linux") {
           throw new Error(`Unsupported desktop platform: ${platform}`);
         }
-        // electron-vite starts a script, so Electron reports its own version in development.
         const version = app.isPackaged ? app.getVersion() : developmentVersion;
-        // Each state other than `enabled*` (such as `disabled_software` or `unavailable_software`)
-        // composites on the CPU. This covers the GPU switch of `linux-gpu-mode.ts` and a GPU that
-        // Chromium blocks, such as the llvmpipe driver of a server or a remote desktop.
         const softwareRendering = !app.getGPUFeatureStatus().gpu_compositing.startsWith("enabled");
         const hourCycle = systemHourCycle();
         const aboveAppsSupport = aboveAppsScreenSupport();
@@ -226,6 +202,7 @@ export function appIpcHandlers({
           ...(softwareRendering ? { softwareRendering } : {}),
           ...(hourCycle ? { hourCycle } : {}),
           ...(aboveAppsSupport ? { aboveAppsSupport } : {}),
+          ...(dynamicIslandAvailable ? {} : { dynamicIslandUnavailable: true }),
         };
       }),
       getSetupState: handler(() => runCauseEffect(readSetupState(setupFile))),
@@ -234,7 +211,6 @@ export function appIpcHandlers({
           readSetupState(setupFile).pipe(Effect.flatMap((setup) => analyticsPreferences.read(setup.completed))),
         ),
       ),
-      // An answer the user gave on another device comes before the regional default.
       getAnalyticsDefault: handler(
         (): AnalyticsPreference => ({
           enabled:
@@ -245,28 +221,15 @@ export function appIpcHandlers({
       setAnalyticsPreference: payloadHandler(parseAnalyticsPreference, (parsed) =>
         runCauseEffect(analyticsPreferences.set(parsed.enabled, parsed.chosen === true)),
       ),
-      // Any window can send its bounded counts. Only the main window's workspace load times the start,
-      // and main times it on its own clock.
       reportRendererTiming: eventPayloadHandler(parseRendererTimingReport, (event, report) => {
         if (report.workspaceReady && isMainWindow(event.sender)) startup?.workspaceReady();
         resources.observeRendererTiming(report);
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       getBusyMessageModePreference: handler(() => busyMessageMode.get()),
-      setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, (parsed) =>
-        runCauseEffect(busyMessageMode.set(parsed)),
-      ),
       getAgentDefaults: handler(() => agentDefaults.get()),
-      // The agents that follow a changed default get it at once: see `AgentService.agentDefaultsChanged`.
-      setAgentDefaults: payloadHandler(parseAgentDefaults, async (parsed) => {
-        const previous = agentDefaults.get();
-        const saved = await runCauseEffect(agentDefaults.set(parsed));
-        service.agentDefaultsChanged(previous);
-        return saved;
-      }),
       getAgentMemoryLimitPreference: handler(() => agentMemoryLimit.get()),
       getRemoteSessionReusePreference: handler(() => remoteSessionReuse.get()),
-      // Off removes the kept sessions at once. The sessions of this run then end when the app quits.
       setRemoteSessionReusePreference: payloadHandler(parseRemoteSessionReusePreference, async (parsed) => {
         const saved = await runCauseEffect(remoteSessionReuse.set(parsed));
         await Effect.runPromise(remoteSessionCache.setEnabled(saved.keepBetweenRuns));
@@ -276,11 +239,9 @@ export function appIpcHandlers({
         ...remoteNetworkRoute.get(),
         tailscaleConnected: isTailscaleConnected(),
       })),
-      // The private route drops the connected devices, so each connects again without the relay.
       setRemoteNetworkRoute: payloadHandler(parseRemoteNetworkRoutePreference, async (parsed) => {
         const previous = remoteNetworkRoute.get();
         const saved = await runCauseEffect(remoteNetworkRoute.set(parsed));
-        // A route that the host did not apply must not stay saved: the next connection would read it.
         await applyRemoteNetworkRoute().catch(async (error: unknown) => {
           await runCauseEffect(remoteNetworkRoute.set(previous));
           throw error;
@@ -303,14 +264,12 @@ export function appIpcHandlers({
       setAppAppearancePreference: payloadHandler(parseAppAppearancePreference, (parsed) =>
         runCauseEffect(appearance.set(parsed)),
       ),
-      // Local only: the list is the fonts of this computer, and the font choice is per computer.
       listInstalledFonts: handler(() => runCauseEffect(listInstalledFonts())),
       getAppInterfaceSizePreference: handler(() => interfaceSize.preference),
       setAppInterfaceSizePreference: payloadHandler(parseAppInterfaceSizePreference, (parsed) =>
         runCauseEffect(interfaceSize.set(parsed)),
       ),
       saveSetup: payloadHandler(parseSetup, async (input): Promise<AppSetupState> => {
-        // Before the setup file: once setup is complete, a missing choice reads as an older user's "on".
         const before = await runCauseEffect(readSetupState(setupFile));
         await runCauseEffect(analyticsPreferences.saveDefault(before.completed));
         const state = await runCauseEffect(writeSetupState(setupFile, input));
@@ -331,7 +290,6 @@ export function appIpcHandlers({
       listExternalLinkBrowsers: handler(() => runCauseEffect(externalLinks.listBrowsers())),
       chooseExternalLinkApp: handler(async (): Promise<ExternalLinkBrowser | null> => {
         const mainWindow = getMainWindow();
-        // macOS shows an application bundle as one file, so the dialog can offer only applications.
         const options: OpenDialogOptions = {
           title: language.translate("dialog.chooseExternalLinkApp"),
           properties: ["openFile"],

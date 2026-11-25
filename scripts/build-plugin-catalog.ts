@@ -20,11 +20,6 @@ const scriptRoot = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptRoot, "..");
 
 const slugPattern = /^[a-z0-9][a-z0-9-]{0,62}$/u;
-/**
- * The sign-in bridge runs a third-party program on the user's machine. `@latest` would make every
- * launch a fresh, unreviewed download that no release can be audited against, so the catalog names
- * one version and moves it only in a reviewed commit.
- */
 const secretPattern =
   /(ghp_[A-Za-z0-9]{8,}|github_pat_[A-Za-z0-9_]{8,}|sk-(?:live|test|proj)-[A-Za-z0-9]{8,}|xox[bpas]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|phx_[A-Za-z0-9]{8,}|re_[A-Za-z0-9]{8,})/u;
 
@@ -102,10 +97,6 @@ export interface PluginHttpServer {
   name: string;
   transport: "http";
   url: string;
-  /**
-   * The addresses that an earlier version of the listing saved rows on. A row with the catalog name
-   * on one of these hosts, or on a subdomain, is still the app's row.
-   */
   earlierUrls?: string[];
   auth?: PluginAuthFlow[];
 }
@@ -115,6 +106,7 @@ export interface PluginStdioServer {
   transport: "stdio";
   command: string;
   args: string[];
+  env?: Record<string, string>;
   auth?: PluginAuthFlow[];
 }
 
@@ -126,7 +118,6 @@ export interface PluginApp {
   description: string;
   iconUrl: string | null;
   server: PluginServer;
-  /** The Apple apps the server drives through AppleScript, which macOS asks about one by one. */
   macAutomation?: MacAutomationTarget[];
 }
 
@@ -148,13 +139,6 @@ export interface PluginDetail {
   updatedAt: string;
 }
 
-/**
- * Reads the catalog source, validates every listing, and writes the four
- * generated outputs: the renderer literal the Apps tab reads, the Worker
- * module the JSON routes will serve, the mobile literal the phone's
- * Marketplace reads, and the offline snapshot shipped with the app. With `check`, it fails when a checked-in file differs from a
- * fresh build, so a hand edit cannot ship.
- */
 export async function buildPluginCatalog(options?: {
   check?: boolean;
   paths?: PluginCatalogPaths;
@@ -229,11 +213,6 @@ function parseCatalogSpec(value: unknown): PluginCatalogSpec {
   };
 }
 
-/**
- * Validates one listing and answers the detail the generated outputs carry.
- * A secret value is never catalog data: the source must name where a
- * credential goes and must never hold one.
- */
 export function validatePlugin(slug: string, value: unknown, featured: boolean, updatedAt: string): PluginDetail {
   if (!isDynamicRecord(value)) throw new Error(`Plugin ${slug} is invalid.`);
   if (value.slug !== slug) throw new Error(`Plugin ${slug} names itself ${String(value.slug)}.`);
@@ -301,7 +280,7 @@ function parseApp(slug: string, value: unknown): PluginApp {
   const server = parseServer(slug, value.server);
   const base = baseServerConfig(server);
   const errors = mcpConfigErrors(normalizeMcpConfig(base));
-  const firstError = errors.name ?? errors.command ?? errors.url;
+  const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
   if (firstError) throw new Error(`Plugin ${slug} server is invalid: ${firstError}`);
   checkCredentialFlows(slug, server, base);
   const app: PluginApp = { id: text("id"), name: text("name"), description: text("description"), iconUrl, server };
@@ -309,7 +288,6 @@ function parseApp(slug: string, value: unknown): PluginApp {
   return macAutomation ? { ...app, macAutomation } : app;
 }
 
-/** Only a server that runs on this computer can drive its apps, so only stdio may ask. */
 function parseMacAutomation(slug: string, value: unknown, server: PluginServer): MacAutomationTarget[] | undefined {
   if (value === undefined) return undefined;
   if (
@@ -329,9 +307,7 @@ function parseServer(slug: string, value: unknown): PluginServer {
   if (!isString(value.name) || value.name.trim().length === 0) throw new Error(`Plugin ${slug} server needs a name.`);
   const auth = parseAuth(slug, value.auth, value.transport);
   if (value.transport === "http") {
-    /* Plain http leaves this computer in the clear, so only a server another app runs on this
-       computer may use it, and a local flow is how a listing says so. A local flow on a remote
-       address would tell the user to turn on a server that is not theirs. */
+    if (value.env !== undefined) throw new Error(`Plugin ${slug} env needs a stdio server.`);
     const local = auth?.some((flow) => flow.kind === "local") ?? false;
     if (local && auth?.length !== 1) throw new Error(`Plugin ${slug} local server takes no other auth flow.`);
     const url = value.url;
@@ -361,11 +337,39 @@ function parseServer(slug: string, value: unknown): PluginServer {
       throw new Error(`Plugin ${slug} server args must all be strings: ${JSON.stringify(value.args)}.`);
     }
     const args = [...value.args];
-    return auth
-      ? { name: value.name, transport: "stdio", command: value.command, args, auth }
-      : { name: value.name, transport: "stdio", command: value.command, args };
+    const env = parseServerEnv(slug, value.env, auth);
+    return {
+      name: value.name,
+      transport: "stdio",
+      command: value.command,
+      args,
+      ...(env ? { env } : {}),
+      ...(auth ? { auth } : {}),
+    };
   }
   throw new Error(`Plugin ${slug} server needs a known transport.`);
+}
+
+function parseServerEnv(
+  slug: string,
+  value: unknown,
+  auth: PluginAuthFlow[] | undefined,
+): Record<string, string> | undefined {
+  if (value === undefined) return undefined;
+  if (!isDynamicRecord(value) || Object.keys(value).length === 0) {
+    throw new Error(`Plugin ${slug} env must name one or more settings.`);
+  }
+  const typed = new Set(
+    (auth ?? []).flatMap((flow) => (flow.kind === "key" ? flow.fields.map((field) => field.env) : [])),
+  );
+  const env: Record<string, string> = {};
+  for (const [key, setting] of Object.entries(value)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) throw new Error(`Plugin ${slug} env has an invalid name.`);
+    if (typed.has(key)) throw new Error(`Plugin ${slug} env sets ${key}, which the user types.`);
+    if (!isString(setting) || !setting.trim()) throw new Error(`Plugin ${slug} env ${key} needs a value.`);
+    env[key] = setting;
+  }
+  return env;
 }
 
 function parseAuth(slug: string, value: unknown, transport: unknown): PluginAuthFlow[] | undefined {
@@ -379,8 +383,6 @@ function parseFlow(slug: string, value: unknown, transport: unknown): PluginAuth
     throw new Error(`Plugin ${slug} has an invalid auth flow.`);
   }
   if (value.kind === "link") {
-    // OpenBot holds the OAuth client itself and adds the header at hand-off, which it can only do
-    // for an http server. A stdio listing asking for a sign-in would be asking for a bridge program.
     if (transport !== "http") throw new Error(`Plugin ${slug} sign-in needs an http server.`);
     return { id: value.id, kind: "link", label: value.label };
   }
@@ -449,7 +451,6 @@ function parseField(slug: string, value: unknown, transport: unknown): PluginAut
   }
   const field: PluginAuthField = { id: value.id, label: value.label };
   if (value.url === true) {
-    // The user's own link replaces the listing's address, which only a remote server has.
     if (transport !== "http") throw new Error(`Plugin ${slug} link field needs an http server.`);
     field.url = true;
   } else if (transport === "stdio") {
@@ -496,7 +497,7 @@ function baseServerConfig(server: PluginServer): McpServerConfig {
     enabled: true,
     command: server.command,
     args: [...server.args],
-    env: [],
+    env: Object.entries(server.env ?? {}).map(([key, value]) => ({ key, value })),
     envPassthrough: [],
     workingDirectory: "",
     url: "",
@@ -504,10 +505,6 @@ function baseServerConfig(server: PluginServer): McpServerConfig {
   };
 }
 
-/**
- * Every key flow must still validate with a typed value in place, so the
- * listing cannot declare a credential the settings form then refuses.
- */
 function checkCredentialFlows(slug: string, server: PluginServer, base: McpServerConfig): void {
   for (const flow of server.auth ?? []) {
     if (flow.kind !== "key") continue;
@@ -521,7 +518,7 @@ function checkCredentialFlows(slug: string, server: PluginServer, base: McpServe
               .map((field) => ({ key: field.header ?? "", value: `sample${field.prefix ?? ""}` })),
           };
     const errors = mcpConfigErrors(normalizeMcpConfig(applied));
-    const firstError = errors.name ?? errors.command ?? errors.url;
+    const firstError = errors.name ?? errors.command ?? errors.url ?? errors.headers;
     if (firstError) throw new Error(`Plugin ${slug} credential is invalid: ${firstError}`);
   }
 }
@@ -548,18 +545,10 @@ function sha256(value: string): string {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
-/**
- * Renders a value the way the formatter prints a literal: short collections
- * stay on one line, longer ones break (with trailing commas in TypeScript),
- * and string values that exceed the line width start on the next line.
- * The catalog schema only holds plain JSON values, so this printer only
- * handles those.
- */
 function tsLiteral(value: unknown): string {
   return printLiteral(value, "", "ts");
 }
 
-/** The snapshot files are JSON, so keys stay quoted and commas stay absent. */
 function jsonLiteral(value: unknown): string {
   return `${printLiteral(value, "", "json")}\n`;
 }
@@ -573,7 +562,6 @@ function printLiteral(value: unknown, indent: string, mode: LiteralMode, prefixW
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
     const child = `${indent}  `;
-    // The formatter counts the comma after an item in the line width.
     const commaWidth = (index: number) => (mode === "ts" || index < value.length - 1 ? 1 : 0);
     return `[\n${value.map((item, index) => `${child}${printLiteral(item, child, mode, commaWidth(index))}`).join(",\n")}${closer}${indent}]`;
   }
@@ -591,7 +579,6 @@ function printLiteralField(key: string, value: unknown, indent: string, mode: Li
   const flat = inlineLiteral(value, mode);
   const head = `${indent}${name}: ${flat}`;
   if (head.length + 1 <= 120) return head;
-  // The formatter keeps a string on the line of a key shorter than the indent width plus three.
   if (typeof value === "string" && mode === "ts" && name.length >= 5) return `${indent}${name}:\n${indent}  ${flat}`;
   if (typeof value === "string") return head;
   return `${indent}${name}: ${printLiteral(value, indent, mode, name.length + 2)}`;
@@ -611,7 +598,6 @@ function inlineLiteral(value: unknown, mode: LiteralMode): string {
   return JSON.stringify(value) ?? "null";
 }
 
-/** A string in the quotes the formatter picks: double, unless the value holds more double quotes than single. */
 function tsString(value: string): string {
   const double = JSON.stringify(value);
   if (value.split('"').length <= value.split("'").length) return double;
@@ -623,7 +609,6 @@ function tsKey(key: string): string {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(key) ? key : JSON.stringify(key);
 }
 
-/** A slug can start with a digit (`21st`), and an identifier cannot. */
 function constName(slug: string): string {
   const name = slug.toUpperCase().replace(/[^A-Z0-9]+/gu, "_");
   return /^[0-9]/u.test(name) ? `PLUGIN_${name}` : name;
@@ -654,18 +639,6 @@ function renderRendererModule(plugins: PluginDetail[]): string {
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/features/settings/marketplace-plugins";
 
-/**
- * The configuration an app installs as. The catalog states the name and how the server is reached -
- * an address, or a command and its words; the rest of the record and \`enabled\` are made here rather
- * than stored as catalog data that could disagree with \`normalizeMcpConfig\`.
- *
- * A credential is never among them. What a server asks for is declared in \`server.auth\`, and the
- * value is typed by the user in the connect dialog, which hands back the configuration that
- * connected.
- *
- * The id is empty, which is what the store reads as "new". An id it does not hold is an edit of a
- * row that is gone, and the save is refused.
- */
 export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfig {
   return {
     id: "",
@@ -674,7 +647,10 @@ export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfi
     enabled: true,
     command: app.server.transport === "stdio" ? app.server.command : "",
     args: app.server.transport === "stdio" ? [...app.server.args] : [],
-    env: [],
+    env:
+      app.server.transport === "stdio"
+        ? Object.entries(app.server.env ?? {}).map(([key, value]) => ({ key, value }))
+        : [],
     envPassthrough: [],
     workingDirectory: "",
     url: app.server.transport === "http" ? app.server.url : "",
@@ -690,18 +666,14 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
 `;
 }
 
-/**
- * The phone's copy. Mobile cannot import the renderer's types from `@openbot/ui`, so the module states
- * its own. The vendor icon addresses are left out: the phone loads each icon from the account
- * service's `/plugins/icon/<slug>?app=<id>`, so opening the Marketplace sends no request to a vendor.
- * The Apple apps a server drives are left out too: only the Mac that runs the server can ask for them.
- */
 function renderMobileModule(plugins: PluginDetail[]): string {
   const listings = plugins.map((plugin) => {
     const { iconUrl: _iconUrl, updatedAt: _updatedAt, apps, ...detail } = plugin;
     return {
       ...detail,
-      apps: apps.map(({ iconUrl: _appIconUrl, macAutomation: _macAutomation, ...app }) => app),
+      apps: apps.map(({ iconUrl: _appIconUrl, macAutomation, ...app }) =>
+        macAutomation?.length ? { ...app, needsMac: true } : app,
+      ),
     };
   });
   return `/**
@@ -751,13 +723,22 @@ export type MobilePluginAuthFlow =
 
 type MobilePluginServer =
   | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: MobilePluginAuthFlow[] }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: MobilePluginAuthFlow[] };
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: MobilePluginAuthFlow[];
+    };
 
 export interface MobilePluginApp {
   id: string;
   name: string;
   description: string;
   server: MobilePluginServer;
+  /** The app drives Apple apps, so it runs only on a host that is a Mac. */
+  needsMac?: true;
 }
 
 export interface MobilePlugin {
@@ -830,7 +811,14 @@ export interface PluginCatalogApp {
 
 export type PluginCatalogServer =
   | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: unknown;
+    };
 
 export interface PluginCatalogDetail {
   slug: string;

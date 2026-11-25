@@ -8,6 +8,7 @@ export const messages = {
   "menu.actualSize": "Werkelijke grootte",
   "menu.zoomIn": "Zoom in",
   "menu.zoomOut": "Zoom uit",
+  "menu.closeDeveloperTools": "Ontwikkelaarstools sluiten",
   "menu.copyLink": "Kopieer link",
   "menu.copyImage": "Kopieer afbeelding",
   "menu.quit": "Stop OpenBot",
@@ -15,6 +16,10 @@ export const messages = {
   "menu.quitConfirmBody": "Agents en routines stoppen tot je OpenBot weer opent.",
   "menu.quitConfirm": "Stop",
   "menu.quitHint": "Houd ⌘Q ingedrukt of druk twee keer om te stoppen",
+  "menu.closeWorkingTitle": { one: "{count} agent werkt nog", other: "{count} agents werken nog" },
+  "menu.closeWorkingBody":
+    "Als je OpenBot stopt, stoppen de agents. Laat OpenBot draaien, zodat ze klaar worden. Open OpenBot om het venster weer te tonen.",
+  "menu.closeKeepRunning": "Laat draaien",
   "menu.trayOpen": "Open OpenBot",
   "menu.trayQuit": "Stop OpenBot",
   "menu.trayTooltip": "OpenBot",

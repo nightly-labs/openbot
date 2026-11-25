@@ -1,6 +1,3 @@
-// The Link account of this computer (link.com, by Stripe): the sign-in, the stored tokens, and the
-// one-time cards that agents ask for.
-
 import type { LinkAccountState, LinkAccountStatus } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import {
@@ -40,13 +37,9 @@ import { LinkOperationError, linkCall, linkDecode } from "./link-effects";
 
 const logger = createOpenBotLogger("link-account");
 
-/** An access token this close to its end is refreshed before a call. */
 const REFRESH_MARGIN_MS = 60_000;
-/** Link's own CLI asks this often while the user decides. */
 const APPROVAL_POLL_MS = 2_000;
-/** After this, the agent is told that the user did not answer. The request expires in Link. */
 const APPROVAL_TIMEOUT_MS = 5 * 60_000;
-/** Spend request states in which the user has not answered yet. */
 const WAITING_STATES = new Set(["created", "pending_approval"]);
 
 const userInfoSchema = z.object({ email: z.string().nullish() });
@@ -82,7 +75,6 @@ interface PendingSignIn {
   controller: AbortController;
 }
 
-/** A JSON body that OpenBot sends to Link: flat fields only. */
 type LinkRequestBody = Readonly<Record<string, string | number | boolean>>;
 
 interface LinkResponse {
@@ -90,11 +82,6 @@ interface LinkResponse {
   data: unknown;
 }
 
-/**
- * Owns the Link sign-in: the device flow, the stored token set and its refresh, and the spend
- * requests that agents make through `LinkWallet`. Each token and each card value is registered for
- * redaction before it is used. Card values go to the browser host only, never to an agent or a log.
- */
 export class LinkAccountService implements LinkWallet {
   readonly #store: LinkAccountStore;
   readonly #openExternal: (url: string) => Promise<void>;
@@ -103,15 +90,11 @@ export class LinkAccountService implements LinkWallet {
   readonly #scope = Scope.makeUnsafe();
   readonly #listeners = new Set<(status: LinkAccountStatus) => void>();
   #pending: PendingSignIn | null = null;
-  /** Link refused the stored refresh token. The record stays, so the panel can name the account. */
   #expired = false;
   #error: string | null = null;
-  /** Changes each time the stored sign-in is replaced or removed, so an old refresh does not write. */
   #generation = 0;
   #disposed = false;
-  /** Store writes, one at a time. */
   readonly #queue = Semaphore.makeUnsafe(1);
-  /** One refresh at a time: Link rotates the refresh token. */
   readonly #refreshQueue = Semaphore.makeUnsafe(1);
 
   constructor(options: LinkAccountServiceOptions) {
@@ -121,7 +104,6 @@ export class LinkAccountService implements LinkWallet {
     this.#now = options.now ?? Date.now;
   }
 
-  /** Reads the stored sign-in. A file that cannot be read is logged and treated as no sign-in. */
   readonly load = Effect.fn("LinkAccount.load")(function* (this: LinkAccountService) {
     const error = yield* this.#store.load();
     if (error) logger.warn("The Link account file could not be read.", { cause: toLogValue(error) });
@@ -144,10 +126,6 @@ export class LinkAccountService implements LinkWallet {
     return this.#store.read() !== null && !this.#expired;
   }
 
-  /**
-   * Starts the device flow and opens Link's approval page in the browser. Returns at once; the wait
-   * for the user runs in the background and reports through `onChanged`.
-   */
   readonly connect = Effect.fn("LinkAccount.connect")(function* (
     this: LinkAccountService,
   ): Effect.fn.Return<LinkAccountStatus> {
@@ -180,10 +158,6 @@ export class LinkAccountService implements LinkWallet {
     return this.status();
   }
 
-  /**
-   * Forgets the sign-in, then asks Link to revoke it. The file is removed first, so a revoke that
-   * fails still leaves no token on this computer.
-   */
   readonly disconnect = Effect.fn("LinkAccount.disconnect")(function* (
     this: LinkAccountService,
   ): Effect.fn.Return<LinkAccountStatus, LinkOperationError> {
@@ -209,9 +183,7 @@ export class LinkAccountService implements LinkWallet {
     return this.status();
   }).bind(this);
 
-  /** Stops the sign-in, the waits for approvals, and the revokes. The encrypted sign-in stays. */
   readonly dispose = Effect.fn("LinkAccount.dispose")(function* (this: LinkAccountService) {
-    // The generation stays: a refresh that runs now must still write Link's rotated token.
     this.#disposed = true;
     this.#pending?.controller.abort();
     this.#pending = null;
@@ -252,7 +224,6 @@ export class LinkAccountService implements LinkWallet {
           return { status: "expired", detail: "The user did not answer in Link within 5 minutes." };
         yield* Effect.sleep(Duration.millis(APPROVAL_POLL_MS));
         const read = yield* this.#api("GET", `/spend_requests/${encodeURIComponent(spend.id)}`).pipe(Effect.result);
-        // Link or the network failed for a moment: the request can still be approved, so ask again.
         if (Result.isFailure(read)) {
           if (isUnreachable(read.failure)) continue;
           return yield* read.failure;
@@ -298,8 +269,6 @@ export class LinkAccountService implements LinkWallet {
     const spend = yield* parseAnswer(spendRequestWithCardSchema, read, "card");
     const card = spend.card;
     if (spend.status !== "approved" || !card) return null;
-    // The number also as the page may show it, in groups of four. The security code is not
-    // registered: a three-digit pattern would remove numbers from every log line. It reaches only the page.
     registerSecretValues([
       card.number,
       card.number.replace(/(\d{4})(?=\d)/gu, "$1 "),
@@ -319,7 +288,6 @@ export class LinkAccountService implements LinkWallet {
     };
   });
 
-  /** One call to the Link API. After a 401, the token is refreshed once and the call is sent again. */
   readonly #api = Effect.fn("LinkAccount.api")(function* (
     this: LinkAccountService,
     method: "GET" | "POST",
@@ -339,7 +307,6 @@ export class LinkAccountService implements LinkWallet {
     return yield* this.#send(method, path, body, record.accessToken);
   });
 
-  /** Link stopped the sign-in, and no refresh token can renew it. The user connects again. */
   readonly #markExpired = Effect.fn("LinkAccount.markExpired")(function* (
     this: LinkAccountService,
   ): Effect.fn.Return<never, LinkOperationError> {
@@ -377,10 +344,6 @@ export class LinkAccountService implements LinkWallet {
     return { status: response.status, data };
   });
 
-  /**
-   * Returns a record with a working access token. A refresh that another call finished first is
-   * reused. The refresh and its write are not interrupted, so a rotated refresh token is never lost.
-   */
   readonly #refresh = Effect.fn("LinkAccount.refresh")(function* (
     this: LinkAccountService,
     stale: LinkAccountRecord,
@@ -450,7 +413,6 @@ export class LinkAccountService implements LinkWallet {
       registerTokenSecrets(tokens);
       const email = yield* this.#readEmail(tokens.accessToken);
       const record: LinkAccountRecord = { ...tokens, email };
-      // Checked in the queue: a cancel or disconnect that ran during the wait wins.
       const committed = yield* this.#serialize(() =>
         Effect.gen({ self: this }, function* () {
           if (this.#pending !== pending || this.#disposed) return false;
@@ -474,7 +436,6 @@ export class LinkAccountService implements LinkWallet {
     );
   });
 
-  /** The email is a label only: a failure to read it does not stop the sign-in. */
   readonly #readEmail = Effect.fn("LinkAccount.readEmail")(function* (this: LinkAccountService, accessToken: string) {
     const read = yield* this.#send("GET", "/userinfo", undefined, accessToken).pipe(Effect.result);
     if (Result.isFailure(read) || read.success.status !== 200) return null;
@@ -523,7 +484,6 @@ function registerTokenSecrets(tokens: Pick<LinkTokenSet, "accessToken" | "refres
   if (tokens.refreshToken) registerSecretValue(tokens.refreshToken);
 }
 
-/** Decodes a Link answer. A body of the wrong shape names only what was read, never its values. */
 function parseAnswer<T>(
   schema: z.ZodType<T>,
   response: LinkResponse,
@@ -541,7 +501,6 @@ function isUnreachable(error: LinkOperationError): boolean {
   return error.cause instanceof LinkAuthError && error.cause.failure === "unreachable";
 }
 
-/** Throws for a failed call: an error with Link's message, never the body. */
 function assertOk(response: LinkResponse, what: string): void {
   if (response.status >= 200 && response.status < 300) return;
   if (response.status === 401) throw new Error(sourceText("error.connector.linkExpired"));
@@ -558,7 +517,6 @@ function apiMessage(data: unknown): string {
   return message ? `, ${message}` : "";
 }
 
-/** The agent reads this sentence. Tokens and card values are masked in it. */
 function walletError(error: LinkOperationError): LinkWalletError {
   const cause = error.cause;
   return new LinkWalletError({ message: redactText(cause instanceof Error ? cause.message : String(cause)) });

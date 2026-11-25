@@ -6,7 +6,6 @@ import { ButtonLink } from "../ui/button";
 import { LandingFooter } from "./LandingFooter";
 import { SiteHeader } from "./SiteHeader";
 
-// After this long without a pointer move, the logo stops following the pointer and looks around again.
 const IDLE_MS = 2400;
 
 const SEARCH_STEPS = [
@@ -27,7 +26,6 @@ export function NotFoundPage() {
   const [tracking, setTracking] = createSignal(false);
   let stage: HTMLDivElement | undefined;
 
-  // The eyes follow the pointer anywhere on the page, not only over the logo.
   onSettled(() => {
     const element = stage;
     if (!element || prefersReducedMotion() || !window.matchMedia?.("(pointer: fine)").matches) return;

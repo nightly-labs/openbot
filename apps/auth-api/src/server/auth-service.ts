@@ -15,6 +15,7 @@ import { type AccountAnalytics, type AccountSurface, NO_ACCOUNT_ANALYTICS } from
 import type { AccountAttribution } from "./account-attribution";
 import { randomToken, sha256 } from "./crypto";
 import type { AuthStoreError } from "./d1-auth-repository";
+import type { Referrals } from "./referrals";
 import type { RemoteFailure } from "./remote-control-plane";
 import { PERSISTENT_SESSION_EXPIRES_AT } from "./session-policy";
 import {
@@ -38,26 +39,27 @@ const RESEND_COOLDOWN_MS = 60_000;
 const TEAM_TICKET_TTL_MS = 2 * 60_000;
 const SERVER_CLAIM_TTL_MS = 15 * 60_000;
 const MOBILE_CONNECT_SERVER_ID = "00000000-0000-4000-8000-000000000002";
-// The host ID rule of `isMobileConnectHostBinding`.
 const MOBILE_CONNECT_HOST_ID_PATTERN = /^[A-Za-z0-9-]{1,128}$/u;
 const RATE_WINDOW_MS = 15 * 60_000;
-// A provider sender limit frees again as its window rolls forward, so the client waits and retries
-// rather than reporting a permanent failure. The wait is shorter than the usual hourly window: some
-// capacity returns before the window ends, and a countdown of a whole hour reads like an outage.
 const DELIVERY_RATE_LIMIT_RETRY_SECONDS = 5 * 60;
 
 interface AuthServiceOptions {
   repository: AuthRepository;
   delivery: EmailCodeDelivery | null;
   exposeDevelopmentCode?: boolean;
+  storeReviewSignIn?: StoreReviewSignIn | null;
   now?: () => number;
   flushSessionRevocations?: () => Effect.Effect<void, RemoteFailure>;
   profileChanged?: (userId: string) => Effect.Effect<void, RemoteFailure>;
   analytics?: AccountAnalytics;
-  /** Saves the first website visit that a sign-in on the web sends. */
   attribution?: AccountAttribution;
-  /** True when the email's domain signs in at its company provider, which then replaces email codes. */
+  referrals?: Referrals;
   usesCompanySignIn?: (email: string) => Effect.Effect<boolean, AuthOperationError>;
+}
+
+export interface StoreReviewSignIn {
+  email: string;
+  code: string;
 }
 
 export interface EmailSignInStart {
@@ -80,11 +82,13 @@ class AuthDependencies extends Context.Service<
     repository: AuthRepository;
     delivery: EmailCodeDelivery | null;
     exposeDevelopmentCode: boolean;
+    storeReviewSignIn: StoreReviewSignIn | null;
     now: () => number;
     flushSessionRevocations: () => Effect.Effect<void, RemoteFailure>;
     profileChanged: (userId: string) => Effect.Effect<void, RemoteFailure>;
     analytics: AccountAnalytics;
     attribution: AccountAttribution | null;
+    referrals: Referrals | null;
     usesCompanySignIn: (email: string) => Effect.Effect<boolean, AuthOperationError>;
   }
 >()("@openbot/auth-api/AuthDependencies") {}
@@ -94,7 +98,6 @@ export interface AnalyticsAnswer {
   ageMs: number;
 }
 
-/** The body of an analytics answer, or null when it is not valid. A missing age is an answer of now. */
 export function readAnalyticsAnswer(body: DynamicRecord): AnalyticsAnswer | null {
   if (!isBoolean(body.enabled)) return null;
   if (body.ageMs === undefined) return { enabled: body.enabled, ageMs: 0 };
@@ -103,10 +106,6 @@ export function readAnalyticsAnswer(body: DynamicRecord): AnalyticsAnswer | null
     : null;
 }
 
-/**
- * The chat color in a `PUT /v1/me/chat-color` body: a lower-case `#rrggbb`, or null for no color.
- * Returns undefined when the body has no valid value.
- */
 export function readChatColor(body: DynamicRecord): AvatarColor | null | undefined {
   if (body.chatColor === null) return null;
   return isAvatarColor(body.chatColor) ? body.chatColor : undefined;
@@ -122,11 +121,13 @@ export class AuthService {
       repository: options.repository,
       delivery: options.delivery,
       exposeDevelopmentCode: options.exposeDevelopmentCode ?? false,
+      storeReviewSignIn: options.storeReviewSignIn ?? null,
       now: options.now ?? Date.now,
       flushSessionRevocations: options.flushSessionRevocations ?? (() => Effect.void),
       profileChanged: options.profileChanged ?? (() => Effect.void),
       analytics: options.analytics ?? NO_ACCOUNT_ANALYTICS,
       attribution: options.attribution ?? null,
+      referrals: options.referrals ?? null,
       usesCompanySignIn: options.usesCompanySignIn ?? (() => Effect.succeed(false)),
     });
   }
@@ -192,9 +193,10 @@ export class AuthService {
         );
       }
 
-      const code = dependencies.exposeDevelopmentCode
-        ? yield* developmentOneTimeCode(challengeId)
-        : generateOneTimeCode();
+      const storeReviewCode = storeReviewCodeFor(dependencies.storeReviewSignIn, email);
+      const code =
+        storeReviewCode ??
+        (dependencies.exposeDevelopmentCode ? yield* developmentOneTimeCode(challengeId) : generateOneTimeCode());
       const expiresAt = now + CHALLENGE_TTL_MS;
       const codeHash = yield* sha256(normalizeOneTimeCode(code));
       const sourceIpHash = yield* sha256(normalizeSourceIp(sourceIp));
@@ -214,7 +216,9 @@ export class AuthService {
       }
       const delivery = dependencies.delivery;
       const deliveryResult = yield* Effect.result(
-        delivery ? delivery.send({ email, code, expiresAt }).pipe(Effect.mapError(safeDeliveryError)) : Effect.void,
+        delivery && storeReviewCode === null
+          ? delivery.send({ email, code, expiresAt }).pipe(Effect.mapError(safeDeliveryError))
+          : Effect.void,
       );
       if (Result.isFailure(deliveryResult)) {
         const deliveryError = deliveryResult.failure;
@@ -302,8 +306,8 @@ export class AuthService {
         code: string;
         sourceIp: string;
         surface: Exclude<AccountSurface, "mobile">;
-        /** Only the web client sends one; it is already checked. */
         firstTouch?: FirstTouch | null;
+        referralCode?: string | null;
       },
     ): Effect.fn.Return<{ sessionToken: string; user: AuthUser }, AuthWorkflowFailure, AuthDependencies> {
       return yield* this.#verifyEmailChallenge(input);
@@ -311,7 +315,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Signs a phone in with an email code. The session is a mobile session with no host binding. */
   readonly verifyMobileEmailCode = Effect.fn("AuthService.verifyMobileEmailCode")(
     function* (
       this: AuthService,
@@ -320,12 +323,12 @@ export class AuthService {
         code: string;
         sourceIp: string;
         device: MobileAuthDeviceIdentity;
+        referralCode?: string | null;
       },
     ): Effect.fn.Return<{ sessionToken: string; user: AuthUser }, AuthWorkflowFailure, AuthDependencies> {
       const dependencies = yield* AuthDependencies;
       const device = yield* authValidate(() => normalizeMobileDevice(input.device));
       const session = yield* this.#verifyEmailChallenge({ ...input, device, surface: "mobile" });
-      // The new session replaces the earlier session of this device.
       yield* dependencies.flushSessionRevocations();
       return session;
     },
@@ -340,6 +343,7 @@ export class AuthService {
       sourceIp: string;
       surface: AccountSurface;
       firstTouch?: FirstTouch | null;
+      referralCode?: string | null;
       device?: MobileAuthDeviceIdentity;
     },
   ): Effect.fn.Return<{ sessionToken: string; user: AuthUser }, AuthWorkflowFailure, AuthDependencies> {
@@ -367,13 +371,18 @@ export class AuthService {
     const firstTouch = input.firstTouch ?? null;
     const { attribution } = dependencies;
     if (firstTouch && attribution) {
-      // The source of an account is for reports. Its failure must not fail the sign-in.
       yield* attribution
         .record(session.user.id, firstTouch, "sign_in")
         .pipe(Effect.catch(() => Effect.sync(() => console.warn("Account attribution save failed."))));
     }
     if (result.status === "verified" && result.created) {
       dependencies.analytics.track(session.user.id, { name: "account_created", surface: input.surface, firstTouch });
+      const { referrals } = dependencies;
+      if (input.referralCode && referrals) {
+        yield* referrals
+          .record(session.user.id, input.referralCode)
+          .pipe(Effect.catch(() => Effect.sync(() => console.warn("Invite link save failed."))));
+      }
     }
     return session;
   });
@@ -422,11 +431,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /**
-   * Saves the latest product analytics answer of the account, so each device of the user follows it.
-   * `ageMs` is how long the answer waited on the device. The server clock dates it, so a wrong device
-   * clock cannot make an old answer replace a newer one.
-   */
   readonly updateAnalytics = Effect.fn("AuthService.updateAnalytics")(
     function* (
       this: AuthService,
@@ -452,7 +456,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Saves the tint of the user's own chat bubbles. Each server of the user shows it to its members. */
   readonly updateChatColor = Effect.fn("AuthService.updateChatColor")(
     function* (
       this: AuthService,
@@ -531,8 +534,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** A claim is 32 random bytes; this limit stops a caller that guesses claims from many VMs. */
-
   readonly enforceHostedServerClaimRateLimit = Effect.fn("AuthService.enforceHostedServerClaimRateLimit")(
     function* (this: AuthService, sourceIp: string): Effect.fn.Return<void, AuthWorkflowFailure, AuthDependencies> {
       const dependencies = yield* AuthDependencies;
@@ -541,7 +542,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** For an operator: the caller checks the admin token. Creates the user of the email when there is none. */
   readonly createServerClaim = Effect.fn("AuthService.createServerClaim")(
     function* (
       this: AuthService,
@@ -563,7 +563,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** For the signed-in user: a claim that signs a new server in to the same account. */
   readonly createServerClaimForUser = Effect.fn("AuthService.createServerClaimForUser")(
     function* (
       this: AuthService,
@@ -585,7 +584,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** A server exchanges a claim once for a desktop session of the claim's user. */
   readonly redeemServerClaim = Effect.fn("AuthService.redeemServerClaim")(
     function* (
       this: AuthService,
@@ -594,7 +592,6 @@ export class AuthService {
     ): Effect.fn.Return<{ sessionToken: string; user: AuthUser }, AuthWorkflowFailure, AuthDependencies> {
       const dependencies = yield* AuthDependencies;
       const now = dependencies.now();
-      // A claim is 32 random bytes; this limit stops a caller that guesses claims.
       yield* this.#enforceRateLimit(`server-claim:ip:${normalizeSourceIp(sourceIp)}`, 30, now);
       if (!isString(claim) || claim.length < 16 || claim.length > 128) return yield* invalidServerClaim();
       const session = yield* dependencies.repository.redeemServerClaim({
@@ -687,7 +684,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** Cancels the Mobile Connect code that one desktop host shows. A new code also replaces it. */
   readonly cancelMobileAuthTickets = Effect.fn("AuthService.cancelMobileAuthTickets")(
     function* (
       this: AuthService,
@@ -700,7 +696,6 @@ export class AuthService {
       }
       const user = yield* this.authenticateDesktopSession(sessionToken);
       if (!user) return yield* new AuthServiceError(401, "unauthorized", "The session is invalid.");
-      // Only this desktop's code: another desktop of the account can show a code at the same time.
       yield* dependencies.repository.cancelMobileAuthTickets({
         userId: user.id,
         serverId: MOBILE_CONNECT_SERVER_ID,
@@ -724,7 +719,6 @@ export class AuthService {
       const now = dependencies.now();
       yield* this.#enforceRateLimit(`mobile-ticket-redeem:ip:${normalizeSourceIp(sourceIp)}`, 60, now);
       const ticketHash = yield* sha256(ticket);
-      // A value that is not a one-time ticket can be a persistent link. Each attempt gets its own session.
       const redeemed =
         (yield* dependencies.repository.redeemMobileAuthTicket({
           ticketHash,
@@ -745,7 +739,6 @@ export class AuthService {
     (operation) => operation.pipe(Effect.mapError(authFailure), Effect.provide(this.#layer)),
   ).bind(this);
 
-  /** A persistent Mobile Connect link for one host. It replaces the earlier link of that host. */
   readonly createMobileConnectLink = Effect.fn("AuthService.createMobileConnectLink")(
     function* (
       this: AuthService,
@@ -935,8 +928,6 @@ function safeDeliveryError(error: unknown): string {
   return isEmailDeliveryFailure(error) ? error.message : "unknown_delivery_error";
 }
 
-// The sign-in code and the team invitation leave from the same mailbox, so a refusal must read the
-// same way on both paths.
 export function isEmailDeliveryFailure(error: unknown): error is Error {
   return error instanceof Error && /^(?:smtp|email_delivery)_[a-z_]+$/u.test(error.message);
 }
@@ -978,6 +969,17 @@ function authFailure(error: unknown): AuthServiceError | AuthOperationError {
 
 function authValidate<A>(operation: () => A): Effect.Effect<A, AuthServiceError | AuthOperationError> {
   return Effect.try({ try: operation, catch: authFailure });
+}
+
+function storeReviewCodeFor(review: StoreReviewSignIn | null, email: string): string | null {
+  return review?.email === email ? review.code : null;
+}
+
+export function readStoreReviewSignIn(email: string | undefined, code: string | undefined): StoreReviewSignIn | null {
+  if (!email || !code) return null;
+  const normalizedEmail = normalizeEmailAddress(email);
+  const normalizedCode = normalizeSharedOneTimeCode(code);
+  return normalizedEmail && normalizedCode ? { email: normalizedEmail, code: normalizedCode } : null;
 }
 
 function generateOneTimeCode(): string {

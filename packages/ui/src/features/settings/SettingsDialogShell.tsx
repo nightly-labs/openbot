@@ -1,62 +1,38 @@
-import { Button, ChevronRight } from "@openbot/ui";
+import { PageHeader, type PageHeaderParent } from "@openbot/ui/features/window/PageHeader";
 import { cx, prefersReducedMotion } from "@openbot/ui/utils";
 import { type JSX, Portal } from "@solidjs/web";
 import { createEffect, createSignal, createUniqueId, onCleanup, Show, untrack } from "solid-js";
 
-/** Where a settings page puts its parts, when the settings show as a page of the window. */
 export interface SettingsPagePlacement {
-  /** The element that holds the section list. */
   nav: HTMLElement;
-  /** The element that holds the panel. */
   content: HTMLElement;
-  /** The element in the top row of the window that holds the title of the section, or the path to its open page. */
   path: HTMLElement;
-  /**
-   * Gets the way back from the open detail page, or `null` when the section shows its list. Back in
-   * the top row of the window then goes to the list, before it goes to an earlier chat.
-   */
   onBack?: (back: SettingsPageBack | null) => void;
 }
 
-/** A detail page that is open in a section, such as one provider in Providers. */
 export interface SettingsCrumb {
   title: string;
-  /** Goes back to the section. */
   back: () => void;
 }
 
-/** The way back from a detail page to the list of its section. */
 export interface SettingsPageBack {
-  /** The name of the section, such as `Providers`. */
   name: string;
   back: () => void;
 }
 
 interface SettingsDialogShellProps {
   open: boolean;
-  /** The title of the section. It goes in the top row of the window, as the title of a Usage page does. */
   title: string;
-  /** Screen readers read it with the panel. */
   description: JSX.Element;
-  /**
-   * The detail page that is open in the section, or nothing. The top row then shows its path, such as
-   * `Providers › ChatGPT`, as the path of a Marketplace page does.
-   */
   crumb?: SettingsCrumb | null | undefined;
   sidebar: JSX.Element;
   contentKey: string;
   children: JSX.Element;
   class?: string;
   footer?: JSX.Element;
-  /**
-   * Content the shell places over the end of the panel, such as an error toast. It is the caller's
-   * to position, and the caller sets `--settings-modal-floating-space` on the modal element with its
-   * height, so the panel keeps its last control above it.
-   */
   floatingContent?: JSX.Element;
   onContentElement?: (element: HTMLElement) => void;
   restoreFocusTarget?: HTMLElement | null | undefined;
-  /** Where the settings show, or nothing while their page is not on screen. The page has no close button. */
   page: SettingsPagePlacement | undefined;
 }
 
@@ -67,7 +43,6 @@ function durationToMilliseconds(value: string, fallback: number): number {
   return fallback;
 }
 
-/** The collapse clock when the stylesheet cannot answer, so a closing bar always leaves the tree. */
 const SAVE_BAR_CLOSE_FALLBACK = 250;
 
 function saveBarCloseDuration(element: HTMLElement | undefined): number {
@@ -76,30 +51,10 @@ function saveBarCloseDuration(element: HTMLElement | undefined): number {
 }
 
 interface SaveBarDockProps<T> {
-  /** What the bar reports, or `null` when there is nothing to save. The dock holds the last one it got. */
   value: T | null;
-  /** The bar itself. It is called with the held value, so it keeps its content through the close. */
   children: (value: () => T) => JSX.Element;
 }
 
-/**
- * A dock for a settings save bar: the bar grows out of the bottom edge when there is something to
- * save and shrinks back into it when there is not. The dock is a grid track that opens from `0fr` to
- * `1fr`, so the bar's own height is what the transition tweens and no pixel value is measured.
- *
- * Any `SettingsDialogShell` footer can use it. The bar mounts closed, because an element that mounts
- * already open cannot transition, and it stays mounted through the close, because a bar that leaves
- * the tree at once has nothing left to shrink. It is `inert` while closed, so a bar on its way out
- * cannot take focus.
- *
- * ```tsx
- * footer={
- *   <SaveBarDock value={dirty() ? true : null}>
- *     {() => <section class="settings-modal-save-bar" aria-label="Unsaved changes">…</section>}
- *   </SaveBarDock>
- * }
- * ```
- */
 export function SaveBarDock<T>(props: SaveBarDockProps<T>) {
   const [held, setHeld] = createSignal<T | null>(null);
   const [open, setOpen] = createSignal(false);
@@ -112,7 +67,6 @@ export function SaveBarDock<T>(props: SaveBarDockProps<T>) {
       window.clearTimeout(closeTimer);
       if (next !== null) {
         setHeld(() => next);
-        // Reading a layout property settles the closed state before the open attribute lands.
         window.requestAnimationFrame(() => {
           void dock?.offsetHeight;
           setOpen(true);
@@ -139,9 +93,22 @@ export function SaveBarDock<T>(props: SaveBarDockProps<T>) {
   );
 }
 
+export function SettingsNavGroupLabel(props: { label: string }) {
+  return (
+    <div class="settings-modal-nav-heading" aria-hidden="true">
+      {props.label}
+    </div>
+  );
+}
+
 export function SettingsDialogShell(props: SettingsDialogShellProps) {
   const titleId = createUniqueId();
   const descriptionId = createUniqueId();
+  const pathTitle = () => props.crumb?.title ?? props.title;
+  const pathParents = (): PageHeaderParent[] => {
+    const crumb = props.crumb;
+    return crumb ? [{ title: props.title, onSelect: crumb.back }] : [];
+  };
   const [canScrollUp, setCanScrollUp] = createSignal(false);
   const [canScrollDown, setCanScrollDown] = createSignal(false);
   let shown = untrack(() => props.open);
@@ -150,7 +117,6 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
   let scrollElement: HTMLDivElement | undefined;
   let scrollResizeObserver: ResizeObserver | undefined;
 
-  /** Puts the focus back on the opener, unless the page that replaced this one took the focus. */
   function restoreFocus(): void {
     if (!restoreTarget?.isConnected) return;
     const target = restoreTarget;
@@ -200,7 +166,6 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
     },
   );
 
-  // The window gets the way back while a detail page shows, and loses it when the page closes.
   createEffect(
     () => {
       const page = props.open ? props.page : undefined;
@@ -234,30 +199,16 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
               aria-describedby={descriptionId}
             >
               <div class="settings-modal-main">
-                {/* The heading names only the open page, as a Marketplace title does; the parent before it goes back. */}
-                <Portal mount={page().path}>
-                  <div class="settings-page-path">
-                    <Show when={props.crumb}>
-                      {(crumb) => (
-                        <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="xs"
-                            class="settings-page-path-parent"
-                            onClick={() => crumb().back()}
-                          >
-                            {props.title}
-                          </Button>
-                          <ChevronRight class="settings-page-path-separator" aria-hidden="true" />
-                        </>
-                      )}
-                    </Show>
-                    <h2 id={titleId} class="settings-page-path-current">
-                      {props.crumb?.title ?? props.title}
-                    </h2>
-                  </div>
-                </Portal>
+                <Show when={props.crumb}>
+                  <Portal mount={page().path}>
+                    <PageHeader
+                      class="settings-page-path"
+                      title={pathTitle()}
+                      headingId={titleId}
+                      path={pathParents()}
+                    />
+                  </Portal>
+                </Show>
                 <p id={descriptionId} class="settings-page-description">
                   {props.description}
                 </p>
@@ -267,6 +218,11 @@ export function SettingsDialogShell(props: SettingsDialogShellProps) {
                   data-scroll-down={canScrollDown() ? "" : undefined}
                 >
                   <div ref={registerScrollElement} class="settings-modal-content" onScroll={updateScrollFades}>
+                    <Show when={!props.crumb}>
+                      <h2 id={titleId} class="settings-page-heading">
+                        {props.title}
+                      </h2>
+                    </Show>
                     {props.children}
                   </div>
                 </div>
