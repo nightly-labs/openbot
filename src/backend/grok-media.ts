@@ -56,15 +56,16 @@ function contentText(content: unknown): string | null {
     })
     .join("\n")
     .trim();
-  return text ? text.slice(0, 500) : null;
+  return text || null;
 }
 
 const ZERO_LIMIT = /(?<![\d.])0\s*\/\s*0(?![\d.])/u;
-const QUOTA_WORDS = /rate.?limit|requests per minute|resource.?exhausted/iu;
+const QUOTA_WORDS = /rate.?limit|requests per minute|resource.?(?:has been )?exhausted|too many requests|\b429\b/iu;
 
 function grokMediaError(kind: GeneratedMediaKind, detail: string | null): string | null {
-  if (!detail || kind !== "video" || !ZERO_LIMIT.test(detail) || !QUOTA_WORDS.test(detail)) return detail;
-  logger.warn("Grok refused a video: the Grok account has no video quota.", { detail });
+  if (!detail) return null;
+  if (kind !== "video" || !ZERO_LIMIT.test(detail) || !QUOTA_WORDS.test(detail)) return detail.slice(0, 500);
+  logger.warn("Grok refused a video: the Grok account has no video quota.", { detail: detail.slice(0, 2000) });
   return sourceText("error.backend.grokVideoNoQuota");
 }
 
