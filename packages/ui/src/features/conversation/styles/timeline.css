@@ -111,6 +111,30 @@
   margin-bottom: -36px;
 }
 
+.scroll-edge-blur + .scroll-to-latest {
+  position: relative;
+  top: auto;
+  left: auto;
+  flex: none;
+  margin: -58px auto 14px;
+  transform: none;
+}
+
+.scroll-edge-blur + .scroll-to-latest:is([data-new-messages], [data-reply-return]) {
+  margin-top: -50px;
+}
+
+@supports (position-anchor: --scroll-edge) and (anchor-scope: --scroll-edge) {
+  .scroll-edge-blur + .scroll-to-latest:is(*, [data-new-messages], [data-reply-return]) {
+    position: absolute;
+    position-anchor: --scroll-edge;
+    bottom: calc(anchor(bottom) + 14px);
+    left: anchor(center);
+    margin: 0;
+    transform: translateX(-50%);
+  }
+}
+
 .scroll-to-latest[data-new-messages] {
   border-color: transparent;
   background: var(--openbot-unread-surface);

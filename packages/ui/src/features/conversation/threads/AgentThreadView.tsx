@@ -777,9 +777,6 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         aria-label={t("conversation.threads.view.label", { title: title() })}
         onScroll={fades.measure}
       >
-        <Show when={props.newerMessages}>
-          {(newer) => <ScrollToLatestButton onClick={() => loadLatest(newer())} />}
-        </Show>
         <div
           class="virtual-chat-list virtual-chat-list-static"
           ref={(element: HTMLDivElement) => {
@@ -1038,6 +1035,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
         </div>
       </section>
       <ScrollEdgeBlur fades={fades} />
+      <Show when={props.newerMessages}>{(newer) => <ScrollToLatestButton onClick={() => loadLatest(newer())} />}</Show>
       <div class="composer-wrap">
         <div class="composer-stack">
           <ComposerStackCard when={failed()}>

@@ -202,21 +202,21 @@ function MarketplaceWindow(props: MarketplaceProps) {
             )}
           </Show>
         </div>
-        <Show when={props.model.error()}>
-          {(message) => (
-            <div class="skills-marketplace-error">
-              <span>
-                {message()}
-                <ErrorReference reference={props.model.errorReference?.()} />
-              </span>
-              <IconButton label={t("common.close")} variant="ghost" size="icon-sm" onClick={props.model.clearError}>
-                <X />
-              </IconButton>
-            </div>
-          )}
-        </Show>
       </div>
       <ScrollEdgeBlur fades={fades} />
+      <Show when={props.model.error()}>
+        {(message) => (
+          <div class="skills-marketplace-error">
+            <span>
+              {message()}
+              <ErrorReference reference={props.model.errorReference?.()} />
+            </span>
+            <IconButton label={t("common.close")} variant="ghost" size="icon-sm" onClick={props.model.clearError}>
+              <X />
+            </IconButton>
+          </div>
+        )}
+      </Show>
       <p class="marketplace-visually-hidden" role="status" data-live-announcer="">
         {props.model.notice()}
       </p>

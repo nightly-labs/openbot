@@ -840,20 +840,6 @@ export function ConversationTimeline() {
         }}
       >
         <ChatScrollRail {...rail.props} />
-        <Show
-          when={replyJump.returnReplyId()}
-          fallback={
-            <Show when={showScrollToLatest() || props.discontinuous}>
-              <ScrollToLatestButton
-                onClick={() => void jumpToLatestMessage()}
-                newMessageCount={newMessageCount()}
-                onDismiss={clearNewMessages}
-              />
-            </Show>
-          }
-        >
-          <ReplyReturnButton onBack={() => void replyJump.returnToReply()} onStay={replyJump.stayHere} />
-        </Show>
         <Show when={props.loaded}>
           <Show when={props.loadingOlder || props.olderError}>
             <div class="conversation-history-status" role={props.olderError ? "alert" : "status"}>
@@ -1809,6 +1795,20 @@ export function ConversationTimeline() {
         </Show>
       </div>
       <ScrollEdgeBlur fades={scrollFades} />
+      <Show
+        when={replyJump.returnReplyId()}
+        fallback={
+          <Show when={showScrollToLatest() || props.discontinuous}>
+            <ScrollToLatestButton
+              onClick={() => void jumpToLatestMessage()}
+              newMessageCount={newMessageCount()}
+              onDismiss={clearNewMessages}
+            />
+          </Show>
+        }
+      >
+        <ReplyReturnButton onBack={() => void replyJump.returnToReply()} onStay={replyJump.stayHere} />
+      </Show>
       <DeleteMessageDialog
         messageId={deleteTargetId()}
         onDelete={deleteMessage}
