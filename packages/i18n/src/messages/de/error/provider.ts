@@ -256,6 +256,8 @@ export const messages = {
     "Dein OpenCode-API-Schlüssel ist abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
   "error.provider.opencodeKeyRefused":
     "OpenCode Go hat deinen gespeicherten API-Schlüssel abgelehnt. Der Schlüssel ist vielleicht abgelaufen. Erstelle in der OpenCode Console einen neuen Schlüssel, füge ihn in den OpenCode-Einstellungen ein und versuche es dann erneut.",
+  "error.provider.opencodeOwnGoKeyRefused":
+    "OpenCode hat nicht den Schlüssel verwendet, den du in OpenBot gespeichert hast. Es hat einen anderen OpenCode-Go-Schlüssel verwendet, den OpenCode selbst speichert, und OpenCode Go hat diesen Schlüssel abgelehnt. Um diesen Schlüssel zu entfernen, führe `opencode auth logout opencode-go` in einem Terminal auf dem Computer aus, auf dem der Agent läuft, und wähle den Schlüssel. Versuche es dann erneut.",
   "error.provider.opencodeGoRequestRefused":
     "OpenCode Go hat die Anfrage abgelehnt. Ein neuer API-Schlüssel hilft hier nicht. Dein OpenCode-Go-Abo ist vielleicht nicht aktiv, oder OpenCode Go blockiert dein Netzwerk: Manche Dienste blockieren VPNs, Proxys oder bestimmte Länder. Prüfe in der OpenCode Console, ob dein Abo aktiv ist, oder schalte das VPN aus. Versuche es dann erneut. Du kannst auch ein anderes Modell wählen.",
   "error.provider.opencodeServiceFailure":
