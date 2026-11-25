@@ -1,11 +1,13 @@
 import { Button, Eye, EyeOff, Field, Input, Lock, X } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
-import { createSignal, createUniqueId, onSettled, Show } from "solid-js";
+import { createSignal, createUniqueId, onSettled, Show, untrack } from "solid-js";
 import { useBrowserPageCover } from "./browser-page-cover";
 
 export interface BrowserHttpSignInPopoverProps {
   site: string;
   refused: boolean;
+  username: string;
+  onUsernameChange: (username: string) => void;
   onSubmit: (username: string, password: string) => Promise<void>;
   onCancel: () => Promise<void>;
 }
@@ -19,7 +21,7 @@ function focusIsFree(): boolean {
 export function BrowserHttpSignInPopover(props: BrowserHttpSignInPopoverProps) {
   const { t, errorMessage } = useText();
   const id = createUniqueId();
-  const [username, setUsername] = createSignal("");
+  const [username, setUsername] = createSignal(untrack(() => props.username));
   const [password, setPassword] = createSignal("");
   const [shown, setShown] = createSignal(false);
   const [pending, setPending] = createSignal(false);
@@ -93,7 +95,10 @@ export function BrowserHttpSignInPopover(props: BrowserHttpSignInPopoverProps) {
           spellcheck={false}
           value={username()}
           disabled={pending()}
-          onValueChange={setUsername}
+          onValueChange={(value: string) => {
+            setUsername(value);
+            props.onUsernameChange(value);
+          }}
         />
       </Field>
       <Field label={t("browser.httpSignIn.password")} error={fieldError()}>

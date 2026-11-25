@@ -14,15 +14,19 @@ import { useText } from "@/shared/lib/text";
 export function BrowserHttpSignInCard({
   site,
   refused,
+  initialUsername,
+  onUsernameChange,
   answer,
 }: {
   site: string;
   refused: boolean;
+  initialUsername: string;
+  onUsernameChange: (username: string) => void;
   answer: (value: { username: string; password: string } | null) => Promise<void>;
 }) {
   const { t } = useText();
   const [muted, foreground] = useThemeColor(["muted", "foreground"]);
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(initialUsername);
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -88,7 +92,10 @@ export function BrowserHttpSignInCard({
         returnKeyType="next"
         submitBehavior="submit"
         onSubmitEditing={() => passwordField.current?.focus()}
-        onChangeText={setUsername}
+        onChangeText={(value) => {
+          setUsername(value);
+          onUsernameChange(value);
+        }}
       />
       <TextInput
         ref={passwordField}

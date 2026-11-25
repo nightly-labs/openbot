@@ -160,7 +160,11 @@ function BrowserView({
   const threadId = conversationStore.get(agent.id)?.threadId ?? null;
   const tabs = useAgentBrowserTabs(agent.serverId, agent.id, threadId);
   const tab = useAgentBrowserTab(agent.serverId, agent.id, preferredTabId, threadId);
-  const httpSignIn = useBrowserHttpSignIn(agent.serverId, tab?.id ?? null);
+  const livePrompt = useBrowserHttpSignIn(agent.serverId, tab?.id ?? null);
+  const [answering, setAnswering] = useState<{ tabId: string; origin: string } | null>(null);
+  const [signInUsername, setSignInUsername] = useState({ key: "", value: "" });
+  const httpSignIn =
+    livePrompt ?? (tab && answering?.tabId === tab.id ? { origin: answering.origin, refused: false } : undefined);
   const appForeground = useAppForeground();
   const contextMenu = useRef<(menu: BrowserViewContextMenu) => void>(() => undefined);
   const live = useBrowserLiveView(
@@ -613,12 +617,20 @@ function BrowserView({
                 key={`${tab.id}\n${httpSignIn.origin}`}
                 site={urlHost(httpSignIn.origin) || httpSignIn.origin}
                 refused={httpSignIn.refused}
-                answer={(value) =>
-                  answerBrowserHttpSignIn(
-                    agent.serverId,
-                    value ? { tabId: tab.id, ...value } : { tabId: tab.id, cancel: true },
-                  )
-                }
+                initialUsername={signInUsername.key === `${tab.id}\n${httpSignIn.origin}` ? signInUsername.value : ""}
+                onUsernameChange={(value) => setSignInUsername({ key: `${tab.id}\n${httpSignIn.origin}`, value })}
+                answer={async (value) => {
+                  const prompt = { tabId: tab.id, origin: httpSignIn.origin };
+                  if (value) setAnswering(prompt);
+                  try {
+                    await answerBrowserHttpSignIn(
+                      agent.serverId,
+                      value ? { tabId: tab.id, ...value } : { tabId: tab.id, cancel: true },
+                    );
+                  } finally {
+                    if (value) setAnswering((current) => (current === prompt ? null : current));
+                  }
+                }}
               />
             </View>
           ) : null}
