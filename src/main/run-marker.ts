@@ -157,13 +157,22 @@ export class RunMarker {
     this.#written = this.#sequence;
     const content = recordContent(this.#record);
     const temporaryPath = `${this.#path}.tmp`;
+    if (this.#writing) this.#removePending();
     Effect.runSync(
       Effect.try({
         try: () => {
-          if (this.#writing) rmSync(this.#pendingPath, { force: true });
           writeFileSync(temporaryPath, content, { mode: 0o600 });
           renameSync(temporaryPath, this.#path);
         },
+        catch: (cause) => new RunMarkerFailure({ cause }),
+      }).pipe(Effect.ignore),
+    );
+  }
+
+  #removePending(): void {
+    Effect.runSync(
+      Effect.try({
+        try: () => rmSync(this.#pendingPath, { force: true }),
         catch: (cause) => new RunMarkerFailure({ cause }),
       }).pipe(Effect.ignore),
     );
