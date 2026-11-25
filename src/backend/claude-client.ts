@@ -259,8 +259,13 @@ const claudeFlagSettings = Effect.fn("claudeFlagSettings")(function* (
       : {}),
     ...(memoryExcludes.length > 0 ? { claudeMdExcludes: memoryExcludes } : {}),
   };
-  return { settings, firstPartyApi };
+  return { settings, firstPartyApi, customApiHost: customClaudeApiHost(environmentValue("ANTHROPIC_BASE_URL")) };
 });
+
+function customClaudeApiHost(baseUrl: string | undefined): string | null {
+  const host = URL.parse(baseUrl?.trim() ?? "")?.hostname;
+  return host && host !== "api.anthropic.com" ? host : null;
+}
 
 function claudeHomeMemoryFiles(): string[] {
   const userFolder = join(homedir(), ".claude");
@@ -400,6 +405,7 @@ interface ActiveTurn {
 interface ThreadRuntime {
   id: string;
   firstPartyApi: boolean;
+  customApiHost: string | null;
   usageCounterId: string;
   usageCost: number;
   resumedUsage: boolean;
@@ -1556,11 +1562,18 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       ...(launchPath ? { PATH: launchPath } : {}),
       ...this.#environment(this.#onApiKey),
     };
-    const { settings: openBotSettings, firstPartyApi } = config.profileGeneration
+    const {
+      settings: openBotSettings,
+      firstPartyApi,
+      customApiHost,
+    } = config.profileGeneration
       ? {
           settings: {},
           firstPartyApi: CLAUDE_OTHER_API_VARIABLES.every(
             (name) => !(signInSettings.env?.[name] ?? cliEnvironment[name]),
+          ),
+          customApiHost: customClaudeApiHost(
+            signInSettings.env?.ANTHROPIC_BASE_URL ?? cliEnvironment.ANTHROPIC_BASE_URL,
           ),
         }
       : yield* claudeFlagSettings(
@@ -1671,6 +1684,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const runtime: ThreadRuntime = {
       id: threadId,
       firstPartyApi,
+      customApiHost,
       usageCounterId: randomUUID(),
       usageCost: 0,
       resumedUsage: resume,
@@ -2777,7 +2791,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const signInFailed = !blocked && (turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error)));
       const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
       const apiKey = this.#usesApiKey();
-      const message = claudeTurnError(error, apiKey, !apiKey && runtime.firstPartyApi && this.#onClaudeAccount());
+      const message =
+        runtime.customApiHost && (billing || CLAUDE_PAYMENT_REQUIRED.test(String(error)))
+          ? sourceText("error.provider.claudeCustomEndpointBilling", {
+              host: runtime.customApiHost,
+              detail: String(error),
+            })
+          : claudeTurnError(error, apiKey, !apiKey && runtime.firstPartyApi && this.#onClaudeAccount());
       const crashed = message === String(error) && claudeProcessExited(error) && classifyFailure(message) === "unknown";
       this.emit("notification", {
         method: "error",
@@ -3230,6 +3250,7 @@ const CLAUDE_SANDBOX_BLOCKED =
   /^(?:apply-seccomp: (?:unshare\(|write \/proc\/self\/(?:setgroups|uid_map|gid_map)\b)|bwrap: (?:Failed to make \/ slave|setting up uid map|No permissions to creat(?:e a new|ing new) namespace|Creating new namespace failed|pivot_root\b|loopback: Failed RTM_NEW(?:ADDR|LINK)|Can't mount proc on (?:\/newroot)?\/proc: (?:Operation not permitted|Permission denied|Invalid argument)))/mu;
 
 const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
+const CLAUDE_PAYMENT_REQUIRED = /\bAPI Error: 402\b/u;
 
 const CLAUDE_NOT_LOGGED_IN = /\bnot logged in\b\s*·\s*please run \/login\b/iu;
 

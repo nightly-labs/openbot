@@ -405,6 +405,8 @@ export const messages = defineMessages("error.provider", {
     "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
   "error.provider.claudeAccountNoCredit":
     "Your Claude account's credit balance is too low. Some requests, such as fast mode, use usage credits also when your Claude plan has usage left. Add usage credits in your Claude account, or select a different model in the agent's model menu.",
+  "error.provider.claudeCustomEndpointBilling":
+    "Claude Code sends requests to {host}, not to Anthropic: the Claude Code settings set this API address. {host} refused the request because of the account's balance, not because of your Claude plan. Add funds to your {host} account, or select a different model in the agent's model menu.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude's service blocked this request. This is usually a short problem on Claude's side, not a problem with your account. Send the message again in a few minutes.",
   "error.provider.foreignReasoning":
