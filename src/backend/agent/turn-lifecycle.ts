@@ -820,10 +820,13 @@ export class TurnLifecycle {
     const earlierTurnIds = new Set(
       deliveries.flatMap(({ planContinuation }) => planContinuation?.turnIds ?? []).filter((id) => id !== turnId),
     );
-    const earlierAnswers = [...earlierTurnIds].flatMap((id) => {
-      const text = latestTurnAnswer(snapshot.messages, id)?.text;
-      return text === undefined || text.trim().length === 0 ? [] : [redact(text)];
-    });
+    const earlierAnswers = [...earlierTurnIds]
+      .flatMap((id) => {
+        const message = latestTurnAnswer(snapshot.messages, id);
+        return message && message.text.trim().length > 0 ? [message] : [];
+      })
+      .sort((first, second) => snapshot.messages.indexOf(first) - snapshot.messages.indexOf(second))
+      .map((message) => redact(message.text));
     const input: FinishCheckInput = {
       request,
       context,

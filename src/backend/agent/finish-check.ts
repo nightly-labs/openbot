@@ -63,7 +63,12 @@ function earlierTurnLines(answers: readonly string[], gaps: readonly string[]): 
       ? [
           "The agent's earlier answers to the user in this request, oldest first. The user already sees them:",
           "<earlier-answers>",
-          ...answers.slice(-EARLIER_ANSWERS).map((answer) => clip(answer.trim(), EARLIER_ANSWER_CHARACTERS)),
+          ...answers
+            .slice(-EARLIER_ANSWERS)
+            .flatMap((answer, index) => [
+              `--- answer ${index + 1} ---`,
+              clip(answer.trim(), EARLIER_ANSWER_CHARACTERS),
+            ]),
           "</earlier-answers>",
         ]
       : []),

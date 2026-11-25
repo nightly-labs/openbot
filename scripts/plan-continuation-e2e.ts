@@ -1266,7 +1266,7 @@ try {
     assert.ok(ran[1]?.text.includes("biome check c.ts"), "The second check reads the steps of its own turn.");
     assert.ok(!ran[0]?.text.includes("<earlier-answers>"), "The first check has no earlier answers.");
     assert.ok(
-      ran[1]?.text.includes("<earlier-answers>\nI fixed a.ts and b.ts.\n</earlier-answers>"),
+      ran[1]?.text.includes("<earlier-answers>\n--- answer 1 ---\nI fixed a.ts and b.ts.\n</earlier-answers>"),
       "The second check reads the earlier answer of the request.",
     );
     assert.ok(
