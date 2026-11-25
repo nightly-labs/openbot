@@ -42,6 +42,7 @@ export function useBrowserLiveView(
   const drawn = useRef<number | null>(null);
   const selections = useRef<((text: string | null) => void)[]>([]);
   const shownTab = useRef(tabId);
+  const shownDialog = useRef<string | null>(null);
   const queue = useMemo(
     () =>
       createLiveViewInputQueue(
@@ -100,7 +101,14 @@ export function useBrowserLiveView(
         else if (message.type === "copyTooLarge") selections.current.shift()?.(null);
         else if (message.type === "pageCopied") pageCopy.current(message.text);
         else if (message.type === "dialog") {
-          if (message.dialog) showPageDialog(message.dialog, (input) => queue.push(input));
+          const dialog = message.dialog;
+          if (dialog && dialog.id !== shownDialog.current) {
+            shownDialog.current = dialog.id;
+            showPageDialog(dialog, (input) => {
+              if (shownDialog.current === input.id) shownDialog.current = null;
+              queue.push(input);
+            });
+          }
         } else contextMenu.current(message);
       } else {
         session.current = null;

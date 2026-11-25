@@ -706,12 +706,16 @@ it while the start waits. The member answers with a `dialog` input. The gateway 
 when it arrives, not in the input queue, because queued input waits behind the dialog too. The answer
 uses the same CDP answer and `-cancel-dialogs` as `handle_dialog`, with no turn check: a person can
 answer every dialog. Then the waiting start continues. While a view runs, the engine keeps `Page`
-events on, so it also sees a dialog that the member's own click opens. A dialog that opened while
+events on, so it also sees a dialog that the member's own click opens. A pointer or key press from a
+view with `dialog=1` counts as person input, so a page `alert` that it opens in an agent tab stays for
+the member and is not answered with OK at once. A view without `dialog=1` cannot show the alert, so
+its input does not count. A dialog that opened while
 the engine did not watch stays unknown: `Page.enable` waits behind it and reports nothing. While a
 dialog is open, the gateway drops pointer and key input and answers `copy` with no text. The desktop
 and web clients show the dialog as a sheet at the top of the page area, named after the site of the
 tab ("openbot.run says"). It dims only the page: the tabs, the address and the chat box stay usable.
-A click outside it does not answer it, Escape answers Cancel, and OK has the focus. Before the first
+A click outside it does not answer it, and OK has the focus. Escape answers Cancel only when the focus
+is on the sheet or the page, not in the chat box or the address. Before the first
 frame, the page area says that the page waits for the answer. The phone shows it in `Alert.alert`.
 
 A member on a remote server cannot see the host's tab, because the tab is a native view on the host's

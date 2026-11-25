@@ -426,7 +426,9 @@ export class BrowserViewGateway {
       session.reportContextMenu && client
         ? (menu: BrowserViewContextMenu) => this.#send(session, client, { type: "context-menu", ...menu })
         : undefined;
-    yield* browser.input(session.tabId, dispatched, onContextMenu).pipe(Effect.catch(() => Effect.void));
+    yield* browser
+      .input(session.tabId, dispatched, onContextMenu, session.reportDialog)
+      .pipe(Effect.catch(() => Effect.void));
   });
 
   readonly #sendHeldMove = Effect.fn("BrowserViewGateway.sendHeldMove")(function* (
@@ -495,7 +497,7 @@ export class BrowserViewGateway {
   }
 
   #answerDialog(session: ManagedViewSession, data: Ws.RawData): boolean {
-    if (rawDataSize(data) > MAX_DIALOG_ANSWER_BYTES) return false;
+    if (!session.dialog || rawDataSize(data) > MAX_DIALOG_ANSWER_BYTES) return false;
     let input: ReturnType<typeof decodeBrowserViewInput>;
     try {
       input = decodeBrowserViewInput(rawDataText(data));

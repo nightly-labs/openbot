@@ -429,6 +429,40 @@ async function main(): Promise<void> {
         assert.equal(await title(contents), "confirm:false");
         assert.equal((await pageBox).aborted, true, "Electron's box stayed open after the person answered.");
         recordCases("view-shows-dialog-that-opens-while-watched");
+
+        const alertBox = nextBox();
+        const shownBeforeAlert = dialogs.length;
+        const target: { x: number; y: number } = await contents.executeJavaScript(
+          "(() => { const r = document.getElementById('alert').getBoundingClientRect(); return { x: (r.x + r.width / 2) / innerWidth, y: (r.y + r.height / 2) / innerHeight }; })()",
+          true,
+        );
+        for (const action of ["down", "up"] as const)
+          socket.send(
+            encodeBrowserViewInput({
+              type: "pointer",
+              action,
+              ...target,
+              button: "left",
+              clickCount: 1,
+              deltaX: 0,
+              deltaY: 0,
+              modifiers: 0,
+            }),
+          );
+        await waitUntil(async () => dialogs.length > shownBeforeAlert);
+        const personAlert = dialogs.at(-1);
+        assert(personAlert, "The view got no alert that the person's click opened.");
+        assert.equal(personAlert.type, "alert");
+        assert.equal(personAlert.message, "Saved");
+        assert.equal(
+          (await alertBox).aborted,
+          false,
+          "The host answered the person's alert before the view showed it.",
+        );
+        socket.send(encodeBrowserViewInput({ type: "dialog", id: personAlert.id, accept: true }));
+        await waitUntil(async () => (await title(contents)) === "alert:done");
+        assert.equal((await alertBox).aborted, true, "Electron's box stayed open after the person answered.");
+        recordCases("view-person-alert-in-agent-tab-shown");
         socket.close();
       } finally {
         await runCauseEffect(gateway.stop());

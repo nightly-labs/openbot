@@ -354,6 +354,10 @@ export default function BrowserLiveView(props: BrowserLiveViewProps) {
                   canvas()?.focus({ preventScroll: true });
                 }}
                 onInteractOutside={(event) => event.preventDefault()}
+                onEscapeKeyDown={(event) => {
+                  const view = canvas()?.parentElement;
+                  if (!(event.target instanceof Node && view?.contains(event.target))) event.preventDefault();
+                }}
               >
                 <AlertDialog.Title class="browser-live-view-dialog-site">
                   <Globe2 aria-hidden="true" />

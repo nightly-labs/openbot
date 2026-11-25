@@ -2402,11 +2402,14 @@ export class BrowserHost {
     tabId: string,
     input: BrowserViewportInput,
     onContextMenu?: (menu: BrowserViewContextMenu) => void,
+    personSeesDialogs = false,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const tab = yield* this.#requireTab(tabId);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserInputProtected")));
     if (input.type !== "pointer" || input.action !== "move") tab.engine.invalidateReferences();
+    if (personSeesDialogs && (input.type === "pointer" || input.type === "key") && input.action === "down")
+      tab.engine.notePersonViewInput();
     if (input.type === "pointer" && input.action === "down") {
       tab.viewContextMenu =
         input.button === "right" && onContextMenu

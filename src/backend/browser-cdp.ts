@@ -2271,6 +2271,10 @@ export class BrowserCdpEngine {
     if (this.#activeLeases === 0) this.#personInputAt = Date.now();
   }
 
+  notePersonViewInput(): void {
+    this.#personInputAt = Date.now();
+  }
+
   #acceptedPageAlert(info: unknown, reply: unknown): boolean {
     if (!this.#acceptsPageAlert || this.#dialogsReleased || this.#dialogWatches.size > 0 || this.#dialog?.agent)
       return false;
