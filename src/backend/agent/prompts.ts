@@ -382,10 +382,18 @@ export function promptResolution(
   };
 }
 
-export function dynamicPromptResult(answers: Record<string, string[]>): DynamicToolResult {
+export function dynamicPromptResult(
+  questions: AgentPromptQuestion[],
+  answers: Record<string, string[]>,
+): DynamicToolResult {
+  const responses = questions.map((question) => {
+    const values = answers[question.id] ?? [];
+    const asked = { id: question.id, question: question.question };
+    return values.length > 0 ? { ...asked, status: "answered", answer: values } : { ...asked, status: "skipped" };
+  });
   return {
     success: true,
-    contentItems: [{ type: "inputText", text: JSON.stringify(answers) }],
+    contentItems: [{ type: "inputText", text: JSON.stringify({ responses }) }],
   };
 }
 
