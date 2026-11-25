@@ -30,7 +30,7 @@ import { type DynamicToolResult, isRecord, PROVIDER_STOPPED_WAITING, type Reques
 import { RequestedUpdate } from "../src/main/requested-update";
 import type { TeamApiRequestContext } from "../src/main/team-api/request-context";
 import { routeHostUpdate } from "../src/main/team-api/route-host-update";
-import { checkRestartReadiness } from "../src/main/update-readiness";
+import { checkRestartReadiness, withoutOpenQuestions } from "../src/main/update-readiness";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/update-open-question-e2e");
 const THREAD = "thread-1";
@@ -63,6 +63,7 @@ interface Report {
     waitingFor?: string[];
     installsAfterMaximumWait?: number;
     cardAtInstall?: CardState;
+    managedHostSafeToRestart?: boolean;
   };
   error?: string;
 }
@@ -195,6 +196,17 @@ function card(turnId: string): CardState {
   return message?.questionPrompt?.resolution ?? "pending";
 }
 
+function readiness() {
+  return checkRestartReadiness({
+    agentWork: registry.hasDetachedQuestionHoldingRestart(Date.now() + clockOffsetMs) ? ["open-question"] : [],
+    hostBlockers: [],
+    activeBrowserControls: 0,
+    activeFileTransfers: false,
+    updaterBusy: false,
+    initializationPending: false,
+  });
+}
+
 function desktopUpdate(maximumWaitMs?: number) {
   const updater = new StagedReleaseUpdater();
   let readinessChecks = 0;
@@ -203,14 +215,7 @@ function desktopUpdate(maximumWaitMs?: number) {
     updater,
     describeReadiness: () => {
       readinessChecks += 1;
-      return checkRestartReadiness({
-        agentWork: registry.hasDetachedQuestionHoldingRestart(Date.now() + clockOffsetMs) ? ["open-question"] : [],
-        hostBlockers: [],
-        activeBrowserControls: 0,
-        activeFileTransfers: false,
-        updaterBusy: false,
-        initializationPending: false,
-      });
+      return readiness();
     },
     preference,
     savePreference: () => Effect.succeed(preference),
@@ -395,6 +400,8 @@ try {
     Boolean(hosted.updater.status.scheduledRestart?.waitingFor.includes("open-question")),
   );
   report.hosted.waitingFor = hosted.updater.status.scheduledRestart?.waitingFor;
+  report.hosted.managedHostSafeToRestart = withoutOpenQuestions(readiness()).safeToRestart;
+  assert.equal(report.hosted.managedHostSafeToRestart, true, "An open card blocked managed-host maintenance.");
   await until("the hosted install after the maximum wait", () => hosted.updater.installs === 1);
   report.hosted.installsAfterMaximumWait = hosted.updater.installs;
   report.hosted.cardAtInstall = card(turn);

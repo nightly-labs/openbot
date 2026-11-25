@@ -485,7 +485,7 @@ import {
   UPDATE_INSTALL_RECORD_FILE,
 } from "./update-install-guard";
 import { readUpdatePreference, UPDATE_PREFERENCE_FILE, writeUpdatePreference } from "./update-preference-store";
-import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
+import { checkRestartReadiness, type RestartReadiness, withoutOpenQuestions } from "./update-readiness";
 import {
   createDisabledUpdateAdapter,
   electronUpdaterCacheDirectory,
@@ -4286,7 +4286,7 @@ export async function createApplicationServices({
     uid: typeof process.getuid === "function" ? process.getuid() : 0,
     pid: process.pid,
     currentVersion,
-    describeReadiness: describeRestartReadiness,
+    describeReadiness: () => withoutOpenQuestions(describeRestartReadiness()),
     setManagedByHost: (managed) => updater.setManagedByHost(managed),
     setHostState: (state) => updater.setHostState(state),
     onDiagnostic: (message) => logger.warn(message),

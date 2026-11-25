@@ -21,6 +21,11 @@ export function checkRestartReadiness(input: RestartReadinessInput): RestartRead
   return { safeToRestart: reasons.length === 0, reasons };
 }
 
+export function withoutOpenQuestions(readiness: RestartReadiness): RestartReadiness {
+  const reasons = readiness.reasons.filter((reason) => reason !== "open-question");
+  return { safeToRestart: reasons.length === 0, reasons };
+}
+
 const BLOCKERS_IGNORED_AFTER_MAXIMUM_WAIT: ReadonlySet<string> = new Set([
   "client-use",
   "browser-view",
