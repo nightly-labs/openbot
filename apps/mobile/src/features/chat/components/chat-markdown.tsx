@@ -915,7 +915,7 @@ function isDisplayMath(token: Token): token is MathToken {
 }
 
 function isBlankInline(token: Token): boolean {
-  return token.type === "br" || (tokenIs(token, "text") && !token.text.trim());
+  return token.type === "br" || token.type === "checkbox" || (tokenIs(token, "text") && !token.text.trim());
 }
 
 function trimmedEdge(token: Token | undefined, trim: (text: string) => string): Token[] {
@@ -938,9 +938,13 @@ function textRun(token: Tokens.Paragraph | Tokens.Text, run: Token[]): Token[] {
   return [{ ...token, raw, text: raw, tokens }];
 }
 
+const displayMathSplits = new WeakMap<Token, Token[]>();
+
 function withDisplayMathBlocks(tokens: Token[]): Token[] {
   return tokens.flatMap((token) => {
     if (!(tokenIs(token, "paragraph") || tokenIs(token, "text")) || !token.tokens?.some(isDisplayMath)) return [token];
+    const cached = displayMathSplits.get(token);
+    if (cached) return cached;
     const blocks: Token[] = [];
     let run: Token[] = [];
     for (const child of token.tokens) {
@@ -952,6 +956,7 @@ function withDisplayMathBlocks(tokens: Token[]): Token[] {
       run = [];
     }
     blocks.push(...textRun(token, run));
+    displayMathSplits.set(token, blocks);
     return blocks;
   });
 }
