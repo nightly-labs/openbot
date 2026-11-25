@@ -713,10 +713,15 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       if (!openThread(seat.id) && !conversations[seat.id]?.messages?.length) void loadLatestAgentMessages(seat.id);
     },
     showThread(agentId: string, id: string, started = false) {
-      if (started && draftShown(agentId)) agentThreads.close(agentId, DRAFT_THREAD_ID);
-      agentThreads.open(agentId, id);
-      if (started && !agentTasks.snapshot(agentId)?.tasks.some((task) => task.id === id))
-        void agentTasks.loadTasks(agentId);
+      if (!started) {
+        agentThreads.open(agentId, id);
+        return;
+      }
+      void agentTasks.loadTasks(agentId).finally(() => {
+        const draftOpen = draftShown(agentId);
+        if (agentThreads.hasDraft(agentId)) agentThreads.close(agentId, DRAFT_THREAD_ID);
+        if (draftOpen) agentThreads.open(agentId, id);
+      });
     },
     newThread(agentId: string) {
       agentThreads.startNew(agentId);
