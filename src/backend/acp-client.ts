@@ -4531,15 +4531,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         : ["edit", "delete", "move"].includes(toolKind ?? "")
           ? "file-change"
           : "permissions";
+    const namedToolCall = { ...toolCall, title: toolCall.title ?? turn?.toolNames.get(toolCallId) ?? null };
     if (
       thread &&
       turn &&
       !turn.stopped &&
       !turn.completing &&
       (((this.options.confine || this.#flavor.bridgeToolsWithoutCard) &&
-        callsBridgeTool(thread, toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
+        callsBridgeTool(thread, namedToolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
         (this.options.confine && runsConfinedCommand(toolCall, kind, this.#flavor.mcpCallInputNamesServer)) ||
-        (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, toolCall.title)))
+        (kind === "permissions" && turn.quietNoUpdate && callsNoUpdateTool(thread, namedToolCall.title)))
     ) {
       const option = params.options.find((candidate) => candidate.kind === "allow_once");
       if (option) return { outcome: { outcome: "selected", optionId: option.optionId } };
@@ -4891,7 +4892,12 @@ function callsBridgeTool(
 }
 
 function namesBridgeTool(title: string, namespace: string, tool: string): boolean {
-  return [`${namespace}__${tool}`, `Run mcp_${namespace}_${tool}`, `mcp__${namespace}__${tool}`].includes(title);
+  return [
+    `${namespace}__${tool}`,
+    `Run mcp_${namespace}_${tool}`,
+    `mcp__${namespace}__${tool}`,
+    `mcp_${namespace}.${tool}`,
+  ].includes(title);
 }
 
 function runsConfinedCommand(
