@@ -2228,6 +2228,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       if (this.#flavor.sessionBusy?.(error)) return yield* providerFailure(new ProviderSessionBusyError(this.#label));
       recovery = this.#flavor.restoreFailure?.(error, method) ?? null;
+      if (!recovery && isUnloadableSession(error)) {
+        logger.warn("An ACP agent could not open a saved session. OpenBot starts a new one.", {
+          provider: this.provider,
+          method,
+          reason: this.#redact(failureText(error)),
+        });
+        return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error));
+      }
       if (!recovery) return yield* providerFailure(error);
       failure = error;
     }
@@ -5225,6 +5233,12 @@ function isSessionNotFound(error: unknown, sessionId: string, flavor: AcpFlavor)
   if (error.code !== -32002) return false;
   const data = isRecord(error.data) ? error.data : undefined;
   return data?.sessionId === sessionId || data?.uri === sessionId || error.message.includes(sessionId);
+}
+
+const DAMAGED_SESSION_STORE = /\b(?:malformed|corrupt(?:ed|ion)?)\b|\bnot a database\b/iu;
+
+function isUnloadableSession(error: unknown): boolean {
+  return error instanceof RequestError && error.code === -32603 && DAMAGED_SESSION_STORE.test(failureText(error));
 }
 
 function failureDetail(error: RequestError): string | null {
