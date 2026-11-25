@@ -44,8 +44,6 @@ export const messages = {
     "La renovación automática se reanudará para este servidor. Sus agentes, conversaciones y archivos se conservan.",
   "billing.lifecycle.dataStays": "La renovación está desactivada. Tus datos se conservan cuando termine el plan.",
   "billing.lifecycle.deleteServer": "Eliminar servidor…",
-  "billing.lifecycle.whenDelete": "¿Cuándo se debe eliminar este servidor?",
-  "billing.lifecycle.atPeriodEnd": "Al final del periodo · {date}",
   "billing.lifecycle.planEndsLabel": "El plan termina",
   "billing.lifecycle.plansDescription":
     "Gestiona cada servidor por separado. Si cancelas la renovación, sus datos se conservan.",
@@ -54,15 +52,12 @@ export const messages = {
   "billing.lifecycle.renewalLabel": "Próxima renovación",
   "billing.lifecycle.deletionLabel": "Fecha de eliminación",
   "billing.lifecycle.billingLabel": "Facturación",
-  "billing.lifecycle.immediately": "Inmediatamente",
   "billing.lifecycle.automatic": "La renovación automática se reanuda",
-  "billing.lifecycle.noRefund": "Sin reembolso por el tiempo no usado",
   "billing.lifecycle.noRenewal": "Sin más renovaciones",
   "billing.lifecycle.dateUtc": "{date} UTC",
   "billing.lifecycle.renews": "La renovación automática está activada.",
   "billing.lifecycle.schedule": "Eliminar al final del periodo",
   "billing.lifecycle.keep": "Conservar servidor",
-  "billing.lifecycle.deleteNow": "Eliminar ahora",
   "billing.lifecycle.deletesOn": "Se elimina el {date}",
   "billing.lifecycle.scheduledDescription": "La renovación está desactivada. Tu servidor y tus datos se eliminarán.",
   "billing.lifecycle.scheduleDescription":
@@ -71,11 +66,8 @@ export const messages = {
   "billing.lifecycle.keepDescription":
     "Tu servidor y sus datos se conservarán. La eliminación programada se detendrá y la renovación automática se reanudará.",
   "billing.lifecycle.deleteTitle": "¿Eliminar {name}?",
-  "billing.lifecycle.deleteDescription":
-    "Elimina de forma permanente este servidor, sus agentes, conversaciones y archivos. Tu suscripción termina ahora. No puedes deshacer esta acción.",
   "billing.lifecycle.saving": "Guardando…",
   "billing.lifecycle.failed": "No se pudo confirmar el cambio. Actualiza Facturación e inténtalo de nuevo.",
-  "billing.lifecycle.deleted": "Se eliminó {name}. Su suscripción terminó.",
   "billing.lifecycle.label": "Vista previa del diseño · Solo acciones simuladas",
   "billing.lifecycle.reset": "Restablecer vista previa",
   "billing.license.title": "Licencia",

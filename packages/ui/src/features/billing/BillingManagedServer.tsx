@@ -17,11 +17,10 @@ export function BillingManagedServer(props: {
   const { t, format, errorMessage } = useText();
   const [dialog, setDialog] = createStore<{
     action: BillingServerLifecycleAction | null;
-    timing: "period-end" | "now";
     name: string;
     pending: boolean;
     error: string | null;
-  }>({ action: null, timing: "period-end", name: "", pending: false, error: null });
+  }>({ action: null, name: "", pending: false, error: null });
   const [addingStorage, setAddingStorage] = createSignal(false);
   createEffect(
     () => props.hosting.state.pendingDelete?.serverId === props.server.serverId,
@@ -32,7 +31,6 @@ export function BillingManagedServer(props: {
         draft.action = "delete";
         draft.name = "";
         draft.error = null;
-        draft.timing = "period-end";
       });
     },
   );
@@ -54,7 +52,7 @@ export function BillingManagedServer(props: {
         expectedPeriodEnd: props.paidThrough,
         serverId: props.server.serverId,
         action,
-        timing: dialog.timing,
+        timing: "period-end",
         confirmName: dialog.name,
       });
       await props.billing.load();
@@ -116,9 +114,7 @@ export function BillingManagedServer(props: {
         )}
         cancelAtPeriodEnd={props.plan.cancelAtPeriodEnd}
         scheduled={props.server.deletionScheduledAt != null}
-        deleted={false}
         action={dialog.action}
-        deletionTiming={dialog.timing}
         confirmName={dialog.name}
         pending={dialog.pending}
         error={dialog.error}
@@ -126,13 +122,6 @@ export function BillingManagedServer(props: {
           setDialog((draft) => {
             draft.action = action;
             draft.name = "";
-            draft.error = null;
-            draft.timing = "period-end";
-          })
-        }
-        onTimingChange={(timing) =>
-          setDialog((draft) => {
-            draft.timing = timing;
             draft.error = null;
           })
         }

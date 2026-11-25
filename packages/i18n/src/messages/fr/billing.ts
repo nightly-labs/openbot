@@ -44,8 +44,6 @@ export const messages = {
     "Le renouvellement automatique reprendra pour ce serveur. Ses agents, conversations et fichiers sont conservés.",
   "billing.lifecycle.dataStays": "Le renouvellement est désactivé. Vos données sont conservées à la fin de l’offre.",
   "billing.lifecycle.deleteServer": "Supprimer le serveur…",
-  "billing.lifecycle.whenDelete": "Quand supprimer ce serveur ?",
-  "billing.lifecycle.atPeriodEnd": "À la fin de la période · {date}",
   "billing.lifecycle.planEndsLabel": "Fin de l’offre",
   "billing.lifecycle.plansDescription":
     "Gérez chaque serveur séparément. Annuler le renouvellement conserve ses données.",
@@ -54,15 +52,12 @@ export const messages = {
   "billing.lifecycle.renewalLabel": "Prochain renouvellement",
   "billing.lifecycle.deletionLabel": "Date de suppression",
   "billing.lifecycle.billingLabel": "Facturation",
-  "billing.lifecycle.immediately": "Immédiatement",
   "billing.lifecycle.automatic": "Le renouvellement automatique reprend",
-  "billing.lifecycle.noRefund": "Aucun remboursement du temps non utilisé",
   "billing.lifecycle.noRenewal": "Aucun autre renouvellement",
   "billing.lifecycle.dateUtc": "{date} UTC",
   "billing.lifecycle.renews": "Le renouvellement automatique est activé.",
   "billing.lifecycle.schedule": "Supprimer à la fin de la période",
   "billing.lifecycle.keep": "Conserver le serveur",
-  "billing.lifecycle.deleteNow": "Supprimer maintenant",
   "billing.lifecycle.deletesOn": "Suppression le {date}",
   "billing.lifecycle.scheduledDescription":
     "Le renouvellement est désactivé. Votre serveur et vos données seront supprimés.",
@@ -72,11 +67,8 @@ export const messages = {
   "billing.lifecycle.keepDescription":
     "Votre serveur et ses données sont conservés. La suppression planifiée s’arrête et le renouvellement automatique reprend.",
   "billing.lifecycle.deleteTitle": "Supprimer {name} ?",
-  "billing.lifecycle.deleteDescription":
-    "Supprimez définitivement ce serveur, ses agents, conversations et fichiers. Votre abonnement prend fin maintenant. Cette action est irréversible.",
   "billing.lifecycle.saving": "Enregistrement…",
   "billing.lifecycle.failed": "La modification n’a pas pu être confirmée. Actualisez la facturation et réessayez.",
-  "billing.lifecycle.deleted": "{name} a été supprimé. Son abonnement a pris fin.",
   "billing.lifecycle.label": "Aperçu de conception · Actions fictives uniquement",
   "billing.lifecycle.reset": "Réinitialiser l’aperçu",
   "billing.license.title": "Licence",
