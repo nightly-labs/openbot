@@ -1,6 +1,5 @@
-import { type CreditMediaModel, creditMediaCost } from "@openbot/contracts/credit-media";
+import { type CreditMediaModel, type CreditMediaPrice, creditMediaPrice } from "@openbot/contracts/credit-media";
 import {
-  CREDIT_CLIP_SECONDS,
   CREDIT_MEDIA_KINDS,
   CREDIT_MODEL_COSTS,
   CREDIT_MODEL_MAKERS,
@@ -16,115 +15,168 @@ import { CREDITS_ROUTE } from "../../lib/credits-page";
 import { matchesMarketplaceQuery } from "../../lib/marketplace-routes";
 import { LandingFooter } from "../landing/LandingFooter";
 import { SiteHeader } from "../landing/SiteHeader";
-import { CREDITS_QUERY_SLOT, CREDITS_SECONDS_SLOT, type CreditsPageText } from "./credits-page-text";
+import { CREDITS_AMOUNT_SLOT, CREDITS_QUERY_SLOT, type CreditsPageText } from "./credits-page-text";
 import "./CreditsPage.css";
 
 type CreditsFilter = "all" | CreditMediaKind;
-
-const VIDEO_LENGTHS: readonly number[] = [CREDIT_CLIP_SECONDS, CREDIT_CLIP_SECONDS * 2];
 
 interface CreditsEntry {
   model: CreditModelCost;
   live: CreditMediaModel | undefined;
 }
 
-interface CreditsVideoSpec {
-  seconds: number;
-  sound: boolean;
-}
-
-interface CreditsPrice {
-  resolution: string | null;
-  charge: number;
-}
-
-interface CreditsChoice<T> {
-  value: T;
-  label: string;
-}
-
-function livePrices(model: CreditMediaModel, spec: CreditsVideoSpec): CreditsPrice[] {
-  const resolutions: readonly (string | null)[] = model.resolutions.length > 0 ? model.resolutions : [null];
-  return resolutions.flatMap((resolution) => {
-    const charge = creditMediaCost(model, { resolution, duration: spec.seconds, count: 1, audio: spec.sound });
-    return charge === null ? [] : [{ resolution, charge }];
-  });
-}
-
-function hasSilentPrice(model: CreditMediaModel): boolean {
-  return model.audio && model.prices.some((price) => price.silentCredits !== null);
-}
-
-function CreditsPrices(props: {
+interface CreditsLiveEntry {
+  model: CreditModelCost;
   live: CreditMediaModel;
-  spec: CreditsVideoSpec;
+}
+
+interface CreditsPriceProps {
   text: CreditsPageText;
   format: (value: number) => string;
-}) {
+}
+
+function resolutionRank(resolution: string): number {
+  const value = Number.parseFloat(resolution);
+  if (!Number.isFinite(value)) return Number.MAX_SAFE_INTEGER;
+  return resolution.endsWith("K") ? value * 1000 : value;
+}
+
+function priceColumns(entries: readonly CreditsLiveEntry[]): (string | null)[] {
+  const resolutions = [...new Set(entries.flatMap((entry) => entry.live.resolutions))].sort(
+    (left, right) => resolutionRank(left) - resolutionRank(right),
+  );
+  return entries.some((entry) => entry.live.resolutions.length === 0) ? [null, ...resolutions] : resolutions;
+}
+
+function cellPrice(model: CreditMediaModel, column: string | null): CreditMediaPrice | null {
+  if (column === null) return model.resolutions.length === 0 ? creditMediaPrice(model, null) : null;
+  return model.resolutions.includes(column) ? creditMediaPrice(model, column) : null;
+}
+
+function silentCredits(model: CreditMediaModel, price: CreditMediaPrice): number | null {
+  return model.audio ? price.silentCredits : null;
+}
+
+function sectionUnit(kind: CreditMediaKind, entries: readonly CreditsLiveEntry[], text: CreditsPageText): string {
+  if (entries.some((entry) => entry.live.prices.some((price) => price.unit === "second"))) return text.perSecond;
+  return kind === "image" ? text.perImage : text.perGeneration;
+}
+
+function CreditsModelIdentity(props: { model: CreditModelCost }) {
   return (
-    <ul class="credits-prices">
-      <For each={livePrices(props.live, props.spec)}>
-        {(price) => (
-          <li class="credits-price">
-            <Show when={price.resolution}>
-              {(resolution) => <span class="credits-price-resolution">{resolution()}</span>}
-            </Show>
-            <span class="credits-price-credits">
+    <div class="credits-model">
+      <span class="credits-logo" aria-hidden="true">
+        <MakerLogo maker={props.model.maker} />
+      </span>
+      <div class="credits-model-body">
+        <span class="credits-model-name">{props.model.name}</span>
+        <span class="credits-model-maker">
+          {CREDIT_MODEL_MAKERS[props.model.maker]}
+          <Show when={props.model.variant}>{(variant) => <span class="credits-model-variant">{variant()}</span>}</Show>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function CreditsPriceCell(props: CreditsPriceProps & { model: CreditMediaModel; column: string | null }) {
+  const price = () => cellPrice(props.model, props.column);
+  return (
+    <td class="credits-cell">
+      <Show
+        when={price()}
+        fallback={
+          <>
+            <span class="credits-cell-none" aria-hidden="true">
+              –
+            </span>
+            <span class="landing-visually-hidden">{props.text.notAvailable}</span>
+          </>
+        }
+      >
+        {(available) => (
+          <>
+            <span class="credits-cell-amount">
               <CreditIcon />
-              {props.format(price.charge)}
+              {props.format(available().credits)}
               <span class="landing-visually-hidden">{props.text.credits}</span>
             </span>
-          </li>
-        )}
-      </For>
-    </ul>
-  );
-}
-
-function CreditsModelRow(props: {
-  entry: CreditsEntry;
-  spec: CreditsVideoSpec;
-  text: CreditsPageText;
-  format: (value: number) => string;
-}) {
-  const unit = (live: CreditMediaModel) =>
-    live.kind === "image"
-      ? props.text.perImage
-      : props.text.perSeconds.replace(CREDITS_SECONDS_SLOT, props.format(props.spec.seconds));
-  return (
-    <li class="credits-row">
-      <div class="credits-row-head">
-        <span class="credits-logo" aria-hidden="true">
-          <MakerLogo maker={props.entry.model.maker} />
-        </span>
-        <div class="credits-row-body">
-          <span class="credits-row-name">{props.entry.model.name}</span>
-          <span class="credits-row-maker">
-            {CREDIT_MODEL_MAKERS[props.entry.model.maker]}
-            <Show when={props.entry.model.variant}>
-              {(variant) => <span class="credits-row-variant">{variant()}</span>}
+            <Show when={silentCredits(props.model, available())}>
+              {(silent) => (
+                <span class="credits-cell-silent">
+                  {props.text.withoutSound.replace(CREDITS_AMOUNT_SLOT, props.format(silent()))}
+                </span>
+              )}
             </Show>
-          </span>
-        </div>
-        <Show when={props.entry.live} fallback={<span class="credits-row-soon">{props.text.soon}</span>}>
-          {(live) => <span class="credits-row-unit">{unit(live())}</span>}
-        </Show>
-      </div>
-      <Show when={props.entry.live}>
-        {(live) => <CreditsPrices live={live()} spec={props.spec} text={props.text} format={props.format} />}
+          </>
+        )}
       </Show>
-    </li>
+    </td>
   );
 }
 
-function CreditsSection(props: {
-  kind: CreditMediaKind;
-  entries: readonly CreditsEntry[];
-  spec: CreditsVideoSpec;
-  text: CreditsPageText;
-  format: (value: number) => string;
-}) {
+function CreditsTable(props: CreditsPriceProps & { titleId: string; entries: readonly CreditsLiveEntry[] }) {
+  const columns = () => priceColumns(props.entries);
+  return (
+    <div class="credits-table-scroll">
+      <table class="credits-table" aria-labelledby={props.titleId}>
+        <thead>
+          <tr>
+            <th scope="col" class="credits-table-model">
+              {props.text.model}
+            </th>
+            <For each={columns()}>{(column) => <th scope="col">{column ?? props.text.oneSize}</th>}</For>
+          </tr>
+        </thead>
+        <tbody>
+          <For each={props.entries}>
+            {(entry) => (
+              <tr>
+                <th scope="row" class="credits-table-model">
+                  <CreditsModelIdentity model={entry.model} />
+                </th>
+                <For each={columns()}>
+                  {(column) => (
+                    <CreditsPriceCell model={entry.live} column={column} text={props.text} format={props.format} />
+                  )}
+                </For>
+              </tr>
+            )}
+          </For>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CreditsSoon(props: { models: readonly CreditModelCost[]; text: CreditsPageText }) {
+  return (
+    <div class="credits-soon">
+      <span class="credits-soon-label">{props.text.soon}</span>
+      <ul class="credits-soon-list">
+        <For each={props.models}>
+          {(model) => (
+            <li class="credits-soon-model">
+              <span class="credits-soon-logo" aria-hidden="true">
+                <MakerLogo maker={model.maker} />
+              </span>
+              {model.name}
+            </li>
+          )}
+        </For>
+      </ul>
+    </div>
+  );
+}
+
+function liveEntries(entries: readonly CreditsEntry[]): CreditsLiveEntry[] {
+  return entries.flatMap((entry) => (entry.live ? [{ model: entry.model, live: entry.live }] : []));
+}
+
+function CreditsSection(props: CreditsPriceProps & { kind: CreditMediaKind; entries: readonly CreditsEntry[] }) {
   const titleId = `credits-${props.kind}-title`;
+  const live = () => liveEntries(props.entries);
+  const soon = () => props.entries.filter((entry) => !entry.live).map((entry) => entry.model);
   return (
     <section class="credits-section" aria-labelledby={titleId}>
       <header class="credits-section-header">
@@ -132,41 +184,17 @@ function CreditsSection(props: {
           <h2 id={titleId}>{props.text[props.kind]}</h2>
           <span class="credits-section-count">{props.entries.length}</span>
         </div>
+        <Show when={live().length > 0}>
+          <span class="credits-section-unit">{sectionUnit(props.kind, live(), props.text)}</span>
+        </Show>
       </header>
-      <ul class="credits-list">
-        <For each={props.entries}>
-          {(entry) => <CreditsModelRow entry={entry} spec={props.spec} text={props.text} format={props.format} />}
-        </For>
-      </ul>
+      <Show when={live().length > 0}>
+        <CreditsTable titleId={titleId} entries={live()} text={props.text} format={props.format} />
+      </Show>
+      <Show when={soon().length > 0}>
+        <CreditsSoon models={soon()} text={props.text} />
+      </Show>
     </section>
-  );
-}
-
-function CreditsOption<T>(props: {
-  label: string;
-  choices: readonly CreditsChoice<T>[];
-  selected: T;
-  onSelect: (value: T) => void;
-}) {
-  return (
-    <fieldset class="credits-option">
-      <legend class="landing-visually-hidden">{props.label}</legend>
-      <span class="credits-option-label" aria-hidden="true">
-        {props.label}
-      </span>
-      <For each={props.choices}>
-        {(choice) => (
-          <button
-            type="button"
-            class="plugin-tag-button credits-filter"
-            aria-pressed={`${props.selected === choice.value}`}
-            onClick={() => props.onSelect(choice.value)}
-          >
-            {choice.label}
-          </button>
-        )}
-      </For>
-    </fieldset>
   );
 }
 
@@ -184,15 +212,11 @@ export function CreditsPage(props: { text: CreditsPageText; lang: string; catalo
   onSettled(() => landingAnalytics.start(document, window.location.hostname, CREDITS_ROUTE));
   const [query, setQuery] = createSignal("");
   const [filter, setFilter] = createSignal<CreditsFilter>("all");
-  const [seconds, setSeconds] = createSignal(CREDIT_CLIP_SECONDS);
-  const [sound, setSound] = createSignal(true);
-  const spec = (): CreditsVideoSpec => ({ seconds: seconds(), sound: sound() });
   const numberFormat = createMemo(() => new Intl.NumberFormat(props.lang));
   const format = (value: number) => numberFormat().format(value);
   const entries = createMemo(() => {
     const live = new Map(props.catalog.map((model) => [model.id, model]));
-    const all = CREDIT_MODEL_COSTS.map((model) => ({ model, live: live.get(model.modelId) }));
-    return [...all.filter((entry) => entry.live), ...all.filter((entry) => !entry.live)];
+    return CREDIT_MODEL_COSTS.map((model) => ({ model, live: live.get(model.modelId) }));
   });
   const matches = createMemo(() => entries().filter((entry) => modelMatches(entry.model, query(), props.text)));
   const countFor = (kind: CreditsFilter) =>
@@ -202,19 +226,9 @@ export function CreditsPage(props: { text: CreditsPageText; lang: string; catalo
       .map((kind) => ({ kind, entries: matches().filter((entry) => entry.model.kind === kind) }))
       .filter((section) => section.entries.length > 0),
   );
-  const liveVideo = () =>
-    sections()
-      .filter((section) => section.kind === "video")
-      .flatMap((section) => section.entries.flatMap((entry) => (entry.live ? [entry.live] : [])));
-  const filters = (): readonly CreditsChoice<CreditsFilter>[] => [
+  const filters = (): readonly { value: CreditsFilter; label: string }[] => [
     { value: "all", label: props.text.all },
     ...CREDIT_MEDIA_KINDS.map((kind) => ({ value: kind, label: props.text[kind] })),
-  ];
-  const lengths = (): readonly CreditsChoice<number>[] =>
-    VIDEO_LENGTHS.map((value) => ({ value, label: props.text.seconds.replace(CREDITS_SECONDS_SLOT, format(value)) }));
-  const sounds = (): readonly CreditsChoice<boolean>[] => [
-    { value: true, label: props.text.soundOn },
-    { value: false, label: props.text.soundOff },
   ];
   return (
     <div class="landing-page credits-page" lang={props.lang}>
@@ -253,14 +267,6 @@ export function CreditsPage(props: { text: CreditsPageText; lang: string; catalo
               )}
             </For>
           </fieldset>
-          <Show when={liveVideo().length > 0}>
-            <div class="credits-options">
-              <CreditsOption label={props.text.length} choices={lengths()} selected={seconds()} onSelect={setSeconds} />
-              <Show when={liveVideo().some(hasSilentPrice)}>
-                <CreditsOption label={props.text.sound} choices={sounds()} selected={sound()} onSelect={setSound} />
-              </Show>
-            </div>
-          </Show>
         </div>
         <Show
           when={sections().length > 0}
@@ -269,13 +275,7 @@ export function CreditsPage(props: { text: CreditsPageText; lang: string; catalo
           <div class="credits-sections">
             <For each={sections()}>
               {(section) => (
-                <CreditsSection
-                  kind={section.kind}
-                  entries={section.entries}
-                  spec={spec()}
-                  text={props.text}
-                  format={format}
-                />
+                <CreditsSection kind={section.kind} entries={section.entries} text={props.text} format={format} />
               )}
             </For>
           </div>

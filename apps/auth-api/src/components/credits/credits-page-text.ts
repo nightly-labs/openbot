@@ -1,7 +1,7 @@
 import type { AppTranslate } from "@openbot/i18n";
 
 export const CREDITS_QUERY_SLOT = "{query}";
-export const CREDITS_SECONDS_SLOT = "{seconds}";
+export const CREDITS_AMOUNT_SLOT = "{credits}";
 
 export function creditsPageText(t: AppTranslate) {
   return {
@@ -12,15 +12,15 @@ export function creditsPageText(t: AppTranslate) {
     search: t("sitePage.credits.search"),
     categories: t("sitePage.credits.categories"),
     all: t("sitePage.credits.all"),
-    length: t("sitePage.credits.length"),
-    seconds: t("sitePage.credits.seconds", { seconds: CREDITS_SECONDS_SLOT }),
-    sound: t("sitePage.credits.sound"),
-    soundOn: t("sitePage.credits.soundOn"),
-    soundOff: t("sitePage.credits.soundOff"),
     empty: t("sitePage.credits.empty", { query: CREDITS_QUERY_SLOT }),
     credits: t("sitePage.credits.credits"),
     perImage: t("sitePage.credits.perImage"),
-    perSeconds: t("sitePage.credits.perSeconds", { seconds: CREDITS_SECONDS_SLOT }),
+    perSecond: t("sitePage.credits.perSecond"),
+    perGeneration: t("sitePage.credits.perGeneration"),
+    model: t("sitePage.credits.model"),
+    oneSize: t("sitePage.credits.oneSize"),
+    notAvailable: t("sitePage.credits.notAvailable"),
+    withoutSound: t("sitePage.credits.withoutSound", { credits: CREDITS_AMOUNT_SLOT }),
     soon: t("sitePage.credits.soon"),
     video: t("sitePage.credits.video.title"),
     image: t("sitePage.credits.image.title"),
