@@ -159,10 +159,15 @@ export function AgentDockSurface() {
     },
   );
   const results = createMemo(() => [...(presentation()?.results ?? [])]);
+  let resultCount = 0;
   createEffect(
-    () => results().length === 0,
-    (empty) => {
-      if (empty) syncShape();
+    () => results().length,
+    (count) => {
+      const fewer = count < resultCount;
+      resultCount = count;
+      if (!fewer) return;
+      shelfExtent = null;
+      syncShape();
     },
   );
   const stripOn = () => (presentation()?.autoHide ?? false) && (presentation()?.edgeStrip ?? false);
@@ -195,11 +200,13 @@ export function AgentDockSurface() {
   };
 
   function syncExtent(settled = false) {
-    if (dockShape !== null && shapeSize !== windowSize()) return;
-    const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
     if (menuOpen()) menuWanted = false;
+    const whole = chatOpen || menuWanted || menuOpen() || (pointerIn && !fitted());
+    const stale = dockShape !== null && shapeSize !== windowSize();
+    if (stale && !whole) return;
+    const body = isTucked && edgeStrip ? agentDockBody()?.getBoundingClientRect() : undefined;
     const measured =
-      dockShape === null
+      dockShape === null || stale
         ? null
         : windowExtent(
             isTucked ? [...dockShape, tuckedStrip(body, AGENT_DOCK_STRIP_FEEL)] : dockShape,
@@ -207,10 +214,7 @@ export function AgentDockSurface() {
           );
     if (results().length === 0) shelfExtent = null;
     else if (shelfShown && measured) shelfExtent = grownExtent(shelfExtent, measured);
-    const extent =
-      measured === null || chatOpen || menuWanted || menuOpen() || (pointerIn && !fitted())
-        ? null
-        : grownExtent(shelfExtent, measured);
+    const extent = measured === null || whole ? null : grownExtent(shelfExtent, measured);
     const change = extentChange(sentExtent, extent);
     if (change === "keep") return stopShrink();
     if (change === "shrink" && !settled) {
@@ -483,6 +487,7 @@ export function AgentDockSurface() {
   createEffect(serverId, () => {
     chatOpen = false;
     shelfShown = false;
+    shelfExtent = null;
     dragging = false;
     sync();
   });
