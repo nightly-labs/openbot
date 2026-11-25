@@ -64,6 +64,14 @@ interface Spring {
 const SHAPE_ID: Record<GlassShape, number> = { lens: 0, blob: 1, pill: 2, torus: 3, prism: 4, diamond: 5 };
 const SPIN: Record<GlassShape, number> = { lens: 0, blob: 0.35, pill: 0.7, torus: 0.8, prism: 1, diamond: 0.9 };
 const TILT: Record<GlassShape, number> = { lens: 0.35, blob: 0.5, pill: 0.6, torus: 0.7, prism: 0.8, diamond: 0.7 };
+const POSE: Record<GlassShape, readonly [number, number]> = {
+  lens: [0, 0],
+  blob: [0.2, 0],
+  pill: [0, 0],
+  torus: [-0.5, 0.18],
+  prism: [-0.3, 0.45],
+  diamond: [-0.35, 0.5],
+};
 const TURN = Math.PI * 2;
 const PIXEL_BUDGET = 5e6;
 const MAX_RATIO = 2;
@@ -77,20 +85,32 @@ const THROW_SPEED = 60;
 const REST_SPEED = 30;
 const MORPH_SECONDS = 0.7;
 const INTERACTIVE = "a, button, input, select, textarea, [role='button']";
+const EXTENT: Record<GlassShape, number> = { lens: 1.03, blob: 1.08, pill: 1.02, torus: 1, prism: 1.18, diamond: 1.05 };
+const FLOOR = 0.75;
+const FOCAL = 1.6;
+const SHADE_SIZE = 256;
+const SUN_LENGTH = Math.hypot(-0.42, 0.55, 1);
+const SUN = [-0.42 / SUN_LENGTH, 0.55 / SUN_LENGTH, 1 / SUN_LENGTH] as const;
 const UNIFORMS = [
   "uScene",
+  "uShade",
   "uSceneOn",
+  "uPass",
+  "uShadeBox",
   "uView",
   "uRatio",
+  "uCamera",
   "uCenter",
-  "uRadius",
+  "uUnit",
+  "uReach",
+  "uLod",
   "uShapes",
   "uMorph",
   "uAxis",
   "uStretch",
   "uTurn",
   "uTime",
-  "uRefraction",
+  "uIor",
   "uDispersion",
   "uColor",
   "uTint",
@@ -107,64 +127,114 @@ void main() {
 const FRAGMENT_SOURCE = `#version 300 es
 precision highp float;
 uniform sampler2D uScene;
+uniform sampler2D uShade;
 uniform float uSceneOn;
+uniform float uPass;
+uniform vec4 uShadeBox;
 uniform vec2 uView;
 uniform float uRatio;
-uniform vec2 uCenter;
-uniform float uRadius;
+uniform vec3 uCamera;
+uniform vec3 uCenter;
+uniform float uUnit;
+uniform float uReach;
+uniform float uLod;
 uniform ivec2 uShapes;
 uniform float uMorph;
 uniform vec2 uAxis;
 uniform float uStretch;
 uniform mat3 uTurn;
 uniform float uTime;
-uniform float uRefraction;
+uniform float uIor;
 uniform float uDispersion;
 uniform vec3 uColor;
 uniform float uTint;
 out vec4 outColor;
 
-const float REACH = 1.3;
-const float BACKDROP = 1.7;
-const float NEAR = 0.0015;
-const vec3 KEY = vec3(-0.55, 0.62, 0.56);
+const float FLOOR = ${FLOOR.toFixed(2)};
+const float SHADE = ${SHADE_SIZE.toFixed(1)};
+const vec3 SUN = vec3(${SUN.map((value) => value.toFixed(4)).join(", ")});
+const vec2 GLINT = vec2(-0.6, 0.8);
+const vec2 JITTER[3] = vec2[3](vec2(0.3, 0.2), vec2(-0.2, 0.3), vec2(0.1, -0.35));
 
-vec4 sceneAt(vec2 point) {
+struct Hit {
+  float kind;
+  float cover;
+  vec3 p;
+  vec3 n;
+  vec3 q;
+  vec3 inner;
+  vec3 exitNormal;
+  vec3 dir;
+  float escaped;
+  float travel;
+};
+
+vec4 sceneGrad(vec2 point, vec2 gx, vec2 gy) {
   vec2 uv = point / uView;
   if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec4(0.0);
-  return texture(uScene, uv) * uSceneOn;
+  return textureGrad(uScene, uv, gx / uView, gy / uView) * uSceneOn;
+}
+
+vec2 lightAt(vec2 point) {
+  vec2 uv = (point - uShadeBox.xy) / uShadeBox.zw;
+  if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return vec2(0.0);
+  return textureLod(uShade, uv, 0.0).rg;
+}
+
+vec4 lit(vec4 color, vec2 light) {
+  vec4 shaded = vec4(color.rgb * (1.0 - light.x), color.a + light.x * (1.0 - color.a));
+  return vec4(vec3(light.y) + shaded.rgb * (1.0 - light.y), light.y + shaded.a * (1.0 - light.y));
+}
+
+vec3 toLocal(vec3 world) {
+  vec3 d = (world - uCenter) / uUnit;
+  return vec3(d.x, -d.y, d.z);
+}
+
+vec2 toWorld(vec2 local) {
+  return uCenter.xy + vec2(local.x, -local.y) * uUnit;
+}
+
+vec2 landing(vec3 origin, vec3 dir, vec2 fallback) {
+  if (dir.z > -0.0005) return fallback;
+  return toWorld(origin.xy + dir.xy * ((-FLOOR - origin.z) / dir.z));
+}
+
+float smax(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (a - b) / k, 0.0, 1.0);
+  return mix(b, a, h) + k * h * (1.0 - h);
 }
 
 float lensBody(vec3 p) {
-  float faces = max(length(p - vec3(0.0, 0.0, -1.941)) - 2.161, length(p - vec3(0.0, 0.0, 1.941)) - 2.161);
-  return max(faces, length(p.xy) - 0.82) - 0.17;
+  return smax(length(p - vec3(0.0, 0.0, -1.87)) - 2.15, length(p - vec3(0.0, 0.0, 1.87)) - 2.15, 0.18);
 }
 
 float blobBody(vec3 p) {
   float t = uTime;
-  float wave = sin(2.6 * p.x + t * 1.1) * sin(2.4 * p.y - t * 0.9) * sin(2.2 * p.z + t * 0.7);
-  float ripple = sin(5.0 * p.x - t * 1.6) * sin(4.6 * p.y + t * 1.3) * sin(4.2 * p.z + t);
-  return (length(p) - 0.84 - 0.09 * wave - 0.03 * ripple) * 0.7;
+  float wave = sin(1.6 * p.x + t * 1.1) * sin(1.8 * p.y - t * 0.9) * sin(1.5 * p.z + t * 0.8);
+  float ripple = sin(2.6 * p.x - t * 0.6 + p.z) * sin(3.0 * p.y + t * 1.2 + 0.8 * p.x);
+  return (length(p) - 0.92 - 0.085 * wave - 0.04 * ripple) * 0.78;
 }
 
 float pillBody(vec3 p) {
-  return length(p - vec3(clamp(p.x, -0.42, 0.42), 0.0, 0.0)) - 0.52;
+  float outline = length(vec2(max(abs(p.x) - 0.56, 0.0), p.y)) - 0.44;
+  vec2 w = vec2(outline + 0.17, abs(p.z) - 0.15);
+  return min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) - 0.17;
 }
 
 float torusBody(vec3 p) {
-  return length(vec2(length(p.xy) - 0.64, p.z)) - 0.3;
+  return length(vec2(length(p.xy) - 0.68, p.z)) - 0.3;
 }
 
 float prismBody(vec3 p) {
-  p.y += 0.27;
   vec3 q = abs(p);
-  float side = max(q.x * 0.866025 + p.y * 0.5, -p.y) - 0.5;
-  return max(q.z - 0.4, side) - 0.03;
+  float side = max(q.x * 0.866025 + p.y * 0.5, -p.y) - 0.52;
+  return max(q.z - 0.34, side) - 0.07;
 }
 
 float diamondBody(vec3 p) {
-  vec3 q = abs(p * vec3(1.0, 0.82, 1.0));
-  return (q.x + q.y + q.z - 0.98) * 0.58;
+  vec3 q = abs(p);
+  return (q.x + q.y * 0.9 + q.z * 1.22 - 0.98) * 0.5;
 }
 
 float body(int id, vec3 p) {
@@ -176,100 +246,217 @@ float body(int id, vec3 p) {
   return lensBody(p);
 }
 
-float scale() {
-  return max(1.0 / uStretch, sqrt(uStretch));
-}
-
 float map(vec3 p) {
   float along = dot(p.xy, uAxis);
   vec2 across = p.xy - uAxis * along;
   p.xy = uAxis * (along / uStretch) + across * sqrt(uStretch);
   vec3 o = uTurn * p;
-  return mix(body(uShapes.x, o), body(uShapes.y, o), uMorph) / scale();
+  float d = body(uShapes.x, o);
+  if (uMorph > 0.0) d = mix(d, body(uShapes.y, o), uMorph);
+  return d / max(1.0 / uStretch, sqrt(uStretch));
 }
 
 vec3 normalAt(vec3 p) {
   const vec2 k = vec2(1.0, -1.0);
-  const float h = 0.002;
+  const float h = 0.0025;
   return normalize(
     k.xyy * map(p + k.xyy * h) + k.yyx * map(p + k.yyx * h) + k.yxy * map(p + k.yxy * h) + k.xxx * map(p + k.xxx * h)
   );
 }
 
-vec3 environment(vec3 d) {
-  float sky = smoothstep(-0.2, 1.0, d.y) * 0.32;
-  float key = pow(max(dot(d, normalize(KEY)), 0.0), 16.0) * 1.3;
-  float rim = smoothstep(0.55, 1.0, -d.x) * 0.18 + smoothstep(0.7, 1.0, d.x) * 0.12;
-  return vec3(0.34 + sky + key + rim) * mix(vec3(1.0), uColor, uTint);
+vec4 studio(vec3 d, float gain) {
+  float yaw = atan(d.x, d.z);
+  float key = smoothstep(0.42, 0.22, abs(yaw + 0.62)) * smoothstep(0.3, 0.12, abs(d.y - 0.5));
+  float strip = smoothstep(0.12, 0.05, abs(yaw - 0.95)) * smoothstep(0.8, 0.35, abs(d.y - 0.05));
+  float level = (key * 18.0 + strip * 8.0 + smoothstep(0.0, 1.0, d.z) * 0.04) * gain;
+  float cover = clamp(level, 0.0, 1.0);
+  return vec4(vec3(cover), cover);
+}
+
+vec2 shadowAt(vec2 point) {
+  vec3 p = toLocal(vec3(point, 0.0));
+  float t = 0.05;
+  float soft = 1.0;
+  float deep = 1e3;
+  for (int i = 0; i < 32; i++) {
+    float d = map(p + SUN * t);
+    deep = min(deep, d);
+    if (d > 0.0) soft = min(soft, 6.0 * d / t);
+    t += clamp(abs(d) * 0.8, 0.02, 0.27);
+    if (t > FLOOR * 2.6 + uReach * 2.0) break;
+  }
+  if (deep > 0.0) return vec2((1.0 - clamp(soft, 0.0, 1.0)) * 0.18, 0.0);
+  float depth = -deep;
+  return vec2(exp(-depth * 14.0) * 0.21, clamp(smoothstep(0.12, 0.5, depth) * (uIor - 1.0), 0.0, 1.0));
+}
+
+Hit trace(vec3 ro, vec3 rd, float eps) {
+  Hit hit = Hit(0.0, 0.0, vec3(0.0), vec3(0.0, 0.0, 1.0), vec3(0.0), rd, vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), 0.0, 0.0);
+  float b = dot(ro, rd);
+  float c = dot(ro, ro) - uReach * uReach;
+  float disc = b * b - c;
+  if (disc <= 0.0) return hit;
+  float root = sqrt(disc);
+  float t = max(-b - root, 0.0);
+  float end = -b + root;
+  float best = 1e5;
+  float bestT = t;
+  bool found = false;
+  for (int i = 0; i < 88; i++) {
+    float d = map(ro + rd * t);
+    if (d < best) {
+      best = d;
+      bestT = t;
+    }
+    if (d < eps) {
+      found = true;
+      break;
+    }
+    t += d * 0.9;
+    if (t > end) break;
+  }
+  if (!found && best < eps * 1.4) {
+    found = true;
+    t = bestT;
+  }
+  if (!found) {
+    hit.cover = clamp(1.0 - best / (eps * 4.8), 0.0, 1.0);
+    if (hit.cover > 0.0) {
+      hit.kind = 1.0;
+      hit.p = ro + rd * bestT;
+      hit.n = normalAt(hit.p);
+    }
+    return hit;
+  }
+  hit.kind = 2.0;
+  hit.p = ro + rd * t;
+  hit.n = normalAt(hit.p);
+  hit.q = hit.p;
+  return hit;
+}
+
+void crossGlass(inout Hit hit, vec3 rd, float eps) {
+  vec3 dir = refract(rd, hit.n, 1.0 / uIor);
+  vec3 q = hit.p + dir * eps * 4.0;
+  bool escaped = false;
+  vec3 leaving = dir;
+  for (int turn = 0; turn < 3; turn++) {
+    for (int i = 0; i < 56; i++) {
+      float d = map(q);
+      if (d > -eps) break;
+      float stride = max(-d * 0.9, eps);
+      q += dir * stride;
+      hit.travel += stride;
+    }
+    vec3 n = normalAt(q);
+    hit.exitNormal = n;
+    vec3 outward = refract(dir, -n, uIor);
+    if (dot(outward, outward) > 0.0) {
+      leaving = outward;
+      escaped = true;
+      break;
+    }
+    dir = reflect(dir, -n);
+    q += dir * eps * 4.0;
+  }
+  if (!escaped) leaving = dir;
+  if (leaving.z > -0.2) leaving = normalize(vec3(leaving.xy, -0.2 - abs(leaving.z)));
+  hit.q = q;
+  hit.inner = dir;
+  hit.dir = leaving;
+  hit.escaped = escaped ? 1.0 : 0.0;
+}
+
+float bandOf(float cosi, float scatter) {
+  return max(smoothstep(0.42, 0.12, cosi), smoothstep(0.06, 0.24, scatter));
+}
+
+vec4 shade(Hit hit, vec3 rd, vec4 back, vec4 tone, vec2 point, vec2 tx, vec2 ty, vec2 rx, vec2 ry, float scatter) {
+  if (hit.kind < 0.5) return back;
+  vec3 mirrorDir = reflect(rd, hit.n);
+  if (hit.kind < 1.5) {
+    vec4 edge = tone * 0.8 + studio(mirrorDir, 1.0) * 0.5;
+    return mix(back, edge + back * (1.0 - edge.a), hit.cover * 0.7);
+  }
+  float cosi = clamp(-dot(rd, hit.n), 0.0, 1.0);
+  float f0 = pow((uIor - 1.0) / (uIor + 1.0), 2.0);
+  float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosi, 5.0);
+  float band = bandOf(cosi, scatter);
+  vec4 mirror = tone;
+  vec4 through = tone;
+  if (band < 1.0) {
+    mirror = mirrorDir.z < -0.0005 ? sceneGrad(landing(hit.p, mirrorDir, point), rx, ry) : studio(mirrorDir, 1.0);
+    vec2 land = landing(hit.q, hit.dir, point);
+    vec4 green = sceneGrad(land, tx, ty);
+    vec4 red = green;
+    vec4 blue = green;
+    if (hit.escaped > 0.5 && uDispersion > 0.0) {
+      float spread = uDispersion * 0.06;
+      vec3 redDir = refract(hit.inner, -hit.exitNormal, uIor - spread);
+      vec3 blueDir = refract(hit.inner, -hit.exitNormal, uIor + spread);
+      if (dot(redDir, redDir) > 0.0 && redDir.z < -0.2) red = sceneGrad(landing(hit.q, redDir, land), tx, ty);
+      if (dot(blueDir, blueDir) > 0.0 && blueDir.z < -0.2) blue = sceneGrad(landing(hit.q, blueDir, land), tx, ty);
+    }
+    vec2 light = lightAt(land) * vec2(0.45, 0.12);
+    red = lit(red, light);
+    green = lit(green, light);
+    blue = lit(blue, light);
+    through = mix(vec4(red.r, green.g, blue.b, green.a), tone, band);
+    mirror = mix(mirror, tone, band);
+  }
+  vec3 absorb = pow(max(uColor, vec3(0.001)), vec3(uTint * 1.6 * hit.travel));
+  through.rgb *= absorb;
+  float cloud = (1.0 - dot(absorb, vec3(0.3333))) * 0.7;
+  through += vec4(uColor * cloud, cloud) * (1.0 - through.a);
+  vec4 reflected = mirrorDir.z < -0.0005 ? mirror * fresnel : studio(mirrorDir, fresnel);
+  vec4 glass = reflected + through * (1.0 - reflected.a);
+  float grazing = 1.0 - smoothstep(0.04, 0.3, cosi);
+  glass = mix(glass, mirror + back * (1.0 - mirror.a), grazing);
+  float rim = pow(1.0 - cosi, 3.0) * (0.25 + 0.75 * abs(dot(normalize(hit.n.xy + 1e-5), GLINT))) * 0.55;
+  rim *= smoothstep(0.0, 0.08, cosi);
+  return vec4(rim) + glass * (1.0 - rim);
 }
 
 void main() {
+  if (uPass > 0.5) {
+    vec2 light = uUnit < 0.5 ? vec2(0.0) : shadowAt(uShadeBox.xy + gl_FragCoord.xy / SHADE * uShadeBox.zw);
+    outColor = vec4(light, 0.0, 1.0);
+    return;
+  }
   vec2 frag = gl_FragCoord.xy / uRatio;
   vec2 point = vec2(frag.x, uView.y - frag.y);
-  vec4 scene = sceneAt(point);
-  vec2 offset = point - uCenter;
-  float reach = REACH * scale();
-  if (uRadius < 0.5 || length(offset) > uRadius * reach + 2.0) {
-    outColor = scene;
+  vec4 back = lit(sceneGrad(point, vec2(0.0), vec2(0.0)), lightAt(point) * vec2(1.0, 0.3));
+  if (uUnit < 0.5) {
+    outColor = back;
     return;
   }
-  vec2 q = vec2(offset.x, -offset.y) / uRadius;
-  vec3 rd = vec3(0.0, 0.0, -1.0);
-  vec3 ro = vec3(q, sqrt(max(reach * reach - dot(q, q), 0.0)) + 0.01);
-  float stop = ro.z * 2.0;
-  float travel = 0.0;
-  float closest = 1e9;
-  bool hit = false;
-  for (int i = 0; i < 56; i++) {
-    float d = map(ro + rd * travel);
-    closest = min(closest, d);
-    if (d < NEAR) {
-      hit = true;
-      break;
+  vec3 ro = toLocal(uCamera);
+  vec3 rd = normalize(toLocal(vec3(point, 0.0)) - ro);
+  float eps = 0.25 / (uRatio * uUnit);
+  Hit hit = trace(ro, rd, eps);
+  if (hit.kind > 1.5) crossGlass(hit, rd, eps);
+  vec2 hitT = hit.kind > 1.5 ? landing(hit.q, hit.dir, point) : point;
+  vec2 hitR = hit.kind > 0.5 ? landing(hit.p, reflect(rd, hit.n), point) : point;
+  vec2 tx = dFdx(hitT);
+  vec2 ty = dFdy(hitT);
+  vec2 rx = dFdx(hitR);
+  vec2 ry = dFdy(hitR);
+  float scatter = (length(tx) + length(ty)) / (uUnit * 1.1);
+  vec4 tone = hit.kind > 0.5 ? textureLod(uScene, uCenter.xy / uView, uLod) * uSceneOn : vec4(0.0);
+  vec4 color = shade(hit, rd, back, tone, point, tx, ty, rx, ry, scatter);
+  float edgy = hit.kind > 1.5 ? 1.0 - smoothstep(0.3, 0.55, clamp(-dot(rd, hit.n), 0.0, 1.0)) : hit.kind;
+  if (edgy > 0.0) {
+    for (int k = 0; k < 3; k++) {
+      vec2 sub = point + JITTER[k] / uRatio;
+      vec3 subDir = normalize(toLocal(vec3(sub, 0.0)) - ro);
+      Hit extra = trace(ro, subDir, eps);
+      bool clear = bandOf(clamp(-dot(subDir, extra.n), 0.0, 1.0), scatter) < 1.0;
+      if (extra.kind > 1.5 && (uTint > 0.0 || clear)) crossGlass(extra, subDir, eps);
+      color += shade(extra, subDir, back, tone, sub, tx, ty, rx, ry, scatter);
     }
-    travel += d;
-    if (travel > stop) break;
+    color *= 0.25;
   }
-  if (!hit) {
-    float edge = clamp(0.6 - closest * uRadius / 1.4, 0.0, 1.0);
-    outColor = mix(scene, vec4(0.42) + scene * 0.58, edge);
-    return;
-  }
-  vec3 p = ro + rd * travel;
-  vec3 n = normalAt(p);
-  float ior = 1.0 + 0.2 * uRefraction;
-  vec3 r1 = refract(rd, n, 1.0 / ior);
-  vec3 inner = p - n * 0.004;
-  float span = 0.02;
-  for (int i = 0; i < 36; i++) {
-    float d = -map(inner + r1 * span);
-    if (d < NEAR) break;
-    span += max(d, 0.004);
-  }
-  vec3 exit = inner + r1 * span;
-  vec3 n2 = normalAt(exit);
-  vec3 r2 = refract(r1, -n2, ior);
-  if (dot(r2, r2) < 0.5) r2 = reflect(r1, -n2);
-  vec2 land = r2.z < -0.05 ? exit.xy + r2.xy * ((-BACKDROP - exit.z) / r2.z) : exit.xy + r2.xy * 2.5;
-  vec2 shift = land - q;
-  float split = 0.03 + 0.09 * uDispersion;
-  vec2 toPoint = vec2(1.0, -1.0) * uRadius;
-  vec4 red = sceneAt(uCenter + (q + shift * (1.0 - split)) * toPoint);
-  vec4 green = sceneAt(uCenter + (q + shift) * toPoint);
-  vec4 blue = sceneAt(uCenter + (q + shift * (1.0 + split)) * toPoint);
-  vec4 seen = vec4(red.r, green.g, blue.b, max(red.a, max(green.a, blue.a)));
-  vec3 absorb = mix(vec3(1.0), uColor, uTint * 0.6) * exp(-span * 0.12);
-  seen.rgb *= absorb;
-
-  float facing = clamp(n.z, 0.0, 1.0);
-  float fresnel = 0.04 + 0.96 * pow(1.0 - facing, 2.2);
-  vec3 bounce = reflect(rd, n);
-  vec3 shine = environment(bounce) * fresnel + vec3(pow(max(dot(bounce, normalize(KEY)), 0.0), 120.0) * 1.6);
-  float fill = 0.05 + 0.035 * span + uTint * 0.22;
-  vec3 tone = mix(vec3(0.78), uColor, uTint) * fill;
-  vec3 glass = shine + tone;
-  float alpha = clamp(max(fill + fresnel * 0.6, max(glass.r, max(glass.g, glass.b))), 0.0, 1.0);
-  outColor = vec4(min(glass, vec3(alpha)) + seen.rgb * (1.0 - alpha), alpha + seen.a * (1.0 - alpha));
+  outColor = color;
 }`;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
@@ -347,6 +534,16 @@ const range = (low: number, high: number, room: number) => {
   return { min: middle, max: middle };
 };
 
+const makeTexture = (gl: WebGL2RenderingContext, minify: number) => {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minify);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return texture;
+};
+
 const shader = (gl: WebGL2RenderingContext, type: number, source: string) => {
   const unit = gl.createShader(type);
   if (!unit) return null;
@@ -388,12 +585,13 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
   );
   const at = (name: UniformName) => uniform.get(name) ?? null;
   const vao = gl.createVertexArray();
-  const texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const texture = makeTexture(gl, gl.LINEAR_MIPMAP_LINEAR);
+  const shadeTexture = makeTexture(gl, gl.LINEAR);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, SHADE_SIZE, SHADE_SIZE, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const shadeTarget = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, shadeTarget);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shadeTexture, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const sceneCanvas = document.createElement("canvas");
@@ -451,10 +649,12 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     pen.setTransform(view.ratio, 0, 0, view.ratio, 0, 0);
     pen.clearRect(0, 0, view.width, view.height);
     paint(pen, { width: view.width, height: view.height });
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sceneCanvas);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.generateMipmap(gl.TEXTURE_2D);
     sceneReady = true;
   };
 
@@ -596,8 +796,8 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
 
   const advanceSpin = (dt: number) => {
     const rate = reduced ? 0 : SPIN[morph.to];
-    spin.yaw = unwind(spin.yaw, rate * 0.75, dt);
-    spin.pitch = unwind(spin.pitch, rate * 0.46, dt);
+    spin.yaw = unwind(spin.yaw, rate * 0.3, dt);
+    spin.pitch = unwind(spin.pitch, rate * 0.12, dt);
   };
 
   const turn = () => {
@@ -605,8 +805,9 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
     const tilt = reduced ? 0 : TILT[morph.from] + (TILT[morph.to] - TILT[morph.from]) * mixed;
     const leanX = reduced ? 0 : clamp(lens.vx * 0.00035, -0.5, 0.5);
     const leanY = reduced ? 0 : clamp(lens.vy * 0.00035, -0.5, 0.5);
-    const yaw = spin.yaw + leanX + tilt * Math.sin(clock * 0.7) * 0.3;
-    const pitch = spin.pitch + leanY + tilt * Math.cos(clock * 0.53) * 0.24;
+    const pose = (index: 0 | 1) => POSE[morph.from][index] + (POSE[morph.to][index] - POSE[morph.from][index]) * mixed;
+    const yaw = spin.yaw + pose(1) + leanX + tilt * Math.sin(clock * 0.7) * 0.2;
+    const pitch = spin.pitch + pose(0) + leanY + tilt * Math.cos(clock * 0.53) * 0.16;
     const roll = tilt * Math.sin(clock * 0.31 + 1.2) * 0.12 - leanX * 0.3;
     return orientation(yaw, pitch, roll);
   };
@@ -614,29 +815,55 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
   const draw = (s: GlassLensSettings, size: number) => {
     const mixed = ease(morph.t);
     const [red, green, blue] = toRgb(s.color);
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    const extent = EXTENT[morph.from] + (EXTENT[morph.to] - EXTENT[morph.from]) * mixed;
+    const unit = (size * Math.max(0, grow.value)) / extent;
+    const stretch = clamp(jelly.value, 0.6, 1.6);
+    const reach = 1.3 * Math.max(stretch, 1);
+    const focal = Math.max(view.width, view.height) * FOCAL;
+    const height = unit * FLOOR;
+    const depth = (focal - height) / focal;
+    const centerX = view.width / 2 + (lens.x - view.width / 2) * depth;
+    const centerY = view.height / 2 + (lens.y - view.height / 2) * depth;
+    const shadeHalf = unit * reach * 1.7;
+    const shadeX = centerX - (SUN[0] / SUN[2]) * height;
+    const shadeY = centerY + (SUN[1] / SUN[2]) * height;
     gl.useProgram(program);
     gl.bindVertexArray(vao);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(at("uScene"), 0);
+    gl.uniform1i(at("uShade"), 1);
     gl.uniform1f(at("uSceneOn"), sceneReady ? 1 : 0);
+    gl.uniform4f(at("uShadeBox"), shadeX - shadeHalf, shadeY - shadeHalf, shadeHalf * 2, shadeHalf * 2);
     gl.uniform2f(at("uView"), view.width, view.height);
     gl.uniform1f(at("uRatio"), view.ratio);
-    gl.uniform2f(at("uCenter"), lens.x, lens.y);
-    gl.uniform1f(at("uRadius"), size * Math.max(0, grow.value));
+    gl.uniform3f(at("uCamera"), view.width / 2, view.height / 2, focal);
+    gl.uniform3f(at("uCenter"), centerX, centerY, height);
+    gl.uniform1f(at("uUnit"), unit);
+    gl.uniform1f(at("uReach"), reach);
+    gl.uniform1f(at("uLod"), Math.log2(Math.max(1, unit * reach * 0.7 * view.ratio)));
     gl.uniform2i(at("uShapes"), SHAPE_ID[morph.from], SHAPE_ID[morph.to]);
     gl.uniform1f(at("uMorph"), mixed);
     gl.uniform2f(at("uAxis"), axis.x, -axis.y);
-    gl.uniform1f(at("uStretch"), clamp(jelly.value, 0.6, 1.6));
+    gl.uniform1f(at("uStretch"), stretch);
     gl.uniformMatrix3fv(at("uTurn"), false, turn());
     gl.uniform1f(at("uTime"), clock);
-    gl.uniform1f(at("uRefraction"), s.refraction);
+    gl.uniform1f(at("uIor"), 1 + 0.5 * clamp(s.refraction, 0, 2));
     gl.uniform1f(at("uDispersion"), clamp(s.dispersion, 0, 1));
     gl.uniform3f(at("uColor"), red, green, blue);
     gl.uniform1f(at("uTint"), clamp(s.tint, 0, 1));
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, shadeTarget);
+    gl.viewport(0, 0, SHADE_SIZE, SHADE_SIZE);
+    gl.uniform1f(at("uPass"), 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, shadeTexture);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.uniform1f(at("uPass"), 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 
@@ -824,6 +1051,8 @@ function runLens(parts: GlassLensParts, read: () => GlassLensSettings, intro: bo
       if (gl.isContextLost()) return;
       gl.deleteProgram(program);
       gl.deleteTexture(texture);
+      gl.deleteTexture(shadeTexture);
+      gl.deleteFramebuffer(shadeTarget);
       gl.deleteVertexArray(vao);
     },
   } satisfies GlassLens;
