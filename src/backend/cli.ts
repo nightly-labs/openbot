@@ -869,7 +869,6 @@ const OPTIONAL_INSTALLED_CLI_WAIT_MS = 20_000;
 const SKIP_HUNG_INSTALLED_CLI_MS = 10 * 60_000;
 
 interface InstalledCliCheck {
-  readonly settled: Deferred.Deferred<boolean>;
   waitedOut: boolean;
   hungAt: number | null;
 }
@@ -880,8 +879,7 @@ function isTimeoutFailure(failure: unknown): boolean {
   return isDynamicRecord(failure) && isCliTimeout(failure.cause);
 }
 
-function settleInstalledCliCheck(key: string, check: InstalledCliCheck, found: boolean, hung: boolean): void {
-  Deferred.doneUnsafe(check.settled, Effect.succeed(found));
+function settleInstalledCliCheck(key: string, check: InstalledCliCheck, hung: boolean): void {
   if (installedCliChecks.get(key) !== check) return;
   if (hung && check.waitedOut) check.hungAt = Date.now();
   else installedCliChecks.delete(key);
@@ -904,30 +902,19 @@ function optionalInstalledCli<Cli, E>(
     const running = installedCliChecks.get(key);
     if (running && running.hungAt === null) {
       if (running.waitedOut) return null;
-      const answer = yield* withinWait(
-        Effect.gen(function* () {
-          if (!(yield* Deferred.await(running.settled))) return null;
-          const own = yield* Effect.result(installed);
-          return Result.isSuccess(own) ? own.success : null;
-        }),
-      );
-      return Option.getOrNull(answer);
+      const own = yield* withinWait(Effect.result(installed));
+      return Option.isSome(own) && Result.isSuccess(own.value) ? own.value.success : null;
     }
-    const check: InstalledCliCheck = { settled: Deferred.makeUnsafe<boolean>(), waitedOut: false, hungAt: null };
+    const check: InstalledCliCheck = { waitedOut: false, hungAt: null };
     installedCliChecks.set(key, check);
     const read = installed.pipe(
       Effect.result,
       Effect.tap((result) =>
         Effect.sync(() =>
-          settleInstalledCliCheck(
-            key,
-            check,
-            Result.isSuccess(result),
-            Result.isFailure(result) && isTimeoutFailure(result.failure),
-          ),
+          settleInstalledCliCheck(key, check, Result.isFailure(result) && isTimeoutFailure(result.failure)),
         ),
       ),
-      Effect.onInterrupt(() => Effect.sync(() => settleInstalledCliCheck(key, check, false, false))),
+      Effect.onInterrupt(() => Effect.sync(() => settleInstalledCliCheck(key, check, false))),
     );
     const fiber = yield* backgroundScope && backgroundScope.state._tag !== "Closed"
       ? Effect.forkIn(read, backgroundScope)
