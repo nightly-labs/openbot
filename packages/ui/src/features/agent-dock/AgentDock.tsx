@@ -303,6 +303,10 @@ export function AgentDock(props: AgentDockProps) {
     return next;
   });
   const seatFor = (id: string) => seatProps().get(id);
+  const firstTemporaryAfterSaved = createMemo(() => {
+    const index = state.seats.findIndex((id) => seatFor(id)?.temporary === true);
+    return index > 0 ? state.seats[index] : undefined;
+  });
   const seatAgent = (agentId: string) => {
     const seat = seatFor(agentDockSeatKey({ kind: "agent", id: agentId }));
     return seat?.kind === "agent" ? seat.agent : undefined;
@@ -1257,6 +1261,7 @@ export function AgentDock(props: AgentDockProps) {
                     }}
                     style={{ left: `${DOCK_PAD}px` }}
                     data-dragging={draggedSeat() === id ? "" : undefined}
+                    data-temporary-start={firstTemporaryAfterSaved() === id ? "" : undefined}
                   >
                     <Show when={seatFor(id)}>
                       {(seat) => (
