@@ -99,6 +99,7 @@ export interface AcpFlavor {
   configConflict?(error: unknown): boolean;
   staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
+  noModelsAfterRetry?(): string;
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
   modelSetUnsaved?(error: RequestError): boolean;
@@ -454,6 +455,7 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
     error.code === -32603 && isRecord(error.data) && error.data.message === "Failed to initialize session services"
       ? sourceText("error.provider.cursorSignInUnusable")
       : null,
+  noModelsAfterRetry: () => sourceText("error.provider.cursorNoModels"),
   planUsedUpChunk: /^(?:\n\nUpgrade your plan to continue|\s*Add a payment method to continue\.?\s*)$/u,
   connectionLostChunk: /^\s*Error: RetriableError: \[(?:canceled|aborted|unavailable|deadline_exceeded)\] [^\n]*\s*$/u,
   turnFailure: cursorTurnFailure,

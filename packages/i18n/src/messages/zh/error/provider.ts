@@ -328,6 +328,8 @@ export const messages = {
   "error.provider.cursorSignIn": "请使用 Cursor 登录，或设置 CURSOR_API_KEY 以使用 Cursor。",
   "error.provider.cursorSignInUnusable":
     "Cursor 无法使用你的登录信息连接到其服务器。请检查网络连接，然后重新登录 Cursor。",
+  "error.provider.cursorNoModels":
+    "Cursor 没有发送模型列表。请重启 Cursor。如果此消息仍然存在，请重新登录 Cursor，并确认你的 Cursor 套餐包含模型。",
   "error.provider.clineArchivePath": "Cline 压缩包中包含异常的路径。",
   "error.provider.clinePackageMismatch": "Cline 包与运行时目录不匹配。",
   "error.provider.clineChecksum": "Cline 运行时校验和不匹配。",

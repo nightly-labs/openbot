@@ -364,6 +364,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.cursorSignIn": "Sign in with Cursor or set CURSOR_API_KEY to use Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor could not connect to its server with your sign-in. Check your internet connection, then sign in to Cursor again.",
+  "error.provider.cursorNoModels":
+    "Cursor did not send its list of models. Restart Cursor. If this message stays, sign in to Cursor again and check that your Cursor plan includes models.",
   "error.provider.clineArchivePath": "The Cline archive has an unexpected path.",
   "error.provider.clinePackageMismatch": "The Cline package does not match the runtime catalog.",
   "error.provider.clineChecksum": "Cline runtime checksum mismatch.",

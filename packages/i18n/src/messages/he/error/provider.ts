@@ -351,6 +351,8 @@ export const messages = {
   "error.provider.cursorSignIn": "יש להתחבר עם Cursor או להגדיר CURSOR_API_KEY כדי להשתמש ב-Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor לא הצליח להתחבר לשרת שלו עם פרטי ההתחברות שלך. יש לבדוק את החיבור לאינטרנט ואז להתחבר שוב ל-Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor לא שלח את רשימת המודלים שלו. הפעילו מחדש את Cursor. אם ההודעה הזו נשארת, התחברו שוב ל-Cursor ובדקו שהתוכנית שלכם ב-Cursor כוללת מודלים.",
   "error.provider.clineArchivePath": "בארכיון של Cline יש נתיב לא צפוי.",
   "error.provider.clinePackageMismatch": "החבילה של Cline אינה תואמת לקטלוג סביבות ההרצה.",
   "error.provider.clineChecksum": "סכום הביקורת של סביבת ההרצה של Cline אינו תואם.",

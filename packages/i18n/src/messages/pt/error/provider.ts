@@ -378,6 +378,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Entre com o Cursor ou defina CURSOR_API_KEY para usar o Cursor.",
   "error.provider.cursorSignInUnusable":
     "O Cursor não conseguiu se conectar ao servidor com o seu login. Verifique sua conexão com a internet e entre no Cursor novamente.",
+  "error.provider.cursorNoModels":
+    "O Cursor não enviou a lista de modelos. Reinicie o Cursor. Se esta mensagem continuar, entre no Cursor de novo e confira se o seu plano do Cursor inclui modelos.",
   "error.provider.clineArchivePath": "O arquivo compactado do Cline tem um caminho inesperado.",
   "error.provider.clinePackageMismatch": "O pacote do Cline não corresponde ao catálogo de ambientes de execução.",
   "error.provider.clineChecksum": "A soma de verificação do ambiente de execução do Cline não corresponde.",
