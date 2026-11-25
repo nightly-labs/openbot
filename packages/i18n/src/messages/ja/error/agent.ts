@@ -20,6 +20,8 @@ export const messages = {
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。tool_search が返す正確な完全修飾名（例: openbot_browser.snapshot）を使ってください。",
   "error.agent.toolCallUnknownToolSuggest":
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。完全修飾名は {name} の可能性があります。その場合は、その名前でもう一度呼び出してください。",
+  "error.agent.toolCallNullValue":
+    "ツールは実行されませんでした。{name} は {paths} にオブジェクトまたはリストを必要としますが、これらのリスト項目はすべて null として届きました。もう一度呼び出し、それぞれの項目をその JSON を含む文字列として渡してください。",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe は {names} という名前の OpenBot ツールを見つけられませんでした。openbot.tool_search が一覧にする OpenBot とブラウザーのツールだけを説明し、MCP ツールは説明しません。",
   "error.agent.toolDescribeDiscoveryNames":
@@ -56,6 +58,12 @@ export const messages = {
   "error.agent.modelUnavailable": "選択したエージェントのモデルを使用できません。",
   "error.agent.modelProviderNotConnected":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} が接続されていません。",
+  "error.agent.modelProviderSignInRequired":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} へのサインインが必要です。{provider} にサインインしてから、もう一度お試しください。",
+  "error.agent.modelProviderNotInstalled":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} がインストールされていません。",
+  "error.agent.modelProviderOutdated":
+    "選択したエージェントのモデル「{model}」を使用できません: {provider} の更新が必要です。",
   "error.agent.modelListEmpty":
     "選択したエージェントのモデル「{model}」を使用できません: {provider} はモデルを 1 つも返しませんでした。最後のエラー: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -135,6 +143,10 @@ export const messages = {
     "エージェントのデータを完全には削除できませんでした。エージェントの削除を再試行してください。",
   "error.agent.deleteFolderInUse":
     "別のエージェントの作業がまだこのエージェントのフォルダを使っています。その作業が終わったとき、または OpenBot を再起動したあとに、もう一度削除してください。",
+  "error.agent.deleteFolderLocked":
+    "別のプログラム（エージェントが起動したプログラムなど）がまだこのエージェントのフォルダを使っています。そのプログラムを閉じるか、このエージェントが動いているコンピューターを再起動してから、もう一度エージェントを削除してください。",
+  "error.agent.deleteWhenFolderFree":
+    "別のエージェントの作業がまだこのエージェントのフォルダを使っています。その作業が終わると、OpenBot がこのエージェントを削除します。",
   "error.agent.duplicationBusy": "このエージェントはすでに複製中です。",
   "error.agent.waitBeforeDuplicate": "複製する前に、エージェントが終わるまで待ち、キューを空にしてください。",
   "error.agent.saveOtherAgent": "この保存は別のエージェントのものです。",
@@ -160,6 +172,8 @@ export const messages = {
     "エージェントの作業中のメッセージの扱いは、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.backupModelsLocalOnly":
     "バックアップモデルは、エージェントを実行しているコンピューターでのみ設定できます。",
+  "error.agent.backupModelsAtLimit":
+    "今は引き継げる予備モデルがありません。どの予備モデルも利用上限に達したか、少し前に失敗しました。同じアカウントのモデルは上限を共有することがあります。今すぐ続けるには、別のプロバイダーまたは別のアカウントの予備モデルを追加するか、上限のリセットを待ってください。",
   "error.agent.taskLimitLocalOnly": "タスクの上限は、エージェントを実行しているコンピューターでのみ設定できます。",
   "error.agent.localScriptsOff": "このエージェントはローカルスクリプトを許可していません。",
   "error.agent.localScriptsRateLimited":
@@ -201,6 +215,8 @@ export const messages = {
     "この領域は 1 つのディスプレイの中に収まっていません。list_capture_sources が返す 1 つのディスプレイの範囲内で、デスクトップのポイント座標を使ってください。",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot に画面収録の権限がありません。ユーザーに「システム設定」→「プライバシーとセキュリティ」→「画面収録とシステムオーディオ録音」を開いて OpenBot をオンにし、OpenBot を終了してから再度開くよう依頼してください。",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot にはまだ画面収録の権限がないため、ウインドウを一覧表示できません。ディスプレイをキャプチャするには、target screen で capture_screen を呼び出してください。ユーザーが先にキャプチャを承認し、その後 macOS がユーザーに権限を求めることがあります。",
   "error.agent.screenCaptureEmptyWindows":
     "Windows が空の画像を返しました。コンピューターのロックを解除し、保護されたコンテンツを閉じるようユーザーに依頼してください。組織のポリシーによって画面キャプチャが止められている場合もあります。",
   "error.agent.screenCaptureFailed": "画面キャプチャに失敗しました。もう一度お試しください。",

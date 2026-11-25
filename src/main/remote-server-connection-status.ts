@@ -1,39 +1,21 @@
-import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
-// What a failure means to the user, and what this build claims to support. Pure functions only --
-// nothing here reads or writes connection state, so the whole table can be checked with a value in
-// and a value out.
-//
-// This is the only translation from `RemoteRequestError` / `RemoteProtocolError` / a transport error
-// code into a `ServerConnectionIssue`. It used to be two `instanceof` ladders in the manager, one for
-// HTTP failures and one for WebRTC transport codes, that had drifted apart -- the same condition
-// could show the user two different messages depending on which transport a server happened to use.
-// They are siblings in this file now so that stays visible. Adding a third caller means adding a
-// classifier here, not another ladder somewhere else.
-
 import type { ServerCompatibility, ServerConnectionIssue, ServerSummary } from "@openbot/contracts/ipc";
 import { TEAM_PROTOCOL_V1, type TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V3_CAPABILITIES } from "@openbot/contracts/team-protocol/v3";
+import { TEAM_PROTOCOL_V10 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
 import { isSafeConnectionError } from "@openbot/team-client/remote-recovery";
 import { errorReference, referenceFrom } from "@openbot/user-errors";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
 
-// The protocol range this build speaks. Every compatibility record reports it as the local half.
 export const LOCAL_TEAM_PROTOCOL = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V10 } as const;
 
-// Everything the app tracks about one server's connection, and the whole of what `list()` reports
-// beyond the server's stored fields.
 export interface RemoteServerConnectionStatus {
   state: ServerSummary["state"];
   compatibility: ServerCompatibility | null;
   issue: ServerConnectionIssue | null;
-  // Bumped on every fresh connection. The renderer uses it to tell a reconnect from a still-open
-  // connection, so it has to change even when nothing else about the status does.
   connectionSequence: number;
-  // True from a new WebRTC connection until its capability read ends, with or without a result.
   capabilitiesPending: boolean;
   hostRestart: ServerSummary["hostRestart"];
-  /** A hosted server that the account service stopped for no use, or that it starts now. */
   hostedSleep: ServerSummary["hostedSleep"];
   hostedIssue: ServerSummary["hostedIssue"];
   hostedStart: ServerSummary["hostedStart"];
@@ -41,22 +23,13 @@ export interface RemoteServerConnectionStatus {
 
 export interface RemoteConnectionOutcome {
   issue: ServerConnectionIssue | null;
-  // Null means "leave the state alone" -- an error the caller has no better word for than whatever
-  // the server was already showing.
   state: ServerSummary["state"] | null;
-  // True for failures no retry fixes: the event stream stops reconnecting until the user acts.
   suspendReconnect: boolean;
-  // What the host said it supports, when the failure was the two ends disagreeing about the wire.
   hostSupport: TeamProtocolSupportV1 | null;
 }
 
 const NO_OUTCOME: RemoteConnectionOutcome = { issue: null, state: null, suspendReconnect: false, hostSupport: null };
 
-// `fetch` rejects with a `TypeError` when it never reached the host, and a WebSocket that fails to
-// open says nothing useful at all. Both mean the same thing to the user, so they report it the same
-// way. A function rather than a constant: the issue ends up inside a status record, and one shared
-// object there would be one mutation away from being every server's issue. The caller can give a
-// more exact reference, such as the WebSocket close code.
 export function hostUnreachable(
   reference = "network/fetch",
   message = sourceText("error.remote.hostUnreachable"),
@@ -74,14 +47,17 @@ export function hostUnreachable(
   };
 }
 
-/**
- * A WebRTC attempt to connect that ended with no transport error event, such as a timeout. It stays
- * a network issue, so the workspace stays on screen and the app tries again. The failure gives the
- * reference, and also the sentence when it is one of our fixed connection sentences (#6873).
- */
 export function classifyConnectFailure(failure: unknown): RemoteConnectionOutcome {
-  const message = failure instanceof Error && isSafeConnectionError(failure.message) ? failure.message : undefined;
-  return hostUnreachable(errorReference(failure) ?? "transport/connect_failed", message);
+  if (failure instanceof DOMException && failure.name === "TimeoutError")
+    return hostUnreachable("auth/timeout", sourceText("error.remote.directoryTimeout"));
+  const reference = errorReference(failure);
+  const message =
+    failure instanceof Error && isSafeConnectionError(failure.message)
+      ? failure.message
+      : reference === null
+        ? sourceText("error.remote.connectionNotStarted")
+        : undefined;
+  return hostUnreachable(reference ?? "transport/connect_failed", message);
 }
 
 export function classifyRemoteConnectionError(error: unknown): RemoteConnectionOutcome {
@@ -91,8 +67,6 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
         { code: error.code, message: error.message, retryable: true },
         referenceFrom("protocol", error.code),
       ),
-      // A protocol error is this app and the host disagreeing about the bytes, which is not the same
-      // as either being out of date -- the two update codes and a host in safe mode say "incompatible".
       state: error.code === "protocol_error" ? "error" : "incompatible",
       suspendReconnect: true,
       hostSupport: error.support,
@@ -100,7 +74,6 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
   }
   if (error instanceof RemoteRequestError) {
     const reference = error.reference ?? referenceFrom("http", error.status, error.code);
-    // The host's own words are for a developer and are not translated, so the user gets ours.
     if (error.code === "client_update_required" || error.code === "host_update_required") {
       return {
         issue: withReference(
@@ -119,7 +92,6 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
         hostSupport: null,
       };
     }
-    // A host in safe mode refuses every route but the reason. The next compatibility read gets the reason.
     if (error.code === "server_safe_mode") {
       return {
         issue: withReference(
@@ -136,7 +108,6 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
         issue: withReference(
           {
             code: "protocol_error",
-            // A 5xx is this app refusing what the host sent; a 4xx is the host refusing this app.
             message:
               error.status >= 500
                 ? sourceText("error.remote.invalidData")
@@ -151,8 +122,6 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
       };
     }
     if (error.status === 401) {
-      // Deliberately not the host's own message: a 401 body is written for a developer, and the one
-      // thing the user can do about it is sign in again.
       return {
         issue: withReference(
           {
@@ -167,9 +136,6 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
         hostSupport: null,
       };
     }
-    // Any other refusal is the host answering normally. It is the caller's to report, not a
-    // connection problem. The error keeps its status and code, so its reference is still
-    // `http/<status>/<code>` where the caller shows it.
     return NO_OUTCOME;
   }
   if (error instanceof SyntaxError) {
@@ -189,8 +155,6 @@ export function classifyRemoteConnectionError(error: unknown): RemoteConnectionO
   return NO_OUTCOME;
 }
 
-// The WebRTC transport reports failures as a code and a message rather than an error object, so it
-// gets its own entry point into the same table.
 export function classifyTransportError(code: string, message: string): RemoteConnectionOutcome {
   const authenticationEnded = code === "session_revoked";
   const suspendReconnect = code === "protocol_error" || authenticationEnded;
@@ -215,22 +179,13 @@ export function classifyTransportError(code: string, message: string): RemoteCon
   };
 }
 
-/**
- * The sentence and the reference for a transport failure. A Signal code (`SIGNAL_ERROR_CODES`) gets
- * our own sentence, because the Signal text is for a developer and is not translated. Any other code
- * is the bridge's own, and its message is already ours.
- */
 export function transportFailure(code: string, message: string): { message: string; reference: string | null } {
   const signal = signalIssueText(code);
   if (signal !== null) return { message: signal, reference: referenceFrom("signal", code) };
-  // The Signal message says why the session ended.
   if (code === "session_revoked") return { message, reference: "signal/session_revoked" };
   return { message, reference: referenceFrom("transport", code) };
 }
 
-// The sentence for each Signal error code. Null for a code that is not Signal's, for
-// `session_revoked`, and for `protocol_error`: the bridge also uses that code for its own failures,
-// such as a host that failed end-to-end authentication, and its message says which.
 function signalIssueText(code: string): string | null {
   switch (code) {
     case "host_unavailable":
@@ -240,12 +195,10 @@ function signalIssueText(code: string): string | null {
     case "permission_denied":
       return sourceText("error.remote.signalPermissionDenied");
     case "rate_limited":
-      // The Signal frame has no wait. The bridge waits 60 seconds before it opens Signal again.
       return sourceText("error.remote.signalRateLimited", { seconds: 60 });
     case "invalid_message":
       return sourceText("error.remote.signalInvalidMessage");
     case "authentication_required":
-      // The next connection gets a new ticket, so the user does not need to sign in again.
       return sourceText("error.remote.ticketInvalidOrExpired");
     default:
       return null;
@@ -256,8 +209,6 @@ function withReference(issue: ServerConnectionIssue, reference: string | null): 
   return reference === null ? issue : { ...issue, reference };
 }
 
-// What the app reports before it has heard from the host. Every other compatibility record is this
-// one with the host's half filled in, so they cannot drift apart.
 export function checkingCompatibility(localAppVersion: string | null): ServerCompatibility {
   return {
     localAppVersion: localAppVersion ?? "0.0.0",
@@ -269,8 +220,6 @@ export function checkingCompatibility(localAppVersion: string | null): ServerCom
   };
 }
 
-// A build with no version of its own is a development build. It cannot negotiate honestly, so it
-// assumes the host matches rather than blocking the developer on a check that means nothing here.
 export function assumedCompatibility(localAppVersion: string | null): ServerCompatibility {
   return {
     ...checkingCompatibility(localAppVersion),
@@ -281,8 +230,6 @@ export function assumedCompatibility(localAppVersion: string | null): ServerComp
   };
 }
 
-// A host that answered the compatibility route: its version and range as reported, and the highest
-// protocol both ends speak. The caller has already established that the ranges overlap.
 export function negotiatedCompatibility(
   localAppVersion: string | null,
   host: TeamProtocolSupportV1,
@@ -298,8 +245,6 @@ export function negotiatedCompatibility(
   };
 }
 
-// The WebRTC transport carries V2 framing and nothing else, so there is nothing to negotiate: the
-// protocol is pinned rather than derived from the host's range.
 export function webRtcCompatibility(localAppVersion: string | null, host: TeamProtocolSupportV1): ServerCompatibility {
   return {
     localAppVersion: localAppVersion ?? "0.0.0",

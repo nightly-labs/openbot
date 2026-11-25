@@ -22,6 +22,11 @@ export const messages = {
   "channel.panel.close": "Chiudi il pannello del canale",
   "channel.settings.title": "Impostazioni del canale",
   "channel.settings.memories": "Memorie",
+  "channel.settings.folders.title": "Cartelle",
+  "channel.settings.folders.description":
+    "Tutti i membri di {channel} possono modificare file ed eseguire comandi in queste cartelle.",
+  "channel.settings.folders.toastAdded": "I membri di {channel} ora possono modificare i file in {folder}",
+  "channel.settings.folders.toastRemoved": "I membri di {channel} non possono più modificare i file in {folder}",
   "channel.settings.isolated": "Tieni le memorie in questo canale",
   "channel.settings.isolatedDescription":
     "Gli agenti salvano ciò che imparano qui come memorie del canale. Le loro altre chat non le vedono.",

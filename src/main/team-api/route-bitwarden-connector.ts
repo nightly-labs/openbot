@@ -16,7 +16,6 @@ import { readJson, requireAdmin, stringField } from "./request-helpers";
 const ROUTES: ReadonlySet<string> = new Set(Object.values(BITWARDEN_CONNECTOR_ROUTES));
 const ERROR_LIMIT = 2_000;
 
-/** The wire status of `bitwarden-connector-v1`. The error is cut to the codec's bound. */
 function wireStatus(status: BitwardenConnectorStatus) {
   return {
     state: status.connecting ? "connecting" : status.connected ? "connected" : "disconnected",
@@ -25,12 +24,6 @@ function wireStatus(status: BitwardenConnectorStatus) {
   };
 }
 
-/**
- * The Bitwarden connection of this host, which an owner or administrator connects from their own
- * computer with an API key and the master password. Frozen by `bitwarden-connector-v1`.
- *
- * They arrive once, in the connect body; no answer carries them. `requireAdmin` runs on every route.
- */
 export async function routeBitwardenConnector(
   context: TeamApiRequestContext,
   connector: TeamApiBitwardenConnector | undefined,
@@ -40,7 +33,6 @@ export async function routeBitwardenConnector(
   if (!connector || !capabilities.has(BITWARDEN_CONNECTOR_CAPABILITY))
     throw new HttpError(400, sourceText("error.team.connectorsUnsupported"));
   requireAdmin(member);
-  // `readJson` has already run the body through the `bitwarden-connector-v1` codec.
   const body = await readJson(request);
   switch (url.pathname) {
     case BITWARDEN_CONNECTOR_ROUTES.connect: {
@@ -50,7 +42,6 @@ export async function routeBitwardenConnector(
         clientSecret: stringField(body, "clientSecret", false, BITWARDEN_CONNECTOR_KEY_LIMIT),
         masterPassword: stringField(body, "masterPassword", false, BITWARDEN_CONNECTOR_PASSWORD_LIMIT),
       };
-      // The service registers each value for redaction before it logs or runs `bw`.
       return json(200, wireStatus(await runCauseEffect(connector.connectWithApiKey(input))));
     }
     case BITWARDEN_CONNECTOR_ROUTES.disconnect:

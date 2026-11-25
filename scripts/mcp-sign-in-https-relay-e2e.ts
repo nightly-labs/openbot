@@ -1,17 +1,3 @@
-// End-to-end check of the Meta Ads MCP sign-in through the openbot.run relay.
-//   bun scripts/mcp-sign-in-https-relay-e2e.ts
-// Meta's ads MCP server registers only the clients it approved and refuses every `http` redirect,
-// loopback too. OpenBot uses its own Meta app and the HTTPS relay page `/oauth/mcp-callback`.
-// 1. Starts a sign-in with McpOAuth against the real https://mcp.facebook.com/ads. The browser is not
-//    opened: the authorization page is read. It must name the OpenBot app and the relay address, and
-//    the store must keep no registration.
-// 2. Starts the site's development server and the real MCP grant listener of `src/main`. The relay
-//    route must answer 302 to `http://127.0.0.1:28417/mcp-auth` with the query unchanged. That request
-//    goes to the listener (on another port when the OpenBot app holds 28417), which must hand the grant
-//    to the sign-in of step 1. A refusal must reach the listener as a refusal.
-// 3. Starts a sign-in with an MCP server on this computer whose metadata names Meta's issuer. It must
-//    not get the OpenBot Meta app: that app's token would go to the server that asked for it.
-// Writes .openbot-build/mcp-sign-in-https-relay-e2e/report.json. Needs network access to Meta.
 import assert from "node:assert/strict";
 import { type ChildProcess, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -33,6 +19,7 @@ const ROOT = resolve(import.meta.dirname, "..");
 const OUT = resolve(ROOT, ".openbot-build/mcp-sign-in-https-relay-e2e");
 const META_ADS_MCP_URL = "https://mcp.facebook.com/ads";
 const META_APP_ID = "1479376854168579";
+const SAVED_APP_ID = "e2e-saved-meta-app";
 const LOOPBACK_REDIRECT_URL = `http://127.0.0.1:${MCP_OAUTH_REDIRECT_PORT}/mcp-auth`;
 
 interface Delivery {
@@ -46,7 +33,6 @@ interface Refusal {
   query: string;
 }
 
-/** One request to the relay route, and the listener's answer to the address it sent the browser to. */
 interface RelayResult {
   status: number;
   location: string;
@@ -71,8 +57,14 @@ interface Report {
   store?: { client: McpOAuthRecord["client"] | null; issuer: string | null };
   grant?: RelayResult & { delivered: Delivery[] };
   refusal?: RelayResult & { refused: Refusal[] };
-  /** The sign-in of a server that names Meta's issuer and is not Meta's: the pages it opened. */
   impostor?: { pages: { origin: string; clientId: string | null }[]; error: string | null };
+  savedApp?: {
+    clientId: string | null;
+    redirectUri: string | null;
+    shownRedirectUrl: string;
+    otherServerRedirectUrl: string;
+    error: string | null;
+  };
   listenerPort?: number;
 }
 
@@ -92,7 +84,6 @@ const freePort = () =>
     });
   });
 
-/** Resolves once Vite prints the address it listens on, or rejects when the server exits first. */
 function waitForSite(child: ChildProcess, address: string): Promise<void> {
   return new Promise((done, fail) => {
     let output = "";
@@ -108,7 +99,6 @@ function waitForSite(child: ChildProcess, address: string): Promise<void> {
 
 mkdirSync(OUT, { recursive: true });
 
-// 1. The sign-in page, from Meta's own discovery documents --------------------------------------
 const records = new Map<string, McpOAuthRecord>();
 const pages: string[] = [];
 let openPage: (url: string) => void = () => {};
@@ -187,13 +177,11 @@ try {
   check(record?.client === undefined, "the store keeps a registration for Meta");
   check(record?.discovery?.authorizationServerUrl === "https://www.facebook.com/ads", "the issuer is not stored");
 
-  // 2. The relay route, and the listener behind it -----------------------------------------------
   await waitForSite(site, origin);
   const relay = async (query: string): Promise<RelayResult> => {
     const response = await fetch(`${origin}/oauth/mcp-callback?${query}`, { redirect: "manual" });
     const location = response.headers.get("location") ?? "";
     const target = URL.parse(location);
-    // The OpenBot app on this computer can hold the preferred port; the test listener then has another.
     if (target) target.port = String(new URL(listener.redirectUrl).port);
     const answer = target ? await fetch(target, { redirect: "manual" }) : null;
     return {
@@ -229,10 +217,8 @@ try {
   check(refusal.listenerStatus === 400, `the listener answered a refusal with ${refusal.listenerStatus}`);
   check(refused.length === 1 && refused[0]?.state === "e2e-refused", "the listener did not see the refusal");
 
-  // The grant above is not real, so the token exchange is not run.
   oauth.cancelSignIn(META_ADS_MCP_URL);
 
-  // 3. A server that is not Meta's names Meta's issuer ----------------------------------------------
   const impostorPort = await freePort();
   const impostorUrl = `http://127.0.0.1:${impostorPort}/ads`;
   const impostor = createHttpServer((request, response) => {
@@ -264,6 +250,42 @@ try {
   check(
     impostorPages.every((opened) => opened.clientId !== META_APP_ID),
     "a server that is not Meta's got the OpenBot Meta app",
+  );
+
+  const savedAppPages = pages.length;
+  let savedAppError: string | null = null;
+  try {
+    await runCauseEffect(
+      oauth.saveSignInApp(META_ADS_MCP_URL, { clientId: SAVED_APP_ID, clientSecret: null, scope: "" }),
+    );
+    const savedAppSignIn = oauth.signIn(META_ADS_MCP_URL);
+    assert.ok(savedAppSignIn, "McpOAuth takes the Meta Ads MCP address with a saved sign-in app");
+    await runCauseEffect(savedAppSignIn.begin());
+  } catch (error) {
+    savedAppError = error instanceof Error ? error.message : String(error);
+  } finally {
+    oauth.cancelSignIn(META_ADS_MCP_URL);
+  }
+  const savedAppPage = URL.parse(pages.slice(savedAppPages).at(-1) ?? "");
+  report.savedApp = {
+    clientId: savedAppPage?.searchParams.get("client_id") ?? null,
+    redirectUri: savedAppPage?.searchParams.get("redirect_uri") ?? null,
+    shownRedirectUrl: oauth.signInAppRedirectUrl(META_ADS_MCP_URL),
+    otherServerRedirectUrl: oauth.signInAppRedirectUrl(impostorUrl),
+    error: savedAppError,
+  };
+  check(report.savedApp.clientId === SAVED_APP_ID, "the page does not name the saved sign-in app");
+  check(
+    report.savedApp.redirectUri === MCP_OAUTH_RELAY_URL,
+    `a saved sign-in app for Meta sent ${report.savedApp.redirectUri}`,
+  );
+  check(
+    report.savedApp.shownRedirectUrl === MCP_OAUTH_RELAY_URL,
+    `the Sign-in app section shows ${report.savedApp.shownRedirectUrl} for Meta`,
+  );
+  check(
+    report.savedApp.otherServerRedirectUrl === LOOPBACK_REDIRECT_URL,
+    `the Sign-in app section shows ${report.savedApp.otherServerRedirectUrl} for another server`,
   );
 } catch (error) {
   report.failures.push(error instanceof Error ? error.message : String(error));

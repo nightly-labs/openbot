@@ -8,10 +8,6 @@ export interface ChatActionCardAction {
   onClick: () => void;
 }
 
-/**
- * The footer line. A `note` is plain text; `busy`, `done` and `error` announce a change the person
- * made from the card, so assistive technology reads them when they appear.
- */
 export type ChatActionCardStatus =
   | { kind: "note"; text: string; action?: ChatActionCardAction | undefined }
   | { kind: "busy"; text: string }
@@ -19,29 +15,18 @@ export type ChatActionCardStatus =
   | { kind: "error"; text: string };
 
 export interface ChatActionCardProps {
-  /** The Lucide icon of the kind of record. */
   icon: JSX.Element;
-  /** What happened, for example "Created routine". */
   eyebrow: string;
   title: string;
-  /** The subject no longer exists: the title is struck through and Open is hidden. */
   removed?: boolean;
-  /** Opens the subject, such as the routine in its settings. */
   onOpen?: (() => void) | undefined;
-  /** The accessible name of Open, for example "Open routine Morning brief". */
   openLabel?: string;
   status?: ChatActionCardStatus | undefined;
-  /** The class of one variant, for its own rules. */
   class?: string;
-  /** The variant content between the header and the footer. */
   children?: JSX.Element;
   elementRef?: (element: HTMLElement) => void;
 }
 
-/**
- * The chat record of a change an agent made, as a card the person can act on. Variants give the
- * body, such as the schedule row of a routine, and map their own states onto `status`.
- */
 export function ChatActionCard(props: ChatActionCardProps) {
   const { t } = useText();
   const titleId = createUniqueId();
@@ -98,7 +83,6 @@ function ChatActionCardFooter(props: { status?: ChatActionCardStatus | undefined
       <Show when={kind() === "note"}>
         <span class="chat-action-card-note">{text()}</span>
       </Show>
-      {/* The region is in the page before its first text, so assistive technology reads each change. */}
       <span class="chat-action-card-status" role="status">
         <Switch>
           <Match when={kind() === "busy"}>

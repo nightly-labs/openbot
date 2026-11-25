@@ -224,6 +224,13 @@ export const messages = {
   "mobile.agent.webhook.rotateBody": "Het huidige geheim werkt niet meer. De host weigert verzoeken die het gebruiken.",
   "mobile.agent.webhook.rotateConfirm": "Opnieuw genereren",
   "mobile.agent.webhook.rotateFailed": "Kan het geheim niet opnieuw genereren. Probeer het opnieuw.",
+  "mobile.agent.webhook.giveToAgent": "Ondertekeningsgeheim aan {name} geven",
+  "mobile.agent.webhook.giveTitle": "Nieuw ondertekeningsgeheim aan {name} geven?",
+  "mobile.agent.webhook.giveBody":
+    "Het huidige geheim werkt niet meer. {name} slaat het nieuwe geheim op als API-sleutel en kan het aan de afzender toevoegen.",
+  "mobile.agent.webhook.giveConfirm": "Geven",
+  "mobile.agent.webhook.giveFailed": "Kan het ondertekeningsgeheim niet aan de agent geven. Probeer het opnieuw.",
+  "mobile.agent.webhook.given": "{name} heeft het nieuwe ondertekeningsgeheim.",
   "mobile.agent.webhook.activity": "Activiteit",
   "mobile.agent.webhook.activityFailed": "Kan de activiteit niet laden. Probeer het opnieuw.",
   "mobile.agent.webhook.activity.ignored": "Genegeerd",
@@ -317,6 +324,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "Geen modellen beschikbaar voor deze aanbieder.",
   "mobile.agent.runtime.searchModels": "Modellen zoeken",
   "mobile.agent.runtime.noMatches": "Geen modellen gevonden.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "Geen modellen gevonden. Je instellingen voor privacy, providers en guardrails op openrouter.ai kunnen modellen uit deze lijst verbergen.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "Deze provider werkt niet met ‘Alleen werkruimte’ op Windows en Linux. Wijzig eerst ‘Machtigingen’ om hem te gebruiken.",
   "mobile.agent.runtime.usageLimit": "Gebruikslimiet bereikt",
@@ -370,6 +379,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} verwijderen",
   "mobile.agent.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "mobile.agent.busyMessage.label": "Tijdens werk",
@@ -394,10 +404,15 @@ export const messages = {
   "mobile.agent.browserProfile.manage": "Profielen beheren",
   "mobile.agent.browserProfile.footer":
     "Elk profiel heeft eigen aanmeldingen en cookies. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.agent.browserProfile.movedNote":
+    "Logins bij sites blijven in het oude profiel. De agent moet opnieuw inloggen op deze sites.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot kon het browserprofiel van de agent niet wijzigen.",
   "mobile.agent.planCard.label": "Plan tonen vóór lange taken",
   "mobile.agent.planCard.footer":
     "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
+  "mobile.agent.builtinMemory.label": "OpenBot-geheugen",
+  "mobile.agent.builtinMemory.footer":
+    "De agent bewaart en leest zijn eigen herinneringen. Zet dit uit om alleen een geheugen-app zoals Mem0 te gebruiken. Bewaarde herinneringen blijven.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.advanced.behavior": "Gedrag",
@@ -413,10 +428,11 @@ export const messages = {
     "Deze server kan geen eigen meldingsniveau voor een agent bewaren. Werk OpenBot bij op de computer waarop hij draait.",
   "mobile.agent.newChat.title": "Nieuwe chat",
   "mobile.agent.newChat.starting": "Nieuwe chat starten…",
-  "mobile.agent.newChat.footer": "De agent vergeet deze chat. Zijn instellingen blijven.",
+  "mobile.agent.newChat.footer":
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. Zijn instellingen blijven.",
   "mobile.agent.newChat.confirmTitle": "Een nieuwe chat met {name} starten?",
   "mobile.agent.newChat.confirmBody":
-    "De agent vergeet deze chat. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, de herinneringen, de werkruimte en de browser veranderen niet.",
+    "De agent begint opnieuw en kan deze chat nog doorzoeken als dat nodig is. De berichten blijven zichtbaar boven een scheidingslijn. De instructies, het model, de tools, de herinneringen, de werkruimte en de browser veranderen niet.",
   "mobile.agent.newChat.confirm": "Nieuwe chat starten",
   "mobile.agent.newChat.failed": "Kan geen nieuwe chat starten",
   "mobile.agent.newChat.failedBody": "De host kan geen nieuwe chat starten.",
@@ -480,6 +496,7 @@ export const messages = {
   "mobile.agent.publish.unsupported": "Deze host kan geen agents publiceren vanaf een extern apparaat.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens zonder cache-lezingen",
   "mobile.agent.usage.estimatedCost": "Geschatte kosten",
+  "mobile.agent.usage.noCostEstimate": "Geen kostenschatting",
   "mobile.agent.usage.daily": "Dagelijks gebruik",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Kosten",
@@ -514,6 +531,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Verzamelen gestart {started}. Bijgewerkt {updated}.",
   "mobile.agent.usage.never": "nooit",
   "mobile.agent.record.time": "Tijd",
+  "mobile.agent.record.date": "Datum",
   "mobile.agent.section.changeFailed": "Kan map niet wijzigen",
   "mobile.agent.section.tryAgain": "Probeer het opnieuw.",
   "mobile.agent.section.moveUp": "Omhoog",
@@ -599,13 +617,13 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Kan je servers niet laden",
   "mobile.agent.home.serversFailedBody": "Controleer of de desktop-app draait en probeer het opnieuw.",
   "mobile.agent.home.noServers": "Geen servers beschikbaar",
-  "mobile.agent.home.noServersBody": "Verbind de desktop-app opnieuw of word lid van een externe server.",
+  "mobile.agent.home.noServersBody":
+    "Open OpenBot op je computer met dit account en zet Publiceer deze server aan in Serverinstellingen → Leden. Of word lid van een externe server.",
   "mobile.agent.home.chooseServer": "Kies een server",
   "mobile.agent.home.openServers": "Servers openen",
   "mobile.agent.home.noChatOpen": "Geen chat geopend",
   "mobile.agent.home.noChatOpenBody": "Kies een chat in de lijst.",
   "mobile.agent.home.chatListWidth": "Breedte van chatlijst",
-  "mobile.agent.home.serverTitle": "{name}, servers openen",
   "mobile.agent.home.waiting": "Wachten op verbinding",
   "mobile.agent.home.waitingBody": "De lijst met agents wordt geladen zodra deze server verbonden is.",
   "mobile.agent.home.noAgents": "Geen agents op deze server",
@@ -678,6 +696,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Niet uitsluiten",
   "mobile.agent.folders.browseTitle": "Map kiezen",
   "mobile.agent.folders.places": "Ga naar",
+  "mobile.agent.folders.path": "Mappad",
   "mobile.agent.folders.home": "Thuismap",
   "mobile.agent.folders.parent": "Omhoog naar {folder}",
   "mobile.agent.folders.browseFailed": "Kan deze map niet openen.",

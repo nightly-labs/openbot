@@ -1,9 +1,5 @@
 import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 
-/**
- * What provider state reaches in main: connecting, signing in and refreshing providers, and the
- * runtimes OpenBot installs for them, on this computer or on a host the account administers.
- */
 export interface ProvidersPort {
   cancelProviderCodeLogin: OpenBotDesktopApi["cancelProviderCodeLogin"];
   connectProvider: OpenBotDesktopApi["connectProvider"];
@@ -22,14 +18,13 @@ export interface ProvidersPort {
   renameProviderAccount: OpenBotDesktopApi["renameProviderAccount"];
   removeProviderAccount: OpenBotDesktopApi["removeProviderAccount"];
   setProviderAccountPool: OpenBotDesktopApi["setProviderAccountPool"];
+  setLiveVoiceAccount: OpenBotDesktopApi["setLiveVoiceAccount"];
   signOutProvider: OpenBotDesktopApi["signOutProvider"];
   providerUsageResets: OpenBotDesktopApi["providerUsageResets"];
   resetProviderUsage: OpenBotDesktopApi["resetProviderUsage"];
-  /** The same, for the host of a joined server the account administers. */
   providerAdmin: OpenBotDesktopApi["providerAdmin"];
 }
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function providersPort(): ProvidersPort {
   return window.openbot;
 }

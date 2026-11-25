@@ -1,17 +1,3 @@
-/*
- * The browser as a full view: the tabs in the top row on the window frame, then the card with the
- * address row and the page. The view is portaled to `document.body`, outside `.app-window`, so it sets
- * the frame values of that window again.
- *
- * The view appears and disappears in one frame, with no transition. The page inside it is a native
- * view that the renderer cannot animate: it is attached once the view has stopped moving
- * (`BrowserFullView.tsx`), so an opening transition is only time in front of an empty card.
- */
-
-/*
- * Keep app navigation below the portaled browser and its backdrop. `BrowserFullView` sets the body
- * attribute: a `body:has()` rule makes the browser restyle the whole page on each change in the chat.
- */
 body[data-browser-full-view] .app-frame {
   isolation: isolate;
 }
@@ -41,8 +27,14 @@ body[data-browser-full-view] .app-frame {
   display: none;
 }
 
-/* The top row on the frame. Its controls are the flat chips of the app top row. The empty parts of the
- * row move the window. */
+.browser-full-view.browser-pane-view {
+  position: relative;
+  z-index: auto;
+  inset: auto;
+  flex: 1;
+  background: transparent;
+}
+
 .browser-full-top {
   display: flex;
   height: var(--browser-full-top-height);
@@ -65,8 +57,6 @@ body[data-browser-full-view] .app-frame {
   flex: 1;
 }
 
-/* "Back to chat" is a round filled button with its text, so it reads as the way out of the view. It
- * keeps the distance from the window edge that Close of a settings page has. */
 .browser-full-top > .browser-hide {
   flex: none;
   border-radius: var(--openbot-radius-pill);
@@ -74,13 +64,6 @@ body[data-browser-full-view] .app-frame {
   margin-inline-end: var(--openbot-space-2);
 }
 
-/*
- * On macOS the window is `titleBarStyle: "hidden"` and the traffic lights are drawn over the view.
- * `trafficLightPosition: { x: 12, y: 13 }` (`src/main/main-window.ts`) puts the group at x 12..71, so
- * the first control starts at x 82, where the top row of the app frame starts beside those dots.
- * In a right-to-left language the group is at the top right (`src/main/window-buttons.ts`), so
- * the inset is at the inline start.
- */
 .browser-full-view-mac-controls .browser-full-top {
   padding-inline-start: calc(82px - var(--browser-full-edge));
 }
@@ -93,11 +76,16 @@ body[data-browser-full-view] .app-frame {
   flex: 1;
   flex-direction: column;
   overflow: hidden;
-  /* The card goes to the left, right and bottom edges of the window. A local page is a native view that
-     the card cannot cut, so the page has no frame there and the window gives it its corners. */
+
   border-top: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-card) var(--openbot-radius-card) 0 0;
   background: var(--openbot-bg-canvas);
+}
+
+.browser-pane-view .browser-full-card {
+  border-top: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .browser-full-browser {
@@ -112,7 +100,6 @@ body[data-browser-full-view] .app-frame {
   margin: var(--openbot-space-2) var(--openbot-space-2) 0;
 }
 
-/* The bar of a task that the user shows to the agent. */
 .browser-teach-bar {
   display: flex;
   min-width: 0;
@@ -147,7 +134,6 @@ body[data-browser-full-view] .app-frame {
   fill: currentColor;
 }
 
-/* The dock is placed in the surface, so the surface is its containing block. */
 .browser-full-surface {
   position: relative;
   min-height: 0;
@@ -155,11 +141,6 @@ body[data-browser-full-view] .app-frame {
   overflow: hidden;
 }
 
-/*
- * A recording shows as a soft light in the danger colour. A local page is a native view that fills the card to its edges,
- * so the light is in the teach bar, at the edge of the page. A host's page has its own frame in the
- * surface, so that frame gets the light too.
- */
 .browser-teach-bar[data-recording] {
   background: linear-gradient(to top, color-mix(in srgb, var(--openbot-danger) 16%, transparent), transparent);
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--openbot-danger) 45%, transparent);
@@ -170,11 +151,6 @@ body[data-browser-full-view] .app-frame {
   --browser-teach-light: color-mix(in srgb, var(--openbot-danger) 38%, transparent);
 }
 
-/*
- * A host's page is drawn on a canvas at the host's viewport shape, not the window's. The page keeps
- * that shape and gets a margin at the sides or at the bottom. `BrowserFullView` sets the frame size
- * once the first frame is drawn; until then the page takes a common desktop shape.
- */
 .browser-full-surface[data-live] {
   display: grid;
   place-items: center;
@@ -196,7 +172,6 @@ body[data-browser-full-view] .app-frame {
   background: var(--openbot-bg-surface);
 }
 
-/* A host's page has its own frame in the surface, so the light is around that frame. */
 .browser-full-surface[data-teach-recording][data-live] .browser-live-view {
   border-color: var(--browser-teach-edge);
   box-shadow: 0 0 20px 3px var(--browser-teach-light);
@@ -220,22 +195,18 @@ body[data-browser-full-view] .app-frame {
   color: var(--openbot-text-muted);
 }
 
-/* The chips share the row. Below their minimum width the row scrolls, as other browsers do. The row is
- * the offset parent of the chips, so a drag can measure them in it. */
 .browser-full-chips {
   --browser-full-fade: calc(var(--openbot-space-8) * 2);
   position: relative;
   min-width: 0;
   flex: 0 1 auto;
   overflow-x: auto;
-  /* The fades, the drag and the scroll into view measure `scrollLeft` from the left edge
-     (`BrowserTabStrip.tsx`), so the row keeps the left-to-right order in every language. */
+
   direction: ltr;
   padding: var(--openbot-space-0-5);
   scrollbar-width: none;
 }
 
-/* A row that scrolls fades out at the edge where more chips are. */
 .browser-full-chips[data-fade-start] {
   mask-image: linear-gradient(to right, transparent, var(--openbot-text-primary) var(--browser-full-fade));
 }
@@ -254,7 +225,6 @@ body[data-browser-full-view] .app-frame {
   );
 }
 
-/* Chips shrink evenly to a width that still shows a few words of the title, then the row scrolls. */
 .browser-full-chip {
   min-width: 120px;
   max-width: 200px;
@@ -263,7 +233,6 @@ body[data-browser-full-view] .app-frame {
   transition: flex-basis var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* A tab of a named profile has a line in the profile's color under its title. */
 .browser-full-chip[data-profile-color]::after {
   position: absolute;
   right: var(--openbot-space-2);
@@ -276,9 +245,13 @@ body[data-browser-full-view] .app-frame {
   pointer-events: none;
 }
 
-/* After a close with the pointer, the chips keep their width until the pointer leaves the row. */
+.browser-full-chips[data-frozen] {
+  flex-basis: var(--browser-full-chips-frozen);
+}
+
 .browser-full-chips[data-frozen] .browser-full-chip {
   flex: 0 0 var(--browser-full-chip-frozen);
+  transition: none;
 }
 
 .browser-full-chips[data-dragging] {
@@ -289,7 +262,6 @@ body[data-browser-full-view] .app-frame {
   transition: transform var(--openbot-duration-normal) var(--openbot-ease-out);
 }
 
-/* The held chip is lifted above the others and follows the pointer without delay. */
 .browser-full-chips[data-dragging] .browser-full-chip[data-dragging] {
   z-index: 1;
   background: var(--openbot-bg-surface-raised);
@@ -337,7 +309,6 @@ body[data-browser-full-view] .app-frame {
   white-space: nowrap;
 }
 
-/* The address row: arrows and a filled capsule. */
 .browser-full-address-row {
   display: flex;
   height: 44px;
@@ -354,8 +325,6 @@ body[data-browser-full-view] .app-frame {
   height: var(--openbot-icon-sm);
 }
 
-/* Focus is quiet: the capsule lifts and gets a thin edge. The caret and the selected address show where
- * typing goes. */
 .browser-full-capsule {
   position: relative;
   display: flex;
@@ -404,7 +373,6 @@ body[data-browser-full-view] .app-frame {
   place-items: center;
 }
 
-/* The suggestions under the address field. */
 .browser-full-suggest {
   position: absolute;
   z-index: var(--openbot-layer-dropdown);
@@ -474,7 +442,6 @@ body[data-browser-full-view] .app-frame {
   color: var(--openbot-text-muted);
 }
 
-/* Narrow: one button with the tab count opens the list of tabs. */
 .browser-full-switch {
   min-width: 0;
   max-width: 100%;
@@ -489,7 +456,6 @@ body[data-browser-full-view] .app-frame {
   white-space: nowrap;
 }
 
-/* The tab count, in a square, as phone browsers show it. */
 .browser-full-switch-count {
   display: grid;
   min-width: 18px;
@@ -559,7 +525,6 @@ body[data-browser-full-view] .app-frame {
 }
 
 @media (max-width: 720px) {
-  /* The page starts under the address row. */
   .browser-full-surface[data-live] {
     place-items: start center;
     padding-top: var(--openbot-space-3);

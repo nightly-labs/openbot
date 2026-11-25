@@ -251,7 +251,7 @@ What moves when a machine stops:
   which names the host's new home. The client drops its resume token, because the other machine does
   not know the socket.
 - The entry: each minute the account Worker checks `/health/ready` of the machine that
-  `signal.openbot.run` gives. When it fails two checks 20 seconds apart, the Worker sets the record to
+  `signal.openbot.run` gives. When it fails three checks 20 seconds apart, the Worker sets the record to
   the address of the first other home in `REMOTE_SIGNAL_HOMES` that answers. When no machine answers,
   or the records do not show one entry machine (proxied, two A records, or an address of no home),
   it changes nothing. The name does not go back when the old machine starts again. With the 60-second
@@ -265,6 +265,11 @@ its clients connect on `signal1` within 1 minute, then start it again. Hosts sta
 until it fails, or until it is no longer near (see "Regional Signal machines"). Then do the same for `sui-alexandria` in a quiet hour, which also moves the entry:
 check that `dig signal.openbot.run` gives `65.109.88.58` within 3 minutes and that
 `openbot_remote_signal_entry` is 1 on `signal2`. To move the entry back, set the A record by hand.
+
+A host whose owner or admin chose a home in Server settings sends it as `preferredSignalHome`. It gets
+that home while the home answers, also when the home is far. When the chosen home stops, the host moves
+as above, and it asks for the chosen home again every 15 minutes. Deploy the Worker before a desktop
+release that lists the homes: an older Worker has no `signal-homes` route, so the row shows an error.
 
 Known limits: the host status shows the home URL from its first ticket and does not change after a
 move. A host that goes back to a released desktop sends no `signalHome`; its ticket request removes the

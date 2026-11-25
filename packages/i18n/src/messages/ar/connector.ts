@@ -408,7 +408,8 @@ export const messages = {
   "connector.whatsapp.numbersTitle": "الأرقام",
   "connector.whatsapp.linkNumber": "ربط رقم",
   "connector.whatsapp.ownNumberNote": "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot.",
-  "connector.whatsapp.dedicatedNote": "يصل الأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
+  "connector.whatsapp.dedicatedNote":
+    "تصل دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم إلى OpenBot. يحصل الآخرون على رمز ليعطوه لك.",
   "connector.whatsapp.helpLoggedOut": "أزال WhatsApp هذا الحاسوب من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpLoggedOutHost": "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpError":
@@ -431,7 +432,7 @@ export const messages = {
     "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. لا يتلقى الآخرون أي رد. عند إيقافه، يرد OpenBot على الأشخاص غير المعروفين برمز.",
   "connector.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "connector.whatsapp.workingMessageDescription":
-    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. ويرسل أيضًا رسالة انتظار عندما ينتظر طلبٌ طلبًا سابقًا. أوقفها لإرسال الإجابة فقط.",
+    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. ويرسل أيضًا رسالة انتظار عندما ينتظر طلبٌ طلبًا سابقًا. على الرقم الشخصي، تصل هذه الرسائل إلى دردشة «مراسلة نفسك» فقط. أوقفها لإرسال الإجابة فقط.",
   "connector.whatsapp.statusReactions": "تفاعلات الحالة",
   "connector.whatsapp.statusReactionsDescription":
     "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
@@ -504,6 +505,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "يمكن لرقم واحد أن يسمح بما يصل إلى {count} من جهات الاتصال والمجموعات.",
   "connector.whatsapp.senderGroup": "مجموعة",
   "connector.whatsapp.removeSender": "إزالة",
+  "connector.whatsapp.senderAccess": "صلاحية {name}",
+  "connector.whatsapp.senderReplies": "يمكنه إسناد العمل",
+  "connector.whatsapp.senderReadOnly": "للقراءة فقط",
   "connector.whatsapp.addContact": "إضافة جهة اتصال",
   "connector.whatsapp.addGroup": "إضافة مجموعة",
   "connector.whatsapp.contactTitle": "إضافة جهة اتصال",
@@ -670,8 +674,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "لا يستطيع الوكلاء تسجيل الدخول ببيانات الدخول المشتركة حتى تسجّل الدخول مرة أخرى.",
   "connector.protonPass.reconnect": "إعادة الاتصال",
-  "connector.protonPass.planTitle": "يحتاج Proton Pass إلى خطة مدفوعة",
-  "connector.protonPass.planDescription": "تعمل Proton Pass CLI مع خطة Proton مدفوعة فقط. غيّر خطتك، ثم اتصل مرة أخرى.",
+  "connector.protonPass.planTitle": "يحتاج Proton Pass إلى خطة تتضمن Pass Plus",
+  "connector.protonPass.planDescription":
+    "تحتاج Proton Pass CLI إلى خطة Proton تتضمن Pass Plus. لا تتضمنها الخطط المدفوعة الأخرى، مثل Mail Plus. غيّر خطتك، ثم اتصل مرة أخرى.",
   "connector.protonPass.vaultTitle": "الخزنة المشتركة",
   "connector.protonPass.vaultDescription":
     "يستطيع الوكلاء تسجيل الدخول ببيانات الدخول في هذه الخزنة. انقل بيانات دخول إليها لمشاركتها.",

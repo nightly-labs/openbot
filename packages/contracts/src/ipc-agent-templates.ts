@@ -7,11 +7,6 @@ import type { MarketplaceAgentRoutine, MarketplaceAgentSkill } from "./ipc-marke
 import { isReleasedRoutineSchedule } from "./ipc-routines";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
-/**
- * An agent template is a public, link-only copy of one agent's instructions, skills and routines.
- * It never holds workspace files or memories. A marketplace skill travels as a reference to an
- * approved version; a local skill travels as its `SKILL.md` text only.
- */
 export type AgentTemplateSkill =
   | ({ kind: "marketplace" } & MarketplaceAgentSkill)
   | { kind: "embedded"; slug: string; name: string; markdown: string };
@@ -29,7 +24,6 @@ export interface AgentTemplateSnapshot {
 export interface AgentTemplateDetail extends AgentTemplateSnapshot {
   id: string;
   avatarUrl: string | null;
-  /** The share card image (`AGENT_TEMPLATE_CARD`), or null when the publish sent none. */
   cardUrl?: string | null;
   creatorName: string;
   updatedAt: string;
@@ -41,31 +35,23 @@ export interface AgentTemplatePublication {
   publishedAt: string;
 }
 
-/** What the publish dialog shows for one local agent. `publication` is null when it is not published. */
 export interface AgentTemplatePreview extends AgentTemplateSnapshot {
   agentId: string;
   avatarUrl: string | null;
-  /** The uploaded avatar's bytes, so the share card can draw it. Null for a generated avatar. */
   avatarImage: AvatarImageInput | null;
   updatedAt: string | null;
   publication: AgentTemplatePublication | null;
-  /**
-   * Why the skills could not be read, such as a marketplace skill with local changes. The preview
-   * still opens, so a published agent can be unpublished; publishing refuses with this error.
-   */
   skillsError: string | null;
 }
 
 export interface PublishAgentTemplateInput {
   agentId: string;
-  /** A PNG of `AGENT_TEMPLATE_CARD` size for link previews, or null to publish without one. */
   card: Uint8Array | null;
 }
 
 export interface InstallAgentTemplateInput {
   templateId: string;
   timezone: string;
-  /** The `updatedAt` of the template the user reviewed; a newer version is refused, not installed. */
   expectedUpdatedAt: string;
 }
 
@@ -73,14 +59,12 @@ export interface InstallAgentTemplateResult {
   agent: ClientAgentSummary;
 }
 
-/** The share card: the 1.91:1 image X and other sites show for a link. */
 export const AGENT_TEMPLATE_CARD = {
   width: 1200,
   height: 630,
   maxBytes: 1_500_000,
 } as const;
 
-/** Reads the PNG signature and the IHDR size, so a card of another type or size is refused. */
 export function isAgentTemplateCardPng(bytes: Uint8Array): boolean {
   const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
   if (bytes.byteLength < 24 || bytes.byteLength > AGENT_TEMPLATE_CARD.maxBytes) return false;
@@ -100,7 +84,6 @@ export const AGENT_TEMPLATE_LIMITS = {
   skillMarkdown: 65_536,
   skillName: 80,
   skillSlug: 64,
-  /** The JSON of the whole template, well under the Worker's row and request limits. */
   snapshotBytes: 1_000_000,
 } as const;
 
@@ -167,7 +150,6 @@ export function isAgentTemplateSnapshot(value: unknown): value is AgentTemplateS
   );
 }
 
-/** Why a template made from a local agent cannot be published. Main turns it into words. */
 export type AgentTemplateSnapshotProblem =
   | { kind: "name" | "title" | "noInstructions" | "instructions" | "avatar" | "skills" | "localSkills" }
   | { kind: "skill"; name: string }
@@ -175,11 +157,6 @@ export type AgentTemplateSnapshotProblem =
   | { kind: "routine"; name: string }
   | { kind: "tooLarge" };
 
-/**
- * The first reason a template made from a local agent cannot be published, or null when
- * `isAgentTemplateSnapshot` accepts it. It checks the same limits in the same order, so the
- * message names the real cause.
- */
 export function agentTemplateSnapshotProblem(value: AgentTemplateSnapshot): AgentTemplateSnapshotProblem | null {
   if (!value.name.trim() || value.name.length > INPUT_LIMITS.agentName) return { kind: "name" };
   if (value.title.length > INPUT_LIMITS.agentTitle) return { kind: "title" };
@@ -190,7 +167,6 @@ export function agentTemplateSnapshotProblem(value: AgentTemplateSnapshot): Agen
   if (value.skills.length > AGENT_TEMPLATE_LIMITS.skills) return { kind: "skills" };
   if (value.skills.filter((skill) => skill.kind === "embedded").length > AGENT_TEMPLATE_LIMITS.embeddedSkills)
     return { kind: "localSkills" };
-  // `findIndex`, not `find`: the guard would narrow a typed skill to `never`.
   const skill = value.skills[value.skills.findIndex((candidate) => !isAgentTemplateSkill(candidate))];
   if (skill) return { kind: "skill", name: skill.name };
   if (value.routines.length > INPUT_LIMITS.agentRoutines) return { kind: "routines" };
@@ -213,10 +189,6 @@ export function isAgentTemplateDetail(value: unknown): value is AgentTemplateDet
   );
 }
 
-/**
- * A template from `GET /v1/agent-templates/<id>`, with only the known fields. `avatarUrl` stays as the
- * account service sent it: a path on the service's origin.
- */
 export function decodeAgentTemplateDetail(value: unknown): AgentTemplateDetail {
   if (!isAgentTemplateDetail(value) || !isAgentTemplateId(value.id)) throw new Error("Invalid agent template.");
   return {
@@ -228,7 +200,6 @@ export function decodeAgentTemplateDetail(value: unknown): AgentTemplateDetail {
   };
 }
 
-/** Copies only the known fields, so an extra key from the wire never reaches storage or the renderer. */
 export function toAgentTemplateSnapshot(value: AgentTemplateSnapshot): AgentTemplateSnapshot {
   return {
     name: value.name.trim(),
@@ -257,10 +228,6 @@ export function toAgentTemplateSnapshot(value: AgentTemplateSnapshot): AgentTemp
   };
 }
 
-/**
- * The agent-publish-v1 preview a host sent. The host keeps `avatarUrl`, a file on it; the dialog
- * does not read it, and the card draws the avatar from its bytes.
- */
 export function decodeHostAgentTemplatePreview(value: unknown): AgentTemplatePreview {
   if (
     !isDynamicRecord(value) ||
@@ -297,7 +264,6 @@ export function decodeHostAgentTemplatePreview(value: unknown): AgentTemplatePre
   };
 }
 
-/** The link is rebuilt from the id on `openbot.run` or the local Worker, so a host cannot name another address. */
 export function decodeHostAgentTemplatePublication(value: unknown): AgentTemplatePublication {
   if (
     !isDynamicRecord(value) ||

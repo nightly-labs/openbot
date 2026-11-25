@@ -4,18 +4,13 @@ import type { StoredFileRow } from "./files-view";
 
 const PICTURES = "[data-file-id], [data-picture-id]";
 
-/**
- * Loads the pictures of the Library from the host when their tiles or rows show. The web client gets
- * no `previewUrl`, so a picture is a file card until it arrives. Only a shown picture loads, so a
- * large Library does not fill the media cache. A picture that does not load keeps its file card.
- */
 export function createLibraryPictureLoader(options: {
   source: AttachmentMediaSource | undefined;
-  /** The file of a tile or row, with the `previewUrl` of a picture that arrived. */
   file: (fileId: string) => StoredFileRow | undefined;
 }) {
   const source = options.source;
   const refused = new Set<string>();
+  const pending = new Set<string>();
   let shown: IntersectionObserver | undefined;
   let added: MutationObserver | undefined;
   onCleanup(() => {
@@ -33,24 +28,24 @@ export function createLibraryPictureLoader(options: {
       file.previewKind !== "image" ||
       file.status !== "available" ||
       file.size > source.thumbnailLimit ||
-      refused.has(file.id)
+      refused.has(file.id) ||
+      pending.has(file.id)
     )
       return;
+    pending.add(file.id);
     const refuse = () => refused.add(file.id);
-    void source.load(file).then((loaded) => {
-      if (!loaded) refuse();
-    }, refuse);
+    void source
+      .load(file)
+      .then((loaded) => {
+        if (!loaded) refuse();
+      }, refuse)
+      .finally(() => pending.delete(file.id));
   }
 
-  /**
-   * Watches each element with `data-file-id` in `container`, now and after each change of the page. A
-   * picture in a folder tile has `data-picture-id`: it loads, but the marquee does not select it.
-   */
   function attach(container: HTMLElement): void {
     if (!source || typeof IntersectionObserver === "undefined" || typeof MutationObserver === "undefined") return;
     const visible = new IntersectionObserver((entries) => {
       for (const entry of entries) {
-        // A tile that went reports once more, as not shown.
         if (!entry.target.isConnected) visible.unobserve(entry.target);
         else if (entry.isIntersecting && entry.target instanceof HTMLElement) load(entry.target);
       }

@@ -1,9 +1,3 @@
-// The window that shows before the start when one version did not finish its start several times
-// in a row (`start-attempts.ts`). It must work when the normal start does not: it has no preload, no
-// IPC, no renderer bundle and no database connection. The main process writes the page as a `data:`
-// URL, and its buttons are links to fixed URLs that the main process stops and handles. It offers an
-// earlier release only when that release can open the data (`start-recovery-release.ts`), and the
-// latest release in its place.
 import type { AppTranslate, TranslatedLocale } from "@openbot/i18n";
 import { localeDirection } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -15,7 +9,6 @@ import type { StartAttemptsSummary } from "./start-attempts";
 import { recoveryPlushSvg } from "./start-recovery-plush";
 
 const logger = createOpenBotLogger("start-recovery");
-// `.invalid` never resolves (RFC 2606), so a link that the handler did not stop goes nowhere.
 const ACTION_ORIGIN = "https://openbot.invalid";
 const ACTIONS = [
   "retry",
@@ -26,38 +19,32 @@ const ACTIONS = [
   "quit",
 ] as const;
 type RecoveryAction = (typeof ACTIONS)[number];
-// In memory only: the page keeps no cookies, cache or storage on the disk.
 const PARTITION = "openbot-start-recovery";
 
 type RecoveryChoice = "retry" | "quit";
 
 interface StartRecoveryOptions {
   summary: StartAttemptsSummary;
-  /** From `compatiblePreviousRelease`. `null` shows the latest release in its place. */
   previousRelease: string | null;
   locale: TranslatedLocale;
   translate: AppTranslate;
   iconPath: string;
+  showWithoutFocus: boolean;
 }
 
 export interface StartRecovery {
   choice: Promise<RecoveryChoice>;
-  /** Closes the window after "retry", when the main window exists. A close then does not quit. */
   close(): void;
 }
 
-/** Opens the recovery window. `choice` resolves when the user tries again or quits. */
 export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRecovery {
   const recoverySession = session.fromPartition(PARTITION);
   recoverySession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   recoverySession.setPermissionCheckHandler(() => false);
-  // The page is one `data:` document. Nothing else loads, and nothing goes to the network.
   recoverySession.webRequest.onBeforeRequest((details, callback) =>
     callback({ cancel: !details.url.startsWith("data:") }),
   );
   const window = new BrowserWindow({
-    // The content size: the plush, five buttons, the texts of a long language and the notice after an
-    // export.
     width: 520,
     height: 640,
     useContentSize: true,
@@ -80,7 +67,7 @@ export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRec
     },
   });
   window.setMenuBarVisibility(false);
-  window.once("ready-to-show", () => window.show());
+  window.once("ready-to-show", () => (options.showWithoutFocus ? window.showInactive() : window.show()));
 
   let settled = false;
   let busy = false;
@@ -104,7 +91,6 @@ export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRec
   contents.on("will-attach-webview", (event) => event.preventDefault());
   contents.on("will-redirect", (event) => event.preventDefault());
   contents.on("will-navigate", (event) => {
-    // Every navigation stops here. Only an exact action URL from this page's main frame runs.
     event.preventDefault();
     if (!event.isMainFrame || event.frame !== contents.mainFrame) return;
     const action = readAction(event.url, options.previousRelease);
@@ -165,10 +151,6 @@ async function runAction(
   }
 }
 
-/**
- * An action that the page shows. The page shows an earlier release that can open the data, or the
- * latest release, and the other release action is not an action.
- */
 function readAction(url: string, previousRelease: string | null): RecoveryAction | null {
   const hidden: RecoveryAction = previousRelease ? "latest-version" : "previous-version";
   for (const action of ACTIONS) if (action !== hidden && url === actionUrl(action)) return action;

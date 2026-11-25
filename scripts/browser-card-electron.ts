@@ -23,7 +23,6 @@ const fixtureRoot = argument("fixture-root");
 const reportPath = argument("report-path");
 const runId = argument("run-id");
 
-// A test card number with a valid checksum. It is not a real account.
 const CARD: VaultCardSecret = {
   number: "4242424242424242",
   securityCode: "737",
@@ -34,7 +33,6 @@ const CARD: VaultCardSecret = {
 const CARD_ID = "card-fixture";
 const CHECKOUT = "https://checkout.openbot.test";
 const SCRIPTED = "https://scripted.openbot.test";
-// A refused evaluate still marks the checkout site as scripted, so later fills use another site.
 const SHOP = "https://shop.openbot.test";
 const PAYMENTS = "https://payments.cardfixture.test";
 
@@ -55,7 +53,6 @@ const formats: Record<string, string> = {};
 let currentPhase = "entry";
 let sequence = 0;
 
-/** A form a page can show: main-frame fields with native month and year selects, or a frame's one expiry field. */
 function checkoutForm(kind: "selects" | "expiry", method = "post"): string {
   const months = Array.from(
     { length: 12 },
@@ -78,7 +75,6 @@ function checkoutForm(kind: "selects" | "expiry", method = "post"): string {
   <script>
   document.addEventListener('input', (event) => {
     if (event.target instanceof HTMLInputElement) event.target.dataset.trusted = String(event.isTrusted);
-    // Some pages echo a field in the title. The agent must not read the number there.
     if (event.target.id === 'number') document.title = 'Card ' + event.target.value;
   });
   </script>`;
@@ -130,7 +126,6 @@ async function main(): Promise<void> {
     browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"));
     const host = browser;
 
-    // HTTPS is served inside the browser session, so no certificate or network service is used.
     phase("https-fixtures");
     const seed = await runCauseEffect(host.open(`${httpOrigin}/seed`, "card-thread", "card-agent"));
     const seedContents = webContents.getAllWebContents().find((contents) => contents.getURL() === seed.url);
@@ -160,7 +155,6 @@ async function main(): Promise<void> {
       turnId: "card-turn",
       callId: `card-${++sequence}`,
     });
-    // The owner's approvals, as the Vault keeps them, and the answer the owner gives to the next card.
     const approvedSites = new Map<string, Set<string>>();
     const approvals: Array<{ page: string; frames: readonly string[] }> = [];
     let ownerAnswer = true;
@@ -183,7 +177,6 @@ async function main(): Promise<void> {
       assert(!result.success, "The call succeeded where a refusal was expected.");
       return text(result);
     };
-    /** No card value in a text that leaves the host. */
     const assertHidden = (value: string, where: string) => {
       assert(!/4242[\s.-]*4242[\s.-]*4242[\s.-]*4242/u.test(value), `The card number is in ${where}.`);
       assert(!/(?<![0-9])737(?![0-9])/u.test(value), `The security code is in ${where}.`);
@@ -193,7 +186,6 @@ async function main(): Promise<void> {
       assert(contents, "Missing fixture contents.");
       return contents;
     };
-    /** Waits until the document, and each frame in it, has loaded. */
     const loaded = async (contents: WebContents, frames = 1) => {
       for (;;) {
         const ready = await Promise.all(
@@ -208,7 +200,6 @@ async function main(): Promise<void> {
     const open = async (url: string, frames = 1) => {
       const opened = await call("open", { url: `${url}${url.includes("?") ? "&" : "?"}n=${++sequence}` });
       assert(opened.success, "Fixture tab did not open.");
-      // open returns the first snapshot of the tab.
       const tab = z.object({ tabId: z.string(), url: z.string() }).parse(JSON.parse(text(opened)));
       const contents = contentsOf(tab.url);
       await loaded(contents, frames);
@@ -257,7 +248,6 @@ async function main(): Promise<void> {
     const declined = await call("fill_card", { tabId: main.tabId, cardId: CARD_ID, targets: mainTargets });
     assert(failure(declined).includes("did not approve"), "A declined fill was not refused.");
     assert.equal((await values(main.contents)).number?.value, "", "A declined fill typed the number.");
-    // A hidden window records no frames, so the stop can fail; a discarded recording fails another way.
     const kept = await call("recording_stop", { tabId: main.tabId });
     assert(!text(kept).includes("not being recorded"), "A declined fill discarded the recording.");
     assert.deepEqual(approvals, [{ page: CHECKOUT, frames: [CHECKOUT] }], "The approval did not name the page.");
@@ -452,7 +442,6 @@ async function main(): Promise<void> {
 
 function phase(name: string): void {
   currentPhase = name;
-  // Machine-readable: phase receipts contain no page or card data.
   process.stdout.write(`${JSON.stringify({ runId, phase: name, status: "running" })}\n`);
 }
 

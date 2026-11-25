@@ -2,8 +2,7 @@ import type { AttachmentSummary } from "@openbot/contracts/ipc";
 import { File } from "expo-file-system";
 import { router } from "expo-router";
 import { useState } from "react";
-import { showFailureAlert } from "@/features/analytics/failure-reports";
-import { haptics } from "@/shared/lib/haptics";
+import { queryKeys } from "@/features/workspace/model/query-keys";
 import { useText } from "@/shared/lib/text";
 import {
   type AttachmentPreviewKind,
@@ -12,9 +11,9 @@ import {
 } from "../model/attachment-file-preview";
 import { type CodePreviewEntry, storeCodePreview } from "../model/code-preview-store";
 import { useAttachmentDownload } from "../model/large-files";
-import { useMediaFile } from "./use-media-file";
+import { showFileFailure } from "./attachment-preview";
+import { requestFile, useMediaFile } from "./use-media-file";
 
-/** Opens a file on this phone on the preview screen. The text of a text file is read first. */
 export async function openFilePreview(
   kind: AttachmentPreviewKind,
   file: { uri: string; name: string; mimeType: string },
@@ -24,7 +23,6 @@ export async function openFilePreview(
     entry.source = await new File(file.uri).text();
     entry.language = "html";
   } else if (kind === "markdown" || kind === "text") {
-    // The whole file: the screen shows a long file in parts.
     entry.source = await new File(file.uri).text();
     entry.language = kind === "markdown" ? "markdown" : attachmentCodeLanguage(file.name);
   }
@@ -32,14 +30,9 @@ export async function openFilePreview(
   router.push({ pathname: "/code-preview/[previewId]", params: { previewId } });
 }
 
-/**
- * Opens a host file on the preview screen, as the desktop file panel shows it. The file downloads
- * when the user opens it, to the place a player reads from. `kind` is null for a file with no
- * preview, which the caller opens in the share sheet.
- */
 export function useAttachmentPreview(serverId: string, attachment: AttachmentSummary) {
-  const { t, sourceText } = useText();
-  // A file above the host's limit has no preview. A large file within it previews after a tap.
+  const text = useText();
+  const { t } = text;
   const kind =
     useAttachmentDownload(serverId, attachment).download === "desktop" ? null : attachmentPreviewKind(attachment);
   const file = useMediaFile(serverId, attachment, false);
@@ -49,18 +42,14 @@ export function useAttachmentPreview(serverId: string, attachment: AttachmentSum
     if (!kind) return;
     setOpening(true);
     try {
-      const result = file.data ? { data: file.data, error: null } : await file.refetch();
+      const result = file.data
+        ? { data: file.data, error: null }
+        : await requestFile(queryKeys.chatMediaFile(serverId, attachment.id), () => file.refetch());
       if (result.error) throw result.error;
       if (!result.data) throw new Error(t("mobile.chat.attachment.unavailable"));
       await openFilePreview(kind, { uri: result.data, name: attachment.name, mimeType: attachment.mimeType });
     } catch (error) {
-      void haptics.notification("error");
-      showFailureAlert(
-        error,
-        "turn",
-        t("mobile.chat.attachment.openFailed"),
-        error instanceof Error ? sourceText(error.message) : t("mobile.chat.tryAgain"),
-      );
+      showFileFailure(error, t("mobile.chat.attachment.openFailed"), text);
     } finally {
       setOpening(false);
     }

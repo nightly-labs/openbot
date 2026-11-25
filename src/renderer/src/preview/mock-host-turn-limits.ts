@@ -6,8 +6,9 @@ import {
   parseHostTurnLimitsInput,
 } from "@openbot/contracts/ipc";
 
-/** Preview has one host, so every server shares these limits. The automatic total is a server's 8. */
-export function createMockHostTurnLimits(): Pick<HostAdminDesktopApi, "getTurnLimits" | "setTurnLimits"> {
+export function createMockHostTurnLimits(
+  changed: () => void,
+): Pick<HostAdminDesktopApi, "getTurnLimits" | "setTurnLimits"> {
   let limits: HostTurnLimitsInput = { turnLimit: null, agentTaskLimit: null };
   const snapshot = (): HostTurnLimits => ({
     ...limits,
@@ -18,6 +19,7 @@ export function createMockHostTurnLimits(): Pick<HostAdminDesktopApi, "getTurnLi
     getTurnLimits: async () => snapshot(),
     setTurnLimits: async (input) => {
       limits = parseHostTurnLimitsInput(input);
+      changed();
       return snapshot();
     },
   };

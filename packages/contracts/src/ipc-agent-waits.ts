@@ -2,25 +2,14 @@ import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isDynamicRecord } from "./runtime-values";
 
-/**
- * Work an agent stopped before it was done, because it waits for something outside the turn. The
- * agent opens the wait with `openbot.await_event`, lists it with `openbot.list_waits` and closes it
- * with `openbot.close_wait`; another local agent can list and close it with `agentId`. The user
- * can cancel it. A routine run of the agent, or a script event that names the wait, wakes it, and
- * the agent continues the request in that run.
- */
 export interface AgentWait {
   id: string;
   agentId: string;
-  /** What the agent waits for, in its own words. */
   note: string;
-  /** The message the wait serves. Its id is the transcript message id. */
   requestMessageId: string;
   requestText: string;
-  /** The one routine whose runs wake the wait. Null: every routine run of the agent wakes it. */
   routineId: string | null;
   createdAt: string;
-  /** The last run that woke the wait. The wait stays open until the agent closes it. */
   wokenAt: string | null;
   wakeDeliveryId: string | null;
 }

@@ -7,6 +7,7 @@ import {
   decodeChannelPage,
   decodeChannelSummaries,
   isAvatarColor,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -19,40 +20,22 @@ import { decodeConversationPage } from "./conversation";
 import { type DrawerSnapshot, decodeDrawerSnapshot } from "./drawer-snapshot";
 import { decodeAgentSummaries, decodeSidebarLayout, type RemoteAgent } from "./workspace-records";
 
-/** What the phone shows for one server before its connection is back. The host stays the source of truth. */
 interface CachedServer {
   agents: RemoteAgent[];
-  /** The host's hidden agents, or null for a host without `agent-hidden-v1`. */
   hidden: string[] | null;
-  /**
-   * The colour of each agent that has one, or null for a host without `agent-colors-v1`. A file of an
-   * older build has none.
-   */
   colors: { agentId: string; color: AvatarColor }[] | null;
   sidebar: SidebarLayoutSnapshot | null;
   conversations: ConversationPage[];
-  /**
-   * The capabilities of the last connection, so the first connection after a start reads the
-   * workspace with its compatibility check. Null in a file from before them.
-   */
   capabilities: readonly string[] | null;
-  /** The last values of the drawer. A file of an older build has none. */
   drawer: DrawerSnapshot | null;
-  /**
-   * The channel list and the latest messages of the loaded channels, or null for a host without
-   * channels. A file of an older build has none.
-   */
   channels: { channels: ChannelSummary[]; pages: ChannelPage[] } | null;
 }
 
 export interface WorkspaceCache {
   read(serverId: string): Promise<CachedServer | null>;
-  /** True when the file is written. False when the keychain gives no key, so nothing is written. */
   write(serverId: string, value: CachedServer): Promise<boolean>;
   remove(serverId: string): Promise<void>;
-  /** Deletes the files of the servers that the account no longer lists, also those removed while the app was closed. */
   retain(serverIds: readonly string[]): Promise<void>;
-  /** The last server list of the account service, so the connections start before it answers again. */
   readHosts(): Promise<RemoteTeamHost[] | null>;
   writeHosts(hosts: readonly RemoteTeamHost[]): Promise<void>;
 }
@@ -60,12 +43,7 @@ export interface WorkspaceCache {
 const FORMAT = 1;
 const ROOT = "workspace-cache-v1/";
 const KEY_NAME = "openbot.mobile.workspace-cache-key.v1";
-/** `segment` never makes a `~`, so no server file has this name. */
 const HOSTS_NAME = "~hosts";
-/**
- * The escaped JSON of a server file. Base64 adds a third, so the file stays under 4 MB. A server with
- * more keeps its agents and the chats that fit, newest first.
- */
 const MAX_JSON_LENGTH = 3 * 1024 * 1024;
 
 const segment = (value: string) => value.replace(/[^A-Za-z0-9._-]/gu, "_").replace(/^\.+/u, "_");
@@ -73,11 +51,6 @@ const rootDirectory = () => (FileSystem.cacheDirectory ? `${FileSystem.cacheDire
 
 let keyLoad: Promise<Crypto.AESEncryptionKey | null> | null = null;
 
-/**
- * The device key of the cache, in the keychain that a locked phone can read after the first unlock.
- * It stays on this device. A keychain that does not open gives no cache in this run; a new key is
- * made only when the keychain has none.
- */
 function cacheKey(): Promise<Crypto.AESEncryptionKey | null> {
   keyLoad ??= (async () => {
     let stored: string | null;
@@ -92,17 +65,12 @@ function cacheKey(): Promise<Crypto.AESEncryptionKey | null> {
     return key;
   })().catch(() => null);
   const load = keyLoad;
-  // A failed load tries again on the next use.
   void load.then((key) => {
     if (!key && keyLoad === load) keyLoad = null;
   });
   return load;
 }
 
-/**
- * JSON in ASCII only: each other UTF-16 unit is a `\u` escape, so the bytes are the characters. No
- * `u` flag: with it, a character outside the Basic Multilingual Plane would not match.
- */
 function asciiJson(value: unknown): string {
   return JSON.stringify(value).replace(
     /[\u007f-\uffff]/g,
@@ -123,7 +91,6 @@ function asciiText(bytes: Uint8Array): string {
   return text;
 }
 
-/** The kept colours. A bad entry is left out, so the agents still show. */
 function decodeCachedColors(value: unknown): CachedServer["colors"] {
   if (!Array.isArray(value)) return null;
   return value.flatMap((entry: unknown) =>
@@ -133,7 +100,6 @@ function decodeCachedColors(value: unknown): CachedServer["colors"] {
   );
 }
 
-/** The kept channels. A bad value drops only the channels, so the agents and chats still show. */
 function decodeCachedChannels(value: unknown): CachedServer["channels"] {
   if (!isDynamicRecord(value) || !Array.isArray(value.pages)) return null;
   try {
@@ -158,18 +124,16 @@ function decodeCachedServer(value: unknown): CachedServer {
     colors: decodeCachedColors(value.colors),
     sidebar: value.sidebar === null ? null : decodeSidebarLayout(value.sidebar),
     conversations: value.conversations.map(decodeConversationPage),
-    // A bad list drops only the early reads: the first connection then waits for its check.
     capabilities: Array.isArray(capabilities) && capabilities.every(isString) ? capabilities : null,
     drawer: decodeDrawerSnapshot(value.drawer),
     channels: decodeCachedChannels(value.channels),
   };
 }
 
-/** A server record as `RemoteTeamDirectoryClient.listHosts` gave it, its key already checked there. */
 function decodeCachedHost(value: unknown): RemoteTeamHost {
   if (!isDynamicRecord(value)) throw new Error("The cached server list is invalid.");
   const { hostId, name, logoKey, devicePublicKey, membershipId, role, memberLimit, hosted, keyChangedAt } = value;
-  const { restartAvailable, storageGb, appearance } = value;
+  const { restartAvailable, storageGb, appearance, hidden } = value;
   if (
     !isString(hostId) ||
     !isString(name) ||
@@ -192,10 +156,9 @@ function decodeCachedHost(value: unknown): RemoteTeamHost {
     role,
     ...(memberLimit === undefined ? {} : { memberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
-    // A bad value drops only the flag: the next server list writes it again.
+    ...(hidden === true ? { hidden } : {}),
     ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
     ...(isStorageGb(storageGb) ? { storageGb } : {}),
-    // A file of an older build has no appearance, and a bad one is dropped: the next server list writes it again.
     ...optionalServerAppearanceField(appearance),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
   };
@@ -207,25 +170,16 @@ function decodeCachedHosts(value: unknown): RemoteTeamHost[] {
   return value.hosts.map(decodeCachedHost);
 }
 
-/**
- * The server list, and the agents, sections, recent chats and channels of each server of one account, so the
- * app shows them at once after a start, before the account service and the connection answer. The
- * list and each server have one file in `Library/Caches`, which is not in a backup and which the
- * system can delete when the device is low on storage. The files are sealed with AES-256-GCM and
- * bound to the account and to the server, or to the list.
- */
 export function createWorkspaceCache(scope: string): WorkspaceCache | null {
   const root = rootDirectory();
   if (!root) return null;
   const account = Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, scope);
-  /** `serverId` null is the server list. */
   const paths = async (serverId: string | null) => {
     const folder = `${root}${await account}/`;
     const name = serverId === null ? HOSTS_NAME : segment(serverId);
     return { folder, file: `${folder}${name}.bin`, next: `${folder}${name}.next.bin` };
   };
   const binding = async (serverId: string | null) => asciiBytes(asciiJson([FORMAT, await account, serverId]));
-  // A remove that follows a write of the same server runs after it, so the file does not come back.
   const queues = new Map<string | null, Promise<unknown>>();
   const inOrder = <T>(serverId: string | null, operation: () => Promise<T>): Promise<T> => {
     const result = (queues.get(serverId) ?? Promise.resolve()).then(operation, operation);
@@ -250,7 +204,6 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
         });
         return decode(JSON.parse(asciiText(plain)));
       } catch {
-        // A file of an older format, of another key or a damaged one: the server loads as before.
         await FileSystem.deleteAsync(file, { idempotent: true });
         return null;
       }
@@ -276,29 +229,23 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
       inOrder(serverId, async () => {
         const key = await cacheKey();
         if (!key) return false;
-        // A provider that this build does not know goes back to `provider`, where the decoder reads it.
         const agents = value.agents.map(({ foreignProvider, ...agent }) => ({
           ...agent,
           provider: agent.provider ?? foreignProvider,
         }));
-        // Each page counts with its escapes and the comma before it. Chats and channels share the
-        // limit, newest first. Each page becomes JSON one time: the kept pages go into the file text
-        // in place of two markers, so the file is the same as `asciiJson` of the whole value.
         const marker = Crypto.randomUUID();
         const conversationsMarker = `${marker}:conversations`;
         const channelPagesMarker = `${marker}:channel-pages`;
         const channels = value.channels && { channels: value.channels.channels, pages: channelPagesMarker };
         const head = asciiJson({ format: FORMAT, ...value, agents, conversations: conversationsMarker, channels });
-        // A marker in quotes stands where `[]` stands in a file with no pages.
         let length = head.length - conversationsMarker.length - (channels ? channelPagesMarker.length : 0);
         const conversations: string[] = [];
         const channelPages: string[] = [];
         const pages = [
-          ...value.conversations.map((page) => ({
-            page,
-            at: page.messages.at(-1)?.createdAt ?? "",
-            kept: conversations,
-          })),
+          ...value.conversations.map((page) => {
+            const messages = page.messages.filter(({ itemType }) => itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE);
+            return { page: { ...page, messages }, at: messages.at(-1)?.createdAt ?? "", kept: conversations };
+          }),
           ...(value.channels?.pages ?? []).map((page) => ({
             page,
             at: page.messages.at(-1)?.message.createdAt ?? "",
@@ -311,7 +258,6 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
           if (length > MAX_JSON_LENGTH) break;
           kept.push(json);
         }
-        // A function gives the text as it is: a replacement string reads `$&` and `$1` in the pages.
         const json = head
           .replace(`"${conversationsMarker}"`, () => `[${conversations.join(",")}]`)
           .replace(`"${channelPagesMarker}"`, () => `[${channelPages.join(",")}]`);
@@ -336,7 +282,6 @@ export function createWorkspaceCache(scope: string): WorkspaceCache | null {
   };
 }
 
-/** Deletes the cache of every account and its key, such as on sign-out. A file left behind cannot be read. */
 export async function deleteWorkspaceCaches(): Promise<void> {
   keyLoad = null;
   await LockedKeychain.deleteItemAsync(KEY_NAME).catch(() => undefined);

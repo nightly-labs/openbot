@@ -32,7 +32,6 @@ import {
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult, siteToolString } from "./routine-tools";
 import { checkAgentFolders, workspaceWritableRoots } from "./workspace-sandbox";
 
-/** The openbot.site host, injected so the backend never depends on the account Worker directly. */
 export interface AgentHostedSites {
   list(): Effect.Effect<HostedSiteList, HostedSiteOperationFailed>;
   publish(
@@ -46,12 +45,6 @@ export interface AgentHostedSites {
   delete(siteId: string): Effect.Effect<void, HostedSiteOperationFailed>;
 }
 
-/**
- * Carried on the pending approval record rather than in a map keyed by request id: request ids come
- * from the provider process and are reused across client restarts, so a second map could hand a
- * stale mutation to an unrelated approval. The approval record is already the thing every cleanup
- * path drops.
- */
 export interface HostedSiteMutationContext {
   agentId: string;
   operationId: string;
@@ -71,8 +64,8 @@ export interface HostedSiteCoordinatorOptions {
   conversation: ConversationRuntime;
   hostedSites: AgentHostedSites | null;
   emitError(code: string, error: unknown, agentId?: string): void;
+  reportFailure(code: string, error: unknown, agentId: string): void;
   isStopping(): boolean;
-  /** Takes secrets out of a failure reason before the agent reads it. */
   redact(text: string): string;
 }
 
@@ -89,20 +82,12 @@ interface HostedSiteMutationResult {
 
 export const HOSTED_SITE_APPROVAL_METHOD = "openbot/hosted-site-mutation";
 
-/**
- * Owns publishing to openbot.site: the approval a mutation needs, the mutation itself, and the
- * conversation markers that record it.
- *
- * The markers are the reason this is a class rather than a set of functions. A terminal marker
- * ("succeeded", "failed", "cancelled", "interrupted") is written to SQLite *before* the provider is
- * answered, so a crash between the two leaves a durable pending event that `restore()` replays; the
- * provider response rides along as the `deliver` callback and only fires once the marker is durable.
- */
 export class HostedSiteCoordinator {
   readonly #store: AgentStore;
   readonly #conversation: ConversationRuntime;
   readonly #hostedSites: AgentHostedSites | null;
   readonly #emitError: (code: string, error: unknown, agentId?: string) => void;
+  readonly #reportFailure: (code: string, error: unknown, agentId: string) => void;
   readonly #isStopping: () => boolean;
   readonly #redact: (text: string) => string;
   readonly #pendingTerminalEvents = new Map<string, PendingHostedSiteTerminalEvent>();
@@ -114,11 +99,11 @@ export class HostedSiteCoordinator {
     this.#conversation = options.conversation;
     this.#hostedSites = options.hostedSites;
     this.#emitError = options.emitError;
+    this.#reportFailure = options.reportFailure;
     this.#isStopping = options.isStopping;
     this.#redact = options.redact;
   }
 
-  /** Replays markers left behind by a crash, then closes out mutations that never terminated. */
   restore(): void {
     this.#restorePendingTerminalEvents();
     this.#reconcileEventsAfterRestart();
@@ -147,7 +132,6 @@ export class HostedSiteCoordinator {
     }
     const prepared = yield* Effect.result(this.#approvalDetailsEffect(params, tool));
     if (Result.isFailure(prepared)) {
-      // An unknown site or a bad argument is a failed tool result that the agent can correct.
       if (client.running) client.respond(request.id, this.#failureResult(prepared.failure.cause));
       this.#emitError("server_request_failed", prepared.failure.cause);
       return null;
@@ -174,11 +158,6 @@ export class HostedSiteCoordinator {
     };
     return { approval, mutation };
   });
-
-  /**
-   * Runs an approved mutation, or records the decline. Never throws: every failure becomes a
-   * terminal marker plus an error event, because the provider is still waiting on a response.
-   */
 
   readonly resolveApproval = Effect.fn("HostedSiteCoordinator.resolveApproval")(function* (
     this: HostedSiteCoordinator,
@@ -212,12 +191,10 @@ export class HostedSiteCoordinator {
     const result = yield* Effect.result(this.#executeMutationEffect(mutation));
     if (Result.isFailure(result)) {
       const error = result.failure.cause;
-      // A JSON-RPC error reaches a Codex agent only as "dynamic tool request failed" (#6779). A failed tool
-      // result gives it the reason, for example a source that is not a folder, so it can correct the call.
       this.#recordTerminalEvent(mutation, "failed", mutation.eventDetails, () => {
         target.client.respond(target.id, this.#failureResult(error));
       });
-      this.#emitError("server_request_failed", error, target.agentId);
+      this.#reportFailure("server_request_failed", error, target.agentId);
     }
     if (Result.isSuccess(result)) {
       const succeeded = result.success;
@@ -508,7 +485,6 @@ export class HostedSiteCoordinator {
         database.deleteActiveHostedSiteConversationEvent(context.agentId, context.operationId);
         database.deletePendingHostedSiteTerminalEvent(context.agentId, context.operationId, status);
       }
-      // The idempotency guard above means this can legitimately append nothing and still publish.
       return { result: undefined, snapshot: current };
     });
   }

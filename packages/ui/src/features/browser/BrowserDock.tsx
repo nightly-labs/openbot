@@ -30,28 +30,17 @@ import {
 
 export type { BrowserIslandContent } from "./BrowserIsland";
 
-/** An answer closes by itself after this time, while the pointer and the focus are not on it. */
 const REPLY_CLOSE_MS = 6000;
 
-/** A sent message moves into the island or the queue only when the host shows it in this time. */
 const SEND_MORPH_WINDOW_MS = 1500;
 
-/** The content of the box fades out in this time when the box shrinks into its tab. */
 const HIDE_FADE_MS = 120;
-/** The content of the tab fades out in this time before the tab grows into the box. */
 const TAB_FADE_MS = 100;
-/** The content of the box or of the tab fades in in this time, after the glass is in its place. */
 const REVEAL_MS = 160;
-/** The parts of the tab come in one after the other, with this gap. */
 const REVEAL_STAGGER_MS = 40;
 
-/**
- * `open`: the box. `hidden`: the tab at the bottom edge. `hiding` and `showing`: the glass of the field
- * changes from one into the other.
- */
 type DockPhase = "open" | "hiding" | "hidden" | "showing";
 
-/** The island needs an answer from the user, so it shows a hidden box again. */
 function needsAnswer(island: BrowserIslandContent | null | undefined): boolean {
   if (!island) return false;
   if (island.kind === "reply") return Boolean(island.question);
@@ -63,7 +52,6 @@ function px(value: number): string {
 }
 
 export interface BrowserDockProps {
-  /** The agent that owns the tab. */
   agent: ComposerAgent;
   agents: ComposerAgent[];
   skills?: ComposerSkill[] | undefined;
@@ -71,7 +59,6 @@ export interface BrowserDockProps {
   value: string;
   focusRequest?: number | undefined;
   sendShortcut?: SendShortcut | undefined;
-  /** The agent has a turn. With an empty field, Send is Stop. */
   working: boolean;
   deliveries: QueueDelivery[];
   hold?: QueueHold | null | undefined;
@@ -82,19 +69,15 @@ export interface BrowserDockProps {
   onValueChange: (value: string) => void;
   onSend: (text: string) => void;
   onStop: () => void;
-  /** Absent where the agent's provider cannot steer a running turn. */
   onSteer?: ((deliveryId: string) => void) | undefined;
   onRunAsTask?: ((deliveryId: string) => void) | undefined;
   onCancel: (deliveryId: string) => void;
   onEdit: (delivery: QueueDelivery) => void;
   onCancelEdit: () => void;
   onReorder: (deliveryIds: string[]) => void;
-  /** Gives the page to the user, or back. Absent when the host cannot. */
   onHandoff?: (() => void) | undefined;
-  /** Offer "Save to Vault" on a password card. */
   vault?: BrowserSecretVault | undefined;
   onRespondSecret: (input: LocalBrowserSecretResponse) => Promise<void>;
-  /** Resolves true when the host has the answers. An empty record cancels the questions. */
   onAnswerPrompt: (requestId: string | number, answers: Record<string, string[]>) => Promise<boolean>;
   onRespondApproval: (requestId: string | number, decision: "accept" | "decline") => Promise<boolean>;
   onDismissReply: (id: string) => void;
@@ -103,7 +86,6 @@ export interface BrowserDockProps {
   onOpenLink: (url: string) => void;
 }
 
-/** A message on its way from the field, or from a queue row, until the host shows where it went. */
 interface PendingSend {
   text: string;
   source: MorphSource;
@@ -112,15 +94,8 @@ interface PendingSend {
   row?: HTMLElement;
 }
 
-/**
- * The composer of the tab's agent over the bottom of the page. A message sent while the agent works waits
- * in the queue above the field. The island, above the queue, is one glass capsule for what the agent does,
- * the code it asks for and what it says. It opens out of the composer, changes size and content with a
- * spring, and closes back into it. A sent message moves from the field into the island or its queue row.
- */
 export function BrowserDock(props: BrowserDockProps) {
   const { t } = useText();
-  /** What the island shows. It follows `props.island` one step later, so that the old island can be measured. */
   const [shown, setShown] = createSignal<BrowserIslandContent | null>(untrack(() => props.island));
   let dock: HTMLDivElement | undefined;
   let form: HTMLFormElement | undefined;
@@ -137,10 +112,6 @@ export function BrowserDock(props: BrowserDockProps) {
   };
   const editing = () => Boolean(props.editingDeliveryId);
   const queueOpen = () => props.deliveries.length > 0;
-  /**
-   * The rows that the queue shows. When the last message goes, the slot closes at once and keeps these
-   * rows, so the whole queue goes down on the island spring. Without them the slot had nothing to close.
-   */
   const [queueRows, setQueueRows] = createSignal<QueueDelivery[]>(untrack(() => props.deliveries));
   let queueCloseTimer: ReturnType<typeof setTimeout> | undefined;
   createEffect(
@@ -163,20 +134,13 @@ export function BrowserDock(props: BrowserDockProps) {
       }, ISLAND_DURATION_MS);
     },
   );
-  /**
-   * The user hid the box to reach the page under it. The glass of the field shrinks into a tab at the
-   * bottom centre, in the middle of the box, and grows back out of it. The tab tells what the agent does. A
-   * question, a code or an approval shows the box again, and the user can hide it again.
-   */
   const [phase, setPhase] = createSignal<DockPhase>("open");
   const tucked = () => phase() === "hidden";
-  let tab: HTMLButtonElement | undefined;
-  /** A question arrived while the box was shrinking, so the box grows back when it is a tab. */
+  let tab: HTMLDivElement | undefined;
+  let tabButton: HTMLButtonElement | undefined;
   let reopen = false;
-  /** The tab fades out before the phase changes, so this stops a second `show` in that time. */
   let showing = false;
 
-  /** An effect asks for the box. `flush` does nothing in an effect, so the box changes after it. */
   function requestShow() {
     queueMicrotask(() => {
       const current = untrack(phase);
@@ -204,19 +168,16 @@ export function BrowserDock(props: BrowserDockProps) {
     },
   );
 
-  /** What the box shows on its glass, which fades while the glass moves. */
   const boxParts = (): Element[] => [
     ...(island?.isConnected ? [island] : []),
     ...(dock?.querySelectorAll(".browser-dock-stack > .agent-queue-slot") ?? []),
     ...(form?.children ?? []),
   ];
-  const tabParts = (): Element[] => (tab ? [...tab.children] : []);
+  const tabParts = (): Element[] => [
+    ...(tabButton?.children ?? []),
+    ...(tab?.querySelectorAll(".browser-dock-tab-done") ?? []),
+  ];
 
-  /**
-   * A copy of the glass of the field that moves from `from` to `to`. While it moves, the field draws no
-   * glass, so two glass layers never show at the same time, and the field takes over from the copy in one
-   * frame. The returned function removes the copy.
-   */
   async function glide(from: DOMRect, to: DOMRect, spring: Spring): Promise<() => void> {
     const root = dock;
     if (!root) return () => undefined;
@@ -258,14 +219,13 @@ export function BrowserDock(props: BrowserDockProps) {
 
   async function tuck() {
     if (untrack(phase) !== "open") return;
-    // A reply waits while the box is a tab, so its close timer stops here.
     clearTimeout(closeTimer);
     if (dock) dock.style.setProperty("--browser-dock-open-width", px(dock.offsetWidth));
     const from = form?.getBoundingClientRect();
     if (!from || !tab || prefersReducedMotion()) {
       setPhase("hidden");
       flush();
-      tab?.focus({ preventScroll: true });
+      tabButton?.focus({ preventScroll: true });
       return;
     }
     setPhase("hiding");
@@ -286,7 +246,7 @@ export function BrowserDock(props: BrowserDockProps) {
     done();
     for (const fade of fades) fade.cancel();
     fadeIn(tabParts(), REVEAL_STAGGER_MS);
-    tab.focus({ preventScroll: true });
+    tabButton?.focus({ preventScroll: true });
     if (reopen) {
       reopen = false;
       void show();
@@ -330,8 +290,6 @@ export function BrowserDock(props: BrowserDockProps) {
     for (const part of tabParts()) for (const motion of part.getAnimations()) motion.cancel();
     const done = await glide(from, form.getBoundingClientRect(), ISLAND_OPEN);
     if (!mounted) return;
-    // In one frame: the field has its glass again, the copy goes, and only the content fades in. A fade of
-    // the whole box here showed as a blink.
     setPhase("open");
     flush();
     fadeIn(boxParts(), 0);
@@ -340,7 +298,6 @@ export function BrowserDock(props: BrowserDockProps) {
     closeLater(false);
   }
 
-  /** What the tab tells about the agent. */
   const tabLabel = () => {
     const name = props.agent.name;
     const current = props.island;
@@ -360,9 +317,10 @@ export function BrowserDock(props: BrowserDockProps) {
     }
   };
   const agentActs = () => props.island?.kind === "activity" && props.island.control === "agent";
+  const stepDone = () =>
+    props.island?.kind === "activity" && props.island.control === "request" ? props.onHandoff : undefined;
   const unread = () => props.island?.kind === "reply" || needsAnswer(props.island);
 
-  // The tab changes its width with a spring when its text changes. It stays at the bottom centre.
   let tabWidth = 0;
   createEffect(tabLabel, () => {
     const current = tab;
@@ -388,7 +346,6 @@ export function BrowserDock(props: BrowserDockProps) {
   const rowText = (id: string) =>
     dock?.querySelector<HTMLElement>(`[data-queue-delivery-id="${CSS.escape(id)}"] .agent-queue-message`) ?? undefined;
 
-  /** The send that waits for its target, when it is recent. A stale one shows its row again. */
   function takePending(): PendingSend | undefined {
     const current = pending;
     pending = undefined;
@@ -397,7 +354,6 @@ export function BrowserDock(props: BrowserDockProps) {
     return current;
   }
 
-  /** Shows `next` in the island, and moves the island from what it showed. A recent send moves into it. */
   function changeIsland(next: BrowserIslandContent | null) {
     const current = island?.isConnected ? island : undefined;
     const before = current && snapshotIsland(current);
@@ -422,14 +378,12 @@ export function BrowserDock(props: BrowserDockProps) {
         setShown(next);
         return;
       }
-      // The new island renders after this update, so the old one can be measured first.
       queueMicrotask(() => {
         if (mounted) changeIsland(props.island);
       });
     },
   );
 
-  // A new queue row for the sent text: the text moves from the field into it.
   createEffect(
     () => props.deliveries.map((delivery) => ({ id: delivery.id, text: delivery.text })),
     (rows, previous) => {
@@ -449,15 +403,10 @@ export function BrowserDock(props: BrowserDockProps) {
     },
   );
 
-  /**
-   * An answer closes by itself after a while. It stays while the pointer or the focus is on the island (`held`).
-   * A question stays until the user answers it or closes it.
-   */
   function closeLater(held: boolean) {
     clearTimeout(closeTimer);
     const current = untrack(reply);
     closeTimer =
-      // A reply waits while the box is a tab, so the user can read it when the box is back.
       held || !current || current.question || untrack(phase) !== "open"
         ? undefined
         : setTimeout(() => props.onDismissReply(current.id), REPLY_CLOSE_MS);
@@ -486,7 +435,6 @@ export function BrowserDock(props: BrowserDockProps) {
         at: performance.now(),
       };
     }
-    // The hint comes back after the text leaves, so the two do not show in the same place.
     if (!prefersReducedMotion()) {
       form
         ?.querySelector(".composer-editor-placeholder")
@@ -495,7 +443,6 @@ export function BrowserDock(props: BrowserDockProps) {
     props.onSend(text);
   };
 
-  // Steer sends a queued message now: the row changes into the island.
   const steer = (id: string) => {
     const row = rowText(id);
     const box = row?.closest<HTMLElement>(".agent-queue-item");
@@ -538,27 +485,49 @@ export function BrowserDock(props: BrowserDockProps) {
         dock = element;
       }}
     >
-      {/* The tab is always laid out, so the glass of the field knows where to go. It shows only as a tab. */}
-      <Button
-        type="button"
-        variant="ghost"
+      <div
         class="browser-dock-glass browser-dock-tab"
-        title={t("browser.dock.show")}
-        ref={(element: HTMLButtonElement) => {
+        ref={(element) => {
           tab = element;
         }}
-        onClick={() => void show()}
       >
-        <span
-          class="browser-dock-tab-avatar"
-          data-working={agentActs() ? "" : undefined}
-          data-unread={unread() ? "" : undefined}
+        <Button
+          type="button"
+          variant="ghost"
+          class="browser-dock-tab-open"
+          title={t("browser.dock.show")}
+          ref={(element: HTMLButtonElement) => {
+            tabButton = element;
+          }}
+          onClick={() => void show()}
         >
-          <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
-        </span>
-        <span class="browser-dock-tab-label">{tabLabel()}</span>
-        <ChevronUp class="browser-dock-tab-chevron" aria-hidden="true" />
-      </Button>
+          <span
+            class="browser-dock-tab-avatar"
+            data-working={agentActs() ? "" : undefined}
+            data-unread={unread() ? "" : undefined}
+          >
+            <AgentAvatar agent={props.agent} class="browser-dock-avatar" />
+          </span>
+          <span class="browser-dock-tab-label">{tabLabel()}</span>
+          <ChevronUp class="browser-dock-tab-chevron" aria-hidden="true" />
+        </Button>
+        <Show when={stepDone()}>
+          {(done) => (
+            <Button
+              type="button"
+              size="xs"
+              class="browser-dock-tab-done"
+              loading={props.handoffPending === true}
+              onClick={() => {
+                tabButton?.focus({ preventScroll: true });
+                done()();
+              }}
+            >
+              {t("prompt.browser.done")}
+            </Button>
+          )}
+        </Show>
+      </div>
       <Show when={shown()}>
         {(content) => (
           <div
@@ -634,7 +603,6 @@ export function BrowserDock(props: BrowserDockProps) {
             event.preventDefault();
             send();
           }}
-          // Escape stops the edit, and the message goes back to its row unchanged.
           onKeyDown={(event) => {
             if (event.key !== "Escape" || event.defaultPrevented || !editing()) return;
             event.preventDefault();
@@ -670,7 +638,6 @@ export function BrowserDock(props: BrowserDockProps) {
           >
             <ChevronDown aria-hidden="true" />
           </Button>
-          {/* As in the conversation: while the agent works and the field is empty, Send is Stop. */}
           <Show
             when={props.working && !editing() && !props.value.trim()}
             fallback={

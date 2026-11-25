@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "{name} sunucusundan ayrılınamadı",
   "mobile.server.drawer.removeFailed": "{name} kaldırılamadı",
   "mobile.server.drawer.deleteFailed": "{name} silinemedi",
+  "mobile.server.drawer.hide": "Sunucuyu gizle",
+  "mobile.server.drawer.show": "Sunucuyu göster",
+  "mobile.server.drawer.hiddenServers": "Gizli sunucular",
+  "mobile.server.drawer.hideFailed": "{name} gizlenemedi",
+  "mobile.server.drawer.showFailed": "{name} gösterilemedi",
   "mobile.server.drawer.actionFailed": "OpenBot bu işlemi tamamlayamadı. Tekrar deneyin.",
   "mobile.server.drawer.moveUp": "Yukarı taşı",
   "mobile.server.drawer.moveDown": "Aşağı taşı",
@@ -103,20 +108,25 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Bulut sunucusu, bilgisayarınız kapalıyken ajanlarınızı ve rutinlerinizi çalıştırır. OpenBot onu kurar ve çalışır durumda tutar.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "Bilgisayarınızda",
+  "mobile.server.hosted.steps.title": "Bilgisayarınızda ekleyin",
+  "mobile.server.hosted.steps.open": "Bilgisayarınızda OpenBot'u açın.",
+  "mobile.server.hosted.steps.settings": "Ayarlar → Barındırılan sunucular bölümüne gidin.",
+  "mobile.server.hosted.steps.add": "“Sunucu ekle”yi seçin ve bir plan seçin.",
+  "mobile.server.hosted.plansToggle": "Her planın içeriği",
   "mobile.server.hosted.computer.add": "Bulut sunucusu ekleyin",
   "mobile.server.hosted.computer.addHint":
     "OpenBot'ta Ayarlar → Barındırılan sunucular bölümünü açın ve “Sunucu ekle” seçeneğini seçin.",
   "mobile.server.hosted.computer.change": "Planı değiştirin",
   "mobile.server.hosted.computer.changeHint": "OpenBot'ta Ayarlar → Faturalandırma bölümünü açın.",
   "mobile.server.hosted.yourServers": "Sunucularınız",
-  "mobile.server.hosted.plans": "Planlar",
   "mobile.server.hosted.currentPlan": "Planınız",
   "mobile.server.hosted.soldOut": "Tükendi",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · {date} tarihinde sona erer",
+  "mobile.server.hosted.serverDataKept": "{plan} · Veriler {date} tarihine kadar kalır",
   "mobile.server.hosted.state.payment": "Ödeme bekleniyor",
   "mobile.server.hosted.state.setup": "Kuruluyor",
+  "mobile.server.hosted.state.restoring": "Geri yükleniyor",
   "mobile.server.hosted.state.starting": "Başlatılıyor",
   "mobile.server.hosted.state.running": "Çalışıyor",
   "mobile.server.hosted.state.stopped": "Durduruldu",
@@ -231,6 +241,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Bekleniyor. Ana makine, belleğinin izin verdiği kadar tur çalıştırır.",
   "mobile.server.threads.hold.agentBusy": "Bu ajanın diğer işlerinin bitmesi bekleniyor.",
   "mobile.server.threads.hold.oneTurn": "Bekleniyor. Bu ajanın sağlayıcısı aynı anda tek tur çalıştırır.",
+  "mobile.server.threads.hold.signIn": "Bekleniyor. Bu ajanın sağlayıcısında oturum açılması gerekiyor.",
   "mobile.server.threads.offline": "Mesaj dizilerini görmek için bu sunucuya bağlanın.",
   "mobile.server.threads.loading": "Mesaj dizileri yükleniyor…",
   "mobile.server.threads.loadFailed": "Bazı ajanların mesaj dizileri yüklenemedi.",
@@ -270,6 +281,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Bu işlem sunucuyu tüm üyeler için hesap hizmetinden kaldırır. Bilgisayarındaki dosyalar ve sohbetler kalır. Yeniden kullanmak için o bilgisayardan kaydedin.",
   "mobile.server.settings.remove": "Sunucuyu kaldır",
+  "mobile.server.settings.hide": "Sunucuyu gizle",
+  "mobile.server.settings.show": "Sunucuyu göster",
   "mobile.server.settings.deleteTitle": "{name} silinsin mi?",
   "mobile.server.settings.deleteBody":
     "OpenBot sunucuyu bilgisayarında durdurur ve ajanlarını, sohbetlerini ve dosyalarını o bilgisayarın çöp kutusuna taşır. Sunucu tüm cihazlarınızdaki sunucu listesinden çıkar.",
@@ -338,8 +351,10 @@ export const messages = {
   "mobile.server.route.invite": "Kişileri davet et",
   "mobile.server.route.member": "Üye",
   "mobile.server.route.timezone": "Saat dilimi",
+  "mobile.server.route.signalHome": "Signal sunucusu",
   "mobile.server.route.personality": "Ajan kişiliği",
   "mobile.server.route.agents": "Ajanlar",
+  "mobile.server.route.voiceModel": "Konuşma tanıma",
   "mobile.server.settings.storage": "Depolama",
   "mobile.server.route.storage": "Depolama",
   "mobile.server.route.storageFiles": "Tüm dosyalar",
@@ -465,6 +480,42 @@ export const messages = {
     "Saat dilimini değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
   "mobile.server.settings.timezoneUnsupported":
     "Saat dilimini burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.signalHomeAutomatic": "Otomatik",
+  "mobile.server.settings.signalHomeNearest": "En yakın Signal sunucusu",
+  "mobile.server.settings.signalHomeInUse": "Kullanımda: {name}",
+  "mobile.server.settings.signalHomeLoading": "Signal sunucuları ölçülüyor…",
+  "mobile.server.settings.signalHomeSaveFailed": "Signal sunucusu değiştirilemedi. Yeniden deneyin.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Signal sunucusunu değiştirmek için bu sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Signal sunucusunu buradan değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.signalHomeDescription":
+    "Üyeler bu sunucuya bu Signal sunucusu üzerinden bağlanır. Gecikmesi daha düşük bir Signal sunucusu daha hızlı bağlantı sağlar.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} yanıt vermiyor. Sunucu, {chosen} yeniden yanıt verene kadar {name} kullanır.",
+  "mobile.server.settings.signalHomeMoving":
+    "Sunucu {name} sunucusuna geçiyor. Üyeler birkaç saniye içinde yeniden bağlanır.",
+  "mobile.server.settings.signalHomeLoadFailed": "Signal sunucuları yüklenemedi.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Yanıt yok",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San Jose",
+  "mobile.server.settings.signalHomePlaceSydney": "Sidney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapur",
+  "mobile.server.settings.voiceModelDescription":
+    "Bu sunucudaki ajanlar, altyazısı olmayan videoların sesini yazıya dökmek için bu modeli kullanır.",
+  "mobile.server.settings.voiceModelLoading": "Konuşma tanıma yükleniyor…",
+  "mobile.server.settings.voiceModelLoadFailed": "Sunucunun konuşma tanıma modeli yüklenemedi.",
+  "mobile.server.settings.voiceModelSaveFailed": "Konuşma tanıma modeli değiştirilemedi. Tekrar deneyin.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Konuşma tanımayı buradan değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.voiceModelReady": "Hazır",
+  "mobile.server.settings.voiceModelDownloading": "İndiriliyor: {percent}",
+  "mobile.server.settings.voiceModelSize": "{size} indirme",
+  "mobile.server.settings.voiceModelDownload": "İndir",
+  "mobile.server.settings.voiceModelCancel": "İndirmeyi durdur",
+  "mobile.server.settings.voiceModelRemove": "Kaldır",
   "mobile.server.settings.keySection": "Sunucu anahtarı",
   "mobile.server.settings.keyChanged": "Son değişiklik",
   "mobile.server.settings.keyChange": "Anahtarı değiştir",
@@ -483,6 +534,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Sunucu anahtarı değiştirilemedi. Tekrar deneyin.",
   "mobile.server.settings.keyOwnerOnly": "Sunucu anahtarını yalnızca sahip değiştirebilir.",
   "mobile.server.settings.keyUnsupported": "Anahtarını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.turnLimit": "Aynı anda mesaj dizileri",
+  "mobile.server.settings.turnLimitDescription":
+    "Bu sunucuda aynı anda kaç ajan mesaj dizisinin çalışabileceği. Daha fazla dizi daha fazla bellek kullanır.",
+  "mobile.server.settings.turnLimitAutomatic": "Otomatik ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Otomatik (sınırsız)",
+  "mobile.server.settings.turnLimitUnlimited": "Sınırsız",
+  "mobile.server.settings.turnLimitsLoadFailed": "Bu sunucunun mesaj dizisi sınırları yüklenemedi.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Mesaj dizisi sınırı kaydedilemedi. Tekrar deneyin.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Mesaj dizisi sınırını burada değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
+  "mobile.server.settings.agentTaskLimit": "Ajan başına paralel mesaj dizileri",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Kendi sınırı olmayan her ajanın aynı anda kaç mesaj dizisi çalıştırabileceği.",
+  "mobile.server.settings.agentTaskLimitDefault": "Varsayılan ({count})",
   "mobile.server.settings.memoryLimit": "Ajan başına bellek",
   "mobile.server.settings.memoryLimitDescription": "Bu sunucudaki her ajanın tutabileceği bellek sayısı.",
   "mobile.server.settings.memoryLimitLoadFailed": "Bu sunucunun bellek sınırı yüklenemedi.",
@@ -546,6 +611,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Ajan ekle",
   "mobile.server.browserProfiles.agentsHint":
     "Dokunmak ajana bu profili verir veya onu ortak profile geri taşır. Bir değişiklik ajanın açık sekmelerini kapatır.",
+  "mobile.server.browserProfiles.movedNote":
+    "Sitelerdeki oturumlar eski profilde kalır. Taşınan bir ajanın bu sitelerde yeniden oturum açması gerekir.",
   "mobile.server.browserProfiles.clear": "Verileri temizle",
   "mobile.server.browserProfiles.clearTitle": "{name} verileri temizlensin mi?",
   "mobile.server.browserProfiles.clearBody":
@@ -715,6 +782,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Proton Pass'te yalnızca OpenBot ile paylaştığınız kasayı okuyabilen bir erişim anahtarı oluşturun ve buraya yapıştırın. Anahtarı {host} saklar; bu telefon saklamaz.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Proton planınız Proton Pass komut satırı aracını içermiyor. Pass Plus içeren bir Proton planı gerekir. Mail Plus gibi diğer ücretli planlar bunu içermez. Hesabınızın planını değiştirin, ardından yeniden bağlanın.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} bu sunucuda kullanılamıyor.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Bu telefonda {name} hesabınıza giriş yapın. Ardından {host} paylaşılan bir kasa ve onun için salt okunur bir erişim anahtarı oluşturur ve yalnızca bu anahtarı saklar. Ajanlar hiçbir zaman parola görmez.",
@@ -743,8 +812,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Salt okunur",
   "mobile.server.connectors.passwordManager.keyExpires": "Salt okunur. Süresi {date} tarihinde dolar.",
   "mobile.server.connectors.passwordManager.keyExpired": "Süresi {date} tarihinde doldu",
-  "mobile.server.connectors.passwordManager.plan":
-    "{name} komut satırı aracı ücretli bir plan gerektirir. Hesabınızın planını değiştirin, ardından yeniden bağlanın.",
   "mobile.server.connectors.passwordManager.expiredTitle": "{name} anahtarının süresi doldu",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Yeniden bağlanana kadar {host} üzerindeki ajanlar paylaşılan girişlerinizle oturum açamaz.",
@@ -898,7 +965,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "“Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler OpenBot'a ulaşır.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "İzin verdiğiniz kişiler OpenBot'a ulaşır. Diğer kişiler size iletmeleri için bir kod alır.",
+    "“Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler OpenBot'a ulaşır. Diğer kişiler size iletmeleri için bir kod alır.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -913,7 +980,7 @@ export const messages = {
     "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Yalnızca yanıtı göndermek için kapatın.",
+    "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Önceki bir isteği bekleyen istek de bir bekleme mesajı alır. Kişisel numarada bu mesajları yalnızca “Kendine mesaj gönder” sohbetiniz alır. Yalnızca yanıtı göndermek için kapatın.",
   "mobile.server.connectors.whatsapp.statusReactions": "Durum tepkileri",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
@@ -975,6 +1042,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Bir numara en fazla {count} kişiye ve gruba izin verebilir.",
   "mobile.server.connectors.whatsapp.senderGroup": "Grup",
   "mobile.server.connectors.whatsapp.removeSender": "Kaldır",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Salt okunur",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Salt okunur yap",
+  "mobile.server.connectors.whatsapp.allowWork": "İş vermesine izin ver",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Salt okunur: ajanlar bu sohbeti okuyabilir ve OpenBot buraya asla yazmaz.",
   "mobile.server.connectors.whatsapp.addContact": "Kişi ekle",
   "mobile.server.connectors.whatsapp.addGroup": "Grup ekle",
   "mobile.server.connectors.whatsapp.contactTitle": "Bir kişi ekleyin",
@@ -1135,10 +1207,14 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Modeller değiştirilemedi. Tekrar deneyin.",
   "mobile.server.providers.promptCache": "İstem önbelleği",
   "mobile.server.providers.promptCacheHint":
-    "Claude'un turlar arasında bir ajanın bağlamını önbellekte tutma süresi. Değişiklik Claude yeniden başladığında uygulanır.",
-  "mobile.server.providers.promptCacheDefault": "Claude Code varsayılanı",
+    "Claude ve Pi'nin bir ajanın bağlamını turlar arasında önbellekte ne kadar tuttuğu. Değişiklik sağlayıcı yeniden başladığında geçerli olur.",
+  "mobile.server.providers.promptCacheDefault": "Sağlayıcı varsayılanı",
   "mobile.server.providers.promptCacheHour": "1 saat",
   "mobile.server.providers.promptCacheLoadFailed": "Bu sunucunun istem önbelleği süresi yüklenemedi.",
+  "mobile.server.providers.cacheExpiryCompaction": "Önbelleğin süresi dolmadan sıkıştır",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "200K veya daha fazla token bağlamı olan bir sohbet 1 saatlik önbellekle boşta olduğunda, ajan önbelleğin süresi dolmadan bağlamı sıkıştırır. Böylece sonraki mesaj tüm bağlamı önbelleksiz yeniden okumaz.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed": "Bu sunucunun sıkıştırma ayarı yüklenemedi.",
   "mobile.server.providers.compactWindow": "Sohbetleri sıkıştırma boyutu",
   "mobile.server.providers.compactWindowHint":
     "Sohbet bu boyuta ulaştığında Claude Code eski turları özetler. Düşük değer turları hızlı ve ucuz tutar. Yüksek değer daha fazla ayrıntı tutar. Daha küçük pencereli bir model kendi sınırında sıkıştırır.",
@@ -1193,6 +1269,8 @@ export const messages = {
     "ChatGPT, ChatGPT planınızı değil bu anahtarı kullanır. OpenAI her isteği anahtara faturalandırır. Planın kullanımı gösterilmez.",
   "mobile.server.providers.codexKeyAlternative":
     "Ya da bir OpenAI API anahtarıyla oturum açın. OpenAI her isteği anahtara faturalandırır.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse oturum açmanızı değil, bu anahtarı kullanır. Oturum açmanızı kullanmak için anahtarı kaldırın.",
   "mobile.server.providers.sectionUse": "Kullanım",
   "mobile.server.providers.unused": "Hiçbir ajan kullanmıyor",
   "mobile.server.providers.usedByCount": { one: "1 ajan kullanıyor", other: "{count} ajan kullanıyor" },
@@ -1257,6 +1335,9 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Bağlandı · {count} araç", other: "Bağlandı · {count} araç" },
   "mobile.server.mcp.signInOnComputer":
     "Bu MCP sunucusu oturum açmanızı istiyor. Bir bilgisayardaki OpenBot'tan oturum açın, sonra yeniden test edin.",
+  "mobile.server.mcp.signIn": "Oturum aç",
+  "mobile.server.mcp.signInHere":
+    "Bu MCP sunucusu oturum açmanızı istiyor. Oturum aç'a dokunun, sonra yeniden test edin.",
   "mobile.server.mcp.signedInDescription": "{server} bu MCP sunucusunda oturum açtı.",
   "mobile.server.mcp.signOut": "Oturumu kapat",
   "mobile.server.mcp.saveFailed": "Değişiklik kaydedilemedi. Tekrar deneyin.",
@@ -1307,6 +1388,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 saatlik",
   "mobile.server.planLimits.window.hours": { one: "{count} saatlik", other: "{count} saatlik" },
   "mobile.server.planLimits.window.minutes": "{minutes} dk",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Güncellemeler",
   "mobile.server.settings.updateAvailable": "Güncelleme var",
   "mobile.server.route.updates": "Güncellemeler",
@@ -1357,7 +1439,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "{reasons} bekleniyor.",
   "mobile.server.update.disabledTitle": "Uzaktan güncellemeler kapalı",
   "mobile.server.update.disabledDescription":
-    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya ayarı açmasını isteyin.",
+    "{name} kullanıcısı sunucu üyelerinin güncelleme yapmasını kapattı. OpenBot uygulamasını güncellemesini veya o bilgisayarda Ayarlar > Güncellemeler bölümünü açıp “Sunucu üyelerinin güncelleme yapmasına izin ver” seçeneğini açmasını isteyin.",
   "mobile.server.update.managedTitle": "Güncellemeleri OpenBot Host Manager yönetiyor",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager, {name} sunucusunu günceller. Ana makine yöneticisiyle iletişime geçin.",
@@ -1480,7 +1562,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member}, {role} rolüne eklendi",
   "mobile.server.audit.roleMemberRemoved": "{member}, {role} rolünden çıkarıldı",
   "mobile.server.audit.agentLevel": "{role} için {agent}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Ajanları içe aktar",
   "mobile.server.route.import": "Ajanları içe aktar",
   "mobile.server.import.unsupported": "Ajanları buradan içe aktarmak için bu sunucudaki OpenBot'u güncelleyin.",
@@ -1553,7 +1634,6 @@ export const messages = {
   "mobile.server.import.channel": "Kanal",
   "mobile.server.import.notImportedTitle": "İçe aktarılmadı",
   "mobile.server.import.resultWarnings": "Bazı öğeler taşınmadı",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Aktarım",
   "mobile.server.route.transfer": "Aktarım",
   "mobile.server.route.transferExport": "Dışa aktar",
@@ -1629,6 +1709,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Kanalları, rutin akışları, iş akışları ve paylaşılan klasör de kopyalanır. API anahtarları, oturum açma bilgileri, bağlayıcılar ve sohbet geçmişi kopyalanmaz. Bunları diğer sunucuda yeniden kurun.",
   "mobile.server.transfer.copySubmit": { one: "{count} ajanı kopyala", other: "{count} ajanı kopyala" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Yinelenen ajanlar kopyalansın mı?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} üzerinde bu adlara sahip ajanlar zaten var: {names}. Kopyalama her biri için ikinci bir ajan ekler. Her kopya, kendi sohbetleri, dosyaları ve bellekleri olan ayrı bir ajandır.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Yinelenenleri kopyala",
   "mobile.server.transfer.copying": "Kopyalanıyor…",
   "mobile.server.transfer.copyFailed": "Kopyalama tamamlanmadı.",
   "mobile.server.transfer.copied": {
@@ -1639,4 +1723,41 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Kopyalanan ajanlar {server} sunucusunun onay kurallarını kullanır.",
   "mobile.server.transfer.copyNoServer":
     "Ajanları kopyalamak için başka bir sunucuya sahip veya yönetici olarak bağlanın.",
+  "mobile.server.route.ownerTransfer": "Sahipliği devret",
+  "mobile.server.ownerTransfer.unavailable": "Sahipliği devretmek için bu sunucuya sahibi olarak bağlanın.",
+  "mobile.server.ownerTransfer.hosted": "Bu sunucuyu OpenBot barındırıyor, bu yüzden sahibi değiştirilemez.",
+  "mobile.server.ownerTransfer.lede":
+    "Yeni sahip bir e-posta alır ve bu e-postayla oturum açmışken kabul etmelidir. Ardından bu sunucudan çıkarılırsınız.",
+  "mobile.server.ownerTransfer.email": "Yeni sahibin e-postası",
+  "mobile.server.ownerTransfer.send": "Gönder",
+  "mobile.server.ownerTransfer.sending": "Gönderiliyor…",
+  "mobile.server.ownerTransfer.stays":
+    "Ajanlar, sohbetler, rutinler, sağlayıcı oturumları, kayıtlı anahtarlar, Vault girişleri, tarayıcı oturumları ve bağlı uygulamalar sunucuda kalır. Yeni sahip bunları kullanabilir.",
+  "mobile.server.ownerTransfer.expiry": "İstek 7 gün sonra sona erer.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} sahip yapılsın mı?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "{email} kabul ettiğinde {server} sunucusunun sahibi olur ve siz erişimi kaybedersiniz. Veriler sunucuda kalır. İstek 7 gün sonra sona erer.",
+  "mobile.server.ownerTransfer.confirm": "Devret",
+  "mobile.server.ownerTransfer.sendFailed": "İstek gönderilmedi.",
+  "mobile.server.ownerTransfer.loadFailed": "Bekleyen devir okunamadı.",
+  "mobile.server.ownerTransfer.pending": "Yeni sahip bekleniyor",
+  "mobile.server.ownerTransfer.expires": "Sona erme: {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} bu e-postayla oturum açmışken kabul etmelidir. O zamana kadar sahip sizsiniz.",
+  "mobile.server.ownerTransfer.cancel": "İptal et",
+  "mobile.server.ownerTransfer.cancelTitle": "Devir iptal edilsin mi?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} artık kabul edemez.",
+  "mobile.server.ownerTransfer.keep": "Koru",
+  "mobile.server.ownerTransfer.cancelFailed": "Devir iptal edilmedi.",
+  "mobile.server.ownerTransfer.incomingTitle": "{server} sunucusunun sahibi olunsun mu?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} sizi {server} sunucusunun sahibi yapmak istiyor. Sunucunun tam denetimini alırsınız; ajanları, sohbetleri, rutinleri ve kayıtlı oturumları sunucuda kalır. {name} erişimi kaybeder. Sunucuyu çalıştıran bilgisayarda hâlâ oturum açabilen herkes OpenBot hesabınızı kullanabilir. O bilgisayarın parolalarını ve SSH anahtarlarını değiştirin.",
+  "mobile.server.ownerTransfer.accept": "Kabul et",
+  "mobile.server.ownerTransfer.decline": "Reddet",
+  "mobile.server.ownerTransfer.accepted": "Artık {server} sunucusunun sahibisiniz.",
+  "mobile.server.ownerTransfer.acceptFailed": "Devir kabul edilemedi",
+  "mobile.server.ownerTransfer.declineFailed": "Devir reddedilemedi",
+  "mobile.server.ownerTransfer.tryAgain": "Daha sonra tekrar deneyin.",
+  "mobile.server.providers.updateAll": "Tümünü güncelle",
+  "mobile.server.providers.updateAllFailed": "Bazı güncellemeler başlamadı. Tekrar deneyin.",
 } as const satisfies PartialTranslation<typeof source>;

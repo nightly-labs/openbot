@@ -5,6 +5,7 @@ import {
   type ConversationMessage,
   type ConversationSnapshot,
   modelSwitchReason,
+  type QueueDeliveryStatus,
   type QueueHold,
   type QueueSnapshot,
 } from "@openbot/contracts/ipc";
@@ -16,12 +17,12 @@ import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import type { RoutineScheduler } from "./routine-scheduler";
 
+const OPEN_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
+
 export interface MailboxSyncHooks {
   emit(event: AgentEvent): void;
   emitError(code: string, error: unknown, agentId?: string): void;
-  /** What holds the queue back, when the reason is not this agent's own running turn. */
   queueHold(agentId: string): QueueHold | null;
-  /** The requests that this agent sent from its side threads changed: one was sent, started or ended. */
   threadRequestsChanged(agentId: string): void;
 }
 
@@ -34,15 +35,6 @@ export interface MailboxSyncOptions {
   hooks: MailboxSyncHooks;
 }
 
-/**
- * Keeps conversation snapshots merged with mailbox rows, and fans queue
- * state out to the renderer.
- *
- * Owns no durable state — every method reads the mailbox/database and writes
- * the in-memory snapshot. The facade keeps no wrappers: call sites use this
- * directly, and later extractions (drain, turn lifecycle) take it as a dep
- * instead of reaching into the mailbox themselves.
- */
 export class MailboxSync {
   readonly #database: OpenBotDatabase;
   readonly #mailbox: MailboxStore;
@@ -50,7 +42,6 @@ export class MailboxSync {
   readonly #routines: RoutineScheduler;
   readonly #scope: () => Scope.Scope;
   readonly #hooks: MailboxSyncHooks;
-  /** The open side-thread requests of each sender, as its thread list last showed them. */
   #threadRequests = new Map<string, string>();
 
   constructor(options: MailboxSyncOptions) {
@@ -66,18 +57,12 @@ export class MailboxSync {
     const context = this.#mailbox.getDelivery(deliveryId);
     const message = snapshot.messages.find((candidate) => candidate.id === deliveryId);
     if (!context || !message) return;
-    // A plan continuation keeps the request in its first turn, so that turn's plan and answer stay
-    // between the request and the continuation's answer. So does work that a backup model continues:
-    // with the request in the continuation's turn, its answer showed above the text of the stopped
-    // turn and the note of the switch (#8406).
     const turnId =
       context.planContinuation?.turnIds[0] ??
       context.resumeAfterUsageLimit?.previousTurnIds[0] ??
       context.delivery.turnId;
     if (turnId === null) delete message.turnId;
     else message.turnId = turnId;
-    // A switch note waits for this delivery's turn under the delivery's id. A provider that names
-    // its own turn, such as Codex, takes the note into that turn, so it stays above the answer.
     if (turnId !== null && turnId !== deliveryId)
       for (const note of snapshot.messages)
         if (note.turnId === deliveryId && modelSwitchReason(note) !== null) note.turnId = turnId;
@@ -94,14 +79,11 @@ export class MailboxSync {
     const mailboxCopies =
       mailboxMessages ??
       this.#mailbox.conversationMessages(snapshot.agentId, fromCreatedAt === undefined ? {} : { fromCreatedAt });
-    // A teammate's or a routine's message stays in the mailbox after a person deletes it from this
-    // chat, so the record of the delete keeps it out.
     const deleted = snapshot.threadId
       ? this.#database.deletedConversationMessageIds(snapshot.threadId)
       : new Set<string>();
     const incomingMailboxMessages =
       deleted.size === 0 ? mailboxCopies : mailboxCopies.filter((message) => !deleted.has(message.id));
-    // A deleted message keeps its entry here, so its provider copy also leaves the chat.
     const incomingMessages = new Map(
       mailboxCopies.flatMap((message) =>
         message.exchange?.direction === "incoming" ? [[message.exchange.messageId, message] as const] : [],
@@ -120,6 +102,8 @@ export class MailboxSync {
         snapshot.messages.push(mailboxMessage);
       }
     }
+    const read = new Set(mailboxCopies.map((message) => message.id));
+    for (const message of snapshot.messages) if (!read.has(message.id)) this.#refreshOpenRequest(message);
     const reactions = this.#mailbox.reactionsFor(snapshot.agentId);
     for (const message of snapshot.messages) {
       message.reactions = reactions.get(message.id) ?? [];
@@ -128,7 +112,29 @@ export class MailboxSync {
     sortConversationMessages(snapshot.messages);
   }
 
-  /** Sends the thread list of each agent whose side-thread requests changed since the last list. */
+  #refreshOpenRequest(message: ConversationMessage): void {
+    const exchange = message.exchange;
+    if (exchange?.direction !== "outgoing" || !exchange.deliveries.some(({ status }) => OPEN_STATUSES.has(status)))
+      return;
+    message.exchange = {
+      ...exchange,
+      deliveries: exchange.deliveries.map((delivery) => {
+        const current = this.#mailbox.getDelivery(delivery.id)?.delivery;
+        if (!current) return delivery;
+        const held =
+          current.status === "completed" &&
+          exchange.expectsReply !== false &&
+          this.#mailbox.heldByTask(current.recipientAgentId, exchange.messageId);
+        return {
+          ...delivery,
+          status: held ? "running" : current.status,
+          position: current.position,
+          error: current.error,
+        };
+      }),
+    };
+  }
+
   #emitThreadRequests(): void {
     const requests = new Map<string, string>();
     for (const request of this.#mailbox.awaitedThreadRequests()) {
@@ -141,10 +147,6 @@ export class MailboxSync {
       if (before.get(agentId) !== requests.get(agentId)) this.#hooks.threadRequestsChanged(agentId);
   }
 
-  /**
-   * Puts the current queue positions on the stored messages of a page. A move of the queue alone is
-   * not saved, so a stored row can keep an older position.
-   */
   refreshQueuePositions(messages: readonly ConversationMessage[]): void {
     const queued = (delivery: { status: string } | undefined) => delivery?.status === "queued";
     if (!messages.some((message) => queued(message.delivery) || message.exchange?.deliveries.some(queued))) return;
@@ -175,8 +177,6 @@ export class MailboxSync {
       this.#mailbox.conversationMessages(agent.id, oldest === undefined ? {} : { fromCreatedAt: oldest }),
     );
     if (conversationContentSignature(persisted) === previousSignature) return;
-    // The signature also changes with key order, which the stored rows keep. Write only the
-    // messages that store differently, so a read with no real change writes nothing (#2224).
     const changedMessages = this.#database.changedConversationMessages(agent.threadId, persisted.messages);
     const removedMessageIds = [...previousMessageIds].filter(
       (messageId) => !persisted.messages.some((message) => message.id === messageId),
@@ -204,16 +204,10 @@ export class MailboxSync {
     }
   }
 
-  /**
-   * The queue the user reads, carrying the reason it waits when something outside this agent holds
-   * it. `AgentService.listQueue` returns this as well, so a reload and a reconnect report the same
-   * wait as the event below.
-   */
   queueSnapshot(agentId: string): QueueSnapshot {
     return this.withHold(this.#mailbox.listQueue(agentId));
   }
 
-  /** Adds the reason that a queue waits, as `queueSnapshot` does, to a queue read in another way. */
   withHold(queue: QueueSnapshot): QueueSnapshot {
     if (!queue.deliveries.some((delivery) => delivery.status === "queued")) return queue;
     const hold = this.#hooks.queueHold(queue.agentId);
@@ -223,7 +217,6 @@ export class MailboxSync {
   emitQueue(agentId: string): void {
     const queue = this.queueSnapshot(agentId);
     let routinesChanged = false;
-    // A run in a routine's side thread is not in the queue of the chat, but its run still follows it.
     for (const delivery of [...queue.deliveries, ...this.#mailbox.taskRoutineDeliveries(agentId)]) {
       if (this.#routines.reconcileDelivery(delivery)) routinesChanged = true;
     }
@@ -238,7 +231,6 @@ export class MailboxSync {
       this.syncMailboxMessages(snapshot);
       const signature = conversationContentSignature(snapshot);
       if (signature !== previousSignature) this.#conversation.emitConversation(snapshot);
-      // The signature is of this snapshot, so the publish does not make it again.
       else if (!this.#conversation.hasPublishedConversation(affectedAgentId))
         this.#conversation.publishConversation(snapshot, signature);
     }
@@ -248,10 +240,6 @@ export class MailboxSync {
     queueMicrotask(() => {
       Effect.runFork(
         Effect.gen({ self: this }, function* () {
-          // A provider response can arrive before the mailbox writes complete. Associate every
-          // still-starting row with the confirmed turn before publishing the retry. This is safe:
-          // the turn id came from the provider, and it prevents a second drain from replaying it.
-          // Check the active marker again so a delayed retry cannot claim a new turn's rows.
           if (turnId && this.#conversation.snapshotWithTurn(agentId, turnId)) {
             const accepted = new Set(deliveryIds);
             for (const deliveryId of accepted) {

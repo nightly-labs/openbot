@@ -1,14 +1,10 @@
-// Runs the real `opencode` provider driver over a fake `opencode acp` (`provider-fakes/agents/opencode-steer.ts`)
-// to check that a steered message goes into the running turn through `_session/steering` (#8231).
-// Cases: a steer with text and an image, a steer for a turn that is not the running one, a steer
-// after the turn ended, a steer that OpenCode answers with `promptRequired`, and an OpenCode without
-// the request. Each refused steer must not stop the running turn, so the message can wait in the queue,
-// and an OpenCode without the request must not get the request at all.
-// `bun run test:opencode-steer`. Writes .openbot-build/opencode-steer-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
+import { Effect } from "effect";
+import { ModelCatalog } from "../src/backend/agent/model-catalog";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type AppServerNotification, getRecord, getString, isRecord } from "../src/backend/protocol";
@@ -17,7 +13,6 @@ import { installFakeAgent, readJsonl, startThread, stopClients } from "./provide
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-steer-e2e");
 const TURN_TIMEOUT_MS = 20_000;
-/** A 1x1 transparent PNG. */
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
   "base64",
@@ -30,8 +25,15 @@ interface LogEntry {
   content?: string[];
 }
 
+interface CatalogSteering {
+  models: { id: string; steersTurns: boolean }[];
+  listedModel: boolean;
+  unlistedModel: boolean;
+}
+
 interface Report {
   passed: boolean;
+  catalog?: { withMethod: CatalogSteering; withoutMethod: CatalogSteering };
   steered?: { turnId: string; reply: string; status: string | null; steering: LogEntry };
   wrongTurn?: { refused: string; requests: number };
   afterTurn?: { refused: string; requests: number };
@@ -62,7 +64,6 @@ async function open(
   return { client, log };
 }
 
-/** Waits until the fake logs an entry that matches, or fails after `timeoutMs`. */
 async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!(await readJsonl<LogEntry>(log)).some(match)) {
@@ -73,11 +74,9 @@ async function waitForEntry(log: string, match: (entry: LogEntry) => boolean, ti
 
 interface RunningTurn {
   id: string;
-  /** The reply text and the `turn/completed` status. */
   done: Promise<{ reply: string; status: string | null }>;
 }
 
-/** Starts a `work` turn, which stays open with one tool call until the agent gets a steer. */
 async function startWork(client: AgentClient, thread: string, log: string): Promise<RunningTurn> {
   let reply = "";
   let listener: ((notification: AppServerNotification) => void) | undefined;
@@ -109,7 +108,6 @@ async function startWork(client: AgentClient, thread: string, log: string): Prom
   return { id, done };
 }
 
-/** Steers the turn with this input. Answers the turn id that the client reports. */
 function steer(
   client: AgentClient,
   thread: string,
@@ -134,10 +132,26 @@ async function refusal(operation: Promise<string | null>): Promise<string> {
   return outcome;
 }
 
+async function catalogSteering(client: AgentClient): Promise<CatalogSteering> {
+  const catalog = new ModelCatalog({
+    client: () => client,
+    isSignedOut: () => false,
+    requestTimeoutMs: 10_000,
+    recordProviderError: () => undefined,
+    startSettingsChanged: () => Effect.void,
+  });
+  const { models } = await runCauseEffect(catalog.read(client, requireProviderDriver("opencode").catalog, 10_000));
+  assert.ok(models.length > 0, "The catalog must list an OpenCode model.");
+  return {
+    models: models.map((model) => ({ id: model.id, steersTurns: model.steersTurns === true })),
+    listedModel: agentSteersTurns({ provider: "opencode", model: models[0]?.id ?? "" }, models),
+    unlistedModel: agentSteersTurns({ provider: "opencode", model: "openai/not-listed" }, models),
+  };
+}
+
 const requests = async (log: string) =>
   (await readJsonl<LogEntry>(log)).filter((entry) => entry.event === "steering").length;
 
-/** Stops the turn, for an agent that keeps it open, and waits for its end. */
 async function stop(client: AgentClient, thread: string, turn: RunningTurn): Promise<void> {
   await runCauseEffect(client.request("turn/interrupt", { threadId: thread, turnId: turn.id }, (value) => value));
   await turn.done;
@@ -148,9 +162,11 @@ try {
   await writeFile(image, PNG);
 
   const { client, log } = await open("native", {});
+  const withMethod = await catalogSteering(client);
+  assert.equal(withMethod.listedModel, true, "An OpenCode with the request must steer.");
+  assert.equal(withMethod.unlistedModel, true, "Each model of an OpenCode with the request must steer.");
   const thread = await startThread(client, { cwd: root });
 
-  // A steer goes into the running turn and does not start or stop a turn.
   const turn = await startWork(client, thread, log);
   const answer = await steer(client, thread, turn.id, [
     { type: "text", text: "use the other branch", text_elements: [] },
@@ -170,7 +186,6 @@ try {
   assert.ok(!entries.some((entry) => entry.event === "cancel"), "The steer must not cancel the turn.");
   report.steered = { turnId: turn.id, reply: finished.reply, status: finished.status, steering };
 
-  // A steer for a turn that is not the running one is refused before it reaches the agent.
   const second = await startWork(client, thread, log);
   const before = await requests(log);
   const wrongTurn = await refusal(steer(client, thread, "another-turn", [{ type: "text", text: "late" }]));
@@ -179,13 +194,11 @@ try {
   await steer(client, thread, second.id, [{ type: "text", text: "end" }]);
   await second.done;
 
-  // After the turn ended, the message waits for a turn of its own.
   const ended = await requests(log);
   const afterTurn = await refusal(steer(client, thread, second.id, [{ type: "text", text: "too late" }]));
   assert.equal(await requests(log), ended);
   report.afterTurn = { refused: afterTurn, requests: (await requests(log)) - ended };
 
-  // OpenCode ran no turn when the steer arrived. It did not keep the message, so the steer is refused.
   const idle = await open("prompt-required", { FAKE_NEVER_RUNNING: "1" });
   const idleThread = await startThread(idle.client, { cwd: root });
   const idleTurn = await startWork(idle.client, idleThread, idle.log);
@@ -202,16 +215,19 @@ try {
     cancelSent: idleCancel,
   };
 
-  // An OpenCode before the request does not report it, and does not get it. The turn goes on.
   const old = await open("without-method", { FAKE_NO_STEERING: "1" }, "2.2.6");
+  const withoutMethod = await catalogSteering(old.client);
+  assert.equal(withoutMethod.listedModel, false, "An OpenCode without the request must not steer.");
+  assert.equal(withoutMethod.unlistedModel, false, "An OpenCode without the request must not steer.");
+  report.catalog = { withMethod, withoutMethod };
   const oldThread = await startThread(old.client, { cwd: root });
   const oldTurn = await startWork(old.client, oldThread, old.log);
-  const withoutMethod = await refusal(steer(old.client, oldThread, oldTurn.id, [{ type: "text", text: "steer" }]));
+  const oldRefusal = await refusal(steer(old.client, oldThread, oldTurn.id, [{ type: "text", text: "steer" }]));
   const oldEntries = await readJsonl<LogEntry>(old.log);
   const cancelSent = oldEntries.some((entry) => entry.event === "cancel");
   assert.equal(await requests(old.log), 0, "An OpenCode without the request must not get it.");
   assert.equal(cancelSent, false);
-  report.withoutMethod = { refused: withoutMethod, requests: await requests(old.log), cancelSent };
+  report.withoutMethod = { refused: oldRefusal, requests: await requests(old.log), cancelSent };
   await stop(old.client, oldThread, oldTurn);
 
   report.passed = true;

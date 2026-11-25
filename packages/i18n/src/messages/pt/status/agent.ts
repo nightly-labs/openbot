@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} ficou sem créditos. Trocado para {model}. Para usá-lo de novo, adicione créditos e depois selecione-o.",
   "status.agent.modelReturnedAfterError": "Após o erro do provedor, o modelo voltou para {model}.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} não está mais disponível. O modelo mudou para {model}.",
   "status.agent.marketplaceSuggested": "App da loja sugerido: {app}.",
   "status.agent.settingShown": "Configuração mostrada: {setting}.",
   "status.agent.channelMemberAdded": "{agent} adicionou {member} ao canal. {person} pediu.",
@@ -26,6 +27,8 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Capturar a tela principal e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureChannel":
     "A imagem aparece no canal {channel}, e cada membro deste servidor que lê o canal pode vê-la.",
+  "status.agent.screenCapturePermissionNext":
+    "Depois, o macOS pode pedir que você permita a Gravação de Tela para o OpenBot.",
   "status.agent.screenCaptureDisplay": "Capturar o monitor {name} e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureWindow": "Capturar a janela {name} e enviar a imagem ao modelo do agente.",
   "status.agent.screenCaptureRegion":
@@ -69,6 +72,7 @@ export const messages = {
   "status.agent.browserActing": "Usando a página da web…",
   "status.agent.browserReviewing": "Analisando a página da web…",
   "status.agent.memoriesSearching": "Pesquisando suas memórias…",
+  "status.agent.chatsSearching": "Pesquisando seus chats anteriores…",
   "status.agent.memoriesSearched": {
     one: "Pesquisou suas memórias: {count} encontrada",
     other: "Pesquisou suas memórias: {count} encontradas",
@@ -112,7 +116,14 @@ export const messages = {
   "status.agent.uiBlockClosedByMessage": "Fechado por uma nova mensagem",
   "status.agent.nextStepContinues": "O agente parou antes da próxima etapa. Ele continua ({current} de {limit}).",
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
+  "status.agent.planStopped": "O agente parou com etapas abertas no plano. Envie uma mensagem para continuar.",
+  "status.agent.continuationLimitReached":
+    "O agente parou antes de terminar o pedido. Ele não pode continuar sozinho outra vez. Envie uma mensagem para continuar.",
   "status.agent.compactionContinues": "A conexão parou enquanto o agente compactava o contexto. O agente continua.",
   "status.agent.providerExitContinues": "O agente parou antes de terminar a resposta. O agente continua.",
   "status.agent.branchTitle": "Chat ramificado",
+  "status.agent.location.field": "A sua localização",
+  "status.agent.location.placeholder": "Cidade, morada ou local",
+  "status.agent.location.submit": "Partilhar",
+  "status.agent.location.shared": "Localização partilhada",
 } as const satisfies PartialTranslation<typeof source>;

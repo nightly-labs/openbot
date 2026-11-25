@@ -1,8 +1,3 @@
-// The motion each idle greeting plays once as it shows. Every curve is a formula, a damped spring or
-// a decaying sine, sampled into keyframes that play linearly, so a motion is one smooth path rather
-// than a curve per keyframe. The card turns in 3D to its back face; the moment it is edge-on is hidden
-// by a small blur, from how fast it turns, and a small scale dip.
-
 import { springProgress } from "@openbot/ui/spring-motion";
 import { clamp } from "@openbot/ui/utils";
 
@@ -15,7 +10,6 @@ interface IdleGreetingParts {
 }
 
 const SAMPLE_COUNT = 30;
-/** The motion starts as the crossfade from the previous greeting settles. */
 const MOTION_DELAY = 350;
 const TURN_BLUR_LIMIT = 1.4;
 const TURN_SPEED_BLUR_LIMIT = 0.4;
@@ -23,11 +17,9 @@ const TURN_BLUR_PER_DEGREE_PER_MS = 0.75;
 const TURN_EDGE_BLUR = 1.2;
 const TURN_EDGE_FADE = 0.5;
 const TURN_EDGE_SHADE = 0.3;
-/** The look of a face at rest, so the last keyframe lists the same filter functions. */
 const FACE_AT_REST = { filter: "blur(0px) brightness(1)", opacity: "1" };
 const EDGE_SCALE_DIP = 0.07;
 
-/** Plays the motion of a greeting that just showed, and returns its animations to cancel. */
 export function playIdleGreetingMotion(name: IdleGreetingMotionName, layer: HTMLElement): Animation[] {
   const card = layer.querySelector<HTMLElement>(".dynamic-island-surface-idle-greeting-card");
   const front = card?.querySelector<HTMLElement>(".dynamic-island-surface-idle-greeting-face");
@@ -40,11 +32,6 @@ export function playIdleGreetingMotion(name: IdleGreetingMotionName, layer: HTML
   return playSparkles(front);
 }
 
-/**
- * Each star lights up on a soft spring, the large one first, and then shimmers: a slow breath in
- * light, size and tilt, each star at its own pace and phase, so they glint in turn. The stars are
- * copies of the glyph, each masked to one star.
- */
 function playSparkles(face: HTMLElement): Animation[] {
   const duration = 7000;
   const light = spring(0.75, 0.6);
@@ -53,7 +40,6 @@ function playSparkles(face: HTMLElement): Animation[] {
     const start = index * 260;
     const period = 1700 + index * 380;
     const phase = index * 2.1;
-    // The shimmer fades in after the star is lit and out before the greeting changes.
     const envelope = (t: number) => clamp((t - start - 700) / 900, 0, 1) * clamp((duration - t) / 700, 0, 1);
     const breath = (t: number) => Math.sin((2 * Math.PI * (t - start)) / period + phase);
     return animate(
@@ -75,7 +61,6 @@ function playSparkles(face: HTMLElement): Animation[] {
   });
 }
 
-/** The hand waves from the wrist, the card turns to the heart hands, and then on, back to the wave. */
 function playWave(parts: IdleGreetingParts): Animation[] {
   const duration = 3500;
   const turn = spring(0.62, 0.7);
@@ -100,7 +85,6 @@ function playWave(parts: IdleGreetingParts): Animation[] {
   ];
 }
 
-/** The smile turns like a ball, with a small hop, to the grin, and after a moment back to the smile. */
 function playSmile(parts: IdleGreetingParts): Animation[] {
   const duration = 3300;
   const turn = spring(0.6, 0.8);
@@ -119,11 +103,6 @@ function playSmile(parts: IdleGreetingParts): Animation[] {
   ];
 }
 
-/**
- * The raised hands turn to clapping hands and clap twice, each clap a squash with a small rebound
- * and tilt. Then they crouch a little, throw themselves up as they turn back raised, and land on a
- * spring.
- */
 function playCheer(parts: IdleGreetingParts): Animation[] {
   const duration = 2700;
   const turn = spring(0.62, 0.65);
@@ -131,11 +110,9 @@ function playCheer(parts: IdleGreetingParts): Animation[] {
   const land = spring(0.55, 0.5);
   const claps = [700, 1000];
   const theta = (t: number) => 180 * turn(t) + 180 * turn(t - 1420);
-  // A crouch before the throw, the throw up, and the landing.
   const crouch = (t: number) => 0.8 * Math.sin(Math.PI * clamp((t - 1280) / 160, 0, 1));
   const rise = (t: number) => crouch(t) - 3 * (launch(t - 1420) - land(t - 1800));
   const pop = (t: number) => 1 - (0.04 * crouch(t)) / 0.8 + 0.1 * (launch(t - 1420) - land(t - 1760));
-  // Each clap squashes the hands across and stretches them a little up, then rebounds.
   const clapAt = (t: number) => {
     for (const at of claps) {
       const since = t - at;
@@ -188,11 +165,6 @@ function faceTurn(face: HTMLElement | undefined, duration: number, theta: (t: nu
   return [animate(face, duration, (t) => turnLook(theta, t), FACE_AT_REST)];
 }
 
-/**
- * Samples a motion into keyframes. The last keyframe is exact, so the card rests square on its face,
- * and `fill: forwards` holds it there until the greeting changes. A motion that does not start from
- * rest, such as the sparkles, also holds its first keyframe through the delay (`both`).
- */
 function animate(
   element: HTMLElement,
   duration: number,
@@ -209,11 +181,6 @@ function animate(
   return element.animate(keyframes, { duration, delay: MOTION_DELAY, easing: "linear", fill });
 }
 
-/**
- * How a face looks as the card turns, for an illusion of depth. Edge-on, the face blurs, fades and
- * darkens, as a card turning away from the light does; a fast turn adds a little motion blur. Both
- * faces get the same look, and the one turned away is hidden by its back face.
- */
 function turnLook(theta: (t: number) => number, t: number): { filter: string; opacity: number } {
   const edge = Math.abs(Math.sin((theta(t) * Math.PI) / 180));
   const degreesPerMs = Math.abs(theta(t + 4) - theta(t - 4)) / 8;
@@ -225,12 +192,10 @@ function turnLook(theta: (t: number) => number, t: number): { filter: string; op
   };
 }
 
-/** The card gets a little smaller as it turns edge-on. */
 function edgeScale(theta: number): number {
   return 1 - EDGE_SCALE_DIP * Math.abs(Math.sin((theta * Math.PI) / 180));
 }
 
-/** A damped spring from 0 to 1, for a time in milliseconds; 0 before it starts. */
 function spring(dampingRatio: number, responseSeconds: number): (t: number) => number {
   const settings = { response: responseSeconds, dampingFraction: dampingRatio };
   return (t) => (t <= 0 ? 0 : springProgress(t / 1000, settings));

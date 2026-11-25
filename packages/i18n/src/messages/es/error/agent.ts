@@ -20,6 +20,8 @@ export const messages = {
     "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Usa el nombre calificado exacto que da tool_search, como openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "La herramienta no se ejecutó. tool_call no encontró ninguna herramienta con este nombre. Es posible que el nombre calificado sea {name}. Si lo es, vuelve a enviar la llamada con ese nombre.",
+  "error.agent.toolCallNullValue":
+    "La herramienta no se ejecutó. {name} necesita un objeto o una lista en {paths}, pero cada uno de estos elementos de la lista llegó como null. Vuelve a enviar la llamada y da cada uno de estos elementos como una cadena que contenga su JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe no encontró ninguna herramienta de OpenBot llamada {names}. Solo describe las herramientas de OpenBot y del navegador que lista openbot.tool_search, no las herramientas MCP.",
   "error.agent.toolDescribeDiscoveryNames":
@@ -54,6 +56,12 @@ export const messages = {
   "error.agent.modelUnavailable": "El modelo de agente seleccionado no está disponible.",
   "error.agent.modelProviderNotConnected":
     "El modelo de agente seleccionado «{model}» no está disponible: {provider} no está conectado.",
+  "error.agent.modelProviderSignInRequired":
+    "El modelo de agente seleccionado «{model}» no está disponible: {provider} necesita que inicies sesión. Inicia sesión en {provider} y vuelve a intentarlo.",
+  "error.agent.modelProviderNotInstalled":
+    "El modelo de agente seleccionado «{model}» no está disponible: {provider} no está instalado.",
+  "error.agent.modelProviderOutdated":
+    "El modelo de agente seleccionado «{model}» no está disponible: {provider} necesita una actualización.",
   "error.agent.modelListEmpty":
     "El modelo de agente seleccionado «{model}» no está disponible: {provider} no mostró ningún modelo. Último error: {detail}",
   "error.agent.modelListEmptyNoError":
@@ -133,6 +141,10 @@ export const messages = {
   "error.agent.deleteIncomplete": "No se pudieron eliminar todos los datos del agente. Intenta eliminarlo de nuevo.",
   "error.agent.deleteFolderInUse":
     "El trabajo de otro agente todavía usa la carpeta de este agente. Vuelve a eliminarlo cuando ese trabajo termine o después de reiniciar OpenBot.",
+  "error.agent.deleteFolderLocked":
+    "Otro programa todavía usa la carpeta de este agente, por ejemplo un programa que inició el agente. Cierra ese programa o reinicia el ordenador en el que funciona este agente y vuelve a eliminar el agente.",
+  "error.agent.deleteWhenFolderFree":
+    "El trabajo de otro agente todavía usa la carpeta de este agente. OpenBot elimina este agente cuando ese trabajo termine.",
   "error.agent.duplicationBusy": "Este agente ya se está duplicando.",
   "error.agent.waitBeforeDuplicate": "Espera a que el agente termine y vacía su cola antes de duplicarlo.",
   "error.agent.saveOtherAgent": "Este guardado pertenece a otro agente.",
@@ -156,6 +168,8 @@ export const messages = {
     "El comportamiento de los mensajes mientras trabaja el agente solo se puede configurar en el equipo que lo ejecuta.",
   "error.agent.backupModelsLocalOnly":
     "Los modelos de respaldo solo se pueden configurar en el equipo que ejecuta el agente.",
+  "error.agent.backupModelsAtLimit":
+    "Ningún modelo de respaldo puede tomar el relevo ahora: cada uno llegó a su límite de uso o falló hace poco. Los modelos de una cuenta pueden compartir un límite. Para continuar ahora, añade un modelo de respaldo de otro proveedor o de otra cuenta, o espera al reinicio.",
   "error.agent.taskLimitLocalOnly": "El límite de tareas solo se puede configurar en el equipo que ejecuta el agente.",
   "error.agent.localScriptsOff": "Este agente no permite scripts locales.",
   "error.agent.localScriptsRateLimited":
@@ -196,6 +210,8 @@ export const messages = {
     "La región no está dentro de una sola pantalla. Usa puntos del escritorio dentro de los límites de una pantalla de list_capture_sources.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot no tiene el permiso de grabación de pantalla. Pide al usuario que abra Ajustes del Sistema > Privacidad y seguridad > Grabación de pantalla y audio del sistema, active OpenBot y después cierre OpenBot y vuelva a abrirlo.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot todavía no tiene el permiso de grabación de pantalla, así que no puede listar las ventanas. Para capturar una pantalla, llama a capture_screen con target screen. El usuario aprueba primero la captura y después macOS puede pedirle el permiso.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows devolvió una imagen vacía. Pide al usuario que desbloquee el equipo y cierre el contenido protegido. Una directiva de la organización también puede impedir la captura de pantalla.",
   "error.agent.screenCaptureFailed": "La captura de pantalla falló. Inténtalo de nuevo.",

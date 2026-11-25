@@ -20,7 +20,6 @@ const WhatsNew = createSimpleContext({
   }) => {
     const platform = usePlatform();
     const i18n = useI18n();
-    // Capture the old analytics value before Settings writes this launch's version.
     const storage = {
       getItem: (key: string) => window.localStorage.getItem(key),
       setItem: (key: string, value: string) => window.localStorage.setItem(key, value),
@@ -35,7 +34,6 @@ const WhatsNew = createSimpleContext({
     let initialized = false;
     let request = 0;
     let pending: AbortController | undefined;
-    // The language of the notes that the dialog shows or loads. Cleared when the dialog closes.
     let shown: { locale: TranslatedLocale; automatic: boolean } | undefined;
     onSettled(() => () => {
       request++;
@@ -66,7 +64,6 @@ const WhatsNew = createSimpleContext({
         notes = { status: "failed" };
       }
       if (id !== request) return;
-      // Empty releases are consumed silently. A failure opens once and can be retried in Settings.
       if (automatic && !claimWhatsNewVersion(storage, version)) {
         shown = undefined;
         return;
@@ -79,8 +76,6 @@ const WhatsNew = createSimpleContext({
       if (!state.open) shown = undefined;
     }
 
-    // The saved language can finish loading after the automatic load starts, and the language can
-    // change while the dialog is open. Load the notes again, so they never stay in the old language.
     createEffect(i18n.locale, (locale) => {
       if (!shown || shown.locale === locale) return;
       void load(shown.automatic && !state.open, state.version, state.previousVersion);
@@ -98,7 +93,6 @@ const WhatsNew = createSimpleContext({
       if (previous === null) {
         claimWhatsNewVersion(storage, current);
       } else if (compareReleaseVersions(current, previous) > 0) {
-        // The workspace calls start after login and setup, so notes do not cover onboarding.
         setState((draft) => {
           draft.previousVersion = previous;
         });
@@ -115,7 +109,6 @@ const WhatsNew = createSimpleContext({
     function reopen(): void {
       const version = state.version;
       if (!version) return;
-      // Manual opening also consumes a pending automatic display.
       claimWhatsNewVersion(storage, version);
       started = true;
       void load(false, version, null);

@@ -19,6 +19,7 @@ export const messages = {
   "computerUse.ready.title": "Computerbesturing is klaar",
   "computerUse.ready.description":
     "OpenBot kan apps op deze computer zien en bedienen. Dit systeem vraagt geen extra machtiging.",
+  "computerUse.limited.title": "Computerbesturing is beperkt op dit bureaublad",
   "computerUse.openSettingsFailed.title": "Kan Systeeminstellingen niet openen",
   "computerUse.restartRequired.title": "Opnieuw starten nodig",
   "computerUse.restartRequired.description":

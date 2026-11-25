@@ -1,7 +1,3 @@
-// Run: bun scripts/agent-install-receipt-e2e.ts
-// Report: .openbot-build/agent-install-receipt-e2e.json
-// Drives the real agent marketplace service with injected auth, agent and skill boundaries.
-
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -29,9 +25,7 @@ interface ScenarioOptions {
   receiptInterrupt?: boolean;
   receiptFailure?: boolean;
   skillFailure?: boolean;
-  /** Start from a saved copy of an older version, so the install is an update. */
   update?: boolean;
-  /** The saved copy has local changes in a skill of the listing and in a skill the listing dropped. */
   modifiedSkills?: boolean;
   receiptAttempts?: number;
 }
@@ -58,7 +52,6 @@ interface CaseReport {
 
 const decodeReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Struct({ receiptId: Schema.String })));
 
-// Do not copy messages, stacks, causes or assertion values into diagnostics.
 function failureReason(error: unknown, phase: string): string {
   if (error instanceof assert.AssertionError) return `Assertion failed during ${phase}.`;
   return `An operation failed during ${phase}.`;
@@ -100,7 +93,6 @@ const detail: MarketplaceAgentDetail = {
   ],
 };
 const timezone = "UTC";
-/** A skill that an older version of the listing had, and the newest one dropped. */
 const DROPPED_SKILL_ID = "receipt-dropped-skill";
 const report: { status: "running" | "pass" | "fail"; cases: CaseReport[] } = { status: "running", cases: [] };
 
@@ -125,7 +117,6 @@ function summary(id: string, workspace: string, values: Partial<AgentSummary>): 
   };
 }
 
-/** The saved state of an added agent: its profile, its marketplace source and its routines. */
 function assertSaved(state: Pick<ScenarioState, "agents" | "routines">, agentId: string): AgentSummary {
   const agent = state.agents.get(agentId);
   assert.ok(agent);
@@ -178,7 +169,6 @@ async function scenario(
         receiptAttempts += 1;
         assert.ok(typeof init.body === "string", "Receipt body must be a string.");
         const { receiptId } = decodeReceipt(init.body);
-        // The receipt is sent only after the agent is saved.
         const saved = [...agents.values()].filter((agent) => agent.marketplaceSource?.listingId === detail.id);
         assert.equal(saved.length, 1);
         assertSaved({ agents, routines }, saved[0]?.id ?? "");
@@ -329,7 +319,6 @@ function addedAgent(state: ScenarioState, input: InstallMarketplaceAgentInput): 
   return agent;
 }
 
-/** A receipt that dies or is interrupted keeps its error path. The saved agent stays, as before. */
 function keptAfterReceiptError(state: ScenarioState): void {
   assert.ok(Exit.isFailure(state.result));
   assert.equal(state.agents.size, 1);
@@ -343,8 +332,6 @@ await scenario("successful receipt", {}, async (state, input) => {
 });
 await scenario("failed receipt after commit", { receiptFailure: true }, async (state, input) => {
   const agent = addedAgent(state, input);
-  // The listing shows the agent as added, so the user can only open or update it. The same version is
-  // already saved: the service returns the agent and sends no second receipt.
   const again = await Effect.runPromise(
     state.service.install({ ...input, agentId: agent.id, receiptId: randomUUID() }),
   );
@@ -371,7 +358,6 @@ await scenario(
   "update keeps changed skills",
   { update: true, modifiedSkills: true, receiptAttempts: 0 },
   async (state, input) => {
-    // #4907: a skill with local changes made the whole update fail. It now stays as the user left it.
     assert.ok(Exit.isSuccess(state.result));
     const agent = assertSaved(state, input.agentId ?? "");
     assert.equal(agent.marketplaceSource?.versionId, detail.versionId);

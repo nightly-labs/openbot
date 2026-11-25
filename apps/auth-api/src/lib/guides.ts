@@ -1,9 +1,3 @@
-// The one list of published guides. Same shape as the news registry, and read by
-// the same pages, feed, sitemap and image generator.
-//
-// The public guides explain how OpenBot works and how to use it. Contributor
-// instructions for adding a guide live in CONTRIBUTING.md instead.
-
 import { type ContentCollection, publishedFirst } from "./content-collection";
 import { NEWS_AUTHOR } from "./news";
 
@@ -24,6 +18,22 @@ export const GUIDES_COLLECTION: ContentCollection<"guides"> = {
   moreTitle: "More guides",
   imageEyebrow: "OPENBOT · GUIDES",
   articles: publishedFirst([
+    {
+      slug: "ai-agent-productivity",
+      title: "AI Agent Productivity: Why Persistence Beats a Blank Chat",
+      description:
+        "See how persistent OpenBot agents can help with recurring work. Follow a weekly client update and check whether saved context reduces setup and corrections.",
+      publishedAt: "2026-11-19",
+      author: NEWS_AUTHOR,
+    },
+    {
+      slug: "ai-agent-workflows",
+      title: "AI Agent Workflows: 12 Repeatable Processes for Small Teams",
+      description:
+        "Build a small team of OpenBot agents and reuse it across 12 practical workflows. Set roles, share files and connect research, writing and review.",
+      publishedAt: "2026-11-17",
+      author: NEWS_AUTHOR,
+    },
     {
       slug: "ai-agent-workflow",
       title: "AI Agent Workflow: From Task to Finished Result",

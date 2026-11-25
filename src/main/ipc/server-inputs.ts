@@ -13,6 +13,7 @@ import type {
   RemoteDesktopTestInput,
   ReorderServersInput,
   SendDirectMessageInput,
+  SetServerHiddenInput,
   SetServerMutedInput,
   SetServerNotificationLevelInput,
   SetTeamTypingInput,
@@ -220,11 +221,15 @@ export function parseSetServerMuted(value: unknown): SetServerMutedInput {
   if (!isObject(value) || !isBoolean(value.muted)) throw new Error("Invalid server mute setting.");
   const serverId = requireString(value.serverId, "serverId", INPUT_LIMITS.identifier);
   if (value.durationMs === undefined) return { serverId, muted: value.muted };
-  // Only a mute has an end, and only the menu's durations are accepted.
   if (!value.muted || !isOneOf(SERVER_MUTE_DURATIONS_MS, value.durationMs)) {
     throw new Error("Invalid server mute duration.");
   }
   return { serverId, muted: true, durationMs: value.durationMs };
+}
+
+export function parseSetServerHidden(value: unknown): SetServerHiddenInput {
+  if (!isObject(value) || !isBoolean(value.hidden)) throw new Error("Invalid server hidden setting.");
+  return { serverId: requireString(value.serverId, "serverId", INPUT_LIMITS.identifier), hidden: value.hidden };
 }
 
 export function parseSetServerNotificationLevel(value: unknown): SetServerNotificationLevelInput {

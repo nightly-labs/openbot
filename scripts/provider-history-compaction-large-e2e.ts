@@ -1,20 +1,3 @@
-// Measures the compaction of imported provider history on a large database (plan 011, item 25).
-//
-//   bun scripts/provider-history-compaction-large-e2e.ts [--size-gb=1.6] [--vacuum]
-//
-// It makes a database with the latest schema and fills `provider_history_staging` to `--size-gb` in the
-// proportions of a hosted server: Codex sessions whose turns are all imported 92.6%, Claude 3.7%, Codex
-// sessions whose import failed 2.1% (half of their turns not imported), Grok 1.7% (half of its turns
-// imported as records only). Three items are 11 MB, as the largest item of that server.
-//
-// Then it compacts the existing rows in a child process, through `OpenBotDatabase` and the batch loop
-// that a start runs, and samples the free disk and the WAL. A second child runs the loop again, as the
-// next start does. The script checks each row: an imported Codex or Claude row holds the hash of its
-// old JSON, and every other row is unchanged. `--vacuum` also measures a VACUUM of the file.
-//
-// Writes `.openbot-build/provider-history-compaction-large/report.json` and exits non-zero when a row is
-// wrong. The report holds sizes, times and counts only.
-
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
@@ -63,16 +46,12 @@ function numberOf(db: DatabaseSync, sql: string, ...parameters: Array<string | n
   return isNumber(value) ? value : 0;
 }
 
-// ---------------------------------------------------------------------------------------------------
-// Child: open the database as a start does and run the batch compaction.
-
 interface ChildResult {
   seconds: number;
   rows: number;
   bytes: number;
   batches: number;
   batchMs: { p50: number; p99: number; max: number };
-  /** The slowest batch: its position, rows and replaced bytes. */
   slowestBatch: { index: number; rows: number; bytes: number };
 }
 
@@ -110,9 +89,6 @@ if (child === "compact") {
   process.exit(0);
 }
 
-// ---------------------------------------------------------------------------------------------------
-// Parent.
-
 const sizeGb = Number(flag("size-gb") ?? "1.6");
 if (!(sizeGb > 0)) throw new Error("Usage: bun scripts/provider-history-compaction-large-e2e.ts [--size-gb=<GB>]");
 const targetBytes = sizeGb * GIB;
@@ -131,17 +107,13 @@ if (freeBytes(OUT) < neededBytes) {
 }
 const databasePath = join(root, "openbot.db");
 
-// ----- Generate
-
 type Group = "codexImported" | "claudeImported" | "codexFailed" | "grok";
 
 interface GroupShape {
   provider: string;
   state: "complete" | "failed" | "active";
   share: number;
-  /** Item sizes, in turn. Their mean is the mean item size of the group on the hosted server. */
   sizes: readonly number[];
-  /** Whether turn `index` of a session is complete and imported. */
   imported(turnIndex: number): boolean;
 }
 
@@ -275,17 +247,13 @@ async function generate(): Promise<Generated> {
   };
 }
 
-// ----- Inspect
-
 const COMPACTABLE = `s.imported = 1 AND t.complete = 1 AND t.imported = 1 AND i.provider IN ('codex', 'claude')`;
 const STAGING_JOIN = `provider_history_staging s
   JOIN provider_history_turns t ON t.session_id = s.session_id AND t.turn_id = s.turn_id
   JOIN provider_history_imports i ON i.session_id = s.session_id`;
 
 interface TableSize {
-  /** Pages of the table and its indexes (`dbstat`). */
   tableAndIndexBytes: number;
-  /** Free bytes inside those pages. */
   unusedBytes: number;
   itemJsonBytes: number;
   rows: number;
@@ -307,7 +275,6 @@ function tableSize(db: DatabaseSync): TableSize {
   };
 }
 
-/** The value each row must hold after compaction, by row id. */
 function expectedValues(db: DatabaseSync): { compacted: Map<number, string>; kept: Map<number, string> } {
   const compacted = new Map<number, string>();
   const kept = new Map<number, string>();
@@ -349,8 +316,6 @@ function verify(db: DatabaseSync, expected: ReturnType<typeof expectedValues>) {
     expectedKept: expected.kept.size,
   };
 }
-
-// ----- Measure
 
 interface Measured<T> {
   result: T;
@@ -427,8 +392,6 @@ const groupsBefore = rows(
 const expected = expectedValues(inspect);
 inspect.close();
 
-// On a real computer the file is on disk long before the start. Write the generated pages to disk
-// now, so the first checkpoint of the compaction does not wait for them.
 spawnSync("sync");
 const first = await runChild(5);
 const repeat = await runChild(5);
@@ -476,7 +439,6 @@ const report = {
     noWrongOrMissingRow: check.wrong === 0 && check.missing === 0,
     firstStartCompactedEveryRow: first.result.rows === check.expectedCompacted,
     nextStartCompactsNothing: repeat.result.rows === 0,
-    // An UPDATE leaves the page of each large item almost empty (about 80% unused in total).
     compactedPagesAreNotLeftEmpty: sizeAfter.unusedBytes < sizeAfter.tableAndIndexBytes * 0.25,
   },
 };

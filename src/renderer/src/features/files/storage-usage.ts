@@ -17,15 +17,10 @@ import { toAgentProfile } from "../../app-message-projection";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { type FilesPort, filesPort } from "./files-port";
 
-/** This computer, or a joined server that serves `storage-v1`. An older host has no storage surface. */
 export function serverHasStorage(server: ServerSummary | undefined): server is ServerSummary {
   return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CAPABILITY)));
 }
 
-/**
- * Server Settings > Storage lists the programs that agents left running: this computer, or a joined
- * server that serves `background-processes-v1`. Only an owner or admin sees the list.
- */
 export function serverHasBackgroundProcesses(server: ServerSummary | undefined): server is ServerSummary {
   return (
     serverHasStorage(server) &&
@@ -33,26 +28,18 @@ export function serverHasBackgroundProcesses(server: ServerSummary | undefined):
   );
 }
 
-/** This computer, or a joined server that serves the files of one channel (`storage-channel-v1`). */
 export function serverHasChannelStorage(server: ServerSummary | undefined): server is ServerSummary {
   return Boolean(server && (server.kind === "local" || serverSupportsCapability(server, STORAGE_CHANNEL_CAPABILITY)));
 }
 
-/** The plan storage in GB of a hosted server, or null for a server that is not hosted. */
 export function hostedPlanStorageGb(server: ServerSummary | undefined): number | null {
   return server?.hosted === true && server.storageGb !== undefined ? server.storageGb : null;
 }
 
-/** Every member reads storage; the host lets only an owner or admin delete or clear. */
 export function canManageStorage(server: ServerSummary): boolean {
   return serverRoleCanAdminister(server);
 }
 
-/**
- * The agents of one server, to name the rows of its storage. They are read for that server, because a
- * storage view can be open for a server that is not the selected one. Undefined until the list of
- * that server arrives, so a file is not taken as a file of a deleted agent before it.
- */
 export function createServerAgents(
   serverId: () => string,
   calls: () => FilesPort = filesPort,
@@ -66,7 +53,6 @@ export function createServerAgents(
       .then((list) => {
         if (current) setAgents(list.map(toAgentProfile));
       })
-      // Without names the rows still show their chats and sizes; the storage read reports its own failure.
       .catch(() => undefined);
     return () => {
       current = false;
@@ -75,23 +61,26 @@ export function createServerAgents(
   return agents;
 }
 
-/** One storage scope of one server. Settings can be open for a server that is not the selected one. */
 export interface StorageTarget {
   serverId: string;
   input: GetStorageUsageInput;
 }
 
 interface StorageUsageState {
-  /** Null before the first answer, and for a remote host without `storage-v1`. */
   usage: StorageUsage | null;
-  /** The first answer for this target arrived. With `usage` null it means the host needs an update. */
   loaded: boolean;
   loading: boolean;
   error: string | null;
 }
 
+const USAGE_CACHE_LIMIT = 16;
+const usageCache = new Map<string, StorageUsage>();
+
+export function clearStorageUsageCache(): void {
+  usageCache.clear();
+}
+
 export interface StorageFileHandlers {
-  /** Opens the message that shows the file. The row has `messageId` when this is offered. */
   onShowInChat: (file: StoredFileRow) => void;
 }
 
@@ -101,10 +90,6 @@ function targetKey(target: StorageTarget | null): string | null {
   return JSON.stringify([target.serverId, scope, agentId ?? null, conversationId ?? null]);
 }
 
-/**
- * The storage of one scope, read when the target appears or changes. The host caches a scan for a
- * minute, so a surface that opens again is quick; a change here asks for a new scan.
- */
 export function createStorageUsage(target: () => StorageTarget | null, calls: () => FilesPort = filesPort) {
   const [state, setState] = createStore<StorageUsageState>({
     usage: null,
@@ -134,6 +119,20 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
       const input = force ? { ...current.input, force: true } : current.input;
       const usage = await calls().storage.getUsage(input, current.serverId);
       if (id !== request) return;
+      const key = targetKey(current);
+      if (key) {
+        if (usage) {
+          usageCache.delete(key);
+          usageCache.set(key, usage);
+          while (usageCache.size > USAGE_CACHE_LIMIT) {
+            const oldest = usageCache.keys().next().value;
+            if (oldest === undefined) break;
+            usageCache.delete(oldest);
+          }
+        } else {
+          usageCache.delete(key);
+        }
+      }
       setState((draft) => {
         draft.usage = usage;
         draft.loaded = true;
@@ -149,19 +148,18 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     }
   }
 
-  // A new target never shows the numbers of the previous one, even for the length of a scan.
   createEffect(
     () => targetKey(target()),
-    () => {
+    (key) => {
+      const cached = key ? usageCache.get(key) : undefined;
       setState((draft) => {
-        draft.usage = null;
-        draft.loaded = false;
+        draft.usage = cached ?? null;
+        draft.loaded = cached !== undefined;
       });
       void untrack(() => refresh());
     },
   );
 
-  /** Rejects with the host's reason, so the confirm dialog of the UI shows it. */
   async function clear(category: ClearableStorageCategory): Promise<void> {
     const current = target();
     if (!current) return;
@@ -202,10 +200,6 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     }
   }
 
-  /**
-   * Runs `run` on the files one at a time and tells `onProgress` how many are done. Resolves with the
-   * number of files that failed.
-   */
   async function eachFile(
     files: readonly StoredFileRow[],
     run: (file: StoredFileRow, serverId: string) => Promise<void>,
@@ -225,10 +219,6 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     return failed;
   }
 
-  /**
-   * Deletes the files one at a time, so a host with `storage-v1` needs no new route, and scans once at
-   * the end. Resolves with the number of files that could not be deleted.
-   */
   async function deleteFiles(files: readonly StoredFileRow[], onProgress?: (done: number) => void): Promise<number> {
     try {
       return await eachFile(
@@ -241,7 +231,6 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     }
   }
 
-  /** Puts the files in the Downloads folder with no dialog. Resolves with the number that could not be saved. */
   function saveFiles(files: readonly StoredFileRow[], onProgress?: (done: number) => void): Promise<number> {
     return eachFile(
       files,
@@ -250,7 +239,6 @@ export function createStorageUsage(target: () => StorageTarget | null, calls: ()
     );
   }
 
-  /** Null while nothing went wrong. A host that answered null predates `storage-v1`. */
   function error(): string | null {
     if (state.error) return state.error;
     return state.loaded && !state.usage ? currentText().t("files.storage.updateServer") : null;

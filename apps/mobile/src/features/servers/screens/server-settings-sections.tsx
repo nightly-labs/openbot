@@ -12,6 +12,7 @@ import Earth from "lucide-react-native/icons/earth";
 import Fingerprint from "lucide-react-native/icons/fingerprint-pattern";
 import HardDrive from "lucide-react-native/icons/hard-drive";
 import KeyRound from "lucide-react-native/icons/key-round";
+import RadioTower from "lucide-react-native/icons/radio-tower";
 import RefreshCcw from "lucide-react-native/icons/refresh-ccw";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
@@ -20,6 +21,7 @@ import RotateCcwKey from "lucide-react-native/icons/rotate-ccw-key";
 import ShieldCheck from "lucide-react-native/icons/shield-check";
 import Sparkles from "lucide-react-native/icons/sparkles";
 import UserRound from "lucide-react-native/icons/user-round";
+import UserRoundCog from "lucide-react-native/icons/user-round-cog";
 import UsersRound from "lucide-react-native/icons/users-round";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -33,13 +35,16 @@ import {
   ServerPersonalityRow,
   ServerSkillLearningRow,
 } from "@/features/servers/components/server-learning-rows";
+import { ServerTurnLimitsRows } from "@/features/servers/components/server-turn-limits-rows";
+import { ServerVoiceModelRow } from "@/features/servers/components/server-voice-model-row";
 import { TrailingValue } from "@/features/servers/components/trailing-value";
 import { SERVER_ROLE_LABEL_KEYS } from "@/features/servers/model/server-role";
-import { canRestartServer } from "@/features/servers/model/server-settings-access";
+import { canRestartServer, useOwnerHostedServerIds } from "@/features/servers/model/server-settings-access";
 import { timeZoneLabel } from "@/features/servers/model/time-zones";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
 import { useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import { useServerProviders } from "@/features/servers/model/use-server-providers";
+import { signalLatencyTone, useServerSignalHome } from "@/features/servers/model/use-server-signal-home";
 import { useServerSites } from "@/features/servers/model/use-server-sites";
 import { useServerTimezone } from "@/features/servers/model/use-server-timezone";
 import { updateAvailable, useServerUpdate } from "@/features/servers/model/use-server-update";
@@ -51,7 +56,6 @@ import type { MobileServer, ServerChecks } from "@/features/workspace/model/work
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/** The state of each row for the role of this member: see `serverRowState`. */
 function useServerRows(serverId: string) {
   const workspace = useMobileWorkspace();
   return (permits: (checks: ServerChecks) => unknown) => serverRowState(workspace, serverId, permits);
@@ -75,6 +79,7 @@ interface LinkRowProps {
   icon: LucideIcon;
   pathname:
     | "/server-settings/members"
+    | "/server-settings/owner-transfer"
     | "/server-settings/roles"
     | "/server-settings/audit"
     | "/server-settings/vault"
@@ -86,13 +91,14 @@ interface LinkRowProps {
   disabled?: boolean;
 }
 
-/** The role of this member, the members, and the roles and the audit log for a role that the host serves them to. */
 export function ServerPeopleSection({ server }: { server: MobileServer }) {
   const { t } = useText();
   const { memberCountByServer } = useMobileWorkspace();
   const row = useServerRows(server.id);
   const roles = row((checks) => checks.canManageServerRoles(server.id));
   const audit = row((checks) => checks.canReadServerAudit(server.id));
+  const ownerTransfer = row((checks) => checks.canTransferOwnership(server.id));
+  const hostedServerIds = useOwnerHostedServerIds(server);
   const memberCount = memberCountByServer[server.id];
   return (
     <SettingsSection title={t("mobile.server.settings.peopleSection")}>
@@ -141,14 +147,19 @@ export function ServerPeopleSection({ server }: { server: MobileServer }) {
           disabled={audit === "disabled"}
         />
       )}
+      {ownerTransfer === "hidden" || hostedServerIds?.has(server.id) ? null : (
+        <LinkRow
+          label={t("mobile.server.route.ownerTransfer")}
+          icon={UserRoundCog}
+          pathname="/server-settings/owner-transfer"
+          serverId={server.id}
+          disabled={ownerTransfer === "disabled"}
+        />
+      )}
     </SettingsSection>
   );
 }
 
-/**
- * The AI providers of the computer that runs the server. Its connectors and MCP servers are apps of the
- * Marketplace, as on the desktop.
- */
 export function ServerAiSection({ serverId }: { serverId: string }) {
   const { t } = useText();
   const row = useServerRows(serverId);
@@ -161,7 +172,6 @@ export function ServerAiSection({ serverId }: { serverId: string }) {
   );
 }
 
-/** The data that the server keeps, and the moves of agents and servers into and out of it. */
 export function ServerDataSections({ serverId }: { serverId: string }) {
   const { t } = useText();
   const row = useServerRows(serverId);
@@ -226,7 +236,6 @@ export function ServerDataSections({ serverId }: { serverId: string }) {
   );
 }
 
-/** The refresh and restart actions. */
 export function ServerConnectionSection({
   server,
   hostedServerIds,
@@ -236,14 +245,12 @@ export function ServerConnectionSection({
 }) {
   const { t } = useText();
   const serverId = server.id;
-  const { refreshServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
+  const { reconnectServer, hostedServerStarting, canRestartServerItself, restartServerItself } = useMobileWorkspace();
   const { session } = useMobileSession();
   const action = useLockedAction();
   const { busy, error } = action;
   const [restarting, setRestarting] = useState(false);
   const [restarted, setRestarted] = useState<string | null>(null);
-  // A hosted server restarts through the account server. A self-hosted server restarts itself: it
-  // answers, then closes, and its service manager starts it again.
   const hosted = canRestartServer(server, hostedServerIds);
   const selfHosted = !hosted && canRestartServerItself(serverId);
   function perform(operation: () => Promise<void>, failure?: (error: unknown) => string) {
@@ -256,14 +263,13 @@ export function ServerConnectionSection({
         leading={<RowIcon icon={RefreshCcw} tone="accent" />}
         disclosure={false}
         disabled={busy}
-        onPress={() => void perform(() => refreshServer(serverId))}
+        onPress={() => void perform(() => reconnectServer(serverId))}
       >
         <Typography.Paragraph className="text-accent">
           {busy && !restarting ? t("mobile.server.settings.refreshing") : t("mobile.server.settings.refresh")}
         </Typography.Paragraph>
       </SettingsRow>
       {hosted || selfHosted ? (
-        // The app connects again after the server starts.
         <SettingsRow
           leading={<RowIcon icon={RotateCcw} tone="accent" />}
           disclosure={false}
@@ -285,7 +291,6 @@ export function ServerConnectionSection({
                           else {
                             if (!session) throw new Error(currentText().t("mobile.server.hosted.restartFailed"));
                             const restart = await hostedServerCalls(session).restart(serverId);
-                            // The connection drops when the server stops. The app connects again, as after a wake.
                             if (WAKE_RECONNECT_STATES.has(restart.state)) hostedServerStarting(serverId);
                           }
                         } finally {
@@ -293,7 +298,6 @@ export function ServerConnectionSection({
                         }
                         setRestarted(currentText().t("mobile.server.settings.restarted", { name: server.name }));
                       },
-                      // The account server or the host explains a refusal, such as a server that cannot restart now.
                       (caught) => {
                         const text = currentText();
                         return text.errorMessage(caught, text.t("mobile.server.hosted.restartFailed"));
@@ -313,37 +317,37 @@ export function ServerConnectionSection({
   );
 }
 
-/** Any of the settings of the Agents page of the server, for the checks of the online or last host. */
 function permitsAgentSettings(checks: ServerChecks, serverId: string): boolean {
   return (
+    checks.canManageServerTurnLimits(serverId) ||
     checks.canManageServerPersonality(serverId) ||
     checks.canManageAgentMemoryLimit(serverId) ||
     checks.canManageMemoryReview(serverId) ||
     checks.canManageSkillLearning(serverId) ||
-    checks.canManageBrowsingMemory(serverId)
+    checks.canManageBrowsingMemory(serverId) ||
+    checks.canManageServerVoiceModel(serverId)
   );
 }
 
-/** True when this user can change at least one of the settings of the Agents page of the server now. */
 export function useAgentSettingsAvailable(serverId: string): boolean {
   return permitsAgentSettings(useMobileWorkspace(), serverId);
 }
 
-/**
- * The OpenBot update of the host, the server timezone and the Agents page, for an owner or admin of a
- * host that serves them. While the server is offline, the rows that its last connection served stay
- * disabled. The host checks the role and the value again.
- */
 export function ServerGeneralSection({ serverId }: { serverId: string }) {
-  const { t, errorMessage } = useText();
+  const { t, errorMessage, format } = useText();
   const timezone = useServerTimezone(serverId);
+  const signalHome = useServerSignalHome(serverId);
   const update = useServerUpdate(serverId, { poll: false });
   const row = useServerRows(serverId);
   const updateRow = row((checks) => checks.serverUpdateAccess(serverId));
   const timezoneRow = row((checks) => checks.canManageServerTimezone(serverId));
   const agentsRow = row((checks) => permitsAgentSettings(checks, serverId));
+  const signalHomeAccess = row((checks) => checks.servesServerSignalHome(serverId));
+  const signalHomes = signalHome.query.data;
+  const signalHomeRow = signalHome.query.isError || (signalHomes?.homes.length ?? 0) > 1 ? signalHomeAccess : "hidden";
+  const signalHomeInUse = signalHomes?.homes.find((home) => home.id === signalHomes.current);
   const updateShown = Boolean(update.access || update.query.data) || updateRow === "disabled";
-  if (!updateShown && timezoneRow === "hidden" && agentsRow === "hidden") return null;
+  if (!updateShown && timezoneRow === "hidden" && agentsRow === "hidden" && signalHomeRow === "hidden") return null;
   const zone = timezone.query.data;
   return (
     <SettingsSection
@@ -373,6 +377,29 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
           <Typography.Paragraph>{t("mobile.server.settings.timezone")}</Typography.Paragraph>
         </SettingsRow>
       )}
+      {signalHomeRow === "hidden" ? null : (
+        <SettingsRow
+          leading={<RowIcon icon={RadioTower} />}
+          trailing={
+            signalHomeInUse ? (
+              <TrailingValue
+                tone={signalLatencyTone(signalHomeInUse.latencyMs)}
+                value={
+                  signalHomeInUse.latencyMs === null
+                    ? t("mobile.server.settings.signalHomeNoAnswer")
+                    : t("mobile.server.settings.signalHomeLatency", {
+                        latency: format.number(signalHomeInUse.latencyMs),
+                      })
+                }
+              />
+            ) : undefined
+          }
+          disabled={signalHomeRow === "disabled" || !signalHome.available}
+          onPress={() => router.push({ pathname: "/server-settings/signal-home", params: { serverId } })}
+        >
+          <Typography.Paragraph>{t("mobile.server.route.signalHome")}</Typography.Paragraph>
+        </SettingsRow>
+      )}
       {agentsRow === "hidden" ? null : (
         <SettingsRow
           leading={<RowIcon icon={Bot} />}
@@ -386,36 +413,29 @@ export function ServerGeneralSection({ serverId }: { serverId: string }) {
   );
 }
 
-/**
- * The groups of the Agents page, one setting each with its description under it: the personality of
- * the agents, the memories per agent and how the agents learn, for an owner or admin of an online host
- * that serves them. The host checks the role and the value again.
- */
 export function ServerAgentsSection({ serverId }: { serverId: string }) {
   const {
+    canManageServerTurnLimits,
     canManageServerPersonality,
     canManageAgentMemoryLimit,
     canManageMemoryReview,
     canManageSkillLearning,
     canManageBrowsingMemory,
+    canManageServerVoiceModel,
   } = useMobileWorkspace();
   return (
     <>
+      {canManageServerTurnLimits(serverId) ? <ServerTurnLimitsRows serverId={serverId} /> : null}
       {canManageServerPersonality(serverId) ? <ServerPersonalityRow serverId={serverId} /> : null}
       {canManageAgentMemoryLimit(serverId) ? <ServerMemoryLimitRow serverId={serverId} /> : null}
       {canManageMemoryReview(serverId) ? <ServerMemoryReviewRow serverId={serverId} /> : null}
       {canManageSkillLearning(serverId) ? <ServerSkillLearningRow serverId={serverId} /> : null}
       {canManageBrowsingMemory(serverId) ? <ServerBrowsingMemoryRow serverId={serverId} /> : null}
+      {canManageServerVoiceModel(serverId) ? <ServerVoiceModelRow serverId={serverId} /> : null}
     </>
   );
 }
 
-/**
- * The server key. Every member sees when the host last changed it. The owner can change it on a host
- * that serves `host-key-rotation-v1`: the host signs a handover with the current and the new key, and
- * this app trusts the new key only when the server list brings that handover. The host checks the
- * role again; the app lock, when it is on, confirms the owner first.
- */
 export function ServerKeySettings({ server }: { server: MobileServer }) {
   const { t, format } = useText();
   const keyRow = useServerRows(server.id)((checks) => checks.canRotateServerKey(server.id));
@@ -425,7 +445,6 @@ export function ServerKeySettings({ server }: { server: MobileServer }) {
   const [newKey, setNewKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const canRotate = keyRow !== "hidden";
-  // A change from another device arrives with the server list. Read it once when the page opens.
   const reload = useRef(reloadServerList);
   useEffect(() => {
     void reload.current().catch(() => undefined);
@@ -452,7 +471,6 @@ export function ServerKeySettings({ server }: { server: MobileServer }) {
     }
   }
 
-  // Until the server list brings the handover, this app still connects with the previous key.
   const footer =
     error ??
     (changing
@@ -507,7 +525,6 @@ export function ServerKeySettings({ server }: { server: MobileServer }) {
   );
 }
 
-/** Opens the OpenBot update of the host. The value is the version that runs there, or a new one. */
 function ServerUpdatesRow({
   serverId,
   update,
@@ -541,10 +558,6 @@ function ServerUpdatesRow({
   );
 }
 
-/**
- * The Providers row, for an owner or admin of a host that serves `providers-v1`: the AI providers of
- * the computer that runs the server, and how many are connected.
- */
 function ServerProvidersRow({ serverId, disabled }: { serverId: string; disabled?: boolean }) {
   const { t } = useText();
   const { status, rows } = useServerProviders(serverId);
@@ -565,7 +578,6 @@ function ServerProvidersRow({ serverId, disabled }: { serverId: string; disabled
   );
 }
 
-/** The Browser profiles row, for an owner or admin of a host that serves `browser-profiles-v1`. */
 function ServerBrowserProfilesRow({ serverId, disabled }: { serverId: string; disabled?: boolean }) {
   const { t } = useText();
   const { profiles } = useServerBrowserProfiles(serverId);
@@ -581,7 +593,6 @@ function ServerBrowserProfilesRow({ serverId, disabled }: { serverId: string; di
   );
 }
 
-/** The Sites row, for every member of a host that serves `hosted-sites-v1`. */
 function ServerSitesRow({ serverId, disabled }: { serverId: string; disabled?: boolean }) {
   const { t } = useText();
   const { query } = useServerSites(serverId);

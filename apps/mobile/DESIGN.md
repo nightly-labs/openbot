@@ -92,6 +92,24 @@ reduced motion), a close button comes in beside the field, and the drawer pan st
 Back, or a result closes them in 160 ms. With no query the results show shortcuts and the agents of
 the server; a query shows the same sections as before, with `BlurSwap` between states.
 
+### Home chat rows
+
+Agent and channel rows on Home use `ChatRowHeading` (`features/agents/components/chat-row.tsx`):
+
+- The avatar is 60 pt (`CHAT_ROW_AVATAR_SIZE`) and a row is at least 68 pt high. A row has two lines: the name (17.5 pt semibold) and
+  the title (15.5 pt, muted) on the first line, the last message (15.5 pt) on the second.
+- The title gets the room that the name does not use. When less than 64 pt (scaled with the text
+  size) is left, the title goes to a hidden second line, so the name never gets shorter for it.
+- A pinned avatar is 70 pt (`PINNED_AVATAR_SIZE`) with the name below it and no title.
+- A section title has 30 pt above it and none below it, so it stays with its own rows. The first
+  section title has no space above it.
+- The unread badge does not grow above the size of a 54 pt avatar. Its edge is 1 pt inside the
+  avatar edge, and the gap ring around it is 3 pt.
+- On a pinned avatar, the ring around a badge or the unread dot is a hole cut out of the avatar
+  (`AvatarCutout`), so the backdrop shows through it. A row paints the ring with the row color,
+  because a row is opaque.
+- Home shows no server name. The drawer shows the servers.
+
 ### Marketplace search
 
 The Marketplace page (drawer → Marketplace) has the same bottom field as home, for the same reason:

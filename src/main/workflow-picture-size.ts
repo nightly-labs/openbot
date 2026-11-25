@@ -1,12 +1,6 @@
 import type { WorkflowMediaSize } from "@openbot/contracts/ipc";
 import { nativeImage } from "electron";
 
-/**
- * The picture of an image step with a custom size (`workflows-media-size-v1`): the centre of the
- * picture cropped to the shape of `size`, then scaled to exactly `size`, as a PNG. Null when Skia
- * cannot decode the file: Electron decodes PNG and JPEG only, so a WebP file keeps the model's size.
- * The decode is synchronous, as for `clearPictureBackground`.
- */
 export function sizeWorkflowPicture(bytes: Uint8Array, size: WorkflowMediaSize): Uint8Array | null {
   const picture = nativeImage.createFromBuffer(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
   if (picture.isEmpty()) return null;

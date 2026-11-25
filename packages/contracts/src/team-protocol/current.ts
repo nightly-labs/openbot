@@ -6,7 +6,10 @@ import { ACP_REGISTRY_CAPABILITY } from "./acp-registry-v1";
 import { AGENT_ACCESS_CAPABILITY } from "./agent-access-v1";
 import { AGENT_ACTIVE_QUEUES_CAPABILITY } from "./agent-active-queues-v1";
 import { AGENT_ADMIN_CAPABILITY } from "./agent-admin-v1";
+import { AGENT_ARCHIVED_THREADS_CAPABILITY } from "./agent-archived-threads-v1";
+import { AGENT_BACKGROUND_WORK_CAPABILITY } from "./agent-background-work-v1";
 import { AGENT_BACKUP_MODELS_CAPABILITY } from "./agent-backup-models-v1";
+import { AGENT_BUILTIN_MEMORY_CAPABILITY } from "./agent-builtin-memory-v1";
 import { AGENT_COLORS_CAPABILITY } from "./agent-colors-v1";
 import { AGENT_CREATE_OPERATION_CAPABILITY } from "./agent-create-operation-v1";
 import { AGENT_DEFAULTS_CAPABILITY } from "./agent-defaults-v1";
@@ -43,6 +46,8 @@ import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CAPABILITY } from "./agent-waits-v1";
 import { AGENT_WELCOME_CAPABILITY } from "./agent-welcome-v1";
+import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "./antigravity-code-sign-in-v1";
+import { ATTACHMENT_PREVIEW_CAPABILITY } from "./attachment-preview-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "./bitwarden-connector-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "./browser-egress-v1";
@@ -67,9 +72,12 @@ import {
   TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY,
 } from "./browser-view-v1";
 import { BROWSING_MEMORY_CAPABILITY } from "./browsing-memory-v1";
+import { CACHE_EXPIRY_COMPACTION_CAPABILITY } from "./cache-expiry-compaction-v1";
 import { TEAM_CHANNEL_ATTENTION_CAPABILITY } from "./channel-attention-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "./channel-browser-v1";
+import { CHANNEL_FOLDERS_CAPABILITY } from "./channel-folders-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "./channel-isolation-v1";
+import { CHANNEL_PAGE_TASKS_CAPABILITY } from "./channel-page-tasks-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "./channel-picture-v1";
 import { CHANNEL_SEEN_SUBTASKS_CAPABILITY } from "./channel-seen-subtasks-v1";
 import { CHANNEL_TASK_WAITS_CAPABILITY } from "./channel-task-waits-v1";
@@ -78,6 +86,7 @@ import { CHAT_HISTORY_CAPABILITY } from "./chat-history-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "./claude-api-key-v1";
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "./claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "./claude-user-setup-v1";
+import { CLIENT_BROWSER_CAPABILITY } from "./client-browser-v1";
 import { CODEX_API_KEY_CAPABILITY } from "./codex-api-key-v1";
 import { COMPUTER_ACTIVITY_CAPABILITY } from "./computer-activity-v1";
 import { CONNECTORS_CAPABILITY } from "./connectors-v1";
@@ -105,9 +114,12 @@ import { HOST_MEMBER_UPDATE_CAPABILITY } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CAPABILITY } from "./host-personality-v1";
 import { HOST_RELEASE_CAPABILITY } from "./host-release-v1";
 import { HOST_RESTART_CAPABILITY } from "./host-restart-v1";
+import { HOST_SIGNAL_HOME_CAPABILITY } from "./host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY } from "./host-timezone-v1";
+import { HOST_TURN_LIMITS_EVENTS_CAPABILITY } from "./host-turn-limits-events-v1";
 import { HOST_TURN_LIMITS_CAPABILITY } from "./host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY } from "./host-update-v1";
+import { HOST_VOICE_MODEL_CAPABILITY } from "./host-voice-model-v1";
 import { HOSTED_SITES_CAPABILITY } from "./hosted-sites-v1";
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "./instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "./instance-transfer-full-copy-v1";
@@ -115,6 +127,7 @@ import { INSTANCE_TRANSFER_CAPABILITY } from "./instance-transfer-v1";
 import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "./library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
+import { LIVE_VOICE_ACCOUNT_CAPABILITY } from "./live-voice-account-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
 import { MAC_APPS_LIMIT_CAPABILITY } from "./mac-apps-limit-v1";
@@ -130,12 +143,16 @@ import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "./message-pins-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "./mistral-code-sign-in-v1";
 import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
+import { MODEL_VISIBILITY_KEPT_CAPABILITY } from "./model-visibility-kept-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
+import { OWNER_TRANSFER_CAPABILITY } from "./owner-transfer-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
+import { PENDING_PROMPTS_CAPABILITY } from "./pending-prompts-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
-import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
+import { PROMPT_CACHE_TTL_CAPABILITY, PROMPT_CACHE_TTL_PI_CAPABILITY } from "./prompt-cache-ttl-v1";
+import { TEAM_PROMPT_DETAIL_CAPABILITY } from "./prompt-detail-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
@@ -148,7 +165,9 @@ import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
+import { PROVIDER_MANY_ACCOUNTS_CAPABILITY } from "./provider-many-accounts-v1";
 import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "./provider-model-source-v1";
+import { PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY } from "./provider-sign-in-relay-v2";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "./provider-use-v1";
@@ -159,16 +178,20 @@ import { PROVIDERS_V4_CAPABILITY } from "./providers-v4";
 import { PROVIDERS_V5_CAPABILITY } from "./providers-v5";
 import { PROVIDERS_V8_CAPABILITY } from "./providers-v8";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "./push-notification-threads-v1";
+import { PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY } from "./push-notification-workflows-v1";
 import { ANDROID_PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-android-v1";
 import { PUSH_NOTIFICATIONS_CAPABILITY } from "./push-notifications-v1";
 import { TEAM_QUEUE_EDIT_CAPABILITY } from "./queue-edit-v1";
+import { QUEUE_HOLD_CAPABILITY, QUEUE_HOLD_SIGN_IN_CAPABILITY } from "./queue-hold-v1";
 import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
 import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
+import { ROUTINE_QUIET_ANSWERS_CAPABILITY } from "./routine-quiet-answers-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
+import { ROUTINE_RESULTS_WHATSAPP_CAPABILITY } from "./routine-results-whatsapp-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
@@ -176,24 +199,29 @@ import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
 import { SERVER_SAFE_MODE_CAPABILITY } from "./server-safe-mode-v1";
 import { SETTING_LINK_MARKERS_CAPABILITY } from "./setting-link-markers-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
-import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
+import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_THREADS_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "./sidebar-pins-v1";
 import { SIGN_IN_RELAY_DEEP_LINK_CAPABILITY } from "./sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CAPABILITY } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "./skill-learning-v1";
+import { SKILL_PROBLEMS_CAPABILITY } from "./skill-problems-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "./skills-admin-v1";
 import { SKILLS_EVENTS_CAPABILITY } from "./skills-events-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "./storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY } from "./storage-disk-v1";
 import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
+import { STORAGE_WORKFLOW_FILES_CAPABILITY } from "./storage-workflow-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
+import { TEAM_UI_BLOCK_LOCATION_CAPABILITY } from "./ui-block-location-v1";
 import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "./ui-block-preview-edit-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
+import { TEAM_USAGE_GROUPS_CAPABILITY } from "./usage-groups-v1";
+import { TEAM_USAGE_READ_FAILED_CAPABILITY } from "./usage-read-failed-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
 import {
   highestCommonTeamProtocol,
@@ -218,25 +246,39 @@ import {
   type TeamCapabilitiesV10,
 } from "./v10";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
+import { VAULT_MEMBER_SAVE_CAPABILITY } from "./vault-member-save-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
 import { VAULT_V3_CAPABILITY } from "./vault-v3";
 import { VAULT_V4_CAPABILITY } from "./vault-v4";
 import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
+import { VOICE_TRANSCRIPTION_CAPABILITY } from "./voice-transcription-v1";
+import { WEBHOOK_AGENT_SECRET_CAPABILITY } from "./webhook-agent-secret-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WHATSAPP_READ_ONLY_CAPABILITY } from "./whatsapp-read-only-v1";
 import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
+import { WORKFLOW_FOLDERS_CAPABILITY } from "./workflow-folders-v1";
+import { WORKFLOWS_AGENT_FILES_CAPABILITY } from "./workflows-agent-files-v1";
+import { WORKFLOWS_ANSWERS_CAPABILITY } from "./workflows-answers-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
+import { WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY } from "./workflows-credit-media-unavailable-v1";
+import { WORKFLOWS_CREDIT_MEDIA_CAPABILITY } from "./workflows-credit-media-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_CATALOG_CAPABILITY } from "./workflows-media-catalog-v1";
+import { WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY } from "./workflows-media-catalog-v2";
+import { WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY } from "./workflows-media-service-account-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "./workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
+import { WORKFLOWS_PAUSE_CAPABILITY } from "./workflows-pause-v1";
+import { WORKFLOWS_PORTABLE_CAPABILITY } from "./workflows-portable-v1";
+import { WORKFLOWS_STEP_SETTINGS_CAPABILITY } from "./workflows-step-settings-v1";
 import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
@@ -246,68 +288,26 @@ export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
 export const TEAM_CONVERSATION_UNREAD_CAPABILITY = "conversation-unread";
 export const TEAM_MODEL_SCOPED_USAGE_CAPABILITY = "model-scoped-usage";
-/**
- * A host that accepts a provider, model and reasoning effort on agent creation. Older hosts drop
- * the fields in their frozen request projection and start the agent on their own default, so the
- * client only sends a chosen pair — and only offers the choice — when the host advertises this.
- */
 export const TEAM_AGENT_CREATE_MODEL_CAPABILITY = "agent-create-model";
 export const TEAM_MEDIA_ATTACHMENTS_CAPABILITY = "media-attachments";
 export const TEAM_EML_ATTACHMENTS_CAPABILITY = "eml-attachments";
 export const TEAM_ZIP_ATTACHMENTS_CAPABILITY = "zip-attachments";
 export const TEAM_MP4_ATTACHMENTS_CAPABILITY = "mp4-attachments";
 export const TEAM_SVG_ATTACHMENTS_CAPABILITY = "svg-attachments";
-/**
- * A host on which a hidden agent works as each other agent does: its routines run and it gets
- * messages. A host with `agent-hidden-v1` and without this stops a hidden agent, so a client shows
- * such an agent as paused only when the host does not advertise this.
- */
 export const AGENT_HIDDEN_WORK_CAPABILITY = "agent-hidden-work";
-/**
- * A host that accepts a file with any name. A file with no known type is stored as an opaque `file`
- * attachment, and the agent gets its path. An older host refuses a name outside the known types.
- */
 export const TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY = "any-file-attachments";
-/**
- * A host that keeps a separate MCP sign-in for each row whose URL ends in an `#account-…` fragment.
- * An older host files every row on one URL under one sign-in, so the client offers "Add account"
- * for a listing only when the host advertises this.
- */
 export const MCP_ACCOUNTS_CAPABILITY = "mcp-accounts-v1";
-/**
- * A host that lets a member, and not only an owner or admin, use the routes of `mcp-servers-v1`,
- * `mcp-sign-in-v1`, `mcp-sign-in-app-v1` and the MCP start of `sign-in-relay-v1`. A member can read
- * the list, test, and add a server. A member can change, sign in, sign out, or remove only a server
- * that the member added; the host refuses any other row with 403. The host lets a member in only
- * when the client also sends this capability, so a released client sees no change. Each server
- * still has one sign-in, which every agent of the host uses.
- */
 export const MCP_MEMBER_ACCESS_CAPABILITY = "mcp-member-access-v1";
-/**
- * Frozen optional member-leave-v1 contract: a bodyless `POST /v1/team/leave` answered with 204. The
- * caller, a member or an admin, removes their own membership with the same effects as an admin's
- * `DELETE /v1/team/members/:id`: the member row and every session of it go, on every device. The
- * owner is refused. A host without the capability answers 404, and the client only logs out.
- * Widening any of it needs a second capability string.
- */
 export const TEAM_MEMBER_LEAVE_CAPABILITY = "member-leave-v1";
-/**
- * Frozen optional queue-window-v1 contract: a bounded queue snapshot. On a protocol 7 request that
- * advertises it, `GET /v1/agents/:agentId/queue` and `POST /v1/agents/:agentId/queue/edit` keep every
- * queued, starting and running delivery. Then they keep every failed, interrupted and cancelled
- * delivery, newest first, while it fits in one WebRTC frame. Then they keep the newest completed
- * deliveries: at most 100, while they fit. The kept
- * deliveries stay in queue order, and the response keeps the frozen shape and keys. A request
- * without the capability gets the full list, as before. Widening any of it needs a second
- * capability string.
- */
 export const TEAM_QUEUE_WINDOW_CAPABILITY = "queue-window-v1";
 export {
   ACP_REGISTRY_CAPABILITY,
   AGENT_ACCESS_CAPABILITY,
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_ADMIN_CAPABILITY,
+  AGENT_BACKGROUND_WORK_CAPABILITY,
   AGENT_BACKUP_MODELS_CAPABILITY,
+  AGENT_BUILTIN_MEMORY_CAPABILITY,
   AGENT_COLORS_CAPABILITY,
   AGENT_CREATE_OPERATION_CAPABILITY,
   AGENT_DEFAULTS_CAPABILITY,
@@ -343,6 +343,7 @@ export {
   AGENT_WAITS_CAPABILITY,
   AGENT_WELCOME_CAPABILITY,
   ANDROID_PUSH_NOTIFICATIONS_CAPABILITY,
+  ATTACHMENT_PREVIEW_CAPABILITY,
   BACKGROUND_PROCESSES_CAPABILITY,
   BITWARDEN_CONNECTOR_CAPABILITY,
   BROWSER_EGRESS_CAPABILITY,
@@ -357,9 +358,12 @@ export {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
   BROWSING_MEMORY_CAPABILITY,
+  CACHE_EXPIRY_COMPACTION_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
+  CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
+  CHANNEL_PAGE_TASKS_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
   CHANNEL_TASK_CANCEL_CAPABILITY,
@@ -389,6 +393,7 @@ export {
   HOST_RESTART_CAPABILITY,
   HOST_TIMEZONE_CAPABILITY,
   HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_EVENTS_CAPABILITY,
   HOST_UPDATE_CAPABILITY,
   HOSTED_SITES_CAPABILITY,
   INSTANCE_TRANSFER_CAPABILITY,
@@ -415,12 +420,14 @@ export {
   PENDING_APPROVAL_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
+  PROMPT_CACHE_TTL_PI_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USE_CAPABILITY,
@@ -436,6 +443,7 @@ export {
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
   ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_QUIET_ANSWERS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
@@ -445,11 +453,13 @@ export {
   SETTING_LINK_MARKERS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
+  SIDE_QUESTION_THREADS_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_PINS_CAPABILITY,
   SIGN_IN_RELAY_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   SKILL_LEARNING_CAPABILITY,
+  SKILL_PROBLEMS_CAPABILITY,
   SKILLS_ADMIN_CAPABILITY,
   SKILLS_EVENTS_CAPABILITY,
   STORAGE_CAPABILITY,
@@ -469,12 +479,16 @@ export {
   TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
+  TEAM_PROMPT_DETAIL_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  TEAM_UI_BLOCK_LOCATION_CAPABILITY,
   TEAM_UI_BLOCK_VAULT_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_GROUPS_CAPABILITY,
+  TEAM_USAGE_READ_FAILED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
@@ -482,36 +496,41 @@ export {
   USAGE_CREDITS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
+  VAULT_MEMBER_SAVE_CAPABILITY,
   VAULT_V2_CAPABILITY,
   VAULT_V3_CAPABILITY,
   VAULT_V4_CAPABILITY,
+  WEBHOOK_AGENT_SECRET_CAPABILITY,
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
   WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
+  WORKFLOW_FOLDERS_CAPABILITY,
+  WORKFLOWS_AGENT_FILES_CAPABILITY,
+  WORKFLOWS_ANSWERS_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_CAPABILITY,
+  WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY,
+  WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
+  WORKFLOWS_PAUSE_CAPABILITY,
+  WORKFLOWS_PORTABLE_CAPABILITY,
+  WORKFLOWS_STEP_SETTINGS_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
   WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 };
 
-/**
- * Where a capability goes on the wire.
- * - `since`: the oldest protocol whose peers send and get it. A peer of protocol 6 or older gets only
- *   the capabilities with `since: 1` (`legacyTeamCapabilities`). Protocols 7 and 8 read at most 128
- *   names and protocol 9 at most 256; these lists are full.
- * - `bootstrap`: the first request of a client has it (`TEAM_BOOTSTRAP_CAPABILITIES`).
- */
 interface TeamCapabilityPlacement {
   readonly since: 1 | 7 | 8 | 9 | 10;
   readonly bootstrap: boolean;
@@ -526,12 +545,6 @@ const V9_BOOTSTRAP = { since: 9, bootstrap: true } as const satisfies TeamCapabi
 const V9 = { since: 9, bootstrap: false } as const satisfies TeamCapabilityPlacement;
 const V10 = { since: 10, bootstrap: false } as const satisfies TeamCapabilityPlacement;
 
-/**
- * Each capability of this app, once, in wire order, with its placement. Every capability list comes
- * from this table. Add a new capability at the end with `V10`. Do not change the placement of a
- * released capability or remove a capability with `since` 9 or lower: the lists of protocol 9 and
- * older and the protocol 10 baseline are released wire contracts.
- */
 const TEAM_CAPABILITY_REGISTRY = [
   [BROWSER_SECRET_CAPABILITY, ALL_BOOTSTRAP],
   ["agent-runtime-snapshots", ALL_BOOTSTRAP],
@@ -791,6 +804,51 @@ const TEAM_CAPABILITY_REGISTRY = [
   [AGENT_CREATE_OPERATION_CAPABILITY, V9],
   [TEAM_CAPABILITY_BASELINE_CAPABILITY, V10],
   [SERVER_SAFE_MODE_CAPABILITY, V10],
+  [WEBHOOK_AGENT_SECRET_CAPABILITY, V10],
+  [AGENT_BACKGROUND_WORK_CAPABILITY, V10],
+  [ATTACHMENT_PREVIEW_CAPABILITY, V10],
+  [WORKFLOWS_MEDIA_SERVICE_ACCOUNT_CAPABILITY, V10],
+  [ROUTINE_QUIET_ANSWERS_CAPABILITY, V10],
+  [SKILL_PROBLEMS_CAPABILITY, V10],
+  [ROUTINE_RESULTS_WHATSAPP_CAPABILITY, V10],
+  [QUEUE_HOLD_CAPABILITY, V10],
+  [OWNER_TRANSFER_CAPABILITY, V10],
+  [VAULT_MEMBER_SAVE_CAPABILITY, V10],
+  [WORKFLOWS_AGENT_FILES_CAPABILITY, V10],
+  [WORKFLOWS_MEDIA_CATALOG_V2_CAPABILITY, V10],
+  [WORKFLOWS_STEP_SETTINGS_CAPABILITY, V10],
+  [TEAM_USAGE_GROUPS_CAPABILITY, V10],
+  [QUEUE_HOLD_SIGN_IN_CAPABILITY, V10],
+  [PROVIDER_SIGN_IN_RELAY_V2_CAPABILITY, V10],
+  [PENDING_PROMPTS_CAPABILITY, V10],
+  [LIVE_VOICE_ACCOUNT_CAPABILITY, V10],
+  [SIDE_QUESTION_THREADS_CAPABILITY, V10],
+  [WORKFLOW_FOLDERS_CAPABILITY, V10],
+  [AGENT_BUILTIN_MEMORY_CAPABILITY, V10],
+  [WORKFLOWS_ANSWERS_CAPABILITY, V10],
+  [STORAGE_WORKFLOW_FILES_CAPABILITY, V10],
+  [PROVIDER_MANY_ACCOUNTS_CAPABILITY, V10],
+  [CHANNEL_FOLDERS_CAPABILITY, V10],
+  [WORKFLOWS_CREDIT_MEDIA_CAPABILITY, V10],
+  [PROMPT_CACHE_TTL_PI_CAPABILITY, V10],
+  [CACHE_EXPIRY_COMPACTION_CAPABILITY, V10],
+  [AGENT_ARCHIVED_THREADS_CAPABILITY, V10],
+  [HOST_VOICE_MODEL_CAPABILITY, V10],
+  [TEAM_USAGE_READ_FAILED_CAPABILITY, V10],
+  [WORKFLOWS_PAUSE_CAPABILITY, V10],
+  [WORKFLOWS_PORTABLE_CAPABILITY, V10],
+  [MODEL_VISIBILITY_KEPT_CAPABILITY, V10],
+  [TEAM_UI_BLOCK_LOCATION_CAPABILITY, V10],
+  [HOST_SIGNAL_HOME_CAPABILITY, V10],
+  [WORKFLOWS_CREDIT_MEDIA_UNAVAILABLE_CAPABILITY, V10],
+  [ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY, V10],
+  [WHATSAPP_READ_ONLY_CAPABILITY, V10],
+  [VOICE_TRANSCRIPTION_CAPABILITY, V10],
+  [CLIENT_BROWSER_CAPABILITY, V10],
+  [CHANNEL_PAGE_TASKS_CAPABILITY, V10],
+  [PUSH_NOTIFICATION_WORKFLOWS_CAPABILITY, V10],
+  [TEAM_PROMPT_DETAIL_CAPABILITY, V10],
+  [HOST_TURN_LIMITS_EVENTS_CAPABILITY, V10],
 ] as const satisfies readonly (readonly [string, TeamCapabilityPlacement])[];
 
 export const TEAM_CURRENT_CAPABILITIES = TEAM_CAPABILITY_REGISTRY.map(([capability]) => capability);
@@ -819,15 +877,10 @@ export function isConversationUnreadRoute(method: string, path: string): boolean
   );
 }
 
-/** The queue snapshot route. Its response carries the `editing` mark beside the frozen keys. */
 export function isQueueSnapshotRoute(method: string, path: string): boolean {
   return method === "GET" && /^\/v1\/agents\/[^/]+\/queue$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }
 
-/**
- * The agent conversation routes. Their responses carry the `expectsReply` mark beside the frozen
- * keys. The read and unread routes keep their own paths and are not included.
- */
 export function isConversationRoute(method: string, path: string): boolean {
   return (
     method === "GET" &&
@@ -854,59 +907,27 @@ export function isAgentCreateRoute(method: string, path: string): boolean {
   return method === "POST" && new URL(path, "http://openbot.invalid").pathname === "/v1/agents";
 }
 
-/**
- * The agent message route. Its request carries the sender's `timezone` and `clientMessageId` beside
- * the frozen keys.
- */
 export function isAgentMessageRoute(method: string, path: string): boolean {
   return method === "POST" && /^\/v1\/agents\/[^/]+\/messages$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }
 
-// Keep the first request readable by every released peer. A client also sends this list to a host
-// of protocol 6 or older. Those hosts read at most 64 capabilities (`TEAM_PROTOCOL_CAPABILITY_LIMITS`):
-// over WebRTC they refuse a longer request, and over HTTP they read it as no capabilities.
-// So each new capability is v7 only. The v7 and v9 markers stay in: a current host reads the
-// protocol from them and returns the expanded list, and an older host ignores them. The v8 marker
-// stays out: a client sends it only after the host reports protocol 8.
 export const TEAM_BOOTSTRAP_CAPABILITIES = capabilitiesWhere((placement) => placement.bootstrap);
-/**
- * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
- * capabilities, and their lists are full. A host leaves these out of the compatibility list of an
- * older peer (`teamCapabilitiesVisibleToProtocol`).
- */
 export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<string>(
   capabilitiesWhere((placement) => placement.since === 9),
 );
-// A v7 host does not know the v8 markers, so a client sends them only after it negotiates protocol 8.
 const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = capabilitiesWhere((placement) => placement.since <= 7);
-// A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
-// negotiates protocol 9.
 const TEAM_PROTOCOL_V8_CURRENT_CAPABILITIES = capabilitiesWhere((placement) => placement.since <= 8);
-/**
- * The frozen protocol 9 list. A protocol 10 peer serves each of these unless it names it in `absent`
- * (`v10.ts`). It must stay equal to `fixtures/v10/baseline-capabilities.json`.
- */
 export const TEAM_PROTOCOL_V10_BASELINE_CAPABILITIES = capabilitiesWhere((placement) => placement.since <= 9);
 const TEAM_PROTOCOL_V10_BASELINE_SET: ReadonlySet<string> = new Set<string>(TEAM_PROTOCOL_V10_BASELINE_CAPABILITIES);
-/**
- * The protocols that mobile speaks through `packages/team-client`. It sends protocol 9 requests; an older
- * host reads them with its own codec. Protocol 3 is the oldest host that it accepted.
- */
 export const TEAM_WEBRTC_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
   minimum: TEAM_PROTOCOL_V3,
   maximum: TEAM_PROTOCOL_V9,
 };
-/**
- * The protocols that the web client and the mobile workspace speak through `packages/team-client`. They
- * send protocol 10 lists to a host of protocol 10. The mobile share extension stays on
- * `TEAM_WEBRTC_CLIENT_PROTOCOL`.
- */
 export const TEAM_WEB_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
   minimum: TEAM_PROTOCOL_V3,
   maximum: TEAM_PROTOCOL_V10,
 };
 
-/** The highest protocol that a WebRTC client and a host both speak, or which side must update. */
 export function teamWebRtcClientProtocol(
   host: TeamProtocolSupportV1["protocol"],
   client: TeamProtocolSupportV1["protocol"] = TEAM_WEBRTC_CLIENT_PROTOCOL,
@@ -920,25 +941,14 @@ export function teamCapabilitiesForProtocol(protocol: number | null | undefined)
   if (protocol === 9) return TEAM_PROTOCOL_V10_BASELINE_CAPABILITIES;
   return protocol === 8 ? TEAM_PROTOCOL_V8_CURRENT_CAPABILITIES : TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES;
 }
-/**
- * The capabilities that a peer of `protocol` reads: each one with `since` up to its protocol. Protocols 1-8
- * keep the capabilities up to protocol 8; `legacyTeamCapabilities` leaves more out for protocol 6 and older.
- * A name that is not in the registry stays.
- */
 export function teamCapabilitiesVisibleToProtocol<T extends string>(capabilities: readonly T[], protocol: number): T[] {
   const newest = protocol >= 10 ? 10 : protocol >= 9 ? 9 : 8;
   return capabilities.filter((capability) => capabilitySince(capability) <= newest);
 }
-/** The capabilities that a peer of protocol 6 or older reads. A name that is not in the registry stays. */
 export function legacyTeamCapabilities(capabilities: readonly string[]): string[] {
   return capabilities.filter((capability) => capabilitySince(capability) === 1);
 }
 
-/**
- * Whether a peer serves `capability`. `capabilities` is the full set of the peer: for a protocol 10 peer,
- * its expanded lists (`expandTeamCapabilitiesV10`, `decodeTeamProtocolSupportExpanded`). Only a registered
- * name compiles.
- */
 export function supportsTeamCapability(
   capabilities: ReadonlySet<string> | readonly string[],
   capability: TeamCurrentCapability,
@@ -946,7 +956,6 @@ export function supportsTeamCapability(
   return "has" in capabilities ? capabilities.has(capability) : capabilities.includes(capability);
 }
 
-/** The full set of a protocol 10 peer: `(baseline - absent) + capabilities`. */
 export function expandTeamCapabilitiesV10(lists: TeamCapabilitiesV10): string[] {
   const absent = new Set(lists.absent);
   return [
@@ -957,10 +966,6 @@ export function expandTeamCapabilitiesV10(lists: TeamCapabilitiesV10): string[] 
   ];
 }
 
-/**
- * The two protocol 10 lists of a full set. `capabilities` keeps the protocol 9 marker, so a host of
- * protocol 9 that gets the lists reads the request as protocol 9.
- */
 export function encodeTeamCapabilitiesV10(capabilities: readonly string[]): TeamCapabilitiesV10 {
   const served = new Set(capabilities);
   return {
@@ -972,7 +977,6 @@ export function encodeTeamCapabilitiesV10(capabilities: readonly string[]): Team
   };
 }
 
-/** The capability headers of an HTTP request of `protocol`: one full list, or the two protocol 10 lists. */
 export function teamCapabilityHeaders(
   protocol: number | null | undefined,
   capabilities: readonly string[],
@@ -984,10 +988,6 @@ export function teamCapabilityHeaders(
   };
 }
 
-/**
- * The capability keys of a WebRTC request of `protocol`: one full list, or the two protocol 10 lists.
- * `absent` is left out when it is empty.
- */
 export function teamCapabilityLists(
   protocol: number | null | undefined,
   capabilities: readonly string[],
@@ -998,10 +998,6 @@ export function teamCapabilityLists(
   return lists.absent.length ? lists : { capabilities: lists.capabilities };
 }
 
-/**
- * A compatibility response from any host, with protocol 10 lists expanded. The result can have more
- * than 256 capabilities, so do not decode it again with a protocol 9 decoder.
- */
 export function decodeTeamProtocolSupportExpanded(value: unknown): TeamProtocolSupportV9 {
   if (!hasTeamProtocolV10Lists(value)) return decodeTeamProtocolSupportV9(value);
   const support = decodeTeamProtocolSupportV10(value);
@@ -1012,11 +1008,6 @@ export function decodeTeamProtocolSupportExpanded(value: unknown): TeamProtocolS
   };
 }
 
-/**
- * Reads the compatibility of a host with the protocol range of a WebRTC client. The first read of a
- * connection does not know the protocol, so a host of protocol 10 answers it as protocol 9. Then the
- * peer knows the protocol, and a second read gets the protocol 10 lists with the full set.
- */
 export async function readTeamHostCompatibility(
   read: () => Promise<unknown>,
   client: TeamProtocolSupportV1["protocol"] = TEAM_WEBRTC_CLIENT_PROTOCOL,

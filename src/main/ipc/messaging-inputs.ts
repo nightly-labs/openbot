@@ -1,5 +1,3 @@
-// The messaging payloads. No message here quotes the input.
-
 import type {
   AddMessagingOrchestratorInput,
   AddTelegramOrchestratorInput,
@@ -16,6 +14,7 @@ import type {
   SetDiscordAccessInput,
   SetMessagingEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppSenderReadOnlyInput,
   SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   StartWhatsAppLinkInput,
@@ -73,7 +72,6 @@ export function parseAddTelegramOrchestratorInput(value: unknown): AddTelegramOr
   return result;
 }
 
-/** A platform that a joined server's `connectors-v1` carries. WhatsApp uses `whatsapp-connector-v1`. */
 function parsePlatform(value: unknown): ConnectorMessagingPlatform {
   if (!isOneOf(CONNECTOR_MESSAGING_PLATFORMS, value)) throw new Error("A messaging request is invalid.");
   return value;
@@ -127,7 +125,6 @@ export function parseStartWhatsAppLinkInput(value: unknown): StartWhatsAppLinkIn
 
 export function parseWhatsAppSenderInput(value: unknown): WhatsAppSenderInput {
   if (!isObject(value)) throw new Error("A messaging request is invalid.");
-  // A contact can be typed with spaces, a plus or brackets; it is stored in digits.
   const sender =
     isObject(value.sender) && value.sender.kind === "contact"
       ? { ...value.sender, id: parseWhatsAppPhoneNumber(value.sender.id) ?? "" }
@@ -167,4 +164,13 @@ export function parseSetWhatsAppWorkingMessageInput(value: unknown): SetWhatsApp
 export function parseSetWhatsAppStatusReactionsInput(value: unknown): SetWhatsAppStatusReactionsInput {
   if (!isObject(value) || !isBoolean(value.statusReactions)) throw new Error("A messaging request is invalid.");
   return { workspaceId: requireString(value.workspaceId, "Workspace id"), statusReactions: value.statusReactions };
+}
+
+export function parseSetWhatsAppSenderReadOnlyInput(value: unknown): SetWhatsAppSenderReadOnlyInput {
+  if (!isObject(value) || !isBoolean(value.readOnly)) throw new Error("A messaging request is invalid.");
+  return {
+    workspaceId: requireString(value.workspaceId, "Workspace id"),
+    senderId: requireString(value.senderId, "Sender id"),
+    readOnly: value.readOnly,
+  };
 }

@@ -12,12 +12,10 @@ import { haptics } from "@/shared/lib/haptics";
 import { savesToPhotos, showsAsImage, useAttachmentFile } from "./attachment-preview";
 import { ImageViewer, type ImageViewerPage } from "./image-viewer";
 
-/** An image the chat can show itself: one that is on the host and small enough to download. */
 export function isViewableImage(attachment: AttachmentSummary) {
   return isStackImage(attachment) && !attachment.id.startsWith("mobile-draft-attachment-");
 }
 
-/** An image a message stack shows: a viewable one, or one this phone is still sending. */
 export function isStackImage(attachment: AttachmentSummary) {
   return showsAsImage(attachment) && attachment.size <= MOBILE_ATTACHMENT_BYTES;
 }
@@ -28,7 +26,6 @@ interface ImageSource {
 }
 
 interface ChatImageViewerValue {
-  /** The id of the image whose chat copy the viewer holds, or null. */
   hiddenSource: SharedValue<string | null>;
   register: (id: string, source: ImageSource) => () => void;
   open: (attachment: AttachmentSummary) => void;
@@ -36,11 +33,6 @@ interface ChatImageViewerValue {
 
 const ChatImageViewerContext = createContext<ChatImageViewerValue | null>(null);
 
-/**
- * One viewer for the whole conversation. A tap on any image opens it, and a swipe steps through
- * every image of the loaded messages, in chat order. Images in rows the list has not drawn
- * download when the reader reaches them, and put themselves away with a fade instead of a flight.
- */
 export function ChatImageViewerProvider({
   serverId,
   images,
@@ -50,8 +42,6 @@ export function ChatImageViewerProvider({
   const sources = useRef(new Map<string, ImageSource>());
   const latestImages = useRef(images);
   latestImages.current = images;
-  // The pages are fixed when the viewer opens, so a message that arrives behind it does not
-  // renumber the pages under the reader.
   const [viewing, setViewing] = useState<{ pages: ImageViewerPage[]; index: number } | null>(null);
 
   const register = useCallback((id: string, source: ImageSource) => {
@@ -99,7 +89,6 @@ export function ChatImageViewerProvider({
   );
 }
 
-/** The viewer, with the share, copy and save actions of the image on screen. */
 function ConversationImageViewer({
   serverId,
   pages,
@@ -115,8 +104,7 @@ function ConversationImageViewer({
 }) {
   const [index, setIndex] = useState(initialIndex);
   const page = pages[index] ?? pages[initialIndex];
-  // The same query as the image in the chat, so the image on screen is not downloaded again.
-  const file = useAttachmentFile(serverId, page?.attachment ?? PLACEHOLDER, Boolean(page));
+  const file = useAttachmentFile(serverId, page?.attachment ?? PLACEHOLDER, Boolean(page), true);
   return (
     <ImageViewer
       serverId={serverId}
@@ -125,7 +113,6 @@ function ConversationImageViewer({
       hiddenSource={hiddenSource}
       busy={file.busy}
       onShare={file.share}
-      // The clipboard and the photo library take the same pictures: raster images, not an SVG.
       onCopy={page && savesToPhotos(page.attachment) ? file.copyImage : undefined}
       onSave={page && savesToPhotos(page.attachment) ? file.saveToPhotos : undefined}
       onIndexChange={setIndex}
@@ -144,10 +131,6 @@ const PLACEHOLDER: AttachmentSummary = {
   previewUrl: null,
 };
 
-/**
- * Connects an image in the chat to the conversation's viewer: the ref the viewer measures for
- * its flight, the style that hides this copy while the viewer holds the picture, and the tap.
- */
 export function useChatImageSource(id: string | null, originRadius: number) {
   const viewer = use(ChatImageViewerContext);
   const origin = useAnimatedRef();

@@ -28,6 +28,10 @@ export const messages = {
   "mcp.signIn.waiting": "Wachten op de browser…",
   "mcp.signIn.continue": "Doorgaan naar {name}",
   "mcp.signIn.pageDescription": "Deze pagina is geopend in de browser op {host}. Log hier in.",
+  "mcp.signIn.copyHint": "Laadt de pagina niet? Kopieer de link en open hem in een andere browser.",
+  "mcp.signIn.copyLink": "Link kopiëren",
+  "mcp.signIn.pasteHint":
+    "Meld je je aan op een ander apparaat? Kopieer aan het eind het adres uit die browser en plak het hier.",
   "mcp.test.connected": { one: "Verbonden · {count} tool", other: "Verbonden · {count} tools" },
   "mcp.status.testing": "Testen…",
   "mcp.status.failed": "Mislukt",
@@ -97,6 +101,7 @@ export const messages = {
   "mcp.panel.signIn": "Inloggen",
   "mcp.panel.signOut": "Uitloggen",
   "mcp.panel.cancelSignIn": "Inloggen annuleren",
+  "mcp.panel.useAddress": "Dit adres gebruiken",
   "mcp.panel.signInTo": "Inloggen bij {name}",
   "mcp.panel.signInWaiting": {
     one: "Rond het inloggen af in je browser. OpenBot stopt met wachten na {count} minuut.",

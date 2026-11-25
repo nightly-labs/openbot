@@ -1,21 +1,3 @@
-// Frozen optional custom-provider-edit-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can list, add, edit and remove the host's custom endpoints. The list, save and delete
-// routes are those of `custom-provider-harness-v1`, and each endpoint in a response also names its
-// header names, so a client can show which headers an edit keeps. The update route changes an
-// endpoint in place, so agents on a kept model stay on it:
-//
-// - a request with no `apiKey` keeps the saved key; a request cannot clear the key;
-// - a request with no `headers` keeps every saved header; a header with a `null` value keeps its
-//   saved value; a header that is not in the request is removed;
-// - the host keeps the harness of the endpoint and the settings of each model id it keeps;
-// - agents on a removed model move to another model of the endpoint, as a save does.
-//
-// A member cannot use any route; `requireAdmin` on the host is the only gate. Secrets are
-// write-only: an endpoint key and a header value travel only in a request body, towards the host,
-// and a response says only whether an endpoint has a key and which header names it has. Widening
-// any of it needs a second capability string.
 import {
   adminRoute,
   boolean,

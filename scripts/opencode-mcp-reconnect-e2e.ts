@@ -1,11 +1,3 @@
-// Runs the real `opencode` provider driver and the real OpenCode binary against a fake
-// OpenAI-compatible model that calls OpenBot's tool through Code Mode. OpenBot's MCP bridge answers
-// the first connection after 35 s, as a busy host can. OpenCode 2.3.0 gives a server 30 s, continues
-// without it, and does not connect again while the settings stay the same, so a team agent had no
-// OpenBot tools for hours (#10749). OpenBot must open the session again with a new token: the first
-// chat and a second chat of the same folder must both reach the tool.
-// `OPENCODE_CLI=<opencode 2.3.0> bun scripts/opencode-mcp-reconnect-e2e.ts`.
-// Writes .openbot-build/opencode-mcp-reconnect/report.json.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -26,7 +18,6 @@ import { runTurn, stopClients } from "./provider-fakes/host";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/opencode-mcp-reconnect");
 const ENDPOINT = "spark";
 const MODEL = "agent-model";
-/** Longer than OpenCode's 30 s MCP connection limit. */
 const SLOW_CONNECT_MS = 35_000;
 const run = promisify(execFile);
 
@@ -37,7 +28,6 @@ interface Report {
   delayedConnects: number;
   diagnostics: string[];
   toolCalls: string[];
-  /** What the model got back from each `execute` call, in order. */
   toolResults: string[];
   replies: string[];
   error?: string;
@@ -53,7 +43,6 @@ const report: Report = {
   replies: [],
 };
 
-// The bridge makes one MCP server for each request. Its first `connect` waits, as on a busy host.
 const connect = Server.prototype.connect;
 Server.prototype.connect = async function (this: Server, ...args: Parameters<typeof connect>) {
   report.bridgeConnects += 1;
@@ -64,9 +53,7 @@ Server.prototype.connect = async function (this: Server, ...args: Parameters<typ
   return connect.apply(this, args);
 };
 
-/** The parts of a chat completion request that the fake model reads. */
 interface ChatRequest {
-  /** The role of the last message, and its text when it is a tool result. */
   lastRole: string | null;
   lastContent: string;
   tools: string[];
@@ -177,7 +164,6 @@ try {
   await new Promise<void>((listening) => model.listen(0, "127.0.0.1", listening));
   const address = model.address();
   if (!address || typeof address === "string") throw new Error("The fake endpoint has no port.");
-  // OpenCode must not read the developer's own config, keys or sessions.
   for (const [name, folder] of [
     ["HOME", "home"],
     ["XDG_CONFIG_HOME", "config"],
@@ -222,7 +208,6 @@ try {
   });
   client.start();
 
-  // The first chat's server connects too late for OpenCode.
   const first = await startThread(client, workspace);
   const firstTurn = await runTurn(client, first, { text: "Call whoami.", timeoutMs: 120_000 });
   report.replies.push(firstTurn.reply);
@@ -233,7 +218,6 @@ try {
     `The first chat must reach its tool: ${report.toolResults[0]}`,
   );
 
-  // A second chat of the same folder shares the server.
   const second = await startThread(client, workspace);
   const secondTurn = await runTurn(client, second, { text: "Call whoami.", timeoutMs: 120_000 });
   report.replies.push(secondTurn.reply);

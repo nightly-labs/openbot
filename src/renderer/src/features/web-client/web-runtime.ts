@@ -10,6 +10,7 @@ import type {
   AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
+  AgentRuntimePrompt,
   AgentStatus,
   AgentWaitsSnapshot,
   AttachmentSummary,
@@ -44,8 +45,6 @@ import type {
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
   RespondToPromptInput,
-  Routine,
-  RoutineRun,
   ServerNotificationLevel,
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
@@ -60,10 +59,8 @@ import type {
   TeamInviteSummary,
   TeamMemberSummary,
   TeamRealtimeEvent,
-  TestRoutineInput,
   UpdateAgentInput,
   UpdateQueuedMessageInput,
-  UpdateRoutineInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import {
@@ -88,6 +85,7 @@ import {
   isSidebarLayoutSnapshot,
   isTeamPresenceSnapshot,
   withFastServiceTiers,
+  withKeptModels,
   withModelListings,
   withModelSources,
   withSteeringModels,
@@ -95,8 +93,9 @@ import {
   withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
+import type { AcceptedOwnerTransfer, OwnerTransfer } from "@openbot/contracts/owner-transfer";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { TEAM_API_ROUTES, WORKSPACE_FILE_EXACT_PATH_QUERY } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ACTIVE_QUEUES_ROUTES,
   type AgentActiveQueues,
@@ -175,6 +174,10 @@ import {
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
+  MODEL_VISIBILITY_KEPT_CAPABILITY,
+  MODEL_VISIBILITY_KEPT_ROUTES,
+} from "@openbot/contracts/team-protocol/model-visibility-kept-v1";
+import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
@@ -183,16 +186,16 @@ import {
   PENDING_APPROVAL_CAPABILITY,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  decodePendingPromptsResponse,
+  PENDING_PROMPTS_CAPABILITY,
+  PENDING_PROMPTS_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-prompts-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import {
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   PROVIDER_MODEL_SOURCE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-model-source-v1";
-import {
-  ROUTINE_FLOW_STOP_CAPABILITY,
-  ROUTINE_FLOW_STOP_ROUTES,
-} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
-import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
   decodeServerSafeModeReason,
@@ -265,10 +268,7 @@ import {
   steerQueuedMessage,
   type TeamApiRequest,
   type TeamChannelsApi,
-  type TeamRoutineFlowsApi,
-  teamAgentRoutinesApi,
   teamChannelsApi,
-  teamRoutineFlowsApi,
   updateQueuedMessage,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
@@ -296,14 +296,8 @@ import {
 } from "./web-host-lock";
 import { closeWebChatNotifications } from "./web-notifications";
 
-/**
- * The host controls of the connected host. The host answers the Team API routes, and the account
- * service answers the member and invitation routes; both refuse a `member`, so the UI gate is not
- * the only one.
- */
 export interface WebAdminRuntime {
   request: TeamApiRequest;
-  /** The same requests, with a response of up to one file of the web file limit, such as a transfer file. */
   download: TeamApiRequest;
   team: ServerAdminPort;
 }
@@ -324,17 +318,23 @@ interface WebConnectOptions {
   early?: WebEarlyReads;
 }
 
-/** The message that `message-delete-v1` deletes: in the chat of an agent, or in a channel. */
 type WebMessageDelete =
   | { kind: "agent"; agentId: string; messageId: string }
   | { kind: "channel"; channelId: string; messageId: string };
 
-/** The chat whose history `chat-history-v1` deletes: the agent's own chat, or a channel. */
 type WebHistoryDelete = { kind: "agent"; agentId: string } | { kind: "channel"; channelId: string };
+
+interface WebOwnerTransfers {
+  pending(hostId: string): Promise<OwnerTransfer | null>;
+  start(hostId: string, email: string): Promise<OwnerTransfer>;
+  cancel(hostId: string): Promise<void>;
+  incoming(): Promise<OwnerTransfer[]>;
+  accept(transferId: string): Promise<AcceptedOwnerTransfer>;
+  decline(transferId: string): Promise<void>;
+}
 
 export interface WebWorkspaceRuntime {
   admin?: WebAdminRuntime;
-  /** The status connections of the hosts that this tab has not opened. */
   hosts?: WebHostConnections;
   browser: BrowserViewRuntime;
   browserTabs(): Promise<BrowserTab[]>;
@@ -342,92 +342,48 @@ export interface WebWorkspaceRuntime {
   openBrowserTab(input: BrowserOpenInput): Promise<BrowserTab>;
   navigateBrowserTab(input: BrowserNavigateInput): Promise<void>;
   reloadBrowserTab(tabId: string): Promise<void>;
-  /** Behind `browser-page-state`. */
   stopBrowserTab(tabId: string): Promise<void>;
   closeBrowserTab(tabId: string): Promise<void>;
-  /** Behind `browser-user-control`: the owning agent waits on the tab until the release. */
   takeBrowserControl(tabId: string): Promise<void>;
   releaseBrowserControl(tabId: string): Promise<void>;
-  /** Behind `browser-teach-v1`: the host records the steps that this member shows in the tab. */
   startBrowserTeach(tabId: string): Promise<void>;
   stopBrowserTeach(input: BrowserTeachStopInput): Promise<BrowserTeachStep[]>;
   respondToBrowserSecret?: (input: LocalBrowserSecretResponse) => Promise<void>;
   getSidebarLayout?: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout?: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
-  /**
-   * The host's channel routes. A channel page arrives without host file URLs, and a channel image
-   * arrives as a data URL. `setChannelImage` needs `channel-picture-v1`.
-   */
   channels?: TeamChannelsApi & {
     setChannelImage(input: SetChannelImageInput): Promise<Channel>;
-    /**
-     * Calls `listener` after channel images that a list did not wait for have arrived, so that the
-     * caller lists again. Returns the function that removes it. A runtime that gives images at once has none.
-     */
     onPictures?(listener: () => void): () => void;
   };
-  /** The team member this connection signs in as, which is how the host names this reader's messages. */
   currentMemberId?: () => Promise<string>;
   respondToTakeover(input: RespondToBrowserTakeoverInput): Promise<void>;
   listHosts(): Promise<RemoteTeamHost[]>;
-  /** Ends this account's membership of a host. The account service refuses the owner. */
   leaveHost(hostId: string, membershipId: string): Promise<void>;
   removeOwnedHost?: (hostId: string) => Promise<void>;
+  setHostHidden?: (hostId: string, hidden: boolean) => Promise<void>;
+  ownerTransfers?: WebOwnerTransfers;
   previewInvite(url: string): Promise<InvitePreview>;
   acceptInvite(url: string): Promise<RemoteTeamHost>;
-  /**
-   * Connects and reads the host's compatibility. When the host protocol of an earlier connection is
-   * known, `early.start` runs as the data channels open, so the first reads go beside that read.
-   * `early.drop` runs when the read gives another protocol: those reads used the wrong capabilities.
-   * With `takeOver`, a tab that has the host open closes it, and `hostTaken` tells that tab.
-   */
   connect(host: RemoteTeamHost, options?: WebConnectOptions): Promise<string[]>;
   disconnect(): Promise<void>;
   listAgents(): Promise<ClientAgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
-  /** The page of an agent's conversation around one message, or the newest page from an older host. */
   conversationAround?: (agentId: string, messageId: string, limit?: number) => Promise<ConversationPage>;
-  /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
-  /** With `conversation-unread-from-v1`: marks one message and the messages after it unread, for this member. */
   markUnreadFrom(agentId: string, fromMessageId: string): Promise<ConversationReadState>;
-  /** This member's read state for each agent, keyed by agent id. Invalid entries are left out. */
   conversationReads(): Promise<Record<string, ConversationReadState>>;
-  /**
-   * Deletes one message of an agent's chat or of a channel, with `message-delete-v1`. A host
-   * without it refuses before a request goes out.
-   */
   deleteMessage?: (input: WebMessageDelete) => Promise<void>;
-  /**
-   * "Compact now" for an agent's own chat, or for one side thread with `taskId`, with
-   * `context-compact-v1`. A host without it refuses before a request goes out.
-   */
   compactContext?: (agentId: string, taskId?: string) => Promise<void>;
-  /**
-   * "Delete history" of an agent's own chat or of a channel, with `chat-history-v1`. A host without
-   * it refuses before a request goes out.
-   */
   deleteHistory?: (input: WebHistoryDelete) => Promise<void>;
-  /** "New conversation" in a channel, with `chat-history-v1`. */
   clearChannelContext?: (channelId: string) => Promise<void>;
-  /** "Compact context" of a channel, with `chat-history-v1`. */
   compactChannelContext?: (channelId: string) => Promise<void>;
-  /** The open waits of an agent, with `agent-waits-v1`. A host without it refuses before a request goes out. */
   listWaits?: (agentId: string) => Promise<AgentWaitsSnapshot>;
-  /** The pinned messages of all chats of an agent, with `message-pins-v1`. A host without it refuses before a request goes out. */
   listPinnedMessages?: (agentId: string) => Promise<PinnedMessagesSnapshot>;
-  /** Pin or Unpin on one message, with `message-pins-v1`. Resolves with the new list of the chat. */
   setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
-  /** Cancel on one open wait of an agent, with `agent-waits-v1`. */
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
-  /**
-   * The whole copy of an approval that a runtime snapshot cut, with `pending-approval-v1`. Null from a
-   * host without it: the card then keeps the cut copy and offers only Deny.
-   */
   readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
-  /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
+  listPendingPrompts?: () => Promise<AgentRuntimePrompt[]>;
   focusUse(): Promise<void>;
-  /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
   send(
     agentId: string,
     text: string,
@@ -436,10 +392,8 @@ export interface WebWorkspaceRuntime {
     clientMessageId?: string,
   ): Promise<string>;
   stop(agentId: string, turnId: string): Promise<void>;
-  /** Sends which agent this member is writing to, or `null`. It does nothing while the host is offline. */
   setTyping(agentId: string | null, typing: boolean): void;
   queue(agentId: string): Promise<QueueSnapshot>;
-  /** The open work of the queues of these agents, on a host with `agent-active-queues-v1`. */
   activeQueues(agentIds: string[]): Promise<AgentActiveQueues>;
   editQueue(input: EditQueuedMessageInput): Promise<QueueSnapshot>;
   cancelQueued(input: CancelQueuedMessageInput): Promise<void>;
@@ -452,88 +406,48 @@ export interface WebWorkspaceRuntime {
   cancelUpload(): Promise<void>;
   discard(attachmentId: string): Promise<void>;
   download(attachmentId: string): Promise<WebFile>;
-  /** A file under the host's shared folder. */
+  downloadPreview(attachmentId: string): Promise<WebFile>;
   sharedFile(path: string): Promise<WebFile>;
-  /** A file in one agent's workspace on the host. */
-  workspaceFile(agentId: string, path: string): Promise<WebFile>;
-  /** A folder in one agent's workspace on the host. */
+  workspaceFile(agentId: string, path: string, options?: { exactPath?: boolean }): Promise<WebFile>;
   workspaceDirectory(agentId: string, path: string): Promise<WorkspaceDirectory>;
-  /** The routine canvas routes. Each call refuses while the host does not serve `routine-flows-v1`. */
-  routineFlows?: TeamRoutineFlowsApi;
-  /** Changes an agent routine, such as its instruction. */
-  updateRoutine?: (input: UpdateRoutineInput) => Promise<Routine>;
-  /** Runs an agent routine now. */
-  testRoutine?: (input: TestRoutineInput) => Promise<RoutineRun>;
-  /** The agents that a user hid on the host. Any member can call it on a host with `agent-hidden-v1`. */
   listHiddenAgents?: () => Promise<HiddenAgentsSnapshot>;
-  /** Hides or restores an agent, and returns the host's hidden list. Needs `agent-hidden-v1`. */
   setAgentHidden?: (input: SetAgentHiddenInput) => Promise<HiddenAgentsSnapshot>;
-  /** The exact colours of the agents on the host. A host without `agent-colors-v1` has none. */
   listAgentColors?: () => Promise<AgentColors>;
-  /** The chat colours of the agents and members on the host. A host without `chat-colors-v1` has none. */
   listChatColors?: () => Promise<ChatColors>;
-  /** The user's own pinned chats on the open host, for all of their devices. Needs `sidebar-pins-v1`. */
   sidebarPins?: {
     read: () => Promise<SidebarPinsSnapshot>;
     set: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
-    /** Saves `items` only when the user has no list on the host yet. */
     seed: (items: SidebarPin[]) => Promise<SidebarPinsSnapshot>;
   };
-  /**
-   * The user's own level for each agent of a host: the open host, or a host with a status connection.
-   * Any member can call it. A host without `agent-notification-levels-v1` has no levels.
-   */
   listAgentNotificationLevels?: (hostId: string) => Promise<AgentNotificationLevelsSnapshot>;
-  /** Sets the user's own level for one agent of the open host. Needs `agent-notification-levels-v1`. */
   setAgentNotificationLevel?: (input: SetAgentNotificationLevelInput) => Promise<AgentNotificationLevelsSnapshot>;
-  /**
-   * The agents and the user's own levels of a host, for the notification settings: the open host, or
-   * a host with a status connection. `levels` is null on a host without `agent-notification-levels-v1`.
-   */
   notificationSettings?: (hostId: string) => Promise<WebHostNotificationSettings>;
-  /** Sets the user's own level for one agent of a host. Needs `agent-notification-levels-v1`. */
   setHostAgentNotificationLevel?: (
     hostId: string,
     input: SetAgentNotificationLevelInput,
   ) => Promise<AgentNotificationLevelsSnapshot>;
-  /** Sets the user's own level of a host, for all of their devices. Needs `agent-notification-levels-v1`. */
   setOwnServerNotificationLevel?: (
     hostId: string,
     level: ServerNotificationLevel | null,
   ) => Promise<AgentNotificationLevelsSnapshot>;
   react(input: SetMessageReactionInput): Promise<void>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Promise<void>;
-  /** The agent image as a data URL. The browser cannot open the host's `openbot-avatar:` URL. */
   agentAvatar(agentId: string, avatarUrl: string): Promise<string>;
   models(): Promise<ClientAgentModelOption[]>;
   status(): Promise<AgentStatus>;
-  /**
-   * The model sources alone. A released status event carries none, so the client adds the last ones
-   * to each status event and reads them again after it (#9956).
-   */
   modelSources?: () => Promise<ProviderModelSourceEntry[]>;
   accountUsage?: () => Promise<AccountUsage>;
   createAgent(input: CreateAgentInput): Promise<ClientAgentSummary>;
   duplicateAgent(agentId: string): Promise<DuplicateAgentResult>;
   updateAgent(input: UpdateAgentInput): Promise<void>;
   deleteAgent(agentId: string): Promise<void>;
-  /**
-   * Searches one agent's conversation, or every conversation on the host when `agentId` is not set.
-   * `includeSideThreads` also searches the side threads when the host serves `thread-message-search-v1`;
-   * an older host searches the agents' own chats.
-   */
   search(
     agentId: string | undefined,
     query: string,
     cursor?: string,
     includeSideThreads?: boolean,
   ): Promise<ConversationSearchPage>;
-  /** Searches the files of the agent chats by name. Needs `conversation-file-search-v1`. */
   searchFiles?: (query: string, cursor?: string) => Promise<ConversationFileSearchPage>;
-  /**
-   * `sessionsEnded`: the account service already ended this account's remote sessions, as sign-out
-   * does. The browser then sends no end request, which the revoked cookie would only have refused.
-   */
   dispose(options?: { sessionsEnded?: boolean }): Promise<void>;
 }
 
@@ -542,20 +456,13 @@ export interface WebRuntimeEvents {
   accessDenied?(hostId: string, error: WebHostConnectionError): void;
   event(hostId: string, event: AgentEvent | TeamRealtimeEvent): void;
   accountChanged(): Promise<void>;
-  /** The state of a host this tab has not opened. */
+  serversChanged?(): Promise<void>;
   hostState?(hostId: string, state: WebHostState): void;
-  /** A host that this tab has not opened revoked its session. */
   hostSessionRevoked?(): void;
-  /** Another tab took the host that this tab has open. The runtime closes it after this call. */
   hostTaken?(hostId: string): void;
-  /** An event of a host this tab has not opened that a notification can show. */
   hostNotice?(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]): void;
 }
 
-/**
- * The host speaks no Team API protocol that this web build speaks, or it is in safe mode
- * (`server-safe-mode-v1`) and answers only with the reason. The workspace shows it in full.
- */
 export class WebHostIncompatibleError extends Error {
   readonly code: "client_update_required" | "host_update_required" | "server_safe_mode";
   readonly hostAppVersion: string;
@@ -574,7 +481,6 @@ export class WebHostIncompatibleError extends Error {
 }
 
 export class WebHostConnectionError extends Error {
-  /** The code a user can copy, such as `http/401`. */
   readonly reference: string | null;
 
   constructor(
@@ -588,7 +494,6 @@ export class WebHostConnectionError extends Error {
   }
 }
 
-/** The sentence for the reason of a host in safe mode. */
 function serverSafeModeText({ reason, appVersion }: ServerSafeModeReason): string {
   return currentText().t(
     reason === "newer_database" ? "error.team.serverSafeModeNewerDatabase" : "error.team.serverSafeModeStartFailed",
@@ -599,11 +504,9 @@ function serverSafeModeText({ reason, appVersion }: ServerSafeModeReason): strin
 interface WebConnectionDependencies {
   createPeer: typeof createRemoteTeamPeer;
   acquireHostLock: typeof acquireWebHostLock;
-  /** The channel between the tabs of the account. Without one, this tab keeps no status connections. */
   openHostChannel?: (accountId: string) => BroadcastChannel | null;
 }
 
-/** The fields of a move to another model at a usage limit. */
 const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
   "agentId",
   "provider",
@@ -613,13 +516,7 @@ const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
   "leaveUsageLimit",
 ]);
 
-/**
- * Puts the text that the host's page copied on this computer's clipboard. A browser that refuses a
- * write this long after the click, such as Safari, gets a button: a click on it is a new action.
- */
 function writePageCopy(text: string): void {
-  // Called in the click itself, which is the user action that Safari asks for. A page that is not
-  // secure has no clipboard, and the call throws at once.
   const write = () => {
     try {
       return navigator.clipboard.writeText(text);
@@ -647,7 +544,6 @@ function savedHostProtocol(accountId: string, hostId: string): number | undefine
   return Number.isSafeInteger(protocol) && protocol > 0 ? protocol : undefined;
 }
 
-/** Pin after directory validation and before connecting. Never silently replace a saved identity. */
 function pinWebHostKey(accountId: string, host: RemoteTeamHost): void {
   const key = `openbot.web.host-key:${accountId}:${host.hostId}`;
   const pinned = localStorage.getItem(key);
@@ -669,7 +565,6 @@ export function createWebWorkspaceRuntime(
     apiUrl: window.location.origin,
     authentication: { kind: "browser" },
     fetch: accountFetch,
-    // `bun run dev:api` serves this page and the account service from `http://localhost:<port>`.
     inviteLinks: { allowLocalDevelopmentApiUrl: import.meta.env.DEV },
     verifyHostKeySignature: verifyEd25519Base64Url,
     hostKeys: {
@@ -683,7 +578,6 @@ export function createWebWorkspaceRuntime(
       try {
         return await runTeamEffect(directory.createBootstrap(id, key, sessionId));
       } catch (error) {
-        // The reference keeps 401 apart from 403 and names the account service code, such as `session_inactive`.
         if (error instanceof RemoteDirectoryError && (error.status === 401 || error.status === 403))
           events.connection({
             hostId: id,
@@ -699,12 +593,10 @@ export function createWebWorkspaceRuntime(
       if (!sessionsEnded) await runTeamEffect(directory.endSession(id));
     },
   };
-  /** The host of a connect attempt that Signal holds until the host is online. */
   let waitingHostId: string | null = null;
   const openedActions: RemoteTeamPeerActions = {
     ...sessionActions,
     onConnectionUpdate: async (update) => {
-      // A `connecting` update without `hostOffline`, such as a `rate_limited` reply, does not end the hold.
       if (update.hostOffline) waitingHostId = update.hostId;
       else if (update.state !== "connecting") waitingHostId = null;
       if (update.state !== "online") {
@@ -719,9 +611,8 @@ export function createWebWorkspaceRuntime(
     onHostStreamData: (data) => browserView.receive(data),
     onTeamEvent: async (id, event) => events.event(id, event),
     onAccountProfileChanged: events.accountChanged,
+    onAccountServersChanged: async () => events.serversChanged?.(),
   };
-  // A new page sends its first reads with the protocol of the last visit, beside the compatibility
-  // read. `connectHost` reads them again when the protocol changed.
   const hostProtocols = {
     get: (id: string) => savedHostProtocol(accountId, id),
     set: (id: string, protocol: number) => localStorage.setItem(hostProtocolKey(accountId, id), String(protocol)),
@@ -737,14 +628,9 @@ export function createWebWorkspaceRuntime(
       actions,
     };
   }
-  // Each host switch replaces the peer, so the old host's session can end while the new host connects.
   let { peer, actions: peerActions } = createOpenedPeer();
-  /** Peers of earlier hosts that are still ending their sessions. */
   const retiring = new Set<Promise<void>>();
-  /** Ends the peer's sessions in the background, then releases its host's lock. */
   function retire(previous: typeof peer, actions: typeof peerActions, releaseLock: (() => void) | null): void {
-    // The account service gives a new connection to the host the same session while it is active,
-    // so the lock waits for the end. The old peer reports nothing more to the workspace.
     actions.current = {
       ...sessionActions,
       onConnectionUpdate: async () => undefined,
@@ -771,7 +657,6 @@ export function createWebWorkspaceRuntime(
         pinHostKey: (host) => pinWebHostKey(accountId, host),
         onState: (hostId, state) => events.hostState?.(hostId, state),
         onSessionRevoked: () => events.hostSessionRevoked?.(),
-        // Without a listener, the status connections read no agent list.
         ...(events.hostNotice
           ? {
               onNotice: (hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) =>
@@ -780,7 +665,6 @@ export function createWebWorkspaceRuntime(
           : {}),
       })
     : undefined;
-  // Another tab asks for the host that this tab has open: it stays here, unless the user takes it there.
   hostChannel?.addEventListener("message", (event) => {
     const message = decodeWebHostTabMessage(event.data);
     if (!message || disposed || !("requestId" in message) || message.hostId !== lockedHostId) return;
@@ -792,7 +676,6 @@ export function createWebWorkspaceRuntime(
       } satisfies WebHostTabMessage);
     else if (message.type === "take") {
       events.hostTaken?.(message.hostId);
-      // The selection stays, so no status connection of this tab asks for the host again.
       hosts?.holdSelected(message.hostId, false);
       void giveUpHost(message.hostId).catch(() => undefined);
     }
@@ -804,15 +687,10 @@ export function createWebWorkspaceRuntime(
   let uploadGeneration = 0;
   let capabilities: string[] = [];
   let connectedHost: RemoteTeamHost | null = null;
-  // A duplicate whose answer got lost sends its id again and gets the first copy.
   const duplicateIds = retryOperationIds(() => crypto.randomUUID());
-  // A create whose answer got lost sends its id again and gets the first agent (`agent-create-operation-v1`).
   const createOperationId = retryOperationIds(() => crypto.randomUUID());
   const completedDraftIdsByHost = new Map<string, Set<string>>();
   const draftCleanupRetryHosts = new Set<string>();
-  // The host names a draft's preview with the desktop `openbot-attachment:` scheme, so a draft image
-  // shows from its local bytes. A discard revokes the URL. A sent draft keeps it until the runtime ends:
-  // the pending row of the message shows it until the host's row comes.
   const localDraftPreviews = new Map<string, string>();
   function localDraftPreview(id: string, file: File): string | null {
     const type = rasterImageMimeType(file.name);
@@ -831,8 +709,6 @@ export function createWebWorkspaceRuntime(
   }
   function trackCompletedDraft(id: string, hostId = lockedHostId): void {
     if (!hostId) return;
-    // The released API has no draft listing. A request that commits before returning cannot be
-    // recovered if its response is lost, so only returned identifiers enter this cleanup set.
     let ids = completedDraftIdsByHost.get(hostId);
     if (!ids) {
       ids = new Set<string>();
@@ -867,14 +743,11 @@ export function createWebWorkspaceRuntime(
         ids.delete(id);
         if (!ids.size) completedDraftIdsByHost.delete(hostId);
       } catch {
-        // Cleanup is best effort. Keep an unconfirmed draft for a same-host reconnect;
-        // never send its identifier to another host.
         draftCleanupRetryHosts.add(hostId);
       }
     }
     if (!completedDraftIdsByHost.has(hostId)) draftCleanupRetryHosts.delete(hostId);
   }
-  /** With `sidebar-folders-v1`, the layout has the parent of each folder. */
   async function readSidebarLayout(): Promise<SidebarLayoutSnapshot> {
     const value = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
       ? await request("POST", SIDEBAR_FOLDERS_ROUTES.read, {})
@@ -882,10 +755,6 @@ export function createWebWorkspaceRuntime(
     if (!isSidebarLayoutSnapshot(value)) throw new Error(currentText().t("error.remote.invalidData"));
     return value;
   }
-  /**
-   * Where each provider's models come from (`provider-model-source-v1`). Optional: an older host, or a
-   * failed read, gives none, and the picker then shows no source.
-   */
   function readModelSources(): Promise<ProviderModelSourceEntry[]> {
     return capabilities.includes(PROVIDER_MODEL_SOURCE_CAPABILITY)
       ? request("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {}).then(decodeProviderModelSources, () => [])
@@ -915,7 +784,6 @@ export function createWebWorkspaceRuntime(
     });
     if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
     const membershipRead = method === "GET" && path === TEAM_API_ROUTES.me;
-    // An action can be forbidden while membership remains valid. Confirm access before clearing drafts.
     if (result.status === 403 && !membershipRead) {
       await request("GET", TEAM_API_ROUTES.me);
       if (disposed || generation !== current) throw new Error(currentText().t("webClient.error.hostChanged"));
@@ -935,8 +803,6 @@ export function createWebWorkspaceRuntime(
       );
     return result.body;
   }
-  // The shared Team API requests decode their own responses. A declaration, like `request`, so the
-  // draft cleanup above can reach it.
   async function teamApi<T>(
     method: string,
     path: string,
@@ -959,10 +825,6 @@ export function createWebWorkspaceRuntime(
     if (!connectedHost) throw new Error(currentText().t("webClient.error.hostNotConnected"));
     return connectedHost;
   }
-  /**
-   * Puts a new agent on the account that the user chose, as on the desktop. The agent exists, so a
-   * failed or unsupported account change does not fail the create: it keeps the provider's own sign-in.
-   */
   async function withCreatedAgentAccount(
     agent: ClientAgentSummary,
     accountId: string | undefined,
@@ -985,7 +847,6 @@ export function createWebWorkspaceRuntime(
     return runTeamEffect(readChatColors(teamApi).pipe(Effect.mapError((error) => error.cause)));
   }
   async function listMembers(): Promise<TeamMemberSummary[]> {
-    // The account service has no chat colours. A failed read from the host gives the members without them.
     const [members, colors] = await Promise.all([
       runTeamEffect(directory.listMembers(requireHost().hostId)),
       listChatColors().catch(() => undefined),
@@ -1028,8 +889,6 @@ export function createWebWorkspaceRuntime(
           inviteUrl: invite.inviteUrl,
         };
       },
-      // The account service returns nothing useful, so the member is read back. The read before the
-      // change refuses an owner, as the desktop does.
       async updateMember(input) {
         const hostId = requireHost().hostId;
         const current = (await listMembers()).find((member) => member.id === input.memberId);
@@ -1049,11 +908,6 @@ export function createWebWorkspaceRuntime(
   };
   const routinesOnce = () => capabilities.includes(ROUTINES_ONCE_CAPABILITY);
   const channels = teamChannelsApi(teamApi, routinesOnce, true);
-  // The host sends an `openbot-avatar:` URL for a channel image, which only the desktop app can open.
-  // The image comes through the host connection, one read for each channel and version, and at most
-  // `CHANNEL_PICTURE_READS` reads at the same time. A failed read shows the channel without its image
-  // until the image gets a new version. A channel list does not wait for the reads: it shows the images
-  // that are already here, and the `onPictures` listeners list again when new ones arrive.
   const channelPictures = new Map<string, ChannelPicture>();
   const pictureListeners = new Set<() => void>();
   let pictureReads = 0;
@@ -1068,7 +922,6 @@ export function createWebWorkspaceRuntime(
       waitingPictureReads.shift()?.();
     }
   }
-  /** The picture of one channel version, and whether this call started its read. Null: no picture to read. */
   function channelPicture(channelId: string, source: string): { picture: ChannelPicture; started: boolean } | null {
     const version = capabilities.includes(CHANNEL_PICTURE_CAPABILITY) ? channelPictureVersion(source, channelId) : null;
     if (!version) return null;
@@ -1103,7 +956,6 @@ export function createWebWorkspaceRuntime(
     if (!source?.startsWith("openbot-avatar:")) return channel;
     return { ...channel, imageUrl: await readChannelPicture(channel.id, source) };
   }
-  /** The channels with the images that are here now. The reads that this list starts end after it. */
   function withKnownChannelPictures<T extends Channel>(list: T[]): T[] {
     const started: Promise<string | null>[] = [];
     const listed = list.map((channel) => {
@@ -1119,21 +971,6 @@ export function createWebWorkspaceRuntime(
       });
     return listed;
   }
-  /** The routine flow routes, sent only to a host that negotiated them. */
-  async function routineFlowsRequest<T>(
-    method: string,
-    path: string,
-    decode: (value: unknown) => T,
-    body?: TeamProtocolV2Json,
-  ): Promise<T> {
-    if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
-    if (path === ROUTINE_FLOW_STOP_ROUTES.stopRun && !capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY))
-      throw new Error(currentText().t("error.team.routineFlowStopUnsupported"));
-    return teamApi(method, path, decode, body);
-  }
-  const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
-  const agentRoutines = teamAgentRoutinesApi(teamApi, undefined, routinesOnce);
   const browserView = createRemoteBrowserView(
     (data) => peer.sendHostStreamData(data),
     request,
@@ -1155,7 +992,6 @@ export function createWebWorkspaceRuntime(
     if (current) {
       await runTeamEffect(current.close()).catch(() => undefined);
     } else {
-      // Also cancel an open request that has not installed its session yet.
       browserView.disconnect();
     }
   }
@@ -1163,7 +999,6 @@ export function createWebWorkspaceRuntime(
   const emitView = (event: BrowserLiveViewEvent) => {
     for (const listener of viewListeners) listener(event);
   };
-  /** Ends the connection of the opened host and gives up its lock. */
   async function closeOpenedHost(): Promise<void> {
     const hostForCleanup = lockedHostId;
     try {
@@ -1180,17 +1015,12 @@ export function createWebWorkspaceRuntime(
       connectedHost = null;
     }
   }
-  /**
-   * Closes a host that another tab takes. An attempt in progress ends first: a reconnect keeps the lock and
-   * does not acquire it again, so a close before its `connect` leaves a peer without the lock.
-   */
   async function giveUpHost(hostId: string): Promise<void> {
     const attempt = connecting;
     if (attempt) {
       if (connectingHostId === hostId) await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
       await attempt.catch(() => undefined);
     }
-    // An attempt for another host already let this host go.
     if (lockedHostId === hostId) await closeOpenedHost();
   }
   async function connectHost(host: RemoteTeamHost, { takeOver = false, early }: WebConnectOptions): Promise<string[]> {
@@ -1205,8 +1035,6 @@ export function createWebWorkspaceRuntime(
         const previous = { peer, actions: peerActions, releaseLock: releaseHostLock };
         releaseHostLock = null;
         lockedHostId = null;
-        // This tab's online status connection of the host becomes the opened host, with its session,
-        // path and lock. Otherwise the status connection gives the host up first.
         const handover = hosts?.handOver(host.hostId) ?? null;
         if (handover) {
           handover.actions.current = openedActions;
@@ -1320,8 +1148,6 @@ export function createWebWorkspaceRuntime(
     async browserTabs() {
       const value = await request("GET", TEAM_API_ROUTES.browser.tabs);
       if (!Array.isArray(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      // The frozen tab list has no field for a person's control or the history state, so the host
-      // answers on their own routes.
       const held = capabilities.includes(BROWSER_USER_CONTROL_CAPABILITY)
         ? new Set(decodeBrowserUserControlSnapshot(await request("POST", BROWSER_USER_CONTROL_ROUTES.state, {})).tabIds)
         : new Set<string>();
@@ -1346,8 +1172,6 @@ export function createWebWorkspaceRuntime(
         await request("POST", TEAM_API_ROUTES.browser.navigate, { ...input });
         return;
       }
-      // An older host has no route that moves an existing tab to an address; the browser store
-      // opens a new tab for it instead.
       if (!capabilities.includes(TEAM_BROWSER_NAVIGATION_CAPABILITY))
         throw new Error(currentText().t("error.backend.browserNavigateUnsupported"));
       await request("POST", TEAM_API_ROUTES.browser.load, { ...input });
@@ -1391,7 +1215,6 @@ export function createWebWorkspaceRuntime(
     getSidebarLayout: readSidebarLayout,
     async mutateSidebarLayout(action) {
       const folders = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY);
-      // The released route has every folder at the top: it refuses `nest`, and would drop a parent.
       if (!folders && (action.type === "nest" || (action.type === "create" && action.parentId !== undefined)))
         throw new Error(currentText().t("error.team.sidebarFoldersUnsupported"));
       const value = await request(
@@ -1415,7 +1238,6 @@ export function createWebWorkspaceRuntime(
       },
       async readChannel(input) {
         const page = await channels.readChannel(input);
-        // A host file URL must not reach the browser; attachments are downloaded through the host.
         return {
           ...page,
           channel: await withChannelPicture(page.channel),
@@ -1433,7 +1255,6 @@ export function createWebWorkspaceRuntime(
         };
       },
       async channelCommand(command) {
-        // A read comes only while the user looks at the channel, so its notifications are done.
         if (command.type === "read" && lockedHostId)
           closeWebChatNotifications(lockedHostId, { channelId: command.channelId });
         const channel = await channels.channelCommand(command);
@@ -1467,6 +1288,15 @@ export function createWebWorkspaceRuntime(
       Effect.runPromise(respondToBrowserTakeover(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
     listHosts: () => runTeamEffect(directory.listHosts()),
     leaveHost: (hostId, membershipId) => runTeamEffect(directory.leaveHost(hostId, membershipId)),
+    setHostHidden: (hostId, hidden) => runTeamEffect(directory.setHostHidden(hostId, hidden)),
+    ownerTransfers: {
+      pending: (hostId) => runTeamEffect(directory.pendingOwnerTransfer(hostId)),
+      start: (hostId, email) => runTeamEffect(directory.startOwnerTransfer(hostId, email)),
+      cancel: (hostId) => runTeamEffect(directory.cancelOwnerTransfer(hostId)),
+      incoming: () => runTeamEffect(directory.incomingOwnerTransfers()),
+      accept: (transferId) => runTeamEffect(directory.acceptOwnerTransfer(transferId)),
+      decline: (transferId) => runTeamEffect(directory.declineOwnerTransfer(transferId)),
+    },
     async removeOwnedHost(hostId) {
       const response = await accountFetch(`/api/browser/v2/remote/hosts/${encodeURIComponent(hostId)}`, {
         method: "DELETE",
@@ -1490,7 +1320,6 @@ export function createWebWorkspaceRuntime(
     },
     acceptInvite: (url) => runTeamEffect(directory.acceptInvite(url)),
     async connect(host, options) {
-      // An attempt that waits for an offline host has no deadline, so another host replaces it.
       if (connecting && waitingHostId !== null && waitingHostId !== host.hostId) {
         const previous = connecting;
         await peer.execute({ id: crypto.randomUUID(), type: "disconnect" });
@@ -1534,7 +1363,6 @@ export function createWebWorkspaceRuntime(
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
     async markRead(id, throughMessageId) {
-      // As for a channel: the user looks at the chat.
       if (lockedHostId) closeWebChatNotifications(lockedHostId, { agentId: id });
       const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
       if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
@@ -1609,6 +1437,10 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
       return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
     },
+    async listPendingPrompts() {
+      if (!capabilities.includes(PENDING_PROMPTS_CAPABILITY)) return [];
+      return decodePendingPromptsResponse(await request("POST", PENDING_PROMPTS_ROUTES.list, {}));
+    },
     async cancelWait(agentId, waitId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
         throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
@@ -1662,9 +1494,7 @@ export function createWebWorkspaceRuntime(
         text,
         attachmentDraftIds,
         replyToMessageId,
-        // The host uses this browser's zone for a routine the agent creates from the message.
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        // A host with `message-client-id-v1` answers a retry with the first receipt.
         ...(clientMessageId ? { clientMessageId } : {}),
       });
       if (!isQueuedMessageReceipt(result)) throw new Error(currentText().t("webClient.error.sendUnconfirmed"));
@@ -1743,15 +1573,20 @@ export function createWebWorkspaceRuntime(
     async download(id) {
       return decodeWebFile(await request("GET", TEAM_API_ROUTES.attachment(id), {}, undefined, WEB_FILE_DOWNLOAD));
     },
+    async downloadPreview(id) {
+      return decodeWebFile(
+        await request("GET", TEAM_API_ROUTES.attachmentPreview(id), {}, undefined, WEB_FILE_DOWNLOAD),
+      );
+    },
     async sharedFile(path) {
       const query = new URLSearchParams({ path });
       return decodeWebFile(
         await request("GET", `${TEAM_API_ROUTES.sharedFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
       );
     },
-    async workspaceFile(agentId, path) {
-      // The released URL spells the agent `botId`.
+    async workspaceFile(agentId, path, options) {
       const query = new URLSearchParams({ botId: agentId, path });
+      if (options?.exactPath) query.set(WORKSPACE_FILE_EXACT_PATH_QUERY, "1");
       return decodeWebFile(
         await request("GET", `${TEAM_API_ROUTES.workspaceFiles}?${query}`, {}, undefined, WEB_FILE_DOWNLOAD),
       );
@@ -1761,9 +1596,6 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.team.workspaceDirectoryUnsupported"));
       return decodeWorkspaceDirectory(await request("POST", WORKSPACE_DIRECTORY_ROUTES.list, { agentId, path }));
     },
-    routineFlows,
-    updateRoutine: agentRoutines.updateRoutine,
-    testRoutine: agentRoutines.testRoutine,
     listHiddenAgents: () => runTeamEffect(listHiddenAgents(teamApi).pipe(Effect.mapError((error) => error.cause))),
     setAgentHidden: (input) =>
       runTeamEffect(setAgentHidden(teamApi, input).pipe(Effect.mapError((error) => error.cause))),
@@ -1826,10 +1658,7 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      // The fast tiers, the picker listing and the steering models are optional: when a route fails,
-      // the picker gets the models with no Fast switch or listing, and a custom agent shows Send now.
-      const [fast, listings, steering] = await Promise.all([
-        // Only `agent-speed-v1` lists Ultrafast tiers and Claude models; an older host keeps `agent-fast-mode-v1`.
+      const [fast, listings, steering, kept] = await Promise.all([
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
           : capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
@@ -1841,9 +1670,15 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_STEERING_CAPABILITY)
           ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
           : [],
+        capabilities.includes(MODEL_VISIBILITY_KEPT_CAPABILITY)
+          ? request("POST", MODEL_VISIBILITY_KEPT_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
       return withWorkspaceOnlyLimit(
-        withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering),
+        withSteeringModels(
+          withKeptModels(withModelListings(withFastServiceTiers(models, fast), listings), kept),
+          steering,
+        ),
         capabilities.includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
       );
     },
@@ -1854,7 +1689,6 @@ export function createWebWorkspaceRuntime(
     },
     modelSources: readModelSources,
     async accountUsage() {
-      // Whether an account works on credits is optional: when its read fails, the reading shows as before.
       const [value, credits] = await Promise.all([
         request("GET", TEAM_API_ROUTES.agents.usage),
         capabilities.includes(USAGE_CREDITS_CAPABILITY)
@@ -1867,9 +1701,6 @@ export function createWebWorkspaceRuntime(
       return withUsageCredits(value, credits);
     },
     async createAgent(input) {
-      // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
-      // The released route does not carry the account either, so it goes on `provider-accounts-v1`
-      // after it, as on the desktop.
       const { avatarColor, providerAccountId, ...profile } = input;
       const operation = capabilities.includes(AGENT_CREATE_OPERATION_CAPABILITY)
         ? createOperationId([lockedHostId, profile])
@@ -1884,7 +1715,6 @@ export function createWebWorkspaceRuntime(
       if (!isClientAgentSummary(value)) throw new Error(currentText().t("error.remote.invalidData"));
       const agent: ClientAgentSummary = await withCreatedAgentAccount(value, providerAccountId);
       if (!avatarColor || !capabilities.includes(AGENT_COLORS_CAPABILITY)) return agent;
-      // The agent exists, so a failed colour change does not fail the create: the agent keeps its hue.
       const colored = await runTeamEffect(
         setAgentColor(teamApi, { agentId: agent.id, color: avatarColor }).pipe(Effect.mapError((error) => error.cause)),
       ).then(
@@ -1906,8 +1736,6 @@ export function createWebWorkspaceRuntime(
         duplicate.failed();
         throw new Error(currentText().t("error.remote.invalidData"));
       }
-      // The released route answers the layout without the parents of the folders. The copy exists, so a
-      // failed read keeps that layout rather than failing the copy; the next layout event has the parents.
       const answered = value.layout;
       const layout = capabilities.includes(SIDEBAR_FOLDERS_CAPABILITY)
         ? await readSidebarLayout().catch(() => answered)
@@ -1915,8 +1743,6 @@ export function createWebWorkspaceRuntime(
       return { agent: value.agent, layout } satisfies DuplicateAgentResult;
     },
     async updateAgent(input) {
-      // A move at a usage limit also sends the held message, so it goes on `agent-usage-limit-v1`. The
-      // move carries only the model fields.
       if (input.leaveUsageLimit !== undefined) {
         const { agentId, provider, model, reasoningEffort, providerAccountId } = input;
         if (
@@ -1937,9 +1763,6 @@ export function createWebWorkspaceRuntime(
         });
         return;
       }
-      // While the agent works, the released agent route refuses a provider change. A change of the runtime
-      // alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the account in the
-      // same change.
       const runtimeChange = capabilities.includes(AGENT_PENDING_RUNTIME_CAPABILITY)
         ? pendingRuntimeUpdateBody(input)
         : null;
@@ -1947,9 +1770,6 @@ export function createWebWorkspaceRuntime(
         await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, runtimeChange);
         return;
       }
-      // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the
-      // profile: a provider change there returns the agent to the new provider's own sign-in.
-      // Backup models go on `agent-backup-models-v1` before this call: the agent route does not carry them.
       const {
         providerAccountId,
         backupModels: _backupModels,
@@ -1960,9 +1780,6 @@ export function createWebWorkspaceRuntime(
       } = input;
       if (providerAccountId !== undefined && !capabilities.includes(PROVIDER_ACCOUNTS_CAPABILITY))
         throw new Error(currentText().t("error.team.providersUnsupported"));
-      // The released agent route does not carry the chat colour, so it goes on `chat-colors-v1` first.
-      // Without the capability, a change of only the chat colour fails. With other fields, they change
-      // and the chat colour stays.
       const chatColors = capabilities.includes(CHAT_COLORS_CAPABILITY);
       if (
         chatColor !== undefined &&
@@ -1976,12 +1793,6 @@ export function createWebWorkspaceRuntime(
             Effect.mapError((error) => error.cause),
           ),
         );
-      // The released agent route does not carry the exact colour. With `agent-colors-v1` it goes on its
-      // own route first. That route also sets the nearest hue, so the profile change then leaves the hue
-      // out: on the released route a hue removes the colour. A removed colour keeps the hue, which then
-      // sets the colour that the user chose. The released route removes the colour only when the hue
-      // changes, so a removed colour always goes on the colour route. Without the capability, only the
-      // hue goes.
       const colors = capabilities.includes(AGENT_COLORS_CAPABILITY);
       const { avatarHue: _avatarHue, ...withoutHue } = fields;
       const profile = colors && avatarColor ? withoutHue : fields;
@@ -1991,8 +1802,6 @@ export function createWebWorkspaceRuntime(
             Effect.mapError((error) => error.cause),
           ),
         );
-      // The released agent route refuses a change without a profile field. When a colour went on its
-      // own route above and nothing else changed, there is nothing to send (#5708).
       const colourRouted = (chatColors && chatColor !== undefined) || (colors && avatarColor !== undefined);
       if (!colourRouted || Object.entries(profile).some(([key, value]) => key !== "agentId" && value !== undefined))
         await request("PATCH", TEAM_API_ROUTES.agent.one(input.agentId), { ...profile });
@@ -2009,7 +1818,6 @@ export function createWebWorkspaceRuntime(
       await Effect.runPromise(deleteAgent(teamApi, agentId).pipe(Effect.mapError((error) => error.cause)));
     },
     async search(agentId, query, cursor, includeSideThreads = false) {
-      // Only `thread-message-search-v1` names the side thread of a result.
       if (includeSideThreads && capabilities.includes(THREAD_MESSAGE_SEARCH_CAPABILITY))
         return teamApi("POST", THREAD_MESSAGE_SEARCH_ROUTES.search, decodeThreadMessageSearchResponse, {
           query,
@@ -2039,7 +1847,6 @@ export function createWebWorkspaceRuntime(
       return { results, total: value.total, nextCursor: value.nextCursor };
     },
     async searchFiles(query, cursor) {
-      // The workspace hides the Files filter while the host does not serve `conversation-file-search-v1`.
       if (!capabilities.includes(CONVERSATION_FILE_SEARCH_CAPABILITY))
         throw new Error(currentText().t("error.team.conversationFileSearchUnsupported"));
       return teamApi("POST", CONVERSATION_FILE_SEARCH_ROUTES.search, decodeConversationFileSearchResponse, {
@@ -2069,26 +1876,17 @@ export function createWebWorkspaceRuntime(
   };
 }
 
-/**
- * The largest file that the browser sends or reads through the host connection: the host's limit, as
- * on desktop. The phone sends a large file in parts, but reads with a smaller limit, because its
- * native bridge copies each file that it reads.
- */
 const WEB_FILE_BYTES = TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
-/** A file read asks for the larger limit. Without it, the connection refuses a file above the phone's limit. */
 const WEB_FILE_DOWNLOAD: RemoteLargeDownload = { maxBytes: WEB_FILE_BYTES };
 
-/** A channel image read through the host. `url` stays undefined until `read` ends; null: no image. */
 interface ChannelPicture {
   source: string;
   url: string | null | undefined;
   read: Promise<string | null>;
 }
 
-/** Channel image reads that run at the same time, so a long channel list does not fill the connection. */
 const CHANNEL_PICTURE_READS = 4;
 
-/** The version of the host's `openbot-avatar://channel/<id>?v=<version>` URL, as mobile reads it. */
 function channelPictureVersion(source: string, channelId: string): string | null {
   try {
     const url = new URL(source);
@@ -2111,11 +1909,6 @@ function decodeWebFile(value: unknown): WebFile {
   };
 }
 
-/**
- * The host's own reason for a refusal. It redacts it; a server failure keeps the generic text. Over
- * WebRTC the host sends a refusal as an error frame, so it arrives as a failed command whose
- * reference is `host/<4xx status>/<code>`.
- */
 function hostRefusal(result: RemoteTeamCommandResult): string | null {
   const status = result.ok ? result.status : Number(/^host\/(\d{3})(?:\/|$)/u.exec(result.reference ?? "")?.[1]);
   if (status === undefined || !(status >= 400 && status < 500)) return null;
@@ -2220,7 +2013,6 @@ function decodeWebConversationPage(value: unknown): ConversationPage {
     pageInfo: {
       hasOlder: value.pageInfo.hasOlder,
       olderCursor: value.pageInfo.olderCursor,
-      // history-extent-v1: the host sends the unloaded length only when it was negotiated.
       ...optionalHistoryExtent(value.pageInfo),
     },
   };

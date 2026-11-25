@@ -9,6 +9,11 @@ export const messages = {
   "mobile.server.drawer.leaveFailed": "Kan {name} niet verlaten",
   "mobile.server.drawer.removeFailed": "Kan {name} niet verwijderen",
   "mobile.server.drawer.deleteFailed": "Kan {name} niet verwijderen",
+  "mobile.server.drawer.hide": "Server verbergen",
+  "mobile.server.drawer.show": "Server tonen",
+  "mobile.server.drawer.hiddenServers": "Verborgen servers",
+  "mobile.server.drawer.hideFailed": "Kan {name} niet verbergen",
+  "mobile.server.drawer.showFailed": "Kan {name} niet tonen",
   "mobile.server.drawer.actionFailed": "OpenBot kan deze actie niet voltooien. Probeer het opnieuw.",
   "mobile.server.drawer.moveUp": "Omhoog",
   "mobile.server.drawer.moveDown": "Omlaag",
@@ -99,19 +104,24 @@ export const messages = {
   "mobile.server.hosted.intro.description":
     "Een cloudserver voert je agents en routines uit als je computer uit staat. OpenBot zet hem op en houdt hem draaiende.",
   "mobile.server.hosted.planFacts": "{members} · {storage} · {sites} · {speed}",
-  "mobile.server.hosted.computer.title": "Op je computer",
+  "mobile.server.hosted.steps.title": "Voeg hem toe op je computer",
+  "mobile.server.hosted.steps.open": "Open OpenBot op je computer.",
+  "mobile.server.hosted.steps.settings": "Ga naar Instellingen → Gehoste servers.",
+  "mobile.server.hosted.steps.add": "Kies Server toevoegen en kies een abonnement.",
+  "mobile.server.hosted.plansToggle": "Wat elk abonnement bevat",
   "mobile.server.hosted.computer.add": "Cloudserver toevoegen",
   "mobile.server.hosted.computer.addHint": "Open in OpenBot Instellingen → Gehoste servers en kies Server toevoegen.",
   "mobile.server.hosted.computer.change": "Abonnement wijzigen",
   "mobile.server.hosted.computer.changeHint": "Open in OpenBot Instellingen → Facturering.",
   "mobile.server.hosted.yourServers": "Je servers",
-  "mobile.server.hosted.plans": "Abonnementen",
   "mobile.server.hosted.currentPlan": "Je abonnement",
   "mobile.server.hosted.soldOut": "Uitverkocht",
   "mobile.server.hosted.serverPlan": "{plan} · {interval}",
   "mobile.server.hosted.serverPlanEnds": "{plan} · {interval} · Eindigt op {date}",
+  "mobile.server.hosted.serverDataKept": "{plan} · Gegevens bewaard tot {date}",
   "mobile.server.hosted.state.payment": "Wacht op betaling",
   "mobile.server.hosted.state.setup": "Wordt ingericht",
+  "mobile.server.hosted.state.restoring": "Gegevens herstellen",
   "mobile.server.hosted.state.starting": "Starten",
   "mobile.server.hosted.state.running": "Actief",
   "mobile.server.hosted.state.stopped": "Gestopt",
@@ -226,6 +236,7 @@ export const messages = {
   "mobile.server.threads.hold.serverBusy": "Wachtend. De host voert zoveel beurten uit als zijn geheugen toelaat.",
   "mobile.server.threads.hold.agentBusy": "Wacht tot ander werk van deze agent klaar is.",
   "mobile.server.threads.hold.oneTurn": "Wachtend. De aanbieder van deze agent voert één beurt tegelijk uit.",
+  "mobile.server.threads.hold.signIn": "Wachtend. De aanbieder van deze agent moet worden aangemeld.",
   "mobile.server.threads.offline": "Maak verbinding met deze server om de threads te zien.",
   "mobile.server.threads.loading": "Threads laden…",
   "mobile.server.threads.loadFailed": "Kan de threads van sommige agents niet laden.",
@@ -265,6 +276,8 @@ export const messages = {
   "mobile.server.settings.removeBody":
     "Hiermee verwijder je de server uit de accountdienst voor alle leden. Bestanden en chats op de computer blijven bewaard. Registreer de server vanaf die computer om hem weer te gebruiken.",
   "mobile.server.settings.remove": "Server verwijderen",
+  "mobile.server.settings.hide": "Server verbergen",
+  "mobile.server.settings.show": "Server tonen",
   "mobile.server.settings.deleteTitle": "{name} verwijderen?",
   "mobile.server.settings.deleteBody":
     "OpenBot stopt de server op zijn computer en verplaatst de agents, chats en bestanden naar de prullenbak van die computer. De server verdwijnt uit de serverlijst op al je apparaten.",
@@ -331,8 +344,10 @@ export const messages = {
   "mobile.server.route.invite": "Mensen uitnodigen",
   "mobile.server.route.member": "Lid",
   "mobile.server.route.timezone": "Tijdzone",
+  "mobile.server.route.signalHome": "Signal-server",
   "mobile.server.route.personality": "Agentpersoonlijkheid",
   "mobile.server.route.agents": "Agents",
+  "mobile.server.route.voiceModel": "Spraakherkenning",
   "mobile.server.settings.storage": "Opslag",
   "mobile.server.route.storage": "Opslag",
   "mobile.server.route.storageFiles": "Alle bestanden",
@@ -461,6 +476,42 @@ export const messages = {
   "mobile.server.settings.timezoneUnavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de tijdzone te wijzigen.",
   "mobile.server.settings.timezoneUnsupported": "Werk OpenBot bij op deze server om de tijdzone hier te wijzigen.",
+  "mobile.server.settings.signalHomeAutomatic": "Automatisch",
+  "mobile.server.settings.signalHomeNearest": "De dichtstbijzijnde Signal-server",
+  "mobile.server.settings.signalHomeInUse": "In gebruik: {name}",
+  "mobile.server.settings.signalHomeLoading": "Signal-servers meten…",
+  "mobile.server.settings.signalHomeSaveFailed": "Kan de Signal-server niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.settings.signalHomeUnavailable":
+    "Maak als eigenaar of beheerder verbinding met deze server om de Signal-server te wijzigen.",
+  "mobile.server.settings.signalHomeUnsupported":
+    "Werk OpenBot op deze server bij om de Signal-server hier te wijzigen.",
+  "mobile.server.settings.signalHomeDescription":
+    "Leden maken via deze Signal-server verbinding met deze server. Een Signal-server met een lagere latentie geeft snellere verbindingen.",
+  "mobile.server.settings.signalHomeFallback":
+    "{chosen} antwoordt niet. De server gebruikt {name} tot {chosen} weer antwoordt.",
+  "mobile.server.settings.signalHomeMoving":
+    "De server gaat over naar {name}. Leden maken binnen enkele seconden opnieuw verbinding.",
+  "mobile.server.settings.signalHomeLoadFailed": "Kan de Signal-servers niet laden.",
+  "mobile.server.settings.signalHomeLatency": "{latency} ms",
+  "mobile.server.settings.signalHomeNoAnswer": "Geen antwoord",
+  "mobile.server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "mobile.server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "mobile.server.settings.signalHomePlaceSanJose": "San Jose",
+  "mobile.server.settings.signalHomePlaceSydney": "Sydney",
+  "mobile.server.settings.signalHomePlaceSingapore": "Singapore",
+  "mobile.server.settings.voiceModelDescription":
+    "Agents op deze server gebruiken dit model om het geluid van video’s zonder ondertiteling uit te schrijven.",
+  "mobile.server.settings.voiceModelLoading": "Spraakherkenning laden…",
+  "mobile.server.settings.voiceModelLoadFailed": "Kan het spraakherkenningsmodel van de server niet laden.",
+  "mobile.server.settings.voiceModelSaveFailed": "Kan het spraakherkenningsmodel niet wijzigen. Probeer het opnieuw.",
+  "mobile.server.settings.voiceModelUnsupported":
+    "Werk OpenBot bij op deze server om de spraakherkenning hier te wijzigen.",
+  "mobile.server.settings.voiceModelReady": "Klaar",
+  "mobile.server.settings.voiceModelDownloading": "Downloaden: {percent}",
+  "mobile.server.settings.voiceModelSize": "Download van {size}",
+  "mobile.server.settings.voiceModelDownload": "Downloaden",
+  "mobile.server.settings.voiceModelCancel": "Download stoppen",
+  "mobile.server.settings.voiceModelRemove": "Verwijderen",
   "mobile.server.settings.keySection": "Serversleutel",
   "mobile.server.settings.keyChanged": "Laatste wijziging",
   "mobile.server.settings.keyChange": "Sleutel wijzigen",
@@ -479,6 +530,20 @@ export const messages = {
   "mobile.server.settings.keyChangeFailed": "Kan de serversleutel niet wijzigen. Probeer het opnieuw.",
   "mobile.server.settings.keyOwnerOnly": "Alleen de eigenaar kan de serversleutel wijzigen.",
   "mobile.server.settings.keyUnsupported": "Werk OpenBot op deze server bij om de sleutel hier te wijzigen.",
+  "mobile.server.settings.turnLimit": "Threads tegelijk",
+  "mobile.server.settings.turnLimitDescription":
+    "Hoeveel agentthreads tegelijk kunnen draaien op deze server. Meer threads gebruiken meer geheugen.",
+  "mobile.server.settings.turnLimitAutomatic": "Automatisch ({count})",
+  "mobile.server.settings.turnLimitAutomaticUnlimited": "Automatisch (geen limiet)",
+  "mobile.server.settings.turnLimitUnlimited": "Geen limiet",
+  "mobile.server.settings.turnLimitsLoadFailed": "Kan de threadlimieten van deze server niet laden.",
+  "mobile.server.settings.turnLimitsSaveFailed": "Kan de threadlimiet niet opslaan. Probeer het opnieuw.",
+  "mobile.server.settings.turnLimitsUnsupported":
+    "Werk OpenBot bij op deze server om de threadlimiet hier te wijzigen.",
+  "mobile.server.settings.agentTaskLimit": "Parallelle threads per agent",
+  "mobile.server.settings.agentTaskLimitDescription":
+    "Hoeveel threads elke agent zonder eigen limiet tegelijk kan draaien.",
+  "mobile.server.settings.agentTaskLimitDefault": "Standaard ({count})",
   "mobile.server.settings.memoryLimit": "Herinneringen per agent",
   "mobile.server.settings.memoryLimitDescription": "Hoeveel herinneringen elke agent op deze server kan bewaren.",
   "mobile.server.settings.memoryLimitLoadFailed": "Kan de geheugenlimiet van deze server niet laden.",
@@ -542,6 +607,8 @@ export const messages = {
   "mobile.server.browserProfiles.addAgents": "Agents toevoegen",
   "mobile.server.browserProfiles.agentsHint":
     "Een tik geeft de agent dit profiel of zet hem terug naar het gedeelde profiel. Een wijziging sluit de open tabbladen van de agent.",
+  "mobile.server.browserProfiles.movedNote":
+    "Logins bij sites blijven in het oude profiel. Een verplaatste agent moet opnieuw inloggen op deze sites.",
   "mobile.server.browserProfiles.clear": "Gegevens wissen",
   "mobile.server.browserProfiles.clearTitle": "Gegevens van {name} wissen?",
   "mobile.server.browserProfiles.clearBody":
@@ -687,6 +754,8 @@ export const messages = {
   "mobile.server.connectors.protonPass.keyHelp":
     "Maak in Proton Pass een toegangssleutel die alleen de kluis kan lezen die je met OpenBot deelt, en plak die hier. {host} bewaart de sleutel; deze telefoon niet.",
   "mobile.server.connectors.protonPass.keyPlaceholder": "pst_…",
+  "mobile.server.connectors.protonPass.plan":
+    "Je Proton-abonnement bevat de opdrachtregeltool van Proton Pass niet. Daarvoor is een Proton-abonnement nodig waarin Pass Plus zit. Andere betaalde abonnementen, zoals Mail Plus, bevatten hem niet. Wijzig het abonnement van je account en verbind daarna opnieuw.",
   "mobile.server.connectors.passwordManager.unavailable": "{name} is niet beschikbaar op deze server.",
   "mobile.server.connectors.passwordManager.howItWorks":
     "Meld je op deze telefoon aan bij {name}. Daarna maakt {host} een gedeelde kluis en een alleen-lezen toegangssleutel ervoor, en bewaart alleen die sleutel. Agents zien nooit een wachtwoord.",
@@ -716,8 +785,6 @@ export const messages = {
   "mobile.server.connectors.passwordManager.keyReadOnly": "Alleen lezen",
   "mobile.server.connectors.passwordManager.keyExpires": "Alleen lezen. Verloopt op {date}.",
   "mobile.server.connectors.passwordManager.keyExpired": "Verlopen op {date}",
-  "mobile.server.connectors.passwordManager.plan":
-    "De opdrachtregeltool van {name} vereist een betaald abonnement. Wijzig het abonnement van je account en verbind daarna opnieuw.",
   "mobile.server.connectors.passwordManager.expiredTitle": "De sleutel van {name} is verlopen",
   "mobile.server.connectors.passwordManager.expiredBody":
     "Agents op {host} kunnen zich pas weer aanmelden met je gedeelde logins als je opnieuw verbindt.",
@@ -871,7 +938,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.ownNumberNote":
     "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot.",
   "mobile.server.connectors.whatsapp.dedicatedNote":
-    "De mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
+    "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
   "mobile.server.connectors.whatsapp.helpLoggedOut":
     "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.helpError":
@@ -885,7 +952,7 @@ export const messages = {
     "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Zet dit uit om alleen het antwoord te sturen.",
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Bij een persoonlijk nummer krijgt alleen je chat “Bericht aan jezelf” deze berichten. Zet dit uit om alleen het antwoord te sturen.",
   "mobile.server.connectors.whatsapp.statusReactions": "Statusreacties",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
@@ -948,6 +1015,11 @@ export const messages = {
   "mobile.server.connectors.whatsapp.sendersLimit": "Een nummer kan maximaal {count} contacten en groepen toestaan.",
   "mobile.server.connectors.whatsapp.senderGroup": "Groep",
   "mobile.server.connectors.whatsapp.removeSender": "Verwijderen",
+  "mobile.server.connectors.whatsapp.senderReadOnlyRow": "{kind} · Alleen lezen",
+  "mobile.server.connectors.whatsapp.makeReadOnly": "Alleen lezen maken",
+  "mobile.server.connectors.whatsapp.allowWork": "Taken laten geven",
+  "mobile.server.connectors.whatsapp.readOnlyDetail":
+    "Alleen lezen: agents kunnen deze chat lezen en OpenBot schrijft er nooit in.",
   "mobile.server.connectors.whatsapp.addContact": "Contact toevoegen",
   "mobile.server.connectors.whatsapp.addGroup": "Groep toevoegen",
   "mobile.server.connectors.whatsapp.contactTitle": "Voeg een contact toe",
@@ -1108,10 +1180,15 @@ export const messages = {
   "mobile.server.providers.modelsFailed": "Kan de modellen niet wijzigen. Probeer het opnieuw.",
   "mobile.server.providers.promptCache": "Promptcache",
   "mobile.server.providers.promptCacheHint":
-    "Hoe lang Claude de context van een agent tussen beurten in de cache houdt. Een wijziging geldt wanneer Claude opnieuw start.",
-  "mobile.server.providers.promptCacheDefault": "Standaard van Claude Code",
+    "Hoe lang Claude en Pi de context van een agent tussen beurten in de cache houden. Een wijziging geldt wanneer de provider opnieuw start.",
+  "mobile.server.providers.promptCacheDefault": "Standaard van de provider",
   "mobile.server.providers.promptCacheHour": "1 uur",
   "mobile.server.providers.promptCacheLoadFailed": "Kan de promptcachetijd van deze server niet laden.",
+  "mobile.server.providers.cacheExpiryCompaction": "Comprimeren voordat de cache verloopt",
+  "mobile.server.providers.cacheExpiryCompactionHint":
+    "Als een chat met 200K of meer tokens context inactief is met een cache van 1 uur, comprimeert de agent de context voordat de cache verloopt. Dan leest het volgende bericht niet de hele context opnieuw zonder cache.",
+  "mobile.server.providers.cacheExpiryCompactionLoadFailed":
+    "De compressie-instelling van deze server kon niet worden geladen.",
   "mobile.server.providers.compactWindow": "Chats comprimeren bij",
   "mobile.server.providers.compactWindowHint":
     "Claude Code vat de oudere beurten van een chat samen wanneer de chat deze grootte bereikt. Lager houdt beurten snel en goedkoop. Hoger bewaart meer details. Een model met een kleiner venster comprimeert bij zijn eigen limiet.",
@@ -1167,6 +1244,8 @@ export const messages = {
     "ChatGPT gebruikt deze sleutel, niet je ChatGPT-abonnement. OpenAI rekent elk verzoek af op de sleutel. Het gebruik van het abonnement wordt niet getoond.",
   "mobile.server.providers.codexKeyAlternative":
     "Of log in met een OpenAI-API-sleutel. OpenAI rekent elk verzoek af op de sleutel.",
+  "mobile.server.providers.museKeyInUse":
+    "Muse gebruikt deze sleutel, niet je login. Verwijder de sleutel om je login te gebruiken.",
   "mobile.server.providers.sectionUse": "Gebruik",
   "mobile.server.providers.unused": "Geen agent gebruikt deze",
   "mobile.server.providers.usedByCount": { one: "1 agent gebruikt deze", other: "{count} agents gebruiken deze" },
@@ -1232,6 +1311,8 @@ export const messages = {
   "mobile.server.mcp.connected": { one: "Verbonden · {count} tool", other: "Verbonden · {count} tools" },
   "mobile.server.mcp.signInOnComputer":
     "Deze MCP-server vraagt je in te loggen. Log in vanuit OpenBot op een computer en test daarna opnieuw.",
+  "mobile.server.mcp.signIn": "Inloggen",
+  "mobile.server.mcp.signInHere": "Deze MCP-server vraagt je om in te loggen. Tik op Inloggen en test daarna opnieuw.",
   "mobile.server.mcp.signedInDescription": "{server} is ingelogd bij deze MCP-server.",
   "mobile.server.mcp.signOut": "Uitloggen",
   "mobile.server.mcp.saveFailed": "Kan de wijziging niet opslaan. Probeer het opnieuw.",
@@ -1284,6 +1365,7 @@ export const messages = {
   "mobile.server.planLimits.window.fiveHour": "5 uur",
   "mobile.server.planLimits.window.hours": { one: "{count} uur", other: "{count} uur" },
   "mobile.server.planLimits.window.minutes": "{minutes} min",
+  "mobile.server.planLimits.window.group": "{group} · {window}",
   "mobile.server.settings.updates": "Updates",
   "mobile.server.settings.updateAvailable": "Update beschikbaar",
   "mobile.server.route.updates": "Updates",
@@ -1334,7 +1416,7 @@ export const messages = {
   "mobile.server.update.waitingFor": "Wachten op {reasons}.",
   "mobile.server.update.disabledTitle": "Externe updates staan uit",
   "mobile.server.update.disabledDescription":
-    "De gebruiker van {name} heeft updates door serverleden uitgezet. Vraag deze persoon OpenBot bij te werken of de instelling aan te zetten.",
+    "De gebruiker van {name} heeft updates door serverleden uitgezet. Vraag diegene om OpenBot bij te werken, of om op die computer Instellingen > Updates te openen en “Sta updates van serverleden toe” aan te zetten.",
   "mobile.server.update.managedTitle": "Een Host Manager beheert updates",
   "mobile.server.update.managedDescription":
     "OpenBot Host Manager werkt {name} bij. Neem contact op met de hostbeheerder.",
@@ -1455,7 +1537,6 @@ export const messages = {
   "mobile.server.audit.roleMemberAdded": "{member} toegevoegd aan {role}",
   "mobile.server.audit.roleMemberRemoved": "{member} verwijderd uit {role}",
   "mobile.server.audit.agentLevel": "{agent} voor {role}: {change}",
-  // Server settings › Import agents: Grok Bot and Hermes exports (`agent-import-v1`).
   "mobile.server.settings.importAgents": "Agents importeren",
   "mobile.server.route.import": "Agents importeren",
   "mobile.server.import.unsupported": "Werk OpenBot op deze server bij om hier agents te importeren.",
@@ -1529,7 +1610,6 @@ export const messages = {
   "mobile.server.import.channel": "Kanaal",
   "mobile.server.import.notImportedTitle": "Niet geïmporteerd",
   "mobile.server.import.resultWarnings": "Sommige onderdelen zijn niet meegegaan",
-  // Server settings › Transfer: the whole server to or from a transfer file (`instance-transfer-v1`).
   "mobile.server.settings.transfer": "Overdracht",
   "mobile.server.route.transfer": "Overdracht",
   "mobile.server.route.transferExport": "Exporteren",
@@ -1607,6 +1687,10 @@ export const messages = {
   "mobile.server.transfer.copyNotMoved":
     "Hun kanalen, routineflows, workflows en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
   "mobile.server.transfer.copySubmit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
+  "mobile.server.transfer.copyDuplicatesTitle": "Dubbele agents kopiëren?",
+  "mobile.server.transfer.copyDuplicatesBody":
+    "{server} heeft al agents met deze namen: {names}. De kopie voegt voor elk een tweede agent toe. Elke kopie is een aparte agent met eigen chats, bestanden en herinneringen.",
+  "mobile.server.transfer.copyDuplicatesConfirm": "Dubbele kopiëren",
   "mobile.server.transfer.copying": "Kopiëren…",
   "mobile.server.transfer.copyFailed": "Het kopiëren is niet voltooid.",
   "mobile.server.transfer.copied": {
@@ -1617,4 +1701,42 @@ export const messages = {
   "mobile.server.transfer.copyNext": "Gekopieerde agents gebruiken de goedkeuringsregels van {server}.",
   "mobile.server.transfer.copyNoServer":
     "Maak verbinding met een andere server als eigenaar of beheerder om er agents naar te kopiëren.",
+  "mobile.server.route.ownerTransfer": "Eigendom overdragen",
+  "mobile.server.ownerTransfer.unavailable":
+    "Maak als eigenaar verbinding met deze server om het eigendom over te dragen.",
+  "mobile.server.ownerTransfer.hosted": "OpenBot host deze server, dus de eigenaar kan niet veranderen.",
+  "mobile.server.ownerTransfer.lede":
+    "De nieuwe eigenaar krijgt een e-mail en moet accepteren terwijl die met dat e-mailadres is ingelogd. Daarna word je van deze server verwijderd.",
+  "mobile.server.ownerTransfer.email": "E-mail van de nieuwe eigenaar",
+  "mobile.server.ownerTransfer.send": "Versturen",
+  "mobile.server.ownerTransfer.sending": "Versturen…",
+  "mobile.server.ownerTransfer.stays":
+    "Agents, chats, routines, aanmeldingen bij aanbieders, opgeslagen sleutels, Vault-logins, browseraanmeldingen en gekoppelde apps blijven op de server. De nieuwe eigenaar kan ze gebruiken.",
+  "mobile.server.ownerTransfer.expiry": "Het verzoek verloopt na 7 dagen.",
+  "mobile.server.ownerTransfer.confirmTitle": "{email} eigenaar maken?",
+  "mobile.server.ownerTransfer.confirmBody":
+    "Als {email} accepteert, wordt die eigenaar van {server} en verlies je de toegang. De gegevens blijven op de server. Het verzoek verloopt na 7 dagen.",
+  "mobile.server.ownerTransfer.confirm": "Overdragen",
+  "mobile.server.ownerTransfer.sendFailed": "Het verzoek is niet verstuurd.",
+  "mobile.server.ownerTransfer.loadFailed": "Kan de openstaande overdracht niet lezen.",
+  "mobile.server.ownerTransfer.pending": "Wacht op de nieuwe eigenaar",
+  "mobile.server.ownerTransfer.expires": "Verloopt op {date}",
+  "mobile.server.ownerTransfer.pendingNote":
+    "{email} moet accepteren terwijl die met dit e-mailadres is ingelogd. Tot dan blijf jij de eigenaar.",
+  "mobile.server.ownerTransfer.cancel": "Annuleren",
+  "mobile.server.ownerTransfer.cancelTitle": "Overdracht annuleren?",
+  "mobile.server.ownerTransfer.cancelBody": "{email} kan het dan niet meer accepteren.",
+  "mobile.server.ownerTransfer.keep": "Behouden",
+  "mobile.server.ownerTransfer.cancelFailed": "De overdracht is niet geannuleerd.",
+  "mobile.server.ownerTransfer.incomingTitle": "Eigenaar van {server} worden?",
+  "mobile.server.ownerTransfer.incomingBody":
+    "{name} wil jou eigenaar van {server} maken. Je krijgt volledige controle over de server, en de agents, chats, routines en opgeslagen aanmeldingen blijven erop. {name} verliest de toegang. Iedereen die nog kan inloggen op de computer waarop de server draait, kan je OpenBot-account gebruiken. Wijzig de wachtwoorden en SSH-sleutels ervan.",
+  "mobile.server.ownerTransfer.accept": "Accepteren",
+  "mobile.server.ownerTransfer.decline": "Weigeren",
+  "mobile.server.ownerTransfer.accepted": "Je bent nu eigenaar van {server}.",
+  "mobile.server.ownerTransfer.acceptFailed": "Kan de overdracht niet accepteren",
+  "mobile.server.ownerTransfer.declineFailed": "Kan de overdracht niet weigeren",
+  "mobile.server.ownerTransfer.tryAgain": "Probeer het later opnieuw.",
+  "mobile.server.providers.updateAll": "Alles updaten",
+  "mobile.server.providers.updateAllFailed": "Sommige updates zijn niet gestart. Probeer het opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

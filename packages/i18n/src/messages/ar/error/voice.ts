@@ -11,6 +11,9 @@ export const messages = {
   "error.voice.transcriptionTimedOut": "انتهت مهلة التفريغ الصوتي.",
   "error.voice.prepareRequired": "التفريغ الصوتي المحلي غير متاح. شغّل `bun run voice:prepare` وأعد تشغيل OpenBot.",
   "error.voice.transcriptionFailed": "تعذّر على OpenBot تفريغ هذا التسجيل.",
+  "error.voice.videoModelMissing": "لم يتم إعداد نموذج للتعرّف على الكلام في التسجيلات في الإعدادات → الصوت.",
+  "error.voice.videoModelMissingServer":
+    "لم يتم إعداد نموذج للتعرّف على الكلام على هذا الخادم. يمكن للمالك أو المسؤول إعداد نموذج في إعدادات الخادم، في قسم التعرّف على الكلام.",
   "error.voice.cloud.keyRequired": "أضف مفتاح {provider} API في الإعدادات → الصوت.",
   "error.voice.cloud.keyRejected": "لم يقبل {provider} مفتاح API. تحقّق من المفتاح في الإعدادات → الصوت.",
   "error.voice.cloud.quotaExceeded": "استُنفدت حصتك في {provider}.",
@@ -23,13 +26,18 @@ export const messages = {
   "error.voice.speech.modelRequired": "نزّل نموذج النطق في الإعدادات → الصوت.",
   "error.voice.speech.timedOut": "انتهت مهلة قراءة الرد بصوت عالٍ.",
   "error.voice.speech.failed": "تعذّر على OpenBot قراءة الرد بصوت عالٍ.",
+  "error.voice.speech.providerRefused": "رفضت {provider} إنشاء الصوت: {reason}",
   "error.voice.recordingNotKept": "تعذّر على OpenBot الاحتفاظ بالتسجيل الصوتي.",
   "error.voice.live.timedOut": "لم يبدأ صوت Codex المباشر في الوقت المحدد. حاول مرة أخرى.",
   "error.voice.live.failed": "توقف الصوت المباشر: {reason}",
   "error.voice.live.disconnected": "انقطع اتصال الصوت المباشر.",
+  "error.voice.live.startFailed":
+    "تعذّر بدء الصوت المباشر. حدّث Codex وسجّل الدخول باستخدام ChatGPT على الكمبيوتر الذي يشغّل الوكيل، ثم حاول مرة أخرى. السبب: {reason}",
   "error.voice.live.hostFailed":
     "لم يتمكن Codex على الخادم من بدء الصوت المباشر. اطلب من مالكه تحديث Codex على ذلك الكمبيوتر وتسجيل الدخول باستخدام ChatGPT، ثم حاول مرة أخرى.",
   "error.voice.live.signIn": "سجّل الدخول إلى Codex بحساب ChatGPT لاستخدام الصوت المباشر.",
+  "error.voice.live.chooseAccount":
+    "لا يمكن لحساب ChatGPT هذا استخدام الصوت المباشر. في الإعدادات ← الصوت، اختر حسابًا تتضمن خطته الصوت.",
   "error.voice.live.unavailable": "تعذّر على OpenAI بدء الصوت المباشر. المشكلة من جهة OpenAI. حاول مرة أخرى لاحقًا.",
   "error.voice.live.refused":
     "رفضت OpenAI بدء الصوت المباشر. حاول مرة أخرى لاحقًا، أو أوقف الصوت المباشر من الإعدادات للتحدث بالصوت.",
@@ -39,4 +47,6 @@ export const messages = {
   "error.voice.server.invalidAnswer": "لم يرسل {host} ردًا متوافقًا مع OpenAI.",
   "error.voice.server.invalidAudio": "أرسل {host} صوتًا لا يمكن لـ OpenBot تشغيله. استخدم خادمًا يرسل WAV.",
   "error.voice.server.tooLarge": "الرد من {host} كبير جدًا.",
+  "error.voice.server.modelUnsupported":
+    "لا يستطيع {host} التفريغ النصي باستخدام {model}. في الإعدادات ← الصوت، اختر نموذج إملاء آخر لخادم الصوت.",
 } as const satisfies PartialTranslation<typeof source>;

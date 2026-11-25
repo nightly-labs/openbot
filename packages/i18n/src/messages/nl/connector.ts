@@ -351,7 +351,7 @@ export const messages = {
   "connector.whatsapp.linkNumber": "Koppel een nummer",
   "connector.whatsapp.ownNumberNote": "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot.",
   "connector.whatsapp.dedicatedNote":
-    "De mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
+    "Je chat “Bericht aan jezelf” en de mensen die je toestaat bereiken OpenBot. Anderen krijgen een code om aan jou te geven.",
   "connector.whatsapp.helpLoggedOut":
     "WhatsApp heeft deze computer uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "connector.whatsapp.helpLoggedOutHost":
@@ -377,7 +377,7 @@ export const messages = {
     "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
   "connector.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "connector.whatsapp.workingMessageDescription":
-    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Zet dit uit om alleen het antwoord te sturen.",
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Bij een persoonlijk nummer krijgt alleen je chat “Bericht aan jezelf” deze berichten. Zet dit uit om alleen het antwoord te sturen.",
   "connector.whatsapp.statusReactions": "Statusreacties",
   "connector.whatsapp.statusReactionsDescription":
     "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
@@ -457,6 +457,9 @@ export const messages = {
   "connector.whatsapp.sendersLimit": "Een nummer kan maximaal {count} contacten en groepen toestaan.",
   "connector.whatsapp.senderGroup": "Groep",
   "connector.whatsapp.removeSender": "Verwijderen",
+  "connector.whatsapp.senderAccess": "Toegang voor {name}",
+  "connector.whatsapp.senderReplies": "Kan taken geven",
+  "connector.whatsapp.senderReadOnly": "Alleen lezen",
   "connector.whatsapp.addContact": "Contact toevoegen",
   "connector.whatsapp.addGroup": "Groep toevoegen",
   "connector.whatsapp.contactTitle": "Voeg een contact toe",
@@ -620,9 +623,9 @@ export const messages = {
   "connector.protonPass.expiredDescription":
     "Agents kunnen niet inloggen met je gedeelde logins tot je opnieuw aanmeldt.",
   "connector.protonPass.reconnect": "Opnieuw verbinden",
-  "connector.protonPass.planTitle": "Proton Pass vraagt een betaald abonnement",
+  "connector.protonPass.planTitle": "Proton Pass heeft een abonnement met Pass Plus nodig",
   "connector.protonPass.planDescription":
-    "De Proton Pass CLI werkt alleen met een betaald Proton-abonnement. Wijzig je abonnement en verbind opnieuw.",
+    "De Proton Pass CLI heeft een Proton-abonnement nodig waarin Pass Plus zit. Andere betaalde abonnementen, zoals Mail Plus, bevatten hem niet. Wijzig je abonnement en verbind opnieuw.",
   "connector.protonPass.vaultTitle": "Gedeelde kluis",
   "connector.protonPass.vaultDescription":
     "Agents kunnen inloggen met de logins in deze kluis. Verplaats een login erheen om hem te delen.",

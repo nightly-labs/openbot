@@ -1,17 +1,11 @@
-// Run: bun scripts/skill-install-local-changes-e2e.ts
-// Report: .openbot-build/skill-install-local-changes-e2e.json; exit 0 = all pass.
-// Drives the real local skill library and skill service in a temporary workspace (#7072).
-// A copy with no unsaved edits installs the next revision: a Finder `.DS_Store`, the text before a
-// save put quotes in the frontmatter, or the files of a newer saved revision than the lock.
-// A copy with an edit that no revision has still refuses, and the user's replace still installs.
-
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { AgentSummary } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Result } from "effect";
+import { zipSync } from "fflate";
 import { CentralAuthManager } from "../src/main/central-auth-manager";
 import { LocalSkillLibrary } from "../src/main/local-skill-library";
 import { localSkillTools } from "../src/main/local-skill-tools";
@@ -33,7 +27,6 @@ function skillMarkdown(description: string, body: string): string {
   return `---\nname: Demo Skill\ndescription: ${description}\n---\n\n${body}\n`;
 }
 
-/** The message of a failed Effect, or null when it succeeded. */
 async function failure<A, E extends { cause: unknown }>(effect: Effect.Effect<A, E>): Promise<string | null> {
   const result = await Effect.runPromise(Effect.result(effect));
   if (Result.isSuccess(result)) return null;
@@ -82,7 +75,6 @@ async function scenario(name: string, run: (context: Context) => Promise<Record<
     };
     const agents = () => [agent];
     const library = new LocalSkillLibrary(join(root, "library"), agents);
-    // A local skill never reaches the account service, so this one has no session.
     const auth = new CentralAuthManager({
       apiUrl: "https://example.invalid",
       storagePath: join(root, "auth.json"),
@@ -186,6 +178,116 @@ await scenario("G Copies at the new revision and at another saved revision insta
   const after = await installedState(context);
   assert.equal(after, "installed@3");
   return { revise, after };
+});
+
+async function writePythonCaches(directory: string, bytecode: string): Promise<void> {
+  await mkdir(join(directory, "__pycache__"), { recursive: true });
+  await writeFile(join(directory, "__pycache__/helper.cpython-312.pyc"), bytecode);
+  await mkdir(join(directory, ".pytest_cache/v/cache"), { recursive: true });
+  await writeFile(join(directory, ".pytest_cache/v/cache/lastfailed"), "{}\n");
+}
+
+await scenario("H Python cache folders are not a local change, and a save leaves them out", async (context) => {
+  for (const folder of [".agents/skills", ".claude/skills"])
+    await writePythonCaches(join(context.workspace, folder, context.slug), "bytecode");
+  const before = await installedState(context);
+  assert.equal(before, "installed@1");
+  await writePythonCaches(join(context.workspace, "source"), "bytecode");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const revise = await reviseFrom(context, 1, "source");
+  assert.equal(revise, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@2");
+  const files = (await Effect.runPromise(context.library.get(context.skillId))).files.join(",");
+  assert.equal(files, "SKILL.md");
+  return { before, revise, after, files };
+});
+
+await scenario("I Python cache files that an older save kept do not block the next revision", async (context) => {
+  const encoder = new TextEncoder();
+  const older = zipSync({
+    "SKILL.md": encoder.encode(skillMarkdown("First.", "Revision 2.")),
+    "__pycache__/helper.cpython-312.pyc": encoder.encode("bytecode"),
+  });
+  await Effect.runPromise(context.library.reviseFromBundle(context.skillId, 1, older));
+  const install = await failure(context.tools.install({ agentId: AGENT_ID, skillId: context.skillId, revision: 2 }));
+  assert.equal(install, null);
+  await writeCopies(context, "__pycache__/helper.cpython-312.pyc", "bytecode that Python wrote again");
+  const before = await installedState(context);
+  assert.equal(before, "installed@2");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 3."));
+  const revise = await reviseFrom(context, 2, "source");
+  assert.equal(revise, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@3");
+  return { install, before, revise, after };
+});
+
+await scenario("J An edit next to Python cache folders still refuses", async (context) => {
+  for (const folder of [".agents/skills", ".claude/skills"])
+    await writePythonCaches(join(context.workspace, folder, context.slug), "bytecode");
+  await writeCopies(context, "notes.md", "An edit that is not saved.\n");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const revise = await reviseFrom(context, 1, "source");
+  assert.ok(revise?.includes(REFUSED), "The edit stops the install.");
+  return { revise };
+});
+
+await scenario("K An empty runtime folder in an installed copy is not a local change", async (context) => {
+  for (const folder of [".agents/skills", ".claude/skills"])
+    await mkdir(join(context.workspace, folder, context.slug, ".claude/.cc-writes"), { recursive: true });
+  const before = await installedState(context);
+  assert.equal(before, "installed@1");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const revise = await reviseFrom(context, 1, "source");
+  assert.equal(revise, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@2");
+  return { before, revise, after };
+});
+
+await scenario("L A file inside a runtime folder still refuses", async (context) => {
+  const folder = join(context.workspace, ".agents/skills", context.slug, ".claude/.cc-writes");
+  await mkdir(folder, { recursive: true });
+  await writeFile(join(folder, "notes.md"), "An edit that is not saved.\n");
+  const before = await installedState(context);
+  assert.equal(before, "modified@1");
+  await writeFile(join(context.workspace, "source/SKILL.md"), skillMarkdown("First.", "Revision 2."));
+  const revise = await reviseFrom(context, 1, "source");
+  assert.ok(revise?.includes(REFUSED), "The file stops the install.");
+  return { before, revise };
+});
+
+async function replaceWithOwnCopy(context: Context, text: string): Promise<string> {
+  await Effect.runPromise(context.service.uninstall({ agentId: AGENT_ID, skillId: context.skillId }));
+  const ownFile = join(context.workspace, ".claude/skills", context.slug, "SKILL.md");
+  await mkdir(dirname(ownFile), { recursive: true });
+  await writeFile(ownFile, text);
+  return ownFile;
+}
+
+await scenario("M An own copy with the same files as the skill installs over it", async (context) => {
+  const installedText = await readFile(join(context.workspace, ".claude/skills", context.slug, "SKILL.md"), "utf8");
+  await replaceWithOwnCopy(context, installedText);
+  const install = await failure(
+    context.service.install({ agentId: AGENT_ID, skillId: context.skillId, replaceModified: false }),
+  );
+  assert.equal(install, null);
+  const after = await installedState(context);
+  assert.equal(after, "installed@1");
+  return { install, after };
+});
+
+await scenario("N An own skill with the same name and other files stays and names the skill", async (context) => {
+  const ownText = skillMarkdown("First.", "The agent's own skill.");
+  const ownFile = await replaceWithOwnCopy(context, ownText);
+  const install = await failure(
+    context.service.install({ agentId: AGENT_ID, skillId: context.skillId, replaceModified: false }),
+  );
+  assert.equal(install, sourceText("error.skill.ownSkillExists", { slug: context.slug }));
+  const kept = await readFile(ownFile, "utf8");
+  assert.equal(kept, ownText);
+  return { install, kept: kept === ownText ? "unchanged" : "changed" };
 });
 
 await mkdir(".openbot-build", { recursive: true });

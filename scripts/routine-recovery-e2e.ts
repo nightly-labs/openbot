@@ -1,9 +1,3 @@
-// Saves and reads a routine's missed-run and usage-limit policies on a joined server through
-// `routine-recovery-v1`, from the window of a running dev client. Start the two-client harness with
-// `bun run dev:test-client`; the test client joins this worktree's app as an owner. The script makes
-// one inactive routine on the host's first agent, changes one policy at a time, reads the run history,
-// and deletes the routine. Writes .openbot-build/routine-recovery-e2e/report.json. Needs
-// `--allow-mutations`: `bun scripts/routine-recovery-e2e.ts --allow-mutations`.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -15,7 +9,6 @@ import type { Page } from "playwright-core";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -55,7 +48,6 @@ function save(page: Page, input: SaveEventRoutineInput, serverId: string): Promi
   ] as const);
 }
 
-/** The error message of a call that must fail, or `null` when it succeeded. */
 function refusal(page: Page, routineId: string, owner: SaveEventRoutineInput["owner"], serverId: string) {
   return page.evaluate(
     async ([id, routineOwner, server]) => {
@@ -95,7 +87,6 @@ try {
     owner,
     name: `Recovery E2E ${Date.now()}`,
     instruction: "Reply with the word done.",
-    // Inactive: the routine never runs while the script works.
     active: false,
     timezone: "UTC",
     trigger: { kind: "schedule", schedule: { kind: "hourly", minute: 0 } },

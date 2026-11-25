@@ -1,4 +1,4 @@
-import { agentProviderCliName, isAgentProvider } from "@openbot/contracts/ipc";
+import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
 import {
   type HeatLevel,
   heatLevel,
@@ -24,19 +24,15 @@ const CELL = 11;
 const GAP = 3;
 const STEP = CELL + GAP;
 const AVATAR_SIZE = 32;
-/** The opacity of each heatmap level; level 0 is the border colour, the others the accent. */
 const LEVEL_ALPHA = [1, 0.32, 0.55, 0.78, 1] as const;
 const EASING = cubicBezier(0.23, 1, 0.32, 1);
 const CELL_MS = 320;
 const SECTION_EASING = Easing.bezier(0.23, 1, 0.32, 1);
 const SECTION_IN = FadeIn.duration(220).easing(SECTION_EASING);
 const SECTION_OUT = FadeOut.duration(160).easing(SECTION_EASING);
-/** The value of a tile or a row before the report arrives. */
 const NO_VALUE = "–";
-/** Keeps the line of a tile detail while the report loads, so the tile does not grow when it arrives. */
 const BLANK_LINE = "\u00a0";
 
-/** The days of the range with no activity: the grid that shows while the report loads. */
 function emptyDays(range: { startDate: string; endDate: string }): ProfileDay[] {
   const days: ProfileDay[] = [];
   const end = Date.parse(`${range.endDate}T00:00:00Z`);
@@ -50,7 +46,6 @@ function emptyDays(range: { startDate: string; endDate: string }): ProfileDay[] 
   return days;
 }
 
-/** A report with no activity. The screen keeps its layout and the real values move into it. */
 function placeholderStats(range: { startDate: string; endDate: string }): ProfileStats<MobileAgent> {
   return {
     days: emptyDays(range),
@@ -70,9 +65,8 @@ function placeholderStats(range: { startDate: string; endDate: string }): Profil
   };
 }
 
-const providerName = (value: string) => (isAgentProvider(value) ? agentProviderCliName(value) : value);
+const providerName = (value: string) => (isAgentProvider(value) ? agentProviderName(value) : value);
 
-/** A day of the report as the user reads it: the date is in the report's zone, not in UTC. */
 function reportDate(date: string): number {
   return Date.parse(`${date}T00:00:00Z`);
 }
@@ -93,12 +87,10 @@ function useProfileDates() {
             start: start.slice(0, 4) === end.slice(0, 4) ? short(start) : long(start),
             end: long(end),
           }),
-    // 1 January 2023 is a Sunday, so the date of each weekday is that day plus its number.
     weekday: (weekday: number) => format.date(Date.UTC(2023, 0, 1 + weekday), { weekday: "long", timeZone: "UTC" }),
   };
 }
 
-/** A day of the grid. When the report arrives, the day fades to its level. */
 function HeatCell({ level, color, empty }: { level: HeatLevel; color: string; empty: string }) {
   const reducedMotion = useReducedMotion();
   return (
@@ -117,10 +109,6 @@ function HeatCell({ level, color, empty }: { level: HeatLevel; color: string; em
   );
 }
 
-/**
- * A year of days: one column for each week, Sunday at the top. The grid scrolls sideways and opens
- * on the current week. A tap on a day shows its date and tokens under the grid.
- */
 function ProfileHeatmap({
   days,
   label,
@@ -142,7 +130,6 @@ function ProfileHeatmap({
     const weeks = heatmapWeeks(days);
     const max = Math.max(0, ...days.map((day) => day.tokens));
     return {
-      // A week keeps the date of its first day as its key, and an empty slot its place after that date.
       columns: weeks.map((week) => {
         const first = week.find((day) => day !== null)?.date ?? "";
         return {
@@ -302,12 +289,6 @@ function ProfileTiles({ stats, loading }: { stats: ProfileStats<MobileAgent>; lo
   );
 }
 
-/**
- * The year of the user's work on the paired desktop, under the profile header, as the desktop
- * Profile tab shows it: five tiles, the year of days, the insights, the teammates and the models.
- * While the report loads, the same layout shows with no values, and the values then move into it.
- * Nothing shows without a paired desktop or when its host has no analytics.
- */
 export function ProfileActivity({ activity }: { activity: ProfileActivityState }) {
   const { t, format } = useText();
   const dates = useProfileDates();
@@ -365,7 +346,6 @@ export function ProfileActivity({ activity }: { activity: ProfileActivityState }
   const sectionOut = reducedMotion ? undefined : SECTION_OUT;
 
   return (
-    // A section that shows with the screen does not fade in; one that the report adds later does.
     <LayoutAnimationConfig skipEntering>
       <UsageLoading loading={loading}>
         <View className="gap-7">

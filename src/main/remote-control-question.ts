@@ -4,13 +4,6 @@ import { type BrowserWindow, dialog, Notification } from "electron";
 import { showRetainedNotification } from "./desktop-notifications";
 import { RemoteWorkflowError } from "./remote-service-effects";
 
-/**
- * Asks the person at this computer whether a member may control it, and answers true for Allow.
- *
- * The question is a sheet of the main window, which is shown first. On macOS a message box with no
- * window runs synchronously: it would stop the main process, and the end of the wait could not close
- * it. Interrupting the Effect closes the question. Enter and Escape choose Deny.
- */
 export function createRemoteControlQuestion(options: {
   translate: AppTranslate;
   ensureMainWindow: () => Promise<BrowserWindow>;
@@ -38,7 +31,6 @@ export function createRemoteControlQuestion(options: {
     });
 }
 
-/** Tells the person at this computer that a member started to control it. */
 export function notifyRemoteControlStarted(translate: AppTranslate, memberName: string): void {
   if (!Notification.isSupported()) return;
   showRetainedNotification(

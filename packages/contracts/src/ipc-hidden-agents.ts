@@ -2,15 +2,8 @@ import { INPUT_LIMITS } from "./input-limits";
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord } from "./runtime-values";
 
-/**
- * An agent the user hid. It keeps its thread, files, memories, settings and sidebar section, and it
- * keeps working: its routines run and it gets messages. A server without `agent-hidden-work` stops
- * it until the user restores it. The state belongs to the server, so every device that shows the
- * server shows the same hidden agents.
- */
 export interface HiddenAgent {
   agentId: string;
-  /** ISO 8601 time of the hide. */
   hiddenAt: string;
 }
 
