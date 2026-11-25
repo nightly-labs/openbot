@@ -1,9 +1,3 @@
-/**
- * The GitHub tables of workflows (migration 49): the events that GitHub triggers received, the queue of
- * events that wait for the open run of their item, the items of GitHub runs, and what the loop guard
- * reads. The runtime calls it under its lock.
- */
-
 import {
   WORKFLOW_GITHUB_DELIVERY_LIMIT,
   WORKFLOW_GITHUB_DELIVERY_OUTCOMES,
@@ -32,7 +26,6 @@ import type { OpenBotDatabase } from "../openbot-database";
 import { workflowTransaction } from "./workflow-transaction";
 
 const OPEN_RUN_STATUSES = ["running", "approval", "stopping"] as const;
-/** Two times offline closer than this are one gap in the history. */
 const OFFLINE_MERGE_MS = 2 * 60_000;
 
 export interface NewGitHubDelivery {
@@ -45,12 +38,10 @@ export interface NewGitHubDelivery {
   outcome: WorkflowGitHubDeliveryOutcome;
   reason: WorkflowGitHubSkipReason | null;
   runId: string | null;
-  /** The run payload of a `waiting` event. */
   payload: string | null;
   causedByBot: boolean;
 }
 
-/** An event that waits for the open run of its item. */
 export interface WaitingGitHubDelivery {
   workflowId: string;
   nodeId: string;
@@ -72,11 +63,9 @@ export interface NewGitHubRun {
 
 const GITHUB_ACTION_STATUSES = ["sending", "done"] as const;
 
-/** One change of a GitHub output. `objectKeys` are the `githubObjectKey`s of what it changes. */
 export interface NewGitHubAction {
   actionKey: string;
   workflowId: string;
-  /** Null for a step that runs alone. */
   runId: string | null;
   stepId: string;
   repository: string;
@@ -87,7 +76,6 @@ export interface NewGitHubAction {
 
 export interface GitHubActionRecord {
   stepId: string;
-  /** The item, or the issue that `issue.create` made. */
   number: number | null;
   status: (typeof GITHUB_ACTION_STATUSES)[number];
   objectKeys: string[];
@@ -112,7 +100,6 @@ export class WorkflowGitHubStore {
     );
   }
 
-  /** Records one event and drops the oldest of the trigger past the limit. A waiting event stays. */
   addDelivery(delivery: NewGitHubDelivery): void {
     workflowTransaction(this.#database, () => {
       const db = this.#database.connection;
@@ -142,10 +129,6 @@ export class WorkflowGitHubStore {
     });
   }
 
-  /**
-   * Records a time when the GitHub route was lost for each trigger. A gap that begins soon after the
-   * newest gap of a trigger ends extends that one, so a host that reconnects often shows one gap.
-   */
   addOffline(
     triggers: readonly { workflowId: string; nodeId: string; event: WorkflowGitHubEvent }[],
     from: Date,
@@ -172,7 +155,6 @@ export class WorkflowGitHubStore {
           ).run(to.toISOString(), trigger.workflowId, trigger.nodeId, requiredStringColumn(newest, "delivery_id"));
           continue;
         }
-        // The ID keeps when the gap began; the time is when it ended, so the gap sorts after the events before it.
         this.addDelivery({
           workflowId: trigger.workflowId,
           nodeId: trigger.nodeId,
@@ -190,15 +172,10 @@ export class WorkflowGitHubStore {
     });
   }
 
-  /**
-   * Whether an event of the item must wait: a GitHub run of the workflow for the item is open, or an
-   * older event of the item waits already.
-   */
   itemBusy(workflowId: string, item: Pick<WorkflowGitHubItem, "repository" | "number">): boolean {
     return this.runOpen(workflowId, item) || this.nextWaiting(workflowId, item) !== null;
   }
 
-  /** Whether a GitHub run of the workflow for the item is open. */
   runOpen(workflowId: string, item: Pick<WorkflowGitHubItem, "repository" | "number">): boolean {
     return (
       databaseRow(
@@ -234,7 +211,6 @@ export class WorkflowGitHubStore {
       );
   }
 
-  /** The runs that OpenBot's bot caused on the item since `since`, in every workflow. */
   botRunsSince(item: Pick<WorkflowGitHubItem, "repository" | "number">, since: Date): number {
     return requiredNumberColumn(
       databaseRow(
@@ -249,11 +225,6 @@ export class WorkflowGitHubStore {
     );
   }
 
-  /**
-   * Whether a GitHub output of the workflow made the change that the event reports: its key matches
-   * one that the output kept since `since`, or an output of the workflow on the item is on its way and
-   * has no key yet. The caller asks only for events that OpenBot's bot caused.
-   */
   selfCaused(
     workflowId: string,
     item: Pick<WorkflowGitHubItem, "repository" | "number">,
@@ -271,7 +242,6 @@ export class WorkflowGitHubStore {
     );
     if (sending) return true;
     if (!objectKey) return false;
-    // `object_id` is one key a line. A new issue is an action without an item number; its key names the issue.
     return (
       databaseRow(
         db
@@ -285,7 +255,6 @@ export class WorkflowGitHubStore {
     );
   }
 
-  /** The item of a run that a GitHub event, or the newest item of a trigger, started. */
   runItem(runId: string): WorkflowGitHubItem | null {
     const row = databaseRow(
       this.#database.connection
@@ -295,7 +264,6 @@ export class WorkflowGitHubStore {
     return row ? toItem(row) : null;
   }
 
-  /** The change that a GitHub output keeps under `actionKey`, or null when it made none. */
   action(actionKey: string): GitHubActionRecord | null {
     const row = databaseRow(
       this.#database.connection
@@ -311,10 +279,6 @@ export class WorkflowGitHubStore {
     };
   }
 
-  /**
-   * Writes `sending` before the call to GitHub, with the keys that the change is known to make. A step
-   * that runs again takes the row over.
-   */
   startAction(action: NewGitHubAction, at: Date): void {
     this.#database.connection
       .prepare(
@@ -338,7 +302,6 @@ export class WorkflowGitHubStore {
       );
   }
 
-  /** The change is on GitHub. A new issue gives its number and key only now. */
   finishAction(actionKey: string, number: number | null, objectKeys: readonly string[], at: Date): void {
     this.#database.connection
       .prepare(
@@ -348,12 +311,10 @@ export class WorkflowGitHubStore {
       .run(number, objectIdOf(objectKeys), at.toISOString(), actionKey);
   }
 
-  /** The change failed or stopped: no event of it can come, so the loop guard must not wait for one. */
   dropAction(actionKey: string): void {
     this.#database.connection.prepare("DELETE FROM workflow_github_actions WHERE action_key = ?").run(actionKey);
   }
 
-  /** The oldest event of the item that waits, of any trigger of the workflow. */
   nextWaiting(
     workflowId: string,
     item: Pick<WorkflowGitHubItem, "repository" | "number">,
@@ -368,7 +329,6 @@ export class WorkflowGitHubStore {
     return row ? toWaiting(row) : null;
   }
 
-  /** The oldest waiting event of each item of the workflow. */
   waiting(workflowId: string): WaitingGitHubDelivery[] {
     const seen = new Set<string>();
     return databaseRows(
@@ -383,7 +343,6 @@ export class WorkflowGitHubStore {
       });
   }
 
-  /** The workflows that have an event that waits. */
   waitingWorkflows(): string[] {
     return databaseRows(
       this.#database.connection
@@ -392,7 +351,6 @@ export class WorkflowGitHubStore {
     ).map((row) => requiredStringColumn(row, "workflow_id"));
   }
 
-  /** Ends the wait of an event: it started a run, or it is skipped. */
   endWaiting(
     delivery: Pick<WaitingGitHubDelivery, "workflowId" | "nodeId" | "deliveryId">,
     end: { runId: string } | { reason: WorkflowGitHubSkipReason },
@@ -414,7 +372,6 @@ export class WorkflowGitHubStore {
     this.#prune(delivery.workflowId, delivery.nodeId);
   }
 
-  /** The newest events of the workflow's GitHub triggers, newest first, and the items of their open and listed runs. */
   history(workflowId: string): WorkflowGitHubHistory {
     const db = this.#database.connection;
     const deliveries = databaseRows(
@@ -440,7 +397,6 @@ export class WorkflowGitHubStore {
     return { deliveries, runs };
   }
 
-  /** Drops the oldest events of the trigger past the limit. Waiting events stay until they start. */
   #prune(workflowId: string, nodeId: string): void {
     this.#database.connection
       .prepare(

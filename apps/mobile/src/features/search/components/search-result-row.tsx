@@ -44,11 +44,9 @@ import { typeScale } from "@/shared/lib/type-scale";
 
 const AVATAR_SIZE = 44;
 
-/** Shows the runs of `text` that match the query in the primary color, as the desktop search does. */
 function Highlighted({ text, query }: { text: string; query: string }) {
   let start = 0;
   return mobileSearchMatchParts(text, query).map((part) => {
-    // The offset of a part in the text names it.
     const key = start;
     start += part.text.length;
     return part.match ? (
@@ -110,7 +108,6 @@ function SearchRow({
   );
 }
 
-/** An icon in the place of an avatar, so the text of every row starts at the same line. */
 function RowIcon({ icon: Icon }: { icon: LucideIcon }) {
   const muted = useThemeColor("muted");
   return (
@@ -155,7 +152,6 @@ const SETTING_ICON = {
   serverUsage: ChartArea,
 } as const satisfies Record<MobileSearchSettingId, LucideIcon>;
 
-/** Opens a settings page in its sheet. The sheet stack puts its first page under it, for the back button. */
 function openSetting(id: MobileSearchSettingId, serverId: string) {
   switch (id) {
     case "profile":
@@ -170,7 +166,6 @@ function openSetting(id: MobileSearchSettingId, serverId: string) {
       return router.push("/settings/language");
     case "haptics":
       return router.push("/settings/haptics");
-    // One page has the notification and the Live Activity settings.
     case "notifications":
     case "liveActivities":
       return router.push("/settings/notifications");
@@ -202,10 +197,6 @@ function fileIcon(file: Extract<MobileSearchResult, { kind: "file" }>["file"]): 
   return file.attachment.previewKind === "pdf" || file.attachment.previewKind === "text" ? FileText : FileIcon;
 }
 
-/**
- * One search result. A press closes the search and opens what the result names: the chat, the
- * channel, the message or the file in its chat, or the routine.
- */
 export function MobileSearchResultRow({
   result,
   query,
@@ -216,21 +207,25 @@ export function MobileSearchResultRow({
   result: MobileSearchResult;
   query: string;
   serverId: string;
-  /** The agents of the server, by ID, for the member avatars of a channel. */
   agents: ReadonlyMap<string, MobileAgent>;
-  /** Runs before a result opens what it names, and closes the search. */
   onLeave: () => void;
 }) {
   const { t, format } = useText();
   const pane = useChatListPane();
-  // In the chat list pane, the chat takes the place of the open one.
   const openChat = (agentId: string, messageId?: string) => {
     onLeave();
     if (pane)
       openChatFromPane(pane, messageId ? undefined : agentId, () =>
-        router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } }),
+        router.push({
+          pathname: "/chat/[agentId]",
+          params: messageId ? { agentId, serverId, messageId } : { agentId, serverId },
+        }),
       );
-    else router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } });
+    else
+      router.push({
+        pathname: "/chat/[agentId]",
+        params: messageId ? { agentId, serverId, messageId } : { agentId, serverId },
+      });
   };
   const snippet = useMemo(
     () => (result.kind === "message" ? mobileSearchSnippet(result.text, query) : ""),
@@ -300,7 +295,6 @@ export function MobileSearchResultRow({
           detail={t("mobile.search.fileDetail", { name: agent.name, size: format.fileSize(file.attachment.size) })}
           trailing={formatUpdatedAt(file.createdAt, format)}
           query={query}
-          // As on desktop, a file opens the message that carries it.
           onPress={() => openChat(agent.id, file.messageId)}
         />
       );

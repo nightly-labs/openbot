@@ -223,7 +223,6 @@ const logAttachment: AttachmentSummary = {
 
 const allChipAttachments = [logAttachment, secondFileTypeAttachment, fourthFileTypeAttachment, longAttachment];
 
-/** One chip of each kind: agent, skill, MCP server, unavailable skill, files, a shared file, a link and a citation. */
 const allChipKindsBody = [
   "Ask @Research to use",
   serializeChatTagReference("skill", "Release notes", "skill-release-notes"),
@@ -258,7 +257,6 @@ export const AllChipKinds: Story = {
   ),
 };
 
-/** The same chips in the reply typography, where they inherit the message font. */
 export const ChipsInReply: Story = {
   name: "Chips in a reply",
   args: allChipKindsArgs,
@@ -271,7 +269,6 @@ export const ChipsInReply: Story = {
   ),
 };
 
-/** A narrow reply. Each chip wraps as one unit; the long file name ends with an ellipsis. */
 export const ChipsInNarrowReply: Story = {
   name: "Chips in a narrow reply",
   args: allChipKindsArgs,

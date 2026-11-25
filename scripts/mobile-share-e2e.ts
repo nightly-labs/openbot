@@ -1,12 +1,3 @@
-// Shares text, a link, an image, a HEIC photo and a PDF to the iOS development build, as the share
-// extension does: the file goes into the App Group, the payload into the App Group defaults, and
-// `simctl openurl` opens `openbot://expo-sharing`. The last case stops the app first (cold start).
-// Each case waits until the app has taken the share: the payload key is gone and the file is in the
-// share folder in the app cache, as a JPEG for the HEIC photo. Writes
-// .openbot-build/mobile-share-e2e/report.json and one screenshot per case.
-//
-// Needs a booted simulator with a development build of this branch, signed in (`bun run dev:mobile`),
-// and `--allow-mutations`: it writes into the app's storage and opens the share sheet. It sends nothing.
 import { execFile } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,12 +8,10 @@ import { bootedSimulatorIds, hasMobileRuntime } from "./dev-mobile";
 
 const BUNDLE_ID = "run.openbot.mobile";
 const APP_GROUP = "group.run.openbot.mobile";
-// The key and the payload shape of expo-sharing (`ios/shared/Constants.swift`, `ShareProtocol.swift`).
 const PAYLOAD_KEY = "expo-sharing";
 const SHARE_LINK = "openbot://expo-sharing";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/mobile-share-e2e");
 const RUNTIME_TIMEOUT_MS = 5 * 60_000;
-// A cold start loads the bundle from Metro and the session before the share sheet reads the share.
 const TAKE_TIMEOUT_MS = 2 * 60_000;
 const POLL_INTERVAL_MS = 500;
 const PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
@@ -44,7 +33,6 @@ interface ShareCase {
   name: string;
   coldStart: boolean;
   text: { type: "text" | "url"; value: string }[];
-  /** The fixture to share, and the name the app must give its copy. */
   file?: { source: string; name: string; type: "image" | "file"; mimeType: string; expected: string };
 }
 
@@ -81,9 +69,7 @@ async function selectSimulator(): Promise<string> {
     try {
       await run("xcrun", ["simctl", "get_app_container", udid, BUNDLE_ID]);
       withApp.push(udid);
-    } catch {
-      // OpenBot is not installed on this simulator.
-    }
+    } catch {}
   }
   const [udid, ...extra] = withApp;
   if (!udid) throw new Error("No booted simulator has OpenBot installed. Run `bun run dev:mobile` first.");
@@ -95,7 +81,6 @@ async function container(udid: string, kind: string): Promise<string> {
   return (await run("xcrun", ["simctl", "get_app_container", udid, BUNDLE_ID, kind])).stdout.trim();
 }
 
-/** Runs `defaults` in the simulator, and tells whether it succeeded. A read of a missing key fails. */
 async function defaults(udid: string, args: string[]): Promise<boolean> {
   try {
     await run("xcrun", ["simctl", "spawn", udid, "defaults", ...args]);
@@ -231,7 +216,6 @@ async function main(): Promise<void> {
         });
       }
       const hex = Buffer.from(JSON.stringify(payloads)).toString("hex");
-      // A read that fails says that the app took the share, so first make sure that a read can succeed.
       if (
         !(await defaults(udid, ["write", domain, PAYLOAD_KEY, "-data", hex])) ||
         !(await defaults(udid, ["read", domain, PAYLOAD_KEY]))

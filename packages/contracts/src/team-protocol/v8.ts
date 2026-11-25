@@ -9,11 +9,6 @@ import {
 } from "./v8-base";
 
 export const TEAM_PROTOCOL_V8 = 8 as const;
-/**
- * A peer that reads a provider id it does not know. The host answers it on protocol 8 and sends every
- * provider; a peer without it stays on protocol 7 or older, which sees only the providers its
- * protocol names.
- */
 export const TEAM_OPEN_PROVIDERS_CAPABILITY = "open-providers-v1";
 export const TEAM_PROTOCOL_V8_CAPABILITIES = [
   ...TEAM_PROTOCOL_V7_CAPABILITIES,

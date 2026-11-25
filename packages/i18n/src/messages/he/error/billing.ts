@@ -30,4 +30,6 @@ export const messages = {
   "error.billing.invalidRequest": "בקשת החיוב אינה תקינה.",
   "error.billing.invalidResponse": "תשובת החיוב אינה תקינה.",
   "error.billing.notStripePage": "דף החיוב אינו דף של Stripe.",
+  "error.billing.customServerOfferMissing": "לשרת הזה אין תוכנית לתשלום.",
+  "error.billing.checkoutUnavailable": "אי אפשר להתחיל את התשלום עכשיו. נסו שוב בעוד דקה.",
 } as const satisfies PartialTranslation<typeof source>;

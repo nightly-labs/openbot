@@ -8,6 +8,7 @@ export const messages = {
   "menu.actualSize": "Tamaño real",
   "menu.zoomIn": "Ampliar",
   "menu.zoomOut": "Reducir",
+  "menu.closeDeveloperTools": "Cerrar herramientas para desarrolladores",
   "menu.copyLink": "Copiar enlace",
   "menu.copyImage": "Copiar imagen",
   "menu.quit": "Salir de OpenBot",

@@ -2,11 +2,6 @@ import type { FilePreview } from "@openbot/contracts/ipc";
 import { strToU8, zipSync } from "fflate";
 import { INLINE_SVG_CHART } from "./chat-visual-fixtures";
 
-/**
- * File previews for the Storybook stories of the file preview panel. The panel takes
- * the bytes that the main process read, so each fixture is written here as text.
- */
-
 const encode = (value: string) => new TextEncoder().encode(value);
 
 const filePreview = (
@@ -53,8 +48,6 @@ Set the provider in \`~/OpenBot/config.json\`:
 3. Open it externally when you need the full application
 `;
 
-// Text keeps its spacing and does not wrap. The long lines show the horizontal
-// scroll, and the indented lines show that the spacing stays as it is in the file.
 const TEXT = `2026-09-13T09:12:04.118Z  info   provider.claude-code   session started  id=sess_8f31c2
 2026-09-13T09:12:04.402Z  debug  ipc.attachments        preview requested  name=RELEASE-NOTES.md kind=markdown bytes=1043
 2026-09-13T09:12:05.907Z  warn   team-api.host          adapter v2 client asked for a v3 field; the response keeps the v2 shape and drops "routines"
@@ -90,9 +83,6 @@ const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width
 </svg>
 `;
 
-// A one-page PDF, written here so the stories need no binary asset. Each offset in
-// the cross-reference table must give the byte position of its object, so the table
-// is built after the objects. All bytes are ASCII: a string index is a byte offset.
 const buildPdf = () => {
   const stream = "BT /F1 18 Tf 24 150 Td (OpenBot file preview) Tj ET";
   const objects = [
@@ -115,12 +105,6 @@ const buildPdf = () => {
   return `${body}xref\n0 ${size}\n0000000000 65535 f \n${entries}trailer\n<< /Size ${size} /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF\n`;
 };
 
-/**
- * A silent MPEG-1 Layer III stream: 40 frames of 417 bytes at 128 kbit/s and 44.1 kHz, which is
- * about one second. Only the four header bytes of each frame carry meaning; the rest stays zero,
- * so the decoder reads silence. A QuickTime container has no equally short honest form, so there
- * is no video fixture: point the panel at a real .mov to check that kind.
- */
 const buildMp3 = (): Uint8Array => {
   const frameBytes = 417;
   const frames = 40;
@@ -150,7 +134,6 @@ const buildXlsx = (): Uint8Array =>
     ),
   });
 
-// Expected row 2: $1,234.50 | USD 1234.50 | Gain 12.5% | 2.50 kg | 1,234.50 | 12.5% | 1234.5 | % 1.00 | 2024-01-01 | 12:00 | -$1,234.50 | Total.
 const buildLiteralPrefixesXlsx = (): Uint8Array =>
   zipSync({
     "[Content_Types].xml": strToU8(
@@ -170,6 +153,21 @@ const buildLiteralPrefixesXlsx = (): Uint8Array =>
     ),
     "xl/worksheets/sheet1.xml": strToU8(
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Dollar prefix</t></is></c><c r="B1" t="inlineStr"><is><t>Spaced prefix</t></is></c><c r="C1" t="inlineStr"><is><t>Prefix and percent</t></is></c><c r="D1" t="inlineStr"><is><t>Suffix</t></is></c><c r="E1" t="inlineStr"><is><t>Number</t></is></c><c r="F1" t="inlineStr"><is><t>Percentage</t></is></c><c r="G1" t="inlineStr"><is><t>Scientific fallback</t></is></c><c r="H1" t="inlineStr"><is><t>Quoted percent prefix</t></is></c><c r="I1" t="inlineStr"><is><t>Date</t></is></c><c r="J1" t="inlineStr"><is><t>Time</t></is></c><c r="K1" t="inlineStr"><is><t>Negative prefix</t></is></c><c r="L1" t="inlineStr"><is><t>Text only</t></is></c></row><row r="2"><c r="A2" s="1"><v>1234.5</v></c><c r="B2" s="2"><v>1234.5</v></c><c r="C2" s="3"><v>0.125</v></c><c r="D2" s="4"><v>2.5</v></c><c r="E2" s="5"><v>1234.5</v></c><c r="F2" s="6"><v>0.125</v></c><c r="G2" s="7"><v>1234.5</v></c><c r="H2" s="8"><v>1</v></c><c r="I2" s="9"><v>45292</v></c><c r="J2" s="10"><v>0.5</v></c><c r="K2" s="1"><v>-1234.5</v></c><c r="L2" s="11"><v>1234.5</v></c></row></sheetData></worksheet>',
+    ),
+  });
+
+const WORD_NAMESPACE = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+
+const buildDocx = (): Uint8Array =>
+  zipSync({
+    "word/document.xml": strToU8(
+      `<?xml version="1.0"?><w:document ${WORD_NAMESPACE}><w:body><w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>Launch review</w:t></w:r></w:p><w:p><w:r><w:t xml:space="preserve">The release is </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>ready</w:t></w:r><w:r><w:t xml:space="preserve"> after the </w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>final checks</w:t></w:r><w:r><w:t>.</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Open items</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Confirm the store listing</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Send the partner email</w:t></w:r></w:p><w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Steps</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr><w:r><w:t>Tag the build</w:t></w:r></w:p><w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr><w:r><w:t>Publish the notes</w:t></w:r></w:p><w:tbl><w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:p><w:r><w:t>Area</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Owner</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>Desktop</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Builder</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:rPr><w:strike/></w:rPr><w:t>Mobile moved to next week</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>`,
+    ),
+    "word/styles.xml": strToU8(
+      `<?xml version="1.0"?><w:styles ${WORD_NAMESPACE}><w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/></w:style><w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/></w:style></w:styles>`,
+    ),
+    "word/numbering.xml": strToU8(
+      `<?xml version="1.0"?><w:numbering ${WORD_NAMESPACE}><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>`,
     ),
   });
 
@@ -218,9 +216,18 @@ export const XLSX_LITERAL_PREFIXES_PREVIEW: FilePreview = {
   bytes: literalPrefixesBytes,
 };
 
+const docxBytes = buildDocx();
+
+export const DOCX_PREVIEW: FilePreview = {
+  name: "launch-review.docx",
+  size: docxBytes.byteLength,
+  mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  previewKind: "document",
+  bytes: docxBytes,
+};
+
 const HTML_PREVIEW = filePreview("weekly-signups.html", "text/html", "text", INLINE_SVG_CHART);
 
-/** A kind that the panel cannot show. The user opens the file externally. */
 export const UNSUPPORTED_PREVIEW: FilePreview = {
   name: "archive.zip",
   size: 68 * 1024,
@@ -229,7 +236,6 @@ export const UNSUPPORTED_PREVIEW: FilePreview = {
   bytes: null,
 };
 
-/** The workspace files that the chat story links to, in the order that the chat names them. */
 export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   MARKDOWN_PREVIEW,
   TEXT_PREVIEW,
@@ -239,10 +245,10 @@ export const WORKSPACE_FILE_PREVIEWS: FilePreview[] = [
   PDF_PREVIEW,
   AUDIO_PREVIEW,
   XLSX_PREVIEW,
+  DOCX_PREVIEW,
   HTML_PREVIEW,
 ];
 
-/** Find the preview for a file path, as the main process does for a file link in a message. */
 export function filePreviewForPath(path: string): FilePreview | null {
   const name = path.replaceAll("\\", "/").split("/").pop();
   return WORKSPACE_FILE_PREVIEWS.find((preview) => preview.name === name) ?? null;

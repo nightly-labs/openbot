@@ -1,66 +1,24 @@
-// The live view of a host browser tab, and the pointer and key input that goes back to it.
-//
-// A still image per request is what the released routes offer, and it is not a browser: the page
-// moves, and a client that asks again gets the page as it was when it asked. This carries the
-// screencast the host already produces, as JPEG frames on a socket, with input on the way back.
-//
-// The frames are binary because they are binary: base64 on the JSON channel costs a third more
-// bytes for every frame and holds the same channel the client's requests use. The socket is opened
-// through the tunnel the remote screen already uses, so nothing new is negotiated on the peer.
-//
-// Coordinates are a fraction of the frame, not pixels. The client draws a frame at whatever size
-// its panel is, and the host's viewport is a third size again; sending pixels means one of the two
-// has to know the other's scale, and the one that guesses wrong clicks somewhere else. A fraction
-// means the same point in both.
-
 import { INPUT_LIMITS } from "../input-limits";
 import { isBoundedString, isIdentifier } from "../ipc-bounded-values";
 import { isDynamicRecord, isNumber, isString } from "../runtime-values";
 
 export const TEAM_BROWSER_VIEW_CAPABILITY = "browser-view";
-/**
- * A host that expands a pointer fraction against the frame the point names, and that forgets a
- * frame once the client says a newer one is on screen. Older hosts reject an unknown input, so a
- * client sends the sequence and the drawn-frame acknowledgement only when the host advertises this.
- */
 export const TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY = "browser-view-frame-point";
-/**
- * A host that pastes the client's text into the page and sends the page's selection back on copy.
- * The clipboard is the user's, on the client: the host never reads or writes its own. Older hosts
- * reject an unknown input, so a client sends `paste`, `copy` and `cut` only when the host advertises
- * this.
- */
 export const TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY = "browser-view-clipboard";
-/** Present on the view socket when this client will acknowledge the frame it has drawn. */
 export const BROWSER_VIEW_FRAME_ACK_QUERY = "frameAck";
 
 export function browserViewClientAcksFrames(url: URL): boolean {
   return url.searchParams.get(BROWSER_VIEW_FRAME_ACK_QUERY) === "1";
 }
 
-/**
- * A host that tells a client which mouse cursor the page shows, as a `cursor` message on the view
- * socket. A frame is a screenshot of the page and has no pointer in it. A client that draws the
- * pointer itself, such as a phone, needs the shape: a hand on a link, a bar in a text field.
- */
 export const TEAM_BROWSER_VIEW_CURSOR_CAPABILITY = "browser-view-cursor";
-/**
- * Present on the view socket when this client draws the cursor the host reports. A host sends no
- * cursor message to a client that did not ask: the desktop and web clients show their own pointer.
- */
 export const BROWSER_VIEW_CURSOR_QUERY = "cursor";
 
 export function browserViewClientWantsCursor(url: URL): boolean {
   return url.searchParams.get(BROWSER_VIEW_CURSOR_QUERY) === "1";
 }
 
-/**
- * A host that holds the page at the size a client asks for while that client's view is open. The
- * page otherwise has the size of the host's browser panel, so a client sees the page change shape
- * each time the host's window changes. A tab an agent gave a size of its own keeps that size.
- */
 export const TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY = "browser-view-viewport";
-/** The page size a client asks for on the view socket, in CSS pixels, as `1280x800`. */
 export const BROWSER_VIEW_VIEWPORT_QUERY = "viewport";
 export const BROWSER_VIEW_VIEWPORT_LIMITS = {
   minWidth: 320,
@@ -78,7 +36,6 @@ export function browserViewViewportQuery(viewport: BrowserViewViewport): string 
   return `${Math.round(viewport.width)}x${Math.round(viewport.height)}`;
 }
 
-/** The page size this client asked for, or null when it asked for none or for a size out of bounds. */
 export function browserViewClientViewport(url: URL): BrowserViewViewport | null {
   const match = /^(\d{3,4})x(\d{3,4})$/u.exec(url.searchParams.get(BROWSER_VIEW_VIEWPORT_QUERY) ?? "");
   if (!match) return null;
@@ -90,40 +47,35 @@ export function browserViewClientViewport(url: URL): BrowserViewViewport | null 
   return { width, height };
 }
 
-/**
- * A host that sends the menu of a right-click to the client that made it, as a `context-menu`
- * message, and does not open its own menu. The host's menu opens on the host's screen, where a
- * member on a phone never sees it. The menu's Select All is the client's Cmd+A or Ctrl+A.
- */
+export const TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY = "browser-view-frame-size";
+export const BROWSER_VIEW_FRAME_SIZE_QUERY = "frame";
+
+export function browserViewFrameSizeQuery(size: BrowserViewViewport): string {
+  const bound = (value: number) => (Number.isFinite(value) ? Math.min(9_999, Math.max(1, Math.round(value))) : 1);
+  return `${bound(size.width)}x${bound(size.height)}`;
+}
+
+export function browserViewClientFrameSize(url: URL): BrowserViewViewport | null {
+  const match = /^([1-9]\d{0,3})x([1-9]\d{0,3})$/u.exec(url.searchParams.get(BROWSER_VIEW_FRAME_SIZE_QUERY) ?? "");
+  if (!match) return null;
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
 export const TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY = "browser-view-context-menu";
-/** Present on the view socket when this client shows the menu of its own right-clicks. */
 export const BROWSER_VIEW_CONTEXT_MENU_QUERY = "menu";
 
 export function browserViewClientWantsContextMenu(url: URL): boolean {
   return url.searchParams.get(BROWSER_VIEW_CONTEXT_MENU_QUERY) === "1";
 }
 
-/**
- * A host that sends a client the text that the page itself copies, such as with a "Copy code"
- * button, as a `pageCopied` message. The page writes the clipboard of the host, which the member
- * cannot reach. The host sends it only to a client that asked, and only shortly after that client's
- * own click or key on the tab.
- */
 export const TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY = "browser-view-page-copy-v1";
-/** Present on the view socket when this client puts the page's own copies on its clipboard. */
 export const BROWSER_VIEW_PAGE_COPY_QUERY = "pageCopy";
 
 export function browserViewClientWantsPageCopy(url: URL): boolean {
   return url.searchParams.get(BROWSER_VIEW_PAGE_COPY_QUERY) === "1";
 }
-/**
- * How long after a member's own click or key a page's copy may go to that member's clipboard. It is
- * the time Chromium lets a page use one user action. The host and the client both check it, so a
- * copy long after the member's last input stays on the host, and a host cannot fill the clipboard.
- */
 export const BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS = 5_000;
 
-/** The items of a page's context menu. A client leaves out an item it does not know. */
 export const BROWSER_VIEW_CONTEXT_MENU_ITEMS = [
   "copy-link",
   "copy-image-address",
@@ -133,13 +85,8 @@ export const BROWSER_VIEW_CONTEXT_MENU_ITEMS = [
   "select-all",
 ] as const;
 export type BrowserViewContextMenuItem = (typeof BROWSER_VIEW_CONTEXT_MENU_ITEMS)[number];
-/** A link or an image address longer than this is not sent, and its copy item is left out. */
 export const BROWSER_VIEW_CONTEXT_MENU_URL_MAX_LENGTH = 2_048;
 
-/**
- * The cursors a host reports, by their CSS names. A host reports a cursor it has no name for here
- * as `default`, and a client draws a name it does not know as `default`.
- */
 export const BROWSER_VIEW_CURSORS = [
   "default",
   "pointer",
@@ -166,19 +113,12 @@ export const BROWSER_VIEW_CURSORS = [
 ] as const;
 export type BrowserViewCursor = (typeof BROWSER_VIEW_CURSORS)[number];
 
-/** The menu of a right-click that a client made, for a client that asked for it. */
 export interface BrowserViewContextMenu {
   items: BrowserViewContextMenuItem[];
-  /** The address of the link under the pointer, for `copy-link`. */
   link?: string;
-  /** The address of the image under the pointer, for `copy-image-address`. */
   image?: string;
 }
 
-/**
- * What a host sends on the view socket as text, beside the binary frames: the answer to a copy, and
- * the cursor, the menus and the page's own copies for a client that asked for them.
- */
 export type BrowserViewHostMessage =
   | BrowserViewCopied
   | { type: "cursor"; cursor: BrowserViewCursor }
@@ -189,11 +129,6 @@ export function encodeBrowserViewHostMessage(message: BrowserViewHostMessage): s
   return JSON.stringify(message);
 }
 
-/**
- * Null for a message that this client does not know: a newer host can send more. An older client
- * that reads only the answer to a copy asks for no cursor, no menu and no page copy, so a host sends
- * it none of them.
- */
 export function decodeBrowserViewHostMessage(value: string): BrowserViewHostMessage | null {
   return decodeHostMessageValue(JSON.parse(value));
 }
@@ -239,20 +174,17 @@ function menuUrl(value: unknown): string | undefined {
   return value;
 }
 
-/** A frame is one JPEG. The cap is generous for a photograph and refuses a stream that is not one. */
 export const BROWSER_VIEW_MAX_FRAME_BYTES = 2 * 1024 * 1024;
-/**
- * The most text one paste or one copy carries. A long article selected whole still fits, and the
- * message stays under the remote stream's 1 MiB text bound even when every character is escaped.
- */
 export const BROWSER_VIEW_MAX_CLIPBOARD_TEXT = 100_000;
 const FRAME_MAGIC = new Uint8Array([0x4f, 0x42, 0x56, 0x31]);
 const FRAME_HEADER_BYTES = FRAME_MAGIC.byteLength + 8;
 
+export function browserViewFrameBytes(frame: { image: Uint8Array }): number {
+  return FRAME_HEADER_BYTES + frame.image.byteLength;
+}
+
 export interface BrowserViewFrame {
-  /** Counts from 1 on the host, so a client can see that it dropped one. */
   sequence: number;
-  /** The frame's own pixels, which is what a fractional coordinate is a fraction of. */
   width: number;
   height: number;
   image: Uint8Array;
@@ -265,7 +197,6 @@ export interface BrowserViewSessionRequest {
 export interface BrowserViewSessionResponse {
   id: string;
   tabId: string;
-  /** Where the frames are. The host builds it, so the client never assembles a path of its own. */
   streamPath: string;
 }
 
@@ -275,11 +206,6 @@ export type BrowserViewInput =
       action: "move" | "down" | "up" | "wheel";
       x: number;
       y: number;
-      /**
-       * The frame the fraction is a fraction of. Sent only to a host that advertises
-       * `browser-view-frame-point`. A client that omits it, including every client from before
-       * this field, gets the newest frame the host sent.
-       */
       sequence?: number;
       button: "left" | "middle" | "right";
       clickCount: number;
@@ -287,31 +213,16 @@ export type BrowserViewInput =
       deltaY: number;
       modifiers: number;
     }
-  /**
-   * A client sends `char` only for a key whose `key` is one character. The host adds the character
-   * of a named key itself, such as the `\r` of Enter, so a client that also sends it types it twice.
-   */
   | { type: "key"; action: "down" | "up" | "char"; key: string; code: string; text: string; modifiers: number }
   | { type: "ack"; sequence: number }
-  /** Text from the client's clipboard, inserted where the page has focus. */
   | { type: "paste"; text: string }
-  /** Asks for the page's selection, which comes back as `copied`. */
   | { type: "copy" }
-  /**
-   * Deletes the selection after a cut, once its text is on the client's clipboard. The host deletes
-   * only when the selection is still `text` and in a field the user can edit.
-   */
   | { type: "cut"; text: string };
 
-/** A click or a key, which gives the page a user action. A move, a scroll or an acknowledgement does not. */
 export function isBrowserViewUserAction(input: BrowserViewInput): boolean {
   return input.type === "key" || (input.type === "pointer" && (input.action === "down" || input.action === "up"));
 }
 
-/**
- * The text message a host sends on the view socket, only in answer to a `copy`: the selection, or
- * word that it is longer than one message carries.
- */
 export type BrowserViewCopied = { type: "copied"; text: string } | { type: "copyTooLarge" };
 
 export function isBrowserViewSessionsRoute(method: string, path: string): boolean {
@@ -322,7 +233,6 @@ export function isBrowserViewSessionRoute(method: string, path: string): boolean
   return method === "DELETE" && /^\/v1\/browser\/view\/sessions\/[^/]+$/u.test(pathname(path));
 }
 
-/** The one path the host's tunnel opens a socket for, and the one the host's router answers. */
 export function browserViewStreamPath(sessionId: string): string {
   if (!isIdentifier(sessionId)) throw new Error("Invalid browser view session ID.");
   return `/v1/browser/view/sessions/${sessionId}/stream`;
@@ -386,12 +296,6 @@ export function encodeBrowserViewInput(input: BrowserViewInput): string {
   return JSON.stringify(input);
 }
 
-/**
- * The input a host of this capability is sent. A host that does not name frames still accepts the
- * released payload, and it expands every point with its newest frame. An acknowledgement, a paste,
- * a copy and a cut are not part of that payload: an older host closes the view on an input it does
- * not know.
- */
 export function browserViewInputForHost(
   input: BrowserViewInput,
   namesFrames: boolean,
@@ -404,18 +308,12 @@ export function browserViewInputForHost(
   return released;
 }
 
-/**
- * The host decodes what a remote member sends. Every field is bounded here rather than where it is
- * dispatched, so a value that reaches CDP has already been read as the small thing it is meant to be.
- */
 export function decodeBrowserViewInput(value: string): BrowserViewInput {
   return decodeBrowserViewInputValue(JSON.parse(value));
 }
 
-/** The same bounds for a value that never was text: what a renderer sends its own main process. */
 export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput {
   if (!isDynamicRecord(message)) throw new Error("Invalid browser view input.");
-  // The client says which frame it has drawn. There is no page event in it.
   if (message.type === "ack") return { type: "ack", sequence: sequenceNumber(message.sequence) };
   if (message.type === "paste" || message.type === "cut") {
     if (!isBoundedString(message.text, BROWSER_VIEW_MAX_CLIPBOARD_TEXT) || message.text.length === 0) {
@@ -457,7 +355,6 @@ export function decodeBrowserViewInputValue(message: unknown): BrowserViewInput 
     if (!isString(message.key) || !isString(message.code) || message.key.length > 32 || message.code.length > 32) {
       throw new Error("Invalid browser view input.");
     }
-    // One keystroke carries one character; a paste is not sent a key at a time.
     if (text.length > 8) throw new Error("Invalid browser view input.");
     return { type: "key", action, key: message.key, code: message.code, text, modifiers };
   }
@@ -468,7 +365,6 @@ export function encodeBrowserViewCopied(message: BrowserViewCopied): string {
   return JSON.stringify(message);
 }
 
-/** The client decodes what the host sends, with the same bound as a paste going the other way. */
 function decodeBrowserViewCopiedValue(message: unknown): BrowserViewCopied {
   if (!isDynamicRecord(message)) throw new Error("Invalid browser view message.");
   if (message.type === "copyTooLarge") return { type: "copyTooLarge" };

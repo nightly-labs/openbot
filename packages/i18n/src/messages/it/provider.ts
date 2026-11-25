@@ -96,6 +96,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Avvio dell'accesso a {name} su {host}…",
   "provider.codeLogin.pageOpening": "Apertura della pagina di accesso di {name} su {host}…",
   "provider.codeLogin.linkStep": "Accedi a {name}. OpenBot continua da solo.",
+  "provider.codeLogin.thisComputerDescription":
+    "Apri questo link in un browser su questo computer. OpenBot attende qui.",
+  "provider.codeLogin.copyLink": "Copia link",
   "provider.codeLogin.chatgptDeviceSetting":
     "In ChatGPT su un computer, apri le impostazioni di sicurezza e attiva l’accesso con codice dispositivo per Codex. Per un account di lavoro, lo attiva l’amministratore del workspace.",
   "provider.useApp.title": "Connetti {name} nell'app OpenBot",
@@ -117,11 +120,14 @@ export const messages = {
   "provider.picker.download": "Download di {name}",
   "provider.picker.search": "Cerca modelli",
   "provider.picker.noMatches": "Nessun modello corrisponde alla ricerca.",
+  "provider.picker.openrouterNoMatches":
+    "Nessun modello corrisponde alla ricerca. Le tue impostazioni di privacy, provider e guardrail su openrouter.ai possono nascondere modelli da questo elenco.",
   "provider.picker.workspaceOnlyUnavailable":
     "Questi modelli non funzionano con «Solo workspace» su Windows e Linux. Per usarli, cambia «Permessi» nelle impostazioni dell'agente.",
   "provider.picker.olderModels": "Modelli precedenti",
   "provider.picker.olderModelsList": "Modelli {name} precedenti",
-  "provider.picker.noModels": "{name} non ha modelli disponibili.",
+  "provider.picker.noModels":
+    "Qui non compare nessun modello di {name}. Se sono disattivati, un amministratore può attivarli in Impostazioni server > Provider > {name} > Modelli.",
   "provider.picker.endpointModelsInCustom":
     "{name} esegue i tuoi endpoint personalizzati. I loro modelli sono nella scheda Personalizzato.",
   "provider.picker.showCustomModels": "Mostra modelli",
@@ -142,6 +148,7 @@ export const messages = {
   "provider.picker.effort": "Impegno",
   "provider.picker.effortLabel": "Impegno di ragionamento dell'agente",
   "provider.picker.effortFixed": "{effort}, fissato da {provider}",
+  "provider.picker.effortLimited": "Le impostazioni di Claude o la tua organizzazione limitano l’impegno a {effort}.",
   "provider.picker.fast": "Veloce",
   "provider.picker.fastText": "Risposte più rapide, utilizzo maggiore",
   "provider.picker.speed": "Velocità",
@@ -266,6 +273,8 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot disconnette {provider} sul server.",
   "provider.settings.geminiKeyReplacesAccount":
     "Una chiave API Gemini salvata viene usata al posto di un accesso con Google. Per usare un piano Google e i suoi modelli, rimuovi la chiave.",
+  "provider.settings.museKeyInUse":
+    "Muse usa questa chiave, non il tuo accesso. Per usare il tuo accesso, rimuovi la chiave.",
   "provider.settings.versionInstalledByUser": "{version} · installata da te",
   "provider.settings.versionDownloaded": "{version} · scaricata da OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Non in uso: {version} · installata da te",
@@ -277,10 +286,15 @@ export const messages = {
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache dei prompt",
   "provider.settings.promptCacheDescription":
-    "Per quanto tempo Claude tiene in cache il contesto di un agente tra un turno e l'altro.",
+    "Per quanto tempo Claude e Pi tengono il contesto di un agente nella cache tra un turno e l’altro.",
   "provider.settings.promptCacheHour": "1 ora",
-  "provider.settings.promptCacheDefault": "Predefinito di Claude Code",
+  "provider.settings.promptCacheDefault": "Predefinito del provider",
   "provider.settings.promptCacheLoadFailed": "Impossibile caricare la durata della cache dei prompt di questo server.",
+  "provider.settings.cacheExpiryCompaction": "Compatta prima della scadenza della cache",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Quando una chat con 200K o più token di contesto è inattiva con una cache di 1 ora, l’agente compatta il contesto prima della scadenza della cache. Così il messaggio successivo non rilegge tutto il contesto senza cache.",
+  "provider.settings.cacheExpiryCompactionLoadFailed":
+    "Impossibile caricare l’impostazione di compattazione di questo server.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Usa la mia configurazione di Claude Code",
   "provider.settings.claudeUserSetupDescription":
@@ -338,4 +352,5 @@ export const messages = {
   "provider.settings.removeDownloadFailed": "Impossibile rimuovere il download.",
   "provider.settings.disconnectLocalOnly":
     "OpenBot disconnette {provider} su questo computer. La CLI di {provider} nel tuo terminale mantiene il proprio accesso.",
+  "provider.settings.updateAll": "Aggiorna tutti",
 } as const satisfies PartialTranslation<typeof source>;

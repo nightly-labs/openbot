@@ -5,7 +5,7 @@ export const messages = {
   "error.mcp.redirectByName": "Questo indirizzo non è raggiungibile per nome.",
   "error.mcp.redirectNotSignIn": "Questo indirizzo non fa parte di un accesso.",
   "error.mcp.redirectRefused": "L'accesso è stato rifiutato. Torna a OpenBot e riprova.",
-  "error.mcp.redirectNoSignIn": "Nessun accesso è in attesa di questo. Potrebbe essere terminato.",
+  "error.mcp.redirectNoSignIn": "Questo accesso non è più attivo. Torna su OpenBot e avvia di nuovo l'accesso.",
   "error.mcp.redirectSignedIn": "OpenBot ha effettuato l'accesso. Puoi chiudere questa finestra.",
   "error.mcp.redirectNotSaved": "L'accesso non è stato completato. Torna su OpenBot per vedere il motivo.",
   "error.mcp.signInFileUnreadable": "Il file di accesso MCP non è leggibile.",
@@ -19,6 +19,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "Questo server non supporta le app di accesso. Aggiorna OpenBot sull'host.",
   "error.mcp.redirectRelayed": "OpenBot ha inviato l'accesso al server. Puoi chiudere questa finestra.",
   "error.mcp.relayEnded": "Questo accesso è terminato. Avvialo di nuovo.",
+  "error.mcp.signInLinkNotReady": "La pagina di accesso non è ancora aperta. Riprova tra un momento.",
   "error.mcp.relayNoState":
     "La pagina di accesso del server non protegge il proprio indirizzo di ritorno, quindi OpenBot non la apre su questo computer.",
   "error.mcp.relayAddressInvalid":

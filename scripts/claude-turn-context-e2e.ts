@@ -1,12 +1,3 @@
-// Checks that a Claude session keeps its turn context across a runtime refresh. Runs the real agent
-// service on a temporary profile. Claude is the real `ClaudeAgentClient`, which the Claude Agent SDK
-// connects to a stand-in `claude` executable. The stand-in logs the text blocks of each user message.
-// Turns: the first chat turn, two turns after the agent gets essential memories, a runtime refresh
-// (as after an MCP or skill change), and one turn in the resumed session. The refresh closes the
-// process and the next turn uses `--resume`, so the conversation still holds the memory block.
-// The check runs twice: once with the release before this change, which forgot the turn context,
-// and once with the current release. Only the current release must send no memory block again.
-// `bun run test:claude-turn-context`. Writes .openbot-build/claude-turn-context-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -33,7 +24,6 @@ const MEMORIES = 6;
 const memoryText = (index: number) =>
   `Fact ${index}: ${"The user ships each release on Friday after a tested database backup. ".repeat(4)}`;
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 mkdirSync(home, { recursive: true });
@@ -45,7 +35,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end.
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
@@ -100,10 +89,6 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here. With
- * `oldRelease`, a release always forgets the turn context, as the release before this change did.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -193,7 +178,6 @@ interface TurnReport {
 interface RunReport {
   release: "before" | "after";
   turns: TurnReport[];
-  /** The turn context characters of the first turn after the refresh. */
   afterRefreshContextCharacters: number;
 }
 
@@ -206,6 +190,7 @@ const report: { model: string; runs: RunReport[]; passed: boolean; error?: strin
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -224,7 +209,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of the stand-in log. */
 async function waitFor<T>(label: string, read: () => T | null | undefined | false, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -311,7 +295,6 @@ async function run(release: "before" | "after"): Promise<void> {
     );
     await turn(agent.id, "first chat turn", null);
     for (let index = 0; index < MEMORIES; index++) agents.createMemory({ agentId: agent.id, text: memoryText(index) });
-    // A person makes them essential, so each prompt gets them.
     const selections = agents.getMemorySelection(agent.id).selections;
     agents.setMemoryInclusion({
       agentId: agent.id,

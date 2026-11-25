@@ -2,7 +2,6 @@ import type { MobileTranslate } from "@openbot/i18n/mobile";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import type { QuickActionKind } from "./quick-action-choice";
 
-/** The phone remembers more chats than it shows, so a deleted or hidden agent leaves others to show. */
 const RECENT_AGENT_LIMIT = 8;
 
 export type QuickActionTarget =
@@ -15,12 +14,10 @@ export type QuickActionTarget =
 export interface QuickActionItem {
   id: string;
   title: string;
-  /** iOS shows it under the title. Android shows only the title. */
   subtitle: string | null;
   icon: "agent" | "routines" | "search" | "share" | "support";
 }
 
-/** A chat that this phone opened. Its last name shows while its server is not connected. */
 export interface RecentAgent {
   serverId: string;
   agentId: string;
@@ -40,7 +37,6 @@ function quickActionId(target: QuickActionTarget): string {
   }
 }
 
-/** An Android shortcut that the user pinned stays after an update, so an unknown ID opens nothing. */
 export function readQuickActionId(id: string): QuickActionTarget | null {
   if (id === "search" || id === "share" || id === "support") return { type: id };
   const separator = id.indexOf(":");
@@ -56,7 +52,6 @@ export function readQuickActionId(id: string): QuickActionTarget | null {
   }
 }
 
-/** Puts an opened chat first. */
 export function withOpenedAgent(
   recents: readonly RecentAgent[],
   agent: Pick<MobileAgent, "id" | "serverId" | "name">,
@@ -73,11 +68,6 @@ interface WorkspaceView {
   hiddenIds: (serverId: string) => readonly string[];
 }
 
-/**
- * Removes the chats that the app icon must not show, and takes the current names. A hidden chat and a
- * chat of a server that the account left go at once. An online server has loaded all its agents, so an
- * agent that it does not list was deleted. A server that is not online keeps its chats.
- */
 export function currentRecentAgents(
   recents: readonly RecentAgent[],
   { servers, agents, hiddenIds }: WorkspaceView,
@@ -102,16 +92,10 @@ interface ItemsInput {
   t: MobileTranslate;
 }
 
-/**
- * The items that the user chose, in a fixed order. Chats, Schedule and Search need the server that the
- * app shows; Share and Support show also with no server.
- */
 export function quickActionItems({ kinds, recents, servers, activeServerId, t }: ItemsInput): QuickActionItem[] {
   const activeServer = servers.find((server) => server.id === activeServerId);
-  // With one server, its name tells the user nothing.
   const serverName = (serverId: string) =>
     servers.length > 1 ? (servers.find((server) => server.id === serverId)?.name ?? null) : null;
-  // Android refuses a shortcut with no title.
   const chats = recents.filter((recent) => recent.name.trim());
   const chatItem = (recent: RecentAgent | undefined): QuickActionItem[] =>
     recent
@@ -152,7 +136,6 @@ export function quickActionItems({ kinds, recents, servers, activeServerId, t }:
     share: () => [
       { id: quickActionId({ type: "share" }), title: t("mobile.app.quickAction.share"), subtitle: null, icon: "share" },
     ],
-    // The menu that holds this item also has Remove App, so it asks the user to tell what is wrong first.
     support: () => [
       {
         id: quickActionId({ type: "support" }),

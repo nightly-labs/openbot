@@ -8,13 +8,13 @@ import {
 import { chatTagReferences } from "@openbot/contracts/chat-tag-references";
 import { replaceEqualDeep } from "@tanstack/react-query";
 import { Marked, type Token, type TokensList } from "marked";
+import markedCjkFriendly from "marked-cjk-friendly";
+import { nextPhoneNumberIndex, phoneNumberAtStart } from "./chat-phone-number";
 
 const markdown = new Marked({
   gfm: true,
   breaks: true,
   tokenizer: {
-    // Marked tries a heading underlined by `=` or `-` before it ends a paragraph at a math block, so
-    // a formula with such a line became a heading. Return `undefined` to read a paragraph instead.
     lheading(source) {
       const heading = this.rules.block.lheading.exec(source);
       return heading && chatMathBlockInterrupts(source, heading[0].length) ? undefined : false;
@@ -55,10 +55,8 @@ const markdown = new Marked({
       start: (source) => source.indexOf("@["),
       tokenizer(source) {
         const reference = chatTagReferences(source)[0];
-        // The phone cannot open the quoted passage, so a quote reads as its text in quotation marks.
         if (reference?.start === 0 && reference.kind === "quote")
           return { type: "text", raw: source.slice(0, reference.end), text: `“${reference.name}”` };
-        // A thread of the agent reads as its name.
         if (reference?.start === 0 && reference.kind === "thread")
           return { type: "text", raw: source.slice(0, reference.end), text: reference.name };
       },
@@ -69,9 +67,26 @@ const markdown = new Marked({
       start: (source) => source.indexOf("@["),
       tokenizer(source) {
         const reference = chatTagReferences(source)[0];
-        // A skill or an app that a message names, such as a Try from the Marketplace, draws as a chip.
         if (reference?.start === 0 && (reference.kind === "skill" || reference.kind === "mcp"))
           return { type: "skillMention", raw: source.slice(0, reference.end) };
+      },
+    },
+    {
+      name: "phoneNumber",
+      level: "inline",
+      start: nextPhoneNumberIndex,
+      tokenizer(source, tokens) {
+        if (this.lexer.state.inLink) return;
+        const phone = phoneNumberAtStart(source, tokens.at(-1)?.raw.at(-1) ?? "");
+        if (!phone) return;
+        return {
+          type: "link",
+          raw: phone.text,
+          href: phone.href,
+          title: null,
+          text: phone.text,
+          tokens: [{ type: "text", raw: phone.text, text: phone.text, escaped: false }],
+        };
       },
     },
     {
@@ -80,19 +95,18 @@ const markdown = new Marked({
       start: (source) => source.indexOf("@["),
       tokenizer(source) {
         const reference = chatTagReferences(source)[0];
-        // A browser tab of the agent draws as a chip, and a tap opens the tab, as the desktop chip does.
         if (reference?.start === 0 && reference.kind === "tab")
           return { type: "tabMention", raw: source.slice(0, reference.end) };
       },
     },
   ],
 });
+markdown.use(markedCjkFriendly());
 
 function parseChatMarkdown(body: string): TokensList {
   return markdown.lexer(body);
 }
 
-/** The blocks of a long document, parsed once and not cached, such as a Markdown file to preview. */
 export function parseChatMarkdownDocument(body: string): TokensList {
   return parseChatMarkdown(body);
 }
@@ -108,10 +122,6 @@ function rawLength(tokens: readonly Token[]): number {
   return tokens.reduce((length, token) => length + token.raw.length, 0);
 }
 
-/**
- * The tokens that text added at the end cannot change: those before a blank line that ends its
- * block, with at least the last two blocks after it. A list or indented code goes on after a blank line.
- */
 function settledLength(tokens: readonly Token[]): number {
   let blocks = 0;
   for (let index = tokens.length - 1; index > 0; index -= 1) {
@@ -131,12 +141,6 @@ function settledLength(tokens: readonly Token[]): number {
   return 0;
 }
 
-/**
- * The tokens of a reply that still streams. A chunk adds text at the end, so the settled blocks
- * keep their tokens and only the rest is parsed again. The lexer reads link definitions
- * and the start of a math block in the whole body, and an inline link or raw HTML tag sets state
- * that the next blocks read, so a body with one of them is parsed in full.
- */
 export function parseStreamingChatMarkdown(body: string): TokensList {
   let index = -1;
   for (const [candidate, entry] of streamingBodies.entries()) {
@@ -173,14 +177,9 @@ function continueParse(body: string, previous: { body: string; tokens: TokensLis
   return Object.assign([...stable, ...rest], { links: rest.links });
 }
 
-const MAX_CACHED_BODIES = 300;
+const MAX_CACHED_BODIES = 600;
 const parsedBodies = new Map<string, ReturnType<typeof parseChatMarkdown>>();
 
-/**
- * The tokens of a finished message, parsed once for the app run rather than each time its chat
- * opens. The renderers only read the tokens. A streaming reply changes on each chunk, so it uses
- * `parseStreamingChatMarkdown` and does not fill the cache.
- */
 export function parseFinishedChatMarkdown(body: string) {
   const cached = parsedBodies.get(body);
   if (cached) {
@@ -195,16 +194,11 @@ export function parseFinishedChatMarkdown(body: string) {
   return tokens;
 }
 
-/**
- * Markdown as one paragraph of inline tokens, such as the question of an agent: links, emphasis and
- * code, but no list or heading. `1. Which branch?` stays a sentence, as on desktop.
- */
 export function parseInlineChatMarkdown(body: string): Token[] {
   const tokens = new markdown.Lexer(markdown.defaults).inlineTokens(body);
   return [{ type: "paragraph", raw: body, text: body, tokens }];
 }
 
-/** Calls `visit` for each token of a parsed message, also the tokens inside lists, tables and links. */
 export function walkChatMarkdown(tokens: Token[], visit: (token: Token) => void): void {
   void markdown.walkTokens(tokens, visit);
 }

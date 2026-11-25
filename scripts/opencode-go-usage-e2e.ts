@@ -1,10 +1,3 @@
-// Reads the OpenCode Go quota end to end with the key the OpenCode CLI uses, from a real OpenCode 2
-// database and `auth.json` in a temporary `XDG_DATA_HOME`, and with a fake `opencode.ai` in place of
-// `fetch`. Checks that a saved key is the only key sent, that with no saved key the Console
-// connection comes first, then the `opencode-go` key in `auth.json`, then `OPENCODE_API_KEY` (#3548),
-// that a rejected key moves the read to the next one, that an inactive, OAuth or self-hosted Console
-// row is not read, that `OPENCODE_AUTH_CONTENT` replaces the local sign-in, and that no key sends
-// nothing. `bun scripts/opencode-go-usage-e2e.ts`. Writes .openbot-build/opencode-go-usage-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -30,6 +23,11 @@ interface Report {
   savedKey?: UsageCase;
   savedKeyRejected?: UsageCase;
   authFileKey?: UsageCase;
+  authFileConsoleKey?: UsageCase;
+  selfHostedAuthFileConsole?: UsageCase;
+  authFileGoKeyFirst?: UsageCase;
+  authFileGoKeyRefused?: UsageCase;
+  inlineAuthConsole?: UsageCase;
   consoleKey?: UsageCase;
   consoleKeyRejected?: UsageCase;
   selfHostedConsole?: UsageCase;
@@ -44,7 +42,6 @@ const dataDirectory = join(root, "data", "opencode");
 const authFile = join(dataDirectory, "auth.json");
 const databaseFile = join(dataDirectory, "opencode.db");
 
-/** The keys the fake console accepts. Any other key gets 401. */
 let accepted = new Set<string>();
 let sent: string[] = [];
 const realFetch = globalThis.fetch;
@@ -64,7 +61,6 @@ globalThis.fetch = Object.assign(
 process.env.XDG_DATA_HOME = join(root, "data");
 for (const name of ["OPENCODE_API_KEY", "OPENCODE_AUTH_CONTENT", "OPENCODE_DB"]) delete process.env[name];
 
-/** The `credential` table as OpenCode 2.1.1 leaves it after its migrations, in WAL mode as OpenCode runs it. */
 function writeDatabase(rows: readonly { id: string; value: unknown; active: number | null; created: number }[]) {
   const database = new DatabaseSync(databaseFile);
   try {
@@ -98,20 +94,17 @@ const goReading = {
 try {
   await mkdir(dataDirectory, { recursive: true });
 
-  // 1. No key anywhere: nothing is sent.
   const none = await readUsage(null, []);
   report.noKey = none;
   assert.deepEqual(none.sent, [], "no request without a key");
   assert.equal(none.reading.rateLimits, null);
 
-  // 2. The case of #3548: the key is only in the environment that started OpenBot.
   process.env.OPENCODE_API_KEY = "fake-env";
   const env = await readUsage(null, ["fake-env"]);
   report.environmentKey = env;
   assert.deepEqual(env.sent, ["fake-env"]);
   assert.deepEqual(env.reading.rateLimits, goReading, "the environment key reads the Go quota");
 
-  // 3. A saved key is the only key the CLI uses, so it is the only key sent, also when rejected.
   const saved = await readUsage("fake-saved", ["fake-saved"]);
   report.savedKey = saved;
   assert.deepEqual(saved.sent, ["fake-saved"]);
@@ -121,7 +114,6 @@ try {
   assert.deepEqual(savedRejected.sent, ["fake-saved"], "a rejected saved key does not fall back");
   assert.equal(savedRejected.reading.rateLimits, null);
 
-  // 4. OpenCode applies the `opencode-go` key in `auth.json` after the environment key.
   await writeFile(
     authFile,
     JSON.stringify({ "opencode-go": { type: "api", key: "fake-auth-file" }, anthropic: { type: "api", key: "x" } }),
@@ -130,7 +122,54 @@ try {
   report.authFileKey = authFileKey;
   assert.deepEqual(authFileKey.sent, ["fake-auth-file"]);
 
-  // 5. The active Console connection in the database comes first.
+  delete process.env.OPENCODE_API_KEY;
+  await writeFile(authFile, JSON.stringify({ opencode: { type: "api", key: "fake-auth-console" } }));
+  const authFileConsole = await readUsage(null, ["fake-auth-console"]);
+  report.authFileConsoleKey = authFileConsole;
+  assert.deepEqual(authFileConsole.sent, ["fake-auth-console"], "the OpenCode key of auth.json reads the Go quota");
+  assert.deepEqual(authFileConsole.reading.rateLimits, goReading);
+
+  await writeFile(
+    authFile,
+    JSON.stringify({
+      opencode: { type: "api", key: "fake-auth-hosted", metadata: { server: "https://console.example.com" } },
+    }),
+  );
+  const authFileHosted = await readUsage(null, ["fake-auth-hosted"]);
+  report.selfHostedAuthFileConsole = authFileHosted;
+  assert.deepEqual(authFileHosted.sent, [], "a self-hosted Console key of auth.json does not go to opencode.ai");
+
+  await writeFile(
+    authFile,
+    JSON.stringify({
+      "opencode-go": { type: "api", key: "fake-auth-file" },
+      opencode: { type: "api", key: "fake-auth-console" },
+    }),
+  );
+  const goKeyFirst = await readUsage(null, ["fake-auth-file", "fake-auth-console"]);
+  report.authFileGoKeyFirst = goKeyFirst;
+  assert.deepEqual(goKeyFirst.sent, ["fake-auth-file"], "the opencode-go key comes before the OpenCode key");
+  const goKeyRefused = await readUsage(null, ["fake-auth-console"]);
+  report.authFileGoKeyRefused = goKeyRefused;
+  assert.deepEqual(
+    goKeyRefused.sent,
+    ["fake-auth-file", "fake-auth-console"],
+    "a refused Go key tries the OpenCode key",
+  );
+  assert.deepEqual(goKeyRefused.reading.rateLimits, goReading);
+
+  process.env.OPENCODE_AUTH_CONTENT = JSON.stringify({ opencode: { type: "api", key: "fake-inline-console" } });
+  const inlineConsole = await readUsage(null, ["fake-inline-console"]);
+  report.inlineAuthConsole = inlineConsole;
+  assert.deepEqual(inlineConsole.sent, ["fake-inline-console"], "the OpenCode key of OPENCODE_AUTH_CONTENT is read");
+  delete process.env.OPENCODE_AUTH_CONTENT;
+
+  process.env.OPENCODE_API_KEY = "fake-env";
+  await writeFile(
+    authFile,
+    JSON.stringify({ "opencode-go": { type: "api", key: "fake-auth-file" }, anthropic: { type: "api", key: "x" } }),
+  );
+
   writeDatabase([
     { id: "old", value: { type: "key", key: "fake-console-old" }, active: null, created: 1 },
     {
@@ -146,13 +185,11 @@ try {
   assert.deepEqual(consoleKey.sent, ["fake-console"], "the active Console row, not the inactive newer one");
   assert.deepEqual(consoleKey.reading.rateLimits, goReading);
 
-  // 6. A rejected Console key moves the read to the `auth.json` key.
   const consoleRejected = await readUsage(null, ["fake-auth-file"]);
   report.consoleKeyRejected = consoleRejected;
   assert.deepEqual(consoleRejected.sent, ["fake-console", "fake-auth-file"]);
   assert.deepEqual(consoleRejected.reading.rateLimits, goReading);
 
-  // 7. A self-hosted Console or an OAuth connection is not read, and does not fall through to an older row.
   writeDatabase([
     { id: "old", value: { type: "key", key: "fake-console-old" }, active: null, created: 1 },
     {
@@ -172,7 +209,6 @@ try {
   report.oauthConsole = oauth;
   assert.deepEqual(oauth.sent, ["fake-auth-file"]);
 
-  // 8. `OPENCODE_AUTH_CONTENT` replaces `auth.json` and the Console connection.
   writeDatabase([{ id: "console", value: { type: "key", key: "fake-console" }, active: 1, created: 2 }]);
   process.env.OPENCODE_AUTH_CONTENT = JSON.stringify({ "opencode-go": { type: "api", key: "fake-inline" } });
   const inline = await readUsage(null, ["fake-inline"]);
@@ -180,7 +216,6 @@ try {
   assert.deepEqual(inline.sent, ["fake-inline"]);
   delete process.env.OPENCODE_AUTH_CONTENT;
 
-  // 9. Every key rejected gives no reading.
   const rejected = await readUsage(null, []);
   report.allRejected = rejected;
   assert.deepEqual(rejected.sent, ["fake-console", "fake-auth-file"]);

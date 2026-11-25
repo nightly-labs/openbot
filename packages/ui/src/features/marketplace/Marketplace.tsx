@@ -24,7 +24,6 @@ import {
 
 export interface MarketplaceProps {
   model: MarketplaceModel;
-  /** Where the user is. The caller owns it, so a link can open the window on an app page. */
   nav: MarketplaceNavigation;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -57,10 +56,6 @@ function viewTitle(scope: MarketplaceScope, view: MarketplaceView, fallback: str
   }
 }
 
-/**
- * The path to the open page: Apps › GitHub. Each part of the path goes back to its view. The top row already has the
- * Back and Forward arrows of the chats, so the path is the way back here. A list has no path: the side panel names it.
- */
 function MarketplaceHeader(props: { scope: MarketplaceScope }) {
   const { t } = useText();
   const stack = () => props.scope.nav.state.stack;
@@ -83,10 +78,6 @@ function MarketplaceHeader(props: { scope: MarketplaceScope }) {
   );
 }
 
-/**
- * The inside of the open window. The listings live here, so the catalog loads only while the window
- * is open.
- */
 function MarketplaceWindow(props: MarketplaceProps) {
   const { t } = useText();
   const nav = props.nav;
@@ -99,7 +90,6 @@ function MarketplaceWindow(props: MarketplaceProps) {
       list: (query) => props.model.listAgents(query),
       homeCache: props.model.agentHomeCache,
       query: () => nav.state.query,
-      // The Agents tab shows each category, and a category page has its own listing.
       category: () => null,
       verified: () => sourceVerified(nav.state.agentSource),
     }),
@@ -107,30 +97,23 @@ function MarketplaceWindow(props: MarketplaceProps) {
       list: (query) => props.model.listSkills(query),
       homeCache: props.model.skillHomeCache,
       query: () => nav.state.query,
-      // The Skills tab shows each category, and a group page has its own listing.
       category: () => null,
       verified: () => sourceVerified(nav.state.skillSource),
     }),
   };
   const lists = createBrowseLists(scope);
   let body: HTMLDivElement | undefined;
-  // A tab, a search or a new view changes the content height but not the body size, so the frame
-  // is observed too.
   const fades = createScrollFades();
   const frameObserver = new ResizeObserver(() => fades.measure());
   onCleanup(() => {
     fades.stop();
     frameObserver.disconnect();
   });
-  // For each open view: its scroll offset, and the name of the control the user last clicked, which
-  // opened the next view. Back returns to that place and that control.
   const places: { top: number; opener: string | null }[] = [];
   const remember = (place: Partial<(typeof places)[number]>) => {
     const depth = nav.state.stack.length - 1;
     places[depth] = { top: 0, opener: null, ...places[depth], ...place };
   };
-  // A new view moves the focus to its name, as a route change does. The first view keeps the focus.
-  // The side panel can replace the open view with another at the same depth, which is a new view too.
   createEffect(
     () => [nav.state.stack.length, nav.state.stack.at(-1)] as const,
     ([length, view], previous) => {
@@ -138,10 +121,8 @@ function MarketplaceWindow(props: MarketplaceProps) {
       const [previousLength, previousView] = previous;
       if (length === previousLength && view === previousView) return;
       const place = length < previousLength ? places[length - 1] : undefined;
-      // Back keeps the place it returns to. Another view at a depth starts with no place there.
       places.length = length < previousLength ? length : length - 1;
       body?.scrollTo({ top: place?.top ?? 0 });
-      // A click in the side panel keeps the focus on the panel.
       if (document.activeElement?.closest(".marketplace-nav")) return;
       const opener = place?.opener
         ? body?.querySelector<HTMLElement>(`[aria-label="${CSS.escape(place.opener)}"]`)
@@ -153,7 +134,6 @@ function MarketplaceWindow(props: MarketplaceProps) {
       });
     },
   );
-  // Another kind is a new list, so it starts at the top.
   createEffect(
     () => nav.state.tab,
     (_tab, previous) => {
@@ -163,7 +143,6 @@ function MarketplaceWindow(props: MarketplaceProps) {
 
   return (
     <>
-      {/* The page rail is the way back from the page, so the top bar has no close button. */}
       <div class="skills-marketplace-topbar">
         <MarketplaceHeader scope={scope} />
       </div>
@@ -206,8 +185,8 @@ function MarketplaceWindow(props: MarketplaceProps) {
                 <Match when={view.kind === "appGroup" && view.category} keyed>
                   {(category) => <AppGroupPage scope={scope} category={category} />}
                 </Match>
-                <Match when={view.kind === "app" && view.id} keyed>
-                  {(id) => <MarketplaceAppPage scope={scope} id={id} />}
+                <Match when={view.kind === "app" ? view : undefined} keyed>
+                  {(app) => <MarketplaceAppPage scope={scope} id={app.id} setup={app.setup === true} />}
                 </Match>
                 <Match when={view.kind === "skillGroup" && view.group} keyed>
                   {(group) => <SkillGroupPage scope={scope} group={group} />}
@@ -236,11 +215,6 @@ function MarketplaceWindow(props: MarketplaceProps) {
           )}
         </Show>
       </div>
-      {/*
-        The agents dialog of a skill hides the rest of the window from screen readers while it is
-        open. It keeps an element with `data-live-announcer` visible, so the results are said from
-        here.
-      */}
       <p class="marketplace-visually-hidden" role="status" data-live-announcer="">
         {props.model.notice()}
       </p>
@@ -251,9 +225,7 @@ function MarketplaceWindow(props: MarketplaceProps) {
   );
 }
 
-/** The Marketplace: agents, apps and skills, and a page for each. It is a page of the window. */
 export function Marketplace(props: MarketplaceProps) {
-  // A closed window starts again from the first tab, with no search and no filter.
   createEffect(
     () => props.open,
     (open, previous) => {
@@ -267,21 +239,11 @@ export function Marketplace(props: MarketplaceProps) {
   );
 }
 
-/**
- * The open Marketplace page. The title takes the focus, as a new page does, and the control that
- * opened the page gets it back when the page closes with the focus in it. Escape goes back one view,
- * or else clears the search, or else closes the page. A view keeps the search but does not show it,
- * so the view goes back first. The handler is on the document and after the delegated handlers, so a
- * control that handles Escape keeps it. The focus can stay on the control that opened the page, so a
- * target outside the page also counts, except an open popup or a text field.
- */
 function MarketplacePage(props: MarketplaceProps) {
   const { t } = useText();
-  // Each view change of the open page moves in a view transition. The caller's navigation stays plain.
   const nav = createMovingNavigation(props.nav);
   let root!: HTMLElement;
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  // Dialogs that the page opens stand above it (`marketplace.css`).
   onCleanup(holdFlag(document.body, "skills-marketplace"));
   onSettled(() => {
     root.querySelector<HTMLElement>(".marketplace-nav-title")?.focus({ preventScroll: true });
@@ -301,10 +263,8 @@ function MarketplacePage(props: MarketplaceProps) {
     document.addEventListener("keydown", closeOnEscape);
     return () => {
       document.removeEventListener("keydown", closeOnEscape);
-      // A rail button that closed the page keeps the focus.
       const focus = document.activeElement;
       if (focus && focus !== document.body && !root.contains(focus)) return;
-      // After the page leaves the DOM, unless the next page took the focus.
       queueMicrotask(() => {
         if (opener?.isConnected && (!document.activeElement || document.activeElement === document.body)) {
           opener.focus({ preventScroll: true });

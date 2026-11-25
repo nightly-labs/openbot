@@ -4,7 +4,6 @@ import { Heading, ServerPlushLogo, Text } from "@openbot/ui";
 import { For } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 
-/** One server ID for each plush colour, so the gallery shows all eight. */
 function seedsForEveryColor(): Array<{ seed: string; color: ServerPlushColor }> {
   const seen = new Map<ServerPlushColor, string>();
   for (let index = 0; seen.size < 8 && index < 1000; index += 1) {
@@ -61,7 +60,6 @@ export const Gallery: Story = {
   ),
 };
 
-/** Every shape that an owner or admin can choose, in the automatic colour and in each picker colour. */
 const SHAPE_COLORS: Array<`#${string}` | null> = [
   null,
   ...AVATAR_COLOR_CHOICES.flatMap((choice) => {

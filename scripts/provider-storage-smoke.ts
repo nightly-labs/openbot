@@ -62,9 +62,7 @@ async function runOptionalGrok(database: OpenBotDatabase): Promise<boolean> {
       client.request("model/list", { limit: 100, includeHidden: true }, decodeModelListResponse),
     );
     model = account.account ? (models.data.find((candidate) => candidate.model)?.model ?? null) : null;
-  } catch {
-    // This is an optional smoke and an unauthenticated local Grok installation is a valid skip.
-  }
+  } catch {}
   if (!model) {
     await runCauseEffect(client.stop());
     process.stdout.write("Skipping optional Grok live smoke: Grok CLI is not authenticated or advertised no models.\n");

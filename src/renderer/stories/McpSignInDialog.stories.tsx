@@ -1,11 +1,3 @@
-/**
- * The connect step that leaves the app: the server's own page asks, and the dialog only learns
- * whether the connection that follows works.
- *
- * One story, with the server's answer on a control. A connection that works closes the dialog, and
- * the stage behind it reports it - so the story shows the hand-off as well as the dialog.
- */
-
 import type { McpServerConfig, McpTestResult } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { McpSignInDialog } from "@openbot/ui/features/settings/McpSignInDialog";
@@ -24,12 +16,7 @@ import {
 import { createSignInHost } from "./mcp-sign-in-host";
 
 interface SignInPlaygroundProps {
-  /** What Linear answers once the sign-in is done. "never answers" is the wait for the browser. */
   outcome: ConnectOutcome;
-  /**
-   * A joined server that signs in with its own browser. The dialog then shows the host's page, and
-   * Allow on it stands in for the sign-in that the host took.
-   */
   hostName?: string;
 }
 
@@ -84,7 +71,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Playground: Story = {};
 
-/** Catalog sign-in for a joined server: the host's browser shows the page here, and that host keeps the grant. */
 export const RemoteHost: Story = {
   args: { hostName: "OpenBot team" },
 };

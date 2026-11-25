@@ -13,10 +13,6 @@ import {
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { useText } from "@/shared/lib/text";
 
-/**
- * Server sheet > Members: the people of the server and the email invitations that wait for an
- * answer. An owner or admin opens a person to manage them, and invites people with the header "+".
- */
 export function ServerMembersScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
@@ -65,7 +61,6 @@ export function ServerMembersScreen() {
         {activeMembers?.map((member) => {
           const name = member.name || member.email;
           const self = member.membershipId === server.membershipId;
-          // Roles apply only to a member: an owner or admin can use all agents.
           const customRoles = member.role === "member" ? memberRoleNames(roles.list, member.membershipId) : [];
           const role = customRoles.length > 0 ? customRoles.join(" · ") : t(SERVER_ROLE_LABEL_KEYS[member.role]);
           return (

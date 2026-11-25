@@ -20,13 +20,14 @@ export const messages = {
     "Araç çalışmadı. tool_call bu adla bir araç bulamadı. tool_search'ün verdiği tam nitelikli adı kullanın, örneğin openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Araç çalışmadı. tool_call bu adla bir araç bulamadı. Nitelikli ad büyük olasılıkla {name}. Öyleyse çağrıyı bu adla yeniden gönderin.",
+  "error.agent.toolCallNullValue":
+    "Araç çalışmadı. {name}, {paths} konumunda bir nesne veya liste bekliyor, ancak bu liste öğelerinin her biri null olarak geldi. Çağrıyı yeniden gönderin ve bu öğelerin her birini JSON'unu içeren bir dize olarak verin.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe, {names} adında bir OpenBot aracı bulamadı. Yalnızca openbot.tool_search'ün listelediği OpenBot ve tarayıcı araçlarını açıklar, MCP araçlarını açıklamaz.",
   "error.agent.toolDescribeDiscoveryNames":
     "{names} araçlarını doğrudan çağır. tool_describe arama araçlarını açıklamaz.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Rutin zamanlaması geçersiz: {detail} Zamanlamayı düzeltip yeniden deneyin. openbot.tool_describe şemayı verir.",
-  // Agent errors that the main process and the backend send.
   "error.agent.approvalWhileDeleting": "Ajan silinirken onay verilemez.",
   "error.agent.accessLocalOnly": "Ajan erişimi yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.duplicateCleanupFailed": "Ajan çoğaltma başarısız oldu ve tamamlanmamış kopya kaldırılamadı.",
@@ -54,6 +55,10 @@ export const messages = {
   "error.agent.setupCleanupFailed": "Ajan kurulumu başarısız oldu ve tamamlanmamış ajan kaldırılamadı.",
   "error.agent.modelUnavailable": "Seçilen ajan modeli kullanılamıyor.",
   "error.agent.modelProviderNotConnected": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} bağlı değil.',
+  "error.agent.modelProviderSignInRequired":
+    'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} oturum açmayı gerektiriyor. {provider} hesabında oturum açıp yeniden dene.',
+  "error.agent.modelProviderNotInstalled": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} yüklü değil.',
+  "error.agent.modelProviderOutdated": 'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} güncellenmeli.',
   "error.agent.modelListEmpty":
     'Seçilen ajan modeli "{model}" kullanılamıyor: {provider} hiç model listelemedi. Son hata: {detail}',
   "error.agent.modelListEmptyNoError":
@@ -125,6 +130,10 @@ export const messages = {
   "error.agent.deleteIncomplete": "Ajan verileri tamamen kaldırılamadı. Ajanı silmeyi tekrar deneyin.",
   "error.agent.deleteFolderInUse":
     "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde veya OpenBot'u yeniden başlattıktan sonra ajanı tekrar silin.",
+  "error.agent.deleteFolderLocked":
+    "Başka bir program, örneğin ajanın başlattığı bir program, bu ajanın klasörünü hâlâ kullanıyor. O programı kapatın veya bu ajanın çalıştığı bilgisayarı yeniden başlatın, sonra ajanı tekrar silin.",
+  "error.agent.deleteWhenFolderFree":
+    "Başka bir ajanın işi bu ajanın klasörünü hâlâ kullanıyor. Bu iş bittiğinde OpenBot bu ajanı siler.",
   "error.agent.duplicationBusy": "Bu ajan zaten kopyalanıyor.",
   "error.agent.waitBeforeDuplicate": "Ajanı kopyalamadan önce bitmesini ve kuyruğunu temizlemesini bekleyin.",
   "error.agent.saveOtherAgent": "Bu kayıt başka bir ajana ait.",
@@ -133,7 +142,6 @@ export const messages = {
     'Kayıtlı bir ajan profili okunamayan bir "{field}" değerine sahip; OpenBot\'u başlatmadan önce verileri güncelleyin.',
   "error.agent.storedProfileUnreadableId":
     '{id} kayıtlı ajan profili okunamayan bir "{field}" değerine sahip; OpenBot\'u başlatmadan önce verileri güncelleyin.',
-  // Written by `QueueEditRejectedError` in @openbot/contracts, which cannot import this package.
   "error.agent.queueEditRejected": "Kuyruk düzenlemesi reddedildi: {reason}",
   "error.agent.computerUseLocalOnly": "Bilgisayar Kullanımı yalnızca ajanı çalıştıran bilgisayarda değiştirilebilir.",
   "error.agent.automationLocalOnly": "Yerel betiklere yalnızca ajanı çalıştıran bilgisayarda izin verilebilir.",
@@ -147,6 +155,8 @@ export const messages = {
   "error.agent.busyMessageModeLocalOnly":
     "Ajan çalışırken mesajların ne yapacağı yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.backupModelsLocalOnly": "Yedek modeller yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
+  "error.agent.backupModelsAtLimit":
+    "Şu anda hiçbir yedek model devralamaz: her biri kullanım sınırına ulaştı ya da kısa süre önce başarısız oldu. Bir hesabın modelleri tek bir sınırı paylaşabilir. Şimdi devam etmek için başka bir sağlayıcıdan veya başka bir hesaptan yedek model ekleyin ya da sınırın sıfırlanmasını bekleyin.",
   "error.agent.taskLimitLocalOnly": "Görev limiti yalnızca ajanı çalıştıran bilgisayarda ayarlanabilir.",
   "error.agent.localScriptsOff": "Bu ajan yerel betiklere izin vermiyor.",
   "error.agent.localScriptsRateLimited":
@@ -177,6 +187,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Ekran yakalama bir Slack, Discord ya da Telegram konuşmasında çalışmaz, çünkü dosyalarını başka kişiler de alır.",
   "error.agent.screenCaptureDeclined": "Kullanıcı bu ekran yakalamaya izin vermedi. Hiçbir şey yakalanmadı.",
+  "error.agent.creditMediaDeclined": "Kullanıcı bu oluşturmaya izin vermedi. Hiç kredi harcanmadı.",
+  "error.agent.creditMediaNotSaved": "Dosya oluşturuldu, ancak OpenBot onu sohbete kaydedemedi.",
   "error.agent.mcpToolDeclined": "Kullanıcı bu MCP aracı çağrısına izin vermedi. Araç çalışmadı.",
   "error.agent.screenCaptureWindowMissing":
     "Bu pencere şu anda açık değil. Geçerli pencere kimliklerini almak için list_capture_sources çağırın.",
@@ -186,6 +198,8 @@ export const messages = {
     "Bölge tek bir ekranın içinde değil. list_capture_sources sonucundaki tek bir ekranın sınırları içinde kalan masaüstü noktaları kullanın.",
   "error.agent.screenCapturePermissionMissing":
     "OpenBot'un Ekran Kaydı izni yok. Kullanıcıdan Sistem Ayarları > Gizlilik ve Güvenlik > Ekran ve Sistem Sesi Kaydı bölümünü açmasını, OpenBot'u etkinleştirmesini, sonra OpenBot'tan çıkıp yeniden açmasını isteyin.",
+  "error.agent.screenCaptureListPermission":
+    "OpenBot'un henüz Ekran Kaydı izni yok, bu yüzden pencereleri listeleyemez. Bir ekranı yakalamak için capture_screen'i target screen ile çağırın. Kullanıcı önce yakalamayı onaylar, sonra macOS kullanıcıdan izin isteyebilir.",
   "error.agent.screenCaptureEmptyWindows":
     "Windows boş bir görüntü verdi. Kullanıcıdan bilgisayarın kilidini açmasını ve korumalı içeriği kapatmasını isteyin. Bir kuruluş ilkesi de ekran yakalamayı engelleyebilir.",
   "error.agent.screenCaptureFailed": "Ekran yakalama başarısız oldu. Tekrar deneyin.",

@@ -1,12 +1,21 @@
-import { isSkillLearningMode, RESPONSE_STYLES, type ResponseStyle } from "@openbot/contracts/ipc";
+import {
+  isMediaApprovalCredits,
+  isSkillLearningMode,
+  RESPONSE_STYLES,
+  type ResponseStyle,
+} from "@openbot/contracts/ipc";
 import { type QueryKey, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Typography } from "heroui-native";
+import { Input, Typography } from "heroui-native";
+import BellRing from "lucide-react-native/icons/bell-ring";
 import BookOpen from "lucide-react-native/icons/book-open";
+import Bot from "lucide-react-native/icons/bot";
 import Brain from "lucide-react-native/icons/brain";
 import BrainCog from "lucide-react-native/icons/brain-cog";
+import Coins from "lucide-react-native/icons/coins";
 import Smile from "lucide-react-native/icons/face-slightly-smiling";
 import MousePointerClick from "lucide-react-native/icons/mouse-pointer-click";
 import { useState } from "react";
+import { View } from "react-native";
 import { useUniwind } from "uniwind";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { RESPONSE_STYLE_LABEL_KEYS, useServerPersonality } from "@/features/servers/model/use-server-personality";
@@ -18,10 +27,6 @@ import { queryKeys } from "@/features/workspace/model/query-keys";
 import { haptics } from "@/shared/lib/haptics";
 import { type MobileText, useText } from "@/shared/lib/text";
 
-/**
- * Reads one host setting and saves a change. Each setting is a group of one row; the load or save
- * error shows in place of its description under the group, as the desktop does.
- */
 function useHostSetting<T>(key: QueryKey, load: () => Promise<T>, loadFailed: string, saveFailed: string) {
   const { errorMessage } = useText();
   const queryClient = useQueryClient();
@@ -29,7 +34,7 @@ function useHostSetting<T>(key: QueryKey, load: () => Promise<T>, loadFailed: st
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  function save(operation: () => Promise<T>) {
+  function save(operation: () => Promise<T>, failed = saveFailed) {
     if (saving) return;
     void haptics.selection();
     setSaving(true);
@@ -42,7 +47,7 @@ function useHostSetting<T>(key: QueryKey, load: () => Promise<T>, loadFailed: st
       })
       .catch((cause: unknown) => {
         void haptics.notification("error");
-        setSaveError(errorMessage(cause, saveFailed));
+        setSaveError(errorMessage(cause, failed));
       })
       .finally(() => setSaving(false));
   }
@@ -51,11 +56,6 @@ function useHostSetting<T>(key: QueryKey, load: () => Promise<T>, loadFailed: st
   return { value: query.data, saving, error, save };
 }
 
-/**
- * How the agents of the server talk while they work (`host-personality-v1`). Natural agents send short
- * updates and the chat shows them; Classic agents answer once. The change applies from the next turn
- * of each agent.
- */
 export function ServerPersonalityRow({ serverId }: { serverId: string }) {
   const { t, errorMessage } = useText();
   const { theme } = useUniwind();
@@ -104,12 +104,10 @@ export function ServerPersonalityRow({ serverId }: { serverId: string }) {
   );
 }
 
-/** A host that no longer permits its saved value still shows it. */
 function withSaved<T>(saved: T, choices: readonly T[]): readonly T[] {
   return choices.includes(saved) ? choices : [saved, ...choices];
 }
 
-/** How many memories each agent of the server can keep (`agent-memory-limit-v1`). The values come from the host. */
 export function ServerMemoryLimitRow({ serverId }: { serverId: string }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -150,10 +148,6 @@ export function ServerMemoryLimitRow({ serverId }: { serverId: string }) {
   );
 }
 
-/**
- * How many completed turns of one conversation pass between two background memory reviews of the
- * server's agents, or Off (`memory-review-v1`). The values come from the host.
- */
 export function ServerMemoryReviewRow({ serverId }: { serverId: string }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -198,7 +192,6 @@ export function ServerMemoryReviewRow({ serverId }: { serverId: string }) {
   );
 }
 
-/** A newer host can send a mode that this app does not know; the row shows the raw value. */
 function skillLearningLabel(mode: string, t: MobileText["t"]): string {
   if (!isSkillLearningMode(mode)) return mode;
   if (mode === "automatic") return t("mobile.server.settings.skillLearningAutomatic");
@@ -206,10 +199,6 @@ function skillLearningLabel(mode: string, t: MobileText["t"]): string {
   return t("mobile.server.settings.skillLearningOff");
 }
 
-/**
- * What the background memory reviews of the server's agents do when a chat teaches a skill
- * (`skill-learning-v1`). The values come from the host.
- */
 export function ServerSkillLearningRow({ serverId }: { serverId: string }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -250,11 +239,6 @@ export function ServerSkillLearningRow({ serverId }: { serverId: string }) {
   );
 }
 
-/**
- * "Learn from my browsing" (`browsing-memory-v1`): while a person holds an agent's tab, the host
- * records the pages and the controls they use, and the memory review learns how those sites work.
- * Off deletes what the host recorded.
- */
 export function ServerBrowsingMemoryRow({ serverId }: { serverId: string }) {
   const { t } = useText();
   const { theme } = useUniwind();
@@ -276,6 +260,102 @@ export function ServerBrowsingMemoryRow({ serverId }: { serverId: string }) {
           dark={theme === "dark"}
           onValueChange={(enabled) => {
             if (current && enabled !== current.enabled) setting.save(() => setBrowsingMemory(enabled, serverId));
+          }}
+        />
+      </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+function creditsOf(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const credits = Number(trimmed);
+  return isMediaApprovalCredits(credits) ? credits : null;
+}
+
+export function ServerMediaApprovalCreditsRow({ serverId }: { serverId: string }) {
+  const { t } = useText();
+  const { theme } = useUniwind();
+  const { loadMediaApprovalCredits, setMediaApprovalCredits } = useMobileWorkspaceActions();
+  const setting = useHostSetting(
+    queryKeys.mediaApprovalCredits(useQueryScope(), serverId),
+    () => loadMediaApprovalCredits(serverId),
+    t("mobile.server.settings.mediaApprovalCreditsLoadFailed"),
+    t("mobile.server.settings.mediaApprovalCreditsSaveFailed"),
+  );
+  const [draft, setDraft] = useState<string | null>(null);
+  const current = setting.value;
+  const text = draft ?? (current ? String(current.credits) : "");
+  const invalid = draft !== null && creditsOf(draft) === null;
+
+  function commit() {
+    if (!current || draft === null) return;
+    const credits = creditsOf(draft);
+    if (credits === null) return;
+    setDraft(null);
+    if (credits !== current.credits) setting.save(() => setMediaApprovalCredits({ credits }, serverId));
+  }
+
+  const error = invalid ? t("error.team.mediaApprovalCreditsInvalid") : setting.error;
+  return (
+    <SettingsSection footer={error}>
+      <SettingsRow leading={<RowIcon icon={Bot} />}>
+        <SettingsSwitch
+          value={current?.agents ?? false}
+          disabled={!current || setting.saving}
+          label={t("mobile.server.settings.mediaApprovalAgents")}
+          dark={theme === "dark"}
+          onValueChange={(agents) => {
+            if (current && agents !== current.agents)
+              setting.save(
+                () => setMediaApprovalCredits({ agents }, serverId),
+                t("mobile.server.settings.mediaApprovalAgentsSaveFailed"),
+              );
+          }}
+        />
+      </SettingsRow>
+      {current?.agents === false ? null : (
+        <SettingsRow
+          leading={<RowIcon icon={Coins} />}
+          disclosure={false}
+          trailing={
+            current ? (
+              <View className="flex-row items-center gap-2">
+                <Input
+                  accessibilityLabel={t("mobile.server.settings.mediaApprovalCredits")}
+                  value={text}
+                  editable={!setting.saving}
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  maxLength={6}
+                  textAlign="right"
+                  isInvalid={invalid}
+                  className="w-24"
+                  onChangeText={setDraft}
+                  onSubmitEditing={commit}
+                  onBlur={commit}
+                />
+                <Typography.Paragraph>{t("mobile.server.settings.mediaApprovalCreditsUnit")}</Typography.Paragraph>
+              </View>
+            ) : null
+          }
+        >
+          <Typography.Paragraph>{t("mobile.server.settings.mediaApprovalCredits")}</Typography.Paragraph>
+        </SettingsRow>
+      )}
+      <SettingsRow leading={<RowIcon icon={BellRing} />}>
+        <SettingsSwitch
+          value={current?.askWhenBlocked ?? true}
+          disabled={!current || setting.saving}
+          label={t("mobile.server.settings.mediaApprovalAsk")}
+          dark={theme === "dark"}
+          onValueChange={(askWhenBlocked) => {
+            if (current && askWhenBlocked !== current.askWhenBlocked)
+              setting.save(
+                () => setMediaApprovalCredits({ askWhenBlocked }, serverId),
+                t("mobile.server.settings.mediaApprovalAskSaveFailed"),
+              );
           }}
         />
       </SettingsRow>

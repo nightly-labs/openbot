@@ -6,8 +6,7 @@ import { createPointerDrag } from "./createPointerDrag";
 interface PanelResizerProps {
   label: string;
   controls: string;
-  /** The side of the panel in a left-to-right layout. A right-to-left layout swaps it. */
-  direction: "left" | "right";
+  direction: "left" | "right" | "bottom";
   value: number;
   defaultValue: number;
   min: number;
@@ -78,7 +77,6 @@ export function PanelResizer(props: PanelResizerProps) {
     const resizeTarget = props.onParentResize ? handle?.parentElement?.parentElement : handle?.parentElement;
     if (resizeTarget) {
       parentResizeObserver = new ResizeObserver(enforceBounds);
-      // Observe outer size only: inner padding changes must not reset a drag.
       parentResizeObserver.observe(resizeTarget, { box: "border-box" });
     }
     return () => {
@@ -88,17 +86,18 @@ export function PanelResizer(props: PanelResizerProps) {
     };
   });
 
-  // The grid mirrors in a right-to-left layout, so the panel is on the other side of the handle.
-  const panelSide = (): "left" | "right" => {
+  const vertical = props.direction === "bottom";
+  const panelSide = (): "left" | "right" | "bottom" => {
+    if (props.direction === "bottom") return "bottom";
     if (!handle || getComputedStyle(handle).direction !== "rtl") return props.direction;
     return props.direction === "left" ? "right" : "left";
   };
 
   let dragStartValue = 0;
-  let dragSide: "left" | "right" = "left";
+  let dragSide: "left" | "right" | "bottom" = "left";
   const fromDelta = (delta: number) => dragStartValue + (dragSide === "left" ? delta : -delta);
   const drag = createPointerDrag({
-    axis: "x",
+    axis: vertical ? "y" : "x",
     rootClass: "panel-resizing",
     onStart: () => {
       dragStartValue = displayedValue();
@@ -110,9 +109,8 @@ export function PanelResizer(props: PanelResizerProps) {
 
   const handleKeyDown = (event: KeyboardEvent) => {
     const side = panelSide();
-    // The arrow that points away from the panel makes it wider.
-    const growKey = side === "left" ? "ArrowRight" : "ArrowLeft";
-    const shrinkKey = side === "left" ? "ArrowLeft" : "ArrowRight";
+    const growKey = side === "bottom" ? "ArrowUp" : side === "left" ? "ArrowRight" : "ArrowLeft";
+    const shrinkKey = side === "bottom" ? "ArrowDown" : side === "left" ? "ArrowLeft" : "ArrowRight";
     let next: number | undefined;
     if (event.key === "Home") {
       event.preventDefault();
@@ -140,11 +138,11 @@ export function PanelResizer(props: PanelResizerProps) {
   return (
     <hr
       ref={(element) => (handle = element)}
-      class={`panel-resizer no-drag ${drag.isDragging() ? "panel-resizer-active" : ""} ${props.class ?? ""}`}
+      class={`panel-resizer no-drag ${vertical ? "panel-resizer-vertical" : ""} ${drag.isDragging() ? "panel-resizer-active" : ""} ${props.class ?? ""}`}
       tabindex={0}
       aria-label={props.label}
       aria-controls={props.controls}
-      aria-orientation="vertical"
+      aria-orientation={vertical ? "horizontal" : "vertical"}
       aria-valuemin={props.snap?.compactValue ?? props.min}
       aria-valuemax={maximum()}
       aria-valuenow={displayedValue()}

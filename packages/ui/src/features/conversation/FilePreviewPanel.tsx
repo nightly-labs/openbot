@@ -29,6 +29,7 @@ import { type CodeToken, fileCodeLanguage, highlightedCodeLines } from "@openbot
 import { MarkdownFilePreview } from "@openbot/ui/features/conversation/MarkdownFilePreview";
 import type { QuoteShortcutModifier } from "@openbot/ui/features/conversation/SelectionActions";
 import { SpreadsheetFilePreview } from "@openbot/ui/features/conversation/SpreadsheetFilePreview";
+import { WordFilePreview } from "@openbot/ui/features/conversation/WordFilePreview";
 import { useText } from "@openbot/ui/text";
 import { holdFlag } from "@openbot/ui/utils";
 import type { JSX } from "@solidjs/web";
@@ -36,70 +37,38 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show
 
 import { MediaFilePreview } from "./MediaFilePreview";
 
-/** The side panel has one width for all its panes, so this pane has the smallest width of the settings pane. */
 const PANEL_MIN = SETTINGS_PANEL_DEFAULT;
 const TEXT_LIMIT = 1_000_000;
-/** Longer text shows as plain text, so the panel stays responsive. */
 const HIGHLIGHT_LIMIT = 200_000;
-/**
- * Text with a longer line also shows as plain text. The tokenizer time for one string literal
- * grows with the square of its length, and a long string is usually on one line.
- */
 const HIGHLIGHT_LINE_LIMIT = 5_000;
-/** Kinds the panel hands to the browser as an object URL instead of decoding itself. */
 const BLOB_PREVIEW_KINDS = new Set<FilePreview["previewKind"]>(["image", "pdf", "audio", "video"]);
 
 interface FilePreviewPanelProps {
-  /** The shared width of the side panel: the width from the last drag, or the default. */
   readWidth: () => number;
   onResizeEnd: (width: number) => void;
   onResetWidth: () => void;
   readWrapLines: () => boolean;
   onWrapLinesChange: (wrap: boolean) => void;
-  /** Empty while the panel shows a folder. */
   preview: FilePreview | null;
-  /**
-   * Names the shown file. A new preview with the same key is the same file read again, so the panel
-   * keeps the source view. Absent means that each preview is another file.
-   */
   fileKey?: string | undefined;
-  /** A workspace folder. The panel lists it instead of a file. */
   directory?: WorkspaceDirectory | null;
   agents: AgentProfile[];
   maxWidth: () => number;
   onWidthChange: (width: number) => void;
   onOpenLink: (url: string) => void;
   onOpenSharedFile: (path: string) => void;
-  /** Absent when no agent workspace can resolve a path, so a path stays text. */
   onOpenWorkspaceFile?: ((path: string) => void) | undefined;
   onOpenWorkspaceFolder?: (path: string) => void;
-  /** Goes to the folder the file came from, or to the parent of the folder. */
   onBack?: (() => void) | undefined;
-  /** Set when the file already has a URL the panel can point at, as an attachment does. */
   sourceUrl?: string | null;
-  /**
-   * Set for an HTML file that the app can serve as a sandboxed page with its scripts. The panel
-   * shows the page, and the source on request. Without it the panel shows the source.
-   */
   pageUrl?: string | null | undefined;
-  /** The page itself, for a client that has no page URL. It replaces `pageUrl`. */
   pageHtml?: string | null | undefined;
-  /**
-   * The quote id of the file, without lines. With it, a selection in a text or Markdown file opens
-   * the selection actions, so the user can quote the passage or ask for a change.
-   */
   selectionQuoteId?: string | undefined;
-  /** Quotes text that the user selected in the page. See `ChatVisual`. */
   onPageQuote?: ((text: string) => void) | undefined;
-  /** The page state for the agent, shown to the user with their next message. See `ChatVisual`. */
   onPageContext?: ((text: string) => void) | undefined;
-  /** Text that the page wrote for the user's message box. See `ChatVisual`. */
   onPageMessage?: ((text: string) => void) | undefined;
-  /** Whether a key chord that the user pressed in the page is an app shortcut. See `ChatVisual`. */
   isPageAppShortcut?: ((key: ChatVisualKey) => boolean) | undefined;
-  /** The modifier of the quote shortcut on this device. */
   quoteShortcut?: QuoteShortcutModifier | undefined;
-  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
   macWindowControls?: boolean | undefined;
   onOpenExternally: () => void;
   allowExternalOpen?: boolean;
@@ -112,8 +81,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   const { t, format } = useText();
   const [panelWidth, setPanelWidth] = createSignal(props.readWidth());
   const [previewUrl, setPreviewUrl] = createSignal<string | null>(null);
-  // The panel mounts when a file opens, so it has to paint its closed state
-  // first. Two frames guarantee that paint before the open state applies.
   const [revealed, setRevealed] = createSignal(false);
   const [rawSource, setRawSource] = createSignal(false);
   const [wrapLines, setWrapLines] = createSignal(untrack(() => props.readWrapLines()));
@@ -124,7 +91,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   const pageUrl = () => (previewKind() === "text" ? props.pageUrl : null) ?? null;
   const pageHtml = () => (previewKind() === "text" ? props.pageHtml : null) ?? null;
   const hasPage = () => pageHtml() !== null || pageUrl() !== null;
-  /** A file of a type the panel shows, over the size limit that `src/main/file-preview.ts` reads (#9272). */
   const tooLarge = () => {
     const preview = file();
     return (
@@ -136,7 +102,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   const showsSourceText = () =>
     (previewKind() === "text" && (rawSource() || !hasPage())) || (previewKind() === "markdown" && rawSource());
   const title = () => props.directory?.name ?? props.preview?.name ?? "";
-  /** The whole text of a text or Markdown file. Copy takes all of it; the view shows up to `TEXT_LIMIT`. */
   const source = createMemo(() => {
     const preview = file();
     if (!preview?.bytes || (preview.previewKind !== "text" && preview.previewKind !== "markdown")) return "";
@@ -154,22 +119,22 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
       props.onWidthChange(width);
     },
   );
-  // A memo, because an effect runs again on an equal value and a file read again has an equal key.
   const shownFile = createMemo(() => props.fileKey ?? file());
   createEffect(shownFile, () => {
     setRawSource(false);
   });
   createEffect(
-    () => ({ preview: file(), sourceUrl: props.sourceUrl }),
-    ({ preview, sourceUrl }) => {
+    () => ({ preview: file(), sourceUrl: props.sourceUrl, pageUrl: props.pageUrl }),
+    ({ preview, sourceUrl, pageUrl }) => {
       if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
       currentPreviewUrl = null;
       if (!preview) {
         setPreviewUrl(null);
         return;
       }
-      if (sourceUrl && BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
-        setPreviewUrl(sourceUrl);
+      const directUrl = sourceUrl || (preview.previewKind === "pdf" ? pageUrl : null);
+      if (directUrl && BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
+        setPreviewUrl(directUrl);
         return;
       }
       if (!preview.bytes || !BLOB_PREVIEW_KINDS.has(preview.previewKind)) {
@@ -177,8 +142,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         return;
       }
       const blob = new Blob([new Uint8Array(preview.bytes).buffer], { type: preview.mimeType });
-      // The renderer policy allows `data:` images and no object URL images. A `data:` SVG also has
-      // no app origin when it is opened on its own. The reader encodes off the UI thread.
       if (preview.previewKind === "image") {
         let current = true;
         setPreviewUrl(null);
@@ -203,9 +166,8 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   });
 
   let panel!: HTMLElement;
-  // The chat beside the panel makes room for it (`panel-layout.css`).
   onSettled(() => {
-    const conversation = panel.closest(".conversation-panel");
+    const conversation = panel.closest("[data-side-split]") ? null : panel.closest(".conversation-panel");
     return conversation ? holdFlag(conversation, "file-preview-panel") : undefined;
   });
 
@@ -224,7 +186,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
     props.onWrapLinesChange(wrap);
   };
 
-  // When the chat gets wider again, the panel goes back to the width from the last drag.
   const resizeDefaultPanel = () => {
     setPanelWidth(Math.round(Math.min(props.maxWidth(), Math.max(PANEL_MIN, props.readWidth()))));
   };
@@ -321,7 +282,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
             </HeaderButton>
           )}
         </Show>
-        {/* In the side panel, the file tab closes the file, so this button hides there. */}
         <HeaderButton
           label={t("preview.panel.close")}
           class="side-panel-pane-close"
@@ -433,6 +393,9 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={previewKind() === "spreadsheet"}>
           <SpreadsheetFilePreview class="file-preview-spreadsheet" bytes={file()?.bytes ?? null} />
         </Show>
+        <Show when={previewKind() === "document"}>
+          <WordFilePreview class="file-preview-markdown" bytes={file()?.bytes ?? null} />
+        </Show>
         <Show when={previewKind() === "none"}>
           <div class="file-preview-unsupported">
             <File />
@@ -450,7 +413,6 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
   );
 }
 
-/** An icon-only header button. Its label names it for a screen reader and in a tooltip. */
 function HeaderButton(props: {
   label: string;
   class?: string;
@@ -478,7 +440,6 @@ function HeaderButton(props: {
   );
 }
 
-/** The text of a file, highlighted as code when its name gives a language that chat code blocks highlight. */
 function FileSourceText(props: { name: string; text: string; wrap: boolean; selectionQuoteId?: string | undefined }) {
   const [tokens, setTokens] = createSignal<CodeToken[] | null>(null);
   let highlightRun = 0;

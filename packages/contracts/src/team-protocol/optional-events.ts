@@ -8,17 +8,18 @@ import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
 import { type BrowserPageStateEvent, browserPageStateEvent } from "./browser-page-state-v1";
 import { type BrowserProfilesEvent, browserProfilesEvent } from "./browser-profiles-events-v1";
 import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser-user-control-v1";
-// Events that optional capabilities add outside the frozen base event vocabularies. The base event
-// adapters reject them, so each transport asks here first and sends or decodes them as they are.
 import { type ChannelEvent, channelEvent } from "./channels-v1";
 import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
+import { type ClientBrowserCommandEvent, clientBrowserCommandEvent } from "./client-browser-v1";
 import { type CrmEvent, crmEvent } from "./crm-v1";
 import { type HostAppearanceEvent, hostAppearanceEvent } from "./host-appearance-v1";
+import { type HostTurnLimitsEvent, hostTurnLimitsEvent } from "./host-turn-limits-events-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
 import { type LibraryFoldersEvent, libraryFoldersEvent } from "./library-folders-events-v1";
 import { type LiveVoiceEvent, liveVoiceEvent } from "./live-voice-v1";
 import { type MachineAlertEvent, machineAlertEvent } from "./machine-resources-v1";
 import { type MessagePinsEvent, messagePinsEvent } from "./message-pins-v1";
+import { type OpenBotCreditsEvent, openBotCreditsEvent } from "./openbot-credits-events-v1";
 import { type QuietTurnCompletedEvent, quietTurnEvent } from "./quiet-turn-v1";
 import { type RoutineFlowsEvent, routineFlowsEvent } from "./routine-flows-v1";
 import { type SidebarFoldersEvent, sidebarFoldersEvent } from "./sidebar-folders-v1";
@@ -26,6 +27,7 @@ import { type SidebarPinsEvent, sidebarPinsEvent } from "./sidebar-pins-v1";
 import { type SkillsEvent, skillsEvent } from "./skills-events-v1";
 import { type UsageCreditsEvent, usageCreditsEvent } from "./usage-credits-v1";
 import { type VaultEvent, vaultEvent } from "./vault-v1";
+import { type WorkflowFoldersEvent, workflowFoldersEvent } from "./workflow-folders-v1";
 import { type WorkflowsEvent, workflowsEvent } from "./workflows-v1";
 
 export type OptionalTeamEvent =
@@ -35,6 +37,7 @@ export type OptionalTeamEvent =
   | AgentNotificationLevelsEvent
   | AgentSessionSettingsEvent
   | ChatColorsEvent
+  | ClientBrowserCommandEvent
   | BrowserPageStateEvent
   | BrowserProfilesEvent
   | BrowserUserControlEvent
@@ -42,10 +45,12 @@ export type OptionalTeamEvent =
   | ChannelEvent
   | HostAppearanceEvent
   | HostRestartEvent
+  | HostTurnLimitsEvent
   | LibraryFoldersEvent
   | LiveVoiceEvent
   | MachineAlertEvent
   | MessagePinsEvent
+  | OpenBotCreditsEvent
   | SidebarPinsEvent
   | SidebarFoldersEvent
   | SkillsEvent
@@ -54,17 +59,13 @@ export type OptionalTeamEvent =
   | UsageCreditsEvent
   | VaultEvent
   | WorkflowsEvent
+  | WorkflowFoldersEvent
   | CrmEvent;
 
 export interface OptionalTeamEventOptions {
-  /**
-   * agent-task-ui-blocks-v1: a task conversation keeps its UI blocks. A host passes the negotiated
-   * capability; a client passes `true`, because a host sends the blocks only when it was negotiated.
-   */
   agentTaskUiBlocks?: boolean;
 }
 
-/** The optional event in `value`, or null for any other event. A malformed optional event throws. */
 export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOptions): OptionalTeamEvent | null {
   const event =
     agentAccessEvent(value) ??
@@ -73,6 +74,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentNotificationLevelsEvent(value) ??
     agentSessionSettingsEvent(value) ??
     chatColorsEvent(value) ??
+    clientBrowserCommandEvent(value) ??
     browserPageStateEvent(value) ??
     browserProfilesEvent(value) ??
     browserUserControlEvent(value) ??
@@ -80,10 +82,12 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     channelEvent(value) ??
     hostAppearanceEvent(value) ??
     hostRestartEvent(value) ??
+    hostTurnLimitsEvent(value) ??
     libraryFoldersEvent(value) ??
     liveVoiceEvent(value) ??
     machineAlertEvent(value) ??
     messagePinsEvent(value) ??
+    openBotCreditsEvent(value) ??
     sidebarPinsEvent(value) ??
     sidebarFoldersEvent(value) ??
     skillsEvent(value) ??
@@ -92,11 +96,11 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     usageCreditsEvent(value) ??
     vaultEvent(value) ??
     workflowsEvent(value) ??
+    workflowFoldersEvent(value) ??
     crmEvent(value);
   return event && options?.agentTaskUiBlocks ? withAgentTaskEventUiBlocks(event, value) : event;
 }
 
-/** Translate the optional wire event at each native transport boundary. */
 export function optionalTeamEventToCurrent(event: OptionalTeamEvent) {
   if (event.type === "sidebar-folders-changed")
     return { type: "sidebar-layout-changed" as const, layout: event.layout };

@@ -44,7 +44,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} è stata installata prima del tracciamento della versione esatta. Aggiornala o riparala prima di pubblicare.",
   "error.skill.tooManySkills": "Un agente può avere fino a {limit} skill.",
-  "error.skill.unmanagedExists": "Esiste già una skill non gestita in {path}.",
+  "error.skill.ownSkillExists":
+    "Questo agente ha già una propria skill chiamata {slug}. Chiedi all'agente di rinominare o eliminare quella skill, poi aggiungi di nuovo questa skill.",
   "error.skill.managedSlug": "OpenBot dà a ogni agente la propria skill {slug}. Dai un altro nome a questa skill.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md è più grande di 64 KB. Accorcialo prima di pubblicare.",
   "error.skill.localNoRevisions": "La skill locale non ha revisioni pubblicate.",

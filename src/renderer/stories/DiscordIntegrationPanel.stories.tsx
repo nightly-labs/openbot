@@ -10,7 +10,6 @@ import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT_SUMMARIES } from "./fixtures";
 import { SettledArgs } from "./settled-args";
 
-/** Marketplace > Apps > Discord: the Slack page with `platform` "discord". */
 const meta = {
   title: "Settings/DiscordIntegrationPanel",
   component: SlackIntegrationPanel,
@@ -68,7 +67,6 @@ const ROLES: MessagingRole[] = [
   { id: "200000000000000003", name: "Member" },
 ];
 
-/** The second Discord server of a page. */
 const SECOND_GUILD: Partial<MessagingConnection> = {
   workspaceId: "100000000000000003",
   workspaceName: "Acme Support",
@@ -87,7 +85,6 @@ const args = (connections: MessagingConnection[], busy = false) => ({
   onAddOrchestrator: fn(),
 });
 
-/** Who can use OpenBot, with `allowed` saved for every Discord server. */
 function access(allowed: MessagingRole[], unsupported = false): DiscordAccessControl {
   return {
     allowed: () => allowed,
@@ -97,13 +94,10 @@ function access(allowed: MessagingRole[], unsupported = false): DiscordAccessCon
   };
 }
 
-/** No Discord server yet: Connect Discord opens the dialog. */
 export const NotSetUp: Story = { args: args([]) };
 
-/** The Discord server is connected, and the Discord Orchestrator answers. */
 export const Connected: Story = { args: args([guild()]) };
 
-/** The Discord server is connected, and no agent answers yet. */
 export const NoOrchestrator: Story = { args: args([guild({ orchestratorAgentId: null })]) };
 
 export const Paused: Story = { args: args([guild({ enabled: false, state: "paused" })]) };
@@ -112,25 +106,20 @@ export const Removed: Story = { args: args([guild({ state: "invalid_token" })]) 
 
 export const RelayUnavailable: Story = { args: args([guild({ state: "relay_unavailable" })]) };
 
-/** Two Discord servers. One orchestrator answers both, and Add Discord server connects another. */
 export const TwoServers: Story = { args: args([guild(), guild(SECOND_GUILD)]) };
 
-/** An earlier build gave each Discord server its own orchestrator. The page shows both, and keeps them. */
 export const EarlierBuildTwoOrchestrators: Story = {
   args: args([guild(), guild({ ...SECOND_GUILD, orchestratorAgentId: SECOND_ORCHESTRATOR.id })]),
 };
 
-/** Two Discord servers, each with its own role list. */
 export const TwoServersAccess: Story = {
   args: { ...args([guild(), guild(SECOND_GUILD)]), access: access(ROLES.slice(0, 1)) },
 };
 
-/** The second Discord server has no orchestrator yet: the header gives it the one that exists. */
 export const SecondServerNoOrchestrator: Story = {
   args: args([guild(), guild({ ...SECOND_GUILD, orchestratorAgentId: null })]),
 };
 
-/** The page has the maximum number of Discord servers, so Add Discord server is off. */
 export const AtLimit: Story = {
   args: args(
     Array.from({ length: MESSAGING_LIMITS.connections }, (_, index) =>
@@ -139,13 +128,10 @@ export const AtLimit: Story = {
   ),
 };
 
-/** No role is chosen, so everyone in the Discord server can mention OpenBot. */
 export const DiscordAccessEveryone: Story = { args: { ...args([guild()]), access: access([]) } };
 
-/** Only members with Admin or Moderator can mention OpenBot. */
 export const DiscordAccessRoles: Story = { args: { ...args([guild()]), access: access(ROLES.slice(0, 2)) } };
 
-/** The joined server's OpenBot is too old to choose roles. */
 export const DiscordAccessUnsupported: Story = {
   args: { ...args([guild()]), hostName: "Studio Mac", access: access([], true) },
 };
@@ -163,19 +149,16 @@ const dialogArgs = (connection: MessagingConnection | null) => ({
   onClose: fn(),
 });
 
-/** Step 1: Discord's authorization page opens in the browser. */
 export const ConnectGuild: DialogStory = {
   render: (props) => <SlackConnectDialog {...props} />,
   args: dialogArgs(null),
 };
 
-/** Step 2: the Discord server is connected, and the Discord Orchestrator is added next. */
 export const AddOrchestrator: DialogStory = {
   render: (props) => <SlackConnectDialog {...props} />,
   args: dialogArgs(guild({ orchestratorAgentId: null })),
 };
 
-/** Done: the Discord server has its Discord Orchestrator. */
 export const ConnectDone: DialogStory = {
   render: (props) => <SlackConnectDialog {...props} />,
   args: dialogArgs(guild()),

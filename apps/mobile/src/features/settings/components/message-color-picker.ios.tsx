@@ -7,16 +7,13 @@ import { useNativeLabelFont } from "@/shared/lib/native-label-font";
 import { useText } from "@/shared/lib/text";
 import type { MessageColorPickerProps } from "./message-color-picker.types";
 
-/** A drag in the system picker reports each frame. The color is saved when it stays this long. */
 const SAVE_DELAY_MS = 400;
 
-/** `#RRGGBB` or `#RRGGBBAA` from SwiftUI as a lower-case `#rrggbb`. */
 function opaqueColor(selection: string): AvatarColor | null {
   const color = selection.slice(0, 7).toLowerCase();
   return isAvatarColor(color) ? color : null;
 }
 
-/** iOS: the system color picker, with its grid, spectrum, sliders and eyedropper. */
 export function MessageColorPicker({ value, disabled, dark, onChange }: MessageColorPickerProps) {
   const { t } = useText();
   const labelFont = useNativeLabelFont();
@@ -24,7 +21,6 @@ export function MessageColorPicker({ value, disabled, dark, onChange }: MessageC
   const pending = useRef<{ timer: ReturnType<typeof setTimeout>; color: AvatarColor } | null>(null);
   const latestOnChange = useRef(onChange);
   latestOnChange.current = onChange;
-  // Leaving the screen saves a color that is still waiting.
   useEffect(
     () => () => {
       if (!pending.current) return;

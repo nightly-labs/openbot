@@ -1,6 +1,10 @@
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { type HostStatus, LOCAL_SERVER_ID, type ServerSummary } from "@openbot/contracts/ipc";
+import { OWNER_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/owner-transfer-v1";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import type { CentralAuthManager } from "../central-auth-manager";
 import type { HostService } from "../host-service";
 import type { LocalServers } from "../local-servers/local-servers";
 import type { RemoteDesktopManager } from "../remote-desktop-manager";
@@ -8,6 +12,7 @@ import type { RemoteServerManager } from "../remote-server-manager";
 import { agentRequest } from "./agent-inputs";
 import { handler, type IpcGroupHandlers, payloadHandler } from "./define-ipc-group";
 import { routeToServer } from "./route-to-server";
+import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import {
   parseCreateTeamInvite,
   parseDirectTyping,
@@ -24,6 +29,7 @@ import {
   parseRemoteDesktopTest,
   parseReorderServers,
   parseSendDirectMessage,
+  parseSetServerHidden,
   parseSetServerMuted,
   parseSetServerNotificationLevel,
   parseSetTeamTyping,
@@ -33,8 +39,8 @@ import { stringPayload } from "./validation";
 
 interface TeamIpcDependencies {
   host: HostService;
-  /** Null in a local server, in server mode and on a hosted server. */
   localServers: LocalServers | null;
+  ownerTransfers: Pick<CentralAuthManager, "pendingOwnerTransfer" | "startOwnerTransfer" | "cancelOwnerTransfer">;
   remoteDesktop: RemoteDesktopManager;
   remoteServers: RemoteServerManager;
   takePendingInvite: () => string | null;
@@ -43,14 +49,27 @@ interface TeamIpcDependencies {
 export function teamIpcHandlers({
   host,
   localServers,
+  ownerTransfers,
   remoteDesktop,
   remoteServers,
   takePendingInvite,
 }: TeamIpcDependencies): Pick<IpcGroupHandlers, "servers" | "host" | "remoteDesktop"> {
+  const ownerTransferUnsupported = (): never => {
+    throw new Error(sourceText("error.team.ownerTransferUnsupported"));
+  };
+  const ownerTransferHost = (serverId: string): string => {
+    if (!remoteServers.supportsCapability(serverId, OWNER_TRANSFER_CAPABILITY)) ownerTransferUnsupported();
+    return serverId;
+  };
   return {
     servers: {
       setMuted: payloadHandler(parseSetServerMuted, ({ serverId, muted, durationMs }) =>
         runCauseEffect(remoteServers.setMuted(serverId, muted, durationMs)).then((servers) =>
+          withLocalHostSummary(servers, host.getStatus()),
+        ),
+      ),
+      setHidden: payloadHandler(parseSetServerHidden, ({ serverId, hidden }) =>
+        runCauseEffect(remoteServers.setHidden(serverId, hidden)).then((servers) =>
           withLocalHostSummary(servers, host.getStatus()),
         ),
       ),
@@ -74,8 +93,6 @@ export function teamIpcHandlers({
       previewInvite: payloadHandler(parseJoinServer, (request) => runCauseEffect(remoteServers.previewInvite(request))),
       takePendingInvite: handler(takePendingInvite),
       login: payloadHandler(parseLoginServer, (request) => runCauseEffect(remoteServers.login(request))),
-      // A stopped server on this computer has no process to connect to, so Retry starts it. Only this
-      // computer can start its own child processes: web and mobile clients only reconnect.
       retryConnection: payloadHandler(stringPayload("serverId"), (serverId) =>
         runCauseEffect(
           (localServers?.startStopped(serverId) ?? Effect.succeed(null)).pipe(
@@ -117,6 +134,19 @@ export function teamIpcHandlers({
       createInvite: payloadHandler(agentRequest(parseCreateTeamInvite), ({ serverId, payload }) =>
         runCauseEffect(remoteServers.createInvite(serverId, payload)),
       ),
+      getOwnerTransfer: scopedQueryHandler({
+        local: ownerTransferUnsupported,
+        remote: (serverId) => runCauseEffect(ownerTransfers.pendingOwnerTransfer(ownerTransferHost(serverId))),
+      }),
+      startOwnerTransfer: scopedHandler(stringPayload("email", INPUT_LIMITS.email), {
+        local: ownerTransferUnsupported,
+        remote: (email, serverId) =>
+          runCauseEffect(ownerTransfers.startOwnerTransfer(ownerTransferHost(serverId), email)),
+      }),
+      cancelOwnerTransfer: scopedQueryHandler({
+        local: ownerTransferUnsupported,
+        remote: (serverId) => runCauseEffect(ownerTransfers.cancelOwnerTransfer(ownerTransferHost(serverId))),
+      }),
       setTyping: payloadHandler(parseSetTeamTyping, (parsed) =>
         routeToServer<void>(remoteServers.activeServerId, {
           local: () => host.setTyping(parsed),

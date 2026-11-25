@@ -2,11 +2,10 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/mcp";
 
 export const messages = {
-  // MCP sign-in errors, and the sign-in page in the browser.
   "error.mcp.redirectByName": "Cette adresse n’est pas accessible par un nom.",
   "error.mcp.redirectNotSignIn": "Cette adresse ne fait pas partie d’une connexion.",
   "error.mcp.redirectRefused": "La connexion a été refusée. Revenez à OpenBot, puis réessayez.",
-  "error.mcp.redirectNoSignIn": "Aucune connexion n’attend cette réponse. Elle est peut-être terminée.",
+  "error.mcp.redirectNoSignIn": "Cette connexion n’est plus active. Revenez dans OpenBot et relancez la connexion.",
   "error.mcp.redirectSignedIn": "OpenBot est connecté. Vous pouvez fermer cette fenêtre.",
   "error.mcp.redirectNotSaved": "La connexion n’a pas abouti. Revenez dans OpenBot pour en voir la raison.",
   "error.mcp.signInFileUnreadable": "Impossible de lire le fichier de connexion MCP.",
@@ -21,6 +20,7 @@ export const messages = {
     "Ce serveur ne prend pas en charge les apps de connexion. Mettez à jour OpenBot sur l’hôte.",
   "error.mcp.redirectRelayed": "OpenBot a envoyé la connexion au serveur. Vous pouvez fermer cette fenêtre.",
   "error.mcp.relayEnded": "Cette connexion est terminée. Relancez-la.",
+  "error.mcp.signInLinkNotReady": "La page de connexion n’est pas encore ouverte. Réessayez dans un instant.",
   "error.mcp.relayNoState":
     "La page de connexion du serveur ne protège pas son adresse de retour : OpenBot ne l’ouvre donc pas sur cet ordinateur.",
   "error.mcp.relayAddressInvalid":

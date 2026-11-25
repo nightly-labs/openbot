@@ -1,13 +1,3 @@
-// Checks the `set_commit_co_author` tool of issue #7579 through the real agent defaults settings, the
-// real preference file, agent store and agent service on a temporary user data folder, and the
-// developer instructions that an agent gets. An agent turns the OpenBot co-author trailer off and on
-// again; a turn that no person started, a declined card and a card that nobody answers change nothing.
-// Each call goes through `handleSetCommitCoAuthorTool`, as the tool router sends it, with a card stub
-// that records the text and gives the owner's answer. The agent service is not initialized, so no
-// provider starts.
-// Run: `bun scripts/agent-commit-co-author-tool-e2e.ts`.
-// Writes .openbot-build/agent-commit-co-author-tool-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -64,6 +54,7 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -82,7 +73,6 @@ const agentBrowser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-// The file name of `AGENT_DEFAULTS_PREFERENCE_FILE` in `application-services.ts`.
 const defaultsPath = join(userData, "openbot-agent-defaults-v1.json");
 const agentDefaults = createAgentDefaultsPreferenceStore(defaultsPath);
 const database = new OpenBotDatabase(userData);
@@ -107,7 +97,6 @@ try {
 
   const cards: string[] = [];
   let answer: ToolApprovalDecision = "accept";
-  /** One `set_commit_co_author` call, answered as the tool router answers it. */
   const call = async (args: unknown, requestedByPerson = true): Promise<{ success: boolean; value: DynamicRecord }> => {
     const response = await Effect.runPromise(
       handleSetCommitCoAuthorTool(

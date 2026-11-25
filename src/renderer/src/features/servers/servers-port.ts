@@ -1,10 +1,5 @@
 import type { OpenBotDesktopApi, ServerSummary } from "@openbot/contracts/ipc";
 
-/**
- * What the servers domain reaches in main: the server list and selection, the account changes, the local host, the
- * settings of one server, the name, logo and update of a joined server's host, the servers that
- * run on this computer, and the remote desktop setup of a server.
- */
 export interface ServersPort {
   agent: Pick<
     OpenBotDesktopApi["agent"],
@@ -38,7 +33,10 @@ export interface ServersPort {
     OpenBotDesktopApi["hostAdmin"],
     "cancelUpdate" | "getUpdateStatus" | "restartHost" | "rotateHostKey" | "startUpdate" | "updateIdentity"
   >;
-  hostedServers: Pick<OpenBotDesktopApi["hostedServers"], "list" | "restart" | "wake">;
+  hostedServers: Pick<
+    OpenBotDesktopApi["hostedServers"],
+    "list" | "openCheckout" | "openCustomCheckout" | "restart" | "wake"
+  >;
   localServers: OpenBotDesktopApi["localServers"];
   host: Pick<
     OpenBotDesktopApi["host"],
@@ -71,20 +69,16 @@ export interface ServersPort {
     | "reorder"
     | "retryConnection"
     | "select"
+    | "setHidden"
     | "setMuted"
     | "setNotificationLevel"
   >;
 }
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function serversPort(): ServersPort {
   return window.openbot;
 }
 
-/**
- * The member and invite calls for one server. This computer answers them for the local server
- * through `host`; a remote server answers them through `servers`, addressed by its id.
- */
 export type ServerAdminPort = Pick<
   OpenBotDesktopApi["host"],
   "getPresence" | "listMembers" | "listInvites" | "createInvite" | "updateMember" | "removeMember" | "revokeInvite"
@@ -104,7 +98,6 @@ export function serverAdminPort(server: Pick<ServerSummary, "id" | "kind">): Ser
   };
 }
 
-/** The server main marks active. A test teardown can remove the bridge while a join is pending. */
 export async function activeServerId(): Promise<string> {
   if (!window.openbot) return "local";
   return (await window.openbot.servers.list()).find((item) => item.active)?.id ?? "local";

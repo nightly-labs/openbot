@@ -1,23 +1,3 @@
-// Measures how much of each Claude request reads the prompt cache after the events that OpenBot
-// causes between turns. Runs the real Claude CLI with the user's Claude login, on Claude Haiku, in
-// a temporary git workspace. Each variant runs these turns in one session:
-//   1. the first turn of a new process,
-//   2. a second turn in the same process (the baseline: it reads the cache),
-//   3. a turn after an idle release, with no change in the workspace,
-//   4. a turn after a file change in the git workspace and another idle release,
-//   5. a turn with another effort,
-//   6. a turn after `thread/resume` with other section-mates (a sidebar move): the list goes in the
-//      turn, so the query stays and the prompt reads the cache,
-//   7. a turn after `thread/resume` with other developer instructions (a profile edit),
-//   8. the first turn of a new session in the same workspace (a runtime refresh),
-//   9. and 10. two routine runs: each in an ephemeral session of its own, as `startRoutineThread`
-//      starts them.
-// The variants change the system prompt options the way `ClaudeAgentClient` could. Measured on
-// 2026-10-24 with CLI 2.1.305: the variants keep the same cache as `current`. A routine session reads
-// the prefix that another session of the agent wrote, so the 1-hour cache is the better one for runs
-// less than an hour apart.
-// Costs a few Haiku turns. `bun run test:claude-cache`; `--variant=<name>` runs one variant.
-// Writes .openbot-build/claude-cache-e2e/report.json.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -69,7 +49,6 @@ interface RequestUsage {
   input: number;
   cacheRead: number;
   cacheWrite: number;
-  /** The part of the cache write that lives one hour. It costs twice the input price, not 1.25 times. */
   cacheWriteOneHour: number;
   output: number;
 }
@@ -78,7 +57,6 @@ interface TurnReport {
   step: string;
   processes: number;
   requests: RequestUsage[];
-  /** The share of the first request's prompt that came from the cache. */
   firstRequestCacheShare: number;
 }
 
@@ -92,7 +70,6 @@ const report: {
   cli: { executable: string; version: string };
   model: string;
   variants: Array<{ name: string; description: string; turns: TurnReport[]; error?: string }>;
-  /** Whether the session transcripts hold the changed section-mates in a turn block. */
   teammatesBlockSent?: boolean;
 } = { cli: { executable: cli.executable, version: cli.version }, model: MODEL, variants: [] };
 
@@ -114,8 +91,6 @@ for (const variant of variants) {
   git(workspace, "add", ".");
   git(workspace, "commit", "-q", "-m", "Start");
 
-  // The real SDK, with the variant's options and a copy of each request's usage. A message repeats
-  // its request once per content block; the last copy has the final count.
   let requests = new Map<string, RequestUsage>();
   let processes = 0;
   const createQuery = (params: Parameters<typeof query>[0]) => {
@@ -245,8 +220,6 @@ for (const variant of variants) {
   }
 }
 
-// The CLI keeps each session under ~/.claude/projects in a folder named after the workspace path.
-// Only the folders of this run's temporary workspaces are removed.
 const projects = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
 const runName = basename(root);
 let transcripts = "";

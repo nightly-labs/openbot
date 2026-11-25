@@ -1,13 +1,3 @@
-// Runs the real account server host and session tickets on a migrated SQLite database, with two
-// Signal homes configured. A host that asks for a home gets one by the rendezvous hash, keeps it,
-// moves only when that home failed for it, and its members follow it. Other host tickets, and a
-// Worker with no homes, name the entry Signal and no `signal` claim. Two requests that race store
-// one home. With home locations, a host gets one of the homes near the place of its request and
-// moves to it from a far home, but only when that home answers `/health/ready`. With a country rule,
-// a host in a listed country gets one of the homes of that country, wherever the map puts it.
-//
-// Run: bun apps/auth-api/scripts/remote-signal-homes-e2e.ts
-// It writes .openbot-build/remote-signal-homes-e2e/report.json and exits non-zero on a failure.
 import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -32,7 +22,6 @@ const REGION_URLS = {
 const REGION_HOMES = Object.entries(REGION_URLS)
   .map(([id, url]) => `${id}=${url}`)
   .join(",");
-// a and b in Helsinki, us in San Jose, au in Sydney.
 const REGION_LOCATIONS = "a=60.17:24.94, b=60.17:24.94, us=37.34:-121.89, au=-33.87:151.21";
 const PLACES = {
   berlin: { latitude: 52.52, longitude: 13.4 },
@@ -64,13 +53,11 @@ const ticketKeys = {
   REMOTE_TICKET_KEY_ID: "ticket-1",
 };
 
-/** The `signal` claim of a ticket that the published key verifies, or "none". */
 async function signalClaim(ticket: string): Promise<string> {
   const { payload } = await jwtVerify(ticket, ticketKeyPair.publicKey, { audience: REMOTE_TICKET_AUDIENCE });
   return typeof payload.signal === "string" ? payload.signal : "none";
 }
 
-/** The rendezvous choice of the design over `ids`, computed apart from the Worker code. */
 function rendezvousOf<Id extends string>(hostId: string, ids: readonly Id[]): Id {
   const score = (id: string) => createHash("sha256").update(`${id}\n${hostId}`).digest().readBigUInt64BE(0);
   return ids.reduce((best, id) => (score(id) > score(best) ? id : best));
@@ -84,7 +71,6 @@ function machineToken(hostId: string): string {
   return `machine-token-${hostId}`;
 }
 
-/** Hosts with their owner and one open member session each, on one database. */
 async function hostsWithSessions(hostIds: string[]) {
   const database = await migratedDatabase();
   database
@@ -120,7 +106,6 @@ function storedHome(database: DatabaseSync, hostId: string): string {
   return row?.signal_home === null || row?.signal_home === undefined ? "none" : String(row.signal_home);
 }
 
-/** The Signal machines (host names) whose `/health/ready` fails, and each health URL that was asked. */
 const downMachines = new Set<string>();
 const healthRequests: string[] = [];
 async function healthFetch(input: string | URL | Request): Promise<Response> {
@@ -159,6 +144,7 @@ async function hostTicket(
     failedSignalUrl: string | null;
     location?: SignalLocation | null;
     country?: string | null;
+    preferredSignalHome?: string | null;
   },
 ) {
   const answer = await Effect.runPromise(remote.issueHostTicket(hostId, machineToken(hostId), placement));
@@ -170,7 +156,6 @@ async function sessionTicket(remote: RemoteControlPlane, hostId: string) {
   return { signalUrl: answer.signalUrl, signal: await signalClaim(answer.ticket) };
 }
 
-/** The error code of a failed operation, or "ok". */
 async function outcome<A, E>(operation: Effect.Effect<A, E>): Promise<string> {
   return Effect.runPromise(
     operation.pipe(
@@ -331,10 +316,6 @@ async function anInvalidHomeListFailsClosed() {
   );
 }
 
-/**
- * Two requests of one host read no home, then both write. The D1 holds each home write until both
- * arrive, so the second write always finds the home of the first.
- */
 async function racingRequestsStoreOneHome() {
   const database = await hostsWithSessions(["host-1"]);
   const d1 = sqliteD1(database);
@@ -363,7 +344,6 @@ async function racingRequestsStoreOneHome() {
     return prepared;
   };
   const remote = plane(d1, HOMES);
-  // Each request excludes a different home, so each one chooses a different home.
   const [first, second] = await Promise.all([
     hostTicket(remote, "host-1", asks(HOME_URLS.a)),
     hostTicket(remote, "host-1", asks(HOME_URLS.b)),
@@ -481,6 +461,78 @@ async function hostsGetANearHome() {
     "a host whose stored home is within the margin of the nearest home keeps it (Tokyo: Sydney 7,800 km, San Jose 8,200 km)",
     tokyo.signal === "us",
     { tokyo },
+  );
+}
+
+async function aChosenHomeWinsAndFallsBack() {
+  const database = await hostsWithSessions(["chosen-1", "chosen-2"]);
+  const remote = plane(database, REGION_HOMES, ENTRY_URL, REGION_LOCATIONS);
+  const chooses = (preferredSignalHome: string | null, failedSignalUrl: string | null = null) => ({
+    ...asksFrom(PLACES.berlin, failedSignalUrl),
+    preferredSignalHome,
+  });
+  const listed = await Effect.runPromise(remote.listSignalHomes("chosen-1", machineToken("chosen-1")));
+  check(
+    "the host lists each configured home with its URL",
+    JSON.stringify(listed.homes) === JSON.stringify(Object.entries(REGION_URLS).map(([id, url]) => ({ id, url }))),
+    { listed },
+  );
+  const refused = await outcome(remote.listSignalHomes("chosen-1", "wrong-token"));
+  check("a wrong host credential cannot list the homes", refused !== "ok", { refused });
+
+  const near = await hostTicket(remote, "chosen-1", chooses(null));
+  const chosen = await hostTicket(remote, "chosen-1", chooses("au"));
+  const member = await sessionTicket(remote, "chosen-1");
+  check(
+    "a host in Berlin that chooses Sydney gets Sydney, and its members follow",
+    near.signal !== "au" &&
+      chosen.signal === "au" &&
+      chosen.signalUrl === REGION_URLS.au &&
+      storedHome(database, "chosen-1") === "au" &&
+      member.signal === "au",
+    { near, chosen, member },
+  );
+  const failed = await hostTicket(remote, "chosen-1", chooses("au", REGION_URLS.au));
+  check(
+    "when the chosen home fails, the host gets a near home",
+    failed.signal !== "au" && storedHome(database, "chosen-1") === failed.signal,
+    { failed },
+  );
+  downMachines.add("signal-au.test");
+  const stillDown = await hostTicket(remote, "chosen-1", chooses("au"));
+  downMachines.delete("signal-au.test");
+  check(
+    "while the chosen home does not answer, the host keeps the near home",
+    stillDown.signal === failed.signal && storedHome(database, "chosen-1") === failed.signal,
+    { stillDown },
+  );
+  const back = await hostTicket(remote, "chosen-1", chooses("au"));
+  check(
+    "when the chosen home answers again, the host goes back to it",
+    back.signal === "au" && storedHome(database, "chosen-1") === "au",
+    { back },
+  );
+  const automatic = await hostTicket(remote, "chosen-1", chooses(null));
+  check(
+    "automatic again moves a host in Berlin from Sydney to a Helsinki home",
+    (automatic.signal === "a" || automatic.signal === "b") && storedHome(database, "chosen-1") === automatic.signal,
+    { automatic },
+  );
+  const unknown = await hostTicket(remote, "chosen-2", chooses("sg"));
+  check(
+    "a chosen home that is not configured gives the automatic home",
+    unknown.signal === rendezvousOf("chosen-2", ["a", "b"] as const),
+    { unknown },
+  );
+  const released = await hostTicket(remote, "chosen-2", {
+    signalHome: false,
+    failedSignalUrl: null,
+    preferredSignalHome: "au",
+  });
+  check(
+    "a host ticket without signalHome ignores the chosen home and names the entry",
+    released.signal === "none" && released.signalUrl === ENTRY_URL,
+    { released },
   );
 }
 
@@ -637,6 +689,7 @@ const scenarios = [
   racingRequestsStoreOneHome,
   hostsSpreadOverTheHomes,
   hostsGetANearHome,
+  aChosenHomeWinsAndFallsBack,
   invalidLocationsFailClosed,
   hostsInAListedCountryGetItsHomes,
   invalidCountriesFailClosed,

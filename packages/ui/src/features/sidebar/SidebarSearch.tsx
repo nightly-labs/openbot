@@ -1,8 +1,3 @@
-/**
- * The search field with the filter and the New menu at its end, and the compact-mode button in their place. The field
- * and the button open the global search.
- */
-
 import { Bot, Button, DropdownMenu, FolderPlus, Hash } from "@openbot/ui";
 import { Show } from "solid-js";
 import { useText } from "../../text";

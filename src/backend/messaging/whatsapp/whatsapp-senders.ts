@@ -1,64 +1,52 @@
 import { randomInt } from "node:crypto";
 import { MESSAGING_LIMITS, type WhatsAppPairingRequest } from "@openbot/contracts/ipc";
 
-/** How long a pairing request waits for the owner. */
 const PAIRING_REQUEST_TTL_MS = 60 * 60 * 1000;
-/** No 0/O or 1/I, so a code read aloud is not mistaken. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
-/** Who may give work through one linked number, read from the connection's settings for each message. */
 export interface WhatsAppSenderRules {
-  /** The owner's personal number: only their own chat and the allowed senders count. */
   ownNumber: boolean;
-  /** Phone numbers in digits, each with the name that the user saved for it (empty when none). */
   contacts: ReadonlyMap<string, string>;
-  /** Group JIDs. */
   groups: ReadonlySet<string>;
+  readOnly: ReadonlySet<string>;
 }
 
-/** What one inbound message may do, before anything shows that it was seen. */
-export type SenderDecision =
-  | { type: "allow" }
-  /** A dedicated number answers an unknown person once, with a code for the owner. */
-  | { type: "pair" }
-  /** The message is saved for the chat's history, and nothing answers it. */
-  | { type: "save" }
-  | { type: "ignore" };
+export type SenderDecision = { type: "allow" } | { type: "pair" } | { type: "save" } | { type: "ignore" };
 
 export interface SenderFacts {
   isGroup: boolean;
   chatJid: string;
-  /** The author's phone number in digits, when it is known. A LID-only author has none. */
   authorNumber: string | null;
-  /** The owner wrote it in their own "Message yourself" chat. */
+  contactNumber: string | null;
   isSelfChat: boolean;
-  /** The owner wrote it from this number, in any chat. */
   fromMe: boolean;
 }
 
-/**
- * The OpenClaw sender model. The owner's own chat always counts. An allowed group counts (the
- * transport still needs a mention or a reply in it). An allowed contact counts in a direct chat. On a
- * dedicated number an unknown direct sender gets one pairing code; on the owner's own number nobody
- * else is ever answered, so OpenBot never writes to the owner's contacts by itself.
- */
 export function senderDecision(rules: WhatsAppSenderRules, facts: SenderFacts): SenderDecision {
   if (facts.isSelfChat) return { type: "allow" };
   const allowedGroup = facts.isGroup && rules.groups.has(facts.chatJid);
-  // The owner's own messages in other chats are their personal conversations. In an allowed group they
-  // are part of the conversation that agents read, so they are saved.
-  if (facts.fromMe) return allowedGroup ? { type: "save" } : { type: "ignore" };
-  if (facts.isGroup) return allowedGroup ? { type: "allow" } : { type: "ignore" };
-  if (facts.authorNumber && allowsContact(rules, facts.authorNumber)) return { type: "allow" };
+  const allowedContact = !facts.isGroup && facts.contactNumber !== null && allowsContact(rules, facts.contactNumber);
+  if (facts.fromMe) return allowedGroup || allowedContact ? { type: "save" } : { type: "ignore" };
+  if (facts.isGroup) {
+    if (!allowedGroup) return { type: "ignore" };
+    return rules.readOnly.has(facts.chatJid) ? { type: "save" } : { type: "allow" };
+  }
+  if (facts.authorNumber && allowsContact(rules, facts.authorNumber))
+    return readOnlyContact(rules, facts.authorNumber) ? { type: "save" } : { type: "allow" };
   if (rules.ownNumber || !facts.authorNumber) return { type: "ignore" };
   return { type: "pair" };
 }
 
-/**
- * The forms of one phone number that WhatsApp can use for the same person. Brazil put a 9 before each
- * mobile number, but an account made before that keeps its WhatsApp number without the 9, so the number
- * that people type and the number that WhatsApp sends can differ. Only mobile numbers get the other form.
- */
+export function isReadOnlyChat(rules: WhatsAppSenderRules, chatJid: string): boolean {
+  const [user = "", domain] = chatJid.split("@");
+  if (domain === "g.us") return rules.readOnly.has(chatJid);
+  return readOnlyContact(rules, user.split(":")[0] ?? "");
+}
+
+function readOnlyContact(rules: WhatsAppSenderRules, number: string): boolean {
+  return whatsAppNumberForms(number).some((form) => rules.readOnly.has(form));
+}
+
 export function whatsAppNumberForms(number: string): string[] {
   const brazil = /^55([1-9]{2})(9?)([6-9][0-9]{7})$/u.exec(number);
   if (!brazil) return [number];
@@ -66,16 +54,10 @@ export function whatsAppNumberForms(number: string): string[] {
   return [number, nine ? `55${area}${local}` : `55${area}9${local}`];
 }
 
-/** True when the number is an allowed contact, in any of its forms. */
 export function allowsContact(rules: WhatsAppSenderRules, number: string): boolean {
   return whatsAppNumberForms(number).some((form) => rules.contacts.has(form));
 }
 
-/**
- * The pairing requests of every linked number, in memory only. A request ends after an hour, when the
- * owner answers it, or at a restart; the person can write again for a new code. At most three wait
- * for each number, so a flood of strangers cannot fill the owner's list.
- */
 export class WhatsAppPairingRequests {
   readonly #requests = new Map<string, WhatsAppPairingRequest[]>();
   readonly #now: () => number;
@@ -91,10 +73,6 @@ export class WhatsAppPairingRequests {
     return live;
   }
 
-  /**
-   * The code for this person: the one they already have, or a new one. Null when three others wait,
-   * so the person gets no answer.
-   */
   request(workspaceId: string, senderId: string, name: string): { code: string; created: boolean } | null {
     const live = this.list(workspaceId);
     const existing = live.find((request) => request.senderId === senderId);
@@ -110,7 +88,6 @@ export class WhatsAppPairingRequests {
     return { code: request.code, created: true };
   }
 
-  /** Removes the request of the code and returns it, or null when it ended. */
   take(workspaceId: string, code: string): WhatsAppPairingRequest | null {
     const live = this.list(workspaceId);
     const found = live.find((request) => request.code === code) ?? null;

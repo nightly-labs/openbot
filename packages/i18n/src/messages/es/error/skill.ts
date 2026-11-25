@@ -44,7 +44,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} se instaló antes del seguimiento de versiones exactas. Actualízala o repárala antes de publicar.",
   "error.skill.tooManySkills": "Un agente puede tener hasta {limit} habilidades.",
-  "error.skill.unmanagedExists": "Ya existe una habilidad no gestionada en {path}.",
+  "error.skill.ownSkillExists":
+    "Este agente ya tiene su propia habilidad llamada {slug}. Pide al agente que cambie el nombre de esa habilidad o la elimine y vuelve a añadir esta habilidad.",
   "error.skill.managedSlug": "OpenBot da a cada agente su propia habilidad {slug}. Ponle otro nombre a esta habilidad.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md supera los 64 KB. Acórtalo antes de publicar.",
   "error.skill.localNoRevisions": "La habilidad local no tiene revisiones publicadas.",

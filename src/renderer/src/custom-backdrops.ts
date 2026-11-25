@@ -4,44 +4,27 @@ import { customBackdropId } from "@openbot/ui/features/conversation/chat-backdro
 import { createSignal } from "solid-js";
 import { useChatBackdrop } from "./chat-backdrop-preference";
 
-/**
- * The backdrops that the user added on this device and browser: a picture or GIF, or an HTML page
- * that an agent made. They stay in this browser's IndexedDB. Nothing goes to a joined server: the
- * backdrop changes only this screen. Each window of the app reads the same store, and a change in one
- * window reaches the others through a broadcast channel.
- */
-
-export type CustomBackdropKind = "image" | "page";
+export type CustomBackdropKind = "image" | "video" | "page";
 
 export interface CustomBackdropSummary {
   id: string;
   name: string;
   kind: CustomBackdropKind;
-  /** When the bytes were saved. An agent replaces its backdrop in place, so this tells a new page. */
   createdAt: number;
 }
 
-/**
- * The file is a `Blob`: the browser keeps it out of the record, so the list of backdrops does not load
- * the bytes of each one.
- */
 export interface CustomBackdrop extends CustomBackdropSummary {
   mimeType: string;
   blob: Blob;
 }
 
-/** The pictures that a browser shows and animates. SVG stays out: a page can be made for that. */
-export const CUSTOM_BACKDROP_IMAGE_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-  "image/avif",
-] as const;
+const CUSTOM_BACKDROP_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"] as const;
+const CUSTOM_BACKDROP_VIDEO_TYPES = ["video/mp4", "video/webm"] as const;
+export const CUSTOM_BACKDROP_UPLOAD_TYPES = [...CUSTOM_BACKDROP_IMAGE_TYPES, ...CUSTOM_BACKDROP_VIDEO_TYPES] as const;
 const IMAGE_MIME_TYPES = new Set<string>(CUSTOM_BACKDROP_IMAGE_TYPES);
-/** A larger picture fills the disk and slows each window start. */
+const VIDEO_MIME_TYPES = new Set<string>(CUSTOM_BACKDROP_VIDEO_TYPES);
 const CUSTOM_BACKDROP_IMAGE_LIMIT = 20 * 1_024 * 1_024;
-/** The most backdrops on one device. Adding one more removes the oldest. */
+const CUSTOM_BACKDROP_VIDEO_LIMIT = 100 * 1_024 * 1_024;
 const CUSTOM_BACKDROP_CAPACITY = 12;
 const NAME_LIMIT = 80;
 
@@ -49,10 +32,10 @@ const DATABASE = "openbot-backdrops";
 const STORE = "backdrops";
 const CHANGED_CHANNEL = "openbot:custom-backdrops";
 
-/** The kind of backdrop that a file can be, or null when it cannot be one. */
 export function customBackdropKind(mimeType: string, size: number): CustomBackdropKind | null {
   const type = (mimeType.split(";", 1)[0] ?? "").trim().toLowerCase();
   if (IMAGE_MIME_TYPES.has(type)) return size <= CUSTOM_BACKDROP_IMAGE_LIMIT ? "image" : null;
+  if (VIDEO_MIME_TYPES.has(type)) return size <= CUSTOM_BACKDROP_VIDEO_LIMIT ? "video" : null;
   if (isChatVisualMimeType(type) && type !== "image/svg+xml") return size <= CHAT_VISUAL_PAGE_LIMIT ? "page" : null;
   return null;
 }
@@ -75,7 +58,6 @@ function openDatabase(): Promise<IDBDatabase> {
     open.onsuccess = () => resolve(open.result);
     open.onerror = () => reject(open.error);
   });
-  // A blocked or failed open is tried again on the next call.
   database.catch(() => {
     database = undefined;
   });
@@ -92,7 +74,7 @@ function isCustomBackdrop(value: unknown): value is CustomBackdrop {
   return (
     typeof record.id === "string" &&
     typeof record.name === "string" &&
-    (record.kind === "image" || record.kind === "page") &&
+    (record.kind === "image" || record.kind === "video" || record.kind === "page") &&
     typeof record.mimeType === "string" &&
     record.blob instanceof Blob &&
     typeof record.createdAt === "number"
@@ -120,9 +102,7 @@ async function refresh(): Promise<void> {
   try {
     const all = await readAll();
     setSummaries(all.map(({ id, name, kind, createdAt }) => ({ id, name, kind, createdAt })));
-  } catch {
-    // Blocked storage keeps the list empty: only the built-in scenes show.
-  }
+  } catch {}
 }
 
 let channel: BroadcastChannel | undefined;
@@ -140,7 +120,6 @@ if (typeof window !== "undefined" && "indexedDB" in window) {
   }
 }
 
-/** The backdrops on this device, oldest first. The list changes when any window adds or removes one. */
 export function useCustomBackdrops(): () => CustomBackdropSummary[] {
   return summaries;
 }
@@ -150,16 +129,10 @@ export async function readCustomBackdrop(id: string): Promise<CustomBackdrop | n
   return isCustomBackdrop(record) ? record : null;
 }
 
-/**
- * Keeps a file as a backdrop and answers its id. The caller checks the kind with
- * `customBackdropKind` first. When the device holds the most backdrops, the oldest goes, but never the
- * backdrop that the window shows now.
- */
 export async function addCustomBackdrop(input: {
   name: string;
   mimeType: string;
   bytes: Uint8Array;
-  /** The id of a backdrop that this one replaces in place, such as the one slot of an agent. */
   id?: string;
 }): Promise<string> {
   const kind = customBackdropKind(input.mimeType, input.bytes.byteLength);

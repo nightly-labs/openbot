@@ -1,13 +1,3 @@
-// Runs issue #2851 end to end on the real `codex app-server`: a server in the user's own
-// `config.toml` and an OpenBot server with the same name. Codex merges the two entries, so a stdio
-// `command` and an http `url` under one key stop it from loading its configuration, and the user's
-// `enabled_tools` hides the tools of a server with the same transport (#5786). The payload is
-// the one `readCodexMcpConfig`, `codexDisabledServers`, `codexMcpServers` and `codexThreadMcpServers`
-// build for a thread. A local server that speaks the Responses API stands in for the model and
-// records the MCP namespaces Codex offers, so no account or key is used. Issue #11041: OpenBot's
-// disabled placeholder under a plain key turned off the server that another Codex app, such as T3
-// Code, sends under the same key at runtime; a second thread stands in for that app.
-// `bun scripts/codex-mcp-name-clash-e2e.ts`. Writes .openbot-build/codex-mcp-name-clash-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server as HttpServer } from "node:http";
@@ -38,7 +28,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/codex-mcp-name-clash
 const NL = String.fromCharCode(10);
 const DEADLINE_MS = 60_000;
 
-// A stdio MCP server with one tool.
 const STDIO_SERVER = `
 const readline = require("node:readline");
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + String.fromCharCode(10));
@@ -77,7 +66,6 @@ interface ModelEvent {
   item?: ModelItem;
 }
 
-/** Answers each Responses request with a short text, and records the MCP namespaces it was offered. */
 async function startFakeModel() {
   const offered: string[][] = [];
   const server = createServer((request, response) => {
@@ -114,7 +102,6 @@ async function startFakeModel() {
   return { offered, ...(await listen(server)) };
 }
 
-/** A stateless SDK Streamable HTTP MCP server with one tool, as the GitHub connector's would be. */
 async function startHttpMcp() {
   const server = createServer(async (request, response) => {
     const mcp = new Server({ name: "http", version: "1.0.0" }, { capabilities: { tools: {} } });
@@ -147,7 +134,6 @@ async function listen(server: HttpServer) {
   };
 }
 
-/** The SDK transport, with its optional members spelled the way `exactOptionalPropertyTypes` wants. */
 function asTransport(inner: StreamableHTTPServerTransport): Transport {
   const transport: Transport = {
     start: () => {
@@ -181,12 +167,9 @@ function row(name: string, fields: Partial<McpServerConfig>): McpServerConfig {
 
 interface Case {
   name: string;
-  /** The user's own entries, as TOML. */
   user: string;
   rows: McpServerConfig[];
-  /** True runs the payload as it was before #2851: each server under its plain key. */
   legacy?: boolean;
-  /** The `mcp_servers` of a thread that another Codex app starts after OpenBot's, with the same home. */
   foreign?: Record<string, CodexMcpServer>;
 }
 
@@ -195,7 +178,6 @@ interface Outcome {
   error: string | null;
   keys: string[];
   offered: string[];
-  /** The namespaces offered in the thread of the other Codex app, before and after OpenBot's registration. */
   foreignBefore: string[];
   foreignOffered: string[];
   file: string;
@@ -224,7 +206,6 @@ async function run(executable: string, modelPort: number, test: Case): Promise<O
   client.on("notification", (notification) => {
     if (notification.method === "turn/completed") turnDone();
   });
-  /** Runs one turn in a new thread, and answers the MCP namespaces that the model was offered. */
   const turn = async (threadStarted: DynamicRecord, what: string) => {
     const threadId = getString(getRecord(threadStarted, "thread"), "id");
     assert(threadId, "thread/start returned no thread id");
@@ -263,7 +244,6 @@ async function run(executable: string, modelPort: number, test: Case): Promise<O
         : [];
     const foreignBefore = await foreignTurn("before");
     const usable = await runCauseEffect(usableMcpServers(test.rows));
-    // Before the fix, each server travelled under its plain key.
     const keyed = (own: CodexOwnTransports) =>
       test.legacy
         ? Object.fromEntries(
@@ -310,7 +290,6 @@ function deadline(what: string): Promise<never> {
   });
 }
 
-/** The lines of one `[mcp_servers.<name>]` table in the user's file. */
 function table(file: string, name: string): string[] {
   const lines = file.split(NL);
   const start = lines.indexOf(`[mcp_servers.${name}]`);
@@ -447,7 +426,6 @@ try {
       assert.deepEqual(table(o.file, "openbot_github.tools.ping"), ['approval_mode = "approve"']);
     },
   );
-  // Its tool consent keeps a card only under this name, so a clash must never rename it.
   await step(
     "Computer Use over a user http computer_use: the key stays computer_use",
     {

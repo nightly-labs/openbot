@@ -1,10 +1,3 @@
-/**
- * The drag&drop vocabulary of the sidebar, the geometry helpers that read it, and the drop
- * resolver. Pure on purpose: everything here takes values and rectangles, so where a drag would
- * land can be reasoned about without the component, and a change to a drop target's shape shows
- * up as a type error at every site that builds one.
- */
-
 import { SIDEBAR_PEOPLE_SECTION_ID } from "@openbot/contracts/ipc";
 
 export interface DragSlot {
@@ -17,7 +10,6 @@ export interface DragSlot {
   centerY: number;
 }
 
-/** How far one row has been pushed from the slot it occupies, in the pixels the CSS transforms by. */
 export interface DragOffset {
   x: number;
   y: number;
@@ -25,7 +17,6 @@ export interface DragOffset {
 
 export const ZERO_DRAG_OFFSET: DragOffset = { x: 0, y: 0 };
 
-/** Enough of a measured slot to say how far a row must travel to reach another one. */
 export interface ReorderSlot {
   left?: number;
   top: number;
@@ -60,19 +51,11 @@ export interface ChatDragSlot {
 export interface SectionDragSlot {
   bottom: number;
   centerY: number;
-  /**
-   * The section's header row, which starts at `top`. `stickTop` is the viewport line that a sticky
-   * header stays on while its section scrolls under it, or null when the header scrolls away.
-   */
   header: { height: number; stickTop: number | null } | null;
   sectionId: string;
   top: number;
 }
 
-/**
- * Where the header of a section shows at this scroll. A sticky header stays on its line until the end
- * of its section pushes it up. The slots are measured once, so this follows the scroll from there.
- */
 function sectionHeaderBand(slot: SectionDragSlot, scrollDelta: number): { top: number; bottom: number } | null {
   if (!slot.header || slot.header.height <= 0) return null;
   const natural = slot.top - scrollDelta;
@@ -92,11 +75,7 @@ export interface PersonDragSlot {
 }
 
 export type SidebarDragSource =
-  /* A row in a section: an agent or a channel. Both are placed by the same layout, so the drag
-   * pipeline knows them as one kind and only pinning asks which of the two a chat is. */
   | { kind: "chat"; id: string; origin: "section" }
-  /* A tile in the pinned strip. It carries its pin key because two chats of different kinds can
-   * share an id, and the strip is ordered by key. */
   | { kind: "pinned"; id: string; key: string; origin: "pinned" }
   | { kind: "person"; id: string; origin: "people" }
   | { kind: "section"; id: string };
@@ -107,7 +86,6 @@ export type SidebarDropTarget =
   | { kind: "section"; sectionId: string }
   | { kind: "person"; target: PersonDropTarget }
   | { kind: "section-order"; target: SectionDropTarget }
-  /** A folder dropped into another folder, after the folders that are in it. */
   | { kind: "section-into"; sectionId: string };
 
 export interface SidebarDragPoint {
@@ -134,40 +112,16 @@ export interface SidebarNativeDragStart {
   source: SidebarDragSource;
 }
 
-/**
- * The reactive projection of the drag in flight: what is being dragged, where it would land, and the
- * two pieces of drop chrome that outlive a single frame. It is one record because a drag is one
- * thing - four parallel `dragged*Id` signals let the sidebar claim an agent and a section are being
- * dragged at once, which is why the list header needed a four-way ternary to pick between them.
- *
- * The imperative half of the drag stays in plain locals (`dragSession`, `dragTarget`, the slot
- * caches) because the pointer pipeline reads its own writes inside one tick, and neither a signal
- * nor a store publishes a write before the next flush.
- */
 export interface SidebarDrag {
-  /** The empty pinned row, held open so an agent dragged out of a section has somewhere to land. */
   emptyPinnedDropVisible: boolean;
-  /** How far each row has shifted to make room for the item being dragged, by row id. */
   offsets: Record<string, DragOffset>;
-  /** What is being dragged. Every dragged id below is one arm of this union. */
   source: SidebarDragSource | null;
-  /** Where it would land. Every drop highlight below is one arm of this union. */
   target: SidebarDropTarget | null;
 }
 
-/**
- * Everything the drop resolver reads, as one snapshot taken at the moment of the pointer event. The
- * resolver is pure against it, so where a drag would land is answered from slot rectangles and a
- * source alone - nothing it can reach mutates under it, and a caller can hand it geometry directly.
- *
- * The three scroll deltas are separate fields rather than one because `chatDragStartScrollTop`,
- * `sectionDragStartScrollTop` and `dragSession.startScrollTop` are assigned in different places and
- * only happen to agree.
- */
 export interface SidebarDragWorld {
   chatScrollDelta: number;
   chatSlots: Map<string, ChatDragSlot>;
-  /** Read untracked, at resolve time - in the component this is a memo, not a value. */
   canPinDraggedItem: () => boolean;
   geometry: SidebarDragGeometry;
   personSlots: Map<string, PersonDragSlot>;
@@ -175,17 +129,11 @@ export interface SidebarDragWorld {
   sectionAcceptsChat: (sectionId: string) => boolean;
   sectionScrollDelta: number;
   sectionSlots: Map<string, SectionDragSlot>;
-  /**
-   * The folder rules, when the host keeps folders in folders (`foldersSupported`). Without them, a
-   * dragged section only changes its place in the flat order.
-   */
   folders: SidebarDragFolders | null;
   session: SidebarDragSession;
-  /** Used by the pinned and people hit tests, both of which key off the session's own start. */
   sessionScrollDelta: number;
 }
 
-/** What the resolver asks about folders. Each answer comes from the layout that is on the screen. */
 export interface SidebarDragFolders {
   canNest: (sectionId: string, parentId: string | null) => boolean;
   isInside: (sectionId: string, ancestorId: string) => boolean;
@@ -240,8 +188,6 @@ export function closestVerticalSlot<T extends { bottom: number; top: number }>(
     const bottom = slot.bottom - scrollDelta;
     extentTop = Math.min(extentTop, top);
     extentBottom = Math.max(extentBottom, bottom);
-    // Distance to the slot's edges, not its center: a point inside a tall section is closer to the
-    // center of a short neighbour, and would land there.
     const distance = Math.max(top - clientY, clientY - bottom, 0);
     if (distance <= closestDistance) {
       closest = slot;
@@ -291,10 +237,6 @@ function chatAtPoint(world: SidebarDragWorld, point: SidebarDragPoint, sectionId
   );
 }
 
-/**
- * A chat held above the first row of its own section, on the section header, goes to the top of the
- * section. Read as a drop on the section, it would go to the end. Undefined: the point is not there.
- */
 function ownSectionTopTarget(
   world: SidebarDragWorld,
   point: SidebarDragPoint,
@@ -388,12 +330,6 @@ export function sidebarDropTargetAt(world: SidebarDragWorld, point: SidebarDragP
   return { kind: "section", sectionId: section.sectionId };
 }
 
-/**
- * Where a dragged folder lands. On the header of a folder, the top and bottom quarters put it before
- * or after that folder, and the middle puts it in. Below the header, in the folder's own rows, it goes
- * in. Between two sections, it goes before or after the nearer one. A place that would make the
- * folder hold itself or go deeper than the limit is no target.
- */
 function folderTargetAtPoint(
   world: SidebarDragWorld,
   folders: SidebarDragFolders,
@@ -405,13 +341,11 @@ function folderTargetAtPoint(
   const sourceSlot = world.sectionSlots.get(sourceId);
   if (sourceSlot && y >= sourceSlot.top && y <= sourceSlot.bottom) return null;
   const accepts = (candidate: SectionDragSlot) => !folders.isInside(candidate.sectionId, sourceId);
-  // A header that shows under the point wins, also when it is stuck over a folder that it holds.
   let header: { slot: SectionDragSlot; top: number; bottom: number } | null = null;
   for (const candidate of world.sectionSlots.values()) {
     const band = accepts(candidate) ? sectionHeaderBand(candidate, scrollDelta) : null;
     if (band && point.clientY >= band.top && point.clientY <= band.bottom) header = { slot: candidate, ...band };
   }
-  // Slots come in document order, so of the sections that hold the point, the deepest one wins.
   const slot = header?.slot ?? closestVerticalSlot(world.sectionSlots.values(), point.clientY, scrollDelta, accepts);
   if (!slot) return null;
   const parentId = folders.parent(slot.sectionId);
@@ -433,19 +367,6 @@ function folderTargetAtPoint(
   return into ?? beside(y < slot.centerY ? "before" : "after");
 }
 
-/**
- * How far every row shifts to open a gap for the one being dragged - the whole animation, for all
- * four reorderable regions of the sidebar.
- *
- * One reorder, computed as splice-then-reindex: take the source out of `currentIds`, put it back
- * beside the target, then ask each remaining id which slot it now sits in. That is the same answer
- * the pinned tiles and the agent rows used to reach through an index ternary, and the same one
- * people and sections used to reach through two separate copies of this loop.
- *
- * `axis` is "y" for the three vertical lists and "x-and-y" for the pinned grid, which wraps. A row
- * that does not move is absent from the result rather than present as a zero, so the caller can
- * treat a missing key and a zero offset as the same thing.
- */
 export function reorderOffsets(
   currentIds: readonly string[],
   sourceId: string,
@@ -473,11 +394,6 @@ export function reorderOffsets(
   return offsets;
 }
 
-/**
- * A pinned tile and an agent row carry no before/after of their own: hovering one means taking its
- * slot, which is `after` when the dragged item started above it and `before` when it started below.
- * The two vertical lists that do carry a placement - people and sections - pass theirs through.
- */
 export function placementForSwap(
   currentIds: readonly string[],
   sourceId: string,

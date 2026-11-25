@@ -24,10 +24,6 @@ export function resolveAppIconPath(options: {
     : join(options.sourceRoot, "build", appIconFileName(options.variant, options.platform));
 }
 
-/**
- * The macOS menu bar icon. The `Template` suffix makes macOS draw it in the color of the menu bar,
- * and Electron loads the `@2x` file next to it.
- */
 export function resolveMenuBarIconPath(options: {
   isPackaged: boolean;
   resourcesPath: string;
@@ -38,10 +34,6 @@ export function resolveMenuBarIconPath(options: {
     : join(options.sourceRoot, "build", "macos", "tray", "trayTemplate.png");
 }
 
-/**
- * The icon for a logo color. The default color is the release icon itself, so it has no file in
- * `build/logo-colors/`.
- */
 export function resolveLogoColorIconPath(options: {
   color: AppLogoColor;
   platform: NodeJS.Platform;

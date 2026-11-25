@@ -13,20 +13,11 @@ const MESSAGING_MEMORY_TABLES: MemoryTables = {
   limitMessage: (limit) => sourceText("error.messaging.memoryLimit", { limit }),
 };
 
-/**
- * The facts of one messaging connection: a Slack workspace, a Discord server or a Telegram chat. The
- * same `MemoryStore` as an agent's or a channel's, with a connection for an owner. Unlike link
- * events, which keep ids only, a memory's events keep its text until the memory is deleted.
- */
 export class MessagingMemoryStore extends MemoryStore {
   constructor(database: OpenBotDatabase) {
     super(database, MESSAGING_MEMORY_TABLES);
   }
 
-  /**
-   * A tool writes at call time. `commandId` is the call's own receipt key: a retried tool call reads
-   * it and saves nothing more. A `memoryId` of another connection is not found, so the save fails.
-   */
   saveFromTool(
     connectionId: string,
     input: { text: string; memoryId?: string; sourceTurnId: string; commandId: string },

@@ -5,7 +5,7 @@ export const messages = {
   "error.mcp.redirectByName": "הכתובת הזו אינה נגישה לפי שם.",
   "error.mcp.redirectNotSignIn": "הכתובת הזו אינה חלק מהתחברות.",
   "error.mcp.redirectRefused": "ההתחברות נדחתה. יש לחזור אל OpenBot ולנסות שוב.",
-  "error.mcp.redirectNoSignIn": "אין התחברות שממתינה לזה. ייתכן שהיא הסתיימה.",
+  "error.mcp.redirectNoSignIn": "ההתחברות הזו כבר לא פעילה. אפשר לחזור ל-OpenBot ולהתחיל את ההתחברות מחדש.",
   "error.mcp.redirectSignedIn": "OpenBot מחובר. אפשר לסגור את החלון הזה.",
   "error.mcp.redirectNotSaved": "ההתחברות לא הסתיימה. חזרו ל-OpenBot כדי לראות למה.",
   "error.mcp.signInFileUnreadable": "לא ניתן לקרוא את קובץ ההתחברות של MCP.",
@@ -17,6 +17,7 @@ export const messages = {
   "error.mcp.signInAppUnsupported": "השרת הזה אינו תומך באפליקציות התחברות. יש לעדכן את OpenBot במארח.",
   "error.mcp.redirectRelayed": "OpenBot שלח את ההתחברות לשרת. אפשר לסגור את החלון הזה.",
   "error.mcp.relayEnded": "ההתחברות הזו הסתיימה. יש להתחיל אותה מחדש.",
+  "error.mcp.signInLinkNotReady": "דף ההתחברות עוד לא נפתח. אפשר לנסות שוב בעוד רגע.",
   "error.mcp.relayNoState": "דף ההתחברות של השרת אינו מגן על כתובת החזרה שלו, ולכן OpenBot אינו פותח אותו במחשב הזה.",
   "error.mcp.relayAddressInvalid": "זו אינה הכתובת שבסוף ההתחברות הזו. יש להעתיק את הכתובת המלאה מהדפדפן.",
 } as const satisfies PartialTranslation<typeof source>;

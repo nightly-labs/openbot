@@ -9,11 +9,6 @@ import { readJson, requireOwner } from "./request-helpers";
 
 const LOCAL_SERVER_PATHS: ReadonlySet<string> = new Set(Object.values(LOCAL_SERVERS_ROUTES));
 
-/**
- * The owner lists, creates and deletes the servers that the desktop app runs on this computer, from another
- * device. Frozen by `local-servers-v1`. The desktop app makes and registers the server as it does from
- * its own server rail.
- */
 export async function routeLocalServers(
   context: TeamApiRequestContext,
   admin: TeamApiAdmin | undefined,
@@ -31,7 +26,6 @@ export async function routeLocalServers(
     try {
       await runCauseEffect(localServers.delete(body.serverId));
     } catch (error) {
-      // A server that is not on this computer is a sentence for the owner, not a host fault.
       if (error instanceof Error && matchingSourceKeys(error.message).length > 0)
         throw new HttpError(409, error.message);
       throw error;
@@ -39,11 +33,8 @@ export async function routeLocalServers(
     return json(200, {});
   }
   try {
-    // The server name check refuses a missing name with the same sentence as an empty one.
     return json(200, await runCauseEffect(localServers.create(isString(body.name) ? body.name : "")));
   } catch (error) {
-    // A name that is too short, or a computer at its limit, is a sentence for the owner, not a host fault.
-    // Its placeholders hold only the name limits and the server limit.
     if (error instanceof Error && matchingSourceKeys(error.message).length > 0) throw new HttpError(409, error.message);
     throw error;
   }

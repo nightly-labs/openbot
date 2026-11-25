@@ -48,22 +48,15 @@ import {
 } from "./BrowserProxies";
 
 export interface BrowserProfilesPanelProps {
-  /** Undefined while the profiles load. */
   profiles: readonly BrowserProfileSummary[] | undefined;
-  /** The agents that use the shared profile. Undefined while they load. */
   sharedAgentCount: number | undefined;
-  /** The name of an agent, for the delete question. Undefined for an agent this window does not show. */
   agentName: (agentId: string) => string | undefined;
   onCreate: (name: string) => Promise<void>;
   onRename: (profileId: string, name: string) => Promise<void>;
   onRecolor: (profileId: string, hue: AvatarHue) => Promise<void>;
-  /** Closes the tabs of the profile and deletes its cookies and site data. */
   onClear: (profileId: string) => Promise<void>;
-  /** Moves the agents of the profile to the shared profile, closes its tabs and deletes its data. */
   onDelete: (profileId: string) => Promise<void>;
-  /** Where the row menus open, so they stay inside the settings page. */
   menuMount?: HTMLElement | undefined;
-  /** The saved proxies, when the server has proxy routes. Undefined hides the proxy choice. */
   proxies?: BrowserProfileProxies | undefined;
 }
 
@@ -71,27 +64,14 @@ interface BrowserProfilesDraft {
   newName: string;
   renaming: { id: string; name: string } | null;
   confirming: { kind: "clear" | "delete"; profile: BrowserProfileSummary } | null;
-  /**
-   * The proxy dialog. `previousAddress`: the address of the proxy when the dialog opened, as the host
-   * checks it on save. `assignTo`: the named profile that uses a new proxy at once.
-   */
   editingProxy: { proxy: BrowserProxySummary | null; previousAddress: string | null; assignTo: string | null } | null;
-  /** The proxy to delete, with the profiles that used it when the question opened. */
   deletingProxy: BrowserProxyChoice | null;
-  /** A proxy change of a profile with open tabs: the change closes them, so it asks first. */
   changingProxy: { profile: BrowserProfileSummary; proxyId: string | null } | null;
-  /** The share question. `assignTo`: the named profile that uses this computer at once. */
   sharing: { assignTo: string | null } | null;
   busy: boolean;
   failure: UserErrorDetails | null;
 }
 
-/**
- * The browser profiles of the computer that runs the agents, in its server settings. The shared
- * profile comes first and has no menu: it cannot be renamed or deleted. Each named profile has its
- * color and one menu: rename, clear and delete. A profile name is user data, so it shows only
- * here and in the labels the user reads.
- */
 export function BrowserProfilesPanel(props: BrowserProfilesPanelProps) {
   const { t, errorMessage, format } = useText();
   const [draft, setDraft] = createStore<BrowserProfilesDraft>({
@@ -106,7 +86,6 @@ export function BrowserProfilesPanel(props: BrowserProfilesPanelProps) {
     failure: null,
   });
 
-  /** Runs one change. A failure stays in the panel; the store keeps the last list. */
   async function run(action: () => Promise<void>): Promise<boolean> {
     setDraft((state) => {
       state.busy = true;
@@ -185,7 +164,6 @@ export function BrowserProfilesPanel(props: BrowserProfilesPanelProps) {
       });
   }
 
-  /** The open tabs of these named profiles: a proxy change closes them. */
   const openTabs = (profileIds: readonly string[]) =>
     (props.profiles ?? []).reduce(
       (count, profile) => (profileIds.includes(profile.id) ? count + profile.tabCount : count),
@@ -264,7 +242,6 @@ export function BrowserProfilesPanel(props: BrowserProfilesPanelProps) {
     return confirming.profile.agentIds.flatMap((agentId) => props.agentName(agentId) ?? []);
   };
 
-  /** The proxy menu of a named profile, or undefined when the server has no proxy routes. */
   const rowProxy = (profile: BrowserProfileSummary): BrowserProfileRowProxy | undefined => {
     const proxies = props.proxies;
     if (!proxies) return undefined;
@@ -273,7 +250,6 @@ export function BrowserProfilesPanel(props: BrowserProfilesPanelProps) {
       choices: choices(),
       value: proxyOf(profile.id)?.id ?? null,
       onChange: (proxyId) => {
-        // This computer, while it does not share: ask first, then share and use it.
         if (canShare && proxyId !== null && proxyId === myComputer()?.id && proxies.sharing === false)
           return askToShare(profile.id);
         if (profile.tabCount > 0)
@@ -579,10 +555,7 @@ function BrowserProfileRowMenu(props: {
   onDelete: () => void;
 }) {
   const { t } = useText();
-  // Rename puts a field in place of the row, and "New proxy…" opens a dialog: both after the menu
-  // gives the focus back to its trigger.
   const menu = createAfterMenuClose();
-  // The share question opens after the menu, as a dialog does.
   function computerAction(proxy: BrowserProfileRowProxy): (() => void) | undefined {
     const next = proxy.onUseComputer;
     if (!next) return undefined;

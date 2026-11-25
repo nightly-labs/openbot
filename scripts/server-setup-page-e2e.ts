@@ -1,12 +1,3 @@
-// The setup page of a server in a container (src/main/server-setup-page.ts), the page that the Umbrel
-// app opens (docs/umbrel.md). It runs the real page listener and the real `ServerMode` with a fake
-// account service and host, then signs the server in with Chrome, as a user does, and checks the
-// refusals that keep other programs on the network of the container out. The page is the
-// `server-setup` entry of the renderer build, so build the renderer first (`bun run build`).
-//
-//   bun scripts/server-setup-page-e2e.ts [--renderer=<out/renderer>] [--browser-executable=<path>]
-//
-// Writes .openbot-build/server-setup-page-e2e/report.json and the screenshots beside it.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtemp } from "node:fs/promises";
@@ -36,15 +27,11 @@ const EMAIL = "owner@example.com";
 const CODE = "K7PQ-R2MX";
 const WRONG_CODE = "22222222";
 const CHALLENGE = "challenge-e2e";
-/** No name comes from the page. The owner renames the server in Server Settings of the app. */
 const SERVER_NAME = "OpenBot";
 
-// The fake account service. It accepts one code, as the account service does.
 let account: CentralAuthState = { status: "signed_out" };
-/** The stored session. It stays when the account service cannot confirm it, as in the real manager. */
 let session = false;
 const sentCodes: string[] = [];
-/** Each code that reached the account service. A refused request must not reach it. */
 const verifiedCodes: string[] = [];
 const centralAuth: ServerModeOptions["centralAuth"] = {
   getState: () => structuredClone(account),
@@ -70,12 +57,10 @@ const centralAuth: ServerModeOptions["centralAuth"] = {
       }
       account = { status: "signed_in", user: { id: "user-e2e", email: account.email, name: null, avatarUrl: null } };
       session = true;
-      // The entry point publishes the host when the account changes.
       setTimeout(() => void runCauseEffect(serverMode.publish()), 0);
       return structuredClone(account);
     }),
   hasSession: () => session,
-  // The account service answers again: a stored session is confirmed.
   retry: () =>
     Effect.sync(() => {
       if (account.status === "error" && session) {
@@ -97,7 +82,6 @@ const centralAuth: ServerModeOptions["centralAuth"] = {
   createMobileConnect: () => Effect.die(new Error("The setup page must not make a Mobile Connect code.")),
 };
 
-// The fake host. It is online about a second after its start, as a real publish takes time.
 let hostStatus: HostStatus = {
   phase: "idle",
   configured: false,
@@ -110,6 +94,7 @@ let hostStatus: HostStatus = {
   apiOnline: false,
   remoteDesktopReady: false,
   remoteDesktopScreenRecordingDenied: false,
+  remoteDesktopNeedsX11Session: false,
   remoteDesktopUnattended: false,
   remoteDesktopActiveSessions: 0,
   remoteDesktopMaxSessions: 0,
@@ -182,7 +167,6 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
 try {
-  // The page and its content security policy.
   const pageResponse = await fetch(`${origin}/`);
   assert.equal(pageResponse.status, 200);
   const policy = pageResponse.headers.get("content-security-policy") ?? "";
@@ -191,7 +175,6 @@ try {
   assert.match(policy, /form-action 'none'/u);
   checks.page = { status: pageResponse.status, policy };
 
-  // Refusals: no setup header, a request of another site, a form post, and a request the page does not have.
   const refusals = {
     noHeader: (await fetch(`${origin}/api/status`)).status,
     crossSite: (
@@ -209,7 +192,6 @@ try {
     mobileConnect: (
       await fetch(`${origin}/api/mobile-connect`, { method: "POST", headers: { "x-openbot-setup": "1" } })
     ).status,
-    // Only the page and the files in assets/: no other file of the build, no path out of it.
     pathEscape: (await fetch(`${origin}/assets/..%2F..%2Fpackage.json`)).status,
     sourceFile: (await fetch(`${origin}/index.html`)).status,
   };
@@ -226,7 +208,6 @@ try {
   assert.equal(sentCodes.length, 0, "A refused request sent a sign-in code.");
   checks.refusals = refusals;
 
-  // The sign-in in Chrome: email, a wrong code, the right code, then the server is online.
   const browser = await chromium.launch(
     browserExecutable ? { executablePath: browserExecutable } : { channel: "chrome" },
   );
@@ -235,7 +216,6 @@ try {
     const tab = await context.newPage();
     const pageErrors: string[] = [];
     tab.on("pageerror", (error) => pageErrors.push(error.message));
-    // The wrong code gets a 400 answer, which Chrome logs as a resource that did not load. That is expected.
     tab.on("console", (message) => {
       if (message.type() === "error" && !message.text().startsWith("Failed to load resource")) {
         pageErrors.push(message.text());
@@ -249,7 +229,6 @@ try {
     await tab.getByRole("heading", { name: "Check your inbox" }).waitFor();
     assert.deepEqual(sentCodes, [EMAIL]);
 
-    // Another program cannot complete a challenge that is not the current one.
     const oldChallenge = await postForm("/api/login/verify", { challenge: "old-challenge", code: CODE });
     assert.equal(oldChallenge.status, 409);
     assert.deepEqual(await oldChallenge.json(), {
@@ -259,7 +238,6 @@ try {
     assert.deepEqual(verifiedCodes, []);
     checks.oldChallengeRefused = oldChallenge.status;
 
-    // The code input sends the code when it is full, as in the app.
     const codeInput = tab.getByLabel("One-time code", { exact: true });
     await codeInput.fill(WRONG_CODE);
     await tab.getByText("The code is not valid.").waitFor();
@@ -273,12 +251,10 @@ try {
     await settledScreenshot(tab, join(OUT, "3-online.png"));
     assert.equal(hostStatus.serverName, SERVER_NAME);
 
-    // A reload of a signed-in server shows the status, not a sign-in form.
     await tab.reload();
     await tab.getByRole("heading", { name: `${SERVER_NAME} is online` }).waitFor();
     assert.equal(await tab.getByLabel("Email").count(), 0);
 
-    // Dark mode and a phone width.
     const dark = await browser.newContext({ colorScheme: "dark", viewport: { width: 390, height: 760 } });
     const phone = await dark.newPage();
     await phone.goto(`${origin}/`);
@@ -288,7 +264,6 @@ try {
     assert.equal(overflow, false, "The page scrolls sideways at phone width.");
     await dark.close();
 
-    // The page in Polish takes its text from the catalog.
     const polish = await browser.newContext({ locale: "pl-PL" });
     const polishTab = await polish.newPage();
     await polishTab.goto(`${origin}/`);
@@ -303,8 +278,6 @@ try {
     await browser.close();
   }
 
-  // A signed-in server refuses a new sign-in, and a code: another account or a wrong code would
-  // replace or remove the session.
   const codesBefore = [...verifiedCodes];
   const again = await postForm("/api/login/start", { email: "other@example.com" });
   assert.equal(again.status, 409);
@@ -318,8 +291,6 @@ try {
   assert.equal(account.status, "signed_in");
   checks.signedInRefusesCode = code.status;
 
-  // The account service did not confirm the stored session at the start. The session is still the
-  // owner's: no sign-in and no code, only the retry, which confirms it.
   const signedIn = account;
   account = { status: "error", issue: { code: "auth_api_unavailable", message: "The account service is down." } };
   const unconfirmedStart = await postForm("/api/login/start", { email: "other@example.com" });
@@ -354,7 +325,6 @@ try {
   rmSync(runtime, { recursive: true, force: true });
 }
 
-/** A form post of the page script. */
 function postForm(path: string, fields: Record<string, string>): Promise<Response> {
   return fetch(`${origin}${path}`, {
     method: "POST",
@@ -363,7 +333,6 @@ function postForm(path: string, fields: Record<string, string>): Promise<Respons
   });
 }
 
-/** A screenshot after the step transitions end. A loop, such as the spinner, does not end, so it is not waited for. */
 async function settledScreenshot(page: Page, path: string): Promise<void> {
   await page.evaluate(() =>
     Promise.all(
@@ -378,7 +347,6 @@ async function settledScreenshot(page: Page, path: string): Promise<void> {
   await page.screenshot({ path });
 }
 
-/** A free port on the loopback address. */
 function freePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
     const probe = createServer();

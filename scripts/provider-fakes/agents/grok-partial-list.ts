@@ -1,8 +1,3 @@
-// The Grok agent of `grok-partial-model-list-e2e.ts`. Each session setup lists the models, as Grok
-// 1.0.70 does. The first `partial` setups of a process list only the two built-in models: Grok starts
-// on them while it renews an expired sign-in, and has its whole catalogue about a second later. Each
-// later setup lists all three. `partial` is read from the JSON file in `FAKE_CONTROL` when the process
-// starts, so the test sets it before it restarts the provider.
 import { readFileSync } from "node:fs";
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
@@ -16,13 +11,16 @@ const BUILT_IN = [
   { modelId: "grok-4.5", name: "Grok 4.5" },
 ];
 const CATALOGUE = [{ modelId: "grok-4.7", name: "Grok 4.7" }, ...BUILT_IN];
-const partial = Number(JSON.parse(readFileSync(process.env.FAKE_CONTROL ?? "", "utf8")).partial) || 0;
+const control = JSON.parse(readFileSync(process.env.FAKE_CONTROL ?? "", "utf8"));
+const partial = Number(control.partial) || 0;
+const marksLists = control.markLists === true;
 let setups = 0;
 let count = 0;
 
 function setup(request: AcpRequest, peer: AcpPeer, sessionId: string): void {
   setups += 1;
-  const models = setups <= partial ? BUILT_IN : CATALOGUE;
+  const short = marksLists ? [...BUILT_IN, { modelId: `grok-list-${setups}`, name: `Grok list ${setups}` }] : BUILT_IN;
+  const models = setups <= partial ? short : CATALOGUE;
   logEntry({ event: "setup", pid: process.pid, setup: setups, models: models.map((model) => model.modelId) });
   peer.reply(request, { sessionId, models: { availableModels: models, currentModelId: models[0]?.modelId } });
 }

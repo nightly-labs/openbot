@@ -121,7 +121,6 @@
   color: var(--openbot-text-secondary);
 }
 
-/* The color of a profile: in its toolbar label, the agent select and the server settings. */
 .browser-profile-dot {
   display: block;
   width: 8px;
@@ -155,7 +154,6 @@
   background: var(--openbot-bg-canvas);
 }
 
-/* The live view of a host's tab. It fills the surface the native view would have covered. */
 .browser-live-view {
   position: absolute;
   inset: 0;

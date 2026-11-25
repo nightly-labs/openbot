@@ -1,30 +1,13 @@
 import { Stack } from "expo-router/stack";
 import { useCSSVariable } from "uniwind";
-import { androidBackOptions } from "@/shared/components/android-header-button";
-import { headerFontOptions } from "@/shared/lib/app-font";
-import { isIOS } from "@/shared/lib/platform";
-import { sheetHeaderInsetOptions } from "@/shared/lib/sheet-header";
+import { sheetStackOptions } from "@/shared/components/sheet-page-stack";
 import { useText } from "@/shared/lib/text";
 
 export default function MemoryChangesLayout() {
   const { t } = useText();
   const background = String(useCSSVariable("--openbot-bg-sheet"));
   return (
-    <Stack
-      screenOptions={(props) => ({
-        ...androidBackOptions(props),
-        ...sheetHeaderInsetOptions,
-        presentation: "card",
-        headerBackButtonDisplayMode: "minimal",
-        ...headerFontOptions,
-        headerShadowVisible: false,
-        headerTransparent: isIOS,
-        headerStyle: { backgroundColor: isIOS ? "transparent" : background },
-        headerBlurEffect: "none",
-        scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-        contentStyle: { backgroundColor: background },
-      })}
-    >
+    <Stack screenOptions={sheetStackOptions(background)}>
       <Stack.Screen name="index" options={{ title: t("mobile.app.route.memoryChanges") }} />
     </Stack>
   );

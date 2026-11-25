@@ -3,11 +3,7 @@ import { View } from "react-native";
 
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 
-// The heroui-native `TextArea` class sets a fixed height, and a utility class does not replace it on
-// native. The style prop comes after the classes. The iOS field uses the same height.
 const tallStyle = { height: 280 } as const;
-// A field inside a frame of its own (a trailing button, or a card): HeroUI raises the field and draws
-// a focus border on Android, which show as a darker box and an accent ring inside the frame.
 const FRAMELESS =
   "android:[elevation:0] android:border-0 android:focus:border-transparent ios:outline-transparent ios:focus:outline-transparent";
 
