@@ -310,9 +310,11 @@ export class MailboxStore {
       );
       yield* this.#database.initialize();
       const stored = this.#database.readMailboxState();
+      const skippedDraftIds: string[] = [];
       if (stored !== null && stored !== undefined) {
         const persisted = readStoredMailboxState(stored);
         this.#state = normalizeStoredState(persisted.state);
+        for (const row of persisted.skippedRows) if (row.kind === "draft" && row.id) skippedDraftIds.push(row.id);
         if (persisted.skippedRows.length > 0) {
           logger.warn("Stored mailbox rows that OpenBot cannot read were left out.", {
             skippedRows: persisted.skippedRows,
@@ -339,7 +341,7 @@ export class MailboxStore {
         this.#persist("mailbox.drafts-cleared");
       }
       yield* this.#files
-        .resetDrafts(retainedDrafts.map((draft) => draft.id))
+        .resetDrafts([...retainedDrafts.map((draft) => draft.id), ...skippedDraftIds])
         .pipe(Effect.mapError(({ cause }) => new StoredStateFailure({ cause })));
       yield* this.#drainFileDeletionOutboxEffect();
       this.#initialized = true;
@@ -3991,7 +3993,7 @@ function readStoredMailboxState(stored: unknown): { state: StoredState; skippedR
     !isRecord(idempotency) ||
     !Array.isArray(reactions)
   )
-    throw new Error("Stored mailbox projection is invalid.");
+    throw new Error(sourceText("error.backend.mailboxStateCorrupt"));
   const skippedRows: SkippedMailboxRow[] = [];
   const keepReadable = <Row>(
     kind: SkippedMailboxRow["kind"],
@@ -4026,7 +4028,8 @@ function readStoredMailboxState(stored: unknown): { state: StoredState; skippedR
         keepReadable(
           "idempotency",
           Object.entries(idempotency),
-          (entry): entry is [string, string] => Array.isArray(entry) && isString(entry[1]),
+          (entry): entry is [string, string] =>
+            Array.isArray(entry) && isString(entry[1]) && !skippedMessageIds.has(entry[1]),
         ),
       ),
       reactions: keepReadable("reaction", reactions, isStoredReaction),

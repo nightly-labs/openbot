@@ -9,6 +9,7 @@ import { OpenBotDatabase } from "../src/backend/openbot-database";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/mailbox-unreadable-row-e2e");
 const AGENT_ID = "agent-unreadable-row";
+const RETRY_KEY = "retry-key-unreadable-row";
 const root = await mkdtemp(join(tmpdir(), "openbot-mailbox-unreadable-row-"));
 const userData = join(root, "user-data");
 const sharedRoot = join(root, "shared");
@@ -33,9 +34,14 @@ async function openMailbox(): Promise<{ database: OpenBotDatabase; mailbox: Mail
   return { database, mailbox };
 }
 
-async function enqueue(mailbox: MailboxStore, text: string): Promise<string> {
+async function enqueue(mailbox: MailboxStore, text: string, idempotencyKey?: string): Promise<string> {
   const receipt = await runCauseEffect(
-    mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [AGENT_ID], text }),
+    mailbox.enqueue({
+      sender: { kind: "user" },
+      recipientAgentIds: [AGENT_ID],
+      text,
+      ...(idempotencyKey ? { idempotencyKey } : {}),
+    }),
   );
   return receipt.messageId;
 }
@@ -68,7 +74,7 @@ function queuedTexts(mailbox: MailboxStore): string[] {
 try {
   mkdirSync(OUT, { recursive: true });
   const first = await openMailbox();
-  const badMessageId = await enqueue(first.mailbox, "Unreadable message");
+  const badMessageId = await enqueue(first.mailbox, "Unreadable message", RETRY_KEY);
   await enqueue(first.mailbox, "Readable message");
   report.badMessageId = badMessageId;
   const badJson = JSON.stringify({
@@ -91,7 +97,8 @@ try {
     storedDeliveryCount(second.database, badMessageId) === 1,
   );
 
-  await enqueue(second.mailbox, "New message");
+  const retriedMessageId = await enqueue(second.mailbox, "New message", RETRY_KEY);
+  check("a retry with the key of the unreadable message makes a new message", retriedMessageId !== badMessageId);
   check("a new message is queued", queuedTexts(second.mailbox).join("|") === "New message|Readable message", {
     queued: queuedTexts(second.mailbox),
   });
