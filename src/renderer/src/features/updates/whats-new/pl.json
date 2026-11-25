@@ -10,6 +10,7 @@
         "type": "added",
         "items": [
           "Agenci mogą tworzyć obrazy i filmy za kredyty OpenBot oraz edytować twoje zdjęcia. Karta zatwierdzenia pokazuje model, cenę i prompt. Zanim zezwolisz, możesz wybrać inny model. Pozycja Credits w lewym pasku pokazuje twoje saldo. Właściciel lub administrator może włączyć albo wyłączyć opcję „Agenci mogą używać kredytów”.",
+          "Agenci mogą płacić na stronach kryptowalutami z portfela NEAR Intents. Połącz go w Ustawienia serwera › Sejf › Krypto za pomocą klucza dostępu, a potem dodaj środki. Każda płatność czeka na twoje zatwierdzenie w czacie, a budżet dzienny ogranicza wydatki agentów.",
           "Każde konto dostaje 10 darmowych kredytów powitalnych. Na stronie Credits możesz też zrealizować kod kredytowy przyciskiem Redeem code.",
           "Karta przeglądarki agenta może poprosić o twoją lokalizację. Czat najpierw cię pyta, a ty wybierasz Blokuj, Zawsze zezwalaj albo Zezwól. Wcześniej przeglądarka zawsze blokowała prośbę.",
           "Pasek boczny ma karty nad listą czatów: Wszystkie, Nieprzeczytane oraz foldery, które wybierzesz. Każda karta pokazuje swoje nieprzeczytane czaty."

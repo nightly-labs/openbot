@@ -10,6 +10,7 @@
         "type": "added",
         "items": [
           "Agents kunnen met OpenBot-credits afbeeldingen en video’s maken en je foto’s bewerken. De goedkeuringskaart toont het model, de prijs en de prompt. Je kunt een ander model kiezen voordat je toestaat. Het item Credits in de linkerbalk toont je saldo. Een eigenaar of beheerder kan “Agents mogen credits gebruiken” aan- of uitzetten.",
+          "Agents kunnen sites in crypto betalen vanuit een NEAR Intents-wallet. Koppel de wallet in Serverinstellingen › Kluis › Crypto met een toegangssleutel en stort daarna geld. Elke betaling wacht in de chat op je goedkeuring, en een dagbudget beperkt wat agents kunnen uitgeven.",
           "Elk account krijgt 10 gratis welkomstcredits. Je kunt ook op de pagina Credits een creditcode inwisselen met Redeem code.",
           "Een browsertab van een agent kan om je locatie vragen. De chat vraagt je eerst, en je kiest Blokkeren, Altijd toestaan of Toestaan. Vroeger blokkeerde de browser het verzoek altijd.",
           "De zijbalk heeft tabbladen boven de chatlijst: Alle, Ongelezen en de mappen die je kiest. Elk tabblad toont zijn ongelezen chats."

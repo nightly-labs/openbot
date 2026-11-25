@@ -2,8 +2,8 @@
   "version": "0.79.0",
   "highlights": [
     "Update your joined servers to this version too, so that credit image and video tools, location requests and many fixes work there.",
-    "Ask an agent for an image or a video. It uses OpenBot credits, and an approval card shows the model, the price and the prompt before it starts.",
-    "Get 10 free welcome credits, or redeem a credit code on the Credits page.",
+    "Ask an agent for an image or a video with OpenBot credits. An approval card shows the model, the price and the prompt first. Each account gets 10 free welcome credits.",
+    "Let agents pay sites in crypto from a NEAR Intents wallet. Each payment waits for your approval, and a daily budget limits the spend.",
     "Allow or block a website's location request from the chat of an agent's browser tab.",
     "Use sidebar tabs above the chat list to see All chats, Unread chats or the folders that you choose."
   ]

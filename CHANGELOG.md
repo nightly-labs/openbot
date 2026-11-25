@@ -94,6 +94,18 @@ All notable changes to OpenBot will be documented here. The project follows
   the thread.
 - An agent on your own server can now use your free credits for a model that takes them, when the
   server has too few paid credits. The credits card of your server shows your free credits.
+- Agents can pay sites in crypto from a NEAR Intents wallet. Connect it in Server settings › Vault ›
+  Crypto: sign in to OpenBot, make a passkey and add funds. The daily budget starts at $25, and all
+  agents, also new agents, can pay. You can change the budget and the agents on the wallet page. Each
+  payment waits for your approval in the chat. Select "Always allow" to let agents pay a site up to a
+  daily limit without asking. The Payments switch at the top of the wallet page stops and starts all
+  payments, and Disconnect removes the wallet from this computer. The payment card also shows in the
+  Tasks view. The wallet is only for this computer, not for a joined server, and payments use real funds.
+- After you make the passkey for the wallet, OpenBot tells you if the passkey has a backup. When the
+  passkey is only on this device, you confirm the risk or make a new passkey. OpenBot does not keep a
+  copy of your passkey. Select "Check backup" on the wallet page to check it again.
+- To add funds to the wallet, you select a coin and a network, with logos and search. USDC on NEAR is
+  the default. The deposit address shows with its QR code, a Copy button and the minimum deposit.
 
 ### Changed
 
@@ -691,6 +703,10 @@ All notable changes to OpenBot will be documented here. The project follows
 - Chrome extension: when a shared tab does not answer an agent action, the action stops after 20
   seconds and the agent can try again. Before, one stuck action blocked all later actions on all
   shared tabs, and each one failed with "Chrome did not answer in time" until Chrome restarted.
+- Browser: a saved login now signs in on pages that hide the real password field behind a masked
+  text field, such as the eproc court portals. Before, the page emptied the password, and the site
+  said that the password was wrong. When a page still does not keep the saved password, the agent
+  stops before it sends the form, so that you can take over and sign in.
 
 ## [0.78.0] - 2026-11-24
 

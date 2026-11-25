@@ -10,6 +10,7 @@
         "type": "added",
         "items": [
           "Ajanlar OpenBot kredileriyle resim ve video oluşturabilir ve resimlerinizi düzenleyebilir. Onay kartı modeli, fiyatı ve istemi gösterir. İzin vermeden önce başka bir model seçebilirsiniz. Sol şeritteki \"Credits\" öğesi bakiyenizi gösterir. Bir sahip veya yönetici \"Ajanlar kredi kullanabilir\" seçeneğini açabilir veya kapatabilir.",
+          "Ajanlar, bir NEAR Intents cüzdanından sitelere kripto ile ödeme yapabilir. Cüzdanı Sunucu ayarları › Vault › Kripto bölümünde geçiş anahtarıyla bağlayın, sonra para yatırın. Her ödeme sohbette onayınızı bekler ve günlük bütçe ajanların harcayabileceği tutarı sınırlar.",
           "Her hesap 10 ücretsiz hoş geldin kredisi alır. Ayrıca Credits sayfasında Redeem code ile bir kredi kodunu kullanabilirsiniz.",
           "Bir ajanın tarayıcı sekmesi konumunuzu isteyebilir. Sohbet önce size sorar; Engelle, Her zaman izin ver veya İzin ver seçersiniz. Önceden tarayıcı isteği her zaman engelliyordu.",
           "Kenar çubuğunda sohbet listesinin üstünde sekmeler var: \"Tümü\", \"Okunmamış\" ve sizin seçtiğiniz klasörler. Her sekme, o sekmenin okunmamış sohbetlerini gösterir."
