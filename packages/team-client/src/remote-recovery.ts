@@ -352,6 +352,15 @@ export function createRemoteConnectionRecovery(
       if (running || !active) refreshRequested = true;
       else startRun();
     },
+    resetBackoff() {
+      if (disposed || suspended) return;
+      attempt = 0;
+      retryDelay = null;
+      if (retryAt === null) return;
+      retryAt = null;
+      cancelTimer();
+      if (active && !running) startRun();
+    },
     dispose() {
       disposed = true;
       cancelTimer();
