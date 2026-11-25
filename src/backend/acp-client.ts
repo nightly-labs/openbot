@@ -273,6 +273,7 @@ interface AcpTurn {
   retrying?: "agent" | "model";
   waitingOnUser: number;
   openbotToolCalls: number;
+  awaitingCommands: boolean;
   abandoned: boolean;
   reportedCost: number | null;
   unprompted: boolean;
@@ -2591,6 +2592,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       answer: Deferred.makeUnsafe(),
       waitingOnUser: 0,
       openbotToolCalls: 0,
+      awaitingCommands: false,
       abandoned: false,
       reportedCost: null,
       unprompted,
@@ -2700,7 +2702,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
         const running: string = response.stopReason === "end_turn" && !staleWake ? this.#backgroundCommands(turn) : "";
         if (!running) break;
+        turn.awaitingCommands = true;
         const wake = yield* this.#awaitSessionChange(thread, turn);
+        turn.awaitingCommands = false;
         if (thread.activeTurn !== turn || turn.completing) return;
         if (wake === "steered") continue;
         if (wake === "none") break;
@@ -3840,7 +3844,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   ) {
     const limit = this.#flavor.silentTurnLimitMs;
     const silentFor = Date.now() - turn.lastActivityAt;
-    if (limit === undefined || silentFor < limit || turn.toolItems.size > 0 || turn.waitingOnUser > 0) return false;
+    if (limit === undefined || turn.awaitingCommands || silentFor < this.#silenceLimit(turn, limit)) return false;
     if (thread.activeTurn !== turn || turn.completing || turn.stopped) return false;
     const sdkHarness = this.#flavor.sdkHarness;
     const logged = sdkHarness?.silentFailure?.(this.options.argv, thread.id, turn.startedAt) ?? null;
