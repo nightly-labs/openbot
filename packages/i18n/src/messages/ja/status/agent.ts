@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
   "status.agent.modelReturnedAfterError": "プロバイダーのエラーの後、{model} に戻しました。",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} は利用できなくなりました。{model} に切り替えました。",
   "status.agent.marketplaceSuggested": "マーケットプレイスのアプリを提案しました: {app}。",
   "status.agent.settingShown": "設定を表示しました: {setting}。",
   "status.agent.channelMemberAdded": "{agent} が {member} をチャンネルに追加しました。{person} の依頼です。",

@@ -13,6 +13,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous}의 크레딧이 모두 소진되었습니다. {model}(으)로 전환했습니다. 다시 사용하려면 크레딧을 추가한 후 선택하세요.",
   "status.agent.modelReturnedAfterError": "제공자 오류 후 {model}(으)로 다시 전환했어요.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous}을(를) 더 이상 사용할 수 없어요. {model}(으)로 전환했어요.",
   "status.agent.marketplaceSuggested": "마켓플레이스 앱을 추천했어요: {app}.",
   "status.agent.settingShown": "설정을 표시했어요: {setting}.",
   "status.agent.channelMemberAdded": "{agent} 에이전트가 {member} 멤버를 채널에 추가했어요. {person} 님이 요청했어요.",
