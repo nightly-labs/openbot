@@ -69,6 +69,19 @@ export const messages = {
   "status.agent.workflowDelete":
     "Eliminar el flujo de trabajo {title} con sus ejecuciones y versiones. Sus pasos abiertos se detienen.",
   "status.agent.deleteAgents": "Eliminar {agents} con sus chats y archivos. No se puede deshacer.",
+  "status.agent.nearSignatureReceived": "OpenBot recibió la firma. Puedes cerrar esta pestaña.",
+  "status.agent.nearSignatureUnknown": "OpenBot no está esperando esta firma. Vuelve a iniciarla en OpenBot.",
+  "status.agent.nearPayment": "Pagar {amount} {symbol} a {recipient} desde la cartera cripto, para {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Todos los agentes pueden pagar hasta {amount} USD al día. Puedes cambiarlo más tarde en OpenBot.",
+  "status.agent.nearSummaryGrant":
+    "Permitir que esta app de OpenBot pague desde la cartera durante {days} días, dentro de tus reglas.",
+  "status.agent.nearSummaryBudget": "Cambiar el presupuesto diario de la cartera a {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Permitir que OpenBot pague sin tu firma cuando una regla de pago lo permita. Para los demás pagos, te seguirán preguntando en el chat.",
+  "status.agent.nearSummaryPayment": "Aprobar el pago de {amount} a {recipient}.",
+  "status.agent.nearSummaryFreeze": "Los agentes no podrán pagar desde esta cartera hasta que reanudes los pagos.",
+  "status.agent.nearSummaryUnfreeze": "Los agentes pueden volver a pagar desde esta cartera, dentro de tus reglas.",
   "status.agent.screenCaptureProgress": "Pidiendo permiso para capturar la pantalla…",
   "status.agent.screenCaptureReviewing": "Revisando la captura de pantalla…",
   "status.agent.browserOpening": "Abriendo una página web…",

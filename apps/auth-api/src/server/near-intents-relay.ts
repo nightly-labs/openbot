@@ -10,6 +10,8 @@ const UPSTREAM_TIMEOUT_MS = 160_000;
 const FORWARDED_REQUEST_HEADERS = ["content-type", "idempotency-key", "x-grant-token"] as const;
 const FORWARDED_RESPONSE_HEADERS = ["content-type", "retry-after"] as const;
 const AGENT_ID = "([0-9a-f]{64})";
+const PARTNER_KEY_ERROR_CODES = new Set(["invalid_api_key", "api_key_retired", "unauthorized"]);
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
 
 type RelayScope = "open" | "intent" | "status" | "agent";
 
@@ -21,7 +23,7 @@ interface RelayRoute {
 
 const ROUTES: readonly RelayRoute[] = [
   { method: "POST", pattern: /^\/v1\/generate-intent$/u, scope: "intent" },
-  { method: "POST", pattern: /^\/v1\/submit-intent$/u, scope: "open" },
+  { method: "POST", pattern: /^\/v1\/submit-intent$/u, scope: "status" },
   { method: "GET", pattern: /^\/v1\/status$/u, scope: "status" },
   { method: "GET", pattern: /^\/v1\/tokens$/u, scope: "open" },
   { method: "GET", pattern: new RegExp(`^/v1/agents/${AGENT_ID}(?:/(?:policy|balances))?$`, "u"), scope: "agent" },
@@ -119,6 +121,43 @@ function readFacts(text: string | null): JsonFacts {
   }
 }
 
+function refusesPartnerKey(status: number, text: string): boolean {
+  if (status !== 401 && status !== 403) return false;
+  try {
+    const value = JSON.parse(text);
+    const errors = isDynamicRecord(value) ? value.errors : null;
+    const first = Array.isArray(errors) ? errors[0] : null;
+    const code = stringField(first, "code");
+    return code === null || PARTNER_KEY_ERROR_CODES.has(code) || stringField(first, "layer") === "auth";
+  } catch {
+    return true;
+  }
+}
+
+async function readLimitedText(request: Request): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const next = await reader.read();
+    if (next.done) break;
+    size += next.value.byteLength;
+    if (size > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(next.value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 export class NearIntentsRelay {
   readonly #config: NearIntentsRelayConfig;
   readonly #fetch: RelayFetch;
@@ -156,6 +195,10 @@ export class NearIntentsRelay {
 
     const upstream = yield* this.#send(request, path, url.search, body, partnerKey);
     const text = yield* relayIo(() => upstream.text());
+    if (refusesPartnerKey(upstream.status, text)) {
+      console.error("near-intents: the partner key was refused", upstream.status);
+      return yield* unavailable();
+    }
     const received = upstream.ok ? readFacts(text) : null;
     if (creates && received?.agentId) yield* this.#record(received.agentId, key);
     if (matched.route.scope === "status" && received?.agentId) yield* this.#requireOwned(received.agentId, key);
@@ -165,8 +208,8 @@ export class NearIntentsRelay {
   readonly #readBody = Effect.fn("NearIntentsRelay.readBody")(function* (this: NearIntentsRelay, request: Request) {
     const declared = Number(request.headers.get("content-length") ?? "0");
     if (declared > MAX_BODY_BYTES) return yield* tooLarge();
-    const text = yield* relayIo(() => request.text());
-    if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) return yield* tooLarge();
+    const text = yield* relayIo(() => readLimitedText(request));
+    if (text === null) return yield* tooLarge();
     return text;
   });
 
@@ -234,10 +277,6 @@ export class NearIntentsRelay {
         signal: AbortSignal.any([request.signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]),
       }),
     );
-    if (upstream.status === 401 || upstream.status === 403) {
-      console.error("near-intents: the partner key was refused", upstream.status);
-      return yield* unavailable();
-    }
     if (upstream.status >= 300 && upstream.status < 400) {
       console.error("near-intents: the Agent API sent a redirect", upstream.status);
       return yield* unavailable();
@@ -251,7 +290,8 @@ export class NearIntentsRelay {
       const value = upstream.headers.get(name);
       if (value) headers.set(name, value);
     }
-    return new Response(text, { status: upstream.status, headers });
+    const status = upstream.status === 401 ? 403 : upstream.status;
+    return new Response(NULL_BODY_STATUSES.has(status) ? null : text, { status, headers });
   }
 }
 

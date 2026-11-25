@@ -190,6 +190,7 @@ function sent(api: FakeAgentApi, from: number) {
 }
 
 const isTransfer = (request: RecordedRequest) => request.path.endsWith("/transfer");
+const SEND_ATTEMPTS = 3;
 
 async function main(): Promise<void> {
   await mkdir(OUT, { recursive: true });
@@ -489,6 +490,83 @@ async function main(): Promise<void> {
       assert.equal(api.balanceRaw, balanceBefore - 1_000_000n, "no second debit");
       assert.equal(wallet.store.read().payments.length, 0);
       assert.equal(wallet.status().rules[0]?.spentTodayUsd, 5, "the spend of the lost payment is kept");
+    });
+
+    await scenario("two auto payments at the same time stay inside the rule limit", async (details) => {
+      const mark = api.requests.length;
+      assert.equal(wallet.status().rules[0]?.spentTodayUsd, 5);
+      assert.deepEqual(await wallet.prepare(payment("pay-race-1", { amount: "3" })), { kind: "auto" });
+      assert.deepEqual(await wallet.prepare(payment("pay-race-2", { amount: "3" })), { kind: "auto" });
+      const results = await Promise.all([wallet.pay("pay-race-1"), wallet.pay("pay-race-2")]);
+      details.set("results", results);
+      details.set(
+        "transfers",
+        sent(api, mark).filter((request) => request.path.endsWith("/transfer")),
+      );
+      assert.deepEqual(results.map((result) => result.status).sort(), ["declined", "paid"]);
+      assert.equal(
+        results.find((result) => result.status === "declined")?.detail,
+        sourceText("error.connector.nearDeclined"),
+      );
+      assert.equal(api.requests.slice(mark).filter(isTransfer).length, 1, "only one payment is sent");
+      assert.equal(wallet.status().rules[0]?.spentTodayUsd, 8);
+    });
+
+    await scenario(
+      "a proxy error with no error document is uncertain; after a new grant a restart does not send it again",
+      async (details) => {
+        const mark = api.requests.length;
+        assert.deepEqual(await wallet.prepare(payment("pay-proxy", { amount: "1" })), { kind: "auto" });
+        api.proxyFailures = SEND_ATTEMPTS;
+        const result = await wallet.pay("pay-proxy");
+        details.set("result", result);
+        assert.equal(result.status, "uncertain");
+        assert.equal(api.proxyFailures, 0);
+        const stored = wallet.store.read().payments;
+        assert.equal(stored.length, 1, "the payment stays stored");
+        const key = stored[0]?.idempotencyKey ?? "";
+        const before = api.requests.slice(mark).filter(isTransfer);
+        assert.ok(before.every((request) => request.idempotencyKey === key && request.answered === 502));
+        assert.equal(wallet.status().rules[0]?.spentTodayUsd, 9, "the spend of the uncertain payment is kept");
+
+        const renewed = await Effect.runPromise(wallet.service.renewGrant());
+        details.set("renewed", { state: renewed.state, error: renewed.error });
+        assert.equal(renewed.error, null);
+        await Effect.runPromise(wallet.service.dispose());
+        const restarted = new Wallet(storePath, cipher, page, api);
+        const cleared = cipher.nextWrite(
+          "the restart drops the payment of the old grant",
+          (keys) => !keys.includes(key),
+        );
+        await Effect.runPromise(restarted.service.load());
+        await cleared;
+        await Effect.runPromise(restarted.store.update((record) => record));
+        wallet = restarted;
+        const after = api.requests.slice(mark).filter(isTransfer);
+        details.set(
+          "transfers",
+          sent(api, mark).filter((request) => request.path.endsWith("/transfer")),
+        );
+        assert.equal(after.length, before.length, "no transfer under the new grant");
+        assert.equal(wallet.store.read().payments.length, 0);
+        assert.equal(wallet.status().rules[0]?.spentTodayUsd, 9, "the dropped payment is not refunded");
+      },
+    );
+
+    await scenario("a token price of zero makes a rule payment ask the owner", async (details) => {
+      api.usdPrice = 0;
+      await Effect.runPromise(wallet.service.dispose());
+      wallet = new Wallet(storePath, cipher, page, api);
+      await Effect.runPromise(wallet.service.load());
+      const ask = await wallet.prepare(payment("pay-no-price", { amount: "500" }));
+      details.set("ask", ask);
+      assert.deepEqual(ask, { kind: "ask", amount: "500", symbol: "USDC" });
+      assert.equal(wallet.status().payments.find((item) => item.requestId === "pay-no-price")?.amountUsd, null);
+      wallet.service.drop("pay-no-price");
+      api.usdPrice = 1;
+      await Effect.runPromise(wallet.service.dispose());
+      wallet = new Wallet(storePath, cipher, page, api);
+      await Effect.runPromise(wallet.service.load());
     });
 
     await scenario("freeze stops payments; unfreeze starts them again", async (details) => {

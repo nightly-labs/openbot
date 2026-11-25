@@ -17,10 +17,21 @@
 - You do not need a NEAR Intents partner key to set up the crypto wallet. Sign in to OpenBot, and the
   setup starts at the passkey. OpenBot's account service sends the wallet calls with its own key.
 - To add funds to the crypto wallet, you select a coin and a network. Each has its logo, and you can
-  search the lists. USDC on Ethereum is the default, and the popular coins and networks are first.
+  search the lists. USDC on NEAR is the default, because it is fast and costs almost nothing to send, and the popular coins and networks are first.
   The deposit address shows with its QR code and a Copy button.
 - Add funds shows the minimum deposit in the coin, for example "0.1 USDC".
 - When the wallet service is busy, the wallet page tells you and shows "Try again".
 - While you sign a wallet change, the dialog shows one Cancel button. A Cancel shows no error.
 - The passkey page says "Pause payments" or "Resume payments" for these actions, and wallet errors
   say "crypto wallet".
+- The crypto wallet is in all 15 app languages.
+- Add funds shows a spinner while it loads the coins, and an error when it cannot load them.
+
+### Fixed
+
+- A cancelled passkey signature on "Always allow" no longer approves the payment.
+- Two payments at the same time can no longer go over the daily limit, and Pause stops a payment that
+  waits in the queue.
+- When the network fails during a payment, OpenBot keeps the payment and does not send it a second time.
+- After you renew the payment grant, OpenBot does not send a payment that you approved under the old grant.
+- On a joined server, the wallet page shows the agents of that server.

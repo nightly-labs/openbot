@@ -47,7 +47,7 @@ const POPULAR_COINS = ["USDC", "USDT", "ETH", "BTC", "SOL", "NEAR", "WNEAR", "ZE
 
 const CHAIN_ORDER = ["eth", "base", "arb", "sol", "near", "bsc", "pol", "op", "avax", "tron", "ton", "btc"];
 
-const HOME_CHAIN: Readonly<Record<string, string>> = {
+const PREFERRED_CHAIN: Readonly<Record<string, string>> = {
   ADA: "cardano",
   APT: "aptos",
   AVAX: "avax",
@@ -62,6 +62,8 @@ const HOME_CHAIN: Readonly<Record<string, string>> = {
   SUI: "sui",
   TON: "ton",
   TRX: "tron",
+  USDC: "near",
+  USDT: "near",
   WNEAR: "near",
   XLM: "stellar",
   XRP: "xrp",
@@ -80,10 +82,10 @@ const rank = (list: readonly string[], value: string) => {
 const byName = (left: string, right: string) => left.localeCompare(right, "en", { sensitivity: "base" });
 
 function networkOrder(symbol: string) {
-  const home = HOME_CHAIN[symbol.toUpperCase()];
+  const preferred = PREFERRED_CHAIN[symbol.toUpperCase()];
   return (left: NearDepositAsset, right: NearDepositAsset) => {
-    const homeOrder = Number(right.blockchain === home) - Number(left.blockchain === home);
-    if (homeOrder !== 0) return homeOrder;
+    const preferredOrder = Number(right.blockchain === preferred) - Number(left.blockchain === preferred);
+    if (preferredOrder !== 0) return preferredOrder;
     const order = rank(CHAIN_ORDER, left.blockchain) - rank(CHAIN_ORDER, right.blockchain);
     return order !== 0 ? order : byName(chainName(left.blockchain), chainName(right.blockchain));
   };

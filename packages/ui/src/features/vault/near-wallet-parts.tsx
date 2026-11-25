@@ -354,9 +354,13 @@ export function AgentPicker(props: {
       : t("vault.near.allAgents", { count: props.agents.length });
   const fades = createScrollFades();
   onCleanup(() => fades.stop());
+  const noneText = () => {
+    const query = search().trim();
+    return query ? t("vault.near.noAgentMatch", { query }) : t("vault.near.noAgents");
+  };
   const none = () => (
     <Text as="p" variant="body-sm" tone="muted" class="near-wallet-picker-none">
-      {t("vault.near.noAgentMatch", { query: search().trim() })}
+      {noneText()}
     </Text>
   );
   return (

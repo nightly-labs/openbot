@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   type AgentApi,
   AgentApiError,
@@ -112,6 +112,7 @@ export class NearWalletService implements NearWallet {
   readonly #listeners = new Set<(status: NearWalletStatus) => void>();
   readonly #ownerQueue = Semaphore.makeUnsafe(1);
   readonly #prepared = new Map<string, PreparedPayment>();
+  readonly #live = new Set<string>();
   #signingState: NearSigning | null = null;
   #error: string | null = null;
   #readFailed = false;
@@ -495,15 +496,9 @@ export class NearWalletService implements NearWallet {
       const wallet = record.wallet;
       if (!wallet?.grant?.active) return yield* nearFailure(sourceText("error.connector.nearNoWallet"));
       if (wallet.frozen) return yield* nearFailure(sourceText("error.connector.nearFrozen"));
-      if (!this.#grantValid(record)) return yield* nearFailure(sourceText("error.connector.nearGrantExpired"));
+      if (!this.#grantValid(record) || !wallet.grant)
+        return yield* nearFailure(sourceText("error.connector.nearGrantExpired"));
       const rule = record.rules.find((candidate) => candidate.domain === payment.request.domain);
-      if (
-        payment.auto &&
-        (!rule ||
-          payment.amountCents === null ||
-          this.#spentCents(record, rule.domain) + payment.amountCents > rule.dailyUsd * 100)
-      )
-        return { status: "declined", correlationId: null, detail: sourceText("error.connector.nearDeclined") };
       const stored: NearStoredPayment = {
         idempotencyKey: newKey(),
         kind: payment.kind,
@@ -516,16 +511,20 @@ export class NearWalletService implements NearWallet {
         amountCents: rule ? payment.amountCents : null,
         createdAt: this.#now(),
         correlationId: null,
+        grant: grantFingerprint(wallet.grant.token),
       };
-      const sent = yield* this.#dispatch(wallet.agentId, stored);
-      if (sent.status !== "sent") return sent.result;
-      const summary = sourceText("status.agent.nearSummaryPayment", {
-        amount: `${payment.request.amount} ${payment.symbol}`,
-        recipient: payment.request.recipient,
-      });
-      const result = yield* this.#follow(wallet.agentId, stored, sent.correlationId, PAYMENT_TIMEOUT_MS, summary);
-      yield* Effect.forkIn(this.#background(this.#refresh(true)), this.#scope);
-      return result;
+      this.#live.add(stored.idempotencyKey);
+      return yield* Effect.gen({ self: this }, function* () {
+        const sent = yield* this.#dispatch(wallet.agentId, stored, payment.auto);
+        if (sent.status !== "sent") return sent.result;
+        const summary = sourceText("status.agent.nearSummaryPayment", {
+          amount: `${payment.request.amount} ${payment.symbol}`,
+          recipient: payment.request.recipient,
+        });
+        const result = yield* this.#follow(wallet.agentId, stored, sent.correlationId, PAYMENT_TIMEOUT_MS, summary);
+        yield* Effect.forkIn(this.#background(this.#refresh(true)), this.#scope);
+        return result;
+      }).pipe(Effect.ensuring(Effect.sync(() => this.#live.delete(stored.idempotencyKey))));
     },
     (operation) => operation.pipe(Effect.mapError(walletError)),
   ).bind(this);
@@ -859,10 +858,20 @@ export class NearWalletService implements NearWallet {
     this: NearWalletService,
     agentId: string,
     payment: NearStoredPayment,
+    auto: boolean,
   ) {
     const today = this.#today();
-    yield* this.#store.update((record) => {
+    const saved = yield* this.#store.update((record) => {
       const byDomainCents = record.spend.day === today ? record.spend.byDomainCents : {};
+      const rule = record.rules.find((candidate) => candidate.domain === payment.domain);
+      if (
+        record.wallet?.frozen ||
+        (auto &&
+          (!rule ||
+            payment.amountCents === null ||
+            (byDomainCents[payment.domain] ?? 0) + payment.amountCents > rule.dailyUsd * 100))
+      )
+        return record;
       return {
         ...record,
         payments: [...record.payments, payment],
@@ -875,7 +884,19 @@ export class NearWalletService implements NearWallet {
         },
       };
     });
+    if (!saved.payments.some((candidate) => candidate.idempotencyKey === payment.idempotencyKey))
+      return {
+        status: "done" as const,
+        result: {
+          status: "declined",
+          correlationId: null,
+          detail: saved.wallet?.frozen
+            ? sourceText("error.connector.nearFrozen")
+            : sourceText("error.connector.nearDeclined"),
+        } satisfies NearPaymentResult,
+      };
     let attempt = 0;
+    let reached = false;
     while (true) {
       attempt += 1;
       const sent = yield* this.#send(agentId, payment).pipe(Effect.result);
@@ -884,7 +905,7 @@ export class NearWalletService implements NearWallet {
         return { status: "sent" as const, correlationId: sent.success };
       }
       const cause = sent.failure.cause;
-      if (cause instanceof AgentApiError && !cause.retryable) {
+      if (cause instanceof AgentApiError && !reached && isRefusal(cause)) {
         yield* this.#removePayment(payment, true);
         return {
           status: "done" as const,
@@ -895,6 +916,7 @@ export class NearWalletService implements NearWallet {
           } satisfies NearPaymentResult,
         };
       }
+      if (cause instanceof AgentApiError && mayHaveTakenEffect(cause)) reached = true;
       if (cause instanceof AgentApiError && attempt < SEND_ATTEMPTS) {
         yield* Effect.sleep(Duration.seconds(Math.min(cause.retryAfterSeconds ?? attempt * 2, 10)));
         continue;
@@ -913,6 +935,7 @@ export class NearWalletService implements NearWallet {
 
   #send(agentId: string, payment: NearStoredPayment): Effect.Effect<string, NearOperationError> {
     return Effect.gen({ self: this }, function* () {
+      if (!this.#sameGrant(payment)) return yield* nearFailure(sourceText("error.connector.nearGrantExpired"));
       const api = yield* this.#grantClient();
       const options = { idempotencyKey: payment.idempotencyKey };
       const answer =
@@ -983,6 +1006,8 @@ export class NearWalletService implements NearWallet {
         const vote = yield* this.#ownerQueue
           .withPermit(
             Effect.gen({ self: this }, function* () {
+              if (this.#store.read().wallet?.frozen)
+                return yield* nearFailure(sourceText("error.connector.nearFrozen"));
               const intent = yield* this.#generate({
                 type: "approval_vote",
                 agent_id: agentId,
@@ -1009,11 +1034,12 @@ export class NearWalletService implements NearWallet {
     const wallet = record.wallet;
     if (!wallet?.grant?.active || !this.#grantValid(record)) return;
     for (const payment of record.payments) {
+      if (this.#live.has(payment.idempotencyKey)) continue;
       if (payment.correlationId) {
         yield* this.#follow(wallet.agentId, payment, payment.correlationId, STATUS_WAIT_MS, null);
         continue;
       }
-      if (payment.createdAt + REPLAY_WINDOW_MS < this.#now() || wallet.frozen) {
+      if (payment.createdAt + REPLAY_WINDOW_MS < this.#now() || wallet.frozen || !this.#sameGrant(payment)) {
         logger.warn("A NEAR payment of an earlier run has no answer and is too old to send again.");
         yield* this.#removePayment(payment, false);
         continue;
@@ -1022,7 +1048,7 @@ export class NearWalletService implements NearWallet {
       if (Result.isSuccess(sent)) {
         yield* this.#updatePayment(payment.idempotencyKey, { correlationId: sent.success });
         yield* this.#follow(wallet.agentId, payment, sent.success, STATUS_WAIT_MS, null);
-      } else if (sent.failure.cause instanceof AgentApiError && !sent.failure.cause.retryable) {
+      } else if (sent.failure.cause instanceof AgentApiError && isRefusal(sent.failure.cause)) {
         yield* this.#removePayment(payment, true);
       }
     }
@@ -1162,6 +1188,11 @@ export class NearWalletService implements NearWallet {
     return Effect.succeed(this.#client(owner).forGrant(grant.token));
   }
 
+  #sameGrant(payment: NearStoredPayment): boolean {
+    const token = this.#store.read().wallet?.grant?.token;
+    return payment.grant === undefined || (token !== undefined && grantFingerprint(token) === payment.grant);
+  }
+
   #grantValid(record: NearWalletRecord): boolean {
     const grant = record.wallet?.grant;
     return grant?.active === true && Date.parse(grant.expiresAt) - GRANT_MARGIN_MS > this.#now();
@@ -1261,6 +1292,7 @@ function depositMinimum(atomic: string | null | undefined, tokens: TokenView[], 
 }
 
 function usdCents(amount: string, price: number): number | null {
+  if (!Number.isFinite(price) || price <= 0) return null;
   const cents = Math.ceil(Number(amount) * price * 100 - 1e-6);
   return Number.isSafeInteger(cents) && cents >= 0 ? cents : null;
 }
@@ -1273,6 +1305,18 @@ function balanceView(entry: BalanceRow): NearBalance {
 
 function depositAssets(tokens: TokenView[]): NearDepositAsset[] {
   return tokens.map((token) => ({ assetId: token.asset_id, symbol: token.symbol, blockchain: token.blockchain }));
+}
+
+function grantFingerprint(token: string): string {
+  return createHash("sha256").update(token).digest("hex").slice(0, 32);
+}
+
+function isRefusal(error: AgentApiError): boolean {
+  return error.status >= 400 && error.status < 500 && !error.retryable && error.code !== "http_error";
+}
+
+function mayHaveTakenEffect(error: AgentApiError): boolean {
+  return error.status >= 500 || error.code === "http_error";
 }
 
 function newKey(): string {

@@ -1,4 +1,4 @@
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rename, rm } from "node:fs/promises";
 import { sourceText } from "@openbot/i18n/source";
 import { registerSecretValue } from "@openbot/logging";
 import { Effect, Result, Semaphore } from "effect";
@@ -61,6 +61,7 @@ const paymentSchema = z.object({
   amountCents: z.number().int().nonnegative().nullable(),
   createdAt: z.number(),
   correlationId: z.string().nullable(),
+  grant: z.string().optional(),
 });
 
 export type NearStoredPayment = z.infer<typeof paymentSchema>;
@@ -152,7 +153,8 @@ export class NearWalletStore {
 
   readonly clear = Effect.fn("NearWalletStore.clear")(
     function* (this: NearWalletStore) {
-      yield* nearCall(() => rm(this.#path, { force: true }));
+      if (this.#unreadable) yield* nearCall(() => rename(this.#path, `${this.#path}.unreadable-${Date.now()}`));
+      else yield* nearCall(() => rm(this.#path, { force: true }));
       this.#record = EMPTY_NEAR_WALLET_RECORD;
       this.#unreadable = null;
     },

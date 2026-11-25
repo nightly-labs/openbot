@@ -35,13 +35,23 @@ function NetworkRow(props: { coin: NearDepositCoin; asset: NearDepositAsset }): 
 }
 
 function CopyText(props: { label: string; value: string }): JSX.Element {
+  const id = `near-copy-${createUniqueId()}`;
   return (
     <div class="near-wallet-copy">
-      <Text variant="caption" tone="muted">
+      <Text id={id} variant="caption" tone="muted">
         {props.label}
       </Text>
       <p class="near-wallet-copy-value">{props.value}</p>
-      <CopyButton value={props.value} size="sm" variant="outline" />
+      <CopyButton value={props.value} size="sm" variant="outline" aria-describedby={id} />
+    </div>
+  );
+}
+
+function DepositLoading(): JSX.Element {
+  const { t } = useText();
+  return (
+    <div class="near-wallet-deposit near-wallet-deposit-loading">
+      <Spinner label={t("common.loading")} />
     </div>
   );
 }
@@ -49,6 +59,7 @@ function CopyText(props: { label: string; value: string }): JSX.Element {
 export function AddFundsFields(props: {
   assets: readonly NearDepositAsset[];
   deposit: (assetId: string) => Promise<NearDepositAddress>;
+  failed?: boolean | undefined;
 }): JSX.Element {
   const { t, errorMessage } = useText();
   const id = createUniqueId();
@@ -87,7 +98,14 @@ export function AddFundsFields(props: {
     },
   );
   return (
-    <Show when={coin()}>
+    <Show
+      when={coin()}
+      fallback={
+        <Show when={!props.failed}>
+          <DepositLoading />
+        </Show>
+      }
+    >
       {(currentCoin) => (
         <Show when={asset()}>
           {(current) => (
@@ -142,9 +160,7 @@ export function AddFundsFields(props: {
                 when={address()}
                 fallback={
                   <Show when={!failure()}>
-                    <div class="near-wallet-deposit near-wallet-deposit-loading" role="status">
-                      <Spinner />
-                    </div>
+                    <DepositLoading />
                   </Show>
                 }
               >

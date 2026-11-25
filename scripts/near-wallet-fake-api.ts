@@ -239,6 +239,8 @@ export class FakeAgentApi {
   balanceRaw = 1_000n * 10n ** BigInt(USDC_DECIMALS);
   dropNextExecution = false;
   refuseCreateGrant = false;
+  proxyFailures = 0;
+  usdPrice = 1;
   #server: Server | null = null;
   port = 0;
   latencyMs: (method: string, path: string) => number = () => 0;
@@ -312,6 +314,12 @@ export class FakeAgentApi {
       request.socket.destroy();
       return "answered";
     };
+    if (this.proxyFailures > 0 && /\/(transfer|withdraw)$/u.test(url.pathname)) {
+      this.proxyFailures -= 1;
+      recorded.answered = 502;
+      response.writeHead(502, { "content-type": "text/html", "retry-after": "0" }).end("<html>Bad gateway</html>");
+      return "answered";
+    }
     if (apiKey !== PARTNER_KEY)
       return answer(401, errorDocument("unauthorized", "auth", "The API key is not valid.", false));
     return this.#route(recorded, url, bodyText, grantToken, answer, drop);
@@ -329,7 +337,10 @@ export class FakeAgentApi {
     const bad = (detail: string) => answer(400, errorDocument("bad_request", "request", detail, false));
     if (method === "GET" && path === "/v1/whoami")
       return answer(200, { api_key_id: "key-e2e", tenant_id: "tenant-e2e" });
-    if (method === "GET" && path === "/v1/tokens") return answer(200, { data: tokenList() });
+    if (method === "GET" && path === "/v1/tokens")
+      return answer(200, {
+        data: tokenList().map((token) => (token.asset_id === USDC ? { ...token, price: this.usdPrice } : token)),
+      });
     if (method === "POST" && path === "/v1/generate-intent") {
       const raw = jsonObjectSchema.safeParse(recorded.body);
       const facts = generateSchema.safeParse(recorded.body);
@@ -363,6 +374,7 @@ export class FakeAgentApi {
         balances: [
           {
             ...tokenView(),
+            price: this.usdPrice,
             balance_raw: this.balanceRaw.toString(),
             balance: atomicToDecimal(this.balanceRaw),
             available_raw: this.balanceRaw.toString(),

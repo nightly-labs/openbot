@@ -118,7 +118,18 @@ function storyNearApi(initial: NearWalletStatus, setup: SetupStory = {}): NearWa
     saveRule: async (rule) =>
       set({ rules: [...status.rules.filter((item) => item.domain !== rule.domain), { ...rule, spentTodayUsd: 0 }] }),
     removeRule: async ({ domain }) => set({ rules: status.rules.filter((item) => item.domain !== domain) }),
-    allowPayment: async () => set({}),
+    allowPayment: async ({ requestId, dailyUsd }) => {
+      const payment = [...status.payments, PAYMENT].find((candidate) => candidate.requestId === requestId);
+      if (!payment) return set({});
+      const rule = status.rules.find((item) => item.domain === payment.domain);
+      const recipients = [...new Set([...(rule?.recipients ?? []), payment.recipient])];
+      return set({
+        rules: [
+          ...status.rules.filter((item) => item.domain !== payment.domain),
+          { domain: payment.domain, recipients, dailyUsd, spentTodayUsd: rule?.spentTodayUsd ?? 0 },
+        ],
+      });
+    },
     openSigning: async () => undefined,
     cancelSigning: async () => set({ signing: null }),
     checkBackup: async () => set({ ownerBackup: { state: "synced", checkedAt: new Date().toISOString() } }),
@@ -235,6 +246,16 @@ export const GuidedSetupStopped: Story = {
 
 export const AddFunds: Story = { render: () => <AddFundsView status={READY} /> };
 
+export const AddFundsLoading: Story = { render: () => <AddFundsView status={{ ...READY, depositAssets: [] }} /> };
+
+export const AddFundsUnavailable: Story = {
+  render: () => (
+    <AddFundsView
+      status={{ ...READY, depositAssets: [], error: sourceText("error.connector.nearServiceUnavailable") }}
+    />
+  ),
+};
+
 export const WalletPage: Story = { render: () => <WalletPageView status={READY} /> };
 
 export const WalletPagePaused: Story = { render: () => <WalletPageView status={{ ...READY, state: "frozen" }} /> };
@@ -245,6 +266,12 @@ export const WalletPageSigning: Story = {
 
 export const WalletPageGrantEnded: Story = {
   render: () => <WalletPageView status={{ ...READY, account: null }} />,
+};
+
+export const WalletPageGrantExpired: Story = {
+  render: () => (
+    <WalletPageView status={{ ...READY, account: READY.account && { ...READY.account, grantExpiresAt: null } }} />
+  ),
 };
 
 export const Payment: Story = { render: () => <PaymentCard payment={PAYMENT} status={READY} /> };

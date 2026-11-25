@@ -1,4 +1,4 @@
-import type { NearPendingPayment, NearWalletStatus } from "@openbot/contracts/ipc";
+import { NEAR_RULE_DAILY_USD, type NearPendingPayment, type NearWalletStatus } from "@openbot/contracts/ipc";
 import { classifyFailure } from "@openbot/telemetry";
 import { Button, toast } from "@openbot/ui";
 import { createSignal, Show } from "solid-js";
@@ -24,7 +24,18 @@ export function NearPaymentCard(props: NearPaymentCardProps) {
     if (!signing) return false;
     return signing.requestId === props.payment.requestId || signing.action === "auto-pay";
   };
-  const canAllow = () => !props.payment.overLimit && props.payment.amountUsd !== null;
+  const canAllow = () => {
+    const amountUsd = props.payment.amountUsd;
+    if (props.payment.overLimit || amountUsd === null) return false;
+    return amountUsd <= (NEAR_RULE_DAILY_USD.at(-1) ?? 0);
+  };
+  const allowed = (status: NearWalletStatus, dailyUsd: number) =>
+    status.rules.some(
+      (rule) =>
+        rule.domain === props.payment.domain &&
+        rule.dailyUsd === dailyUsd &&
+        rule.recipients.includes(props.payment.recipient),
+    );
   const subtitle = () =>
     [props.payment.domain, props.payment.reason, props.payment.overLimit && t("vault.near.overLimit")]
       .filter(Boolean)
@@ -45,7 +56,7 @@ export function NearPaymentCard(props: NearPaymentCardProps) {
 
   async function allow(dailyUsd: number): Promise<NearWalletStatus> {
     const status = await props.actions.allowPayment({ requestId: props.payment.requestId, dailyUsd });
-    if (status.error === null) void answer(props.onApprove);
+    if (status.error === null && allowed(status, dailyUsd)) void answer(props.onApprove);
     return status;
   }
 

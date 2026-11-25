@@ -70,6 +70,21 @@ export const messages = {
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
   "status.agent.deleteAgents": "{agents} をチャットとファイルごと削除します。元に戻せません。",
+  "status.agent.nearSignatureReceived": "OpenBot が署名を受け取りました。このタブは閉じてかまいません。",
+  "status.agent.nearSignatureUnknown": "OpenBot はこの署名を待っていません。OpenBot でもう一度始めてください。",
+  "status.agent.nearPayment":
+    "{domain} のため、暗号資産ウォレットから {recipient} に {amount} {symbol} を支払います: {reason}",
+  "status.agent.nearSummaryCreate":
+    "すべてのエージェントが 1 日あたり最大 {amount} USD まで支払えます。あとで OpenBot で変更できます。",
+  "status.agent.nearSummaryGrant":
+    "この OpenBot アプリが、あなたのルールの範囲内で {days} 日間ウォレットから支払えるようにします。",
+  "status.agent.nearSummaryBudget": "ウォレットの 1 日の予算を {amount} USD に変更します。",
+  "status.agent.nearSummaryAutoPay":
+    "支払いルールで許可されている場合は、OpenBot があなたの署名なしで支払えるようにします。その他の支払いは引き続きチャットで確認します。",
+  "status.agent.nearSummaryPayment": "{recipient} への {amount} の支払いを承認します。",
+  "status.agent.nearSummaryFreeze": "支払いを再開するまで、エージェントはこのウォレットから支払えません。",
+  "status.agent.nearSummaryUnfreeze":
+    "エージェントは、あなたのルールの範囲内で再びこのウォレットから支払えるようになります。",
   "status.agent.screenCaptureProgress": "画面のキャプチャを要求しています…",
   "status.agent.screenCaptureReviewing": "画面のキャプチャを確認しています…",
   "status.agent.browserOpening": "Web ページを開いています…",

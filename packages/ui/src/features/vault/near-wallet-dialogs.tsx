@@ -281,7 +281,11 @@ export function NearSetupDialog(props: NearDialogProps) {
           </Show>
         </Match>
         <Match when={step() === "funds"}>
-          <AddFundsFields assets={props.status.depositAssets} deposit={props.actions.deposit} />
+          <AddFundsFields
+            assets={props.status.depositAssets}
+            deposit={props.actions.deposit}
+            failed={failure() !== null}
+          />
         </Match>
       </Switch>
       <NearFailure text={failure()} />
@@ -290,8 +294,13 @@ export function NearSetupDialog(props: NearDialogProps) {
 }
 
 export function NearAddFundsDialog(props: NearDialogProps) {
-  const { t } = useText();
+  const { t, sourceText } = useText();
   const footer = () => <Button type="submit">{t("common.done")}</Button>;
+  const unavailable = () => {
+    const error = props.status.error;
+    if (props.status.depositAssets.length > 0 || error === null) return null;
+    return sourceText(error);
+  };
   return (
     <NearWalletDialog
       title={t("vault.near.addFunds")}
@@ -299,7 +308,12 @@ export function NearAddFundsDialog(props: NearDialogProps) {
       onSubmit={props.onClose}
       actions={footer()}
     >
-      <AddFundsFields assets={props.status.depositAssets} deposit={props.actions.deposit} />
+      <AddFundsFields
+        assets={props.status.depositAssets}
+        deposit={props.actions.deposit}
+        failed={unavailable() !== null}
+      />
+      <NearFailure text={unavailable()} />
     </NearWalletDialog>
   );
 }

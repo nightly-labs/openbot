@@ -8,14 +8,16 @@ import type { LinkAccountStore } from "./stores/link-account-store";
 import type { NearWalletStore } from "./stores/near-wallet-store";
 import type { VaultStore } from "./stores/vault-store";
 
+type VaultAgent = VaultAgentChoice & NearWalletAgent;
+
 export interface ServerVaultOptions {
   store: VaultStore;
   apiKeys: boolean;
   twoStep: boolean;
   link?: LinkAccountStore | undefined;
   near?: NearWalletStore | undefined;
-  nearAgents?: (() => readonly NearWalletAgent[]) | undefined;
-  listAgents?: (() => Promise<readonly VaultAgentChoice[]>) | undefined;
+  nearAgents?: (() => readonly NearWalletAgent[] | undefined) | undefined;
+  listAgents?: (() => Promise<readonly VaultAgent[]>) | undefined;
 }
 
 export function ServerVaultPanel(
@@ -25,7 +27,7 @@ export function ServerVaultPanel(
   },
 ) {
   const { t, errorMessage } = useText();
-  const [agents, setAgents] = createSignal<readonly VaultAgentChoice[]>([]);
+  const [agents, setAgents] = createSignal<readonly VaultAgent[]>([]);
   let request = 0;
   createEffect(
     () => props.listAgents,
@@ -69,7 +71,7 @@ export function ServerVaultPanel(
   const nearWallet = () => {
     const near = props.near;
     if (!near) return undefined;
-    return { status: near.state.status, agents: props.nearAgents?.() ?? [], actions: near.actions };
+    return { status: near.state.status, agents: props.nearAgents?.() ?? agents(), actions: near.actions };
   };
   const onCodes = () => (props.twoStep ? props.store.codes : undefined);
   return (

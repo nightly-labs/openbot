@@ -209,6 +209,7 @@ export const messages = defineMessages("vault", {
   "vault.near.allAgents": { one: "All {count} agent", other: "All {count} agents" },
   "vault.near.allMatches": { one: "All {count} match", other: "All {count} matches" },
   "vault.near.noAgentMatch": "No agent matches “{query}”.",
+  "vault.near.noAgents": "No agents yet.",
   "vault.near.noneCanPay": "No agent can pay",
   "vault.near.namesCanPay": "{names} can pay",
   "vault.near.allCanPay": "All agents can pay",

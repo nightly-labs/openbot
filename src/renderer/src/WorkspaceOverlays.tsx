@@ -610,7 +610,7 @@ function ServerSettings() {
   });
   const vaultApiKeys = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V2_CAPABILITY));
   const vaultTwoStep = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_V3_CAPABILITY));
-  const nearAgents = () => (activeServer()?.kind === "local" ? agentList() : []);
+  const nearAgents = () => (activeServer()?.kind === "local" ? agentList() : undefined);
   const vaultImport = createMemo(() => serverCanAdminister(serverSettingsTarget(), VAULT_IMPORT_CAPABILITY));
   const vault = createMemo(() => {
     const serverId = vaultServerId();

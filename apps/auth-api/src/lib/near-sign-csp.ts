@@ -3,7 +3,11 @@ export const NEAR_PASSKEY_WALLET_HOST = "nearintents.openbot.run";
 
 export function passkeyWalletHostResponse(request: Request, siteUrl: string): Response | null {
   const url = new URL(request.url);
-  if (url.hostname !== NEAR_PASSKEY_WALLET_HOST || url.pathname === NEAR_SIGN_PATH) return null;
+  if (url.hostname !== NEAR_PASSKEY_WALLET_HOST) {
+    const signPage = url.pathname.replace(/\/+$/u, "") === NEAR_SIGN_PATH;
+    return signPage && url.hostname === new URL(siteUrl).hostname ? new Response(null, { status: 404 }) : null;
+  }
+  if (url.pathname === NEAR_SIGN_PATH) return null;
   if (request.method !== "GET" && request.method !== "HEAD") return new Response(null, { status: 404 });
   return Response.redirect(siteUrl, 308);
 }

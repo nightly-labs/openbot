@@ -68,6 +68,19 @@ export const messages = {
   "status.agent.workflowDelete":
     "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",
   "status.agent.deleteAgents": "{agents} ajanlarını sohbetleri ve dosyalarıyla birlikte silin. Bu işlem geri alınamaz.",
+  "status.agent.nearSignatureReceived": "OpenBot imzayı aldı. Bu sekmeyi kapatabilirsiniz.",
+  "status.agent.nearSignatureUnknown": "OpenBot bu imzayı beklemiyor. OpenBot'ta yeniden başlatın.",
+  "status.agent.nearPayment": "{domain} için kripto cüzdandan {recipient} alıcısına {amount} {symbol} öde: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Tüm ajanlar günde en fazla {amount} USD ödeyebilir. Bunu daha sonra OpenBot'ta değiştirebilirsiniz.",
+  "status.agent.nearSummaryGrant":
+    "Bu OpenBot uygulamasının {days} gün boyunca, kurallarınız dahilinde cüzdandan ödeme yapmasına izin ver.",
+  "status.agent.nearSummaryBudget": "Cüzdanın günlük bütçesini {amount} USD olarak değiştir.",
+  "status.agent.nearSummaryAutoPay":
+    "Bir ödeme kuralı izin verdiğinde OpenBot'un imzanız olmadan ödeme yapmasına izin ver. Diğer ödemeler için yine sohbette size sorulur.",
+  "status.agent.nearSummaryPayment": "{recipient} alıcısına {amount} ödemesini onayla.",
+  "status.agent.nearSummaryFreeze": "Siz ödemeleri sürdürene kadar ajanlar bu cüzdandan ödeme yapamaz.",
+  "status.agent.nearSummaryUnfreeze": "Ajanlar kurallarınız dahilinde bu cüzdandan yeniden ödeme yapabilir.",
   "status.agent.screenCaptureProgress": "Ekranı yakalamak için izin isteniyor…",
   "status.agent.screenCaptureReviewing": "Ekran görüntüsü inceleniyor…",
   "status.agent.browserOpening": "Web sayfası açılıyor…",

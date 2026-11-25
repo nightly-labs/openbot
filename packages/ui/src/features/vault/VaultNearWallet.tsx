@@ -177,16 +177,19 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
   const { t, format, sourceText } = useText();
   const [dialog, setDialog] = createSignal<PageDialog | null>(null);
   const run = createNearRun();
+  const leave = createNearRun();
   const id = `near-wallet-${createUniqueId()}`;
   const account = () => props.status.account;
   const signing = () => props.status.signing;
   const busyWith = (action: string) => signing()?.action === action;
+  const locked = () => Boolean(signing()) || run.busy();
   const paymentsOn = () => busyWith("unfreeze") || (props.status.state === "ready" && !busyWith("freeze"));
   const paymentsText = () => (paymentsOn() ? t("vault.near.paymentsOnDetail") : t("vault.near.pausedDetail"));
   const changeAllowed = createPassed(() => account()?.policyChangeAvailableAt ?? null);
   const close = () => setDialog(null);
   const open = (next: PageDialog) => {
     run.clear();
+    leave.clear();
     setDialog(next);
   };
 
@@ -196,9 +199,10 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
     return props.status.error ? sourceText(props.status.error) : null;
   };
 
-  const assetName = (assetId: string) => {
-    const asset = props.status.depositAssets.find((item) => item.assetId === assetId);
-    return asset ? chainName(asset.blockchain) : "";
+  const networkLabel = (balance: { assetId: string; symbol: string }) => {
+    const asset = props.status.depositAssets.find((item) => item.assetId === balance.assetId);
+    const network = asset ? chainName(asset.blockchain) : "";
+    return network === balance.symbol ? "" : network;
   };
 
   const payingIds = () => (props.status.allAgents ? props.agents.map((agent) => agent.id) : props.status.agentIds);
@@ -232,6 +236,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
     });
     return `${count} · ${until}`;
   };
+  const grantEnded = () => !account()?.grantExpiresAt;
   const renewDue = () => {
     const ends = account()?.grantExpiresAt;
     if (!ends) return false;
@@ -318,7 +323,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
           </Alert>
         )}
       </Show>
-      <Show when={account() === null}>
+      <Show when={grantEnded()}>
         <Alert tone="warning" report={false}>
           <AlertContent>
             <AlertTitle>{t("vault.near.grantEnded")}</AlertTitle>
@@ -330,7 +335,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
               variant="outline"
               loading={busyWith("grant")}
               loadingLabel={t("vault.near.waitingShort")}
-              disabled={Boolean(signing())}
+              disabled={locked()}
               onClick={() => void run.run(props.actions.renewGrant)}
             >
               {t("vault.near.renew")}
@@ -342,7 +347,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
       <Card label={t("vault.near.payments")}>
         <SwitchField
           checked={paymentsOn()}
-          disabled={Boolean(signing())}
+          disabled={locked()}
           onChange={(on) => void run.run(on ? props.actions.unfreeze : props.actions.freeze)}
           label={t("vault.near.payments")}
           description={paymentsText()}
@@ -364,7 +369,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
               <Item class="settings-modal-row">
                 <ItemContent>
                   <ItemTitle class="vault-truncate">
-                    {balance().symbol} <span class="near-wallet-network">{assetName(balance().assetId)}</span>
+                    {balance().symbol} <span class="near-wallet-network">{networkLabel(balance())}</span>
                   </ItemTitle>
                 </ItemContent>
                 <ItemActions>
@@ -414,7 +419,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
                     variant="outline"
                     loading={busyWith("budget") && dialog() === null}
                     loadingLabel={t("vault.near.waitingShort")}
-                    disabled={Boolean(signing()) || !changeAllowed()}
+                    disabled={locked() || !changeAllowed()}
                     onClick={() => open({ kind: "budget" })}
                   >
                     {t("vault.near.change")}
@@ -460,7 +465,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
                     <DomainMenu
                       domain={rule().domain}
                       menuMount={props.menuMount}
-                      disabled={Boolean(signing())}
+                      disabled={locked()}
                       onChange={() => open({ kind: "domain", rule: rule() })}
                       onRemove={() => void run.run(() => props.actions.removeRule(rule().domain))}
                     />
@@ -492,7 +497,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
                   variant="outline"
                   loading={busyWith("grant")}
                   loadingLabel={t("vault.near.waitingShort")}
-                  disabled={Boolean(signing())}
+                  disabled={locked()}
                   onClick={() => void run.run(props.actions.renewGrant)}
                 >
                   {t("vault.near.renew")}
@@ -502,7 +507,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={Boolean(signing())}
+                disabled={locked()}
                 onClick={() => open({ kind: "agents" })}
               >
                 {t("vault.near.chooseAgents")}
@@ -527,7 +532,7 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
                   variant="outline"
                   loading={busyWith("check-backup")}
                   loadingLabel={t("vault.near.waitingShort")}
-                  disabled={Boolean(signing())}
+                  disabled={locked()}
                   onClick={() => void run.run(props.actions.checkBackup)}
                 >
                   {t("vault.near.backup.check")}
@@ -569,10 +574,10 @@ export function VaultNearWalletPage(props: VaultNearWalletProps & { menuMount?: 
         description={t("vault.near.disconnectDescription")}
         confirmLabel={t("vault.near.disconnect")}
         tone="destructive"
-        error={disconnectError(dialog(), run.failure())}
+        error={disconnectError(dialog(), leave.failure())}
         onCancel={close}
         onConfirm={async () => {
-          if (await run.run(props.actions.disconnect)) close();
+          if (await leave.run(props.actions.disconnect)) close();
         }}
       />
     </div>

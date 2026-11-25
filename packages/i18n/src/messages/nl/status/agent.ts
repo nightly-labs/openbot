@@ -72,6 +72,18 @@ export const messages = {
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
   "status.agent.deleteAgents": "Verwijder {agents} met hun chats en bestanden. Je kunt dit niet ongedaan maken.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
+  "status.agent.nearSignatureReceived": "OpenBot heeft de handtekening ontvangen. Je kunt dit tabblad sluiten.",
+  "status.agent.nearSignatureUnknown": "OpenBot wacht niet op deze handtekening. Start het opnieuw in OpenBot.",
+  "status.agent.nearPayment": "Betaal {amount} {symbol} aan {recipient} uit de cryptowallet, voor {domain}: {reason}",
+  "status.agent.nearSummaryCreate":
+    "Alle agents kunnen tot {amount} USD per dag betalen. Je kunt dit later wijzigen in OpenBot.",
+  "status.agent.nearSummaryGrant": "Laat deze OpenBot-app {days} dagen uit de wallet betalen, binnen je regels.",
+  "status.agent.nearSummaryBudget": "Wijzig het dagbudget van de wallet naar {amount} USD.",
+  "status.agent.nearSummaryAutoPay":
+    "Laat OpenBot zonder je handtekening betalen als een betaalregel dat toestaat. Voor andere betalingen krijg je nog steeds een vraag in de chat.",
+  "status.agent.nearSummaryPayment": "Keur de betaling van {amount} aan {recipient} goed.",
+  "status.agent.nearSummaryFreeze": "Agents kunnen niet uit deze wallet betalen tot je de betalingen hervat.",
+  "status.agent.nearSummaryUnfreeze": "Agents kunnen weer uit deze wallet betalen, binnen je regels.",
   "status.agent.screenCaptureProgress": "Vraagt om het scherm vast te leggen…",
   "status.agent.screenCaptureReviewing": "Bekijkt de schermopname…",
   "status.agent.browserOpening": "Opent een webpagina…",
