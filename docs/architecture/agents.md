@@ -1204,8 +1204,9 @@ never relays it for a steered request, and sends no "no reply" note: Claude can 
 steer in a turn of its own (`moveSteerToTurn`). Until a result or a `command_lifecycle` start lists a steer's uuid, `ClaudeAgentClient` keeps it in
 `unreadSteers`. A turn that ends with one waits for Claude's own turn (`awaitOwnTurn`), so the idle
 limit does not close the thread before Claude answers it (#16361). A result that lists no uuids, or a
-stop, clears the list. When the thread closes with a steer that is still unread, the client sends
-`openbot/unread-steers`, and `restoreUnsteered` puts the message back in the queue.
+stop, clears the list. When the thread closes with a steer that is still unread, `restoreUnsteered` puts
+the message back in the queue: through `unreadSteers` of `turn/completed` when the closing turn holds the
+steer, so the failed turn does not mark it failed, otherwise through `openbot/unread-steers`.
 `scripts/claude-steer-idle-release-e2e.ts` checks both paths. When the turn ends as interrupted before a reply (a
 stop, or an exit of the provider process), the sender gets an OpenBot note (`MailboxStore.answerFailedRequest`), and does not wait for a result that
 never comes. Routine runs, channel work and messages from Slack, Telegram or

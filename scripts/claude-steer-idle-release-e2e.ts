@@ -13,9 +13,13 @@ import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecode
 import { providerSync } from "../src/backend/provider-client-effects";
 import type { ReadProviderHistory } from "../src/backend/provider-history";
 
-const DROP = process.argv.includes("--drop");
+const EXIT_MID = process.argv.includes("--exit-mid");
+const DROP = EXIT_MID || process.argv.includes("--drop");
 const OUT = resolve(import.meta.dirname, "../.openbot-build/claude-late-steer-e2e");
-const REPORT = join(OUT, DROP ? "report-idle-release-exit.json" : "report-idle-release.json");
+const REPORT = join(
+  OUT,
+  EXIT_MID ? "report-idle-release-exit-mid.json" : DROP ? "report-idle-release-exit.json" : "report-idle-release.json",
+);
 const root = await mkdtemp(join(tmpdir(), "openbot-claude-steer-idle-release-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
@@ -101,6 +105,10 @@ const turn = (message) => {
   if (held) {
     const done = held;
     held = null;
+    if (${JSON.stringify(EXIT_MID)}) {
+      log({ event: "exit" });
+      process.exit(1);
+    }
     if (${JSON.stringify(DROP)}) {
       finish(done, ${JSON.stringify(FIRST_ANSWER)}, () => {
         log({ event: "exit" });
@@ -269,7 +277,7 @@ const report: {
   events?: StandInEvent[];
   passed: boolean;
   error?: string;
-} = { mode: DROP ? "process-exit" : "idle-release-race", passed: false };
+} = { mode: EXIT_MID ? "process-exit-mid-turn" : DROP ? "process-exit" : "idle-release-race", passed: false };
 
 const events = (): StandInEvent[] =>
   existsSync(eventLog)
@@ -371,8 +379,10 @@ try {
     "The chat shows the steered message once and then its answer.",
   );
   assert.ok(
-    report.deliveries.every((delivery) => delivery.status === "completed"),
-    "Each delivery completes.",
+    report.deliveries.every(
+      (delivery) => delivery.status === "completed" || (EXIT_MID && delivery.id !== steerDeliveryId),
+    ),
+    EXIT_MID ? "The steered message completes after its turn failed." : "Each delivery completes.",
   );
   const steerTurns = report.events.filter((event) => event.event === "user-message" && event.uuid === steerDeliveryId);
   if (DROP) {
