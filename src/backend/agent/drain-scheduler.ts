@@ -301,13 +301,8 @@ export class DrainScheduler {
   }
 
   #laneTurnActive(lane: Lane): boolean {
-    if (lane.taskId === null || lane.taskId === MESSAGING_LANE)
-      return this.#ownThreadTurnActive(lane.agentId, lane.taskId === MESSAGING_LANE);
-    const channelId = laneChannelId(lane.taskId);
-    if (channelId !== null)
-      return this.#conversation
-        .workingChannelSnapshots(lane.agentId)
-        .some((snapshot) => this.#conversation.channelForThread(snapshot.threadId) === channelId);
+    if (lane.taskId === null || lane.taskId === MESSAGING_LANE || laneChannelId(lane.taskId) !== null)
+      return this.#heldTurnSnapshot(lane) !== undefined;
     const threadId = this.#tasks.threadId(lane.taskId);
     return this.#conversation
       .workingTaskSnapshots(lane.agentId)
