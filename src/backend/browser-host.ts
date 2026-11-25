@@ -11,7 +11,9 @@ import type {
   BrowserEnvironment,
   BrowserImageMode,
   BrowserJsonValue,
+  BrowserLocation,
   BrowserNavigationDirection,
+  BrowserPermissionAnswer,
   BrowserPreview,
   BrowserProxyFailure,
   BrowserSecretRequest,
@@ -83,6 +85,13 @@ import {
   toPublicTab,
 } from "./browser-host-tab";
 import { BrowserHintRequests, sessionBrowserUserAgent } from "./browser-identity";
+import {
+  alwaysLocationKey,
+  BrowserLocationRequests,
+  EVERY_LOCATION_OWNER,
+  locationOrigin,
+  locationOwner,
+} from "./browser-location";
 import {
   describeBrowserTarget,
   isCommittedNavigationTimeout,
@@ -547,6 +556,14 @@ export class BrowserHost {
   readonly #reservedDownloadPaths = new Set<string>();
   #activeDownloads = 0;
   readonly #recorder: BrowserRecorder;
+  readonly #locations = new BrowserLocationRequests((tabId) => {
+    const tab = this.#tabs.get(tabId);
+    if (tab) tab.permissionRequest = this.#locations.request(tabId);
+    this.#emitChanged();
+  });
+  readonly #sharedLocations = new Map<string, BrowserLocation>();
+  readonly #alwaysLocations = new Map<string, BrowserLocation>();
+  readonly #answeringLocations = new Set<string>();
   #activeTabId: string | null = null;
   #visible = false;
   #bounds: BrowserBounds | null = null;
@@ -837,6 +854,7 @@ export class BrowserHost {
       tab.secret !== undefined ||
       tab.secretDocument === true ||
       tab.filledCard === true ||
+      tab.permissionRequest !== undefined ||
       this.#takeoverTabIds.has(tab.id) ||
       this.#userControlTabIds.has(tab.id)
     );
@@ -873,6 +891,7 @@ export class BrowserHost {
   readonly #closeRenderer = Effect.fn("BrowserHost.closeRenderer")(function* (this: BrowserHost, tab: BrowserHostTab) {
     const { view, contents, engine } = tab;
     engine.releaseDialogs();
+    this.#forgetLocation(tab.id);
     yield* engine.destroy();
     yield* browserSync(() => {
       if (tab.closing || this.#destroying || this.#tabs.get(tab.id) !== tab) return;
@@ -1085,6 +1104,7 @@ export class BrowserHost {
             if (this.#tabs.get(tab.id) === tab && (closeOnFailure || tab.contents.isDestroyed())) {
               this.#unmountView(tab.view);
               this.#tabs.delete(tab.id);
+              this.#forgetLocation(tab.id);
               this.#userControlTabIds.delete(tab.id);
               this.#teachRecordings.delete(tab.id);
               this.#completeUserControlWaiters(tab.id);
@@ -1266,6 +1286,95 @@ export class BrowserHost {
     yield* browserSync(() => tab.contents.stop());
   }).bind(this);
 
+  readonly answerPermission = Effect.fn("BrowserHost.answerPermission")(function* (
+    this: BrowserHost,
+    answer: BrowserPermissionAnswer,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const tab = yield* this.#requireTab(answer.tabId);
+    const origin = this.#locations.pendingOrigin(tab.id, answer.requestId);
+    if (origin === null || this.#answeringLocations.has(answer.requestId)) return;
+    this.#answeringLocations.add(answer.requestId);
+    yield* this.#applyLocationAnswer(tab, origin, answer).pipe(
+      Effect.ensuring(Effect.sync(() => this.#answeringLocations.delete(answer.requestId))),
+    );
+  }).bind(this);
+
+  readonly #applyLocationAnswer = Effect.fn("BrowserHost.applyLocationAnswer")(function* (
+    this: BrowserHost,
+    tab: BrowserHostTab,
+    origin: string,
+    answer: BrowserPermissionAnswer,
+  ): Effect.fn.Return<void, BrowserOperationError> {
+    const location = answer.allow ? answer.location : undefined;
+    if (location) {
+      const applied = yield* tab.engine.setLocation(location).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false)),
+      );
+      if (!applied) {
+        this.#locations.decide(tab.id, answer.requestId, false);
+        return yield* browserFailure(new Error(sourceText("error.backend.browserLocationFailed")));
+      }
+      this.#sharedLocations.set(tab.id, location);
+    } else if (this.#sharedLocations.delete(tab.id)) yield* tab.engine.setLocation(null);
+    const owner = locationOwner(tab);
+    const alwaysOwner =
+      answer.allow && answer.always === true && owner ? (location ? owner : EVERY_LOCATION_OWNER) : null;
+    const alwaysKey = alwaysOwner && location ? alwaysLocationKey(alwaysOwner, origin) : null;
+    const alwaysBefore = alwaysKey ? this.#alwaysLocations.get(alwaysKey) : undefined;
+    if (alwaysKey && location) this.#alwaysLocations.set(alwaysKey, location);
+    if (this.#locations.decide(tab.id, answer.requestId, answer.allow, alwaysOwner)) return;
+    if (alwaysKey && this.#alwaysLocations.get(alwaysKey) === location) {
+      if (alwaysBefore) this.#alwaysLocations.set(alwaysKey, alwaysBefore);
+      else this.#alwaysLocations.delete(alwaysKey);
+    }
+    if (location && this.#sharedLocations.get(tab.id) === location) {
+      this.#sharedLocations.delete(tab.id);
+      yield* tab.engine.setLocation(null);
+    }
+  }).bind(this);
+
+  #locationAsker(contents: WebContents | null): { tab: BrowserHostTab; owner: string; origin: string } | null {
+    const tab = contents ? [...this.#tabs.values()].find((candidate) => candidate.contents === contents) : undefined;
+    const owner = tab ? locationOwner(tab) : null;
+    if (!tab || !owner || tab.secret || tab.privateSession || tab.closing) return null;
+    const origin = locationOrigin(tab.contents.getURL());
+    return origin ? { tab, owner, origin } : null;
+  }
+
+  #askLocation(contents: WebContents, answer: (granted: boolean) => void): void {
+    const asker = this.#locationAsker(contents);
+    if (!asker) {
+      answer(false);
+      return;
+    }
+    const { tab, owner, origin } = asker;
+    this.#locations.ask(tab.id, owner, origin, (granted) => {
+      const shared = granted
+        ? (this.#sharedLocations.get(tab.id) ?? this.#alwaysLocations.get(alwaysLocationKey(owner, origin)))
+        : undefined;
+      if (!shared) {
+        answer(granted);
+        return;
+      }
+      this.#sharedLocations.set(tab.id, shared);
+      void runCauseEffect(tab.engine.setLocation(shared)).then(
+        () => answer(this.#sharedLocations.get(tab.id) === shared),
+        () => answer(false),
+      );
+    });
+  }
+
+  #locationAllowed(contents: WebContents | null): boolean {
+    const asker = this.#locationAsker(contents);
+    return asker !== null && this.#locations.allowed(asker.tab.id, asker.owner, asker.origin);
+  }
+
+  #forgetLocation(tabId: string): void {
+    this.#locations.forget(tabId);
+    this.#sharedLocations.delete(tabId);
+  }
+
   readonly close = Effect.fn("BrowserHost.close")(function* (
     this: BrowserHost,
     tabId: string,
@@ -1278,6 +1387,7 @@ export class BrowserHost {
     this.#unmountView(tab.view);
     this.#releaseScriptedDocument(tab);
     this.#tabs.delete(tabId);
+    this.#forgetLocation(tabId);
     const signInSession = tab.popup ? undefined : tab.privateSession;
     const childDrains = [...this.#tabs.values()]
       .filter((child) => child.openerTabId === tabId || (signInSession && child.privateSession === signInSession))
@@ -3229,6 +3339,9 @@ export class BrowserHost {
           );
         }
         this.#tabs.clear();
+        this.#locations.clear();
+        this.#sharedLocations.clear();
+        this.#alwaysLocations.clear();
         this.#userControlTabIds.clear();
         for (const tabId of [...this.#userControlWaiters.keys()]) this.#completeUserControlWaiters(tabId);
         this.#listeners.clear();
@@ -3646,12 +3759,18 @@ export class BrowserHost {
       });
       if (!cancelled) this.#emitChanged();
     });
-    target.setPermissionRequestHandler((webContents, permission, callback, details) =>
+    target.setPermissionRequestHandler((webContents, permission, callback, details) => {
+      if (permission === "geolocation") {
+        this.#askLocation(webContents, callback);
+        return;
+      }
       callback(
         isAllowedBrowserPermission(permission) || this.#recorder.allowsTabCapture(webContents, permission, details),
-      ),
+      );
+    });
+    target.setPermissionCheckHandler((webContents, permission) =>
+      permission === "geolocation" ? this.#locationAllowed(webContents) : isAllowedBrowserPermission(permission),
     );
-    target.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
     target.on("will-download", (event, item, contents) => {
       const tab = [...this.#tabs.values()].find((candidate) => candidate.contents === contents);
       if (tab?.secret) {
@@ -3929,6 +4048,8 @@ export class BrowserHost {
       if (isMainFrame && contents.isFocused()) restoreFocusAfterCommit();
     });
     contents.on("did-navigate", (_event, url) => {
+      if (this.#locations.navigated(tab.id, locationOrigin(url)) && this.#sharedLocations.delete(tab.id))
+        void runCauseEffect(tab.engine.setLocation(null)).catch(() => {});
       tab.documents += 1;
       this.#releaseScriptedDocument(tab);
       if (tab.secretDocument) {

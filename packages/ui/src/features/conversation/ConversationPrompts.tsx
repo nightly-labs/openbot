@@ -1,5 +1,6 @@
 import type {
   AgentApproval,
+  BrowserPermissionRequest,
   BrowserPreview,
   BrowserTab,
   BrowserTakeoverRequest,
@@ -7,6 +8,7 @@ import type {
   MediaApprovalChoice,
   MediaApprovalRead,
 } from "@openbot/contracts/ipc";
+import { browserPermissionSite } from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { type FeedbackApproval, feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import { classifyFailure } from "@openbot/telemetry";
@@ -563,5 +565,54 @@ function PermissionDetails(props: { permissions: AgentApproval["permissions"] })
     <section class="approval-permissions" aria-label={t("prompt.approval.permissions")}>
       <For each={details()}>{(detail) => <span>{detail}</span>}</For>
     </section>
+  );
+}
+
+export function BrowserLocationCard(props: {
+  request: BrowserPermissionRequest;
+  pending: boolean;
+  onAnswer: (allow: boolean, always: boolean) => void;
+}) {
+  const { t } = useText();
+  return (
+    <UiBlockCard
+      class="approval-card"
+      status="pending"
+      title={t("browser.location.title", { site: browserPermissionSite(props.request.origin) })}
+      subtitle={t("browser.location.description")}
+      busy={props.pending}
+      waiting
+      actions={
+        <>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            disabled={props.pending}
+            onClick={() => props.onAnswer(false, false)}
+          >
+            {t("browser.location.block")}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            disabled={props.pending}
+            onClick={() => props.onAnswer(true, true)}
+          >
+            {t("browser.location.allowAlways")}
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            type="button"
+            disabled={props.pending}
+            onClick={() => props.onAnswer(true, false)}
+          >
+            {t("browser.location.allow")}
+          </Button>
+        </>
+      }
+    />
   );
 }

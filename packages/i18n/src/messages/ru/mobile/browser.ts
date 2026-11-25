@@ -89,4 +89,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Вернуть управление",
   "mobile.browser.help.handBack.body":
     "Когда агент просит вас взять управление, выберите «Готово» в меню ···. Затем агент продолжит работу в этой вкладке.",
+  "mobile.browser.location.title": "{site} хочет узнать ваше местоположение",
+  "mobile.browser.location.description": "Разрешайте только надежным сайтам.",
+  "mobile.browser.location.block": "Блокировать",
+  "mobile.browser.location.allow": "Разрешить",
+  "mobile.browser.location.allowAlways": "Разрешать всегда",
+  "mobile.browser.location.unavailable": "Не удалось получить местоположение этого устройства.",
+  "mobile.browser.location.answerFailed": "Не удалось ответить на запрос местоположения.",
 } as const satisfies PartialTranslation<typeof source>;

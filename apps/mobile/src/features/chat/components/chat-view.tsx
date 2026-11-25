@@ -58,7 +58,10 @@ import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLinesOf } from "@/features/workspace/components/use-agent-activity";
-import { useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
+import {
+  useBrowserRequests,
+  useOwnedBrowserPermissionRequests,
+} from "@/features/workspace/components/use-live-workspace";
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import {
   useMobileWorkspaceReader,
@@ -92,6 +95,7 @@ import { voiceAccent, voicePalette } from "../model/voice-palette";
 import { rememberImageDimensions } from "./attachment-preview";
 import {
   asksForSecret,
+  BrowserLocationCard,
   BrowserSecretComposer,
   BrowserTakeoverCard,
   QuestionSecretComposer,
@@ -303,6 +307,11 @@ export function ChatView({
     [browserRequests, target, threadId, channelThreadIds],
   );
   const browserAllowed = useBrowserFeature();
+  const chatAgentIds = useMemo(
+    () => (target.kind === "agent" ? [target.id] : target.members.map((member) => member.id)),
+    [target],
+  );
+  const locationRequests = useOwnedBrowserPermissionRequests(target.serverId, chatAgentIds);
   const channelBrowser = useMemo(() => {
     if (target.kind !== "channel") return null;
     const memberIds = target.members.map((member) => member.id);
@@ -1312,6 +1321,15 @@ export function ChatView({
                           }
                         />
                       ))
+                  : null}
+                {showBrowserRequests && browserAllowed
+                  ? locationRequests.map((request) => (
+                      <BrowserLocationCard
+                        key={`${target.serverId}:location:${request.id}`}
+                        request={request}
+                        answer={(answer) => workspace().answerBrowserPermission(target.serverId, answer)}
+                      />
+                    ))
                   : null}
                 {sendError?.agentId === target.id ? (
                   <Typography.Paragraph

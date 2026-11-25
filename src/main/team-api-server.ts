@@ -66,6 +66,10 @@ import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-pro
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  browserPermissionRequests,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { BROWSER_PROFILES_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-events-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
@@ -2072,6 +2076,12 @@ export class TeamApiServer {
     client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-page-state-changed", tabs })));
   }
 
+  #sendBrowserPermissions(client: Ws.WebSocket, connection: EventClientState): void {
+    const requests = browserPermissionRequests(this.#options.browser.listTabs());
+    if (client.readyState !== webSockets.WebSocket.OPEN) return;
+    client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-permissions-changed", requests })));
+  }
+
   #eventFor(connection: EventClientState, event: AgentEvent, access?: () => EventAccess): AgentEvent {
     if (event.type === "usage-changed" && event.usage.limits.some((limit) => limit.accountId !== undefined))
       return {
@@ -2091,6 +2101,15 @@ export class TeamApiServer {
       );
       if (!hidden) return event;
       return { ...event, tabs: event.tabs.filter((tab) => !hidden(tab.tabId)) };
+    }
+    if (event.type === "browser-permissions-changed") {
+      const hidden = this.#hiddenTab(
+        connection,
+        event.requests.map((request) => request.tabId),
+        access,
+      );
+      if (!hidden) return event;
+      return { ...event, requests: event.requests.filter((request) => !hidden(request.tabId)) };
     }
     if (event.type === "browser-control-changed") {
       const tabIds = event.state.sessions.flatMap((session) => (session.tabId === null ? [] : [session.tabId]));
@@ -2191,6 +2210,7 @@ export class TeamApiServer {
               connection.capabilities.has(HOST_MEMBER_UPDATE_CAPABILITY);
             const userControlWasSent = connection.capabilities.has(BROWSER_USER_CONTROL_CAPABILITY);
             const pageStateWasSent = connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY);
+            const permissionsWereSent = connection.capabilities.has(BROWSER_PERMISSIONS_CAPABILITY);
             const machineAlertsWereSent = connection.capabilities.has(MACHINE_RESOURCES_CAPABILITY);
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
@@ -2204,6 +2224,8 @@ export class TeamApiServer {
               this.#sendBrowserUserControl(client, connection);
             if (!pageStateWasSent && connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY))
               this.#sendBrowserPageState(client, connection);
+            if (!permissionsWereSent && connection.capabilities.has(BROWSER_PERMISSIONS_CAPABILITY))
+              this.#sendBrowserPermissions(client, connection);
             if (!colorsWereSent && connection.capabilities.has(AGENT_COLORS_CAPABILITY))
               this.#sendAgentColors(client, connection);
             if (!chatColorsWereSent && connection.capabilities.has(CHAT_COLORS_CAPABILITY))
@@ -3173,6 +3195,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "agent-access-changed") return AGENT_ACCESS_CAPABILITY;
   if (event.type === "browser-user-control-changed") return BROWSER_USER_CONTROL_CAPABILITY;
   if (event.type === "browser-page-state-changed") return BROWSER_PAGE_STATE_CAPABILITY;
+  if (event.type === "browser-permissions-changed") return BROWSER_PERMISSIONS_CAPABILITY;
   if (
     event.type === "agent-tasks-changed" ||
     event.type === "agent-task-conversation" ||

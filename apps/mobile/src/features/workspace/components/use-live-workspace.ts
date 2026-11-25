@@ -1,4 +1,5 @@
 import type { BrowserTakeoverRequest } from "@openbot/contracts/ipc";
+import type { BrowserPermissionRequestState } from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { agentBrowserTab, agentBrowserTabs, type MobileBrowserTabs } from "@/features/browser/model/browser-tabs";
 import {
@@ -11,6 +12,7 @@ import type { MobileThreadWait } from "@/features/workspace/model/thread-waits";
 const NO_REQUESTS: BrowserTakeoverRequest[] = [];
 const NO_APPROVALS: readonly PendingApproval[] = [];
 const NO_WAITS: readonly MobileThreadWait[] = [];
+const NO_PERMISSIONS: readonly BrowserPermissionRequestState[] = [];
 
 export function selectLiveState(workspace: MobileWorkspaceContextValue) {
   return workspace.liveState;
@@ -74,6 +76,31 @@ export function useAgentBrowserTabs(serverId: string, agentId: string, threadId:
   );
   const state = useSyncExternalStore(liveState.subscribe, select);
   return useMemo(() => agentBrowserTabs(state, agentId, threadId), [state, agentId, threadId]);
+}
+export function useBrowserPermissionRequest(serverId: string, tabId: string | null) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(
+    () => liveState.get().browserPermissions[serverId]?.find((request) => request.tabId === tabId),
+    [liveState, serverId, tabId],
+  );
+  return useSyncExternalStore(liveState.subscribe, select);
+}
+export function useOwnedBrowserPermissionRequests(serverId: string, ownerAgentIds: readonly string[]) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const selectRequests = useCallback(
+    () => liveState.get().browserPermissions[serverId] ?? NO_PERMISSIONS,
+    [liveState, serverId],
+  );
+  const selectTabs = useCallback(() => liveState.get().browserTabs[serverId], [liveState, serverId]);
+  const requests = useSyncExternalStore(liveState.subscribe, selectRequests);
+  const tabs = useSyncExternalStore(liveState.subscribe, selectTabs);
+  return useMemo(() => {
+    if (requests.length === 0 || !tabs) return NO_PERMISSIONS;
+    const owned = new Set(
+      tabs.tabs.filter((tab) => tab.ownerAgentId && ownerAgentIds.includes(tab.ownerAgentId)).map((tab) => tab.id),
+    );
+    return requests.filter((request) => owned.has(request.tabId));
+  }, [requests, tabs, ownerAgentIds]);
 }
 export function useBrowserTabsLoaded(serverId: string) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);

@@ -69,6 +69,7 @@ import {
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ChatVisualReply, shownVisualReply } from "./ChatVisualReply";
+import { ConversationBrowserLocation } from "./ConversationBrowserLocation";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
@@ -1723,6 +1724,7 @@ export function ConversationTimeline() {
             </Show>
             <Show when={!sideThreadOpen()}>
               <ConversationBrowserTakeover />
+              <ConversationBrowserLocation />
             </Show>
             <div
               class="agent-activity-slot"
