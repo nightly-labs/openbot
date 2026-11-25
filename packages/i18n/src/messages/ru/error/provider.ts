@@ -368,6 +368,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Войдите через Cursor или задайте CURSOR_API_KEY, чтобы использовать Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor не смог подключиться к своему серверу с вашим входом. Проверьте подключение к интернету, затем снова войдите в Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor не прислал список моделей. Выберите «Подключить», чтобы снова войти в Cursor. Если это сообщение не исчезает, проверьте, что ваш тариф Cursor включает модели.",
   "error.provider.clineArchivePath": "В архиве Cline неожиданный путь.",
   "error.provider.clinePackageMismatch": "Пакет Cline не соответствует каталогу сред выполнения.",
   "error.provider.clineChecksum": "Контрольная сумма среды выполнения Cline не совпадает.",

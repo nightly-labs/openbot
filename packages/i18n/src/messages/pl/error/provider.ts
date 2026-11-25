@@ -370,6 +370,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Zaloguj się przez Cursor lub ustaw CURSOR_API_KEY, aby używać Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor nie mógł połączyć się ze swoim serwerem przy użyciu Twojego logowania. Sprawdź połączenie z internetem, a potem zaloguj się ponownie do Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor nie wysłał listy modeli. Wybierz „Połącz”, aby ponownie zalogować się do Cursor. Jeśli ten komunikat nie znika, sprawdź, czy Twój plan Cursor obejmuje modele.",
   "error.provider.clineArchivePath": "Archiwum Cline ma nieoczekiwaną ścieżkę.",
   "error.provider.clinePackageMismatch": "Pakiet Cline nie pasuje do katalogu środowisk uruchomieniowych.",
   "error.provider.clineChecksum": "Niezgodna suma kontrolna środowiska uruchomieniowego Cline.",

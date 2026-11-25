@@ -381,6 +381,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Accedi con Cursor o imposta CURSOR_API_KEY per usare Cursor.",
   "error.provider.cursorSignInUnusable":
     "Cursor non è riuscito a connettersi al suo server con il tuo accesso. Controlla la connessione a Internet, poi accedi di nuovo a Cursor.",
+  "error.provider.cursorNoModels":
+    "Cursor non ha inviato l’elenco dei modelli. Scegli «Connetti» per accedere di nuovo a Cursor. Se questo messaggio resta, controlla che il tuo piano Cursor includa dei modelli.",
   "error.provider.clineArchivePath": "L'archivio di Cline ha un percorso inatteso.",
   "error.provider.clinePackageMismatch": "Il pacchetto di Cline non corrisponde al catalogo dei runtime.",
   "error.provider.clineChecksum": "Checksum del runtime di Cline non corrispondente.",

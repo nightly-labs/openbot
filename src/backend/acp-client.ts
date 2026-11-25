@@ -1470,13 +1470,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       let discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
       if (Result.isFailure(discovered) && this.#signInUnusable(discovered.failure.cause))
         discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
+      const noModelsAfterRetry = this.#flavor.noModelsAfterRetry;
+      if (noModelsAfterRetry && Result.isSuccess(discovered) && discovered.success.length === 0)
+        discovered = yield* Effect.result(this.#discoverModels(timeoutMs));
       this.#models = providerResult(discovered);
       if (this.#models.length === 0 && this.options.noModelsWhenSignedOut) {
         this.#signedIn = false;
         return;
       }
       if (this.#models.length === 0 && !this.options.allowNoModels) {
-        throw new Error(sourceText("error.provider.acpNoModels"));
+        throw new Error(noModelsAfterRetry?.() ?? sourceText("error.provider.acpNoModels"));
       }
       if (yield* this.options.savedSignInCheck?.refusedAtStart() ?? Effect.succeed(false)) {
         this.#models = [];

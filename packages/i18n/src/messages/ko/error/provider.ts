@@ -372,6 +372,8 @@ export const messages = {
   "error.provider.cursorSignIn": "Cursor를 사용하려면 Cursor로 로그인하거나 CURSOR_API_KEY를 설정하세요.",
   "error.provider.cursorSignInUnusable":
     "Cursor가 로그인 정보로 서버에 연결하지 못했어요. 인터넷 연결을 확인한 다음 Cursor에 다시 로그인하세요.",
+  "error.provider.cursorNoModels":
+    "Cursor가 모델 목록을 보내지 않았습니다. '연결'을 선택해 Cursor에 다시 로그인하세요. 이 메시지가 계속 표시되면 Cursor 요금제에 모델이 포함되어 있는지 확인하세요.",
   "error.provider.clineArchivePath": "Cline 아카이브에 예상하지 못한 경로가 있어요.",
   "error.provider.clinePackageMismatch": "Cline 패키지가 런타임 카탈로그와 일치하지 않아요.",
   "error.provider.clineChecksum": "Cline 런타임 체크섬이 일치하지 않아요.",
