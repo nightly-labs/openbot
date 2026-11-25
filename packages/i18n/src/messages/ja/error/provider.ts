@@ -435,7 +435,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "Claude アカウントのクレジット残高が不足しています。高速モードなど一部のリクエストは、Claude のプランに使用量が残っていても使用クレジットを使います。Claude アカウントで使用クレジットを追加するか、エージェントのモデルメニューで別のモデルを選択してください。",
   "error.provider.claudeCustomEndpointBilling":
-    "Claude Code は Anthropic ではなく {host} にリクエストを送っています。Claude Code の設定でこの API アドレスが指定されています。{host} はアカウント残高のためにリクエストを拒否しました。Claude のプランの問題ではありません。{host} のアカウントに残高を追加するか、エージェントのモデルメニューで別のモデルを選択してください。\n{detail}",
+    "Claude Code は Anthropic ではなく {host} にリクエストを送っています。Claude Code の設定または環境変数でこの API アドレスが指定されています。{host} はアカウント残高のためにリクエストを拒否しました。Claude のプランの問題ではありません。{host} のアカウントに残高を追加するか、エージェントのモデルメニューで別のモデルを選択してください。\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude のサービスがこのリクエストをブロックしました。通常は Claude 側の一時的な問題で、アカウントの問題ではありません。数分後にもう一度メッセージを送信してください。",
   "error.provider.foreignReasoning":

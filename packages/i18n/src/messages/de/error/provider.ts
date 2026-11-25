@@ -436,7 +436,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "Das Guthaben deines Claude-Kontos ist zu niedrig. Manche Anfragen, zum Beispiel im Schnellmodus, nutzen Nutzungsguthaben, auch wenn dein Claude-Abo noch Nutzung übrig hat. Lade Nutzungsguthaben in deinem Claude-Konto auf, oder wähle ein anderes Modell im Modellmenü des Agenten.",
   "error.provider.claudeCustomEndpointBilling":
-    "Claude Code sendet Anfragen an {host}, nicht an Anthropic: Die Claude-Code-Einstellungen legen diese API-Adresse fest. {host} hat die Anfrage wegen des Kontoguthabens abgelehnt, nicht wegen deines Claude-Abos. Lade Guthaben in deinem {host}-Konto auf, oder wähle ein anderes Modell im Modellmenü des Agenten.\n{detail}",
+    "Claude Code sendet Anfragen an {host}, nicht an Anthropic: Die Claude-Code-Einstellungen oder die Umgebungsvariablen legen diese API-Adresse fest. {host} hat die Anfrage wegen des Kontoguthabens abgelehnt, nicht wegen deines Claude-Abos. Lade Guthaben in deinem {host}-Konto auf, oder wähle ein anderes Modell im Modellmenü des Agenten.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Der Claude-Dienst hat diese Anfrage blockiert. Das ist meist ein kurzes Problem bei Claude, kein Problem mit deinem Konto. Sende die Nachricht in ein paar Minuten noch einmal.",
   "error.provider.foreignReasoning":

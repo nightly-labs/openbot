@@ -391,7 +391,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "رصيد حسابك على Claude منخفض جدًا. بعض الطلبات، مثل الوضع السريع، تستخدم أرصدة الاستخدام حتى إذا بقي استخدام في خطة Claude. أضف أرصدة استخدام في حسابك على Claude، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.",
   "error.provider.claudeCustomEndpointBilling":
-    "يرسل Claude Code الطلبات إلى {host}، لا إلى Anthropic: إعدادات Claude Code تحدد عنوان API هذا. رفض {host} الطلب بسبب رصيد الحساب، لا بسبب خطة Claude. أضف رصيدًا إلى حسابك على {host}، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.\n{detail}",
+    "يرسل Claude Code الطلبات إلى {host}، لا إلى Anthropic: إعدادات Claude Code أو متغيرات البيئة تحدد عنوان API هذا. رفض {host} الطلب بسبب رصيد الحساب، لا بسبب خطة Claude. أضف رصيدًا إلى حسابك على {host}، أو اختر نموذجًا آخر في قائمة نموذج الوكيل.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "حظرت خدمة Claude هذا الطلب. عادةً تكون هذه مشكلة قصيرة من جهة Claude، وليست مشكلة في حسابك. أرسل الرسالة مرة أخرى بعد بضع دقائق.",
   "error.provider.foreignReasoning":

@@ -1577,7 +1577,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           ),
         }
       : yield* claudeFlagSettings(
-          userSettingsFile,
+          userSetup ? userSettingsFile : { ...userSettingsFile, env: signInSettings.env ?? {} },
           configDirectory,
           config.cwd,
           settingSources,

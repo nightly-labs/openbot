@@ -416,7 +416,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "Claude 계정의 크레딧 잔액이 너무 적어요. 빠른 모드 같은 일부 요청은 Claude 플랜에 사용량이 남아 있어도 사용 크레딧을 써요. Claude 계정에서 사용 크레딧을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.",
   "error.provider.claudeCustomEndpointBilling":
-    "Claude Code가 Anthropic이 아닌 {host}(으)로 요청을 보내요. Claude Code 설정에서 이 API 주소를 지정했어요. {host}에서 계정 잔액 때문에 요청을 거부했어요. Claude 플랜의 문제가 아니에요. {host} 계정에 잔액을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.\n{detail}",
+    "Claude Code가 Anthropic이 아닌 {host}(으)로 요청을 보내요. Claude Code 설정 또는 환경 변수에서 이 API 주소를 지정했어요. {host}에서 계정 잔액 때문에 요청을 거부했어요. Claude 플랜의 문제가 아니에요. {host} 계정에 잔액을 추가하거나, 에이전트의 모델 메뉴에서 다른 모델을 선택하세요.\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude 서비스가 이 요청을 차단했어요. 보통 Claude 쪽의 일시적인 문제이며, 계정 문제가 아니에요. 몇 분 후에 메시지를 다시 보내세요.",
   "error.provider.foreignReasoning":

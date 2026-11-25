@@ -369,7 +369,7 @@ export const messages = {
   "error.provider.claudeAccountNoCredit":
     "你的 Claude 账户额度余额不足。部分请求（例如快速模式）即使在 Claude 套餐仍有用量时也会使用用量额度。请在你的 Claude 账户中添加用量额度，或在智能体的模型菜单中选择其他模型。",
   "error.provider.claudeCustomEndpointBilling":
-    "Claude Code 将请求发送到 {host}，而不是 Anthropic：Claude Code 设置中指定了这个 API 地址。{host} 因账户余额拒绝了请求，不是你的 Claude 套餐的问题。请为你的 {host} 账户充值，或在智能体的模型菜单中选择其他模型。\n{detail}",
+    "Claude Code 将请求发送到 {host}，而不是 Anthropic：Claude Code 设置或环境变量中指定了这个 API 地址。{host} 因账户余额拒绝了请求，不是你的 Claude 套餐的问题。请为你的 {host} 账户充值，或在智能体的模型菜单中选择其他模型。\n{detail}",
   "error.provider.claudeServiceBlocked":
     "Claude 服务拦截了这个请求。这通常是 Claude 方面的短暂问题，不是你的账号问题。请过几分钟再发送一次消息。",
   "error.provider.foreignReasoning":
