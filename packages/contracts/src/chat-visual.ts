@@ -414,6 +414,11 @@ const src=image.currentSrc||image.src;
 if(!event.defaultPrevented&&src)send({method:"${CHAT_VISUAL_OPEN_IMAGE}",params:{src,name:image.alt||image.title||""}});
 });
 });
+const jump=(fragment)=>{
+const target=document.getElementById(decodeURIComponent(fragment.slice(1)));
+if(target)target.scrollIntoView();
+else if(fragment.length>1)location.hash=fragment;
+};
 document.addEventListener("click",(event)=>{
 if(event.button!==0||!(event.target instanceof Element))return;
 const link=event.target.closest("a[href],area[href]");
@@ -421,8 +426,7 @@ if(!link)return;
 const href=link.getAttribute("href")||"";
 if(href.startsWith("#")){
 event.preventDefault();
-const target=document.getElementById(decodeURIComponent(href.slice(1)));
-if(target)target.scrollIntoView();
+jump(href);
 return;
 }
 if(!event.isTrusted)return;
@@ -430,8 +434,7 @@ let url;
 try{url=new URL(link.getAttribute("href"),document.baseURI);}catch{return;}
 if(url.hash&&url.href.split("#")[0]===location.href.split("#")[0]){
 event.preventDefault();
-const target=document.getElementById(decodeURIComponent(url.hash.slice(1)));
-if(target)target.scrollIntoView();
+jump(url.hash);
 return;
 }
 if(url.protocol!=="http:"&&url.protocol!=="https:")return;
