@@ -1,5 +1,6 @@
 import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
+import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
 import { BillingSales } from "./billing-sales";
@@ -129,11 +130,22 @@ export function createWorkerHandler(
             Effect.exit(tickReferralCredit(bindings)),
             Effect.exit(tickCreditHolds(bindings, now)),
             Effect.exit(tickCreditGrants(bindings, now)),
+            Effect.exit(tickAccountActivity(bindings, now)),
           ],
           { concurrency: "unbounded" },
         ).pipe(
           Effect.flatMap(
-            ([retentionExit, deliveryExit, sitesExit, salesExit, poolExit, referralExit, holdsExit, grantsExit]) =>
+            ([
+              retentionExit,
+              deliveryExit,
+              sitesExit,
+              salesExit,
+              poolExit,
+              referralExit,
+              holdsExit,
+              grantsExit,
+              activityExit,
+            ]) =>
               Effect.all([
                 retentionExit,
                 deliveryExit,
@@ -143,6 +155,7 @@ export function createWorkerHandler(
                 referralExit,
                 holdsExit,
                 grantsExit,
+                activityExit,
               ]),
           ),
         ),
@@ -241,6 +254,11 @@ const tickCreditGrants = Effect.fn("CreditGrants.tick")(function* (bindings: Ana
     .sweep()
     .pipe(Effect.ensuring(flush));
   if (Object.values(result).some(Boolean)) console.info("Credit grant sweep completed.", result);
+});
+
+const tickAccountActivity = Effect.fn("AccountActivity.tick")(function* (bindings: AnalyticsBindings, now: number) {
+  const { analytics, flush } = tickAnalytics(bindings);
+  yield* sendAccountActivitySnapshots(bindings.DB, analytics, now).pipe(Effect.ensuring(flush));
 });
 
 const tickHostedPool = Effect.fn("HostedPool.tick")(function* (bindings: SalesBindings, now: number) {

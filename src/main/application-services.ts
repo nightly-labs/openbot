@@ -142,6 +142,7 @@ import {
   type WorkflowsHandle,
   workflowNoticeEvent,
 } from "../backend/workflows/workflows";
+import { ACCOUNT_ACTIVITY_PATH, AccountActivityReporter } from "./account-activity-reporter";
 import { centralAuthApiUrl, createCentralAuthManager, safeStorageCipher } from "./account-service-access";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { AGENT_ACCESS_FILE, AgentAccessStore } from "./agent-access-store";
@@ -3218,7 +3219,34 @@ export async function createApplicationServices({
   };
   const remoteDesktopRuntimeCredentials = { username: "openbot", password: randomBytes(32).toString("base64url") };
   const attachmentPreviews = new AttachmentPreviews(join(app.getPath("userData"), "attachment-previews"));
+  const resolveHostOwner = () => {
+    const state = centralAuth.getState();
+    if (state.status !== "signed_in") return null;
+    const storedOwner = teamStore.getOwnerAnalyticsIdentity();
+    if (storedOwner) return storedOwner.id === state.user.id ? storedOwner : null;
+    const ownerEmail = teamStore.getOwnerEmail();
+    return !teamStore.configured || ownerEmail?.trim().toLowerCase() === state.user.email.trim().toLowerCase()
+      ? state.user
+      : null;
+  };
+  const accountActivity = new AccountActivityReporter({
+    send: (accounts) =>
+      centralAuth.requestAuthorized(
+        ACCOUNT_ACTIVITY_PATH,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accounts }) },
+        (value) => value,
+      ),
+  });
+  service.on("event", (event) => {
+    if (event.type !== "turn-started") return;
+    const owner = resolveHostOwner();
+    if (owner) accountActivity.record(owner.id);
+  });
   const host = new HostService({
+    onMemberUse: (memberId) => {
+      const accountId = teamStore.getMemberAccountId(memberId);
+      if (accountId) accountActivity.record(accountId);
+    },
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
@@ -3627,16 +3655,7 @@ export async function createApplicationServices({
     installId: analyticsInstallId,
     appVersion: app.getVersion(),
     platform: analyticsPlatform,
-    resolveOwner: () => {
-      const state = centralAuth.getState();
-      if (state.status !== "signed_in") return null;
-      const storedOwner = teamStore.getOwnerAnalyticsIdentity();
-      if (storedOwner) return storedOwner.id === state.user.id ? storedOwner : null;
-      const ownerEmail = teamStore.getOwnerEmail();
-      return !teamStore.configured || ownerEmail?.trim().toLowerCase() === state.user.email.trim().toLowerCase()
-        ? state.user
-        : null;
-    },
+    resolveOwner: resolveHostOwner,
     resolveAgent: (agentId) => service.listAgents().find((agent) => agent.id === agentId) ?? null,
     resolveProviderAuth: (agent) =>
       providerAuthKind(agent, {

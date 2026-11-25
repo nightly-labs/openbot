@@ -27,6 +27,7 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
+import { ACCOUNT_ACTIVITY_TIME_ZONE } from "./account-activity";
 import {
   CREDIT_CODE_CAMPAIGN_PATTERN,
   CREDIT_CODE_LIMIT_NAMES,
@@ -37,9 +38,10 @@ import {
 import type { HostedPoolGroup } from "./hosted-pool-snapshot";
 
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 19;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 20;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
+const ACTIVITY_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 const BILLING_ACTIONS = [
   "checkout_started",
@@ -185,6 +187,7 @@ export type AccountAnalyticsEvent =
     }
   | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
   | { name: "hosted_pool_snapshot"; group: HostedPoolGroup }
+  | { name: "account_activity_snapshot"; day: string; activeAccounts: number }
   | CreditActionEvent
   | CreditCodeRedeemEvent;
 
@@ -320,6 +323,8 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
     return { ...properties, kind: event.kind, result: event.result };
   }
   if (event.name === "hosted_pool_snapshot") return hostedPoolProperties(properties, event.group);
+  if (event.name === "account_activity_snapshot")
+    return accountActivityProperties(properties, event.day, event.activeAccounts);
   if (event.name === "credit_action") return creditActionProperties(properties, event);
   if (event.name === "credit_code_redeem") return creditCodeRedeemProperties(properties, event);
   if (event.name !== "hosted_server_action" || !isOneOf(HOSTED_SERVER_ACTIONS, event.action)) return null;
@@ -339,6 +344,21 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   )
     properties.duration_ms = duration;
   return properties;
+}
+
+function accountActivityProperties(
+  properties: AnalyticsProperties,
+  day: string,
+  activeAccounts: number,
+): AnalyticsProperties | null {
+  if (!ACTIVITY_DAY_PATTERN.test(day) || !Number.isInteger(activeAccounts) || activeAccounts < 0) return null;
+  return {
+    ...properties,
+    day,
+    time_zone: ACCOUNT_ACTIVITY_TIME_ZONE,
+    active_accounts: activeAccounts,
+    __timestamp: `${day}T12:00:00.000Z`,
+  };
 }
 
 function isAnalyticsCredits(value: unknown): value is number {
