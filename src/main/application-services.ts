@@ -13,6 +13,7 @@ import {
   type ManagedProviderId,
 } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
   AgentProviderStatus,
@@ -2158,6 +2159,7 @@ export async function createApplicationServices({
     agentCursorDrawn: drawsComputerUseHighlight,
     computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
     computerUseInputRefused: () => agentsShareDisplay && cuaDriver.waylandInputRefused(),
+    computerUseMissingPermissions: () => cuaDriver.missingPermissions(),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -2251,6 +2253,8 @@ export async function createApplicationServices({
         mcpServerOwners.remove(mcpServerId).pipe(Effect.andThen(mcpAccessStore.remove(mcpServerId))),
     },
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
+    reviewSkillsFull: (agentId) =>
+      skills.lockedSkillIds(agentId).pipe(Effect.map((ids) => ids.length >= INPUT_LIMITS.agentSkills)),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,
     webhookRoutines: () => agentWebhookRoutineWriter(events),
@@ -2327,6 +2331,7 @@ export async function createApplicationServices({
     updateAgent: (input) => service.updateAgent(input),
     clearAgentContext: (agentId) => service.clearAgentContext(agentId),
   });
+  await Effect.runPromise(automation.removeStaleFiles());
   service.on("event", (event) => {
     if (event.type === "agents-changed") Effect.runFork(automation.requestSync());
   });
@@ -2719,12 +2724,17 @@ export async function createApplicationServices({
     githubSkillSource((url, init) => fetch(url, init)),
   );
   const marketplaceAgents = new AgentMarketplaceService(marketplaceAuth, service, skills);
-  const agentTemplates = new AgentTemplateService(centralAuth, service, {
-    listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
-    installVersion: (input) => skills.installVersion(input),
-    library: () => skills.requireLocalLibrary(),
-    installLocal: (input) => skills.installLocal(input),
-  });
+  const agentTemplates = new AgentTemplateService(
+    centralAuth,
+    service,
+    {
+      listTemplateSkills: (agentId) => skills.listTemplateSkills(agentId),
+      installVersion: (input) => skills.installVersion(input),
+      library: () => skills.requireLocalLibrary(),
+      installLocal: (input) => skills.installLocal(input),
+    },
+    marketplaceAuth,
+  );
   const teamStore = new TeamStore(
     join(app.getPath("userData"), TEAM_STORE_FILE),
     join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),

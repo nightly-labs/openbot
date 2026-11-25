@@ -68,6 +68,7 @@ import {
   isMessageReaction,
   isPasswordManagerId,
   isSettingLinkId,
+  type MacPermissionId,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
   SETTING_LINK_SCOPES,
@@ -128,7 +129,7 @@ import {
 } from "../protocol";
 import { handleRoutineFlowTool, type RoutineFlowTools } from "../routine-flows/routine-flow-tools";
 import type { StoredStateFailure } from "../stored-state-effects";
-import type { VaultItems } from "../vault-items";
+import { type VaultItems, vaultClosedText } from "../vault-items";
 import { WORKFLOW_ANSWER_TOOL } from "../workflows/workflow-answers";
 import {
   handleWorkflowAnswerTool,
@@ -254,6 +255,7 @@ import {
   DEFERRED_MCP_NOTE,
   deferredCall,
   deferredCallArgumentsError,
+  deferredNullValueError,
   discoverTools,
   givesBrowserSchemas,
   mayNameMcpTool,
@@ -278,6 +280,16 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "list_api_keys",
   "remove_api_key",
   "save_api_key",
+]);
+
+const VAULT_ITEM_TOOLS: ReadonlySet<string> = new Set([
+  "list_logins",
+  "submit_secret",
+  "request_takeover",
+  "list_vault_items",
+  "request_vault_item",
+  "save_vault_item",
+  "delete_vault_item",
 ]);
 
 function lowerCaseColor(color: string): AvatarColor {
@@ -419,6 +431,11 @@ function captureFailure(failure: ScreenCaptureFailed) {
   return openBotToolFailure(failure.reason);
 }
 
+const MAC_PERMISSION_NAMES: Record<MacPermissionId, string> = {
+  "screen-recording": "Screen Recording",
+  accessibility: "Accessibility",
+};
+
 export interface OpenBotToolRouterHooks {
   listAgents(): AgentSummary[];
   listModels(): AgentModelOption[];
@@ -437,6 +454,7 @@ export interface OpenBotToolRouterHooks {
   deleteAgent(agentId: string): Effect.Effect<void, ToolOperationFailed>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, ToolOperationFailed>;
   enabledMcpServers(agentId?: string): McpServerConfig[];
+  computerUseMissingPermissions?(): readonly MacPermissionId[];
   emitError(code: string, error: unknown, agentId?: string): void;
   redactMcp(text: string): string;
   redactMcpForAgent(text: string): string;
@@ -750,6 +768,11 @@ export class OpenBotToolRouter {
                 );
                 return;
               }
+              const nullValue = deferredNullValueError(resolved, client.provider);
+              if (nullValue) {
+                client.respond(request.id, openBotToolFailure(nullValue));
+                return;
+              }
               params = resolved;
             }
           }
@@ -878,6 +901,7 @@ export class OpenBotToolRouter {
               client.respond(toolRequest.id, this.#withBrowserPrimer(toolRequest.params.threadId, result));
               return;
             }
+            if (this.#vaultItems && VAULT_ITEM_TOOLS.has(toolRequest.params.tool)) yield* this.#vaultItems.reload();
             if (toolRequest.params.tool === "request_takeover" || toolRequest.params.tool === "submit_secret") {
               const result = yield* this.#attention.surfaceBrowserTakeover(client, toolRequest);
               if (client.running) client.respond(toolRequest.id, result);
@@ -1172,6 +1196,7 @@ export class OpenBotToolRouter {
     if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
     const apiKeys = this.#apiKeys;
     if (!apiKeys) return openBotToolFailure("This OpenBot server cannot save API keys.");
+    if (this.#vaultItems) yield* this.#vaultItems.reload();
     const failed = (failure: { cause: unknown }) =>
       Effect.succeed(
         openBotToolFailure(
@@ -1265,7 +1290,7 @@ export class OpenBotToolRouter {
         "Only a person's message, in your OpenBot chat or a thread they opened, can save a key to the Vault. Ask the user to add it in Server settings > Vault.",
       );
     const vault = this.#vaultItems;
-    if (!vault?.ready()) return openBotToolFailure("No Vault is available on this computer. Ask the user.");
+    if (!vault?.ready()) return openBotToolFailure(vaultClosedText(vault?.status()));
     const agentName = this.#store.list().find((candidate) => candidate.id === agentId)?.name;
     const saved = yield* Effect.result(vault.saveApiKey({ name, key, notes }, { id: agentId, name: agentName }, false));
     if (Result.isFailure(saved)) {
@@ -1786,6 +1811,11 @@ export class OpenBotToolRouter {
     const agent = yield* toolStep(() => this.#requireAgent(agentId));
     const computerUse = agentComputerUseEnabled(agent);
     const mcpServers = agentMcpServers(this.#hooks.enabledMcpServers(agentId), computerUse);
+    const computerUseReady = mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID);
+    const computerUseMissing =
+      computerUse && !computerUseReady
+        ? (this.#hooks.computerUseMissingPermissions?.() ?? []).map((id) => MAC_PERMISSION_NAMES[id])
+        : [];
     let skills: unknown[] | undefined;
     let skillsError: string | undefined;
     const loaded = yield* Effect.result(
@@ -1830,9 +1860,8 @@ export class OpenBotToolRouter {
       permissions,
       permissionLevels: agentPermissionLevels(agent.provider, permissions),
       computerUse,
-      ...(computerUse
-        ? { computerUseReady: mcpServers.some((server) => server.id === COMPUTER_USE_MCP_SERVER_ID) }
-        : {}),
+      ...(computerUse ? { computerUseReady } : {}),
+      ...(computerUseMissing.length > 0 ? { computerUseMissingPermissions: computerUseMissing } : {}),
       notifications: agent.notifications,
       ...this.#agentBrowserProfile(agent),
       ...(skills ? { skills } : { skillsError }),

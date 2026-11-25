@@ -377,6 +377,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Rimuovi {model}",
   "mobile.agent.backupModels.unavailable": "Non disponibile ora · saltato",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "mobile.agent.busyMessage.label": "Durante il lavoro",
@@ -694,6 +695,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Non escludere",
   "mobile.agent.folders.browseTitle": "Scegli cartella",
   "mobile.agent.folders.places": "Vai a",
+  "mobile.agent.folders.path": "Percorso della cartella",
   "mobile.agent.folders.home": "Cartella Inizio",
   "mobile.agent.folders.parent": "Su a {folder}",
   "mobile.agent.folders.browseFailed": "Impossibile aprire questa cartella.",

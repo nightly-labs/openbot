@@ -12,8 +12,8 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Schema } from "effect";
-import { agentLaunchPath, forgetWindowsLookups, isExecutable, isWindowsRunnable, windowsWhere } from "./cli";
+import { Deferred, Effect, Option, Schema } from "effect";
+import { agentLaunchPath, forgetWindowsLookups, isExecutable, isWindowsRunnable, windowsPathExtensions } from "./cli";
 import { causeHelpers } from "./effect-boundary";
 import { isMissingFileError } from "./file-errors";
 import type { McpOperationError } from "./mcp-effects";
@@ -250,23 +250,35 @@ export function pickWindowsExecutable(stdout: string, pathext: string | undefine
 
 const lookUpMcpCommand = Effect.fn("McpShape.lookUpCommand")(
   function* (trimmed: string, path: string | null) {
-    if (process.platform === "win32") {
-      const stdout = yield* mcpShapeIo(() => windowsWhere(trimmed, path));
-      return pickWindowsExecutable(stdout, process.env.PATHEXT);
-    }
-    if (trimmed.includes("/")) return null;
-    for (const folder of (path ?? process.env.PATH ?? "").split(delimiter)) {
+    const windows = process.platform === "win32";
+    if (trimmed.includes("/") || (windows && trimmed.includes("\\"))) return null;
+    const names = windows ? windowsCommandNames(trimmed, process.env.PATHEXT) : [trimmed];
+    const value = path ?? process.env.PATH ?? "";
+    let notRunnable: string | null = null;
+    for (const folder of windows ? windowsPathEntries(value) : value.split(delimiter)) {
       if (!isAbsolute(folder)) continue;
-      const candidate = join(folder, trimmed);
-      const found = yield* isExecutable(candidate).pipe(
-        Effect.timeoutOrElse({ duration: COMMAND_FILE_CHECK_MS, orElse: () => Effect.succeed(false) }),
-      );
-      if (found) return candidate;
+      for (const name of names) {
+        const candidate = join(folder, name);
+        const found = yield* isExecutable(candidate).pipe(Effect.timeoutOption(COMMAND_FILE_CHECK_MS));
+        if (Option.isNone(found)) break;
+        if (!found.value) continue;
+        if (!windows || isWindowsRunnable(candidate, process.env.PATHEXT)) return candidate;
+        notRunnable ??= candidate;
+      }
     }
-    return null;
+    return notRunnable;
   },
   Effect.catch(() => Effect.succeed(null)),
 );
+
+function windowsPathEntries(value: string): string[] {
+  return (value.match(/(?:"[^"]*"|[^;"])+/gu) ?? []).map((entry) => entry.replaceAll('"', "").trim());
+}
+
+function windowsCommandNames(command: string, pathext: string | undefined): string[] {
+  if (isWindowsRunnable(command, pathext)) return [command];
+  return [...windowsPathExtensions(pathext).map((extension) => `${command}${extension}`), command];
+}
 
 export const needsManagedRuntime = Effect.fn("McpShape.needsManagedRuntime")(function* (
   config: McpServerConfig,

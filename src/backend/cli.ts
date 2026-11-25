@@ -1072,11 +1072,17 @@ function withWindowsPath(environment: NodeJS.ProcessEnv, path: string): NodeJS.P
 
 const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
 
+export function windowsPathExtensions(pathext: string | undefined): string[] {
+  return (pathext?.trim() || DEFAULT_PATHEXT)
+    .split(";")
+    .map((entry) => entry.trim().toLowerCase())
+    .filter((entry) => entry.length > 0);
+}
+
 export function isWindowsRunnable(path: string, pathext: string | undefined): boolean {
   const dot = path.lastIndexOf(".");
   if (dot <= Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"))) return false;
-  const extension = path.slice(dot).toLowerCase();
-  return (pathext?.trim() || DEFAULT_PATHEXT).split(";").some((entry) => entry.trim().toLowerCase() === extension);
+  return windowsPathExtensions(pathext).includes(path.slice(dot).toLowerCase());
 }
 
 function windowsFallbackPaths(

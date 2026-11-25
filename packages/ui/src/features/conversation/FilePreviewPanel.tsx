@@ -167,7 +167,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
 
   let panel!: HTMLElement;
   onSettled(() => {
-    const conversation = panel.closest(".conversation-panel");
+    const conversation = panel.closest("[data-side-split]") ? null : panel.closest(".conversation-panel");
     return conversation ? holdFlag(conversation, "file-preview-panel") : undefined;
   });
 

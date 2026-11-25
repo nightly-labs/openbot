@@ -96,6 +96,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "다음 부분",
   "mobile.chat.preview.pdfFailed": "이 PDF를 표시할 수 없어요.",
   "mobile.chat.preview.spreadsheetFailed": "이 스프레드시트를 읽을 수 없어요.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "이 스프레드시트는 너무 커서 미리 볼 수 없어요. 공유해서 다른 앱에서 여세요.",
   "mobile.chat.preview.spreadsheetTruncated": "미리보기는 처음 {rows}행, {columns}열까지만 표시해요.",
   "mobile.chat.copyFailedMessage": "다시 시도해 주세요.",
   "mobile.chat.message.copyFailed": "메시지를 복사할 수 없어요",
@@ -223,7 +225,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "서버에 연결되지 않았어요. 다시 연결되면 대화를 이어갈게요.",
   "mobile.chat.liveVoice.speakFailed": "답변을 소리 내어 읽지 못했어요.",
   "mobile.chat.liveVoice.voiceNotReady": "설정 > 음성에서 답변 목소리를 선택하세요.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3는 이 언어를 읽을 수 없어요.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3는 이 언어를 읽을 수 없어요. 설정 > 음성에서 다른 답변 목소리를 선택하세요.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs가 API 키를 받아들이지 않았어요.",
   "mobile.chat.liveVoice.elevenLabsPermission": "ElevenLabs 키에 권한이 없어요. 설정 > 음성에서 확인하세요.",
   "mobile.chat.liveVoice.networkNeeded": "ElevenLabs에는 네트워크 연결이 필요해요.",
@@ -508,6 +511,7 @@ export const messages = {
   "mobile.chat.history.connecting": "서버에 연결하는 중",
   "mobile.chat.history.loading": "채팅 기록을 불러오는 중",
   "mobile.chat.history.waiting": "연결을 기다리는 중",
+  "mobile.chat.history.syncing": "새 메시지 확인 중",
   "mobile.chat.history.loadFailed": "채팅 기록을 불러올 수 없어요",
   "mobile.chat.scrollToLatest": "최신 메시지로 스크롤",
   "mobile.chat.agentUnavailable.title": "에이전트를 사용할 수 없어요",

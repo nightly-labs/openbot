@@ -512,9 +512,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     else this.#incompleteSystemClis.delete(provider);
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
+    if (version && !flagged) this.#clearFailureCoveredBySystemCli(provider, version);
     this.#revision += 1;
     this.emit("status", this.getStatus());
     return previous !== null && version === null;
+  }
+
+  #clearFailureCoveredBySystemCli(provider: ManagedProviderId, systemVersion: string): void {
+    const target = this.#target;
+    if (!target || this.#stopping || this.#tasks.has(provider)) return;
+    if (this.#statuses[provider].phase !== "download-error") return;
+    if (olderVersion(systemVersion, this.#targetSpec(provider, target).version)) return;
+    const reinspect = Effect.gen({ self: this }, function* () {
+      const status = yield* this.#installedStatusEffect(provider);
+      if (this.#tasks.has(provider) || this.#statuses[provider].phase !== "download-error") return;
+      this.#setStatus(provider, status);
+    }).pipe(Effect.ignore);
+    void runCauseEffect(Effect.forkIn(reinspect, this.#scope)).catch(() => undefined);
   }
 
   providerUseChanged(): Effect.Effect<void> {
@@ -780,14 +794,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     atStart = false,
   ): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
+      this.#statuses[runtime] = yield* this.#installedStatusEffect(runtime, atStart);
+      return this.#statuses[runtime];
+    });
+  }
+
+  #installedStatusEffect(
+    runtime: ManagedRuntimeId,
+    atStart = false,
+  ): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
       if (!this.#target) return this.#statuses[runtime];
       const pinned = runtimeSpec(runtime, this.#target, this.#lock);
       const { installed, rejected } = yield* this.#newestInstalledEffect(pinned);
       if (atStart && !installed && rejected) this.#rejected.add(runtime);
-      this.#statuses[runtime] = installed
+      return installed
         ? readyStatus(installed)
         : { ...emptyStatus(), version: yield* this.#previousVersionEffect(pinned) };
-      return this.#statuses[runtime];
     });
   }
 

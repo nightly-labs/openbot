@@ -1,6 +1,8 @@
 import type {
   CreditActivity,
   CreditCheckoutRequest,
+  CreditRedeemRequest,
+  CreditRedeemResult,
   CreditServerWallet,
   CreditsState,
   CreditTransferRequest,
@@ -16,9 +18,10 @@ export interface CreditsCalls {
   getActivity: () => Promise<CreditActivity>;
   openCheckout: (request: CreditCheckoutRequest) => Promise<void>;
   transfer: (request: CreditTransferRequest) => Promise<CreditsState>;
+  redeem: (request: CreditRedeemRequest) => Promise<CreditRedeemResult>;
 }
 
-export type CreditsAction = "checkout" | "transfer";
+export type CreditsAction = "checkout" | "transfer" | "redeem";
 
 interface CreditsCheckout {
   serverId: string | null;
@@ -152,9 +155,28 @@ export function createCreditsStore(
     }
   }
 
+  async function redeem(request: CreditRedeemRequest): Promise<CreditRedeemResult | null> {
+    const api = calls();
+    if (!api || state.pending) return null;
+    setState((draft) => {
+      draft.pending = "redeem";
+    });
+    try {
+      const result = await api.redeem(request);
+      apply(result.state);
+      void loadActivity(api);
+      return result;
+    } finally {
+      setState((draft) => {
+        draft.pending = null;
+      });
+    }
+  }
+
   return {
     state,
     load,
+    redeem,
     openCheckout: (request: CreditCheckoutRequest) => {
       const serverId = request.serverId ?? null;
       setState((draft) => {

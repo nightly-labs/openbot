@@ -170,6 +170,7 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "empty_answer",
   "model_not_found",
   "invalid_request",
+  "provider_internal_error",
 ]);
 
 const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
@@ -701,10 +702,24 @@ export class TurnLifecycle {
     });
   }
 
-  #loseBackgroundWork(threadId: string, agentId: string): void {
+  #loseBackgroundWork(threadId: string, agentId: string, waker: AgentClient | null = null): void {
     this.#waitingThreads.delete(threadId);
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId !== null && this.#hooks.taskOpen(taskId)) this.#hooks.taskBackgroundLost(taskId);
+    else if (taskId === null && waker?.wakeAfterLostWork)
+      Effect.runFork(
+        waker.wakeAfterLostWork(threadId).pipe(
+          Effect.catchCause((cause) =>
+            Effect.sync(() =>
+              logger.warn("The agent got no turn after its provider process stopped its background work.", {
+                provider: waker.provider,
+                error: Cause.squash(cause),
+              }),
+            ),
+          ),
+          Effect.forkIn(this.#scope, { startImmediately: true }),
+        ),
+      );
   }
 
   #taskRunsInProvider(agentId: string, taskId: string): boolean {
@@ -1566,7 +1581,8 @@ export class TurnLifecycle {
           for (const turn of this.#runningTurns.values())
             if (turn.threadId === threadId && turn.client === source) turn.startedBackgroundWork = true;
         const waited = this.#waitingThreads.has(threadId);
-        if (!runs && isRecord(params) && params.closed === true) this.#loseBackgroundWork(threadId, agentId);
+        if (!runs && isRecord(params) && params.closed === true)
+          this.#loseBackgroundWork(threadId, agentId, params.lost === true ? source : null);
         if (runs === waited) return;
         if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
         else this.#waitingThreads.delete(threadId);
@@ -1618,6 +1634,14 @@ export class TurnLifecycle {
           return;
         }
         if (isRecord(params) && params.willRetry === true) {
+          const retriedTurnId = getString(params, "turnId");
+          if (
+            agentId &&
+            threadId &&
+            retriedTurnId &&
+            this.#compaction.providerRetried(agentId, threadId, retriedTurnId)
+          )
+            return;
           const details = getString(error, "additionalDetails");
           this.#providerRetried(
             agentId,
@@ -1964,7 +1988,7 @@ export class TurnLifecycle {
       !deliveries.some(
         ({ delivery }) =>
           delivery.sender.kind === "routine" ||
-          quietTeammateDelivery(delivery) ||
+          quietTeammateDelivery(delivery, this.#followsUpOwnAnswer) ||
           teammateRequest(delivery) ||
           this.#continuesQuietRun(delivery),
       )
@@ -2121,8 +2145,14 @@ export class TurnLifecycle {
   }
 
   #quietTeammateTurnDelivery(delivery: QueueDelivery): boolean {
-    return quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id));
+    return quietTeammateTurnDelivery(
+      delivery,
+      (request) => this.#mailbox.hasOwnReplyFrom(request.id),
+      this.#followsUpOwnAnswer,
+    );
   }
+
+  readonly #followsUpOwnAnswer = (delivery: QueueDelivery): boolean => this.#mailbox.followsUpOwnAnswer(delivery);
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
     function* (this: TurnLifecycle, agentId: string, threadId: string, turnId: string, status: string) {
@@ -3136,7 +3166,7 @@ export class TurnLifecycle {
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
       this.#mailbox.heldByTask(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
+      this.#mailbox.hasAgentReplyOrRequestFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
       (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId)) ||
       this.#mailbox.steeredIntoOtherWork(delivery.id)
     );

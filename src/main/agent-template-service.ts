@@ -83,6 +83,8 @@ interface AgentTemplateAuth {
   resolveApiUrl(path: string): string;
 }
 
+type AgentTemplateCatalog = Pick<AgentTemplateAuth, "requestAuthorized" | "downloadAuthorized">;
+
 interface AgentTemplateAgents {
   listAgents(): AgentSummary[];
   listRoutines(agentId: string): Array<{
@@ -140,6 +142,7 @@ export class AgentTemplateService {
     private readonly auth: AgentTemplateAuth,
     private readonly agents: AgentTemplateAgents,
     private readonly skills: AgentTemplateSkills,
+    private readonly catalog: AgentTemplateCatalog = auth,
   ) {}
 
   preview(agentId: string): Effect.Effect<AgentTemplatePreview, AgentTemplateFailure> {
@@ -210,7 +213,7 @@ export class AgentTemplateService {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<AgentTemplateDetail, AgentTemplateFailure> {
       if (!isAgentTemplateId(templateId))
         return yield* new AgentTemplateFailure({ cause: new Error(sourceText("error.marketplace.linkInvalid")) });
-      const detail = yield* this.auth
+      const detail = yield* this.catalog
         .requestAuthorized(
           `/v1/agent-templates/${encodeURIComponent(templateId)}`,
           { method: "GET" },
@@ -250,7 +253,7 @@ export class AgentTemplateService {
       let avatar: AvatarImageInput | null = null;
       if (detail.avatarUrl) {
         const avatarUrl = detail.avatarUrl;
-        const bytes = yield* this.auth.downloadAuthorized(avatarUrl).pipe(toAgentTemplateFailure);
+        const bytes = yield* this.catalog.downloadAuthorized(avatarUrl).pipe(toAgentTemplateFailure);
         const mimeType = imageMimeType(bytes);
         if (!mimeType)
           return yield* new AgentTemplateFailure({ cause: new Error(sourceText("error.marketplace.avatarInvalid")) });

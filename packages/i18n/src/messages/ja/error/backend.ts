@@ -68,6 +68,12 @@ export const messages = {
     "圧縮してもこのチャットは小さくなりません。2回圧縮しても、モデルのコンテキストウィンドウの{percent}%を使っているため、OpenBotは自動圧縮を止めます。ウィンドウの大部分はツールと指示が使っています。このエージェントに不要なMCPサーバーやコンピューター操作をオフにするか、より大きなウィンドウのモデルを選んでください。その後、新しいチャットを開始してください。",
   "error.backend.contextCompactionStopped":
     "このチャットの圧縮が2回続けて失敗したため、OpenBot は自動圧縮を停止します。試行のたびにチャット全体がモデルに送信され、プランの上限を消費します。もう一度試すには「今すぐ圧縮」を選択するか、新しいチャットを開始してください。",
+  "error.backend.contextCompactionRetrying":
+    "プロバイダーはこのチャットを圧縮できず、再試行しています。圧縮が終わるまで、このチャットの新しいメッセージは待機します。すぐに終わらない場合、OpenBot は圧縮を停止してメッセージを送信します。",
+  "error.backend.contextCompactionFailed":
+    "このチャットの圧縮に失敗しました。チャットは変更されていません。待機中のメッセージは今エージェントに送られます。",
+  "error.backend.contextCompactionTimedOut":
+    "このチャットの圧縮に時間がかかりすぎたため、OpenBot が停止しました。チャットは変更されていません。待機中のメッセージは今エージェントに送られます。",
   "error.backend.providerModelAtCapacity":
     "モデルが混雑しています。プロバイダーは数分後に再試行します。今すぐ続けるには、ターンを停止して別のモデルを選んでください。",
   "error.backend.providerRetrying":
@@ -307,6 +313,8 @@ export const messages = {
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerExitedWithOutput": "サーバーは応答する前に停止しました。出力: {detail}",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "MCP サーバー {name} のプログラムが OpenBot を実行しているコンピューターにインストールされていないため、OpenBot は起動できませんでした。そのコンピューターに {name} を提供するアプリをインストールするか、マーケットプレイス、アプリで {name} をオフにしてください。",
   "error.backend.mcpServerStartAbandoned":
     "サーバーが起動する前に {provider} が待つのをやめたため、{provider} のエージェントはこのサーバーのツールを使えません。",
   "error.backend.mcpServerStoppedDuringCall": "MCP サーバーがこの呼び出しに応答する前に停止しました。",

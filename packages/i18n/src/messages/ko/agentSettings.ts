@@ -47,6 +47,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder}은(는) 이 컴퓨터의 폴더가 아니에요",
   "agentSettings.folders.limit": { other: "폴더는 최대 {count}개까지 추가할 수 있어요" },
   "agentSettings.folders.browse.places": "이동",
+  "agentSettings.folders.browse.path": "폴더 경로",
   "agentSettings.folders.browse.home": "홈 폴더",
   "agentSettings.folders.browse.parent": "상위 폴더: {folder}",
   "agentSettings.folders.browse.failed": "이 폴더를 열 수 없어요.",
@@ -90,6 +91,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "사용 한도 도달 · 건너뜀",
   "agentSettings.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "작업을 시작한 뒤 사용 한도로 {name}이(가) 멈추면, 순서에서 처음으로 사용 가능한 모델로 같은 작업을 이어가요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
   "agentSettings.groups.brain": "두뇌",

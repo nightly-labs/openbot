@@ -70,6 +70,12 @@ export const messages = {
     "Comprimeren maakt deze chat niet kleiner: na twee keer comprimeren gebruikt hij nog {percent}% van het contextvenster van het model, dus OpenBot stopt met comprimeren. Tools en instructies gebruiken het grootste deel van het venster. Zet de MCP-servers of computerbediening uit die deze agent niet nodig heeft, of kies een model met een groter venster. Start daarna een nieuwe chat.",
   "error.backend.contextCompactionStopped":
     "Twee compressies van deze chat zijn na elkaar mislukt, dus OpenBot comprimeert hem niet meer automatisch. Elke poging stuurt de hele chat naar het model en gebruikt je abonnementslimiet. Kies ‘Nu comprimeren’ om het opnieuw te proberen, of start een nieuwe chat.",
+  "error.backend.contextCompactionRetrying":
+    "De provider kon deze chat niet comprimeren en probeert het opnieuw. Nieuwe berichten in deze chat wachten tot het comprimeren klaar is. Als het niet snel klaar is, stopt OpenBot het en verstuurt je berichten.",
+  "error.backend.contextCompactionFailed":
+    "Het comprimeren van deze chat is mislukt. De chat is niet gewijzigd. Wachtende berichten gaan nu naar de agent.",
+  "error.backend.contextCompactionTimedOut":
+    "Het comprimeren van deze chat duurde te lang, dus OpenBot heeft het gestopt. De chat is niet gewijzigd. Wachtende berichten gaan nu naar de agent.",
   "error.backend.providerModelAtCapacity":
     "Het model zit aan zijn capaciteit. De provider probeert het over een paar minuten opnieuw. Stop de beurt en kies een ander model om nu door te gaan.",
   "error.backend.providerRetrying":
@@ -304,6 +310,8 @@ export const messages = {
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerExitedWithOutput": "De server is gestopt voordat hij antwoordde. Hij schreef: {detail}",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot kon de MCP-server {name} niet starten, omdat het programma ervan niet is geïnstalleerd op de computer waarop OpenBot draait. Installeer de app die {name} levert op die computer, of zet {name} uit in Marktplaats, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopte met wachten voordat de server was gestart, dus de agents ervan krijgen de tools van deze server niet.",
   "error.backend.mcpServerStoppedDuringCall": "De MCP-server stopte voordat hij op deze aanroep antwoordde.",

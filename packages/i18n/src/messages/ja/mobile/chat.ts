@@ -97,6 +97,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "次のパート",
   "mobile.chat.preview.pdfFailed": "この PDF を表示できませんでした。",
   "mobile.chat.preview.spreadsheetFailed": "このスプレッドシートを読み込めませんでした。",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "このスプレッドシートは大きすぎてプレビューできません。共有して別のアプリで開いてください。",
   "mobile.chat.preview.spreadsheetTruncated": "プレビューは最初の {rows} 行と {columns} 列までです。",
   "mobile.chat.copyFailedMessage": "もう一度お試しください。",
   "mobile.chat.message.copyFailed": "メッセージをコピーできませんでした",
@@ -225,7 +227,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "サーバーに接続していません。再接続すると会話を続けます。",
   "mobile.chat.liveVoice.speakFailed": "返信を読み上げられませんでした。",
   "mobile.chat.liveVoice.voiceNotReady": "設定 > 音声 で返信の声を選んでください。",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 はこの言語を読み上げられません。",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 はこの言語を読み上げられません。設定 > 音声 で別の返信の声を選んでください。",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs が API キーを受け付けませんでした。",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "ElevenLabs のキーに権限が不足しています。設定 > 音声 で確認してください。",
@@ -514,6 +517,7 @@ export const messages = {
   "mobile.chat.history.connecting": "サーバーに接続中",
   "mobile.chat.history.loading": "チャット履歴を読み込み中",
   "mobile.chat.history.waiting": "接続を待っています",
+  "mobile.chat.history.syncing": "新しいメッセージを確認中",
   "mobile.chat.history.loadFailed": "チャット履歴を読み込めませんでした",
   "mobile.chat.scrollToLatest": "最新のメッセージへ移動",
   "mobile.chat.agentUnavailable.title": "エージェントを利用できません",

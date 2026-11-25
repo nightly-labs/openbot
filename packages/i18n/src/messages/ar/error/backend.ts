@@ -65,6 +65,12 @@ export const messages = {
     "لا يؤدي الضغط إلى تصغير هذه الدردشة: بعد عمليتي ضغط لا تزال تستخدم {percent}% من نافذة سياق النموذج، لذا يتوقف OpenBot عن ضغطها. تستخدم الأدوات والتعليمات معظم النافذة. أوقف خوادم MCP أو التحكم في الحاسوب التي لا يحتاج إليها هذا الوكيل، أو اختر نموذجًا بنافذة أكبر. ثم ابدأ دردشة جديدة.",
   "error.backend.contextCompactionStopped":
     'فشلت عمليتا ضغط متتاليتان لهذه الدردشة، لذا يتوقف OpenBot عن ضغطها تلقائيًا. كل محاولة ترسل الدردشة كاملة إلى النموذج وتستهلك من حد خطتك. اختر "الضغط الآن" للمحاولة مرة أخرى، أو ابدأ دردشة جديدة.',
+  "error.backend.contextCompactionRetrying":
+    "تعذّر على المزوّد ضغط هذه الدردشة وهو يحاول مرة أخرى. تنتظر الرسائل الجديدة في هذه الدردشة حتى ينتهي الضغط. إذا لم ينتهِ قريبًا، يوقفه OpenBot ويرسل رسائلك.",
+  "error.backend.contextCompactionFailed":
+    "فشل ضغط هذه الدردشة. لم تتغير الدردشة. تُرسل الرسائل المنتظرة إلى الوكيل الآن.",
+  "error.backend.contextCompactionTimedOut":
+    "استغرق ضغط هذه الدردشة وقتًا طويلًا، لذلك أوقفه OpenBot. لم تتغير الدردشة. تُرسل الرسائل المنتظرة إلى الوكيل الآن.",
   "error.backend.providerModelAtCapacity":
     "النموذج بلغ أقصى سعته. سيحاول المزوّد مرة أخرى خلال بضع دقائق. للمتابعة الآن، أوقف الدور واختر نموذجًا آخر.",
   "error.backend.providerRetrying":
@@ -277,6 +283,8 @@ export const messages = {
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerExitedWithOutput": "توقف الخادم قبل أن يُجيب. كتب: {detail}",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "تعذّر على OpenBot تشغيل خادم MCP {name}، لأن برنامجه غير مثبّت على الكمبيوتر الذي يشغّل OpenBot. ثبّت التطبيق الذي يوفّر {name} على ذلك الكمبيوتر، أو أوقف {name} في المتجر، التطبيقات.",
   "error.backend.mcpServerStartAbandoned":
     "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
   "error.backend.mcpServerStoppedDuringCall": "توقف خادم MCP قبل أن يرد على هذا الاستدعاء.",

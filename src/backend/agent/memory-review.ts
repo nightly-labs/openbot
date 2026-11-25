@@ -65,6 +65,7 @@ export interface MemoryReviewOptions {
   turnActive(agentId: string, threadId: string | null): boolean;
   appendSystemMessage(agentId: string, threadId: string | null, message: ConversationMessage): void;
   skills?(agentId: string): Effect.Effect<readonly ReviewSkill[], unknown>;
+  skillsFull?(agentId: string): Effect.Effect<boolean, unknown>;
   skillLearning?(): SkillLearningMode;
   skillLearner?: SkillLearner;
   redact(text: string): string;
@@ -413,7 +414,7 @@ export class MemoryReview {
         : [];
       const suggestion = skillInput
         ? yield* Schema.decodeUnknownEffect(SkillReviewResult)(json).pipe(
-            Effect.map(({ skill }) => acceptedSuggestion(skill, skillInput.skills)),
+            Effect.map(({ skill }) => acceptedSuggestion(skill, skillInput.skills, skillInput.canCreate)),
             Effect.map((accepted) =>
               accepted?.action === "update" &&
               excerpt.some(
@@ -454,12 +455,15 @@ export class MemoryReview {
   }
 
   #skillInput(agentId: string, messages: readonly ConversationMessage[]): Effect.Effect<SkillReviewInput | null> {
-    const { skills, redact, skillLearner } = this.#options;
+    const { skills, skillsFull, redact, skillLearner } = this.#options;
     const mode = this.#options.skillLearning?.() ?? "ask";
     if (!skills || !this.#skillLearningOn()) return Effect.succeed(null);
-    return Effect.suspend(() => skills(agentId)).pipe(
+    const full = skillsFull
+      ? Effect.suspend(() => skillsFull(agentId)).pipe(Effect.orElseSucceed(() => false))
+      : Effect.succeed(false);
+    return Effect.all([Effect.suspend(() => skills(agentId)), full]).pipe(
       Effect.map(
-        (list): SkillReviewInput => ({
+        ([list, atLimit]): SkillReviewInput => ({
           skills: list.map((skill) => ({
             skillId: skill.skillId,
             name: redact(skill.name),
@@ -467,6 +471,7 @@ export class MemoryReview {
           })),
           earlierSuggestions: earlierSkillLines(messages).map(redact),
           automatic: mode === "automatic" && skillLearner !== undefined,
+          canCreate: !atLimit,
         }),
       ),
       Effect.catchCause((cause) =>

@@ -287,6 +287,9 @@ export const messages = {
   "settings.agentDock.xwayland.unsupported":
     "Sous Wayland sans XWayland, le dock ne peut pas s’afficher au-dessus des autres apps. Il s’affiche dans la fenêtre OpenBot.",
   "settings.agentDock.xwayland.restart": "Redémarrer",
+  "settings.agentDock.noCompositor.title": "Dans la fenêtre OpenBot",
+  "settings.agentDock.noCompositor.description":
+    "Votre bureau ne peut pas afficher de fenêtres transparentes : le dock s’affiche donc dans la fenêtre OpenBot. Pour l’afficher au-dessus des autres apps, activez les effets de bureau (un compositeur) dans les réglages du système, puis redémarrez OpenBot.",
   "settings.agentDock.display.title": "Écran",
   "settings.agentDock.display.description":
     "Si cet écran n’est pas connecté, le dock passe sur l’écran de la fenêtre OpenBot.",

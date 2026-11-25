@@ -151,6 +151,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Следующая часть",
   "mobile.chat.preview.pdfFailed": "Не удалось показать этот PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Не удалось прочитать эту таблицу.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Эта таблица слишком большая для просмотра. Поделитесь ею, чтобы открыть в другом приложении.",
   "mobile.chat.preview.spreadsheetTruncated": "Просмотр ограничен первыми {rows} строками и {columns} столбцами.",
   "mobile.chat.copyFailedMessage": "Повторите попытку.",
   "mobile.chat.message.copyFailed": "Не удалось скопировать сообщение",
@@ -283,7 +285,8 @@ export const messages = {
   "mobile.chat.liveVoice.offline": "Сервер не подключён. Разговор продолжится, когда он снова подключится.",
   "mobile.chat.liveVoice.speakFailed": "Не удалось прочитать ответ вслух.",
   "mobile.chat.liveVoice.voiceNotReady": "Выберите голос ответов в Настройки > Голос.",
-  "mobile.chat.liveVoice.languageUnsupported": "Supertonic 3 не читает этот язык.",
+  "mobile.chat.liveVoice.languageUnsupported":
+    "Supertonic 3 не читает этот язык. Выберите другой голос ответов в Настройки > Голос.",
   "mobile.chat.liveVoice.elevenLabsKeyInvalid": "ElevenLabs не принял ключ API.",
   "mobile.chat.liveVoice.elevenLabsPermission":
     "У ключа ElevenLabs нет нужного разрешения. Проверьте его в Настройки > Голос.",
@@ -602,6 +605,7 @@ export const messages = {
   "mobile.chat.history.connecting": "Подключение к серверу",
   "mobile.chat.history.loading": "Загрузка истории чата",
   "mobile.chat.history.waiting": "Ожидание подключения",
+  "mobile.chat.history.syncing": "Проверка новых сообщений",
   "mobile.chat.history.loadFailed": "Не удалось загрузить историю чата",
   "mobile.chat.scrollToLatest": "К последнему сообщению",
   "mobile.chat.agentUnavailable.title": "Агент недоступен",

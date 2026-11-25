@@ -14,7 +14,9 @@ import type { AppServerNotification, AppServerRequest, RequestId, ResponseDecode
 import { providerSync } from "../src/backend/provider-client-effects";
 import type { ReadProviderHistory } from "../src/backend/provider-history";
 
+const HELD_TAKEOVER = process.argv.includes("--held=takeover");
 const OUT = resolve(import.meta.dirname, "../.openbot-build/claude-steer-now-e2e");
+const REPORT = join(OUT, HELD_TAKEOVER ? "report-takeover.json" : "report.json");
 const root = await mkdtemp(join(tmpdir(), "openbot-claude-steer-now-"));
 const userData = join(root, "user-data");
 const home = join(root, "home");
@@ -29,8 +31,11 @@ const STEERED_ANSWER = "Answer of the steered message.";
 const STEERED_MESSAGE = "Steered message.";
 const HELD_TOOL_ID = "toolu_held_command";
 const heldToolEvents: Array<{ method: string; turnId: string | null; status: string | null }> = [];
-const HELD_HOST_TOOL = "list_agents";
-const heldHostToolCalls: AbortSignal[] = [];
+const HELD_HOST_TOOL = HELD_TAKEOVER ? "tool_call" : "list_agents";
+const HELD_HOST_ARGUMENTS = HELD_TAKEOVER
+  ? { name: "openbot_browser.request_takeover", arguments: { tabId: "tab-1", reason: "sign-in-blocked" } }
+  : {};
+const heldHostToolCalls: Array<{ signal: AbortSignal; answer: (result: unknown) => void }> = [];
 
 function recordHeldTool(notification: AppServerNotification): void {
   const params = notification.params;
@@ -101,6 +106,18 @@ const finish = (message, text) => {
   result(message, { subtype: "success", is_error: false, result: text, terminal_reason: "completed" });
 };
 let held = null;
+let waiting = null;
+const finishHeld = () => {
+  const done = held;
+  const next = waiting;
+  held = null;
+  waiting = null;
+  if (!next) return finish(done, "Done.");
+  begin(next, ${JSON.stringify(STEERED_ANSWER)});
+  assistant(next, [{ type: "text", text: ${JSON.stringify(STEERED_ANSWER)} }], "end_turn");
+  result(next, { subtype: "success", is_error: false, result: ${JSON.stringify(STEERED_ANSWER)},
+    terminal_reason: "completed", user_message_uuids: [done.uuid, next.uuid] });
+};
 const turn = (message) => {
   fs.appendFileSync(${JSON.stringify(priorityLog)}, JSON.stringify({ uuid: message.uuid, priority: message.priority ?? null }) + "\\n");
   if (held && message.priority === "now") {
@@ -111,13 +128,16 @@ const turn = (message) => {
     finish(message, ${JSON.stringify(STEERED_ANSWER)});
     return;
   }
-  if (held) return;
+  if (held) {
+    waiting = message;
+    return;
+  }
   if (JSON.stringify(message.message).includes("steer-now")) {
     begin(message, ${JSON.stringify(WORKING_TEXT)});
     assistant(message, [{ type: "text", text: ${JSON.stringify(WORKING_TEXT)} },
       { type: "tool_use", id: ${JSON.stringify(HELD_TOOL_ID)}, name: "Bash", input: { command: "sleep 600" } }], "tool_use");
     write({ type: "control_request", request_id: "req_held_host_tool", request: { subtype: "mcp_message", server_name: "openbot",
-      message: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: ${JSON.stringify(HELD_HOST_TOOL)}, arguments: {} } } } });
+      message: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: ${JSON.stringify(HELD_HOST_TOOL)}, arguments: ${JSON.stringify(HELD_HOST_ARGUMENTS)} } } } });
     held = message;
     fs.writeFileSync(${JSON.stringify(holdMarker)}, message.uuid);
     return;
@@ -138,6 +158,8 @@ process.stdin.on("data", (chunk) => {
     const message = JSON.parse(line);
     if (message.type === "control_request")
       write({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: {} } });
+    else if (message.type === "control_response" && message.response?.request_id === "req_held_host_tool" && held)
+      finishHeld();
     else if (message.type === "user") turn(message);
   }
 });
@@ -177,7 +199,8 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
       this.emit("notification", notification);
     });
     this.#real.on("request", (request) => {
-      if (isHeldHostToolCall(request) && request.signal) heldHostToolCalls.push(request.signal);
+      if (isHeldHostToolCall(request) && request.signal)
+        heldHostToolCalls.push({ signal: request.signal, answer: (result) => this.#real.respond(request.id, result) });
       else this.emit("request", request);
     });
     this.#real.on("diagnostic", (message) => this.emit("diagnostic", message));
@@ -346,6 +369,14 @@ try {
   const steerDeliveryId = receipt.deliveries[0]?.id;
   assert.ok(steerDeliveryId, "The steered message has a delivery.");
   report.steerDeliveryId = steerDeliveryId;
+  if (HELD_TAKEOVER) {
+    await waitFor("the steer to reach Claude", () => readFileSync(priorityLog, "utf8").trim().split("\n").length === 2);
+    assert.equal(heldHostToolCalls[0]?.signal.aborted, false, "The steer keeps the sign-in card open.");
+    heldHostToolCalls[0]?.answer({
+      success: true,
+      contentItems: [{ type: "inputText", text: JSON.stringify({ status: "completed" }) }],
+    });
+  }
   await waitFor(
     "the steered answer",
     () => service.shown(agent.id, threadId).includes(STEERED_ANSWER) && service.idle(agent.id),
@@ -358,10 +389,14 @@ try {
   report.deliveries = service.deliveries(agent.id);
   report.shown = service.shown(agent.id, threadId);
   report.heldToolEvents = heldToolEvents;
-  report.heldHostToolCallAborted = heldHostToolCalls.every((signal) => signal.aborted);
+  report.heldHostToolCallAborted = heldHostToolCalls.every((call) => call.signal.aborted);
   assert.equal(report.priorities.length, 2, "Claude gets the first message and the steer.");
   assert.equal(report.priorities[0]?.priority, null, "The first message has no priority.");
-  assert.equal(report.priorities[1]?.priority, "now", "The steer stops the running tool call.");
+  assert.equal(
+    report.priorities[1]?.priority,
+    HELD_TAKEOVER ? null : "now",
+    HELD_TAKEOVER ? "The steer waits for the sign-in card." : "The steer stops the running tool call.",
+  );
   assert.ok(
     report.turns.every((turn) => turn.status === "completed"),
     "No OpenBot turn ends as interrupted when Claude stops its tools for a steer.",
@@ -388,8 +423,10 @@ try {
   assert.equal(heldHostToolCalls.length, 1, "The stand-in makes one host tool call.");
   assert.equal(
     report.heldHostToolCallAborted,
-    true,
-    "The host stops the tool call that Claude dropped, so its approval card goes away.",
+    !HELD_TAKEOVER,
+    HELD_TAKEOVER
+      ? "The sign-in card stays until the person answers it."
+      : "The host stops the tool call that Claude dropped, so its approval card goes away.",
   );
   report.passed = true;
 } catch (error) {
@@ -398,8 +435,8 @@ try {
 } finally {
   await service.stop();
   mkdirSync(OUT, { recursive: true });
-  writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
+  writeFileSync(REPORT, `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });
-  process.stdout.write(`${report.passed ? "PASS" : "FAIL"} ${join(OUT, "report.json")}\n`);
+  process.stdout.write(`${report.passed ? "PASS" : "FAIL"} ${REPORT}\n`);
   if (report.error) process.stdout.write(`${report.error}\n`);
 }
