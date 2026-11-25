@@ -357,9 +357,13 @@ export function createRemoteConnectionRecovery(
       attempt = 0;
       retryDelay = null;
       if (retryAt === null) return;
+      if (running) {
+        retryAt = Math.min(retryAt, Date.now() + remoteRetryDelay(0));
+        return;
+      }
       retryAt = null;
       cancelTimer();
-      if (active && !running) startRun();
+      if (active) startRun();
     },
     dispose() {
       disposed = true;
