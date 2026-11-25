@@ -120,7 +120,6 @@ export function parseLocalSignInFinish(value: unknown): BrowserLocalSignInFinish
   return { send: value.send, check: value.check === true };
 }
 
-/** Never include the rejected payload in validation errors. */
 export function parseHttpSignInAnswer(value: unknown): BrowserHttpSignInInput {
   if (!isObject(value)) throw new Error("Invalid browser sign-in answer.");
   const tabId = requireString(value.tabId, "tabId");

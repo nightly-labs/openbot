@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} non ha più crediti. Passaggio a {model}. Per usarlo di nuovo, aggiungi crediti e poi selezionalo.",
   "status.agent.modelReturnedAfterError": "Tornato a {model} dopo l’errore del provider.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} non è più disponibile. Passato a {model}.",
   "status.agent.marketplaceSuggested": "Ha suggerito un'app del Marketplace: {app}.",
   "status.agent.settingShown": "Ha mostrato un'impostazione: {setting}.",
   "status.agent.channelMemberAdded": "{agent} ha aggiunto {member} al canale. Lo ha chiesto {person}.",
@@ -28,6 +29,12 @@ export const messages = {
     "Acquisizione dello schermo principale e invio dell'immagine al modello dell'agente.",
   "status.agent.screenCaptureChannel":
     "L'immagine appare nel canale {channel} e ogni membro di questo server che legge il canale può vederla.",
+  "status.agent.creditImageApproval": "Genera un’immagine con {model}. Costa {credits} crediti.",
+  "status.agent.creditVideoApproval": "Genera un video con {model}. Costa {credits} crediti.",
+  "status.agent.creditMediaChannel":
+    "Il risultato appare nel canale {channel} e ogni membro di questo server che legge il canale può vederlo.",
+  "status.agent.creditsHoldBalance": "Usa {credits} crediti e il saldo è di {balance} crediti.",
+  "status.agent.creditsHoldAgentsOff": "Gli agenti di questo server non possono usare i crediti.",
   "status.agent.screenCapturePermissionNext":
     "Poi macOS può chiederti di consentire a OpenBot la registrazione dello schermo.",
   "status.agent.screenCaptureDisplay":
@@ -117,10 +124,16 @@ export const messages = {
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
   "status.agent.mcpToolCall": "Eseguire lo strumento {tool} del server MCP {name}.",
   "status.agent.uiBlockClosedByMessage": "Chiuso da un nuovo messaggio",
+  "status.agent.location.field": "La tua posizione",
+  "status.agent.location.placeholder": "Città, indirizzo o luogo",
+  "status.agent.location.submit": "Condividi",
+  "status.agent.location.shared": "Posizione condivisa",
   "status.agent.nextStepContinues":
     "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
   "status.agent.planStopped": "L'agente si è fermato con passaggi aperti nel piano. Invia un messaggio per continuare.",
+  "status.agent.continuationLimitReached":
+    "L'agente si è fermato prima di finire la richiesta. Non può più continuare da solo. Invia un messaggio per continuare.",
   "status.agent.compactionContinues":
     "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
   "status.agent.providerExitContinues": "L'agente si è fermato prima di finire la risposta. L'agente continua.",

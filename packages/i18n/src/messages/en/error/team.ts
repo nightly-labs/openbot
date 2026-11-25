@@ -107,6 +107,11 @@ export const messages = defineMessages("error.team", {
   "error.team.sideQuestionUnsupported": "Side questions are not supported by this connection.",
   "error.team.liveVoiceUnsupported":
     "This server does not support Codex live voice. Update OpenBot on the computer that runs it.",
+  "error.team.voiceTranscriptionUnsupported":
+    "This server does not support dictation. Update OpenBot on the computer that runs it.",
+  "error.team.clientBrowserUnsupported":
+    "This server does not support shared Chrome tabs. Update OpenBot on the computer that runs it.",
+  "error.team.clientBrowserCommandUnknown": "The agent no longer waits for this Chrome action.",
   "error.team.routineFlowsUnsupported":
     "This server does not support routine flows. Update OpenBot on the computer that runs it.",
   "error.team.routineCanvasTooLarge":
@@ -123,6 +128,9 @@ export const messages = defineMessages("error.team", {
   "error.team.hostIdentityUnsupported": "Server identity changes are not supported by this connection.",
   "error.team.hostUpdateUnsupported": "Host updates are not supported by this connection.",
   "error.team.hostTimezoneUnsupported": "The server timezone is not supported by this connection.",
+  "error.team.hostSignalHomeUnsupported": "The Signal server choice is not supported by this connection.",
+  "error.team.hostVoiceModelUnsupported":
+    "The speech recognition model of the server is not supported by this connection.",
   "error.team.hostRestartUnsupported": "Restarting the server is not supported by this connection.",
   "error.team.ownerTransferUnsupported": "Transferring ownership is not supported by this server.",
   "error.team.hostKeyRotationUnsupported": "Server key changes are not supported by this connection.",
@@ -138,6 +146,10 @@ export const messages = defineMessages("error.team", {
   "error.team.promptCacheTtlUnsupported": "The prompt cache time is not supported by this connection.",
   "error.team.claudeUserSetupUnsupported": "This connection does not support the Claude Code setup switch.",
   "error.team.claudeCompactWindowUnsupported": "This connection does not support the Claude compaction size.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "This connection does not support compaction before the cache expires.",
+  "error.team.mediaApprovalCreditsUnsupported": "This connection does not support the credit approval limit.",
+  "error.team.mediaApprovalCreditsInvalid": "Enter a whole number of credits from 0 to 100,000.",
   "error.team.providerEnvironmentUnsupported": "This connection does not support provider variables.",
   "error.team.modelVisibilityUnsupported": "The model list is not supported by this connection.",
   "error.team.providerDefaultUnsupported": "The default provider is not supported by this connection.",
@@ -207,4 +219,7 @@ export const messages = defineMessages("error.team", {
   "error.team.backgroundProcessesUnsupported": "Background processes are not supported by this connection.",
   "error.team.providerUseUnsupported": "Turning providers on and off is not supported by this connection.",
   "error.team.providerUseInvalid": "This provider does not have an on/off switch.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "This server does not support a model choice in media approvals. Update OpenBot on the server.",
+  "error.team.mediaApprovalChoiceInvalid": "The media approval choice is not valid.",
 });

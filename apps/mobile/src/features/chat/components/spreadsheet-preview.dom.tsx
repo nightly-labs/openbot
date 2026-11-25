@@ -1,5 +1,6 @@
 "use dom";
 
+import { OfficePreviewTooLargeError } from "@openbot/contracts/office-zip";
 import { parseSpreadsheet, type SpreadsheetData } from "@openbot/contracts/spreadsheet-workbook";
 import { base64ToBytes } from "@openbot/team-client/base64";
 import { useMemo, useState } from "react";
@@ -11,6 +12,7 @@ interface SpreadsheetPreviewProps {
   insets: { top: number; bottom: number };
   colors: { background: string; foreground: string; muted: string; border: string; field: string };
   failedText: string;
+  tooLargeText: string;
   truncatedText: string;
   dom?: import("expo/dom").DOMProps;
 }
@@ -48,16 +50,18 @@ export default function SpreadsheetPreview({
   insets = NO_INSETS,
   colors = NO_COLORS,
   failedText = "",
+  tooLargeText = "",
   truncatedText = "",
 }: SpreadsheetPreviewProps) {
-  const workbook = useMemo<SpreadsheetData | null>(() => {
-    if (!base64) return null;
+  const { workbook, tooLarge } = useMemo<{ workbook: SpreadsheetData | null; tooLarge: boolean }>(() => {
+    if (!base64) return { workbook: null, tooLarge: false };
     try {
-      return parseSpreadsheet(base64ToBytes(base64), {
+      const parsed = parseSpreadsheet(base64ToBytes(base64), {
         number: (value, options) => new Intl.NumberFormat(locale, options).format(value),
       });
-    } catch {
-      return null;
+      return { workbook: parsed, tooLarge: false };
+    } catch (error) {
+      return { workbook: null, tooLarge: error instanceof OfficePreviewTooLargeError };
     }
   }, [base64, locale]);
   const sheets = useMemo(() => (workbook ? shownSheets(workbook) : []), [workbook]);
@@ -88,7 +92,7 @@ export default function SpreadsheetPreview({
     >
       {base64 && !workbook ? (
         <p style={{ color: colors.muted, textAlign: "center", font: "15px system-ui", margin: "48px 24px" }}>
-          {failedText}
+          {tooLarge ? tooLargeText : failedText}
         </p>
       ) : null}
       {sheets.length > 1 ? (

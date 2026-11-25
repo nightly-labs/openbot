@@ -6,6 +6,7 @@ import {
   pasteCodeSignInSupported,
   type ServerSummary,
 } from "@openbot/contracts/ipc";
+import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/antigravity-code-sign-in-v1";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
@@ -90,6 +91,7 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-signal-home-v1" ||
       capability === "host-turn-limits-v1" ||
       capability === "host-restart-v1" ||
       capability === "host-appearance-v1" ||
@@ -99,10 +101,14 @@ export function serverSupportsCapability(
       capability === "browsing-memory-v1" ||
       capability === "browser-teach-v1" ||
       capability === "prompt-cache-ttl-v1" ||
+      capability === "prompt-cache-ttl-pi-v1" ||
+      capability === "cache-expiry-compaction-v1" ||
+      capability === "media-approval-credits-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
       capability === "mistral-code-sign-in-v1" ||
+      capability === "antigravity-code-sign-in-v1" ||
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
@@ -243,7 +249,8 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
       (provider) =>
         v4.includes(provider) ||
         (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)) ||
-        (provider === "mistral" && serverSupportsCapability(server, MISTRAL_CODE_SIGN_IN_CAPABILITY)),
+        (provider === "mistral" && serverSupportsCapability(server, MISTRAL_CODE_SIGN_IN_CAPABILITY)) ||
+        (provider === "antigravity" && serverSupportsCapability(server, ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY)),
     );
   }
   if (serverSupportsCapability(server, "providers-v3")) return PROVIDERS_SIGN_IN_V3_PROVIDERS;
@@ -253,8 +260,13 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
 export function localCodeSignInProviders(platform: string | undefined): readonly AgentProviderId[] {
   const paste = platform !== undefined && pasteCodeSignInSupported(platform);
   return AGENT_PROVIDERS.filter((provider) => {
-    const codeSignIn = agentProviderDescriptor(provider).localCodeSignIn;
-    return codeSignIn === "device" || (codeSignIn === "paste" && paste);
+    const descriptor = agentProviderDescriptor(provider);
+    const codeSignIn = descriptor.localCodeSignIn;
+    return (
+      codeSignIn === "device" ||
+      (codeSignIn === "paste" && paste) ||
+      (platform === "win32" && descriptor.windowsCodeSignIn !== undefined)
+    );
   });
 }
 
@@ -273,6 +285,10 @@ export function remoteAdminServer(
 export function activeServerHasProviderSettings(server: ServerSummary): boolean {
   return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
 }
+
+export const PROVIDER_SEARCH_NAMES: readonly string[] = AGENT_PROVIDERS.filter((provider) => provider !== "acp").map(
+  (provider) => agentProviderDescriptor(provider).displayName,
+);
 
 export function serverHasAgentDefaults(server: ServerSummary): boolean {
   return serverCanAdminister(server, "agent-defaults-v1") && (server.kind === "local" || server.state === "online");

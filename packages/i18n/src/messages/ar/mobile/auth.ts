@@ -31,7 +31,7 @@ export const messages = {
   "mobile.auth.signIn.helpTitle": "أين رمز QR؟",
   "mobile.auth.signIn.helpStep1": "1. افتح OpenBot على حاسوبك.",
   "mobile.auth.signIn.helpStep2": "2. انتقل إلى الإعدادات ← Mobile Connect.",
-  "mobile.auth.signIn.helpStep3": "3. اختر «إنشاء رمز QR»، ثم امسحه هنا.",
+  "mobile.auth.signIn.helpStep3": "3. اختر «إضافة هاتف» ← «نعم، تسجيل الدخول»، ثم امسح الرمز هنا.",
   "mobile.auth.signIn.emailButton": "المتابعة بالبريد الإلكتروني",
   "mobile.auth.done.title": "تم الاتصال",
   "mobile.auth.done.body": "سجّلت الدخول.",

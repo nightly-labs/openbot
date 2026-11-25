@@ -4,7 +4,7 @@ import { WhatsAppAuthStore } from "@openbot/whatsapp/auth-store";
 import type { SocketConfig, WAVersion } from "@openbot/whatsapp/baileys";
 import type { WhatsAppHistory } from "./whatsapp-archive";
 import { WhatsAppChatState } from "./whatsapp-chats";
-import type { WhatsAppSenderRules } from "./whatsapp-senders";
+import { isReadOnlyChat, type WhatsAppSenderRules } from "./whatsapp-senders";
 import { WhatsAppSession, type WhatsAppSocketFactory } from "./whatsapp-session";
 
 export interface WhatsAppPolicy {
@@ -30,7 +30,12 @@ export interface WhatsAppRuntimeOptions {
 
 const PART_FILE_MAX_AGE_MS = 60 * 60_000;
 
-const NO_RULES: WhatsAppSenderRules = { ownNumber: true, contacts: new Map(), groups: new Set() };
+const NO_RULES: WhatsAppSenderRules = {
+  ownNumber: true,
+  contacts: new Map(),
+  groups: new Set(),
+  readOnly: new Set(),
+};
 
 export class WhatsAppRuntime {
   readonly #options: WhatsAppRuntimeOptions;
@@ -114,9 +119,15 @@ export class WhatsAppRuntime {
       createSocket: this.#options.createSocket,
       makeSignalRepository: this.#options.makeSignalRepository,
       pairing,
+      readOnly: (jid) => this.#readOnly(store, jid),
       ...(this.#options.fetchVersion ? { fetchVersion: this.#options.fetchVersion } : {}),
       ...(this.#options.now ? { now: this.#options.now } : {}),
     });
+  }
+
+  #readOnly(store: WhatsAppAuthStore, jid: string): boolean {
+    const number = store.creds.me?.id?.split("@")[0]?.split(":")[0];
+    return number ? isReadOnlyChat(this.#policy.rules(number), jid) : false;
   }
 
   get(storeId: string): WhatsAppConnectionHandle | null {

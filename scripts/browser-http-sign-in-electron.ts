@@ -20,7 +20,6 @@ const fixtureRoot = argument("fixture-root");
 const reportPath = argument("report-path");
 const runId = argument("run-id");
 
-// The fixture site uses a certificate that this run makes, so Chromium must accept it.
 app.commandLine.appendSwitch("ignore-certificate-errors");
 
 const USERNAME = "fixture-user";

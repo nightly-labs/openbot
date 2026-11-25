@@ -97,6 +97,7 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
   const chromiumMajor = chromiumMajorVersion();
   const mode = readLinuxGpuMode(options.userDataPath, options.server);
   if (mode.reason === "not-linux") return mode;
+  if (runsWebGlOnCpu(mode, options.server)) app.commandLine.appendSwitch("enable-unsafe-swiftshader");
   if (!mode.hardwareAcceleration) {
     app.disableHardwareAcceleration();
     app.commandLine.appendSwitch("disable-gpu-process-crash-limit");
@@ -113,10 +114,7 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
   if (options.ownsInstance && mode.reason === "unfinished-start-retry") {
     logger.warn("The previous start stopped before it was confirmed, with no crash dump. The GPU gets one more start.");
   }
-  if (mode.reason === "server") {
-    app.commandLine.appendSwitch("disable-gpu-compositing");
-    app.commandLine.appendSwitch("enable-unsafe-swiftshader");
-  }
+  if (mode.reason === "server") app.commandLine.appendSwitch("disable-gpu-compositing");
   if (!options.ownsInstance) return mode;
   if (mode.reason !== "server") {
     writeGpuFailure(startPath, chromiumMajor, mode.reason === "unfinished-start-retry");
@@ -137,6 +135,10 @@ export function configureLinuxGpu(options: ConfigureLinuxGpuOptions): LinuxGpuMo
     writeGpuFailure(crashPath, chromiumMajor);
   });
   return mode;
+}
+
+function runsWebGlOnCpu(mode: LinuxGpuMode, server: boolean): boolean {
+  return server ? mode.reason === "server" : mode.reason !== "environment-off";
 }
 
 function quitOnGpuRestartLoop(): void {

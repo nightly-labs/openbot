@@ -27,6 +27,14 @@ body[data-browser-full-view] .app-frame {
   display: none;
 }
 
+.browser-full-view.browser-pane-view {
+  position: relative;
+  z-index: auto;
+  inset: auto;
+  flex: 1;
+  background: transparent;
+}
+
 .browser-full-top {
   display: flex;
   height: var(--browser-full-top-height);
@@ -72,6 +80,12 @@ body[data-browser-full-view] .app-frame {
   border-top: 1px solid var(--openbot-border);
   border-radius: var(--openbot-radius-card) var(--openbot-radius-card) 0 0;
   background: var(--openbot-bg-canvas);
+}
+
+.browser-pane-view .browser-full-card {
+  border-top: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .browser-full-browser {
@@ -231,8 +245,13 @@ body[data-browser-full-view] .app-frame {
   pointer-events: none;
 }
 
+.browser-full-chips[data-frozen] {
+  flex-basis: var(--browser-full-chips-frozen);
+}
+
 .browser-full-chips[data-frozen] .browser-full-chip {
   flex: 0 0 var(--browser-full-chip-frozen);
+  transition: none;
 }
 
 .browser-full-chips[data-dragging] {

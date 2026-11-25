@@ -11,6 +11,9 @@ export const messages = defineMessages("error.voice", {
   "error.voice.prepareRequired":
     "Local voice transcription is unavailable. Run `bun run voice:prepare` and restart OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot could not transcribe this recording.",
+  "error.voice.videoModelMissing": "No speech recognition model for recordings is set up in Settings → Voice.",
+  "error.voice.videoModelMissingServer":
+    "No speech recognition model is set up on this server. An owner or an admin can set up a model in the server settings, in Speech recognition.",
   "error.voice.cloud.keyRequired": "Add your {provider} API key in Settings → Voice.",
   "error.voice.cloud.keyRejected": "{provider} did not accept the API key. Check the key in Settings → Voice.",
   "error.voice.cloud.quotaExceeded": "Your {provider} quota is used up.",
@@ -30,6 +33,8 @@ export const messages = defineMessages("error.voice", {
   "error.voice.live.timedOut": "Codex live voice did not start in time. Try again.",
   "error.voice.live.failed": "Live voice stopped: {reason}",
   "error.voice.live.disconnected": "Live voice disconnected.",
+  "error.voice.live.startFailed":
+    "Live voice could not start. Update Codex and sign in with ChatGPT on the computer that runs the agent, then try again. Reason: {reason}",
   "error.voice.live.hostFailed":
     "Codex on the server could not start live voice. Ask its owner to update Codex on that computer and sign in with ChatGPT, then try again.",
   "error.voice.live.signIn": "Sign in to Codex with your ChatGPT account to use live voice.",
@@ -45,4 +50,11 @@ export const messages = defineMessages("error.voice", {
   "error.voice.server.invalidAnswer": "{host} did not send an OpenAI-compatible answer.",
   "error.voice.server.invalidAudio": "{host} sent audio that OpenBot cannot play. Use a server that sends WAV.",
   "error.voice.server.tooLarge": "The answer from {host} is too large.",
+  "error.voice.server.modelUnsupported":
+    "{host} cannot transcribe with {model}. In Settings → Voice, choose a different dictation model for the voice server.",
+  "error.voice.host.preparing": "The server is downloading its speech recognition model. Try again in a few minutes.",
+  "error.voice.host.notSetUp":
+    "Speech recognition is not set up on this server. Ask its owner to set it up in Settings → Voice.",
+  "error.voice.host.invalidRecording": "The recording is not valid. Record again.",
+  "error.voice.host.tooLong": "The recording is too long. Speak for 2 minutes or less.",
 });

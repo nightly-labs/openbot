@@ -1,19 +1,15 @@
-import {
-  parseWorkflowAnswerSpec,
-  type WORKFLOW_ANSWER_FIELD,
-  WORKFLOW_CHECK_FIELD,
-  type WorkflowAnswerProblem,
-} from "@openbot/contracts/ipc";
+import { type WORKFLOW_ANSWER_FIELD, WORKFLOW_CHECK_FIELD, type WorkflowAnswerProblem } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { ListChecks, Popover, Textarea, TriangleAlert } from "@openbot/ui";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
+import { AnswerRows, answerRows } from "./workflow-answer-rows";
 import { useBoard } from "./workflow-board";
 import { asString, ToolAction, useField } from "./workflow-node-parts";
 
 type AnswerKey = typeof WORKFLOW_ANSWER_FIELD | typeof WORKFLOW_CHECK_FIELD;
 
-function answerProblemText(t: AppTranslate, problem: WorkflowAnswerProblem): string {
+export function answerProblemText(t: AppTranslate, problem: WorkflowAnswerProblem): string {
   switch (problem.code) {
     case "spec":
       switch (problem.spec.code) {
@@ -38,6 +34,10 @@ function answerProblemText(t: AppTranslate, problem: WorkflowAnswerProblem): str
       return t("workflow.answer.problem.test", { name: problem.name });
     case "conflict":
       return t("workflow.answer.problem.conflict", { name: problem.name });
+    case "path":
+      return t("workflow.answer.problem.path", { name: problem.name });
+    case "repeated":
+      return t("workflow.answer.problem.repeated", { name: problem.name });
   }
 }
 
@@ -78,47 +78,28 @@ export function AnswerAction(props: { id: string; field: AnswerKey; locked: bool
             <Popover.Title class="wfn-popover-title">
               {check() ? t("workflow.check.title") : t("workflow.answer.title")}
             </Popover.Title>
-            <Textarea
-              class="wfn-input wfn-answer-input"
-              aria-label={check() ? t("workflow.check.title") : t("workflow.answer.title")}
-              placeholder={check() ? t("workflow.check.placeholder") : t("workflow.answer.placeholder")}
-              readonly={props.locked}
-              spellcheck={false}
-              value={value()}
-              onValueChange={setValue}
-            />
+            <Show
+              when={!check() && answerRows(untrack(value)) !== null}
+              fallback={
+                <Textarea
+                  class="wfn-input wfn-answer-input"
+                  aria-label={check() ? t("workflow.check.title") : t("workflow.answer.title")}
+                  placeholder={check() ? t("workflow.check.placeholder") : t("workflow.answer.placeholder")}
+                  readonly={props.locked}
+                  spellcheck={false}
+                  value={value()}
+                  onValueChange={setValue}
+                />
+              }
+            >
+              <AnswerRows value={value()} locked={props.locked} onChange={setValue} />
+            </Show>
             <Show when={names().length > 0}>
               <p class="wfn-answer-names">{t("workflow.check.fields", { names: names().join(", ") })}</p>
             </Show>
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
-    </Show>
-  );
-}
-
-export function AnswerSummary(props: { id: string; field: AnswerKey }) {
-  const board = useBoard();
-  const { t } = useText();
-  const [value] = useAnswerText(() => props.id, props.field);
-  const text = () => {
-    const spec = value().trim();
-    if (!spec || board.catalogs().answers !== true) return "";
-    if (props.field === WORKFLOW_CHECK_FIELD) return spec;
-    const names = parseWorkflowAnswerSpec(spec).fields.map((field) => field.name);
-    return names.length > 0 ? names.join(", ") : spec;
-  };
-  return (
-    <Show when={text()}>
-      {(shown) => (
-        <p class="wfn-answer-summary">
-          <ListChecks class="wfn-answer-summary-icon" aria-hidden="true" />
-          <span class="sr-only">
-            {props.field === WORKFLOW_CHECK_FIELD ? t("workflow.check.title") : t("workflow.answer.title")}
-          </span>
-          <span class="wfn-answer-summary-text">{shown()}</span>
-        </p>
-      )}
     </Show>
   );
 }

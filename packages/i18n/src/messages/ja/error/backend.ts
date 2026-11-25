@@ -4,6 +4,9 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "このホストではイベントを利用できません。",
   "error.backend.databaseIntegrity": "OpenBot のデータベースが整合性チェックに失敗しました。",
+  "error.backend.creditsHoldAdminOnly":
+    "エージェントのクレジット使用を許可できるのは、このサーバーのオーナーまたは管理者のみです。",
+  "error.backend.creditsHoldShort": "クレジットがまだ足りません。",
   "error.backend.webhookRouteLimit": "1 つのホストの Webhook ルーティンは最大 {limit} 個です。",
   "error.backend.webhookSettingsInvalid": "Webhook の設定を確認して、もう一度お試しください。",
   "error.backend.webhookSenderSecretInvalid":
@@ -55,6 +58,8 @@ export const messages = {
     "このリモートホストは、ブラウザーのタブの操作の引き継ぎに対応していません。",
   "error.backend.browserSignInUnsupported": "このリモートホストはこのコンピューターからのサインインを受け取れません。",
   "error.backend.browserSignInOpenFailed": "OpenBot はサインインウィンドウを開けませんでした。",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot はサインインウィンドウでページを読み込めませんでした。インターネット接続を確認してから、サインインウィンドウをもう一度開いてください。",
   "error.backend.browserSignInReadFailed": "OpenBot はウィンドウからサインインを読み取れませんでした。",
   "error.backend.browserStopUnsupported": "このリモートホストはページの読み込みを停止できません。",
   "error.backend.browserHttpSignInInactive":
@@ -69,6 +74,12 @@ export const messages = {
     "圧縮してもこのチャットは小さくなりません。2回圧縮しても、モデルのコンテキストウィンドウの{percent}%を使っているため、OpenBotは自動圧縮を止めます。ウィンドウの大部分はツールと指示が使っています。このエージェントに不要なMCPサーバーやコンピューター操作をオフにするか、より大きなウィンドウのモデルを選んでください。その後、新しいチャットを開始してください。",
   "error.backend.contextCompactionStopped":
     "このチャットの圧縮が2回続けて失敗したため、OpenBot は自動圧縮を停止します。試行のたびにチャット全体がモデルに送信され、プランの上限を消費します。もう一度試すには「今すぐ圧縮」を選択するか、新しいチャットを開始してください。",
+  "error.backend.contextCompactionRetrying":
+    "プロバイダーはこのチャットを圧縮できず、再試行しています。圧縮が終わるまで、このチャットの新しいメッセージは待機します。すぐに終わらない場合、OpenBot は圧縮を停止してメッセージを送信します。",
+  "error.backend.contextCompactionFailed":
+    "このチャットの圧縮に失敗しました。チャットは変更されていません。待機中のメッセージは今エージェントに送られます。",
+  "error.backend.contextCompactionTimedOut":
+    "このチャットの圧縮に時間がかかりすぎたため、OpenBot が停止しました。チャットは変更されていません。待機中のメッセージは今エージェントに送られます。",
   "error.backend.providerModelAtCapacity":
     "モデルが混雑しています。プロバイダーは数分後に再試行します。今すぐ続けるには、ターンを停止して別のモデルを選んでください。",
   "error.backend.providerRetrying":
@@ -94,6 +105,8 @@ export const messages = {
     "このチャンネルのメンバーには、まだ圧縮する会話がありません。メンバーがチャンネルで回答した後に圧縮してください。",
   "error.backend.channelCompactNotSupported":
     "このチャンネルのどのメンバーも、要求に応じて圧縮できません。対応しているメンバーは、コンテキストがほぼいっぱいになると自動で圧縮します。",
+  "error.backend.channelCompactProviderUnavailable":
+    "チャンネルメンバーのプロバイダーが現在動作していません。プロバイダーを更新してから、もう一度チャンネルを圧縮してください。",
   "error.backend.channelArchived":
     "メッセージを送信したりタスクを変更したりする前に、このチャンネルを復元してください。",
   "error.backend.channelArchiveRunning": "このチャンネルで実行中の作業を停止してから削除してください。",
@@ -115,6 +128,16 @@ export const messages = {
     "チャンネルリードが時間内に応答しませんでした。メンバーを選択するか、もう一度お試しください。",
   "error.backend.channelLeadFailed":
     "チャンネルリードがこのメッセージをルーティングできませんでした。メンバーを選択するか、もう一度お試しください。",
+  "error.backend.channelLeadBusy":
+    "チャンネルリードのモデルは混み合っています。数分後にもう一度お試しいただくか、メンバーを選択してください。",
+  "error.backend.channelLeadOffline":
+    "チャンネルリードのモデルの接続が切れました。もう一度お試しいただくか、メンバーを選択してください。",
+  "error.backend.channelLeadSignIn":
+    "チャンネルリードのプロバイダーのサインインが期限切れです。もう一度サインインするか、メンバーを選択してください。",
+  "error.backend.channelLeadModelGone":
+    "チャンネルリードのモデルは利用できません。リードに別のモデルを選ぶか、メンバーを選択してください。",
+  "error.backend.channelLeadRefused":
+    "チャンネルリードのモデルがこのリクエストを拒否しました。メンバーを選択するか、リードに別のモデルを選んでください。",
   "error.backend.channelRequestMemberRequired": "この依頼のメンバーを選択してください。",
   "error.backend.channelDeliveryNotCreated": "チャンネルへの配信を作成できませんでした。",
   "error.backend.channelAssignmentStopped": "このチャンネルの割り当ては停止されたか、置き換えられました。",
@@ -137,6 +160,10 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "実行はエラーで停止しましたが、理由は届いていません。実行を開いて、エージェントが何をしたかを確認してください。",
   "error.backend.turnNotStarted": "プロバイダーはこのターンを開始しませんでした。",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} はこのメッセージを開始したことを時間内に確認しませんでした。作業が二重に実行されないように、OpenBot はメッセージを再送信しません。OpenBot はエージェントが開始するまで最大 5 分待ちます。",
+  "error.backend.turnStartAbandoned":
+    "エージェントは 5 分以内にこのメッセージを開始しませんでした。メッセージをもう一度送信してください。",
   "error.backend.routineResultConnectionOff":
     "このメッセージ接続はオフか削除されています。別の送信先を選んでください。",
   "error.backend.routineResultNoDelivery": "この実行には再送信できる回答がありません。",
@@ -258,8 +285,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot に保存できる MCP サーバーは {limit} 個までです。",
   "error.backend.mcpServerNameTaken": "{name} という名前の MCP サーバーはすでに存在します。",
   "error.backend.mcpServerInvalid": "OpenBot はこの MCP サーバーの設定を保存できません。",
+  "error.backend.mcpHeaderNameInvalid":
+    "ヘッダー名にはスペースや : ( ) / などの記号を使えません。Authorization のような名前を使い、キーまたはトークンは「値」に入力してください。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
+  "error.backend.mcpSignInGrantRefused":
+    "サーバーがサインインを受け付けませんでした。もう一度サインインしてください。問題が続く場合は、アカウントがこのアプリと同じサイトまたはリージョンにあることを確認してください。",
   "error.backend.mcpSignInAccountRefused":
     "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
@@ -297,7 +328,11 @@ export const messages = {
   "error.backend.mcpServerExited":
     "サーバーは応答する前に停止しました。ターミナルでコマンドを実行してエラーを確認してください。",
   "error.backend.mcpServerExitedWithOutput": "サーバーは応答する前に停止しました。出力: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "ダウンロードに失敗したため、サーバーが起動しませんでした。インターネット接続を確認してから、もう一度お試しください。",
   "error.backend.mcpServerFailedToStart": "サーバーが起動しませんでした: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "MCP サーバー {name} のプログラムが OpenBot を実行しているコンピューターにインストールされていないため、OpenBot は起動できませんでした。そのコンピューターに {name} を提供するアプリをインストールするか、マーケットプレイス、アプリで {name} をオフにしてください。",
   "error.backend.mcpServerStartAbandoned":
     "サーバーが起動する前に {provider} が待つのをやめたため、{provider} のエージェントはこのサーバーのツールを使えません。",
   "error.backend.mcpServerStoppedDuringCall": "MCP サーバーがこの呼び出しに応答する前に停止しました。",
@@ -305,6 +340,8 @@ export const messages = {
     "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
   "error.backend.mcpServerSignInForProvider":
     "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。マーケットプレイス、アプリで {name} を開いて「サインイン」を選択してください。",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがキーを求めています。マーケットプレイス、アプリで {name} を開き、「編集」を選択して、「ヘッダー」に正しいキーを入力してください。",
   "error.backend.mcpServerFailedForProvider":
     "{provider} は MCP サーバー {name} を起動できませんでした。マーケットプレイス、アプリで {name} を開いて「接続をテスト」を選択すると、原因を確認できます。",
   "error.backend.mcpServerFailedInProvider":
@@ -423,6 +460,8 @@ export const messages = {
     "このサイトのセキュリティ証明書が信頼されていないため、ページを開けませんでした。",
   "error.backend.browserLowMemory":
     "このサーバーはメモリーが不足しているため、ブラウザーで新しいタブを開けません。タブを閉じるか、ほかのエージェントの作業が終わるまでお待ちください。",
+  "error.backend.browserNoMemory":
+    "このサーバーはメモリーがほぼなくなっているため、今はブラウザーでタブを開けません。ほかのエージェントの作業が終わってから、もう一度お試しください。",
   "error.backend.browserOpenFailed": "{url} を開けません: {reason}",
   "error.backend.popupSecureInput":
     "セキュア入力中はポップアップがブロックされます。セキュア入力を完了またはキャンセルしてから、ページからもう一度お試しください。",

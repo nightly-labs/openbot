@@ -2,15 +2,19 @@ import {
   type ConversationMessage,
   DEFAULT_SPEECH_SETTINGS,
   LOCAL_SERVER_ID,
+  SPEECH_MODEL,
+  type SpeechModelStatus,
   VOICE_AUDIO_LIMITS,
   VOICE_MODELS,
   VOICE_STREAM_LIMITS,
+  type VoiceModelId,
+  type VoiceModelStatus,
 } from "@openbot/contracts/ipc";
 import type { VoicePhase, VoiceTalkMode } from "@openbot/ui/features/conversation/VoicePill";
 import { currentText } from "@openbot/ui/text";
+import { encodePcm16, recordingToSamples, recordingToWav } from "@openbot/ui/voice-recording";
 import { createEffect, createStore, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../../analytics";
-import { encodePcm16, recordingToSamples, recordingToWav } from "../../../voice-recording";
 import { holdSpeech, releaseSpeech, SPEECH_LEVEL_COUNT, speechReading } from "../../speech/speech-playback";
 import { speechPort } from "../../speech/speech-port";
 import {
@@ -69,6 +73,7 @@ interface VoiceConversationState {
   heard: string;
   error: string | null;
   levels: number[];
+  downloadProgress: number | null;
 }
 
 export interface VoiceConversationDeps {
@@ -83,6 +88,8 @@ export interface VoiceConversationDeps {
   ) => Promise<boolean>;
   serverOnline: () => boolean;
   progressUpdate: (message: ConversationMessage) => boolean;
+  keepsRecording: boolean;
+  inChannel: boolean;
 }
 
 interface Recording {
@@ -111,6 +118,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     heard: "",
     error: null,
     levels: quietLevels(),
+    downloadProgress: null,
   });
   let generation = 0;
   let disposed = false;
@@ -138,6 +146,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   let sentTurns = 0;
   const serverKind = deps.serverId === LOCAL_SERVER_ID ? "local" : "remote";
   let ownServer = false;
+  const downloadListeners: Array<() => void> = [];
+  const downloads: Array<{ modelId: string; bytes: number; share: number }> = [];
   const transcription = () => {
     if (ownServer) return "server";
     return cloud ? "cloud" : "local";
@@ -200,6 +210,46 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     if (ready && step === "listening") void listen();
   });
 
+  function showDownload(status: VoiceModelStatus | SpeechModelStatus): void {
+    const index = downloads.findIndex((download) => download.modelId === status.modelId);
+    if (index < 0 || status.phase !== "downloading" || disposed) return;
+    downloads.forEach((download, position) => {
+      if (position < index) download.share = 1;
+    });
+    const current = downloads[index];
+    if (current) current.share = (status.progress ?? 0) / 100;
+    const total = downloads.reduce((sum, download) => sum + download.bytes, 0);
+    const received = downloads.reduce((sum, download) => sum + download.share * download.bytes, 0);
+    setState((draft) => {
+      draft.downloadProgress = Math.min(100, Math.floor((received / total) * 100));
+    });
+  }
+
+  function planDownloads(
+    speechModel: SpeechModelStatus | null,
+    dictationModelId: VoiceModelId | null,
+    dictationStatuses: VoiceModelStatus[] | null,
+  ): void {
+    downloads.length = 0;
+    if (speechModel?.modelId === SPEECH_MODEL.id && speechModel.phase !== "ready")
+      downloads.push({ modelId: speechModel.modelId, bytes: SPEECH_MODEL.bytes, share: 0 });
+    const dictation = VOICE_MODELS.find((candidate) => candidate.id === dictationModelId);
+    const dictationStatus = dictationStatuses?.find((status) => status.modelId === dictationModelId);
+    if (dictation?.kind === "local" && dictationStatus && dictationStatus.phase !== "ready")
+      downloads.push({ modelId: dictation.id, bytes: dictation.bytes, share: 0 });
+  }
+
+  function removeDownloadListeners(): void {
+    for (const stop of downloadListeners.splice(0)) stop();
+  }
+
+  function stopDownloadProgress(): void {
+    removeDownloadListeners();
+    setState((draft) => {
+      draft.downloadProgress = null;
+    });
+  }
+
   async function start(): Promise<void> {
     const own = generation;
     const analytics = desktopAnalytics.scope();
@@ -207,15 +257,20 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     loading = true;
     try {
       const speech = speechPort().voice;
-      const [server, turnPauseMs] = await Promise.all([
+      downloadListeners.push(speech.onSpeechModelStatus(showDownload), deps.voice.onModelStatus(showDownload));
+      const [server, turnPauseMs, plannedSettings, dictationStatuses] = await Promise.all([
         speech.getServer(),
         speech.getSpeechSettings().then(
-          (settings) => settings.turnPauseMs,
+          (speechSettings) => speechSettings.turnPauseMs,
           () => DEFAULT_SPEECH_SETTINGS.turnPauseMs,
         ),
+        deps.voice.getSettings(),
+        speech.getModelStatuses().catch(() => null),
       ]);
       turnEndSilenceMs = turnPauseMs;
-      if (!server?.routes.speech && (await speech.getSpeechModelStatus()).phase !== "ready") {
+      const speechModel = server?.routes.speech ? null : await speech.getSpeechModelStatus();
+      planDownloads(speechModel, server?.routes.dictation ? null : plannedSettings.modelId, dictationStatuses);
+      if (speechModel && speechModel.phase !== "ready") {
         const downloadAt = performance.now();
         const status = await speech.downloadSpeechModel().catch((error: unknown) => {
           analytics.track("speech_model_action", {
@@ -272,6 +327,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
       });
     } finally {
       loading = false;
+      stopDownloadProgress();
     }
   }
 
@@ -622,7 +678,11 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
         discardRecording(recordingId);
         return;
       }
-      noteDictatedMessage(target, text, { always: true, progressUpdate: deps.progressUpdate });
+      noteDictatedMessage(target, text, {
+        always: true,
+        progressUpdate: deps.progressUpdate,
+        channel: deps.inChannel,
+      });
       delivered = await deps.submit({ ...EMPTY_DRAFT, text }, target, EMPTY_DRAFT, {
         recordingDraftId: recordingId,
         onFailed: notSent,
@@ -647,7 +707,8 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
   }
 
   async function keepRecording(recording: Blob): Promise<string | undefined> {
-    if (deps.serverId !== LOCAL_SERVER_ID || !recording.type.startsWith("audio/webm")) return undefined;
+    if (!deps.keepsRecording || deps.serverId !== LOCAL_SERVER_ID || !recording.type.startsWith("audio/webm"))
+      return undefined;
     if (recording.size > VOICE_AUDIO_LIMITS.maximumRecordingBytes) return undefined;
     try {
       return (await speechPort().voice.keepRecording({ audio: new Uint8Array(await recording.arrayBuffer()) })).id;
@@ -829,6 +890,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     });
     generation += 1;
     stopReplyEnd();
+    removeDownloadListeners();
     releaseTurn();
     dropReply();
   }
@@ -852,6 +914,7 @@ export function createVoiceConversation(deps: VoiceConversationDeps) {
     muted: () => state.muted,
     talking: () => state.talking,
     error: () => state.error,
+    downloadProgress: () => state.downloadProgress,
     levels: () => (phase() === "speaking" ? (reading()?.levels ?? state.levels) : state.levels),
     toggleMute,
     setTalkMode,

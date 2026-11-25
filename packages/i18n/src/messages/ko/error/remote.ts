@@ -31,6 +31,8 @@ export const messages = {
     "호스트와의 연결이 너무 느려서 화면을 표시할 수 없어요. 다시 시도해 주세요. 다음 연결은 더 낮은 화질을 사용해요.",
   "error.remote.streamTooSlow":
     "호스트와의 연결이 너무 느려서 화면을 표시할 수 없어요. 더 빠른 네트워크를 사용한 다음 다시 시도해 주세요.",
+  "error.remote.noPictureSwitchEncoder":
+    "호스트가 화면을 보내지 않았어요. 다시 시도해 주세요. 다음 연결에서는 더 많은 컴퓨터에서 작동하는 비디오 설정을 사용해요.",
   "error.remote.teamSessionExpired": "팀 세션이 만료되었어요.",
   "error.remote.finishTestBeforeSwitch": "디스플레이를 전환하기 전에 원격 데스크톱 테스트를 끝내 주세요.",
   "error.remote.displayNotFound": "원격 디스플레이를 찾을 수 없어요.",
@@ -91,7 +93,11 @@ export const messages = {
     "보안 키가 없거나 변경되어 OpenBot이 이 서버를 확인할 수 없어요. 서버 소유자에게 서버를 확인해 달라고 요청하세요.",
   "error.remote.connectionNotStarted":
     "OpenBot이 이 서버와 연결을 시작하지 못했어요. 문제가 계속되면 OpenBot을 종료하고 다시 여세요.",
-  "error.remote.hostDidNotConnect": "WebRTC 호스트가 연결되지 않았어요.",
+  "error.remote.connectionServiceUnreachable":
+    "이 컴퓨터가 OpenBot 연결 서비스에 연결할 수 없어요. 인터넷 연결을 확인하세요. OpenBot이 자동으로 다시 연결해요.",
+  "error.remote.serverAnswerTimeout": "서버가 제때 응답하지 않았어요. OpenBot이 자동으로 다시 연결해요.",
+  "error.remote.signInConnectionClosed":
+    "로그인 중에 서버 연결이 끊겼어요. 계속 그러면 서버와 이 기기의 날짜와 시간이 맞는지 확인하세요.",
   "error.remote.connectionCancelled": "원격 연결이 취소되었어요.",
   "error.remote.hostDisconnected": "서버와의 연결이 끊어졌어요. 작업이 완료되었는지 확인한 후 다시 시도해 주세요.",
   "error.remote.eventGap": "호스트 이벤트 순서에 누락이 있어요.",

@@ -6,7 +6,9 @@ export async function readFileBase64(file: File): Promise<string> {
     return await file.base64();
   } catch (error) {
     if (!isAndroid) throw error;
-    const blob = await (await fetch(file.uri)).blob();
+    const response = await fetch(file.uri);
+    if (!response.ok) throw error;
+    const blob = await response.blob();
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));

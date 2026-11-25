@@ -18,6 +18,7 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import {
   decodeVoiceServerWav,
   OPENAI_VOICES,
+  shortVoiceServerModel,
   VOICE_SERVER_VOICE_PATHS,
   voiceServerHost,
   voiceServerModelLists,
@@ -150,7 +151,16 @@ export class VoiceServerService extends EventEmitter<VoiceServerEvents> {
       model,
       wav,
       language,
-      { label: "Voice server" },
+      {
+        label: "Voice server",
+        refused: (status) =>
+          status === 404
+            ? sourceText("error.voice.server.modelUnsupported", {
+                host: voiceServerHost(server.address),
+                model: shortVoiceServerModel(model),
+              })
+            : null,
+      },
     );
   }).bind(this);
 

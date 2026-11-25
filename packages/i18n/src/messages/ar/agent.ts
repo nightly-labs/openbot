@@ -55,6 +55,7 @@ export const messages = {
   "agent.dock.closeOnLeave": "إغلاق عند النقر خارجها",
   "agent.dock.openInMain": "فتح في النافذة الرئيسية",
   "agent.dock.openWindow": "فتح في نافذة جديدة",
+  "agent.dock.openPage": "فتح {title}",
   "agent.dock.remove": "إزالة من الشريط",
   "agent.dock.send": "إرسال",
   "agent.dock.working": "يعمل…",

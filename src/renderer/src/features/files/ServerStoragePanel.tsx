@@ -116,6 +116,7 @@ export function ServerStoragePanel(
       scannedAt={usage()?.scannedAt ?? null}
       breakdown={usage()?.breakdown ?? []}
       freeBytes={freeBytes()}
+      hostedPlan={Boolean(props.storageGb)}
       agents={agents() ?? []}
       agentUsage={usage()?.agents ?? []}
       conversations={usage()?.conversations ?? []}

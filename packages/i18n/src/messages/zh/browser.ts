@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "关闭浏览器标签页",
   "browser.newTab": "新建浏览器标签页",
   "browser.backToChat": "返回聊天",
+  "browser.fullView.open": "在完整视图中打开",
   "browser.goBack": "后退",
   "browser.goForward": "前进",
   "browser.reload": "刷新页面",
@@ -100,6 +101,7 @@ export const messages = {
   "browser.secret.submitting": "正在提交…",
   "browser.secret.takeOver": "接管",
   "browser.secret.failed": "无法完成该请求，请检查连接后重试。",
+  "browser.secret.ended": "此登录请求已结束。请让助手再试一次。",
   "browser.secret.vaultSkip.agentScript":
     "由于助手在此页面上运行了脚本，OpenBot 没有使用你保存的登录信息。如需使用，请让助手重新加载页面后再试一次。",
   "browser.secret.vaultSkip.fieldKind": "由于助手在页面上选择了错误的字段，OpenBot 没有使用你保存的登录信息。",

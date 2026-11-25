@@ -387,6 +387,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} entfernen",
   "mobile.agent.backupModels.unavailable": "Gerade nicht verfügbar · übersprungen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Stoppt ein Nutzungslimit {name} nach Beginn der Arbeit, setzt {name} dieselbe Arbeit mit dem ersten verfügbaren Modell der Reihenfolge fort. Wenn das Limit endet oder 10 Minuten nach einem Anbieterfehler, kehrt {name} zu {model} zurück.",
   "mobile.agent.busyMessage.label": "Während der Arbeit",
@@ -538,6 +539,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Erfasst seit {started}. Aktualisiert {updated}.",
   "mobile.agent.usage.never": "nie",
   "mobile.agent.record.time": "Uhrzeit",
+  "mobile.agent.record.date": "Datum",
   "mobile.agent.section.changeFailed": "Ordner konnte nicht geändert werden",
   "mobile.agent.section.tryAgain": "Versuche es erneut.",
   "mobile.agent.section.moveUp": "Nach oben verschieben",
@@ -622,7 +624,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Deine Server konnten nicht geladen werden",
   "mobile.agent.home.serversFailedBody": "Prüfe, ob die Desktop-App läuft, und versuche es erneut.",
   "mobile.agent.home.noServers": "Keine Server verfügbar",
-  "mobile.agent.home.noServersBody": "Verbinde die Desktop-App erneut oder tritt einem Remote-Server bei.",
+  "mobile.agent.home.noServersBody":
+    "Öffne OpenBot auf deinem Computer mit diesem Konto und aktiviere „Server veröffentlichen“ unter Servereinstellungen → Mitglieder. Oder tritt einem Remote-Server bei.",
   "mobile.agent.home.chooseServer": "Wähle einen Server",
   "mobile.agent.home.openServers": "Server öffnen",
   "mobile.agent.home.noChatOpen": "Kein Chat geöffnet",
@@ -700,6 +703,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Nicht ausschließen",
   "mobile.agent.folders.browseTitle": "Ordner wählen",
   "mobile.agent.folders.places": "Gehe zu",
+  "mobile.agent.folders.path": "Ordnerpfad",
   "mobile.agent.folders.home": "Benutzerordner",
   "mobile.agent.folders.parent": "Nach oben: {folder}",
   "mobile.agent.folders.browseFailed": "Dieser Ordner kann nicht geöffnet werden.",

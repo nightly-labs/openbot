@@ -198,6 +198,13 @@ export function ProviderAccountRenameField(props: {
     done = true;
     props.onDone(value === null ? null : value.trim());
   };
+  const returnFocusFromClosingMenu = (input: HTMLInputElement, next: EventTarget | null) => {
+    if (!(next instanceof Element) || !next.closest('[role="menuitem"]')) return false;
+    requestAnimationFrame(() => {
+      if (!done && input.isConnected) input.focus({ preventScroll: true });
+    });
+    return true;
+  };
   return (
     <Input
       class="provider-picker-account-rename"
@@ -214,7 +221,10 @@ export function ProviderAccountRenameField(props: {
           finish(null);
         }
       }}
-      onBlur={(event) => finish(event.currentTarget.value)}
+      onBlur={(event) => {
+        if (returnFocusFromClosingMenu(event.currentTarget, event.relatedTarget)) return;
+        finish(event.currentTarget.value);
+      }}
     />
   );
 }

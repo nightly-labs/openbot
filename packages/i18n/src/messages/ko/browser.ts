@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "브라우저 탭 닫기",
   "browser.newTab": "새 브라우저 탭",
   "browser.backToChat": "채팅으로 돌아가기",
+  "browser.fullView.open": "전체 보기로 열기",
   "browser.goBack": "뒤로",
   "browser.goForward": "앞으로",
   "browser.reload": "페이지 새로고침",
@@ -91,6 +92,7 @@ export const messages = {
   "browser.secret.submitting": "제출 중…",
   "browser.secret.takeOver": "직접 제어",
   "browser.secret.failed": "요청을 완료할 수 없어요. 연결을 확인한 후 다시 시도해 주세요.",
+  "browser.secret.ended": "이 로그인 요청은 종료되었어요. 에이전트에게 다시 시도해 달라고 요청해 주세요.",
   "browser.secret.vaultSkip.agentScript":
     "에이전트가 이 페이지에서 스크립트를 실행해서 OpenBot이 저장된 로그인 정보를 사용하지 않았어요. 사용하려면 에이전트에게 페이지를 새로고침하고 다시 시도해 달라고 요청하세요.",
   "browser.secret.vaultSkip.fieldKind":

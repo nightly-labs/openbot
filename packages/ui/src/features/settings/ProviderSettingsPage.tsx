@@ -118,9 +118,18 @@ export type ProviderDefaultChoice = AgentProviderId | "custom";
 
 export interface ProviderPromptCache {
   value: PromptCacheTtl | null;
+  appliesToPi: boolean;
   pending: boolean;
   error: string | null;
   onChange: (ttl: PromptCacheTtl) => void;
+  compaction?: ProviderCacheExpiryCompaction | undefined;
+}
+
+export interface ProviderCacheExpiryCompaction {
+  value: boolean | null;
+  pending: boolean;
+  error: string | null;
+  onChange: (enabled: boolean) => void;
 }
 
 export interface ProviderClaudeCompactWindow {
@@ -604,7 +613,12 @@ function ProviderPage(props: PageProps) {
           <ApiKeySection {...props} row={row} />
         </Show>
         <RuntimeSection {...props} row={row} />
-        <Show when={props.option.id === "claude" && props.promptCache}>
+        <Show
+          when={
+            (props.option.id === "claude" || (props.option.id === "pi" && props.promptCache?.appliesToPi)) &&
+            props.promptCache
+          }
+        >
           {(cache) => <PromptCacheSection cache={cache()} disabled={props.disabled} menuMount={props.menuMount} />}
         </Show>
         <Show when={props.option.id === "claude" && props.claudeCompactWindow}>
@@ -1545,7 +1559,9 @@ function ApiKeySection(props: SectionProps) {
                       ? saved()
                         ? t("provider.settings.codexKeyInUse")
                         : t("provider.settings.codexKeyAlternative")
-                      : t("provider.settings.keyAlternative", { name: props.option.name })}
+                      : props.option.id === "muse" && saved()
+                        ? t("provider.settings.museKeyInUse")
+                        : t("provider.settings.keyAlternative", { name: props.option.name })}
             </ItemDescription>
           </ItemContent>
           <ItemActions>
@@ -1815,8 +1831,45 @@ function PromptCacheSection(props: {
             )}
           </Show>
         </Item>
+        <Show when={props.cache.compaction}>
+          {(compaction) => <CacheExpiryCompactionRow compaction={compaction()} disabled={props.disabled} />}
+        </Show>
       </ItemGroup>
     </SettingsSection>
+  );
+}
+
+function CacheExpiryCompactionRow(props: { compaction: ProviderCacheExpiryCompaction; disabled: boolean | undefined }) {
+  const { t } = useText();
+  return (
+    <Item class="settings-modal-row">
+      <ItemContent>
+        <ItemTitle id="provider-settings-cache-expiry-compaction-label">
+          {t("provider.settings.cacheExpiryCompaction")}
+        </ItemTitle>
+        <Show
+          when={props.compaction.error}
+          fallback={<ItemDescription>{t("provider.settings.cacheExpiryCompactionDescription")}</ItemDescription>}
+        >
+          {(message) => (
+            <ItemDescription class="provider-settings-error" role="alert">
+              {message()}
+            </ItemDescription>
+          )}
+        </Show>
+      </ItemContent>
+      <Show when={props.compaction.value !== null}>
+        <ItemActions>
+          <Switch
+            checked={props.compaction.value === true}
+            disabled={Boolean(props.disabled || props.compaction.pending)}
+            aria-busy={props.compaction.pending ? "true" : "false"}
+            aria-labelledby="provider-settings-cache-expiry-compaction-label"
+            onChange={(enabled: boolean) => props.compaction.onChange(enabled)}
+          />
+        </ItemActions>
+      </Show>
+    </Item>
   );
 }
 
@@ -2464,12 +2517,25 @@ function servesCustomEndpoints(props: ProviderSettingsPageProps): boolean {
 }
 
 function CustomEndpointsPage(props: ProviderSettingsPageProps) {
-  const { t, format } = useText();
+  const { t, format, errorMessage } = useText();
   const endpoints = () => props.customProviders ?? [];
   const engine = () => props.options.find((option) => option.id === "opencode");
   const ready = () => servesCustomEndpoints(props);
+  const engineOff = () => !ready() && Boolean(engine()?.off);
+  const turnOnOffered = () => engineOff() && Boolean(props.onSetProviderOn);
+  const [turningOn, setTurningOn] = createSignal(false);
+  async function turnEngineOn() {
+    setTurningOn(true);
+    try {
+      await props.onSetProviderOn?.("opencode", true);
+    } catch (error) {
+      toast.error(errorMessage(error, t("error.provider.useChangeFailed")));
+    } finally {
+      setTurningOn(false);
+    }
+  }
   const engineAction = () => {
-    if (ready() || (!props.onDownloadProvider && !props.onCancelProviderDownload)) return undefined;
+    if (ready() || turnOnOffered() || (!props.onDownloadProvider && !props.onCancelProviderDownload)) return undefined;
     return customEngineDownloadAction(engine());
   };
   const runsOn = (endpoint: CustomProviderSummary) =>
@@ -2491,7 +2557,9 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
         subtitle={
           ready() || !engine()
             ? t("provider.custom.description")
-            : providerStatusLabel(t, format, engine()?.state ?? "checking")
+            : engineOff()
+              ? t("provider.settings.turnOnFirst", { name: engine()?.name ?? "" })
+              : providerStatusLabel(t, format, engine()?.state ?? "checking")
         }
       />
       <SettingsSection
@@ -2500,17 +2568,33 @@ function CustomEndpointsPage(props: ProviderSettingsPageProps) {
           <Show
             when={engineAction()}
             fallback={
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-label={t("provider.custom.addLabel")}
-                disabled={props.disabled || !ready()}
-                onClick={() => props.onAddCustomProvider?.()}
+              <Show
+                when={turnOnOffered()}
+                fallback={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    aria-label={t("provider.custom.addLabel")}
+                    disabled={props.disabled || !ready()}
+                    onClick={() => props.onAddCustomProvider?.()}
+                  >
+                    <Plus aria-hidden="true" />
+                    {t("common.add")}
+                  </Button>
+                }
               >
-                <Plus aria-hidden="true" />
-                {t("common.add")}
-              </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  aria-label={t("provider.aria.use", { name: engine()?.name ?? "" })}
+                  loading={turningOn()}
+                  disabled={props.disabled || turningOn()}
+                  onClick={() => void turnEngineOn()}
+                >
+                  {t("provider.settings.useTitle", { name: engine()?.name ?? "" })}
+                </Button>
+              </Show>
             }
           >
             {(action) => (

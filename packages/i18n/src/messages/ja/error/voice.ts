@@ -12,6 +12,9 @@ export const messages = {
   "error.voice.prepareRequired":
     "ローカル音声文字起こしを使用できません。`bun run voice:prepare` を実行し、OpenBot を再起動してください。",
   "error.voice.transcriptionFailed": "OpenBot はこの録音を文字起こしできませんでした。",
+  "error.voice.videoModelMissing": "設定 → 音声 で録音用の音声認識モデルが設定されていません。",
+  "error.voice.videoModelMissingServer":
+    "このサーバーには音声認識モデルが設定されていません。オーナーまたは管理者が、サーバーの設定の「音声認識」でモデルを設定できます。",
   "error.voice.cloud.keyRequired": "設定 → 音声 で {provider} の API キーを追加してください。",
   "error.voice.cloud.keyRejected":
     "{provider} が API キーを受け付けませんでした。設定 → 音声 でキーを確認してください。",
@@ -30,6 +33,8 @@ export const messages = {
   "error.voice.live.timedOut": "Codex ライブ音声が時間内に開始しませんでした。もう一度お試しください。",
   "error.voice.live.failed": "ライブ音声が停止しました: {reason}",
   "error.voice.live.disconnected": "ライブ音声の接続が切れました。",
+  "error.voice.live.startFailed":
+    "ライブ音声を開始できませんでした。エージェントを実行しているコンピューターで Codex を更新し、ChatGPT でサインインしてから、もう一度お試しください。理由: {reason}",
   "error.voice.live.hostFailed":
     "サーバーの Codex がライブ音声を開始できませんでした。オーナーに、そのコンピューターの Codex を更新して ChatGPT でサインインするよう依頼してから、もう一度お試しください。",
   "error.voice.live.signIn": "ライブ音声を使うには、ChatGPT アカウントで Codex にサインインしてください。",
@@ -40,4 +45,6 @@ export const messages = {
   "error.voice.live.refused":
     "OpenAI がライブ音声の開始を拒否しました。しばらくしてからもう一度お試しいただくか、設定 でライブ音声をオフにして音声で話してください。",
   "error.voice.live.off": "Codex ライブ音声はオフです。設定 → 音声 でオンにしてください。",
+  "error.voice.server.modelUnsupported":
+    "{host} は {model} で文字起こしできません。設定 → 音声 で、音声サーバーの別の音声入力モデルを選んでください。",
 } as const satisfies PartialTranslation<typeof source>;

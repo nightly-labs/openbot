@@ -19,16 +19,11 @@ export interface BrowserTab {
   httpSignIn?: BrowserHttpSignIn;
 }
 
-/**
- * The sign-in prompt that the site of a tab shows itself (HTTP Basic or Digest), for a page load over
- * HTTPS. `refused` says that the site did not accept the last username and password.
- */
 export interface BrowserHttpSignIn {
   origin: string;
   refused?: true;
 }
 
-/** The site sign-in prompts of `tabs`, for the `browser-http-sign-in-changed` event and its route. */
 export function browserHttpSignInPrompts(
   tabs: readonly BrowserTab[],
 ): { tabId: string; origin: string; refused: boolean }[] {
@@ -37,7 +32,6 @@ export function browserHttpSignInPrompts(
   );
 }
 
-/** `cancel` closes the prompt; the page keeps what the site sent without a sign-in. */
 export type BrowserHttpSignInInput = { tabId: string } & ({ username: string; password: string } | { cancel: true });
 
 export interface BrowserTeachStep {

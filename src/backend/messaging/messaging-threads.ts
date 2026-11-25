@@ -410,15 +410,15 @@ export class MessagingThreads {
     args: unknown,
     openFiles: (paths: string[]) => Effect.Effect<MessagingAnswerFile[], AttachmentOperationError>,
   ): Effect.fn.Return<OpenBotToolResponse, AttachmentOperationError> {
-    const call = parseMessagingOutboundTool(tool, args);
-    if ("error" in call) return openBotToolFailure(call.error);
     if (
-      call.tool === "messaging_history" &&
+      tool === "messaging_history" &&
       (this.store.linkForThread(turn.threadId) || this.#mailbox.turnServesExternalChat(agentId, turn.turnId))
     )
       return openBotToolFailure(
         "A turn that works for an external chat cannot read a place by name. In the turn that answers the chat, call messaging_history without connection and place.",
       );
+    const call = parseMessagingOutboundTool(tool, args);
+    if ("error" in call) return openBotToolFailure(call.error);
     const enabled = this.store.connections().filter((record) => record.enabled);
     if (call.tool === "messaging_list_places" && !call.connection)
       return openBotToolResult({
@@ -779,7 +779,8 @@ export class MessagingThreads {
           followUp = origin !== null;
         }
         const deliveryIds = active.map((context) => context.delivery.id);
-        const teammateRequest = active.length > 0 && active.every(({ delivery }) => isTeammateMessage(delivery));
+        const teammateRequest =
+          active.length > 0 && active.every(({ delivery }) => isTeammateMessage(delivery, this.#mailbox));
         this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp, teammateRequest });
         this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp, teammateRequest });
         let stopped = false;
@@ -906,7 +907,7 @@ export class MessagingThreads {
       status,
       origin,
       followUp: delivery?.sender.kind === "agent",
-      teammateRequest: delivery !== undefined && isTeammateMessage(delivery),
+      teammateRequest: delivery !== undefined && isTeammateMessage(delivery, this.#mailbox),
       answer,
       files: [],
       reason,
@@ -1031,11 +1032,11 @@ export class MessagingThreads {
   }
 }
 
-function isTeammateMessage(delivery: DeliveryContext["delivery"]): boolean {
+function isTeammateMessage(delivery: DeliveryContext["delivery"], mailbox: MailboxStore): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
-    !delivery.replyToMessageId
+    (!delivery.replyToMessageId || mailbox.followsUpOwnAnswer(delivery))
   );
 }
 

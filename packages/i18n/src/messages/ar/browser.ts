@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "إغلاق علامة تبويب المتصفح",
   "browser.newTab": "علامة تبويب جديدة",
   "browser.backToChat": "الرجوع إلى المحادثة",
+  "browser.fullView.open": "فتح في العرض الكامل",
   "browser.goBack": "رجوع",
   "browser.goForward": "تقدّم",
   "browser.reload": "إعادة تحميل الصفحة",
@@ -104,6 +105,7 @@ export const messages = {
   "browser.secret.submitting": "جارٍ الإرسال…",
   "browser.secret.takeOver": "تولّي التحكم",
   "browser.secret.failed": "تعذّر إكمال الطلب. تحقّق من الاتصال وحاول مرة أخرى.",
+  "browser.secret.ended": "انتهى طلب تسجيل الدخول هذا. اطلب من الوكيل المحاولة مرة أخرى.",
   "browser.secret.vaultSkip.agentScript":
     "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأن الوكيل شغّل نصًا برمجيًا في هذه الصفحة. لاستخدامها، اطلب من الوكيل إعادة تحميل الصفحة والمحاولة مرة أخرى.",
   "browser.secret.vaultSkip.fieldKind":

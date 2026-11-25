@@ -37,7 +37,7 @@ export const messages = {
     "Maak een gehoste server om vanuit deze browser met je agents te chatten. Je kunt OpenBot ook op je computer draaien, of lid worden van een server met een uitnodiging.",
   "webClient.connect.stepInstall": "Installeer en open OpenBot op je computer.",
   "webClient.connect.stepSignIn": "Log in met je e-mailadres.",
-  "webClient.connect.stepRemote": "Zet toegang op afstand aan.",
+  "webClient.connect.stepRemote": "Open in OpenBot Serverinstellingen > Leden en zet Publiceer deze server aan.",
   "webClient.notice.download": "OpenBot downloaden",
   "webClient.notice.createServer": "Gehoste server maken",
   "webClient.notice.join": "Lid worden met uitnodiging",

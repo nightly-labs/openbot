@@ -6,10 +6,12 @@ export const messages = {
   "error.workflow.versionMissing": "הגרסה הזו של תהליך העבודה כבר לא קיימת.",
   "error.workflow.annotation": "אי אפשר לחבר טקסט, הערות וצורות.",
   "error.workflow.port": "שלב לא יכול לקבל סוג קלט כזה.",
+  "error.workflow.unknownValue": "ה-OpenBot הזה לא מכיר הגדרה של שלב. יש לעדכן את OpenBot ולנסות שוב.",
   "error.workflow.branch": "רק לתנאי יכולים להיות חיבורי כן ולא.",
   "error.workflow.conditionBranch": "כל חיבור היוצא מתנאי חייב להיות כן או לא.",
   "error.workflow.duplicateEdge": "שני השלבים האלה כבר מחוברים כך.",
   "error.workflow.serverTooOld": "השרת הזה אינו תומך בתהליכי עבודה. יש לעדכן את OpenBot במחשב שמפעיל אותו.",
+  "error.workflow.newerSteps": "בתהליך העבודה הזה יש שלבים מ-OpenBot חדש יותר. יש לעדכן את OpenBot כדי לשנות אותו.",
   "error.workflow.nodeUnsupported": "הגרסה הזו של OpenBot עדיין לא יכולה להריץ שלבי תמונה, קובץ והודעה.",
   "error.workflow.interrupted": "OpenBot נעצר בזמן שהשלב הזה רץ. יש להריץ אותו שוב.",
   "error.workflow.agentMissing": "יש לבחור סוכן לשלב הזה.",
@@ -18,6 +20,13 @@ export const messages = {
   "error.workflow.agentStepStopped": "הסוכן נעצר לפני שענה על השלב הזה. יש להריץ את השלב שוב.",
   "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
   "error.workflow.answerInvalid": "התשובה לא כללה את השדות שהשלב הזה מבקש: {fields}. יש להריץ את השלב שוב.",
+  "error.workflow.answerSetup":
+    "יש בעיה בשדות התשובה של תהליך העבודה הזה כאן: {fields}. תקן את תהליך העבודה ואז הרץ את השלב שוב.",
+  "error.workflow.answerSourceEnded":
+    "לשדות האלה אין ערך, כי השלב שנותן אותם לא הסתיים: {fields}. הרץ קודם את השלב הזה שוב.",
+  "error.workflow.runInputInvalid":
+    "הקלט של ההרצה לא מתאים לשדות התשובה של הטריגר: {fields}. שלח אובייקט JSON אחד עם השדות האלה.",
+  "error.workflow.sourceNotDone": "שלב קודם נכשל או נעצר בפעם האחרונה שרץ. הרץ קודם את השלב הזה שוב.",
   "error.workflow.checkInvalid": "הבדיקה של השלב הזה לא תקינה. יש לתקן אותה ולהריץ את השלב שוב.",
   "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
   "error.workflow.modelTimedOut":

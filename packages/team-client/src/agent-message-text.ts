@@ -7,6 +7,7 @@ const FILE_CITATION_ATTRIBUTE = /([A-Za-z_][\w-]*)=(?:"([^"]*)"|(\S+))/gu;
 const LABEL_MARKDOWN = /[\\`*_[\]<>~$&|]/gu;
 
 export function cleanAgentMessageText(text: string): string {
+  if (!text.includes("\u{e200}") && !text.includes(":codex-file-citation{")) return text;
   const cleaned = text.replace(COMPLETE_INTERNAL_CITATION, "").replace(STREAMING_INTERNAL_CITATION, "");
   if (!cleaned.includes(":codex-file-citation{")) return cleaned;
   return cleaned.replace(FILE_CITATION_OR_CODE, (match, code: string | undefined, attributes: string | undefined) => {

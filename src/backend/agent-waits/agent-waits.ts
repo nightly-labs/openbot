@@ -82,19 +82,19 @@ export class AgentWaits {
     deliveryId: string,
     waitId: string | null,
     runTaskId: string | null,
-  ): Map<string, string[]> {
+  ): Map<string | null, string[]> {
     const named = waitId ? this.#store.get(run.agentId, waitId) : null;
     const candidates = waitId ? (named ? [named] : []) : this.#store.forRoutineRun(run.agentId, run.routineId);
     const inRun: string[] = [];
-    const inSideThreads = new Map<string, string[]>();
+    const inRequestChats = new Map<string | null, string[]>();
     for (const wait of candidates) {
       if (wait.wakeDeliveryId && this.#isPending(wait.wakeDeliveryId)) continue;
-      const taskId = this.#sideThreadOf(wait);
-      if (taskId === null || taskId === runTaskId) inRun.push(wait.id);
-      else inSideThreads.set(taskId, [...(inSideThreads.get(taskId) ?? []), wait.id]);
+      const requestChat = this.#requestChatOf(wait);
+      if (requestChat === undefined || requestChat === runTaskId) inRun.push(wait.id);
+      else inRequestChats.set(requestChat, [...(inRequestChats.get(requestChat) ?? []), wait.id]);
     }
     this.markWoken(run.agentId, inRun, deliveryId);
-    return inSideThreads;
+    return inRequestChats;
   }
 
   markWoken(agentId: string, waitIds: readonly string[], deliveryId: string): void {
@@ -181,7 +181,7 @@ export class AgentWaits {
         ? `The next run of routine ${wait.routineId} wakes this wait, or a script event that names it.`
         : "The next run of any of your routines wakes this wait, or a script event that names it.",
       scriptEvent: `A local script names the wait with "waitId": "${wait.id}" next to "payload" in the body of its routine run request.`,
-      next: "End your turn now. The run that wakes the wait repeats the request and your note in the chat where you opened the wait. Close the wait with openbot.close_wait when the request is done.",
+      next: "Say in one short sentence what you wait for, then end your turn. The run that wakes the wait repeats the request and your note in the chat where you opened the wait. Close the wait with openbot.close_wait when the request is done.",
     });
   }
 
@@ -214,6 +214,13 @@ export class AgentWaits {
       throw new AgentWaitError(error instanceof Error ? error.message : String(error));
     }
     return agentId;
+  }
+
+  #requestChatOf(wait: AgentWait): string | null | undefined {
+    if (!this.#mailbox.getDelivery(wait.requestMessageId)) return undefined;
+    const taskId = this.#mailbox.taskIdForDelivery(wait.requestMessageId);
+    if (taskId === null) return null;
+    return this.#hooks.isSideThread(wait.agentId, taskId) ? taskId : undefined;
   }
 
   #sideThreadOf(wait: AgentWait): string | null {

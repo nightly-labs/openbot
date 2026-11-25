@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { createReadStream, createWriteStream } from "node:fs";
+import { type BigIntStats, createReadStream, createWriteStream } from "node:fs";
 import {
   access,
   lstat,
@@ -45,7 +45,7 @@ import { createOpenBotLogger, type LogValue, redactText, toLogValue } from "@ope
 import { Deferred, Effect, Exit, Fiber, Result, Scope, Stream } from "effect";
 import lockValue from "../../native-runtime.lock.json";
 import { type AgentRuntimeLock, parseAgentRuntimeLock } from "../../scripts/agent-runtime-lock";
-import { reportsMissingProcessorFeature } from "../backend/agent-client";
+import { reportsMissingProcessorFeature, unsupportedKernelReason } from "../backend/agent-client";
 import {
   type BundledProviderExecutables,
   compareReleases,
@@ -512,9 +512,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     else this.#incompleteSystemClis.delete(provider);
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
+    if (version && !flagged) this.#clearFailureCoveredBySystemCli(provider, version);
     this.#revision += 1;
     this.emit("status", this.getStatus());
     return previous !== null && version === null;
+  }
+
+  #clearFailureCoveredBySystemCli(provider: ManagedProviderId, systemVersion: string): void {
+    const target = this.#target;
+    if (!target || this.#stopping || this.#tasks.has(provider)) return;
+    if (this.#statuses[provider].phase !== "download-error") return;
+    if (olderVersion(systemVersion, this.#targetSpec(provider, target).version)) return;
+    const reinspect = Effect.gen({ self: this }, function* () {
+      const status = yield* this.#installedStatusEffect(provider);
+      if (this.#tasks.has(provider) || this.#statuses[provider].phase !== "download-error") return;
+      this.#setStatus(provider, status);
+    }).pipe(Effect.ignore);
+    void runCauseEffect(Effect.forkIn(reinspect, this.#scope)).catch(() => undefined);
   }
 
   providerUseChanged(): Effect.Effect<void> {
@@ -780,14 +794,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
     atStart = false,
   ): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
+      this.#statuses[runtime] = yield* this.#installedStatusEffect(runtime, atStart);
+      return this.#statuses[runtime];
+    });
+  }
+
+  #installedStatusEffect(
+    runtime: ManagedRuntimeId,
+    atStart = false,
+  ): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
+    return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
       if (!this.#target) return this.#statuses[runtime];
       const pinned = runtimeSpec(runtime, this.#target, this.#lock);
       const { installed, rejected } = yield* this.#newestInstalledEffect(pinned);
       if (atStart && !installed && rejected) this.#rejected.add(runtime);
-      this.#statuses[runtime] = installed
+      return installed
         ? readyStatus(installed)
         : { ...emptyStatus(), version: yield* this.#previousVersionEffect(pinned) };
-      return this.#statuses[runtime];
     });
   }
 
@@ -836,7 +859,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #readStoreEffect(spec: RuntimeSpec): Effect.Effect<ProviderRuntimeStatus, ProviderRuntimeFailure> {
     return Effect.gen({ self: this }, function* (): Effect.fn.Return<ProviderRuntimeStatus, ProviderRuntimeFailure> {
       const installRoot = this.#installRoot(spec);
-      if (yield* this.#verifiesEffect(installRoot, spec)) {
+      const verified = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false)),
+      );
+      if (verified) {
         yield* this.#stampInUseEffect(spec.runtime, installRoot);
         return readyStatus(spec.version);
       }
@@ -939,8 +966,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         }),
       );
       if (Result.isFailure(result)) {
-        if (installed && !this.#stopping)
-          yield* runtimeIO(() => rm(this.#installRoot(spec), { recursive: true, force: true }));
+        if (installed && !this.#stopping) {
+          const installRoot = this.#installRoot(spec);
+          if (signal.aborted || (yield* this.#workingBackupEffect(dirname(installRoot), spec, spec.version)))
+            yield* runtimeIO(() => rm(installRoot, { recursive: true, force: true }));
+          else yield* this.#removeRuntimePartialsEffect(spec.runtime, spec.target);
+        }
         return yield* result.failure;
       }
       if (download) yield* this.#removeRuntimePartialsEffect(spec.runtime, spec.target);
@@ -1050,11 +1081,23 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
                   downloadSmallFile: (url, hash) => this.#downloadSmallFileEffect(url, hash),
                 });
                 if (spec.source === "latest") yield* writeInstallRecord(staging, spec);
-                yield* verifyInstalledRuntime(staging, spec, this.#lock, this.#isProviderOn);
+                const staged = yield* verifyRuntimeFiles(
+                  staging,
+                  spec,
+                  this.#lock,
+                  this.#isProviderOn,
+                  yield* runtimeFingerprint(staging),
+                );
                 const destination = this.#installRoot(spec);
                 yield* runtimeIO(() => mkdir(dirname(destination), { recursive: true }));
                 committed = yield* this.#commitEffect(staging, destination, spec);
-                yield* verifyInstalledRuntime(destination, spec, this.#lock, this.#isProviderOn);
+                yield* verifyChangedRuntime(
+                  destination,
+                  spec,
+                  this.#lock,
+                  this.#isProviderOn,
+                  committed ? staged : null,
+                );
                 return committed;
               }),
             );
@@ -1481,7 +1524,11 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
           env: { ...process.env, ...descriptor.versionEnvironment },
           windowsHide: true,
         }),
-      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
+      ).pipe(
+        Effect.mapError((failure) =>
+          windowsBlockedFailure(spec.runtime, unsupportedProcessorFailure(spec.runtime, failure)),
+        ),
+      )).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
@@ -1496,11 +1543,29 @@ function unsupportedProcessorFailure(
     isManagedToolRuntime(runtime) ||
     !(cause instanceof Error) ||
     !("stderr" in cause) ||
-    typeof cause.stderr !== "string" ||
-    !reportsMissingProcessorFeature(cause.stderr, "signal" in cause && cause.signal === "SIGILL")
+    typeof cause.stderr !== "string"
   )
     return failure;
+  const kernel = unsupportedKernelReason(cause.stderr);
+  if (kernel) return new ProviderRuntimeFailure({ cause: new Error(sourceText(kernel), { cause }) });
+  const illegalInstruction = "signal" in cause && cause.signal === "SIGILL";
+  if (!illegalInstruction && !reportsMissingProcessorFeature(cause.stderr, false)) return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
+
+function windowsBlockedFailure(runtime: ManagedRuntimeId, failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
+  const { cause } = failure;
+  if (
+    process.platform !== "win32" ||
+    isManagedToolRuntime(runtime) ||
+    !(cause instanceof Error) ||
+    errorCode(cause) !== "UNKNOWN" ||
+    !("syscall" in cause) ||
+    typeof cause.syscall !== "string" ||
+    !cause.syscall.startsWith("spawn")
+  )
+    return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.windowsBlocked"), { cause }) });
 }
 
 function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
@@ -1518,33 +1583,89 @@ function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailur
 
 const VERIFICATION_RECORD_LAYOUT = 1;
 
+interface RuntimeVerification {
+  key: string;
+  versionChecked: boolean;
+  files: string[];
+}
+
+function verificationKey(spec: RuntimeSpec, lock: AgentRuntimeLock): string {
+  const subject =
+    spec.source === "lock"
+      ? [VERIFICATION_RECORD_LAYOUT, spec, lock[spec.runtime]]
+      : [VERIFICATION_RECORD_LAYOUT, spec.runtime, spec.target, spec.version, spec.source, spec.executableName];
+  return createHash("sha256").update(JSON.stringify(subject)).digest("hex");
+}
+
+function versionCheckRequired(spec: RuntimeSpec, isProviderOn: (provider: ManagedProviderId) => boolean): boolean {
+  return isManagedToolRuntime(spec.runtime) || isProviderOn(spec.runtime);
+}
+
+function verificationCovers(
+  verification: RuntimeVerification | null,
+  key: string,
+  versionChecked: boolean,
+  files: string[] | null,
+): verification is RuntimeVerification {
+  return (
+    verification !== null &&
+    files !== null &&
+    verification.key === key &&
+    (verification.versionChecked || !versionChecked) &&
+    verification.files.join("\n") === files.join("\n")
+  );
+}
+
+const verifyRuntimeFiles = Effect.fn("ProviderRuntime.verifyRuntimeFiles")(function* (
+  root: string,
+  spec: RuntimeSpec,
+  lock: AgentRuntimeLock,
+  isProviderOn: (provider: ManagedProviderId) => boolean,
+  before: string[] | null,
+): Effect.fn.Return<RuntimeVerification | null, ProviderRuntimeFailure> {
+  yield* verifyInstalledRuntime(root, spec, lock, isProviderOn);
+  if (before === null) return null;
+  const after = yield* runtimeFingerprint(root);
+  if (after === null || after.join("\n") !== before.join("\n")) {
+    logger.info("Provider runtime files changed during the check.", { runtime: spec.runtime, version: spec.version });
+    return null;
+  }
+  return { key: verificationKey(spec, lock), versionChecked: versionCheckRequired(spec, isProviderOn), files: after };
+});
+
 const verifyChangedRuntime = Effect.fn("ProviderRuntime.verifyChangedRuntime")(function* (
   root: string,
   spec: RuntimeSpec,
   lock: AgentRuntimeLock,
   isProviderOn: (provider: ManagedProviderId) => boolean,
+  verified: RuntimeVerification | null = null,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const recordPath = verificationRecordPath(root);
-  const key = createHash("sha256")
-    .update(JSON.stringify([VERIFICATION_RECORD_LAYOUT, spec, lock[spec.runtime]]))
-    .digest("hex");
-  const versionChecked = isManagedToolRuntime(spec.runtime) || isProviderOn(spec.runtime);
+  const key = verificationKey(spec, lock);
+  const versionChecked = versionCheckRequired(spec, isProviderOn);
   const before = yield* runtimeFingerprint(root);
-  const saved = yield* runtimeIO(() => readFile(recordPath, "utf8")).pipe(
+  if (verificationCovers(verified, key, versionChecked, before)) {
+    yield* writeVerificationRecord(recordPath, verified);
+    return;
+  }
+  const saved = yield* readVerificationRecord(recordPath);
+  if (verificationCovers(saved, key, versionChecked, before)) return;
+  const checked = yield* verifyRuntimeFiles(root, spec, lock, isProviderOn, before);
+  if (checked !== null) yield* writeVerificationRecord(recordPath, checked);
+});
+
+const readVerificationRecord = Effect.fn("ProviderRuntime.readVerificationRecord")(function* (recordPath: string) {
+  return yield* runtimeIO(() => readFile(recordPath, "utf8")).pipe(
     Effect.flatMap((text) => runtimeSync(() => parseVerificationRecord(text))),
     Effect.catch(() => Effect.succeed(null)),
   );
-  if (
-    before !== null &&
-    saved?.key === key &&
-    (saved.versionChecked || !versionChecked) &&
-    saved.files.join("\n") === before.join("\n")
-  )
-    return;
-  yield* verifyInstalledRuntime(root, spec, lock, isProviderOn);
-  const after = before === null ? null : yield* runtimeFingerprint(root);
-  if (after === null || after.join("\n") !== before?.join("\n")) return;
-  const record = `${JSON.stringify({ key, versionChecked, files: after })}\n`;
+});
+
+const writeVerificationRecord = Effect.fn("ProviderRuntime.writeVerificationRecord")(function* (
+  recordPath: string,
+  verification: RuntimeVerification,
+) {
+  const record = `${JSON.stringify(verification)}\n`;
   const staged = `${recordPath}.${process.pid}-${randomBytes(4).toString("hex")}`;
   yield* runtimeIO(async () => {
     await writeFile(staged, record);
@@ -1556,7 +1677,7 @@ function verificationRecordPath(root: string): string {
   return join(dirname(root), `.${basename(root)}.verified.json`);
 }
 
-function parseVerificationRecord(text: string): { key: string; versionChecked: boolean; files: string[] } | null {
+function parseVerificationRecord(text: string): RuntimeVerification | null {
   const value = JSON.parse(text);
   if (!isDynamicRecord(value) || !isString(value.key) || !isBoolean(value.versionChecked)) return null;
   const files = value.files;
@@ -1578,15 +1699,19 @@ const runtimeFingerprint = Effect.fn("ProviderRuntime.runtimeFingerprint")(funct
       lines.push(...nested);
     } else if (entry.isFile()) {
       const info = yield* runtimeIO(() => lstat(join(root, path), { bigint: true }));
-      lines.push([path, info.size, info.mtimeNs, info.ctimeNs, info.ino, info.dev].join("\0"));
+      lines.push([path, info.size, info.mtimeNs, fingerprintChangeTime(info), info.ino, info.dev].join("\0"));
     } else if (entry.isSymbolicLink()) {
       const info = yield* runtimeIO(() => lstat(join(root, path), { bigint: true }));
       const target = yield* runtimeIO(() => readlink(join(root, path)));
-      lines.push([path, "link", target, info.ctimeNs, info.ino, info.dev].join("\0"));
+      lines.push([path, "link", target, fingerprintChangeTime(info), info.ino, info.dev].join("\0"));
     } else return null;
   }
   return lines.sort();
 });
+
+function fingerprintChangeTime(info: BigIntStats): bigint | null {
+  return process.platform === "win32" ? null : info.ctimeNs;
+}
 
 const renameIfVacant = Effect.fn("ProviderRuntime.renameIfVacant")(function* (
   from: string,

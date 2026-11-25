@@ -41,6 +41,7 @@ const STOP_TIMEOUT_MS = {
   elevenlabs: 12_000,
   "voice-server": 125_000,
 } as const;
+const MODEL_LOAD_TIMEOUT_MS = 30_000;
 
 const SCRIBE_NOTICES: Record<ScribeFailure | ElevenLabsError["code"], DictationNotice> = {
   network: { title: "mobile.chat.dictation.stopped", message: "mobile.chat.liveVoice.networkNeeded" },
@@ -76,6 +77,8 @@ interface CaptureSession {
   recording: string[] | null;
   spokeAt: number | null;
   abort: AbortController;
+  ready: Promise<{ error: unknown } | null>;
+  loading: boolean;
   native: boolean;
   heard: boolean;
   listeningAt: number | null;
@@ -202,14 +205,14 @@ export function useModelDictation({
 
   const fail = useCallback(
     (current: CaptureSession, notice: DictationNotice, error?: unknown) => {
-      if (session.current !== current) return;
+      if (owner !== id || session.current !== current) return;
       current.ending = "operation_failed";
       speechNative?.cancelCapture?.();
       current.scribe?.cancel();
       settle();
       showNotice(notice, error);
     },
-    [settle],
+    [id, settle],
   );
 
   const showText = useCallback((current: CaptureSession, spoken: string) => {
@@ -280,7 +283,11 @@ export function useModelDictation({
               else showNotice(dictationFailedNotice, failure);
             },
           );
-        } else settle();
+        } else
+          void current.ready.then((failure) => {
+            if (failure) fail(current, modelLoadNotice, failure.error);
+            else if (session.current === current) settle();
+          });
       }),
     ];
     return () => {
@@ -302,6 +309,8 @@ export function useModelDictation({
         recording: engine === "voice-server" ? [] : null,
         spokeAt: null,
         abort: new AbortController(),
+        ready: Promise.resolve(null),
+        loading: false,
         native: false,
         heard: false,
         listeningAt: null,
@@ -325,15 +334,15 @@ export function useModelDictation({
             if (!useVoiceServer.getState().server?.routes.dictation)
               throw new VoiceServerError("address", sourceText("error.voice.server.routeOff"));
           } else if (engine !== "elevenlabs") {
-            try {
-              await loadLocalRecognizer(engine, LOCAL_MODEL_THREADS);
-            } catch (error) {
-              if (!stillCurrent()) return;
-              current.ending = "operation_failed";
-              settle();
-              showNotice(modelLoadNotice, error);
-              return;
-            }
+            current.loading = true;
+            current.ready = loadLocalRecognizer(engine, LOCAL_MODEL_THREADS)
+              .then(
+                () => null,
+                (error: unknown) => ({ error }),
+              )
+              .finally(() => {
+                current.loading = false;
+              });
           } else {
             const key = await readElevenLabsKey();
             if (!key) throw new ElevenLabsError("invalid-key");
@@ -358,6 +367,7 @@ export function useModelDictation({
           current.listeningAt = performance.now();
           update("listening");
           void haptics.impact("light");
+          void current.ready.then((failure) => failure && fail(current, modelLoadNotice, failure.error));
         } catch (error) {
           if (session.current !== current) return;
           current.native = false;
@@ -399,11 +409,14 @@ export function useModelDictation({
       update("stopping");
       void haptics.selection();
       speechNative?.finishCapture?.();
-      stopTimer.current = setTimeout(() => {
-        if (owner !== id || session.current !== current) return;
-        cancelNative(current);
-        settle();
-      }, STOP_TIMEOUT_MS[current.engine]);
+      stopTimer.current = setTimeout(
+        () => {
+          if (owner !== id || session.current !== current) return;
+          cancelNative(current);
+          settle();
+        },
+        STOP_TIMEOUT_MS[current.engine] + (current.loading ? MODEL_LOAD_TIMEOUT_MS : 0),
+      );
     });
   }, [cancelNative, id, settle, update]);
 

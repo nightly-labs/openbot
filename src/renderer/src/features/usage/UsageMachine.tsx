@@ -118,6 +118,7 @@ export function UsageMachine(props: { serverId: string }) {
       {(current) => (
         <UsageMachineMeter
           metrics={current().metrics}
+          hostedPlan={storageGb() !== null}
           onOpenStorage={() => openServerSettings(current().serverId, null, "storage")}
         />
       )}

@@ -1,6 +1,7 @@
 import {
   decodeWorkflowFoldersSnapshot,
   isWorkflowDetail,
+  isWorkflowFileSaveResult,
   isWorkflowGitHubCatalog,
   isWorkflowGitHubHistory,
   isWorkflowGitHubRepositoryOptions,
@@ -26,6 +27,7 @@ export const decodeWorkflowSummary = guardedDecoder(isWorkflowSummary, "workflow
 export const decodeWorkflowDetail = guardedDecoder(isWorkflowDetail, "workflow response");
 export const decodeWorkflowGraph = guardedDecoder(isWorkflowGraph, "workflow version response");
 export const decodeWorkflowSaveResult = guardedDecoder(isWorkflowSaveResult, "workflow save response");
+export const decodeWorkflowFileSaveResult = guardedDecoder(isWorkflowFileSaveResult, "workflow file export response");
 export const decodeWorkflowVersions = guardedListDecoder(isWorkflowVersion, "workflow versions response");
 export const decodeWorkflowRunDetail = guardedDecoder(isWorkflowRunDetail, "workflow run response");
 export const decodeWorkflowRunPage = guardedDecoder(isWorkflowRunPage, "workflow runs response");

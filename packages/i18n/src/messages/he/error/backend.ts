@@ -4,6 +4,8 @@ import type { messages as source } from "../../en/error/backend";
 export const messages = {
   "error.backend.eventsUnavailable": "אירועים אינם זמינים במארח הזה.",
   "error.backend.databaseIntegrity": "מסד הנתונים של OpenBot נכשל בבדיקת השלמות.",
+  "error.backend.creditsHoldAdminOnly": "רק בעלים או מנהל של השרת הזה יכולים לאפשר לסוכנים להשתמש בקרדיטים.",
+  "error.backend.creditsHoldShort": "עדיין אין מספיק קרדיטים.",
   "error.backend.webhookRouteLimit": "במארח אחד יכולות להיות לכל היותר {limit} שגרות webhook.",
   "error.backend.webhookSettingsInvalid": "יש לבדוק את הגדרות ה-webhook ולנסות שוב.",
   "error.backend.webhookSenderSecretInvalid":
@@ -51,6 +53,8 @@ export const messages = {
   "error.backend.browserUserControlUnsupported": "המארח המרוחק הזה אינו תומך בשליטה בלשונית דפדפן.",
   "error.backend.browserSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות מהמחשב הזה.",
   "error.backend.browserSignInOpenFailed": "OpenBot לא הצליח לפתוח את חלון ההתחברות.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot לא הצליח לטעון את הדף בחלון ההתחברות. בדקו את החיבור לאינטרנט, ואז פתחו שוב את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
   "error.backend.browserHttpSignInInactive": "האתר הזה כבר לא מבקש התחברות. יש לטעון מחדש את הדף כדי לנסות שוב.",
@@ -64,6 +68,11 @@ export const messages = {
     "הדחיסה אינה מקטינה את הצ'אט הזה: אחרי שתי דחיסות הוא עדיין תופס {percent}% מחלון ההקשר של המודל, ולכן OpenBot מפסיק לדחוס אותו. כלים והנחיות תופסים את רוב החלון. יש לכבות את שרתי ה-MCP או את השליטה במחשב שהסוכן הזה לא צריך, או לבחור מודל עם חלון גדול יותר. אחר כך יש להתחיל צ'אט חדש.",
   "error.backend.contextCompactionStopped":
     "שתי דחיסות של הצ'אט הזה נכשלו ברצף, ולכן OpenBot מפסיק לדחוס אותו אוטומטית. כל ניסיון שולח את כל הצ'אט למודל וצורך ממגבלת התוכנית שלך. יש לבחור Compact now כדי לנסות שוב, או להתחיל צ'אט חדש.",
+  "error.backend.contextCompactionRetrying":
+    "הספק לא הצליח לדחוס את הצ'אט הזה ומנסה שוב. הודעות חדשות בצ'אט הזה ממתינות עד שהדחיסה תסתיים. אם היא לא תסתיים בקרוב, OpenBot יעצור אותה וישלח את ההודעות שלך.",
+  "error.backend.contextCompactionFailed": "דחיסת הצ'אט הזה נכשלה. הצ'אט לא השתנה. הודעות ממתינות נשלחות עכשיו לסוכן.",
+  "error.backend.contextCompactionTimedOut":
+    "דחיסת הצ'אט הזה נמשכה יותר מדי זמן, ולכן OpenBot עצר אותה. הצ'אט לא השתנה. הודעות ממתינות נשלחות עכשיו לסוכן.",
   "error.backend.providerModelAtCapacity":
     "המודל בעומס מלא. הספק ינסה שוב בעוד כמה דקות. כדי להמשיך עכשיו, עצור את התור ובחר מודל אחר.",
   "error.backend.providerRetrying":
@@ -84,6 +93,8 @@ export const messages = {
   "error.backend.channelCompactNoSession": "לחברי הערוץ הזה אין עדיין שיחה לדחוס. דחסו אותו אחרי שחבר עונה בערוץ.",
   "error.backend.channelCompactNotSupported":
     "אף חבר בערוץ הזה לא יכול לדחוס לפי בקשה. חברים שתומכים בזה דוחסים את ההקשר שלהם אוטומטית כשהוא כמעט מלא.",
+  "error.backend.channelCompactProviderUnavailable":
+    "הספק של חברי הערוץ לא עובד כרגע. יש לרענן את הספקים, ואז לדחוס שוב את הערוץ.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
   "error.backend.channelArchiveRunning": "יש לעצור את העבודה הפעילה בערוץ הזה ואז למחוק אותו.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",
@@ -99,6 +110,11 @@ export const messages = {
   "error.backend.channelRoutingFailed": "הניתוב נכשל. יש לבחור חבר או לנסות שוב.",
   "error.backend.channelLeadTimedOut": "מוביל הערוץ לא ענה בזמן. יש לבחור חבר או לנסות שוב.",
   "error.backend.channelLeadFailed": "מוביל הערוץ לא הצליח לנתב את ההודעה הזו. יש לבחור חבר או לנסות שוב.",
+  "error.backend.channelLeadBusy": "המודל של מוביל הערוץ עמוס כרגע. יש לנסות שוב בעוד כמה דקות, או לבחור חבר.",
+  "error.backend.channelLeadOffline": "המודל של מוביל הערוץ איבד את החיבור. יש לנסות שוב, או לבחור חבר.",
+  "error.backend.channelLeadSignIn": "פג תוקף ההתחברות לספק של מוביל הערוץ. יש להתחבר שוב, או לבחור חבר.",
+  "error.backend.channelLeadModelGone": "המודל של מוביל הערוץ לא זמין. יש לבחור מודל אחר למוביל, או לבחור חבר.",
+  "error.backend.channelLeadRefused": "המודל של מוביל הערוץ דחה את הבקשה. יש לבחור חבר, או מודל אחר למוביל.",
   "error.backend.channelRequestMemberRequired": "יש לבחור חבר לבקשה הזו.",
   "error.backend.channelDeliveryNotCreated": "מסירת הערוץ לא נוצרה.",
   "error.backend.channelAssignmentStopped": "הקצאת הערוץ הזו נעצרה או הוחלפה.",
@@ -119,6 +135,9 @@ export const messages = {
   "error.backend.routineRunFailedNoReason":
     "ההרצה נעצרה עם שגיאה, אך לא התקבלה סיבה. פתחו את ההרצה כדי לראות מה הסוכן עשה.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} לא אישר בזמן שהוא התחיל את ההודעה הזו. OpenBot לא שולח אותה שוב, כדי שהעבודה לא תרוץ פעמיים. OpenBot ממתין עד 5 דקות שהסוכן יתחיל.",
+  "error.backend.turnStartAbandoned": "הסוכן לא התחיל את ההודעה הזו תוך 5 דקות. שלחו את ההודעה שוב.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",
   "error.backend.channelMemoryLimit": "בערוץ יכולים להיות עד {limit} זיכרונות.",
@@ -231,8 +250,12 @@ export const messages = {
   "error.backend.mcpServerLimit": "OpenBot שומר עד {limit} שרתי MCP.",
   "error.backend.mcpServerNameTaken": "כבר קיים שרת MCP בשם {name}.",
   "error.backend.mcpServerInvalid": "OpenBot אינו יכול לשמור את תצורת שרת ה-MCP הזו.",
+  "error.backend.mcpHeaderNameInvalid":
+    "שמות כותרות לא יכולים להכיל רווחים או סמלים כמו : ( ) /. השתמשו בשם כמו Authorization, והזינו את המפתח או האסימון בשדה ערך.",
   "error.backend.mcpServerNoAnswer": "השרת לא ענה תוך {seconds} שניות.",
   "error.backend.mcpSignInNotAccepted": "השרת לא קיבל את ההתחברות הזו.",
+  "error.backend.mcpSignInGrantRefused":
+    "השרת לא קיבל את ההתחברות. התחבר שוב. אם הבעיה נמשכת, ודא שהחשבון שלך נמצא באותו אתר או אזור כמו האפליקציה הזו.",
   "error.backend.mcpSignInAccountRefused":
     "השרת דחה את החשבון שאיתו התחברת. יש לוודא שלחשבון הזה יש גישה לשירות. כדי להשתמש בחשבון אחר, יש להתנתק ואז להתחבר שוב.",
   "error.backend.mcpSignInClientRefused":
@@ -266,7 +289,10 @@ export const messages = {
     "שרת ההתחברות שלח תשובה ש-OpenBot לא יכול לקרוא. אם השירות נותן לך מפתח API או טוקן, יש להוסיף אותו להגדרות של השרת הזה ולבדוק שוב את החיבור.",
   "error.backend.mcpServerExited": "השרת נעצר לפני שענה. יש להריץ את הפקודה במסוף כדי לראות את השגיאה שלו.",
   "error.backend.mcpServerExitedWithOutput": "השרת נעצר לפני שענה. הוא כתב: {detail}",
+  "error.backend.mcpServerDownloadFailed": "השרת לא התחיל, כי ההורדה שלו נכשלה. בדקו את החיבור לאינטרנט ונסו שוב.",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot לא הצליח להפעיל את שרת ה-MCP {name}, כי התוכנה שלו לא מותקנת במחשב שמריץ את OpenBot. יש להתקין את האפליקציה שמספקת את {name} במחשב הזה, או לכבות את {name} בחנות, אפליקציות.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} הפסיק לחכות לפני שהשרת התחיל, ולכן הסוכנים שלו לא מקבלים את הכלים של השרת הזה.",
   "error.backend.mcpServerStoppedDuringCall": "שרת ה-MCP נעצר לפני שענה לקריאה הזו.",
@@ -274,6 +300,8 @@ export const messages = {
     "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Sign in.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש מפתח. יש לפתוח את {name} בחנות, אפליקציות, לבחור עריכה ולהזין את המפתח הנכון בכותרות.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Test connection כדי לראות את הסיבה.",
   "error.backend.mcpServerFailedInProvider":
@@ -387,6 +415,8 @@ export const messages = {
   "error.backend.browserCertificateUntrusted": "תעודת האבטחה של האתר הזה אינה מהימנה, ולכן הדף לא נפתח.",
   "error.backend.browserLowMemory":
     "בשרת הזה נותר מעט זיכרון, ולכן הדפדפן אינו יכול לפתוח לשונית נוספת. יש לסגור לשונית או להמתין לסיום העבודה של סוכנים אחרים.",
+  "error.backend.browserNoMemory":
+    "הזיכרון בשרת הזה כמעט נגמר, ולכן הדפדפן אינו יכול לפתוח לשונית כרגע. יש להמתין לסיום העבודה של סוכנים אחרים ולנסות שוב.",
   "error.backend.browserOpenFailed": "לא ניתן לפתוח את {url}: {reason}",
   "error.backend.popupSecureInput":
     "חלונות קופצים חסומים בזמן קלט מאובטח. יש לסיים או לבטל את הקלט המאובטח ולנסות שוב מהדף.",

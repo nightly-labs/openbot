@@ -1,5 +1,6 @@
 import BrowserFullView from "@openbot/ui/features/browser/BrowserFullView";
 import BrowserLocalSignInDialog from "@openbot/ui/features/browser/BrowserLocalSignInDialog";
+import type { BrowserPageMenu } from "@openbot/ui/features/browser/browser-page-cover";
 import { useText } from "@openbot/ui/text";
 import { createMemo, onCleanup, Show } from "solid-js";
 import { browserSessionHistory, canReopenBrowserTab } from "../browser/browser-tab-session";
@@ -10,7 +11,12 @@ import { browserTeachFile, browserTeachSteps } from "./browser-teach-message";
 import { conversationPort } from "./conversation-port";
 import { useConversationViewScope } from "./conversation-scope";
 
-export default function BrowserFullViewAdapter() {
+export interface BrowserPaneMode {
+  open: boolean;
+  coveringMenus: readonly (BrowserPageMenu | undefined)[];
+}
+
+export default function BrowserFullViewAdapter(adapter: { pane?: BrowserPaneMode | undefined }) {
   const {
     props,
     activeBrowserTab,
@@ -27,6 +33,8 @@ export default function BrowserFullViewAdapter() {
     answerBrowserHttpSignIn,
     setActiveRightPanel,
     setBrowserSurfaceElement,
+    setBrowserPaneSurfaceElement,
+    releaseBrowserPaneSurface,
     showBrowserPip,
     localSignIn,
     browserTeach,
@@ -61,13 +69,22 @@ export default function BrowserFullViewAdapter() {
     };
   });
 
-  onCleanup(localSignIn.cancel);
+  let paneSurface: HTMLDivElement | undefined;
+  const setPaneSurface = (element: HTMLDivElement | undefined) => {
+    paneSurface = element;
+    setBrowserPaneSurfaceElement(element);
+  };
+  if (adapter.pane) onCleanup(() => releaseBrowserPaneSurface(paneSurface));
+  else onCleanup(localSignIn.cancel);
+  const full = () => adapter.pane === undefined;
 
   return (
     <BrowserFullView
-      open={browserExpandedOpen()}
+      open={adapter.pane ? adapter.pane.open : browserExpandedOpen()}
+      pane={adapter.pane !== undefined}
+      coveringMenus={adapter.pane?.coveringMenus}
       macWindowControls={props.platform === "darwin"}
-      shortcuts={props.runtime ? undefined : props.platform === "darwin" ? "mac" : "pc"}
+      shortcuts={props.runtime || !full() ? undefined : props.platform === "darwin" ? "mac" : "pc"}
       tabs={controls.tabs()}
       activeTab={activeBrowserTab()}
       history={browserSessionHistory(controls.serverId())}
@@ -88,7 +105,7 @@ export default function BrowserFullViewAdapter() {
       onOpenAddress={(url, tabId) => void openBrowserAddress(url, tabId === undefined)}
       canEnterPip={browserCanDetach()}
       canOpenWindow={browserCanDetach()}
-      onSurface={setBrowserSurfaceElement}
+      onSurface={full() ? setBrowserSurfaceElement : setPaneSurface}
       liveViewTabId={
         props.server?.kind === "remote" && serverSupportsCapability(props.server, "browser-view")
           ? (activeBrowserTab()?.id ?? null)
@@ -97,18 +114,23 @@ export default function BrowserFullViewAdapter() {
       liveViewRuntime={props.browserRuntime ?? conversationPort().browser}
       liveViewClipboard={serverSupportsCapability(props.server, "browser-view-clipboard")}
       onBack={() => setActiveRightPanel("browser")}
+      onOpenFullView={full() ? undefined : () => setActiveRightPanel("browser-expanded")}
       onEnterPip={props.runtime ? () => undefined : showBrowserPip}
       onOpenWindow={windowOpener()}
-      onSignInLocally={localSignIn.canStart(activeBrowserTab()) ? localSignIn.start : undefined}
+      onSignInLocally={full() && localSignIn.canStart(activeBrowserTab()) ? localSignIn.start : undefined}
       onHttpSignIn={
         props.server?.kind !== "remote" || serverSupportsCapability(props.server, "browser-http-sign-in")
           ? answerBrowserHttpSignIn
           : undefined
       }
-      teach={teach()}
-      dock={<BrowserDockAdapter tab={activeBrowserTab()} overlay={!props.runtime && props.server?.kind === "local"} />}
+      teach={full() ? teach() : undefined}
+      dock={
+        <Show when={full()}>
+          <BrowserDockAdapter tab={activeBrowserTab()} overlay={!props.runtime && props.server?.kind === "local"} />
+        </Show>
+      }
       dialogs={
-        <Show when={localSignIn.state()}>
+        <Show when={full() && localSignIn.state()}>
           {(current) => (
             <BrowserLocalSignInDialog
               open

@@ -12,6 +12,7 @@ import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { McpAccessSection } from "@/features/servers/components/mcp-access-section";
 import { ListField, PairField } from "@/features/servers/components/repeatable-fields";
+import { SignInSteps } from "@/features/servers/components/sign-in-steps";
 import {
   type McpServerDraft,
   mcpServerConfig,
@@ -130,14 +131,19 @@ function McpServerForm({
   const enabled = saved?.enabled ?? newEnabled;
   const config = mcpServerConfig(draft, saved?.id ?? "", enabled);
   const errors = mcpServerDraftErrors(config);
-  const valid = !errors.name && !errors.command && !errors.url;
+  const valid = !errors.name && !errors.command && !errors.url && !errors.headers;
   const dirty = mcpServerDraftChanged(draft, saved);
   const signedIn =
     saved?.transport === "http" &&
     Boolean(mcp.signIns.data?.some((state) => state.mcpServerId === saved.id && state.signedIn));
+  const signInsKnown = mcp.signIns.isSuccess;
   const testAsksSignIn = test?.status === "done" && isSignInError(test.result.error);
   const showSignIn =
-    canRelay && saved?.transport === "http" && !dirty && !signedIn && (signInRequested || testAsksSignIn || signingIn);
+    canRelay &&
+    saved?.transport === "http" &&
+    !dirty &&
+    !signedIn &&
+    (signInsKnown || signInRequested || testAsksSignIn || signingIn);
   const busy = action.isPending || test?.status === "testing" || signingIn;
 
   useDiscardGuard((dirty || action.isPending) && !leaving, { busy: () => action.isPending, warn: true });
@@ -358,7 +364,7 @@ function McpServerForm({
           />
           <PairField
             title={t("mobile.server.mcp.headers")}
-            footer={t("mobile.server.mcp.headersHint")}
+            footer={errors.headers ? sourceText(errors.headers) : t("mobile.server.mcp.headersHint")}
             items={draft.headers}
             maxItems={INPUT_LIMITS.mcpHeaders}
             maxKeyLength={INPUT_LIMITS.mcpEnvName}
@@ -408,6 +414,19 @@ function McpServerForm({
       </SettingsSection>
       {showSignIn ? (
         <View className="gap-3">
+          {relayPage?.paste && saved ? (
+            <SettingsSection>
+              <SignInSteps
+                steps={[
+                  t("mobile.marketplace.app.stepOpen", { name: saved.name }),
+                  t("mobile.marketplace.app.stepAllow"),
+                  t("mobile.marketplace.app.stepBlank"),
+                  t("mobile.marketplace.app.stepCopy"),
+                  t("mobile.marketplace.app.stepPaste"),
+                ]}
+              />
+            </SettingsSection>
+          ) : null}
           <SettingsSection footer={relay.error ?? t("mobile.marketplace.app.signInIntro")}>
             <SettingsRow
               disclosure={false}
@@ -428,7 +447,6 @@ function McpServerForm({
             <View className="gap-3">
               <SheetFormField
                 label={t("mobile.marketplace.app.pasteLabel")}
-                hint={t("mobile.marketplace.app.pasteHint")}
                 placeholder={RELAY_PASTE_PLACEHOLDER}
                 value={address}
                 autoCapitalize="none"

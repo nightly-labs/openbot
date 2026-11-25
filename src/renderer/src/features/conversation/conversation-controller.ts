@@ -166,7 +166,7 @@ export function createStableConversationState(
   const attachmentUploads = createAttachmentUploadStore();
   const [conversationErrors, setConversationErrors] = createSignal<Record<string, string>>({});
   const [conversationErrorRuns, setConversationErrorRuns] = createSignal<
-    Record<string, { message: string; run: string | null; link?: string; details?: string }>
+    Record<string, { message: string; run: string | null; link?: string; details?: string; notice?: true }>
   >({});
   createEffect(
     () => {
@@ -446,6 +446,7 @@ export function createServerConversationState(keepSidePanelFiles = false) {
   } | null>(null);
   const [sidePanels, setSidePanels] = createStore<SidePanelsState>({
     side: storedSidePanels.side,
+    splits: {},
     subagents: {},
     threads: {},
   });

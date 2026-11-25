@@ -91,10 +91,18 @@ export async function routeStorage(
       const input = parseGetStorageUsageInput(body);
       requireVisibleBodyAgent(body, hiddenAgentIds);
       const living = canAdministerServer(member.role) ? null : agentIds();
-      return json(
-        200,
-        await visibleStorage(await runCauseEffect(storage.usage(input)), hiddenAgentIds, living, workflowIds),
+      const visible = agentVisibility(hiddenAgentIds, living);
+      const shownWorkflows = visible ? await workflowIds() : null;
+      const listed = await runCauseEffect(
+        storage.usage(
+          input,
+          visible && shownWorkflows
+            ? (file) => visibleFile(file, visible(file.agentId), shownWorkflows).length > 0
+            : undefined,
+        ),
       );
+      const readWorkflows = shownWorkflows ? () => Promise.resolve(shownWorkflows) : workflowIds;
+      return json(200, await visibleStorage(listed, hiddenAgentIds, living, readWorkflows));
     }
     if (deleteFile) {
       const { fileId } = parseDeleteStoredFileInput(body);
@@ -108,19 +116,26 @@ export async function routeStorage(
   return json(200, {});
 }
 
+function agentVisibility(
+  hiddenAgentIds: ReadonlySet<string>,
+  livingAgentIds: ReadonlySet<string> | null,
+): ((agentId: string | null) => boolean) | null {
+  if (hiddenAgentIds.size === 0 && livingAgentIds === null) return null;
+  return (agentId) =>
+    agentId !== null && !hiddenAgentIds.has(agentId) && (livingAgentIds === null || livingAgentIds.has(agentId));
+}
+
 async function visibleStorage(
   usage: StorageUsage,
   hiddenAgentIds: ReadonlySet<string>,
   livingAgentIds: ReadonlySet<string> | null,
   workflowIds: () => Promise<ReadonlySet<string>>,
 ): Promise<StorageUsage> {
-  const filtersAgents = hiddenAgentIds.size > 0 || livingAgentIds !== null;
+  const agentVisible = agentVisibility(hiddenAgentIds, livingAgentIds);
   const tagged = usage.files.some((file) => file.workflow !== undefined);
-  if (!filtersAgents && !tagged) return usage;
+  if (!agentVisible && !tagged) return usage;
   const shownWorkflows = tagged ? await workflowIds() : new Set<string>();
-  const visible = (agentId: string | null) =>
-    !filtersAgents ||
-    (agentId !== null && !hiddenAgentIds.has(agentId) && (livingAgentIds === null || livingAgentIds.has(agentId)));
+  const visible = (agentId: string | null) => !agentVisible || agentVisible(agentId);
   return {
     ...usage,
     agents: usage.agents.filter((row) => visible(row.agentId)),

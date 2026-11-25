@@ -1,12 +1,3 @@
-// Frozen optional browser HTTP sign-in wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a signed-in member who can see
-// a host browser tab answers the sign-in prompt that the site of that tab shows itself (HTTP Basic or
-// Digest), with a username and a password. The host asks only for a page load over HTTPS, never for a
-// proxy. It keeps the answer in memory for one try at the same site and realm, loads the page again,
-// and forgets the answer after that try. The host never sends the answer back and never records it.
-// `refused` says that the site did not accept the last answer. Bounds and meaning do not follow IPC
-// changes; widening any of it needs a second capability string.
 import { isBoolean, isDynamicRecord, isString } from "../runtime-values";
 import {
   type AdminDecoder,
@@ -51,10 +42,8 @@ export const BROWSER_HTTP_SIGN_IN_CODECS: ReadonlyMap<string, OptionalRouteCodec
   [BROWSER_HTTP_SIGN_IN_ROUTES.answer, adminRoute(answerRequest, snapshot)],
 ]);
 
-/** A site's own sign-in prompt in a tab. */
 export type BrowserHttpSignInPrompt = { tabId: string; origin: string; refused: boolean };
 export type BrowserHttpSignInSnapshot = { tabs: BrowserHttpSignInPrompt[] };
-/** `cancel` closes the prompt; the page keeps what the site sent without a sign-in. */
 export type BrowserHttpSignInAnswer = { tabId: string } & ({ username: string; password: string } | { cancel: true });
 
 function httpsOrigin(value: string): boolean {
@@ -84,7 +73,6 @@ export function decodeBrowserHttpSignInSnapshot(input: unknown): BrowserHttpSign
   return { tabs: signInPrompts(isDynamicRecord(input) ? input.tabs : undefined) };
 }
 
-/** Never include the rejected payload in validation errors. */
 export function decodeBrowserHttpSignInAnswer(input: unknown): BrowserHttpSignInAnswer {
   let decoded: unknown;
   try {

@@ -1,4 +1,10 @@
-import type { AgentModelOption, AgentReasoningEffort, AgentSummary, UpdateAgentInput } from "@openbot/contracts/ipc";
+import type {
+  AgentModelChoice,
+  AgentModelOption,
+  AgentReasoningEffort,
+  AgentSummary,
+  UpdateAgentInput,
+} from "@openbot/contracts/ipc";
 import {
   CUSTOM_AGENT_DEFAULT_MODEL,
   CUSTOM_PROVIDER_HARNESSES,
@@ -9,6 +15,7 @@ import {
   isCustomProviderHarness,
   isReasoningEffort,
   PICKER_PROVIDERS,
+  savedCustomModelId,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Exit, Schema, Semaphore } from "effect";
@@ -30,13 +37,15 @@ export interface CustomEndpointsHooks {
   modelsChanged(): void;
   stopProfileClients(): Effect.Effect<void>;
   emitError(code: string, error: unknown, agentId?: string): void;
+  removedModelBackup(agent: AgentSummary): UpdateAgentInput | null;
+  noteModelRemoved(agent: AgentSummary, removed: AgentModelChoice): void;
   providerAvailable(provider: AgentProvider): boolean;
   preference(): ProviderPreference;
 }
 
 interface SavedEndpoint {
   readonly harness: CustomProviderHarness;
-  readonly models: readonly string[];
+  readonly modelIds: readonly string[];
 }
 
 function choiceKey(provider: string, model: string): string {
@@ -68,6 +77,7 @@ export class CustomEndpoints {
   #committedRevision = 0;
   readonly #chain = Semaphore.makeUnsafe(1);
   readonly #pendingMoves = new Map<string, { endpointId: string; harness: CustomProviderHarness }>();
+  readonly #unlistedAtLastStart = new Map<string, string>();
 
   constructor(options: CustomEndpointsOptions) {
     this.#store = options.store;
@@ -94,8 +104,10 @@ export class CustomEndpoints {
       if (!isCustomProviderHarness(option.provider)) continue;
       const separator = option.id.indexOf("/");
       if (separator <= 0) continue;
-      const endpoint = endpoints.get(option.id.slice(0, separator));
-      if (endpoint?.harness !== option.provider || savesModel(endpoint.models, option.id)) continue;
+      const endpointId = option.id.slice(0, separator);
+      const endpoint = endpoints.get(endpointId);
+      if (endpoint?.harness !== option.provider) continue;
+      if (savesModel(listedModelIds(endpointId, endpoint.harness, endpoint.modelIds), option.id)) continue;
       inUse ??= this.#modelsInUse();
       if (!inUse.has(choiceKey(option.provider, option.id))) added.add(option);
     }
@@ -242,18 +254,14 @@ export class CustomEndpoints {
   ) {
     if (removed.size === 0) return;
     const prefix = `${providerId}/`;
-    const remaining = this.available().filter(
-      (option) => !(option.id.startsWith(prefix) && removed.has(option.id.slice(prefix.length))),
+    const removedIds = new Set(
+      CUSTOM_PROVIDER_HARNESSES.flatMap((harness) => listedModelIds(providerId, harness, [...removed])),
     );
+    const remaining = this.available().filter((option) => !removedIds.has(option.id));
     for (const harness of CUSTOM_PROVIDER_HARNESSES) {
       const affected = this.#store
         .list()
-        .filter(
-          (agent) =>
-            providerForAgent(agent) === harness &&
-            agent.model.startsWith(prefix) &&
-            removed.has(agent.model.slice(prefix.length)),
-        );
+        .filter((agent) => providerForAgent(agent) === harness && removedIds.has(agent.model));
       if (affected.length === 0) continue;
       const fallback =
         remaining.find((option) => option.provider === harness && option.id.startsWith(prefix)) ??
@@ -398,7 +406,8 @@ export class CustomEndpoints {
   ) {
     const models = this.available().filter((model) => model.provider === harness);
     for (const agent of this.#waitingFor(harness)) {
-      const target = models.find((model) => model.id === agent.model);
+      const moved = this.#modelOnHarness(agent, harness);
+      const target = models.find((model) => model.id === moved);
       if (!target) continue;
       this.#pendingMoves.delete(agent.id);
       yield* this.#hooks
@@ -432,6 +441,15 @@ export class CustomEndpoints {
 
   waitsForHarness(harness: CustomProviderHarness): boolean {
     return this.#waitingFor(harness).length > 0;
+  }
+
+  #modelOnHarness(agent: AgentSummary, harness: CustomProviderHarness): string {
+    const from = providerForAgent(agent);
+    const endpointId = endpointOfModel(agent.model);
+    const endpoint = endpointId ? this.#hooks.savedEndpoints().get(endpointId) : undefined;
+    if (!endpointId || !endpoint || !isCustomProviderHarness(from)) return agent.model;
+    const id = endpoint.modelIds.find((modelId) => savedCustomModelId(endpointId, from, modelId) === agent.model);
+    return id === undefined ? agent.model : savedCustomModelId(endpointId, harness, id);
   }
 
   #waitingFor(harness: CustomProviderHarness): AgentSummary[] {
@@ -515,6 +533,23 @@ export class CustomEndpoints {
     );
   }
 
+  moveAgentsOffModelsUnlistedTwice(provider: AgentProvider): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      const models = this.available().filter((model) => model.provider === provider);
+      if (models.length === 0) return Effect.void;
+      const unlisted = new Map(this.#agentsOffList(provider, models).map((agent) => [agent.id, agent.model]));
+      const twice = new Set<string>();
+      for (const agent of this.#store.list()) {
+        if (providerForAgent(agent) !== provider) continue;
+        const model = unlisted.get(agent.id);
+        if (model === undefined) this.#unlistedAtLastStart.delete(agent.id);
+        else if (this.#unlistedAtLastStart.get(agent.id) === model) twice.add(agent.id);
+        else this.#unlistedAtLastStart.set(agent.id, model);
+      }
+      return twice.size ? this.moveAgentsOffUnlistedModels(provider, twice) : Effect.void;
+    });
+  }
+
   readonly moveAgentsOffUnlistedModels = Effect.fn("CustomEndpoints.moveAgentsOffUnlistedModels")(function* (
     this: CustomEndpoints,
     provider: AgentProvider,
@@ -527,30 +562,47 @@ export class CustomEndpoints {
       const listed = this.#agentModels(provider, agent, models) ?? models;
       const variant = provider === "acp" ? null : effortVariant(listed, agent.model);
       const family = provider === "acp" || variant ? null : newestOfFamily(listed, agent.model);
-      const fallback =
+      const nearest =
         variant?.model ??
         family ??
         (provider === "acp"
           ? listed.find((model) => sameCustomAgent(model.id, agent.model) && !isCustomAgentDefaultModel(model.id))
-          : providerFallback);
-      if (!fallback) continue;
+          : undefined);
+      const backup = nearest || provider === "acp" ? null : this.#hooks.removedModelBackup(agent);
+      const fallback = nearest ?? (provider === "acp" ? undefined : providerFallback);
       const keptEffort =
         family && family.reasoningEffortConfigurable !== false
           ? ([effortInModelId(agent.model), agent.reasoningEffort].find(
               (effort) => effort !== null && family.supportedReasoningEfforts.includes(effort),
             ) ?? null)
           : null;
-      yield* this.#hooks
-        .applyAgentUpdate({
-          agentId: agent.id,
-          model: fallback.id,
-          reasoningEffort: variant?.effort ?? keptEffort ?? fallback.defaultReasoningEffort,
-        })
+      const moves = [
+        ...(backup ? [backup] : []),
+        ...(fallback
+          ? [
+              {
+                agentId: agent.id,
+                model: fallback.id,
+                reasoningEffort: variant?.effort ?? keptEffort ?? fallback.defaultReasoningEffort,
+              },
+            ]
+          : []),
+      ];
+      if (moves.length === 0) continue;
+      const removed: AgentModelChoice = {
+        provider,
+        model: agent.model,
+        ...(agent.providerAccountId ? { providerAccountId: agent.providerAccountId } : {}),
+      };
+      yield* Effect.firstSuccessOf(moves.map((move) => Effect.suspend(() => this.#hooks.applyAgentUpdate(move))))
         .pipe(toEndpointChangeFailed)
         .pipe(
-          Effect.catch((failure) =>
-            Effect.sync(() => this.#hooks.emitError("agent_model_fallback_failed", failure.cause, agent.id)),
-          ),
+          Effect.match({
+            onFailure: (failure) => this.#hooks.emitError("agent_model_fallback_failed", failure.cause, agent.id),
+            onSuccess: (moved) => {
+              if (!variant) this.#hooks.noteModelRemoved(moved, removed);
+            },
+          }),
         );
     }
   }, Effect.uninterruptible).bind(this);
@@ -562,6 +614,10 @@ export class CustomEndpoints {
       (agent.threadId ? this.#store.database.readConversationRuntime(agent.id, agent.threadId).activeTurnId : null);
     return Boolean(active);
   }
+}
+
+function listedModelIds(endpointId: string, harness: CustomProviderHarness, modelIds: readonly string[]): string[] {
+  return modelIds.map((modelId) => savedCustomModelId(endpointId, harness, modelId));
 }
 
 function endpointOfModel(model: string): string | null {

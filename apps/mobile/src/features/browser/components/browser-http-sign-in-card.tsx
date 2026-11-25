@@ -11,7 +11,6 @@ import { haptics } from "@/shared/lib/haptics";
 import { selectionColorProps } from "@/shared/lib/selection-color";
 import { useText } from "@/shared/lib/text";
 
-/** The sign-in that a site asks for in its own prompt (HTTP Basic or Digest), above the page. */
 export function BrowserHttpSignInCard({
   site,
   refused,

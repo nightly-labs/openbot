@@ -18,7 +18,7 @@ export const messages = {
   "mobile.onboarding.server.invitationBody": "다른 사람이 공유한 서버에 참여해요.",
   "mobile.onboarding.server.computerTitle": "컴퓨터 연결",
   "mobile.onboarding.server.computerSteps":
-    "먼저 이 휴대폰에서 로그아웃하세요. 그런 다음 컴퓨터에서 OpenBot을 열고 설정 → Mobile Connect로 이동해 QR 코드 생성을 선택한 후 이 휴대폰으로 스캔하세요.",
+    "먼저 이 휴대폰에서 로그아웃하세요. 그런 다음 컴퓨터에서 OpenBot을 열고 설정 → 모바일 연결로 이동해 휴대폰 추가 → 예, 로그인을 선택한 후 이 휴대폰으로 코드를 스캔하세요.",
   "mobile.onboarding.server.signOut": "로그아웃",
   "mobile.onboarding.server.connecting": "{name}에 연결 중…",
   "mobile.onboarding.agent.title": "첫 에이전트를 골라보세요",

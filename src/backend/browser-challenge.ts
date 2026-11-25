@@ -214,7 +214,6 @@ const NEEDS_USER_NEXT =
 const HTTP_SIGN_IN_NEXT =
   "The site asks for a username and password in its own sign-in prompt, not in the page, so the page has no fields to fill. Call request_takeover: the user types them in the sign-in box of the browser. Never ask for them in chat. In a routine run, report the sign-in requirement.";
 
-/** The challenge of a tab whose site asks for a sign-in in its own prompt (HTTP Basic or Digest). */
 export function httpSignInChallenge(): BrowserChallenge {
   return { vendor: "http-sign-in", status: "needs-user", waitedMs: 0, next: HTTP_SIGN_IN_NEXT };
 }

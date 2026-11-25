@@ -13,7 +13,6 @@ export interface MobileBrowserTabs {
   activeTabId: string | null;
 }
 
-/** The sign-in prompt that the site of a tab shows itself, by tab id. */
 export type MobileHttpSignIns = Record<string, { origin: string; refused: boolean }>;
 
 export function mobileHttpSignIns(

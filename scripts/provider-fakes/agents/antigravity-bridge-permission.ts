@@ -2,9 +2,15 @@ import type { ToolKind } from "@agentclientprotocol/sdk";
 import { logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" };
-const toolCalls: { toolCallId: string; title: string; kind: ToolKind; rawInput?: unknown }[] = JSON.parse(
-  process.env.FAKE_TOOL_CALLS ?? "[]",
-);
+const toolCalls: {
+  toolCallId: string;
+  title: string;
+  kind: ToolKind;
+  rawInput?: unknown;
+  locations?: { path: string }[];
+  idOnlyPermission?: true;
+  untitledPermission?: true;
+}[] = JSON.parse(process.env.FAKE_TOOL_CALLS ?? "[]");
 let sessions = 0;
 
 function selectedOption(reply: unknown): string {
@@ -29,11 +35,15 @@ serveFakeAcpAgent({
   "session/resume": (request, peer) => peer.reply(request, { models: MODELS }),
   "session/prompt": async (request, peer) => {
     const sessionId = request.params.sessionId ?? "";
-    for (const toolCall of toolCalls) {
+    for (const { idOnlyPermission, untitledPermission, ...toolCall } of toolCalls) {
       peer.update(sessionId, { sessionUpdate: "tool_call", status: "pending", ...toolCall });
       const reply = await peer.ask("session/request_permission", {
         sessionId,
-        toolCall: { ...toolCall, status: "pending" },
+        toolCall: untitledPermission
+          ? { toolCallId: toolCall.toolCallId }
+          : idOnlyPermission
+            ? { toolCallId: toolCall.toolCallId, title: toolCall.title }
+            : { ...toolCall, status: "pending" },
         options: [
           { optionId: "allow", name: "Allow", kind: "allow_once" },
           { optionId: "reject", name: "Reject", kind: "reject_once" },

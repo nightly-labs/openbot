@@ -17,7 +17,7 @@ import Animated, {
 import Svg, { Circle, Line, Rect } from "react-native-svg";
 import { useCSSVariable } from "uniwind";
 import { formatRunDuration } from "@/features/workflows/model/workflow-duration";
-import { STEP_STATUS_LABEL } from "@/features/workflows/model/workflow-steps";
+import { stepStatusLabel } from "@/features/workflows/model/workflow-steps";
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
@@ -166,9 +166,10 @@ export function RunStepStatus({ step }: { step: WorkflowStep | undefined }) {
     "--openbot-danger-text",
   ]);
   const status = step?.status;
-  const elapsed = useElapsed(status === "running" ? (step?.startedAt ?? null) : null);
+  const timed = status === "running" && !step?.waiting;
+  const elapsed = useElapsed(timed ? (step?.startedAt ?? null) : null);
   const took = step?.startedAt && step.endedAt ? formatRunDuration(step.startedAt, step.endedAt, t) : null;
-  const label = status ? t(STEP_STATUS_LABEL[status]) : t("mobile.workflow.status.notRun");
+  const label = step ? t(stepStatusLabel(step)) : t("mobile.workflow.status.notRun");
   const icon =
     status === "running" ? (
       <Spinner color={String(secondary)} />
@@ -195,7 +196,7 @@ export function RunStepStatus({ step }: { step: WorkflowStep | undefined }) {
         numberOfLines={1}
         style={[typeScale.small, { fontVariant: ["tabular-nums"] }]}
       >
-        {status === "running" ? (elapsed ?? label) : status === "done" ? (took ?? label) : label}
+        {timed ? (elapsed ?? label) : status === "done" ? (took ?? label) : label}
       </Typography.Paragraph>
     </View>
   );

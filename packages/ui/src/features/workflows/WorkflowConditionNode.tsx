@@ -2,7 +2,7 @@ import { AGENT_REASONING_EFFORTS, type AgentModelId, type AgentReasoningEffort }
 import { Button, CircleCheck, Play, Split, Textarea } from "@openbot/ui";
 import { createMemo, For, Show, untrack } from "solid-js";
 import { useText } from "../../text";
-import { AnswerAction, AnswerProblems, AnswerSummary, useAnswerText } from "./workflow-answer-parts";
+import { AnswerAction, AnswerProblems, useAnswerText } from "./workflow-answer-parts";
 import { BRANCH_NAME, resultValue, useBoard } from "./workflow-board";
 import { defaultWorkflowModel } from "./workflow-model";
 import { EffortPill, ModelPill, modelOption } from "./workflow-model-pills";
@@ -121,7 +121,6 @@ export function ConditionNode(props: { id: string; rule?: string }) {
           </div>
         </Field>
       </Show>
-      <AnswerSummary id={props.id} field="check" />
       <AnswerProblems id={props.id} />
       <For each={BRANCHES}>
         {(branch) => (

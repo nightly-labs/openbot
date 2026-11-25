@@ -23,6 +23,7 @@ export const messages = {
   "error.messaging.whatsappTooManySenders": "Номер WhatsApp может разрешить не более 200 контактов и групп.",
   "error.messaging.whatsappNumberNotFound":
     "У этого номера нет аккаунта WhatsApp. Введите его с кодом страны, например +44 7700 900123.",
+  "error.messaging.whatsappSenderNotFound": "Этого контакта или группы больше нет в списке.",
   "error.messaging.whatsappRequestEnded":
     "Срок этого запроса истёк. Попросите человека написать снова, чтобы получить новый код.",
   "error.messaging.memoryLimit":

@@ -216,9 +216,16 @@ export function MobileSearchResultRow({
     onLeave();
     if (pane)
       openChatFromPane(pane, messageId ? undefined : agentId, () =>
-        router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } }),
+        router.push({
+          pathname: "/chat/[agentId]",
+          params: messageId ? { agentId, serverId, messageId } : { agentId, serverId },
+        }),
       );
-    else router.push({ pathname: "/chat/[agentId]", params: messageId ? { agentId, messageId } : { agentId } });
+    else
+      router.push({
+        pathname: "/chat/[agentId]",
+        params: messageId ? { agentId, serverId, messageId } : { agentId, serverId },
+      });
   };
   const snippet = useMemo(
     () => (result.kind === "message" ? mobileSearchSnippet(result.text, query) : ""),

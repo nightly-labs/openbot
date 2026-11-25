@@ -28,6 +28,21 @@ export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef
   return rows;
 }
 
+export function naturalThreadRows(
+  messages: readonly AgentMessage[],
+  provider: AgentProviderRef | undefined,
+  held: (message: AgentMessage) => boolean,
+): AgentMessage[] {
+  const turns: AgentMessage[][] = [];
+  const listed = messages.flatMap((message) => {
+    if (message.kind !== "thinking") return [message];
+    const rows = [...narrationRows(message, provider), message];
+    turns.push(rows);
+    return rows;
+  });
+  return placeUpdatesAfterSteers(listed, turns).filter((message) => !held(message));
+}
+
 export function placeTurnRowsByTime(rows: readonly AgentMessage[], turns: readonly AgentMessage[][]): AgentMessage[] {
   const timed = turns.flatMap((turn) => {
     let at = "";
@@ -86,21 +101,29 @@ export function placeUpdatesAfterSteers(rows: AgentMessage[], turns: readonly Ag
 function turnSteerTimes(rows: readonly AgentMessage[]): Map<string, string> {
   const firstTimes = new Map<string, string>();
   const inputs = new Map<string, AgentMessage[]>();
+  const questions = new Map<string, string>();
   for (const row of rows) {
     if (!row.turnId || !row.createdAt) continue;
     const first = firstTimes.get(row.turnId);
     if (first === undefined || row.createdAt < first) firstTimes.set(row.turnId, row.createdAt);
+    const asked = questions.get(row.turnId);
+    if (row.questionPrompt && (asked === undefined || row.createdAt < asked)) questions.set(row.turnId, row.createdAt);
     if (row.author !== "you" && row.exchange?.direction !== "incoming") continue;
     inputs.set(row.turnId, [...(inputs.get(row.turnId) ?? []), row]);
   }
-  const steerTimes = new Map<string, string>();
+  const steerTimes = new Map(questions);
   for (const [turnId, turnInputs] of inputs) {
     const second = turnInputs.map((row) => row.createdAt ?? "").sort()[1];
     const first = firstTimes.get(turnId) ?? "";
     const steers = turnInputs.flatMap((row) =>
       row.steered && row.createdAt && row.createdAt > first ? [row.createdAt] : [],
     );
-    const steerAt = [...(second === undefined ? [] : [second]), ...steers].sort()[0];
+    const asked = questions.get(turnId);
+    const steerAt = [
+      ...(second === undefined ? [] : [second]),
+      ...steers,
+      ...(asked === undefined ? [] : [asked]),
+    ].sort()[0];
     if (steerAt !== undefined) steerTimes.set(turnId, steerAt);
   }
   return steerTimes;

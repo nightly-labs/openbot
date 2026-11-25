@@ -56,6 +56,7 @@ import {
   untrack,
 } from "solid-js";
 import { AmbientMotion, useAmbientMotion } from "../../ambient-motion";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { StopIcon } from "../conversation/ConversationIcons";
 import { playIdleGreetingMotion } from "./idle-greeting-motion";
@@ -1439,6 +1440,13 @@ function QuestionContent(props: {
       />
       <div data-island-motion-content>
         <div ref={questionStep} class="dynamic-island-surface-question-step">
+          <Show when={currentQuestion()?.detail}>
+            {(detail) => (
+              <ScrollEdges axis="y" class="dynamic-island-surface-question-detail">
+                <p>{detail()}</p>
+              </ScrollEdges>
+            )}
+          </Show>
           <Show when={directAnswerAvailable()}>
             <ul class="dynamic-island-surface-question-options" aria-label={t("island.question.suggestedAnswers")}>
               <For each={currentQuestion()?.options ?? []}>

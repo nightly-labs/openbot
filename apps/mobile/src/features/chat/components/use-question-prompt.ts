@@ -37,6 +37,7 @@ export function useQuestionPrompt(
   canSend: boolean,
   respond: (agentId: string, input: RespondToPromptInput) => Promise<void>,
   onUnsentPreview?: (text: string) => void,
+  automaticAnswer = false,
 ) {
   const scope = JSON.stringify([agentId, message?.id]);
   const [stored, setState] = useState(() => initialState(scope));
@@ -53,7 +54,8 @@ export function useQuestionPrompt(
   const prompt = message?.prompt;
   const resolution = prompt?.resolution ?? state.resolution;
   const question = resolution ? undefined : prompt?.questions[state.index];
-  const disabled = !canSend || state.pending || Boolean(resolution) || !prompt;
+  const locked = state.pending || Boolean(resolution) || !prompt;
+  const disabled = !canSend || locked;
   const messageId = message?.id;
 
   return useMemo(() => {
@@ -85,13 +87,17 @@ export function useQuestionPrompt(
       }
     }
 
-    async function submit(answers: Record<string, string[]>): Promise<void> {
-      if (disabled || !prompt || submitting.current.has(scope)) return;
-      await send(answers).then(
-        () => void haptics.notification("success"),
+    async function submit(answers: Record<string, string[]>): Promise<boolean> {
+      if (disabled || !prompt || submitting.current.has(scope)) return false;
+      return send(answers).then(
+        () => {
+          void haptics.notification("success");
+          return true;
+        },
         () => {
           void haptics.notification("error");
           update({ failedAnswers: answers });
+          return false;
         },
       );
     }
@@ -123,6 +129,7 @@ export function useQuestionPrompt(
     }
 
     return {
+      agentId,
       messageId,
       index: state.index,
       question,
@@ -132,7 +139,7 @@ export function useQuestionPrompt(
       failedAnswers: state.failedAnswers,
       draft: question ? (state.drafts[question.id] ?? "") : "",
       setDraft: (text: string) => {
-        if (question && !disabled) update({ drafts: { ...state.drafts, [question.id]: text } });
+        if (question && !locked) update({ drafts: { ...state.drafts, [question.id]: text } });
       },
       setUnsentPreview: (text: string | undefined) => {
         unsentPreview.current = text === undefined ? undefined : { scope, text };
@@ -154,8 +161,9 @@ export function useQuestionPrompt(
       answerText,
       submit,
       send,
+      automaticAnswer,
     };
-  }, [scope, messageId, state, question, resolution, disabled, prompt, respond, agentId]);
+  }, [scope, messageId, state, question, resolution, disabled, locked, prompt, respond, agentId, automaticAnswer]);
 }
 
 export type QuestionPromptController = ReturnType<typeof useQuestionPrompt>;

@@ -1,4 +1,15 @@
-import { Button, Maximize2, Minimize2, Pause, Play, SeekSlider, Spinner, Volume2, VolumeX } from "@openbot/ui";
+import {
+  Button,
+  Download,
+  Maximize2,
+  Minimize2,
+  Pause,
+  Play,
+  SeekSlider,
+  Spinner,
+  Volume2,
+  VolumeX,
+} from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createStore, onCleanup, Show } from "solid-js";
 import { useText } from "../../text";
@@ -18,6 +29,7 @@ export interface VideoPlayerProps {
   onError?: (() => void) | undefined;
   ref?: ((video: HTMLVideoElement) => void) | undefined;
   fullControls?: boolean | undefined;
+  onDownload?: (() => void) | undefined;
   children?: JSX.Element;
 }
 
@@ -237,6 +249,19 @@ export function VideoPlayer(props: VideoPlayerProps) {
           >
             {player.fullScreen ? <Minimize2 aria-hidden="true" /> : <Maximize2 aria-hidden="true" />}
           </Button>
+        </Show>
+        <Show when={props.onDownload}>
+          {(download) => (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              aria-label={t("attachment.download", { name: props.label })}
+              onClick={() => download()()}
+            >
+              <Download aria-hidden="true" />
+            </Button>
+          )}
         </Show>
         {props.children}
       </div>

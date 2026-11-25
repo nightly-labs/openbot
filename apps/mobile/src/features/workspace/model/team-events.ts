@@ -108,6 +108,10 @@ export function syncEventQueries(
   if (event.type === "library-folders-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverLibraryFolders(scope, serverId) });
   }
+  if (event.type === "host-turn-limits-changed") {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.serverTurnLimits(scope, serverId) });
+    return;
+  }
   if (event.type === "usage-credits-changed") {
     void queryClient.invalidateQueries({ queryKey: queryKeys.planLimits(scope, serverId) });
     return;
@@ -125,6 +129,7 @@ export function syncEventQueries(
       queryKeys.providerStatus(scope, serverId),
       queryKeys.providerModels(scope, serverId),
       queryKeys.providerPromptCache(scope, serverId),
+      queryKeys.providerCacheExpiryCompaction(scope, serverId),
       queryKeys.providerCompactWindow(scope, serverId),
       queryKeys.agentModels(scope, serverId),
     ])

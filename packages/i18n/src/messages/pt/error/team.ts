@@ -130,6 +130,9 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "Esta conexão não oferece suporte a alterações na identidade do servidor.",
   "error.team.hostUpdateUnsupported": "Esta conexão não oferece suporte a atualizações do computador anfitrião.",
   "error.team.hostTimezoneUnsupported": "Esta conexão não oferece suporte ao fuso horário do servidor.",
+  "error.team.hostSignalHomeUnsupported": "Esta conexão não oferece suporte à escolha do servidor do Signal.",
+  "error.team.hostVoiceModelUnsupported":
+    "Esta conexão não oferece suporte ao modelo de reconhecimento de fala do servidor.",
   "error.team.hostRestartUnsupported": "Esta conexão não oferece suporte à reinicialização do servidor.",
   "error.team.ownerTransferUnsupported": "Este servidor não permite transferir a propriedade.",
   "error.team.hostKeyRotationUnsupported": "Esta conexão não oferece suporte à alteração da chave do servidor.",
@@ -145,6 +148,10 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
   "error.team.claudeUserSetupUnsupported": "Esta conexão não suporta a opção de configuração do Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexão não oferece suporte ao tamanho de compactação do Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "Esta conexão não oferece suporte à compactação antes de o cache expirar.",
+  "error.team.mediaApprovalCreditsUnsupported": "Esta conexão não oferece suporte ao limite de aprovação de créditos.",
+  "error.team.mediaApprovalCreditsInvalid": "Digite um número inteiro de créditos de 0 a 100.000.",
   "error.team.providerEnvironmentUnsupported": "Esta conexão não oferece suporte a variáveis de provedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
@@ -210,4 +217,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "Esta conexão não suporta processos em segundo plano.",
   "error.team.providerUseUnsupported": "Esta conexão não suporta ativar e desativar provedores.",
   "error.team.providerUseInvalid": "Este provedor não tem um interruptor de ativação.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Este servidor não permite escolher o modelo nas aprovações de mídia. Atualize o OpenBot no servidor.",
+  "error.team.mediaApprovalChoiceInvalid": "A escolha da aprovação de mídia não é válida.",
 } as const satisfies PartialTranslation<typeof source>;
