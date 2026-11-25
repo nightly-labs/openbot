@@ -29,6 +29,10 @@
     {
       "pattern": "api.openbot.run",
       "custom_domain": true
+    },
+    {
+      "pattern": "nearintents.openbot.run",
+      "custom_domain": true
     }
   ],
   "secrets": {

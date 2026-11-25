@@ -1,5 +1,7 @@
 import { Effect, Result } from "effect";
 import { routeRequest as routeHostedSiteRequest } from "../../../site-router/src/index";
+import { passkeyWalletHostResponse } from "../lib/near-sign-csp";
+import { OPENBOT_SITE_URL } from "../lib/site-metadata";
 import { sendAccountActivitySnapshots } from "./account-activity";
 import { createAccountAnalytics, createAccountEventDelivery } from "./account-analytics";
 import { type AuthRetentionResult, pruneExpiredAuthData } from "./auth-data-retention";
@@ -52,7 +54,7 @@ export function createWorkerHandler(
       context?: WorkerExecutionContext,
     ) {
       const bindings = workerBindings.DB ? { ...workerBindings, DB: observedD1(workerBindings.DB) } : workerBindings;
-      const hostRedirect = canonicalHostRedirect(request);
+      const hostRedirect = canonicalHostRedirect(request) ?? passkeyWalletHostResponse(request, OPENBOT_SITE_URL);
       if (hostRedirect) return hostRedirect;
       if (request.method === "GET" && new URL(request.url).pathname === "/billing/checkout-return") {
         return runApiEffect(checkoutReturnResponse(request, bindings));

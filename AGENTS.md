@@ -71,6 +71,9 @@ adding a module or moving ownership between workspaces.
   [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway) and
   its Worker secrets, never in this repository. To change a processor, a route, a welcome route or
   the active upstream, work in that repository and deploy its Worker as its README says.
+  Exception: the crypto wallet sends its NEAR Intents Agent API calls through the account service
+  (`/v1/near/*`), which adds the partner key (`NEAR_INTENTS_PARTNER_KEY`, a secret). It passes them
+  through in transit only, and keeps only the wallet ID, its owner and its creation time in D1.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.
@@ -258,6 +261,14 @@ State which surfaces a change touches. Check all affected consumers and reverse 
   Load it with `bunx @dotenvx/dotenvx@2.38.2 run -f apps/auth-api/.env.dev -fk <root>/.env.keys --
   <command>`; `bun run dev` does not pass it on. Never print it. Ask before a benchmark or a run of many
   turns: the token budget is small.
+- For NEAR Intents wallet smoke checks, `apps/auth-api/.env.dev` holds `NEAR_INTENTS_PARTNER_KEY`
+  (an `agent-api` partner key for the production Agent API, `https://api.agentsonintents.com`; the
+  demo API refuses it) and `NEAR_TEST_OWNER_PASSKEY` (the P-256 key of the test wallet's passkey
+  owner). Load them the same way as `INCEPTION_API_KEY`, and never print them.
+  `bun run smoke:near-wallet-live` drives the real wallet service against production with that owner;
+  it keeps its encrypted state in `.openbot-build/near-wallet-live/`. It is a shared test wallet:
+  each person or agent with the dev key controls its funds. Keep only a few dollars in it. The Agent
+  API has no testnet: ask before any call that moves funds.
 - For development and manual tests, the team has one test Google account. `apps/auth-api/.env.dev`
   holds `DEV_TEST_GMAIL_ADDRESS` and `DEV_TEST_GMAIL_PASSWORD`. Use it to sign in to Gmail and to
   third-party services ("Sign in with Google") for development and smoke checks, never for a

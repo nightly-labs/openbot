@@ -10,12 +10,14 @@ export type DeepLink =
   | { kind: "marketplace"; link: MarketplaceListingLink }
   | { kind: "mcp-auth"; state: string; code: string }
   | { kind: "slack-workspace"; nonce: string; grant: string }
-  | { kind: "discord-guild"; nonce: string; grant: string };
+  | { kind: "discord-guild"; nonce: string; grant: string }
+  | { kind: "near-signature"; nonce: string; data: string };
 
 export const MCP_OAUTH_REDIRECT_URL = "openbot://mcp-auth";
 
 const MCP_OAUTH_HOST = "mcp-auth";
 const SLACK_WORKSPACE_HOST = "slack-workspace";
+const NEAR_SIGNATURE_HOST = "near-signature";
 const DISCORD_GUILD_HOST = "discord-guild";
 
 export function parseDeepLink(value: string, options: InviteLinkOptions = {}): DeepLink | null {
@@ -56,6 +58,11 @@ function parseSlackUrl(value: string): DeepLink | null {
     const nonce = url.searchParams.get("nonce");
     const grant = url.searchParams.get("grant");
     return nonce && grant ? { kind: "discord-guild", nonce, grant } : null;
+  }
+  if (url.hostname === NEAR_SIGNATURE_HOST) {
+    const nonce = url.searchParams.get("nonce");
+    const data = url.searchParams.get("data");
+    return nonce && data ? { kind: "near-signature", nonce, data } : null;
   }
   return null;
 }
