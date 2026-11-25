@@ -319,6 +319,15 @@ export const messages = {
   "marketplace.plugin.sunra.prompt.balance": "كم لديّ من أرصدة Sunra؟",
   "marketplace.plugin.sunra.prompt.poster": "أنشئ في Sunra ملصقًا لسوق ليلي تحت المطر، بتنسيق عمودي.",
   "marketplace.plugin.sunra.prompt.clip": "أنشئ في Sunra فيديو مدته 5 ثوانٍ لقارب ورقي على نهر. أخبرني بالتكلفة أولًا.",
+  "marketplace.plugin.faste.tagline": "إنشاء الصور والفيديو بالذكاء الاصطناعي",
+  "marketplace.plugin.faste.description":
+    "يتيح Faste للوكلاء إنشاء الصور والفيديو وتعديلها ورفع دقتها بالذكاء الاصطناعي عبر نماذج مختارة، وتقدير تكلفة الأرصدة مسبقًا، والتحقق من الرصيد وحدود المفتاح، ومتابعة مهام التصيير غير المتزامنة مع روابط تسليم عبر CDN. يفوّض كل مستخدم حسابه في Faste عبر المتصفح، وتُحجز الأرصدة ذريًا لكل مهمة وتُرد تلقائيًا إذا فشل الإنشاء.",
+  "marketplace.plugin.faste.app":
+    "إنشاء الصور والفيديو بالذكاء الاصطناعي، وتقدير تكلفة الأرصدة، وفحص الرصيد وتتبع المهام، عبر خادم MCP الخاص بـ Faste مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.faste.prompt.balance": "تحقق من رصيد أرصدة Faste لديّ واعرض نماذج الصور والفيديو المتاحة لمفتاحي.",
+  "marketplace.plugin.faste.prompt.estimate": "قدّر تكلفة الأرصدة في Faste لإنشاء فيديو منتج مدته 5 ثوانٍ قبل تشغيله.",
+  "marketplace.plugin.faste.prompt.generate":
+    "أنشئ صورة منتج استوديو بسيطة لآلة إسبريسو باستخدام Faste وشارك رابط النتيجة.",
   "marketplace.plugin.elevenlabs.tagline": "الكلام والأصوات ووكلاء الصوت",
   "marketplace.plugin.elevenlabs.description":
     "يتيح ElevenLabs للوكلاء تحويل النص إلى كلام، والعمل مع الأصوات، وإنشاء وكلاء صوت ElevenLabs واختبارهم ومراجعتهم ومراجعة محادثاتهم. يعود الصوت المُنشأ كرابط تنزيل صالح لمدة قصيرة. يسجّل كل مستخدم الدخول إلى حساب ElevenLabs الخاص به عبر المتصفح، وكل عملية إنشاء تستهلك أرصدة ذلك الحساب.",

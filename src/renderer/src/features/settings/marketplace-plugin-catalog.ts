@@ -4835,6 +4835,56 @@ const FANVUE: MarketplacePluginDetail = {
   shareUrl: "https://openbot.run/plugins/fanvue",
 };
 
+const FASTE: MarketplacePluginDetail = {
+  id: "plugin-faste",
+  slug: "faste",
+  name: "Faste",
+  tagline: "AI image and video generation",
+  description:
+    "Faste lets agents generate, edit and upscale AI images and videos across curated models, estimate credit costs upfront, check balances and key guardrails, and track asynchronous render jobs with CDN delivery links. Each user authorizes their own Faste account through the browser. Credits are reserved atomically per job and refunded automatically if generation fails.",
+  category: "design",
+  creatorName: "Faste",
+  iconUrl: "https://faste.dev/plugins/claude-code/icon.png",
+  version: "1.0.0",
+  prompts: [
+    {
+      id: "prompt-balance",
+      text: "Check my Faste credit balance and list the image and video models available on my key.",
+    },
+    {
+      id: "prompt-estimate",
+      text: "Estimate the Faste credit cost to generate a 5-second product video before running it.",
+    },
+    {
+      id: "prompt-generate",
+      text: "Generate a minimalist studio product photo of an espresso machine with Faste and share the output link.",
+    },
+  ],
+  apps: [
+    {
+      id: "app-faste-mcp",
+      name: "Faste",
+      description:
+        "AI image and video generation, credit cost estimation, balance checks and job tracking, over Faste's MCP server with browser sign-in.",
+      iconUrl: "https://faste.dev/plugins/claude-code/icon.png",
+      server: {
+        name: "faste",
+        transport: "http",
+        url: "https://api.faste.dev/mcp",
+        auth: [{ id: "faste-oauth", kind: "link", label: "Sign in" }],
+      },
+    },
+  ],
+  websiteUrl: "https://faste.dev",
+  privacyPolicyUrl: "https://faste.dev/privacy",
+  termsUrl: "https://faste.dev/terms",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/faste",
+};
+
 const FASTMAIL: MarketplacePluginDetail = {
   id: "plugin-fastmail",
   slug: "fastmail",
@@ -10827,6 +10877,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   EXTEND,
   FAL,
   FANVUE,
+  FASTE,
   FASTMAIL,
   FATHOM,
   FEISHU,

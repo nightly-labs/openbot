@@ -320,6 +320,17 @@ export const messages = {
     "Crée avec Sunra une affiche d'un marché de nuit sous la pluie, au format portrait.",
   "marketplace.plugin.sunra.prompt.clip":
     "Crée avec Sunra une vidéo de 5 secondes d'un bateau en papier sur une rivière. Donne-moi d'abord le coût.",
+  "marketplace.plugin.faste.tagline": "Génération d'images et de vidéos par IA",
+  "marketplace.plugin.faste.description":
+    "Faste permet aux agents de générer, modifier et agrandir des images et vidéos par IA via des modèles sélectionnés, d'estimer le coût en crédits à l'avance, de vérifier le solde et les limites de clé, et de suivre les tâches de rendu asynchrones avec des liens CDN. Chaque utilisateur autorise son propre compte Faste dans le navigateur. Les crédits sont réservés de manière atomique par tâche et remboursés automatiquement en cas d'échec.",
+  "marketplace.plugin.faste.app":
+    "Génération d'images et de vidéos par IA, estimation des coûts en crédits, vérification du solde et suivi des tâches via le serveur MCP de Faste avec connexion dans le navigateur.",
+  "marketplace.plugin.faste.prompt.balance":
+    "Vérifie mon solde de crédits Faste et liste les modèles d'image et de vidéo disponibles sur ma clé.",
+  "marketplace.plugin.faste.prompt.estimate":
+    "Estime le coût en crédits Faste pour générer une vidéo produit de 5 secondes avant de la lancer.",
+  "marketplace.plugin.faste.prompt.generate":
+    "Génère avec Faste une photo produit de studio minimaliste d'une machine à expresso et partage le lien de sortie.",
   "marketplace.plugin.elevenlabs.tagline": "Parole, voix et agents vocaux",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs permet aux agents de convertir du texte en parole, de travailler avec des voix, et de créer, tester et examiner des agents vocaux ElevenLabs et leurs conversations. L'audio généré revient sous forme de lien de téléchargement de courte durée. Chaque utilisateur se connecte à son propre compte ElevenLabs dans le navigateur, et chaque génération utilise des crédits de ce compte.",

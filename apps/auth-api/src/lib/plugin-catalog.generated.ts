@@ -703,6 +703,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "42427654983beff5744864eaf09f5ae07d3d2055b6761d66825ad6073fc28e15",
     },
     {
+      slug: "faste",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "b1cc29d8f3e2530129b7d687c6fd34323ae2ae79959c7ceb1dd96f3c408d5a76",
+    },
+    {
       slug: "fastmail",
       version: "1.0.0",
       featured: false,
@@ -5748,6 +5754,50 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://www.fanvue.com",
     privacyPolicyUrl: "https://legal.fanvue.com/privacy-policy",
     termsUrl: "https://legal.fanvue.com/terms-conditions",
+    skills: [],
+  },
+  faste: {
+    slug: "faste",
+    name: "Faste",
+    tagline: "AI image and video generation",
+    description:
+      "Faste lets agents generate, edit and upscale AI images and videos across curated models, estimate credit costs upfront, check balances and key guardrails, and track asynchronous render jobs with CDN delivery links. Each user authorizes their own Faste account through the browser. Credits are reserved atomically per job and refunded automatically if generation fails.",
+    category: "design",
+    creatorName: "Faste",
+    iconUrl: "https://faste.dev/plugins/claude-code/icon.png",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-balance",
+        text: "Check my Faste credit balance and list the image and video models available on my key.",
+      },
+      {
+        id: "prompt-estimate",
+        text: "Estimate the Faste credit cost to generate a 5-second product video before running it.",
+      },
+      {
+        id: "prompt-generate",
+        text: "Generate a minimalist studio product photo of an espresso machine with Faste and share the output link.",
+      },
+    ],
+    apps: [
+      {
+        id: "app-faste-mcp",
+        name: "Faste",
+        description:
+          "AI image and video generation, credit cost estimation, balance checks and job tracking, over Faste's MCP server with browser sign-in.",
+        iconUrl: "https://faste.dev/plugins/claude-code/icon.png",
+        server: {
+          name: "faste",
+          transport: "http",
+          url: "https://api.faste.dev/mcp",
+          auth: [{ id: "faste-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://faste.dev",
+    privacyPolicyUrl: "https://faste.dev/privacy",
+    termsUrl: "https://faste.dev/terms",
     skills: [],
   },
   fastmail: {

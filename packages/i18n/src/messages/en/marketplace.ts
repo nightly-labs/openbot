@@ -313,6 +313,17 @@ export const messages = defineMessages("marketplace", {
   "marketplace.plugin.sunra.prompt.poster": "Make a Sunra poster of a night market in the rain, in portrait format.",
   "marketplace.plugin.sunra.prompt.clip":
     "Make a 5-second Sunra video of a paper boat on a river. Tell me the cost first.",
+  "marketplace.plugin.faste.tagline": "AI image and video generation",
+  "marketplace.plugin.faste.description":
+    "Faste lets agents generate, edit and upscale AI images and videos across curated models, estimate credit costs upfront, check balances and key guardrails, and track asynchronous render jobs with CDN delivery links. Each user authorizes their own Faste account through the browser. Credits are reserved atomically per job and refunded automatically if generation fails.",
+  "marketplace.plugin.faste.app":
+    "AI image and video generation, credit cost estimation, balance checks and job tracking, over Faste's MCP server with browser sign-in.",
+  "marketplace.plugin.faste.prompt.balance":
+    "Check my Faste credit balance and list the image and video models available on my key.",
+  "marketplace.plugin.faste.prompt.estimate":
+    "Estimate the Faste credit cost to generate a 5-second product video before running it.",
+  "marketplace.plugin.faste.prompt.generate":
+    "Generate a minimalist studio product photo of an espresso machine with Faste and share the output link.",
   "marketplace.plugin.elevenlabs.tagline": "Speech, voices and voice agents",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs lets agents turn text into speech, work with voices, and create, test and review ElevenLabs voice agents and their conversations. Generated audio comes back as a short-lived download link. Each user signs in to their own ElevenLabs account through the browser, and each generation uses credits of that account.",

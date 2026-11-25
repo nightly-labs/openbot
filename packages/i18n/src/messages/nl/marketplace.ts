@@ -302,6 +302,17 @@ export const messages = {
     "Maak met Sunra een poster van een nachtmarkt in de regen, in staand formaat.",
   "marketplace.plugin.sunra.prompt.clip":
     "Maak met Sunra een video van 5 seconden van een papieren bootje op een rivier. Vertel me eerst wat het kost.",
+  "marketplace.plugin.faste.tagline": "AI-beeld- en videogeneratie",
+  "marketplace.plugin.faste.description":
+    "Faste laat agents AI-afbeeldingen en -video's genereren, bewerken en opschalen met geselecteerde modellen, vooraf de creditkosten schatten, het saldo en sleutellimieten controleren en asynchrone rendertaken volgen met CDN-links. Elke gebruiker autoriseert zijn eigen Faste-account in de browser. Credits worden atomair gereserveerd per taak en automatisch teruggestort als het genereren mislukt.",
+  "marketplace.plugin.faste.app":
+    "AI-beeld- en videogeneratie, kostenraming in credits, saldocontrole en taakopvolging via de MCP-server van Faste met aanmelding in de browser.",
+  "marketplace.plugin.faste.prompt.balance":
+    "Controleer mijn Faste-creditsaldo en toon de beeld- en videomodellen die beschikbaar zijn op mijn sleutel.",
+  "marketplace.plugin.faste.prompt.estimate":
+    "Schat de Faste-creditkosten voor een productvideo van 5 seconden voordat je die uitvoert.",
+  "marketplace.plugin.faste.prompt.generate":
+    "Genereer met Faste een minimalistische studioproductfoto van een espressomachine en deel de uitvoerlink.",
   "marketplace.plugin.elevenlabs.tagline": "Spraak, stemmen en spraakagenten",
   "marketplace.plugin.elevenlabs.description":
     "Met ElevenLabs zetten agenten tekst om in spraak, werken ze met stemmen, en maken, testen en bekijken ze ElevenLabs-spraakagenten en hun gesprekken. Gegenereerde audio komt terug als een kortlevende downloadlink. Elke gebruiker meldt zich in de browser aan bij een eigen ElevenLabs-account, en elke generatie gebruikt credits van dat account.",

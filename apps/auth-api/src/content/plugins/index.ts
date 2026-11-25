@@ -9,6 +9,7 @@ import { COINBASE_PLUGIN_GUIDE } from "./coinbase";
 import { COMPOSIO_PLUGIN_GUIDE } from "./composio";
 import { CONTEXT7_PLUGIN_GUIDE } from "./context7";
 import { ELEVENLABS_PLUGIN_GUIDE } from "./elevenlabs";
+import { FASTE_PLUGIN_GUIDE } from "./faste";
 import { FIGMA_PLUGIN_GUIDE } from "./figma";
 import { FIRECRAWL_PLUGIN_GUIDE } from "./firecrawl";
 import { GITLAB_PLUGIN_GUIDE } from "./gitlab";
@@ -57,6 +58,7 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   paper: PAPER_PLUGIN_GUIDE,
   higgsfield: HIGGSFIELD_PLUGIN_GUIDE,
   sunra: SUNRA_PLUGIN_GUIDE,
+  faste: FASTE_PLUGIN_GUIDE,
   elevenlabs: ELEVENLABS_PLUGIN_GUIDE,
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,

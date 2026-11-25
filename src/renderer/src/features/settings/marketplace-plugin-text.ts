@@ -145,6 +145,18 @@ const PLUGIN_TEXT = {
       "prompt-clip": "marketplace.plugin.sunra.prompt.clip",
     },
   },
+  faste: {
+    tagline: "marketplace.plugin.faste.tagline",
+    description: "marketplace.plugin.faste.description",
+    apps: {
+      "app-faste-mcp": "marketplace.plugin.faste.app",
+    },
+    prompts: {
+      "prompt-balance": "marketplace.plugin.faste.prompt.balance",
+      "prompt-estimate": "marketplace.plugin.faste.prompt.estimate",
+      "prompt-generate": "marketplace.plugin.faste.prompt.generate",
+    },
+  },
   elevenlabs: {
     tagline: "marketplace.plugin.elevenlabs.tagline",
     description: "marketplace.plugin.elevenlabs.description",

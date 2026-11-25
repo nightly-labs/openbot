@@ -308,6 +308,17 @@ export const messages = {
   "marketplace.plugin.sunra.prompt.poster": "Sunra で、雨の夜市のポスターを縦長で作ってください。",
   "marketplace.plugin.sunra.prompt.clip":
     "Sunra で、川を流れる紙の船の 5 秒の動画を作ってください。先に費用を教えてください。",
+  "marketplace.plugin.faste.tagline": "AI 画像・動画生成",
+  "marketplace.plugin.faste.description":
+    "Faste を使うと、エージェントは厳選されたモデルで AI 画像・動画の生成、編集、高解像度化を行い、事前にクレジット費用を見積もり、残高やキーの制限を確認し、CDN 配信リンク付きで非同期レンダリングジョブを追跡できます。各ユーザーはブラウザで自分の Faste アカウントを認可します。クレジットはジョブごとにアトミックに予約され、生成に失敗した場合は自動的に返金されます。",
+  "marketplace.plugin.faste.app":
+    "Faste の MCP サーバー経由で、AI 画像・動画生成、クレジット見積もり、残高確認、ジョブ追跡を行います。ブラウザでサインインします。",
+  "marketplace.plugin.faste.prompt.balance":
+    "Faste のクレジット残高を確認して、自分のキーで使える画像・動画モデルを一覧表示してください。",
+  "marketplace.plugin.faste.prompt.estimate":
+    "実行前に、Faste で 5 秒間の商品動画を生成するクレジット費用を見積もってください。",
+  "marketplace.plugin.faste.prompt.generate":
+    "Faste でミニマルなスタジオ撮影風のエスプレッソマシン商品写真を生成し、出力リンクを共有してください。",
   "marketplace.plugin.elevenlabs.tagline": "音声、ボイス、音声エージェント",
   "marketplace.plugin.elevenlabs.description":
     "ElevenLabs を使うと、エージェントがテキストを音声に変換し、ボイスを扱い、ElevenLabs の音声エージェントとその会話を作成、テスト、確認できます。生成された音声は短時間だけ有効なダウンロードリンクで返されます。各ユーザーはブラウザーで自分の ElevenLabs アカウントにサインインし、生成ごとにそのアカウントのクレジットを使います。",

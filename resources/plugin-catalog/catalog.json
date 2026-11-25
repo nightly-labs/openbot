@@ -687,6 +687,12 @@
       "detailSha256": "42427654983beff5744864eaf09f5ae07d3d2055b6761d66825ad6073fc28e15"
     },
     {
+      "slug": "faste",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "b1cc29d8f3e2530129b7d687c6fd34323ae2ae79959c7ceb1dd96f3c408d5a76"
+    },
+    {
       "slug": "fastmail",
       "version": "1.0.0",
       "featured": false,
