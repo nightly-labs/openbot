@@ -23,6 +23,9 @@ interface Report {
   savedKey?: UsageCase;
   savedKeyRejected?: UsageCase;
   authFileKey?: UsageCase;
+  authFileConsoleKey?: UsageCase;
+  selfHostedAuthFileConsole?: UsageCase;
+  authFileGoKeyFirst?: UsageCase;
   consoleKey?: UsageCase;
   consoleKeyRejected?: UsageCase;
   selfHostedConsole?: UsageCase;
@@ -116,6 +119,40 @@ try {
   const authFileKey = await readUsage(null, ["fake-auth-file"]);
   report.authFileKey = authFileKey;
   assert.deepEqual(authFileKey.sent, ["fake-auth-file"]);
+
+  delete process.env.OPENCODE_API_KEY;
+  await writeFile(authFile, JSON.stringify({ opencode: { type: "api", key: "fake-auth-console" } }));
+  const authFileConsole = await readUsage(null, ["fake-auth-console"]);
+  report.authFileConsoleKey = authFileConsole;
+  assert.deepEqual(authFileConsole.sent, ["fake-auth-console"], "the OpenCode key of auth.json reads the Go quota");
+  assert.deepEqual(authFileConsole.reading.rateLimits, goReading);
+
+  await writeFile(
+    authFile,
+    JSON.stringify({
+      opencode: { type: "api", key: "fake-auth-hosted", metadata: { server: "https://console.example.com" } },
+    }),
+  );
+  const authFileHosted = await readUsage(null, ["fake-auth-hosted"]);
+  report.selfHostedAuthFileConsole = authFileHosted;
+  assert.deepEqual(authFileHosted.sent, [], "a self-hosted Console key of auth.json does not go to opencode.ai");
+
+  await writeFile(
+    authFile,
+    JSON.stringify({
+      "opencode-go": { type: "api", key: "fake-auth-file" },
+      opencode: { type: "api", key: "fake-auth-console" },
+    }),
+  );
+  const goKeyFirst = await readUsage(null, ["fake-auth-file", "fake-auth-console"]);
+  report.authFileGoKeyFirst = goKeyFirst;
+  assert.deepEqual(goKeyFirst.sent, ["fake-auth-file"], "the opencode-go key comes before the OpenCode key");
+
+  process.env.OPENCODE_API_KEY = "fake-env";
+  await writeFile(
+    authFile,
+    JSON.stringify({ "opencode-go": { type: "api", key: "fake-auth-file" }, anthropic: { type: "api", key: "x" } }),
+  );
 
   writeDatabase([
     { id: "old", value: { type: "key", key: "fake-console-old" }, active: null, created: 1 },
