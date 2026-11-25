@@ -375,12 +375,15 @@ try {
     "Each delivery completes.",
   );
   const steerTurns = report.events.filter((event) => event.event === "user-message" && event.uuid === steerDeliveryId);
-  if (DROP)
+  if (DROP) {
+    const exit = report.events.findIndex((event) => event.event === "exit");
+    const exitedPid = report.events[exit]?.pid;
+    assert.ok(exit >= 0, "Claude exits while it holds the steer.");
     assert.ok(
-      report.events.some((event) => event.event === "exit"),
-      "Claude exits while it holds the steer.",
+      report.events.slice(exit).some((event) => event.event === "user-message" && event.pid !== exitedPid),
+      "The queue sends the steered message again to a new Claude process.",
     );
-  else {
+  } else {
     assert.equal(steerTurns.length, 1, "Claude gets the steer once.");
     const workerPid = steerTurns[0]?.pid;
     const lateAnswer = report.events.findIndex((event) => event.event === "late-answer" && event.pid === workerPid);

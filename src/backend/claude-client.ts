@@ -2097,7 +2097,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     runtime.lastOutputAt = Date.now();
     if (runtime.activeTurn) runtime.activeTurn.lastActivityAt = runtime.lastOutputAt;
     runtime.answered = true;
-    for (const uuid of takenMessageIds(message)) runtime.unreadSteers.delete(uuid);
+    if (!message.parent_tool_use_id) for (const uuid of takenMessageIds(message)) runtime.unreadSteers.delete(uuid);
     if (message.type === "command_lifecycle") {
       if (message.state === "started" && isString(message.command_uuid))
         runtime.unreadSteers.delete(message.command_uuid);
@@ -2456,7 +2456,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       queryLogger.info("Claude stopped its running tools to take a steered message.", { threadId: runtime.id });
       return;
     }
-    if (turn?.stopRequested || takenMessageIds(message).length === 0) runtime.unreadSteers.clear();
+    if (turn?.stopRequested || (!turn?.unprompted && takenMessageIds(message).length === 0))
+      runtime.unreadSteers.clear();
     const apiError = message.subtype === "success" && message.is_error === true;
     if (turn) {
       for (const [toolCallId, { name }] of turn.toolCalls) {
