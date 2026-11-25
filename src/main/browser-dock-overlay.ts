@@ -21,6 +21,7 @@ const logger = createOpenBotLogger("browser-dock-overlay");
 const INITIAL_HEIGHT = 160;
 const SHRINK_DELAY_MS = 500;
 const HEIGHT_STEP = 8;
+const ROOM_SETTLE_MS = 200;
 const GLASS_BACKGROUND = "#01ffffff";
 
 export interface BrowserDockOverlayOptions {
@@ -94,6 +95,8 @@ export class BrowserDockOverlay {
   #shown = false;
   #dockHeight = 0;
   #pageBottomRoom = 0;
+  #pendingRoom: number | null = null;
+  #roomTimer: ReturnType<typeof setTimeout> | null = null;
   #destroyed = false;
 
   constructor(options: BrowserDockOverlayOptions) {
@@ -162,6 +165,7 @@ export class BrowserDockOverlay {
     if (this.#destroyed) return;
     this.#destroyed = true;
     this.#cancelShrink();
+    this.#cancelRoom();
     this.#presentation = null;
     this.#page = null;
     const window = this.#options.mainWindow;
@@ -269,12 +273,33 @@ export class BrowserDockOverlay {
     window.contentView.addChildView(view);
     if (view.webContents.getZoomFactor() !== page.zoomFactor) view.webContents.setZoomFactor(page.zoomFactor);
     this.#setShown(true);
-    const dockHeight = Math.min(Math.round(this.#dockHeight * page.zoomFactor), layout.overlay.height);
+    const dockHeight = Math.min(Math.round(this.#dockHeight * page.zoomFactor), Math.floor(page.bounds.height / 2));
     this.#keepPageBottomRoom(userActsOnPage(this.#presentation) ? dockHeight : 0);
   }
 
   #keepPageBottomRoom(height: number): void {
-    if (this.#pageBottomRoom === height) return;
+    if (height === this.#pendingRoom) return;
+    this.#cancelRoom();
+    if (height === this.#pageBottomRoom) return;
+    if (height === 0) {
+      this.#applyRoom(0);
+      return;
+    }
+    this.#pendingRoom = height;
+    this.#roomTimer = setTimeout(() => {
+      this.#roomTimer = null;
+      this.#pendingRoom = null;
+      this.#applyRoom(height);
+    }, ROOM_SETTLE_MS);
+  }
+
+  #cancelRoom(): void {
+    if (this.#roomTimer) clearTimeout(this.#roomTimer);
+    this.#roomTimer = null;
+    this.#pendingRoom = null;
+  }
+
+  #applyRoom(height: number): void {
     this.#pageBottomRoom = height;
     this.#options.keepPageBottomRoom(height);
   }

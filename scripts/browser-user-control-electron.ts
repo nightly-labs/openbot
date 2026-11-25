@@ -8,7 +8,7 @@ import { Effect, Exit } from "effect";
 import { app, BrowserWindow, type WebContents, webContents } from "electron";
 import { z } from "zod";
 import { browserUserControlResult } from "../src/backend/agent/prompts";
-import { BrowserHost } from "../src/backend/browser-host";
+import { BrowserHost, type BrowserMainPage } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams, DynamicToolResult } from "../src/backend/protocol";
 import type { UserBrowsingStep } from "../src/backend/user-browsing-log";
@@ -474,6 +474,22 @@ async function main(): Promise<void> {
       await runCauseEffect(host.activate(tab.id));
       await runCauseEffect(host.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
       await runCauseEffect(host.loadUrl(tab.id, `${origin}/capture?token=QUERY-SECRET#part`));
+      const mainPage: { current: BrowserMainPage | null } = { current: null };
+      host.setMainPageListener((page) => {
+        mainPage.current = page;
+      });
+      const pageHeight = (height: number) =>
+        contents.executeJavaScript(
+          `new Promise((resolve) => { const seen = () => (innerHeight === ${height} ? resolve() : requestAnimationFrame(seen)); seen(); })`,
+        );
+      host.keepMainPageBottomRoom(120);
+      await pageHeight(480);
+      assert.equal(mainPage.current?.bounds.height, 600, "The dock lost the full page area during the room.");
+      recordCases("page-keeps-bottom-room-for-dock");
+      host.keepMainPageBottomRoom(0);
+      await pageHeight(600);
+      host.setMainPageListener(null);
+      recordCases("page-gets-full-height-after-room");
       await press(25);
       assert.equal(captured.length, 0, "A tab that no person holds was recorded.");
       recordCases("capture-skips-agent-tab");
