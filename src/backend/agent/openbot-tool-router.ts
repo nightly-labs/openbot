@@ -254,6 +254,7 @@ import {
   DEFERRED_MCP_NOTE,
   deferredCall,
   deferredCallArgumentsError,
+  deferredNullValueError,
   discoverTools,
   givesBrowserSchemas,
   mayNameMcpTool,
@@ -758,6 +759,11 @@ export class OpenBotToolRouter {
                       ) ?? invalid(),
                     ),
                 );
+                return;
+              }
+              const nullValue = deferredNullValueError(resolved, client.provider);
+              if (nullValue) {
+                client.respond(request.id, openBotToolFailure(nullValue));
                 return;
               }
               params = resolved;

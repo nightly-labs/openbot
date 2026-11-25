@@ -20,6 +20,8 @@ export const messages = {
     "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. Use o nome qualificado exato que tool_search fornece, como openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. O nome qualificado talvez seja {name}. Se for, envie a chamada novamente com esse nome.",
+  "error.agent.toolCallNullValue":
+    "A ferramenta não foi executada. {name} precisa de um objeto ou de uma lista em {paths}, mas cada um desses itens da lista chegou como null. Envie a chamada novamente e dê cada um desses itens como uma string que contenha o seu JSON.",
   "error.agent.toolDescribeUnknownNames":
     "tool_describe não encontrou nenhuma ferramenta do OpenBot chamada {names}. Ele descreve só as ferramentas do OpenBot e do navegador que openbot.tool_search lista, não as ferramentas MCP.",
   "error.agent.toolDescribeDiscoveryNames":
