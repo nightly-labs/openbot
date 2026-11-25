@@ -172,6 +172,7 @@ export const messages = {
   "mobile.chat.preview.nextPart": "الجزء التالي",
   "mobile.chat.preview.pdfFailed": "تعذّر عرض ملف PDF هذا.",
   "mobile.chat.preview.spreadsheetFailed": "تعذّرت قراءة جدول البيانات هذا.",
+  "mobile.chat.preview.spreadsheetTooLarge": "جدول البيانات هذا كبير جدًا للمعاينة. شاركه لفتحه في تطبيق آخر.",
   "mobile.chat.preview.spreadsheetTruncated": "تقتصر المعاينة على أول {rows} صف و{columns} عمود.",
   "mobile.chat.copyFailedMessage": "حاول مرة أخرى.",
   "mobile.chat.message.copyFailed": "تعذّر نسخ الرسالة",

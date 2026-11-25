@@ -151,6 +151,8 @@ export const messages = {
   "mobile.chat.preview.nextPart": "Следующая часть",
   "mobile.chat.preview.pdfFailed": "Не удалось показать этот PDF.",
   "mobile.chat.preview.spreadsheetFailed": "Не удалось прочитать эту таблицу.",
+  "mobile.chat.preview.spreadsheetTooLarge":
+    "Эта таблица слишком большая для просмотра. Поделитесь ею, чтобы открыть в другом приложении.",
   "mobile.chat.preview.spreadsheetTruncated": "Просмотр ограничен первыми {rows} строками и {columns} столбцами.",
   "mobile.chat.copyFailedMessage": "Повторите попытку.",
   "mobile.chat.message.copyFailed": "Не удалось скопировать сообщение",
