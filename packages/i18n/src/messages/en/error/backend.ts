@@ -58,6 +58,9 @@ export const messages = defineMessages("error.backend", {
     "OpenBot could not load the page in the sign-in window. Check the internet connection, then open the sign-in window again.",
   "error.backend.browserSignInReadFailed": "OpenBot could not read the sign-in from the window.",
   "error.backend.browserStopUnsupported": "This remote host cannot stop a page load.",
+  "error.backend.browserLocationFailed": "Could not set the location for the page.",
+  "error.backend.browserPermissionsUnsupported": "This remote host cannot answer location requests.",
+  "error.backend.browserLocationRequired": "Send the location of the device to allow the request.",
   "error.backend.sharedDataLocalOnly": "Shared data is managed on the computer that runs these agents.",
   "error.backend.browserUrlProtocol": "Only HTTP(S) browser URLs are allowed.",
   "error.backend.sunshineNotReady": "Sunshine did not become ready.",
@@ -281,6 +284,8 @@ export const messages = defineMessages("error.backend", {
     "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",
   "error.backend.mcpRegistrationUnavailable":
     "The sign-in server cannot register OpenBot as an app. Your account is not the cause. To connect, save this server in Marketplace, Apps, then add a sign-in app to it.",
+  "error.backend.mcpSignInAppNeeded":
+    "The sign-in server cannot register OpenBot as an app. Your account is not the cause. To connect, open this server in Marketplace, Apps, click Test connection, then add a sign-in app.",
   "error.backend.mcpSignInAbandonedGeneric": "The sign-in was abandoned.",
   "error.backend.mcpSignInForgotten": "The MCP sign-in was forgotten while it was running.",
   "error.backend.mcpSignInAbandoned": "The MCP sign-in was abandoned.",

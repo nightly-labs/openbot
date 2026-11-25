@@ -61,6 +61,7 @@ export const messages = {
   "provider.aria.install": "{name} installeren",
   "provider.aria.signIn": "Inloggen bij {name}",
   "provider.aria.codeFallback": "Inloggen bij {name} met een code",
+  "provider.aria.addressFallback": "Plak het aanmeldadres voor {name}",
   "provider.aria.moreActions": "Meer acties voor {name}",
   "provider.aria.use": "{name} gebruiken in OpenBot",
   "provider.use.inUseOne": "{agent} gebruikt {name}. Wijzig het model van deze agent en zet {name} daarna uit.",
@@ -87,6 +88,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "Wacht op jou. Deze inlogpoging stopt over {time}.",
   "provider.codeLogin.linkTitle": "Inloggen bij {name} op een ander apparaat",
   "provider.codeLogin.pageTitle": "Inloggen bij {name}",
+  "provider.codeLogin.addressDescription":
+    "Rond de aanmelding af in je browser. Dit venster sluit wanneer de aanmelding klaar is.",
   "provider.codeLogin.pageDescription": "Deze pagina is geopend in de browser op {host}. Log hier in.",
   "provider.codeLogin.relayStarting": "Inloggen bij {name} starten op {host}…",
   "provider.codeLogin.pageOpening": "Inlogpagina van {name} openen op {host}…",

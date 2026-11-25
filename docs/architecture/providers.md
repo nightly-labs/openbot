@@ -358,6 +358,11 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
   An agent delete sends `thread/archive` after the unsubscribe: Codex ends the thread before it answers,
   so Windows can remove the workspace (#6266).
+- The Codex app server keeps the tool list of each MCP server in memory for 30 minutes. With a valid
+  list, a resumed thread does not wait for its MCP servers to start; without one, the first turn waits
+  up to `mcp_optional_startup_grace_ms` (10 s) for each slow server. So `ProviderRuntime` stops an
+  idle Codex app server 30 minutes after its last use, not after the 10 minutes of the other
+  provider CLIs (#16388). A Workspace only Codex process still stops after 10 minutes.
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
 - Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups

@@ -79,4 +79,11 @@ export const messages = {
   "mobile.browser.help.handingBack": "交还控制",
   "mobile.browser.help.handBack.title": "交还",
   "mobile.browser.help.handBack.body": "当助手请你接管时，在 ··· 菜单中选择“我已完成”，助手会在该标签页中继续。",
+  "mobile.browser.location.title": "{site} 想知道你的位置",
+  "mobile.browser.location.description": "仅允许你信任的网站。",
+  "mobile.browser.location.block": "阻止",
+  "mobile.browser.location.allow": "允许",
+  "mobile.browser.location.allowAlways": "始终允许",
+  "mobile.browser.location.unavailable": "无法获取此设备的位置。",
+  "mobile.browser.location.answerFailed": "无法回应位置请求。",
 } as const satisfies PartialTranslation<typeof source>;

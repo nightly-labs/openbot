@@ -229,4 +229,11 @@ export const messages = {
   "browser.proxies.closesTabs": { other: "열린 탭 {count}개가 닫혀요." },
   "browser.proxies.changeTitle": "{name}의 프록시를 바꿀까요?",
   "browser.proxies.change": "프록시 바꾸기",
+  "browser.location.title": "{site}에서 내 위치를 알고 싶어 합니다",
+  "browser.location.description": "신뢰하는 사이트에만 허용하세요.",
+  "browser.location.block": "차단",
+  "browser.location.allow": "허용",
+  "browser.location.allowAlways": "항상 허용",
+  "browser.location.unavailable": "이 기기의 위치를 가져올 수 없습니다.",
+  "browser.location.answerFailed": "위치 요청에 응답할 수 없습니다.",
 } as const satisfies PartialTranslation<typeof source>;

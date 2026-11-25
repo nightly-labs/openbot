@@ -194,6 +194,7 @@ import { macShipItDirectory, shipItInstallInProgress } from "./update-install-gu
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
+import { clearEarlierWindowsNotifications } from "./windows-notification-history";
 import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
 guardConsoleOutput([process.stdout, process.stderr], () => {
@@ -327,8 +328,8 @@ const systemTimezone =
     ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
     : localTimezone;
 app.enableSandbox();
-if (process.platform === "win32")
-  app.setAppUserModelId(app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev");
+const WINDOWS_APP_USER_MODEL_ID = app.isPackaged ? "app.openbot.desktop" : "app.openbot.desktop.dev";
+if (process.platform === "win32") app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
 if (
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
@@ -712,6 +713,7 @@ function attachWindowsSessionEndHandlers(window: BrowserWindow): void {
 function registerIpcHandlers({
   service,
   signInRelayClient,
+  localSignInPages,
   relayedMessagingInstalls,
   providerRuntimes,
   providerCredentials,
@@ -896,6 +898,7 @@ function registerIpcHandlers({
       providerRuntimes,
       credentials: providerCredentials,
       openLink,
+      signInPages: localSignInPages,
     }),
     ...voiceIpcHandlers({
       voice,
@@ -1062,6 +1065,7 @@ function registerIpcHandlers({
       customProviders: customProviderChanges,
       remoteServers,
       relay: signInRelayClient,
+      signInPages: localSignInPages,
     }),
     ...messagingIpcHandlers({
       messaging,
@@ -1476,7 +1480,10 @@ if (!hasSingleInstanceLock) {
         app.quit();
         return;
       }
-      if (!localServerChild && !serverMode && !hostedServer) await presentApplication();
+      if (!localServerChild && !serverMode && !hostedServer) {
+        clearEarlierWindowsNotifications(WINDOWS_APP_USER_MODEL_ID);
+        await presentApplication();
+      }
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
         quitFor("quit");

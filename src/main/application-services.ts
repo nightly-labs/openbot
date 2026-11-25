@@ -324,6 +324,7 @@ import {
 } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
 import { LocalServers, sandboxArguments } from "./local-servers/local-servers";
+import { LocalSignInPages } from "./local-sign-in-pages";
 import { LocalSignInWindows } from "./local-sign-in-window";
 import { localSkillLearner } from "./local-skill-learner";
 import { LocalSkillLibrary } from "./local-skill-library";
@@ -690,6 +691,7 @@ export interface ApplicationServices {
   teamWebRtcBridge: TeamWebRtcBridge;
   mcpOAuth: McpOAuth;
   signInRelayClient: SignInRelayClient;
+  localSignInPages: LocalSignInPages;
   relayedMessagingInstalls: RelayedMessagingInstalls;
   githubConnector: GitHubConnectorService;
   linkAccount: LinkAccountService;
@@ -3164,6 +3166,11 @@ export async function createApplicationServices({
   });
   const mcpHostSignIns = new McpHostSignIns({ service, browser });
   const providerSignIns = new ProviderHostSignIns({ service, browser });
+  const localSignInPages = new LocalSignInPages(
+    (provider) =>
+      service.getStatus().providers?.some((row) => row.id === provider && row.connectionState === "connecting") ??
+      false,
+  );
   const providerAccountsHost = new ProviderAccountsHost({ service, browser });
   const signInRelayHost = new SignInRelayHost({
     mcp: mcpHostSignIns,
@@ -4412,6 +4419,7 @@ export async function createApplicationServices({
     teamWebRtcBridge,
     mcpOAuth,
     signInRelayClient,
+    localSignInPages,
     relayedMessagingInstalls: new RelayedMessagingInstalls(remoteServers),
     githubConnector,
     linkAccount,

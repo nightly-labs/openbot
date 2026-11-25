@@ -311,7 +311,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
           server: describeServer(config, servers.signIns()),
           toolCount: outcome.toolCount,
           tools: outcome.tools,
-          error: sourceText("error.backend.mcpRegistrationUnavailable"),
+          error: sourceText("error.backend.mcpSignInAppNeeded"),
           next: "The tools that need a sign-in fail until the user adds a sign-in app to this server. Tell the user what the error says, in plain words. Do not offer a Sign in card or ask the user to sign in before the sign-in app is there.",
         });
       if (offer === "offered") {

@@ -18,6 +18,7 @@ import { useSetup } from "../onboarding/onboarding-context";
 import { useRemoteDesktop } from "../remote-desktop/remote-desktop-context";
 import { useSettings } from "../settings/settings-context";
 import { useWindowPage } from "../window/window-page-context";
+import { watchAgentWorkflows } from "../workflows/agent-workflow-toast";
 import { useServerSwitch } from "./server-switch";
 import { useServers } from "./servers-context";
 import { activeServerId, serversPort } from "./servers-port";
@@ -36,7 +37,7 @@ const ServerSelection = createSimpleContext({
       setPendingThreadSelection,
       setPreviousServerId,
     } = useServerSwitch();
-    const { agentSetupOpen, creatingAgent } = useAgents();
+    const { agentList, agentSetupOpen, creatingAgent } = useAgents();
     const { stopComposerTyping } = useConversationController();
     const { setDirectTyping } = useDirectMessages();
     const { chatWindow } = usePlatform();
@@ -151,6 +152,14 @@ const ServerSelection = createSimpleContext({
         void openNotifiedWorkflow(event).catch(() => undefined);
       }),
     );
+
+    if (!chatWindow)
+      watchAgentWorkflows({
+        activeServer: () => servers().find((server) => server.active),
+        workflowsOnScreen: () => windowPage.page() === "workflows",
+        agentName: (agentId) => agentList().find((agent) => agent.id === agentId)?.name,
+        open: (workflow) => void openNotifiedWorkflow(workflow).catch(() => undefined),
+      });
 
     async function joinServer(input: { inviteUrl: string }): Promise<void> {
       const analytics = desktopAnalytics.scope();

@@ -67,6 +67,7 @@ export const messages = {
   "provider.aria.install": "Installer {name}",
   "provider.aria.signIn": "Se connecter à {name}",
   "provider.aria.codeFallback": "Se connecter à {name} avec un code",
+  "provider.aria.addressFallback": "Coller l’adresse de connexion pour {name}",
   "provider.aria.moreActions": "Autres actions pour {name}",
 
   "provider.aria.use": "Utiliser {name} dans OpenBot",
@@ -94,6 +95,8 @@ export const messages = {
   "provider.codeLogin.pasteExpiresIn": "En attente. Cette connexion s’arrête dans {time}.",
   "provider.codeLogin.linkTitle": "Connectez-vous à {name} sur un autre appareil",
   "provider.codeLogin.pageTitle": "Se connecter à {name}",
+  "provider.codeLogin.addressDescription":
+    "Terminez la connexion dans votre navigateur. Cette fenêtre se ferme quand la connexion est terminée.",
   "provider.codeLogin.pageDescription": "Cette page est ouverte dans le navigateur de {host}. Connectez-vous ici.",
   "provider.codeLogin.relayStarting": "Démarrage de la connexion à {name} sur {host}…",
   "provider.codeLogin.pageOpening": "Ouverture de la page de connexion de {name} sur {host}…",

@@ -64,6 +64,9 @@ export const messages = {
     "OpenBot no pudo cargar la página en la ventana de inicio de sesión. Comprueba la conexión a internet y vuelve a abrir la ventana de inicio de sesión.",
   "error.backend.browserSignInReadFailed": "OpenBot no pudo leer el inicio de sesión de la ventana.",
   "error.backend.browserStopUnsupported": "Este host remoto no puede detener la carga de una página.",
+  "error.backend.browserLocationFailed": "No se pudo establecer la ubicación de la página.",
+  "error.backend.browserPermissionsUnsupported": "Este host remoto no puede responder a solicitudes de ubicación.",
+  "error.backend.browserLocationRequired": "Envía la ubicación del dispositivo para permitir la solicitud.",
   "error.backend.sharedDataLocalOnly": "Los datos compartidos se gestionan en el equipo que ejecuta estos agentes.",
   "error.backend.browserUrlProtocol": "Solo se permiten URL HTTP(S) en el navegador.",
   "error.backend.sunshineNotReady": "Sunshine no llegó a estar listo.",
@@ -299,6 +302,8 @@ export const messages = {
     "El servidor de inicio de sesión aún no acepta OpenBot como aplicación. Tu cuenta no es la causa. Usa otra forma de conexión, como un servidor MCP local.",
   "error.backend.mcpRegistrationUnavailable":
     "El servidor de inicio de sesión no puede registrar OpenBot como aplicación. Tu cuenta no es la causa. Para conectar, guarda este servidor en Marketplace, Apps, y después añádele una app de inicio de sesión.",
+  "error.backend.mcpSignInAppNeeded":
+    "El servidor de inicio de sesión no puede registrar OpenBot como aplicación. Tu cuenta no es la causa. Para conectar, abre este servidor en Marketplace, Apps, haz clic en Probar conexión y después añade una app de inicio de sesión.",
   "error.backend.mcpSignInAbandonedGeneric": "Se abandonó el inicio de sesión.",
   "error.backend.mcpSignInForgotten": "Se olvidó el inicio de sesión de MCP mientras estaba en curso.",
   "error.backend.mcpSignInAbandoned": "Se abandonó el inicio de sesión de MCP.",

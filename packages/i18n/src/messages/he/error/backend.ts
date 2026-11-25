@@ -57,6 +57,9 @@ export const messages = {
     "OpenBot לא הצליח לטעון את הדף בחלון ההתחברות. בדקו את החיבור לאינטרנט, ואז פתחו שוב את חלון ההתחברות.",
   "error.backend.browserSignInReadFailed": "OpenBot לא הצליח לקרוא את ההתחברות מהחלון.",
   "error.backend.browserStopUnsupported": "המארח המרוחק הזה אינו יכול לעצור טעינת דף.",
+  "error.backend.browserLocationFailed": "לא ניתן להגדיר את המיקום עבור הדף.",
+  "error.backend.browserPermissionsUnsupported": "המארח המרוחק הזה לא יכול להשיב לבקשות מיקום.",
+  "error.backend.browserLocationRequired": "שלח את מיקום המכשיר כדי לאשר את הבקשה.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",
   "error.backend.browserUrlProtocol": "מותר להשתמש רק בכתובות דפדפן של HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine לא הפך למוכן.",
@@ -267,6 +270,8 @@ export const messages = {
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
   "error.backend.mcpRegistrationUnavailable":
     "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לשמור את השרת הזה בחנות, אפליקציות, ואחר כך להוסיף לו אפליקציית התחברות.",
+  "error.backend.mcpSignInAppNeeded":
+    "שרת ההתחברות אינו יכול לרשום את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. כדי להתחבר, יש לפתוח את השרת הזה בחנות, אפליקציות, ללחוץ על בדיקת חיבור, ואחר כך להוסיף אפליקציית התחברות.",
   "error.backend.mcpSignInAbandonedGeneric": "ההתחברות ננטשה.",
   "error.backend.mcpSignInForgotten": "התחברות ה-MCP נשכחה בזמן שהיא רצה.",
   "error.backend.mcpSignInAbandoned": "התחברות ה-MCP ננטשה.",

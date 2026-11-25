@@ -332,6 +332,8 @@ interface AcpThread {
   relayed: RelayedMcpServers;
   activeTurn: AcpTurn | null;
   needsResume: boolean;
+  abandonedTurn: boolean;
+  openPrompts: number;
   transport: AcpConnection | null;
   dynamicTools: DynamicToolNamespace[];
   workspaceRoots: string[];
@@ -1779,8 +1781,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         this.#requireConnection().closeSession({ sessionId: requestedThreadId, ...this.#forcedClose }),
       ).pipe(this.#backgroundTimeout("session/close"), Effect.ignore);
     }
-    const exit = yield* Effect.exit(this.#openThreadWithModels(params, true));
-    if (recovering && Exit.isSuccess(exit)) {
+    const exit = yield* Effect.exit(
+      this.#openThreadWithModels(params, true).pipe(
+        Effect.catchIf(
+          (failure) => recovering === true && this.#refusedAsActive(held, params, failure),
+          (failure) => (held ? this.#reopenActiveSession(held, params) : Effect.fail(failure)),
+        ),
+      ),
+    );
+    if (recovering && Exit.isSuccess(exit) && this.#threads.get(requestedThreadId) !== held) {
       held.mcp.close();
       yield* held.relays;
     }
@@ -1788,6 +1797,60 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (this.#startingThreads.get(requestedThreadId) === completion) this.#startingThreads.delete(requestedThreadId);
     return yield* exit;
   }, Effect.uninterruptible);
+
+  #refusedAsActive(held: AcpThread | undefined, params: unknown, failure: ProviderClientOperationError): boolean {
+    return (
+      held !== undefined &&
+      held.transport === null &&
+      held.abandonedTurn &&
+      held.computerUse === computerUseParam(params) &&
+      !this.#workspaceRootsChanged(held, params) &&
+      this.#flavor.sessionStillActive?.(failure.cause) === true
+    );
+  }
+
+  readonly #reopenActiveSession = Effect.fn("AcpAgentClient.reopenActiveSession")(function* (
+    this: AcpAgentClient,
+    held: AcpThread,
+    params: unknown,
+  ): Effect.fn.Return<{ thread: { id: string } }, ProviderClientOperationError> {
+    if (held.backgroundUntil !== 0) return yield* this.#keepActiveSession(held, params);
+    this.#stopThreadSubagents(held.id);
+    const connection = yield* providerSync(() => this.#requireConnection());
+    yield* providerCall(() => connection.cancel({ sessionId: held.id })).pipe(Effect.ignore);
+    yield* providerCall(() => connection.closeSession({ sessionId: held.id, ...this.#forcedClose })).pipe(
+      this.#backgroundTimeout("session/close"),
+      Effect.ignore,
+    );
+    return yield* this.#openThreadWithModels(params, true).pipe(
+      Effect.catchIf(
+        (failure) => this.#refusedAsActive(held, params, failure),
+        () => this.#keepActiveSession(held, params),
+      ),
+    );
+  });
+
+  readonly #keepActiveSession = Effect.fn("AcpAgentClient.keepActiveSession")(function* (
+    this: AcpAgentClient,
+    held: AcpThread,
+    params: unknown,
+  ): Effect.fn.Return<{ thread: { id: string } }, ProviderClientOperationError> {
+    if (held.openPrompts > 0) return yield* providerFailure(new ProviderSessionBusyError(this.#label));
+    held.developerInstructions = getString(params, "developerInstructions") ?? held.developerInstructions;
+    held.agentId ??= mcpAgentParam(params);
+    yield* this.#configuration.applyConfig(
+      held,
+      this.#requestedModel(params),
+      getString(params, "effort"),
+      this.#models,
+    );
+    held.needsResume = false;
+    held.abandonedTurn = false;
+    logger.warn("An ACP agent still holds a session after a stopped turn. OpenBot keeps using it.", {
+      provider: this.provider,
+    });
+    return { thread: { id: held.id } };
+  });
 
   #openThreadWithModels(
     params: unknown,
@@ -1988,6 +2051,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               relayed: relayedServers,
               activeTurn: null,
               needsResume: false,
+              abandonedTurn: false,
+              openPrompts: 0,
               transport: sessionTransport,
               dynamicTools,
               workspaceRoots: additionalDirectories,
@@ -3047,11 +3112,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return Effect.suspend(() => {
       const answered = Deferred.makeUnsafe<void>();
       turn.lastPrompt = answered;
-      return providerCall(() => this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })).pipe(
-        Effect.result,
-        Effect.ensuring(Deferred.succeed(answered, undefined)),
-      );
+      return providerCall(() =>
+        this.#trackedPrompt(thread, this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })),
+      ).pipe(Effect.result, Effect.ensuring(Deferred.succeed(answered, undefined)));
     });
+  }
+
+  #trackedPrompt(thread: AcpThread, request: Promise<PromptResponse>): Promise<PromptResponse> {
+    thread.openPrompts += 1;
+    const settle = () => {
+      thread.openPrompts -= 1;
+    };
+    request.then(settle, settle);
+    return request;
   }
 
   readonly #sendPrompt = Effect.fn("AcpAgentClient.sendPrompt")(function* (
@@ -3843,7 +3916,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     error: string | null,
   ) {
     if (thread.activeTurn !== turn || turn.completing) return;
-    if (this.#supportsSessionResume || this.#loadsSessions) thread.needsResume = true;
+    if (this.#supportsSessionResume || this.#loadsSessions) {
+      thread.needsResume = true;
+      thread.abandonedTurn = true;
+    }
     turn.abandoned = true;
     if (turn.task) yield* Fiber.interrupt(turn.task);
     yield* this.#completeTurn(thread, turn, status, error);
