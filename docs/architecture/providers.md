@@ -690,6 +690,13 @@ and does not connect again while the settings stay the same (#10749). When the b
 its tools within that time after the session request, OpenBot gives the directory a new token and
 resumes the session once. The earlier tokens stay valid until the last session of the directory closes.
 
+On Windows, OpenCode picks PowerShell 7 first and accepts its Microsoft Store alias in `WindowsApps`.
+Its process service (`@opencode/pty` 0.6.0) starts that alias only some of the time: Windows refuses it
+with error 5 while another process of the Store package runs (anomalyco/opencode#64803). When `pwsh` on
+the `PATH` is only that alias and `SHELL` is not set, `opencode-windows-shell.ts` sets `SHELL` to
+Windows PowerShell in `System32`. A `shell` in the OpenCode config comes before `SHELL`, so the
+user's choice still wins. Remove this when an OpenCode release ships anomalyco/opencode#64901.
+
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
 `question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
