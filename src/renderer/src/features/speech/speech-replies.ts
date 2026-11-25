@@ -460,6 +460,7 @@ async function speak(
   const analytics = desktopAnalytics.scope();
   try {
     if (voiceServer() === undefined) {
+      spoken = own;
       const generation = readingsGeneration;
       await voiceServerLoaded();
       if (generation !== readingsGeneration) return;
