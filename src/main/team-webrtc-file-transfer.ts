@@ -206,7 +206,6 @@ export class TeamWebRtcFileTransfer {
               const source = yield* remoteCall(() => open(path, "r"));
               file = source;
               this.#writing.delete(pending);
-              this.#notifyStateChange();
               yield* remoteDecode(() => this.#checkOutgoing(size));
               const transferId = yield* this.#sendOutgoingEffect(peerId, {
                 name: input.name,
@@ -225,7 +224,6 @@ export class TeamWebRtcFileTransfer {
           () =>
             Effect.gen({ self: this }, function* () {
               this.#writing.delete(pending);
-              this.#notifyStateChange();
               yield* remoteCall(() => (file ? file.close() : Promise.resolve())).pipe(Effect.catch(() => Effect.void));
               yield* remoteCall(() => rm(path, { force: true }));
             }),
