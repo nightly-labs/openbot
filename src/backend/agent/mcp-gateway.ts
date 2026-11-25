@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import type {
   McpServerConfig,
   McpSignInAppInput,
@@ -12,7 +13,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import { GITHUB_CONNECTOR_MCP_SERVER_ID, mcpConfigErrors, normalizeMcpConfig } from "@openbot/contracts/ipc";
 import { mcpAccountFragment, withoutMcpAccountFragment } from "@openbot/contracts/mcp-accounts";
-import { matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { matchingSourceKeys, sourceText, sourceTextValues } from "@openbot/i18n/source";
 import { type Logger, redactSecrets, toLogValue } from "@openbot/logging";
 import { Effect, Exit, Result, Schema, Scope } from "effect";
 import type { AgentProvider } from "../agent-client";
@@ -633,9 +634,14 @@ export class McpGateway {
 
 function dropText(provider: AgentProvider, drop: McpServerDrop): string {
   if (drop.reason === "failed_in_provider") return drop.detail;
-  if (drop.reason === "command_not_found")
+  if (drop.reason === "command_not_found" && isProgramPath(drop.detail))
     return sourceText("error.backend.mcpServerProgramMissing", { name: drop.name });
   return `${providerLabel(provider)} did not get the MCP server "${drop.name}". ${drop.detail}`;
+}
+
+function isProgramPath(detail: string): boolean {
+  const command = sourceTextValues(detail, "error.backend.mcpCommandNotFound")?.command?.trim() ?? "";
+  return command.startsWith("~") || isAbsolute(command);
 }
 
 export class McpGatewayFailed extends Schema.TaggedError<McpGatewayFailed>()("McpGatewayFailed", {

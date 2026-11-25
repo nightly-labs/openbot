@@ -277,7 +277,7 @@ export const messages = {
   "error.backend.mcpServerExitedWithOutput": "השרת נעצר לפני שענה. הוא כתב: {detail}",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
   "error.backend.mcpServerProgramMissing":
-    "OpenBot לא הצליח להפעיל את שרת ה-MCP {name}, כי התוכנה שלו לא נמצאת במחשב הזה. יש להתקין את האפליקציה שמספקת את {name}, או לכבות את {name} בחנות, אפליקציות.",
+    "OpenBot לא הצליח להפעיל את שרת ה-MCP {name}, כי התוכנה שלו לא מותקנת במחשב שמריץ את OpenBot. יש להתקין את האפליקציה שמספקת את {name} במחשב הזה, או לכבות את {name} בחנות, אפליקציות.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} הפסיק לחכות לפני שהשרת התחיל, ולכן הסוכנים שלו לא מקבלים את הכלים של השרת הזה.",
   "error.backend.mcpServerStoppedDuringCall": "שרת ה-MCP נעצר לפני שענה לקריאה הזו.",

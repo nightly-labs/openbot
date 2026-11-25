@@ -306,7 +306,7 @@ export const messages = {
   "error.backend.mcpServerExitedWithOutput": "El servidor se detuvo antes de responder. Escribió: {detail}",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
   "error.backend.mcpServerProgramMissing":
-    "OpenBot no pudo iniciar el servidor MCP {name}, porque su programa no está en este equipo. Instala la aplicación que ofrece {name}, o desactiva {name} en Marketplace, Apps.",
+    "OpenBot no pudo iniciar el servidor MCP {name}, porque su programa no está instalado en el equipo que ejecuta OpenBot. Instala la aplicación que ofrece {name} en ese equipo, o desactiva {name} en Marketplace, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} dejó de esperar antes de que el servidor se iniciara, así que sus agentes no reciben las herramientas de este servidor.",
   "error.backend.mcpServerStoppedDuringCall": "El servidor MCP se detuvo antes de responder a esta llamada.",
