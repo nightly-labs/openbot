@@ -497,6 +497,7 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
   staleSession: kimiStaleSession,
   unsentBackgroundTurns: true,
   unsentTaskTurns: KIMI_TASK_TURNS,
+  messagePerId: true,
 };
 
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
@@ -600,6 +601,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     staleSession: kimiStaleSession,
     unsentBackgroundTurns: true,
     unsentTaskTurns: KIMI_TASK_TURNS,
+    messagePerId: true,
   },
   "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000, modelConfigId: "model" },
 };

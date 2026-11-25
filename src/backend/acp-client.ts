@@ -4135,10 +4135,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   #applyBackgroundEntries(thread: AcpThread, loaded: SessionUpdate[]): void {
     const taskTurns = this.#flavor.unsentTaskTurns;
-    const updates = taskTurns
-      ? loaded.map((update, index) => keyedEntry(update, index, taskTurns.toolCallKey))
-      : loaded;
-    const ids = updates.map((update) => shownEntryId(update));
+    const updates = taskTurns ? withLoadedMessageIds(loaded, taskTurns.toolCallKey) : loaded;
+    const ids = updates.map((update) => shownEntryId(update, taskTurns?.toolCallKey));
     const lastShown = ids.findLastIndex((id) => id !== null && thread.shownIds.has(id));
     if (lastShown < 0) return;
     const firstUnshown = taskTurns ? afterShownTail(updates, lastShown + 1, thread.shownTail) : lastShown + 1;
@@ -4163,7 +4161,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       });
     for (const [index, update] of updates.entries()) {
       const id = ids[index];
-      if (id && (fresh.has(id) || turn.toolItems.has(id))) this.#applyTurnUpdate(thread, turn, update);
+      const itemId =
+        update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update" ? update.toolCallId : id;
+      if (id && (fresh.has(id) || turn.toolItems.has(itemId ?? id))) this.#applyTurnUpdate(thread, turn, update);
     }
     turn.lastActivityAt = Date.now();
   }
@@ -4994,15 +4994,27 @@ function withShownText(tail: ShownTail, update: SessionUpdate): ShownTail {
   return tail;
 }
 
-function keyedEntry(update: SessionUpdate, index: number, toolCallKey: (toolCallId: string) => string): SessionUpdate {
-  if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update")
-    return { ...update, toolCallId: toolCallKey(update.toolCallId) };
-  if (
-    (update.sessionUpdate === "agent_message_chunk" || update.sessionUpdate === "agent_thought_chunk") &&
-    contentMessageId(update) === null
-  )
-    return { ...update, messageId: `loaded:${index}` };
-  return update;
+function withLoadedMessageIds(
+  updates: readonly SessionUpdate[],
+  toolCallKey: (toolCallId: string) => string,
+): SessionUpdate[] {
+  let afterTool: string | null = null;
+  let chunks = 0;
+  return updates.map((update) => {
+    if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
+      afterTool = toolCallKey(update.toolCallId);
+      chunks = 0;
+      return update;
+    }
+    if (
+      afterTool === null ||
+      (update.sessionUpdate !== "agent_message_chunk" && update.sessionUpdate !== "agent_thought_chunk") ||
+      contentMessageId(update) !== null
+    )
+      return update;
+    chunks += 1;
+    return { ...update, messageId: `loaded:${afterTool}:${chunks}` };
+  });
 }
 
 function afterShownTail(updates: readonly SessionUpdate[], start: number, tail: ShownTail): number {
