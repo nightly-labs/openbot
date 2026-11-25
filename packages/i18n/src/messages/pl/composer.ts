@@ -7,6 +7,15 @@ export const messages = {
   "composer.feedbackFix.body":
     "Poprawiasz zgłoszenie #{number}. Wyślij prośbę albo anuluj, aby zostawić zgłoszenie bez zmian.",
   "composer.feedbackFix.cancel": "Anuluj",
+  "composer.browserTab.opened": "{name} otworzył(a) {title} w przeglądarce.",
+  "composer.browserTab.openedMany": {
+    one: "{name} otworzył(a) {count} stronę w przeglądarce.",
+    few: "{name} otworzył(a) {count} strony w przeglądarce.",
+    many: "{name} otworzył(a) {count} stron w przeglądarce.",
+    other: "{name} otworzył(a) {count} strony w przeglądarce.",
+  },
+  "composer.browserTab.open": "Otwórz stronę",
+  "composer.browserTab.hide": "Ukryj",
   "composer.providerWait.offlineTitle": "Brak połączenia z internetem",
   "composer.providerWait.offline": "{provider} nie może odpowiedzieć, dopóki ten komputer nie wróci do sieci.",
   "composer.providerWait.silent": "Czas bez aktualizacji od {provider}: {duration}.",
