@@ -223,6 +223,8 @@ const RESULT_FORMAT =
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
 const STILL_WORKING_FROM = "No answer yet from ";
 const EXTERNAL_CHAT_ANSWER = `This turn runs in an external chat, such as WhatsApp, Slack or Telegram. OpenBot posts your written answer there, and the people in it read it. Put the result only in openbot.send_message. When only a person in that chat can give what you need, ask them for it in your written answer, in plain words. Otherwise answer only ${QUIET_ANSWER}: nothing is posted.`;
+const EXTERNAL_CHAT_RESULT =
+  "OpenBot posts your written answer in the external chat of this turn, such as WhatsApp, Slack or Telegram, and the people in it read it. Give them the result in your own voice, as your instructions say. Do not name the teammate or say that a teammate did the work, unless your instructions tell you to.";
 const STILL_WORKING_REASON = ": they still work on the request. Their answer comes in a later turn.";
 export const HANDOFF_START = "Continue this OpenBot conversation.";
 export const HANDOFF_END = "--- end previous transcript ---";
@@ -478,11 +480,12 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
     const routine = answersRequest ? sources.answeredRoutine : null;
+    const externalChatResult = sources.externalChat ? EXTERNAL_CHAT_RESULT : null;
     const replyProtocol = answersRequest
       ? [
           routine
-            ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. Then give the result to the user naturally, starting with the teammate's name.`
-            : "This replies to a message you sent. Give the result to the user naturally, starting with the teammate's name.",
+            ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. ${externalChatResult ?? "Then give the result to the user naturally, starting with the teammate's name."}`
+            : `This replies to a message you sent. ${externalChatResult ?? "Give the result to the user naturally, starting with the teammate's name."}`,
           "For partial or blocked work, you still own the request: finish the rest yourself, with a follow-up, or with a better teammate; do not repeat a failed call unchanged. Give the user the blocker and its Unblock action only when the user must act. When OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app and end your answer with the next field of its result.",
           `Reply to the teammate only for another requested action or new information that unblocks its work, with replyToMessageId "${delivery.messageId}", never with the same request or an acknowledgement.`,
           USER_LANGUAGE_LINE,
