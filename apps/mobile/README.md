@@ -351,6 +351,47 @@ start, and iOS suspends the app soon after the intent returns.
 
 Check the shortcuts on an iPhone, also with the app removed from the app switcher.
 
+## CarPlay
+
+The car screen shows the pinned agents of the active server in one row. Below it, the agents with
+unread messages come first, newest on top, then the other agents. A tap on an agent starts a voice
+session: the agent reads its unread replies aloud, then listens, as the voice conversation of a
+chat does. CarPlay uses the voice-based conversation category, which needs iOS 26.4.
+
+The voice screen shows the avatar of the agent in each state: the idle loop while it listens, the
+working loop with the three dots while it thinks, and the happy loop while it speaks. JavaScript
+draws the loops to PNG frames in `Caches/carplay-voice` (`model/carplay-voice-pictures.ts`), first
+for the pinned agents, and the frames play as one animated image. An agent with a photo shows the
+photo. Sign-out deletes the frames. The voice screen opens at once with the still picture of the
+CarPlay list and changes to the loops when their frames are ready. The state text is drawn small under
+the avatar in the same image, because the template always puts its own title above the image, and
+the states have no action buttons, because they make CarPlay shrink the image. On iOS 26.4 and later,
+the mute (microphone) button is in the navigation bar next to the system close button. CarPlay does
+not redraw changed action buttons of a state on screen, so the mute button changes only its image. A template
+has at most five states: `unavailable` happens only before the conversation starts, so a template
+has `muted` or `unavailable`, never both.
+
+When the car connects before the phone app opens, React Native starts in a window that has no scene.
+UIKit does not lay out that window, and the safe area provider of Expo Router renders nothing until
+it has a size, so `ParkedReactView` lays the window out until the phone scene takes it.
+
+- `plugins/with-carplay.js` adds the CarPlay scene to the scene manifest, and copies
+  `plugins/carplay/CarPlaySceneDelegate.swift` into the app target. It also changes the template
+  `SceneDelegate.swift`: when the car connects first, the scene delegate starts React Native with no
+  window, and the phone window uses that same root view when it opens later.
+- `modules/carplay` draws the templates (`CPListTemplate` and `CPVoiceControlTemplate`) and sends
+  the taps to `src/features/carplay`. The JavaScript gives the list and runs the voice session with
+  `useLiveConversation`, so speech, sending and the reply follow the voice settings of the app.
+- The server connections stay on while CarPlay is connected, also with the phone app in the
+  background. App lock hides the agents in the car until the app is unlocked on the phone.
+- Apple granted the entitlement `com.apple.developer.carplay-voice-based-conversation` to the team,
+  so `app.json` sets `"entitled": true` for `./plugins/with-carplay`. The provisioning profile of the
+  app must include it: turn it on for the App ID in Certificates, Identifiers & Profiles, then make
+  the profiles again.
+
+Check the car screen with the CarPlay window of the simulator, then with the CarPlay Simulator of
+Xcode and a real iPhone, also with the app removed from the app switcher before the car connects.
+
 ## Source structure
 
 The mobile app uses a feature-first structure. Expo Router files stay deliberately thin: `src/app`
@@ -364,6 +405,7 @@ src/
   features/
     auth/               QR and email sign-in, session storage, and session context
     agents/             agent list, agent actions, and pin transitions
+    carplay/            CarPlay list data and the voice session in the car
     chat/               chat screen and its focused UI sections
     search/             search model, controls, results, and screen
     servers/            server drawer and joining a server

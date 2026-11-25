@@ -253,6 +253,7 @@
         }
       ],
       "./plugins/with-shortcuts",
+      ["./plugins/with-carplay", { "entitled": true }],
       "./plugins/with-xcode-warning-fixes"
     ],
     "experiments": {

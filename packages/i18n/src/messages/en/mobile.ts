@@ -4,6 +4,7 @@ import { messages as mobileApp } from "./mobile/app";
 import { messages as mobileAppLock } from "./mobile/appLock";
 import { messages as mobileAuth } from "./mobile/auth";
 import { messages as mobileBrowser } from "./mobile/browser";
+import { messages as mobileCarPlay } from "./mobile/carplay";
 import { messages as mobileChannel } from "./mobile/channel";
 import { messages as mobileChat } from "./mobile/chat";
 import { messages as mobileLink } from "./mobile/link";
@@ -35,6 +36,7 @@ export const enMobile = {
   ...mobileSettings,
   ...mobileLink,
   ...mobileLiveActivity,
+  ...mobileCarPlay,
   ...mobileMarketplace,
   ...mobileOnboarding,
   ...mobileWorkspace,

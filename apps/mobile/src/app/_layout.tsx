@@ -21,6 +21,8 @@ import { UpdateRequiredOverlay } from "@/features/app-update/components/update-r
 import { DevelopmentConnectLinkHandler } from "@/features/auth/components/development-connect-link-handler";
 import { MobileSessionProvider, useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { backgroundRefreshNative } from "@/features/background-refresh/background-refresh-native";
+import { installCarPlay } from "@/features/carplay/carplay-native";
+import { resetCarPlay } from "@/features/carplay/carplay-reset";
 import { loadOnboardingProgress } from "@/features/onboarding/model/onboarding-progress";
 import { resetNotificationAvatars } from "@/features/push-notifications/notification-avatars";
 import { installNotificationHandler } from "@/features/push-notifications/use-notification-taps";
@@ -77,6 +79,7 @@ export const unstable_settings = {
 installSupportLog();
 installQuickActions();
 installShortcuts();
+installCarPlay();
 installAppLock();
 installNotificationHandler();
 backgroundRefreshNative?.install();
@@ -137,6 +140,7 @@ function RootNavigator() {
     resetShortcutDirectory();
     resetShortcuts();
     resetNotificationAvatars();
+    resetCarPlay();
   }, [loading, session]);
 
   useLayoutEffect(() => {

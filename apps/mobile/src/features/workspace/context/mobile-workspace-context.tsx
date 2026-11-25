@@ -170,6 +170,8 @@ import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import { useCarPlayConnected } from "@/features/carplay/carplay-native";
+import { deleteServerCarPlayData } from "@/features/carplay/carplay-reset";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
 import {
@@ -437,7 +439,9 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const [connectionWaits] = useState(() => new ConnectionWaits());
   const loadGeneration = useRef(0);
   const directoryGeneration = useRef(0);
-  const foreground = useAppForeground();
+  const appForeground = useAppForeground();
+  const carPlayConnected = useCarPlayConnected();
+  const foreground = appForeground || carPlayConnected;
   const [servers, setServers] = useState<MobileServer[]>([]);
   const [serverDirectoryState, setServerDirectoryState] = useState<MobileServerDirectoryState>("loading");
   const [serverDirectoryError, setServerDirectoryError] = useState<string | null>(null);
@@ -626,6 +630,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         clearTimeout(firstConnectionTimers.current.get(serverId));
         firstConnectionTimers.current.delete(serverId);
         deleteServerAvatars(serverId);
+        deleteServerCarPlayData(serverId);
         connectionWaits.drop(
           serverId,
           new ConnectionUnavailableError(currentText().t("mobile.workspace.error.transportNotReady")),

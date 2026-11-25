@@ -27,6 +27,7 @@ module.exports = {
     { type: "dir", filePath: "plugins/share-extension", reasons: ["shareExtension"] },
     { type: "dir", filePath: "plugins/notification-service", reasons: ["notificationService"] },
     { type: "dir", filePath: "plugins/shortcuts", reasons: ["shortcuts"] },
+    { type: "dir", filePath: "plugins/carplay", reasons: ["carPlay"] },
     { type: "dir", filePath: "assets/sounds", reasons: ["notificationSounds"] },
     { type: "dir", filePath: "certs", reasons: ["updateSigningCertificate"] },
     { type: "file", filePath: "../../packages/contracts/src/app-logo-color.ts", reasons: ["appIcons"] },
