@@ -10,7 +10,7 @@
         "type": "added",
         "items": [
           "Agents can make images and videos with OpenBot credits, and edit your pictures. The approval card shows the model, the price and the prompt. You can choose another model before you allow it. The Credits item in the left rail shows your balance. An owner or an admin can turn \"Agents can use credits\" on or off.",
-          "Agents can pay sites in crypto from a NEAR Intents wallet. Connect it in Server settings › Vault › Crypto with a passkey, then add funds. Each payment waits for your approval in the chat, and a daily budget limits what agents can spend.",
+          "Agents can pay sites in crypto from a NEAR Intents wallet. Connect it in Server settings › Vault › Crypto with a passkey, then add funds. A payment waits for your approval in the chat, unless you select \"Always allow\" for that site. A daily budget limits what agents can spend. The wallet is only for this computer, and payments use real funds.",
           "Each account gets 10 free welcome credits. You can also redeem a credit code on the Credits page with Redeem code.",
           "An agent's browser tab can ask for your location. The chat asks you first, and you choose Block, Allow always or Allow. Before, the browser always blocked the request.",
           "The sidebar has tabs above the chat list: All, Unread and the folders that you choose. Each tab shows its unread chats."

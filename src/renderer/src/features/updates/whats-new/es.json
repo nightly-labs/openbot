@@ -10,7 +10,7 @@
         "type": "added",
         "items": [
           "Los agentes pueden crear imágenes y videos con créditos de OpenBot, y editar tus imágenes. La tarjeta de aprobación muestra el modelo, el precio y el prompt. Puedes elegir otro modelo antes de permitirlo. El elemento Credits de la barra izquierda muestra tu saldo. Un propietario o un administrador puede activar o desactivar «Los agentes pueden usar créditos».",
-          "Los agentes pueden pagar en sitios con cripto desde una cartera de NEAR Intents. Conéctala en Ajustes del servidor › Vault › Cripto con una llave de acceso y luego haz un depósito. Cada pago espera tu aprobación en el chat, y un presupuesto diario limita lo que pueden gastar los agentes.",
+          "Los agentes pueden pagar en sitios con cripto desde una cartera de NEAR Intents. Conéctala en Ajustes del servidor › Vault › Cripto con una llave de acceso y luego haz un depósito. Cada pago espera tu aprobación en el chat, a menos que elijas «Permitir siempre» para ese sitio. Un presupuesto diario limita lo que pueden gastar los agentes. La cartera es solo para este equipo, y los pagos usan fondos reales.",
           "Cada cuenta recibe 10 créditos gratis de bienvenida. También puedes canjear un código de crédito en la página Credits con Redeem code.",
           "La pestaña del navegador de un agente puede pedir tu ubicación. El chat te pregunta primero, y eliges Bloquear, Permitir siempre o Permitir. Antes, el navegador siempre bloqueaba la solicitud.",
           "La barra lateral tiene pestañas encima de la lista de chats: Todos, No leídos y las carpetas que elijas. Cada pestaña muestra sus chats no leídos."
