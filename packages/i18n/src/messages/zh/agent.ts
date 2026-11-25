@@ -47,6 +47,8 @@ export const messages = {
   "agent.dock.add": "添加到停靠栏",
   "agent.dock.allAdded": "你的所有智能体和频道都已在停靠栏中",
   "agent.dock.more": "更多",
+  "agent.dock.mainChat": "主聊天",
+  "agent.dock.changeChat": "切换聊天",
   "agent.dock.keepOpen": "保持打开",
   "agent.dock.closeOnLeave": "点击别处时关闭",
   "agent.dock.openInMain": "在主窗口中打开",

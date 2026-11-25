@@ -179,6 +179,7 @@ export function createWebConversationRuntime(
   canAdminister?: (capability: string) => boolean,
   storageCalls?: () => FilesPort,
   skillCatalog?: () => SkillCatalogCalls,
+  imageCopiesSupported?: () => boolean | undefined,
 ): ConversationRuntime {
   const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
   const routinePauseReasonsEnabled = () => hasCapability?.(ROUTINE_PAUSE_REASONS_CAPABILITY) === true;
@@ -186,7 +187,7 @@ export function createWebConversationRuntime(
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
   const downloadListeners = new Set<(progress: AttachmentDownloadProgress) => void>();
-  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId, undefined, imageCopiesSupported);
   const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   let importBusy = false;
@@ -521,6 +522,12 @@ export function createWebConversationRuntime(
     },
     previewAttachment: files.preview,
     attachmentMedia,
+    imageCopies: {
+      mediaSource: attachmentMedia.withCopies,
+      copyUrl: (image) => attachmentMedia.copyUrl(image.id),
+      fullUrl: (image) => attachmentMedia.url(image.id),
+      loadFull: (image) => attachmentMedia.load(image, "generated"),
+    },
     visualPage: files.visualPage,
     async importFiles(files) {
       if (files.length > 0) await importPick(files);

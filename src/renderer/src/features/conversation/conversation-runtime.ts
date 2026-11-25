@@ -13,6 +13,7 @@ import type {
   WithdrawFeedbackResult,
 } from "@openbot/contracts/ipc";
 import type { AttachmentMediaSource } from "@openbot/ui/features/conversation/AttachmentCards";
+import type { ImageCopies } from "@openbot/ui/features/conversation/ImageLightbox";
 import type { AgentSkillCalls, SkillCatalogCalls } from "../../skills-port";
 import type { AgentTemplatePublishCalls } from "../agent-templates/agent-templates-port";
 import type { BrowserProfileCalls } from "../browser/browser-profiles-port";
@@ -95,6 +96,7 @@ export interface ConversationRuntime {
   saveSkillSuggestion?: ((input: SaveSkillSuggestionInput) => Promise<SaveSkillSuggestionResult>) | undefined;
   previewAttachment?: (attachment: AttachmentSummary) => Promise<FilePreview>;
   attachmentMedia?: AttachmentMediaSource;
+  imageCopies?: ImageCopies | undefined;
   visualPage?: (attachment: AttachmentSummary) => Promise<string>;
   importFiles?: (files: File[]) => Promise<void>;
   cancelImportFiles?: () => Promise<void>;

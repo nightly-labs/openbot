@@ -201,6 +201,12 @@ starts a new conversation or compacts it; only an owner or admin deletes the cha
 desktop hides that row from a member. A host without the capability does not show the rows. Protocol
 9 only.
 
+`channel-compact-availability-v1` adds `POST /v1/channels/context/compact-availability` with
+`{ channelId }`. The host answers `{ available }`: false when no member of the channel can compact on
+request, for example when all members use Claude Code or a custom ACP agent, which compact by
+themselves. The desktop, the web client and mobile then hide "Compact context" in the channel
+settings. A client of a host without the capability shows the row as before. Protocol 10 only.
+
 ### Workspace folders
 
 `workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who

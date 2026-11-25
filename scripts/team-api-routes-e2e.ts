@@ -180,6 +180,7 @@ import {
   AGENT_THREAD_REQUESTS_CAPABILITY,
   AGENT_THREAD_REQUESTS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
+import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
@@ -235,6 +236,11 @@ import {
   CACHE_EXPIRY_COMPACTION_CODECS,
   CACHE_EXPIRY_COMPACTION_ROUTES,
 } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import {
+  CHANNEL_COMPACT_AVAILABILITY_CAPABILITY,
+  CHANNEL_COMPACT_AVAILABILITY_ROUTE,
+  decodeChannelCompactAvailability,
+} from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import {
   CHANNEL_FOLDERS_CAPABILITY,
   CHANNEL_FOLDERS_ROUTES,
@@ -399,6 +405,7 @@ import {
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { OPENBOT_CREDITS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/openbot-credits-events-v1";
+import { optionalRouteCodec } from "@openbot/contracts/team-protocol/optional-routes";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
@@ -573,8 +580,10 @@ import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { strToU8, unzipSync, zipSync } from "fflate";
 import { runClientBrowserTool, withClientTabs } from "../src/backend/agent/client-browser-tools";
+import { compactsOnRequest } from "../src/backend/agent/context-compaction";
 import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../src/backend/agent/inactive-attention-request";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
+import { fixedContextCompaction } from "../src/backend/agent-client";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
 import { AgentThreadLimitError } from "../src/backend/agent-tasks/agent-tasks";
 import { AgentWaitError } from "../src/backend/agent-waits/agent-wait-store";
@@ -1895,6 +1904,14 @@ const fakeAgents: TeamApiAgents = {
   },
   clearChannelContext: unused("clearChannelContext"),
   compactChannelContext: unused("compactChannelContext"),
+  channelCompactAvailable: (channelId) => {
+    record("channelCompactAvailable", channelId);
+    const members = new Set(channelService?.store.get(channelId).members.map((member) => member.agentId));
+    return agents.some((item) => {
+      const mode = fixedContextCompaction(item.provider);
+      return members.has(item.id) && (mode === undefined || compactsOnRequest(mode));
+    });
+  },
   deleteChannelHistory: unused("deleteChannelHistory"),
   compactAgentContext: (agentId) => Effect.sync(() => record("compactAgentContext", agentId)),
   compactTaskContext: (input) => {
@@ -2210,7 +2227,7 @@ const fakeAgentTasks: TeamApiAgentTasks = {
     throw new AgentThreadLimitError();
   },
   renameTask: unused("renameTask"),
-  deleteTask: unused("deleteTask"),
+  deleteTask: (input) => Effect.sync(() => record("deleteTask", input)),
   listTaskReads: unused("listTaskReads"),
   markTaskRead: unused("markTaskRead"),
   branchTask: unused("branchTask"),
@@ -8420,6 +8437,27 @@ try {
   }
 
   {
+    const target = { agentId: "agent-ada", taskId: "task-1" };
+    const unsupported = await call("POST", AGENT_THREADS_ROUTES.delete, { token: bobToken, json: target });
+    check(
+      "the thread delete route without agent-threads-v1 gets 400 threadRemoteUnsupported, and deletes nothing",
+      errorIs(unsupported, 400, sourceText("error.backend.threadRemoteUnsupported")) &&
+        callsOf("deleteTask").length === 0,
+      summary(unsupported),
+    );
+    const deleted = await call("POST", AGENT_THREADS_ROUTES.delete, {
+      token: bobToken,
+      json: target,
+      capabilities: [AGENT_HIDDEN_CAPABILITY, AGENT_THREADS_CAPABILITY],
+    });
+    check(
+      "the thread delete route with agent-threads-v1 deletes the thread of the agent that the member names",
+      deleted.status === 200 && isDeepStrictEqual(callsOf("deleteTask"), [[target]]),
+      [summary(deleted), callsOf("deleteTask")],
+    );
+  }
+
+  {
     const capabilities = [AGENT_HIDDEN_CAPABILITY, AGENT_THREAD_REPLIES_CAPABILITY];
     const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
     const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
@@ -10875,6 +10913,83 @@ try {
         field(alertRow, "unreadCount") === 1 &&
         logged.slice(alertLogStart).every((line) => !line.includes("Team API request failed")),
       [heldSequence, shownSequence, summary(readAfterDelete), summary(readPastHistory), field(alertRow, "unreadCount")],
+    );
+    pictures.store.update(
+      pictures.store.create("channel-mixed", {
+        name: "mixed",
+        title: "",
+        instructions: "",
+        members: [{ agentId: "agent-ada" }, { agentId: "agent-pi" }],
+        leadAgentId: null,
+      }),
+    );
+    const compactUse = {
+      base: at,
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V10,
+      capabilities: [CHANNEL_COMPACT_AVAILABILITY_CAPABILITY],
+    };
+    const compactAdvertised = await call("GET", TEAM_API_ROUTES.compatibility, {
+      base: at,
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const compactOlder = await call("GET", TEAM_API_ROUTES.compatibility, { base: at, protocol: TEAM_PROTOCOL_V9 });
+    const compactMainHost = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    check(
+      "a host with channels advertises channel-compact-availability-v1 to protocol 10 only, and a host without channels does not",
+      list(field(compactAdvertised.body, "capabilities")).includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY) &&
+        !list(field(compactOlder.body, "capabilities")).includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY) &&
+        !list(field(compactMainHost.body, "capabilities")).includes(CHANNEL_COMPACT_AVAILABILITY_CAPABILITY),
+      [summary(compactAdvertised), summary(compactOlder), summary(compactMainHost)],
+    );
+    const claudeOnly = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, { ...compactUse, json: { channelId } });
+    const mixed = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      json: { channelId: "channel-mixed" },
+    });
+    const decodeAvailability = (reply: Reply) =>
+      decodeChannelCompactAvailability(
+        optionalRouteCodec(CHANNEL_COMPACT_AVAILABILITY_ROUTE)?.response(reply.status, reply.body),
+      );
+    check(
+      "a channel whose members are all Claude Code cannot compact on request, and a channel with a Pi member can",
+      claudeOnly.status === 200 &&
+        decodeAvailability(claudeOnly).available === false &&
+        mixed.status === 200 &&
+        decodeAvailability(mixed).available === true &&
+        isDeepStrictEqual(callsOf("channelCompactAvailable"), [[channelId], ["channel-mixed"]]),
+      [summary(claudeOnly), summary(mixed)],
+    );
+    const compactNoCapability = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      capabilities: [CHANNEL_CHATS_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: { channelId },
+    });
+    const compactMissing = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      json: { channelId: "channel-missing" },
+    });
+    const compactNoChannels = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      base,
+      json: { channelId },
+    });
+    accessLevels = { revision: 10, everyone: { "agent-ada": "none" }, roles: [] };
+    const compactHidden = await call("POST", CHANNEL_COMPACT_AVAILABILITY_ROUTE, {
+      ...compactUse,
+      token: bobToken,
+      json: { channelId },
+    });
+    accessLevels = { revision: 11, everyone: {}, roles: [] };
+    check(
+      "the availability route refuses a peer without the capability, an unknown channel, a host without channels and a member who does not see the channel",
+      errorIs(compactNoCapability, 400, sourceText("error.team.channelContextUnsupported")) &&
+        errorIs(compactMissing, 404, sourceText("error.backend.channelNotFound")) &&
+        errorIs(compactNoChannels, 400, sourceText("error.team.channelContextUnsupported")) &&
+        errorIs(compactHidden, 404, sourceText("error.backend.channelNotFound")) &&
+        callsOf("channelCompactAvailable").length === 2,
+      [summary(compactNoCapability), summary(compactMissing), summary(compactNoChannels), summary(compactHidden)],
     );
 
     const pageTask = (id: string, requestMessageId: string, state: ChannelTask["state"]): ChannelTask => ({

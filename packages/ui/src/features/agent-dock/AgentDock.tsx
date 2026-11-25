@@ -94,6 +94,7 @@ import {
 
 export type { AgentDockChatAnswers, AgentDockChatModel } from "./AgentDockChat";
 export type { AgentDockShelfResult } from "./AgentDockShelf";
+export type { AgentDockThreadChoices } from "./AgentDockThreadMenu";
 
 export interface AgentDockSeatRef {
   kind: "agent" | "channel";
@@ -189,6 +190,8 @@ export interface AgentDockProps {
   onSend: (seat: AgentDockSeatRef, text: string) => Promise<AgentDockSendResult>;
   onOpenInMain: (seat: AgentDockSeatRef) => void;
   onOpenWindow?: ((agentId: string) => void) | undefined;
+  onOpenThread?: ((seat: AgentDockSeatRef, id: string) => void) | undefined;
+  onNewThread?: ((seat: AgentDockSeatRef) => void) | undefined;
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
@@ -1519,6 +1522,10 @@ export function AgentDock(props: AgentDockProps) {
                       else props.onOpenInMain(refOfKey(id));
                     }}
                     onOpenWindow={openWindowFor(id)}
+                    onOpenThread={
+                      props.onOpenThread ? (threadId) => props.onOpenThread?.(refOfKey(id), threadId) : undefined
+                    }
+                    onNewThread={props.onNewThread ? () => props.onNewThread?.(refOfKey(id)) : undefined}
                     voice={chatVoice(id)}
                     agents={props.agents}
                     onSelectAgent={(agentId) => {

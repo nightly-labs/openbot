@@ -16,6 +16,7 @@ import { createEffect, createMemo, createSignal, flush, onCleanup } from "solid-
 import { desktopAnalytics } from "../../analytics";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
+import { FALLBACK_SERVER_NAME } from "./hosted-server-name";
 import type { ServerSettingsSection } from "./ServerSettingsModal";
 import {
   serverCanAdminister,
@@ -25,8 +26,6 @@ import {
 } from "./server-capabilities";
 import { useServers } from "./servers-context";
 import { serverAdminPort, serversPort } from "./servers-port";
-
-const FALLBACK_SERVER_NAME = "OpenBot";
 
 function generatedServerName(user: CentralAuthUser | null): string {
   const person = (user?.name?.trim() || user?.email.split("@")[0] || "").split(/\s+/u)[0] ?? "";

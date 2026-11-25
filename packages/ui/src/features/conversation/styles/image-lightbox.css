@@ -172,6 +172,7 @@
   place-items: center;
   padding: 0 calc(var(--openbot-space-8) * 2);
   transform: translateX(calc(var(--image-lightbox-slide) * 100%));
+  container-type: size;
 }
 
 .image-lightbox-image {
@@ -182,6 +183,13 @@
   user-select: none;
   will-change: transform;
   -webkit-user-drag: none;
+}
+
+.image-lightbox-image-copy {
+  width: min(100cqw, 100cqh * var(--image-lightbox-ratio));
+  max-width: none;
+  max-height: none;
+  aspect-ratio: var(--image-lightbox-ratio);
 }
 
 .image-lightbox-image[data-zoomed] {
