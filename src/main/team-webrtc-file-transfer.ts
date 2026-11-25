@@ -270,15 +270,15 @@ export class TeamWebRtcFileTransfer {
       cancelled: null,
       onProgress: input.onProgress,
     };
-    yield* this.#waitUntilEffect(() => this.#reserveOutgoing(transfer), Date.now() + this.#resumeMilliseconds).pipe(
-      Effect.mapError((error) =>
-        this.#stopped
-          ? error
-          : new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.fileSetTooLarge")) }),
-      ),
-    );
-    recordRestartActivity();
     return yield* Effect.gen({ self: this }, function* () {
+      yield* this.#waitUntilEffect(() => this.#reserveOutgoing(transfer), Date.now() + this.#resumeMilliseconds).pipe(
+        Effect.mapError((error) =>
+          this.#stopped
+            ? error
+            : new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.fileSetTooLarge")) }),
+        ),
+      );
+      recordRestartActivity();
       yield* this.#sendWithResumeEffect(transfer);
       return transferId;
     }).pipe(
