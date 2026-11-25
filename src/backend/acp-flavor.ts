@@ -105,6 +105,7 @@ export interface AcpFlavor {
   configConflict?(error: unknown): boolean;
   staleSession?(error: unknown): boolean;
   keepModelsOnRefreshFailure?: true;
+  rereadModelsInNewProcess?: true;
   noModelsAfterRetry?(): string;
   processWideModel?: true;
   setsConfigOnlyOnChange?: true;
