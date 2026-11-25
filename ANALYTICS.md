@@ -19,7 +19,7 @@ Every event has these low-cardinality properties:
 - `surface`: `desktop`, `desktop_host`, `landing`, `web`, `mobile`, `extension`, `account_api`, or `signal`;
 - `environment`: currently `production` only;
 - `event_schema_version`: the integer schema generation of that surface: currently `13` on `desktop`,
-  `21` on `desktop_host`, `10` on `landing`, `19` on `account_api`, `5` on `mobile`, `2` on `web`, `1` on `extension`, and `2` on
+  `21` on `desktop_host`, `10` on `landing`, `20` on `account_api`, `5` on `mobile`, `2` on `web`, `1` on `extension`, and `2` on
   `signal`;
 - `app_version` and `platform` on desktop surfaces, and on `extension` (`platform: chrome`);
 - `acquisition_source` on landing surfaces: `direct`, `search`, `social`, `github`, or `other`;
