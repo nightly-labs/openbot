@@ -1512,7 +1512,7 @@ textarea:not(.ui-textarea):focus-visible {
   position: absolute;
   right: 0;
   left: 0;
-  height: var(--scroll-edge-blur-size, calc(var(--openbot-space-1) * 8));
+  height: var(--scroll-edge-blur-size, calc(var(--openbot-space-1) * 10));
   visibility: hidden;
   opacity: 0;
   transition:
@@ -1556,20 +1556,32 @@ textarea:not(.ui-textarea):focus-visible {
 }
 
 .scroll-edge-blur-layer:nth-child(1) {
-  --scroll-edge-blur-radius: calc(var(--openbot-space-1) / 2);
+  --scroll-edge-blur-radius: 0.5px;
   --scroll-edge-blur-from: 0%;
-  --scroll-edge-blur-to: 35%;
+  --scroll-edge-blur-to: 25%;
 }
 
 .scroll-edge-blur-layer:nth-child(2) {
-  --scroll-edge-blur-radius: calc(var(--openbot-space-1) * 1.5);
-  --scroll-edge-blur-from: 25%;
-  --scroll-edge-blur-to: 70%;
+  --scroll-edge-blur-radius: 1.5px;
+  --scroll-edge-blur-from: 20%;
+  --scroll-edge-blur-to: 45%;
 }
 
 .scroll-edge-blur-layer:nth-child(3) {
-  --scroll-edge-blur-radius: calc(var(--openbot-space-1) * 3.5);
-  --scroll-edge-blur-from: 55%;
+  --scroll-edge-blur-radius: 3px;
+  --scroll-edge-blur-from: 40%;
+  --scroll-edge-blur-to: 65%;
+}
+
+.scroll-edge-blur-layer:nth-child(4) {
+  --scroll-edge-blur-radius: 5px;
+  --scroll-edge-blur-from: 60%;
+  --scroll-edge-blur-to: 85%;
+}
+
+.scroll-edge-blur-layer:nth-child(5) {
+  --scroll-edge-blur-radius: 8px;
+  --scroll-edge-blur-from: 80%;
   --scroll-edge-blur-to: 100%;
 }
 

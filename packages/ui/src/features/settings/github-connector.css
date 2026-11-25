@@ -48,7 +48,7 @@
 }
 
 .github-connector-repository-list + .scroll-edge-blur {
-  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 5);
+  --scroll-edge-blur-size: calc(var(--openbot-space-1) * 6);
 }
 
 .github-connector-repository {
