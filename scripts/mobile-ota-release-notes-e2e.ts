@@ -1,10 +1,3 @@
-// Drives `mobile-ota-release-notes.ts`, `check-release-notes.ts --ota` and `prepare-release.ts --mobile`
-// as processes, in a temporary git repository that has the files they read. Then it reads the
-// changelog that they wrote with the parser of the account Worker, as `/changelog` and
-// `/v1/mobile/changelog` do. Writes .openbot-build/mobile-ota-release-notes-e2e.json.
-//
-//   bun scripts/mobile-ota-release-notes-e2e.ts
-
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -17,7 +10,6 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const REPORT = join(root, ".openbot-build", "mobile-ota-release-notes-e2e.json");
 const CHANGELOG = "apps/mobile/CHANGELOG.md";
 const NOTES = "apps/mobile/changelog.d";
-/** The files that an OTA update must not change. */
 const VERSION_FILES = [
   "apps/mobile/app.json",
   "apps/mobile/package.json",
@@ -31,7 +23,6 @@ function write(path: string, text: string): void {
   mkdirSync(dirname(join(work, path)), { recursive: true });
   writeFileSync(join(work, path), text);
 }
-// Each commit is one minute after the one before it: the release orders the notes by commit time.
 let clock = Date.parse("2026-11-10T00:00:00Z");
 function git(...args: string[]): string {
   const date = new Date(clock).toISOString();
@@ -73,7 +64,6 @@ function check(name: string, passed: boolean, detail: unknown): void {
 }
 
 try {
-  // The store build: 1.4.8 is on Android, and iOS still reviews it. One note waits for 1.4.9.
   git("init", "--quiet", "--initial-branch=main");
   write("apps/mobile/app.json", `${JSON.stringify({ expo: { version: "1.4.8" } }, null, 2)}\n`);
   write("apps/mobile/package.json", `${JSON.stringify({ name: "@openbot/mobile", version: "1.4.8" }, null, 2)}\n`);
@@ -110,7 +100,6 @@ try {
   const storeFiles = versionFiles();
   const storeChangelog = read(CHANGELOG);
 
-  // No note is new since the store build.
   let result = ota("--platform", "android");
   check(
     "stops with no new note",
@@ -124,7 +113,6 @@ try {
     result.output,
   );
 
-  // Two fixes after the store build, in two commits. The older one is first in its group.
   write(`${NOTES}/fix-scroll.md`, "### Fixed\n\n- The chat scrolls to the newest message again.\n");
   commit("Fix scroll");
   write(`${NOTES}/add-shortcut.md`, "### Added\n\n- A shortcut to the last chat.\n\n### Fixed\n\n- A second fix.\n");
@@ -141,7 +129,6 @@ try {
     result.output,
   );
 
-  // iOS does not have 1.4.8, so its users cannot get an update of it.
   result = ota("--platform", "all", "--date", "2026-11-12");
   check(
     "refuses a platform that does not have the store version",
@@ -183,7 +170,6 @@ try {
   check("the changelog check accepts the section", result.status === 0, result.output);
   commit("OTA 1.4.8.1");
 
-  // The account Worker reads the same file for /changelog and /v1/mobile/changelog.
   const releases = parseChangelog(first, { anchorPrefix: "mobile-", stores: true });
   const [otaRelease, storeRelease] = releases;
   check(
@@ -208,7 +194,6 @@ try {
     "isNewerMobileVersion",
   );
 
-  // The second update of the same store build gets the next number.
   write(`${NOTES}/fix-crash.md`, "### Fixed\n\n- The app does not stop when a file opens.\n");
   commit("Fix crash");
   result = ota("--platform", "android", "--date", "2026-11-13");
@@ -231,7 +216,6 @@ try {
   commit("OTA 1.4.8.2");
   const withOta = read(CHANGELOG);
 
-  // A malformed OTA section stops the check, on disk and in the index.
   const secondStart = withOta.indexOf("## [1.4.8.2]");
   const firstStart = withOta.indexOf("## [1.4.8.1]");
   const olderStart = withOta.indexOf("## [1.4.7]");
@@ -262,7 +246,6 @@ try {
   check("the staged check reads the index", result.status === 1, result.output);
   git("reset", "--quiet", "--hard");
 
-  // The next store version comes from app.json, not from the newest heading.
   result = cli("prepare-release.ts", ["patch", "--mobile"]);
   check(
     "the next store version after 1.4.8.2 is 1.4.9",
@@ -284,7 +267,6 @@ try {
   check("the changelog check accepts OTA sections below a store version in review", result.status === 0, result.output);
   commit("Prepare 1.4.9");
 
-  // The 1.4.8 build cannot get an update from a tree that is 1.4.9.
   write(`${NOTES}/fix-late.md`, "### Fixed\n\n- A late fix.\n");
   commit("Late fix");
   const prepared = read(CHANGELOG);
@@ -298,7 +280,6 @@ try {
     result.output,
   );
 
-  // A hotfix branch from the store build: the update of 1.4.8 goes below the 1.4.9 that is in review.
   git("switch", "--quiet", "-c", "hotfix", "store-1.4.8");
   git("checkout", "--quiet", "main", "--", CHANGELOG);
   write(`${NOTES}/fix-hot.md`, "### Fixed\n\n- A hot fix.\n");

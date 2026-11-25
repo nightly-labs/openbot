@@ -1,16 +1,11 @@
-import type { AppTranslate } from "@openbot/i18n";
+import type { AppTranslate, LayoutDirection } from "@openbot/i18n";
 import { appLanguageOption } from "@openbot/i18n/languages";
 import type { SiteLocale } from "./site-paths";
 import { slot } from "./text-slots";
 
-/*
- * The text of the header, the menu, the footer and the last call to action of the public site, built
- * from `sitePage.site.*` catalog keys. A route loader runs `siteText` with `loadPageText`, and the
- * components read plain strings through `useSiteText`. This module has only a type import of the
- * catalogs, so the components do not pull them into the browser bundle.
- */
-
 export function siteText(t: AppTranslate) {
+  const currentLanguage = (locale: SiteLocale) =>
+    t("sitePage.site.language.current", { language: appLanguageOption(locale).label });
   const love = slot("love");
   const [madeBefore = "", madeAfter = ""] = t("sitePage.site.footer.made", { love }).split(love);
   const download = t("sitePage.site.download");
@@ -57,11 +52,22 @@ export function siteText(t: AppTranslate) {
     closeMenu: t("sitePage.site.closeMenu"),
     language: {
       label: t("sitePage.site.language"),
-      /** The label of the header button on a page in each language. */
       current: {
-        en: t("sitePage.site.language.current", { language: appLanguageOption("en").label }),
-        pl: t("sitePage.site.language.current", { language: appLanguageOption("pl").label }),
-        pt: t("sitePage.site.language.current", { language: appLanguageOption("pt").label }),
+        en: currentLanguage("en"),
+        ar: currentLanguage("ar"),
+        de: currentLanguage("de"),
+        es: currentLanguage("es"),
+        fr: currentLanguage("fr"),
+        he: currentLanguage("he"),
+        it: currentLanguage("it"),
+        ja: currentLanguage("ja"),
+        ko: currentLanguage("ko"),
+        nl: currentLanguage("nl"),
+        pl: currentLanguage("pl"),
+        pt: currentLanguage("pt"),
+        ru: currentLanguage("ru"),
+        tr: currentLanguage("tr"),
+        zh: currentLanguage("zh"),
       } satisfies Record<SiteLocale, string>,
     },
     latest: t("sitePage.site.latest"),
@@ -140,10 +146,9 @@ export type SiteLinkId = keyof SiteText["links"];
 export type FooterColumnId = keyof SiteText["footer"]["columns"];
 export type FooterTextId = keyof SiteText["footer"]["links"];
 
-/** The site text in one language, with the `lang` attribute of that language. */
 export interface SiteChrome {
   lang: string;
-  /** The language of the page. Links to a page with localized copies go to the copy in this language. */
+  dir: LayoutDirection;
   locale: SiteLocale;
   text: SiteText;
 }

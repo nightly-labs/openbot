@@ -2,7 +2,6 @@ import type { AvatarColorChoice, AvatarColorPresetId } from "@openbot/brand/blou
 import type { AvatarHue } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 
-/** The name of each avatar hue. `AVATAR_HUE_CHOICES` in `@openbot/brand` keeps English labels. */
 export const AVATAR_HUE_LABEL = {
   0: "agent.color.red",
   30: "agent.color.orange",
@@ -26,7 +25,6 @@ const AVATAR_PRESET_LABEL = {
   grey: "agent.color.grey",
 } as const satisfies Record<AvatarColorPresetId, AppTextKey>;
 
-/** The name of a colour in an agent colour picker. */
 export function avatarColorChoiceLabel(choice: AvatarColorChoice): AppTextKey {
   return choice.kind === "hue" ? AVATAR_HUE_LABEL[choice.hue] : AVATAR_PRESET_LABEL[choice.preset];
 }

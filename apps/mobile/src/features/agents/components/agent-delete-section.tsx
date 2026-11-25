@@ -10,11 +10,6 @@ import { type MobileAgent, useMobileWorkspaceReader } from "@/features/workspace
 import { haptics } from "@/shared/lib/haptics";
 import { currentText, useText } from "@/shared/lib/text";
 
-/**
- * The last group of Agent info: delete the agent, as the agent menu of the chat list does. The host
- * lets only an owner or an admin delete an agent, so the parent shows it only to them. After the
- * delete, the sheet and the chat of the agent under it close.
- */
 export function AgentDeleteSection({ agent, disabled }: { agent: MobileAgent; disabled: boolean }) {
   const { t } = useText();
   const workspace = useMobileWorkspaceReader();

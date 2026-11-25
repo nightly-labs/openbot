@@ -21,6 +21,18 @@ export const messages = {
   "error.remote.testActive": "Идёт проверка удалённого рабочего стола. Повторите попытку, когда она закончится.",
   "error.remote.screenRecordingDenied":
     "Хост не разрешил OpenBot записывать экран. Разрешите запись экрана на хосте и повторите попытку.",
+  "error.remote.windowsSessionDisconnected":
+    "Сеанс Windows на хосте отключён, поэтому нет экрана для показа. Войдите в Windows на экране хоста и повторите попытку.",
+  "error.remote.windowsCaptureDenied":
+    "Windows на хосте не разрешает OpenBot записывать экран. Разблокируйте Windows на экране хоста, закройте все запросы администратора и повторите попытку. Если проблема не исчезнет, перезапустите хост.",
+  "error.remote.macScreenLocked":
+    "Mac заблокирован, поэтому не может показать свой экран. Разблокируйте Mac на его экране и повторите попытку.",
+  "error.remote.streamTooSlowLowerQuality":
+    "Соединение с хостом слишком медленное для изображения. Повторите попытку: следующее подключение будет с более низким качеством.",
+  "error.remote.streamTooSlow":
+    "Соединение с хостом слишком медленное для изображения. Используйте более быструю сеть и повторите попытку.",
+  "error.remote.noPictureSwitchEncoder":
+    "Хост не передал изображение. Повторите попытку: следующее подключение использует настройку видео, которая работает на большем числе компьютеров.",
   "error.remote.teamSessionExpired": "Сессия команды истекла.",
   "error.remote.finishTestBeforeSwitch": "Завершите проверку удалённого рабочего стола, прежде чем переключать экраны.",
   "error.remote.displayNotFound": "Удалённый экран не найден.",
@@ -79,10 +91,18 @@ export const messages = {
   "error.remote.ownerOnlyRemove": "Удалить этот сервер может только владелец.",
   "error.remote.requestTimeout": "Время удалённого запроса истекло.",
   "error.remote.requestFailed": "Удалённый запрос не удался.",
-  "error.remote.pinnedKeyMissing": "У удалённого хоста нет закреплённого ключа устройства.",
-  "error.remote.hostDidNotConnect": "Хост WebRTC не подключился.",
+  "error.remote.hostKeyMissing":
+    "OpenBot не может проверить этот сервер: его ключ безопасности отсутствует или изменился. Попросите владельца сервера проверить сервер.",
+  "error.remote.connectionNotStarted":
+    "OpenBot не удалось начать подключение к этому серверу. Если проблема повторяется, закройте OpenBot и откройте его снова.",
+  "error.remote.connectionServiceUnreachable":
+    "Этот компьютер не может подключиться к сервису соединений OpenBot. Проверьте его подключение к интернету. OpenBot подключится снова автоматически.",
+  "error.remote.serverAnswerTimeout": "Сервер не ответил вовремя. OpenBot подключится снова автоматически.",
+  "error.remote.signInConnectionClosed":
+    "Соединение с сервером закрылось при входе. Если это повторяется, проверьте дату и время на сервере и на этом устройстве.",
   "error.remote.connectionCancelled": "Удалённое подключение отменено.",
-  "error.remote.hostDisconnected": "Хост WebRTC отключился.",
+  "error.remote.hostDisconnected":
+    "Соединение с сервером прервано. Проверьте, выполнено ли действие, и повторите попытку.",
   "error.remote.eventGap": "В последовательности событий хоста есть пропуск.",
   "error.remote.malformedKnownEvent": "Хост вернул искажённое известное событие.",
   "error.remote.fileTransportIsStopped": "Файловый транспорт WebRTC остановлен.",
@@ -148,6 +168,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Хост отклонил вложение.",
   "error.remote.attachmentTooLarge": "Вложения должны быть не больше 10 МБ.",
   "error.remote.attachmentBusy": "Дождитесь завершения текущего вложения.",
+  "error.remote.attachmentChanged": "Файл изменился или недоступен. Выберите его снова.",
   "error.remote.uploadTimeout": "Время отправки вложения истекло.",
   "error.remote.hostSessionActive": "У хоста уже есть активная удалённая сессия.",
   "error.remote.tooManyConnections": "Слишком много активных удалённых подключений.",
@@ -179,6 +200,8 @@ export const messages = {
   "error.remote.iceFailed":
     "Не удалось установить прямое подключение к хосту. Его может блокировать брандмауэр, VPN или прокси.",
   "error.remote.iceDisconnected": "Прямое подключение к хосту потеряно.",
+  "error.remote.webrtcBlocked":
+    "Это устройство блокирует подключение, которое нужно OpenBot. Если включен режим блокировки, выключите его для OpenBot в Настройки > Конфиденциальность и безопасность > Режим блокировки.",
   "error.remote.directoryUnreachable": "OpenBot не смог связаться со службой OpenBot. Проверьте подключение.",
   "error.remote.directoryTimeout": "Служба OpenBot не ответила вовремя. Повторите попытку.",
   "error.remote.inviteAlreadyUsed": "Это приглашение уже использовано. Попросите новое приглашение.",
@@ -197,10 +220,17 @@ export const messages = {
   "error.remote.formUnavailable": "Эта форма больше недоступна.",
   "error.remote.hostedServerRemoval": "Чтобы удалить размещённый сервер, используйте раздел «Оплата».",
   "error.remote.hostRemoved": "Владелец удалил этот сервер из аккаунта.",
+  "error.remote.ownerTransferSelf": "Этот сервер уже принадлежит вам. Введите email нового владельца.",
+  "error.remote.ownerTransferHosted": "Сервер, который размещает OpenBot, не может сменить владельца.",
+  "error.remote.ownerTransferInvalid":
+    "Эта передача владения больше недоступна. Попросите владельца отправить её снова.",
   "error.remote.channelsUnsupported": "Обновите этот сервер на компьютере, чтобы использовать каналы.",
   "error.remote.channelDeleteUnsupported": "Обновите этот сервер на компьютере, чтобы удалять каналы.",
   "error.remote.historyRefreshFailed": "Сообщение отправлено, но историю чата обновить не удалось.",
   "error.remote.taskHistoryRefreshFailed": "Задача изменена, но историю чата обновить не удалось.",
+  "error.remote.serverNotLoaded": "Не удалось загрузить сервер. Повторите попытку.",
+  "error.remote.localServerNotStarted":
+    "Сервер на этом компьютере не запустился. Повторите попытку. Если он не запустится, перезапустите OpenBot на этом компьютере.",
   "error.remote.localServerAccountRemovalFailed":
     "Сервер удалён на своём компьютере, но в аккаунте он ещё есть. Удалите его ещё раз, чтобы убрать из аккаунта.",
 } as const satisfies PartialTranslation<typeof source>;

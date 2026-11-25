@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about ClickUp here is taken from developer.clickup.com. Each page used is in
-// `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const CLICKUP_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

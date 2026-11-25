@@ -50,10 +50,6 @@ const server = createServer((request, response) => {
   else response.end(PAGE);
 });
 
-/**
- * Electron's own box for a page dialog. The fixture shows none: a person answers with `answer`, and
- * `aborted` records that Electron closed the box with its internal cancel event.
- */
 interface NativeBox {
   message: string;
   aborted: boolean;
@@ -216,7 +212,6 @@ async function main(): Promise<void> {
       assert.equal(await title(contents), "chain:done");
       recordCases("chained-dialog-returned");
 
-      // The click ends before the dialog opens, and the page settles meanwhile.
       const later = agentDialog(await click(tabId, "#later"));
       assert.equal(later.message, "Later?");
       assert.equal((await answer(tabId, later.id, true)).success, true);
@@ -232,7 +227,6 @@ async function main(): Promise<void> {
       const prompt = await click(tabId, "#prompt");
       assert.equal(prompt.success, true, text(prompt));
       assert.equal(JSON.parse(text(prompt)).dialog, undefined, "The agent got a prompt dialog.");
-      // Electron's page throws "prompt() is not supported", so no dialog opens.
       assert.match(text(prompt), /prompt\(\) is not supported/);
       recordCases("prompt-not-claimed");
 
@@ -242,7 +236,6 @@ async function main(): Promise<void> {
       assert.match(JSON.parse(text(submitted)).url, /\/done\??$/);
       recordCases("form-navigation-kept-after-accept");
 
-      // The page loads with no debugger command in flight.
       const greeting = agentDialog(await call("navigate", { tabId, url: `${origin}/greet` }));
       assert.equal(greeting.message, "Welcome");
       const greeted = await answer(tabId, greeting.id, true);
@@ -282,13 +275,54 @@ async function main(): Promise<void> {
     {
       const { contents } = await open();
       const box = nextBox();
-      // A person's click: no agent tool runs.
       const clicked = contents.executeJavaScript("document.getElementById('confirm').click()", true);
       assert.equal((await box).aborted, false);
       (await box).answer(1);
       await clicked;
       assert.equal(await title(contents), "confirm:false");
       recordCases("person-dialog-stays-native");
+    }
+
+    {
+      const { tabId, contents } = await open();
+      const box = nextBox();
+      await contents.executeJavaScript(
+        "setTimeout(() => { alert('Session expired password=hunter2'); document.title = 'noticed' })",
+      );
+      await waitUntil(async () => (await title(contents)) === "noticed");
+      assert.equal((await box).aborted, true, "Electron's box stayed open after the page alert.");
+      recordCases("page-alert-accepted-in-agent-tab");
+      const snapshot = await call("snapshot", { tabId, image: "never" });
+      assert.equal(snapshot.success, true, text(snapshot));
+      assert.match(text(snapshot), /Session expired/);
+      assert(!text(snapshot).includes("hunter2"), "The alert text kept a secret.");
+      recordCases("page-alert-reported-to-agent");
+    }
+
+    {
+      const { contents } = await open();
+      const box = nextBox();
+      await contents.executeJavaScript("document.getElementById('alert').focus()");
+      contents.sendInputEvent({ type: "keyDown", keyCode: "Space" });
+      contents.sendInputEvent({ type: "keyUp", keyCode: "Space" });
+      assert.equal((await box).aborted, false, "A person's alert in an agent tab got OK with no person.");
+      (await box).answer(0);
+      await waitUntil(async () => (await title(contents)) === "alert:done");
+      recordCases("person-input-alert-in-agent-tab-stays-native");
+    }
+
+    {
+      const tab = await runCauseEffect(host.open(`${origin}/person-${++sequence}`));
+      const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
+      assert(contents, "Missing person tab contents.");
+      const box = nextBox();
+      const shown = contents.executeJavaScript("alert('Hello'); document.title = 'person:alert'", true);
+      assert.equal((await box).aborted, false);
+      (await box).answer(0);
+      await shown;
+      assert.equal(await title(contents), "person:alert");
+      recordCases("person-tab-alert-stays-native");
+      await runCauseEffect(host.close(tab.id));
     }
 
     {
@@ -313,7 +347,6 @@ async function main(): Promise<void> {
       const closed = await call("close_tab", { tabId }, "turn-4");
       assert.equal(closed.success, true, text(closed));
       assert(!host.listTabs().some((tab) => tab.id === tabId));
-      // The tab closes after its queue drains.
       const shown = await box;
       await waitUntil(async () => shown.aborted);
       recordCases("close-tab-with-open-dialog");
@@ -322,7 +355,6 @@ async function main(): Promise<void> {
     {
       const { tabId, contents } = await open();
       const box = nextBox();
-      // A person's dialog. Electron keeps its box open after the page closes.
       void contents.executeJavaScript("document.getElementById('confirm').click()", true).catch(() => undefined);
       const shown = await box;
       await runCauseEffect(host.close(tabId));
@@ -370,7 +402,6 @@ async function main(): Promise<void> {
   }
 }
 
-/** The next box that Electron shows. */
 function nextBox(): Promise<NativeBox> {
   const index = boxes.length;
   return new Promise((resolve) => {
@@ -384,7 +415,6 @@ function nextBox(): Promise<NativeBox> {
   });
 }
 
-/** Checks a state again after each turn of the event loop, until it holds. */
 async function waitUntil(check: () => Promise<boolean>): Promise<void> {
   const deadline = Date.now() + STATE_WAIT_MS;
   while (!(await check())) {
@@ -395,7 +425,6 @@ async function waitUntil(check: () => Promise<boolean>): Promise<void> {
 
 function phase(name: string): void {
   currentPhase = name;
-  // Machine-readable: phase receipts contain no page data.
   process.stdout.write(`${JSON.stringify({ runId, phase: name, status: "running" })}\n`);
 }
 

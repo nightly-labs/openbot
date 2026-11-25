@@ -1,37 +1,47 @@
 import { canPreviewAttachment } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { classifyFailure } from "@openbot/telemetry";
+import { Input } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import { contextUsageView } from "@openbot/ui/features/conversation/ContextUsage";
 import { AgentThreadView } from "@openbot/ui/features/conversation/threads/AgentThreadView";
 import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/threads/BranchDivider";
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createProjection, Show } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { createEffect, createMemo, createProjection, createSignal, onSettled, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { threadAwaitingReplies } from "../../awaiting-replies";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { remoteAgentError } from "../agents/agent-error-text";
+import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
+import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
+import { useMessageBackdropAction } from "./message-backdrop";
+import { naturalThreadRows } from "./narration-rows";
+import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
+import { createTurnStreamHold } from "./turn-stream-hold";
+import { useTurnTrace } from "./turn-trace";
 
-/**
- * A side thread in the side panel, beside the agent's own chat. Its message box takes text only:
- * files, and the question and takeover cards of the thread, stay in the chat. A thread that waits
- * for an answer shows a card that moves it to the chat.
- */
-export function ConversationSideThread(props: { threadId: string }) {
+export function ConversationSideThread(props: { threadId: string; resizer: JSX.Element }) {
   const {
     props: view,
     openExternalMessageUrl,
+    openFileFromThread,
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
+    openThreadFile,
     installedSkills,
     installedSkillsLoadFailed,
     mcpServers,
@@ -40,11 +50,21 @@ export function ConversationSideThread(props: { threadId: string }) {
     openTaggedReference,
     threadComposer,
     threadQueue,
+    threadVoice,
+    besideFocusRequest,
     movePanelThreadToChat,
     copyMessage,
     copiedMessageId,
     branchThread,
+    messagePins,
+    changeMarkerActions,
+    openWaitingAgent,
+    shownSubagentId,
+    toggleSubagentPanel,
   } = useConversationViewScope();
+  const backdropAction = useMessageBackdropAction(conversationRuntime(view));
+  const threadBackgroundWorkSince = (taskId: string | undefined) =>
+    taskId === undefined ? undefined : view.backgroundWorkSince?.(taskId);
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
@@ -55,10 +75,9 @@ export function ConversationSideThread(props: { threadId: string }) {
   });
   const thread = (): SideThread | undefined => view.threads?.side.thread(props.threadId);
   const item = () => view.threads?.side.tabs.find((tab) => tab.id === props.threadId);
-  /** Reconciled by id, so a stream chunk redraws only the message that changed. */
+  const awaiting = createMemo(() => threadAwaitingReplies(thread()?.task, view.agents, view.agentWaits));
   const messages = createProjection<AgentMessage[]>(
     () => {
-      // A question that waits shows in the chat tab of the thread, so its message is left out there too.
       const messages = thread()?.conversation?.messages.filter(
         (message) => message.questionPrompt?.resolution !== null,
       );
@@ -67,15 +86,24 @@ export function ConversationSideThread(props: { threadId: string }) {
     [],
     { key: "id" },
   );
+  const streamHeld = createTurnStreamHold(() => thread()?.task.activeTurnId);
+  const shownMessages = createMemo(() =>
+    view.responseStyle === "natural" ? naturalThreadRows(messages, view.agent?.provider, streamHeld) : messages,
+  );
   const turnSteps = createTurnSteps({
     messages: () => messages,
     lines: () => undefined,
     activeTurnId: () => thread()?.task.activeTurnId,
   });
+  const turnTrace = useTurnTrace({
+    turnSteps,
+    agentName: () => view.agent?.name,
+    agents: () => view.agents,
+  });
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const { appFocused } = usePlatform();
-  // The person reads the thread in the side panel while the window has focus.
   createEffect(
     () => ({
       messageId: appFocused() ? latestVisibleAgentMessageId(messages) : null,
@@ -85,7 +113,13 @@ export function ConversationSideThread(props: { threadId: string }) {
       if (messageId && read) read(messageId);
     },
   );
+  const fromThread = (open: () => void) => openFileFromThread(props.threadId, open);
   const draftKey = () => threadComposer.sideDraftKey(props.threadId);
+  const shownAt = untrack(besideFocusRequest);
+  const focusRequest = () => {
+    const request = besideFocusRequest();
+    return request > shownAt ? request : undefined;
+  };
   const rowImages = () => {
     const key = draftKey();
     return key ? threadComposer.rowImages(key) : [];
@@ -94,16 +128,43 @@ export function ConversationSideThread(props: { threadId: string }) {
     const key = draftKey();
     return key ? threadComposer.draft(key) : undefined;
   };
-  /** Sends the draft of this thread. Without its key, a send would take the draft of the chat's thread. */
+  function attachFiles(files: File[]): void {
+    if (!files.length) return;
+    const end = (draft()?.text ?? "").length;
+    void threadComposer.pasteFiles(files, { start: end, end }, draftKey());
+  }
+  const [panel, setPanel] = createSignal<HTMLElement>();
+  const [picker, setPicker] = createSignal<HTMLInputElement>();
+  const openPicker = () => {
+    const input = picker();
+    if (!input) return;
+    input.value = "";
+    input.click();
+  };
+  onSettled(() => {
+    const conversation = panel()?.closest<HTMLElement>(".conversation-panel");
+    if (!conversation) return;
+    const takeDrop = (event: DragEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(SIDE_DROP_TARGETS)) return;
+      const rect = panel()?.getBoundingClientRect();
+      if (!rect || event.clientX < rect.left || event.clientX > rect.right) return;
+      if (event.clientY < rect.top || event.clientY > rect.bottom) return;
+      const files = droppedFiles(event.dataTransfer);
+      if (!files.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      attachFiles(files);
+    };
+    conversation.addEventListener("drop", takeDrop, { capture: true });
+    return () => conversation.removeEventListener("drop", takeDrop, { capture: true });
+  });
   function sendSide(side: SideThread, text: string): Promise<boolean> {
     const key = draftKey();
     if (!key) return Promise.resolve(false);
-    // While a queued message is in the message box, Send saves it in its place.
     return threadQueue.editOf(side.task.id)
       ? threadComposer.importsEnded(key).then(() => threadQueue.save(key))
       : threadComposer.send(side, text, key);
   }
-  /** The thread waits for an answer to a question or a takeover, which the chat tab of the thread shows. */
   const waitsForAnswer = () => {
     const status = item()?.status;
     return status?.kind === "waiting" && status.reason !== "approval";
@@ -112,21 +173,27 @@ export function ConversationSideThread(props: { threadId: string }) {
     waitsForAnswer() ? (
       <TaskAnswerCard agentName={view.agent?.name ?? ""} onAnswer={() => movePanelThreadToChat(props.threadId)} />
     ) : undefined;
-  /** Continue on a sign-in card goes to this thread, as the person's next message there. */
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
-  /** Branches this thread through an answer. The branch opens as a chat tab. */
+  const marketplaceCard = useThreadMarketplaceSuggestionCard();
+  const settingLinkCard = useThreadSettingLinkCard();
+  const visualReplyCard = useThreadVisualReplyCard(draftKey, undefined, props.threadId);
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
     return (messageId: string) => void branchThread(props.threadId, messageId);
   };
-  /** Deletes a message of this thread. A host without `message-delete-v1` has no Delete item. */
+  const threadPins = (taskId: string) => {
+    if (!messagePins.available()) return undefined;
+    return {
+      isPinned: (messageId: string) => messagePins.isPinned(taskId, messageId),
+      onToggle: (messageId: string, pinned: boolean) => messagePins.set(taskId, messageId, pinned),
+    };
+  };
   const deleteMessage = () => {
     const remove = view.threads?.onDeleteMessage;
     const taskId = thread()?.task.id;
     if (!remove || !taskId) return undefined;
     return (messageId: string) => remove(taskId, messageId);
   };
-  /** Replies to a message of this thread. */
   const reply = () => {
     if (!view.threads?.acceptsReplies) return undefined;
     return (message: AgentMessage) => threadComposer.setReply(draftKey(), message.id);
@@ -135,12 +202,10 @@ export function ConversationSideThread(props: { threadId: string }) {
     const id = view.threads?.acceptsReplies ? draft()?.replyToMessageId : null;
     return id ? messages.find((message) => message.id === id) : undefined;
   };
-  /** Text selected in this thread goes to this thread, as a reply where the server takes one. */
   const selectionActions = (side: SideThread) => ({
     onSend: (messageId: string, body: string) => side.onSend(body, [], view.threads?.acceptsReplies ? messageId : null),
     quoteShortcut: deviceQuoteShortcut(view.platform),
   });
-  /** Where this thread came from, when it is a branch. The agent's own chat shows the agent's name. */
   const branchSource = (side: SideThread, agentName: string): AgentThreadBranchSource | undefined => {
     const source = view.threads?.branchSource(side.task);
     if (!source) return undefined;
@@ -157,17 +222,29 @@ export function ConversationSideThread(props: { threadId: string }) {
   };
   return (
     <aside
+      ref={setPanel}
+      id="side-thread-panel"
       class="browser-panel side-thread-panel"
       aria-label={t("conversation.threads.view.label", { title: item()?.title ?? "" })}
     >
+      {props.resizer}
+      <Input
+        ref={setPicker}
+        type="file"
+        multiple
+        hidden
+        tabindex={-1}
+        onChange={(event) => attachFiles(Array.from(event.currentTarget.files ?? []))}
+      />
       <Show when={shown()}>
         {(current) => (
           <AgentThreadView
             task={current().thread.task}
+            failureText={view.server && view.server.kind !== "local" ? remoteAgentError : undefined}
             limit={view.threads?.limit ?? 1}
             agent={current().agent}
             agents={view.agents}
-            messages={messages}
+            messages={shownMessages()}
             skills={installedSkills()}
             skillsLoadFailed={installedSkillsLoadFailed()}
             mcpServers={mcpServers()}
@@ -182,18 +259,29 @@ export function ConversationSideThread(props: { threadId: string }) {
             onPasteFiles={(files, selection, text) => threadComposer.pasteFiles(files, selection, draftKey(), text)}
             onDraftChange={(text) => threadComposer.setText(draftKey(), text)}
             onOpenDraftAttachment={(attachment) =>
-              canPreviewAttachment(attachment)
-                ? void previewAttachment(attachment)
-                : attachmentAction(attachment, "open")
+              fromThread(() =>
+                canPreviewAttachment(attachment)
+                  ? void previewAttachment(attachment)
+                  : attachmentAction(attachment, "open"),
+              )
             }
+            onAttachFiles={view.threads?.acceptsFiles ? openPicker : undefined}
+            voice={threadVoice(draftKey())}
+            focusRequest={focusRequest()}
             mediaSource={view.runtime?.attachmentMedia}
             downloads={attachmentDownloads}
             onSend={(text) => sendSide(current().thread, text)}
             onStop={() => current().thread.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
+            onOpenFile={(kind, agentId, path, asWritten) =>
+              fromThread(() => openThreadFile(kind, agentId, path, asWritten))
+            }
             onSelectAgent={view.onSelectAgent}
-            onPreview={(attachment) => void previewAttachment(attachment)}
-            onAttachmentAction={attachmentAction}
+            onOpenWaitingAgent={openWaitingAgent}
+            changeMarkerActions={changeMarkerActions}
+            onPreview={(attachment) => fromThread(() => void previewAttachment(attachment))}
+            onAttachmentAction={(attachment, action) => fromThread(() => attachmentAction(attachment, action))}
+            backdropAction={backdropAction}
             approval={current().thread.approval}
             onRespondApproval={(decision) =>
               current().thread.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))
@@ -202,27 +290,53 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCompactContext={current().thread.onCompactContext}
             waitsForAnswer={waitsForAnswer()}
             attention={answerCard()}
-            messageCard={mcpSignInCard}
+            messageCard={(message, quote) =>
+              visualReplyCard(message, quote) ??
+              mcpSignInCard(message) ??
+              marketplaceCard(message) ??
+              settingLinkCard(message)
+            }
             olderMessages={current().thread.olderMessages}
+            newerMessages={current().thread.newerMessages}
+            focusMessage={current().thread.focusMessage}
             stepsAbove={turnSteps.stepsAbove}
             factsAbove={turnSteps.factsAbove}
+            traceAbove={turnTrace}
             activeSteps={turnSteps.activeSteps()}
+            backgroundWorkSince={threadBackgroundWorkSince(current().thread.task?.id)}
             stepsOpenByDefault={showAgentSteps()}
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             compactMessageActions={compactMessageActions()}
+            bubbleStyle={bubbleStyle()}
+            responseStyle={view.responseStyle}
             onBranch={branch()}
             onDeleteMessage={deleteMessage()}
+            messagePins={threadPins(current().thread.task.id)}
             canDeleteMessage={view.canDeleteMessage}
             branchSource={branchSource(current().thread, current().agent.name)}
             onReply={reply()}
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(draftKey(), null)}
             queue={threadQueue.view(current().thread.task, draftKey())}
+            awaiting={awaiting()}
             selectionActions={selectionActions(current().thread)}
+            subagents={{ selectedId: shownSubagentId(), onOpen: toggleSubagentPanel }}
           />
         )}
       </Show>
     </aside>
   );
+}
+
+const SIDE_DROP_TARGETS = "#side-thread-panel, .attachment-drop-overlay, .agent-folders-chat-drop";
+
+function droppedFiles(transfer: DataTransfer | null): File[] {
+  if (!transfer) return [];
+  const items = Array.from(transfer.items).filter((item) => item.kind === "file");
+  if (items.some((item) => item.webkitGetAsEntry()?.isDirectory === true)) return [];
+  return items.flatMap((item) => {
+    const file = item.getAsFile();
+    return file ? [file] : [];
+  });
 }

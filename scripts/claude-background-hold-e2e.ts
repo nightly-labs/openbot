@@ -1,16 +1,3 @@
-// Checks the low-memory limit of the Claude background-work hold. Runs the real agent service on a
-// temporary profile, with a stand-in server memory reading. Claude is the real `ClaudeAgentClient`,
-// which the Claude Agent SDK connects to a stand-in `claude` executable. Each turn of the stand-in
-// starts one background task, which stays running and sends nothing. Steps:
-// 1. The turn ends. The task holds the process: the idle release does not close it (#1870).
-// 2. A sample with normal memory does not ask for the quiet release.
-// 3. A low sample asks for it, but the task was quiet for less than 30 minutes: the process stays.
-// 4. A low sample with the quiet time set to 0 closes the process.
-// 5. Memory is back. The next turn resumes the saved session in a new process.
-// 6. The task ends, and a turn of a second agent ends before the CLI answers the result in a turn
-//    of its own. The idle limit does not close the first thread, and the answer shows (#6557).
-// Only the quiet time is injected; the memory guard, the provider runtime and the client are real.
-// `bun run test:claude-background-hold`. Writes .openbot-build/claude-background-hold-e2e/report.json.
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -35,7 +22,6 @@ const processLog = join(root, "claude-processes.jsonl");
 const claudeExecutable = join(root, "claude");
 const CLAUDE_MODEL = defaultProviderModel("claude");
 
-// Before the service modules load: the stores and the CLI search read these.
 process.env.HOME = home;
 process.env.OPENBOT_CLAUDE_PATH = claudeExecutable;
 mkdirSync(home, { recursive: true });
@@ -47,10 +33,6 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The stand-in for the Claude CLI. It speaks enough of the stream-json protocol for a turn to end,
-// and it reports one running background task before the result, except for a message that asks
-// for no background work. It logs its start and its exit. A `finish-<pid>` file ends its task, and
-// an `answer-<pid>` file then sends the turn that the CLI starts by itself to answer the result.
 const STAND_IN_CLAUDE = `#!${process.execPath}
 const fs = require("node:fs");
 const { randomUUID } = require("node:crypto");
@@ -139,16 +121,9 @@ interface ClientEvents {
   diagnostic: [message: string, origin?: DiagnosticOrigin];
 }
 
-/** Null uses the client's own quiet time of 30 minutes. */
 let quietForMs: number | null = null;
-/** The quiet releases that completed. */
 let quietReleases = 0;
 
-/**
- * The real Claude client. Only the account, usage and model reads are answered here: the real ones
- * run `claude auth status` or a probe query. The quiet release goes to the real client, with the
- * injected quiet time.
- */
 class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   readonly provider = "claude";
   readonly contextCompaction = "native";
@@ -178,6 +153,10 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   }
 
   canReleaseProcess = () => this.#real.canReleaseProcess();
+
+  holdsBackgroundWork(threadId: string) {
+    return this.#real.holdsBackgroundWork(threadId);
+  }
 
   releaseThread(externalThreadId: string) {
     return this.#real.releaseThread(externalThreadId);
@@ -220,7 +199,6 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   }
 }
 
-/** A server memory reading that the check sets. A sample runs the service's listeners at once. */
 let level: HostMemoryLevel = "ok";
 const listeners = new Set<() => void>();
 const memory: HostMemory = {
@@ -252,6 +230,7 @@ const report: { steps: Step[]; resumedSession?: string; passed: boolean; error?:
 const unused = () => Effect.die(new Error("Not used by this check."));
 const browser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -270,7 +249,6 @@ const browser: AgentBrowserHost = {
   agentTab: () => null,
 };
 
-/** Waits for a state of the service or of the stand-in's log. */
 async function waitFor<T>(
   label: string,
   read: () => T | null | undefined | false | Promise<T | null | undefined | false>,
@@ -363,6 +341,12 @@ try {
     assert.deepEqual(live(), [first.pid], "The idle release must not close a thread with background work.");
   });
 
+  await runCauseEffect(agents.refreshAllAgentRuntimes("after-background-work"));
+  step("an added MCP server waits for the background work", () => {
+    assert.deepEqual(live(), [first.pid], "An MCP addition must not close a thread with background work (#15198).");
+    assert.equal(standIn.canReleaseProcess(), false, "The client must still hold the background work.");
+  });
+
   sample("ok");
   step("normal memory asks for no quiet release", () => {
     assert.equal(quietReleases, 0);
@@ -399,7 +383,6 @@ try {
   });
   if (resumed?.resume) report.resumedSession = resumed.resume;
 
-  // #6557: a second agent's turn ends after the task ended and before the CLI's own answer.
   const worker = resumed?.pid;
   assert.ok(worker, "The resumed process has no pid.");
   const other = await runCauseEffect(

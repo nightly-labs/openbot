@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "技能包不能包含符号链接。",
   "error.skill.expandedTooLarge": "解压后的技能必须小于 10 MB。",
   "error.skill.irregularEntry": "技能包只能包含普通文件和文件夹。",
@@ -42,11 +41,16 @@ export const messages = {
   "error.skill.publishNeedsRepair": "{name} 有本地修改或需要修复，无法发布。",
   "error.skill.publishUntracked": "{name} 在精确版本跟踪之前就已安装，请先更新或修复再发布。",
   "error.skill.tooManySkills": "一个助手最多可有 {limit} 个技能。",
-  "error.skill.unmanagedExists": "{path} 处已存在一个未受管理的技能。",
+  "error.skill.ownSkillExists":
+    "此智能体已有名为 {slug} 的自有技能。请让智能体重命名或删除该技能，然后再次添加此技能。",
   "error.skill.managedSlug": "OpenBot 会为每个智能体提供自带的 {slug} 技能。请为此技能换一个名称。",
   "error.skill.templateMarkdownTooLarge": "{name}：SKILL.md 大于 64 KB，请精简后再发布。",
   "error.skill.localNoRevisions": "本地技能没有已发布的修订版本。",
+  "error.skill.localNotFound": "此本地技能不存在。请在本地技能列表中核对其 ID。",
+  "error.skill.localRevisionNotFound": "此本地技能没有修订版本 {revision}。最新的修订版本是 {latest}。",
   "error.skill.localNameTaken": "已存在同名本地技能，请改为修订它。",
+  "error.skill.localNameClash":
+    "此名称与本地技能“{name}”都会变成“{slug}”。要更改该技能，请修订它。要添加新技能，请更改此名称中的拉丁字母或数字。",
   "error.skill.localKeepName": "修订技能时请保持技能名称不变。",
   "error.skill.localRelativeFolder": "请使用当前助手工作区内的相对技能文件夹。",
   "error.skill.localSourceOutside": "技能源必须位于助手工作区内。",
@@ -54,4 +58,12 @@ export const messages = {
   "error.skill.localMissingSkillFile": "技能文件夹根目录需要 SKILL.md。",
   "error.skill.pathSymlink": "技能路径不能包含符号链接。",
   "error.skill.folderNotRead": "{provider} 不读取 {folder}，请把该文件夹复制到 {target}。",
+  "error.skill.githubLinkInvalid": "粘贴 GitHub 仓库或文件夹的链接。",
+  "error.skill.githubNotFound": "OpenBot 无法打开 {repository}。该仓库是私有的，或者不存在。",
+  "error.skill.githubNoSkills": "{folder} 中没有 SKILL.md。",
+  "error.skill.githubUnavailable": "OpenBot 现在无法读取 GitHub，请稍后再试。",
+  "error.skill.githubRateLimited": "GitHub 限制了 OpenBot 在没有账户时的读取次数，请一小时后再试。",
+  "error.skill.githubTooLarge": "OpenBot 无法读取 {repository} 的所有文件。仓库太大。",
+  "error.skill.githubHostTooOld": "请更新此服务器，以便从 GitHub 添加技能。",
+  "error.skill.publishGithub": "{name} 来自 GitHub。你只能发布自己创建的技能。",
 } as const satisfies PartialTranslation<typeof source>;

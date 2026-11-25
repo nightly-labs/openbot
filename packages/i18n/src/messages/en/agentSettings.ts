@@ -46,6 +46,7 @@ export const messages = defineMessages("agentSettings", {
     other: "You can add at most {count} folders",
   },
   "agentSettings.folders.browse.places": "Go to",
+  "agentSettings.folders.browse.path": "Folder path",
   "agentSettings.folders.browse.home": "Home folder",
   "agentSettings.folders.browse.parent": "Up to {folder}",
   "agentSettings.folders.browse.failed": "Could not open this folder.",
@@ -92,6 +93,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.backupModels.limited": "Usage limit reached · skipped",
   "agentSettings.backupModels.unavailable": "Not available now · skipped",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "When a usage limit stops {name} after it starts to work, {name} continues the same work on the first available model in the order. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "agentSettings.groups.brain": "Brain",
@@ -148,8 +150,6 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.runtime.accessLabel": "Agent access",
   "agentSettings.runtime.busyMessage": "While working",
   "agentSettings.runtime.busyMessageLabel": "Messages while the agent works",
-  "agentSettings.runtime.taskLimit": "Parallel threads",
-  "agentSettings.runtime.taskLimitLabel": "Threads that run at the same time",
   "agentSettings.runtime.workingDirectory": "Working directory",
   "agentSettings.runtime.notAvailable": "Not available yet",
   "agentSettings.runtime.fullAccessNote":
@@ -169,9 +169,6 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.busyMessage.steer": "Steer",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
-  "agentSettings.taskLimit.default": "Default ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} runs one turn at a time. The threads of this agent wait for each other.",
 
   "agentSettings.notificationLevel.title": "Notify me",
   "agentSettings.notificationLevel.server": "Server default ({level})",
@@ -179,13 +176,15 @@ export const messages = defineMessages("agentSettings", {
     "This choice is only for you and applies on all your devices. When the server is muted or set to Nothing, this agent stays silent too.",
 
   "agentSettings.newChat.title": "New chat",
-  "agentSettings.newChat.description": "The agent forgets this chat. Its setup stays.",
+  "agentSettings.newChat.description":
+    "The agent starts fresh and can still look up this chat when it needs to. Its setup stays.",
   "agentSettings.newChat.button": "Start",
   "agentSettings.newChat.confirmTitle": "Start a new chat with {name}?",
   "agentSettings.newChat.confirmDescription":
-    "The agent forgets this chat. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
+    "The agent starts fresh and can still look up this chat when it needs to. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
   "agentSettings.newChat.confirm": "Start new chat",
   "agentSettings.newChat.failed": "Could not start a new chat.",
+  "agentSettings.newChat.busy": "The agent is working. To start a new chat, wait until it finishes or stop it.",
   "agentSettings.deleteHistory.title": "Delete history",
   "agentSettings.deleteHistory.description":
     "The messages of this chat go, and the agent forgets them. Its setup stays.",
@@ -195,6 +194,9 @@ export const messages = defineMessages("agentSettings", {
     "All messages and files of this chat go from OpenBot, and the agent forgets them. You cannot undo this. Side threads, instructions, model, tools, memories, workspace, and browser do not change.",
   "agentSettings.deleteHistory.confirm": "Delete history",
   "agentSettings.deleteHistory.failed": "Could not delete the history.",
+  "agentSettings.deleteAgent.title": "Delete agent",
+  "agentSettings.deleteAgent.description": "The agent, its chat, memories, routines, and workspace go from OpenBot.",
+  "agentSettings.deleteAgent.button": "Delete",
 
   "agentSettings.fullAccess.title": "Give this agent full access?",
   "agentSettings.fullAccess.askTitle": "Let this agent work outside its workspace?",
@@ -206,6 +208,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.fullAccess.askConfirm": "Use Ask first",
 
   "agentSettings.links.usage": "Usage",
+  "agentSettings.links.apps": "Apps",
+  "agentSettings.links.appsScope": "All agents",
   "agentSettings.links.memories": "Memories",
   "agentSettings.links.memoriesCount": { one: "{count} saved", other: "{count} saved" },
   "agentSettings.links.skills": "Skills",
@@ -232,6 +236,9 @@ export const messages = defineMessages("agentSettings", {
     "Let the agent start a new chat when its chat gets long. It saves notes first.",
   "agentSettings.quickAcknowledgement.title": "Show the plan before long tasks",
   "agentSettings.quickAcknowledgement.description": "Before a long task, the agent shows its plan.",
+  "agentSettings.builtinMemory.title": "OpenBot memory",
+  "agentSettings.builtinMemory.description":
+    "The agent saves and reads its own memories. Turn off to use only a memory app, such as Mem0. Saved memories stay.",
   "agentSettings.browserProfile.label": "Browser profile",
   "agentSettings.browserProfile.shared": "Shared",
   "agentSettings.browserProfile.agent": "Only this agent",
@@ -241,6 +248,8 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.browserProfile.manageDescription":
     "Each profile keeps its own sign-ins and cookies. A change closes the agent's open tabs.",
   "agentSettings.browserProfile.manage": "Manage",
+  "agentSettings.browserProfile.movedNote":
+    "Site sign-ins stay in the old profile. The agent must sign in to these sites again.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "The whole {provider} process runs in a sandbox, so a write outside fails. Available on macOS only.",
 });

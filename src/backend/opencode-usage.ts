@@ -1,10 +1,4 @@
-// The OpenCode Go quota, read from the endpoint the OpenCode console serves for the Go API key.
-//
-// OpenCode's ACP process does not report a quota, so this is a direct HTTPS request with the key the
-// CLI uses: the key the user pasted into OpenBot, else the CLI's own key. The route is
-// `packages/console/app/src/routes/zen/go/v1/usage.ts` in anomalyco/opencode; it answers
-// `{ usage: { rolling, weekly, monthly } }`, each with an integer `percent` and an ISO `resetsAt`.
-
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -22,39 +16,45 @@ import {
 const OPENCODE_GO_USAGE_URL = "https://opencode.ai/zen/go/v1/usage";
 
 const OPENCODE_GO_USAGE_TIMEOUT_MS = 10_000;
-/** The Go plan's rolling window. The response carries the reset time but not the length. */
 const ROLLING_WINDOW_MINS = 300;
 const WEEKLY_WINDOW_MINS = 10_080;
 const MONTHLY_WINDOW_MINS = 43_200;
 
 const NO_USAGE: AccountRateLimitsReadResult = { rateLimits: null, rateLimitsByLimitId: null };
 
-/**
- * No key, a key the console rejects, and a key with no Go subscription all read as no usage, so the
- * dock hides the row instead of showing an error for the free catalog.
- */
 class OpenCodeUsageFailed extends Schema.TaggedError<OpenCodeUsageFailed>()("OpenCodeUsageFailed", {
   cause: Schema.Defect(),
 }) {}
 
 const OPENCODE_CONSOLE_URL = "https://opencode.ai/console";
-/** OpenCode keeps its database in WAL mode; a read waits this long for a writer, not more. */
 const OPENCODE_DB_BUSY_TIMEOUT_MS = 100;
 
-/** An API key in OpenCode's `auth.json` (OpenCode 1.x), the file `OPENCODE_AUTH_CONTENT` replaces. */
+export function openCodeDatabasePath(env: NodeJS.ProcessEnv, home?: string): string | null {
+  const databaseFile = env.OPENCODE_DB || "opencode.db";
+  return databaseFile === ":memory:" ? null : resolve(openCodeDataDirectory(env, home), databaseFile);
+}
+
+export function readOpenCodeDatabase<A>(databasePath: string, read: (database: DatabaseSync) => A): A {
+  const database = new DatabaseSync(databasePath, { readOnly: true });
+  try {
+    database.exec(`PRAGMA busy_timeout = ${OPENCODE_DB_BUSY_TIMEOUT_MS}`);
+    return read(database);
+  } finally {
+    database.close();
+  }
+}
+
 const AuthFileKey = Schema.Struct({ type: Schema.Literal("api"), key: Schema.String });
-const AuthFile = Schema.Struct({ "opencode-go": Schema.optionalKey(Schema.Unknown) });
-/** A key in the `credential` table of OpenCode 2's database. `server` names a self-hosted console. */
+const AuthFile = Schema.Struct({
+  "opencode-go": Schema.optionalKey(Schema.Unknown),
+  opencode: Schema.optionalKey(Schema.Unknown),
+});
 const StoredKey = Schema.Struct({
   type: Schema.Literal("key"),
   key: Schema.String,
   metadata: Schema.optionalKey(Schema.NullOr(Schema.Struct({ server: Schema.optionalKey(Schema.Unknown) }))),
 });
 
-/**
- * The OpenCode Go quota for the key the CLI uses. The CLI sends a saved key over every other key
- * (`opencode-config.ts`), so with one this reads that key only.
- */
 export const readOpenCodeGoUsage = Effect.fn("OpenCode.readGoUsage")(function* (apiKey: string | null) {
   const keys = apiKey ? [apiKey] : yield* readOwnKeys();
   for (const key of keys) {
@@ -64,13 +64,6 @@ export const readOpenCodeGoUsage = Effect.fn("OpenCode.readGoUsage")(function* (
   return NO_USAGE;
 });
 
-/**
- * The keys of the user's own OpenCode set-up, in the order the CLI uses them: the OpenCode Console
- * connection in OpenCode 2's database, then the Go key. The Go key is the `opencode-go` key in
- * `auth.json`, which OpenCode applies after `OPENCODE_API_KEY`, or that variable when `auth.json` has
- * none. A rejected Console key moves the read to the Go key. `OPENCODE_AUTH_CONTENT` replaces the
- * local sign-in, the Console connection included.
- */
 const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
   const env = process.env;
   const dataDirectory = openCodeDataDirectory(env);
@@ -81,55 +74,138 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
       try: () => readFile(join(dataDirectory, "auth.json"), "utf8"),
       catch: (cause) => new OpenCodeUsageFailed({ cause }),
     }).pipe(Effect.orElseSucceed(() => "")));
-  const goKey = (authFileGoKey(authText) ?? env.OPENCODE_API_KEY)?.trim();
-  const databaseFile = env.OPENCODE_DB || "opencode.db";
-  const consoleKey =
-    inlineAuth || databaseFile === ":memory:" ? undefined : yield* readConsoleKey(resolve(dataDirectory, databaseFile));
-  return [...new Set([consoleKey, goKey].filter((key): key is string => Boolean(key)))];
+  const authFile = Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(authText));
+  const goKey = (authFileApiKey(authFile, "opencode-go")?.key ?? env.OPENCODE_API_KEY)?.trim();
+  const consoleFile = authFileApiKey(authFile, "opencode");
+  const consoleFileKey = consoleFile?.servedByConsole ? consoleFile.key.trim() : undefined;
+  const databasePath = openCodeDatabasePath(env);
+  const consoleKey = inlineAuth || !databasePath ? undefined : yield* readConsoleKey(databasePath);
+  return [...new Set([consoleKey, goKey, consoleFileKey].filter((key): key is string => Boolean(key)))];
 });
 
-function authFileGoKey(text: string): string | undefined {
-  const file = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFile))(text);
-  if (Option.isNone(file)) return undefined;
-  const entry = Schema.decodeUnknownOption(AuthFileKey)(file.value["opencode-go"]);
-  return Option.isSome(entry) ? entry.value.key : undefined;
+const AuthFileEntries = Schema.Record(Schema.String, Schema.Unknown);
+const AuthFileEntry = Schema.Struct({ type: Schema.String });
+
+export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(function* (
+  provider: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const dataDirectory = openCodeDataDirectory(env);
+  const inlineAuth = env.OPENCODE_AUTH_CONTENT;
+  const authText =
+    inlineAuth ||
+    (yield* Effect.try({
+      try: () => readFileSync(join(dataDirectory, "auth.json"), "utf8"),
+      catch: (cause) => new OpenCodeUsageFailed({ cause }),
+    }).pipe(Effect.orElseSucceed(() => "")));
+  const entries = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFileEntries))(authText);
+  if (
+    Option.isSome(entries) &&
+    Object.hasOwn(entries.value, provider) &&
+    Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entries.value[provider]))
+  )
+    return true;
+  const databasePath = openCodeDatabasePath(env);
+  if (inlineAuth || !databasePath) return false;
+  return yield* Effect.try({
+    try: () =>
+      readOpenCodeDatabase(
+        databasePath,
+        (database) =>
+          database
+            .prepare("SELECT 1 FROM credential WHERE integration_id = ? AND active IS NOT 0 LIMIT 1")
+            .get(provider) !== undefined,
+      ),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => false));
+});
+
+const RefusedTurn = Schema.Struct({
+  error: Schema.Struct({ type: Schema.Literal("provider.auth"), status: Schema.Finite }),
+});
+
+export const readOpenCodeRefusalStatus = Effect.fn("OpenCode.readRefusalStatus")(function* (
+  sessionId: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (!databasePath) return null;
+  const row = yield* Effect.try({
+    try: () =>
+      readOpenCodeDatabase(databasePath, (database) =>
+        database
+          .prepare("SELECT data FROM session_message WHERE session_id = ? ORDER BY seq DESC LIMIT 1")
+          .get(sessionId),
+      ),
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => undefined));
+  const refused = Schema.decodeUnknownOption(Schema.fromJsonString(RefusedTurn))(row?.data);
+  return Option.isSome(refused) ? refused.value.error.status : null;
+});
+
+interface AuthFileApiKey {
+  readonly key: string;
+  readonly servedByConsole: boolean;
 }
 
-/**
- * The active OpenCode Console key, or none. The row is chosen before it is decoded, so an OAuth or
- * self-hosted connection cannot fall through to another stored account. A NULL `active` predates the
- * flag. No database, a locked one, or an older schema gives no key.
- */
+function authFileApiKey(
+  file: typeof AuthFile.Type | undefined,
+  integration: "opencode" | "opencode-go",
+): AuthFileApiKey | undefined {
+  const entry = file?.[integration];
+  const decoded = Schema.decodeUnknownOption(AuthFileKey)(entry);
+  if (Option.isNone(decoded)) return undefined;
+  return {
+    key: decoded.value.key,
+    servedByConsole: servedByOpenCodeConsole(getRecord(entry, "metadata")?.server),
+  };
+}
+
+function servedByOpenCodeConsole(server: unknown): boolean {
+  if (typeof server !== "string") return true;
+  const url = URL.parse(server);
+  return url !== null && `${url.origin}${url.pathname.replace(/\/+$/u, "")}` === OPENCODE_CONSOLE_URL;
+}
+
+function newestStoredKey(databasePath: string, integration: string) {
+  const row = readOpenCodeDatabase(databasePath, (database) =>
+    database
+      .prepare(
+        `SELECT value FROM credential
+         WHERE integration_id = ? AND active IS NOT 0
+         ORDER BY active DESC, time_created DESC, id DESC LIMIT 1`,
+      )
+      .get(integration),
+  );
+  return Schema.decodeUnknownOption(Schema.fromJsonString(StoredKey))(row?.value);
+}
+
+export const readOpenCodeStoredKey = Effect.fn("OpenCode.readStoredKey")(function* (
+  integration: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const databasePath = openCodeDatabasePath(env);
+  if (!databasePath) return null;
+  return yield* Effect.try({
+    try: () => {
+      const stored = newestStoredKey(databasePath, integration);
+      return Option.isSome(stored) ? stored.value.key.trim() || null : null;
+    },
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => null));
+});
+
 const readConsoleKey = Effect.fn("OpenCode.readConsoleKey")(function* (databasePath: string) {
   return yield* Effect.try({
     try: () => {
-      const database = new DatabaseSync(databasePath, { readOnly: true });
-      try {
-        database.exec(`PRAGMA busy_timeout = ${OPENCODE_DB_BUSY_TIMEOUT_MS}`);
-        const row = database
-          .prepare(
-            `SELECT value FROM credential
-             WHERE integration_id = 'opencode' AND active IS NOT 0
-             ORDER BY active DESC, time_created DESC, id DESC LIMIT 1`,
-          )
-          .get();
-        const stored = Schema.decodeUnknownOption(Schema.fromJsonString(StoredKey))(row?.value);
-        if (Option.isNone(stored)) return undefined;
-        const server = stored.value.metadata?.server;
-        if (typeof server === "string") {
-          const url = new URL(server);
-          if (`${url.origin}${url.pathname.replace(/\/+$/u, "")}` !== OPENCODE_CONSOLE_URL) return undefined;
-        }
-        return stored.value.key.trim() || undefined;
-      } finally {
-        database.close();
-      }
+      const stored = newestStoredKey(databasePath, "opencode");
+      if (Option.isNone(stored) || !servedByOpenCodeConsole(stored.value.metadata?.server)) return undefined;
+      return stored.value.key.trim() || undefined;
     },
     catch: (cause) => new OpenCodeUsageFailed({ cause }),
   }).pipe(Effect.orElseSucceed(() => undefined));
 });
 
-/** The quota for one key, or null when the console rejects the key. */
 const readGoUsage = Effect.fn("OpenCode.readGoUsageWithKey")(function* (apiKey: string) {
   return yield* Effect.acquireUseRelease(
     Effect.sync(() => new AbortController()),
@@ -160,11 +236,6 @@ const readGoUsage = Effect.fn("OpenCode.readGoUsageWithKey")(function* (apiKey: 
 
 const UsageWindow = Schema.Struct({ percent: Schema.Finite, resetsAt: Schema.NullOr(Schema.String) });
 
-/**
- * The second window of the reading is the weekly or the monthly one, whichever is closer to its
- * limit, since that is the one that stops a turn first. When both are spent, the one that resets
- * later, since turns stay stopped until then. The other one goes to `tertiary` for the usage list.
- */
 function openCodeGoRateLimits(value: unknown): AccountRateLimitsReadResult {
   const usage = getRecord(value, "usage");
   const rolling = usageWindow(getRecord(usage, "rolling"), ROLLING_WINDOW_MINS);

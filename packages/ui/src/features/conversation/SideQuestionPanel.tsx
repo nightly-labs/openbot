@@ -5,12 +5,15 @@ import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/feat
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
+import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { useText } from "@openbot/ui/text";
+import type { JSX } from "@solidjs/web";
 import { For, onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { createComposerRowsResize } from "./createComposerRowsResize";
 
-/** One question of a side question. The answer is null while the agent writes it. */
 export interface SideQuestionExchange {
   id: string;
   question: string;
@@ -21,24 +24,20 @@ export interface SideQuestionExchange {
 
 export interface SideQuestionPanelProps {
   agent: AgentProfile;
+  bubbleStyle?: ChatBubbleStyle | undefined;
   agents: AgentProfile[];
   exchanges: readonly SideQuestionExchange[];
-  /** The agent's skills, for the `$` picker and the skill tags in messages. */
   skills?: InstalledSkill[] | undefined;
-  /** The last skill list request failed, so an empty picker says so instead of "no skills". */
   skillsLoadFailed?: boolean | undefined;
-  /** The host's MCP servers, offered by the same `$` the skills answer. */
   mcpServers?: ComposerMcpServer[] | undefined;
-  /** Why the last question got no answer. The question is back in the draft. */
   error: string | null;
   draft: string;
-  /** Raised by one to put the caret in the composer. */
   focusRequest: number;
   onDraftChange: (value: string) => void;
   onAsk: (question: string) => void;
   onClosePanel: () => void;
   onOpenLink: (url: string) => void;
-  /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
+  resizer?: JSX.Element;
   macWindowControls?: boolean | undefined;
 }
 
@@ -65,15 +64,12 @@ function exchangeMessages(exchange: SideQuestionExchange): AgentMessage[] {
   ];
 }
 
-/**
- * A question about the chat that stays out of the chat. The agent answers with its own model, with
- * no tools, and nothing of it is kept: closing the pane deletes it.
- */
 export function SideQuestionPanel(props: SideQuestionPanelProps) {
   const { t } = useText();
   const activityLabel = nextAgentActivityLabel();
   const fades = createScrollFades();
   onSettled(() => fades.stop);
+  const draftRows = createComposerRowsResize(() => props.agent.id);
   const asking = () => props.exchanges.at(-1)?.answer === null;
   const messages = () => props.exchanges.flatMap(exchangeMessages);
   const ask = () => {
@@ -83,7 +79,12 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
   };
   const author = (message: AgentMessage) =>
     message.author === "you"
-      ? { kind: "you" as const, name: t("chat.message.you") }
+      ? ownMessageAuthor({
+          name: t("chat.message.you"),
+          style: props.bubbleStyle ?? "classic",
+          agent: props.agent,
+          chatColor: undefined,
+        })
       : { kind: "agent" as const, name: props.agent.name, agent: props.agent };
   return (
     <aside
@@ -91,6 +92,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
       class="browser-panel side-question-panel"
       aria-label={t("conversation.sidePanel.pane.question")}
     >
+      {props.resizer}
       <header class="file-preview-header side-panel-pane-header">
         <h2 class="side-panel-pane-title">{t("conversation.sidePanel.pane.question")}</h2>
         <Button
@@ -146,24 +148,26 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
         </section>
       </Show>
       <div class="composer-wrap">
-        <Show when={props.error}>
-          {(error) => (
-            <ComposerNotice
-              tone="danger"
-              title={t("conversation.sideQuestion.failed")}
-              body={error()}
-              action={
-                // The failed question is back in the draft, so Retry asks the draft again.
-                <Show when={props.draft.trim()}>
-                  <Button variant="outline" size="sm" type="button" disabled={asking()} onClick={ask}>
-                    {t("common.retry")}
-                  </Button>
-                </Show>
-              }
-            />
-          )}
-        </Show>
+        <div class="composer-stack">
+          <ComposerStackCard when={props.error}>
+            {(error) => (
+              <ComposerNotice
+                tone="danger"
+                title={t("conversation.sideQuestion.failed")}
+                body={error()}
+                action={
+                  <Show when={props.draft.trim()}>
+                    <Button variant="outline" size="sm" type="button" disabled={asking()} onClick={ask}>
+                      {t("common.retry")}
+                    </Button>
+                  </Show>
+                }
+              />
+            )}
+          </ComposerStackCard>
+        </div>
         <form
+          ref={draftRows.form}
           class="composer side-question-composer"
           data-compact="true"
           onSubmit={(event) => {
@@ -171,7 +175,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
             ask();
           }}
         >
-          <div class="composer-input-label">
+          <div class="composer-input-label" ref={draftRows.label}>
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}

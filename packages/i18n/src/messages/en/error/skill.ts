@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.skill", {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "Skill packages cannot contain symbolic links.",
   "error.skill.expandedTooLarge": "The expanded skill must be under 10 MB.",
   "error.skill.irregularEntry": "Skill packages can contain only regular files and folders.",
@@ -44,11 +43,16 @@ export const messages = defineMessages("error.skill", {
   "error.skill.publishUntracked":
     "{name} was installed before exact-version tracking. Update or repair it before publishing.",
   "error.skill.tooManySkills": "An agent can have up to {limit} skills.",
-  "error.skill.unmanagedExists": "An unmanaged skill already exists at {path}.",
+  "error.skill.ownSkillExists":
+    "This agent already has its own skill named {slug}. Ask the agent to rename or delete that skill, then add this skill again.",
   "error.skill.managedSlug": "OpenBot gives every agent its own {slug} skill. Give this skill a different name.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md is larger than 64 KB. Shorten it before publishing.",
   "error.skill.localNoRevisions": "Local skill has no published revisions.",
+  "error.skill.localNotFound": "This local skill does not exist. Check its ID in the list of local skills.",
+  "error.skill.localRevisionNotFound": "This local skill has no revision {revision}. Its latest revision is {latest}.",
   "error.skill.localNameTaken": "A local skill with this name already exists. Revise it instead.",
+  "error.skill.localNameClash":
+    'This name and the local skill "{name}" both become "{slug}". To change that skill, revise it. To add a new skill, change the Latin letters or digits in this name.',
   "error.skill.localKeepName": "Keep the skill name unchanged when revising it.",
   "error.skill.localRelativeFolder": "Use a relative skill folder inside the current agent workspace.",
   "error.skill.localSourceOutside": "Skill source must be inside the agent workspace.",
@@ -56,4 +60,13 @@ export const messages = defineMessages("error.skill", {
   "error.skill.localMissingSkillFile": "The skill folder needs SKILL.md at its root.",
   "error.skill.pathSymlink": "Skill paths cannot contain symbolic links.",
   "error.skill.folderNotRead": "{provider} does not read {folder}. Copy this folder to {target}.",
+  "error.skill.githubLinkInvalid": "Paste a link to a GitHub repository or folder.",
+  "error.skill.githubNotFound": "OpenBot cannot open {repository}. The repository is private, or it does not exist.",
+  "error.skill.githubNoSkills": "There is no SKILL.md in {folder}.",
+  "error.skill.githubUnavailable": "OpenBot cannot read GitHub now. Try again later.",
+  "error.skill.githubRateLimited":
+    "GitHub limits how often OpenBot can read it without an account. Try again in one hour.",
+  "error.skill.githubTooLarge": "OpenBot cannot read all files of {repository}. The repository is too large.",
+  "error.skill.githubHostTooOld": "Update this server to add skills from GitHub.",
+  "error.skill.publishGithub": "{name} comes from GitHub. You can publish only the skills that you made.",
 });

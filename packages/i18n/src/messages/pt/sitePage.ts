@@ -93,6 +93,8 @@ export const messages = {
   "sitePage.pricing.consent.statement": "Declaro que aceito {policy}, {terms}.",
   "sitePage.pricing.consent.policy": "a política de privacidade",
   "sitePage.pricing.consent.terms": "os termos e o direito de arrependimento",
+  "sitePage.pricing.consent.earlyStart":
+    "Solicito que o serviço de hospedagem comece antes do fim do prazo de arrependimento de 14 dias. Reconheço que, se eu desistir do contrato antes de o serviço ser totalmente prestado, terei de pagar pelos serviços prestados até o momento da desistência e que, depois que o serviço for totalmente prestado, perderei o direito de desistir do contrato.",
   "sitePage.teams.title": "OpenBot para Equipes",
   "sitePage.teams.description":
     "Execute o OpenBot em infraestrutura gerenciada ou deixe a gente criar uma implantação sob medida para sua equipe, seus fluxos de trabalho e os sistemas que você já usa.",
@@ -385,6 +387,29 @@ export const messages = {
   "sitePage.landing.download.appStore": "Baixar na App Store",
   "sitePage.landing.download.googlePlay": "Disponível no Google Play",
   "sitePage.landing.download.pages": "Requisitos do sistema e passos de instalação:",
+  "sitePage.landing.download.apk": "Baixar o APK",
+  "sitePage.referral.invitedBy": "{name} convidou você para o OpenBot",
+  "sitePage.referral.invited": "Você tem um convite para o OpenBot",
+  "sitePage.referral.offer": "{percent} de desconto",
+  "sitePage.referral.offerDetail": "no seu primeiro pagamento",
+  "sitePage.referral.lead":
+    "Execute Codex, Claude, Gemini e Grok como uma equipe de agentes no seu computador, com os planos de IA que você já paga.",
+  "sitePage.referral.card.from": "De {name}",
+  "sitePage.referral.card.invite": "Convite",
+  "sitePage.referral.card.offer": "de desconto no primeiro pagamento",
+  "sitePage.referral.card.code": "Código de convite",
+  "sitePage.referral.keep": {
+    one: "Este navegador guarda o código por {count} dia.",
+    other: "Este navegador guarda o código por {count} dias.",
+  },
+  "sitePage.referral.desktop": "No app de desktop, cole o código ao entrar.",
+  "sitePage.referral.prices.title": "Seu primeiro pagamento, com {percent} de desconto",
+  "sitePage.referral.prices.description":
+    "Pague só quando precisar de um servidor hospedado ou de uma licença para trabalho.",
+  "sitePage.referral.prices.firstMonth": "primeiro mês · você economiza {amount}",
+  "sitePage.referral.prices.firstYear": "primeiro ano · você economiza {amount}",
+  "sitePage.referral.prices.note": "Preços em {currency}, sem impostos.",
+  "sitePage.referral.prices.all": "Todos os planos e recursos",
   "sitePage.site.download": "Baixar",
   "sitePage.site.app": "App",
   "sitePage.site.primaryNavigation": "Navegação principal",

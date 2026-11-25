@@ -1,22 +1,18 @@
 import { spawnSync } from "node:child_process";
 import { createOpenBotLogger } from "@openbot/logging";
 
-// Pull request screenshots and recordings go in the pull request body, not in the repository
-// (AGENTS.md, "Pull requests"). Only the product owns image files, in these directories.
 const ALLOWED_DIRECTORIES = [
-  // electron-builder application icons.
   "build/",
-  // Images that the renderer bundles, and Storybook fixtures.
   "src/renderer/src/assets/",
   "src/renderer/stories/assets/",
-  // Images that shared UI (`@openbot/ui`) bundles for the desktop and web apps.
   "packages/ui/src/assets/",
-  // Expo icons and splash screens.
   "apps/mobile/assets/",
-  // Public site files, news and guide art, and guide images.
+  "apps/browser-extension/public/icons/",
   "apps/auth-api/public/",
   "apps/auth-api/content-art/",
   "apps/auth-api/src/content/guides/media/",
+  "scripts/hosting/desktop/",
+  "docs/store-assets/",
 ] as const;
 
 const IMAGE_FILE = /\.(avif|bmp|gif|heic|icns|ico|jpe?g|mov|mp4|png|svg|tiff?|webm|webp)$/i;

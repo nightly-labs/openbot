@@ -1,6 +1,3 @@
-// The Computer Use driver: one long-lived daemon this process owns, and the MCP entry the
-// providers spawn against it.
-
 import { type ChildProcess, spawn as nodeSpawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
@@ -18,7 +15,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Deferred, Effect, Exit, Result } from "effect";
+import { Deferred, Effect, Exit, Result, Semaphore } from "effect";
 import { agentDisplayEnvironment } from "./agent-display";
 import { CuaDriverActionTap, type ObservedAction, type ObservedPointer } from "./cua-driver-action-tap";
 import { CUA_DRIVER_VENDOR_CALLS_OFF } from "./cua-driver-artifact";
@@ -27,76 +24,33 @@ import { LifecycleGate } from "./lifecycle-gate";
 import { forwardDiagnosticLines, stopRemoteProcess } from "./remote-diagnostics";
 
 const SOCKET_FILE = "driver.sock";
-/** The address OpenBot listens on itself, between the agents' proxies and the daemon. */
 const TAP_SOCKET_FILE = "tap.sock";
-/** Where the Windows pipe name is kept, below the profile directory. */
 const PIPE_NAME_FILE = ["cua-driver", "pipe-name"] as const;
-/**
- * The most a Unix socket path may hold, per platform.
- *
- * `sockaddr_un.sun_path` is 104 bytes on macOS and 108 on Linux, the last of them the terminator,
- * and the kernel answers a longer path with `EINVAL` rather than anything that names the real
- * cause. The user data directory is far too deep to hold the socket: an isolated development
- * profile alone spends 64 characters on the worktree hash. So the socket lives in a per-user
- * runtime directory, and the length is checked before the daemon is started.
- *
- * Windows has no such limit. A named pipe is a name in a kernel namespace rather than a path on
- * disk, so nothing there is measured.
- */
 const MAX_SOCKET_PATH_LENGTH: Readonly<Partial<Record<NodeJS.Platform, number>>> = {
   darwin: 103,
   linux: 107,
 };
 const READY_TIMEOUT_MS = 20_000;
 const READY_POLL_MS = 200;
-/** How long a daemon left by a previous run gets to release its socket. The driver's own `stop` waits as long. */
 const ORPHAN_STOP_TIMEOUT_MS = 2_000;
 const PERMISSION_TIMEOUT_MS = 10_000;
+const WAYLAND_INPUT_CHECK_TIMEOUT_MS = 4_000;
+const WAYLAND_BACKEND_CHECK = "wayland_backend";
+const RECHECK_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000] as const;
+const RECHECK_STABLE_MS = 5 * 60_000;
 
-/**
- * Embedded mode, which is what makes the grant OpenBot's own.
- *
- * macOS attributes a permission to the responsible process, which it finds by walking up the
- * launch chain. Spawning the daemon directly from this process puts OpenBot at the top of that
- * chain, so the user grants Accessibility and Screen Recording to OpenBot rather than to a helper
- * signed by somebody else. Launching it through `open(1)` or `NSWorkspace` would hand the chain to
- * `launchd` instead and break the attribution, so nothing here may do that.
- *
- * Windows and Linux have no equivalent to grant, so there the variable only tells the driver that
- * its lifetime belongs to this process.
- *
- * The driver reads this variable as the exact string `1`.
- */
 const EMBEDDED_ENV = "CUA_DRIVER_EMBEDDED";
-/**
- * Makes the daemon stop when its standard input closes.
- *
- * The kernel closes that pipe when this process ends for any reason, a crash or an out-of-memory
- * kill included, so the daemon cannot outlive OpenBot. Only the daemon gets it: the proxy reads its
- * standard input as JSON-RPC. The driver reads it only together with `CUA_DRIVER_EMBEDDED`.
- */
 const PARENT_LIVENESS_ENV = "CUA_DRIVER_PARENT_LIVENESS_STDIN";
 const HOST_BUNDLE_ID_ENV = "CUA_DRIVER_HOST_BUNDLE_ID";
 const WAYLAND_ENV = "CUA_DRIVER_RS_ENABLE_WAYLAND";
+const KEEP_DISPLAY_AWAKE_ENV = "CUA_DRIVER_KEEP_DISPLAY_AWAKE";
+const CLICK_HOLD_ENV = "CUA_DRIVER_CLICK_GAP_MS";
+const MAC_CLICK_HOLD_MS = "60";
 
-/**
- * The grants the driver needs, in the order the panel lists them.
- *
- * Only macOS has any. Windows and Linux put no permission between a program and the desktop it is
- * already running on, so there the list is empty and a driver that answers is a driver that is
- * ready. An empty list must never read as "nothing granted yet": the panel shows rows only when
- * this list has entries.
- */
 const REQUIRED_PERMISSIONS: Readonly<Partial<Record<NodeJS.Platform, readonly MacPermissionId[]>>> = {
   darwin: ["screen-recording", "accessibility"],
 };
 
-/**
- * Exactly the spawn this class performs, rather than every overload `child_process` carries.
- *
- * Narrow on purpose: a test supplies its own, and a wider type would make it write an assertion to
- * satisfy overloads this code never uses.
- */
 interface SpawnDriverOptions {
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -110,87 +64,33 @@ export type SpawnDriverProcess = (
   options: SpawnDriverOptions,
 ) => ChildProcess;
 
-/**
- * The variables the proxy inherits from this machine, named per desktop.
- *
- * The proxy is a short-lived client of the daemon, so it needs only enough to start and to find a
- * temporary directory. Windows needs `SystemRoot`: a process started without it cannot load the
- * system libraries it links against. A name this machine does not hold is skipped, so nothing here
- * invents a value.
- */
 const ENVIRONMENT_PASSTHROUGH: Readonly<Partial<Record<NodeJS.Platform, readonly string[]>>> = {
   win32: ["SystemRoot", "windir", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "TEMP", "TMP"],
 };
 
-/** The POSIX set, which macOS and Linux share. */
 const POSIX_ENVIRONMENT_PASSTHROUGH: readonly string[] = ["HOME", "USER", "TMPDIR"];
 
 function environmentPassthrough(platform: NodeJS.Platform): readonly string[] {
   return ENVIRONMENT_PASSTHROUGH[platform] ?? POSIX_ENVIRONMENT_PASSTHROUGH;
 }
 
-/**
- * Where the daemon listens, which is a different kind of thing on each desktop.
- *
- * Both forms are passed to the driver as `--socket`, and both are what `net.connect` takes, so the
- * only code that cares about the difference is the code that creates and removes them.
- */
 export type CuaDriverEndpoint =
   | {
-      /**
-       * A Unix domain socket in a directory private to this user.
-       *
-       * Private, because the socket is a control channel to a process that can drive the whole
-       * desktop. Short, because of `MAX_SOCKET_PATH_LENGTH`.
-       */
       kind: "unix-socket";
       directory: string;
     }
   | {
-      /**
-       * A Windows named pipe.
-       *
-       * Windows gives a pipe a security descriptor rather than a directory mode, and the default
-       * one already denies every other user, so there is nothing here to create or to remove.
-       */
       kind: "windows-pipe";
       name: string;
     };
 
 export interface CuaDriverEndpointInput {
   platform: NodeJS.Platform;
-  /** This profile's directory. Windows keeps the pipe name below it; the rest name a socket after it. */
   userDataPath: string;
   temporaryDirectory: string;
-  /** `XDG_RUNTIME_DIR`, read on Linux alone. */
   runtimeDirectory?: string | null | undefined;
 }
 
-/**
- * Where the daemon listens, which is a different kind of thing on each desktop.
- *
- * The endpoint is a control channel to a process that can drive the whole desktop, so where it sits
- * decides who may reach it. It also has to be the same across restarts: it is passed to each proxy
- * as an argument, the arguments are folded into the stored Codex tool fingerprint, and a fingerprint
- * that moves replaces every session, which loses what each provider held privately.
- *
- * On macOS the temporary directory is already private per user (`/var/folders/…`, mode `0700`). On
- * Linux `os.tmpdir()` is usually the shared, world-writable `/tmp`, where another local user can
- * create our directory before we do, so `XDG_RUNTIME_DIR` is used first: the login session owns it,
- * it is mode `0700`, and it is removed at logout. The temporary directory stays as the fallback for
- * a session that has none, and this runtime refuses a directory this user does not own either way.
- * The digest of the profile path keeps two profiles on one computer apart and keeps the name the
- * same, so a socket left by a crashed run is found and removed rather than accumulating.
- *
- * The user data directory cannot hold the socket: a socket path may hold about a hundred characters,
- * and an isolated development profile spends 64 of them on a worktree hash alone.
- *
- * On Windows it is a named pipe, a name in a kernel namespace rather than a path, so it has no
- * length limit and no directory to protect. The name is random, because Windows lets a second
- * process add an instance to an existing pipe name, so a name another local process can guess could
- * be taken before the driver starts. It is kept in the profile so that it is random once rather than
- * once per launch: only a process that can already read this user's profile can read it back.
- */
 export const resolveCuaDriverEndpoint = Effect.fn("CuaDriver.endpoint")(function* (
   input: CuaDriverEndpointInput,
 ): Effect.fn.Return<CuaDriverEndpoint, CuaDriverFailure> {
@@ -204,7 +104,6 @@ export const resolveCuaDriverEndpoint = Effect.fn("CuaDriver.endpoint")(function
   return { kind: "unix-socket", directory: join(parent, `openbot-cua-${digest}`) };
 });
 
-/** Only this shape is read back, so a truncated or edited file is replaced rather than served. */
 const WINDOWS_PIPE_NAME = /^\\\\\.\\pipe\\openbot-cua-[0-9a-f-]{36}$/;
 
 const windowsPipeName = Effect.fn("CuaDriver.windowsPipeName")(function* (userDataPath: string) {
@@ -223,72 +122,28 @@ const windowsPipeName = Effect.fn("CuaDriver.windowsPipeName")(function* (userDa
 export interface CuaDriverCommandAliasInput {
   platform: NodeJS.Platform;
   isPackaged: boolean;
-  /** `APPIMAGE`, which only an AppImage run sets. */
   appImagePath?: string | null | undefined;
   userDataPath: string;
 }
 
-/**
- * A path that holds still for the MCP command, for the one build whose own files do not.
- *
- * An AppImage mounts its resources in a new temporary directory at each launch, so the packaged
- * driver sits somewhere else every time. That path reaches each proxy as the command, the command is
- * folded into the stored Codex tool fingerprint, and a fingerprint that moves replaces every session
- * after a restart, which loses what the provider held privately. The path also dies with the mount,
- * so a session that kept the old one could not start a proxy at all.
- *
- * The runtime links this path to the driver at each start, so the command stays the same and always
- * names the mount this run uses. Every other build has a path that already stays, and gets none.
- */
 export function cuaDriverCommandAlias(input: CuaDriverCommandAliasInput): string | null {
   if (input.platform !== "linux" || !input.isPackaged || !input.appImagePath?.trim()) return null;
   return join(input.userDataPath, "cua-driver", "cua-driver");
 }
 
 export interface CuaDriverRuntimeOptions {
-  /** The resolved executable, or `null` when this computer has none. */
   executable: string | null;
-  /**
-   * Looks for the executable again, for a computer that had none when OpenBot started.
-   *
-   * The panel tells such a user to install the driver and then check again, and the check has to
-   * read the filesystem rather than the answer from startup: otherwise the only way to finish the
-   * installation is to restart OpenBot.
-   */
   resolveExecutable?: () => Effect.Effect<string | null, CuaDriverFailure>;
-  /**
-   * Where to link the executable, so the MCP command is the same at each launch.
-   *
-   * Null for a build whose driver path already stays. See `cuaDriverCommandAlias`.
-   */
   commandAlias?: string | null;
   endpoint: CuaDriverEndpoint;
-  /**
-   * Whether the driver is published for this computer at all, which is not whether it is installed.
-   *
-   * Separate from `executable`, because the two mean different things to the user: an unsupported
-   * computer has nothing to install, and a supported one without a binary has an install command.
-   */
   supported: boolean;
-  /** Advisory only. The driver logs it; it is not a trust signal, so nothing may treat it as one. */
   hostBundleId: string;
   platform: NodeJS.Platform;
   spawnProcess?: SpawnDriverProcess;
   onDiagnostic?: (message: string) => void;
-  /** Injected by the test, which has no driver to ask. */
   readPermissions?: (config: McpServerConfig, platform: NodeJS.Platform) => Promise<readonly ComputerUsePermission[]>;
   waitForSocket?: (path: string) => Promise<void>;
-  /** Injected by the test, which listens on no address of its own. */
   actionTap?: CuaDriverActionTap;
-  /**
-   * True once OpenBot starts to quit. The providers are told nothing more from then on.
-   *
-   * A signal to the process group, which a terminal, `systemd` and Docker send, reaches the daemon
-   * too, and the daemon can stop before the teardown stops it. Its exit then looks like a death
-   * under OpenBot, and announcing it would deactivate every agent's stored session, which the next
-   * run would otherwise resume. A function rather than a method to call, so a quit during startup,
-   * before anything holds this runtime, counts too.
-   */
   quitting?: () => boolean;
 }
 
@@ -297,24 +152,27 @@ export class CuaDriverRuntime {
   readonly #spawn: SpawnDriverProcess;
   readonly #listeners = new Set<(state: ComputerUseState) => void>();
   readonly #mcpListeners = new Set<() => void>();
-  /** What the providers were last told to spawn, `""` for "nothing". */
   #announcedMcpServer = "";
-  /** True while the entry is allowed to move without the providers being told. See `warmUp`. */
   #quiet = false;
-  /** What the proxies are told to run: the alias once it is linked, the executable otherwise. */
   #command: string | null = null;
   #child: ChildProcess | null = null;
   readonly #lifecycle = new LifecycleGate<void, CuaDriverFailure>();
   #state: ComputerUseState;
-  /** Mutable, because a user may install the driver while OpenBot runs. */
   #executable: string | null;
   readonly #tap: CuaDriverActionTap;
+  #waylandInputRefused = false;
+  #restartRequired = false;
+  #recheckTimer: ReturnType<typeof setTimeout> | null = null;
+  #recheckAttempt = 0;
+  #readySince: number | null = null;
+  #permissionsRead = false;
 
   constructor(options: CuaDriverRuntimeOptions) {
     this.#options = options;
     this.#spawn = options.spawnProcess ?? nodeSpawn;
     this.#executable = options.executable;
     this.#tap = options.actionTap ?? new CuaDriverActionTap();
+    this.#tap.onAccessibilityRefused(() => this.#requireRestart());
     this.#state = initialState(options.platform, options.supported, options.executable);
   }
 
@@ -322,56 +180,40 @@ export class CuaDriverRuntime {
     return this.#state;
   }
 
+  waylandInputRefused(): boolean {
+    return this.#waylandInputRefused;
+  }
+
+  missingPermissions(): MacPermissionId[] {
+    if (!this.#permissionsRead || this.#state.status !== "permissions-required") return [];
+    return this.#state.permissions.filter((permission) => !permission.granted).map((permission) => permission.id);
+  }
+
   running(): boolean {
     return this.#child !== null && this.#child.exitCode === null;
   }
 
-  /** The address the daemon listens on and every client connects to. */
   socketPath(): string {
     const endpoint = this.#options.endpoint;
     return endpoint.kind === "windows-pipe" ? endpoint.name : join(endpoint.directory, SOCKET_FILE);
   }
 
-  /**
-   * The address the agents are handed: OpenBot's own while it listens, the daemon's own otherwise.
-   *
-   * The tap forwards every request unchanged, so a tap that failed to listen costs the rim its
-   * answer, never the agent a tool that works. What it does cost is the JSON copy the tap adds to
-   * each tool answer, which a provider that shows the model only the result text needs to read
-   * window ids and snapshot ids, and the removal of the driver's cursor tools from the tool list.
-   */
   tapAddress(): string {
     return this.#tap.address ?? this.socketPath();
   }
 
-  /**
-   * Where an agent last asked the daemon to act, as far as the window is concerned.
-   *
-   * This is the only answer OpenBot has to "which window is the agent working in": it comes from
-   * the request the agent's own proxy sent, not from which window happens to be in front.
-   */
   lastAction(maxAgeMs: number): ObservedAction | null {
     return this.#tap.lastAction(maxAgeMs);
   }
 
-  /**
-   * Where an agent last aimed the pointer, which is where OpenBot draws its own agent cursor.
-   */
   lastPointer(maxAgeMs: number): ObservedPointer | null {
     return this.#tap.lastPointer(maxAgeMs);
   }
 
-  /**
-   * How to reach the running daemon over MCP, or `null` while there is nothing to reach.
-   *
-   * This is the address, not the decision of who may have it: the panel asks the daemon what it may
-   * do through this entry, before any grant exists. `mcpServerForProviders` decides what an agent
-   * is given.
-   *
-   * The command is absolute, so `resolveMcpCommand` accepts it without a login shell. The working
-   * directory stays empty on purpose: ACP has no field for one, so ACP providers would drop this
-   * entry with no error if it carried one.
-   */
+  onToolCall(listener: () => void): void {
+    this.#tap.onToolCall(listener);
+  }
+
   mcpServerConfig(): McpServerConfig | null {
     const command = this.#command ?? this.#executable;
     if (!command || !this.running()) return null;
@@ -393,15 +235,6 @@ export class CuaDriverRuntime {
     };
   }
 
-  /**
-   * What an agent's provider is handed, which is nothing until the grants are in place.
-   *
-   * Tools an ungranted daemon would refuse are worth nothing to an agent, and handing them over has
-   * a cost: the entry enters the tool fingerprint of every session spawned while the panel keeps an
-   * ungranted daemon alive, and the warm-up stops that daemon at the next start, so each of those
-   * sessions would be replaced although the user changed nothing. Reading the state instead of the
-   * process makes the panel and the warm-up agree: below `ready` there is no entry either way.
-   */
   mcpServerForProviders(): McpServerConfig | null {
     return this.#state.status === "ready" ? this.mcpServerConfig() : null;
   }
@@ -411,35 +244,11 @@ export class CuaDriverRuntime {
     return () => this.#listeners.delete(listener);
   }
 
-  /**
-   * Told when the entry the providers are handed appears or the daemon dies under OpenBot, and at
-   * no other time.
-   *
-   * Separate from the state, because the two ask for different work. A state change updates the
-   * capability, which costs nothing. An entry change deactivates every agent's stored provider
-   * session, because the tool set is decided at each spawn, and a deactivated session is gone: the
-   * next turn starts a new one, which keeps the public thread and loses what the provider held
-   * privately. So this reports only the two moments that leave a live session holding a tool set
-   * that is not the one it would be given now.
-   *
-   * Three things it is quiet for. The warm-up at startup settles the entry the stored sessions were
-   * already using. A stop this process asked for happens at teardown, where the sessions are being
-   * left for the next run. A daemon that dies once OpenBot quits dies with it: see the `quitting`
-   * option. A state that moves below `ready` and back while the daemon keeps serving
-   * is not quiet, because the entry goes with it.
-   */
   onMcpServerChanged(listener: () => void): () => void {
     this.#mcpListeners.add(listener);
     return () => this.#mcpListeners.delete(listener);
   }
 
-  /**
-   * The daemon, started once however many callers ask at the same time.
-   *
-   * Starting is what makes macOS ask for the grants, so nothing starts it except the panel, an
-   * agent that reaches for the tools, and `warmUp`, which keeps it only for a user who granted
-   * them already.
-   */
   start(): Effect.Effect<void, CuaDriverFailure> {
     return this.#lifecycle.start(() =>
       Effect.gen({ self: this }, function* () {
@@ -451,10 +260,17 @@ export class CuaDriverRuntime {
   }
 
   stop(): Effect.Effect<void, CuaDriverFailure> {
+    this.#cancelRecheck();
     return this.#lifecycle.stop(() => this.#stop());
   }
 
-  readonly state = Effect.fn("CuaDriver.state")(function* (
+  readonly #checks = Semaphore.makeUnsafe(1);
+
+  state(): Effect.Effect<ComputerUseState, CuaDriverFailure> {
+    return this.#checks.withPermit(this.#check());
+  }
+
+  readonly #check = Effect.fn("CuaDriver.state")(function* (
     this: CuaDriverRuntime,
   ): Effect.fn.Return<ComputerUseState, CuaDriverFailure> {
     if (!this.#options.supported) return this.#publish(this.#initialState());
@@ -480,7 +296,9 @@ export class CuaDriverRuntime {
     const injected = this.#options.readPermissions;
     const result = yield* Effect.result(
       injected
-        ? cuaIO(() => injected(config, this.#options.platform))
+        ? cuaIO(() => injected(config, this.#options.platform)).pipe(
+            Effect.map((permissions) => ({ permissions, waylandInputRefused: false })),
+          )
         : readPermissionsOverMcpEffect(config, this.#options.platform),
     );
     if (Result.isFailure(result))
@@ -489,29 +307,34 @@ export class CuaDriverRuntime {
         permissions: ungranted(this.#options.platform),
         message: sourceText("status.computerUse.driverNoAnswer", { reason: describe(result.failure.cause) }),
       });
-    const permissions = result.success;
+    const { permissions, waylandInputRefused } = result.success;
+    this.#permissionsRead = true;
+    this.#waylandInputRefused = waylandInputRefused;
     const granted = requiredPermissions(this.#options.platform).every((id) =>
       permissions.some((p) => p.id === id && p.granted),
     );
-    return this.#publish({ status: granted ? "ready" : "permissions-required", permissions, message: null });
+    const state = this.#publish(
+      !granted
+        ? { status: "permissions-required", permissions, message: null }
+        : this.#restartRequired
+          ? restartRequiredState(permissions)
+          : {
+              status: "ready",
+              permissions,
+              message: waylandInputRefused ? sourceText("status.computerUse.inputRefused") : null,
+            },
+    );
+    if (!granted) yield* this.stop().pipe(Effect.catch(() => Effect.void));
+    return state;
   }).bind(this);
 
-  /**
-   * Starts the daemon at startup for a user who granted the permissions already, and stops it again
-   * for one who did not.
-   *
-   * The providers are handed the MCP entry at each spawn, and there is no entry while the daemon is
-   * stopped. Waiting for the panel would therefore leave a fully granted user without the tools
-   * after every restart, and would leave a remote request or a scheduled task — neither of which
-   * opens a window — without them at all. Asking the driver what it may do raises no prompt, so a
-   * user who never granted anything sees nothing and keeps no process.
-   */
   readonly warmUp = Effect.fn("CuaDriver.warmUp")(function* (this: CuaDriverRuntime) {
     if (!this.#options.supported) return;
     this.#quiet = true;
     yield* Effect.gen({ self: this }, function* () {
       const state = yield* this.state();
       if (state.status !== "ready") yield* this.stop().pipe(Effect.catch(() => Effect.void));
+      if (state.status === "error") this.#scheduleRecheck();
     }).pipe(
       Effect.ensuring(
         Effect.sync(() => {
@@ -527,8 +350,6 @@ export class CuaDriverRuntime {
     yield* this.#tap.close();
     if (child) yield* stopRemoteProcess(child).pipe(toCuaDriverFailure);
     yield* this.#removeSocket();
-    // No announcement: a stop this process asked for is the teardown, and telling the providers
-    // there would deactivate the very sessions the next run resumes.
     this.#announcedMcpServer = "";
   });
 
@@ -546,17 +367,13 @@ export class CuaDriverRuntime {
         });
       }
 
-      // `0o700`, because the socket inside is a control channel to a process that can drive the
-      // whole desktop. The per-user runtime directory is already private; this keeps it private if
-      // the caller ever names somewhere else. The mode applies only to a directory this call
-      // creates, which is why what is already there is inspected below rather than trusted.
       yield* cuaIO(() => mkdir(endpoint.directory, { recursive: true, mode: 0o700 }));
       yield* assertPrivateDirectoryEffect(endpoint.directory);
     }
     yield* this.#stopOrphanedDaemon(socketPath);
     yield* this.#removeSocket();
     this.#command = yield* this.#linkCommandAlias(executable);
-    // OpenBot owns the cursor on every display, including displays connected after startup.
+    const tapListening = yield* this.#startTap(socketPath);
     const child = yield* cuaSync(() =>
       this.#spawn(executable, ["serve", "--socket", socketPath, "--no-overlay"], {
         cwd: dirname(executable),
@@ -568,17 +385,15 @@ export class CuaDriverRuntime {
           ...CUA_DRIVER_VENDOR_CALLS_OFF,
           [HOST_BUNDLE_ID_ENV]: this.#options.hostBundleId,
           ...waylandEnvironment(this.#options.platform),
+          ...clickHoldEnvironment(this.#options.platform),
+          ...(tapListening ? displayAwakeEnvironment(this.#options.platform) : {}),
         },
-        // Nothing is written to standard input. It stays open only so that it closes when OpenBot ends.
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       }),
     );
     this.#child = child;
     this.#pipeDiagnostics(child);
-    // `spawn` reports a missing or unreadable executable through this event, after it returns. An
-    // unhandled `error` event on a child process throws in the main process, and Computer Use is
-    // an optional function, so it is caught here and reported as a state instead.
     const spawnFailure = Deferred.makeUnsafe<never, CuaDriverFailure>();
     child.once("error", (error: Error) => {
       if (this.#child === child) this.#child = null;
@@ -595,6 +410,7 @@ export class CuaDriverRuntime {
         permissions: ungranted(this.#options.platform),
         message: sourceText("status.computerUse.driverStopped"),
       });
+      this.#scheduleRecheck();
     });
 
     const ready = yield* Effect.result(
@@ -604,26 +420,15 @@ export class CuaDriverRuntime {
       yield* this.#stop();
       return yield* ready.failure;
     }
-    yield* this.#startTap(socketPath);
   });
 
-  /**
-   * The address the agents are handed, once the daemon answers on its own.
-   *
-   * A failure here is reported and then left: Computer Use works without the tap, and the rim is
-   * worth less than the tools. The address is only ever inside the private state directory, which
-   * the daemon's own socket already proved is private.
-   */
   #startTap = Effect.fn("CuaDriver.startTap")(function* (
     this: CuaDriverRuntime,
     socketPath: string,
-  ): Effect.fn.Return<void, CuaDriverFailure> {
+  ): Effect.fn.Return<boolean, CuaDriverFailure> {
     const endpoint = this.#options.endpoint;
     const address =
       endpoint.kind === "windows-pipe" ? `${endpoint.name}-tap` : join(endpoint.directory, TAP_SOCKET_FILE);
-    // A daemon that stops on its own leaves the tap listening, and `listen` returns at once while it
-    // does. Without this, the restart would unlink the address below and then hand the providers a
-    // path nothing answers on, with no way back except restarting OpenBot.
     yield* this.#tap.close();
     if (endpoint.kind === "unix-socket") yield* cuaIO(() => rm(address, { force: true }).catch(() => undefined));
     const listening = yield* Effect.result(this.#tap.listen({ upstream: socketPath, tap: address }));
@@ -631,16 +436,9 @@ export class CuaDriverRuntime {
       this.#options.onDiagnostic?.(
         `OpenBot: the Computer Use tap could not listen. ${describe(listening.failure.cause)}\n`,
       );
+    return Result.isSuccess(listening);
   });
 
-  /**
-   * Stops a daemon that a previous run left on this profile's endpoint.
-   *
-   * Before the daemon watched its standard input, a run that crashed or was killed left it running.
-   * Removing its socket file then hid it from every client while it kept its memory. The endpoint
-   * belongs to this profile, and the single-instance lock keeps a second OpenBot off the profile, so
-   * a daemon that answers here serves no other run.
-   */
   #stopOrphanedDaemon = Effect.fn("CuaDriver.stopOrphanedDaemon")(function* (
     this: CuaDriverRuntime,
     socketPath: string,
@@ -658,8 +456,6 @@ export class CuaDriverRuntime {
   #removeSocket = Effect.fn("CuaDriver.removeSocket")(function* (
     this: CuaDriverRuntime,
   ): Effect.fn.Return<void, CuaDriverFailure> {
-    // A socket file left by a previous run refuses the bind, so it goes before the daemon starts.
-    // A Windows pipe has no file: it is released when the process that owns it exits.
     if (this.#options.endpoint.kind !== "unix-socket") return;
     yield* cuaIO(() => rm(this.socketPath(), { force: true }).catch(() => undefined));
   });
@@ -670,12 +466,6 @@ export class CuaDriverRuntime {
     }
   }
 
-  /**
-   * Points the alias at this run's executable, and reports the path the proxies should run.
-   *
-   * A link that cannot be made is not fatal: a driver reachable by its real path is better than no
-   * Computer Use at all, and the cost is the replacement session this alias exists to avoid.
-   */
   #linkCommandAlias = Effect.fn("CuaDriver.linkCommandAlias")(function* (
     this: CuaDriverRuntime,
     executable: string,
@@ -698,6 +488,44 @@ export class CuaDriverRuntime {
     return alias;
   });
 
+  #requireRestart(): void {
+    if (this.#restartRequired) return;
+    this.#restartRequired = true;
+    this.#options.onDiagnostic?.("OpenBot: macOS refused Accessibility to Computer Use (AXError -25211).\n");
+    if (this.#state.status === "ready") this.#publish(restartRequiredState(this.#state.permissions));
+  }
+
+  #scheduleRecheck(): void {
+    if (this.#recheckTimer || this.#options.quitting?.()) return;
+    if (this.#readySince !== null && Date.now() - this.#readySince >= RECHECK_STABLE_MS) {
+      this.#recheckAttempt = 0;
+      this.#readySince = null;
+    }
+    const delay = RECHECK_DELAYS_MS[this.#recheckAttempt];
+    if (delay === undefined) return;
+    this.#recheckAttempt += 1;
+    this.#recheckTimer = setTimeout(() => {
+      this.#recheckTimer = null;
+      if (this.#options.quitting?.()) return;
+      Effect.runFork(
+        this.state().pipe(
+          Effect.tap((state) =>
+            Effect.sync(() => {
+              if (state.status === "error") this.#scheduleRecheck();
+            }),
+          ),
+          Effect.catch(() => Effect.void),
+        ),
+      );
+    }, delay);
+    this.#recheckTimer.unref?.();
+  }
+
+  #cancelRecheck(): void {
+    if (this.#recheckTimer) clearTimeout(this.#recheckTimer);
+    this.#recheckTimer = null;
+  }
+
   #announceMcpServer(): void {
     const config = this.mcpServerForProviders();
     const announced = config ? [config.command, ...config.args].join(" ") : "";
@@ -711,18 +539,10 @@ export class CuaDriverRuntime {
     return initialState(this.#options.platform, this.#options.supported, this.#executable);
   }
 
-  /**
-   * Tells the listeners, and only when the answer is not the one they hold already.
-   *
-   * Reopening the panel asks the driver the same question again, and repeating an unchanged answer
-   * would update the capability and reconsider the entry for nothing.
-   *
-   * The entry is announced from here, after the state listeners, because it follows the state: a
-   * grant is what puts the tools in an agent's hands, and losing one takes them back.
-   */
   #publish(state: ComputerUseState): ComputerUseState {
     if (sameState(this.#state, state)) return this.#state;
     this.#state = state;
+    if (state.status === "ready") this.#readySince = Date.now();
     for (const listener of this.#listeners) listener(state);
     this.#announceMcpServer();
     return state;
@@ -753,12 +573,14 @@ function initialState(platform: NodeJS.Platform, supported: boolean, executable:
     return {
       status: "driver-missing",
       permissions: ungranted(platform),
-      // Never an instruction to install one: every release carries the driver, so a build without
-      // it is a broken build. The message says what is wrong and leaves the fix to the developer.
       message: sourceText("status.computerUse.driverMissing"),
     };
   }
   return { status: "permissions-required", permissions: ungranted(platform), message: null };
+}
+
+function restartRequiredState(permissions: readonly ComputerUsePermission[]): ComputerUseState {
+  return { status: "restart-required", permissions, message: null };
 }
 
 function requiredPermissions(platform: NodeJS.Platform): readonly MacPermissionId[] {
@@ -773,32 +595,25 @@ function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/**
- * Turns on the driver's Wayland backend, on a Wayland session that has not decided already.
- *
- * The driver treats X11 as its supported Linux desktop and keeps the native Wayland backend behind
- * this variable. Without it a Wayland session falls back to XWayland, where the driver sees only the
- * XWayland clients and misses every native application on the screen. OpenBot starts the daemon, so
- * OpenBot is what has to say which desktop it woke up on.
- *
- * A value the user set already is left alone, so the fallback stays reachable when a compositor
- * handles the native backend badly.
- */
+function clickHoldEnvironment(platform: NodeJS.Platform): Record<string, string> {
+  return platform === "darwin" ? { [CLICK_HOLD_ENV]: MAC_CLICK_HOLD_MS } : {};
+}
+
+function displayAwakeEnvironment(platform: NodeJS.Platform): Record<string, string> {
+  return platform === "darwin" ? { [KEEP_DISPLAY_AWAKE_ENV]: "0" } : {};
+}
+
 function waylandEnvironment(platform: NodeJS.Platform): NodeJS.ProcessEnv {
   if (platform !== "linux" || process.env[WAYLAND_ENV] !== undefined) return {};
   return process.env.XDG_SESSION_TYPE === "wayland" ? { [WAYLAND_ENV]: "1" } : {};
 }
 
-/**
- * Refuses a socket directory this user does not privately own.
- *
- * `mkdir` succeeds without complaint when the directory is already there, and applies its mode only
- * to one it creates. On a shared temporary directory another local user can therefore put ours in
- * place first, and then read or replace the socket a process that drives the whole desktop listens
- * on. Anything not owned by this user, or writable by anyone else, is refused rather than used.
- *
- * Windows reaches none of this: a named pipe has a security descriptor rather than a directory.
- */
+export function cuaDriverDrivesWayland(platform: NodeJS.Platform): boolean {
+  if (platform !== "linux" || !process.env.WAYLAND_DISPLAY) return false;
+  const flag = (process.env[WAYLAND_ENV] ?? waylandEnvironment(platform)[WAYLAND_ENV] ?? "").trim();
+  return flag !== "" && flag !== "0" && flag.toLowerCase() !== "false";
+}
+
 const assertPrivateDirectoryEffect = Effect.fn("CuaDriver.privateDirectory")(function* (directory: string) {
   const stats = yield* cuaIO(() => lstat(directory));
   if (!stats.isDirectory()) {
@@ -806,7 +621,6 @@ const assertPrivateDirectoryEffect = Effect.fn("CuaDriver.privateDirectory")(fun
       cause: new Error(sourceText("error.computerUse.socketDirectoryNotDirectory", { path: directory })),
     });
   }
-  // `getuid` is absent on Windows, which never calls this.
   const uid = process.getuid?.();
   if (uid !== undefined && stats.uid !== uid) {
     return yield* new CuaDriverFailure({
@@ -820,12 +634,6 @@ const assertPrivateDirectoryEffect = Effect.fn("CuaDriver.privateDirectory")(fun
   }
 });
 
-/**
- * Whether something accepts on `path`. `message` is sent to it, and then the connection closes.
- *
- * A connect that does not finish in time counts as refused, so a daemon that hangs cannot hold the
- * start past the deadline of its caller.
- */
 const acceptsEffect = Effect.fn("CuaDriver.accepts")((path: string, message = "") =>
   Effect.callback<boolean>((resume) => {
     const socket = connect(path);
@@ -845,12 +653,6 @@ const acceptsEffect = Effect.fn("CuaDriver.accepts")((path: string, message = ""
   }).pipe(Effect.timeoutOrElse({ duration: READY_POLL_MS, orElse: () => Effect.succeed(false) })),
 );
 
-/**
- * Waits until the daemon accepts on its socket.
- *
- * The file appearing is not enough: the driver creates it and then binds, so a client that connects
- * between the two is refused. Connecting is the only condition that means "ready".
- */
 const waitForSocketEffect = Effect.fn("CuaDriver.waitForSocket")(function* (path: string) {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   let lastError: unknown;
@@ -884,13 +686,6 @@ const waitForSocketEffect = Effect.fn("CuaDriver.waitForSocket")(function* (path
   });
 });
 
-/**
- * Asks the driver what it may do, over one short-lived MCP connection.
- *
- * Only macOS has a grant to report. Elsewhere the question is simply whether the daemon answers, so
- * the tool list is the probe: it proves the same connection without assuming a tool that a
- * non-macOS build may not publish.
- */
 const readPermissionsOverMcpEffect = Effect.fn("CuaDriver.permissions")(
   (config: McpServerConfig, platform: NodeJS.Platform) =>
     Effect.acquireUseRelease(
@@ -909,14 +704,17 @@ const readPermissionsOverMcpEffect = Effect.fn("CuaDriver.permissions")(
           yield* cuaIO((signal) => client.connect(transport, { signal: AbortSignal.any([signal, timer.signal]) }));
           if (requiredPermissions(platform).length === 0) {
             yield* cuaIO((signal) => client.listTools(undefined, { signal: AbortSignal.any([signal, timer.signal]) }));
-            return [];
+            const waylandInputRefused = cuaDriverDrivesWayland(platform)
+              ? yield* readWaylandInputRefusedEffect(client, timer.signal)
+              : false;
+            return { permissions: [], waylandInputRefused };
           }
           const result = yield* cuaIO((signal) =>
             client.callTool({ name: "check_permissions", arguments: {} }, undefined, {
               signal: AbortSignal.any([signal, timer.signal]),
             }),
           );
-          return readPermissionResult(result, platform);
+          return { permissions: readPermissionResult(result, platform), waylandInputRefused: false };
         }).pipe(
           Effect.timeoutOrElse({
             duration: PERMISSION_TIMEOUT_MS,
@@ -936,13 +734,27 @@ const readPermissionsOverMcpEffect = Effect.fn("CuaDriver.permissions")(
     ),
 );
 
-/**
- * The grants inside a `check_permissions` answer.
- *
- * The driver reports its own names for the two, so this reads both what macOS calls them and what
- * the driver does. Anything it does not recognise counts as not granted, which keeps a driver
- * release that renames a field from reporting a permission the user never gave.
- */
+const readWaylandInputRefusedEffect = Effect.fn("CuaDriver.waylandInput")((client: Client, abort: AbortSignal) =>
+  cuaIO((signal) =>
+    client.callTool({ name: "health_report", arguments: { include: [WAYLAND_BACKEND_CHECK] } }, undefined, {
+      signal: AbortSignal.any([signal, abort]),
+    }),
+  ).pipe(
+    Effect.map(waylandBackendFailed),
+    Effect.timeoutOrElse({ duration: WAYLAND_INPUT_CHECK_TIMEOUT_MS, orElse: () => Effect.succeed(false) }),
+    Effect.catch(() => Effect.succeed(false)),
+  ),
+);
+
+function waylandBackendFailed(result: unknown): boolean {
+  const structured = isDynamicRecord(result) ? result.structuredContent : undefined;
+  const checks = isDynamicRecord(structured) ? structured.checks : undefined;
+  return (
+    Array.isArray(checks) &&
+    checks.some((check) => isDynamicRecord(check) && check.name === WAYLAND_BACKEND_CHECK && check.status === "fail")
+  );
+}
+
 function readPermissionResult(result: unknown, platform: NodeJS.Platform): ComputerUsePermission[] {
   const structured = isDynamicRecord(result) ? result.structuredContent : undefined;
   const source: DynamicRecord = isDynamicRecord(structured) ? structured : isDynamicRecord(result) ? result : {};

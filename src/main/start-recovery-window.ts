@@ -1,53 +1,50 @@
-// The window that shows before the start when one version did not finish its start several times
-// in a row (`start-attempts.ts`). It must work when the normal start does not: it has no preload, no
-// IPC, no renderer bundle and no database. The main process writes the page as a `data:` URL, and
-// its buttons are links to fixed URLs that the main process stops and handles.
 import type { AppTranslate, TranslatedLocale } from "@openbot/i18n";
 import { localeDirection } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { app, BrowserWindow, nativeTheme, session, shell } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
+import { DOWNLOAD_URL, RELEASES_URL } from "./download-url";
 import { exportStartDiagnostics } from "./maintenance-service";
 import type { StartAttemptsSummary } from "./start-attempts";
 import { recoveryPlushSvg } from "./start-recovery-plush";
-import { isValidSemver } from "./update-service";
 
 const logger = createOpenBotLogger("start-recovery");
-const RELEASES_URL = "https://github.com/nightly-labs/openbot/releases";
-// `.invalid` never resolves (RFC 2606), so a link that the handler did not stop goes nowhere.
 const ACTION_ORIGIN = "https://openbot.invalid";
-const ACTIONS = ["retry", "previous-version", "export-diagnostics", "open-data-folder", "quit"] as const;
+const ACTIONS = [
+  "retry",
+  "previous-version",
+  "latest-version",
+  "export-diagnostics",
+  "open-data-folder",
+  "quit",
+] as const;
 type RecoveryAction = (typeof ACTIONS)[number];
-// In memory only: the page keeps no cookies, cache or storage on the disk.
 const PARTITION = "openbot-start-recovery";
 
 type RecoveryChoice = "retry" | "quit";
 
 interface StartRecoveryOptions {
   summary: StartAttemptsSummary;
+  previousRelease: string | null;
   locale: TranslatedLocale;
   translate: AppTranslate;
   iconPath: string;
+  showWithoutFocus: boolean;
 }
 
 export interface StartRecovery {
   choice: Promise<RecoveryChoice>;
-  /** Closes the window after "retry", when the main window exists. A close then does not quit. */
   close(): void;
 }
 
-/** Opens the recovery window. `choice` resolves when the user tries again or quits. */
 export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRecovery {
   const recoverySession = session.fromPartition(PARTITION);
   recoverySession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   recoverySession.setPermissionCheckHandler(() => false);
-  // The page is one `data:` document. Nothing else loads, and nothing goes to the network.
   recoverySession.webRequest.onBeforeRequest((details, callback) =>
     callback({ cancel: !details.url.startsWith("data:") }),
   );
   const window = new BrowserWindow({
-    // The content size: the plush, five buttons, the texts of a long language and the notice after an
-    // export.
     width: 520,
     height: 640,
     useContentSize: true,
@@ -70,7 +67,7 @@ export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRec
     },
   });
   window.setMenuBarVisibility(false);
-  window.once("ready-to-show", () => window.show());
+  window.once("ready-to-show", () => (options.showWithoutFocus ? window.showInactive() : window.show()));
 
   let settled = false;
   let busy = false;
@@ -94,10 +91,9 @@ export function openStartRecoveryWindow(options: StartRecoveryOptions): StartRec
   contents.on("will-attach-webview", (event) => event.preventDefault());
   contents.on("will-redirect", (event) => event.preventDefault());
   contents.on("will-navigate", (event) => {
-    // Every navigation stops here. Only an exact action URL from this page's main frame runs.
     event.preventDefault();
     if (!event.isMainFrame || event.frame !== contents.mainFrame) return;
-    const action = readAction(event.url);
+    const action = readAction(event.url, options.previousRelease);
     if (!action || busy || settled) return;
     if (action === "retry" || action === "quit") {
       if (action === "retry") window.hide();
@@ -129,12 +125,14 @@ type Notice = "diagnosticsSaved" | "actionFailed";
 
 async function runAction(
   action: Exclude<RecoveryAction, "retry" | "quit">,
-  { summary, translate }: StartRecoveryOptions,
+  { summary, previousRelease, translate }: StartRecoveryOptions,
   window: BrowserWindow,
 ): Promise<Notice | null> {
   try {
-    if (action === "previous-version") {
-      await shell.openExternal(previousVersionUrl(summary));
+    if (action === "previous-version" || action === "latest-version") {
+      await shell.openExternal(
+        previousRelease ? `${RELEASES_URL}/tag/v${encodeURIComponent(previousRelease)}` : DOWNLOAD_URL,
+      );
       return null;
     }
     if (action === "open-data-folder") {
@@ -153,16 +151,9 @@ async function runAction(
   }
 }
 
-/** The release page of the last version that finished a start, or the list of releases. */
-function previousVersionUrl(summary: StartAttemptsSummary): string {
-  const version = summary.lastGoodVersion;
-  if (version && version !== summary.appVersion && isValidSemver(version))
-    return `${RELEASES_URL}/tag/v${encodeURIComponent(version)}`;
-  return RELEASES_URL;
-}
-
-function readAction(url: string): RecoveryAction | null {
-  for (const action of ACTIONS) if (url === actionUrl(action)) return action;
+function readAction(url: string, previousRelease: string | null): RecoveryAction | null {
+  const hidden: RecoveryAction = previousRelease ? "latest-version" : "previous-version";
+  for (const action of ACTIONS) if (action !== hidden && url === actionUrl(action)) return action;
   return null;
 }
 
@@ -226,11 +217,15 @@ p { margin: 0; }
 ${plush ?? ""}
 <h1>${text(t("startup.recoveryTitle"))}</h1>
 <p>${text(t("startup.recoveryBody", { version: options.summary.appVersion, count: options.summary.consecutiveFailures }))}</p>
-<p class="muted">${text(t("startup.recoveryHint"))}</p>
+<p class="muted">${text(t(options.previousRelease ? "startup.recoveryHint" : "startup.recoveryHintLatest"))}</p>
 ${noticeText ? `<p class="notice" role="status">${text(noticeText)}</p>` : ""}
 <div class="actions">
 ${link("retry", t("startup.recoveryRetry"), true)}
-${link("previous-version", t("startup.recoveryPreviousVersion"))}
+${
+  options.previousRelease
+    ? link("previous-version", t("startup.recoveryPreviousVersion"))
+    : link("latest-version", t("startup.recoveryLatestVersion"))
+}
 ${link("export-diagnostics", t("startup.recoveryExportDiagnostics"))}
 ${link("open-data-folder", t("startup.recoveryOpenDataFolder"))}
 ${link("quit", t("startup.recoveryQuit"))}

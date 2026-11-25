@@ -1,12 +1,3 @@
-// Runs the real `openrouter` provider driver over the real Pi CLI, in a new Pi folder, to check that
-// the model list shows OpenRouter's current catalog and not the one that Pi bundled at its release
-// (#4926). Pi refreshes the catalog in the background of an RPC process, which OpenBot stopped before
-// the refresh ended, so models that OpenRouter added after the Pi release, such as the stealth model
-// `stealth/crouton-alpha`, did not show. The driver now runs `pi update --models` first. The check
-// runs with Full access, and on macOS also with Workspace only, where Pi must read the saved catalog
-// in the sandbox. The key is not valid: OpenRouter's public catalog needs no key.
-// `PI_CLI=<path to pi> bun scripts/pi-model-catalog-refresh-smoke.ts`. Needs the network.
-// Writes .openbot-build/pi-model-catalog-refresh-smoke/report.json.
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -26,7 +17,6 @@ interface ListCase {
   access: "full" | "workspace";
   listed: number;
   saved: number;
-  /** Saved chat models that the list did not show. */
   missing: string[];
   stealth: string[];
   agentFolderAfter: string[];
@@ -40,7 +30,6 @@ interface Report {
   failure?: string;
 }
 
-// Not in the temporary folder: the sandbox lets every confined process write there.
 await mkdir(OUT, { recursive: true });
 const root = await mkdtemp(join(OUT, "run-"));
 const agentDirectory = join(root, "pi-agent");
@@ -79,7 +68,6 @@ async function listModels(access: ListCase["access"]): Promise<void> {
   const store: { openrouter?: { models?: { id: string; type?: string }[] } } = JSON.parse(
     await readFile(storePath, "utf8"),
   );
-  // Pi lists only chat models. The catalog also has image and classifier models.
   const saved = (store.openrouter?.models ?? []).filter((model) => model.type === "chat").map((model) => model.id);
   const result: ListCase = {
     access,

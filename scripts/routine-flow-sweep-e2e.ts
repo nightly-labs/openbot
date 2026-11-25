@@ -1,13 +1,3 @@
-// Checks the routine flow sweep of a profile with a frequent routine (#2283). Runs the real SQLite and
-// the real routine flow service on a temporary profile, with a week of runs of a 15-minute routine that
-// has no flow and of a routine with a flow. Checks that the sweep still gives each ended run its own
-// agent's step, sends only the handoffs that are not sent yet, and sends nothing on a second sweep.
-// Years of older runs sit outside the 7 days: no query of the sweep may read every row of a table for
-// them. Records the time of a sweep with nothing to do, which runs on each turn and queue change. No
-// app, provider, account or network is started.
-//
-// Run: bun scripts/routine-flow-sweep-e2e.ts
-// Writes .openbot-build/routine-flow-sweep-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -21,11 +11,8 @@ import { createRoutineFlows } from "../src/backend/routine-flows/routine-flows";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/routine-flow-sweep-e2e");
 const QUARTER_HOUR_MS = 15 * 60 * 1000;
-/** A 15-minute routine runs 672 times in the 7 days a sweep looks back. */
 const SOLO_RUNS = 672;
-/** A routine with a flow, every hour: runs whose flow is done. */
 const DONE_FLOW_RUNS = 160;
-/** The same routine before the 7 days: more than two years of hourly runs whose flow is done. */
 const OLD_FLOW_RUNS = 20_000;
 const TIMED_SWEEPS = 20;
 const INDEXES = ["routine_runs_status_updated", "routine_flow_steps_running", "routine_flow_steps_updated"];
@@ -35,6 +22,7 @@ interface Report {
   doneFlowRuns: number;
   oldFlowRuns: number;
   plans?: Record<string, string[]>;
+  answerPlan?: string[];
   checks: string[];
   timing?: { sweeps: number; totalMs: number; perSweepMs: number };
   passed: boolean;
@@ -90,18 +78,12 @@ function seed(database: OpenBotDatabase): void {
     step.run(`old-${index}-editor`, `old-${index}`, "editor", `old-editor-${index}`, time, time);
   }
   const recent = at(now - 60_000);
-  // The app stopped after the answer and before its handoff.
   run.run("pending", "routine-flow", "chief", recent, "Hourly brief", "pending-delivery", recent, recent);
   step.run("pending-chief", "pending", "chief", null, recent, recent);
-  // The answer is in, and no sweep saw it yet.
   run.run("fresh", "routine-flow", "chief", recent, "Hourly brief", "fresh-delivery", recent, recent);
   db.exec("COMMIT");
 }
 
-/**
- * The query plan of each statement that one sweep prepares. The sweep reads through the store, so the
- * statements come from the connection, not from a copy of their text here.
- */
 async function sweepPlans(database: OpenBotDatabase, sweep: () => Promise<void>): Promise<Record<string, string[]>> {
   const connection = database.connection;
   const prepare = connection.prepare.bind(connection);
@@ -128,6 +110,60 @@ async function sweepPlans(database: OpenBotDatabase, sweep: () => Promise<void>)
   );
 }
 
+function checkTurnAnswerRead(database: OpenBotDatabase): string[] {
+  const db = database.connection;
+  const at = (second: number) => new Date(Date.UTC(2026, 10, 1, 0, 0, second)).toISOString();
+  db.prepare(
+    `INSERT INTO projection_threads (thread_id, agent_id, title, active_turn_id, created_at, updated_at,
+       last_event_sequence) VALUES ('chief-chat', 'chief', 'Chat', NULL, ?, ?, 1)`,
+  ).run(at(0), at(0));
+  const turn = db.prepare(
+    `INSERT INTO projection_turns (turn_id, thread_id, provider_session_id, status, started_at, completed_at,
+       last_event_sequence) VALUES (?, 'chief-chat', NULL, 'completed', ?, ?, 1)`,
+  );
+  const message = db.prepare(
+    `INSERT INTO projection_thread_messages (thread_id, message_id, turn_id, author, status, item_type, created_at,
+       ordinal, message_json, last_event_sequence) VALUES ('chief-chat', ?, ?, ?, 'completed', NULL, ?, ?, ?, 1)`,
+  );
+  const add = (id: string, turnId: string, author: string, second: number, ordinal: number) =>
+    message.run(id, turnId, author, at(second), ordinal, JSON.stringify({ id, turnId, author, text: id }));
+  db.exec("BEGIN");
+  turn.run("chat-turn", at(1), at(1));
+  turn.run("routine-turn", at(10), at(12));
+  add("chat-question", "chat-turn", "user", 1, 0);
+  add("chat-answer", "chat-turn", "assistant", 2, 1);
+  add("routine-answer", "routine-turn", "assistant", 12, 4);
+  add("routine-instruction", "routine-turn", "user", 10, 2);
+  add("routine-progress", "routine-turn", "assistant", 11, 3);
+  db.exec("COMMIT");
+
+  const prepare = db.prepare.bind(db);
+  const statements: string[] = [];
+  db.prepare = (...args: Parameters<typeof prepare>) => {
+    statements.push(args[0]);
+    return prepare(...args);
+  };
+  let ids: string[];
+  try {
+    ids = database.readTurnAssistantMessages("chief", "routine-turn").map((read) => read.id);
+  } finally {
+    db.prepare = prepare;
+  }
+  assert.deepEqual(ids, ["routine-progress", "routine-answer"], "The read gives the turn's answers in chat order.");
+  assert.deepEqual(database.readTurnAssistantMessages("editor", "routine-turn"), [], "Another agent reads nothing.");
+  const [sql] = statements;
+  assert.ok(sql, "The answer read prepares a statement.");
+  const plan = prepare(`EXPLAIN QUERY PLAN ${sql}`)
+    .all("routine-turn", "chief")
+    .map((row) => String(row.detail));
+  const messages = plan.find((line) => line.includes(" message "));
+  assert.ok(
+    messages?.startsWith("SEARCH message USING INDEX thread_messages_turn (thread_id=? AND turn_id=?)"),
+    `The answer read finds the turn's messages by the turn index, not by reading the chat: ${plan.join("; ")}`,
+  );
+  return plan;
+}
+
 function count(database: OpenBotDatabase, sql: string): number {
   return Number(database.connection.prepare(sql).get()?.count);
 }
@@ -150,7 +186,6 @@ try {
     createRoutineFlows({
       store: new RoutineFlowStore({ database }),
       routines: { list: () => [], get: () => null, listRuns: () => [] },
-      // Every run's own delivery answered; every handoff is still in the queue.
       delivery: (deliveryId) =>
         deliveryId.startsWith("handoff-")
           ? { status: "queued", turnId: null, error: null }
@@ -161,6 +196,8 @@ try {
         handoffs.push({ runId: input.run.id, agentId: input.agentId });
         return Effect.succeed(`handoff-${input.run.id}`);
       },
+      stopRoutineRun: () => Effect.void,
+      stopDelivery: () => Effect.void,
       changed: () => {},
     }),
   );
@@ -187,7 +224,6 @@ try {
 
     const plans = await sweepPlans(database, () => Effect.runPromise(flows.sweep()));
     report.plans = plans;
-    // The running steps index holds only running steps, so its scan reads no ended step.
     const scans = Object.entries(plans).filter(([, plan]) =>
       plan.some((line) => line.startsWith("SCAN") && !line.includes("USING INDEX routine_flow_steps_running")),
     );
@@ -206,6 +242,8 @@ try {
       totalMs: Math.round(totalMs),
       perSweepMs: Number((totalMs / TIMED_SWEEPS).toFixed(2)),
     };
+    report.answerPlan = checkTurnAnswerRead(database);
+    report.checks.push("answer read: the turn's answers in chat order, by the turn index");
     report.passed = true;
   } finally {
     await Effect.runPromise(flows.close());

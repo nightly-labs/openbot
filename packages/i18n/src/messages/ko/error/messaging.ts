@@ -16,11 +16,16 @@ export const messages = {
   "error.messaging.telegramUnsupported": "이 컴퓨터는 Telegram에 연결할 수 없어요.",
   "error.messaging.telegramRelayUnavailable":
     "OpenBot이 이 컴퓨터에서 Telegram에 연결할 수 없어요. 로그인하고 이 컴퓨터에 이름을 지정한 다음 다시 시도해 주세요.",
+  "error.messaging.telegramRelayUnreachable":
+    "OpenBot이 이 컴퓨터에서 서비스에 연결할 수 없어요. 인터넷 연결, VPN, 프록시 또는 방화벽을 확인한 다음 다시 시도해 주세요.",
   "error.messaging.telegramServiceUnavailable":
     "지금은 OpenBot이 Telegram을 연결할 수 없어요. 나중에 다시 시도해 주세요.",
   "error.messaging.whatsappNotConnected": "이 WhatsApp 번호가 연결되어 있지 않아요.",
   "error.messaging.whatsappUnsupported": "이 컴퓨터는 WhatsApp에 연결할 수 없어요.",
   "error.messaging.whatsappTooManySenders": "WhatsApp 번호 하나에 연락처와 그룹을 최대 200개까지 허용할 수 있어요.",
+  "error.messaging.whatsappNumberNotFound":
+    "이 번호에는 WhatsApp 계정이 없습니다. +44 7700 900123처럼 국가 코드를 포함해 입력하세요.",
+  "error.messaging.whatsappSenderNotFound": "이 연락처나 그룹은 더 이상 목록에 없습니다.",
   "error.messaging.whatsappRequestEnded":
     "이 요청은 끝났어요. 새 코드를 받으려면 상대에게 다시 메시지를 보내 달라고 하세요.",
   "error.messaging.memoryLimit":

@@ -25,8 +25,14 @@ const runId = argument("run-id");
 
 const cases: string[] = [];
 const resultSchema = z.object({ status: z.literal("user-control-ended"), note: z.string(), next: z.string() });
+const tabListSchema = z.object({
+  tabs: z.array(z.object({ id: z.string(), chat: z.string(), otherChatWorking: z.literal(true).optional() })),
+});
+const fixtureChats = new Map([
+  ["fixture-thread", { agentId: "fixture-agent", sideThread: null }],
+  ["fixture-side", { agentId: "fixture-agent", sideThread: { taskId: "fixture-task", title: "Side work" } }],
+]);
 
-// The capture page: each control has a fixed place, and the page counts the presses it sees.
 const capturePage = `<!doctype html><meta charset="utf-8"><title>Capture</title>
 <style>body{margin:0}button,input,p{position:absolute;left:10px;width:200px;height:30px;margin:0}</style>
 <button style="top:10px">Proceed to checkout</button>
@@ -37,11 +43,22 @@ const capturePage = `<!doctype html><meta charset="utf-8"><title>Capture</title>
 <label style="position:absolute;top:260px;left:10px">Remember me <input style="position:static" type="checkbox" value="checkbox-value-fixture"></label>
 <script>window.presses = 0; addEventListener("mousedown", () => { window.presses += 1; }, true);</script>`;
 
-// `/slow` never answers, so only a stop ends its load.
+const framesPage = (frameOrigin: string) => `<!doctype html><meta charset="utf-8"><title>Frames</title>
+<style>body{margin:0}</style>
+<div id="host" style="position:absolute;top:10px;left:10px;width:200px;height:30px"></div>
+<iframe src="${frameOrigin}/frame-content" style="position:absolute;top:100px;left:0;width:300px;height:100px;border:0"></iframe>
+<script>document.getElementById("host").attachShadow({ mode: "open" }).innerHTML = '<button style="width:200px;height:30px;margin:0">Shadow import</button>';</script>`;
+const frameContentPage = `<!doctype html><meta charset="utf-8"><style>body{margin:0}</style>
+<button style="position:absolute;top:10px;left:10px;width:200px;height:30px;margin:0">Import in frame</button>`;
+
 const server = createServer((request, response) => {
   if (request.url === "/slow") return;
   response.setHeader("Content-Type", "text/html; charset=utf-8");
   if (request.url?.startsWith("/capture")) return response.end(capturePage);
+  const address = server.address();
+  if (request.url === "/frames" && address && typeof address === "object")
+    return response.end(framesPage(`http://localhost:${address.port}`));
+  if (request.url === "/frame-content") return response.end(frameContentPage);
   response.end('<!doctype html><meta charset="utf-8"><title>Fixture</title><button>Fixture button</button>');
 });
 
@@ -80,6 +97,7 @@ async function main(): Promise<void> {
     const captured: { agentId: string; step: Omit<UserBrowsingStep, "at"> }[] = [];
     const captureState = { enabled: true, onRecord: () => {} };
     browser = new BrowserHost(window, join(fixtureRoot, "downloads"), join(fixtureRoot, "tabs.json"), {
+      agentChat: (threadId) => fixtureChats.get(threadId) ?? null,
       userBrowsing: {
         enabled: () => captureState.enabled,
         record: (agentId, step) => {
@@ -98,9 +116,6 @@ async function main(): Promise<void> {
       turnId: "fixture-turn",
       callId: `user-control-${++sequence}`,
     });
-    // The same composition as the browser branch of `OpenBotToolRouter`: a held tab waits before the
-    // call, a call that the hold reaches in the tab queue waits through the hook, and the turn's
-    // cancellation interrupts either wait.
     const routed = (
       call: DynamicToolCallParams,
       signal: AbortSignal,
@@ -126,8 +141,6 @@ async function main(): Promise<void> {
       });
       return state;
     };
-    // A settled promise runs its callbacks before the next macrotask, so this proves "still waiting"
-    // without a timer that guesses how long the host needs.
     const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
     const open = async () => {
       const tab = await runCauseEffect(host.open(`${origin}/page-${++sequence}`, "fixture-thread", "fixture-agent"));
@@ -156,7 +169,6 @@ async function main(): Promise<void> {
       const started = controlStarted(host, call.callId);
       const running = routed(call, signal);
       await started;
-      // The page owns the promise, so the action ends only when the fixture says so.
       await contents.executeJavaScript(
         "new Promise((resolve) => { const ready = () => (window.fixtureFinish ? resolve() : requestAnimationFrame(ready)); ready(); })",
       );
@@ -216,10 +228,55 @@ async function main(): Promise<void> {
     }
 
     {
+      const { tab: mainTab } = await open();
+      const channelTab = await runCauseEffect(
+        host.open(`${origin}/page-${++sequence}`, "fixture-channel", "fixture-agent"),
+      );
+      const inThread = (threadId: string, tool: string, args: DynamicToolCallParams["arguments"]) => ({
+        ...params(tool, args),
+        threadId,
+        turnId: `${threadId}-turn`,
+      });
+      const tabList = (result: DynamicToolResult) => {
+        const text = result.contentItems.find((item) => item.type === "inputText");
+        assert(text?.type === "inputText", "Missing tab list text.");
+        return tabListSchema.parse(JSON.parse(text.text)).tabs;
+      };
+      const sideTabs = tabList(success(await routed(inThread("fixture-side", "list_tabs", {}), never)));
+      assert.equal(sideTabs.find((tab) => tab.id === mainTab.id)?.chat, "main chat");
+      assert(!sideTabs.some((tab) => tab.id === channelTab.id), "A side thread listed a channel tab.");
+      const sideRead = success(
+        await routed(inThread("fixture-side", "snapshot", { tabId: mainTab.id, image: "never" }), never),
+      );
+      assert.equal(sideRead.success, true, "A side thread could not read a tab of the main chat.");
+      const sideChannelRead = await routed(
+        inThread("fixture-side", "snapshot", { tabId: channelTab.id, image: "never" }),
+        never,
+      );
+      assert(
+        Exit.isFailure(sideChannelRead) || !sideChannelRead.value.success,
+        "A side thread could read a channel tab.",
+      );
+      const mainTabs = tabList(success(await routed(params("list_tabs", {}), never)));
+      const mainView = mainTabs.find((tab) => tab.id === mainTab.id);
+      assert.equal(mainView?.chat, "this chat");
+      assert.equal(mainView?.otherChatWorking, true, "The main chat did not see the side thread work in its tab.");
+      const channelTabs = tabList(success(await routed(inThread("fixture-channel", "list_tabs", {}), never)));
+      assert(!channelTabs.some((tab) => tab.id === mainTab.id), "A channel listed a tab of the main chat.");
+      assert.equal(channelTabs.find((tab) => tab.id === channelTab.id)?.chat, "this chat");
+      recordCases(
+        "side-thread-lists-main-chat-tab",
+        "side-thread-uses-main-chat-tab",
+        "side-thread-skips-channel-tab",
+        "owner-sees-other-chat-working",
+        "channel-skips-main-chat-tab",
+      );
+    }
+
+    {
       const { tab, contents } = await open();
       const action = await startBlockingEvaluate(tab.id, contents, never);
       const queued = routed(params("snapshot", { tabId: tab.id, image: "never" }), never);
-      // The queued call takes its place in the tab queue before the take does.
       await turn();
       const take = runCauseEffect(host.takeUserControl(tab.id, { kind: "local" }));
       const takeState = settled(take);
@@ -405,8 +462,6 @@ async function main(): Promise<void> {
             resolve(item.step);
           };
         });
-      // The page counts a press after the host saw its input event, so a press the page saw and the
-      // host did not record is never recorded.
       const press = async (y: number, x = 50) => {
         const before = Number(await contents.executeJavaScript("window.presses"));
         contents.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
@@ -416,7 +471,6 @@ async function main(): Promise<void> {
         );
       };
 
-      // A press reaches only a page that is shown.
       await runCauseEffect(host.activate(tab.id));
       await runCauseEffect(host.setVisible({ visible: true, bounds: { x: 0, y: 0, width: 800, height: 600 } }));
       await runCauseEffect(host.loadUrl(tab.id, `${origin}/capture?token=QUERY-SECRET#part`));
@@ -454,7 +508,6 @@ async function main(): Promise<void> {
       const field = nextClick();
       await press(75);
       await press(175);
-      // The field, right of its label text.
       await press(125, 150);
       assert.deepEqual(await field, {
         kind: "click",
@@ -466,7 +519,6 @@ async function main(): Promise<void> {
       const marker = nextClick();
       await press(225);
       assert.equal((await marker).name, "Marker");
-      // A checkbox value is a field value: the step keeps the label.
       const checkbox = nextClick();
       await press(275, 150);
       assert.deepEqual(await checkbox, {
@@ -493,11 +545,130 @@ async function main(): Promise<void> {
         assert(!stored.includes(secret), `A step kept ${secret}.`);
       recordCases("capture-skips-password-and-text", "capture-keeps-field-label-not-value");
 
+      const frameLoaded = new Promise<void>((resolve) => {
+        const loaded = (_event: unknown, isMainFrame: boolean) => {
+          if (isMainFrame) return;
+          contents.off("did-frame-finish-load", loaded);
+          resolve();
+        };
+        contents.on("did-frame-finish-load", loaded);
+      });
+      await runCauseEffect(host.loadUrl(tab.id, `${origin}/frames`));
+      await frameLoaded;
+      const [childFrame] = contents.mainFrame.frames;
+      assert(
+        childFrame && childFrame.osProcessId !== contents.mainFrame.osProcessId,
+        "The frame shares the page's process.",
+      );
+      const framesClick = (name: string) => ({
+        kind: "click",
+        host: "127.0.0.1",
+        path: "/frames",
+        role: "button",
+        name,
+      });
+      const sendPress = (y: number) => {
+        for (const type of ["mouseMove", "mouseDown", "mouseUp"] as const)
+          contents.sendInputEvent({ type, x: 50, y, button: "left", clickCount: 1 });
+      };
+      const shadowButton = nextClick();
+      sendPress(25);
+      assert.deepEqual(await shadowButton, framesClick("Shadow import"));
+      recordCases("capture-records-shadow-root-click");
+      const frameButton = nextClick();
+      sendPress(125);
+      assert.deepEqual(await frameButton, framesClick("Import in frame"));
+      contents.sendInputEvent({ type: "mouseMove", x: 50, y: 25 });
+      await contents.executeJavaScript(
+        `new Promise((resolve) => { const hovered = () => (document.getElementById("host").matches(":hover") ? resolve() : requestAnimationFrame(hovered)); hovered(); })`,
+      );
+      const viewButton = nextClick();
+      for (const action of ["move", "down", "up"] as const)
+        await runCauseEffect(
+          host.dispatchViewInput(tab.id, {
+            type: "pointer",
+            action,
+            x: 60,
+            y: 130,
+            button: "left",
+            clickCount: 1,
+            deltaX: 0,
+            deltaY: 0,
+            modifiers: 0,
+          }),
+        );
+      assert.deepEqual(await viewButton, framesClick("Import in frame"));
+      recordCases("capture-records-frame-click", "capture-records-frame-click-from-view");
+      await runCauseEffect(host.loadUrl(tab.id, `${origin}/capture`));
+
       host.releaseUserControl(tab.id);
       const count = captured.length;
       await press(25);
       assert.equal(captured.length, count, "A released tab was recorded.");
       recordCases("capture-stops-after-release");
+
+      const settled = async () => {
+        await turn();
+        while (contents.debugger.isAttached()) await turn();
+      };
+      const held = () => host.listTabs().find((item) => item.id === tab.id)?.userControl === true;
+      const pageStep = { kind: "page", host: "127.0.0.1", path: "/capture", title: "Capture" };
+      const clickStep = {
+        kind: "click",
+        host: "127.0.0.1",
+        path: "/capture",
+        role: "button",
+        name: "Proceed to checkout",
+      };
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      assert(held(), "The recording did not give the tab to the person.");
+      await press(25);
+      await settled();
+      assert.equal(captured.length, count, "A step of a shown task went to the log of the agent.");
+      const saved = host.stopTeach(tab.id, { kind: "local" }, true);
+      assert.deepEqual(saved, [pageStep, clickStep], "The saved recording did not have the page and the click.");
+      assert(!JSON.stringify(saved).includes("QUERY-SECRET"), "A saved step kept the query.");
+      assert(!held(), "The saved recording did not give the tab back.");
+      recordCases("teach-records-page-and-click", "teach-keeps-steps-from-agent-log", "teach-save-releases-tab");
+
+      captureState.enabled = false;
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      await press(25);
+      await settled();
+      assert.deepEqual(
+        host.stopTeach(tab.id, { kind: "local" }, true),
+        [pageStep, clickStep],
+        "A shown task was not recorded with the setting off.",
+      );
+      captureState.enabled = true;
+      recordCases("teach-records-with-setting-off");
+
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      await press(25);
+      await settled();
+      assert.deepEqual(host.stopTeach(tab.id, { kind: "local" }, false), [], "A discarded recording gave steps.");
+      assert(!held(), "The discarded recording did not give the tab back.");
+      recordCases("teach-discard-gives-no-step");
+
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      host.releaseUserControl(tab.id);
+      assert.deepEqual(
+        host.stopTeach(tab.id, { kind: "local" }, true),
+        [],
+        "A recording stayed after the control of its tab ended.",
+      );
+      recordCases("teach-ends-with-control");
+
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      assert.deepEqual(
+        host.stopTeach(tab.id, { kind: "member", memberId: "other-member", sessionId: "other-session" }, true),
+        [],
+        "A person who did not start the recording got its steps.",
+      );
+      assert(held(), "A person who did not start the recording ended it.");
+      assert.deepEqual(host.stopTeach(tab.id, { kind: "local" }, true), [pageStep], "The recording lost its steps.");
+      assert.equal(captured.length, count, "A teach recording added to the log of the agent.");
+      recordCases("teach-other-holder-gets-no-step");
     }
 
     const report = {
@@ -509,7 +680,7 @@ async function main(): Promise<void> {
       electron: process.versions.electron,
       cases,
       scope:
-        "Owned hidden native process, temporary profile, and a loopback page. BrowserHost with the tool router's composition, the history state and Stop, the capture of a held tab for learning from browsing, and the remote event merge. No provider calls, no Team API transport, no secret request.",
+        "Owned hidden native process, temporary profile, and a loopback page. BrowserHost with the tool router's composition, the history state and Stop, the capture of a held tab for learning from browsing, the recording of a shown task, and the remote event merge. No provider calls, no Team API transport, no secret request.",
     };
     await mkdir(dirname(reportPath), { recursive: true });
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
@@ -532,7 +703,6 @@ async function main(): Promise<void> {
 
 function phase(name: string): void {
   currentPhase = name;
-  // Machine-readable: phase receipts contain no page data.
   process.stdout.write(`${JSON.stringify({ runId, phase: name, status: "running" })}\n`);
 }
 

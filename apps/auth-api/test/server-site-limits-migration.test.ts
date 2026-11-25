@@ -30,7 +30,6 @@ describe("server site limits migration", () => {
     database.exec(migration("0048_server_site_limits.sql"));
 
     expect(snapshot(database)).toEqual(before);
-    // The old Worker's host registration still runs.
     database.exec(`
       UPDATE remote_hosts SET device_public_key = 'key-b', auth_epoch = auth_epoch + 1, updated_at = 2
        WHERE host_id = 'host-1' AND owner_user_id = 'owner';
@@ -43,20 +42,15 @@ describe("server site limits migration", () => {
       "INSERT INTO server_site_limits(server_id, owner_user_id, site_limit, created_at, updated_at) VALUES (?, ?, ?, 3, 3)",
     );
     insert.run("host-1", "owner", 200);
-    // A hosted server that has not published its host yet can have a limit too.
     insert.run("hosted-1", "owner", 75);
     expect(() => insert.run("host-1", "owner", 50)).toThrow();
-    // A limit is a whole number from 1 to 1000.
     for (const limit of [0, 1001, 2.5]) expect(() => insert.run("host-2", "owner", limit)).toThrow();
     expect(() => insert.run("host-2", "missing", 10)).toThrow();
 
-    // The query of hostedSiteLimit.
     const customLimit = (serverId: string) => database.prepare(SERVER_SITE_LIMIT_SQL).get(serverId);
     expect(customLimit("host-1")).toEqual({ site_limit: 200 });
     expect(customLimit("hosted-1")).toEqual({ site_limit: 75 });
 
-    // A host that the owner deletes and registers again keeps its limit. Another account that
-    // registers the same ID gets nothing.
     database.exec("DELETE FROM remote_hosts WHERE host_id = 'host-1'");
     expect(customLimit("host-1")).toBeUndefined();
     const register = database.prepare(
@@ -68,15 +62,13 @@ describe("server site limits migration", () => {
     register.run("owner");
     expect(customLimit("host-1")).toEqual({ site_limit: 200 });
 
-    // The rows stop with their account.
     insert.run("host-3", "other", 10);
     database.exec("DELETE FROM users WHERE id = 'other'");
     expect(database.prepare("SELECT server_id FROM server_site_limits ORDER BY server_id").all()).toEqual([
       { server_id: "host-1" },
       { server_id: "hosted-1" },
     ]);
-    // The pool and account counts of a new site read only indexes. An unindexed count once overloaded
-    // the production D1.
+    database.exec(migration("0060_remote_owner_transfers.sql"));
     for (const bucket of [
       { kind: "shared", serverId: "host-1", limit: 3 },
       { kind: "server", serverId: "host-1", limit: 3, custom: false },

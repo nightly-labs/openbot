@@ -2,6 +2,8 @@ import { NotificationObserver, Toaster } from "@openbot/ui";
 import { AppAccessGate } from "./AppView";
 import { type AppProps, AppProviders } from "./app-providers";
 import { reportNotification } from "./error-reports";
+import { nativeBrowserPageShown, nativeBrowserPageToastOffset } from "./native-browser-page";
+import { WindowAmbientMotion } from "./window-ambient-motion";
 
 export function App(props: AppProps = {}) {
   return (
@@ -11,9 +13,15 @@ export function App(props: AppProps = {}) {
         peopleEnabled={props.peopleEnabled}
         chatWindow={props.chatWindow}
       >
-        <AppAccessGate />
+        <WindowAmbientMotion>
+          <AppAccessGate />
+        </WindowAmbientMotion>
       </AppProviders>
-      <Toaster onToastShown={reportNotification} />
+      <Toaster
+        hidden={nativeBrowserPageShown()}
+        offset={nativeBrowserPageToastOffset()}
+        onToastShown={reportNotification}
+      />
     </NotificationObserver>
   );
 }

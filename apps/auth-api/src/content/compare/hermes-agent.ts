@@ -1,12 +1,6 @@
 import { OPENBOT_LINKS } from "../../lib/landing-links";
 import { type Comparison, OPENBOT_TEXT } from "./comparison";
 
-// Every statement about Hermes Agent here is taken from the Hermes Agent documentation,
-// its repository or Nous Research's own pages, and each page used is in `sources`.
-// Where they state nothing, the text says so. Check them again, and move `checkedAt`,
-// whenever this file changes. Statements about OpenBot follow its privacy notes and
-// the remote connection that `remote/README.md` describes.
-
 const HERMES_DOCS = "https://hermes-agent.nousresearch.com/docs";
 
 export const HERMES_AGENT_COMPARISON: Comparison = {

@@ -31,10 +31,6 @@ import { type BusyMessageMode, isBusyMessageMode } from "./ipc-queue";
 import type { SidebarLayoutSnapshot } from "./ipc-sidebar-layout";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
 
-/**
- * How far an agent may reach on this computer. `workspace` limits writes to the agent's workspace, the
- * shared folder and the temporary folders; `full` is the unrestricted access every agent had before the setting existed.
- */
 export const AGENT_ACCESS_MODES = ["full", "workspace"] as const;
 export type AgentAccess = (typeof AGENT_ACCESS_MODES)[number];
 export const DEFAULT_AGENT_ACCESS: AgentAccess = "full";
@@ -43,47 +39,32 @@ export function isAgentAccess(value: unknown): value is AgentAccess {
   return isOneOf(AGENT_ACCESS_MODES, value);
 }
 
-/** Whether the agent may use Computer Use. Absent means on, as for every agent before the setting existed. */
 export function agentComputerUseEnabled(agent: { computerUse?: boolean | undefined }): boolean {
   return agent.computerUse !== false;
 }
 
-/** The agent settings that have an account default. An agent with no value of its own follows it. */
+export function agentMemoryEnabled(agent: { memory?: boolean | undefined }): boolean {
+  return agent.memory !== false;
+}
+
 export const AGENT_DEFAULT_KEYS = ["allowAutomation", "allowNewChat", "quickAcknowledgement"] as const;
 export type AgentDefaultKey = (typeof AGENT_DEFAULT_KEYS)[number];
 export type AgentDefaults = Record<AgentDefaultKey, boolean> & {
-  /**
-   * How long the plan card waits before it starts the work by itself, for all agents. `null` waits
-   * until a person presses Start.
-   */
   planStartAfterMs: number | null;
-  /**
-   * How many messages and routine runs local scripts can send each agent in one hour. It stops a
-   * script that loops from spending the user's provider quota.
-   */
   automationRunsPerHour: number;
-  /** Agents end each git commit message that they write with `OPENBOT_COMMIT_TRAILER`, for all agents. */
   commitCoAuthor: boolean;
 };
 
-/**
- * The trailer that names OpenBot as a co-author of a commit. The address is the GitHub noreply address
- * of the `openbotgit[bot]` account (user id 335604065), so GitHub links the co-author to the OpenBot app.
- */
 export const OPENBOT_COMMIT_TRAILER = "Co-authored-by: OpenBot <335604065+openbotgit[bot]@users.noreply.github.com>";
 
-/** The plan card start time that every agent had before the setting existed. */
 export const DEFAULT_PLAN_START_AFTER_MS = 10_000;
 export const MIN_PLAN_START_AFTER_MS = 5_000;
-/** The longest `setTimeout` delay. A longer one runs at once. */
 export const MAX_PLAN_START_AFTER_MS = 2_147_483_647;
 
-/** The local script limit that every agent had before the setting existed. */
 export const DEFAULT_AUTOMATION_RUNS_PER_HOUR = 30;
 export const MIN_AUTOMATION_RUNS_PER_HOUR = 1;
 export const MAX_AUTOMATION_RUNS_PER_HOUR = 10_000;
 
-/** Off, which is what every agent had before the defaults existed. The commit co-author is on. */
 export const DEFAULT_AGENT_DEFAULTS: AgentDefaults = {
   allowAutomation: false,
   allowNewChat: false,
@@ -141,36 +122,20 @@ export function agentQuickAcknowledgementEnabled(
   return agent.quickAcknowledgement ?? defaults.quickAcknowledgement;
 }
 
-/**
- * Whether this agent runs inside the workspace sandbox now. Every provider enforces it. Codex runs the
- * agent in its `workspace-write` sandbox. Claude runs Bash in its sandbox and asks before a file edit
- * outside the roots. Grok and OpenCode run the agent in a provider process of its own, inside an
- * operating system sandbox (`process-confinement.ts`); on Linux and Windows that process does not start.
- */
 export function workspaceAccessEnforced(agent: { access?: AgentAccess | undefined }): boolean {
   return agent.access === "workspace";
 }
 
-/** A provider, a model and an account that an agent can run on. */
 export interface AgentModelChoice {
   provider: AgentProviderId;
   model: AgentModelId;
-  /** Absent means the provider's own sign-in, `DEFAULT_PROVIDER_ACCOUNT_ID`. */
   providerAccountId?: string | undefined;
 }
 
-/** The most backup models an agent keeps. */
 export const AGENT_BACKUP_MODEL_LIMIT = 8;
 
-/**
- * What an agent does when a usage limit holds a message that has not started. Absent means the
- * agent asks in the chat, with no saved order. An automatic order also moves the agent when a
- * provider error fails a turn that did no work yet.
- */
 export interface AgentBackupModels {
-  /** True: the agent switches at once to the first available model in `order`. False: it asks first. */
   automatic: boolean;
-  /** The models to try, first to last. */
   order: AgentModelChoice[];
 }
 
@@ -183,17 +148,10 @@ export function isAgentModelChoice(value: unknown): value is AgentModelChoice {
   );
 }
 
-/** The model an agent left for a usage limit or a provider error, with the reasoning effort it had there. */
 export interface AgentUsageLimitReturn extends AgentModelChoice {
   reasoningEffort: AgentReasoningEffort;
-  /**
-   * "provider-error" when a provider error made the agent leave. Absent means a usage limit. Another
-   * value, from a newer build, reads as a usage limit, so the agent still goes back.
-   */
   cause?: string | undefined;
-  /** True when fast mode was on at the model the agent left. The return turns it on again. */
   fastMode?: boolean | undefined;
-  /** True when the fast mode at that model was Ultrafast. */
   ultrafast?: boolean | undefined;
 }
 
@@ -208,10 +166,6 @@ export function isAgentUsageLimitReturn(value: unknown): value is AgentUsageLimi
   );
 }
 
-/**
- * Local-only. The provider, model, account and effort to use from the next turn, while this turn
- * still runs.
- */
 export interface AgentPendingRuntime extends AgentModelChoice {
   reasoningEffort: AgentReasoningEffort;
 }
@@ -220,10 +174,6 @@ export function isAgentPendingRuntime(value: unknown): value is AgentPendingRunt
   return isDynamicRecord(value) && isAgentModelChoice(value) && isReasoningEffort(value.reasoningEffort);
 }
 
-/**
- * The account of the next turn. A queued runtime without an account uses the provider's own
- * sign-in, not the account of the running turn.
- */
 export function agentNextProviderAccountId(agent: {
   providerAccountId?: string | undefined;
   pendingRuntime?: AgentPendingRuntime | undefined;
@@ -241,7 +191,6 @@ export function isAgentBackupModels(value: unknown): value is AgentBackupModels 
   );
 }
 
-/** Whether two choices name the same provider, model and account. */
 export function sameAgentModelChoice(left: AgentModelChoice, right: AgentModelChoice): boolean {
   return (
     left.provider === right.provider &&
@@ -250,7 +199,6 @@ export function sameAgentModelChoice(left: AgentModelChoice, right: AgentModelCh
   );
 }
 
-/** The listing an agent was added from, as the host sends it. Clients read it to show what is installed. */
 export function isAgentMarketplaceSource(value: unknown): value is NonNullable<AgentSummary["marketplaceSource"]> {
   return (
     isDynamicRecord(value) &&
@@ -276,99 +224,27 @@ export interface AgentSummary {
   provider: AgentProviderId;
   model: AgentModelId;
   reasoningEffort: AgentReasoningEffort;
-  /** Local saved provider settings; released Team API agent payloads omit this field. */
   sessionSettingOverrides?: AgentSessionSettingOverrides;
-  /** Provider sessions that must restart to restore defaults after a reset. Local-only. */
   sessionSettingResets?: string[];
-  /**
-   * Local-only, like Auto approve: the Team API does not carry it, so an agent read from a remote host
-   * has none. Absent means `DEFAULT_AGENT_ACCESS`.
-   */
   access?: AgentAccess;
-  /**
-   * The folders that the user gave the agent besides its workspace and the shared folder, as absolute
-   * paths. Local-only, like `access`. Absent means none. Only `agentFolders` changes them.
-   */
   additionalFolders?: string[];
-  /**
-   * Folders in the workspace, the shared folder or `additionalFolders` that the agent must not change
-   * in Workspace only. Local-only, like `access`. Absent means none. Only `agentFolders` changes them.
-   */
   excludedFolders?: string[];
-  /**
-   * Whether the agent gets the Computer Use tools. Local-only, like `access`. Absent means on; see
-   * `agentComputerUseEnabled`.
-   */
   computerUse?: boolean;
-  /**
-   * Whether a local script can run this agent's routines through the automation server. Local-only,
-   * like `access`. Absent means the account default; see `agentAutomationAllowed`.
-   */
+  memory?: boolean;
   allowAutomation?: boolean;
-  /**
-   * Whether the agent can start a new chat with its `start_new_chat` tool. Local-only, like `access`.
-   * Absent means the account default; see `agentNewChatAllowed`.
-   */
   allowNewChat?: boolean;
-  /**
-   * Whether the agent shows its plan with the `acknowledge_request` tool before a long task.
-   * Local-only, like `access`. Absent means the account default; see `agentQuickAcknowledgementEnabled`.
-   */
   quickAcknowledgement?: boolean;
-  /**
-   * Whether the browser tabs of the agent use a session of their own, with their own cookies and
-   * sign-ins. Local-only, like `access`. Absent means off: the tabs use the shared session. When
-   * `browserProfileId` is also set, the named profile applies; see `agentBrowserProfile`.
-   */
   ownBrowserSession?: boolean;
-  /**
-   * The named browser profile that the tabs of the agent use. Local-only, like `access`. It comes
-   * before `ownBrowserSession`; see `agentBrowserProfile`. The agent store also sets
-   * `ownBrowserSession` with it, so an older OpenBot opens the agent's own session, never the shared one.
-   */
   browserProfileId?: string;
-  /**
-   * Whether the agent asks its provider (Codex or Claude) for the fast service tier of its model. Local-only, like `access`.
-   * Absent means that OpenBot leaves the tier to the provider. A provider change turns it off.
-   */
   fastMode?: boolean;
-  /**
-   * With `fastMode`, the agent asks for the Ultrafast tier in place of Fast. Local-only, like `access`.
-   * A model without the tier runs at the standard tier. An older OpenBot ignores it and runs Fast.
-   */
   ultrafast?: boolean;
-  /**
-   * What a message sent while the agent is busy does. Local-only, like `access`. Absent means the
-   * app default.
-   */
   busyMessageMode?: BusyMessageMode;
-  /**
-   * How many tasks of the agent run a turn at the same time, 1 to `AGENT_TASK_LIMIT_MAX`. Local-only,
-   * like `access`; an owner or admin of a joined server reads it on `agent-task-limit-v1`. Absent
-   * means `AGENT_TASK_LIMIT_DEFAULT`; see `agentTaskLimit`.
-   */
   taskLimit?: number;
-  /**
-   * The provider account the agent's turns run on. Local-only, like `access`. Absent means the
-   * provider's own sign-in, `DEFAULT_PROVIDER_ACCOUNT_ID`.
-   */
   providerAccountId?: string;
-  /** Local-only, like `access`. Absent means the agent asks before it leaves a usage limit. */
   backupModels?: AgentBackupModels;
-  /**
-   * The agent's own model while a usage limit has moved it to a backup. Local-only. The agent goes
-   * back to it when the limit ends.
-   */
   usageLimitReturn?: AgentUsageLimitReturn;
-  /**
-   * Local-only. The provider, model, account and effort to use from the next turn, while this turn
-   * still runs. Absent means the next turn uses the provider, model, account and effort on this agent.
-   */
   pendingRuntime?: AgentPendingRuntime;
-  /**
-   * ISO 8601 time when a user hid the agent. Local-only, like `access`: a remote client reads the
-   * hidden agents through `agent-hidden-v1`. Absent means the agent is not hidden.
-   */
+  pinnedAccountId?: string;
   hiddenAt?: string;
   threadId: string | null;
   workspacePath: string;
@@ -376,16 +252,7 @@ export interface AgentSummary {
   updatedAt: string | null;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
-  /**
-   * The exact colour, when it is not one of the hues. `avatarHue` then holds the nearest hue for
-   * released apps and peers. Absent or null means that `avatarHue` is the colour. A remote client reads
-   * it through `agent-colors-v1`.
-   */
   avatarColor?: AvatarColor | null;
-  /**
-   * The chat colour: a soft tint of the agent's chat bubbles, `#rrggbb` in lower case. It is not the
-   * avatar colour. Absent means no chat colour. A remote client reads it through `chat-colors-v1`.
-   */
   chatColor?: AvatarColor;
   avatarUrl: string | null;
   marketplaceSource?: {
@@ -401,10 +268,6 @@ export function isAgentSummary(value: unknown): value is AgentSummary {
   return isDynamicRecord(value) && isAgentProvider(value.provider) && hasAgentSummaryFields(value);
 }
 
-/**
- * An agent that a client reads from a host. A newer host can run it on a provider that this OpenBot
- * does not know; the agent stays listed, and its chat works because the host runs it.
- */
 export type ClientAgentSummary = Omit<AgentSummary, "provider"> & { provider: AgentProviderRef };
 
 export function isClientAgentSummary(value: unknown): value is ClientAgentSummary {
@@ -426,6 +289,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.additionalFolders === undefined || isAgentAdditionalFolders(value.additionalFolders)) &&
     (value.excludedFolders === undefined || isAgentAdditionalFolders(value.excludedFolders)) &&
     (value.computerUse === undefined || isBoolean(value.computerUse)) &&
+    (value.memory === undefined || isBoolean(value.memory)) &&
     (value.allowAutomation === undefined || isBoolean(value.allowAutomation)) &&
     (value.allowNewChat === undefined || isBoolean(value.allowNewChat)) &&
     (value.quickAcknowledgement === undefined || isBoolean(value.quickAcknowledgement)) &&
@@ -439,6 +303,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.backupModels === undefined || isAgentBackupModels(value.backupModels)) &&
     (value.usageLimitReturn === undefined || isAgentUsageLimitReturn(value.usageLimitReturn)) &&
     (value.pendingRuntime === undefined || isAgentPendingRuntime(value.pendingRuntime)) &&
+    (value.pinnedAccountId === undefined || isProviderAccountId(value.pinnedAccountId)) &&
     (value.hiddenAt === undefined || isHiddenAt(value.hiddenAt)) &&
     (value.threadId === null || isIdentifier(value.threadId)) &&
     isBoundedString(value.workspacePath, INPUT_LIMITS.path) &&
@@ -458,23 +323,13 @@ export interface CreateAgentInput {
   description: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
-  /** See `AgentSummary.avatarColor`. The store sets `avatarHue` to the nearest hue of the colour. */
   avatarColor?: AvatarColor | null;
   initialMessage: string;
-  /**
-   * The provider and model the agent starts on, applied before the initial message is queued.
-   * Absent, the backend picks its starting default. A provider change after the first message is
-   * queued is rejected while work is active, so naming them here is the only way a chosen pair
-   * survives creation.
-   */
   provider?: AgentProviderId;
   model?: AgentModelId;
   reasoningEffort?: AgentReasoningEffort;
-  /**
-   * The provider account the agent starts on. It applies only with `provider` and `model`. Absent
-   * means the provider's own sign-in. Local-only: the released Team API create route does not carry it.
-   */
   providerAccountId?: string;
+  operationId?: string;
 }
 
 export interface UpdateAgentInput {
@@ -488,32 +343,20 @@ export interface UpdateAgentInput {
   reasoningEffort?: AgentReasoningEffort;
   access?: AgentAccess;
   computerUse?: boolean;
-  /** `null` returns the agent to the account default, as for `allowNewChat` and `quickAcknowledgement`. */
+  memory?: boolean;
   allowAutomation?: boolean | null;
   allowNewChat?: boolean | null;
   quickAcknowledgement?: boolean | null;
   fastMode?: boolean;
-  /** Sent only with `fastMode`; an update with `ultrafast` and no `fastMode` fails. A change of `fastMode` without it turns Ultrafast off. */
   ultrafast?: boolean;
-  /** `null` returns the agent to the app default. */
   busyMessageMode?: BusyMessageMode | null;
-  /** `null` returns the agent to the default task limit. */
   taskLimit?: number | null;
-  /** `null` returns the agent to the provider's own sign-in. */
   providerAccountId?: string | null;
-  /** `null` returns the agent to the default: ask, with no saved order. */
   backupModels?: AgentBackupModels | null;
-  /**
-   * The provider, model or account change moves held work away from a usage limit. The agent goes
-   * back to its current model when that limit ends. Ignored when no limit holds the agent.
-   */
   leaveUsageLimit?: boolean;
   avatarSeed?: string;
-  /** A hue without `avatarColor` also clears the colour, so that a released app can change the colour. */
   avatarHue?: AvatarHue | null;
-  /** A colour also sets `avatarHue` to its nearest hue. `null` clears the colour. */
   avatarColor?: AvatarColor | null;
-  /** See `AgentSummary.chatColor`. `null` removes the chat colour. It does not change the avatar colour. */
   chatColor?: AvatarColor | null;
 }
 

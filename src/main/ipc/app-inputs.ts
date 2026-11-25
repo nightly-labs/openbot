@@ -3,6 +3,7 @@ import type {
   AgentDefaults,
   AgentDockAction,
   AgentDockDragPhase,
+  AgentDockExtent,
   AgentDockInputRect,
   AgentDockPresentation,
   AgentMemoryLimitPreference,
@@ -13,6 +14,7 @@ import type {
   BrowserDockAction,
   BrowserDockFrame,
   BrowserDockPresentation,
+  BrowserTakeoverPage,
   BusyMessageModePreference,
   ChatBackgroundColor,
   ChatWindowTarget,
@@ -56,10 +58,12 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   decodeExternalLinkTarget,
+  GITHUB_SKILL_ID_MAX_LENGTH,
   IDLE_RESTART_TARGETS,
   isAgentDefaults,
   isAgentDockAction,
   isAgentDockDragPhase,
+  isAgentDockExtent,
   isAgentDockInputRegion,
   isAgentDockInteractive,
   isAgentDockPresentation,
@@ -77,6 +81,7 @@ import {
   isBrowserDockAction,
   isBrowserDockFrame,
   isBrowserDockPresentation,
+  isBrowserTakeoverPage,
   isBusyMessageMode,
   isChatBackgroundColor,
   isDynamicIslandAction,
@@ -90,6 +95,7 @@ import {
   QUIT_GUARDS,
   RENDERER_TIMING_LIMITS,
 } from "@openbot/contracts/ipc";
+import { isReferralCode } from "@openbot/contracts/referral";
 import {
   type DynamicRecord,
   isBoolean,
@@ -106,8 +112,6 @@ export function parseSetup(input: unknown): SaveSetupInput {
   if (!isDynamicRecord(input)) throw new Error("Setup input is required.");
   const provider = input.preferredProvider;
   if (!isAgentProvider(provider)) throw new Error("Unknown provider.");
-  // `null` is the whole meaning of "no model chosen", so a missing field is not accepted in its
-  // place: setup is written from one screen that always knows which of the two it means.
   const model = input.preferredModel;
   if (model !== null && !isAgentModel(model)) throw new Error("Unknown model.");
   return { preferredProvider: provider, preferredModel: model };
@@ -128,7 +132,6 @@ function isCount(value: unknown, max: number): value is number {
   return isNumber(value) && Number.isSafeInteger(value) && value >= 0 && value <= max;
 }
 
-/** Counts and delays only. Each value has a bound, so one window cannot fill the daily summary. */
 export function parseRendererTimingReport(input: unknown): RendererTimingReport {
   if (!isDynamicRecord(input)) throw new Error("Renderer timing is required.");
   const { workspaceReady, longTasks, inputs, inputDelaysMs } = input;
@@ -257,7 +260,6 @@ export function parseIdleRestartTarget(input: unknown): IdleRestartTarget {
 
 const APP_BEHAVIOR_SWITCHES = ["launchAtLogin", "keepRunningInBackground", "keepAwake", "keepAwakeOnBattery"] as const;
 
-/** At least one switch or the quit guard. */
 export function parseAppBehaviorPreferenceChange(input: unknown): AppBehaviorPreferenceChange {
   const message = "The app behavior setting is required.";
   if (!isDynamicRecord(input)) throw new Error(message);
@@ -275,12 +277,10 @@ export function parseUpdatePreference(input: unknown): UpdatePreferenceChange {
   return parseSwitches(input, ["autoDownload", "allowRemoteUpdates", "autoInstall"], "Update preference is required.");
 }
 
-/** The switches an admin of a joined server sets on its host. `allowRemoteUpdates` stays with the host user. */
 export function parseHostUpdateSettings(input: unknown): HostUpdateSettingsChange {
   return parseSwitches(input, ["autoDownload", "autoInstall"], "Update settings are required.");
 }
 
-/** At least one of `keys`, each a boolean. An absent key stays absent. */
 function parseSwitches<Key extends string>(
   input: unknown,
   keys: readonly Key[],
@@ -329,6 +329,11 @@ export function parseDynamicIslandAction(input: unknown): DynamicIslandAction {
   throw new Error("Dynamic Island action is invalid.");
 }
 
+export function parseBrowserTakeoverPage(input: unknown): BrowserTakeoverPage {
+  if (isBrowserTakeoverPage(input)) return input;
+  throw new Error("Browser takeover page is invalid.");
+}
+
 export function parseBrowserDockPresentation(input: unknown): BrowserDockPresentation | null {
   if (input === null || isBrowserDockPresentation(input)) return input;
   throw new Error("Browser dock presentation is invalid.");
@@ -369,6 +374,11 @@ export function parseAgentDockInputRegion(input: unknown): AgentDockInputRect[] 
   throw new Error("Agent dock input region is invalid.");
 }
 
+export function parseAgentDockExtent(input: unknown): AgentDockExtent | null {
+  if (isAgentDockExtent(input)) return input;
+  throw new Error("Agent dock extent is invalid.");
+}
+
 export function parseDynamicIslandXWayland(input: unknown): SetAgentDockXWaylandInput {
   if (isAgentDockXWayland(input)) return input;
   throw new Error("Dynamic Island XWayland state is required.");
@@ -391,7 +401,6 @@ export function parseMacPermission(input: unknown): MacPermissionId {
   return input;
 }
 
-/** Each app once, in the order asked: macOS shows one prompt at a time. */
 export function parseMacAutomationTargets(input: unknown): readonly MacAutomationTarget[] {
   if (!Array.isArray(input) || !input.every((target) => isOneOf(MAC_AUTOMATION_TARGETS, target))) {
     throw new Error("Unknown Apple app.");
@@ -437,6 +446,7 @@ export function parseExternalDestination(input: unknown): ExternalDestination {
     !isSocialDestination(input) &&
     input !== "grok-bot-export" &&
     input !== "hosted-server-contact" &&
+    input !== "download" &&
     input !== "mac-screen-recording"
   ) {
     throw new Error("Unknown external destination.");
@@ -449,6 +459,7 @@ export function parseEmailCodeVerification(input: unknown): VerifyEmailCodeInput
   return {
     challengeId: requireString(input.challengeId, "challengeId", INPUT_LIMITS.identifier),
     code: requireString(input.code, "code", 32),
+    ...(isReferralCode(input.referralCode) ? { referralCode: input.referralCode } : {}),
   };
 }
 
@@ -460,15 +471,12 @@ export function parseProfileName(input: unknown): string {
   return validation.name;
 }
 
-/** The chat color of the account: a lower-case `#rrggbb`, or null for no chat color. */
 export function parseChatColor(input: unknown): AvatarColor | null {
   if (input === null) return null;
   if (!isAvatarColor(input)) throw new Error("chatColor must be null or a lower-case #rrggbb color.");
   return input;
 }
 
-// The two marketplaces share query fields and validate their category filters at the boundary.
-// `query` is truncated rather than rejected, which is the behaviour these channels have always had.
 function parseMarketplaceQueryFields(input: DynamicRecord) {
   return {
     ...(isString(input.query) ? { query: input.query.slice(0, 100) } : {}),
@@ -525,11 +533,15 @@ export function parseSubmitSkill(input: unknown): SubmitSkillInput {
   };
 }
 
+export function requireSkillId(value: unknown): string {
+  return requireString(value, "skillId", GITHUB_SKILL_ID_MAX_LENGTH);
+}
+
 export function parseInstallSkill(input: unknown): InstallSkillInput {
   if (!isObject(input)) throw new Error("Invalid skill installation.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     ...(input.versionId === undefined ? {} : { versionId: requireString(input.versionId, "versionId") }),
     ...(input.replaceModified === true ? { replaceModified: true } : {}),
   };
@@ -539,7 +551,7 @@ export function parseUninstallSkill(input: unknown): UninstallSkillInput {
   if (!isObject(input)) throw new Error("Invalid skill removal.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     ...(input.removeModified === true ? { removeModified: true } : {}),
   };
 }
@@ -550,7 +562,7 @@ export function parseSetEnabledSkill(input: unknown): SetEnabledSkillInput {
   if (enabled === undefined) throw new Error("Invalid skill enablement.");
   return {
     agentId: requireString(input.agentId, "agentId"),
-    skillId: requireString(input.skillId, "skillId"),
+    skillId: requireSkillId(input.skillId),
     enabled,
   };
 }

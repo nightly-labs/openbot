@@ -1,7 +1,3 @@
-// The Discord calls that Signal makes for a host with the bot token. `app.ts` authorizes the
-// caller for the guild; this module validates the request, checks that each channel is in that
-// guild, and makes the call. No response or log holds Discord's error text or a message's content.
-
 import {
   DISCORD_CUSTOM_ID_PREFIX,
   DISCORD_EMBED_LIMITS,
@@ -14,6 +10,7 @@ import {
   type DiscordApiErrorCode,
   type DiscordApiRequest,
   type DiscordButton,
+  type DiscordChannelList,
   type DiscordChannelSummary,
   type DiscordHistoryMessage,
   type DiscordRoleSummary,
@@ -63,7 +60,6 @@ const embedSchema = z
       .max(DISCORD_EMBED_LIMITS.fields)
       .optional(),
   })
-  // Discord refuses an embed that shows nothing.
   .refine((embed) =>
     Boolean(
       embed.title ||
@@ -92,7 +88,6 @@ const discordApiRequestSchema = z.discriminatedUnion("op", [
       buttons: buttonsSchema,
       embeds: embedsSchema.optional(),
     })
-    // Discord refuses a post without text, files or embeds.
     .refine((request) => request.content.length > 0 || request.embeds !== undefined),
   z.strictObject({
     op: z.literal("editMessage"),
@@ -138,12 +133,11 @@ const discordApiRequestSchema = z.discriminatedUnion("op", [
     guildId: snowflakeSchema,
     channelId: snowflakeSchema,
     replyTo: snowflakeSchema.nullable(),
-    // No path separator and no control character.
     filename: z.string().regex(/^[^/\\\p{Cc}]{1,200}$/u),
+    content: contentSchema.optional(),
   }),
 ]) satisfies z.ZodType<DiscordApiRequest>;
 
-/** The request of a call, or null when it does not match the contract. */
 export function decodeDiscordApiRequest(value: unknown): DiscordApiRequest | null {
   const parsed = discordApiRequestSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
@@ -161,22 +155,18 @@ export interface DiscordRestRequest {
   query?: URLSearchParams;
   body?: unknown;
   files?: DiscordUpload[];
-  /** False for the interaction routes, which the interaction token authorizes. */
   auth?: boolean;
 }
 
-/** A Discord call that failed. `status` is 0 when Discord did not answer in time. */
 export class DiscordTransportError extends Schema.TaggedError<DiscordTransportError>()("DiscordTransportError", {
   status: Schema.Number,
   retryAfterMs: Schema.optional(Schema.Number),
 }) {}
 
-/** The bot's Discord REST client. Tests replace it with a fake. */
 export interface DiscordTransport {
   request(input: DiscordRestRequest): Effect.Effect<unknown, DiscordTransportError>;
 }
 
-/** A refused or failed call, as the host receives it. */
 class DiscordApiFailure extends Schema.TaggedError<DiscordApiFailure>()("DiscordApiFailure", {
   status: Schema.Number,
   code: Schema.Literals([
@@ -196,7 +186,7 @@ type DiscordApiResult =
   | { messageId: string }
   | { name: string }
   | { messages: DiscordHistoryMessage[] }
-  | { channels: DiscordChannelSummary[] }
+  | DiscordChannelList
   | { roles: DiscordRoleSummary[] }
   | Record<string, never>;
 
@@ -234,7 +224,6 @@ const activeThreadsSchema = z.object({
       name: z.string().nullish(),
     }),
   ),
-  // One entry for each returned thread that the bot has joined.
   members: z.array(z.object({ id: snowflakeSchema.optional() })).optional(),
 });
 const rolesSchema = z.array(z.object({ id: snowflakeSchema, permissions: permissionsSchema }));
@@ -247,7 +236,6 @@ const namedRolesSchema = z.array(
   }),
 );
 const botMemberSchema = z.object({ roles: z.array(snowflakeSchema) });
-/** Text and announcement channels: the guild channels that take a message. */
 const POSTABLE_CHANNEL_TYPES = new Set([0, 5]);
 const PRIVATE_THREAD_TYPE = 12;
 const ADMINISTRATOR = 1n << 3n;
@@ -272,8 +260,6 @@ const historyAttachmentsSchema = z
     }),
   )
   .optional();
-// Each part is optional: Discord leaves out the parts that an embed does not have. Embeds of an
-// unexpected shape are left out, so that they do not fail the whole page of messages.
 const historyEmbedsSchema = z
   .array(
     z.object({
@@ -303,7 +289,6 @@ const historySchema = z
         .optional(),
       attachments: historyAttachmentsSchema,
       embeds: historyEmbedsSchema,
-      // The forwarded message of a forward.
       message_snapshots: z
         .array(
           z.object({
@@ -320,8 +305,6 @@ const historySchema = z
   .max(DISCORD_LIST_MESSAGES_LIMIT);
 
 const BUTTON_STYLES = { primary: 1, secondary: 2, success: 3, danger: 4 } as const;
-// A new post can ping a user that it mentions, but not a role, `@everyone`, or the author of the
-// replied message. Discord sends no ping for an edit.
 const USER_MENTIONS = { parse: ["users"], replied_user: false };
 const NO_MENTIONS = { parse: [], replied_user: false };
 
@@ -365,7 +348,6 @@ function decode<A>(schema: z.ZodType<A>, value: unknown): Effect.Effect<A, Disco
 export function makeDiscordApi(transport: DiscordTransport, state: DiscordState): DiscordApi {
   const send = (input: DiscordRestRequest) => transport.request(input).pipe(Effect.mapError(fromTransport));
 
-  /** The channel, when it is in the guild. A channel that the Gateway did not show is fetched once. */
   const guildChannel = Effect.fn("DiscordApi.guildChannel")(function* (guildId: string, channelId: string) {
     const known = state.channel(channelId);
     if (known) {
@@ -441,7 +423,6 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
                 authorId: message.author.id,
                 authorName: discordAuthorName(message),
                 authorIsBot: message.author.bot === true,
-                // A forward refers to the message it copies, which it does not reply to.
                 replyToId: body.forwarded ? null : (message.message_reference?.message_id ?? null),
                 sentAt: message.timestamp,
                 ...body,
@@ -461,8 +442,6 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
         const channel = yield* guildChannel(request.guildId, request.channelId);
         return { name: channel.name };
       }
-      // Discord gives every channel of the guild, hidden ones too. Only the channels and threads that
-      // the bot can view and post in are listed, so a hidden channel's name does not reach the host.
       case "listChannels": {
         const guild = `/guilds/${request.guildId}` as const;
         const botId = state.botUserId ?? state.applicationId;
@@ -491,7 +470,7 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
         const can = (channelId: string | null | undefined, needed: bigint) =>
           channelId != null && ((permissions.get(channelId) ?? 0n) & needed) === needed;
         const joined = new Set((active.members ?? []).flatMap((member) => (member.id ? [member.id] : [])));
-        const channels: DiscordChannelSummary[] = [
+        const places: DiscordChannelSummary[] = [
           ...guildChannels
             .filter(
               (channel) => POSTABLE_CHANNEL_TYPES.has(channel.type) && can(channel.id, VIEW_CHANNEL | SEND_MESSAGES),
@@ -503,13 +482,13 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
                 can(thread.parent_id, VIEW_CHANNEL | SEND_MESSAGES_IN_THREADS) &&
                 (thread.type !== PRIVATE_THREAD_TYPE || joined.has(thread.id)),
             )
+            .sort((left, right) => (BigInt(right.id) > BigInt(left.id) ? 1 : -1))
             .map((thread) => ({ id: thread.id, name: thread.name ?? "", kind: "thread" as const })),
-        ].slice(0, DISCORD_LIST_CHANNELS_LIMIT);
+        ];
+        const channels = places.slice(0, DISCORD_LIST_CHANNELS_LIMIT);
         for (const channel of channels) state.rememberChannel(channel.id, request.guildId, channel.name);
-        return { channels };
+        return { channels, omitted: places.length - channels.length };
       }
-      // The roles a person can have: not `@everyone`, whose id is the guild's, and not a role that a
-      // bot or integration manages.
       case "listRoles": {
         const roles = yield* send({ method: "GET", route: `/guilds/${request.guildId}/roles` }).pipe(
           Effect.flatMap((value) => decode(namedRolesSchema, value)),
@@ -539,7 +518,11 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
         const created = yield* send({
           method: "POST",
           route: `/channels/${request.channelId}/messages`,
-          body: { allowed_mentions: NO_MENTIONS, ...messageReference(request.replyTo) },
+          body: {
+            ...(request.content ? { content: request.content } : {}),
+            allowed_mentions: request.content ? USER_MENTIONS : NO_MENTIONS,
+            ...messageReference(request.replyTo),
+          },
           files: [{ ...file, name: request.filename }],
         }).pipe(Effect.flatMap((value) => decode(createdMessageSchema, value)));
         return { messageId: created.id };
@@ -550,10 +533,6 @@ export function makeDiscordApi(transport: DiscordTransport, state: DiscordState)
   return { call };
 }
 
-/**
- * The bot's permissions in one channel, as Discord computes them: the guild permissions, then the
- * `@everyone` overwrite, the overwrites of the bot's roles, and the bot's own overwrite.
- */
 function channelPermissions(
   base: bigint,
   overwrites: readonly z.infer<typeof overwriteSchema>[],

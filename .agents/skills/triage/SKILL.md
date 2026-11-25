@@ -237,7 +237,7 @@ A `defer` or `decline` that the user approves does not close the issue.
 The user closes it.
 
 For `build` and `build smaller`, name the next step: `$prototype` for a UI
-direction, or a plan for the user to approve. The `approved` label shows
+direction (`$prototype-mobile` for the phone app), or a plan for the user to approve. The `approved` label shows
 that a maintainer accepts the issue. Do not add it; recommend it to the
 user.
 
@@ -297,7 +297,7 @@ Introduced by: <commit and PR>, or "unknown".
 When Step 3 proves the root cause, continue to the fix. Do not wait for
 the user. Stop and ask the user before you fix only when the fix:
 
-- changes a database migration or the latest schema,
+- changes a database migration,
 - changes a released Team API adapter or a wire protocol,
 - touches the renderer-to-main trust boundary or a security test,
 - needs a product decision, or has more than one reasonable behavior.
@@ -399,7 +399,7 @@ Feature request:
 | Value | `<n>/15` |
 | Priority | `P1`, `P2`, or `P3` |
 | Recommendation | The recommendation, and the smallest version or the general mechanism |
-| Next step | `$prototype`, a plan, the `approved` label, or the draft comment |
+| Next step | `$prototype` or `$prototype-mobile`, a plan, the `approved` label, or the draft comment |
 
 For several feature requests, one row for each issue: issue, scope, UX,
 value, priority, recommendation.

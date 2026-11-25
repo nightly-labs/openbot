@@ -1,7 +1,7 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type ChannelDraft, type ChannelSummary, isChannelDraft } from "@openbot/contracts/ipc";
+import { type ChannelDraft, type ChannelSummary, canAdministerServer, isChannelDraft } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
@@ -11,11 +11,12 @@ import Crown from "lucide-react-native/icons/crown";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
 import Users from "lucide-react-native/icons/users";
-import X from "lucide-react-native/icons/x";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { ChannelAvatar } from "@/features/channels/components/channel-avatar";
+import { ChannelContextActions } from "@/features/channels/components/channel-context-actions";
+import { ChannelFoldersRow } from "@/features/channels/components/channel-folders";
 import { useChannels } from "@/features/channels/components/use-channels";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
@@ -24,12 +25,12 @@ import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
-import { AndroidHeaderButton } from "@/shared/components/android-header-button";
+import { SaveError } from "@/shared/components/save-error";
+import { SheetCloseAction } from "@/shared/components/sheet-close-action";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { haptics } from "@/shared/lib/haptics";
-import { isAndroid } from "@/shared/lib/platform";
 import { currentText, useText } from "@/shared/lib/text";
 import { useChannelAgentPicker } from "../model/channel-agent-picker";
 import { toggleChannelMember } from "../model/channel-draft";
@@ -70,6 +71,7 @@ export function ChannelFormScreen({ create = false }: { create?: boolean }) {
       channel={create ? undefined : (current ?? last.current)}
       available={available}
       pictureSupported={state.canSetPicture}
+      contextActionsSupported={state.canUseContextActions}
       store={state.store}
     />
   );
@@ -82,6 +84,7 @@ function ChannelForm({
   channel,
   available,
   pictureSupported,
+  contextActionsSupported,
   store,
 }: {
   create: boolean;
@@ -89,15 +92,15 @@ function ChannelForm({
   channelId: string;
   channel?: ChannelSummary;
   available: boolean;
-  /** The host takes a channel picture (`channel-picture-v1`). */
   pictureSupported: boolean;
+  contextActionsSupported: boolean;
   store: MobileChannelStore;
 }) {
   const { t, errorMessage } = useText();
   const agents = useMobileWorkspaceSelector((current) => current.agents);
-  const canManage = useMobileWorkspaceSelector(
-    (current) => current.servers.find((server) => server.id === serverId)?.role !== "member",
-  );
+  const role = useMobileWorkspaceSelector((current) => current.servers.find((server) => server.id === serverId)?.role);
+  const canManage = role !== "member";
+  const canManageFolders = useMobileWorkspaceSelector((current) => current.canManageChannelFolders(serverId));
   const { theme } = useUniwind();
   const openAgentPicker = useChannelAgentPicker((state) => state.open);
   const foreground = String(useThemeColor("foreground"));
@@ -125,7 +128,6 @@ function ChannelForm({
   const choices = useMemo(() => agents.filter((agent) => agent.serverId === serverId), [agents, serverId]);
   const agentsById = useMemo(() => new Map(choices.map((agent) => [agent.id, agent])), [choices]);
   const disabled = saving || !available || finished || Boolean(channel?.archived);
-  // Discard turns prevention off before it repeats the action, so the hook does not warn.
   const [discarding, setDiscarding] = useState(false);
   usePreventRemove(!discarding && !finished && (dirty || saving), ({ repeat }) => {
     if (lock.current) return;
@@ -203,31 +205,14 @@ function ChannelForm({
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
     >
-      {create && isAndroid ? (
-        <AndroidHeaderButton
-          placement="left"
-          icon={X}
-          accessibilityLabel={t("common.close")}
+      {create ? (
+        <SheetCloseAction
           disabled={saving}
           onPress={() => {
             void haptics.impact("soft");
             router.back();
           }}
         />
-      ) : create ? (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon="xmark"
-            accessibilityLabel={t("common.close")}
-            disabled={saving}
-            onPress={() => {
-              void haptics.impact("soft");
-              router.back();
-            }}
-          >
-            {t("common.close")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
       ) : null}
       <SheetSaveAction
         dirty={dirty}
@@ -348,14 +333,27 @@ function ChannelForm({
           >
             <Typography.Paragraph>{t("mobile.channel.form.routines")}</Typography.Paragraph>
           </SettingsRow>
+          {canManageFolders ? (
+            <ChannelFoldersRow serverId={serverId} channelId={channelId} available={available} disabled={saving} />
+          ) : null}
         </SettingsSection>
+      ) : null}
+      {!create && channel && !channel.archived && contextActionsSupported ? (
+        <ChannelContextActions
+          serverId={serverId}
+          channelId={channelId}
+          channelName={channel.name}
+          store={store}
+          available={available && !saving && !finished}
+          canDeleteHistory={canAdministerServer(role)}
+        />
       ) : null}
       {!create && !channel?.archived ? (
         <SettingsSection>
           {canManage ? (
             <SettingsRow
               leading={<RowIcon icon={Trash2} tone="danger" />}
-              disabled={disabled || dirty}
+              disabled={disabled || dirty || (channel?.activeTasks ?? 0) > 0}
               disclosure={false}
               onPress={() => {
                 const text = currentText();
@@ -386,11 +384,7 @@ function ChannelForm({
           {t("mobile.channel.form.invalidName")}
         </Typography.Paragraph>
       ) : null}
-      {error ? (
-        <Typography.Paragraph accessibilityRole="alert" className="text-danger-text">
-          {error}
-        </Typography.Paragraph>
-      ) : null}
+      <SaveError error={error} />
     </SheetScrollView>
   );
 }

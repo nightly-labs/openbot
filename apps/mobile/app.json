@@ -3,13 +3,14 @@
     "name": "OpenBot",
     "slug": "openbot",
     "platforms": ["ios", "android"],
-    "version": "1.4.9",
+    "version": "1.4.14",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "openbot",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "run.openbot.mobile",
+      "appleTeamId": "8A47NKRZSJ",
       "supportsTablet": true,
       "associatedDomains": ["applinks:openbot.run"],
       "infoPlist": {
@@ -17,7 +18,9 @@
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         },
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["fetch"],
+        "BGTaskSchedulerPermittedIdentifiers": ["run.openbot.mobile.refresh"]
       },
       "icon": "./assets/icons/app-icon.icon"
     },
@@ -43,6 +46,9 @@
       "./plugins/with-rocketsim",
       "./plugins/with-workspace-bundle-inputs",
       "./plugins/with-update-channel",
+      "./plugins/with-app-icons",
+      "./plugins/with-android-view-preallocation-off",
+      "./plugins/with-android-optional-features",
       "expo-router",
       "expo-video",
       [
@@ -110,6 +116,19 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Allow OpenBot to use Face ID to unlock the app."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow OpenBot to send your current location to an agent when you tap Share once, so it can answer questions about places near you.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "locationFullAccuracyPermission": false,
+          "motionUsagePermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       [
@@ -232,7 +251,9 @@
           "bundleIdentifier": "run.openbot.mobile.NotificationService",
           "groupIdentifier": "group.run.openbot.mobile"
         }
-      ]
+      ],
+      "./plugins/with-shortcuts",
+      "./plugins/with-xcode-warning-fixes"
     ],
     "experiments": {
       "typedRoutes": true,

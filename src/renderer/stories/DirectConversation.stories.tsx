@@ -117,7 +117,6 @@ export const UnreadMessages: Story = {
   },
 };
 
-/** Five days of history: the scroll rail is on the right edge. */
 export const LongHistory: Story = {
   render: (storyArgs) => <StatefulDirectConversation args={storyArgs} />,
   args: {

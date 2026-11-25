@@ -20,6 +20,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { withTransaction, withTransactionAsync } from "./database/sqlite-transaction";
 import { LineTooLongError } from "./jsonl";
 import { getString, isRecord, type ThreadItem } from "./protocol";
 import { providerFailure } from "./provider-client-effects";
@@ -44,6 +45,7 @@ export interface ClaudeSessionMessage {
   parent_tool_use_id: string | null;
   parent_agent_id: string | null;
   timestamp?: string;
+  task_run_id?: string;
 }
 
 interface ParsedRecord {
@@ -62,6 +64,7 @@ interface ParsedRecord {
   teamName?: unknown;
   subtype?: unknown;
   compactMetadata?: unknown;
+  origin?: unknown;
   message?: unknown;
 }
 
@@ -124,7 +127,6 @@ const SCHEMA = `
 const MAX_TRANSCRIPT_RECORD_BYTES = 256 * 1024 * 1024;
 const MAX_TURN_FRAGMENT_ITEMS = 50;
 
-/** Reads Claude JSONL through a disk index. Message payloads are read one at a time per turn. */
 export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadProviderHistory {
   return (request, consume) =>
     Effect.tryPromise({
@@ -133,7 +135,20 @@ export function claudeHistoryReader(options: ClaudeHistoryOptions = {}): ReadPro
     });
 }
 
-/** Explicit test boundary for an injected SDK history reader. Production uses claudeHistoryReader. */
+export const CLAUDE_NO_RESPONSE_TEXT = "No response requested.";
+
+export function isClaudeNoResponsePlaceholder(message: unknown): boolean {
+  if (!isRecord(message) || message.model !== "<synthetic>" || !Array.isArray(message.content)) return false;
+  const [block, ...rest] = message.content;
+  return rest.length === 0 && isRecord(block) && block.type === "text" && block.text === CLAUDE_NO_RESPONSE_TEXT;
+}
+
+export function claudeTaskTurnId(sessionId: string, taskId: string, runId: string): string {
+  const hex = createHash("sha256").update(`claude-task-turn\n${sessionId}\n${taskId}\n${runId}`).digest("hex");
+  const variant = ((Number.parseInt(hex.slice(16, 17), 16) & 0x3) | 0x8).toString(16);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-8${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
 export function claudeHistoryFromMessages(
   readMessages: (threadId: string, options?: { dir?: string }) => Promise<readonly ClaudeSessionMessage[]>,
 ): ReadProviderHistory {
@@ -209,7 +224,13 @@ async function scanClaudeHistory(
         await selectConversation(database, signal);
         await populateTurnMetadata(database, transcript, request.items === "full", signal);
         if (request.items === "none") await emitMetadata(database, consume, signal);
-        else await emitTurns(database, transcript, consume, signal);
+        else {
+          const { resumeKey } = request;
+          const fromSeq = resumeKey === undefined ? 0 : resumeStartSeq(database, resumeKey);
+          if ((await emitTurns(database, transcript, consume, signal, fromSeq)) && resumeKey !== undefined) {
+            writeResumePoint(database, resumeKey);
+          }
+        }
         return;
       } finally {
         database.close();
@@ -219,10 +240,6 @@ async function scanClaudeHistory(
   });
 }
 
-/**
- * The last scan of each index. A scan holds a write transaction while it awaits transcript reads, so
- * a second scan of the same session waits for it and does not fail with "database is locked".
- */
 const indexScans = new Map<string, Promise<unknown>>();
 
 async function oneScanAtATime(indexPath: string, scan: () => Promise<void>): Promise<void> {
@@ -248,12 +265,12 @@ async function buildIndex(
     `INSERT INTO entries
       (uuid, type, offset, length, parent_uuid, timestamp, session_id, parent_tool_use_id,
        parent_agent_id, is_sidechain, is_meta, team_name, subtype, compact_metadata, visible_user)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(uuid) DO NOTHING`,
   );
   let nextOffset = startOffset;
   let lineNumber = 0;
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  return withTransactionAsync(database, async () => {
     for await (const record of readTranscriptLines(filePath, signal, startOffset, fileSize)) {
       if (signal.aborted) throw signal.reason;
       const parsed = record.complete ? parseRecord(record.line.trim()) : null;
@@ -290,12 +307,8 @@ async function buildIndex(
       if (lineNumber % 256 === 0) await new Promise<void>((resume) => setImmediate(resume));
     }
     writeHistoryState(database, identity, nextOffset, await scanBoundaryHash(filePath, nextOffset));
-    database.exec("COMMIT");
     return nextOffset;
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function* readTranscriptLines(
@@ -397,25 +410,13 @@ function writeHistoryState(database: DatabaseSync, identity: FileIdentity, scanO
 }
 
 function resetIndex(database: DatabaseSync): void {
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  withTransaction(database, () => {
     database.exec("DELETE FROM entries; DELETE FROM selected; DELETE FROM turn_metadata; DELETE FROM history_meta;");
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function selectConversation(database: DatabaseSync, signal: AbortSignal): Promise<void> {
-  database.exec("BEGIN IMMEDIATE");
-  try {
-    await writeSelectedConversation(database, signal);
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  await withTransactionAsync(database, () => writeSelectedConversation(database, signal));
 }
 
 async function writeSelectedConversation(database: DatabaseSync, signal: AbortSignal): Promise<void> {
@@ -530,8 +531,7 @@ async function populateTurnMetadata(
   const insert = database.prepare(
     "INSERT OR REPLACE INTO turn_metadata (turn_id, start_seq, end_seq, timestamp, final_answer_uuid) VALUES (?, ?, ?, ?, ?)",
   );
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  await withTransactionAsync(database, async () => {
     database.exec("DELETE FROM turn_metadata");
     const file = includeAnswerMetadata ? await open(filePath, "r") : null;
     try {
@@ -547,11 +547,7 @@ async function populateTurnMetadata(
     } finally {
       if (file) await file.close();
     }
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function findFinalAnswer(
@@ -571,7 +567,7 @@ async function findFinalAnswer(
     if (signal.aborted) throw signal.reason;
     const row = decodeTranscriptRow(raw);
     const message = await readMessage(file, row);
-    if (message?.type !== "assistant") continue;
+    if (message?.type !== "assistant" || isClaudeNoResponsePlaceholder(message.message)) continue;
     const text = messageText(message.message);
     const thinking = messageThinking(message.message);
     const endsStep = messageToolCalls(message.message).length > 0;
@@ -620,19 +616,81 @@ async function emitTurns(
   filePath: string,
   consume: ProviderHistoryConsumer,
   signal: AbortSignal,
-): Promise<void> {
+  fromSeq: number,
+): Promise<boolean> {
   let cursor = Number.MAX_SAFE_INTEGER;
   const statement = database.prepare(
-    "SELECT turn_id, start_seq, end_seq, timestamp, final_answer_uuid FROM turn_metadata WHERE start_seq < ? ORDER BY start_seq DESC LIMIT 1",
+    "SELECT turn_id, start_seq, end_seq, timestamp, final_answer_uuid FROM turn_metadata WHERE start_seq < ? AND start_seq >= ? ORDER BY start_seq DESC LIMIT 1",
   );
   for (;;) {
     if (signal.aborted) throw signal.reason;
-    const raw = statement.get(cursor);
-    if (raw === undefined) return;
+    const raw = statement.get(cursor, fromSeq);
+    if (raw === undefined) return true;
     const row = decodeTurnMetadata(raw);
     cursor = row.startSeq;
-    if (!(await emitTurnFragments(database, filePath, row, consume, signal))) return;
+    if (!(await emitTurnFragments(database, filePath, row, consume, signal))) return false;
   }
+}
+
+const RESUME_POINT_KEY = "resume_point";
+
+interface TurnListDigest {
+  turns: number;
+  digest: string;
+  lastStart: number;
+}
+
+function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest | null {
+  const rows = [
+    ...database
+      .prepare("SELECT turn_id, start_seq, end_seq, final_answer_uuid FROM turn_metadata ORDER BY start_seq LIMIT ?")
+      .iterate(limit),
+  ].map((raw) => {
+    const row = databaseRow(raw);
+    if (!row) throw new Error("Invalid Claude history turn row.");
+    return [
+      requiredStringColumn(row, "turn_id"),
+      requiredNumberColumn(row, "start_seq"),
+      requiredNumberColumn(row, "end_seq"),
+      optionalStringColumn(row, "final_answer_uuid") ?? null,
+    ] as const;
+  });
+  const last = rows.at(-1);
+  if (!last) return null;
+  const selectedBefore = databaseRow(
+    database.prepare("SELECT COUNT(*) AS count FROM selected WHERE seq < ?").get(last[1]),
+  );
+  const hash = createHash("sha256");
+  for (const row of rows.slice(0, -1)) hash.update(`${JSON.stringify(row)}\n`);
+  hash.update(JSON.stringify([last[0], last[1], selectedBefore ? requiredNumberColumn(selectedBefore, "count") : 0]));
+  return { turns: rows.length, digest: hash.digest("hex"), lastStart: last[1] };
+}
+
+function resumeStartSeq(database: DatabaseSync, resumeKey: string): number {
+  const raw = database.prepare("SELECT value FROM history_meta WHERE key = ?").get(RESUME_POINT_KEY);
+  const row = raw === undefined ? null : databaseRow(raw);
+  if (!row) return 0;
+  let stored: unknown;
+  try {
+    stored = JSON.parse(requiredStringColumn(row, "value"));
+  } catch {
+    return 0;
+  }
+  if (!isRecord(stored) || stored.key !== resumeKey || typeof stored.turns !== "number") return 0;
+  const current = turnListDigest(database, stored.turns);
+  return current && current.turns === stored.turns && current.digest === stored.digest ? current.lastStart : 0;
+}
+
+function writeResumePoint(database: DatabaseSync, resumeKey: string): void {
+  const current = turnListDigest(database, -1);
+  const value = current ? JSON.stringify({ key: resumeKey, turns: current.turns, digest: current.digest }) : null;
+  if (value === null) database.prepare("DELETE FROM history_meta WHERE key = ?").run(RESUME_POINT_KEY);
+  else
+    database
+      .prepare(
+        "INSERT INTO history_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run(RESUME_POINT_KEY, value);
 }
 
 async function emitTurnFragments(
@@ -646,12 +704,14 @@ async function emitTurnFragments(
   let items: ThreadItem[] = [];
   let itemOffset = 0;
   let stopped = false;
+  let liveTurnId: string | null = null;
   const flush = async (complete: boolean): Promise<boolean> => {
     if (signal.aborted) throw signal.reason;
     const count = items.length;
     const result = await Effect.runPromise(
       consume({
         turnId: turn.turnId,
+        ...(liveTurnId ? { liveTurnId } : {}),
         status: "completed",
         startedAt: turnStartedAt(turn.timestamp, turn.startSeq),
         itemOffset,
@@ -700,6 +760,7 @@ async function emitTurnFragments(
           if (stopped) break;
           continue;
         }
+        if (row.seq === turn.startSeq && isClaudeTaskNotification(text)) liveTurnId = taskNotificationTurnId(message);
         if (
           row.seq !== turn.startSeq ||
           !text ||
@@ -719,7 +780,7 @@ async function emitTurnFragments(
           break;
         continue;
       }
-      if (message.type !== "assistant") continue;
+      if (message.type !== "assistant" || isClaudeNoResponsePlaceholder(message.message)) continue;
       const thinking = messageThinking(message.message);
       const endsStep = messageToolCalls(message.message).length > 0;
       if (!thinking && !text && !endsStep) continue;
@@ -761,6 +822,13 @@ async function emitTurnFragments(
   } finally {
     await file.close();
   }
+}
+
+function taskNotificationTurnId(message: ClaudeSessionMessage): string | null {
+  const taskId = [...messageText(message.message).matchAll(/<task-id>([^<]+)<\/task-id>/g)].at(-1)?.[1];
+  return taskId && message.task_run_id && message.session_id
+    ? claudeTaskTurnId(message.session_id, taskId, message.task_run_id)
+    : null;
 }
 
 function decodeTurnRow(raw: unknown): { seq: number; uuid: string; timestamp: string | null } {
@@ -812,6 +880,8 @@ async function readMessage(
   if (result.bytesRead !== row.length) throw new Error("Claude transcript changed while it was being read.");
   const parsed = parseRecord(buffer.toString("utf8"));
   if (!parsed || (parsed.type !== "user" && parsed.type !== "assistant" && parsed.type !== "system")) return null;
+  const taskRunId =
+    isRecord(parsed.origin) && parsed.origin.kind === "task-notification" ? stringOrNull(parsed.origin.runId) : null;
   return {
     type: parsed.type,
     uuid: parsed.uuid,
@@ -820,6 +890,7 @@ async function readMessage(
     parent_tool_use_id: stringOrNull(parsed.parentToolUseId ?? parsed.parent_tool_use_id),
     parent_agent_id: stringOrNull(parsed.parentAgentId ?? parsed.parent_agent_id),
     ...(parsed.timestamp ? { timestamp: String(parsed.timestamp) } : {}),
+    ...(taskRunId ? { task_run_id: taskRunId } : {}),
   };
 }
 
@@ -860,7 +931,7 @@ function historyFragments(messages: readonly ClaudeSessionMessage[], includeItem
         });
       continue;
     }
-    if (message.type !== "assistant" || skippingCompaction) continue;
+    if (message.type !== "assistant" || skippingCompaction || isClaudeNoResponsePlaceholder(message.message)) continue;
     const thinking = messageThinking(message.message);
     const endsStep = messageToolCalls(message.message).length > 0;
     if (!thinking && !text && !endsStep) continue;
@@ -965,6 +1036,7 @@ function parseRecord(line: string): ParsedRecord | null {
       teamName: value.teamName,
       subtype: value.subtype,
       compactMetadata: value.compactMetadata,
+      origin: value.origin,
       message: value.message,
     };
   } catch {
@@ -986,7 +1058,6 @@ function messageText(message: unknown): string {
       (block) =>
         block.type === "text" &&
         typeof block.text === "string" &&
-        // OpenBot's memory block is not text that the user wrote.
         !(message.role === "user" && isTurnContextBlock(block.text)),
     )
     .map((block) => String(block.text))

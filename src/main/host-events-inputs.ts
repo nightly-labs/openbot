@@ -13,8 +13,6 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 
-// Each parser decodes an untrusted renderer or Team API body. A failure has only catalog text.
-
 const invalidEventInput = () => new Error(sourceText("error.backend.webhookSettingsInvalid"));
 
 function requiredString(value: unknown, maximum: number): string {
@@ -41,7 +39,6 @@ export function parseEventRoutineRef(value: unknown): EventRoutineRef {
   return { id: requiredString(input.id, 128), owner: owner(input.owner) };
 }
 
-/** The host checks the secret itself; this parser only bounds its size. */
 export function parseSetWebhookSecret(value: unknown): SetWebhookSecretInput {
   const input = record(value);
   return { id: requiredString(input.id, 128), owner: owner(input.owner), secret: requiredString(input.secret, 1024) };
@@ -66,7 +63,6 @@ export function parseSaveEventRoutine(value: unknown): SaveEventRoutineInput {
     instruction: requiredString(input.instruction, 100_000),
     active: input.active,
     timezone: requiredString(input.timezone, 128),
-    // Copy only the known fields, so unknown keys from the sender do not reach storage.
     trigger:
       trigger.kind === "schedule"
         ? { kind: "schedule", schedule: trigger.schedule }

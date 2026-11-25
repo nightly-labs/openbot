@@ -5,8 +5,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { databaseRows, requiredStringColumn } from "./database/database-rows";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
-// Failure modes: upgrade loses text; selection exceeds budget; a partial migration survives failure;
-// invalid history is accepted; selection/index outlive a deleted memory. These fixtures cover each.
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
@@ -67,7 +65,7 @@ describe("agent memory selection migration", () => {
       const before = rows(db);
       migrateOpenBotDatabase(db);
       expect(rows(db)).toEqual(before.map((row) => ({ ...row, site: null })));
-      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 60 });
+      expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 69 });
       const selected = databaseRows(
         db
           .prepare(`SELECT m.memory_id, m.text, m.origin FROM projection_agent_memories m
@@ -133,9 +131,9 @@ describe("agent memory selection migration", () => {
     const db = databaseAt(31);
     seedMemories(db);
     const before = rows(db);
-    db.exec("INSERT INTO schema_migrations VALUES(61,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(70,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=61; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=70; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(rows(db)).toEqual(before);
   });

@@ -7,12 +7,6 @@ import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENTS } from "./fixtures";
 
-/*
- * The trace of an agent's turn: each model call, tool call, wait and handoff as a bar on one
- * timeline. The steps row of a finished turn opens it in a dialog. These stories use fixtures.
- */
-
-/** A span of the fixture turn, with its times in ms after the turn started. */
 interface FixtureSpan extends Omit<TraceSpan, "start" | "end"> {
   from: number;
   to: number;
@@ -39,6 +33,7 @@ const TURN: readonly FixtureSpan[] = [
     from: 0,
     to: 3_200,
     tokens: 1_840,
+    cachedInput: 12_400,
     costUsd: 0.011,
   },
   {
@@ -201,7 +196,6 @@ const TURN: readonly FixtureSpan[] = [
 
 const TURN_LENGTH = 38_600;
 
-/** The turn as it is `elapsed` ms after it started at `origin`: later spans are not there yet. */
 function spansAt(origin: number, elapsed: number): TraceSpan[] {
   return TURN.filter((span) => span.from <= elapsed).map(({ from, to, ...span }) => ({
     ...span,
@@ -214,7 +208,6 @@ const ORIGIN = Date.UTC(2026, 9, 24, 9, 30);
 const FINISHED = spansAt(ORIGIN, TURN_LENGTH);
 const FINISHED_NOW = ORIGIN + TURN_LENGTH;
 
-/** A clock for the story. It moves `now` each second, as the caller does in the app. */
 function createStoryClock() {
   const [now, setNow] = createSignal(Date.now());
   onSettled(() => {
@@ -232,7 +225,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** A finished turn with two subagents and one failed tool call. */
 export const Finished: Story = {
   render: () => (
     <div style={{ width: "1000px", height: "640px", display: "flex" }}>
@@ -241,7 +233,6 @@ export const Finished: Story = {
   ),
 };
 
-/** A running turn. The open spans grow to the "now" line, and the turn starts again at its end. */
 export const Live: Story = {
   render: () => {
     const now = createStoryClock();
@@ -256,7 +247,6 @@ export const Live: Story = {
   },
 };
 
-/** A search that matches nothing. */
 export const NoMatches: Story = {
   render: () => (
     <div style={{ width: "1000px", height: "520px", display: "flex" }}>
@@ -265,7 +255,6 @@ export const NoMatches: Story = {
   ),
 };
 
-/** A narrow trace. The step names get less room, and the timeline keeps the rest. */
 export const Narrow: Story = {
   render: () => (
     <div style={{ width: "420px", height: "640px", display: "flex" }}>
@@ -274,7 +263,6 @@ export const Narrow: Story = {
   ),
 };
 
-/** The steps of the fixture turn that the steps row lists: its own thoughts and tool calls. */
 const STEPS: AgentStep[] = TURN.filter((span) => span.parentId === "agent" && span.icon !== "agent").flatMap(
   (span): AgentStep[] => {
     if (span.icon === "thinking") return [{ id: span.id, kind: "thinking", text: span.name }];
@@ -283,10 +271,6 @@ const STEPS: AgentStep[] = TURN.filter((span) => span.parentId === "agent" && sp
   },
 );
 
-/**
- * The placement: the steps row of a finished turn opens the trace in a dialog. A click on one of the
- * turn's own steps closes it and shows that step in the list.
- */
 export const FromStepsRow: Story = {
   render: () => (
     <div style={{ width: "640px" }}>
@@ -300,11 +284,9 @@ export const FromStepsRow: Story = {
   ),
 };
 
-/** One agent answer of a channel, with the actions and the steps row that show on hover. */
 function ChannelAnswer(props: { id: string; agent: number; body: string; first: boolean }) {
   const agent = STORY_AGENTS[props.agent];
   const message = { id: props.id, author: "agent" as const, body: props.body, time: "09:31", kind: "text" as const };
-  // The timeline row gives the distance between messages: more before a new author.
   return (
     <div class="virtual-chat-list-static">
       <div class="virtual-chat-row" data-grouped={props.first ? undefined : "sender"}>
@@ -350,10 +332,6 @@ function ChannelAnswer(props: { id: string; agent: number; body: string; first: 
   );
 }
 
-/**
- * The placement in a channel: the actions and the steps row stand beside the answer, or under a long
- * answer, and show on hover. The steps open only the trace, so the channel never grows a list.
- */
 export const FromChannelAnswer: Story = {
   render: () => (
     <div style={{ width: "720px" }}>

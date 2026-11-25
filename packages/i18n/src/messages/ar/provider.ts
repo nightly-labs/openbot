@@ -136,9 +136,16 @@ export const messages = {
   "provider.picker.download": "تنزيل {name}",
   "provider.picker.search": "البحث في النماذج",
   "provider.picker.noMatches": "لا توجد نماذج تطابق بحثك.",
+  "provider.picker.openrouterNoMatches":
+    "لا توجد نماذج تطابق بحثك. يمكن أن تخفي إعدادات الخصوصية والمزوّدين والحواجز الوقائية في openrouter.ai بعض النماذج من هذه القائمة.",
+  "provider.picker.workspaceOnlyUnavailable":
+    "لا تعمل هذه النماذج مع «مساحة العمل فقط» على Windows وLinux. لاستخدامها، غيّر «الأذونات» في إعدادات الوكيل.",
   "provider.picker.olderModels": "نماذج أقدم",
   "provider.picker.olderModelsList": "نماذج {name} الأقدم",
-  "provider.picker.noModels": "لا تتوفر نماذج من {name}.",
+  "provider.picker.noModels":
+    "لا تظهر هنا نماذج من {name}. إذا كانت متوقفة، يمكن للمسؤول تشغيلها في إعدادات الخادم > المزوّدون > {name} > النماذج.",
+  "provider.picker.endpointModelsInCustom": "يشغّل {name} نقاط النهاية المخصصة لديك. نماذجها في تبويب مخصص.",
+  "provider.picker.showCustomModels": "عرض النماذج",
   "provider.picker.museNoModels":
     "لم يرسل Muse أي نماذج لهذا الحساب. قد لا يكون Muse متاحًا في البلد الذي يعمل فيه هذا الوكيل. اختر نموذجًا من مزوّد آخر.",
   "provider.picker.customEmpty":
@@ -155,6 +162,7 @@ export const messages = {
   "provider.picker.effort": "الجهد",
   "provider.picker.effortLabel": "جهد التفكير لدى الوكيل",
   "provider.picker.effortFixed": "{effort}، يحدده {provider}",
+  "provider.picker.effortLimited": "إعدادات Claude أو مؤسستك تحدّ الجهد عند {effort}.",
   "provider.picker.fast": "سريع",
   "provider.picker.fastText": "ردود أسرع واستخدام أكبر",
   "provider.picker.speed": "السرعة",
@@ -165,6 +173,8 @@ export const messages = {
   "provider.picker.selectEffort": "اختيار الجهد",
   "provider.picker.custom": "مخصص",
   "provider.picker.cliReady": "{cli} جاهز",
+  "provider.picker.modelSourceProvider": "يستخدم {name} من إعدادات {cli}",
+  "provider.picker.modelSourceCatalog": "يستخدم قائمة نماذج من إعدادات {cli}",
   "provider.status.signInRequired": "تسجيل الدخول مطلوب",
   "provider.model.free": "مجاني",
   "provider.model.new": "جديد",
@@ -183,6 +193,8 @@ export const messages = {
   "provider.geminiKey.title": "مفتاح Gemini API",
   "provider.geminiKey.description":
     "احفظ مفتاح Gemini API على هذا الحاسوب. يُستخدم المفتاح المحفوظ بدلًا من حسابك في Google. لتسجيل الدخول باستخدام Google، أزل المفتاح واختر «اتصال» في صف Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "احفظ مفتاح Gemini API على المضيف. يُستخدم المفتاح المحفوظ بدلًا من حسابك في Google. لتسجيل الدخول باستخدام Google، أزل المفتاح واختر «اتصال» في صف Gemini.",
   "provider.geminiKey.label": "مفتاح Gemini API",
   "provider.claudeKey.title": "مفتاح Anthropic API",
   "provider.claudeKey.description":
@@ -194,17 +206,29 @@ export const messages = {
   "provider.codexKey.descriptionHost":
     "يحفظ Codex المفتاح على المضيف. تحتسب OpenAI كل طلب على المفتاح، لا على خطة ChatGPT. لاستخدام الخطة مرة أخرى، افصل الحساب ووصّل ChatGPT.",
   "provider.codexKey.label": "مفتاح OpenAI API",
+  "provider.cursorKey.title": "مفتاح Cursor API",
+  "provider.cursorKey.description":
+    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن Integrations، ثم الصقه هنا. يُحفظ المفتاح على هذا الحاسوب.",
+  "provider.cursorKey.descriptionHost":
+    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن Integrations، ثم الصقه هنا. يُحفظ المفتاح على المضيف.",
+  "provider.cursorKey.label": "مفتاح Cursor API",
   "provider.inceptionKey.title": "مفتاح Inception API",
   "provider.inceptionKey.description":
     "احفظ مفتاح Inception API على هذا الحاسوب لاستخدام نماذج Mercury. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.inceptionKey.descriptionHost":
+    "احفظ مفتاح Inception API على المضيف لاستخدام نماذج Mercury. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.inceptionKey.label": "مفتاح Inception API",
   "provider.deepseekKey.title": "مفتاح DeepSeek API",
   "provider.deepseekKey.description":
     "احفظ مفتاح DeepSeek API على هذا الحاسوب لاستخدام نماذج DeepSeek. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.deepseekKey.descriptionHost":
+    "احفظ مفتاح DeepSeek API على المضيف لاستخدام نماذج DeepSeek. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.deepseekKey.label": "مفتاح DeepSeek API",
   "provider.openrouterKey.title": "مفتاح OpenRouter API",
   "provider.openrouterKey.description":
     "احفظ مفتاح OpenRouter API على هذا الحاسوب لاستخدام النماذج التي يقدمها OpenRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.openrouterKey.descriptionHost":
+    "احفظ مفتاح OpenRouter API على المضيف لاستخدام النماذج التي يقدمها OpenRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.openrouterKey.label": "مفتاح OpenRouter API",
   "provider.openCodeKey.title": "تسجيل الدخول إلى OpenCode Go",
   "provider.openCodeKey.description": "لا تحتاج النماذج المجانية إلى حساب. يفتح المفتاح نماذج Go المدفوعة.",
@@ -220,6 +244,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "تعذّرت إعادة الاتصال.",
   "provider.account.add": "إضافة حساب",
   "provider.account.addLabel": "إضافة حساب {name} آخر",
+  "provider.account.addWithCode": "إضافة حساب برمز",
   "provider.account.count": {
     zero: "لا حسابات",
     one: "حساب واحد",
@@ -258,6 +283,16 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "لم يتبقَّ لدى {name} أي رصيد لإعادة تعيين الاستخدام.",
   "provider.account.resetUsageAlreadyRedeemed": "رصيد إعادة التعيين هذا لـ {name} مستخدم بالفعل.",
   "provider.account.resetUsageFailed": "تعذّرت إعادة تعيين استخدام {name}.",
+  "provider.account.pool": "تجميع الحسابات",
+  "provider.account.poolDescription":
+    "يستخدم الوكلاء حسابًا واحدًا حتى يقترب من حد الاستخدام، ثم الحساب الذي يُعاد تعيين حده أولًا.",
+  "provider.account.inUse": "قيد الاستخدام",
+  "provider.account.notInPool": "خارج المجموعة",
+  "provider.account.leaveOutOfPool": "استبعاد من المجموعة",
+  "provider.account.putBackInPool": "إعادة إلى المجموعة",
+  "provider.account.poolChip": "مجموعة",
+  "provider.account.poolCount": "مجموعة من {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} قيد الاستخدام",
   "provider.settings.connected": "متصل",
   "provider.settings.other": "مزوّدون آخرون",
   "provider.settings.search": "البحث في المزوّدين",
@@ -290,6 +325,7 @@ export const messages = {
   "provider.settings.defaultSubtitle": "الافتراضي للوكلاء الجدد · {use}",
   "provider.settings.accounts": "الحسابات",
   "provider.settings.accountsDescription": "{count} من {max}. يستخدم كل وكيل حسابًا واحدًا.",
+  "provider.settings.accountsPooledDescription": "{count} من {max}. يتشارك الوكلاء هذه الحسابات.",
   "provider.settings.accountBlocked": "لا يمكن تشغيل {agents} حتى تسجّل الدخول مرة أخرى.",
   "provider.settings.removeTitle": "إزالة {name}؟",
   "provider.settings.removeMoves": "سيستخدم {agents} الحساب {name}.",
@@ -309,11 +345,14 @@ export const messages = {
   "provider.settings.keyOptional": "اختياري. يضيف المفتاح نماذج مدفوعة.",
   "provider.settings.keyAlternative": "أو الصق مفتاح {name} API.",
   "provider.settings.geminiKeyInUse": "يستخدم Gemini هذا المفتاح، لا خطة Google AI. لا يُعرض استخدام الخطة.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "يُستخدم مفتاح Gemini API المحفوظ بدلًا من تسجيل الدخول بحساب Google. لاستخدام خطة Google ونماذجها، أزِل المفتاح.",
   "provider.settings.claudeKeyInUse":
     "تحتسب Anthropic رصيد API للمفتاح، وليس خطة Claude. اختر حساب مفتاح API في قائمة نموذج الوكيل. عندما لا يكون Claude مسجّل الدخول، يستخدم كل الوكلاء المفتاح.",
   "provider.settings.codexKeyInUse":
     "يستخدم ChatGPT هذا المفتاح، لا خطة ChatGPT. تحتسب OpenAI كل طلب على المفتاح. لا يُعرض استخدام الخطة.",
   "provider.settings.codexKeyAlternative": "أو سجّل الدخول بمفتاح OpenAI API. تحتسب OpenAI كل طلب على المفتاح.",
+  "provider.settings.museKeyInUse": "يستخدم Muse هذا المفتاح، لا تسجيل دخولك. لاستخدام تسجيل الدخول، أزل المفتاح.",
   "provider.settings.addKey": "إضافة مفتاح",
   "provider.settings.changeKey": "تغيير المفتاح",
   "provider.settings.runtime": "بيئة التشغيل",
@@ -321,16 +360,26 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · يتوفر {available}",
   "provider.settings.versionInstalledByUser": "{version} · ثبّته أنت",
   "provider.settings.versionDownloaded": "{version} · نزّله OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "غير مستخدم: {version} · ثبّته أنت",
+  "provider.settings.otherVersionDownloaded": "غير مستخدم: {version} · نزّله OpenBot",
+  "provider.settings.installedVersionIncomplete":
+    "تحتاج بعض النماذج إلى جزء غير موجود في هذا الإصدار. نزّل إصدار OpenBot لاستخدامها.",
+  "provider.settings.useInstalledVersion": "استخدم الإصدار المثبّت",
+  "provider.settings.useDownloadedVersion": "استخدم إصدار OpenBot",
   "provider.settings.update": "تحديث",
   "provider.settings.downloadLabel": "تنزيل {name}",
   "provider.settings.diagnostics": "التشخيص",
   "provider.settings.cache": "ذاكرة التخزين المؤقت",
   "provider.settings.promptCache": "ذاكرة التخزين المؤقت للموجّه",
   "provider.settings.promptCacheDescription":
-    "المدة التي يحتفظ فيها Claude بسياق الوكيل في ذاكرة التخزين المؤقت بين الأدوار.",
+    "المدة التي يحتفظ فيها Claude وPi بسياق الوكيل في ذاكرة التخزين المؤقت بين الأدوار.",
   "provider.settings.promptCacheHour": "ساعة واحدة",
-  "provider.settings.promptCacheDefault": "الافتراضي في Claude Code",
+  "provider.settings.promptCacheDefault": "الإعداد الافتراضي للمزوّد",
   "provider.settings.promptCacheLoadFailed": "تعذّر تحميل مدة ذاكرة التخزين المؤقت للموجّه لهذا الخادم.",
+  "provider.settings.cacheExpiryCompaction": "الضغط قبل انتهاء ذاكرة التخزين المؤقت",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "عندما تكون محادثة ذات سياق من 200 ألف رمز أو أكثر خاملة مع ذاكرة تخزين مؤقت لمدة ساعة، يضغط الوكيل السياق قبل انتهاء ذاكرة التخزين المؤقت. عندها لا تقرأ الرسالة التالية السياق الكامل مرة أخرى بدون ذاكرة تخزين مؤقت.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "تعذّر تحميل إعداد الضغط لهذا الخادم.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "استخدام إعداد Claude Code الخاص بي",
   "provider.settings.claudeUserSetupDescription":
@@ -345,6 +394,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "الافتراضي في Claude Code",
   "provider.settings.compactWindowTokens": "{size} رمز",
   "provider.settings.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
+  "provider.settings.environment": "البيئة",
+  "provider.settings.environmentVariables": "المتغيرات",
+  "provider.settings.environmentDescription":
+    "مفاتيح API وعناوين URL الأساسية وإعدادات أخرى يحصل عليها كل عملية لـ {name}. يسري التغيير عند انتهاء الأدوار الجارية.",
+  "provider.settings.environmentCodexHint":
+    "يرسل OPENAI_BASE_URL، مع OPENAI_API_KEY كمفتاح له، طلبات نماذج ChatGPT إلى ذلك العنوان.",
+  "provider.settings.environmentShellNote": "يمكن للأوامر التي يشغّلها الوكلاء قراءة هذه القيم.",
+  "provider.settings.environmentAdd": "إضافة متغير",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "القيمة",
+  "provider.settings.environmentSaved": "محفوظة",
+  "provider.settings.environmentSensitive": "حساس",
+  "provider.settings.environmentNameLabel": "اسم المتغير {index}",
+  "provider.settings.environmentValueLabel": "قيمة {name}",
+  "provider.settings.environmentSensitiveLabel": "إبقاء {name} سرًا",
+  "provider.settings.environmentRemoveLabel": "إزالة {name}",
+  "provider.settings.environmentUnnamed": "المتغير {index}",
+  "provider.settings.environmentPending":
+    "يعيد الحفظ تشغيل {name} عند انتهاء أدواره الجارية. تبقى القيم الحساسة على الخادم.",
+  "provider.settings.environmentDone": "تم الحفظ. يعاد تشغيل {name} عند انتهاء أدواره الجارية.",
+  "provider.settings.environmentDiscard": "تجاهل",
+  "provider.settings.environmentSave": "حفظ",
+  "provider.settings.environmentLoadFailed": "تعذّر تحميل متغيرات {name}.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",
@@ -384,4 +456,7 @@ export const messages = {
     many: "{url} · {count} نموذجًا",
     other: "{url} · {count} نموذج",
   },
+  "provider.settings.disconnectLocalOnly":
+    "يسجّل OpenBot خروج {provider} على هذا الكمبيوتر. تحتفظ واجهة {provider} CLI في الطرفية بتسجيل دخولها.",
+  "provider.settings.updateAll": "تحديث الكل",
 } as const satisfies PartialTranslation<typeof source>;

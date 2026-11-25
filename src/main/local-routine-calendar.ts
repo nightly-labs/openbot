@@ -1,5 +1,3 @@
-// The routines of this computer, for the in-app calendar and for the iCalendar feed.
-
 import type { RoutineCalendarOwner } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
@@ -8,7 +6,6 @@ import type { AgentService } from "../backend/agent-service";
 import { routineFeedIcs } from "./routine-feed-ics";
 import { RoutineFeedAgentNotFound } from "./routine-feed-server";
 
-/** How far ahead the feed lists runs. A calendar app reads the feed again long before the end. */
 const FEED_DAYS = 30;
 
 export function localRoutineCalendarSource(service: AgentService): RoutineCalendarSource<never> {
@@ -37,10 +34,6 @@ export function localRoutineCalendarSource(service: AgentService): RoutineCalend
   };
 }
 
-/**
- * The feed of the next 30 days of runs: every active routine, or only those of the agent `agentId`.
- * A paused routine is left out, so it leaves the user's calendar at the next read.
- */
 export function localRoutineFeedDocument(service: AgentService, translate: AppTranslate) {
   return Effect.fn("RoutineFeed.document")(function* (agentId: string | null) {
     const agents = service.listAgents();

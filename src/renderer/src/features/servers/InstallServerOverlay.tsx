@@ -8,20 +8,13 @@ import { retryNewServer } from "./new-server-retry";
 export interface InstallServerOverlayProps {
   open: boolean;
   servers: readonly ServerSummary[];
-  /** Asks the account service for a one-time claim. Never log the claim. */
   createClaim: () => Promise<ServerClaim>;
-  /** Connects to a server again now. A new host can reach Signal after the first try of this app. */
   retryConnection: (serverId: string) => Promise<unknown>;
-  /**
-   * Puts an SSH task into the composer of the open chat and closes the dialog. The agent gets its own
-   * command from OpenBot, and a card in the chat waits for the server. Absent: no chat can take it.
-   */
   onSetUpWithAgent?: (() => void) | undefined;
   onOpenServer: (serverId: string) => void;
   onClose: () => void;
 }
 
-/** The dialog with the command that installs a server on another computer. Each opening makes a new claim. */
 export function InstallServerOverlay(props: InstallServerOverlayProps) {
   return (
     <Show when={props.open}>
@@ -33,11 +26,9 @@ export function InstallServerOverlay(props: InstallServerOverlayProps) {
 }
 
 interface InstallServerState {
-  /** The step before a new server shows in the list. */
   step: "making" | "waiting" | "expired" | "failed";
   claim: ServerClaim | null;
   error: unknown;
-  /** The servers in the list when the app asked for the claim. Any other server is the new one. */
   knownIds: readonly string[];
 }
 
@@ -55,7 +46,6 @@ function InstallServerSession(props: InstallServerOverlayProps) {
     window.clearTimeout(expiry);
   });
 
-  /** For `onSettled` and event handlers only. */
   async function newCommand(): Promise<void> {
     const current = ++request;
     window.clearTimeout(expiry);
@@ -95,7 +85,6 @@ function InstallServerSession(props: InstallServerOverlayProps) {
     void newCommand();
   });
 
-  /** A server that signed in with the claim. The account service adds it to the list of each device. */
   const newServer = createMemo(() => {
     if (state.step !== "waiting" && state.step !== "expired") return undefined;
     const known = new Set(state.knownIds);

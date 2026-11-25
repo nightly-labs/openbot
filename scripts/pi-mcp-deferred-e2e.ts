@@ -1,11 +1,3 @@
-// Runs the real `pi` provider driver and the real Pi binary against a fake OpenAI-compatible server,
-// to check which tools each request declares. A user's MCP server, such as computer use with 56
-// tools, must wait for Pi's `tool_search` and not be declared in each request. The OpenBot tools stay
-// declared. The fake model first answers with a `tool_search` call, so the second request must
-// declare the loaded tool, which Pi then keeps for the rest of the session. The system prompt names
-// the server, so the model knows what to search for, and it stays the same in each request. The
-// OpenBot extension removes Pi's `<docs>` section, and the `<mcp_servers>` section must stay.
-// `PI_CLI=<pi> bun scripts/pi-mcp-deferred-e2e.ts`. Writes .openbot-build/pi-mcp-deferred-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -24,7 +16,6 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/pi-mcp-deferred-e2e"
 const NL = String.fromCharCode(10);
 const TOOL = "ping_fixture";
 
-// A stdio MCP server with one tool.
 const STDIO_SERVER = `
 const readline = require("node:readline");
 const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + String.fromCharCode(10));
@@ -49,8 +40,8 @@ interface Report {
   passed: boolean;
   piVersion?: string;
   requests: string[][];
-  /** The `<mcp_servers>` section of the system prompt in the first request. */
   servers?: string;
+  toolResults?: string;
   reply?: string;
   error?: string;
 }
@@ -58,7 +49,6 @@ interface Report {
 const report: Report = { passed: false, requests: [] };
 const root = await mkdtemp(join(tmpdir(), "openbot-pi-deferred-e2e-"));
 const clients: AgentClient[] = [];
-/** The system prompt of each request with tools. */
 const systems: string[] = [];
 
 async function body(request: IncomingMessage): Promise<ChatRequest> {
@@ -68,7 +58,6 @@ async function body(request: IncomingMessage): Promise<ChatRequest> {
   return text ? JSON.parse(text) : {};
 }
 
-/** The `delta` of a streamed chat completion chunk. */
 interface Delta {
   role?: "assistant";
   content?: string;
@@ -86,12 +75,10 @@ function event(delta: Delta, finish: string | null): string {
   return `data: ${JSON.stringify(value)}${NL}${NL}`;
 }
 
-// The first turn request gets a `tool_search` call for the fixture tool; every later request gets text.
 const server = createServer((request: IncomingMessage, response: ServerResponse) => {
   void (async () => {
     const parsed = await body(request);
     const names = (parsed.tools ?? []).flatMap((tool) => tool.function?.name ?? []).sort();
-    // Pi also sends side requests with no tools, such as a session title. They are not turns.
     if (names.length > 0) {
       report.requests.push(names);
       systems.push(
@@ -102,6 +89,13 @@ const server = createServer((request: IncomingMessage, response: ServerResponse)
           )
           .join(NL),
       );
+      if (report.requests.length === 2)
+        report.toolResults = (parsed.messages ?? [])
+          .filter((message) => message.role === "tool")
+          .map(({ content }) =>
+            typeof content === "string" ? content : (content ?? []).map((part) => part.text).join(""),
+          )
+          .join(NL);
     }
     response.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" });
     if (names.length > 0 && report.requests.length === 1) {
@@ -126,7 +120,6 @@ try {
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("The fake endpoint has no port.");
 
-  // Pi must not read the developer's own providers, keys and MCP servers.
   const agentDirectory = join(root, "agent");
   await mkdir(agentDirectory, { recursive: true });
   await writeFile(join(agentDirectory, "settings.json"), "{}\n");
@@ -192,7 +185,12 @@ try {
   assert.ok(first.includes("tool_search"), `The first request has no tool_search: ${first.join(", ")}`);
   assert.ok(bridge(first).length > 0, `The first request declares no OpenBot tool: ${first.join(", ")}`);
   assert.equal(external(second).length, 1, `tool_search did not load the user's tool: ${second.join(", ")}`);
-  // The model finds the server by its name, and a fixed system prompt keeps the provider's cache.
+  const openbotSearch = bridge(first).find((name) => name.endsWith("__tool_search"));
+  assert.ok(openbotSearch, `The first request has no OpenBot tool_search: ${first.join(", ")}`);
+  assert.ok(
+    report.toolResults?.includes(`find them with ${openbotSearch},`),
+    `Pi's tool_search result does not name ${openbotSearch}: ${report.toolResults}`,
+  );
   report.servers = systems[0]?.match(/<mcp_servers>[\s\S]*?<\/mcp_servers>/u)?.[0] ?? "";
   assert.match(report.servers, /\(tool_search\): fixture$/mu, "The system prompt does not name the server.");
   assert.ok(!systems.some((system) => system.includes("<docs>")), "The system prompt has Pi's <docs> section.");

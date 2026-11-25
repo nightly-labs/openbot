@@ -1,20 +1,27 @@
 import type { JSX } from "@solidjs/web";
 import { For } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { firstTextDirection } from "../../content-direction";
 import { useText } from "../../text";
 import type { ComparisonTableBlock } from "./DataTable";
 
-export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell?: (text: string) => JSX.Element }) {
+export function ComparisonTable(props: {
+  table: ComparisonTableBlock;
+  renderCell?: (text: string) => JSX.Element;
+  selectionMessageId?: string | undefined;
+}) {
   const { t } = useText();
   return (
-    <section
-      class="message-data-table-scroll message-comparison-table-scroll"
-      aria-label={t("chat.table.comparison")}
-      tabindex="0"
+    <ScrollEdges
+      axis="x"
+      class="message-table-frame"
+      viewClass="message-data-table-scroll message-comparison-table-scroll"
+      label={t("chat.table.comparison")}
     >
       <table
         class="message-data-table message-comparison-table"
         style={`--message-data-table-columns: ${props.table.headers.length}`}
+        data-selection-message-id={props.selectionMessageId}
         dir={firstTextDirection([...props.table.headers, ...props.table.rows.flat()])}
       >
         <thead>
@@ -46,6 +53,6 @@ export function ComparisonTable(props: { table: ComparisonTableBlock; renderCell
           </For>
         </tbody>
       </table>
-    </section>
+    </ScrollEdges>
   );
 }

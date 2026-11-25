@@ -16,8 +16,13 @@ Invitations use the existing Add remote server dialog.
 The conversation accepts an explicit `ConversationRuntime`. Desktop calls still use preload;
 the web adapter uses the authenticated host connection. Browser drafts remain in memory.
 Native-only actions are hidden. Remote browser transport uses the shared desktop browser
-panel through an explicit runtime. Small screens switch between the existing conversation
-and workspace panes. Desktop layout remains unchanged. Browser ownership and stream recovery
+panel through an explicit runtime. On a phone (touch pointer, and a narrow screen or a landscape
+height), the client first shows `WebPhoneAppScreen`, which links to the phone app in the App Store
+and Google Play. A link or a return in the address (invitation, plugin, billing, sign-in) skips
+that screen, because the client removes the link from the address when it reads it. After
+"Continue in browser", which the browser keeps, small screens switch between the existing
+conversation and workspace panes. That phone layout is kept, not extended. Desktop layout remains
+unchanged. Browser ownership and stream recovery
 still require the release checks below.
 
 ## Review scopes
@@ -46,7 +51,7 @@ mock. The separate web preview implements the browser runtime with that same moc
   session start/ticket/end, invitation preview/accept and email, host member and invite
   administration, and the account's display name, avatar, and session list/revoke
   (`v1/me/profile`, `v1/me/avatar`, `v1/me/sessions`), and billing (`v1/me/billing`,
-  `v1/me/billing/portal`), and hosted servers (`v2/hosting/servers` list and create with
+  `v1/me/billing/portal`, `v1/me/billing/storage`), and hosted servers (`v2/hosting/servers` list and create with
   `{name, plan, interval, currency}`, `v2/hosting/plans`, `v2/hosting/servers/:id` delete, and
   `v2/hosting/servers/:id/wake`, `/restart`, `/status`, `/lifecycle` and `/checkout`), and the
   account's hosted site list/delete
@@ -106,8 +111,8 @@ mock. The separate web preview implements the browser runtime with that same moc
   serves `agent-publish-v1`; the host publishes with its own account. A plugin app
   that needs a browser sign-in is installed on the host computer, as for a desktop remote admin.
 - Join, marketplace, shared agent, server settings, global search and channel creation use the
-  shared views in `src/renderer/src/WorkspaceOverlayViews.tsx`, as desktop does. An open overlay or
-  toast suspends the browser view, as on desktop.
+  shared views in `src/renderer/src/WorkspaceOverlayViews.tsx`, as desktop does. An open overlay
+  suspends the browser view, as on desktop. A toast does not.
 - `/app` accepts three links: `?agent=<id>` from a shared agent page, the four invitation fields from
   the `/join` page, and `?plugin=<slug>` from a plugin page. The client removes the fields after it
   reads them, so the invitation secret does not stay in the address bar or history. A link opens the
@@ -140,10 +145,11 @@ mock. The separate web preview implements the browser runtime with that same moc
   the HTML file (8 MB or less, HTML type on the attachment and the file) and the frame shows it as
   `srcdoc`, with the same `allow-scripts allow-forms` sandbox as desktop and never
   `allow-same-origin`. The page has an opaque origin and cannot read the web client's storage or
-  host keys. The last 8 pages stay in memory. The frame inherits the `/app` CSP, so a `script-src`
-  or `default-src` there would stop every page. Differences from desktop: a relative URL in the
-  page resolves to the `/app` origin, and the browser blocks `http:` and private-network loads from
-  the page.
+  host keys. At most 4 pages download at the same time for each host connection, because the web
+  client accepts at most 10 open file transfers from the host. The last 8 pages stay in memory. The
+  frame inherits the `/app` CSP, so a `script-src` or `default-src` there would stop every page.
+  Differences from desktop: a relative URL in the page resolves to the `/app` origin, and the
+  browser blocks `http:` and private-network loads from the page.
 - Pinned agents and channels and collapsed sections are kept in local storage for each account and
   host, with the same storage modules as desktop. Only ids are stored. Pins do not delete
   conversations. Notification changes use the host's existing settings and include
@@ -176,11 +182,6 @@ mock. The separate web preview implements the browser runtime with that same moc
   another origin through CDP (`DOM.describeNode` on the focused frame element gives its frame ID,
   and a frame in another process is a target of its own). An `email` or `number` input has no
   selection to read, so copy gets no text there; paste works.
-- The sidebar's Agents and Routines switch shows when the host serves `routine-flows-v1`. The Routines
-  view hides channels and shows the open agent's routine canvas, as on desktop: links, node positions,
-  task edits, Run now, a new agent from the right-click menu, and the chat panel that asks the agent
-  to edit the canvas. Webhook config and webhook routine changes need an owner or admin with
-  `events-v1`. On a phone the canvas takes the chat pane, and the pane button reads Routines.
 - No full remote desktop, push notifications, or offline operation is included. See
   [Remote desktop](#remote-desktop) for the reason.
 - These stay desktop only: the application Settings page (permissions, app updates),

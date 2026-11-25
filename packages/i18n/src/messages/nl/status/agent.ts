@@ -8,9 +8,15 @@ export const messages = {
   "status.agent.instructionsChanged": "Heeft zijn instructies bijgewerkt",
   "status.agent.modelSwitchedForLimit": "Gebruikslimiet bereikt. Overgeschakeld naar {model}.",
   "status.agent.modelReturnedAfterLimit": "Gebruikslimiet voorbij. Teruggeschakeld naar {model}.",
+  "status.agent.routineSkippedRunOpen": "Overgeslagen: de vorige uitvoering was nog niet klaar",
+  "status.agent.routineSkippedUsageLimit": "Overgeslagen: gebruikslimiet bereikt",
   "status.agent.modelSwitchedForError": "Fout bij de aanbieder. Overgeschakeld naar {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} is niet meer beschikbaar. Overgeschakeld naar {model}.",
   "status.agent.marketplaceSuggested": "Een app uit de marktplaats voorgesteld: {app}.",
+  "status.agent.settingShown": "Een instelling getoond: {setting}.",
   "status.agent.channelMemberAdded": "{agent} heeft {member} aan het kanaal toegevoegd. {person} vroeg erom.",
   "status.agent.channelMemberRemoved": "{agent} heeft {member} uit het kanaal verwijderd. {person} vroeg erom.",
   "status.agent.channelInstructionsChanged": "{agent} heeft de kanaalinstructies gewijzigd. {person} vroeg erom.",
@@ -22,6 +28,7 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Het hoofdscherm vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureChannel":
     "De afbeelding verschijnt in het kanaal {channel}, en elk lid van deze server dat het kanaal leest, kan haar zien.",
+  "status.agent.screenCapturePermissionNext": "macOS kan je daarna vragen om schermopname toe te staan voor OpenBot.",
   "status.agent.screenCaptureDisplay":
     "Het beeldscherm {name} vastleggen en de afbeelding naar het model van de agent sturen.",
   "status.agent.screenCaptureWindow":
@@ -32,15 +39,32 @@ export const messages = {
     "De opgeslagen kaart {card} invullen op {site}. Na je goedkeuring kunnen agents deze kaart op deze site invullen zonder goedkeuring. Verwijder de site in Serverinstellingen > Kluis.",
   "status.agent.reportProblem":
     "Dit wordt een openbare GitHub-issue, met de appversie en je systeem. Je naam is niet zichtbaar.",
+  "status.agent.reportPhoneProblem":
+    "Dit wordt een openbare GitHub-issue, met de appversie, je systeem en de versie, het systeem en het ondersteuningslog van je telefoon. Je naam is niet zichtbaar.",
   "status.agent.sendIdea": "Dit wordt een openbaar GitHub-issue. Je naam wordt niet getoond.",
   "status.agent.feedbackRecentErrors": "Recente fouten in de chat:",
   "status.agent.feedbackSameAs": "Wordt toegevoegd aan issue #{issue}",
   "status.agent.feedbackSent": "Naar het OpenBot-team gestuurd: {title}",
+  "status.agent.feedbackWithdrawn": "Verwijderd van GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Melding #{issue} van GitHub verwijderen",
+  "status.agent.feedbackWithdrawReason":
+    "Niemand kan deze melding nog op GitHub zien. Je kunt dit niet ongedaan maken. Om de melding te verbeteren, kan de agent een verbeterde melding sturen.",
+  "status.agent.feedbackWithdrawing": "Je melding wordt van GitHub verwijderd…",
   "status.agent.serverInstallCommand":
     "Een eenmalige opdracht maken die OpenBot op een andere computer installeert als de server {name} en die aanmeldt bij je account. De agent voert hem daar uit.",
   "status.agent.serverInstallCard": "Installatieopdracht voor de server {name}",
+  "status.agent.browserProfileNamed":
+    "Verplaats {agents} naar het browserprofiel {profile}. Ze krijgen de aanmeldingen en cookies ervan. Hun open tabbladen sluiten.",
+  "status.agent.commitCoAuthorOff": "Stop met OpenBot als co-auteur toevoegen aan de commits van alle agenten.",
+  "status.agent.commitCoAuthorOn": "Voeg OpenBot weer als co-auteur toe aan de commits van alle agenten.",
+  "status.agent.browserProfileNew":
+    "Maak het nieuwe browserprofiel {profile} en verplaats {agents} ernaartoe. Het heeft geen aanmeldingen. Hun open tabbladen sluiten.",
+  "status.agent.browserProfileShared":
+    "Verplaats {agents} naar het gedeelde browserprofiel. Ze krijgen de aanmeldingen en cookies ervan. Hun open tabbladen sluiten.",
+  "status.agent.browserProfileOwn": "Geef {agents} elk een eigen browserprofiel. Hun open tabbladen sluiten.",
   "status.agent.feedbackSending": "Je feedback wordt naar het OpenBot-team gestuurd…",
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
+  "status.agent.deleteAgents": "Verwijder {agents} met hun chats en bestanden. Je kunt dit niet ongedaan maken.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
   "status.agent.screenCaptureProgress": "Vraagt om het scherm vast te leggen…",
   "status.agent.screenCaptureReviewing": "Bekijkt de schermopname…",
@@ -51,12 +75,14 @@ export const messages = {
   "status.agent.browserActing": "Gebruikt de webpagina…",
   "status.agent.browserReviewing": "Bekijkt de webpagina…",
   "status.agent.memoriesSearching": "Doorzoekt de herinneringen…",
+  "status.agent.chatsSearching": "Doorzoekt eerdere chats…",
   "status.agent.memoriesSearched": {
     one: "Herinneringen doorzocht: {count} gevonden",
     other: "Herinneringen doorzocht: {count} gevonden",
   },
   "status.agent.memoriesUpdating": "Werkt de herinneringen bij…",
   "status.agent.skillUsing": "Gebruikt de vaardigheid {name}…",
+  "status.agent.backdropSetting": "Achtergrond wordt gewijzigd…",
   "status.agent.skillReading": "Leest een vaardigheid…",
   "status.agent.toolStepFailed":
     "Een toolstap is mislukt; het resultaat wordt bekeken en bepaald wat ik daarna probeer…",
@@ -93,10 +119,14 @@ export const messages = {
     "De MCP-server {name} toevoegen: {target}. Elke agent op deze server krijgt de tools ervan. OpenBot maakt verbinding om hem te testen.",
   "status.agent.mcpServerChange":
     "De MCP-server {name} wijzigen naar {target}. Elke agent op deze server krijgt de tools ervan. OpenBot maakt verbinding om hem te testen.",
+  "status.agent.mcpServerHeaders": "Het wijzigt ook deze headers: {names}.",
   "status.agent.mcpServerEnable": "De MCP-server {name} aanzetten voor elke agent op deze server.",
   "status.agent.mcpServerDisable": "De MCP-server {name} uitzetten voor elke agent op deze server.",
   "status.agent.mcpServerRemove": "De MCP-server {name} en de inlog ervan verwijderen bij elke agent op deze server.",
-  "status.agent.mcpSignInRequested": "De MCP-server {name} vraagt om in te loggen. Log in via Serverinstellingen, MCP.",
+  "status.agent.mcpToolCall": "De tool {tool} van de MCP-server {name} uitvoeren.",
+  "status.agent.mcpSignInRequested":
+    "De MCP-server {name} vraagt om in te loggen. Log in via Marktplaats, Apps, {name}.",
+  "status.agent.uiBlockClosedByMessage": "Gesloten door een nieuw bericht",
   "status.agent.vaultAdded": "Opgeslagen in de Kluis: {name}",
   "status.agent.vaultUpdated": "Gewijzigd in de Kluis: {name}",
   "status.agent.vaultDeleted": "Verwijderd uit de Kluis: {name}",
@@ -124,7 +154,15 @@ export const messages = {
   "status.agent.vaultField.email": "E-mailadres",
   "status.agent.nextStepContinues": "De agent stopte vóór de volgende stap en gaat verder ({current} van {limit}).",
   "status.agent.planContinues": "Het plan heeft open stappen. De agent gaat verder ({current} van {limit}).",
+  "status.agent.planStopped": "De agent is gestopt met open stappen in het plan. Stuur een bericht om verder te gaan.",
+  "status.agent.continuationLimitReached":
+    "De agent is gestopt voordat de aanvraag klaar was. Hij kan niet nog een keer zelf verdergaan. Stuur een bericht om verder te gaan.",
   "status.agent.compactionContinues":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde. De agent gaat verder.",
+  "status.agent.providerExitContinues": "De agent stopte voordat zijn antwoord klaar was. De agent gaat verder.",
   "status.agent.branchTitle": "Afgetakte chat",
+  "status.agent.location.field": "Je locatie",
+  "status.agent.location.placeholder": "Stad, adres of plaats",
+  "status.agent.location.submit": "Delen",
+  "status.agent.location.shared": "Locatie gedeeld",
 } as const satisfies PartialTranslation<typeof source>;

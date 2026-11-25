@@ -1,6 +1,3 @@
-// Shared steps of the channel E2E scripts. Each script drives this worktree's running dev app
-// (`bun run dev`, never `--shared`) through the real preload bridge, so it changes the data of the
-// profile. It makes its own channels and deletes them at the end; it does not touch other channels.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -32,7 +29,6 @@ declare global {
 }
 
 export const WAIT_MS = 180_000;
-// Long enough that a turn still runs while a script checks the other lanes, also on a fast model.
 export const LONG_PROMPT = "Write a numbered list of 300 short facts about rivers, one per line. Do not use tools.";
 export const SHORT_PROMPT = "Reply with the single word ready. Do not use tools.";
 
@@ -45,7 +41,6 @@ export interface ChannelE2e {
   close: () => Promise<void>;
 }
 
-/** Connects to the one dev app of this worktree, after the mutation gate. */
 export async function connectChannelE2e(command: string): Promise<ChannelE2e> {
   const instances = readDevInstanceRecords().filter(
     (record) => record.service === "app" && resolve(record.projectRoot) === resolve(process.cwd()),
@@ -74,7 +69,6 @@ export function writeReport(name: string, report: unknown): string {
   return path;
 }
 
-/** Reads `read` again until `ready` accepts it. The app pushes no event to a script. */
 export async function waitFor<T>(
   page: Page,
   label: string,
@@ -97,7 +91,6 @@ export class ChannelClient {
   readonly chatted = new Set<string>();
   constructor(readonly page: Page) {}
 
-  /** The visible agents on a provider that this OpenBot knows. */
   async agents(): Promise<AgentSummary[]> {
     const agents = await this.page.evaluate(() => window.openbot.agent.listAgents());
     return agents.filter((agent): agent is AgentSummary => isAgentProvider(agent.provider));
@@ -180,7 +173,6 @@ export class ChannelClient {
     return this.page.evaluate((input) => window.openbot.agent.updateAgent(input), { agentId, ...change });
   }
 
-  /** Stops the running turn of the agent's own chat. */
   async stopOwnChat(agentId: string): Promise<void> {
     const snapshot = await this.queue(agentId).catch(() => null);
     for (const delivery of snapshot?.deliveries ?? [])
@@ -190,10 +182,6 @@ export class ChannelClient {
           .catch(() => undefined);
   }
 
-  /**
-   * Stops the own-chat turns this script started, and the open tasks of the channels it made. Then
-   * archives and deletes those channels.
-   */
   async cleanup(): Promise<void> {
     for (const agentId of this.chatted) await this.stopOwnChat(agentId);
     for (const channelId of this.created) {
@@ -207,15 +195,10 @@ export class ChannelClient {
   }
 }
 
-/** Is any delivery of this queue starting or running? */
 export function queueBusy(snapshot: QueueSnapshot): boolean {
   return snapshot.deliveries.some((delivery) => delivery.status === "starting" || delivery.status === "running");
 }
 
-/**
- * The advertised capabilities of the dev app's Team API host. The host takes a free loopback port at
- * start and no record names it, so this asks each port that the app's processes listen on.
- */
 export async function hostCapabilities(instance: DevInstanceRecord): Promise<string[]> {
   const children = execFileSync("pgrep", ["-P", String(instance.pid)], { encoding: "utf8" })
     .split("\n")

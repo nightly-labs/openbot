@@ -1,9 +1,3 @@
-/**
- * View and Undo on the chat line that says the agent changed its instructions. View opens the
- * Instructions page in the agent settings. Undo puts back the text from before the turn, but only while the file still has the
- * agent's text: the save sends that text, so main refuses it after a later change.
- */
-
 import type { AgentInstructionsChange } from "@openbot/contracts/ipc";
 import { Button, FileText, MarkerIcon, Undo2 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -14,32 +8,29 @@ import type { AgentInstructionsFileCalls } from "./AgentInstructionsView";
 export function InstructionsChangeActions(props: {
   agentId: string;
   change: AgentInstructionsChange | null;
-  calls: AgentInstructionsFileCalls;
-  /** Absent where the chat has no settings page for the agent. View then does not show. */
+  calls?: AgentInstructionsFileCalls | undefined;
   onView?: ((agentId: string) => void) | undefined;
 }): JSX.Element {
   const { t, errorMessage } = useText();
-  /** The file text now, or null before the first read. */
   const [current, setCurrent] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   let closed = false;
-  /** A read that ends after a save, or after a later read, does not replace the newer text. */
   let request = 0;
 
-  async function refresh(): Promise<void> {
+  async function refresh(calls: AgentInstructionsFileCalls): Promise<void> {
     const mine = ++request;
     try {
-      const file = await props.calls.read(props.agentId);
+      const file = await calls.read(props.agentId);
       if (!closed && mine === request) setCurrent(file.text);
-    } catch {
-      // Undo stays hidden. View still opens the page, which shows its own read error.
-    }
+    } catch {}
   }
 
   onSettled(() => {
-    void refresh();
-    const stop = props.calls.watch((agentId, file) => {
+    const calls = props.calls;
+    if (!calls) return;
+    void refresh(calls);
+    const stop = calls.watch((agentId, file) => {
       if (agentId !== props.agentId) return;
       ++request;
       setCurrent(file.text);
@@ -51,15 +42,16 @@ export function InstructionsChangeActions(props: {
   });
 
   async function undo(change: AgentInstructionsChange): Promise<void> {
-    if (busy()) return;
+    const calls = props.calls;
+    if (busy() || !calls) return;
     setBusy(true);
     setError(null);
     try {
-      await props.calls.save(props.agentId, change.before, change.after);
+      await calls.save(props.agentId, change.before, change.after);
     } catch (failure) {
       if (closed) return;
       setError(errorMessage(failure, t("error.agent.instructionsSaveFailed")));
-      await refresh();
+      await refresh(calls);
     } finally {
       if (!closed) setBusy(false);
     }

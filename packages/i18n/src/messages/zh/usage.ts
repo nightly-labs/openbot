@@ -9,6 +9,7 @@ export const messages = {
   "usage.period.days90": "90 天",
   "usage.period.year": "1 年",
   "usage.unavailable": "不可用",
+  "usage.noCostEstimate": "无费用估算",
   "usage.exactCost": "{amount} USD",
   "usage.tokensAmount": "{tokens} 个 token",
   "usage.chart.costDescription": "按服务商统计的每日预估费用（USD）。点“查看每日数据”可看到精确值。",

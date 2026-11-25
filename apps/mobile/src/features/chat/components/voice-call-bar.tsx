@@ -16,17 +16,10 @@ import type { ComposerVoice } from "./composer-voice";
 import { VoiceAurora } from "./voice-aurora";
 
 const VOICE_BAR_AVATAR_SIZE = 40;
-/** The bar is as tall as the round voice button of dictation. */
 const VOICE_BUTTON_HEIGHT = 64;
 const BUTTON_SIZE = 40;
-/** The content rises this far into place while it fades in, after the card has its shape. */
 const CONTENT_RISE = 6;
 
-/**
- * The agent of the call bar. It stays mounted when another channel member takes over, so the plush
- * of the old agent shrinks away and the new one pops out, as in the agent editor, instead of one
- * avatar replacing the other. It runs on the UI thread.
- */
 export function VoiceAgentAvatar({
   agentId,
   serverId,
@@ -38,7 +31,6 @@ export function VoiceAgentAvatar({
   serverId: string;
   seed: string;
   hue: AvatarHue | null;
-  /** The agent's `avatarColor`. It wins over `hue`. */
   color: AvatarColor | null;
 }) {
   const activity = useAgentActivity(agentId);
@@ -66,7 +58,6 @@ function BarButton({
   children,
 }: {
   label: string;
-  /** The colour of the round button. Null draws it in the bar's text colour, faintly. */
   tint: string | null;
   background: string;
   disabled?: boolean;
@@ -104,14 +95,6 @@ function BarButton({
   );
 }
 
-/**
- * The composer as a call bar while a live conversation is open: the agent, what the conversation
- * does and the words heard or read, and Interrupt, Mute and End. It is drawn inside the composer card,
- * which closes to the bar's shape, so the composer turns into the bar and keeps its surface: Liquid
- * Glass on iOS, else the composer's own colour. The agent's aurora glows inside the bar and follows
- * the voice. Every motion runs on the UI thread: the content follows the card's own `presence`, and
- * the aurora draws from the voice level in a frame callback.
- */
 export function VoiceCallBar({
   voice,
   bar,
@@ -123,7 +106,6 @@ export function VoiceCallBar({
   bar: NonNullable<ComposerVoice["bar"]>;
   avatar?: ReactNode;
   palette?: VoicePalette;
-  /** The agent's colour for End, and the glyph colour on it. Without it End looks like Mute and Stop. */
   accent?: { fill: string; glyph: string };
 }) {
   const text = String(useThemeColor("foreground"));
@@ -133,7 +115,6 @@ export function VoiceCallBar({
     const shown = interpolate(presence.get(), [0.5, 1], [0, 1], Extrapolation.CLAMP);
     return { opacity: shown, transform: [{ translateY: (1 - shown) * CONTENT_RISE }] };
   });
-  // Interrupt shows while the agent thinks or speaks.
   const replying = voice.trailing.enabled;
   return (
     <View

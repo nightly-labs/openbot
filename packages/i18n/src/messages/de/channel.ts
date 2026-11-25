@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "Die Mitglieder haben diese Aufgabe zu oft untereinander weitergegeben. Sie wurde gestoppt, um eine Schleife zu verhindern.",
   "channel.conversation.noMembers": "Füge in den Kanaleinstellungen Agenten hinzu, um mit der Arbeit zu beginnen.",
+  "channel.conversation.waitFull": "Wartet – {name} beginnt, wenn eine laufende Aufgabe endet",
   "channel.conversation.archivedNotice": "Gelöschter Kanal. Nur Vorschau.",
   "channel.composer.label": "Nachricht an den Kanal",
   "channel.composer.placeholder": "Nachricht an {name}",
@@ -21,6 +22,11 @@ export const messages = {
   "channel.panel.close": "Kanalbereich schließen",
   "channel.settings.title": "Kanaleinstellungen",
   "channel.settings.memories": "Erinnerungen",
+  "channel.settings.folders.title": "Ordner",
+  "channel.settings.folders.description":
+    "Alle Mitglieder von {channel} können in diesen Ordnern Dateien ändern und Befehle ausführen.",
+  "channel.settings.folders.toastAdded": "Mitglieder von {channel} können jetzt Dateien in {folder} ändern",
+  "channel.settings.folders.toastRemoved": "Mitglieder von {channel} können Dateien in {folder} nicht mehr ändern",
   "channel.settings.isolated": "Erinnerungen in diesem Kanal behalten",
   "channel.settings.isolatedDescription":
     "Agenten speichern, was sie hier lernen, als Kanalerinnerungen. Ihre anderen Chats sehen sie nicht.",

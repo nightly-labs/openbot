@@ -7,6 +7,8 @@ export const messages = {
   "queue.attachment": "Bijlage",
   "queue.hold.named": "Wachten - {name} is bezig in {channel}",
   "queue.hold.unnamed": "Wachten - deze agent is bezig in {channel}",
+  "queue.hold.providerRestart": "Wachten - {provider} herstart wanneer de lopende taken klaar zijn",
+  "queue.hold.signIn": "Wacht – {provider} moet worden aangemeld",
   "queue.item.label": "Bericht in wachtrij {position}: {preview}",
   "queue.item.labelEditing": "Bericht in wachtrij {position}, wordt bewerkt: {preview}",
   "queue.item.editing": "Bewerken",

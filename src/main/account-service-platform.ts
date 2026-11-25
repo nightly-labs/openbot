@@ -1,5 +1,5 @@
+import { sourceText } from "@openbot/i18n/source";
 import { Context, Effect, Layer, Schema } from "effect";
-import { causeHelpers } from "../backend/effect-boundary";
 import type { CentralAuthOperationError } from "./central-auth-effects";
 
 export interface AccountRequestClient {
@@ -15,13 +15,33 @@ class AccountRequestFailure extends Schema.TaggedError<AccountRequestFailure>()(
   cause: Schema.Defect(),
 }) {}
 
-const { rewrap: toAccountRequestFailure } = causeHelpers(AccountRequestFailure);
+class AccountServiceTimeoutError extends Error {
+  readonly reference = "auth/timeout";
+}
+
+function isRequestTimeout(cause: unknown): boolean {
+  return cause instanceof DOMException && cause.name === "TimeoutError";
+}
+
+function toAccountRequestFailure<A, R>(
+  request: Effect.Effect<A, { readonly cause: unknown }, R>,
+): Effect.Effect<A, AccountRequestFailure, R> {
+  return Effect.mapError(
+    request,
+    ({ cause }) =>
+      new AccountRequestFailure({
+        cause: isRequestTimeout(cause)
+          ? new AccountServiceTimeoutError(sourceText("error.auth.serviceTimeout"), { cause })
+          : cause,
+      }),
+  );
+}
+
 class AccountPageFailure extends Schema.TaggedError<AccountPageFailure>()("AccountPageFailure", {
   cause: Schema.Defect(),
 }) {}
 export type AccountServiceFailure = AccountRequestFailure | AccountPageFailure;
 
-/** Desktop account services share these injected I/O boundaries, including test implementations. */
 export class AccountServicePlatform extends Context.Service<
   AccountServicePlatform,
   {

@@ -4,7 +4,6 @@ import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import {
   ComposerCompactionNotice,
-  ComposerNewChatButton,
   ContextCompactionMarker,
   type ContextCompactionView,
   ContextUsageMeter,
@@ -15,18 +14,6 @@ import { createSignal, For, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENT, STORY_AGENTS } from "./fixtures";
-
-/*
- * Context usage for an agent's provider thread. The data differs by provider:
- *
- * - Codex reports `tokenUsage.last.totalTokens` and `modelContextWindow`. OpenBot already asks Codex
- *   to compact at 80% (`context-compaction.ts`) and holds the queue until it ends.
- * - Claude supplies local context estimates and native compaction events. Its compacted-message
- *   count excludes system/tools, so it cannot supply a full-context before/after comparison.
- * - ACP agents can send `usage_update` (`used`, `size`) and `compaction` updates, both unstable in
- *   the protocol. An agent that sends neither shows no ring. Gemini (Antigravity) sends
- *   `usage_update` only; OpenBot compacts it by starting a new session from the history handoff.
- */
 
 const MINUTE = 60_000;
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * MINUTE).toISOString();
@@ -70,9 +57,7 @@ const ACP_NO_SUMMARY: ContextUsageView = {
   compacting: false,
 };
 
-/** The composer's toolbar row: the ring sits with the voice and send controls, away from "+". */
 function ComposerToolbar(props: {
-  /** Undefined until the provider reports usage: the toolbar then shows only the New chat button. */
   usage: ContextUsageView | undefined;
   onStartNewChat?: (() => Promise<void>) | undefined;
   onCompact?: (() => Promise<void>) | undefined;
@@ -83,14 +68,7 @@ function ComposerToolbar(props: {
         <Plus aria-hidden="true" />
       </Button>
       <div class="composer-primary-actions">
-        <Show
-          when={props.usage}
-          fallback={
-            <Show when={props.onStartNewChat}>
-              {(start) => <ComposerNewChatButton agent={STORY_AGENT} start={start()} />}
-            </Show>
-          }
-        >
+        <Show when={props.usage}>
           {(usage) => (
             <ContextUsageMeter
               usage={usage()}
@@ -159,12 +137,10 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Open the ring to see the popover. The args drive one composer. */
 export const Playground: Story = {
   render: (args) => <Composer usage={args.usage} />,
 };
 
-/** The ring through a thread's life: quiet, visible, near the compaction point, compacting, and full. */
 export const RingStates: Story = {
   render: () => (
     <div style={{ display: "grid", gap: "20px" }}>
@@ -187,22 +163,16 @@ export const RingStates: Story = {
   ),
 };
 
-/** Claude reports an estimate and what fills it. It compacts on its own near 92%. */
 export const ClaudeEstimate: Story = {
   args: { usage: CLAUDE },
   render: (args) => <Composer usage={args.usage} />,
 };
 
-/** Codex reports one total. OpenBot compacts at 80% and remembers the last result. */
 export const CodexTotal: Story = {
   args: { usage: { ...CODEX, usedTokens: 206_700 } },
   render: (args) => <Composer usage={args.usage} />,
 };
 
-/**
- * A local agent: the popover ends with a New chat row. The second ring shows a failed start. Before
- * the provider reports usage, such as after a restart, the toolbar shows a New chat button.
- */
 export const NewChat: Story = {
   args: { usage: { ...CODEX, usedTokens: 206_700 } },
   render: (args) => (
@@ -213,14 +183,10 @@ export const NewChat: Story = {
       <Row label="The agent is busy">
         <Composer usage={args.usage} onStartNewChat={() => Promise.reject(new Error("The agent is busy."))} />
       </Row>
-      <Row label="No usage reported yet">
-        <Composer usage={undefined} onStartNewChat={() => new Promise((resolve) => setTimeout(resolve, 1500))} />
-      </Row>
     </div>
   ),
 };
 
-/** Gemini reports a total only. The popover offers Compact now; the second ring shows a refusal. */
 export const CompactNow: Story = {
   args: { usage: GEMINI },
   render: (args) => (
@@ -243,7 +209,6 @@ export const CompactNow: Story = {
   ),
 };
 
-/** An ACP agent that reports usage but cannot compact: the ring turns red near full. */
 export const NoSummary: Story = {
   args: { usage: ACP_NO_SUMMARY },
   render: (args) => <Composer usage={args.usage} />,
@@ -251,7 +216,6 @@ export const NoSummary: Story = {
 
 const COMPACTING: ContextUsageView = { ...CODEX, usedTokens: 219_000, compacting: true };
 
-/** While the provider compacts, the notice above the input says why the queue does not move. */
 export const CompactingNotice: Story = {
   render: () => {
     const startedAt = Date.now();
@@ -291,10 +255,6 @@ export const CompactingNotice: Story = {
   },
 };
 
-/**
- * The whole cycle: press the button. The fake provider ends after 6 s, against a 5 s estimate, and
- * the finished notice goes away 2 s later.
- */
 export const CompactionCycle: Story = {
   render: () => {
     const [startedAt, setStartedAt] = createSignal<number | null>(null);
@@ -346,9 +306,22 @@ const MARKERS: { label: string; compaction: ContextCompactionView }[] = [
     label: "Failed or timed out",
     compaction: { status: "failed", timestamp: minutesAgo(5), beforeTokens: 221_400 },
   },
+  {
+    label: "Before the prompt cache expires",
+    compaction: { status: "running", timestamp: minutesAgo(0), beforeTokens: 611_000, reason: "cacheExpiry" },
+  },
+  {
+    label: "Compacted before the prompt cache expired",
+    compaction: {
+      status: "completed",
+      timestamp: minutesAgo(1),
+      beforeTokens: 611_000,
+      afterTokens: 19_400,
+      reason: "cacheExpiry",
+    },
+  },
 ];
 
-/** The conversation row for each state. It replaces the silent queue hold that Codex has today. */
 export const CompactionMarkers: Story = {
   parameters: { layout: "padded" },
   render: () => (
@@ -373,7 +346,6 @@ const message = (id: string, author: "you" | "agent", body: string): AgentMessag
   time: "9:12 AM",
 });
 
-/** How the pieces sit together: a compaction row in the thread, and the ring after it drops. */
 export const InConversation: Story = {
   parameters: { layout: "fullscreen" },
   render: () => (

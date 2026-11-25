@@ -1,10 +1,3 @@
-// Frozen optional agent-admin-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: an owner or admin of a
-// server can read and change how far each agent reaches on the host (`access`) and whether the
-// host answers that agent's approvals by itself (`autoApprove`). A member cannot use either route;
-// `requireAdmin` on the host is the only gate. Turbo mode stays on the host: the client reads it as
-// `autoApproveLocked` and cannot change it. Widening any of it needs a second capability string.
 import {
   type AdminDecoder,
   adminRoute,

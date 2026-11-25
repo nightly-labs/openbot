@@ -1,16 +1,3 @@
-// Frozen optional agent-threads-v1 wire contract.
-//
-// What it grants, recorded here because freezing it makes it permanent: a signed-in member who can
-// send a message to an agent can also rename and delete its side threads. A side thread is a task of
-// `agent-tasks-v1`, and its id is the same task id. A host that grants this also grants
-// `agent-tasks-v1`; the list, read, start, send, stop, archive (close) and restore (reopen) routes stay
-// there. The host does not ask for a role, as for `agent-tasks-v1`. A hidden agent, or an agent that
-// the peer cannot see, is not found (404). A rename is one line of 1 to 120 characters after trim, and
-// the title then no longer follows the first message. A delete removes the thread, its conversation,
-// its attachments and its queued messages for good; the host refuses it while a turn of that thread
-// runs. The agent's own chat is not a task, so neither route can name it. Every route is a POST with
-// its ids in the body. The host sends `agent-tasks-changed` after each change. Bounds and meaning do
-// not follow IPC changes; widening any of it needs a second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import { type AdminDecoder, adminRoute, empty, fields, identifier, type OptionalRouteCodec } from "./admin-wire";
 

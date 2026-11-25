@@ -48,6 +48,7 @@ export const messages = {
     other: "Puoi aggiungere al massimo {count} cartelle",
   },
   "agentSettings.folders.browse.places": "Vai a",
+  "agentSettings.folders.browse.path": "Percorso della cartella",
   "agentSettings.folders.browse.home": "Cartella Inizio",
   "agentSettings.folders.browse.parent": "Su a {folder}",
   "agentSettings.folders.browse.failed": "Impossibile aprire questa cartella.",
@@ -94,6 +95,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Limite di utilizzo raggiunto · saltato",
   "agentSettings.backupModels.unavailable": "Non disponibile ora · saltato",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "agentSettings.groups.brain": "Cervello",
@@ -150,8 +152,6 @@ export const messages = {
   "agentSettings.runtime.accessLabel": "Accesso dell'agente",
   "agentSettings.runtime.busyMessage": "Durante il lavoro",
   "agentSettings.runtime.busyMessageLabel": "Messaggi mentre l'agente lavora",
-  "agentSettings.runtime.taskLimit": "Thread in parallelo",
-  "agentSettings.runtime.taskLimitLabel": "Thread eseguiti contemporaneamente",
   "agentSettings.runtime.workingDirectory": "Cartella di lavoro",
   "agentSettings.runtime.notAvailable": "Non ancora disponibile",
   "agentSettings.runtime.fullAccessNote":
@@ -171,9 +171,6 @@ export const messages = {
   "agentSettings.busyMessage.steer": "Indirizza",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} non può indirizzare un turno in corso. I messaggi inviati mentre lavora restano in coda.",
-  "agentSettings.taskLimit.default": "Predefinito ({count})",
-  "agentSettings.taskLimit.oneTurn":
-    "{provider} esegue un turno alla volta. I thread di questo agente si aspettano a vicenda.",
 
   "agentSettings.notificationLevel.title": "Avvisami",
   "agentSettings.notificationLevel.server": "Predefinita del server ({level})",
@@ -181,13 +178,15 @@ export const messages = {
     "Questa scelta vale solo per te, su tutti i tuoi dispositivi. Se il server è silenziato o impostato su «Niente», anche questo agente resta in silenzio.",
 
   "agentSettings.newChat.title": "Nuova chat",
-  "agentSettings.newChat.description": "L'agente dimentica questa chat. La sua configurazione resta.",
+  "agentSettings.newChat.description":
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. La sua configurazione resta.",
   "agentSettings.newChat.button": "Inizia",
   "agentSettings.newChat.confirmTitle": "Iniziare una nuova chat con {name}?",
   "agentSettings.newChat.confirmDescription":
-    "L'agente dimentica questa chat. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
+    "L'agente riparte da zero e può ancora consultare questa chat quando serve. I messaggi restano visibili sopra un divisore. Istruzioni, modello, tool, memorie, workspace e browser non cambiano.",
   "agentSettings.newChat.confirm": "Inizia una nuova chat",
   "agentSettings.newChat.failed": "Impossibile iniziare una nuova chat.",
+  "agentSettings.newChat.busy": "L'agente sta lavorando. Per iniziare una nuova chat, attendi che finisca o fermalo.",
   "agentSettings.deleteHistory.title": "Elimina cronologia",
   "agentSettings.deleteHistory.description":
     "I messaggi di questa chat vengono eliminati e l'agente li dimentica. La sua configurazione resta.",
@@ -197,6 +196,10 @@ export const messages = {
     "Tutti i messaggi e i file di questa chat vengono eliminati da OpenBot e l'agente li dimentica. Non puoi annullare. Thread secondari, istruzioni, modello, strumenti, memorie, spazio di lavoro e browser non cambiano.",
   "agentSettings.deleteHistory.confirm": "Elimina cronologia",
   "agentSettings.deleteHistory.failed": "Impossibile eliminare la cronologia.",
+  "agentSettings.deleteAgent.title": "Elimina agente",
+  "agentSettings.deleteAgent.description":
+    "L’agente, la sua chat, le memorie, le routine e il workspace vengono eliminati da OpenBot.",
+  "agentSettings.deleteAgent.button": "Elimina",
 
   "agentSettings.fullAccess.title": "Dare accesso completo a questo agente?",
   "agentSettings.fullAccess.askTitle": "Far lavorare questo agente fuori dal suo workspace?",
@@ -208,6 +211,8 @@ export const messages = {
   "agentSettings.fullAccess.askConfirm": "Usa Chiedi prima",
 
   "agentSettings.links.usage": "Utilizzo",
+  "agentSettings.links.apps": "App",
+  "agentSettings.links.appsScope": "Tutti gli agenti",
   "agentSettings.links.memories": "Memorie",
   "agentSettings.links.memoriesCount": { one: "{count} salvata", other: "{count} salvate" },
   "agentSettings.links.skills": "Skill",
@@ -234,6 +239,9 @@ export const messages = {
     "L'agente può avviare una nuova chat quando la sua diventa lunga. Prima salva delle note.",
   "agentSettings.quickAcknowledgement.title": "Mostra il piano prima delle attività lunghe",
   "agentSettings.quickAcknowledgement.description": "Prima di un'attività lunga, l'agente mostra il suo piano.",
+  "agentSettings.builtinMemory.title": "Memoria di OpenBot",
+  "agentSettings.builtinMemory.description":
+    "L'agente salva e legge le proprie memorie. Disattiva per usare solo un'app di memoria, come Mem0. Le memorie salvate restano.",
   "agentSettings.browserProfile.label": "Profilo del browser",
   "agentSettings.browserProfile.shared": "Condiviso",
   "agentSettings.browserProfile.agent": "Solo questo agente",
@@ -243,6 +251,8 @@ export const messages = {
   "agentSettings.browserProfile.manageDescription":
     "Ogni profilo mantiene accessi e cookie propri. Una modifica chiude le schede aperte dell'agente.",
   "agentSettings.browserProfile.manage": "Gestisci",
+  "agentSettings.browserProfile.movedNote":
+    "Gli accessi ai siti restano nel profilo precedente. L'agente deve accedere di nuovo a questi siti.",
   "agentSettings.runtime.workspaceEnforcedProcess":
     "L'intero processo di {provider} gira in una sandbox, quindi una scrittura all'esterno non riesce. Disponibile solo su macOS.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -19,7 +19,12 @@ export const messages = {
   "computerUse.ready.title": "Bilgisayar Kullanımı hazır",
   "computerUse.ready.description":
     "OpenBot bu bilgisayardaki uygulamaları görebilir ve onlarla etkileşime girebilir. Bu sistem fazladan izin istemez.",
+  "computerUse.limited.title": "Bilgisayar Kullanımı bu masaüstünde sınırlı",
   "computerUse.openSettingsFailed.title": "Sistem Ayarları açılamadı",
+  "computerUse.restartRequired.title": "Yeniden başlatma gerekli",
+  "computerUse.restartRequired.description":
+    "macOS hâlâ tıklamayı ve yazmayı engelliyor. Yeniden başlattıktan sonra yine olursa OpenBot'u Erişilebilirlik'ten kaldırıp yeniden ekleyin.",
+  "computerUse.restartRequired.action": "OpenBot'u yeniden başlat",
   "computerUse.compact.title": "Bilgisayar Kullanımını etkinleştir",
   "computerUse.compact.description":
     "OpenBot'un bu bilgisayardaki uygulamaları görmesine ve etkileşime girmesine izin verin.",
