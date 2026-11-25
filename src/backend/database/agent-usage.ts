@@ -40,6 +40,7 @@ export interface UsageSample {
   zeroCostUnpriced?: boolean;
 }
 const TOKEN_KEYS = ["uncachedInput", "cachedInput", "cacheCreation", "output"] as const;
+const TIME_ZONE_OFFSET_STEP_MS = 15 * 60 * 1000;
 
 export interface SkillLoadSample {
   agentId: string;
@@ -314,6 +315,7 @@ export class AgentUsage {
               .prepare(`SELECT * FROM ${table} WHERE occurred_at >= ? AND occurred_at < ?`)
               .all(rangeStart, rangeEnd),
       );
+    const dateOf = analyticsDates(input.timeZone);
     const records = readRange("agent_usage_records");
     const activity = readRange("agent_usage_activity");
     const totals = bucket();
@@ -330,7 +332,7 @@ export class AgentUsage {
     let updatedAt: string | null = null;
     const targets = (row: DynamicRecord): { targets: Bucket[]; cell: AnalyticsProviderDay | null } => {
       const occurred = requiredStringColumn(row, "occurred_at");
-      const date = analyticsDate(new Date(occurred), input.timeZone);
+      const date = dateOf(occurred);
       const day = days.get(date);
       if (!day) return { targets: [], cell: null };
       const updated = typeof row.recorded_at === "string" ? row.recorded_at : occurred;
@@ -359,19 +361,23 @@ export class AgentUsage {
     };
     for (const row of records) {
       const tokens = decodeUsageTokens(JSON.parse(requiredStringColumn(row, "tokens_json")));
-      const turn = JSON.stringify([row.agent_id, row.provider, row.session_id, row.turn_id]);
-      const cost = recordCost(row, tokens);
       const scope = targets(row);
+      if (scope.targets.length === 0) continue;
+      const turn = JSON.stringify([row.agent_id, row.provider, row.session_id, row.turn_id]);
+      const session = JSON.stringify([row.agent_id, row.provider, row.session_id]);
+      const cost = recordCost(row, tokens);
+      const reported = TOKEN_KEYS.some((key) => tokens[key] !== null);
+      const incomplete = TOKEN_KEYS.some((key) => tokens[key] === null);
       for (const target of scope.targets) {
-        if (TOKEN_KEYS.some((key) => tokens[key] !== null)) target.usageTurns.add(turn);
-        target.sessions.add(JSON.stringify([row.agent_id, row.provider, row.session_id]));
+        if (reported) target.usageTurns.add(turn);
+        target.sessions.add(session);
         for (const key of TOKEN_KEYS) {
           if (tokens[key] !== null) {
             target.values[key] = (target.values[key] ?? 0) + tokens[key];
             target.values.processedTokens += tokens[key];
           }
         }
-        if (TOKEN_KEYS.some((key) => tokens[key] === null)) target.values.incompleteRecords++;
+        if (incomplete) target.values.incompleteRecords++;
         if (cost !== null) target.values.estimatedCostUsd = (target.values.estimatedCostUsd ?? 0) + cost;
         else target.values.unpricedRecords++;
       }
@@ -383,20 +389,23 @@ export class AgentUsage {
       }
     }
     for (const row of activity) {
-      for (const target of targets(row).targets) {
-        if (row.kind === "turn") {
-          target.turns.add(JSON.stringify([row.agent_id, row.provider, row.session_id, row.turn_id]));
-          target.sessions.add(JSON.stringify([row.agent_id, row.provider, row.session_id]));
-        } else if (row.kind === "user") target.values.userMessages++;
-        else target.values.assistantMessages++;
-      }
+      const scope = targets(row).targets;
+      if (row.kind === "turn") {
+        const turn = JSON.stringify([row.agent_id, row.provider, row.session_id, row.turn_id]);
+        const session = JSON.stringify([row.agent_id, row.provider, row.session_id]);
+        for (const target of scope) {
+          target.turns.add(turn);
+          target.sessions.add(session);
+        }
+      } else if (row.kind === "user") for (const target of scope) target.values.userMessages++;
+      else for (const target of scope) target.values.assistantMessages++;
     }
     const summary = finish(totals);
     const skills = new Map<string, { row: AnalyticsSkill; agents: Set<string> }>();
     let skillTokens = 0;
     for (const row of readRange("agent_usage_skill_loads")) {
       const occurred = requiredStringColumn(row, "occurred_at");
-      if (!days.has(analyticsDate(new Date(occurred), input.timeZone))) continue;
+      if (!days.has(dateOf(occurred))) continue;
       const name = requiredStringColumn(row, "skill");
       let entry = skills.get(name);
       if (!entry) {
@@ -451,6 +460,18 @@ export class AgentUsage {
         .sort((a, b) => b.tokens - a.tokens || b.loads - a.loads || a.skill.localeCompare(b.skill)),
     };
   }
+}
+function analyticsDates(timeZone: string): (occurred: string) => string {
+  const dates = new Map<number, string>();
+  return (occurred) => {
+    const time = Date.parse(occurred);
+    const slot = Math.floor(time / TIME_ZONE_OFFSET_STEP_MS);
+    const known = dates.get(slot);
+    if (known !== undefined) return known;
+    const date = analyticsDate(new Date(time), timeZone);
+    dates.set(slot, date);
+    return date;
+  };
 }
 interface Bucket {
   values: AnalyticsTotals;

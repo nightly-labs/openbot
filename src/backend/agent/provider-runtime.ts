@@ -1983,8 +1983,7 @@ export class ProviderRuntime implements ProviderPort {
 
   #extraModels(provider: AgentProvider, account: ProviderAccountStatus): ProviderAccountStatus {
     if (!account.models) return account;
-    const catalogue = this.#modelCatalog.list().filter((model) => model.provider === provider);
-    const models = account.models.filter((model) => !catalogue.some((listed) => listed.id === model.id));
+    const models = account.models.filter((model) => !this.#modelCatalog.lists(provider, model.id));
     return { ...account, models };
   }
 
