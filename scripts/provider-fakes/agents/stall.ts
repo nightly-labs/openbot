@@ -3,7 +3,7 @@ import { type AcpParams, type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAg
 interface HeldPrompt {
   request: AcpRequest;
   peer: AcpPeer;
-  onCancel: "answer" | "confirm";
+  onCancel: "answer" | "confirm" | "tool";
 }
 
 const MODELS = [{ modelId: "fake-alpha", name: "Fake Alpha" }];
@@ -82,8 +82,9 @@ serveFakeAcpAgent(
       const text = promptText(request.params).trim();
       logEntry({ event: "prompt", sessionId, text });
       if (text === "hang") return;
-      if (text === "answer-after-cancel" || text === "confirm-cancel") {
-        held.set(sessionId, { request, peer, onCancel: text === "confirm-cancel" ? "confirm" : "answer" });
+      if (text === "answer-after-cancel" || text === "confirm-cancel" || text === "tool-after-cancel") {
+        const onCancel = text === "confirm-cancel" ? "confirm" : text === "tool-after-cancel" ? "tool" : "answer";
+        held.set(sessionId, { request, peer, onCancel });
         return;
       }
       if (text === "hang-once" && !resumed.has(sessionId)) {
@@ -183,7 +184,15 @@ serveFakeAcpAgent(
         prompt.peer.reply(prompt.request, { stopReason: "cancelled" });
         return;
       }
-      prompt.peer.say(sessionId, "late answer");
+      if (prompt.onCancel === "tool")
+        prompt.peer.update(sessionId, {
+          sessionUpdate: "tool_call",
+          toolCallId: "tool-after-cancel-1",
+          title: "Run",
+          kind: "execute",
+          status: "failed",
+        });
+      else prompt.peer.say(sessionId, "late answer");
       prompt.peer.reply(prompt.request, { stopReason: "end_turn" });
     },
   },
