@@ -258,6 +258,12 @@ const MAX_ACTIVE_DOWNLOADS = 4;
 const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 const DOWNLOAD_TOO_LARGE =
   "Download stopped: the file is larger than 2 GiB, the download limit of this browser. No file was saved. The user can download it in their own web browser.";
+const MAX_DOWNLOAD_NOTES = 20;
+
+interface BrowserDownloadNote {
+  tab: Pick<BrowserHostTab, "id" | "ownerThreadId" | "ownerAgentId" | "sharedThreadIds">;
+  text: string;
+}
 
 export interface BrowserViewOptions {
   onCursor?: (cursor: BrowserViewCursor) => void;
@@ -554,6 +560,7 @@ export class BrowserHost {
   readonly #siteVisitListeners = new Set<(...args: BrowserHostEvents["siteVisited"]) => void>();
   readonly #controls = new BrowserControlSessions();
   readonly #reservedDownloadPaths = new Set<string>();
+  #downloadNotes: BrowserDownloadNote[] = [];
   #activeDownloads = 0;
   readonly #recorder: BrowserRecorder;
   readonly #locations = new BrowserLocationRequests((tabId) => {
@@ -2893,7 +2900,8 @@ export class BrowserHost {
           }),
         ),
       );
-    if ("result" in outcome) return this.#withIdleUnloadNote(params, calledTabId, outcome.result);
+    if ("result" in outcome)
+      return this.#withDownloadNotes(params, this.#withIdleUnloadNote(params, calledTabId, outcome.result));
     if (hooks.onUserControl) return yield* hooks.onUserControl(outcome.heldTabId);
     return {
       success: false,
@@ -2913,6 +2921,14 @@ export class BrowserHost {
     if (!listed || !this.#canUseToolTab(params, listed)) return result;
     noted.add(params.threadId);
     return { ...result, contentItems: [...result.contentItems, { type: "inputText", text: IDLE_UNLOAD_NOTE }] };
+  }
+
+  #withDownloadNotes(params: DynamicToolCallParams, result: DynamicToolResult): DynamicToolResult {
+    const notes = this.#downloadNotes.filter((note) => this.#canUseToolTab(params, note.tab));
+    if (notes.length === 0) return result;
+    this.#downloadNotes = this.#downloadNotes.filter((note) => !notes.includes(note));
+    const text = notes.map((note) => note.text).join("\n");
+    return { ...result, contentItems: [...result.contentItems, { type: "inputText", text }] };
   }
 
   #toolTabs(params: DynamicToolCallParams): {
@@ -3777,9 +3793,22 @@ export class BrowserHost {
         event.preventDefault();
         return;
       }
+      let note: BrowserDownloadNote | undefined;
+      const noteDownload = (text: string) => {
+        if (!tab || tab.secret) return;
+        const scrubbed = redactText(tab.engine.scrubText(`Browser download in tab ${tab.id}: ${text}`));
+        if (note && this.#downloadNotes.includes(note)) {
+          note.text = scrubbed;
+          return;
+        }
+        const { id, ownerThreadId, ownerAgentId, sharedThreadIds } = tab;
+        note = { tab: { id, ownerThreadId, ownerAgentId, sharedThreadIds }, text: scrubbed };
+        this.#downloadNotes = [...this.#downloadNotes, note].slice(-MAX_DOWNLOAD_NOTES);
+      };
       const stopped = (message: string) => {
         if (!tab || tab.secret) return;
         tab.diagnostics.add({ kind: "network", level: "error", message, ...diagnosticUrlField(item.getURL()) });
+        noteDownload(message);
         this.#emitChanged();
       };
       if (this.#activeDownloads >= MAX_ACTIVE_DOWNLOADS) {
@@ -3803,6 +3832,7 @@ export class BrowserHost {
       this.#reservedDownloadPaths.add(downloadPath);
       item.setSavePath(downloadPath);
       this.#activeDownloads += 1;
+      noteDownload(`started. The file saves at ${downloadPath}. A later browser tool result says when it is complete.`);
       item.on("updated", () => {
         if (item.getState() !== "progressing" || item.getReceivedBytes() <= MAX_DOWNLOAD_BYTES) return;
         logger.warn("Browser download stopped at the size limit", { limitBytes: MAX_DOWNLOAD_BYTES });
@@ -3815,12 +3845,9 @@ export class BrowserHost {
         if (state === "interrupted") stopped("Download failed before the file was complete. Try again.");
         if (state !== "completed") return;
         if (!tab || tab.secret) return;
-        tab.diagnostics.add({
-          kind: "load",
-          level: "info",
-          message: `Download complete: saved at ${downloadPath} (${item.getReceivedBytes()} bytes)`,
-          ...diagnosticUrlField(item.getURL()),
-        });
+        const message = `Download complete: saved at ${downloadPath} (${item.getReceivedBytes()} bytes)`;
+        tab.diagnostics.add({ kind: "load", level: "info", message, ...diagnosticUrlField(item.getURL()) });
+        noteDownload(`${message}.`);
       });
     });
   }
