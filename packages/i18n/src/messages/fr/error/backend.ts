@@ -310,6 +310,8 @@ export const messages = {
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
   "error.backend.mcpServerExitedWithOutput": "Le serveur s’est arrêté avant de répondre. Il a écrit : {detail}",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot n’a pas pu démarrer le serveur MCP {name}, car son programme n’est pas installé sur l’ordinateur qui exécute OpenBot. Installez l’application qui fournit {name} sur cet ordinateur, ou désactivez {name} dans Marketplace, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} a cessé d’attendre avant le démarrage du serveur : ses agents n’ont donc pas les outils de ce serveur.",
   "error.backend.mcpServerStoppedDuringCall": "Le serveur MCP s’est arrêté avant de répondre à cet appel.",
