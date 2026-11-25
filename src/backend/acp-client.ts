@@ -4743,6 +4743,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           reason: toolCall.title ?? null,
           permissions: requestedPermissions,
           grantRoot: filePaths.length === 1 ? filePaths[0] : null,
+          ...(filePaths.length > 0 ? { filePaths } : {}),
           ...(this.options.confine && toolKind !== "move" ? { confinedWritePaths: filePaths } : {}),
         },
         turn?.stop.signal,

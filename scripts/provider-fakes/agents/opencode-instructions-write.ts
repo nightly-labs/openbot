@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
@@ -64,7 +64,7 @@ async function writeInstructions(peer: AcpPeer, sessionId: string, file: string,
       title: file,
       kind: "edit",
       status: "pending",
-      locations,
+      locations: index === 1 ? [...locations, { path: join(dirname(file), "notes.md") }] : locations,
       rawInput: { path: file, content },
     },
     options: [

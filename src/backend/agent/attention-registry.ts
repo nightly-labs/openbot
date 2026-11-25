@@ -1273,7 +1273,11 @@ export class AttentionRegistry {
 
   #beforeAccept(approval: AgentApproval, params: unknown): Effect.Effect<void> {
     if (approval.kind !== "file-change") return Effect.void;
-    const paths = [getString(params, "grantRoot"), ...getArray(params, "confinedWritePaths")].filter(isString);
+    const paths = [
+      getString(params, "grantRoot"),
+      ...getArray(params, "confinedWritePaths"),
+      ...getArray(params, "filePaths"),
+    ].filter(isString);
     if (paths.length === 0) return Effect.void;
     return this.#beforeFileChangeAccepted(approval.agentId, paths).pipe(Effect.catchCause(() => Effect.void));
   }
