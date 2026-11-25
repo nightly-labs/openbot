@@ -150,7 +150,7 @@ export class TeamWebRtcFileTransfer {
     return yield* this.#owned(
       Effect.gen({ self: this }, function* () {
         const { bytes } = input;
-        yield* remoteDecode(() => this.#checkOutgoing(peerId, bytes.byteLength));
+        yield* remoteDecode(() => this.#checkOutgoing(bytes.byteLength));
         return yield* this.#sendOutgoingEffect(peerId, {
           name: input.name,
           mimeType: input.mimeType,
@@ -186,7 +186,7 @@ export class TeamWebRtcFileTransfer {
           () =>
             Effect.gen({ self: this }, function* () {
               const hash = createHash("sha256");
-              const check = (size: number) => this.#checkOutgoing(peerId, size, pending);
+              const check = (size: number) => this.#checkOutgoing(size);
               yield* remoteCall(() =>
                 pipeline(
                   Readable.from(input.body),
@@ -206,7 +206,8 @@ export class TeamWebRtcFileTransfer {
               const source = yield* remoteCall(() => open(path, "r"));
               file = source;
               this.#writing.delete(pending);
-              yield* remoteDecode(() => this.#checkOutgoing(peerId, size));
+              this.#notifyStateChange();
+              yield* remoteDecode(() => this.#checkOutgoing(size));
               const transferId = yield* this.#sendOutgoingEffect(peerId, {
                 name: input.name,
                 mimeType: input.mimeType,
@@ -224,6 +225,7 @@ export class TeamWebRtcFileTransfer {
           () =>
             Effect.gen({ self: this }, function* () {
               this.#writing.delete(pending);
+              this.#notifyStateChange();
               yield* remoteCall(() => (file ? file.close() : Promise.resolve())).pipe(Effect.catch(() => Effect.void));
               yield* remoteCall(() => rm(path, { force: true }));
             }),
@@ -232,16 +234,20 @@ export class TeamWebRtcFileTransfer {
     );
   }).bind(this);
 
-  #checkOutgoing(peerId: string, size: number, own?: { peerId: string; size: number }): void {
+  #checkOutgoing(size: number): void {
     if (this.#stopped) throw new Error(sourceText("error.remote.fileTransportIsStopped"));
     if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
       throw new TeamFileTooLargeError(sourceText("error.remote.fileTooLarge"));
-    const activeBytes = [...this.#outgoing.values(), ...[...this.#writing].filter((stream) => stream !== own)]
-      .filter((transfer) => transfer.peerId === peerId)
-      .reduce((sum, transfer) => sum + transfer.size, 0);
-    if (activeBytes + size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) {
-      throw new Error(sourceText("error.remote.fileSetTooLarge"));
-    }
+  }
+
+  #reserveOutgoing(transfer: OutgoingTransfer): boolean {
+    const activeBytes = [...this.#outgoing.values()]
+      .filter((item) => item.peerId === transfer.peerId)
+      .reduce((sum, item) => sum + item.size, 0);
+    if (activeBytes + transfer.size > TEAM_PROTOCOL_V2_MAX_FILE_SET_BYTES) return false;
+    transfer.lastProgressAt = Date.now();
+    this.#outgoing.set(transferKey(transfer.peerId, transfer.transferId), transfer);
+    return true;
   }
 
   readonly #sendOutgoingEffect = Effect.fn("TeamFileTransfer.sendOutgoing")(function* (
@@ -264,7 +270,13 @@ export class TeamWebRtcFileTransfer {
       cancelled: null,
       onProgress: input.onProgress,
     };
-    this.#outgoing.set(transferKey(peerId, transferId), transfer);
+    yield* this.#waitUntilEffect(() => this.#reserveOutgoing(transfer), Date.now() + this.#resumeMilliseconds).pipe(
+      Effect.mapError((error) =>
+        this.#stopped
+          ? error
+          : new RemoteWorkflowError({ cause: new Error(sourceText("error.remote.fileSetTooLarge")) }),
+      ),
+    );
     recordRestartActivity();
     return yield* Effect.gen({ self: this }, function* () {
       yield* this.#sendWithResumeEffect(transfer);
@@ -273,6 +285,7 @@ export class TeamWebRtcFileTransfer {
       Effect.ensuring(
         Effect.sync(() => {
           this.#outgoing.delete(transferKey(peerId, transferId));
+          this.#notifyStateChange();
         }),
       ),
     );
