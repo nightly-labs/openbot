@@ -7,11 +7,11 @@ import {
   type SessionUpdate,
 } from "@agentclientprotocol/sdk";
 import { agentProviderName } from "@openbot/contracts/agent-providers";
-import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { type CauseCode, classifyFailure } from "@openbot/telemetry";
 import type { GeneratedMediaKind } from "./agent/image-generation";
+import { PLAN_APPROVE, PLAN_STOP, PLAN_UNANSWERED, planApprovalQuestion } from "./agent/plan-approval";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { grokMediaItem, grokMediaKind, grokMediaToolKind } from "./grok-media";
 import { grokMcpServerName } from "./mcp-provider-shapes";
@@ -285,7 +285,7 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   },
   planApproval: {
     method: "x.ai/exit_plan_mode",
-    questions: (params) => [grokPlanQuestion(params)],
+    questions: (params) => [planApprovalQuestion(params.planContent)],
     reply: (questions, answers) => grokPlanReply(answers[questions[0]?.id ?? ""]?.[0]?.trim()),
   },
   retryNotice: grokRetryNotice,
@@ -294,33 +294,10 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
   turnFailure: grokTurnFailure,
 };
 
-const GROK_PLAN_APPROVE = sourceText("status.messaging.approve");
-const GROK_PLAN_STOP = sourceText("status.agent.planStop");
-const GROK_PLAN_UNANSWERED =
-  "The user did not answer the plan approval, so plan mode is off. Do not edit files yet. Show the plan to the user and wait for their reply.";
-
-function grokPlanQuestion(params: DynamicRecord): DynamicRecord {
-  const plan = typeof params.planContent === "string" ? params.planContent.trim() : "";
-  const limit = INPUT_LIMITS.promptQuestion;
-  return {
-    header: sourceText("status.agent.planApprovalHeader"),
-    question: !plan
-      ? sourceText("status.agent.planApprovalEmpty")
-      : plan.length > limit
-        ? `${plan.slice(0, limit - 1)}…`
-        : plan,
-    detail: sourceText("status.agent.planApprovalDetail"),
-    options: [
-      { label: GROK_PLAN_APPROVE, description: sourceText("status.agent.planApproveDetail") },
-      { label: GROK_PLAN_STOP, description: sourceText("status.agent.planStopDetail") },
-    ],
-  };
-}
-
 function grokPlanReply(answer: string | undefined): DynamicRecord {
-  if (!answer) return { outcome: "abandoned", feedback: GROK_PLAN_UNANSWERED };
-  if (answer === GROK_PLAN_APPROVE) return { outcome: "approved" };
-  if (answer === GROK_PLAN_STOP) return { outcome: "abandoned" };
+  if (!answer) return { outcome: "abandoned", feedback: PLAN_UNANSWERED };
+  if (answer === PLAN_APPROVE) return { outcome: "approved" };
+  if (answer === PLAN_STOP) return { outcome: "abandoned" };
   return { outcome: "request_changes", feedback: answer };
 }
 

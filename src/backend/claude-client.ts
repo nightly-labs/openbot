@@ -14,6 +14,7 @@ import {
   type ModelInfo,
   type OnElicitation,
   type Options,
+  type PermissionMode,
   type PermissionResult,
   query,
   type SDKUserMessage,
@@ -35,6 +36,14 @@ import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import { z } from "zod";
 import { advertisedZodShape } from "./agent/advertised-json-schema";
 import { isTurnContextBlock } from "./agent/developer-instructions";
+import {
+  PLAN_APPROVE,
+  PLAN_MODE_OFF,
+  PLAN_STOP,
+  PLAN_STOPPED,
+  PLAN_UNANSWERED,
+  planApprovalQuestion,
+} from "./agent/plan-approval";
 import {
   type ClaudePlanState,
   foldClaudePlanCall,
@@ -579,6 +588,7 @@ interface ClaudeQuery extends AsyncIterable<ClaudeStreamMessage> {
   initializationResult?(): Promise<unknown>;
   mcpServerStatus?(): Promise<unknown>;
   setModel(model?: string): Promise<void>;
+  setPermissionMode(mode: PermissionMode): Promise<void>;
   applyFlagSettings(settings: { effortLevel?: ClaudeEffort | null; fastMode?: boolean }): Promise<void>;
   usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET?(options?: { skipBehaviors?: boolean }): Promise<unknown>;
   close(): void;
@@ -1463,6 +1473,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
                 options.toolUseID ?? randomUUID(),
               );
           }
+          if (toolName === "ExitPlanMode")
+            return yield* this.#requestPlanApprovalEffect(
+              threadId,
+              toolInput,
+              options.toolUseID ?? randomUUID(),
+              options.signal,
+            );
           if (toolName !== "AskUserQuestion") {
             return yield* providerCall(
               () => ({ behavior: "allow", updatedInput: toolInput }) satisfies PermissionResult,
@@ -2998,6 +3015,48 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }),
     );
     return { behavior: "allow", updatedInput: { questions: input.questions, answers } };
+  });
+
+  readonly #requestPlanApprovalEffect = Effect.fn("ClaudeAgentClient.requestPlanApproval")(function* (
+    this: ClaudeAgentClient,
+    threadId: string,
+    input: DynamicRecord,
+    toolUseId: string,
+    signal: AbortSignal,
+  ): Effect.fn.Return<PermissionResult, ProviderClientOperationError> {
+    const runtime = yield* providerSync(() => this.#requireThread(threadId));
+    const question = { ...planApprovalQuestion(input.plan), id: "question-0" };
+    const result = yield* this.#awaitPerson(
+      threadId,
+      this.#serverRequests.call(
+        "item/tool/requestUserInput",
+        {
+          threadId,
+          turnId: runtime.activeTurn?.id ?? randomUUID(),
+          itemId: toolUseId,
+          questions: [question],
+        },
+        signal,
+      ),
+    ).pipe(Effect.orElseSucceed(() => null));
+    const entry = isRecord(result) && isRecord(result.answers) ? result.answers[question.id] : undefined;
+    const chosen = isRecord(entry) && Array.isArray(entry.answers) ? entry.answers.find(isString) : undefined;
+    const answer = chosen?.trim() ?? "";
+    const note = isRecord(result) && isString(result.note) ? result.note : "";
+    if (answer === PLAN_APPROVE) return { behavior: "allow", updatedInput: input };
+    if (answer && answer !== PLAN_STOP)
+      return { behavior: "deny", message: `The user wants changes to the plan: ${answer}` };
+    yield* providerCall(() => runtime.query.setPermissionMode("default")).pipe(
+      Effect.catch((error) =>
+        Effect.sync(() =>
+          queryLogger.warn("Claude stays in plan mode after the plan approval.", { error: error.cause }),
+        ),
+      ),
+    );
+    return {
+      behavior: "deny",
+      message: answer ? PLAN_STOPPED : note ? `${PLAN_MODE_OFF} ${note}` : PLAN_UNANSWERED,
+    };
   });
 
   readonly #requestElicitationEffect = Effect.fn("ClaudeAgentClient.requestElicitation")(function* (
