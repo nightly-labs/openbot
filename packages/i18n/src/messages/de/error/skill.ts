@@ -47,7 +47,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name} wurde vor der Einführung der genauen Versionserfassung installiert. Aktualisiere oder repariere sie vor dem Veröffentlichen.",
   "error.skill.tooManySkills": "Ein Agent kann bis zu {limit} Fähigkeiten haben.",
-  "error.skill.unmanagedExists": "Unter {path} existiert bereits eine nicht verwaltete Fähigkeit.",
+  "error.skill.ownSkillExists":
+    "Dieser Agent hat bereits eine eigene Fähigkeit namens {slug}. Bitte den Agenten, diese Fähigkeit umzubenennen oder zu löschen, und füge diese Fähigkeit dann erneut hinzu.",
   "error.skill.managedSlug":
     "OpenBot gibt jedem Agenten eine eigene Fähigkeit {slug}. Gib dieser Fähigkeit einen anderen Namen.",
   "error.skill.templateMarkdownTooLarge":

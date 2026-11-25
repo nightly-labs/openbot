@@ -1,7 +1,3 @@
-// Runs the `video-generation-v1` wire on the real Team API codecs: a stored conversation with a
-// `video_generation` message goes out as a host sends it over HTTP and WebRTC, with and without the
-// capability, and comes back as each client reads it. No provider, account or network is used.
-// `bun scripts/video-generation-e2e.ts`. Writes .openbot-build/video-generation-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -70,7 +66,6 @@ function videoMessage(id: string, info: unknown = videoGeneration): Conversation
       },
     ],
   };
-  // A cast-free way to put a value that the type refuses on the message: the malformed case needs it.
   return Object.assign(message, { videoGeneration: info });
 }
 
@@ -109,10 +104,6 @@ function withoutVideoGeneration(value: ConversationPage): ConversationPage {
 
 const hasVideoGeneration = (json: string) => json.includes('"videoGeneration"');
 
-/**
- * The event as the host event stream sends it to the WebRTC host peer for a client with the
- * capability (`#encodeProviderEvent`): the wire shape, with `botId` keys.
- */
 function hostWireEvent(event: Parameters<typeof encodeTeamProtocolV8BaseCurrentEvent>[0]): string {
   const encoded = encodeTeamProtocolV8BaseCurrentEvent(event, { videoGeneration: true });
   assert.ok(encoded);
@@ -121,7 +112,6 @@ function hostWireEvent(event: Parameters<typeof encodeTeamProtocolV8BaseCurrentE
   return encoded;
 }
 
-/** The messages of a decoded page, each checked against the IPC contract. */
 function decodedMessages(value: unknown): ConversationMessage[] {
   assert.ok(isDynamicRecord(value));
   const { messages } = value;
@@ -163,7 +153,6 @@ try {
     const encoded = httpV9.encodeResponse("GET", PAGE_PATH, 200, current, {});
     assert.equal(encoded, httpV9.encodeResponse("GET", PAGE_PATH, 200, released, {}));
     assert.ok(!hasVideoGeneration(encoded));
-    // The released fallback: the message keeps its item type and its mp4.
     const [, video] = decodedMessages(httpV9.decodeResponse("GET", PAGE_PATH, 200, JSON.parse(encoded)));
     assert.equal(video?.itemType, "video_generation");
     assert.equal(video?.attachments?.[0]?.mimeType, "video/mp4");

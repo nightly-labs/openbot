@@ -26,24 +26,14 @@ function isWebhookRoutine(routine: EventRoutine): routine is ChatWebhookRoutine 
   return routine.trigger.kind === "webhook";
 }
 
-/** A routine read from a store is a proxy, which the desktop bridge cannot clone. */
 function plainOwner(routine: EventRoutine): EventRoutineOwner {
   return { kind: routine.owner.kind, id: routine.owner.id };
 }
 
-/** One text for the events of a trigger, to compare a draft with the saved events. */
 function eventsKey(events: { eventType: string | null; filters: readonly EventFilter[] }): string {
   return JSON.stringify({ eventType: events.eventType, filters: events.filters });
 }
 
-/**
- * The webhook routines of the chat's agent and the relay state of its host, for the cards of the
- * routines the agent created or changed. The list loads again on each routine change, because the
- * route sync stores the URL after the save. Undefined from `source` clears it.
- *
- * A new signing secret stays here, not in its card: the timeline removes a card that leaves the
- * view, and the old secret no longer works. It goes when the chat changes.
- */
 export function createChatWebhookRoutines(source: () => { api: EventRoutinesApi; agentId: string } | undefined) {
   const [state, setState] = createStore<{
     routines: ChatWebhookRoutine[];
@@ -70,7 +60,6 @@ export function createChatWebhookRoutines(source: () => { api: EventRoutinesApi;
             draft.connected = status.connected;
           });
         })
-        // The plain marker stays when the host cannot list the routines.
         .catch(() => undefined);
     };
     load();
@@ -92,9 +81,7 @@ export interface RoutineWebhookChatCardProps {
   action: "created" | "updated";
   routine: ChatWebhookRoutine;
   connected: boolean | null;
-  /** The name of the chat's agent, which owns the routine. */
   agentName: string | undefined;
-  /** The secret that the person made in this chat, until they press Done. */
   secret: string | null;
   onSecret: (secret: string | null) => void;
   onOpenRoutine: (routine: { routineId: string; name: string }) => void;
@@ -102,19 +89,13 @@ export interface RoutineWebhookChatCardProps {
 
 type CardSave = { status: "idle" } | { status: "saving" } | { status: "saved" } | { status: "error"; message: string };
 
-/**
- * The chat card of a webhook routine the agent created or changed. A change of the events saves
- * with Save, as the Save of the routine settings does.
- */
 export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
   const text = useText();
   const [card, setCard] = createStore<{
     eventType: string;
     filters: EventFilterDraft[];
-    /** The saved events when the person started to edit; null with no edit. */
     base: string | null;
     save: CardSave;
-    /** The save result is newer than the routine list until the list loads again. */
     saved: ChatWebhookRoutine | null;
   }>({ eventType: "", filters: [], base: null, save: { status: "idle" }, saved: null });
   const routine = createMemo(() => {
@@ -122,8 +103,6 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
     return saved && saved.updatedAt > props.routine.updatedAt ? saved : props.routine;
   });
   const draft = () => ({ eventType: card.eventType.trim() || null, filters: eventFiltersFromDrafts(card.filters) });
-  // A newer save, such as the agent's, replaces the draft unless the person changed it: an edit
-  // that they took back does not hold the old events.
   createEffect(
     () => (card.base !== null && eventsKey(draft()) !== card.base ? undefined : routine().trigger),
     (trigger) => {
@@ -137,7 +116,6 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
   );
   const changed = () => eventsKey(draft()) !== eventsKey(routine().trigger);
   const valid = () => eventFilterDraftsValid(card.filters);
-  // A failed save keeps Save, so the person can try again; the card shows the error with it.
   const retry = () => card.save.status === "error" && card.base !== null && valid() && changed();
   const state = (): RoutineWebhookCardState => {
     if (retry()) return "changed";
@@ -166,7 +144,6 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
       next.save = { status: "saving" };
     });
     try {
-      // The policies are left out, so the host keeps the saved ones.
       const result = await props.api.saveRoutine({
         id: current.id,
         owner: plainOwner(current),
@@ -188,7 +165,6 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
     }
   }
 
-  /** Uses a secret that the sender made. Undefined when the host cannot do this. */
   function senderSecret(): ((secret: string) => Promise<void>) | undefined {
     const set = props.api.setSecret;
     if (!set) return undefined;
@@ -198,7 +174,6 @@ export function RoutineWebhookChatCard(props: RoutineWebhookChatCardProps) {
     };
   }
 
-  /** Gives a new secret to the agent. Undefined when the host cannot do this. */
   function agentSecret(): RoutineWebhookCardProps["agentSecret"] {
     const give = props.api.giveSecretToAgent;
     const agentName = props.agentName;

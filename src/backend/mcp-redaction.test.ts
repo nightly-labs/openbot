@@ -1,5 +1,3 @@
-// A provider record goes to the renderer and to history after this redaction. It must stay a valid
-// record, and a value that the MCP configuration knows must not reach either place.
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,7 +10,6 @@ import { piCustomEndpointSecrets } from "./pi-custom-endpoints";
 import { createPiMcpExtension } from "./pi-mcp";
 
 describe("redactMcpRecord", () => {
-  // A setting word is never a credential. Masking it broke `QA_READY=true` in a workflow (#10680).
   it("keeps JSON literals and setting words when a known value is `true` or `null`", () => {
     const record = { path: "README.md", enabled: true, note: null, label: "true story", flag: "QA_READY=TRUE" };
     expect(redactMcpRecord(record, ["true", "null", "TRUE", "false"])).toEqual({
@@ -46,7 +43,6 @@ describe("redactMcpRecord", () => {
     expect(redacted).not.toContain("sig_part");
   });
 
-  // The record is the agent's own chat: the user must read the address (#9988), not its secrets.
   it("keeps an email address and still redacts secrets", () => {
     const record = { item: { type: "agentMessage", text: "Sign in as admin@example.com. password=hunter2" } };
     expect(redactMcpRecord(record, [])).toEqual({
@@ -54,8 +50,6 @@ describe("redactMcpRecord", () => {
     });
   });
 
-  // A local server ignores its key, so the provider's name can be the key. Masking it hid the name in
-  // each answer of a Pi agent (#12580). The other values of the endpoint stay masked.
   it("keeps the custom provider's name and still masks its other values", () => {
     const values = piCustomEndpointSecrets([
       {
@@ -75,11 +69,29 @@ describe("redactMcpRecord", () => {
       item: { type: "agentMessage", text: "Provider `magpie` (Magpie), token •••" },
     });
   });
+
+  it("keeps a long html answer with many CSS rules whole (#9778)", () => {
+    const rules = Array.from({ length: 40 }, (_, index) => `.card-${index}{display:flex;color:#fff}`);
+    const jsx = "{items.map((item) => <li key={item.id}>{item.name}</li>)}";
+    const text = ["```html", '<div class="digest">', "<style>", ...rules, "</style>", jsx, "</div>", "```"].join("\n");
+    expect(redactMcpRecord({ item: { type: "agentMessage", text } }, [])).toEqual({
+      item: { type: "agentMessage", text },
+    });
+  });
+
+  it("still redacts secrets after many brace runs in an answer", () => {
+    const rules = Array.from({ length: 20 }, (_, index) => `.card-${index}{color:#fff}`).join("\n");
+    const record = (tail: string) => ({ item: { type: "agentMessage", text: `${rules}\n${tail}` } });
+    const keyed = JSON.stringify(redactMcpRecord(record("key sk-ant-abcdefghijklmnop"), []));
+    expect(keyed).not.toContain("sk-ant-abcdefghijklmnop");
+    expect(keyed).toContain(".card-19{color:#fff}");
+    const named = JSON.stringify(redactMcpRecord(record('{"name":"api_key","value":"plain-value-1"}'), []));
+    expect(named).not.toContain("plain-value-1");
+    for (const tail of ['"tokens": {\n  "prod": "plain-value-2"\n}', "tokens = {'prod': 'plain-value-2'}"])
+      expect(JSON.stringify(redactMcpRecord(record(tail), []))).not.toContain("plain-value-2");
+  });
 });
 
-// The Computer Use server inherits HOME, USER and TMPDIR. Masking HOME broke each Shared file link
-// in a Pi or Muse transcript (#4863). A credential beside them, or a value typed under a profile
-// name, must stay masked.
 describe("mcpSecretValues", () => {
   const home = "/Users/smoke-home";
   const originalHome = process.env.HOME;
@@ -131,6 +143,7 @@ describe("mcpSecretValues", () => {
         setThreadId: () => {},
         reached: () => false,
         dropped: () => false,
+        listedWithin: () => false,
         renew: () => [],
         close: () => {},
       };

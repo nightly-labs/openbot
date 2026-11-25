@@ -8,111 +8,53 @@ import {
 } from "./delivery-content";
 
 export interface PlanContinuationOptions {
-  /** The most automatic continuations of one request. */
   limit: number;
 }
 
-/**
- * Why a turn continues: open steps in its plan, a next step that it named but did not do, a finish
- * check that found a part of the request not done, a compaction that lost the connection and stopped
- * the turn, or a provider process that exited during the agent's answer.
- */
 type ContinuationKind = "plan" | "nextStep" | "finishCheck" | "compaction" | "providerExit";
 
-/**
- * Whether a finish check may decide a turn that no other rule continues: `no`, `allowed`, or `only`
- * for a turn whose last line waits for the user, which only the check can continue.
- */
 export type FinishCheckMode = "no" | "allowed" | "only";
 
-/**
- * No rule continues the turn, but a finish check may. The chain waits for `afterFinishCheck`; a
- * `cancel` ends it when the check does not continue the request. `continuations` counts the
- * automatic continuations of the request so far.
- */
 export interface FinishCheckPending {
   kind: "check";
   continuations: number;
 }
 
-/**
- * A chain that ended with open steps in the plan: at the limit, or after a continuation turn that
- * changed no open step. Nothing runs after it, so the chat says that the agent stopped (#8263).
- */
 const STOPPED = { kind: "stopped" } as const;
 
-/** The most finish-check continuations of one request. Each one costs a call to the model. */
+const LIMIT_REACHED = { kind: "limitReached" } as const;
+
 const FINISH_CHECK_LIMIT = 3;
 
-/** The most next-step continuations of one request. Each one has no plan to measure progress. */
 const NEXT_STEP_LIMIT = 2;
-/** A longer answer is a report, not a turn that stopped before the step it named. */
 const NEXT_STEP_ANSWER_MAX = 400;
-/** Verbs that mean "go on with the same work". "Proceed" and "go ahead" ask for approval, so they block. */
 const CONTINUE_VERB = "(?:continue|keep going|go on|carry on|move on)";
-/** Parts of the same work. A named action, such as "the rest of the deploy", is not in it, so it blocks. */
 const WORK_PARTS =
   "(?:steps|work|items|parts|ones|tasks|files|tests|changes|fixes|edits|checks|pages|sections|list|plan)";
 const REST_OF_WORK = String.raw`(?:\s+(?:with|to|on)\s+(?:the\s+)?(?:next(?:\s+(?:steps?|ones?|parts?|phases?|items?))?|rest(?:\s+of\s+(?:it|them|the\s+${WORK_PARTS}))?|remaining(?:\s+${WORK_PARTS})?|steps?\s+\d+))?`;
-/**
- * A last line that only asks whether to go on with the work, such as "Shall I continue?" or "Step
- * one is done. Want me to continue with the remaining files?". Text in front of the question must end a
- * statement, so another question in the line still blocks. A question about a named action, such as
- * "Should I continue with the deploy?" or "Proceed?", does not match: the user must answer it.
- */
 const ASKS_TO_CONTINUE = new RegExp(
   String.raw`^(?:[^?？]*[.!]\s+)?(?:(?:(?:shall|should|can|may)\s+i|(?:do\s+you\s+)?want\s+me\s+to|would\s+you\s+like\s+me\s+to|ok(?:ay)?\s+(?:if\s+i|to))\s+)?${CONTINUE_VERB}${REST_OF_WORK}\s*\?+$`,
   "i",
 );
-/** A character inside a sentence. A period inside a word, as in "parser.ts" or "v1.2", does not end it. */
 const SENTENCE_CHAR = String.raw`(?:[^.!?\n]|\.(?=\S))`;
-/**
- * The rest of a next-step sentence must not wait for someone or something: an offer to the user
- * ("… if you want"), the user's approval, a later time, or another person ("… get back to you").
- */
 const NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*\b(?:(?:if|when|once|after|unless|until|as\s+soon\s+as)\s+(?:you|your)|get\s+back|once\s+approved|(?:your|the\s+user['’]s)\s+(?:approval|confirmation|permission)|later|tomorrow|next\s+(?:week|month|time)|back\s+in)\b)`;
-/**
- * A short answer whose last words name the agent's next step, such as "I'll now run the tests." An
- * answer that says the agent waits, holds or stops does not match.
- */
 const NAMES_NEXT_STEP = new RegExp(
   String.raw`(?:\blet me now\b|\bnow let me\b|\bi['’]ll now\b|\bi will now\b|\bnow i(?:['’]ll| will)\b|\bnext,?\s+i(?:['’]ll| will)\b)(?!\s+(?:wait|hold|pause|stop)\b)${NOT_WAITING}[^.!?\n]{0,100}[.:…]?\s*$`,
   "i",
 );
 
-/**
- * Work verbs that a stopped turn names for its next step. Verbs such as deploy or delete are not in it.
- * The continuation note does not approve a risky action in any case.
- */
 const WORK_VERB = String.raw`(?:run|re-?run|check|test|fix|update|edit|write|create|add|build|install|open|read|look|search|inspect|review|verify|start|try|apply|implement|rename|move|refactor|debug|finish|continue|configure|set\s+up|generate|download|compile|patch|query|consult(?!\s+with\b)|fetch|retrieve|pull)`;
-/**
- * The "-ing" form of work verbs, for "I'm checking the connector.". Phrases that report a problem or
- * wait for someone, such as "running into …", "checking with the team" or "looking for your feedback",
- * are not in it.
- */
 const WORK_GERUND = String.raw`(?:(?:re-?)?running(?!\s+(?:late|low|out|behind|into)\b)|checking(?!\s+with\b)|testing|fixing|updating|editing|writing(?!\s+to\b)|creating|adding|building|installing|opening|reading|looking\s+(?:at|into|up|through|for(?!\s+your\b))|searching|inspecting|reviewing|verifying|trying(?!\s+(?:my|our)\b)|applying|implementing|refactoring|debugging|configuring|generating|downloading|compiling|patching|querying|consulting(?!\s+with\b)|fetching|retrieving|pulling)`;
-/** The start of the last sentence. */
 const SENTENCE_START = String.raw`(?:^|[.!:…–—]\s+|\s-\s+|\n\s*)`;
-/**
- * A last sentence in which the agent says that it does the next work, such as "Let me run the tests."
- * or "I'm going to fix the parser.". It must name a work verb, so "Let me know …", "I'll keep an eye on
- * it." and "I'll update you …" do not match.
- */
 const ANNOUNCES_WORK = new RegExp(
   String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|now|next|first|then|so)[,:]?\s+)*(?:let\s+me|i['’]ll|i\s+will|i['’]m\s+going\s+to|i\s+am\s+going\s+to)\s+(?:(?:now|first|next|then|also|quickly)\s+)?${WORK_VERB}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?\s*$`,
   "i",
 );
-/**
- * A last sentence that says that the work runs now, such as "I'm checking the connector now." or, with
- * a closing ellipsis, "Checking the connector…". Nothing runs after the turn ends, so the turn stopped
- * before that work.
- */
 const STATES_WORK = new RegExp(
   String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|now|so)[,:]?\s+)*(?:(?:i['’]m|i\s+am)\s+(?:now\s+)?${WORK_GERUND}\b(?!\s+you\b)${NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|${WORK_GERUND}\b${NOT_WAITING}${SENTENCE_CHAR}{0,120}(?:…|\.{3}))\s*$`,
   "i",
 );
 
-/** Portuguese work verbs, as infinitives. Verbs that send, publish or delete are not in it. */
 const PT_WORK_VERBS = [
   "ver",
   "olhar",
@@ -167,42 +109,21 @@ const PT_WORK_VERBS = [
 const ptPattern = (verbs: readonly string[]) =>
   `(?:${verbs.map((verb) => verb.replaceAll(" ", "\\s+")).join("|")})(?!\\p{L})`;
 const PT_WORK_VERB = ptPattern(PT_WORK_VERBS);
-/**
- * The gerund of each verb: "consultar" gives "consultando", "ler" "lendo", "dar uma olhada" "dando uma
- * olhada". "Ver" has none: "estou vendo um erro" reports what the agent sees, not work.
- */
 const PT_WORK_GERUND = ptPattern(
   PT_WORK_VERBS.filter((verb) => verb !== "ver").map((verb) => verb.replace(/r(?=\s|$)/, "ndo")),
 );
-/**
- * The Portuguese form of `NOT_WAITING`: an offer to the user ("se você quiser", "caso queira"), the
- * user's approval ("sua confirmação"), a later time ("mais tarde", "em breve", a closing "depois"), or
- * another person ("te retorno"). JavaScript's `\b` sees only ASCII letters, so no `\b` follows an
- * accented letter.
- */
 const PT_NOT_WAITING = String.raw`(?!${SENTENCE_CHAR}*(?:\b(?:se|quando|assim\s+que|depois\s+que|logo\s+que|caso)\s+(?:você|voce|vc|o\s+senhor|a\s+senhora)|\b(?:se|caso|quando)\s+(?:quiser|queira|preferir|prefira|desejar|deseje|puder|possa|achar|ache|precisar|precise)(?!\p{L})|\b(?:sua|tua)\s+(?:aprovação|aprovacao|confirmação|confirmacao|autorização|autorizacao|permissão|permissao|resposta)|\bmais\s+tarde|\bem\s+breve|\bdaqui\s+a\s+pouco|\bdepois(?=\s*[.!…]*\s*$)|\bamanh|\bpróxima\s+(?:semana|vez)|\bdepois\s+(?:te|lhe)\s+(?:aviso|falo)|\b(?:te|lhe)\s+(?:retorno|dou\s+(?:um\s+)?retorno)|\b(?:retorno|volto)\s+(?:em|mais|depois)))`;
-/**
- * A Portuguese last sentence that announces the next work ("Vou consultar o conector agora."), says
- * that it runs now ("Estou consultando o conector."), or, with a closing ellipsis, only names it
- * ("Consultando o conector…").
- */
 const PT_ANNOUNCES_WORK = new RegExp(
   String.raw`${SENTENCE_START}(?:(?:ok(?:ay)?|certo|beleza|agora|então|primeiro|em\s+seguida)[,:]?\s+)*(?:(?:(?:eu\s+)?(?:vou|irei)\s+(?:agora\s+|já\s+|primeiro\s+)?|deix[ae](?:-me|\s+eu)\s+)${PT_WORK_VERB}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|(?:eu\s+)?(?:estou|tô)\s+(?:agora\s+)?${PT_WORK_GERUND}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}[.:…]?|${PT_WORK_GERUND}${PT_NOT_WAITING}${SENTENCE_CHAR}{0,120}(?:…|\.{3}))\s*$`,
   "iu",
 );
 
-/**
- * A closing sentence that only tells the user that they need to do nothing, such as "Nothing needed from
- * you." or "De você, nada.". It waits for no one, so the sentence before it is the agent's last word (#9392).
- */
 const NOTHING_FROM_USER =
   /(?:(?<=[.!…])\s+|\s*\n\s*)(?:nothing\s+(?:else\s+)?(?:(?:needed|required)\s+)?(?:from\s+you|for\s+you\s+to\s+do)|no\s+action\s+(?:needed|required)\s+from\s+you|(?:de\s+(?:você|voce|vc)|da\s+sua\s+parte)[,:]?\s+nada|nada\s+(?:de\s+(?:você|voce|vc)|da\s+sua\s+parte|para\s+(?:você|voce|vc)\s+fazer)|(?:você|voce|vc)\s+não\s+precisa\s+fazer\s+nada)[.!]?\s*$/iu;
 
-/** A last line that says the agent waits for the user, such as "I'll now wait for your approval." */
 const WAITS_FOR_USER =
   /\b(?:i['\u2019]ll|i will|i['\u2019]m going to|let me)\s+(?:now\s+)?(?:wait|hold|pause|stop)\b|\bwaiting\s+(?:for|on)\s+(?:you|your)\b/i;
 
-/** The last line of an answer, without Markdown emphasis, code, quote or heading marks. */
 function lastLine(answer: string | undefined): string {
   return (answer?.trimEnd().split("\n").at(-1) ?? "").replace(/[*_`>#]/g, "").trim();
 }
@@ -211,17 +132,11 @@ function asksToContinue(answer: string | undefined): boolean {
   return ASKS_TO_CONTINUE.test(lastLine(answer));
 }
 
-/**
- * Whether the last line of the answer waits for the user: it asks a question, or says that the agent
- * waits. A question anywhere in the line counts, so Markdown or a closing remark after it does not
- * hide it. A question that only asks whether to continue does not count: the work continues by itself.
- */
 export function waitsForUser(answer: string | undefined): boolean {
   const line = lastLine(answer);
   return (/[?？]/.test(line) && !ASKS_TO_CONTINUE.test(line)) || WAITS_FOR_USER.test(line);
 }
 
-/** Whether a turn stopped before the next step: it named the step, or asked whether to continue. */
 function stoppedBeforeNextStep(answer: string | undefined): boolean {
   if (asksToContinue(answer)) return true;
   const text = answer?.trim() ?? "";
@@ -234,6 +149,20 @@ function stoppedBeforeNextStep(answer: string | undefined): boolean {
   return ANNOUNCES_WORK.test(plain) || STATES_WORK.test(plain) || PT_ANNOUNCES_WORK.test(plain);
 }
 
+const PROMISES_WORK =
+  /(?:^|[^\p{L}'’])(?<!(?:^|[^\p{L}])(?:não|nao|nunca)\s+)(?:i['’]ll|i\s+will|let\s+me|i['’]m\s+going\s+to|i\s+am\s+going\s+to|(?:eu\s+)?vou|(?:eu\s+)?irei|deix[ae](?:-me|\s+eu))\s+(?!(?:not|never|know|wait|hold|pause|stop|be\s+here|aguardar|esperar|ficar\s+(?:aguardando|esperando|no\s+aguardo))(?!\p{L}))\p{L}/iu;
+
+export function promisesWork(answer: string | undefined): boolean {
+  const text = answer?.trim() ?? "";
+  if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX || waitsForUser(answer)) return false;
+  const plain = text
+    .replace(/[*_`>#]/g, "")
+    .trimEnd()
+    .replace(NOTHING_FROM_USER, "");
+  const lastSentence = plain.split(/(?<=[.!…])\s+|\n+/u).at(-1) ?? "";
+  return PROMISES_WORK.test(lastSentence);
+}
+
 interface ContinuationCount {
   current: number;
   limit: number;
@@ -243,21 +172,14 @@ interface Chain {
   deliveryIds: ReadonlySet<string>;
   count: number;
   kind: ContinuationKind;
-  /** The number and the limit that the chat line and the note show for the last continuation. */
   shown: ContinuationCount;
-  /** The next-step continuations of the chain. */
   nextSteps: number;
-  /** The finish-check continuations of the chain. */
   checks: number;
-  /** The work that the last finish check found not done, or null while its check runs. */
   gap: string | null;
-  /** Whether a failed compaction or a provider exit continued the chain already. A second one ends it. */
+  final?: true;
   failureContinued: boolean;
-  /** The plan of the last turn of the chain. A turn that sends no plan update keeps it. */
   plan: ConversationPlan | null;
-  /** The open steps of that plan, by text and status, to see whether a turn made progress. */
   openSteps: string;
-  /** The open steps of the chat's plan before the request, by text and status. */
   earlierSteps: ReadonlySet<string>;
 }
 
@@ -271,19 +193,6 @@ function openSteps(plan: ConversationPlan, earlierSteps: ReadonlySet<string>): C
   return plan.steps.filter((step) => step.status !== "completed" && !earlierSteps.has(stepKey(step)));
 }
 
-/**
- * Owns the in-memory chains of automatic plan continuations: for each lane (the agent's own chat or
- * one task), the deliveries of the request, the count, and the plan of the last turn. A turn that
- * ends with open steps in the agent's own plan runs once more with a short note, until the plan is
- * done, the limit is reached, or a turn makes no progress. A step that was open, with the same text
- * and status, in the plan from before the request is left from earlier work and does not count.
- * A turn with no open step also continues, at most `NEXT_STEP_LIMIT` times, when its answer only asks
- * whether to continue, or is short and ends on a next step that it did not do. When no rule continues
- * a turn, a finish check can: `consider` answers `check`, the caller asks the model, and
- * `afterFinishCheck` continues at most `FINISH_CHECK_LIMIT` times with the work it found. A restart forgets every
- * chain, and the drain then settles the waiting deliveries. It never imports the mailbox or the
- * service facade.
- */
 export class PlanContinuation {
   readonly #limit: number;
   readonly #chains = new Map<string, Chain>();
@@ -296,23 +205,15 @@ export class PlanContinuation {
     return this.#limit;
   }
 
-  /**
-   * Decides whether the turn that just ended continues. `plan` is the plan of that turn, or null when
-   * the turn sent none. `earlierPlan` is the chat's last plan from before that turn; only the first
-   * turn of a request reads it. Returns the kind of this continuation, with its number and limit, or
-   * null; null also ends the chain. A next-step continuation counts against `NEXT_STEP_LIMIT`.
-   * Returns `stopped`, which ends the chain too, when a chain ends with open steps in the plan.
-   */
   consider(input: {
     agentId: string;
     taskId: string | null;
     deliveryIds: readonly string[];
     plan: ConversationPlan | null;
     earlierPlan: ConversationPlan | null;
-    /** The answer of that turn. */
     answer: string | undefined;
-    /** Whether a finish check may decide the turn when no other rule continues it. */
     finishCheck?: FinishCheckMode;
+    nextStep?: boolean;
   }): ({ kind: ContinuationKind } & ContinuationCount) | typeof STOPPED | FinishCheckPending | null {
     const key = laneKey(input.agentId, input.taskId);
     const previous = this.#chains.get(key);
@@ -320,7 +221,6 @@ export class PlanContinuation {
     const chained =
       previous !== undefined &&
       input.deliveryIds.length > 0 &&
-      // A message steered into a continuation turn joins the request, so the chain keeps its count.
       input.deliveryIds.some((deliveryId) => previous.deliveryIds.has(deliveryId));
     const plan = input.plan ?? (chained ? previous.plan : null);
     const earlierSteps = chained
@@ -330,15 +230,31 @@ export class PlanContinuation {
         );
     const count = chained ? previous.count : 0;
     const open = plan ? openSteps(plan, earlierSteps) : [];
-    if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : null;
     const nextSteps = chained ? previous.nextSteps : 0;
     const checks = chained ? previous.checks : 0;
     const mode = input.finishCheck ?? "no";
+    const checkAtLimit = (): FinishCheckPending | null => {
+      if (!chained || mode === "no") return null;
+      this.#chains.set(key, {
+        deliveryIds: new Set(input.deliveryIds),
+        count,
+        kind: "finishCheck",
+        shown: previous.shown,
+        nextSteps,
+        checks,
+        gap: null,
+        final: true,
+        failureContinued: previous.failureContinued,
+        plan,
+        openSteps: JSON.stringify(open.map(stepKey)),
+        earlierSteps,
+      });
+      return { kind: "check", continuations: count };
+    };
+    if (count >= this.#limit) return chained && open.length > 0 ? STOPPED : checkAtLimit();
     let kind: ContinuationKind;
     if (open.length > 0 && mode !== "only") {
       const signature = JSON.stringify(open.map(stepKey));
-      // A continuation after a failed compaction keeps the plan of the turn before it.
-      // A next-step or finish-check turn worked on other work, so an unchanged plan is not a stall.
       if (
         chained &&
         previous.kind !== "nextStep" &&
@@ -347,7 +263,13 @@ export class PlanContinuation {
       )
         return STOPPED;
       kind = "plan";
-    } else if (mode !== "only" && nextSteps < NEXT_STEP_LIMIT && stoppedBeforeNextStep(input.answer)) kind = "nextStep";
+    } else if (
+      mode !== "only" &&
+      input.nextStep !== false &&
+      nextSteps < NEXT_STEP_LIMIT &&
+      stoppedBeforeNextStep(input.answer)
+    )
+      kind = "nextStep";
     else if (mode !== "no" && checks < FINISH_CHECK_LIMIT) {
       this.#chains.set(key, {
         deliveryIds: new Set(input.deliveryIds),
@@ -363,7 +285,7 @@ export class PlanContinuation {
         earlierSteps,
       });
       return { kind: "check", continuations: count };
-    } else return null;
+    } else return checkAtLimit();
     const shown =
       kind === "plan"
         ? { current: count + 1, limit: this.#limit }
@@ -384,22 +306,16 @@ export class PlanContinuation {
     return { kind, ...shown };
   }
 
-  /**
-   * Continues the request after a finish check found work not done (`gap`). Only the lane whose last
-   * `consider` answered `check` continues, within the limits of its chain. Returns null when it does
-   * not continue; null also ends the chain.
-   */
   afterFinishCheck(
     agentId: string,
     taskId: string | null,
     gap: string,
-  ): ({ kind: ContinuationKind } & ContinuationCount) | null {
+  ): ({ kind: ContinuationKind } & ContinuationCount) | typeof LIMIT_REACHED | null {
     const key = laneKey(agentId, taskId);
     const chain = this.#chains.get(key);
-    // `consider` gives no check at the limit, so a chain that waits for a check is below it.
-    if (chain?.kind !== "finishCheck" || chain.gap !== null) {
+    if (chain?.kind !== "finishCheck" || chain.gap !== null || chain.final) {
       this.#chains.delete(key);
-      return null;
+      return chain?.final ? LIMIT_REACHED : null;
     }
     const shown = {
       current: chain.checks + 1,
@@ -409,21 +325,11 @@ export class PlanContinuation {
     return { kind: "finishCheck", ...shown };
   }
 
-  /**
-   * Whether the lane still waits for the finish check that its last `consider` started. A Stop, a new
-   * chat or a new message ends the chain (`cancel`), and then the check has no use.
-   */
   waitsForCheck(agentId: string, taskId: string | null): boolean {
     const chain = this.#chains.get(laneKey(agentId, taskId));
     return chain?.kind === "finishCheck" && chain.gap === null;
   }
 
-  /**
-   * Decides whether a turn that a failed compaction stopped continues: the connection failed or
-   * stopped while the provider compacted the context of the turn (#5822). Once for each request, and
-   * within the limit of the chain. Returns null when it does not continue; null also ends the chain.
-   * `plan` and `earlierPlan` are as in `consider`, so a later plan continuation compares the same steps.
-   */
   afterFailedCompaction(input: {
     agentId: string;
     taskId: string | null;
@@ -434,10 +340,6 @@ export class PlanContinuation {
     return this.#afterFailure("compaction", input);
   }
 
-  /**
-   * Decides whether a turn continues whose provider process exited during the agent's answer, so the
-   * answer is not complete (#9729). As `afterFailedCompaction`, and the two share their one continuation.
-   */
   afterProviderExit(input: {
     agentId: string;
     taskId: string | null;
@@ -488,11 +390,6 @@ export class PlanContinuation {
     return { kind, ...shown };
   }
 
-  /**
-   * The note that starts the continuation of this delivery, or null when no chain waits for it:
-   * after a restart, a Stop, a new chat, or when other messages wait in the lane (`othersQueued`).
-   * A start that goes back to the queue, as during a compaction, claims the same note again.
-   */
   claim(agentId: string, taskId: string | null, deliveryId: string, othersQueued: boolean): string | null {
     const key = laneKey(agentId, taskId);
     const chain = this.#chains.get(key);
@@ -509,7 +406,6 @@ export class PlanContinuation {
       : nextStepContinuationPrompt(chain.shown.current, chain.shown.limit);
   }
 
-  /** Ends the chain of one lane, or of every lane of the agent when `taskId` is undefined. */
   cancel(agentId: string, taskId?: string | null): void {
     if (taskId !== undefined) {
       this.#chains.delete(laneKey(agentId, taskId));

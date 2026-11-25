@@ -18,53 +18,33 @@ import { scheduleOnRN } from "react-native-worklets";
 import { type SplitPaneMode, setSplitPanePreference, useSplitPanePreference } from "@/shared/lib/split-pane-preference";
 import { END_X } from "@/shared/lib/text-direction";
 
-/**
- * The narrowest window that shows the pane beside the detail. iPad in portrait and landscape and the
- * open iPhone Duo are wider. A phone, the folded iPhone Duo, and each half of Split View (469 pt on
- * iPhone Duo, up to about 680 pt on iPad) keep one column.
- */
 const SPLIT_MIN_WIDTH = 700;
 const PANE_MIN_WIDTH = 320;
 const PANE_MAX_WIDTH = 400;
 const PANE_WIDTH_FRACTION = 0.36;
-/** The widest list that a drag gives, and the width that the detail always keeps. */
 const PANE_DRAG_MAX_WIDTH = 520;
 const DETAIL_MIN_WIDTH = 380;
-/** The pane with avatars only, without the side inset of the window. */
 const PANE_RAIL_WIDTH = 76;
-/** The touch area of the divider, which a drag resizes or collapses the pane with. */
 const HANDLE_WIDTH = 24;
 const RESIZE_STEP = 40;
 const PANE_EASE = Easing.bezier(0.23, 1, 0.32, 1);
 
-/** Where the pane ends and the detail starts, in window points. */
 export interface SplitLayout {
   mode: SplitPaneMode;
-  /** The width of the pane now: the list, or the rail of avatars. */
   paneWidth: number;
-  /** The width of the list when it shows. */
   listWidth: number;
-  /** The width of the fold between the two columns, or 0 when no fold divides the window. */
   foldWidth: number;
-  /** The width that the window gives the detail column. */
   detailWidth: number;
 }
 
 const SplitLayoutContext = createContext<SplitLayout | null>(null);
-/** The width of the pane as it shows on the UI thread, which follows a drag and the animations. */
 const SplitPaneMotionContext = createContext<{ shownWidth: SharedValue<number>; railWidth: number } | null>(null);
-/** The width of the column that holds a view: the pane, the detail, or the whole window. */
 const ColumnWidthContext = createContext<number | null>(null);
 
-/** The split that shows now, or null when the window has one column. */
 export function useSplitLayout(): SplitLayout | null {
   return use(SplitLayoutContext);
 }
 
-/**
- * The width of the column that holds the caller. Use it in place of the window width for a view that
- * sizes itself, as the pane is narrower than the window.
- */
 export function useColumnWidth(): number {
   const { width } = useWindowDimensions();
   return use(ColumnWidthContext) ?? width;
@@ -79,11 +59,6 @@ function listWidthLimit(width: number): number {
   return Math.max(PANE_MIN_WIDTH, Math.min(PANE_DRAG_MAX_WIDTH, width - DETAIL_MIN_WIDTH));
 }
 
-/**
- * The split for a window. A vertical fold, as on the open iPhone Duo or an Android foldable, ends the
- * list, so neither column lies across it. Without a fold, the list takes a part of the window, or the
- * width that the user dragged it to. The rail leaves the detail across the fold.
- */
 function splitFor(
   width: number,
   fold: Fold | null,
@@ -106,7 +81,6 @@ function splitFor(
   return { mode, paneWidth, listWidth, foldWidth, detailWidth: width - paneWidth - foldWidth };
 }
 
-/** The pane after a drag ends at a width: the rail of avatars, or the list. */
 function modeAt(paneWidth: number, railWidth: number): SplitPaneMode {
   "worklet";
   return paneWidth < (railWidth + PANE_MIN_WIDTH) / 2 ? "rail" : "list";
@@ -119,7 +93,6 @@ interface SplitColumnsProps {
   children: ReactNode;
 }
 
-/** The columns beside the vertical fold that `ReservedRegionsProvider` reports. */
 function FoldSplitColumns(props: SplitColumnsProps) {
   const division = useReservedRegions().find(
     (region) => region.kind === "division" && region.frame.height > region.frame.width,
@@ -141,14 +114,10 @@ function SplitColumns({ enabled, pane, resizeLabel, children, fold }: SplitColum
   const mode = split?.mode ?? "list";
   const limit = listWidthLimit(width);
 
-  // The pane follows a drag on the UI thread. A change of mode or a drag that ends moves it to its
-  // place; a turn of the device or a fold puts it there at once.
   const shownWidth = useSharedValue(paneWidth);
   const dragStart = useSharedValue(0);
   const dragging = useSharedValue(false);
   const lastPreference = useRef(preference);
-  // The width that a drag already animates to on the UI thread. Its commit must not start the
-  // animation again from React.
   const settledOnUI = useRef<number | null>(null);
   useEffect(() => {
     const chosen = lastPreference.current !== preference;
@@ -163,8 +132,6 @@ function SplitColumns({ enabled, pane, resizeLabel, children, fold }: SplitColum
     );
   }, [paneWidth, preference, shownWidth]);
 
-  // Only the result of a drag goes to React, to keep it. The pane animates to its place on the UI
-  // thread from the frame the finger lifts.
   const commit = (next: SplitPaneMode, nextWidth: number | null, target: number) => {
     const changed = next !== mode || nextWidth !== preference.width;
     settledOnUI.current = changed ? target : null;
@@ -182,12 +149,10 @@ function SplitColumns({ enabled, pane, resizeLabel, children, fold }: SplitColum
     })
     .onUpdate((event) => {
       "worklet";
-      // The pane is at the start: on the right in a right-to-left layout, where a drag to the left widens it.
       shownWidth.set(Math.min(limit, Math.max(railWidth, dragStart.get() + event.translationX * END_X)));
     })
     .onEnd((event) => {
       "worklet";
-      // A flick goes on a little past the finger, so a quick swipe collapses or opens the pane.
       const released = shownWidth.get() + event.velocityX * END_X * 0.08;
       const next = modeAt(released, railWidth);
       const nextWidth =
@@ -226,8 +191,6 @@ function SplitColumns({ enabled, pane, resizeLabel, children, fold }: SplitColum
     [splitShown, mode, paneWidth, listWidth, foldWidth, width],
   );
 
-  // The detail keeps its place among the children in all layouts, so the navigation in it stays
-  // mounted, with its screens and their state, when the device folds or the window changes size.
   return (
     <SplitLayoutContext value={splitValue}>
       {splitShown ? (
@@ -246,8 +209,6 @@ function SplitColumns({ enabled, pane, resizeLabel, children, fold }: SplitColum
       ) : null}
       <View key="detail" style={styles.column}>
         <ColumnWidthContext value={splitValue?.detailWidth ?? null}>
-          {/* Each column has its own safe area: the rail of iPhone Duo and the side insets of
-              landscape touch only the column at that edge. */}
           <SafeAreaProvider style={styles.column}>{children}</SafeAreaProvider>
         </ColumnWidthContext>
       </View>
@@ -269,11 +230,6 @@ function SplitColumns({ enabled, pane, resizeLabel, children, fold }: SplitColum
   );
 }
 
-/**
- * The two forms of the pane: the list, and the rail of its avatars. Both stay mounted, so a drag or a
- * change of mode crosses from one to the other with the width, without a swap. The list never lays
- * out narrower than its minimum width: the pane clips it, and it fades out as the rail fades in.
- */
 export function SplitPaneLayers({ list, rail }: { list: ReactNode; rail: ReactNode }) {
   const split = useSplitLayout();
   const motion = use(SplitPaneMotionContext);
@@ -318,11 +274,6 @@ export function SplitPaneLayers({ list, rail }: { list: ReactNode; rail: ReactNo
   );
 }
 
-/**
- * A pane beside the main content on a wide window, such as a list beside the item it opened. On a
- * narrow window only the main content shows. The main content is never mounted again when the
- * layout changes. A drag on the divider resizes the pane, or collapses it to its rail of avatars.
- */
 export function AdaptiveSplit({
   enabled,
   pane,
@@ -331,11 +282,9 @@ export function AdaptiveSplit({
 }: {
   enabled: boolean;
   pane: ReactNode;
-  /** What a screen reader says for the divider, which resizes the pane. */
   resizeLabel: string;
   children: ReactNode;
 }) {
-  // Expo Go does not include the native `ReservedRegionsView`, so there the window has no fold.
   if (isRunningInExpoGo()) {
     return (
       <View style={styles.row}>

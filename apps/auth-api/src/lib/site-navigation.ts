@@ -1,12 +1,3 @@
-// What the header menu offers. Each section is one trigger and one panel, and
-// the mobile sheet shows the same sections in the same order, so the two can not
-// disagree about what the site holds.
-//
-// The collections come from `HEADER_COLLECTIONS`, the part of the one list of
-// collections that the header offers. No JSX here, for the same reason
-// `content-collection.ts` holds none. The text is in `SiteText`, under the id of
-// each section and link, so the header has the language of the page.
-
 import type { LandingIconName } from "../components/landing/LandingIcon";
 import { BRAND_ROUTE } from "./brand-page";
 import { CHANGELOG_ROUTE } from "./changelog";
@@ -19,9 +10,7 @@ import { PRICING_ROUTE } from "./pricing-page";
 import type { SiteLinkId, SiteResourceId } from "./site-text";
 import { TEAMS_ROUTE } from "./teams-page";
 
-/** How many articles a panel lists: one featured, and the rest under it. */
 const PANEL_ARTICLE_COUNT = 4;
-/** Two columns of three. */
 const PANEL_PLUGIN_COUNT = 6;
 
 type HeaderCollectionId = (typeof HEADER_COLLECTIONS)[number]["id"];
@@ -29,7 +18,6 @@ type HeaderCollectionId = (typeof HEADER_COLLECTIONS)[number]["id"];
 export interface ArticleNavigationSection {
   kind: "articles";
   id: HeaderCollectionId;
-  /** Where the trigger itself goes: the panel is a preview of this page. */
   indexRoute: ContentCollection["indexRoute"];
   collection: ContentCollection;
   articles: readonly CollectionArticle[];
@@ -43,20 +31,15 @@ export interface PluginNavigationSection {
   pluginCount: number;
 }
 
-/** One row of the Resources panel: a page of this site, or a page somewhere else. */
 export type ResourceLink = {
   id: SiteResourceId;
-  /** The seed of the gradient behind the icon. It is the English label, so each row keeps its colours. */
   seed: string;
-  /** "logo" draws the OpenBot mark. */
   icon: LandingIconName | "logo";
 } & ({ to: typeof CHANGELOG_ROUTE | typeof BRAND_ROUTE | "/download" } | { href: string });
 
-/** The pages that have no section of their own. It has no index page, so its trigger is a button. */
 export interface ResourceNavigationSection {
   kind: "resources";
   id: "resources";
-  /** The footer link of the panel, on another site. */
   footer: { href: string };
   links: readonly ResourceLink[];
 }
@@ -77,7 +60,6 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
     kind: "plugins",
     id: "plugins",
     indexRoute: MARKETPLACE_APPS_ROUTE,
-    // Featured first, and otherwise in the order the catalog declares.
     plugins: SITE_PLUGINS.toSorted((left, right) => Number(right.featured) - Number(left.featured)).slice(
       0,
       PANEL_PLUGIN_COUNT,
@@ -99,13 +81,11 @@ export const SITE_NAVIGATION_SECTIONS: readonly SiteNavigationSection[] = [
   },
 ];
 
-/** A header entry with no panel: one page, reached in one press. */
 export interface SiteNavigationLink {
   id: SiteLinkId;
   to: typeof TEAMS_ROUTE | typeof PRICING_ROUTE;
 }
 
-/** After the sections, in both the desktop menu and the mobile sheet. */
 export const SITE_NAVIGATION_LINKS: readonly SiteNavigationLink[] = [
   { id: "teams", to: TEAMS_ROUTE },
   { id: "pricing", to: PRICING_ROUTE },

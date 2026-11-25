@@ -1,31 +1,20 @@
 import type { OnePasswordConnectorStatus, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 
-/** What the 1Password page reaches: one 1Password connection, of this computer or of a joined server. */
 export type OnePasswordConnectorPort = Omit<
   OpenBotDesktopApi["onePasswordConnector"],
   "hostStatus" | "hostConnectWithToken" | "hostDisconnect"
 >;
 
-/** Read on each call: tests and stories replace `window.openbot` per case. */
 export function onePasswordConnectorPort(): OnePasswordConnectorPort {
   return window.openbot.onePasswordConnector;
 }
 
-/** The actions of a joined server's connection (`onepassword-connector-v1`): a token connects it. */
 export type HostOnePasswordActions = Pick<OnePasswordConnectorPort, "status" | "connectWithToken" | "disconnect">;
 
-/** How often a joined server's connection is read while the host connects or still counts its logins. */
 const HOST_POLL_MS = 2_000;
-/** A read of the logins that fails leaves no count, so the reads stop. Opening the page reads again. */
 const HOST_POLL_LIMIT = 15;
 
-/**
- * A port to a joined server's connection. The host sends no event, so `onChanged` reads the status
- * while the host connects or the login count is not known, and stops after `HOST_POLL_LIMIT` reads
- * or when a read fails. Each status read asks the host to read its logins again when they are old.
- * The host has no screen, so the CLI and the 1Password app are not used: their actions fail.
- */
 export function polledOnePasswordConnectorPort(actions: HostOnePasswordActions): OnePasswordConnectorPort {
   const listeners = new Set<(status: OnePasswordConnectorStatus) => void>();
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -74,7 +63,6 @@ export function polledOnePasswordConnectorPort(actions: HostOnePasswordActions):
   };
 }
 
-/** The connection of the joined server that `serverId` names, through main. */
 export function hostOnePasswordConnectorPort(serverId: () => string | undefined): OnePasswordConnectorPort {
   const server = () => {
     const id = serverId();

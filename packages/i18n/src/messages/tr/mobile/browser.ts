@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Sayfaya yazma",
   "mobile.browser.reconnect": "Yeniden bağlan",
   "mobile.browser.status.connecting": "Tarayıcıya bağlanılıyor…",
+  "mobile.browser.dialog.title": "Sayfa bir mesaj gösteriyor",
+  "mobile.browser.dialog.ok": "Tamam",
   "mobile.browser.status.ended": "Canlı görünüm sona erdi.",
   "mobile.browser.status.offline": "Sunucu bağlı değil.",
   "mobile.browser.status.noTab": "{name} için açık tarayıcı sekmesi yok.",
@@ -84,4 +86,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Kontrolü geri ver",
   "mobile.browser.help.handBack.body":
     "Bir ajan sizden devralmanızı istediğinde ··· menüsünde “Bitirdim” seçeneğini seçin. Ajan bu sekmede devam eder.",
+  "mobile.browser.location.title": "{site} konumunuzu öğrenmek istiyor",
+  "mobile.browser.location.description": "Yalnızca güvendiğiniz sitelere izin verin.",
+  "mobile.browser.location.block": "Engelle",
+  "mobile.browser.location.allow": "İzin ver",
+  "mobile.browser.location.allowAlways": "Her zaman izin ver",
+  "mobile.browser.location.unavailable": "Bu cihazın konumu alınamadı.",
+  "mobile.browser.location.answerFailed": "Konum isteği yanıtlanamadı.",
 } as const satisfies PartialTranslation<typeof source>;

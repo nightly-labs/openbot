@@ -4,11 +4,6 @@ import { pipeline } from "node:stream/promises";
 import { downloadMediaMessage, type WAMessage } from "@openbot/whatsapp/baileys";
 import type { WhatsAppSession } from "./whatsapp-session";
 
-/**
- * Writes the file of a message to `destination`, readable only by this user. Stops with
- * `file_too_large` after `maxBytes`, or when `signal` aborts; the caller deletes what it wrote.
- * WhatsApp sends a new link for an old file when the socket is open.
- */
 export async function downloadWhatsAppMedia(
   session: WhatsAppSession,
   message: WAMessage,

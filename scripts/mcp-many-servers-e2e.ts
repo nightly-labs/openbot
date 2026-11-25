@@ -1,14 +1,3 @@
-// Checks that a host keeps 100 MCP servers and serves them over the Team API (`mcp-many-servers-v1`).
-// A real `TeamApiServer` runs on loopback with the real team store and the real MCP server store on a
-// temporary profile. The MCP sign-ins are a stand-in that lists every http row, so no browser starts.
-//
-// A released client, which does not send the capability, manages up to 32 servers as before. The host
-// refuses it the 33rd server, and every list longer than 32, with an update message and before any
-// change. A current client adds servers up to 100 and reads all of them, through the same codec that
-// every transport uses. The host refuses the 101st server. The 100 rows stay after a restart.
-// Run: `bun run test:mcp-many-servers`.
-// Writes .openbot-build/mcp-many-servers-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -49,7 +38,6 @@ const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const STEP_DEADLINE_MS = 60_000;
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "mcp-many-servers-electron-boundary",
   setup(build) {
@@ -101,7 +89,6 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its reply.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -121,6 +108,7 @@ async function step<T>(name: string, run: () => Promise<T>): Promise<T> {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -146,6 +134,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -161,10 +150,10 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
 };
 
-/** The sign-in state of every http row: none is signed in. */
 const signIns: TeamApiMcpSignIns = {
   start: unused,
   status: () => ({ tabId: null, result: null }),
@@ -197,7 +186,6 @@ interface Host {
 
 let host: Host | null = null;
 
-/** Starts the host on the profile, as the app does at each launch. The stores keep their files. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -205,7 +193,6 @@ async function startHost(): Promise<Host> {
   const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
@@ -240,10 +227,8 @@ function current(): Host {
 }
 
 const CURRENT = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
-/** A released client: the current list without `mcp-many-servers-v1`. */
 const RELEASED = CURRENT.filter((capability) => capability !== MCP_MANY_SERVERS_CAPABILITY);
 
-/** One protocol 9 request. A current client sends `mcp-many-servers-v1`. */
 async function call(
   method: string,
   path: string,
@@ -290,19 +275,16 @@ function httpServer(index: number): McpServerConfig {
   };
 }
 
-/** A list as a current client reads it: the codec of every transport, with the capability. */
 function currentList(path: string, response: { status: number; body: unknown }): McpServerConfig[] {
   assert.equal(response.status, 200, `${path} returned ${response.status}: ${JSON.stringify(response.body)}`);
   const codec = teamSideRouteCodec(path);
   assert.ok(codec, `${path} has no side-route codec.`);
-  // The codec throws on a list that it does not accept; the rows are then the decoded body.
   codec.response(path, response.status, response.body, { mcpManyServers: true });
   const rows = response.body;
   assert.ok(Array.isArray(rows), `${path} is not a list.`);
   return rows;
 }
 
-/** A list as a released client reads it: the frozen codec alone. */
 function releasedList(path: string, response: { status: number; body: unknown }): unknown[] {
   assert.equal(response.status, 200, `${path} returned ${response.status}: ${JSON.stringify(response.body)}`);
   const codec = teamSideRouteCodec(path);
@@ -314,7 +296,6 @@ function releasedList(path: string, response: { status: number; body: unknown })
 
 const NEEDS_UPDATE = sourceText("error.team.mcpServerListNeedsUpdate", { limit: MCP_FROZEN_SERVERS_LIST_LIMIT });
 
-/** Asserts that the host refused a released client with 409 and the update message. */
 function needsUpdate(response: { status: number; body: unknown }, label: string): void {
   assert.equal(response.status, 409, `${label}: expected 409, got ${response.status}.`);
   assert.equal(
@@ -380,7 +361,6 @@ try {
     const list = await call("GET", MCP_ROUTES.list, { token });
     const rows = currentList(MCP_ROUTES.list, list);
     assert.equal(rows.length, MCP_MANY_SERVERS_LIST_LIMIT);
-    // The frozen codec alone refuses this list: that is why a released client must not get it.
     assert.throws(() => mcpResponse(MCP_ROUTES.list, 200, list.body));
     const signInRows = await call("POST", MCP_SIGN_IN_ROUTES.list, { token, body: {} });
     assert.equal(currentList(MCP_SIGN_IN_ROUTES.list, signInRows).length, MCP_MANY_SERVERS_LIST_LIMIT);

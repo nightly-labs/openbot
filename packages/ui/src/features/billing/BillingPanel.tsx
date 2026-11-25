@@ -55,7 +55,6 @@ const INTERVAL_LABEL = {
   year: "billing.interval.year",
 } as const satisfies Record<BillingInterval, AppTextKey>;
 
-/** The statuses that show a badge. An active plan shows none. */
 const STATUS_BADGE: Partial<
   Record<BillingSubscriptionStatus, { text: AppTextKey; variant: "info-light" | "destructive-light" | "warning-light" }>
 > = {
@@ -73,17 +72,11 @@ export interface BillingPanelProps {
   store: BillingStore;
   hostedServers?: SettingsHostedServersStore | undefined;
   onAddServer?: (() => void) | undefined;
-  /** False when this surface has no billing calls. */
   available: boolean;
-  /** The License part, above the server plans. It shows its own state, apart from the server plans. */
   license?: JSX.Element;
+  credits?: JSX.Element;
 }
 
-/**
- * The Billing content of the desktop Settings tab and the web dialog: the plan of each server that
- * the account pays for, with "Add storage", and the Stripe Customer Portal for the payment method
- * and the invoices. The plan of a new server is chosen where the server is made, not here.
- */
 export function BillingPanel(props: BillingPanelProps): JSX.Element {
   const { t } = useText();
   const billing = () => props.store.state.billing;
@@ -105,6 +98,7 @@ export function BillingPanel(props: BillingPanelProps): JSX.Element {
   return (
     <div class="billing-panel" aria-busy={props.store.state.loading ? "true" : undefined}>
       {props.license}
+      {props.credits}
       <Show when={!unavailable() && billing()}>
         <Show when={props.store.state.error}>
           {(message) => <BillingError message={message()} store={props.store} />}
@@ -276,14 +270,12 @@ function BillingServerRow(props: { server: BillingServerPlan; store: BillingStor
   const name = () => props.server.serverName ?? t("billing.server.unnamed");
   const storageGb = () => serverStorageGb(props.server);
   const badge = () => STATUS_BADGE[props.server.status];
-  // The price of one period, or only the interval when Stripe gave no fixed amount.
   const price = () => {
     const { amount, currency, interval } = props.server;
     if (amount === null) return t(INTERVAL_LABEL[interval]);
     const value = format.number(amount / 100, {
       style: "currency",
       currency: currency.toUpperCase(),
-      // All plan currencies have cents. A whole amount shows no cents.
       minimumFractionDigits: amount % 100 === 0 ? 0 : 2,
     });
     return interval === "month"
@@ -351,7 +343,6 @@ function BillingServerRow(props: { server: BillingServerPlan; store: BillingStor
               <Show
                 when={!props.server.cancelAtPeriodEnd}
                 fallback={
-                  // Stripe has no Portal flow that renews one plan. The account Portal shows a Renew button.
                   <DropdownMenu.Item onSelect={() => open({ flow: "manage" })}>
                     <RotateCcw aria-hidden="true" />
                     {t("billing.action.renew")}

@@ -5,7 +5,7 @@ export const messages = {
   "error.mcp.redirectByName": "Dit adres is niet bereikbaar via een naam.",
   "error.mcp.redirectNotSignIn": "Dit adres hoort niet bij een inlog.",
   "error.mcp.redirectRefused": "Het inloggen is geweigerd. Ga terug naar OpenBot en probeer het opnieuw.",
-  "error.mcp.redirectNoSignIn": "Er wacht geen inlog op dit adres. Misschien is de inlog afgelopen.",
+  "error.mcp.redirectNoSignIn": "Deze inlog is niet meer actief. Ga terug naar OpenBot en start de inlog opnieuw.",
   "error.mcp.redirectSignedIn": "OpenBot is ingelogd. Je kunt dit venster sluiten.",
   "error.mcp.redirectNotSaved": "Het inloggen is niet voltooid. Ga terug naar OpenBot om te zien waarom.",
   "error.mcp.signInFileUnreadable": "Het MCP-inlogbestand is onleesbaar.",

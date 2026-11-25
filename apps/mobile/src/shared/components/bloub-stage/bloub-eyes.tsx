@@ -16,25 +16,21 @@ import Svg, { Path } from "react-native-svg";
 import { SPLASH_EASE_IN_OUT, SPLASH_EASE_OUT } from "@/shared/lib/splash-motion";
 import type { BloubMood } from "./bloub-stage-store";
 
-/** The box that holds both eyes, in points at scale 1. */
 export const EYES_WIDTH = 220;
 export const EYES_HEIGHT = 170;
 const EYE_WIDTH = 66;
 const EYE_HEIGHT = 160;
 const EYE_INSET = 18;
-// The scanner frame: the eyes become its two sides, and four arms finish the corners.
 const FRAME_OUTSET_X = 15;
 const FRAME_OUTSET_Y = 40;
 const ARM_LENGTH = 46;
 const ARM_THICKNESS = 6;
 const ARM_STAGGER_MS = 40;
 const ARM_MS = 220;
-// The arms start when the sides have mostly stretched.
 const ARM_DELAY_MS = 520;
 
 const MOOD = { duration: 500, easing: SPLASH_EASE_IN_OUT };
 const BLINK_CLOSED = 0.08;
-// The scanner frame over the camera.
 const FRAME_COLOR = "#ffffff";
 const FRAME_TINT_DELAY_MS = 500;
 
@@ -59,16 +55,13 @@ function poseFor(mood: BloubMood, side: -1 | 1): EyePose {
     case "joy":
       return { ...OPEN, rotate: 0, scaleX: 1.08, scaleY: 1.08 };
     case "cry":
-      // Closed arcs that droop to the outside.
       return { x: 0, y: 8, rotate: side < 0 ? -16 : 16, scaleX: 1, scaleY: 1 };
     case "meh":
-      // Flat, half-closed eyes; the right one sits a little higher.
       return side < 0
         ? { x: 0, y: 32, rotate: 0, scaleX: 1, scaleY: 0.3 }
         : { x: 0, y: 26, rotate: -6, scaleX: 1, scaleY: 0.3 };
     case "frame":
     case "found":
-      // A thin, tall bar on each side of the frame.
       return { x: 66 * side, y: 5, rotate: 0, scaleX: 0.09, scaleY: 1.56 };
     default:
       return OPEN;
@@ -76,27 +69,21 @@ function poseFor(mood: BloubMood, side: -1 | 1): EyePose {
 }
 
 const isFrame = (mood: BloubMood) => mood === "frame" || mood === "found";
-/** The moods that close the capsules and show an arc: a smile, or a frown for `cry`. */
 const isClosed = (mood: BloubMood) => mood === "happy" || mood === "joy" || mood === "cry";
 
-// Joy: the eyes squish down and spring back, then swing from side to side until the mood changes.
 const SQUISH_MS = 900;
 const SWING_DEG = 9;
 const SWING_X = 8;
 const SWING_HALF_MS = 350;
-// The swing turns around a point low in the eye box, so it reads as a head that sways.
 const SWAY_ORIGIN = "50% 85%";
-// Cry: a short tremble, and a tear runs from each eye in turn.
 const TREMBLE = [-3, 3, -2, 2, 0];
 const TREMBLE_STEP_MS = 96;
 const TEAR_FALL = 56;
 const TEAR_MS = 1500;
 const TEAR_COLOR = "#74b9ff";
 
-/** A move of the gaze: where to, how long the move takes, and how long the eyes stay. */
 type Glance = readonly [x: number, y: number, moveMs: number, holdMs: number];
 
-// The eyes look left, then right, while the user decides.
 const IDLE_GLANCES: readonly Glance[] = [
   [0, 0, 0, 2080],
   [-14, 2, 480, 1440],
@@ -104,7 +91,6 @@ const IDLE_GLANCES: readonly Glance[] = [
   [12, -5, 480, 1600],
   [0, 0, 1120, 0],
 ];
-// Thinking: up and to the side, across, up again, and back.
 const THINK_GLANCES: readonly Glance[] = [
   [-12, -10, 420, 900],
   [11, -8, 520, 700],
@@ -143,7 +129,6 @@ function Eye({
   mood: BloubMood;
   reduced: boolean;
   blink: SharedValue<number>;
-  /** 0 is the eye color, 1 the white of the scanner frame. */
   tint: SharedValue<number>;
   eyeColor: string;
 }) {
@@ -152,7 +137,6 @@ function Eye({
   const rotate = useSharedValue(OPEN.rotate);
   const scaleX = useSharedValue(1);
   const scaleY = useSharedValue(1);
-  // Happy closes the capsule, and a smiling arc takes its place. Cry turns the arc upside down.
   const closed = useSharedValue(0);
   const smile = useSharedValue(0);
   const flip = useSharedValue(1);
@@ -240,7 +224,6 @@ function Arm({
   return <Animated.View style={[styles.arm, position, style]} />;
 }
 
-/** A tear under one eye while the mood is `cry`. It runs down and fades, again and again. */
 function Tear({ side, crying, reduced }: { side: -1 | 1; crying: boolean; reduced: boolean }) {
   const fall = useSharedValue(0);
   const shown = useSharedValue(0);
@@ -251,12 +234,10 @@ function Tear({ side, crying, reduced }: { side: -1 | 1; crying: boolean; reduce
       return;
     }
     if (reduced) {
-      // A tear that stays still under the eye.
       fall.set(0.3);
       shown.set(1);
       return;
     }
-    // The right eye cries a little later, so the two tears do not fall together.
     const start = side < 0 ? 300 : 1000;
     fall.set(
       withDelay(
@@ -275,7 +256,6 @@ function Tear({ side, crying, reduced }: { side: -1 | 1; crying: boolean; reduce
   }, [crying, fall, reduced, shown, side]);
   const style = useAnimatedStyle(() => {
     const value = fall.get();
-    // In 20% the drop forms under the eye, then it runs down and fades at the end.
     const opacity = value < 0.2 ? value / 0.2 : value > 0.8 ? (1 - value) / 0.2 : 1;
     return {
       opacity: shown.get() * opacity,
@@ -290,10 +270,6 @@ function Tear({ side, crying, reduced }: { side: -1 | 1; crying: boolean; reduce
   );
 }
 
-/**
- * The two eyes of the stage. Every movement is a shared value on the UI thread: moods change the
- * eye transforms, and the idle and thinking glances loop there without the JS thread.
- */
 export function BloubEyes({
   mood,
   active,
@@ -303,7 +279,6 @@ export function BloubEyes({
   eyeColor,
 }: {
   mood: BloubMood;
-  /** Off while the stage is hidden: no loop runs for eyes nobody sees. */
   active: boolean;
   reduced: boolean;
   gazeX: SharedValue<number>;
@@ -315,7 +290,6 @@ export function BloubEyes({
   const blink = useSharedValue(1);
   const frame = useSharedValue(0);
   const tint = useSharedValue(0);
-  // The joy squish and swing: a turn and a squash of both eyes together.
   const sway = useSharedValue(0);
   const squashX = useSharedValue(1);
   const squashY = useSharedValue(1);
@@ -325,7 +299,6 @@ export function BloubEyes({
     const glances = mood === "idle" ? IDLE_GLANCES : mood === "think" ? THINK_GLANCES : null;
     const settle = { duration: reduced ? 0 : 240, easing: SPLASH_EASE_OUT };
     if (loops && mood === "joy") {
-      // Down with the stretching block, a small spring up, then the swing.
       const squish = (down: number, up: number) =>
         withSequence(
           withTiming(down, { duration: 200, easing: SPLASH_EASE_OUT }),
@@ -366,7 +339,6 @@ export function BloubEyes({
       sway.set(withTiming(0, settle));
       squashX.set(withTiming(1, settle));
       squashY.set(withTiming(1, settle));
-      // The idle glance waits until the screen has settled; thinking starts at once.
       const delay = mood === "idle" ? 1600 : 120;
       wanderX.set(
         withSequence(withTiming(0, { duration: 240, easing: SPLASH_EASE_OUT }), glanceLoop(glances, 0, delay)),
@@ -386,15 +358,12 @@ export function BloubEyes({
         withDelay(1200, withRepeat(withSequence(withDelay(4464, withTiming(1, { duration: 0 })), ...blinkOnce()), -1)),
       );
     } else if (loops && mood === "think") {
-      // A double blink now and then, as when someone thinks hard.
       blink.set(
         withRepeat(withSequence(withDelay(2600, withTiming(1, { duration: 0 })), ...blinkOnce(), ...blinkOnce()), -1),
       );
     } else {
       blink.set(withTiming(1, { duration: reduced ? 0 : 120 }));
     }
-    // Over the camera the frame turns white, so it shows on a dark picture. The color waits until
-    // the block has mostly faded and the camera shows, so it changes gently; it goes back at once.
     tint.set(
       isFrame(mood)
         ? withDelay(

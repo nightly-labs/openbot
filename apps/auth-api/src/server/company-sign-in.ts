@@ -1,17 +1,3 @@
-// Company sign-in. A server owner connects the company's OpenID Connect provider, such as Microsoft
-// Entra ID, Okta or Google Workspace, and proves the company's email domains with a DNS record. A
-// person at one of these domains then signs in at the provider, not with an email code:
-//
-// 1. The app sends the email and its loopback address to `startSignIn`. The answer is the provider URL.
-// 2. The provider sends the browser to `/v1/auth/company/callback`. `finish` checks the ID token,
-//    finds or makes the account, and sends the browser to the app's loopback with a one-time code.
-// 3. The app gives the code and its verifier to `exchange` and gets a session like an email code gives.
-//    The phone app returns to `openbot://company-sign-in` in its browser session, and its exchange
-//    names the device, so the session is a mobile session.
-//
-// A test sign-in uses the same flow. It saves the connection only when it passes, so a connection
-// with a wrong value never takes the email codes away. SCIM from the provider turns a person off.
-
 import { MOBILE_COMPANY_SIGN_IN_RETURN } from "@openbot/contracts/company-sign-in";
 import { isAvatarColor } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
@@ -28,20 +14,17 @@ const FLOW_TTL_MS = 10 * 60_000;
 const CODE_TTL_MS = 2 * 60_000;
 const PROVIDER_TIMEOUT_MS = 10_000;
 const MAX_DOMAINS = 20;
-// The same window and limits as the email start: each start asks the provider for its metadata.
 const RATE_WINDOW_MS = 15 * 60_000;
 const START_EMAIL_LIMIT = 5;
 const START_IP_LIMIT = 20;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,128}$/u;
-/** The app's loopback listener. The port is the one the app took. */
+const BROWSER_EXTENSION_ID_PATTERN = /^[a-p]{32}$/u;
 const RETURN_PATTERN = /^http:\/\/(?:127\.0\.0\.1|localhost):[0-9]{2,5}\/company-sign-in$/u;
-/** The web app's return on this account service. The browser that started the flow holds its verifier. */
 export const WEB_RETURN_PATH = "/api/browser/company/return";
 const DOMAIN_RECORD_PREFIX = "_openbot";
 const DOMAIN_RECORD_VALUE_PREFIX = "openbot-domain-verification=";
 const CALLBACK_PATH = "/v1/auth/company/callback";
 const GOOGLE_ISSUER = "https://accounts.google.com";
-/** Mail services that no company owns. Their addresses keep email codes. */
 const SHARED_MAIL_DOMAINS = new Set([
   "gmail.com",
   "googlemail.com",
@@ -88,7 +71,6 @@ function storeCall<A>(operation: () => Promise<A>): Effect.Effect<A, CompanySign
   return Effect.tryPromise({ try: operation, catch: () => new CompanySignInOperationError({}) });
 }
 
-/** A failure at the provider. The cause can hold provider data, so it is not kept. */
 function providerCall<A>(operation: () => Promise<A>): Effect.Effect<A, CompanySignInError> {
   return Effect.tryPromise({
     try: operation,
@@ -113,9 +95,7 @@ interface CompanySignInConnection {
 export interface CompanySignInSettings {
   redirectUri: string;
   scimUrl: string;
-  /** The TXT record that proves a domain: `<name>.<domain>` holds `value`. */
   domainRecord: { name: string; value: string };
-  /** False on a development API, which does not check the DNS record. */
   domainCheck: boolean;
   connection: CompanySignInConnection | null;
 }
@@ -134,7 +114,6 @@ export interface CompanySignInStartInput {
   returnTo: string;
   clientState: string;
   clientChallenge: string;
-  /** The client address from `requestSourceIp`, for the rate limit. */
   sourceIp: string;
 }
 
@@ -205,7 +184,6 @@ function emailDomain(email: string): string {
   return email.slice(email.lastIndexOf("@") + 1);
 }
 
-/** The domains that a flow saved when it started. */
 function storedDomains(value: string): string[] {
   const parsed = JSON.parse(value);
   return Array.isArray(parsed) ? parsed.filter(isString) : [];
@@ -215,7 +193,6 @@ function loopbackHttp(url: URL): boolean {
   return url.protocol === "http:" && (url.hostname === "127.0.0.1" || url.hostname === "localhost");
 }
 
-/** Adds a person to the server of the connection as a member. See `RemoteControlPlane.joinByCompanySignIn`. */
 type JoinServer = (
   hostId: string,
   userId: string,
@@ -226,6 +203,7 @@ export class CompanySignInService {
   readonly #database: D1Database;
   readonly #secret: string | null;
   readonly #development: boolean;
+  readonly #browserExtensionIds: ReadonlySet<string>;
   readonly #fetch: Fetch;
   readonly #now: () => number;
   readonly #flushSessionRevocations: () => Effect.Effect<void, RemoteFailure>;
@@ -237,7 +215,10 @@ export class CompanySignInService {
   readonly #joinServer: JoinServer;
 
   constructor(
-    bindings: Pick<WorkerBindings, "DB" | "COMPANY_SIGN_IN_SECRET" | "AUTH_EXPOSE_DEVELOPMENT_CODE">,
+    bindings: Pick<
+      WorkerBindings,
+      "DB" | "COMPANY_SIGN_IN_SECRET" | "AUTH_EXPOSE_DEVELOPMENT_CODE" | "BROWSER_EXTENSION_IDS"
+    >,
     options: {
       fetch?: Fetch;
       now?: () => number;
@@ -253,8 +234,13 @@ export class CompanySignInService {
     const secret = bindings.COMPANY_SIGN_IN_SECRET?.trim();
     this.#database = bindings.DB;
     this.#secret = secret && new TextEncoder().encode(secret).byteLength >= 32 ? secret : null;
-    // A development API signs in with a local test provider: plain HTTP on loopback, and no DNS.
     this.#development = bindings.AUTH_EXPOSE_DEVELOPMENT_CODE === "true";
+    this.#browserExtensionIds = new Set(
+      (bindings.BROWSER_EXTENSION_IDS ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => BROWSER_EXTENSION_ID_PATTERN.test(id)),
+    );
     this.#fetch = options.fetch ?? ((input, init) => fetch(input, init));
     this.#now = options.now ?? Date.now;
     this.#flushSessionRevocations = options.flushSessionRevocations ?? (() => Effect.void);
@@ -262,10 +248,6 @@ export class CompanySignInService {
     this.#joinServer = options.joinServer ?? (() => Effect.succeed("member"));
   }
 
-  /**
-   * True when the email is at a domain whose connection is on. Then email codes are refused. With no
-   * secret, company sign-in cannot start, so everyone signs in with an email code.
-   */
   readonly usesCompanySignIn = Effect.fn("CompanySignIn.usesCompanySignIn")(function* (
     this: CompanySignInService,
     email: string,
@@ -312,7 +294,6 @@ export class CompanySignInService {
     };
   });
 
-  /** Starts a test sign-in with the values of the dialog. A test that passes saves them. */
   readonly startTest = Effect.fn("CompanySignIn.startTest")(function* (
     this: CompanySignInService,
     user: AuthUser,
@@ -331,7 +312,6 @@ export class CompanySignInService {
     if (!this.#development) {
       for (const domain of domains) yield* this.#requireDomainRecord(secret, hostId, domain);
     }
-    // The saved secret is never used again for a test: a changed issuer must not receive it.
     if (!input.clientSecret) return yield* invalid("Enter the client secret.");
     const ciphertext = yield* this.#encrypt(secret, input.clientSecret);
     const metadata = yield* this.#discover(input.issuer);
@@ -372,7 +352,6 @@ export class CompanySignInService {
     }
   });
 
-  /** Removes the connection. Its domains go back to email codes, and SCIM stops. */
   readonly remove = Effect.fn("CompanySignIn.remove")(function* (
     this: CompanySignInService,
     user: AuthUser,
@@ -384,7 +363,6 @@ export class CompanySignInService {
     );
   });
 
-  /** A new SCIM token replaces the earlier one. Only its hash is stored, so it shows once. */
   readonly createScimToken = Effect.fn("CompanySignIn.createScimToken")(function* (
     this: CompanySignInService,
     user: AuthUser,
@@ -426,7 +404,6 @@ export class CompanySignInService {
     );
   });
 
-  /** Counts one attempt for `key` in the current window, in the table of the email sign-in limits. */
   readonly #enforceRateLimit = Effect.fn("CompanySignIn.enforceRateLimit")(function* (
     this: CompanySignInService,
     key: string,
@@ -453,7 +430,6 @@ export class CompanySignInService {
     this: CompanySignInService,
     input: CompanySignInStartInput,
     requestUrl: string,
-    /** The web app's origin, when the web app started the sign-in. `requestUrl` is then the API's. */
     webOrigin?: string,
   ): Effect.fn.Return<{ authorizationUrl: string }, CompanySignInFailure> {
     yield* this.#requireSecret();
@@ -497,10 +473,6 @@ export class CompanySignInService {
     });
   });
 
-  /**
-   * Finishes the flow that the provider sent the browser back for. The answer is the app's loopback
-   * address with the result, or null when the request has no flow, such as an old browser tab.
-   */
   readonly finish = Effect.fn("CompanySignIn.finish")(function* (
     this: CompanySignInService,
     params: URLSearchParams,
@@ -509,7 +481,6 @@ export class CompanySignInService {
     const state = params.get("state");
     if (!state || !TOKEN_PATTERN.test(state)) return null;
     const stateHash = yield* sha256(state).pipe(Effect.mapError(() => new CompanySignInOperationError({})));
-    // One use: a second visit of the same address finds no flow.
     const flow = yield* storeCall(() =>
       this.#database
         .prepare("DELETE FROM company_sign_in_flows WHERE state_hash = ? RETURNING *")
@@ -526,16 +497,11 @@ export class CompanySignInService {
     const result = yield* this.#completeFlow(flow, params, requestUrl).pipe(
       Effect.map((values) => back(values)),
       Effect.catchTag("CompanySignInError", (error) => Effect.succeed(back({ error: error.code }))),
-      // The flow is spent, so each other failure also goes back to the app, which then stops its wait.
       Effect.catch(() => Effect.succeed(back({ error: "company_sign_in_failed" }))),
     );
     return result;
   });
 
-  /**
-   * Gives the session for a one-time code. The verifier proves the app that started the flow. With a
-   * device, the session is a mobile session that replaces the earlier session of that device.
-   */
   readonly exchange = Effect.fn("CompanySignIn.exchange")(function* (
     this: CompanySignInService,
     input: { code: string; codeVerifier: string; device?: MobileAuthDeviceIdentity },
@@ -552,8 +518,6 @@ export class CompanySignInService {
     const now = this.#now();
     const session = { id: crypto.randomUUID(), token: randomToken() };
     const tokenHash = yield* hash(session.token);
-    // The session row is made only by the exchange that spent the code with the right verifier. One
-    // batch: a session without its mobile row would count as a desktop session.
     const [spent, , registered] = yield* storeCall(() =>
       this.#database.batch([
         this.#database
@@ -574,7 +538,6 @@ export class CompanySignInService {
     if (spent?.meta.changes !== 1) return yield* failed;
     if (input.device) {
       if (registered?.meta.changes !== 1) return yield* new CompanySignInOperationError({});
-      // The revocation of the earlier session is written, and the cron delivers it again.
       yield* this.#flushSessionRevocations().pipe(Effect.catch(() => Effect.void));
     }
     const row = yield* storeCall(() =>
@@ -590,7 +553,6 @@ export class CompanySignInService {
     return { sessionToken: session.token, user: mapUser(row) };
   });
 
-  /** The connection that a SCIM token belongs to. */
   readonly scimConnection = Effect.fn("CompanySignIn.scimConnection")(function* (
     this: CompanySignInService,
     token: string | null,
@@ -608,7 +570,6 @@ export class CompanySignInService {
     return { hostId: row.host_id, actorUserId: row.updated_by_user_id };
   });
 
-  /** A person at one of the connection's domains, or null. */
   readonly scimUser = Effect.fn("CompanySignIn.scimUser")(function* (
     this: CompanySignInService,
     hostId: string,
@@ -631,7 +592,6 @@ export class CompanySignInService {
     return { id: row.id, email: row.email, name: row.name, externalId: row.external_id, active: row.active !== 0 };
   });
 
-  /** Makes the account for a person the provider adds. The person signs in later at the provider. */
   readonly scimCreate = Effect.fn("CompanySignIn.scimCreate")(function* (
     this: CompanySignInService,
     connection: { hostId: string; actorUserId: string },
@@ -661,16 +621,10 @@ export class CompanySignInService {
     );
     const user = yield* this.scimUser(connection.hostId, { email });
     if (!user) return yield* new CompanySignInOperationError({});
-    // A new row starts on. Off, or a change of a row that exists, goes through the same path as a PATCH,
-    // which ends sessions and removes the person, or adds the person again.
     if (user.active !== input.active) yield* this.scimSetActive(connection, user.id, input.active);
     return { ...user, active: input.active };
   });
 
-  /**
-   * Turns a person on or off. Off ends every session of the account and removes it from the server.
-   * On lets the person sign in again and adds them to the server again.
-   */
   readonly scimSetActive = Effect.fn("CompanySignIn.scimSetActive")(function* (
     this: CompanySignInService,
     connection: { hostId: string; actorUserId: string },
@@ -688,11 +642,7 @@ export class CompanySignInService {
         .bind(connection.hostId, userId, active ? 1 : 0, now)
         .run(),
     );
-    // A person that the provider turns on again comes back, also after the removal that turning off made.
     if (active) return yield* this.#join(connection.hostId, userId, { restore: true });
-    // The trigger on `revoked_at` ends the remote sessions of these sessions and queues their events.
-    // An email code or a company sign-in code that the person got before is spent too, so it cannot
-    // make a new session.
     yield* storeCall(() =>
       this.#database.batch([
         this.#database
@@ -781,8 +731,38 @@ export class CompanySignInService {
     if (inactive) {
       return yield* new CompanySignInError(403, "company_account_disabled", "Your company turned this account off.");
     }
-    // The company's provider decides who gets in, so a person who signs in joins with no invitation.
     yield* this.#join(flow.host_id, userId, { restore: false });
+    return { code: yield* this.#issueCode(userId, flow.client_challenge) };
+  });
+
+  readonly issueBrowserExtensionCode = Effect.fn("CompanySignIn.issueBrowserExtensionCode")(function* (
+    this: CompanySignInService,
+    userId: string,
+    input: { extensionId: string; clientChallenge: string },
+  ): Effect.fn.Return<{ code: string }, CompanySignInFailure> {
+    const listed = this.#development || this.#browserExtensionIds.has(input.extensionId);
+    if (!BROWSER_EXTENSION_ID_PATTERN.test(input.extensionId) || !listed) {
+      return yield* new CompanySignInError(
+        403,
+        "browser_extension_not_allowed",
+        "This browser extension cannot sign in to OpenBot.",
+      );
+    }
+    if (!TOKEN_PATTERN.test(input.clientChallenge)) {
+      return yield* new CompanySignInError(
+        400,
+        "invalid_company_sign_in_code",
+        "The sign-in did not finish. Try again.",
+      );
+    }
+    return { code: yield* this.#issueCode(userId, input.clientChallenge) };
+  });
+
+  readonly #issueCode = Effect.fn("CompanySignIn.issueCode")(function* (
+    this: CompanySignInService,
+    userId: string,
+    clientChallenge: string,
+  ): Effect.fn.Return<string, CompanySignInFailure> {
     const exchangeCode = randomToken(32);
     const codeHash = yield* sha256(exchangeCode).pipe(Effect.mapError(() => new CompanySignInOperationError({})));
     const now = this.#now();
@@ -792,10 +772,10 @@ export class CompanySignInService {
           `INSERT INTO company_sign_in_codes(code_hash, user_id, client_challenge, created_at, expires_at)
            VALUES (?, ?, ?, ?, ?)`,
         )
-        .bind(codeHash, userId, flow.client_challenge, now, now + CODE_TTL_MS)
+        .bind(codeHash, userId, clientChallenge, now, now + CODE_TTL_MS)
         .run(),
     );
-    return { code: exchangeCode };
+    return exchangeCode;
   });
 
   readonly #join = Effect.fn("CompanySignIn.join")(function* (
@@ -810,7 +790,6 @@ export class CompanySignInService {
     if (result === "no_seat") console.warn("Company sign-in found no free seat on the server.", { hostId });
   });
 
-  /** The account of the provider's person: the linked one, else the one with the email, else a new one. */
   readonly #accountFor = Effect.fn("CompanySignIn.accountFor")(function* (
     this: CompanySignInService,
     issuer: string,
@@ -952,7 +931,6 @@ export class CompanySignInService {
         "The provider gave a sign-in that cannot be checked.",
       );
     }
-    // Entra ID often gives no `email`; its `preferred_username` is then the sign-in address.
     const address = isString(claims.email)
       ? claims.email
       : isString(claims.preferred_username)
@@ -966,7 +944,6 @@ export class CompanySignInService {
         "The provider did not give a verified email address.",
       );
     }
-    // Each Google account has the same issuer. Only `hd` shows that a Workspace of the company manages the account.
     const hostedDomain = isString(claims.hd) ? claims.hd.toLowerCase() : null;
     return { subject: claims.sub, email, hostedDomain };
   });
@@ -1032,7 +1009,6 @@ export class CompanySignInService {
     url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("code_challenge_method", "S256");
     if (input.loginHint) url.searchParams.set("login_hint", input.loginHint);
-    // A test signs in as a person the owner picks, not as the account the browser already has.
     if (input.purpose === "test") url.searchParams.set("prompt", "select_account");
     return { authorizationUrl: url.toString() };
   });
@@ -1041,14 +1017,12 @@ export class CompanySignInService {
     this: CompanySignInService,
     issuerInput: string,
   ): Effect.fn.Return<ProviderMetadata, CompanySignInError> {
-    // The Entra ID portal shows the address of the metadata document. It is the issuer with a suffix.
     const issuer = issuerInput.trim().replace(/\/\.well-known\/openid-configuration\/?$/u, "");
     const issuerUrl = URL.canParse(issuer) ? new URL(issuer) : null;
     if (!issuerUrl || issuer.length > 512 || issuerUrl.search || issuerUrl.hash || !this.#allowedEndpoint(issuerUrl)) {
       return yield* invalid("Enter the issuer URL of the provider, such as https://login.microsoftonline.com/…/v2.0.");
     }
     const discoveryUrl = `${issuer.replace(/\/+$/u, "")}/.well-known/openid-configuration`;
-    // Workers refuse `redirect: "error"`. With `manual`, a redirect answer is not `ok`, so it is refused.
     const document = yield* providerCall(async () => {
       const response = await this.#fetch(discoveryUrl, {
         headers: { Accept: "application/json" },
@@ -1065,12 +1039,9 @@ export class CompanySignInService {
     );
     if (!isDynamicRecord(document)) return yield* notFound;
     const { issuer: documentIssuer, authorization_endpoint, token_endpoint, jwks_uri } = document;
-    // Entra ID `common` and `organizations` give a placeholder issuer, which no token has.
     if (isString(documentIssuer) && documentIssuer.includes("{")) {
       return yield* invalid("Enter the issuer URL with your tenant ID, not common or organizations.");
     }
-    // Entra ID gives the issuer with the tenant ID for a tenant domain. Only the host that sent the
-    // document can give another issuer, and that issuer is the one that is saved and checked in tokens.
     if (
       !isString(documentIssuer) ||
       !URL.canParse(documentIssuer) ||
@@ -1103,9 +1074,7 @@ export class CompanySignInService {
   readonly #validateReturn = Effect.fn("CompanySignIn.validateReturn")(function* (
     returnTo: string,
     clientState: string,
-    /** Given for a web sign-in. A test returns only to the desktop app. */
     webOrigin?: string,
-    /** True for a sign-in that an app starts. A test is not made on the phone. */
     mobile = false,
   ) {
     const webReturn = webOrigin !== undefined && returnTo === new URL(WEB_RETURN_PATH, webOrigin).toString();
@@ -1151,7 +1120,6 @@ export class CompanySignInService {
     }
   });
 
-  /** The TXT record `_openbot.<domain>` must hold the value of this server. */
   readonly #requireDomainRecord = Effect.fn("CompanySignIn.requireDomainRecord")(function* (
     this: CompanySignInService,
     secret: string,

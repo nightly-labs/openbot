@@ -1,8 +1,3 @@
-// Runs the real `grok` provider driver over a fake Grok agent (`provider-fakes/agents/grok-question.ts`)
-// to check the reply to Grok's `ask_user_question`. Grok CLI 1.0.77 reads the reply as an enum with
-// the tag `outcome`; a reply without it failed the tool, and the model then asked in prose.
-// Cases: all questions answered, one question answered, and no answer.
-// `bun run test:grok-question`. Writes .openbot-build/grok-question-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -50,7 +45,6 @@ try {
     NO_PROVIDER_CREDENTIALS,
   );
   clients.push(client);
-  /** The answers of the next question prompt, by question number. */
   let answers: readonly (readonly string[])[] = [];
   let asked: Asked[] = [];
   client.on("request", (request) => {
@@ -65,7 +59,6 @@ try {
       options: getArray(question, "options").length,
       multiSelect: question.multiSelect === true,
     }));
-    // As the app answers: only the answered questions, by question id.
     client.respond(request.id, {
       answers: Object.fromEntries(
         asked.flatMap(({ id }, index) => {

@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Saisie sur la page",
   "mobile.browser.reconnect": "Se reconnecter",
   "mobile.browser.status.connecting": "Connexion au navigateur…",
+  "mobile.browser.dialog.title": "La page affiche un message",
+  "mobile.browser.dialog.ok": "OK",
   "mobile.browser.status.ended": "La vue en direct est terminée.",
   "mobile.browser.status.offline": "Le serveur n’est pas connecté.",
   "mobile.browser.status.noTab": "{name} n’a aucun onglet de navigateur ouvert.",
@@ -85,4 +87,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Rendre la main",
   "mobile.browser.help.handBack.body":
     "Quand un agent vous demande de prendre la main, choisissez « J’ai terminé » dans le menu ···. L’agent continue ensuite dans cet onglet.",
+  "mobile.browser.location.title": "{site} veut connaître votre position",
+  "mobile.browser.location.description": "Autorisez uniquement les sites de confiance.",
+  "mobile.browser.location.block": "Bloquer",
+  "mobile.browser.location.allow": "Autoriser",
+  "mobile.browser.location.allowAlways": "Toujours autoriser",
+  "mobile.browser.location.unavailable": "Impossible d’obtenir la position de cet appareil.",
+  "mobile.browser.location.answerFailed": "Impossible de répondre à la demande de position.",
 } as const satisfies PartialTranslation<typeof source>;

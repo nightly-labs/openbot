@@ -1,8 +1,5 @@
 import type { PluginGuide } from "./plugin-guide";
 
-// Every statement about TryPost here is taken from trypost.it and docs.trypost.it. Each page used is
-// in `sources`. Check the sources again, and move `checkedAt`, whenever this file changes.
-
 export const TRYPOST_PLUGIN_GUIDE: PluginGuide = {
   uses: [
     {

@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/skill";
 
 export const messages = {
-  // Skill package, library, and marketplace errors.
   "error.skill.symlinks": "스킬 패키지에는 심볼릭 링크를 포함할 수 없어요.",
   "error.skill.expandedTooLarge": "압축을 푼 스킬은 10MB보다 작아야 해요.",
   "error.skill.irregularEntry": "스킬 패키지에는 일반 파일과 폴더만 포함할 수 있어요.",
@@ -45,7 +44,8 @@ export const messages = {
   "error.skill.publishUntracked":
     "{name}은(는) 정확한 버전 추적이 도입되기 전에 설치되었어요. 게시하기 전에 업데이트하거나 복구해 주세요.",
   "error.skill.tooManySkills": "에이전트에는 스킬을 최대 {limit}개까지 둘 수 있어요.",
-  "error.skill.unmanagedExists": "{path}에 관리되지 않는 스킬이 이미 있어요.",
+  "error.skill.ownSkillExists":
+    "이 에이전트에는 이미 {slug}(이)라는 자체 스킬이 있어요. 에이전트에게 그 스킬의 이름을 바꾸거나 삭제해 달라고 요청한 다음 이 스킬을 다시 추가해 주세요.",
   "error.skill.managedSlug":
     "OpenBot은 모든 에이전트에 자체 {slug} 스킬을 제공해요. 이 스킬에는 다른 이름을 지정해 주세요.",
   "error.skill.templateMarkdownTooLarge": "{name}: SKILL.md가 64KB보다 커요. 게시하기 전에 줄여 주세요.",

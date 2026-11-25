@@ -8,10 +8,6 @@ import type {
 import { appPort } from "../../app-port";
 import { type AgentSkillCalls, agentSkillCalls, type SkillsPort, skillsPort } from "../../skills-port";
 
-/**
- * What the marketplace calls. The desktop app reads the catalog and changes agents through main. The
- * browser client reads the catalog on its own origin and changes its host over the Team API.
- */
 export interface MarketplaceCalls {
   skills: Pick<SkillsPort["skills"], "get" | "getBySlug" | "list">;
   agents: Pick<SkillsPort["marketplaceAgents"], "get" | "getListing" | "list">;
@@ -31,47 +27,28 @@ export interface MarketplaceCalls {
     | "signOutMcpServer"
     | "testMcpServer"
   >;
-  /** Who gets each MCP server (`mcp-access-v1`). Absent: this client cannot change it. */
   mcpAccess?: MarketplaceMcpAccessCalls | undefined;
-  /** `serverId` absent: this computer, which is also the only place an installed agent is updated. */
   addAgent: (input: InstallMarketplaceAgentInput, serverId: string | undefined) => Promise<AddedAgent>;
   openUrl: (url: string) => Promise<void>;
-  /** A sign-in that a joined server relays to this computer's browser. Absent: this client cannot take one. */
   signInRelay?: MarketplaceSignInRelay | undefined;
-  /**
-   * Copies the page of a sign-in that waits in this computer's browser. Absent: this client signs in
-   * only on a joined server, whose page is not in this computer's browser.
-   */
   copySignInLink?: ((url: string, serverId: string) => Promise<void>) | undefined;
-  /** Asks macOS on this computer for Automation access to Apple apps. Absent: this client cannot. */
   macAutomation?: SkillsPort["macAutomation"]["request"] | undefined;
-  /**
-   * The origin of a copied agent or skill link. Absent: `openbot.run`, as for a plugin link. The
-   * browser client gives the local Worker's origin while a developer runs it.
-   */
   shareOrigin?: string | undefined;
 }
 
-/** The MCP access of this computer (`serverId` absent) or of a joined server, and the roles it names. */
 interface MarketplaceMcpAccessCalls {
   get: (serverId: string) => Promise<McpAccessSnapshot>;
   set: (input: SetMcpAccessInput, serverId: string) => Promise<McpAccessSnapshot>;
   roles: (serverId: string) => Promise<readonly { id: string; name: string }[]>;
 }
 
-/** The relayed sign-in of the app at `url` on the joined server `serverId`, while it waits. */
 export interface MarketplaceSignInRelay {
   page: (url: string, serverId: string) => Promise<McpSignInRelayPage | null>;
   open: (url: string, serverId: string) => Promise<void>;
   paste: (url: string, address: string, serverId: string) => Promise<void>;
-  /**
-   * The host tab of a sign-in whose page only the joined server can reach, while it waits. The host
-   * opens it instead of the relay. Absent: this client cannot start such a sign-in.
-   */
   hostTab?: ((url: string, serverId: string) => Promise<string | null>) | undefined;
 }
 
-/** Read on each call, as `skillsPort` is: tests and stories replace `window.openbot` per case. */
 export function desktopMarketplaceCalls(): MarketplaceCalls {
   const port = skillsPort();
   return {

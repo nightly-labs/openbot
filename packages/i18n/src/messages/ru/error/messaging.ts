@@ -1,7 +1,6 @@
 import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/error/messaging";
 
-// Not translated yet: the screen shows the English text.
 export const messages = {
   "error.messaging.notConnected": "Это рабочее пространство Slack не подключено.",
   "error.messaging.unsupported": "Этот компьютер не может подключиться к Slack.",
@@ -24,6 +23,7 @@ export const messages = {
   "error.messaging.whatsappTooManySenders": "Номер WhatsApp может разрешить не более 200 контактов и групп.",
   "error.messaging.whatsappNumberNotFound":
     "У этого номера нет аккаунта WhatsApp. Введите его с кодом страны, например +44 7700 900123.",
+  "error.messaging.whatsappSenderNotFound": "Этого контакта или группы больше нет в списке.",
   "error.messaging.whatsappRequestEnded":
     "Срок этого запроса истёк. Попросите человека написать снова, чтобы получить новый код.",
   "error.messaging.memoryLimit":

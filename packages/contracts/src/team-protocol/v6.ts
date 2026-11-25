@@ -10,10 +10,6 @@ import {
 } from "./v6-base";
 
 export const TEAM_PROTOCOL_V6 = 6 as const;
-/**
- * A peer that reads Cursor (`cursor`) and Cline (`cline`). The host answers it on protocol 6; a peer
- * without it stays on protocol 5 or older, which never names these providers.
- */
 export const TEAM_CURSOR_CLINE_CAPABILITY = "local-providers-v2";
 export const TEAM_PROTOCOL_V6_CAPABILITIES = [
   ...TEAM_PROTOCOL_V6Base_CAPABILITIES,

@@ -15,10 +15,8 @@ export const HOSTED_SITE_LIMITS = {
   uploadAttemptMultiplier: 2,
   creationsPerHour: 20,
   creationsPerDay: 100,
-  /**
-   * A new site's first upload with no file upload for this long is stopped, and a new site of its bucket can take
-   * its slot. A live publish sends its files one after the other, so it is never idle for this long.
-   */
+  activationsPerHour: 20,
+  activationsPerDay: 100,
   idleUploadMs: 60_000,
   accountSites: HOSTED_SITE_ACCOUNT_LIMIT,
   ...HOSTED_SITE_UPLOAD_LIMITS,
@@ -53,9 +51,10 @@ export class HostedSiteInputError extends Schema.TaggedError<HostedSiteInputErro
   status: Schema.Literals([400, 401, 404, 409, 413, 429]),
   code: Schema.String,
   message: Schema.String,
+  retryAfterSeconds: Schema.optional(Schema.Number),
 }) {
-  constructor(status: 400 | 401 | 404 | 409 | 413 | 429, code: string, message: string) {
-    super({ status, code, message });
+  constructor(status: 400 | 401 | 404 | 409 | 413 | 429, code: string, message: string, retryAfterSeconds?: number) {
+    super({ status, code, message, ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }) });
   }
 }
 

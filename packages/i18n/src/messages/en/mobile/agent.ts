@@ -316,6 +316,8 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.runtime.noModels": "No models available for this provider.",
   "mobile.agent.runtime.searchModels": "Search models",
   "mobile.agent.runtime.noMatches": "No models match your search.",
+  "mobile.agent.runtime.openrouterNoMatches":
+    "No models match your search. Your privacy, provider and guardrail settings on openrouter.ai can hide models from this list.",
   "mobile.agent.runtime.workspaceOnlyUnavailable":
     "This provider does not work with Workspace only on Windows and Linux. To use it, change Permissions first.",
   "mobile.agent.runtime.usageLimit": "Usage limit reached",
@@ -368,6 +370,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.backupModels.remove": "Remove {model}",
   "mobile.agent.backupModels.unavailable": "Not available now · skipped",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "When a usage limit stops {name} after it starts to work, {name} continues the same work on the first available model in the order. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "mobile.agent.busyMessage.label": "While working",
@@ -392,10 +395,15 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.browserProfile.manage": "Manage profiles",
   "mobile.agent.browserProfile.footer":
     "Each profile keeps its own sign-ins and cookies. A change closes the agent's open tabs.",
+  "mobile.agent.browserProfile.movedNote":
+    "Site sign-ins stay in the old profile. The agent must sign in to these sites again.",
   "mobile.agent.browserProfile.saveFailed": "OpenBot could not change the browser profile of the agent.",
   "mobile.agent.planCard.label": "Show the plan before long tasks",
   "mobile.agent.planCard.footer":
     "Before a long task, the agent shows its plan. It starts after 10 s, or when you press Start.",
+  "mobile.agent.builtinMemory.label": "OpenBot memory",
+  "mobile.agent.builtinMemory.footer":
+    "The agent saves and reads its own memories. Turn off to use only a memory app, such as Mem0. Saved memories stay.",
   "mobile.agent.workspace.title": "Workspace folder",
   "mobile.agent.workspace.footer": "The folder of this agent on the host computer.",
   "mobile.agent.advanced.behavior": "Behavior",
@@ -411,10 +419,11 @@ export const messages = defineMessages("mobile.agent", {
     "This server cannot keep your own notification level for an agent. Update OpenBot on the computer that runs it.",
   "mobile.agent.newChat.title": "New chat",
   "mobile.agent.newChat.starting": "Starting new chat…",
-  "mobile.agent.newChat.footer": "The agent forgets this chat. Its setup stays.",
+  "mobile.agent.newChat.footer":
+    "The agent starts fresh and can still look up this chat when it needs to. Its setup stays.",
   "mobile.agent.newChat.confirmTitle": "Start a new chat with {name}?",
   "mobile.agent.newChat.confirmBody":
-    "The agent forgets this chat. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
+    "The agent starts fresh and can still look up this chat when it needs to. The messages stay visible above a divider. The instructions, model, tools, memories, workspace, and browser do not change.",
   "mobile.agent.newChat.confirm": "Start new chat",
   "mobile.agent.newChat.failed": "Could not start a new chat",
   "mobile.agent.newChat.failedBody": "The host could not start a new chat.",
@@ -475,6 +484,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.publish.unsupported": "This host cannot publish agents from a remote device.",
   "mobile.agent.usage.tokensWithoutCacheReads": "Tokens without cache reads",
   "mobile.agent.usage.estimatedCost": "Estimated cost",
+  "mobile.agent.usage.noCostEstimate": "No cost estimate",
   "mobile.agent.usage.daily": "Daily usage",
   "mobile.agent.usage.tokens": "Tokens",
   "mobile.agent.usage.cost": "Cost",
@@ -509,6 +519,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.usage.collection": "Collection started {started}. Updated {updated}.",
   "mobile.agent.usage.never": "never",
   "mobile.agent.record.time": "Time",
+  "mobile.agent.record.date": "Date",
   "mobile.agent.section.changeFailed": "Could not change folder",
   "mobile.agent.section.tryAgain": "Please try again.",
   "mobile.agent.section.moveUp": "Move up",
@@ -588,13 +599,13 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.home.serversFailed": "Couldn’t load your servers",
   "mobile.agent.home.serversFailedBody": "Check that the desktop app is running and try again.",
   "mobile.agent.home.noServers": "No servers available",
-  "mobile.agent.home.noServersBody": "Connect the desktop app again or join a remote server.",
+  "mobile.agent.home.noServersBody":
+    "Open OpenBot on your computer with this account, and turn on Publish this server in Server settings → Members. Or join a remote server.",
   "mobile.agent.home.chooseServer": "Choose a server",
   "mobile.agent.home.openServers": "Open servers",
   "mobile.agent.home.noChatOpen": "No chat open",
   "mobile.agent.home.noChatOpenBody": "Choose a chat in the list.",
   "mobile.agent.home.chatListWidth": "Chat list width",
-  "mobile.agent.home.serverTitle": "{name}, open servers",
   "mobile.agent.home.waiting": "Waiting for connection",
   "mobile.agent.home.waitingBody": "The agent list will load once this server is connected.",
   "mobile.agent.home.noAgents": "No agents on this server",
@@ -665,6 +676,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.folders.includeConfirm": "Stop excluding",
   "mobile.agent.folders.browseTitle": "Choose folder",
   "mobile.agent.folders.places": "Go to",
+  "mobile.agent.folders.path": "Folder path",
   "mobile.agent.folders.home": "Home folder",
   "mobile.agent.folders.parent": "Up to {folder}",
   "mobile.agent.folders.browseFailed": "Could not open this folder.",

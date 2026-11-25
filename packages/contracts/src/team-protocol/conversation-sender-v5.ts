@@ -2,15 +2,6 @@ import { isConversationMessageSender } from "../ipc-conversation-messages";
 import { isDynamicRecord, isString } from "../runtime-values";
 import type { TeamProtocolV5BaseJsonObject, TeamProtocolV5BaseJsonValue } from "./v5-base";
 
-/**
- * `senderMember` rides beside the frozen conversation projection, in the way `plan` does: the
- * shipped key lists drop it, so a client on protocol 1-4 shows every user message as its reader's
- * own, as it always did. Only the current protocol names the person who wrote it.
- *
- * A present sender must decode. The projection removes the key, so an unchecked value would reach
- * the client as a name no member bound allowed. Fail closed instead; an absent sender still means
- * an older host, or a message from before senders were kept.
- */
 export function withConversationSenders(
   projected: TeamProtocolV5BaseJsonValue,
   source: unknown,
@@ -19,7 +10,6 @@ export function withConversationSenders(
   const senders = new Map<string, TeamProtocolV5BaseJsonObject>();
   for (const message of [
     ...(Array.isArray(source.messages) ? source.messages : []),
-    // A page names the messages its replies point at separately, and a quoted reply names its author.
     ...(isDynamicRecord(source.references) ? Object.values(source.references) : []),
   ]) {
     if (!isDynamicRecord(message) || message.senderMember === undefined) continue;

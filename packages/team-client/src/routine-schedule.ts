@@ -33,7 +33,6 @@ interface CronSpec {
   exactTimes?: Set<string>;
 }
 
-/** A routine request the caller can correct. Other errors are faults. */
 export class RoutineInputError extends Error {}
 
 export function validateStoredRoutineSchedule(schedule: RoutineSchedule, timezone: string): void {
@@ -73,11 +72,6 @@ function hasRunsTooClose(spec: CronSpec, timezone: string): boolean {
   return false;
 }
 
-/**
- * The check for a schedule being saved. Steps restart at each hour or day, so "every 59 minutes"
- * also runs at :59 and then :00. A stored schedule is read through `validateStoredRoutineSchedule`:
- * an older version accepted such a schedule, and rejecting it on read would stop every routine from loading.
- */
 export function validateRoutineSchedule(schedule: RoutineSchedule, timezone: string): void {
   validateStoredRoutineSchedule(schedule, timezone);
   if (schedule.kind === "custom") validateCronSaveSyntax(schedule.expression);
@@ -97,7 +91,6 @@ export function nextRoutineOccurrence(schedule: RoutineSchedule, timezone: strin
   return nextValidRoutineOccurrence(schedule, timezone, after);
 }
 
-/** For a schedule that `validateStoredRoutineSchedule` accepted: a custom one costs 200 searches to validate. */
 export function nextValidRoutineOccurrence(schedule: RoutineSchedule, timezone: string, after: Date): Date {
   if (schedule.kind === "once") {
     const due = routineOnceInstant(schedule, timezone);
@@ -115,10 +108,6 @@ export function nextValidRoutineOccurrence(schedule: RoutineSchedule, timezone: 
   return nextCronOccurrence(scheduleCronSpec(schedule), timezone, after);
 }
 
-/**
- * The instant of a one-time schedule. A local time that repeats runs at its first instant. A local
- * time in a gap runs at the first minute after the gap, so a date that a clock change skips still runs.
- */
 export function routineOnceInstant(schedule: Extract<RoutineSchedule, { kind: "once" }>, timezone: string): Date {
   const [year = Number.NaN, month = Number.NaN, day = Number.NaN] = schedule.date.split("-").map(Number);
   const [hour, minute] = parseTime(schedule.time);
@@ -141,7 +130,6 @@ export function routineOnceInstant(schedule: Extract<RoutineSchedule, { kind: "o
   throw new RoutineInputError(sourceText("error.backend.routineNoOccurrence"));
 }
 
-/** The longest clock change of a time zone is shorter than this. */
 const MAX_GAP_MINUTES = 3 * 60;
 
 export function normalizeRoutineSchedule(schedule: RoutineSchedule, now = new Date()): RoutineSchedule {
@@ -259,8 +247,6 @@ function nextCronOccurrence(spec: CronSpec, timezone: string, after: Date): Date
         const candidates = zonedDateTimeCandidates({ year, month, day, weekday, hour, minute }, timezone);
         for (const [index, candidate] of candidates.entries()) {
           if (candidate.getTime() <= after.getTime()) continue;
-          // First occurrences follow wall-clock order. A second occurrence can precede a later
-          // wall time's first occurrence, even across hours when the clock moves back several hours.
           if (index === 0) {
             return repeatedCandidate && repeatedCandidate.getTime() < candidate.getTime()
               ? repeatedCandidate
@@ -279,8 +265,6 @@ function nextCronOccurrence(spec: CronSpec, timezone: string, after: Date): Date
 
 function zonedDateTimeCandidates(parts: CalendarParts, timezone: string): Date[] {
   const approximate = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
-  // A local time falls at its UTC time less an offset that the zone uses near it. A time in a gap
-  // has no candidate, and a time that repeats has two.
   const offsets = new Set(
     [-18, 0, 18].map((hours) => {
       const instant = approximate + hours * 3_600_000;
@@ -351,10 +335,8 @@ function parseCron(expression: string): CronSpec {
   );
 }
 
-/** Only ASCII digits. `Number` also reads forms such as `0x5`, `1e1`, `+5` and `5.0`. */
 const CRON_DECIMAL = /^[0-9]+$/;
 
-/** Reject tokens the released parser ignores or reads loosely, but keep stored schedules readable. */
 function validateCronSaveSyntax(expression: string): void {
   const values = expression.trim().split(/\s+/);
   if (!hasFiveFields(values)) throw new RoutineInputError(sourceText("error.backend.routineCronFields"));
@@ -448,11 +430,6 @@ function intervalMilliseconds(amount: number, unit: RoutineIntervalUnit): number
 
 const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
-/**
- * Walks a trigger forward over every occurrence the process slept through and returns the last one
- * plus the first still in the future. Missed occurrences are collapsed, never replayed: an app that
- * was closed for a week must not wake into a week of firings.
- */
 export function collapseMissedOccurrences(
   schedule: RoutineSchedule,
   timezone: string,

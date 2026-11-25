@@ -11,13 +11,7 @@ import { currentText } from "@/shared/lib/text";
 import { remoteViewerProxyNative, type ViewerProxyRequest } from "./remote-viewer-proxy-native";
 import { VIEWER_STATS_FILE } from "./viewer-page-script";
 
-// The phone's copy of the desktop app's `RemoteViewerProxy`. The host's Moonlight viewer loads in a
-// web view from a loopback address with a random token. The native module only reads HTTP and
-// WebSocket frames; this file sends each request to the host as a Team API request and each socket
-// over the peer's desktop channel. The viewer's video goes over its own WebRTC connection.
-
 type ViewerState = "connecting" | "connected" | "error";
-/** How the video reaches the phone: straight from the computer, or through a TURN relay. */
 export type ViewerRoute = "p2p" | "relay";
 
 export interface ViewerReport {
@@ -27,18 +21,13 @@ export interface ViewerReport {
 }
 
 export interface ViewerProxy {
-  /** The viewer page for the session. The grant is in the fragment, so no request carries it. */
   viewerUrl(grant: string): string;
   stop(): Promise<void>;
 }
 
-/** The host's file answers and the attachment limit allow a few files at a time. */
 const REQUESTS_IN_FLIGHT = 4;
-/** The native server answers 504 after this, so a request that takes longer frees its place. */
 const REQUEST_DEADLINE_MS = 60_000;
-/** As the desktop proxy: what a socket can hold before the host opens it. */
 const MAX_PENDING_SIGNAL_BYTES = 1024 * 1024;
-// The desktop proxy sends the same policy for the viewer's pages.
 const VIEWER_PAGE_POLICY =
   "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:";
 
@@ -59,7 +48,6 @@ function utf8Base64(text: string): string {
   return bytesToBase64(new TextEncoder().encode(text));
 }
 
-/** Hermes has no `TextDecoder`. A request body here is a small JSON text. */
 function utf8Text(bytes: Uint8Array): string {
   let text = "";
   for (let index = 0; index < bytes.length; ) {
@@ -73,11 +61,6 @@ function utf8Text(bytes: Uint8Array): string {
   return text;
 }
 
-/**
- * The viewer's own files name `/v1/remote-screen`, in plain form and with escaped slashes. Both get
- * the proxy's token first, as on desktop. The names are ASCII, and an ASCII byte is never part of a
- * longer UTF-8 character, so the change is made on the bytes without decoding them.
- */
 function rewriteNamespace(base64: string, prefix: string): string {
   const namespace = TEAM_API_ROUTES.remoteScreen.prefix;
   const escapedNamespace = namespace.replaceAll("/", "\\/");
@@ -115,7 +98,6 @@ function createLimiter(limit: number) {
   };
 }
 
-/** Null in a build without the native module. */
 export async function startViewerProxy(
   connection: RemoteDesktopConnection,
   sessionId: string,
@@ -127,13 +109,11 @@ export async function startViewerProxy(
   const token = Array.from(Crypto.getRandomBytes(16), (byte) => byte.toString(16).padStart(2, "0")).join("");
   const prefix = `/${token}`;
   const sessionPath = TEAM_API_ROUTES.remoteScreen.session(sessionId);
-  // Only this session's viewer routes and its stream. The host checks them again.
   const viewerRoute = new RegExp(
     `^${sessionPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}/(?:viewer|authorize|viewer-state|moonlight(?:/[A-Za-z0-9_./-]*)?)$`,
     "u",
   );
   const streamPath = `${sessionPath}/stream`;
-  // The page's stats for the app's stats sheet. Moonlight serves no file of this name.
   const statsPath = `${sessionPath}/moonlight/${VIEWER_STATS_FILE}`;
   const limit = createLimiter(REQUESTS_IN_FLIGHT);
   const sockets = new Map<string, ViewerSocket>();
@@ -160,16 +140,13 @@ export async function startViewerProxy(
 
   const forward = async (request: ViewerProxyRequest) => {
     const route = upstream(request.target);
-    // A request of a proxy that a newer session started: that proxy answers it.
     if (!route) return;
     if (!viewerRoute.test(route.pathname)) return respondText(request.requestId, 404, "Not found");
     if (route.pathname === statsPath) {
       if (request.method === "POST" && request.bodyBase64) {
         try {
           onStats(JSON.parse(utf8Text(base64ToBytes(request.bodyBase64))));
-        } catch {
-          // A sample that is not JSON is dropped.
-        }
+        } catch {}
       }
       return respond(request.requestId, 204, {});
     }
@@ -195,7 +172,6 @@ export async function startViewerProxy(
     }
     try {
       const answer = await limit(async () => {
-        // A request that waited for its place after the stop does not go to the host.
         if (stopped) throw new Error("The viewer proxy stopped.");
         let timer: ReturnType<typeof setTimeout> | undefined;
         const deadline = new Promise<never>((_, reject) => {
@@ -245,7 +221,6 @@ export async function startViewerProxy(
     native.addListener("onRequest", (request) => void forward(request)),
     native.addListener("onSocketOpen", ({ socketId, target }) => {
       const route = upstream(target);
-      // A socket of a proxy that a newer session started: that proxy takes it.
       if (!route) return;
       if (route.path !== streamPath) {
         void native.socketClose(socketId, 1008, "").catch(() => undefined);
@@ -296,7 +271,6 @@ export async function startViewerProxy(
     port = await native.start(token);
   } catch {
     for (const subscription of subscriptions) subscription.remove();
-    // The native reason is English: the screen shows the app's own text.
     throw new Error(currentText().t("mobile.server.remoteDesktop.failed"));
   }
 

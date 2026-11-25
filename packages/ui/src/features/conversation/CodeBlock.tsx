@@ -15,11 +15,9 @@ export interface CodeToken {
 export type CodeLine = CodeToken[];
 
 interface HighlightedCode {
-  /** The highlighted source. While the block streams, this ends at its last line break. */
   code: string;
   language: ShjLanguage;
   lines: CodeLine[];
-  /** For each line start, whether the tokenizer had no open token there, so it can start again there. */
   restarts: boolean[];
 }
 
@@ -93,7 +91,6 @@ const SUPPORTED_LANGUAGES = new Set<string>([
   "yaml",
 ]);
 
-// Words, not language names: these are translated.
 const LANGUAGE_TEXT_KEYS = {
   asm: "chat.code.language.assembly",
   bash: "chat.code.language.shell",
@@ -102,7 +99,6 @@ const LANGUAGE_TEXT_KEYS = {
   regex: "chat.code.language.regex",
 } as const satisfies Partial<Record<ShjLanguage, AppTextKey>>;
 
-// Mermaid has no highlighter, so it shows as plain code with its own name.
 const PLAIN_LANGUAGE_LABELS: Record<string, string> = { mermaid: "Mermaid", mmd: "Mermaid" };
 
 const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
@@ -133,11 +129,8 @@ const LANGUAGE_LABELS: Partial<Record<ShjLanguage, string>> = {
 export function CodeBlock(props: {
   block: MessageCodeBlock;
   streaming?: boolean | undefined;
-  /** Buttons before Copy, such as the switch between a preview and its code. */
   actions?: JSX.Element;
-  /** Buttons after Copy, such as the button that opens a larger view. */
   trailingActions?: JSX.Element;
-  /** Places the code lines in a larger body, such as beside a rendered preview of the code. */
   body?: ((code: JSX.Element) => JSX.Element) | undefined;
 }) {
   const { t } = useText();
@@ -149,12 +142,8 @@ export function CodeBlock(props: {
 
   const language = () => codeLanguage(props.block.language);
   const languageLabel = () => codeLanguageLabel(props.block.language, t);
-  // A memo, because the caller computes this prop again for each streamed step of the message.
   const streaming = createMemo(() => props.streaming === true);
 
-  // While the block streams, only complete lines are highlighted, and only from the last line that
-  // the tokenizer can start again at. The open line shows as plain text until it ends. The complete
-  // block is highlighted whole once, so a color that depends on later lines is correct at the end.
   createEffect(
     () => ({ code: props.block.code, language: language(), streaming: streaming() }),
     ({ code, language: selectedLanguage, streaming: blockStreaming }) => {
@@ -190,7 +179,6 @@ export function CodeBlock(props: {
     }
   };
 
-  // One element, so the code keeps its scroll position when a caller moves it into its body.
   const code = (
     <ScrollEdges axis="x" class="message-code-frame" viewClass="message-code-scroll" dir="ltr">
       <pre class="message-code-pre">
@@ -260,14 +248,12 @@ export function codeLanguage(language: string): ShjLanguage {
   return isSupportedLanguage(normalized) ? normalized : "plain";
 }
 
-/** The language of a file from its extension, or from its whole name when it has none, such as `Dockerfile`. */
 export function fileCodeLanguage(name: string): ShjLanguage {
   const fileName = name.slice(name.lastIndexOf("/") + 1);
   const extensionStart = fileName.lastIndexOf(".");
   return codeLanguage(extensionStart > 0 ? fileName.slice(extensionStart + 1) : fileName);
 }
 
-/** The highlighted lines of complete code, or `undefined` when the tokenizer fails. */
 export async function highlightedCodeLines(code: string, language: ShjLanguage): Promise<CodeLine[] | undefined> {
   return (await tokenizedCode(code, language))?.lines;
 }
@@ -310,11 +296,6 @@ function sameCodeLine(left: CodeLine, right: CodeLine): boolean {
   );
 }
 
-/**
- * The lines of `code`: a highlighted line, else a current line, else plain text, each only while
- * its text is still the same. A line equal to the current one is the current array, so `For`
- * keeps its elements.
- */
 function reusedCodeLines(code: string, highlightedLines: CodeLine[], current: CodeLine[]): CodeLine[] {
   return code.split("\n").map((text, index) => {
     const highlightedLine = highlightedLines[index];
@@ -329,19 +310,8 @@ function reusedCodeLines(code: string, highlightedLines: CodeLine[], current: Co
   });
 }
 
-// Languages that contain lines of a different language, such as script in HTML or a fence in
-// Markdown. Their lines have no type, so each one looks like a restart point.
 const EMBEDDING_LANGUAGES = new Set<ShjLanguage>(["html", "md", "leanpub-md"]);
 
-/**
- * Highlights `code`. With an earlier result for the start of the same code, the lines before a
- * restart point are kept and only the rest is tokenized.
- *
- * Text with no type can also come from a sub-language, such as script in HTML, so a restart point
- * can be false. Tokenizing starts before at least one complete line of the earlier result. A
- * different token on those lines, or a tail that ends in an open token, such as a string that a
- * false restart point started, tokenizes the whole code instead.
- */
 async function highlightedCode(
   code: string,
   language: ShjLanguage,
@@ -378,10 +348,8 @@ async function tokenizedCode(
   language: ShjLanguage,
 ): Promise<Pick<HighlightedCode, "lines" | "restarts"> | undefined> {
   const lines: CodeLine[] = [[]];
-  // Line 0 is a restart point: it is the block start or an earlier restart point.
   const restarts = [true];
   try {
-    // At the top level of a language, text that no rule matches has no type.
     await tokenize(code, language, (text, type) => {
       const fragments = text.split("\n");
       for (const [index, fragment] of fragments.entries()) {

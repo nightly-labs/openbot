@@ -24,23 +24,14 @@ import {
 export interface RoutineSchedulePickerProps {
   schedule: RoutineScheduleDraft;
   onChange: (schedule: RoutineScheduleDraft) => void;
-  /**
-   * One edit is complete: a chip menu or popover closed, or the cron field committed. A consumer
-   * that saves each edit saves here, because `onChange` also runs for each step inside a popover.
-   */
   onEditEnd?: () => void;
   disabled?: boolean;
-  /** `card` is the tighter row used inside a chat message. */
   density?: "panel" | "card";
-  /** The first day a one-time run can use, and the source of new dates. Defaults to now. */
   today?: Date | undefined;
-  /** The frequencies the menu offers. Defaults to all of them. */
   kinds?: RoutineDraftKindOption[] | undefined;
-  /** A control at the end of the row, such as the menu that changes the trigger. */
   action?: JSX.Element;
 }
 
-/** A cron example. It is the same in each language. */
 const CRON_PLACEHOLDER = "0 9 * * 1-5";
 
 type DraftOf<K extends RoutineDraftKind> = Extract<RoutineScheduleDraft, { kind: K }>;
@@ -53,7 +44,6 @@ function draftOf<K extends RoutineDraftKind>(draft: RoutineScheduleDraft, kind: 
   return isDraftOf(draft, kind) && draft;
 }
 
-/** From the most space to the least. The last step hides the icon and the connector words. */
 const ROW_FITS = ["roomy", "snug", "tight", "minimal"] as const;
 
 function rowFits(picker: HTMLElement): boolean {
@@ -66,15 +56,8 @@ function rowFits(picker: HTMLElement): boolean {
   ).every(Boolean);
 }
 
-/** The width of each row when it was last fitted. */
 const fitWidths = new WeakMap<HTMLElement, number>();
 
-/**
- * Gives each row the most space that still shows every label whole. The step depends on the
- * labels, not only on the width: "Daily on Weekdays at 7 AM" needs less room than an hourly row.
- * All rows that wait move one step at a time: a row that changes its step before another row
- * reads its labels lays out the page again, and a chat can open with many routine cards.
- */
 function fitRows(pickers: Iterable<HTMLElement>) {
   const connected = [...pickers].filter((picker) => picker.isConnected);
   let pending = connected;
@@ -85,7 +68,6 @@ function fitRows(pickers: Iterable<HTMLElement>) {
     pending = pending.filter((picker) => !rowFits(picker));
     if (pending.length === 0) break;
   }
-  // The last step read the labels, so these reads lay out nothing.
   for (const picker of connected) fitWidths.set(picker, picker.clientWidth);
 }
 
@@ -97,7 +79,6 @@ function queueFit(picker: HTMLElement) {
       const pickers = [...queuedFits];
       queuedFits.clear();
       fitRows(pickers);
-      // The fit laid out the labels, and that can start to load a font they use. Its width changes no row width.
       if (document.fonts?.status === "loading") {
         void document.fonts.ready.then(() => {
           for (const picker of pickers) queueFit(picker);
@@ -108,7 +89,6 @@ function queueFit(picker: HTMLElement) {
   queuedFits.add(picker);
 }
 
-// One observer for all rows, so the rows that a resize changes fit in one pass.
 let fitObserver: ResizeObserver | undefined;
 
 function observeFit(picker: HTMLElement) {
@@ -121,10 +101,6 @@ function observeFit(picker: HTMLElement) {
   return () => fitObserver?.unobserve(picker);
 }
 
-/**
- * The schedule as one sentence of chips: "[Daily] on [Every day] at [7:30 AM]". Each chip opens
- * the smallest control that edits it, and a change of frequency keeps the time already set.
- */
 export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
   const text = useText();
   const { t } = text;
@@ -132,13 +108,11 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
   const kindOptions = () =>
     (props.kinds ?? ROUTINE_DRAFT_KINDS).map((option) => ({ value: option.value, label: t(option.label) }));
   const editEnd = () => props.onEditEnd?.();
-  // Days 29 to 31 do not exist in every month, and the run skips those months.
   const lateMonthDay = () => {
     const draft = draftOf(props.schedule, "monthly");
     return draft && draft.day > 28 ? draft.day : null;
   };
 
-  // An hourly run with a longer step names it on the frequency chip: "Every 2h".
   const hourlyLabel = () => {
     const draft = draftOf(props.schedule, "hourly");
     return draft && draft.everyHours > 1 ? routineHourlyLabel(draft.everyHours, text) : undefined;
@@ -343,7 +317,6 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
                   maxlength={INPUT_LIMITS.routineCron}
                   value={draft().expression}
                   disabled={props.disabled}
-                  // The expression saves when the field commits it (blur or Enter), not after each key.
                   onChange={(event) => {
                     props.onChange({ ...draft(), expression: event.currentTarget.value });
                     editEnd();
@@ -365,11 +338,6 @@ export function RoutineSchedulePicker(props: RoutineSchedulePickerProps) {
   );
 }
 
-/**
- * A connector word and its chip. The row never wraps; a `flexible` phrase is the one that
- * shrinks, and its chip cuts its label short, when the row is too narrow. An `optional` word is
- * hidden in the narrowest panels, where the row still reads without it.
- */
 function Phrase(props: { word: string; flexible?: boolean; optional?: boolean; children: JSX.Element }) {
   return (
     <span class={["routine-trigger-phrase", { "routine-trigger-phrase-flexible": props.flexible === true }]}>

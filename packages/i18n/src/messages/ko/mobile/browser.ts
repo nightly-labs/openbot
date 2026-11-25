@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "페이지에 입력",
   "mobile.browser.reconnect": "다시 연결",
   "mobile.browser.status.connecting": "브라우저에 연결하는 중…",
+  "mobile.browser.dialog.title": "페이지에 메시지가 표시됩니다",
+  "mobile.browser.dialog.ok": "확인",
   "mobile.browser.status.ended": "실시간 보기가 종료되었어요.",
   "mobile.browser.status.offline": "서버가 연결되어 있지 않아요.",
   "mobile.browser.status.noTab": "{name}에 열린 브라우저 탭이 없어요.",
@@ -84,4 +86,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "돌려주기",
   "mobile.browser.help.handBack.body":
     "에이전트가 직접 처리해 달라고 요청하면 ··· 메뉴에서 완료했어요를 선택하세요. 그러면 에이전트가 이 탭에서 이어서 작업해요.",
+  "mobile.browser.location.title": "{site}에서 내 위치를 알고 싶어 합니다",
+  "mobile.browser.location.description": "신뢰하는 사이트에만 허용하세요.",
+  "mobile.browser.location.block": "차단",
+  "mobile.browser.location.allow": "허용",
+  "mobile.browser.location.allowAlways": "항상 허용",
+  "mobile.browser.location.unavailable": "이 기기의 위치를 가져올 수 없습니다.",
+  "mobile.browser.location.answerFailed": "위치 요청에 응답할 수 없습니다.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -1,14 +1,3 @@
-// Measures the finish check (`src/backend/agent/finish-check.ts`) on labeled turn ends. Each case is
-// the end of one agent turn: the user's request, the tool steps, the plan and the last answer. Its
-// label says what a person would want next: "continue" (work that the agent can do now is missing)
-// or "stop" (done, a question that only the user can answer, or blocked). Each case goes through
-// the real `finishCheckPrompt` and `generateTextWithoutTools` path, on the model that the app uses for
-// the check: the provider's default model at `withBackgroundEffort`, with the user's own Claude and
-// Codex sign-ins.
-// A false continue costs one extra turn that the user did not want; a missed continue leaves the
-// user to write "continue", as before the check.
-// `bun scripts/finish-check-bench.ts`; `--provider=claude|codex` runs one provider; `--runs=<n>`
-// repeats each case (default 1). Writes .openbot-build/finish-check-bench/report.json.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -44,7 +33,6 @@ type Label = "continue" | "stop";
 interface Case {
   name: string;
   label: Label;
-  /** The verdict that fits best. A "stop" case is right with any verdict but "continue". */
   verdict: FinishCheckResult["verdict"];
   input: FinishCheckInput;
 }
@@ -74,7 +62,6 @@ function input(
 }
 
 const CASES: Case[] = [
-  // Work that the agent can do now is missing.
   {
     name: "partial-items",
     label: "continue",
@@ -176,7 +163,6 @@ const CASES: Case[] = [
       "/a returns 200. /b returns 404, so it is broken. I'll check the rest next.",
     ),
   },
-  // The request is done, or only the user can go on.
   {
     name: "complete-and-verified",
     label: "stop",
@@ -327,9 +313,7 @@ interface Run {
   expectedVerdict: FinishCheckResult["verdict"];
   model: string;
   effort: string;
-  /** Null when the answer did not decode: the app then does not continue the request. */
   verdict: FinishCheckResult["verdict"] | null;
-  /** The note that the agent would get, or null when the request ends. */
   gap: string | null;
   continues: boolean;
   correct: boolean;
@@ -503,9 +487,7 @@ const summary = providers.map((provider) => {
     effort: of[0]?.effort ?? null,
     calls: of.length,
     correct: of.filter((run) => run.correct).length,
-    /** Of the cases with missing work, the share that the check continued. */
     caught: `${shouldContinue.filter((run) => run.continues).length}/${shouldContinue.length}`,
-    /** Of the cases that must stop, the share that the check continued anyway. */
     falseContinues: `${shouldStop.filter((run) => run.continues).length}/${shouldStop.length}`,
     exactVerdicts: `${of.filter((run) => run.verdict === run.expectedVerdict).length}/${of.length}`,
     undecoded: of.filter((run) => run.verdict === null).length,

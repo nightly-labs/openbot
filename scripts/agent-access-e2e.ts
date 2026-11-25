@@ -1,13 +1,3 @@
-// Checks member access to agents through the agent-access-v1 Team API contract. A real
-// `TeamApiServer` runs on loopback with the real team, agent, mailbox, sidebar and roles stores on a
-// temporary profile. The owner sets roles; a member signs in as a current desktop client does. The
-// host must hide a `none` agent, refuse a write that the level does not permit, refuse a stale
-// revision, tell the member's event socket about each change, and keep the roles after a restart.
-// The server-audit-v1 log records each roles change with its actor, for owners and admins only.
-// The agent service is not initialized, so no provider CLI starts.
-// Run: `bun scripts/agent-access-e2e.ts`.
-// Writes .openbot-build/agent-access-e2e/report.json.
-
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -63,7 +53,6 @@ const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
 const STEP_DEADLINE_MS = 30_000;
 
-// The main process imports Electron for its windows and IPC. No check here opens a window.
 plugin({
   name: "agent-access-electron-boundary",
   setup(build) {
@@ -114,7 +103,6 @@ const report: { passed: boolean; unverified: string[]; steps: Step[] } = {
   steps: [],
 };
 
-/** Runs one check. `summarize` keeps session tokens out of the report. */
 async function step<T>(
   name: string,
   run: () => Promise<T>,
@@ -123,7 +111,6 @@ async function step<T>(
   process.stdout.write(`- ${name}\n`);
   let deadline: ReturnType<typeof setTimeout> | undefined;
   try {
-    // A bound on failure only: each check waits for its reply or event, and a missing event must fail.
     const value = await Promise.race([
       run(),
       new Promise<never>((_, reject) => {
@@ -140,7 +127,6 @@ async function step<T>(
   }
 }
 
-/** A value that `JSON.parse` gives: the wire body of a response, a frame or a fixture. */
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
 
@@ -161,6 +147,7 @@ function text(value: unknown, label: string): string {
 const unused = () => Effect.die(new Error("Not used by this check."));
 const agentBrowser: AgentBrowserHost = {
   listTabs: () => [],
+  toolCanUseTab: () => false,
   beginTakeover: unused,
   endTakeover: () => {},
   userControlTabFor: () => null,
@@ -186,6 +173,7 @@ const teamBrowser: TeamApiBrowser = {
   navigate: unused,
   reload: unused,
   stop: unused,
+  answerPermission: unused,
   takeUserControl: unused,
   startTeach: unused,
   stopTeach: () => [],
@@ -201,6 +189,7 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
 };
 
@@ -223,7 +212,6 @@ interface Host {
 let host: Host | null = null;
 const sockets: WebSocket[] = [];
 
-/** Starts the host on the profile, as the app does at each launch. The stores keep their files. */
 async function startHost(): Promise<Host> {
   const database = new OpenBotDatabase(userData);
   const agentStore = new AgentStore(userData, home, database);
@@ -232,7 +220,6 @@ async function startHost(): Promise<Host> {
   const team = new TeamStore(join(userData, "openbot-team-server-v2.json"));
   const audit = new ServerAuditStore(join(userData, SERVER_AUDIT_FILE));
   await runCauseEffect(audit.load());
-  // As the app wires it: the roles store records each save in the audit log.
   const access = new AgentAccessStore(join(userData, AGENT_ACCESS_FILE), {
     audit: (serverId, before, after, actor) =>
       audit.recordAgentAccess(serverId, actor, before, after, () =>
@@ -240,14 +227,12 @@ async function startHost(): Promise<Host> {
       ),
   });
   await runCauseEffect(sidebar.initialize());
-  // The stores only: `AgentService.initialize` would start the provider CLIs, which no step needs.
   await runCauseEffect(agentStore.initialize());
   await runCauseEffect(mailbox.initialize());
   await runCauseEffect(team.initialize());
   assert.equal(await runCauseEffect(access.load()), true, "The roles file did not load.");
   if (!team.getIdentity()) await runCauseEffect(team.configure("E2E Host", OWNER.username, OWNER.password));
   const agents = new AgentService({ store: agentStore, mailbox, browser: agentBrowser, sidebarLayout: sidebar });
-  // The real storage service, as the app wires it. This host has no channels.
   const storageSources = {
     roots: {
       database: join(userData, "openbot.db"),
@@ -293,7 +278,6 @@ function current(): Host {
   return host;
 }
 
-/** One request from a current desktop client, which advertises agent-access-v1. */
 async function call(
   method: string,
   path: string,
@@ -317,7 +301,6 @@ async function call(
   return { status: response.status, body: body ? JSON.parse(body) : null };
 }
 
-/** A roles request through the frozen codec, in both directions. */
 async function access(path: string, token: string, body: unknown): Promise<{ status: number; body: unknown }> {
   const codec = AGENT_ACCESS_CODECS.get(path);
   assert.ok(codec, `No agent-access-v1 codec for ${path}.`);
@@ -336,10 +319,6 @@ async function setAccess(token: string, change: AgentAccessChange) {
   return access(AGENT_ACCESS_ROUTES.set, token, change);
 }
 
-/**
- * Reads the audit log through the frozen server-audit-v1 codec, in both directions. The capability
- * comes after the full protocol 7 and 8 lists, so only a protocol 9 client sends it.
- */
 async function readAudit(
   token: string,
   capabilities?: readonly string[],
@@ -357,7 +336,6 @@ async function readAudit(
   return { status: 200, log: decodeServerAuditLog(codec.response(response.status, response.body)) };
 }
 
-/** The name that the audit log keeps for a member of this host. */
 function auditName(memberId: string): string {
   const member = current()
     .team.listMembers()
@@ -366,7 +344,6 @@ function auditName(memberId: string): string {
   return memberAuditName(member).name;
 }
 
-/** Each entry as `<kind> <role or Everyone> <agent or member> <from>-><to>`, newest first. */
 function auditLines(log: ServerAuditLog): string[] {
   return log.entries.map(({ change }) => {
     switch (change.kind) {
@@ -396,7 +373,6 @@ async function listedIds(token: string): Promise<string[]> {
   return listed.body.map((agent) => text(record(agent, "agent").id, "agent id")).sort();
 }
 
-/** Stores one file that the user sent to the agent, and gives the id of the file. */
 async function sendFile(agentId: string, name: string): Promise<string> {
   const { mailbox } = current();
   const [draft] = await runCauseEffect(
@@ -406,7 +382,6 @@ async function sendFile(agentId: string, name: string): Promise<string> {
   const receipt = await runCauseEffect(
     mailbox.enqueue({ sender: { kind: "user" }, recipientAgentIds: [agentId], text: name, draftIds: [draft.id] }),
   );
-  // No provider runs here. A completed delivery leaves the agent idle, so a later step can delete it.
   for (const delivery of receipt.deliveries) {
     await runCauseEffect(mailbox.markStarting(delivery.id));
     await runCauseEffect(mailbox.markRunning(delivery.id, `turn-${delivery.id}`));
@@ -415,7 +390,6 @@ async function sendFile(agentId: string, name: string): Promise<string> {
   return draft.id;
 }
 
-/** The storage of the host as the Library reads it, through the frozen storage-v1 codec. */
 async function readStorage(token: string, body: JsonObject): Promise<{ status: number; body: JsonObject }> {
   const response = await call("POST", STORAGE_ROUTES.usage, { token, body, protocol: TEAM_PROTOCOL_V9 });
   return { status: response.status, body: record(response.body, "storage") };
@@ -431,7 +405,6 @@ function refusal(body: unknown): string {
   return JSON.stringify(body);
 }
 
-/** Opens a member's event socket that declares agent-access-v1, and waits for its first snapshot. */
 async function openEvents(token: string): Promise<WebSocket> {
   const socket = new WebSocket(`ws://127.0.0.1:${current().port}${TEAM_API_ROUTES.events}`, [
     TEAM_PROTOCOL_V1_WEBSOCKET,
@@ -456,7 +429,6 @@ async function openEvents(token: string): Promise<WebSocket> {
   return socket;
 }
 
-/** Waits for the first socket message that `pick` accepts. */
 function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): Promise<T> {
   return new Promise((resolveMessage, reject) => {
     const onMessage = (event: MessageEvent) => {
@@ -472,7 +444,6 @@ function nextMessage<T>(socket: WebSocket, pick: (value: unknown) => T | null): 
   });
 }
 
-/** The next agent list frame, as the ids of its agents. The released wire calls it `bots-changed`. */
 function nextAgentsChanged(socket: WebSocket): Promise<string[]> {
   return nextMessage(socket, (value) => {
     if (!isRecord(value) || value.type !== "bots-changed" || !Array.isArray(value.bots)) return null;
@@ -533,7 +504,6 @@ try {
   const legalRole = { id: "legal", name: "Legal", agents: { [legal]: "chat" as const }, memberIds: [setup.memberId] };
   const restricted: AgentAccessChange = {
     revision: 0,
-    // General is not listed, so Everyone keeps `manage` on it.
     everyone: { [legal]: "none", [finance]: "none", [ops]: "view" },
     roles: [legalRole],
   };
@@ -637,8 +607,6 @@ try {
   });
 
   await step("chat: a chat write passes the check, and a settings change is refused", async () => {
-    // An interrupt or a message starts the provider CLI, which this check does not run. A cancel of
-    // a delivery that does not exist is a chat write that the queue refuses without a provider.
     const cancel = (agentId: string) =>
       call("POST", TEAM_API_ROUTES.agent.queueCancel(agentId), {
         token: setup.memberToken,
@@ -655,13 +623,11 @@ try {
     });
     assert.equal(patched.status, 403, `PATCH on a chat agent returned ${patched.status}.`);
     assert.ok(refusal(patched.body).includes(sourceText("error.team.agentManageDenied")), refusal(patched.body));
-    // The memory inclusion route names the agent in its body, not in its path.
     const included = await call("POST", AGENT_MEMORY_INCLUSION_ROUTE, {
       token: setup.memberToken,
       body: { agentId: legal, changes: [{ memoryId: "memory-e2e", inclusion: "essential", expectedRevision: 0 }] },
     });
     assert.equal(included.status, 403, `A memory inclusion change on a chat agent returned ${included.status}.`);
-    // A chat colour needs manage access, as the avatar on the released agent route does.
     const chatColor = await call("POST", CHAT_COLORS_ROUTES.set, {
       token: setup.memberToken,
       body: { agentId: legal, color: "#a1b2c3" },
@@ -779,7 +745,6 @@ try {
     const stored = access.get(team.getIdentity()?.serverId ?? "");
     assert.equal(stored.revision, 3);
     assert.deepEqual(stored.everyone, { [legal]: "none", [ops]: "view" }, "The deleted agent kept its level.");
-    // Nobody changed the level of the deleted agent, so the log has no entry for it.
     const { log } = await readAudit(ownerToken);
     assert.ok(log, "The owner cannot read the audit log.");
     assert.equal(log.entries.length, 7, `The save of a deleted agent's levels was logged: ${auditLines(log)[0]}.`);
@@ -793,7 +758,6 @@ try {
       body: { operationId: crypto.randomUUID() },
     });
     assert.equal(response.status, 201, `Duplicate returned ${response.status}: ${refusal(response.body)}`);
-    // The released duplicate response keeps the name `bot`.
     const copy = text(record(record(response.body, "duplicate").bot, "bot").id, "copy id");
     const stored = access.get(team.getIdentity()?.serverId ?? "");
     assert.equal(stored.everyone[copy], "none", "Everyone can use the copy of a closed agent.");

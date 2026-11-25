@@ -10,6 +10,7 @@ import type {
   TeamPresenceMember,
   UpdateTeamMemberInput,
 } from "@openbot/contracts/ipc";
+import { accountRestartsServer } from "@openbot/ui/features/servers/ServerActionItems";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, flush, onCleanup } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
@@ -26,31 +27,6 @@ import {
 import { useServers } from "./servers-context";
 import { serverAdminPort, serversPort } from "./servers-port";
 
-/**
- * The settings page for one server: its identity, whether it is published,
- * and who can reach it.
- *
- * Global rather than scoped to the active server, and deliberately so - the
- * server rail opens this for *any* server in the list, so `openServerSettings`
- * takes an id. Scoping it to the active server would break opening the settings
- * of a server the user has not switched to.
- *
- * Ungated - the dialog is closed until someone opens it, and `refreshServerSettings`
- * carries its own loading and error signals for what happens after that.
- *
- * Every mutation ends in `refreshServerSettings(server.id)` rather than patching
- * the lists it just changed: main is the authority on membership, and a failed
- * write must not leave a row the server never accepted. The `operationSucceeded`
- * latch in each is what keeps a failure *after* the write from being reported as
- * a failed write.
- */
-
-/**
- * A name for a server that the user publishes before naming it, such as "Ann’s server". The first
- * word of the account name or email goes in, shortened by whole characters to fit the length limit.
- * When the name has too few Latin letters or digits for a host address, the fallback is used. This
- * depends on the language: "Анна’s server" is long enough, but "Анна のサーバー" is not.
- */
 function generatedServerName(user: CentralAuthUser | null): string {
   const person = (user?.name?.trim() || user?.email.split("@")[0] || "").split(/\s+/u)[0] ?? "";
   if (!person) return FALLBACK_SERVER_NAME;
@@ -68,39 +44,32 @@ const ServerSettings = createSimpleContext({
     const { servers, setServers, hostStatus, setHostStatus, setHostUpdateOpener } = useServers();
     const { signedInAccount } = useAuth();
     const [serverSettingsTargetId, setServerSettingsTargetId] = createSignal<string | null>(null);
-    /** The section an opener asked for, such as Updates from the host version notice. */
     const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
-    /** The section on screen, so the rail marks Providers while it shows. */
     const [serverSettingsShownSection, setServerSettingsShownSection] = createSignal<ServerSettingsSection | null>(
       null,
     );
     const [serverSettingsOpen, setServerSettingsOpen] = createSignal(false);
-    /** Counts each open request, so the settings page can tell a new request for the open server. */
     const [serverSettingsOpenRequest, setServerSettingsOpenRequest] = createSignal(0);
     const [serverSettingsMembers, setServerSettingsMembers] = createSignal<TeamPresenceMember[]>([]);
     const [serverSettingsInvites, setServerSettingsInvites] = createSignal<TeamInviteSummary[]>([]);
     const [serverSettingsLoading, setServerSettingsLoading] = createSignal(false);
     const [serverSettingsError, setServerSettingsError] = createSignal<string | null>(null);
-    /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
     let serverSettingsRestoreTarget: HTMLElement | null = null;
 
     const serverSettingsTarget = createMemo(() => servers().find((server) => server.id === serverSettingsTargetId()));
-    /** The server that the leave confirmation from the server menu asks about, and the element that asked. */
     const [leaveRequest, setLeaveRequest] = createSignal<{ serverId: string; trigger: HTMLElement | null } | null>(
       null,
     );
     const leaveConfirmServer = createMemo(
       () => servers().find((server) => server.id === leaveRequest()?.serverId) ?? null,
     );
-    // A server that leaves the list in another way ends the request, so it does not open again on a rejoin.
     createEffect(
       () => leaveRequest() !== null && leaveConfirmServer() === null,
       (gone) => {
         if (gone) setLeaveRequest(null);
       },
     );
-    /** The hosted server that the restart confirmation from the server menu asks about, and the element that asked. */
     const [restartRequest, setRestartRequest] = createSignal<{ serverId: string; trigger: HTMLElement | null } | null>(
       null,
     );
@@ -120,8 +89,6 @@ const ServerSettings = createSimpleContext({
         if (!open || !id) return;
         let previous = "";
         return serversPort().servers.onPresence((presence) => {
-          // Typing updates must not read the account API again. Membership and
-          // online changes are enough to refresh an accepted invitation.
           const signature = JSON.stringify(
             presence.members.map((member) => [member.id, member.role, member.disabled, member.online]),
           );
@@ -235,10 +202,6 @@ const ServerSettings = createSimpleContext({
       }
     }
 
-    /**
-     * Saves the plush look of the server in the settings. The list shows it before the host answers,
-     * so each mark of the server changes at the click; a failure puts the previous look back.
-     */
     async function saveServerAppearance(appearance: ServerAppearance | null): Promise<void> {
       const server = serverSettingsTarget();
       if (!serverCanAdminister(server, "host-appearance-v1"))
@@ -267,20 +230,10 @@ const ServerSettings = createSimpleContext({
       setServers(await serversPort().servers.list());
     }
 
-    /**
-     * Asks the host whether the screen recording grant it was refused is now in place.
-     *
-     * The member who was refused cannot answer this: the grant is given on the host, and the status
-     * that carries the answer is the host's own.
-     */
     async function recheckScreenRecording(): Promise<void> {
       setHostStatus(await serversPort().host.recheckScreenRecording());
     }
 
-    /**
-     * Changes the server key: this computer's, or a joined server's through `host-key-rotation-v1`,
-     * which only its owner may use. Paired devices follow the signed handover.
-     */
     async function rotateHostKey(): Promise<void> {
       const server = serverSettingsTarget();
       if (server?.kind === "local") {
@@ -298,7 +251,6 @@ const ServerSettings = createSimpleContext({
       await setLocalServerPublished(published);
     }
 
-    /** Publishes or unpublishes this computer's server, whichever server the settings show. */
     async function setLocalServerPublished(published: boolean): Promise<void> {
       const server = servers().find((candidate) => candidate.kind === "local");
       if (!server) throw new Error(currentText().t("server.settings.publicationLocalOnly"));
@@ -306,8 +258,6 @@ const ServerSettings = createSimpleContext({
       const action = published ? ("published" as const) : ("unpublished" as const);
       let operationSucceeded = false;
       try {
-        // The host needs a name to publish. One that the user did not set is generated, so the
-        // switch works on its own; the user can change it in General later.
         if (published && !hostStatus().configured)
           setHostStatus(await serversPort().host.configure({ serverName: generatedServerName(signedInAccount()) }));
         const status = published ? await serversPort().host.start() : await serversPort().host.stop();
@@ -435,11 +385,6 @@ const ServerSettings = createSimpleContext({
       }
     }
 
-    /**
-     * Ends this account's membership of a joined server, or removes a server that it owns from the
-     * account service. Main removes the server from the list and sends the new list, which removes
-     * the dialog's target, so the dialog closes here first.
-     */
     async function leaveServer(): Promise<void> {
       const server = serverSettingsTarget();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
@@ -447,7 +392,6 @@ const ServerSettings = createSimpleContext({
       setServerSettingsOpen(false);
     }
 
-    /** Leaves the server that the confirmation from the server menu asks about. */
     async function leaveConfirmedServer(): Promise<void> {
       const server = leaveConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
@@ -456,16 +400,11 @@ const ServerSettings = createSimpleContext({
       if (serverSettingsTarget()?.id === server.id) setServerSettingsOpen(false);
     }
 
-    /**
-     * Restarts the server that the confirmation from the server menu asks about: a server on this computer
-     * through its supervisor, a hosted server through the account service, and a self-hosted server
-     * through its own host (`host-restart-v1`).
-     */
     async function restartConfirmedServer(): Promise<void> {
       const server = restartConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       if (server.thisComputer) await serversPort().localServers.restart(server.id);
-      else if (server.hosted !== true && serverSupportsCapability(server, "host-restart-v1"))
+      else if (!accountRestartsServer(server) && serverSupportsCapability(server, "host-restart-v1"))
         await serversPort().hostAdmin.restartHost(server.id);
       else await serversPort().hostedServers.restart(server.id);
     }

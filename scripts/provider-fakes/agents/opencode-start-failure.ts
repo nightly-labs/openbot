@@ -1,6 +1,3 @@
-// The `opencode` of `opencode-installed-fallback-e2e.ts`. It prints `FAKE_OPENCODE_VERSION` for
-// `--version`. With `FAKE_OPENCODE_FAIL=1` it fails `initialize` as OpenCode 2.3.0 did on Windows
-// (#10174): `-32603` "Internal error: Internal service failure". Each start writes a log line.
 import { logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODEL = "opencode/big-pickle";

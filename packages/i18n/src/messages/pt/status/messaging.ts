@@ -38,9 +38,11 @@ export const messages = {
   "status.messaging.signInUnknown":
     "O OpenBot não iniciou esta instalação do Slack. Inicie a instalação novamente no OpenBot.",
   "status.messaging.telegramNoAgent":
-    "Nenhum agente pode responder aqui ainda. Adicione o Orquestrador do Telegram no OpenBot.",
+    "Nenhum agente pode responder aqui ainda. No OpenBot, abra Loja > Apps > Telegram e clique em Adicionar agente.",
   "status.messaging.telegramLinked":
     "O OpenBot está conectado a este chat. Mencione {bot} ou responda a uma mensagem do OpenBot para falar com os agentes.",
+  "status.messaging.telegramNotLinked":
+    "O OpenBot não está conectado a este chat. Para conectá-lo, abra o app OpenBot, vá em Loja → Apps → Telegram e selecione “Adicionar a um grupo” ou “Abrir um chat direto”.",
   "status.messaging.telegramOrchestratorName": "Orquestrador do Telegram",
   "status.messaging.telegramOrchestratorTitle": "Responde no Telegram e consulta a equipe",
   "status.messaging.whatsappNoAgent":
@@ -59,6 +61,9 @@ export const messages = {
     "Outro OpenBot está conectado a este número do WhatsApp, então você pode receber duas respostas. Para corrigir, abra Dispositivos conectados no WhatsApp do seu celular e desconecte o OpenBot que você não usa.",
   "status.messaging.whatsappPaused":
     "O OpenBot parou de responder aqui por 10 minutos: chegaram mensagens demais em pouco tempo. Se outro OpenBot estiver conectado a este número, abra Dispositivos conectados no WhatsApp do seu celular e desconecte o OpenBot que você não usa.",
+  "status.messaging.whatsappNotDelivered": "O WhatsApp não aceitou esta resposta, então a pessoa não a recebeu.",
+  "status.messaging.whatsappPartlyDelivered":
+    "O WhatsApp não aceitou toda esta resposta, então a pessoa recebeu só uma parte.",
   "status.messaging.whatsappOrchestratorName": "Orquestrador do WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Responde no WhatsApp e consulta a equipe",
 } as const satisfies PartialTranslation<typeof source>;

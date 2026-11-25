@@ -14,6 +14,7 @@ export const messages = {
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} için kredi kalmadı. {model} modeline geçildi. Yeniden kullanmak için kredi ekleyin ve sonra seçin.",
   "status.agent.modelReturnedAfterError": "Sağlayıcı hatasından sonra {model} modeline geri dönüldü.",
+  "status.agent.modelSwitchedForRemovedModel": "{previous} artık kullanılamıyor. {model} modeline geçildi.",
   "status.agent.marketplaceSuggested": "Bir Pazaryeri uygulaması önerildi: {app}.",
   "status.agent.settingShown": "Bir ayar gösterildi: {setting}.",
   "status.agent.channelMemberAdded": "{agent}, {member} ajanını kanala ekledi. İsteyen: {person}.",
@@ -26,6 +27,13 @@ export const messages = {
   "status.agent.screenCaptureScreen": "Ana ekranı yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureChannel":
     "Görüntü {channel} kanalında görünür ve bu sunucuda kanalı okuyan her üye onu görebilir.",
+  "status.agent.creditImageApproval": "{model} ile bir görsel oluştur. Bu işlem {credits} kredi kullanır.",
+  "status.agent.creditVideoApproval": "{model} ile bir video oluştur. Bu işlem {credits} kredi kullanır.",
+  "status.agent.creditMediaChannel":
+    "Sonuç {channel} kanalında görünür ve bu sunucuda kanalı okuyan her üye onu görebilir.",
+  "status.agent.creditsHoldBalance": "Bu işlem {credits} kredi kullanır, bakiye {balance} kredidir.",
+  "status.agent.creditsHoldAgentsOff": "Bu sunucudaki ajanlar kredi kullanamaz.",
+  "status.agent.screenCapturePermissionNext": "Ardından macOS, OpenBot için Ekran Kaydı'na izin vermenizi isteyebilir.",
   "status.agent.screenCaptureDisplay": "{name} ekranını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureWindow": "{name} penceresini yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.screenCaptureRegion":
@@ -69,6 +77,7 @@ export const messages = {
   "status.agent.browserActing": "Web sayfası kullanılıyor…",
   "status.agent.browserReviewing": "Web sayfası inceleniyor…",
   "status.agent.memoriesSearching": "Belleklerinde arıyor…",
+  "status.agent.chatsSearching": "Önceki sohbetlerinde arıyor…",
   "status.agent.memoriesSearched": {
     one: "Belleklerinde aradı: {count} bulundu",
     other: "Belleklerinde aradı: {count} bulundu",
@@ -110,10 +119,15 @@ export const messages = {
     "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu, {notChanged} değiştirilmedi çünkü önce başka bir mesaj dizisi değiştirdi.",
   "status.agent.mcpToolCall": "{name} MCP sunucusunun {tool} aracını çalıştır.",
   "status.agent.uiBlockClosedByMessage": "Yeni bir mesajla kapatıldı",
-  "status.agent.finishCheckContinues": "İstek henüz bitmedi. Ajan devam ediyor ({current}/{limit}).",
+  "status.agent.location.field": "Konumun",
+  "status.agent.location.placeholder": "Şehir, adres veya yer",
+  "status.agent.location.submit": "Paylaş",
+  "status.agent.location.shared": "Konum paylaşıldı",
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
   "status.agent.planStopped": "Ajan, planında açık adımlar varken durdu. Devam etmesi için bir mesaj gönderin.",
+  "status.agent.continuationLimitReached":
+    "Ajan, istek bitmeden durdu. Kendi başına tekrar devam edemez. Devam etmesi için bir mesaj gönderin.",
   "status.agent.compactionContinues": "Ajan bağlamını sıkıştırırken bağlantı kesildi. Ajan devam ediyor.",
   "status.agent.providerExitContinues": "Ajan yanıtını bitirmeden durdu. Ajan devam ediyor.",
   "status.agent.branchTitle": "Dallandırılmış sohbet",

@@ -7,7 +7,6 @@ import type { HostedServersDesktopApi } from "@openbot/contracts/ipc";
 import { createEffect, createStore, untrack } from "solid-js";
 import { currentText } from "../../../text";
 
-/** A server in one of these states changes without a user action, so the list polls while one is shown. */
 const TRANSITION_STATES: ReadonlySet<HostedServerState> = new Set([
   "awaiting_payment",
   "creating",
@@ -23,28 +22,19 @@ interface HostedServersStoreProps {
 }
 
 interface HostedServersPanel {
-  /** False until the account server says that this account can create hosted servers. */
   available: boolean;
   lifecycleAvailable: boolean;
   loaded: boolean;
   error: string | null;
   servers: HostedServerSummary[];
   wakingServerId: string | null;
-  /** The server whose payment page is opening. */
   checkoutServerId: string | null;
-  /** The server the confirmation dialog asks about. */
   pendingDelete: HostedServerSummary | null;
-  /** The name that the user types to confirm the deletion. */
   deleteConfirmName: string;
   deleting: boolean;
   deleteError: string | null;
 }
 
-/**
- * The Hosted servers tab: the server list, wake, the payment page, and the delete confirmation. A new
- * server starts in the add server dialog, because it needs a plan. The list loads when the dialog
- * opens, because the tab is shown only when the account can use it.
- */
 export function createSettingsHostedServersStore(props: HostedServersStoreProps, isActive: () => boolean) {
   const [panel, setPanel] = createStore<HostedServersPanel>({
     available: false,
@@ -60,9 +50,7 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     deleteError: null,
   });
   let loadRevision = 0;
-  /** A read can take longer than the poll interval. A poll or focus read then skips, so reads do not overlap. */
   let reloading = false;
-  /** The server that the server menu asked to delete. The next list read opens its confirmation. */
   let deleteRequestId: string | null = null;
 
   async function load(): Promise<void> {
@@ -85,7 +73,6 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
       if (server) requestDelete(server);
     } catch (error) {
       if (revision !== loadRevision) return;
-      // A failed read ends the request: a later read must not open the confirmation by itself.
       deleteRequestId = null;
       setPanel((state) => {
         const text = currentText();
@@ -98,7 +85,6 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     () => props.open && Boolean(props.hostedServersApi),
     (shouldLoad) => {
       if (shouldLoad) void untrack(load);
-      // A closed panel ends the request, so the next open does not show the confirmation.
       else deleteRequestId = null;
     },
   );
@@ -120,7 +106,6 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     },
   );
 
-  // The payment page and the Stripe portal open in the browser, so the list reads again when the user comes back.
   createEffect(
     () => props.open && isActive() && Boolean(props.hostedServersApi),
     (shown) => {
@@ -161,10 +146,6 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     }
   }
 
-  /**
-   * Opens the payment page of a server that waits for payment, or a new plan for a server whose plan
-   * ended. The account server refuses a second plan while an unpaid one is open.
-   */
   async function openCheckout(server: HostedServerSummary): Promise<void> {
     const api = props.hostedServersApi;
     if (!api || panel.checkoutServerId) return;
@@ -198,10 +179,6 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
     });
   }
 
-  /**
-   * Opens the confirmation for a server that the server menu names by id. The dialog opens with the
-   * list, so it reads the list first; a server that is not in the list opens nothing.
-   */
   function requestDeleteById(serverId: string): void {
     deleteRequestId = serverId;
     void load();
@@ -226,7 +203,6 @@ export function createSettingsHostedServersStore(props: HostedServersStoreProps,
   const deleteConfirmed = () =>
     panel.pendingDelete !== null && panel.deleteConfirmName.trim() === panel.pendingDelete.name;
 
-  /** Deletes the server the dialog asks about. A failed deletion keeps the dialog open with the error. */
   async function confirmDelete(): Promise<void> {
     const api = props.hostedServersApi;
     const server = panel.pendingDelete;

@@ -1,11 +1,5 @@
 import { BENCHMARK_SOURCES, type RoundupComparison } from "./comparison";
 
-// Every statement about another app here repeats a statement on the comparison that
-// includes it, where each claim has its own sources and check date. When one of those
-// pages changes, change the entry here too, and move `checkedAt`. `sources` lists the
-// official home or pricing page of each app. The benchmark numbers are read by hand
-// from the Artificial Analysis Coding Agent Index.
-
 const OPENBOT = "https://github.com/nightly-labs/openbot";
 
 export const BEST_AI_AGENT_APPS: RoundupComparison = {

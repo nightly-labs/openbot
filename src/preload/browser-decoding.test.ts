@@ -5,6 +5,9 @@ import type {
   BrowserLiveViewEvent,
   BrowserPictureInPictureEvent,
   BrowserTab,
+  BrowserTabAgent,
+  BrowserWindowEvent,
+  BrowserWindowModel,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
@@ -15,6 +18,8 @@ import {
   decodeBrowserPictureInPictureEvent,
   decodeBrowserTab,
   decodeBrowserTabs,
+  decodeBrowserWindowEvent,
+  decodeBrowserWindowModel,
 } from "./browser-decoding";
 
 const tab = {
@@ -37,6 +42,7 @@ const fullTab = {
   diagnosticErrorCount: 2,
   openerTabId: "tab-0",
   popupFailure: { id: "popup-1", message: "The popup was blocked." },
+  permissionRequest: { id: "request-1", origin: "https://maps.example.test", permission: "geolocation" },
   userControl: true,
   canGoBack: true,
   canGoForward: false,
@@ -79,6 +85,36 @@ const frame = {
   image: new Uint8Array([255, 216, 255]),
 } satisfies BrowserLiveViewEvent;
 
+const agent: BrowserTabAgent = {
+  id: "agent-1",
+  name: "Chief",
+  avatarSeed: "chief",
+  avatarHue: 215,
+  avatarColor: null,
+  avatarUrl: null,
+};
+
+const windowModel = {
+  tabs: [tab, fullTab],
+  activeTabId: "tab-1",
+  details: [
+    {
+      tabId: "tab-1",
+      control: controlState.sessions[1],
+      controller: agent,
+      owner: agent,
+      profile: { tabId: "tab-1", name: "Work", hue: 30, proxy: "proxy.example.test:8080" },
+    },
+    { tabId: "tab-0" },
+  ],
+  history: [{ url: "https://example.test", title: "", visits: 3 }],
+  canReopen: true,
+  canCloseTabs: true,
+  liveViewTabId: null,
+  liveViewClipboard: false,
+  shortcuts: "mac",
+} satisfies BrowserWindowModel;
+
 describe("browser decoders", () => {
   it.each([
     ["browser tab", decodeBrowserTab, tab],
@@ -98,6 +134,20 @@ describe("browser decoders", () => {
       { type: "stopped", tabId: "tab-1", reason: "The live view of this page ended." } satisfies BrowserLiveViewEvent,
     ],
     [
+      "live view dialog",
+      decodeBrowserLiveViewEvent,
+      {
+        type: "dialog",
+        tabId: "tab-1",
+        dialog: { id: "dialog-1", type: "confirm", message: "Pay now?" },
+      } satisfies BrowserLiveViewEvent,
+    ],
+    [
+      "closed live view dialog",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: null } satisfies BrowserLiveViewEvent,
+    ],
+    [
       "picture-in-picture move",
       decodeBrowserPictureInPictureEvent,
       { type: "bounds-changed", bounds } satisfies BrowserPictureInPictureEvent,
@@ -106,6 +156,22 @@ describe("browser decoders", () => {
       "picture-in-picture dock",
       decodeBrowserPictureInPictureEvent,
       { type: "dock" } satisfies BrowserPictureInPictureEvent,
+    ],
+    ["browser window model", decodeBrowserWindowModel, windowModel],
+    ["missing browser window model", decodeBrowserWindowModel, null],
+    ["browser window move", decodeBrowserWindowEvent, { type: "bounds-changed", bounds } satisfies BrowserWindowEvent],
+    [
+      "browser window tab close",
+      decodeBrowserWindowEvent,
+      { type: "action", action: { type: "close", tabIds: ["tab-1", "tab-0"] } } satisfies BrowserWindowEvent,
+    ],
+    [
+      "browser window address",
+      decodeBrowserWindowEvent,
+      {
+        type: "action",
+        action: { type: "open-address", url: "example.test", tabId: "tab-1" },
+      } satisfies BrowserWindowEvent,
     ],
   ] as const)("keeps a valid %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(decode(value)).toEqual(value);
@@ -124,6 +190,16 @@ describe("browser decoders", () => {
     ["browser tab with a text error count", decodeBrowserTab, { ...tab, diagnosticErrorCount: "2" }],
     ["browser tab with a text canGoBack", decodeBrowserTab, { ...tab, canGoBack: "true" }],
     ["browser tab with a numeric canGoForward", decodeBrowserTab, { ...tab, canGoForward: 1 }],
+    [
+      "browser tab with an unknown permission request",
+      decodeBrowserTab,
+      { ...tab, permissionRequest: { id: "request-1", origin: "https://example.test", permission: "camera" } },
+    ],
+    [
+      "browser tab with a permission request without an origin",
+      decodeBrowserTab,
+      { ...tab, permissionRequest: { id: "request-1", permission: "geolocation" } },
+    ],
     ["browser tab list that is not an array", decodeBrowserTabs, tab],
     ["browser display state without tabs", decodeBrowserDisplayState, { activeTabId: null }],
     [
@@ -134,14 +210,40 @@ describe("browser decoders", () => {
     ["browser bounds without a height", decodeBrowserBounds, { x: 0, y: 0, width: 1 }],
     ["live view frame with a text image", decodeBrowserLiveViewEvent, { ...frame, image: "jpeg" }],
     ["live view event of an unknown type", decodeBrowserLiveViewEvent, { type: "paused", tabId: "tab-1" }],
+    [
+      "live view dialog of an unknown type",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: { id: "dialog-1", type: "prompt", message: "Name?" } },
+    ],
+    [
+      "live view dialog without a message",
+      decodeBrowserLiveViewEvent,
+      { type: "dialog", tabId: "tab-1", dialog: { id: "dialog-1", type: "alert" } },
+    ],
+    ["live view dialog event without a dialog", decodeBrowserLiveViewEvent, { type: "dialog", tabId: "tab-1" }],
     ["picture-in-picture move without bounds", decodeBrowserPictureInPictureEvent, { type: "bounds-changed" }],
     ["picture-in-picture event of an unknown type", decodeBrowserPictureInPictureEvent, { type: "grow" }],
+    [
+      "browser window model with an unknown avatar hue",
+      decodeBrowserWindowModel,
+      { ...windowModel, details: [{ tabId: "tab-1", owner: { ...agent, avatarHue: 17 } }] },
+    ],
+    ["browser window model with unknown shortcuts", decodeBrowserWindowModel, { ...windowModel, shortcuts: "linux" }],
+    ["browser window model without history", decodeBrowserWindowModel, { ...windowModel, history: undefined }],
+    [
+      "browser window action of an unknown type",
+      decodeBrowserWindowEvent,
+      { type: "action", action: { type: "print" } },
+    ],
+    [
+      "browser window navigation in an unknown direction",
+      decodeBrowserWindowEvent,
+      { type: "action", action: { type: "navigate", tabId: "tab-1", direction: "up" } },
+    ],
   ] as const)("rejects a %s", (_name, decode: (value: unknown) => unknown, value) => {
     expect(() => decode(value)).toThrow(/^Invalid /);
   });
 
-  // A renderer that read a truthy value as a person's control would show a tab as held that the agent
-  // still uses. Only the exact `true` that main sends crosses the bridge.
   it.each([false, "true", 1, null, {}])("drops a userControl value of %j", (userControl) => {
     expect(decodeBrowserTab({ ...tab, userControl })).toEqual(tab);
   });

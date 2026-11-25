@@ -1,16 +1,9 @@
-/* Question prompt: one bubble, one question at a time. The open page moves and fades in; the others
-   wait to the start (done) or to the end (later). The stage height follows the open page. */
-
 .question-prompt-bubble.ui-bubble {
   width: min(540px, 100%);
   max-width: 100%;
+  scroll-margin-top: var(--openbot-space-2);
 }
 
-/*
- * In a chat with agent faces, the open question starts after the face column, as the agents' bubbles
- * do. It keeps the gap of a chat row above it, and the same gap below it, so it clears the stopped
- * tasks panel that covers the transcript's lower padding.
- */
 .question-prompt-with-author {
   padding-inline-start: calc(var(--message-author-column) + var(--openbot-space-2));
 }
@@ -68,8 +61,6 @@
     visibility 0s linear var(--page-slide-dur);
 }
 
-/* Only the open page sizes the stage. A chat that opens with an answered card lays it out at its
-   summary height at once, so the rows under it do not move when the stage height is set. */
 .question-prompt-page[data-pos="prev"],
 .question-prompt-page[data-pos="next"] {
   position: absolute;
@@ -100,7 +91,6 @@
   transition-delay: 0s, 0s, 0s, 0s;
 }
 
-/* The footer folds away when the answers are sent. */
 .question-prompt-fold {
   display: grid;
   grid-template-rows: 0fr;
@@ -130,8 +120,6 @@
     filter var(--acc-expand) var(--acc-ease);
 }
 
-/* Question ------------------------------------------------------------------------------------ */
-
 .question-prompt-header {
   display: grid;
   gap: var(--openbot-space-0-5);
@@ -155,6 +143,7 @@
 .question-prompt-detail {
   font-size: var(--openbot-text-md);
   line-height: var(--openbot-leading-md);
+  white-space: pre-line;
 }
 
 .question-prompt-options {
@@ -191,7 +180,6 @@
   background: var(--openbot-question-option-pressed);
 }
 
-/* The stage clips, so the keyboard ring sits inside the row. */
 .question-prompt-option.ui-questionnaire-choice:focus-within {
   outline: 0;
 }
@@ -217,7 +205,6 @@
   overflow-wrap: anywhere;
 }
 
-/* Letter badge: a question tint; solid when picked, with a small pop; success tint once answered. */
 .question-prompt-letter.ui-kbd {
   width: 22px;
   min-width: 22px;
@@ -233,7 +220,8 @@
     color var(--openbot-duration-fast) ease-out;
 }
 
-.question-prompt-answer-skipped .question-prompt-letter.ui-kbd {
+.question-prompt-answer-skipped .question-prompt-letter.ui-kbd,
+.question-prompt-answer-closed .question-prompt-letter.ui-kbd {
   background: var(--openbot-bg-control-active);
   color: var(--openbot-text-muted);
 }
@@ -287,8 +275,6 @@
   box-shadow: none;
 }
 
-/* Footer: progress, then Back, Skip and Next. ------------------------------------------------ */
-
 .question-prompt-footer {
   display: flex;
   align-items: center;
@@ -319,7 +305,6 @@
   opacity: 0.55;
 }
 
-/* The current question is a wide pill. It moves along as the questions open. */
 .question-prompt-dot[data-state="current"] {
   width: 18px;
   background: var(--openbot-question-option);
@@ -337,8 +322,6 @@
   padding-inline: var(--openbot-space-4);
   font-size: var(--openbot-text-md);
 }
-
-/* Summary ------------------------------------------------------------------------------------- */
 
 .question-prompt-summary {
   display: grid;
@@ -379,7 +362,8 @@
   overflow-wrap: anywhere;
 }
 
-.question-prompt-answer-skipped {
+.question-prompt-answer-skipped,
+.question-prompt-answer-closed {
   color: var(--openbot-text-muted);
 }
 

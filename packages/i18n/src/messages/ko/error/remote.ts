@@ -23,10 +23,16 @@ export const messages = {
     "호스트에서 OpenBot의 화면 녹화를 허용하지 않았어요. 호스트에서 화면 녹화 권한을 허용한 다음 다시 시도해 주세요.",
   "error.remote.windowsSessionDisconnected":
     "호스트의 Windows 세션 연결이 끊겨 공유할 화면이 없어요. 호스트 화면에서 Windows에 로그인한 다음 다시 시도해 주세요.",
+  "error.remote.windowsCaptureDenied":
+    "호스트의 Windows가 OpenBot의 화면 녹화를 허용하지 않아요. 호스트 화면에서 Windows 잠금을 해제하고 관리자 확인 창을 모두 닫은 다음 다시 시도해 주세요. 계속 문제가 생기면 호스트를 다시 시작해 주세요.",
+  "error.remote.macScreenLocked":
+    "Mac이 잠겨 있어 화면을 공유할 수 없어요. Mac 화면에서 잠금을 해제한 다음 다시 시도해 주세요.",
   "error.remote.streamTooSlowLowerQuality":
     "호스트와의 연결이 너무 느려서 화면을 표시할 수 없어요. 다시 시도해 주세요. 다음 연결은 더 낮은 화질을 사용해요.",
   "error.remote.streamTooSlow":
     "호스트와의 연결이 너무 느려서 화면을 표시할 수 없어요. 더 빠른 네트워크를 사용한 다음 다시 시도해 주세요.",
+  "error.remote.noPictureSwitchEncoder":
+    "호스트가 화면을 보내지 않았어요. 다시 시도해 주세요. 다음 연결에서는 더 많은 컴퓨터에서 작동하는 비디오 설정을 사용해요.",
   "error.remote.teamSessionExpired": "팀 세션이 만료되었어요.",
   "error.remote.finishTestBeforeSwitch": "디스플레이를 전환하기 전에 원격 데스크톱 테스트를 끝내 주세요.",
   "error.remote.displayNotFound": "원격 디스플레이를 찾을 수 없어요.",
@@ -87,7 +93,11 @@ export const messages = {
     "보안 키가 없거나 변경되어 OpenBot이 이 서버를 확인할 수 없어요. 서버 소유자에게 서버를 확인해 달라고 요청하세요.",
   "error.remote.connectionNotStarted":
     "OpenBot이 이 서버와 연결을 시작하지 못했어요. 문제가 계속되면 OpenBot을 종료하고 다시 여세요.",
-  "error.remote.hostDidNotConnect": "WebRTC 호스트가 연결되지 않았어요.",
+  "error.remote.connectionServiceUnreachable":
+    "이 컴퓨터가 OpenBot 연결 서비스에 연결할 수 없어요. 인터넷 연결을 확인하세요. OpenBot이 자동으로 다시 연결해요.",
+  "error.remote.serverAnswerTimeout": "서버가 제때 응답하지 않았어요. OpenBot이 자동으로 다시 연결해요.",
+  "error.remote.signInConnectionClosed":
+    "로그인 중에 서버 연결이 끊겼어요. 계속 그러면 서버와 이 기기의 날짜와 시간이 맞는지 확인하세요.",
   "error.remote.connectionCancelled": "원격 연결이 취소되었어요.",
   "error.remote.hostDisconnected": "서버와의 연결이 끊어졌어요. 작업이 완료되었는지 확인한 후 다시 시도해 주세요.",
   "error.remote.eventGap": "호스트 이벤트 순서에 누락이 있어요.",
@@ -186,6 +196,8 @@ export const messages = {
     "Signal이 이 연결에 사용할 릴레이 서버를 보내지 않았어요. 나중에 다시 시도해 주세요.",
   "error.remote.iceFailed": "호스트에 직접 연결할 수 없어요. 방화벽, VPN 또는 프록시가 연결을 막고 있을 수 있어요.",
   "error.remote.iceDisconnected": "호스트와의 직접 연결이 끊어졌어요.",
+  "error.remote.webrtcBlocked":
+    "이 기기가 OpenBot에 필요한 연결을 차단합니다. 차단 모드가 켜져 있으면 설정 > 개인정보 보호 및 보안 > 차단 모드에서 OpenBot에 대해 끄세요.",
   "error.remote.directoryUnreachable": "OpenBot이 OpenBot 서비스에 연결할 수 없어요. 연결 상태를 확인해 주세요.",
   "error.remote.directoryTimeout": "OpenBot 서비스가 제때 응답하지 않았어요. 다시 시도해 주세요.",
   "error.remote.inviteAlreadyUsed": "이미 사용된 초대예요. 새 초대를 요청해 주세요.",
@@ -205,6 +217,10 @@ export const messages = {
   "error.remote.formUnavailable": "이 양식은 더 이상 사용할 수 없어요.",
   "error.remote.hostedServerRemoval": "호스팅 서버를 삭제하려면 결제에서 삭제해 주세요.",
   "error.remote.hostRemoved": "소유자가 이 서버를 계정에서 삭제했어요.",
+  "error.remote.ownerTransferSelf": "이미 이 서버의 소유자예요. 새 소유자의 이메일을 입력하세요.",
+  "error.remote.ownerTransferHosted": "OpenBot이 호스팅하는 서버는 소유자를 바꿀 수 없어요.",
+  "error.remote.ownerTransferInvalid":
+    "이 소유권 이전은 더 이상 사용할 수 없어요. 소유자에게 다시 보내 달라고 요청하세요.",
   "error.remote.channelsUnsupported": "채널을 사용하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.channelDeleteUnsupported": "채널을 삭제하려면 이 데스크톱 서버를 업데이트해 주세요.",
   "error.remote.historyRefreshFailed": "메시지를 보냈지만 채팅 기록을 새로 고칠 수 없었어요.",

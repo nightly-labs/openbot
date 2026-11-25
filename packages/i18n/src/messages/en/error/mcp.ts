@@ -1,11 +1,10 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.mcp", {
-  // MCP sign-in errors, and the sign-in page in the browser.
   "error.mcp.redirectByName": "This address is not reachable by name.",
   "error.mcp.redirectNotSignIn": "This address is not part of a sign-in.",
   "error.mcp.redirectRefused": "The sign-in was refused. Go back to OpenBot and try again.",
-  "error.mcp.redirectNoSignIn": "No sign-in is waiting for this. It may have ended.",
+  "error.mcp.redirectNoSignIn": "This sign-in is no longer active. Go back to OpenBot and start the sign-in again.",
   "error.mcp.redirectSignedIn": "OpenBot is signed in. You can close this window.",
   "error.mcp.redirectNotSaved": "The sign-in did not finish. Go back to OpenBot to see why.",
   "error.mcp.signInFileUnreadable": "The MCP sign-in file is unreadable.",

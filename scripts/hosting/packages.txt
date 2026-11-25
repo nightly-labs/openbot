@@ -22,7 +22,6 @@ at-spi2-core
 # minimal Ubuntu 26.04 does not have.
 openbox
 lxterminal
-pcmanfm
 hsetroot
 fonts-dejavu-core
 # The emoji of the pages that the agent browser opens. Without an emoji font, each emoji is an empty box.

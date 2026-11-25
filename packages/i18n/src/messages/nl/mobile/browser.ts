@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Typen op de pagina",
   "mobile.browser.reconnect": "Verbind opnieuw",
   "mobile.browser.status.connecting": "Verbinden met de browser…",
+  "mobile.browser.dialog.title": "De pagina toont een bericht",
+  "mobile.browser.dialog.ok": "OK",
   "mobile.browser.status.ended": "De live weergave is beëindigd.",
   "mobile.browser.status.offline": "De server is niet verbonden.",
   "mobile.browser.status.noTab": "{name} heeft geen browsertabblad open.",
@@ -85,4 +87,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Geef terug",
   "mobile.browser.help.handBack.body":
     "Als een agent je vraagt het over te nemen, kies je Ik ben klaar in het ···-menu. De agent gaat dan verder in dit tabblad.",
+  "mobile.browser.location.title": "{site} wil je locatie weten",
+  "mobile.browser.location.description": "Sta dit alleen toe voor sites die je vertrouwt.",
+  "mobile.browser.location.block": "Blokkeren",
+  "mobile.browser.location.allow": "Toestaan",
+  "mobile.browser.location.allowAlways": "Altijd toestaan",
+  "mobile.browser.location.unavailable": "Kan de locatie van dit apparaat niet ophalen.",
+  "mobile.browser.location.answerFailed": "Kan het locatieverzoek niet beantwoorden.",
 } as const satisfies PartialTranslation<typeof source>;

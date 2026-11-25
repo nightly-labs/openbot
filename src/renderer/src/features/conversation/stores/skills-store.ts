@@ -4,7 +4,6 @@ import { conversationRuntime } from "../conversation-runtime";
 import type { ConversationProps } from "../conversation-types";
 import { installedSkillsRequestKey } from "../installed-skills-source";
 
-/** Separates the agent ids in a request key. An agent id holds no control character. */
 const SKILL_AGENT_ID_SEPARATOR = "\u0001";
 
 export interface SkillsStoreDeps {
@@ -12,10 +11,6 @@ export interface SkillsStoreDeps {
   settingsOpen: () => boolean;
 }
 
-/**
- * The agents whose skills `$` offers: the agent of the chat, or each agent of a channel. A skill tag
- * reaches every agent by its name, so a channel offers the skills of all its agents.
- */
 function skillAgentIds(props: ConversationProps): string[] {
   if (props.channel) return [...new Set((props.mentionAgents ?? []).map((agent) => agent.id))].sort();
   return props.agent?.id ? [props.agent.id] : [];
@@ -24,10 +19,6 @@ function skillAgentIds(props: ConversationProps): string[] {
 const usable = (skill: InstalledSkill) =>
   skill.state !== "needs-repair" && skill.enabled !== false && skill.problem === undefined;
 
-/**
- * One entry for each skill id: agents that have the same skill give the same id. A usable copy wins,
- * because the composer hides a skill that needs repair or is turned off.
- */
 function mergedSkills(lists: readonly InstalledSkill[][]): InstalledSkill[] {
   const skills = new Map<string, InstalledSkill>();
   for (const skill of lists.flat()) {
@@ -44,7 +35,6 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
   let installedSkillsRequest = 0;
   let installedSkillsSourceId: string | undefined;
   let failedInstalledSkillsAttempt: { serverId: string; sourceId: string; connectionSequence: number } | undefined;
-  /** The last list that loaded for each agent of the current source. A failed request keeps it. */
   let skillsByAgent = new Map<string, InstalledSkill[]>();
   let skillsServerId: string | undefined;
   const showLoadedSkills = (agentIds: readonly string[]) =>
@@ -87,7 +77,6 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
     const agentIds = agentIdsText.split(SKILL_AGENT_ID_SEPARATOR);
     if (installedSkillsSourceId !== sourceId) {
       installedSkillsSourceId = sourceId;
-      // A new member of a channel keeps the skills of the other members while its own list loads.
       const kept = skillsServerId === serverId ? skillsByAgent : new Map<string, InstalledSkill[]>();
       skillsByAgent = new Map(
         agentIds.flatMap((agentId) => {
@@ -111,7 +100,6 @@ export function createSkillsStore(deps: SkillsStoreDeps) {
     const runtime = conversationRuntime(deps.props);
     void Promise.allSettled(agentIds.map((agentId) => runtime.agent.listInstalledSkills(agentId))).then((results) => {
       if (request !== installedSkillsRequest) return;
-      // A failed request keeps the list that loaded before for that agent.
       results.forEach((result, index) => {
         if (result.status === "fulfilled") skillsByAgent.set(agentIds[index] ?? "", result.value);
       });

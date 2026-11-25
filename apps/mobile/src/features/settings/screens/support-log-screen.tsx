@@ -18,30 +18,20 @@ const LEVEL_CLASS = {
   warn: "text-warning-text",
   error: "text-danger-text",
 } as const satisfies Record<SupportLogLevel, string>;
-/**
- * Entries in one block. A block holds the entries whose IDs have the same quotient by this number,
- * so its edges do not move when the log drops its oldest entries. New entries change only the newest
- * block, and the other blocks do not render again.
- */
 const BLOCK_LINES = 50;
-/** The lines that the page shows at first, and that each "Show older events" adds. */
 const PAGE_LINES = 500;
-/** A list scrolled less than this far from its top still counts as at the top. */
 const TOP_SLOP = 48;
 
 interface LogBlockProps {
   entries: readonly SupportLogEntry[];
 }
 
-/** The blocks that hold at least the newest `shown` entries, newest block first. */
 function logBlocks(entries: readonly SupportLogEntry[], shown: number): LogBlockProps[] {
   const blocks: LogBlockProps[] = [];
   let lines = 0;
   for (let end = entries.length; end > 0 && lines < shown; ) {
     const bucket = Math.floor((entries[end - 1]?.id ?? 0) / BLOCK_LINES);
     let start = end - 1;
-    // Restored entries get their IDs after the first entries of this launch, so a block ends where
-    // the quotient changes, not at a fixed index.
     while (start > 0 && Math.floor((entries[start - 1]?.id ?? 0) / BLOCK_LINES) === bucket) start -= 1;
     blocks.push({ entries: entries.slice(start, end) });
     lines += end - start;
@@ -72,18 +62,12 @@ const LogBlock = memo(function LogBlock({ entries }: LogBlockProps) {
   );
 }, sameBlock);
 
-/**
- * The support log, newest first, in the scroll view of the other settings pages, which owns the
- * header blur. At the top of the list new events appear at once. Lower down the list holds the
- * events it shows, so the lines do not move while the user reads them, and it catches up at the top.
- */
 export function SupportLogScreen() {
   const { t } = useText();
   const live = useSyncExternalStore(supportLog.subscribe, supportLog.entries);
   const [held, setHeld] = useState<readonly SupportLogEntry[] | null>(null);
   const entries = held ?? live;
   const [shown, setShown] = useState(PAGE_LINES);
-  // iOS insets the content under the transparent header, so the top of the list is above zero.
   const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const top = isIOS ? -headerHeight : 0;
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

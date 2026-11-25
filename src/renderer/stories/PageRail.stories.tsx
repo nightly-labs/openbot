@@ -1,18 +1,23 @@
+import type { CreditsState } from "@openbot/contracts/credits";
 import { accountUsageProviderRows } from "@openbot/ui/features/account/account-usage-view";
+import { creditsRailWallet } from "@openbot/ui/features/credits/credits-store";
+import { RailMoveCreditsDialog } from "@openbot/ui/features/credits/MoveCreditsDialog";
 import { ServerMenu } from "@openbot/ui/features/servers/ServerMenu";
 import { HelpMenu } from "@openbot/ui/features/updates/HelpMenu";
 import {
   type CustomAgentUsageRailRow,
   type MediaCreditsRailRow,
   PageRail,
+  type PageRailHideableItem,
   type PageRailPage,
   type PageRailPinnablePage,
   type PageRailProps,
 } from "@openbot/ui/features/window/PageRail";
 import { useText } from "@openbot/ui/text";
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { createMockCredits } from "../src/preview/mock-credits";
 import { STORY_SERVERS } from "./fixtures";
 
 const nowSeconds = Math.floor(Date.now() / 1_000);
@@ -33,7 +38,6 @@ const usageRows = accountUsageProviderRows({
   ],
 });
 
-/** A merged Cursor plan counts the Grok plan quota: one Grok ring, and its card lists Cursor too. */
 const sharedQuotaRows = accountUsageProviderRows({
   limits: [
     {
@@ -50,6 +54,17 @@ const sharedQuotaRows = accountUsageProviderRows({
   ],
 });
 
+const readFailedRows = accountUsageProviderRows({
+  limits: [
+    {
+      id: "codex",
+      primary: { usedPercent: 28, windowDurationMins: 300, resetsAt: nowSeconds + 2 * 3_600 },
+      secondary: { usedPercent: 15, windowDurationMins: 10_080, resetsAt: nowSeconds + 4 * 86_400 },
+    },
+    { id: "grok", primary: null, secondary: null, readFailed: true },
+  ],
+});
+
 const account = (id: string, label: string) =>
   ({ id, label, email: `${label.toLowerCase()}@example.com`, state: "connected", message: null }) as const;
 const window5h = (usedPercent: number) => ({ usedPercent, windowDurationMins: 300, resetsAt: nowSeconds + 7_200 });
@@ -59,7 +74,6 @@ const windowWeek = (usedPercent: number) => ({
   resetsAt: nowSeconds + 4 * 86_400,
 });
 
-/** Three Codex and three Claude accounts, and four other plans: ten rings, more than the rail has room for. */
 const manyAccountRows = accountUsageProviderRows(
   {
     limits: [
@@ -97,53 +111,54 @@ const manyAccountRows = accountUsageProviderRows(
   ],
 );
 
-/** An example answer. Each agent writes its own text, which the card shows as it is. */
 const customAgentUsage: CustomAgentUsageRailRow[] = [
   { id: "devin", name: "Devin", text: "Plan: Team\nACUs used this cycle: 42 of 250\nThe cycle resets in 12 days." },
 ];
 
-/** On the Canvas page: a Sunra team member with 120 of a 500-credit quota left. */
 const teamCredits: MediaCreditsRailRow[] = [
   { key: "sunra", provider: "sunra", name: "Sunra", available: 120, quota: 500 },
 ];
 
-/** A personal Sunra account has no quota of its own. */
 const personalCredits: MediaCreditsRailRow[] = [
   { key: "sunra", provider: "sunra", name: "Sunra", available: 2140, quota: null },
 ];
 
-/** Sunra and Higgsfield both signed in on the host: one button for each service. */
 const bothCredits: MediaCreditsRailRow[] = [
   ...teamCredits,
   { key: "higgsfield", provider: "higgsfield", name: "Higgsfield", available: 860, quota: null, number: 1 },
 ];
 
-/** Two Higgsfield accounts on the host: one button for each account, with the name that Apps shows. */
 const twoAccountCredits: MediaCreditsRailRow[] = [
   { key: "higgsfield:first", provider: "higgsfield", name: "Higgsfield", available: 860, quota: null, number: 1 },
   { key: "higgsfield:second", provider: "higgsfield", name: "Higgsfield 2", available: 95, quota: null, number: 2 },
 ];
 
-/** Almost no Sunra team credits, and no Higgsfield credits. */
 const lowCredits: MediaCreditsRailRow[] = [
   { key: "sunra", provider: "sunra", name: "Sunra", available: 140, quota: 2000 },
   { key: "higgsfield", provider: "higgsfield", name: "Higgsfield", available: 0, quota: null },
 ];
 
-/** The page rail as the desktop window shows it, with the menu of the open server at its end. Hover a button, or move to it with Tab, to see its tooltip. */
 function RailPreview(props: {
   updateReady?: boolean;
   logo?: PageRailProps["logo"];
   customAgentUsage?: readonly CustomAgentUsageRailRow[];
   usageRows?: PageRailProps["usageRows"];
   mediaCredits?: readonly MediaCreditsRailRow[];
-  /** Pins the CRM, whose button has a right-click menu. */
+  creditBalance?: number | undefined;
+  creditAgents?: boolean;
+  creditAsk?: boolean;
+  creditMove?: boolean;
+  creditWalletName?: string | undefined;
+  onCreditMove?: () => void;
+  hiddenItems?: readonly PageRailHideableItem[];
   crm?: boolean;
 }) {
   const { t } = useText();
   const [current, setCurrent] = createSignal<PageRailPage | null>("agents");
   const [pinned, setPinned] = createSignal<readonly PageRailPinnablePage[]>(props.crm ? ["usage", "crm"] : ["usage"]);
-  /** Named functions, not ternary props. */
+  const [creditAgents, setCreditAgents] = createSignal(props.creditAgents);
+  const [creditAsk, setCreditAsk] = createSignal(props.creditAsk);
+  const [hidden, setHidden] = createSignal<readonly PageRailHideableItem[]>(props.hiddenItems ?? []);
   function crmAction(): (() => void) | undefined {
     if (!props.crm) return undefined;
     return () => setCurrent("crm");
@@ -152,8 +167,11 @@ function RailPreview(props: {
     if (!props.crm) return undefined;
     return () => setCurrent("crm");
   }
+  function creditsAction(): (() => void) | undefined {
+    if (props.creditBalance === undefined) return undefined;
+    return () => setCurrent("credits");
+  }
   return (
-    // The extra box keeps the rail out of the rule that hides it in a narrow window.
     <div class="app-window" style={{ height: "100vh" }}>
       <div style={{ display: "flex" }}>
         <PageRail
@@ -168,11 +186,22 @@ function RailPreview(props: {
           mediaCredits={props.mediaCredits}
           onMediaCredits={fn()}
           onAgents={() => setCurrent("agents")}
-          onRoutines={() => setCurrent("routines")}
           onSchedule={() => setCurrent("schedule")}
           onUsage={() => setCurrent("usage")}
           onCrm={crmAction()}
           onCrmConnectors={crmConnectorsAction()}
+          onCredits={creditsAction()}
+          creditBalance={props.creditBalance}
+          creditAgents={creditAgents()}
+          onCreditAgentsChange={creditAgents() === undefined ? undefined : setCreditAgents}
+          creditAsk={creditAsk()}
+          onCreditAskChange={creditAsk() === undefined ? undefined : setCreditAsk}
+          creditWalletName={props.creditWalletName}
+          onCreditMove={props.onCreditMove ?? (props.creditMove ? fn() : undefined)}
+          hiddenItems={hidden()}
+          onHiddenChange={(item, hide) =>
+            setHidden((items) => (hide ? [...items, item] : items.filter((other) => other !== item)))
+          }
           onMarketplace={fn()}
           onSettings={() => setCurrent("settings")}
           settingsNotice={props.updateReady ? t("account.update.ready") : undefined}
@@ -209,6 +238,38 @@ function RailPreview(props: {
   );
 }
 
+function CreditMovePreview(props: { personal: number; server: number }) {
+  const calls = createMockCredits({
+    balance: props.personal,
+    servers: [{ serverId: "team", name: "OpenBot team", role: "owner", balance: props.server }],
+  });
+  const [state, setState] = createSignal<CreditsState | null>(null);
+  const [moving, setMoving] = createSignal(false);
+  void calls.getState().then(setState);
+  const wallet = () => creditsRailWallet(state(), { kind: "remote", id: "team" }, null);
+  return (
+    <>
+      <RailPreview
+        creditBalance={wallet()?.balance}
+        creditWalletName={wallet()?.name ?? undefined}
+        creditAgents
+        creditAsk
+        onCreditMove={() => setMoving(true)}
+      />
+      <Show when={moving() ? wallet()?.movable : null}>
+        {(server) => (
+          <RailMoveCreditsDialog
+            calls={() => calls}
+            server={server()}
+            onChange={setState}
+            onClose={() => setMoving(false)}
+          />
+        )}
+      </Show>
+    </>
+  );
+}
+
 const meta = {
   title: "Window/PageRail",
   component: RailPreview,
@@ -220,65 +281,98 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/** The Settings tooltip also says what the dot stands for. */
 export const SettingsNotice: Story = {
   args: { updateReady: true },
 };
 
-/** A custom agent with a usage command: its logo with no ring. Hover it to see the answer. */
 export const CustomAgentUsage: Story = {
   args: { customAgentUsage },
 };
 
-/** Grok and a merged Cursor plan share one quota, so the rail shows the Grok ring alone. */
 export const SharedQuota: Story = {
   args: { usageRows: sharedQuotaRows },
 };
 
-/**
- * Ten accounts: the rings that fit, at most four, then one "+N" ring. The rings with the least left
- * stay. Hover "+N" to see the other accounts, and make the window shorter to see fewer rings.
- */
+export const UsageReadFailed: Story = {
+  args: { usageRows: readFailedRows },
+};
+
 export const ManyAccounts: Story = {
   args: { usageRows: manyAccountRows },
 };
 
-/** The web client: no macOS window buttons, so the logo in the top row links to the OpenBot site. */
 export const WebLogo: Story = {
   args: { logo: { variant: "production", href: "/" } },
 };
 
-/** Windows and Linux: the logo is in the top row, with no link. */
 export const DesktopLogo: Story = {
   args: { logo: { variant: "production" } },
 };
 
-/** The Canvas page with a Sunra team quota: the logo with the number of credits left. Hover it to see the quota. */
+export const Credits: Story = {
+  args: { creditBalance: 1250 },
+};
+
+export const CreditsAdmin: Story = {
+  args: {
+    creditBalance: 1250,
+    creditAgents: true,
+    creditAsk: true,
+    creditMove: true,
+    creditWalletName: "Studio server",
+  },
+};
+
+export const CreditsMember: Story = {
+  args: { creditBalance: 1250, creditAsk: false },
+};
+
+export const CreditsHundredThousand: Story = {
+  args: {
+    creditBalance: 100_000,
+    creditAgents: true,
+    creditAsk: true,
+    creditMove: true,
+    creditWalletName: "OpenBot team",
+  },
+};
+
+export const CreditsMove: Story = {
+  render: () => <CreditMovePreview personal={100_000} server={1_799.5} />,
+};
+
+export const CreditsAgentsOff: Story = {
+  args: { creditBalance: 1250, creditAgents: false },
+};
+
+export const CreditsLarge: Story = {
+  args: { creditBalance: 48_250.5, creditAgents: true },
+};
+
+export const HiddenItems: Story = {
+  args: { creditBalance: 1250, hiddenItems: ["marketplace", "help"] },
+};
+
 export const MediaCreditsQuota: Story = {
   args: { mediaCredits: teamCredits },
 };
 
-/** The Canvas page with a personal Sunra account: the logo with the number of credits under it. */
 export const MediaCreditsPersonal: Story = {
   args: { mediaCredits: personalCredits },
 };
 
-/** The Canvas page with Sunra and Higgsfield: a button for each service. */
 export const MediaCreditsTwoServices: Story = {
   args: { mediaCredits: bothCredits },
 };
 
-/** The Canvas page with two Higgsfield accounts: a button for each account, with its number. Hover one to see its name. */
 export const MediaCreditsTwoAccounts: Story = {
   args: { mediaCredits: twoAccountCredits },
 };
 
-/** Low credits: 7% of the Sunra team quota is left, and the Higgsfield account has none. Both numbers show in red. */
 export const MediaCreditsLow: Story = {
   args: { mediaCredits: lowCredits },
 };
 
-/** The CRM is pinned. Right-click its button for Connectors and Unpin; the other pinned buttons have Unpin. */
 export const CrmMenu: Story = {
   args: { crm: true },
 };

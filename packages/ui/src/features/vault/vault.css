@@ -1,5 +1,3 @@
-/* The Vault page of the server settings. */
-
 .vault-panel {
   display: grid;
   gap: var(--openbot-space-6);
@@ -24,14 +22,12 @@
   height: var(--openbot-icon-md);
 }
 
-/* Item logos. A site gets a letter tile: no icon is fetched from it. */
 .vault-letter {
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-md);
   font-weight: var(--openbot-weight-semibold);
 }
 
-/* Card brands sit on light paper, as their artwork expects. */
 .vault-card-logo {
   display: inline-grid;
   flex: none;
@@ -86,6 +82,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--openbot-space-3) var(--openbot-space-4);
+  align-items: start;
 }
 
 .vault-wide {
@@ -135,7 +132,6 @@
   inset-inline-end: var(--openbot-space-1);
 }
 
-/* The search matches the tab bar beside it: same height, fill and text size, no border until focus. */
 .vault-toolbar .server-settings-search {
   align-self: stretch;
 }
@@ -168,7 +164,6 @@
   padding-inline: var(--openbot-space-6) var(--openbot-space-4);
 }
 
-/* An agent's request title can be long, so it wraps like the title of its chat card. */
 .vault-dialog-title {
   flex: 1;
   min-width: 0;
@@ -178,8 +173,6 @@
   overflow-wrap: anywhere;
 }
 
-/* A requested key is labelled with its variable name, which has no spaces. Without a break, a long
-   name makes the field wider than the dialog, which hides the end of the field. */
 .vault-dialog .ui-label {
   overflow-wrap: anywhere;
 }
@@ -192,7 +185,6 @@
   padding: var(--openbot-space-4) var(--openbot-space-6) var(--openbot-space-6);
 }
 
-/* The Payment accounts group above the saved cards. */
 .vault-link-accounts {
   display: grid;
   gap: var(--openbot-space-2);
@@ -212,7 +204,6 @@
   color: var(--openbot-danger-text);
 }
 
-/* The chat card that asks for a Vault item. The frame is a UiBlockCard (ui-blocks.css). */
 .vault-request {
   max-width: 520px;
 }
@@ -221,8 +212,6 @@
   display: flex;
   flex: none;
 }
-
-/* Two-step codes: the live code of a login and the setup steps of its key. */
 
 .vault-two-step-digits {
   font-family: var(--openbot-font-mono);
@@ -256,7 +245,6 @@
   width: var(--openbot-icon-lg, 20px);
 }
 
-/* The code in a list row sits above the row's hit area, as the ⋯ menu does. */
 .vault-two-step-row-code {
   position: relative;
   z-index: 1;

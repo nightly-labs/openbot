@@ -37,6 +37,8 @@ export const messages = {
   "mobile.browser.keyboard.field": "Auf der Seite tippen",
   "mobile.browser.reconnect": "Neu verbinden",
   "mobile.browser.status.connecting": "Verbindung zum Browser wird hergestellt…",
+  "mobile.browser.dialog.title": "Die Seite zeigt eine Meldung",
+  "mobile.browser.dialog.ok": "OK",
   "mobile.browser.status.ended": "Die Liveansicht wurde beendet.",
   "mobile.browser.status.offline": "Der Server ist nicht verbunden.",
   "mobile.browser.status.noTab": "{name} hat keinen Browser-Tab geöffnet.",
@@ -84,4 +86,11 @@ export const messages = {
   "mobile.browser.help.handBack.title": "Zurückgeben",
   "mobile.browser.help.handBack.body":
     "Wenn ein Agent dich bittet zu übernehmen, wähle „Fertig“ im Menü ···. Der Agent macht dann in diesem Tab weiter.",
+  "mobile.browser.location.title": "{site} möchte deinen Standort wissen",
+  "mobile.browser.location.description": "Erlaube das nur für Websites, denen du vertraust.",
+  "mobile.browser.location.block": "Blockieren",
+  "mobile.browser.location.allow": "Erlauben",
+  "mobile.browser.location.allowAlways": "Immer erlauben",
+  "mobile.browser.location.unavailable": "Der Standort dieses Geräts ist nicht verfügbar.",
+  "mobile.browser.location.answerFailed": "Die Standortanfrage konnte nicht beantwortet werden.",
 } as const satisfies PartialTranslation<typeof source>;

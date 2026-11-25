@@ -5,6 +5,7 @@ import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import { Fragment, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useCSSVariable } from "uniwind";
+import { CreditBadge } from "@/features/workflows/components/workflow-credit-badge";
 import {
   FLOW_CARD_WIDTH,
   FlowAddButton,
@@ -20,7 +21,8 @@ import {
   type RunTone,
 } from "@/features/workflows/components/workflow-run-visuals";
 import { WorkflowStepMenuLayer } from "@/features/workflows/components/workflow-step-menu-layer";
-import type { WorkflowStepMenu } from "@/features/workflows/components/workflow-steps-list";
+import { pathLabel, pathTone, type WorkflowStepMenu } from "@/features/workflows/components/workflow-steps-list";
+import { type NodeCredits, useMediaCredits } from "@/features/workflows/model/use-media-credits";
 import { type FlowItem, type FlowPath, workflowFlowTree } from "@/features/workflows/model/workflow-flow-tree";
 import type { GraphPlace } from "@/features/workflows/model/workflow-graph-edit";
 import { stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
@@ -29,32 +31,27 @@ import type { MenuAction } from "@/shared/components/menu-view";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
-/** The corner of a step card: the grouped radius of the app. */
 const GROUPED_RADIUS = 16;
 
-/**
- * What a tap on a step does: open its menu (the workflow page), open its page (the editor of a workflow
- * that is not an outline, and a run), or open its page with the menu on a long press (the outline editor).
- */
 export type StepPress =
   | { kind: "menu"; menu: WorkflowStepMenu }
   | { kind: "open"; open: (node: WorkflowNode) => void; canOpen: (node: WorkflowNode) => boolean }
   | { kind: "edit"; actions: MenuAction[]; onAction: (id: string) => void; open: () => void; hint: string };
 
-/** One step of the flow. A step with a problem has a red edge and shows the problem. */
 export function FlowStepCard({
   node,
   agents,
   press,
   problem,
   run,
+  credits,
 }: {
   node: WorkflowNode;
   agents: readonly MobileAgent[];
   press: StepPress | undefined;
   problem: string | undefined;
-  /** The step of a run on this node, and whether the person selected it to read below the flow. */
   run?: { step: WorkflowStep | undefined; selected: boolean } | undefined;
+  credits?: NodeCredits | undefined;
 }) {
   const { t } = useText();
   const [control, grouped, danger, warning, accent] = useCSSVariable([
@@ -65,7 +62,6 @@ export function FlowStepCard({
     "--openbot-accent",
   ]);
   const status = run?.step?.status;
-  // A step that waits has the warning ring of the desktop; the selected step has the accent ring.
   const ring = problem
     ? { borderWidth: 1.5, borderColor: String(danger) }
     : run?.selected
@@ -73,7 +69,6 @@ export function FlowStepCard({
       : status === "approval"
         ? { borderWidth: 1.5, borderColor: String(warning) }
         : null;
-  // As the list of a run: a step that did not run, or that the run skipped or stopped, is quieter.
   const quiet = run !== undefined && (!status || status === "skipped" || status === "stopped");
   const [size, setSize] = useState<{ width: number; height: number }>();
   const [pressed, setPressed] = useState(false);
@@ -82,6 +77,8 @@ export function FlowStepCard({
   const actions = press?.kind === "menu" ? press.menu.actions(node) : press?.kind === "edit" ? press.actions : [];
   const hasMenu = actions.length > 0;
   const opens = (press?.kind === "open" && press.canOpen(node)) || press?.kind === "edit";
+  const openOnPress =
+    press?.kind === "edit" && !hasMenu ? press.open : press?.kind === "open" && opens ? () => press.open(node) : null;
   return (
     <View
       style={{ width: FLOW_CARD_WIDTH, opacity: quiet ? 0.6 : 1 }}
@@ -99,6 +96,7 @@ export function FlowStepCard({
         <WorkflowKindTile
           kind={node.kind}
           trigger={node.kind === "trigger" ? triggerType(node) : undefined}
+          fields={node.fields}
           size={30}
         />
         <View className="min-w-0 flex-1">
@@ -111,6 +109,11 @@ export function FlowStepCard({
           <Typography.Paragraph numberOfLines={4} style={typeScale.caption}>
             {text}
           </Typography.Paragraph>
+          {credits ? (
+            <View className="mt-1">
+              <CreditBadge credits={credits.credits} short={credits.short} />
+            </View>
+          ) : null}
           {problem ? (
             <Typography.Paragraph className="font-medium text-danger-text" numberOfLines={3} style={typeScale.small}>
               {problem}
@@ -142,31 +145,20 @@ export function FlowStepCard({
           onPressedChange={setPressed}
         />
       ) : null}
-      {press?.kind === "edit" && !hasMenu ? (
+      {openOnPress ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${label}, ${problem ?? text}`}
           style={StyleSheet.absoluteFill}
           onPressIn={() => setPressed(true)}
           onPressOut={() => setPressed(false)}
-          onPress={press.open}
-        />
-      ) : null}
-      {press?.kind === "open" && opens ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${label}, ${problem ?? text}`}
-          style={StyleSheet.absoluteFill}
-          onPressIn={() => setPressed(true)}
-          onPressOut={() => setPressed(false)}
-          onPress={() => press.open(node)}
+          onPress={openOnPress}
         />
       ) : null}
     </View>
   );
 }
 
-/** A way to a step that the flow shows at another place: a loop back, or a second way in. */
 function FlowJump({ label, loop }: { label: string; loop: boolean }) {
   const { t } = useText();
   const muted = String(useCSSVariable("--openbot-text-grouped-secondary"));
@@ -182,32 +174,15 @@ function FlowJump({ label, loop }: { label: string; loop: boolean }) {
 
 function PathLabel({ path, index }: { path: FlowPath; index: number }) {
   const { t } = useText();
-  const text =
-    path.branch === "yes"
-      ? t("mobile.workflow.path.yes")
-      : path.branch === "no"
-        ? t("mobile.workflow.path.no")
-        : t("mobile.workflow.flow.path", { number: index + 1 });
-  const tone =
-    path.branch === "yes" ? "text-success-text" : path.branch === "no" ? "text-danger-text" : "text-grouped-secondary";
   return (
-    <Typography.Paragraph className={`font-semibold ${tone}`} style={typeScale.caption}>
-      {text}
+    <Typography.Paragraph className={`font-semibold ${pathTone(path.branch)}`} style={typeScale.caption}>
+      {pathLabel(path.branch, index, t)}
     </Typography.Paragraph>
   );
 }
 
-/**
- * The steps of a workflow on a canvas from left to right, as on the desktop, for any shape of graph.
- * The paths of every split sit one under the other, at any depth, and each step keeps the same width;
- * the canvas scrolls sideways. A loop and a second way into a step show as a line that names the step it
- * goes to. The steps that no trigger reaches come last.
- *
- * `menu`: a tap opens the menu of a step (the workflow page). `onOpenStep`: a tap opens the page of a
- * step that `canOpenStep` allows (the editor). `onAdd`: a "+" on each connection and at the end of
- * each path adds a step there; without it, a connection is a plain line.
- */
 export function WorkflowFlowView({
+  serverId,
   graph,
   agents,
   menu,
@@ -217,6 +192,7 @@ export function WorkflowFlowView({
   onAdd,
   run,
 }: {
+  serverId: string;
   graph: WorkflowGraph;
   agents: readonly MobileAgent[];
   menu?: WorkflowStepMenu;
@@ -224,10 +200,6 @@ export function WorkflowFlowView({
   canOpenStep?: (node: WorkflowNode) => boolean;
   problems?: ReadonlyMap<string, string>;
   onAdd?: (place: GraphPlace) => void;
-  /**
-   * A run on the flow: the newest step of each node, and the step that the person selected. A tap
-   * selects a step; the run page shows it below the flow.
-   */
   run?: {
     steps: ReadonlyMap<string, WorkflowStep>;
     selectedId: string | null;
@@ -235,8 +207,8 @@ export function WorkflowFlowView({
   };
 }) {
   const { t } = useText();
-  // The tree walks the graph and searches each join; it changes only with the graph.
   const tree = useMemo(() => workflowFlowTree(graph), [graph]);
+  const { byNode } = useMediaCredits(serverId, run ? [] : graph.nodes);
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
   const press: StepPress | undefined = run
     ? { kind: "open", open: run.onSelect, canOpen: () => true }
@@ -250,10 +222,6 @@ export function WorkflowFlowView({
     return node ? stepLabel(node, agents, t) : "";
   };
   const edges = new Map(graph.edges.map((edge) => [edge.id, edge]));
-  /**
-   * The tone of a line in a run, as the desktop `edgeTone`: into the step that runs from a step that
-   * is done, or between two steps that are done. A prompt or a file is done once the run has started.
-   */
   const edgeTone = (edgeId: string): RunTone => {
     const edge = edges.get(edgeId);
     if (!edge || !run) return "idle";
@@ -275,10 +243,8 @@ export function WorkflowFlowView({
           : item.place.kind === "edge"
             ? `add-${item.place.edgeId}`
             : `add-${item.place.nodeId}-${item.place.branch ?? ""}`;
-  /** A line joins two items that have no line of their own: an add point and a split draw theirs. */
   const ownLine = (item: FlowItem | undefined) => item?.type === "add" || item?.type === "split";
   const list = (all: readonly FlowItem[]) => {
-    // Without editing, the end of a path is no place: only the connections stay, as lines.
     const items = onAdd ? all : all.filter((item) => item.type !== "add" || item.place.kind === "edge");
     return items.map((item, index) => (
       <Fragment key={keyOf(item)}>
@@ -304,10 +270,10 @@ export function WorkflowFlowView({
           press={press}
           problem={problems?.get(item.id)}
           run={run ? { step: run.steps.get(item.id), selected: run.selectedId === item.id } : undefined}
+          credits={byNode.get(item.id)}
         />
       ) : null;
     }
-    // The answer of a condition in this run: its other path dims.
     const taken = run?.steps.get(item.from)?.branch ?? null;
     return (
       <FlowLanes
@@ -316,7 +282,6 @@ export function WorkflowFlowView({
           key: path.key,
           label: <PathLabel path={path} index={index} />,
           dimmed: Boolean(taken && path.branch && path.branch !== taken),
-          // A path with only a place to add has no step yet: it goes to the join, or the run ends there.
           content: (
             <>
               {list(path.items)}

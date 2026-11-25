@@ -1,7 +1,6 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("error.host", {
-  // Errors from host setup, publishing, and host maintenance.
   "error.host.iceServersMissing": "Remote Signal has not supplied ICE servers.",
   "error.host.keyRotationUnavailable": "This server cannot change its key without the account service.",
   "error.host.keyRotationRefused":
@@ -23,6 +22,7 @@ export const messages = defineMessages("error.host", {
   "error.host.noServer": "This computer has no server to change.",
   "error.host.identityLocalOnly": "The server name and logo can only be changed on the computer that runs it.",
   "error.host.timezoneInvalid": "This timezone is not known.",
+  "error.host.signalHomeUnknown": "This Signal server is not available.",
   "error.host.turnLimitInvalid": "This thread limit is not valid.",
   "error.host.maintenanceInterrupted":
     "Interrupted host maintenance. Verify the application and reset host state before retrying.",

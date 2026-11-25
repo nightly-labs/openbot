@@ -1,10 +1,3 @@
-// Sets where a routine runs, the agent's chat or the routine's own thread, on a joined server through
-// `routine-run-place-v1`, from the window of a running dev client. Start the two-client harness with
-// `bun run dev:test-client`; the test client joins this worktree's app as an owner. The script makes
-// one inactive routine on the host's first agent through the released routine calls that every member
-// uses, moves it between the chat and a thread, does the same through the event calls of an owner,
-// and deletes the routine. Writes .openbot-build/routine-run-place-e2e/report.json. Needs
-// `--allow-mutations`: `bun scripts/routine-run-place-e2e.ts --allow-mutations`.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -20,7 +13,6 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { assertMutationAllowed, connectToDevApp } from "./dev-automation/cdp-client";
 import { readDevInstanceRecords } from "./dev-automation/instance-registry";
 
-// The page functions below run in the app window, where the preload bridge sets this.
 declare global {
   interface Window {
     openbot: OpenBotDesktopApi;
@@ -84,12 +76,10 @@ try {
     return routines.find((routine) => routine.id === routineId)?.runIn;
   };
 
-  // The released routine calls, which every member who manages the agent uses.
   const input = {
     agentId,
     name: `Run place E2E ${Date.now()}`,
     instruction: "Reply with the word done.",
-    // Inactive: the routine never runs while the script works.
     active: false,
     timezone: "UTC",
     schedule: { kind: "hourly", minute: 0 },
@@ -130,8 +120,6 @@ try {
     updated.runIn,
   );
 
-  // The event calls of an owner or admin. The test client joins as a member until a host admin changes
-  // its role, so a member run records that it left them out.
   if (!canAdministerServer(server.role)) {
     skipped.push("event calls: the test client is a member of the joined host");
     await cleanup();

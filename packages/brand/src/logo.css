@@ -42,7 +42,6 @@
 
 .app-logo-eye-motion {
   pointer-events: none;
-  /* `--app-logo-eye-squint` half closes both eyes for a moment. The blink animates the eyes inside. */
   transform: translate(var(--app-logo-eye-x, 0%), var(--app-logo-eye-y, 0%)) scaleY(var(--app-logo-eye-squint, 1));
   transform-origin: center;
   transition: transform var(--openbot-duration-normal) cubic-bezier(0.23, 1, 0.32, 1);
@@ -56,8 +55,6 @@
   transform-origin: 71.2% 48.8%;
 }
 
-/* `AppLogo` starts each blink. A loop over the whole period, with the eyes still for most of it, makes
-   the page draw a frame on every display refresh, because Chromium runs SVG animations on the main thread. */
 .app-logo[data-animation="blink"]:where([data-blink]) .app-logo-eye {
   animation: app-logo-blink 192ms cubic-bezier(0.77, 0, 0.175, 1);
 }
