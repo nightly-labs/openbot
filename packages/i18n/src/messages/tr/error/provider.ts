@@ -261,7 +261,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode'un model sağlayıcısı geçersiz bir yükleme isteği bildirdi. Başka bir model seçin ve devam edin. Kayıtlı rutinleri yeniden oluşturmadan önce denetleyin.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Bu model, bu sohbetteki bir dosyayı veya görseli okuyamıyor. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Mesajınızı dosya olmadan yeniden gönderin veya dosya okuyabilen bir model seçin. Bu modeli özel bir sağlayıcıya eklediyseniz, ayarlarında “Kabul eder” altındaki “Görseller” seçeneğini kaldırın.",
+    "Bu model, bu sohbetteki bir dosyayı veya görseli okuyamıyor. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Mesajınızı dosya olmadan yeniden gönderin veya dosya okuyabilen bir model seçin. Bu modeli özel bir sağlayıcıya eklediyseniz, ayarlarında “Kabul eder” altındaki “Görseller” veya “PDF” seçeneğini kaldırın.",
   "error.provider.opencodeOutOfMemory":
     "Model sunucusunun belleği bu sohbet için yetmedi. Yeni bir sohbet başlatın ya da modeli daha küçük bir bağlam uzunluğuyla yükleyin ve OpenBot'taki sağlayıcı ayarlarına aynı pencereyi girin.",
   "error.provider.opencodeContextTooSmall":

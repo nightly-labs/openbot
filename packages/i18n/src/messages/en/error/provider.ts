@@ -251,7 +251,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.opencodeInvalidUpload":
     "OpenCode's model provider reported an invalid upload request. Choose another model and continue. Check saved routines before you create them again.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "This model cannot read a file or image in this chat. OpenBot started a new OpenCode session with the chat history. Send your message again without the file, or choose a model that can read files. If you added this model to a custom provider, clear Images at Accepts in its settings.",
+    "This model cannot read a file or image in this chat. OpenBot started a new OpenCode session with the chat history. Send your message again without the file, or choose a model that can read files. If you added this model to a custom provider, clear Images or PDF at Accepts in its settings.",
   "error.provider.opencodeOutOfMemory":
     "The model server ran out of memory for this chat. Start a new chat, or load the model with a smaller context length and enter the same window in its OpenBot provider settings.",
   "error.provider.opencodeContextTooSmall":

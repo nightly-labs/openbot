@@ -259,7 +259,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode의 모델 제공자가 올바르지 않은 업로드 요청이라고 알렸어요. 다른 모델을 선택해 계속하세요. 저장된 루틴을 다시 만들기 전에 확인하세요.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 파일 없이 메시지를 다시 보내거나, 파일을 읽을 수 있는 모델을 선택하세요. 이 모델을 사용자 지정 제공자에 추가했다면 설정의 '입력'에서 '이미지'를 해제하세요.",
+    "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 파일 없이 메시지를 다시 보내거나, 파일을 읽을 수 있는 모델을 선택하세요. 이 모델을 사용자 지정 제공자에 추가했다면 설정의 '입력'에서 '이미지' 또는 'PDF'를 해제하세요.",
   "error.provider.opencodeOutOfMemory":
     "모델 서버의 메모리가 이 채팅에 부족합니다. 새 채팅을 시작하거나, 더 작은 컨텍스트 길이로 모델을 불러오고 OpenBot의 제공자 설정에 같은 창을 입력하세요.",
   "error.provider.opencodeContextTooSmall":

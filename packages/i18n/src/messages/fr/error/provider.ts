@@ -276,7 +276,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "Le fournisseur de modèles d’OpenCode a signalé une demande d’envoi non valide. Choisissez un autre modèle et continuez. Vérifiez les routines enregistrées avant de les créer à nouveau.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "Ce modèle ne peut pas lire un fichier ou une image de cette conversation. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Envoyez à nouveau votre message sans le fichier, ou choisissez un modèle qui sait lire les fichiers. Si vous avez ajouté ce modèle à un fournisseur personnalisé, décochez « Images » dans « Accepte » dans ses réglages.",
+    "Ce modèle ne peut pas lire un fichier ou une image de cette conversation. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Envoyez à nouveau votre message sans le fichier, ou choisissez un modèle qui sait lire les fichiers. Si vous avez ajouté ce modèle à un fournisseur personnalisé, décochez « Images » ou « PDF » dans « Accepte » dans ses réglages.",
   "error.provider.opencodeOutOfMemory":
     "Le serveur du modèle manque de mémoire pour cette conversation. Commencez une nouvelle conversation, ou chargez le modèle avec un contexte plus court, puis saisissez la même fenêtre dans les réglages de son fournisseur dans OpenBot.",
   "error.provider.opencodeContextTooSmall":

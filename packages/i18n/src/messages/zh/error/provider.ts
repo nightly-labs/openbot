@@ -228,7 +228,7 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode 的模型服务商报告上传请求无效。请改用其他模型继续；重新创建自动化任务前请先检查已保存的自动化任务。\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "该模型无法读取该对话中的文件或图片。OpenBot 已使用聊天记录开始新的 OpenCode 会话。请去掉文件后重新发送消息，或选择能读取文件的模型。如果你将此模型添加到了自定义服务商，请在其设置的“接受”中取消勾选“图片”。",
+    "该模型无法读取该对话中的文件或图片。OpenBot 已使用聊天记录开始新的 OpenCode 会话。请去掉文件后重新发送消息，或选择能读取文件的模型。如果你将此模型添加到了自定义服务商，请在其设置的“接受”中取消勾选“图片”或“PDF”。",
   "error.provider.opencodeOutOfMemory":
     "模型服务器的内存不足以处理此聊天。请开始新的聊天，或以更小的上下文长度加载模型，并在 OpenBot 中该模型提供方的设置里填写相同的窗口。",
   "error.provider.opencodeContextTooSmall":
