@@ -34,7 +34,9 @@ import {
   type BrowserViewContextMenu,
   type BrowserViewCursor,
   type BrowserViewViewport,
+  browserViewFrameBytes,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { REMOTE_DESKTOP_MAX_SIGNAL_BYTES } from "@openbot/contracts/team-protocol/remote-stream-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, toLogValue } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
@@ -225,6 +227,15 @@ const VIEW_FRAME_LIMIT = 2_048;
 
 function viewFrameSide(asked: number | undefined, fallback: number): number {
   return asked === undefined ? fallback : Math.min(VIEW_FRAME_LIMIT, Math.max(fallback, Math.round(asked)));
+}
+
+function fitViewFrameImage(image: Uint8Array): Uint8Array {
+  if (browserViewFrameBytes({ image }) <= REMOTE_DESKTOP_MAX_SIGNAL_BYTES) return image;
+  const picture = nativeImage.createFromBuffer(Buffer.from(image.buffer, image.byteOffset, image.byteLength));
+  if (picture.isEmpty()) return image;
+  const scale = Math.sqrt(REMOTE_DESKTOP_MAX_SIGNAL_BYTES / image.byteLength) * 0.9;
+  const width = Math.max(1, Math.floor(picture.getSize().width * scale));
+  return picture.resize({ width, quality: "good" }).toJPEG(VIEW_FRAME_QUALITY);
 }
 const TAB_SET_TOOLS: ReadonlySet<string> = new Set(["open", "list_tabs", "status"]);
 const VIEW_CONTEXT_MENU_MS = 1_500;
@@ -2291,7 +2302,7 @@ export class BrowserHost {
         (frame) => {
           if (!showsPage(streamGeneration)) return;
           sequence += 1;
-          onFrame({ ...frame, sequence });
+          onFrame({ ...frame, image: fitViewFrameImage(frame.image), sequence });
         },
         (error) => {
           if (streamGeneration !== generation) return;
