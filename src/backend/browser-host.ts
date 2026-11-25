@@ -2905,6 +2905,7 @@ export class BrowserHost {
     request_vault_item: rejectTakeoverTool,
     delete_vault_item: rejectTakeoverTool,
     request_link_payment: rejectTakeoverTool,
+    request_near_payment: rejectTakeoverTool,
   };
 
   #siteRecall(params: DynamicToolCallParams) {

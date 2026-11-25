@@ -370,6 +370,7 @@ import { McpServerStore } from "./mcp-server-store";
 import type { MessageDeleteAccess, MessageDeleteRefused } from "./message-delete";
 import type { MessagePinRefused } from "./message-pins";
 import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging/messaging-threads";
+import type { NearWallet } from "./near-wallet";
 import type { CustomProviderConfig } from "./opencode-config";
 import type { PasswordVault } from "./password-vault";
 import { canConfineProcesses } from "./process-confinement";
@@ -517,6 +518,7 @@ export interface AgentServiceOptions {
   passwordVault?: PasswordVault | null;
   vaultItems?: VaultItems | null;
   linkWallet?: LinkWallet | null;
+  nearWallet?: NearWallet | null;
   agentApiKeys?: AgentApiKeys | null;
   hostMemory?: HostMemory | null;
   hostTurnLimits?: { turnLimit(): number | "unlimited" | null; agentTaskLimit(): number };
@@ -1274,6 +1276,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.passwordVault === undefined ? {} : { passwordVault: options.passwordVault }),
       ...(options.vaultItems === undefined ? {} : { vaultItems: options.vaultItems }),
       linkWallet: options.linkWallet ?? null,
+      nearWallet: options.nearWallet ?? null,
       agentName: (agentId) => store.get(agentId)?.name,
       noteVaultChange: (agentId, threadId, turnId, text) => this.#tools.postVaultNote(agentId, threadId, turnId, text),
       apiKeys: options.agentApiKeys ?? null,
@@ -1425,6 +1428,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         cards: options.vaultItems?.hasCards(agentId) ?? false,
         contacts: options.vaultItems?.hasContacts(agentId) ?? false,
         link: options.linkWallet?.connected() ?? false,
+        near: options.nearWallet?.ready() ?? false,
       }),
       serverHost: hostMemory !== null,
       ...(options.hostedStorageGb ? { hostedStorageGb: options.hostedStorageGb } : {}),

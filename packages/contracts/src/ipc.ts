@@ -84,6 +84,7 @@ export * from "./ipc-media-approval-credits";
 export * from "./ipc-message-pins";
 export * from "./ipc-messaging";
 export * from "./ipc-model-visibility";
+export * from "./ipc-near-wallet";
 export * from "./ipc-notifications";
 export * from "./ipc-onepassword-connector";
 export * from "./ipc-password-managers";

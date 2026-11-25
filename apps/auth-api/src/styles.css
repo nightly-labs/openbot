@@ -11361,6 +11361,10 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   flex: 0 0 auto;
 }
 
+.near-sign-summary {
+  overflow-wrap: anywhere;
+}
+
 .brand-hero-row {
   display: flex;
   flex-wrap: wrap;

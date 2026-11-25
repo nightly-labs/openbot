@@ -385,6 +385,10 @@ import { MemoryReviewPreferenceStore } from "./memory-review-preference-store";
 import { MessagingCredentialStore } from "./messaging-credential-store";
 import { createModelReasoningSupport, MODEL_REASONING_RETRY_WAITS_MS } from "./model-reasoning-probe";
 import { ModelReleaseCatalog, ModelVisibility } from "./model-visibility";
+import { createNearIntentsGateway } from "./near-intents-gateway";
+import { NearWalletService } from "./near-wallet-service";
+import { NEAR_PASSKEY_WALLET_ORIGIN, NearOwnerSigning, nearPasskeyPageOrigin } from "./near-wallet-signing";
+import { NearWalletStore } from "./near-wallet-store";
 import { NotificationPreferenceStore } from "./notification-preference-store";
 import { OnePasswordConnectorService } from "./onepassword-connector-service";
 import { OnePasswordConnectorStore } from "./onepassword-connector-store";
@@ -573,6 +577,7 @@ const MCP_OAUTH_FILE = "openbot-mcp-oauth-v1.json";
 const MCP_OAUTH_PROXY_FILE = "openbot-mcp-oauth-proxy-v1.json";
 const GITHUB_CONNECTOR_FILE = "openbot-github-connector-v1.json";
 const LINK_ACCOUNT_FILE = "openbot-link-account-v1.json";
+const NEAR_WALLET_FILE = "openbot-near-wallet-v1.json";
 const ONEPASSWORD_CONNECTOR_FILE = "openbot-onepassword-connector-v1.json";
 const BITWARDEN_CONNECTOR_FILE = "openbot-bitwarden-connector-v1.json";
 const PROTONPASS_CONNECTOR_FILE = "openbot-protonpass-connector-v1.json";
@@ -635,6 +640,7 @@ const TEARDOWN_ORDER = {
   passwordManagers: 106.75,
   githubConnector: 107,
   linkAccount: 107.5,
+  nearWallet: 107.6,
   automation: 108,
   storageUsage: 109,
   service: 110,
@@ -696,6 +702,7 @@ export interface ApplicationServices {
   relayedMessagingInstalls: RelayedMessagingInstalls;
   githubConnector: GitHubConnectorService;
   linkAccount: LinkAccountService;
+  nearWallet: NearWalletService;
   onePasswordConnector: OnePasswordConnectorService;
   bitwardenConnector: BitwardenConnectorService;
   passwordManagers: PasswordManagersService;
@@ -1862,6 +1869,28 @@ export async function createApplicationServices({
   });
   await Effect.runPromise(linkAccount.load());
   teardown.push(TEARDOWN_ORDER.linkAccount, "the Link account", () => Effect.runPromise(linkAccount.dispose()));
+  const nearHost: { serverId: () => string | null } = { serverId: () => null };
+  const nearWallet = new NearWalletService({
+    gateway: createNearIntentsGateway({
+      auth: centralAuth,
+      hostId: () => nearHost.serverId(),
+      serverWallet: Boolean(hostedServer || serverModeEnvironment || localServerChild),
+    }),
+    store: new NearWalletStore(join(app.getPath("userData"), NEAR_WALLET_FILE), secretCipher),
+    signing: new NearOwnerSigning({
+      pageOrigin: app.isPackaged
+        ? NEAR_PASSKEY_WALLET_ORIGIN
+        : nearPasskeyPageOrigin(process.env.OPENBOT_DEV_NEAR_SIGNING_ORIGIN || centralAuthApiUrl()),
+      openExternal: openLink,
+      loopback: !app.isPackaged,
+    }),
+    baseUrl: app.isPackaged ? undefined : process.env.OPENBOT_DEV_NEAR_AGENT_API_URL || undefined,
+  });
+  await Effect.runPromise(nearWallet.load());
+  centralAuth.on("changed", (state) => {
+    if (state.status === "signed_in") void Effect.runPromise(nearWallet.refresh());
+  });
+  teardown.push(TEARDOWN_ORDER.nearWallet, "the NEAR wallet", () => Effect.runPromise(nearWallet.dispose()));
   const bitwardenCliTarget = runtimeTarget(process.platform, process.arch);
   const bitwardenConnector = new BitwardenConnectorService({
     host: {
@@ -2306,6 +2335,7 @@ export async function createApplicationServices({
     ]),
     vaultItems: vault.items,
     linkWallet: linkAccount,
+    nearWallet,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
@@ -2781,6 +2811,7 @@ export async function createApplicationServices({
     join(app.getPath("userData"), LEGACY_TEAM_STORE_FILE),
   );
   await runCauseEffect(teamStore.initialize());
+  nearHost.serverId = () => teamStore.getIdentity()?.serverId ?? null;
   performance.mark("openbot:services.team");
   const machineAlertStore = new MachineAlertPreferenceStore(
     join(app.getPath("userData"), MACHINE_ALERTS_PREFERENCE_FILE),
@@ -4465,6 +4496,7 @@ export async function createApplicationServices({
     relayedMessagingInstalls: new RelayedMessagingInstalls(remoteServers),
     githubConnector,
     linkAccount,
+    nearWallet,
     onePasswordConnector,
     bitwardenConnector,
     passwordManagers,

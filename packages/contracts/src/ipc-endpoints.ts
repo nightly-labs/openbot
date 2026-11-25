@@ -493,6 +493,15 @@ import type {
 } from "./ipc-messaging";
 import type { ProviderModelVisibility, ProviderModelVisibilityChange } from "./ipc-model-visibility";
 import type {
+  NearAgentsInput,
+  NearAllowPaymentInput,
+  NearDepositAddress,
+  NearDepositInput,
+  NearRuleInput,
+  NearWalletCreateInput,
+  NearWalletStatus,
+} from "./ipc-near-wallet";
+import type {
   NotificationOpenedEvent,
   NotificationPreference,
   WorkflowNotificationOpenedEvent,
@@ -1367,6 +1376,24 @@ export const IPC_ENDPOINTS = {
     disconnect: request<undefined, LinkAccountStatus>()("link-account:disconnect"),
     changed: event<LinkAccountStatus>()("link-account:changed"),
   },
+  nearWallet: {
+    status: request<undefined, NearWalletStatus>()("near-wallet:status"),
+    create: request<NearWalletCreateInput, NearWalletStatus>()("near-wallet:create"),
+    setBudget: request<{ dailyBudgetUsd: string }, NearWalletStatus>()("near-wallet:set-budget"),
+    setAgents: request<NearAgentsInput, NearWalletStatus>()("near-wallet:set-agents"),
+    renewGrant: request<undefined, NearWalletStatus>()("near-wallet:renew-grant"),
+    freeze: request<undefined, NearWalletStatus>()("near-wallet:freeze"),
+    unfreeze: request<undefined, NearWalletStatus>()("near-wallet:unfreeze"),
+    deposit: request<NearDepositInput, NearDepositAddress>()("near-wallet:deposit"),
+    saveRule: request<NearRuleInput, NearWalletStatus>()("near-wallet:save-rule"),
+    removeRule: request<{ domain: string }, NearWalletStatus>()("near-wallet:remove-rule"),
+    allowPayment: request<NearAllowPaymentInput, NearWalletStatus>()("near-wallet:allow-payment"),
+    openSigning: request<undefined, void>()("near-wallet:open-signing"),
+    cancelSigning: request<undefined, NearWalletStatus>()("near-wallet:cancel-signing"),
+    checkBackup: request<undefined, NearWalletStatus>()("near-wallet:check-backup"),
+    disconnect: request<undefined, NearWalletStatus>()("near-wallet:disconnect"),
+    changed: event<NearWalletStatus>()("near-wallet:changed"),
+  },
   vault: {
     list: request<undefined, VaultState>()("vault:list"),
     save: request<VaultSaveInput, VaultState>()("vault:save"),
@@ -2114,6 +2141,7 @@ export const IPC_GROUP_PATHS = {
   bitwardenConnector: "bitwardenConnector",
   passwordManagers: "passwordManagers",
   linkAccount: "linkAccount",
+  nearWallet: "nearWallet",
   vault: "vault",
   hostedSites: "hostedSites",
   routineFeed: "routineFeed",
