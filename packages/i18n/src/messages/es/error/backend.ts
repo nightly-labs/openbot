@@ -67,6 +67,9 @@ export const messages = {
   "error.backend.browserLocationFailed": "No se pudo establecer la ubicación de la página.",
   "error.backend.browserPermissionsUnsupported": "Este host remoto no puede responder a solicitudes de ubicación.",
   "error.backend.browserLocationRequired": "Envía la ubicación del dispositivo para permitir la solicitud.",
+  "error.backend.browserHttpSignInInactive":
+    "Este sitio ya no pide iniciar sesión. Vuelve a cargar la página para intentarlo de nuevo.",
+  "error.backend.browserHttpSignInUnsupported": "Este host remoto no puede recibir un inicio de sesión en un sitio.",
   "error.backend.sharedDataLocalOnly": "Los datos compartidos se gestionan en el equipo que ejecuta estos agentes.",
   "error.backend.browserUrlProtocol": "Solo se permiten URL HTTP(S) en el navegador.",
   "error.backend.sunshineNotReady": "Sunshine no llegó a estar listo.",

@@ -198,6 +198,12 @@ export const messages = {
   "browser.signIn.notFound": "لم يجد OpenBot تسجيل دخول إلى {site}. سجّل الدخول في النافذة، ثم اختر «تم».",
   "browser.signIn.stillSignedOut": "لا يزال {server} يعرض صفحة تسجيل الدخول إلى {site}. أكمل تسجيل الدخول في النافذة.",
   "browser.signIn.failed": "تعذّر على OpenBot إرسال تسجيل الدخول.",
+  "browser.httpSignIn.title": "تسجيل الدخول إلى {site}",
+  "browser.httpSignIn.description": "يطلب هذا الموقع اسم المستخدم وكلمة المرور الخاصين به.",
+  "browser.httpSignIn.refused": "لم يقبل الموقع اسم المستخدم أو كلمة المرور هذه.",
+  "browser.httpSignIn.username": "اسم المستخدم",
+  "browser.httpSignIn.password": "كلمة المرور",
+  "browser.httpSignIn.submit": "تسجيل الدخول",
   "browser.profiles.title": "ملفات تعريف المتصفح",
   "browser.profiles.subtitle":
     "يحتفظ كل ملف تعريف بتسجيلات الدخول وملفات تعريف الارتباط وبيانات المواقع الخاصة به على الحاسوب الذي يشغّل OpenBot.",

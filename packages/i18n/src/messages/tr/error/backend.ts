@@ -64,6 +64,9 @@ export const messages = {
   "error.backend.browserLocationFailed": "Sayfanın konumu ayarlanamadı.",
   "error.backend.browserPermissionsUnsupported": "Bu uzak ana bilgisayar konum isteklerini yanıtlayamaz.",
   "error.backend.browserLocationRequired": "İsteğe izin vermek için cihazın konumunu gönderin.",
+  "error.backend.browserHttpSignInInactive":
+    "Bu site artık oturum açmanı istemiyor. Yeniden denemek için sayfayı yenile.",
+  "error.backend.browserHttpSignInUnsupported": "Bu uzak ana makine bir siteye oturum açma alamaz.",
   "error.backend.sharedDataLocalOnly": "Paylaşılan veriler bu ajanları çalıştıran bilgisayarda yönetilir.",
   "error.backend.browserUrlProtocol": "Yalnızca HTTP(S) tarayıcı URL'lerine izin verilir.",
   "error.backend.sunshineNotReady": "Sunshine hazır hale gelmedi.",

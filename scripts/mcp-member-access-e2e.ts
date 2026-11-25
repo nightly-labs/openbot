@@ -170,6 +170,7 @@ const teamBrowser: TeamApiBrowser = {
   copyViewSelection: unused,
   answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const calls: string[] = [];

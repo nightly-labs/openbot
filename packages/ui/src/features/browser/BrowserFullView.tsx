@@ -4,6 +4,7 @@ import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
 import { createEffect, createMemo, createSignal, flush, onCleanup, onSettled, Show } from "solid-js";
 import { BrowserAddressRow } from "./BrowserAddressRow";
+import { BrowserHttpSignInPopover } from "./BrowserHttpSignInPopover";
 import BrowserLiveView, { browserPageSite } from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
 import { BrowserTabSwitcher } from "./BrowserTabSwitcher";
@@ -33,6 +34,16 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
   const narrow = createNarrow();
   const [dismissedPopupFailures, setDismissedPopupFailures] = createSignal<ReadonlySet<string>>(new Set());
   const popupFailure = () => props.activeTab?.popupFailure;
+  const [httpSignInAnswering, setHttpSignInAnswering] = createSignal<string | undefined>(undefined);
+  const [httpSignInUsername, setHttpSignInUsername] = createSignal({ key: "", value: "" });
+  const httpSignInKey = () => {
+    const tab = props.activeTab;
+    if (!props.onHttpSignIn || !tab) return undefined;
+    if (tab.httpSignIn) return `${tab.id}\n${tab.httpSignIn.origin}`;
+    const answering = httpSignInAnswering();
+    return answering?.startsWith(`${tab.id}\n`) ? answering : undefined;
+  };
+  const httpSignInSite = (origin: string) => (URL.canParse(origin) ? new URL(origin).host : origin);
   const [frameSize, setFrameSize] = createSignal<{ width: number; height: number } | undefined>(undefined, {
     equals: (previous, next) => previous?.width === next?.width && previous?.height === next?.height,
   });
@@ -258,6 +269,31 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
               ref={(element) => {
                 address = element;
               }}
+              popover={
+                <Show when={httpSignInKey()} keyed>
+                  {(key) => {
+                    const [tabId = "", origin = ""] = key.split("\n");
+                    const answer = async (value: { username: string; password: string } | null) => {
+                      if (value) setHttpSignInAnswering(key);
+                      try {
+                        await props.onHttpSignIn?.(tabId, value);
+                      } finally {
+                        if (value) setHttpSignInAnswering((current) => (current === key ? undefined : current));
+                      }
+                    };
+                    return (
+                      <BrowserHttpSignInPopover
+                        site={httpSignInSite(origin)}
+                        refused={props.activeTab?.httpSignIn?.refused === true}
+                        username={httpSignInUsername().key === key ? httpSignInUsername().value : ""}
+                        onUsernameChange={(value) => setHttpSignInUsername({ key, value })}
+                        onSubmit={(username, password) => answer({ username, password })}
+                        onCancel={() => answer(null)}
+                      />
+                    );
+                  }}
+                </Show>
+              }
             />
           </BrowserPageCover>
           <Show when={popupFailure() && !dismissedPopupFailures().has(popupFailure()?.id ?? "")}>

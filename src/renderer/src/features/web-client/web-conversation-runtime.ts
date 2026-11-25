@@ -429,6 +429,7 @@ export function createWebConversationRuntime(
       answerPermission: async () => {
         throw new Error(currentText().t("error.backend.browserPermissionsUnsupported"));
       },
+      answerHttpSignIn: (input) => remote.answerBrowserHttpSignIn(input),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
       releaseControl: (tabId) => remote.releaseBrowserControl(tabId),
       startTeach: (tabId) => remote.startBrowserTeach(tabId),

@@ -65,6 +65,9 @@ export const messages = {
   "error.backend.browserLocationFailed": "Nie można ustawić lokalizacji dla strony.",
   "error.backend.browserPermissionsUnsupported": "Ten zdalny host nie może odpowiadać na prośby o lokalizację.",
   "error.backend.browserLocationRequired": "Wyślij lokalizację urządzenia, aby zezwolić na prośbę.",
+  "error.backend.browserHttpSignInInactive":
+    "Ta strona nie prosi już o logowanie. Wczytaj stronę ponownie, aby spróbować jeszcze raz.",
+  "error.backend.browserHttpSignInUnsupported": "Ten zdalny host nie może przyjąć logowania do strony.",
   "error.backend.sharedDataLocalOnly": "Dane współdzielone są zarządzane na komputerze, na którym działają ci agenci.",
   "error.backend.browserUrlProtocol": "Dozwolone są tylko adresy URL HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine nie osiągnął gotowości.",

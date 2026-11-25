@@ -92,4 +92,11 @@ export const messages = {
   "mobile.browser.location.allowAlways": "常に許可",
   "mobile.browser.location.unavailable": "このデバイスの位置情報を取得できませんでした。",
   "mobile.browser.location.answerFailed": "位置情報のリクエストに応答できませんでした。",
+  "mobile.browser.httpSignIn.title": "{site} にサインイン",
+  "mobile.browser.httpSignIn.description": "このサイトは独自のユーザー名とパスワードを求めています。",
+  "mobile.browser.httpSignIn.refused": "サイトはこのユーザー名またはパスワードを受け付けませんでした。",
+  "mobile.browser.httpSignIn.username": "ユーザー名",
+  "mobile.browser.httpSignIn.password": "パスワード",
+  "mobile.browser.httpSignIn.submit": "サインイン",
+  "mobile.browser.httpSignIn.failed": "OpenBot はサインインを送信できませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -98,4 +98,11 @@ export const messages = {
   "mobile.browser.location.allowAlways": "Разрешать всегда",
   "mobile.browser.location.unavailable": "Не удалось получить местоположение этого устройства.",
   "mobile.browser.location.answerFailed": "Не удалось ответить на запрос местоположения.",
+  "mobile.browser.httpSignIn.title": "Вход в {site}",
+  "mobile.browser.httpSignIn.description": "Этот сайт запрашивает собственное имя пользователя и пароль.",
+  "mobile.browser.httpSignIn.refused": "Сайт не принял это имя пользователя или пароль.",
+  "mobile.browser.httpSignIn.username": "Имя пользователя",
+  "mobile.browser.httpSignIn.password": "Пароль",
+  "mobile.browser.httpSignIn.submit": "Войти",
+  "mobile.browser.httpSignIn.failed": "OpenBot не удалось отправить вход.",
 } as const satisfies PartialTranslation<typeof source>;

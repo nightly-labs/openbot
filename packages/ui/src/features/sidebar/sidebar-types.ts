@@ -73,6 +73,8 @@ export interface SidebarProps {
   layoutMutable?: boolean | undefined;
   chatOrder?: SidebarChatOrder | undefined;
   onChatOrderChange?: ((order: SidebarChatOrder) => void) | undefined;
+  tabIds?: readonly string[] | undefined;
+  onTabIdsChange?: ((tabIds: string[]) => void) | undefined;
   collapsedSectionIds: string[];
   onMutateLayout: (action: SidebarLayoutAction) => Promise<void>;
   foldersSupported?: boolean | undefined;

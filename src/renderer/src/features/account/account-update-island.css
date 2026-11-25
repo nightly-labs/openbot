@@ -327,8 +327,9 @@
   position: relative;
   inset: auto;
   min-height: 0;
-  margin: var(--openbot-space-2) var(--openbot-space-3) var(--openbot-space-3);
+  margin: var(--openbot-space-2);
   border-radius: var(--openbot-radius-lg);
+  box-shadow: inset 0 0 0 1px var(--openbot-accent-soft);
   padding-block: var(--openbot-space-1-5);
   padding-inline: var(--openbot-space-3) var(--openbot-space-1-5);
 }

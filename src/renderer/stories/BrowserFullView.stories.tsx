@@ -228,6 +228,29 @@ export const PopupBlocked: Story = {
   },
 };
 
+const siteSignInTab = {
+  ...tab,
+  title: "401 Unauthorized",
+  url: "https://files.example.com/remote.php/dav/",
+  httpSignIn: { origin: "https://files.example.com" },
+};
+
+export const SiteSignIn: Story = {
+  args: {
+    activeTab: siteSignInTab,
+    tabs: [siteSignInTab, ...tabs.slice(1)],
+    onHttpSignIn: fn(async () => undefined),
+  },
+};
+
+export const SiteSignInRefused: Story = {
+  args: {
+    activeTab: { ...siteSignInTab, httpSignIn: { ...siteSignInTab.httpSignIn, refused: true } },
+    tabs: [{ ...siteSignInTab, httpSignIn: { ...siteSignInTab.httpSignIn, refused: true } }, ...tabs.slice(1)],
+    onHttpSignIn: fn(async () => undefined),
+  },
+};
+
 const teach = { agentName: chief.name, pending: false, onStart: fn(), onSave: fn(), onClose: fn() };
 
 export const TeachTask: Story = { args: { teach: { ...teach, startedAt: null } } };

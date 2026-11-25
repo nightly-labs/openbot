@@ -93,4 +93,11 @@ export const messages = {
   "mobile.browser.location.allowAlways": "항상 허용",
   "mobile.browser.location.unavailable": "이 기기의 위치를 가져올 수 없습니다.",
   "mobile.browser.location.answerFailed": "위치 요청에 응답할 수 없습니다.",
+  "mobile.browser.httpSignIn.title": "{site}에 로그인",
+  "mobile.browser.httpSignIn.description": "이 사이트는 자체 사용자 이름과 비밀번호를 요구해요.",
+  "mobile.browser.httpSignIn.refused": "사이트가 이 사용자 이름이나 비밀번호를 받아들이지 않았어요.",
+  "mobile.browser.httpSignIn.username": "사용자 이름",
+  "mobile.browser.httpSignIn.password": "비밀번호",
+  "mobile.browser.httpSignIn.submit": "로그인",
+  "mobile.browser.httpSignIn.failed": "OpenBot이 로그인 정보를 보내지 못했어요.",
 } as const satisfies PartialTranslation<typeof source>;

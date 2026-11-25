@@ -173,6 +173,12 @@ export const messages = {
   "browser.signIn.notFound": "OpenBot이 {site}의 로그인 정보를 찾지 못했어요. 창에서 로그인한 후 완료를 선택해 주세요.",
   "browser.signIn.stillSignedOut": "{server}에서 {site}의 로그인 페이지가 계속 표시돼요. 창에서 로그인을 마쳐 주세요.",
   "browser.signIn.failed": "OpenBot이 로그인 정보를 보내지 못했어요.",
+  "browser.httpSignIn.title": "{site}에 로그인",
+  "browser.httpSignIn.description": "이 사이트는 자체 사용자 이름과 비밀번호를 요구해요.",
+  "browser.httpSignIn.refused": "사이트가 이 사용자 이름이나 비밀번호를 받아들이지 않았어요.",
+  "browser.httpSignIn.username": "사용자 이름",
+  "browser.httpSignIn.password": "비밀번호",
+  "browser.httpSignIn.submit": "로그인",
   "browser.profiles.title": "브라우저 프로필",
   "browser.profiles.subtitle":
     "각 프로필은 OpenBot을 실행하는 컴퓨터에 자신만의 로그인 정보, 쿠키, 사이트 데이터를 보관해요.",

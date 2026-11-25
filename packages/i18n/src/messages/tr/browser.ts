@@ -183,6 +183,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} hâlâ {site} için bir oturum açma sayfası gösteriyor. Oturum açmayı pencerede tamamlayın.",
   "browser.signIn.failed": "OpenBot oturumu gönderemedi.",
+  "browser.httpSignIn.title": "{site} sitesinde oturum aç",
+  "browser.httpSignIn.description": "Bu site kendi kullanıcı adını ve şifresini istiyor.",
+  "browser.httpSignIn.refused": "Site bu kullanıcı adını veya şifreyi kabul etmedi.",
+  "browser.httpSignIn.username": "Kullanıcı adı",
+  "browser.httpSignIn.password": "Şifre",
+  "browser.httpSignIn.submit": "Oturum aç",
   "browser.profiles.title": "Tarayıcı profilleri",
   "browser.profiles.subtitle":
     "Her profil kendi oturum açma bilgilerini, çerezlerini ve site verilerini OpenBot'u çalıştıran bilgisayarda tutar.",

@@ -93,4 +93,11 @@ export const messages = {
   "mobile.browser.location.allowAlways": "Permitir siempre",
   "mobile.browser.location.unavailable": "No se pudo obtener la ubicación de este dispositivo.",
   "mobile.browser.location.answerFailed": "No se pudo responder a la solicitud de ubicación.",
+  "mobile.browser.httpSignIn.title": "Iniciar sesión en {site}",
+  "mobile.browser.httpSignIn.description": "Este sitio pide su propio nombre de usuario y contraseña.",
+  "mobile.browser.httpSignIn.refused": "El sitio no aceptó este nombre de usuario o esta contraseña.",
+  "mobile.browser.httpSignIn.username": "Nombre de usuario",
+  "mobile.browser.httpSignIn.password": "Contraseña",
+  "mobile.browser.httpSignIn.submit": "Iniciar sesión",
+  "mobile.browser.httpSignIn.failed": "OpenBot no pudo enviar el inicio de sesión.",
 } as const satisfies PartialTranslation<typeof source>;

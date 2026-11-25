@@ -436,6 +436,7 @@ const browser: TeamApiBrowser = {
   copyViewSelection: unused("copyViewSelection"),
   answerViewDialog: unused("answerViewDialog"),
   importSignIn: unused("importSignIn"),
+  answerHttpSignIn: unused("answerHttpSignIn"),
 };
 
 const mailbox: TeamApiMailbox = { resolveAttachment: () => Effect.succeed(null) };

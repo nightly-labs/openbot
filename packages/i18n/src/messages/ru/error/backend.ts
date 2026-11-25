@@ -64,6 +64,9 @@ export const messages = {
   "error.backend.browserLocationFailed": "Не удалось задать местоположение для страницы.",
   "error.backend.browserPermissionsUnsupported": "Этот удаленный хост не может отвечать на запросы местоположения.",
   "error.backend.browserLocationRequired": "Отправьте местоположение устройства, чтобы разрешить запрос.",
+  "error.backend.browserHttpSignInInactive":
+    "Этот сайт больше не запрашивает вход. Перезагрузите страницу, чтобы попробовать снова.",
+  "error.backend.browserHttpSignInUnsupported": "Этот удалённый хост не может принять вход на сайт.",
   "error.backend.sharedDataLocalOnly": "Общими данными управляют на компьютере, где работают эти агенты.",
   "error.backend.browserUrlProtocol": "Допускаются только URL браузера с HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine не стал готов.",
