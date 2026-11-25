@@ -1468,6 +1468,10 @@
     color var(--openbot-duration-hover) ease;
 }
 
+.message-file-reference {
+  max-width: min(400px, calc(100% - 8px));
+}
+
 .reference-chip.message-reference-chip,
 .message-file-reference {
   display: inline-block;
