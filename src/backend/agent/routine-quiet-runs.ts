@@ -46,10 +46,7 @@ export function quietTeammateDelivery(delivery: QueueDelivery, followsUpOwnAnswe
 }
 
 export function answeredRequestId(delivery: QueueDelivery): string | null {
-  return delivery.sender.kind === "agent" &&
-    delivery.sender.agentId !== delivery.recipientAgentId &&
-    delivery.expectsReply === false &&
-    delivery.replyToMessageId
+  return delivery.sender.kind === "agent" && delivery.expectsReply === false && delivery.replyToMessageId
     ? delivery.replyToMessageId
     : null;
 }
