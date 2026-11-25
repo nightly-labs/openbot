@@ -262,6 +262,7 @@ const MAX_DOWNLOAD_NOTES = 20;
 
 interface BrowserDownloadNote {
   tab: Pick<BrowserHostTab, "id" | "ownerThreadId" | "ownerAgentId" | "sharedThreadIds">;
+  threadId: string | null;
   text: string;
 }
 
@@ -2924,7 +2925,9 @@ export class BrowserHost {
   }
 
   #withDownloadNotes(params: DynamicToolCallParams, result: DynamicToolResult): DynamicToolResult {
-    const notes = this.#downloadNotes.filter((note) => this.#canUseToolTab(params, note.tab));
+    const notes = this.#downloadNotes.filter(
+      (note) => (note.threadId === null || note.threadId === params.threadId) && this.#canUseToolTab(params, note.tab),
+    );
     if (notes.length === 0) return result;
     this.#downloadNotes = this.#downloadNotes.filter((note) => !notes.includes(note));
     const text = notes.map((note) => note.text).join("\n");
@@ -3804,6 +3807,7 @@ export class BrowserHost {
         const { id, ownerThreadId, ownerAgentId, sharedThreadIds } = tab;
         const added: BrowserDownloadNote = {
           tab: { id, ownerThreadId, ownerAgentId, ...(sharedThreadIds ? { sharedThreadIds } : {}) },
+          threadId: tab.lastToolChat?.threadId ?? ownerThreadId,
           text: scrubbed,
         };
         note = added;
