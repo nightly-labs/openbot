@@ -1482,7 +1482,9 @@ Network traffic can also occur when:
   token to the central account service (`api.openbot.run`) about once an hour, and when you open the
   repository list. The service uses it
   only to ask GitHub which repositories you can push to, and gets back short-lived installation
-  tokens for those repositories. It does not store or log either token, and it gets no chats, files
+  tokens for those repositories. When you open the repository list, the service also gives the names
+  of the public repositories where the OpenBot GitHub App is installed, so the list shows public
+  repositories that you can read but have no own access to. It does not store or log either token, and it gets no chats, files
   or commands. Agents reach the GitHub MCP server through a local server on `127.0.0.1`, which adds
   the right token to each call;
 - the user approves a bug report or a feature idea that an agent wrote. Before the card, OpenBot

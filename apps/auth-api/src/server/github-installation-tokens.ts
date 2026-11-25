@@ -51,6 +51,7 @@ const MAX_REPOSITORIES_PER_TOKEN = 500;
 const USER_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(["administration"]);
 const LISTING_TOKEN_MARGIN_MS = 5 * 60_000;
 const LISTING_PERMISSIONS = { metadata: "read" } as const;
+const PUBLIC_LISTING_CONCURRENCY = 4;
 
 const appSchema = Schema.Struct({ id: Schema.Number });
 const installationsSchema = Schema.Struct({
@@ -245,17 +246,18 @@ export class GitHubInstallationTokens {
     const appId = yield* this.#readAppId();
     const user: Credential = { kind: "user", token: userToken };
     const { installations } = yield* this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
-    const repositories: GitHubPublicRepository[] = [];
-    for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
-      const listed = yield* Effect.result(this.#publicInstallationRepositories(installation.id));
-      if (Result.isFailure(listed)) {
-        if (listed.failure.code !== "github_failed") return yield* listed.failure;
-        continue;
-      }
-      for (const repository of listed.success)
-        repositories.push({ installationId: installation.id, fullName: repository.full_name });
-    }
-    return repositories;
+    const listed = yield* Effect.forEach(
+      installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS),
+      (installation) =>
+        this.#publicInstallationRepositories(installation.id).pipe(
+          Effect.map((repositories) =>
+            repositories.map((repository) => ({ installationId: installation.id, fullName: repository.full_name })),
+          ),
+          Effect.orElseSucceed((): GitHubPublicRepository[] => []),
+        ),
+      { concurrency: PUBLIC_LISTING_CONCURRENCY },
+    );
+    return listed.flat();
   }).bind(this);
 
   readonly openIssue = Effect.fn("GitHubInstallationTokens.openIssue")(function* (

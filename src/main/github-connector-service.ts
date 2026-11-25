@@ -48,6 +48,7 @@ const githubUserSchema = z.object({
 });
 const GITHUB_PAGE_SIZE = 100;
 const MAX_LISTED_REPOSITORIES = 500;
+const PUBLIC_REPOSITORIES_CACHE_MS = 60_000;
 const githubInstallationsSchema = z.object({
   installations: z.array(z.object({ id: z.number(), events: z.array(z.string()).optional() })),
 });
@@ -106,6 +107,11 @@ export class GitHubConnectorService {
   #repositoriesWritten: string | null = null;
   #mcpProxy: GitHubMcpProxy | null = null;
   #mcpProxySecret = randomBytes(32).toString("base64url");
+  #publicRepositoriesCache: {
+    token: string;
+    at: number;
+    repositories: z.infer<typeof publicRepositoriesSchema>["repositories"];
+  } | null = null;
 
   constructor(options: GitHubConnectorServiceOptions) {
     this.#app = options.app;
@@ -556,12 +562,15 @@ export class GitHubConnectorService {
       { concurrency: "unbounded" },
     );
     const repositories: InstallationRepository[] = [];
-    const eventsByInstallation = new Map<number, boolean>();
+    const eventsByInstallation = new Map(
+      installations.map((installation) => {
+        const subscribed = installation.events ?? [];
+        return [installation.id, GITHUB_ROUTE_EVENTS.every((event) => subscribed.includes(event))] as const;
+      }),
+    );
     let total = 0;
     for (const installation of installations) {
-      const subscribed = installation.events ?? [];
-      const events = GITHUB_ROUTE_EVENTS.every((event) => subscribed.includes(event));
-      eventsByInstallation.set(installation.id, events);
+      const events = eventsByInstallation.get(installation.id) ?? false;
       for (let page = 1; ; page += 1) {
         const answer = yield* this.#getGitHubEffect(
           `https://api.github.com/user/installations/${installation.id}/repositories?per_page=${GITHUB_PAGE_SIZE}&page=${page}`,
@@ -597,6 +606,8 @@ export class GitHubConnectorService {
     this: GitHubConnectorService,
     token: string,
   ): Effect.fn.Return<z.infer<typeof publicRepositoriesSchema>["repositories"], GitHubOperationError, GitHubPlatform> {
+    const cached = this.#publicRepositoriesCache;
+    if (cached?.token === token && this.#now() - cached.at < PUBLIC_REPOSITORIES_CACHE_MS) return cached.repositories;
     const response = yield* GitHubPlatform.use((platform) =>
       platform.fetch(new URL("/v1/github/public-repositories", this.#apiUrl).toString(), {
         method: "POST",
@@ -609,7 +620,9 @@ export class GitHubConnectorService {
       return [];
     }
     const answer = publicRepositoriesSchema.safeParse(yield* githubCall(() => response.json().catch(() => null)));
-    return answer.success ? answer.data.repositories : [];
+    if (!answer.success) return [];
+    this.#publicRepositoriesCache = { token, at: this.#now(), repositories: answer.data.repositories };
+    return answer.data.repositories;
   });
 
   readonly #canRead = Effect.fn("GitHubConnector.canRead")(
