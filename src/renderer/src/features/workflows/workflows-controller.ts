@@ -231,11 +231,11 @@ export function createWorkflowsController(
   let previewRequest = 0;
 
   let writes: Promise<void> = Promise.resolve();
-  const queued = <T>(task: () => Promise<T>): Promise<T> => {
+  const queued = <T>(task: () => Promise<T>, failed: (error: unknown) => void = report): Promise<T> => {
     writing += 1;
     const done = writes.then(task);
     writes = done
-      .then(() => undefined, report)
+      .then(() => undefined, failed)
       .finally(() => {
         writing -= 1;
         edits += 1;
@@ -871,10 +871,13 @@ export function createWorkflowsController(
     },
     onCreate: (input) => {
       flush();
-      write(async () => {
-        const created = await tracked("create", () => host.workflows.create(input));
-        await load(created.summary.id);
-      });
+      return queued(
+        async () => {
+          const created = await tracked("create", () => host.workflows.create(input));
+          await load(created.summary.id).catch(report);
+        },
+        () => undefined,
+      );
     },
     onRename: (workflowId, title) => {
       tracked("rename", () => host.workflows.rename({ workflowId, title })).catch(report);
