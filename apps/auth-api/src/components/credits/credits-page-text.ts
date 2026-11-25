@@ -1,6 +1,7 @@
 import type { AppTranslate } from "@openbot/i18n";
 
 export const CREDITS_QUERY_SLOT = "{query}";
+export const CREDITS_SECONDS_SLOT = "{seconds}";
 
 export function creditsPageText(t: AppTranslate) {
   return {
@@ -11,15 +12,21 @@ export function creditsPageText(t: AppTranslate) {
     search: t("sitePage.credits.search"),
     categories: t("sitePage.credits.categories"),
     all: t("sitePage.credits.all"),
+    length: t("sitePage.credits.length"),
+    seconds: t("sitePage.credits.seconds", { seconds: CREDITS_SECONDS_SLOT }),
+    sound: t("sitePage.credits.sound"),
+    soundOn: t("sitePage.credits.soundOn"),
+    soundOff: t("sitePage.credits.soundOff"),
     empty: t("sitePage.credits.empty", { query: CREDITS_QUERY_SLOT }),
     credits: t("sitePage.credits.credits"),
     perImage: t("sitePage.credits.perImage"),
-    perClip: t("sitePage.credits.perClip"),
-    video: { title: t("sitePage.credits.video.title"), unit: t("sitePage.credits.video.unit") },
-    image: { title: t("sitePage.credits.image.title"), unit: t("sitePage.credits.image.unit") },
-    avatar: { title: t("sitePage.credits.avatar.title"), unit: t("sitePage.credits.avatar.unit") },
-    edit: { title: t("sitePage.credits.edit.title"), unit: t("sitePage.credits.edit.unit") },
-    audio: { title: t("sitePage.credits.audio.title"), unit: t("sitePage.credits.audio.unit") },
+    perSeconds: t("sitePage.credits.perSeconds", { seconds: CREDITS_SECONDS_SLOT }),
+    soon: t("sitePage.credits.soon"),
+    video: t("sitePage.credits.video.title"),
+    image: t("sitePage.credits.image.title"),
+    avatar: t("sitePage.credits.avatar.title"),
+    edit: t("sitePage.credits.edit.title"),
+    audio: t("sitePage.credits.audio.title"),
   };
 }
 
