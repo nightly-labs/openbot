@@ -1,4 +1,4 @@
-export type GlassShape = "lens" | "blob" | "cube" | "pill" | "torus" | "prism" | "diamond";
+export type GlassShape = "lens" | "blob" | "pill" | "torus" | "prism" | "diamond";
 export type GlassInteraction = "follow" | "drag";
 
 export interface GlassPoint {
@@ -38,6 +38,7 @@ export interface FluidGlassParts {
   readonly canvas: HTMLCanvasElement;
   readonly handle: HTMLElement | undefined;
   readonly paint: (context: CanvasRenderingContext2D, view: GlassView) => void;
+  readonly onLive: (live: boolean) => void;
 }
 
 export interface FluidGlass {
@@ -74,7 +75,6 @@ const LIGHT = [-0.42 / LIGHT_LENGTH, 0.55 / LIGHT_LENGTH, 1 / LIGHT_LENGTH] as c
 const EXTENT: Record<GlassShape, number> = {
   lens: 1.02,
   blob: 1.08,
-  cube: 1.32,
   pill: 1.02,
   torus: 1.0,
   prism: 1.18,
@@ -83,7 +83,6 @@ const EXTENT: Record<GlassShape, number> = {
 const BASE: Record<GlassShape, readonly [number, number, number]> = {
   lens: [0, 0, 0],
   blob: [0.2, 0, 0],
-  cube: [-0.48, 0.62, 0],
   pill: [0, 0, 0],
   torus: [-0.5, 0.18, 0],
   prism: [-0.3, 0.45, 0],
@@ -92,7 +91,6 @@ const BASE: Record<GlassShape, readonly [number, number, number]> = {
 const SPIN: Record<GlassShape, readonly [number, number]> = {
   lens: [0, 0],
   blob: [1, 0],
-  cube: [1, 0],
   pill: [0, 0],
   torus: [0, 1],
   prism: [1, 0],
@@ -134,10 +132,6 @@ const SDF: Record<GlassShape, string> = {
     float n = sin(q.x + t * 1.1) * sin(q.y * 1.15 - t * 0.9) * sin(q.z * 0.95 + t * 0.8);
     n += 0.45 * sin(q.x * 1.6 - t * 0.6 + q.z) * sin(q.y * 1.9 + t * 1.2 + q.x * 0.5);
     return (length(p) - 0.92 - 0.085 * n) * 0.78;
-  }`,
-  cube: `{
-    vec3 q = abs(p) - vec3(0.6);
-    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - 0.16;
   }`,
   pill: `{
     float outline = length(vec2(max(abs(p.x) - 0.58, 0.0), p.y)) - 0.42;
@@ -1225,6 +1219,7 @@ function startEngine(
     lost = true;
     cancelAnimationFrame(raf);
     raf = 0;
+    parts.onLive(false);
   };
 
   const resizeObserver = new ResizeObserver(resize);
@@ -1297,6 +1292,7 @@ export function createFluidGlass(parts: FluidGlassParts, read: () => FluidGlassS
   const restart = () => {
     engine?.dispose();
     engine = startEngine(parts, read, false, restart);
+    parts.onLive(engine !== null);
   };
   engine = startEngine(parts, read, true, restart);
   if (!engine) return null;

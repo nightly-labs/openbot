@@ -159,7 +159,15 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     };
   };
 
-  const glass = createFluidGlass({ container: layer, canvas: parts.canvas, handle: parts.handle, paint }, settings);
+  const setLive = (live: boolean) => {
+    if (live) section.dataset.glass = "on";
+    else delete section.dataset.glass;
+  };
+
+  const glass = createFluidGlass(
+    { container: layer, canvas: parts.canvas, handle: parts.handle, paint, onLive: setLive },
+    settings,
+  );
   if (!glass) return () => {};
 
   const later = (ms: number, run: () => void) => {
@@ -214,8 +222,15 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     shake.travel = Math.abs(dx);
   };
 
-  const onMove = (event: PointerEvent) => {
+  const stopStill = () => {
+    if (stillTimer === undefined) return;
     clearTimeout(stillTimer);
+    timers.delete(stillTimer);
+    stillTimer = undefined;
+  };
+
+  const onMove = (event: PointerEvent) => {
+    stopStill();
     stillTimer = later(STILL_MS, () => {
       update({ smallPrint: true });
       later(SMALL_PRINT_MS, () => update({ smallPrint: false }));
@@ -224,7 +239,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
   };
 
   const onLeave = () => {
-    clearTimeout(stillTimer);
+    stopStill();
     shake = { lastX: Number.NaN, dir: 0, travel: 0, flips: [] };
   };
 
@@ -266,13 +281,12 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
   document.addEventListener("keydown", onKey);
   void document.fonts?.ready.then(relayout);
   layer.dataset.interaction = state.interaction;
-  section.dataset.glass = "on";
+  setLive(true);
 
   return () => {
     for (const id of timers) clearTimeout(id);
     timers.clear();
     clearInterval(partyLoop);
-    clearTimeout(stillTimer);
     sizeObserver.disconnect();
     visibility.disconnect();
     section.removeEventListener("pointermove", onMove);
