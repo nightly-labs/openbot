@@ -202,7 +202,7 @@ const ACP_BACKGROUND_POLL_MS = 2_000;
 
 const ACP_BACKGROUND_WATCH_MS = 30 * 60_000;
 
-const ACP_OWN_REPLY_WAIT_MS = 10_000;
+const ACP_OWN_REPLY_WAIT_MS = 30_000;
 
 const ACP_OWN_REPLY_SETTLE_MS = 3_000;
 
@@ -282,7 +282,7 @@ interface AcpTurn {
   waitingOnUser: number;
   openbotToolCalls: number;
   awaitingCommands: boolean;
-  ownReply: "none" | "open" | "ended";
+  ownReply: "none" | "reported" | "open" | "ended";
   abandoned: boolean;
   reportedCost: number | null;
   unprompted: boolean;
@@ -422,16 +422,16 @@ export function withStartModels(params: unknown): DynamicRecord {
   return { ...(isRecord(params) ? params : {}), [START_MODELS_PARAM]: true };
 }
 
-function startsOwnReply(update: SessionUpdate): boolean {
-  if (update.sessionUpdate === "tool_call_update") return update.status === "completed" || update.status === "failed";
-  return OWN_REPLY_UPDATES.has(update.sessionUpdate);
+function ownReplyStep(update: SessionUpdate): "reported" | "open" | null {
+  if (update.sessionUpdate === "tool_call_update")
+    return update.status === "completed" || update.status === "failed" ? "reported" : null;
+  return OWN_REPLY_UPDATES.has(update.sessionUpdate) ? "open" : null;
 }
 
-function ownReplyEnded(turn: AcpTurn, running: string): boolean {
+function ownReplyQuiet(turn: AcpTurn): boolean {
   const quietMs = turn.ownReply === "ended" ? ACP_OWN_REPLY_SETTLE_MS : ACP_OWN_REPLY_QUIET_MS;
   if (turn.waitingOnUser > 0 || Date.now() - turn.lastActivityAt < quietMs) return false;
-  const awaited = new Set(running.split("\n"));
-  return [...turn.toolItems.keys()].every((id) => awaited.has(id));
+  return [...turn.toolItems.values()].every((item) => item.toolKind === "execute");
 }
 
 function markAnswered(turn: AcpTurn): void {
@@ -2727,7 +2727,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         if (!running) break;
         turn.ownReply = "none";
         turn.awaitingCommands = true;
-        const wake = yield* this.#awaitSessionChange(thread, turn, running);
+        const wake = yield* this.#awaitSessionChange(thread, turn);
         turn.awaitingCommands = false;
         if (thread.activeTurn !== turn || turn.completing) return;
         if (wake === "steered") continue;
@@ -2949,7 +2949,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     this: AcpAgentClient,
     thread: AcpThread,
     turn: AcpTurn,
-    running: string,
   ) {
     const until = Date.now() + ACP_BACKGROUND_WATCH_MS;
     let before: string | undefined;
@@ -2959,8 +2958,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (thread.activeTurn !== turn || turn.completing || turn.stopped) return "none";
       if (turn.steerReplies.length > 0) return "steered";
       if (turn.ownReply !== "none") {
-        if (ownReplyEnded(turn, running)) return "replied";
-        continue;
+        if (!ownReplyQuiet(turn)) continue;
+        return turn.ownReply === "reported" ? "changed" : "replied";
       }
       if (changedAt !== null) {
         if (Date.now() - changedAt >= ACP_OWN_REPLY_WAIT_MS) return "changed";
@@ -3368,7 +3367,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const turn = thread.activeTurn;
     if (!turn || turn.completing) return;
-    if (turn.awaitingCommands && startsOwnReply(update)) turn.ownReply = "open";
+    const step = turn.awaitingCommands ? ownReplyStep(update) : null;
+    if (step === "open" || (step === "reported" && turn.ownReply === "none")) turn.ownReply = step;
     if (turn.beforeWakeEcho) {
       if (update.sessionUpdate === "user_message_chunk" && update.content.type === "text") {
         if (isTurnContextBlock(update.content.text)) turn.beforeWakeEcho = null;

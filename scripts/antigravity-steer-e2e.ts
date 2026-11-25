@@ -9,8 +9,9 @@ import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/p
 import { installFakeAgent, readJsonl, startThread, stopClients } from "./provider-fakes/host";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/antigravity-steer-e2e");
-const TURN_TIMEOUT_MS = 30_000;
+const TURN_TIMEOUT_MS = 60_000;
 const COMMAND_ANSWER = "The build finished: 42 files.";
+const TEST_ANSWER = "The tests passed: 7 of 7.";
 
 interface LogEntry {
   event: string;
@@ -30,6 +31,7 @@ interface Finished {
 interface CommandWake {
   status: string | null;
   answers: number;
+  testAnswers: number;
   wakePrompts: number;
 }
 
@@ -45,7 +47,7 @@ interface Report {
   oldCli?: { refused: string; prompts: number; status: string | null };
   heldWork?: { status: string | null; releasable: boolean | undefined; closedSessions: number; daemonRuns: boolean };
   reloadNote?: { afterIdleStop: boolean; secondPrompt: boolean; heldSession: boolean };
-  commandWake?: { agentReplies: CommandWake; silentAgent: CommandWake };
+  commandWake?: { agentReplies: CommandWake; silentAgent: CommandWake; chained: CommandWake };
   failure?: string;
 }
 
@@ -173,6 +175,7 @@ async function commandWake(name: string, env: Readonly<Record<string, string>>):
   return {
     status: finished.status,
     answers: finished.reply.split(COMMAND_ANSWER).length - 1,
+    testAnswers: finished.reply.split(TEST_ANSWER).length - 1,
     wakePrompts: (await prompts(run.log)).filter((entry) => entry.wake).length,
   };
 }
@@ -375,13 +378,20 @@ try {
 
   const agentReplies = await commandWake("command-wake-reply", {});
   const silentAgent = await commandWake("command-wake-silent", { FAKE_SILENT_WAKE: "1" });
-  report.commandWake = { agentReplies, silentAgent };
+  const chained = await commandWake("command-wake-chain", { FAKE_CHAIN: "1" });
+  report.commandWake = { agentReplies, silentAgent, chained };
   assert.equal(agentReplies.status, "completed");
   assert.equal(agentReplies.answers, 1, "The agent's own answer to a finished command must show once.");
   assert.equal(agentReplies.wakePrompts, 0, "An agent that replied by itself must get no wake prompt.");
   assert.equal(silentAgent.status, "completed");
   assert.equal(silentAgent.wakePrompts, 1, "An agent that stays silent must still get one wake prompt.");
   assert.equal(silentAgent.answers, 1, "The answer to the wake prompt must show once.");
+  assert.equal(chained.status, "completed");
+  assert.deepEqual(
+    [chained.answers, chained.testAnswers, chained.wakePrompts],
+    [1, 1, 0],
+    "A reply that starts a new background command must wait for it and show each answer once.",
+  );
 
   report.passed = true;
 } catch (error) {
