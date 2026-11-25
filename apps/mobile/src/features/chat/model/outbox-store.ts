@@ -266,6 +266,7 @@ export class OutboxStore {
   retry(clientMessageId: string): void {
     const message = this.find(clientMessageId);
     if (message?.state !== "failed") return;
+    this.clearNotSentRetry(clientMessageId);
     if (!outboxRetrySafe(message, this.now())) {
       this.update(clientMessageId, { repeatSafe: false });
     } else {
@@ -297,6 +298,7 @@ export class OutboxStore {
     const current = this.find(clientMessageId);
     if (!current || !removable(current)) return null;
     this.editing = new Set([...this.editing, clientMessageId]);
+    this.clearNotSentRetry(clientMessageId);
     this.update(clientMessageId, { state: "failed", error: null, returned: false, stopped: true });
     await this.persist();
     this.pump();
