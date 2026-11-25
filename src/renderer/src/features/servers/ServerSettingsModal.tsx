@@ -1,3 +1,4 @@
+import { AGENT_PROVIDERS, agentProviderName } from "@openbot/contracts/agent-providers";
 import type {
   AvatarImageInput,
   HostedSitesDesktopApi,
@@ -258,6 +259,7 @@ const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
     "server.companySignIn.scim",
     "server.ownerTransfer.title",
   ],
+  providers: ["provider.settings.accounts", "provider.account.add"],
   storage: ["settings.backgroundProcesses.title"],
   experimental: ["server.settings.experimentalCrm"],
 };
@@ -449,8 +451,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     const needle = props.sectionQuery?.trim().toLocaleLowerCase();
     if (!needle) return true;
     const { title, description } = sections[value];
-    return [title, description, ...(SECTION_ROWS[value] ?? [])].some((key) =>
-      t(key).toLocaleLowerCase().includes(needle),
+    const names = value === "providers" ? AGENT_PROVIDERS.map(agentProviderName) : [];
+    return [...[title, description, ...(SECTION_ROWS[value] ?? [])].map((key) => t(key)), ...names].some((words) =>
+      words.toLocaleLowerCase().includes(needle),
     );
   };
   const matchingSections = createMemo(() =>

@@ -427,7 +427,19 @@ const PHONE_SERVERS = "On the phone app: in Servers, touch and hold the server";
 
 export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
-const SERVER_PLACES: readonly SettingLinkEntry[] = [
+interface ServerPlaceEntry extends SettingLinkEntry {
+  matchesWithoutServerWord?: true;
+}
+
+const SERVER_PLACES: readonly ServerPlaceEntry[] = [
+  {
+    title: "Provider accounts",
+    place: `On a computer: ${SERVER_SETTINGS} > Providers > the provider, such as Claude or ChatGPT > Accounts > Add account. On the phone app: Server settings > Providers > the provider > Add account; for some providers, the phone says to add the account on a computer.`,
+    about:
+      "Only the owner or an admin of the server. Signs in one more account of a provider, for example a second Claude or ChatGPT subscription, or adds an API key. Each agent uses one account: choose it in the agent's settings. Pool accounts lets the agents of a provider share its accounts.",
+    words: "account accounts subscription claude anthropic codex chatgpt openai gemini grok pool",
+    matchesWithoutServerWord: true,
+  },
   {
     title: "Add a server",
     place:
@@ -490,9 +502,10 @@ const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macb
 
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
-  if (!queryTerms.some((term) => hits(term, SERVER_TERMS))) return [];
+  const namesServer = queryTerms.some((term) => hits(term, SERVER_TERMS));
+  const places = namesServer ? SERVER_PLACES : SERVER_PLACES.filter((entry) => entry.matchesWithoutServerWord);
   const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));
-  return rank(SERVER_PLACES, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
+  return rank(places, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
     title,
     place,
     about,
