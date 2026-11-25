@@ -17,7 +17,6 @@ const SCENE = {
   UISceneDelegateClassName: "CarPlaySceneDelegate",
 };
 const ENTITLEMENT = "com.apple.developer.carplay-voice-based-conversation";
-const ENTITLEMENT_VARIABLE = "OPENBOT_CARPLAY_ENTITLEMENT";
 const PHONE_SCENE_DELEGATE = "SceneDelegate.swift";
 const PHONE_SCENE_CLASS = /^(@objc\(SceneDelegate\)\r?\nclass SceneDelegate: ExpoAppSceneDelegate \{\r?\n)/m;
 const PLUGIN_PLACEHOLDER = /^[ \t]*\/\/ Extension point for config plugins\.\r?\n/m;
@@ -87,15 +86,11 @@ const withCarPlayScene = (config) =>
     return mod;
   });
 
-const withCarPlayEntitlement = (config, entitled) =>
+const withCarPlayEntitlement = (config) =>
   withEntitlementsPlist(config, (mod) => {
-    if (entitled) mod.modResults[ENTITLEMENT] = true;
-    else delete mod.modResults[ENTITLEMENT];
+    mod.modResults[ENTITLEMENT] = true;
     return mod;
   });
 
-/** @type {import('expo/config-plugins').ConfigPlugin<{ entitled?: boolean } | undefined>} */
-module.exports = (config, props) => {
-  const entitled = props?.entitled === true || process.env[ENTITLEMENT_VARIABLE] === "1";
-  return withCarPlayEntitlement(withCarPlayScene(withCarPlayProject(withCarPlayFiles(config))), entitled);
-};
+/** @type {import('expo/config-plugins').ConfigPlugin} */
+module.exports = (config) => withCarPlayEntitlement(withCarPlayScene(withCarPlayProject(withCarPlayFiles(config))));

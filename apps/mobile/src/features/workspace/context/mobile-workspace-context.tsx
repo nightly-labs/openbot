@@ -824,7 +824,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     activeServerId,
     agents: directoryAgents,
     liveState,
-    foreground,
+    foreground: appForeground,
     post: postLiveActivityAction,
     loadAgentAvatar,
     supportsPush: supportsLiveActivityPush,
@@ -846,7 +846,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   usePushNotifications({
     servers,
     serversReady: serverDirectoryState === "ready",
-    foreground,
+    foreground: appForeground,
     post: postLiveActivityAction,
     supportsPush: supportsPushNotifications,
     supportsThreads: supportsThreadNotifications,
@@ -1575,8 +1575,8 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   const activeServerOnline = servers.some((server) => server.id === activeServerId && server.state === "online");
   useEffect(() => {
     const supported = hasCapability(serverCapabilities.current, activeServerId, FOCUS_USE_CAPABILITY);
-    focusUse.setTarget(foreground && activeServerOnline && supported ? activeServerId : null);
-  }, [focusUse, foreground, activeServerOnline, activeServerId]);
+    focusUse.setTarget(appForeground && activeServerOnline && supported ? activeServerId : null);
+  }, [focusUse, appForeground, activeServerOnline, activeServerId]);
   useEffect(() => () => focusUse.dispose(), [focusUse]);
 
   useEffect(() => {
@@ -1901,7 +1901,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
   useSyncedNotificationLevelsLoader({
     servers,
-    foreground,
+    foreground: appForeground,
     supports: hostRequests.checks.canSetAgentNotificationLevel,
     load: hostRequests.actions.loadAgentNotificationLevels,
   });
@@ -2846,7 +2846,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           <OwnerTransferPrompts
             directory={directory}
             revision={directoryLoads}
-            active={foreground}
+            active={appForeground}
             onAccepted={refreshMemberships}
           />
           <NotificationAvatarSync

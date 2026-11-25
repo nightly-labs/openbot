@@ -383,11 +383,12 @@ it has a size, so `ParkedReactView` lays the window out until the phone scene ta
   the taps to `src/features/carplay`. The JavaScript gives the list and runs the voice session with
   `useLiveConversation`, so speech, sending and the reply follow the voice settings of the app.
 - The server connections stay on while CarPlay is connected, also with the phone app in the
-  background. App lock hides the agents in the car until the app is unlocked on the phone.
-- Apple granted the entitlement `com.apple.developer.carplay-voice-based-conversation` to the team,
-  so `app.json` sets `"entitled": true` for `./plugins/with-carplay`. The provisioning profile of the
-  app must include it: turn it on for the App ID in Certificates, Identifiers & Profiles, then make
-  the profiles again.
+  background. Push notifications, Live Activities and the focus ping still follow the phone app, so
+  the host keeps sending notifications while the phone is in the background. App lock hides the
+  agents in the car until the app is unlocked on the phone.
+- The plugin always sets the entitlement `com.apple.developer.carplay-voice-based-conversation`,
+  which Apple granted to the team. The provisioning profile of the app must include it: turn it on
+  for the App ID in Certificates, Identifiers & Profiles, then make the profiles again.
 
 Check the car screen with the CarPlay window of the simulator, then with the CarPlay Simulator of
 Xcode and a real iPhone, also with the app removed from the app switcher before the car connects.
