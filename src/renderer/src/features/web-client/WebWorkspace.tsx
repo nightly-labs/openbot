@@ -784,6 +784,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   createEffect(fullWindowLoading, (loading) => {
     if (!loading) setPageLoad(false);
   });
+  const hasSidebarFolders = createMemo(() => workspace.state.sidebarLayout.sections.length > 0);
+  createEffect(hasSidebarFolders, (folders) => {
+    layout.setSidebarHasFolders(folders);
+  });
   const [loadingCover, setLoadingCover] = createSignal<boolean>(untrack(fullWindowLoading));
   const [loadingWaitedLong, setLoadingWaitedLong] = createSignal(false);
   createEffect(

@@ -154,6 +154,10 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
   createEffect(serverSettingsOpen, (open, wasOpen) => {
     if (!open && wasOpen) alertCards.refresh();
   });
+  const hasFolders = createMemo(() => sidebarLayout().sections.length > 0);
+  createEffect(hasFolders, (folders) => {
+    layout.setSidebarHasFolders(folders);
+  });
 
   const channelsListed = () => channels.supported();
   const sidebarChannels = () =>

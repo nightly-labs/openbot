@@ -74,12 +74,12 @@ function readRailHiddenChoices(): RailPinChoices {
   return readRailChoices(RAIL_HIDDEN_STORAGE_KEY);
 }
 
-function readSidebarChatOrder(): SidebarChatOrder {
+function readSidebarChatOrder(): SidebarChatOrder | null {
   try {
     const saved = window.localStorage.getItem(SIDEBAR_CHAT_ORDER_STORAGE_KEY);
-    return SIDEBAR_CHAT_ORDERS.find((order) => order === saved) ?? "unread-group";
+    return SIDEBAR_CHAT_ORDERS.find((order) => order === saved) ?? null;
   } catch {
-    return "unread-group";
+    return null;
   }
 }
 
@@ -96,7 +96,13 @@ const Layout = createSimpleContext({
     const [serverView, setServerViewSignal] = createSignal<ServerView>(
       window.localStorage.getItem(SERVER_VIEW_STORAGE_KEY) === "rail" ? "rail" : "menu",
     );
-    const [sidebarChatOrder, setSidebarChatOrderSignal] = createSignal<SidebarChatOrder>(readSidebarChatOrder());
+    const [chosenSidebarChatOrder, setSidebarChatOrderSignal] = createSignal<SidebarChatOrder | null>(
+      readSidebarChatOrder(),
+    );
+    const [sidebarHasFolders, setSidebarHasFolders] = createSignal(false);
+    const sidebarChatOrder = createMemo(
+      (): SidebarChatOrder => chosenSidebarChatOrder() ?? (sidebarHasFolders() ? "unread-first" : "unread-group"),
+    );
     const [railPinChoices, setRailPinChoices] = createSignal<RailPinChoices>(readRailPinChoices());
     const railPinned = createMemo(() => {
       const choices = railPinChoices();
@@ -203,6 +209,7 @@ const Layout = createSimpleContext({
       serverRailVisible,
       sidebarChatOrder,
       setSidebarChatOrder,
+      setSidebarHasFolders,
       railPinned,
       setRailPinned,
       railHidden,
