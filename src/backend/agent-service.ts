@@ -1089,7 +1089,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             yield* this.#endpoints.runExclusive(() =>
               Effect.gen({ self: this }, function* () {
                 if (isCustomProviderHarness(provider)) yield* this.#endpoints.moveAgentsToHarness(provider);
-                if (listConfirmed) yield* this.#endpoints.moveAgentsOffUnlistedModels(provider);
+                if (!listConfirmed) return;
+                yield* catalog?.partialListAtStart
+                  ? this.#endpoints.moveAgentsOffModelsUnlistedTwice(provider)
+                  : this.#endpoints.moveAgentsOffUnlistedModels(provider);
               }),
             );
           }),

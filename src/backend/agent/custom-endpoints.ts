@@ -69,6 +69,7 @@ export class CustomEndpoints {
   #committedRevision = 0;
   readonly #chain = Semaphore.makeUnsafe(1);
   readonly #pendingMoves = new Map<string, { endpointId: string; harness: CustomProviderHarness }>();
+  readonly #unlistedAtLastStart = new Map<string, string>();
 
   constructor(options: CustomEndpointsOptions) {
     this.#store = options.store;
@@ -522,6 +523,23 @@ export class CustomEndpoints {
         return agentIds.size ? this.moveAgentsOffUnlistedModels(provider, agentIds) : Effect.void;
       }),
     );
+  }
+
+  moveAgentsOffModelsUnlistedTwice(provider: AgentProvider): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      const models = this.available().filter((model) => model.provider === provider);
+      if (models.length === 0) return Effect.void;
+      const unlisted = new Map(this.#agentsOffList(provider, models).map((agent) => [agent.id, agent.model]));
+      const twice = new Set<string>();
+      for (const agent of this.#store.list()) {
+        if (providerForAgent(agent) !== provider) continue;
+        const model = unlisted.get(agent.id);
+        if (model !== undefined && this.#unlistedAtLastStart.get(agent.id) === model) twice.add(agent.id);
+        if (model === undefined || twice.has(agent.id)) this.#unlistedAtLastStart.delete(agent.id);
+        else this.#unlistedAtLastStart.set(agent.id, model);
+      }
+      return twice.size ? this.moveAgentsOffUnlistedModels(provider, twice) : Effect.void;
+    });
   }
 
   readonly moveAgentsOffUnlistedModels = Effect.fn("CustomEndpoints.moveAgentsOffUnlistedModels")(function* (

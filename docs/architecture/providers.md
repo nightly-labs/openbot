@@ -749,7 +749,12 @@ the Go models and no paid Zen model (#6185).
 OpenCode first lists the models of a cached or built-in catalog and fetches the new catalog in the
 background, about 3 s later. A first start of OpenCode 2.2.5 listed 80 of 88 models. The OpenCode
 driver thus sets `catalog.relistAfterStart`: the list is read again 5 s after each start, and agents
-do not leave a model that only the first list lacks.
+do not leave a model that only the first list lacks. When the catalog fetch takes longer, for example
+right after the computer wakes, also the second list lacks new models (#16212). So for a provider with
+`catalog.partialListAtStart`, an agent leaves its model only when two starts in a row do not list it
+(`moveAgentsOffModelsUnlistedTwice`). The count is kept in memory, so the first start after an
+OpenBot restart never moves an agent. A model that is really gone moves at the next provider start,
+for example after the idle release.
 
 The CLI reports no Go quota over ACP. `readOpenCodeGoUsage` (`src/backend/opencode-usage.ts`)
 sends `opencode.ai/zen/go/v1/usage` the key the CLI uses. A saved key is the only key: the CLI
