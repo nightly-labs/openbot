@@ -427,7 +427,11 @@ const PHONE_SERVERS = "On the phone app: in Servers, touch and hold the server";
 
 export type ServerPlace = Omit<SettingLinkEntry, "words">;
 
-const SERVER_PLACES: readonly SettingLinkEntry[] = [
+interface ServerPlaceEntry extends SettingLinkEntry {
+  foundWithoutServerWord?: readonly string[];
+}
+
+const SERVER_PLACES: readonly ServerPlaceEntry[] = [
   {
     title: "Add a server",
     place:
@@ -456,6 +460,14 @@ const SERVER_PLACES: readonly SettingLinkEntry[] = [
     about:
       "Owners and admins move the agents, with their skills, routines, memories and files, to another computer: export a .zip file from the old server, then import it into the new server.",
     words: "move migrate migration copy new",
+  },
+  {
+    title: "Vault",
+    place: `On a computer: ${SERVER_SETTINGS} > Vault. The API keys filter shows the saved keys; the menu of a key has Copy API key and Copy variable name.`,
+    about:
+      "Only the owner or an admin. The saved logins, cards, contact info and API keys that agents use, also the keys that an agent saved with save_api_key. A Marketplace app does not read the Vault: to use a saved key in an app, copy it here, then open Marketplace, open the app, and paste it where the app asks for its key (Change key when the app is connected). A member asks the owner.",
+    words: "vault api key keys token tokens secret secrets password passwords credential credentials",
+    foundWithoutServerWord: ["vault", "api", "key", "keys", "token", "secret", "credential", "password"],
   },
 ];
 
@@ -490,9 +502,15 @@ const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macb
 
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
-  if (!queryTerms.some((term) => hits(term, SERVER_TERMS))) return [];
+  const places = queryTerms.some((term) => hits(term, SERVER_TERMS))
+    ? SERVER_PLACES
+    : SERVER_PLACES.filter(
+        ({ foundWithoutServerWord }) =>
+          foundWithoutServerWord && queryTerms.some((term) => hits(term, foundWithoutServerWord)),
+      );
+  if (places.length === 0) return [];
   const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));
-  return rank(SERVER_PLACES, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
+  return rank(places, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
     title,
     place,
     about,
