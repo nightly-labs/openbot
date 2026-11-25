@@ -85,6 +85,14 @@ export function useBrowserPermissionRequest(serverId: string, tabId: string | nu
   );
   return useSyncExternalStore(liveState.subscribe, select);
 }
+export function useBrowserHttpSignIn(serverId: string, tabId: string | null) {
+  const liveState = useMobileWorkspaceSelector(selectLiveState);
+  const select = useCallback(
+    () => (tabId === null ? undefined : liveState.get().browserHttpSignIns[serverId]?.[tabId]),
+    [liveState, serverId, tabId],
+  );
+  return useSyncExternalStore(liveState.subscribe, select);
+}
 export function useOwnedBrowserPermissionRequests(serverId: string, ownerAgentIds: readonly string[]) {
   const liveState = useMobileWorkspaceSelector(selectLiveState);
   const selectRequests = useCallback(

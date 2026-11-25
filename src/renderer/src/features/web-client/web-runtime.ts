@@ -15,6 +15,8 @@ import type {
   AgentWaitsSnapshot,
   AttachmentSummary,
   AvatarImageInput,
+  BrowserHttpSignIn,
+  BrowserHttpSignInInput,
   BrowserLiveViewEvent,
   BrowserNavigateInput,
   BrowserOpenInput,
@@ -129,6 +131,11 @@ import {
   AGENT_WAITS_ROUTES,
   decodeAgentWaitsResponse,
 } from "@openbot/contracts/team-protocol/agent-waits-v1";
+import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
 import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
@@ -358,6 +365,7 @@ export interface WebWorkspaceRuntime {
   navigateBrowserTab(input: BrowserNavigateInput): Promise<void>;
   reloadBrowserTab(tabId: string): Promise<void>;
   stopBrowserTab(tabId: string): Promise<void>;
+  answerBrowserHttpSignIn(input: BrowserHttpSignInInput): Promise<void>;
   closeBrowserTab(tabId: string): Promise<void>;
   takeBrowserControl(tabId: string): Promise<void>;
   releaseBrowserControl(tabId: string): Promise<void>;
@@ -1191,11 +1199,22 @@ export function createWebWorkspaceRuntime(
             ),
           )
         : new Map<string, { canGoBack: boolean; canGoForward: boolean }>();
-      return value.map(decodeWebBrowserTab).map((tab) => ({
-        ...tab,
-        ...(held.has(tab.id) ? { userControl: true as const } : {}),
-        ...pageStates.get(tab.id),
-      }));
+      const httpSignIns = capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY)
+        ? new Map(
+            decodeBrowserHttpSignInSnapshot(await request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, {})).tabs.map(
+              ({ tabId, origin, refused }) => [tabId, { origin, ...(refused ? { refused: true as const } : {}) }],
+            ),
+          )
+        : new Map<string, BrowserHttpSignIn>();
+      return value.map(decodeWebBrowserTab).map((tab) => {
+        const httpSignIn = httpSignIns.get(tab.id);
+        return {
+          ...tab,
+          ...(held.has(tab.id) ? { userControl: true as const } : {}),
+          ...pageStates.get(tab.id),
+          ...(httpSignIn ? { httpSignIn } : {}),
+        };
+      });
     },
     async openBrowserTab(input) {
       return decodeWebBrowserTab(await request("POST", TEAM_API_ROUTES.browser.open, { ...input }));
@@ -1216,6 +1235,11 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(BROWSER_PAGE_STATE_CAPABILITY))
         throw new Error(currentText().t("error.backend.browserStopUnsupported"));
       decodeBrowserPageStateSnapshot(await request("POST", BROWSER_PAGE_STATE_ROUTES.stop, { tabId }));
+    },
+    async answerBrowserHttpSignIn(input) {
+      if (!capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserHttpSignInUnsupported"));
+      decodeBrowserHttpSignInSnapshot(await request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.answer, { ...input }));
     },
     async closeBrowserTab(tabId) {
       await request("POST", TEAM_API_ROUTES.browser.close, { tabId });

@@ -300,6 +300,7 @@
     "./team-protocol/browser-profiles-v1": "./src/team-protocol/browser-profiles-v1.ts",
     "./team-protocol/browser-egress-v1": "./src/team-protocol/browser-egress-v1.ts",
     "./team-protocol/browser-proxies-v1": "./src/team-protocol/browser-proxies-v1.ts",
+    "./team-protocol/browser-http-sign-in-v1": "./src/team-protocol/browser-http-sign-in-v1.ts",
     "./team-protocol/browser-page-state-v1": "./src/team-protocol/browser-page-state-v1.ts",
     "./team-protocol/browser-permissions-v1": "./src/team-protocol/browser-permissions-v1.ts",
     "./team-protocol/browser-secret-vault-v1": "./src/team-protocol/browser-secret-vault-v1.ts",

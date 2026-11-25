@@ -69,6 +69,8 @@ export const messages = {
   "error.backend.browserLocationFailed": "Não foi possível definir a localização da página.",
   "error.backend.browserPermissionsUnsupported": "Este host remoto não pode responder a pedidos de localização.",
   "error.backend.browserLocationRequired": "Envie a localização do dispositivo para permitir o pedido.",
+  "error.backend.browserHttpSignInInactive": "Este site não pede mais login. Recarregue a página para tentar de novo.",
+  "error.backend.browserHttpSignInUnsupported": "Este host remoto não pode receber um login de site.",
   "error.backend.sharedDataLocalOnly":
     "Os dados compartilhados são gerenciados no computador que executa estes agentes.",
   "error.backend.browserUrlProtocol": "Somente URLs HTTP(S) são permitidas no navegador.",

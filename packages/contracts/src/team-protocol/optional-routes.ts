@@ -41,6 +41,7 @@ import { AGENT_USAGE_LIMIT_CODECS } from "./agent-usage-limit-v1";
 import { AGENT_WAITS_CODECS } from "./agent-waits-v1";
 import { BACKGROUND_PROCESSES_CODECS } from "./background-processes-v1";
 import { BITWARDEN_CONNECTOR_CODECS } from "./bitwarden-connector-v1";
+import { BROWSER_HTTP_SIGN_IN_CODECS } from "./browser-http-sign-in-v1";
 import { BROWSER_PAGE_STATE_CODECS } from "./browser-page-state-v1";
 import { BROWSER_PERMISSIONS_CODECS } from "./browser-permissions-v1";
 import { BROWSER_PROFILES_CODECS } from "./browser-profiles-v1";
@@ -345,6 +346,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...BROWSER_TEACH_CODECS,
   ...BROWSER_PAGE_STATE_CODECS,
   ...BROWSER_PERMISSIONS_CODECS,
+  ...BROWSER_HTTP_SIGN_IN_CODECS,
   ...BROWSER_SIGN_IN_CODECS,
   ...BROWSER_SIGN_IN_STORAGE_CODECS,
   ...AGENT_TASKS_CODECS,

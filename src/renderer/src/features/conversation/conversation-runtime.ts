@@ -64,6 +64,7 @@ export interface ConversationRuntime {
     | "reload"
     | "stop"
     | "answerPermission"
+    | "answerHttpSignIn"
     | "releaseControl"
     | "setVisible"
     | "startTeach"

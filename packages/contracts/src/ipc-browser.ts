@@ -17,6 +17,7 @@ export interface BrowserTab {
   userControl?: true;
   canGoBack?: boolean;
   canGoForward?: boolean;
+  httpSignIn?: BrowserHttpSignIn;
 }
 
 export interface BrowserPermissionRequest {
@@ -38,6 +39,20 @@ export interface BrowserPermissionAnswer {
   always?: boolean | undefined;
   location?: BrowserLocation | undefined;
 }
+export interface BrowserHttpSignIn {
+  origin: string;
+  refused?: true;
+}
+
+export function browserHttpSignInPrompts(
+  tabs: readonly BrowserTab[],
+): { tabId: string; origin: string; refused: boolean }[] {
+  return tabs.flatMap((tab) =>
+    tab.httpSignIn ? [{ tabId: tab.id, origin: tab.httpSignIn.origin, refused: tab.httpSignIn.refused === true }] : [],
+  );
+}
+
+export type BrowserHttpSignInInput = { tabId: string } & ({ username: string; password: string } | { cancel: true });
 
 export interface BrowserTeachStep {
   kind: "page" | "click";

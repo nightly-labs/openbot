@@ -413,6 +413,7 @@ const teamBrowser: TeamApiBrowser = {
   copyViewSelection: unused,
   answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const root = await mkdtemp(join(tmpdir(), "openbot-crm-stripe-sync-"));

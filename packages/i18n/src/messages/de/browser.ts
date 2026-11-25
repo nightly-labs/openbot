@@ -188,6 +188,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} zeigt für {site} noch eine Anmeldeseite. Schließe die Anmeldung im Fenster ab.",
   "browser.signIn.failed": "OpenBot konnte die Anmeldung nicht senden.",
+  "browser.httpSignIn.title": "Bei {site} anmelden",
+  "browser.httpSignIn.description": "Diese Website fragt nach ihrem eigenen Benutzernamen und Passwort.",
+  "browser.httpSignIn.refused": "Die Website hat diesen Benutzernamen oder dieses Passwort nicht angenommen.",
+  "browser.httpSignIn.username": "Benutzername",
+  "browser.httpSignIn.password": "Passwort",
+  "browser.httpSignIn.submit": "Anmelden",
   "browser.profiles.title": "Browser-Profile",
   "browser.profiles.subtitle":
     "Jedes Profil behält eigene Anmeldungen, Cookies und Website-Daten auf dem Computer, auf dem OpenBot läuft.",

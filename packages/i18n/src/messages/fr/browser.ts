@@ -185,6 +185,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} affiche toujours une page de connexion de {site}. Terminez la connexion dans la fenêtre.",
   "browser.signIn.failed": "OpenBot n’a pas pu envoyer la connexion.",
+  "browser.httpSignIn.title": "Se connecter à {site}",
+  "browser.httpSignIn.description": "Ce site demande son propre nom d’utilisateur et son mot de passe.",
+  "browser.httpSignIn.refused": "Le site n’a pas accepté ce nom d’utilisateur ou ce mot de passe.",
+  "browser.httpSignIn.username": "Nom d’utilisateur",
+  "browser.httpSignIn.password": "Mot de passe",
+  "browser.httpSignIn.submit": "Se connecter",
   "browser.profiles.title": "Profils de navigateur",
   "browser.profiles.subtitle":
     "Chaque profil garde ses propres connexions, cookies et données de sites sur l’ordinateur qui exécute OpenBot.",

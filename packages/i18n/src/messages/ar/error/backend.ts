@@ -61,6 +61,8 @@ export const messages = {
   "error.backend.browserLocationFailed": "تعذر تعيين الموقع للصفحة.",
   "error.backend.browserPermissionsUnsupported": "لا يمكن لهذا المضيف البعيد الرد على طلبات الموقع.",
   "error.backend.browserLocationRequired": "أرسل موقع الجهاز للسماح بالطلب.",
+  "error.backend.browserHttpSignInInactive": "لم يعد هذا الموقع يطلب تسجيل الدخول. أعد تحميل الصفحة للمحاولة مرة أخرى.",
+  "error.backend.browserHttpSignInUnsupported": "لا يمكن لهذا المضيف البعيد استقبال تسجيل دخول إلى موقع.",
   "error.backend.sharedDataLocalOnly": "تتم إدارة البيانات المشتركة على الحاسوب الذي يشغّل هؤلاء الوكلاء.",
   "error.backend.browserUrlProtocol": "يُسمح فقط بعناوين URL من نوع HTTP(S) في المتصفح.",
   "error.backend.sunshineNotReady": "لم يصبح Sunshine جاهزًا.",

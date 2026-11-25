@@ -88,4 +88,11 @@ export const messages = {
   "mobile.browser.location.allowAlways": "始终允许",
   "mobile.browser.location.unavailable": "无法获取此设备的位置。",
   "mobile.browser.location.answerFailed": "无法回应位置请求。",
+  "mobile.browser.httpSignIn.title": "登录 {site}",
+  "mobile.browser.httpSignIn.description": "此网站要求输入它自己的用户名和密码。",
+  "mobile.browser.httpSignIn.refused": "网站不接受此用户名或密码。",
+  "mobile.browser.httpSignIn.username": "用户名",
+  "mobile.browser.httpSignIn.password": "密码",
+  "mobile.browser.httpSignIn.submit": "登录",
+  "mobile.browser.httpSignIn.failed": "OpenBot 无法发送登录信息。",
 } as const satisfies PartialTranslation<typeof source>;

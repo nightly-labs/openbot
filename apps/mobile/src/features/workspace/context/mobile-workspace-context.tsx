@@ -35,6 +35,11 @@ import { AGENT_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BITWARDEN_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
   BROWSER_PERMISSIONS_CAPABILITY,
   BROWSER_PERMISSIONS_ROUTES,
   decodeBrowserPermissionsSnapshot,
@@ -174,7 +179,7 @@ import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { mobileAnalytics } from "@/features/analytics/mobile-analytics";
 import { trackWorkspaceActions } from "@/features/analytics/workspace-actions";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import { decodeMobileBrowserTabs, mobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import { MobileChannelStore } from "@/features/channels/model/channel-store";
 import { deleteServerDrafts } from "@/features/chat/model/composer-drafts";
 import {
@@ -672,6 +677,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("browserRequests", (current) => withoutKeys(current, serverIds));
       liveState.update("browserTabs", (current) => withoutKeys(current, serverIds));
       liveState.update("browserPermissions", (current) => withoutKeys(current, serverIds));
+      liveState.update("browserHttpSignIns", (current) => withoutKeys(current, serverIds));
       const kept = keptHosts.current;
       if (kept?.some((host) => serverIds.has(host.hostId)))
         keepHosts(kept.filter((host) => !serverIds.has(host.hostId)));
@@ -1339,6 +1345,17 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
             }));
           })
           .catch(() => undefined);
+        if (compatibility.capabilities.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+          void client
+            .request("POST", BROWSER_HTTP_SIGN_IN_ROUTES.state, decodeBrowserHttpSignInSnapshot, {})
+            .then((snapshot) => {
+              if (!context.isCurrent()) return;
+              liveState.update("browserHttpSignIns", (current) => ({
+                ...current,
+                [serverId]: mobileHttpSignIns(snapshot.tabs),
+              }));
+            })
+            .catch(() => undefined);
       }
       if (compatibility.capabilities.includes(BROWSER_PERMISSIONS_CAPABILITY)) {
         void client
@@ -1959,6 +1976,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       remoteDesktopConnection: (serverId) => connections.current.get(serverId)?.client ?? null,
       controlBrowserTab: browser.controlBrowserTab,
       answerBrowserPermission: browser.answerBrowserPermission,
+      answerBrowserHttpSignIn: browser.answerBrowserHttpSignIn,
       mutateSidebarLayout: async (serverId, action) => {
         requireCapability(
           serverCapabilities.current,

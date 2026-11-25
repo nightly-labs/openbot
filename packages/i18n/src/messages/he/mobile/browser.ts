@@ -90,4 +90,11 @@ export const messages = {
   "mobile.browser.location.allowAlways": "לאפשר תמיד",
   "mobile.browser.location.unavailable": "לא ניתן לקבל את המיקום של המכשיר הזה.",
   "mobile.browser.location.answerFailed": "לא ניתן להשיב לבקשת המיקום.",
+  "mobile.browser.httpSignIn.title": "התחברות אל {site}",
+  "mobile.browser.httpSignIn.description": "האתר הזה מבקש שם משתמש וסיסמה משלו.",
+  "mobile.browser.httpSignIn.refused": "האתר לא קיבל את שם המשתמש או את הסיסמה האלה.",
+  "mobile.browser.httpSignIn.username": "שם משתמש",
+  "mobile.browser.httpSignIn.password": "סיסמה",
+  "mobile.browser.httpSignIn.submit": "התחברות",
+  "mobile.browser.httpSignIn.failed": "OpenBot לא הצליח לשלוח את ההתחברות.",
 } as const satisfies PartialTranslation<typeof source>;

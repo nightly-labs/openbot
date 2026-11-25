@@ -5,6 +5,7 @@ import { type AgentNotificationLevelsEvent, agentNotificationLevelsEvent } from 
 import { type AgentSessionSettingsEvent, agentSessionSettingsEvent } from "./agent-session-settings-v1";
 import { withAgentTaskEventUiBlocks } from "./agent-task-ui-blocks-v1";
 import { type AgentTasksEvent, agentTasksEvent } from "./agent-tasks-v1";
+import { type BrowserHttpSignInEvent, browserHttpSignInEvent } from "./browser-http-sign-in-v1";
 import { type BrowserPageStateEvent, browserPageStateEvent } from "./browser-page-state-v1";
 import { type BrowserPermissionsEvent, browserPermissionsEvent } from "./browser-permissions-v1";
 import { type BrowserProfilesEvent, browserProfilesEvent } from "./browser-profiles-events-v1";
@@ -39,6 +40,7 @@ export type OptionalTeamEvent =
   | AgentSessionSettingsEvent
   | ChatColorsEvent
   | ClientBrowserCommandEvent
+  | BrowserHttpSignInEvent
   | BrowserPageStateEvent
   | BrowserPermissionsEvent
   | BrowserProfilesEvent
@@ -77,6 +79,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     agentSessionSettingsEvent(value) ??
     chatColorsEvent(value) ??
     clientBrowserCommandEvent(value) ??
+    browserHttpSignInEvent(value) ??
     browserPageStateEvent(value) ??
     browserPermissionsEvent(value) ??
     browserProfilesEvent(value) ??

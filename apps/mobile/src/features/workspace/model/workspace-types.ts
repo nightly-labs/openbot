@@ -49,6 +49,7 @@ import type {
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   BranchAgentTaskInput,
+  BrowserHttpSignInInput,
   BrowserPermissionAnswer,
   BrowserProfileList,
   BrowserProfileSummary,
@@ -320,6 +321,7 @@ export interface MobileBrowserViewSupport {
   viewport: boolean;
   navigation: boolean;
   permissions: boolean;
+  httpSignIn: boolean;
 }
 
 type MobileBrowserTabAction =
@@ -338,6 +340,7 @@ export interface MobileWorkspaceContextValue {
   ) => RemoteBrowserViewSession | null;
   controlBrowserTab: (serverId: string, action: MobileBrowserTabAction) => Promise<MobileBrowserTab | null>;
   answerBrowserPermission: (serverId: string, answer: BrowserPermissionAnswer) => Promise<void>;
+  answerBrowserHttpSignIn: (serverId: string, input: BrowserHttpSignInInput) => Promise<void>;
   respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
   readsWholeApprovals: (serverId: string) => boolean;
   readWholeApproval: (serverId: string, approval: PendingApproval) => Promise<void>;
