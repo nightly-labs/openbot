@@ -453,7 +453,10 @@ export interface ProviderClientContext {
   readonly providerStateDirectory?: string;
   readonly providerTempDirectory?: string;
   readonly availableDiskBytes?: (path: string) => number;
-  readonly agentEnvironment?: (inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>;
+  readonly agentEnvironment?: (
+    inherited?: NodeJS.ProcessEnv,
+    gitConfig?: AgentGitConfigForm,
+  ) => Readonly<Record<string, string>>;
   readonly serverEnvironment?: Readonly<Record<string, string>>;
   readonly accountEnvironment?: Readonly<Record<string, string>>;
   readonly customAgents?: CustomAgentSource;
@@ -466,6 +469,8 @@ export interface ProviderClientContext {
   readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
   readonly fitImage?: ImageFitter | null;
 }
+
+export type AgentGitConfigForm = "parameters" | "count";
 
 const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
 
@@ -481,12 +486,10 @@ function codexVariableOverrides(variables: Readonly<Record<string, string>>): st
   ];
 }
 
-function withAccountEnvironment(
-  context: ProviderClientContext,
-): ((inherited?: NodeJS.ProcessEnv) => Readonly<Record<string, string>>) | undefined {
+function withAccountEnvironment(context: ProviderClientContext): ProviderClientContext["agentEnvironment"] {
   const { agentEnvironment, accountEnvironment } = context;
   if (!accountEnvironment) return agentEnvironment;
-  return (inherited) => ({ ...agentEnvironment?.(inherited), ...accountEnvironment });
+  return (inherited, gitConfig) => ({ ...agentEnvironment?.(inherited, gitConfig), ...accountEnvironment });
 }
 
 function claudeAgentEnvironment(
@@ -500,7 +503,7 @@ function claudeAgentEnvironment(
         ? { ENABLE_PROMPT_CACHING_1H: "1" }
         : {}),
       ...(compactWindow === null ? {} : { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(compactWindow) }),
-      ...environment?.(inherited),
+      ...environment?.(inherited, "count"),
       ...context.providerEnvironment?.("claude"),
     };
   };

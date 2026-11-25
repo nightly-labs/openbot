@@ -2288,9 +2288,9 @@ export async function createApplicationServices({
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
       ...(processLauncher ? { launchProcess: processLauncher.launch } : {}),
       serverEnvironment,
-      agentEnvironment: (inherited) => ({
+      agentEnvironment: (inherited, gitConfig) => ({
         ...agentDisplayEnvironment(process.platform),
-        ...githubConnector.agentEnvironment(inherited),
+        ...githubConnector.agentEnvironment(inherited, gitConfig),
       }),
     },
     computerUseMcpServer: () => cuaDriver.mcpServerForProviders(),
