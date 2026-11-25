@@ -11,6 +11,12 @@ export function codexSandboxMode(agent: SandboxedAgent): "workspace-write" | "da
   return workspaceAccessEnforced(agent) ? "workspace-write" : "danger-full-access";
 }
 
+export type CodexApprovalPolicy = "untrusted" | "on-request";
+
+export function codexApprovalPolicy(agent: Pick<AgentSummary, "access">, asksFirst: boolean): CodexApprovalPolicy {
+  return asksFirst && !workspaceAccessEnforced(agent) ? "untrusted" : "on-request";
+}
+
 const foundFolders = new Map<string, boolean>();
 
 type FolderAgent = Pick<AgentSummary, "id" | "additionalFolders">;

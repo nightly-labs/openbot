@@ -38,6 +38,8 @@ export const messages = {
     "Henüz burada yanıt verebilecek bir ajan yok. OpenBot'ta Pazar yeri > Uygulamalar > Telegram'ı açın ve Ajan ekle'ye tıklayın.",
   "status.messaging.telegramLinked":
     "OpenBot bu sohbete bağlandı. Ajanlara sormak için {bot} adını anın veya OpenBot'un bir mesajını yanıtlayın.",
+  "status.messaging.telegramNotLinked":
+    'OpenBot bu sohbete bağlı değil. Bağlamak için OpenBot uygulamasını açın, Pazaryeri → Uygulamalar → Telegram\'a gidin ve "Bir gruba ekle" veya "Doğrudan sohbet aç" seçeneğini seçin.',
   "status.messaging.telegramOrchestratorName": "Telegram Düzenleyicisi",
   "status.messaging.telegramOrchestratorTitle": "Telegram'da yanıt verir ve ekibe sorar",
   "status.messaging.whatsappNoAgent":

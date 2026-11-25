@@ -36,6 +36,8 @@ export const messages = defineMessages("status.messaging", {
     "No agent can answer here yet. In OpenBot, open Marketplace > Apps > Telegram and click Add agent.",
   "status.messaging.telegramLinked":
     "OpenBot is connected to this chat. Mention {bot} or reply to a message of OpenBot to ask the agents.",
+  "status.messaging.telegramNotLinked":
+    "OpenBot is not connected to this chat. To connect it, open the OpenBot app, go to Marketplace → Apps → Telegram, and select Add to a group or Open a direct chat.",
   "status.messaging.telegramOrchestratorName": "Telegram Orchestrator",
   "status.messaging.telegramOrchestratorTitle": "Answers in Telegram and asks the team",
   "status.messaging.whatsappNoAgent": "No agent can answer here yet. Add the WhatsApp Orchestrator in OpenBot.",

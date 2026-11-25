@@ -2,12 +2,14 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { canAdministerServer } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
+import Eye from "lucide-react-native/icons/eye";
+import EyeOff from "lucide-react-native/icons/eye-off";
 import LogOut from "lucide-react-native/icons/log-out";
+import Palette from "lucide-react-native/icons/palette";
 import Trash2 from "lucide-react-native/icons/trash";
 import { useRef, useState } from "react";
 import { Alert, Keyboard, View } from "react-native";
-import { ServerAppearancePicker } from "@/features/servers/components/server-appearance-picker";
-import { SERVER_AVATAR_CORNER_RATIO, ServerAvatar } from "@/features/servers/components/server-avatar";
+import { ServerAvatar } from "@/features/servers/components/server-avatar";
 import { ServerStatusLabel } from "@/features/servers/components/server-status-label";
 import { useOwnerHostedServerIds } from "@/features/servers/model/server-settings-access";
 import { useLockedAction } from "@/features/servers/model/use-locked-action";
@@ -33,7 +35,6 @@ import { useLiveServerRecovery } from "@/features/workspace/context/server-recov
 import type { MobileServer } from "@/features/workspace/model/workspace-types";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
-import { type AvatarPhoto, pickAvatarPhoto } from "@/shared/lib/pick-avatar-photo";
 import { useText } from "@/shared/lib/text";
 import { useDiscardGuard } from "@/shared/lib/use-discard-guard";
 
@@ -53,16 +54,15 @@ export function ServerSettingsScreen() {
 
 function ServerSettingsHome({ server }: { server: MobileServer }) {
   const hostedServerIds = useOwnerHostedServerIds(server);
-  const { canEditServerAppearance } = useMobileWorkspace();
   return (
     <SettingsContent>
       {canAdministerServer(server.role) ? <ServerIdentityForm server={server} /> : <ServerHeader server={server} />}
-      {canEditServerAppearance(server.id) && !server.logoKey ? <ServerAppearancePicker server={server} /> : null}
       <ServerGeneralSection serverId={server.id} />
       <ServerPeopleSection server={server} />
       <ServerAiSection serverId={server.id} />
       <ServerDataSections serverId={server.id} />
       <ServerConnectionSection server={server} hostedServerIds={hostedServerIds} />
+      <ServerVisibilitySection server={server} />
       <ServerExitSection server={server} hostedServerIds={hostedServerIds} />
       <ServerKeySettings server={server} />
     </SettingsContent>
@@ -88,6 +88,39 @@ function ServerStatusLine({ server }: { server: MobileServer }) {
         </Typography.Paragraph>
       ) : null}
     </View>
+  );
+}
+
+function ServerVisibilitySection({ server }: { server: MobileServer }) {
+  const { t, errorMessage } = useText();
+  const { servers, setServerHidden } = useMobileWorkspace();
+  const { busy, error, perform } = useLockedAction();
+  const hidden = server.hidden === true;
+  if (!hidden && !servers.some((item) => item.id !== server.id && !item.hidden)) return null;
+  return (
+    <SettingsSection footer={error}>
+      <SettingsRow
+        leading={<RowIcon icon={hidden ? Eye : EyeOff} tone="accent" />}
+        disclosure={false}
+        disabled={busy}
+        onPress={() =>
+          void perform(
+            () => setServerHidden(server.id, !hidden),
+            (caught) =>
+              errorMessage(
+                caught,
+                hidden
+                  ? t("mobile.server.drawer.showFailed", { name: server.name })
+                  : t("mobile.server.drawer.hideFailed", { name: server.name }),
+              ),
+          )
+        }
+      >
+        <Typography.Paragraph className="text-accent">
+          {hidden ? t("mobile.server.settings.show") : t("mobile.server.settings.hide")}
+        </Typography.Paragraph>
+      </SettingsRow>
+    </SettingsSection>
   );
 }
 
@@ -132,9 +165,7 @@ function ServerExitSection({
         </SettingsRow>
       </SettingsSection>
     );
-  const kind = localServerKind(serverId);
-  if (kind === "computer") return null;
-  if (kind === "onComputer")
+  if (localServerKind(serverId) === "onComputer")
     return (
       <SettingsSection footer={error}>
         <SettingsRow
@@ -216,74 +247,37 @@ function ServerHeader({ server }: { server: MobileServer }) {
 
 function ServerIdentityForm({ server }: { server: MobileServer }) {
   const { t, errorMessage } = useText();
-  const { canEditServerIdentity, updateServerIdentity } = useMobileWorkspace();
+  const { canEditServerIdentity, canEditServerAppearance, updateServerIdentity } = useMobileWorkspace();
   const available = canEditServerIdentity(server.id);
+  const canEditPicture = available || canEditServerAppearance(server.id);
   const [draftName, setDraftName] = useState<string | undefined>();
-  const [logo, setLogo] = useState<AvatarPhoto | null | undefined>();
-  const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const name = draftName ?? server.name;
   const trimmed = name.trim();
   const nameChanged = draftName !== undefined && trimmed !== server.name;
-  const logoChanged = logo !== undefined && (logo !== null || server.logoKey !== null);
-  const dirty = nameChanged || logoChanged;
+  const dirty = nameChanged;
   const nameValid =
     !nameChanged || (trimmed.length >= INPUT_LIMITS.serverNameMin && trimmed.length <= INPUT_LIMITS.serverName);
-  const hasLogo = logo === undefined ? server.logoKey !== null : logo !== null;
 
-  useDiscardGuard(dirty || saving || picking, { busy: () => pending.current || picking, warn: true });
+  useDiscardGuard(dirty || saving, { busy: () => pending.current, warn: true });
 
-  async function chooseLogo(): Promise<void> {
-    if (pending.current || picking) return;
-    setPicking(true);
-    setError(null);
-    try {
-      const photo = await pickAvatarPhoto({ pathname: "/server-settings/crop-logo" }, SERVER_AVATAR_CORNER_RATIO);
-      if (photo) setLogo(photo);
-    } catch (cause) {
-      void haptics.notification("error");
-      setError(errorMessage(cause, t("mobile.shared.photo.openFailed")));
-    } finally {
-      setPicking(false);
-    }
-  }
-
-  function editLogo(): void {
+  function editPicture(): void {
     Keyboard.dismiss();
     void haptics.impact("soft");
-    if (!hasLogo) {
-      void chooseLogo();
-      return;
-    }
-    Alert.alert(t("mobile.server.settings.logo"), undefined, [
-      { text: t("mobile.server.settings.changeLogo"), onPress: () => void chooseLogo() },
-      {
-        text: t("mobile.server.settings.removeLogo"),
-        style: "destructive",
-        onPress: () => {
-          setError(null);
-          setLogo(null);
-        },
-      },
-      { text: t("common.cancel"), style: "cancel" },
-    ]);
+    router.push({ pathname: "/server-settings/logo", params: { serverId: server.id } });
   }
 
   async function save(): Promise<void> {
-    if (!dirty || !nameValid || !available || picking || pending.current) return;
+    if (!dirty || !nameValid || !available || pending.current) return;
     pending.current = true;
     setSaving(true);
     setError(null);
     Keyboard.dismiss();
     try {
-      await updateServerIdentity(server.id, {
-        ...(nameChanged ? { serverName: trimmed } : {}),
-        ...(logoChanged ? { logo: logo ? { mimeType: logo.mimeType, bytes: logo.bytes } : null } : {}),
-      });
+      await updateServerIdentity(server.id, { serverName: trimmed });
       setDraftName(undefined);
-      setLogo(undefined);
       void haptics.notification("success");
     } catch (cause) {
       void haptics.notification("error");
@@ -294,7 +288,7 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
     }
   }
 
-  const locked = !available || saving || picking;
+  const locked = !available || saving;
   return (
     <View className="gap-3">
       <SettingsIdentityHeader
@@ -303,11 +297,12 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
             server={{ ...server, name: trimmed || server.name }}
             size={IDENTITY_PICTURE_SIZE}
             showStatus={false}
-            logoUri={logo === undefined ? undefined : (logo?.uri ?? null)}
           />
         }
-        pictureLabel={t(hasLogo ? "mobile.server.settings.editLogo" : "mobile.server.settings.addLogo")}
-        onPicturePress={available ? editLogo : undefined}
+        pictureLabel={t("mobile.server.settings.editLogo")}
+        pictureIcon={Palette}
+        onPicturePress={canEditPicture ? editPicture : undefined}
+        pictureDisabled={saving}
         name={name}
         nameLabel={t("mobile.server.settings.name")}
         nameMaxLength={INPUT_LIMITS.serverName}
@@ -342,12 +337,7 @@ function ServerIdentityForm({ server }: { server: MobileServer }) {
           {error}
         </Typography.Paragraph>
       ) : null}
-      <SheetSaveAction
-        dirty={dirty}
-        canSave={nameValid && available}
-        pending={saving || picking}
-        onSave={() => void save()}
-      />
+      <SheetSaveAction dirty={dirty} canSave={nameValid && available} pending={saving} onSave={() => void save()} />
     </View>
   );
 }

@@ -315,9 +315,15 @@ install steps always match the build that they install. A release before this fe
 file, and the install stops with a message.
 
 `openbot-server-setup` uses the install steps of a hosted server (`openbot-hosted-update`): it
-installs the packages in `packages.txt`, copies the release to `/opt/OpenBot/app`, and installs the
-scripts, the AppArmor profile and the units. It writes `self` to `/opt/OpenBot/hosted/mode` and
-links `/usr/local/bin/openbot`.
+installs the packages in `packages.txt` and `optional-packages.txt`, copies the release to
+`/opt/OpenBot/app`, and installs the scripts, the AppArmor profile and the units. It writes `self`
+to `/opt/OpenBot/hosted/mode` and links `/usr/local/bin/openbot`.
+
+apt never removes a package of the computer for OpenBot (`--no-remove`). When a package in
+`packages.txt` needs a removal, the install stops. A package in `optional-packages.txt` is skipped
+when a command with its name already exists, or when it needs a removal. For example, on Raspberry
+Pi OS `pcmanfm-pi` gives the `pcmanfm` command, and the `pcmanfm` package would remove the desktop
+of the Pi.
 
 The AppArmor profile (`/etc/apparmor.d/openbot-hosted`) needs AppArmor 4 (`abi <abi/4.0>` and the
 `userns` rule). When `/etc/apparmor.d/abi/4.0` does not exist and `apparmor_parser` cannot read the
@@ -334,7 +340,9 @@ the computer. `sudo openbot uninstall` removes the rule.
 With `mode` set to `self`, `openbot-hosted-server` does not wait for a claim or for a boat desktop.
 It starts a D-Bus session with an unlocked keyring, as on a hosted server, and runs OpenBot under
 Xvfb with `OPENBOT_SERVER=1`. Main (`src/main/server-mode.ts`) then opens the control socket
-`/run/openbot/control.sock` and publishes the host after each sign-in.
+`/run/openbot/control.sock` and publishes the host after each sign-in. The
+[watchdog](hosted-servers.md#watchdog) also runs: when main stops updating its heartbeat file for 10
+minutes, the watchdog stops OpenBot and systemd starts it again.
 
 The server has two Xvfb displays, one in each of two nested `xvfb-run` commands that share one
 authority file. The outer one starts the agent display, at the [display size](#display-size), and

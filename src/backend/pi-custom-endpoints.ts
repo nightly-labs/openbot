@@ -25,6 +25,7 @@ interface EndpointPayload {
 interface PiCompat {
   readonly supportsStore: false;
   readonly supportsDeveloperRole: false;
+  readonly supportsLongCacheRetention: false;
 }
 
 function keepsPiCompat(baseUrl: string): boolean {
@@ -43,7 +44,9 @@ function piEndpoint(baseUrl: string): Pick<EndpointPayload, "api" | "baseUrl" | 
   return {
     api: "openai-completions",
     baseUrl,
-    ...(keepsPiCompat(baseUrl) ? {} : { compat: { supportsStore: false, supportsDeveloperRole: false } }),
+    ...(keepsPiCompat(baseUrl)
+      ? {}
+      : { compat: { supportsStore: false, supportsDeveloperRole: false, supportsLongCacheRetention: false } }),
   };
 }
 

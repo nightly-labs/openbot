@@ -43,18 +43,48 @@ const RESTART_WINDOW_MS = 10 * 60_000;
 const RESTART_LIMIT = 3;
 const SESSION_RENEW_AFTER_MS = 7 * 24 * 60 * 60_000;
 const SESSION_CHECK_INTERVAL = Duration.hours(1);
+const PROVIDER_HOMES_FOLDER = "provider-homes";
+const PROVIDER_HOME_VARIABLES = {
+  claude: "CLAUDE_CONFIG_DIR",
+  codex: "CODEX_HOME",
+  grok: "GROK_HOME",
+} as const;
+
+const pathExists = (path: string) =>
+  localIO(() => stat(path)).pipe(
+    Effect.as(true),
+    Effect.catch(({ cause }) =>
+      cause instanceof Error && "code" in cause && cause.code === "ENOENT"
+        ? Effect.succeed(false)
+        : Effect.fail(new LocalServerFailure({ cause })),
+    ),
+  );
+
+const ownProviderHomes = Effect.fn("LocalServers.ownProviderHomes")(function* (userData: string) {
+  const root = join(userData, PROVIDER_HOMES_FOLDER);
+  const homes: Record<string, string> = {};
+  if (!(yield* pathExists(root))) return homes;
+  for (const [folder, variable] of Object.entries(PROVIDER_HOME_VARIABLES)) {
+    const home = join(root, folder);
+    yield* localIO(() => mkdir(home, { recursive: true, mode: 0o700 }));
+    homes[variable] = home;
+  }
+  return homes;
+});
 
 function childEnvironment(
   entry: StoredLocalServer,
   agentRoot: string,
   runtimeRoot: string,
   secret: string,
+  providerHomes: Readonly<Record<string, string>>,
 ): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(process.env)) {
     if (name === "ELECTRON_RUN_AS_NODE" || name.startsWith("OPENBOT_DEV_")) continue;
     environment[name] = value;
   }
+  Object.assign(environment, providerHomes);
   environment[LOCAL_SERVER_ENVIRONMENT.child] = "1";
   environment[LOCAL_SERVER_ENVIRONMENT.agentRoot] = agentRoot;
   environment[LOCAL_SERVER_ENVIRONMENT.runtimeRoot] = runtimeRoot;
@@ -130,6 +160,8 @@ const MARKETPLACE_READS: ReadonlyArray<{ method: "GET" | "POST"; download: boole
   { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/content$/u },
   { method: "GET", download: false, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+$/u },
   { method: "GET", download: true, path: /^\/v1\/skills\/[^/]+\/versions\/[^/]+\/content$/u },
+  { method: "GET", download: false, path: /^\/v1\/agent-templates\/(?!mine$)[^/]+$/u },
+  { method: "GET", download: true, path: /^\/v1\/agent-templates\/[^/]+\/avatar$/u },
   { method: "POST", download: false, path: /^\/v1\/marketplace\/agents\/[^/]+\/install$/u },
   { method: "POST", download: false, path: /^\/v1\/skills\/[^/]+\/install$/u },
 ];
@@ -352,7 +384,10 @@ export class LocalServers {
       publicKey: null,
     };
     yield* this.#registry.add(entry, LOCAL_SERVER_LIMIT).pipe(toLocalServerFailure);
-    return yield* this.#start(entry, from === "device").pipe(
+    return yield* localIO(() =>
+      mkdir(join(this.#paths(entry).userData, PROVIDER_HOMES_FOLDER), { recursive: true, mode: 0o700 }),
+    ).pipe(
+      Effect.andThen(this.#start(entry, from === "device")),
       Effect.tapError(() =>
         this.#forget(entry).pipe(
           Effect.catch(({ cause }) =>
@@ -610,13 +645,14 @@ export class LocalServers {
     const paths = this.#paths(entry);
     yield* localIO(() => mkdir(paths.userData, { recursive: true, mode: 0o700 }));
     yield* localIO(() => mkdir(paths.agentRoot, { recursive: true }));
+    const providerHomes = yield* ownProviderHomes(paths.userData);
 
     const child = yield* localSync(() =>
       this.#spawn(
         this.#options.command.executable,
         [...this.#options.command.args, `--user-data-dir=${paths.userData}`],
         {
-          env: childEnvironment(entry, paths.agentRoot, this.#options.runtimeRoot, secret),
+          env: childEnvironment(entry, paths.agentRoot, this.#options.runtimeRoot, secret, providerHomes),
           stdio: this.#options.platform === "win32" ? ["ignore", "pipe", "pipe", "pipe"] : ["pipe", "pipe", "pipe"],
           windowsHide: true,
         },
@@ -817,15 +853,7 @@ export class LocalServers {
     yield* this.#stopChild(entry);
     const paths = this.#paths(entry);
     for (const path of [paths.userData, paths.agentRoot]) {
-      const exists = yield* localIO(() => stat(path)).pipe(
-        Effect.as(true),
-        Effect.catch(({ cause }) =>
-          cause instanceof Error && "code" in cause && cause.code === "ENOENT"
-            ? Effect.succeed(false)
-            : Effect.fail(new LocalServerFailure({ cause })),
-        ),
-      );
-      if (exists) yield* localIO(() => this.#options.trash(path));
+      if (yield* pathExists(path)) yield* localIO(() => this.#options.trash(path));
     }
     const serverId = this.#registry.find(entry.id)?.serverId ?? null;
     yield* this.#registry.remove(entry.id, serverId).pipe(toLocalServerFailure);

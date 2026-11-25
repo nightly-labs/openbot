@@ -232,7 +232,7 @@ class Rig {
         endTakeover: () => {},
       },
       hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-      routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+      routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
       approvalAutomation: setup.policy,
       workspaceSandboxed: (agentId) => setup.sandboxed.has(agentId),
       emit: (event) => this.#onEvent(event),

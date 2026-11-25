@@ -61,6 +61,7 @@ export const messages = {
     other: "Możesz dodać maksymalnie {count} folderu",
   },
   "agentSettings.folders.browse.places": "Przejdź do",
+  "agentSettings.folders.browse.path": "Ścieżka folderu",
   "agentSettings.folders.browse.home": "Folder domowy",
   "agentSettings.folders.browse.parent": "W górę: {folder}",
   "agentSettings.folders.browse.failed": "Nie można otworzyć tego folderu.",
@@ -116,6 +117,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Osiągnięto limit użycia · pominięto",
   "agentSettings.backupModels.unavailable": "Chwilowo niedostępny · pominięto",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Gdy limit użycia zatrzyma agenta {name} po rozpoczęciu pracy, {name} kontynuuje tę samą pracę na pierwszym dostępnym modelu z kolejności. Wraca do modelu {model}, gdy limit się skończy, lub 10 minut po błędzie dostawcy.",
   "agentSettings.groups.brain": "Mózg",
@@ -200,6 +202,7 @@ export const messages = {
     "Agent zacznie od nowa, ale w razie potrzeby przeszuka ten czat. Wiadomości pozostaną widoczne nad separatorem. Instrukcje, model, narzędzia, wspomnienia, obszar roboczy i przeglądarka się nie zmienią.",
   "agentSettings.newChat.confirm": "Rozpocznij nowy czat",
   "agentSettings.newChat.failed": "Nie udało się rozpocząć nowego czatu.",
+  "agentSettings.newChat.busy": "Agent pracuje. Aby rozpocząć nowy czat, poczekaj, aż skończy, albo go zatrzymaj.",
   "agentSettings.deleteHistory.title": "Usuń historię",
   "agentSettings.deleteHistory.description":
     "Wiadomości tego czatu znikają, a agent o nich zapomina. Jego konfiguracja zostaje.",
@@ -209,6 +212,9 @@ export const messages = {
     "Wszystkie wiadomości i pliki tego czatu znikną z OpenBot, a agent o nich zapomni. Nie można tego cofnąć. Wątki poboczne, instrukcje, model, narzędzia, wspomnienia, przestrzeń robocza i przeglądarka się nie zmienią.",
   "agentSettings.deleteHistory.confirm": "Usuń historię",
   "agentSettings.deleteHistory.failed": "Nie udało się usunąć historii.",
+  "agentSettings.deleteAgent.title": "Usuń agenta",
+  "agentSettings.deleteAgent.description": "Agent, jego czat, wspomnienia, rutyny i obszar roboczy znikają z OpenBot.",
+  "agentSettings.deleteAgent.button": "Usuń",
   "agentSettings.fullAccess.title": "Dać temu agentowi pełny dostęp?",
   "agentSettings.fullAccess.askTitle": "Pozwolić temu agentowi pracować poza obszarem roboczym?",
   "agentSettings.fullAccess.description":

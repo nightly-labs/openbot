@@ -12,6 +12,7 @@ import { canManageStorage, serverHasBackgroundProcesses } from "../files/storage
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
 import {
   activeServerHasProviderSettings,
+  PROVIDER_SEARCH_NAMES,
   serverHasAgentDefaults,
   serverSupportsCapability,
 } from "../servers/server-capabilities";
@@ -37,7 +38,13 @@ type PersonalRow = {
   macOS?: boolean;
 };
 
-type ServerRow = { section: ServerSettingsSection; titleKey: AppTextKey; descriptionKey?: AppTextKey };
+type ServerRow = {
+  section: ServerSettingsSection;
+  titleKey: AppTextKey;
+  descriptionKey?: AppTextKey;
+  searchKeys?: readonly AppTextKey[];
+  searchNames?: readonly string[];
+};
 
 type MarketplaceRow = { app: ConnectorId | null; titleKey: AppTextKey; descriptionKey?: AppTextKey };
 
@@ -52,6 +59,8 @@ const PROVIDERS_ROW: ServerRow = {
   section: "providers",
   titleKey: "server.settings.providersTitle",
   descriptionKey: "server.settings.providersDescription",
+  searchKeys: ["provider.settings.accounts", "provider.account.add"],
+  searchNames: PROVIDER_SEARCH_NAMES,
 };
 
 const IMPORT_ROW: ServerRow = {
@@ -88,7 +97,11 @@ function rankRows(query: string, rows: ReadonlyArray<SearchRow>, text: (key: App
     const title = text(row.titleKey).toLocaleLowerCase();
     if (title.startsWith(needle)) return 0;
     if (title.includes(needle)) return 1;
-    return row.descriptionKey && text(row.descriptionKey).toLocaleLowerCase().includes(needle) ? 2 : 3;
+    const described = [
+      ...(row.descriptionKey ? [text(row.descriptionKey)] : []),
+      ...("section" in row ? [...(row.searchKeys ?? []).map(text), ...(row.searchNames ?? [])] : []),
+    ];
+    return described.some((words) => words.toLocaleLowerCase().includes(needle)) ? 2 : 3;
   };
   return rows
     .map((row) => ({ row, rank: score(row) }))

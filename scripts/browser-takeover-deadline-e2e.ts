@@ -124,7 +124,7 @@ const registry = new AttentionRegistry({
     },
   },
   hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+  routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
   emit: (event) => events.push(event),
   emitError: () => {},
   emitRuntimeSnapshot: () => {},
@@ -352,7 +352,7 @@ try {
           endTakeover: () => {},
         },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
         emit: (event) => events.push(event),
         emitError: () => {},
         emitRuntimeSnapshot: () => {},
@@ -444,7 +444,11 @@ try {
         },
       },
       hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-      routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+      routines: {
+        markNeedsAttention: () => {},
+        markRunningForTurn: () => {},
+        runsTurn: (turnId) => turnId.startsWith("routine-"),
+      },
       emit: (event) => limitedEvents.push(event),
       emitError: () => {},
       emitRuntimeSnapshot: () => {},
@@ -657,6 +661,59 @@ try {
     return { note: result.note, lateAnswer: releasedAnswers.at(-1) };
   });
 
+  await step("a routine question leaves the user's waiting question open", async () => {
+    const noteClient = new NoteClient("/nonexistent/claude");
+    const ask = async (turnId: string, question: string) => {
+      const id = nextRequest++;
+      limited.surfacePrompt(noteClient, {
+        id,
+        method: "item/tool/requestUserInput",
+        params: {
+          threadId: THREAD,
+          turnId,
+          questions: [
+            {
+              id: "pick",
+              header: "Pick",
+              question,
+              options: [
+                { label: "Yes", description: "Do it" },
+                { label: "No", description: "Do not do it" },
+              ],
+            },
+          ],
+        },
+      });
+      await noteClient.answered(id);
+      limited.clearForTurn(THREAD, turnId, true);
+      return String(id);
+    };
+    const open = (ids: string[]) =>
+      limited
+        .runtimeAttention()
+        .pendingPrompts.map((prompt) => String(prompt.requestId))
+        .filter((id) => ids.includes(id));
+    const chatQuestion = await ask("turn-limit-12", "Use the new plan?");
+    const firstRoutineQuestion = await ask("routine-turn-limit-13", "Post the report?");
+    assert.deepEqual(
+      open([chatQuestion, firstRoutineQuestion]),
+      [chatQuestion, firstRoutineQuestion],
+      "the routine question closed the user's question",
+    );
+    const nextRoutineQuestion = await ask("routine-turn-limit-14", "Post the next report?");
+    assert.deepEqual(
+      open([chatQuestion, firstRoutineQuestion, nextRoutineQuestion]),
+      [chatQuestion, nextRoutineQuestion],
+      "a newer routine question did not replace the older routine question",
+    );
+    const late = releasedAnswers.length;
+    await runCauseEffect(limited.respondToPrompt({ requestId: Number(chatQuestion), answers: { pick: ["Yes"] } }));
+    assert.equal(releasedAnswers.length, late + 1, "the user's answer did not reach the agent");
+    assert.match(releasedAnswers.at(-1) ?? "", /Use the new plan\?[\s\S]*Yes/);
+    limited.expireDetached(AGENT, THREAD);
+    return { lateAnswer: releasedAnswers.at(-1) };
+  });
+
   await step("a secret question expires at the limit", async () => {
     const answer = answerOf(await askQuestion(limited, "turn-limit-9", true));
     assert.equal(answer.success, false);
@@ -743,7 +800,7 @@ try {
           endTakeover: () => {},
         },
         hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
-        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {} },
+        routines: { markNeedsAttention: () => {}, markRunningForTurn: () => {}, runsTurn: () => false },
         emit: (event) => vaultEvents.push(event),
         emitError: () => {},
         emitRuntimeSnapshot: () => {},
@@ -861,6 +918,7 @@ try {
         routines: {
           markNeedsAttention: (turnId) => attention.push(`needs:${turnId}`),
           markRunningForTurn: (turnId) => attention.push(`running:${turnId}`),
+          runsTurn: () => false,
         },
         emit: (event) => vaultEvents.push(event),
         emitError: () => {},
@@ -941,6 +999,144 @@ try {
       assert.equal(answerOf(await unnamed).status, "completed");
       assert.deepEqual(vaultFills, [SECRET], "the card did not fill what the user typed");
       return { skipped, cards: cards() };
+    },
+  );
+
+  await step(
+    "a routine's saved login that OpenBot cannot fill goes back to the agent, with no card (#16283)",
+    async () => {
+      const vaultEvents: AgentEvent[] = [];
+      const attention: string[] = [];
+      let routineFillFails = false;
+      let routineScripted = false;
+      const vaultRegistry = new AttentionRegistry({
+        conversation: {
+          agentForThread: (threadId) => (threadId === THREAD ? AGENT : undefined),
+          publicThreadId: (_agentId, threadId) => threadId,
+          ensureSnapshot: () => snapshot,
+          emitConversation: () => {
+            snapshot.revision += 1;
+          },
+        },
+        browser: {
+          listTabs: () => tabs,
+          toolCanUseTab: (params, tabId) =>
+            tabs.some(
+              (candidate) =>
+                candidate.id === tabId &&
+                candidate.ownerAgentId === params.ownerAgentId &&
+                candidate.ownerThreadId === params.threadId,
+            ),
+          prepareSecret: () =>
+            Effect.sync(() => ({
+              ...preparedSecret(),
+              agentScriptedOrigin: routineScripted,
+              vaultFillable: true,
+              submit: () =>
+                routineFillFails
+                  ? Effect.fail(browserFailure("The secure field changed before OpenBot could enter the value."))
+                  : Effect.succeed("submitted" as const),
+            })),
+          beginTakeover: () => Effect.void,
+          endTakeover: () => {},
+        },
+        hostedSites: { prepareApproval: () => Effect.succeed(null), resolveApproval: () => Effect.void },
+        routines: {
+          markNeedsAttention: (turnId) => attention.push(`needs:${turnId}`),
+          markRunningForTurn: (turnId) => attention.push(`running:${turnId}`),
+          runsTurn: (turnId) => turnId.startsWith("routine-"),
+        },
+        emit: (event) => vaultEvents.push(event),
+        emitError: () => {},
+        emitRuntimeSnapshot: () => {},
+        lateAnswerTarget: () => ({}),
+        passwordVault: {
+          connected: () => true,
+          loginsFor: () =>
+            Effect.succeed([
+              { id: "openbot:a", title: "Account A", username: "a@example.test", hasOneTimePassword: false },
+            ]),
+          secretFor: (loginId) => Effect.succeed(loginId === "openbot:a" ? VAULT_SECRET : null),
+        },
+      });
+      const cards = () => vaultEvents.filter((event) => event.type === "browser-takeover-requested").length;
+      const signIn = (turnId: string, loginId: string) =>
+        runCauseEffect(
+          vaultRegistry.surfaceBrowserTakeover(client, {
+            id: nextRequest++,
+            method: "item/tool/call",
+            params: {
+              threadId: THREAD,
+              turnId,
+              callId: `call-${turnId}`,
+              namespace: "openbot_browser",
+              tool: "submit_secret",
+              arguments: {
+                tabId: TAB,
+                method: "password",
+                targets: [{ kind: "css", selector: "#password" }],
+                submission: "click",
+                submitTarget: { kind: "css", selector: "#submit" },
+                loginId,
+              },
+            },
+          }),
+        );
+      const settled = async (turnId: string, loginId: string) => {
+        const before = cards();
+        const call = signIn(turnId, loginId);
+        let answered = false;
+        void call.finally(() => {
+          answered = true;
+        });
+        while (cards() === before && !answered) await new Promise((done) => setImmediate(done));
+        return { call };
+      };
+      const cancelledBefore = browserLog.filter((entry) => entry === "secret-cancelled").length;
+      const { call: unknownCall } = await settled("routine-unknown-login", "openbot:missing");
+      assert.equal(cards(), 0, "a password card opened in a routine for an unknown saved login");
+      const unknown = answerOf(await unknownCall);
+      assert.equal(unknown.success, false, "the skipped saved login was reported as a success");
+      assert.match(unknown.next ?? "", /list_logins/u, "the agent did not get the reason for the skip");
+      assert.match(unknown.next ?? "", /routine run/u, "the agent was not told that nobody answers in a routine");
+      routineScripted = true;
+      const { call: scriptedCall } = await settled("routine-scripted-login", "openbot:a");
+      assert.equal(cards(), 0, "a password card opened in a routine for a login that an agent script blocks");
+      const scripted = answerOf(await scriptedCall);
+      assert.match(scripted.next ?? "", /navigate direction=reload/u, "the agent did not get the reload step");
+      assert.doesNotMatch(
+        scripted.next ?? "",
+        /so that the user types the password/u,
+        "a routine was told to open a card that nobody answers",
+      );
+      routineScripted = false;
+      routineFillFails = true;
+      const { call: failedCall } = await settled("routine-failed-fill", "openbot:a");
+      assert.equal(cards(), 0, "a takeover card opened in a routine after a saved login fill failed");
+      const failed = answerOf(await failedCall);
+      assert.equal(failed.success, false, "the failed fill was reported as a success");
+      assert.match(failed.next ?? "", /could not finish filling saved login openbot:a/u);
+      assert.equal(vaultRegistry.runtimeAttention().pendingBrowserTakeovers.length, 0, "the takeover stayed open");
+      assert.equal(
+        browserLog.filter((entry) => entry === "secret-cancelled").length,
+        cancelledBefore + 3,
+        "the secure input lock of the tab was not released",
+      );
+      assert(!attention.some((entry) => entry.startsWith("needs:")), "the routine was marked as waiting for the user");
+      routineFillFails = false;
+      const { call: chatCall } = await settled("turn-chat-unknown-login", "openbot:missing");
+      const card = vaultRegistry.runtimeAttention().pendingBrowserTakeovers[0];
+      assert(card?.secret, "a chat lost the password card for an unknown saved login");
+      await runCauseEffect(
+        vaultRegistry.respondToBrowserSecret({
+          requestId: card.requestId,
+          agentId: AGENT,
+          decision: "submit",
+          secret: SECRET,
+        }),
+      );
+      assert.equal(answerOf(await chatCall).status, "completed");
+      return { unknown, scripted, failed, cards: cards() };
     },
   );
 

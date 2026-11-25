@@ -82,6 +82,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--openbot-space-3) var(--openbot-space-4);
+  align-items: start;
 }
 
 .vault-wide {

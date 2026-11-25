@@ -18,8 +18,10 @@ import { currentText, useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createStore, onSettled, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { ServerMediaApprovalSetting } from "./ServerMediaApprovalSetting";
 import { ServerTimezoneSetting } from "./ServerTimezoneSetting";
 import { ServerTurnLimitsSetting } from "./ServerTurnLimitsSetting";
+import { ServerVoiceModelSetting } from "./ServerVoiceModelSetting";
 import { serverCanAdminister, serverHasAgentDefaults } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
 
@@ -88,7 +90,16 @@ export function createServerAgentsSection(
     serverCanAdminister(props.server, "host-timezone-v1") && actionsAvailable() ? props.hostTimezone : undefined;
   const turnLimits = () =>
     serverCanAdminister(props.server, "host-turn-limits-v1") && actionsAvailable() ? props.hostTurnLimits : undefined;
-  const available = () => defaultsAvailable() || Boolean(timezone() || turnLimits());
+  const voiceModel = () =>
+    !local() && serverCanAdminister(props.server, "host-voice-model-v1") && actionsAvailable()
+      ? props.hostVoiceModel
+      : undefined;
+  const mediaApprovalCredits = () =>
+    serverCanAdminister(props.server, "media-approval-credits-v1") && actionsAvailable()
+      ? props.mediaApprovalCredits
+      : undefined;
+  const available = () =>
+    defaultsAvailable() || Boolean(timezone() || turnLimits() || voiceModel() || mediaApprovalCredits());
 
   function load(serverId: string): void {
     const options = props.agentDefaults;
@@ -238,6 +249,31 @@ export function createServerAgentsSection(
               </Show>
             </ItemGroup>
           </SettingsSection>
+        </Show>
+        <Show when={!state.setting && mediaApprovalCredits()}>
+          {(options) => (
+            <SettingsSection title={t("server.settings.creditsCard")}>
+              <ItemGroup class="settings-modal-card">
+                <ServerMediaApprovalSetting
+                  {...options()}
+                  serverId={props.server.id}
+                  disabled={Boolean(busy())}
+                  run={run}
+                />
+              </ItemGroup>
+            </SettingsSection>
+          )}
+        </Show>
+        <Show when={!state.setting && voiceModel()}>
+          {(options) => (
+            <ServerVoiceModelSetting
+              {...options()}
+              serverId={props.server.id}
+              disabled={Boolean(busy())}
+              menuMount={host.menuMount()}
+              run={run}
+            />
+          )}
         </Show>
         <Show when={defaultsAvailable()}>
           <AgentDefaults />

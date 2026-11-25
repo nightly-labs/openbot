@@ -1057,8 +1057,8 @@ function markerLabel(
     marker.kind === "model-switch" ||
     marker.kind === "channel-change" ||
     marker.kind === "vault-change" ||
-    marker.kind === "messaging-undelivered" ||
     marker.kind === "plan-continuation" ||
+    marker.kind === "no-answer" ||
     marker.kind === "instructions-change" ||
     marker.kind === "sign-in-failure"
   )
@@ -1150,8 +1150,8 @@ function markerAccessibleLabel(
     marker.kind === "model-switch" ||
     marker.kind === "channel-change" ||
     marker.kind === "vault-change" ||
-    marker.kind === "messaging-undelivered" ||
     marker.kind === "plan-continuation" ||
+    marker.kind === "no-answer" ||
     marker.kind === "instructions-change" ||
     marker.kind === "sign-in-failure"
   )

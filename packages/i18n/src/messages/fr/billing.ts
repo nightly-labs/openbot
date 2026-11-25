@@ -222,4 +222,30 @@ export const messages = {
   "billing.details.vatIdInvalid": "Ce n’est pas un numéro de TVA du pays choisi.",
   "billing.details.countryMissing": "Choisissez votre pays de facturation.",
   "billing.details.saveFailed": "Impossible d’enregistrer les informations de facturation",
+  "billing.credits.explainer.title": "Que sont les crédits ?",
+  "billing.credits.explainer.page": "{page} sur {total}",
+  "billing.credits.explainer.pages": "Pages",
+  "billing.credits.explainer.mediaTitle": "Les crédits paient les médias",
+  "billing.credits.explainer.mediaText":
+    "Quand un agent crée une image, une vidéo ou une voix, il utilise des crédits.",
+  "billing.credits.explainer.chatTitle": "Les chats restent gratuits",
+  "billing.credits.explainer.chatText":
+    "Les chats utilisent votre propre fournisseur d’IA. Parler à vos agents n’utilise pas de crédits.",
+  "billing.credits.explainer.chatFree": "0 crédit",
+  "billing.credits.explainer.modelsTitle": "Chaque modèle a un prix",
+  "billing.credits.explainer.modelsText":
+    "Les meilleurs modèles coûtent plus cher. Une image utilise {pictureMin}–{pictureMax} crédits, une vidéo de {seconds} s {videoMin}–{videoMax}.",
+  "billing.credits.explainer.perPicture": "/ image",
+  "billing.credits.explainer.perClip": "/ vidéo de {seconds} s",
+  "billing.credits.explainer.getTitle": "Obtenir des crédits",
+  "billing.credits.explainer.getText":
+    "Achetez un pack quand il vous en faut plus. Les gros packs offrent un meilleur prix par crédit.",
+  "billing.credits.explainer.freeEnd": "Les crédits gratuits mensuels ont une date de fin",
+  "billing.credits.explainer.welcome":
+    "Les nouveaux comptes reçoivent {amount} crédits gratuits pour essayer certains modèles",
+  "billing.credits.welcomeIncluded": "Crédits gratuits : {amount}",
+  "billing.credits.explainer.allPrices": "Les {count} modèles",
+  "billing.credits.explainer.next": "Suivant",
+  "billing.credits.explainer.gotIt": "Compris",
+  "billing.credits.explainer.place": "OpenBot",
 } as const satisfies PartialTranslation<typeof source>;

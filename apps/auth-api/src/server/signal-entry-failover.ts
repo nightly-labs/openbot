@@ -5,6 +5,7 @@ import type { WorkerBindings } from "./types";
 export const SIGNAL_ENTRY_CRON = "*/1 * * * *";
 const CLOUDFLARE_API = "https://api.cloudflare.com/client/v4";
 const CONFIRM_DELAY: Duration.Input = "20 seconds";
+const ENTRY_CHECKS = 3;
 const HEALTH_TIMEOUT_MS = 5_000;
 const API_TIMEOUT_MS = 10_000;
 
@@ -72,10 +73,7 @@ export const checkSignalEntry = Effect.fn("SignalEntry.check")(function* (
   });
   const current = located.find((machine) => machine.address === entry.content);
   if (!current) return { status: "unknown", reason: "entry_address" } satisfies SignalEntryCheck;
-  if (yield* isHealthy(options.fetch, current))
-    return { status: "healthy", entry: current.id } satisfies SignalEntryCheck;
-  yield* Effect.sleep(options.confirmDelay ?? CONFIRM_DELAY);
-  if (yield* isHealthy(options.fetch, current))
+  if (yield* answersAnyCheck(options.fetch, current, options.confirmDelay ?? CONFIRM_DELAY))
     return { status: "healthy", entry: current.id } satisfies SignalEntryCheck;
   for (const machine of located) {
     if (machine === current || machine.address === null) continue;
@@ -93,6 +91,18 @@ function signalMachines(plan: RemoteSignalPlan): SignalMachine[] {
 function isHealthy(fetcher: SignalEntryFetch, machine: SignalMachine): Effect.Effect<boolean> {
   return signalAnswers(fetcher, machine.url, HEALTH_TIMEOUT_MS);
 }
+
+const answersAnyCheck = Effect.fn("SignalEntry.answersAnyCheck")(function* (
+  fetcher: SignalEntryFetch,
+  machine: SignalMachine,
+  confirmDelay: Duration.Input,
+) {
+  for (let check = 1; check <= ENTRY_CHECKS; check += 1) {
+    if (check > 1) yield* Effect.sleep(confirmDelay);
+    if (yield* isHealthy(fetcher, machine)) return true;
+  }
+  return false;
+});
 
 interface CloudflareDnsApi {
   token: string;

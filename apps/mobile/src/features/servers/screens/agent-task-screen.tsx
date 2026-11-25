@@ -54,6 +54,7 @@ import {
   withQuestionContext,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
+import { promptAskedByThisPerson } from "@/features/chat/model/location-request";
 import {
   answerlessTurnSummaries,
   finishedTurnSummaries,
@@ -81,7 +82,7 @@ import type { MobileAgentActivity } from "@/features/workspace/model/agent-activ
 import type { PendingApproval } from "@/features/workspace/model/pending-approvals";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
-import { addStartedTask } from "@/features/workspace/model/task-cache";
+import { addStartedTask, loadNewestTaskConversation } from "@/features/workspace/model/task-cache";
 import { hostAwaitsQuestion } from "@/features/workspace/model/thread-waits";
 import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
@@ -98,8 +99,8 @@ const NO_OLDER = () => {};
 const AWAIT_TURN_MS = 10_000;
 const taskMessageId = retryOperationIds(() => Crypto.randomUUID());
 
-function onThreadDeleted(task: AgentTask) {
-  router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId } });
+function onThreadDeleted(task: AgentTask, serverId: string) {
+  router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: task.agentId, serverId } });
 }
 
 export function AgentTaskScreen() {
@@ -208,11 +209,15 @@ function AgentTaskChat({
     retry: false,
     queryFn: () => loadAgentTasks(agentId, serverId),
   });
+  const conversationKey = queryKeys.agentTaskConversation(queryScope, serverId, taskId);
   const conversation = useQuery({
-    queryKey: queryKeys.agentTaskConversation(queryScope, serverId, taskId),
+    queryKey: conversationKey,
     enabled: enabled && !isDraft,
     retry: false,
-    queryFn: () => loadAgentTaskConversation({ agentId, taskId }, serverId),
+    queryFn: () =>
+      loadNewestTaskConversation(queryClient, conversationKey, () =>
+        loadAgentTaskConversation({ agentId, taskId }, serverId),
+      ),
   });
   const task = list.data?.tasks.find((item) => item.id === taskId);
   const memberId = server?.membershipId ?? null;
@@ -255,11 +260,14 @@ function AgentTaskChat({
       link && sourceTitle !== null
         ? () => {
             if (link.sourceTaskId === null)
-              router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId, messageId: link.sourceMessageId } });
+              router.dismissTo({
+                pathname: "/chat/[agentId]",
+                params: { agentId, serverId, messageId: link.sourceMessageId },
+              });
             else router.setParams<"/task/[taskId]">({ taskId: link.sourceTaskId, messageId: link.sourceMessageId });
           }
         : undefined,
-    [link, sourceTitle, agentId],
+    [link, sourceTitle, agentId, serverId],
   );
   const [focus, setFocus] = useState(focusMessageId);
   const openingUnread = useThreadOpeningUnread(serverId, agentId, isDraft ? null : taskId);
@@ -325,6 +333,7 @@ function AgentTaskChat({
     online,
     respond,
     (text) => setDraft((current) => (current.trim() ? `${current.trimEnd()}\n${text}` : text)),
+    promptAskedByThisPerson(messages, activePrompt?.id),
   );
   const answersQuestion = Boolean(questionForm.question && !questionForm.question.isSecret && questionForm.replyInChat);
   const threadId = conversation.data?.threadId ?? null;

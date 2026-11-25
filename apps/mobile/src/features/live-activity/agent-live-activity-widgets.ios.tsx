@@ -473,8 +473,8 @@ export const agentLiveActivity: AgentLiveActivityLoader = () => {
       return fileName;
     },
     hasAvatar: (fileName) => Boolean(widgetsDirectory) && new File(widgetsDirectory, fileName).exists,
-    renderBloub: async (seed, hue, mood) =>
-      `data:image/png;base64,${await renderPlushPicture({ seed, hue, color: null, mood, pixels: AVATAR_PIXELS, saturation: 1 })}`,
+    renderBloub: async (seed, hue, mood, color) =>
+      `data:image/png;base64,${await renderPlushPicture({ seed, hue, color, mood, pixels: AVATAR_PIXELS, saturation: 1 })}`,
     removeAvatars(keep) {
       if (!widgetsDirectory) return;
       for (const entry of new Directory(widgetsDirectory).list()) {

@@ -1,4 +1,4 @@
-import { agentProviderName } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, agentProviderName, KEY_ONLY_PROVIDERS } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -22,6 +22,7 @@ import {
   isAgentAnswer,
   isAgentContextCategories,
   latestTurnAnswer,
+  NO_ANSWER_NOTICE_ITEM_TYPE,
   PLAN_CONTINUATION_ITEM_TYPE,
   type QueueDelivery,
   SIGN_IN_FAILURE_ITEM_TYPE_PREFIX,
@@ -87,6 +88,7 @@ import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import {
   GEMINI_INVALID_CREDENTIALS,
   isBalanceDiagnostic,
+  isCodexAccountSettingsFailure,
   isPlanLimitDiagnostic,
   isUsageLimitDiagnostic,
   providerResetDelayMs,
@@ -168,6 +170,8 @@ export const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "timeout",
   "empty_answer",
   "model_not_found",
+  "invalid_request",
+  "provider_internal_error",
 ]);
 
 const CODEX_SAFETY_BLOCKS: ReadonlySet<string> = new Set(["cyberPolicy", "misalignmentPolicyViolation"]);
@@ -190,11 +194,18 @@ function isRefusedGeminiToken(provider: string | undefined, message: string): bo
   return provider === "antigravity" && GEMINI_INVALID_CREDENTIALS.test(message);
 }
 
-const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable", "rate_limit"]);
+const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set([
+  "authentication",
+  "provider_unavailable",
+  "rate_limit",
+  "network",
+  "timeout",
+]);
 const POOL_PASS_OVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "usage_limit",
   "provider_unavailable",
   "authentication",
+  "model_not_found",
 ]);
 
 const COMPACTION_RETRY_CAUSES: ReadonlySet<CauseCode> = new Set(["network", "timeout"]);
@@ -213,6 +224,7 @@ interface HeldProviderError {
   context: FailureContext & { causeCode: CauseCode };
   quiet?: boolean;
   link?: string;
+  movesToBackup?: true;
 }
 
 function accountLink(params: unknown): string | undefined {
@@ -239,6 +251,7 @@ export interface AgentBrowserHost extends AttentionBrowserHost, BrowserUploadTar
   shareTab(tabId: string, target: { agentId: string; threadId: string }): void;
   unshareThread(threadId: string): void;
   agentTab(tabId: string, agentId: string): { title: string; url: string } | null;
+  releaseIdleTabs?(runningThreadIds: ReadonlySet<string>): Effect.Effect<void>;
 }
 
 export interface TurnHooks {
@@ -256,6 +269,7 @@ export interface TurnHooks {
   turnModel(agentId: string, turnId: string): string | null;
   mayFailOver(agentId: string): boolean;
   backupReadyAt(agentId: string): number | null;
+  backupsAtLimit(agentId: string): boolean;
   poolHasOtherAccount(agentId: string): boolean;
   mayContinueOnBackup(agentId: string): boolean;
   requeueChannelDelivery(deliveryId: string, continueWork?: boolean): Effect.Effect<boolean>;
@@ -365,6 +379,7 @@ export class TurnLifecycle {
   readonly #turnCauses = new Map<string, CauseCode>();
   readonly #turnRetries = new Map<string, number>();
   readonly #capacityNotices = new Set<string>();
+  readonly #retryNotices = new Set<string>();
   readonly #runningTurns = new Map<
     string,
     {
@@ -382,6 +397,8 @@ export class TurnLifecycle {
       compacted: boolean;
       startedBackgroundWork: boolean;
       narration: string | null;
+      narrationStepKnown: boolean;
+      narrationOpenTools: ReadonlySet<string>;
       openTools: Set<string>;
       failureReports: Set<string>;
       lastEventAt: number;
@@ -392,7 +409,10 @@ export class TurnLifecycle {
   >();
   readonly #unreadReports = new Map<string, Map<string, string>>();
   readonly #selfStartedOrigins = new Map<string, readonly string[]>();
-  readonly #lastResults = new Map<string, { turnIds: readonly string[]; requests: readonly DeliveryContext[] }>();
+  readonly #lastResults = new Map<
+    string,
+    { turnIds: readonly string[]; requests: readonly DeliveryContext[]; interim?: true }
+  >();
   readonly #deliveryStarts = new Map<string, DeliveryStart>();
   readonly #turnTimings = new Map<string, TurnTiming>();
   readonly #limitedTurns = new Map<string, number | null>();
@@ -415,6 +435,7 @@ export class TurnLifecycle {
   readonly #quietRepeats = new Set<string>();
   readonly #reportedFailures = new Map<string, string>();
   readonly #endedTurns = new Set<string>();
+  readonly #channelResultNotes = new Map<string, Set<string>>();
   readonly #completingTurns = new Set<string>();
   readonly #lastEventAt = new Map<string, number>();
   readonly #codexChildren = new Map<string, CodexSubagentParent>();
@@ -554,6 +575,7 @@ export class TurnLifecycle {
     this.#turnCauses.clear();
     this.#turnRetries.clear();
     this.#capacityNotices.clear();
+    this.#retryNotices.clear();
     this.#limitedTurns.clear();
     this.#unreadReports.clear();
     this.#selfStartedOrigins.clear();
@@ -573,6 +595,7 @@ export class TurnLifecycle {
     this.#quietRepeats.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
+    this.#channelResultNotes.clear();
     this.#refusedRetries.clear();
     this.#safetyBlockedTurns.clear();
     this.#sessionFailures.clear();
@@ -608,6 +631,7 @@ export class TurnLifecycle {
       this.#runningTurns.delete(turnId);
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
+      this.#retryNotices.delete(turnId);
       const compactionFailure = this.#compactionFailures.get(turnId);
       this.#compactionFailures.delete(turnId);
       const quietStop = this.#quietStops.has(turnId) && !this.#turnErrors.has(turnId);
@@ -665,10 +689,41 @@ export class TurnLifecycle {
     return this.#conversation.isTaskThread(threadId) ? this.#hooks.taskForThread(threadId) : null;
   }
 
-  #loseBackgroundWork(threadId: string, agentId: string): void {
+  #teammateWorksInBackground(agentId: string, taskId: string | null): boolean {
+    return [...this.#waitingThreads].some(([threadId, work]) => {
+      const last = this.#lastResults.get(
+        `${work.agentId}\u0000${this.#conversation.publicThreadId(work.agentId, threadId)}`,
+      );
+      return (
+        last?.interim === true &&
+        last.requests.some(
+          ({ delivery, senderTaskId }) =>
+            delivery.sender.kind === "agent" &&
+            delivery.sender.agentId === agentId &&
+            (senderTaskId ?? null) === taskId,
+        )
+      );
+    });
+  }
+
+  #loseBackgroundWork(threadId: string, agentId: string, waker: AgentClient | null = null): void {
     this.#waitingThreads.delete(threadId);
     const taskId = this.#taskForThread(agentId, threadId);
     if (taskId !== null && this.#hooks.taskOpen(taskId)) this.#hooks.taskBackgroundLost(taskId);
+    else if (taskId === null && waker?.wakeAfterLostWork)
+      Effect.runFork(
+        waker.wakeAfterLostWork(threadId).pipe(
+          Effect.catchCause((cause) =>
+            Effect.sync(() =>
+              logger.warn("The agent got no turn after its provider process stopped its background work.", {
+                provider: waker.provider,
+                error: Cause.squash(cause),
+              }),
+            ),
+          ),
+          Effect.forkIn(this.#scope, { startImmediately: true }),
+        ),
+      );
   }
 
   #taskRunsInProvider(agentId: string, taskId: string): boolean {
@@ -740,6 +795,7 @@ export class TurnLifecycle {
     plan: ConversationPlan | null,
     answer: string,
     continuations: number,
+    awaitsTeammate: boolean,
   ): Effect.Effect<string | null> {
     const check = this.#hooks.checkFinish;
     if (!check) return Effect.succeed(null);
@@ -775,6 +831,7 @@ export class TurnLifecycle {
       plan: plan && { ...plan, steps: plan.steps.map((step) => ({ ...step, text: redact(step.text) })) },
       answer: redact(answer),
       continuations,
+      ...(awaitsTeammate ? { awaitsTeammate } : {}),
     };
     const mayContinue = () =>
       this.#planContinuation.waitsForCheck(agentId, taskId) && this.#mayContinue(agentId, taskId, turnId, deliveries);
@@ -901,7 +958,6 @@ export class TurnLifecycle {
   #holdNoAnswer(agentId: string, threadId: string, turnId: string, source: AgentClient): boolean {
     const running = this.#runningTurns.get(turnId);
     if (
-      (source.provider !== "codex" && source.provider !== "claude") ||
       running === undefined ||
       (running.startedBackgroundWork && this.#waitingThreads.has(threadId)) ||
       running.compacted ||
@@ -936,6 +992,29 @@ export class TurnLifecycle {
       logger.info("A turn's last narration became its answer.", { agentId, turnId, provider: source.provider });
       return false;
     }
+    if (
+      this.#hooks.hasOpenWait(
+        agentId,
+        deliveries.map(({ delivery }) => delivery.id),
+      )
+    ) {
+      logger.info("A turn that keeps a wait open ended with no answer.", {
+        agentId,
+        turnId,
+        provider: source.provider,
+      });
+      return false;
+    }
+    const teammateResults = deliveries.every(({ delivery }) => answeredRequestId(delivery) !== null);
+    if (teammateResults && this.#awaitsTeammateInOwnLane(agentId, threadId, snapshot.threadId)) {
+      logger.info("A turn for a teammate result ended with no answer while a teammate still works.", {
+        agentId,
+        turnId,
+        provider: source.provider,
+      });
+      return false;
+    }
+    if (!NO_ANSWER_CHECKED_PROVIDERS.has(source.provider)) return false;
     if (deliveries.every(({ delivery }) => this.#mailbox.answersHandledRequest(delivery.id))) {
       logger.info("A turn for another teammate result to a handled request ended quietly.", {
         agentId,
@@ -966,9 +1045,14 @@ export class TurnLifecycle {
     }
     if (deliveries.every(({ delivery }) => this.#mailbox.isAgentSetupDelivery(delivery.id))) return false;
     const channelTask = this.#channelTask(snapshot.threadId, deliveries);
-    const message = sourceText(channelTask ? "error.provider.channelNoAnswer" : "error.provider.acpNoAnswer", {
-      provider: agentProviderDescriptor(source.provider).displayName,
-    });
+    const message = sourceText(
+      channelTask
+        ? "error.provider.channelNoAnswer"
+        : teammateResults
+          ? "error.provider.teammateResultsNoAnswer"
+          : "error.provider.acpNoAnswer",
+      { provider: agentProviderDescriptor(source.provider).displayName },
+    );
     const context = {
       causeCode: "empty_answer" as const,
       provider: source.provider,
@@ -981,6 +1065,12 @@ export class TurnLifecycle {
     this.#turnCauses.set(turnId, context.causeCode);
     this.#failoverTurns.set(turnId, { message, context });
     return true;
+  }
+
+  #awaitsTeammateInOwnLane(agentId: string, threadId: string, publicThreadId: string | null): boolean {
+    const taskId = this.#taskForThread(agentId, threadId);
+    if (taskId === null && this.#conversation.isExecutionThread(publicThreadId)) return false;
+    return this.#mailbox.teammateStillWorks(agentId, taskId);
   }
 
   #channelTask(threadId: string | null, deliveries: readonly DeliveryContext[]): boolean {
@@ -996,7 +1086,7 @@ export class TurnLifecycle {
     turnId: string,
     source: AgentClient,
     deliveries: readonly DeliveryContext[],
-    messages: readonly ConversationMessage[],
+    messages: ConversationMessage[],
     workedBesidesReaction: boolean,
   ): void {
     if (
@@ -1010,20 +1100,25 @@ export class TurnLifecycle {
     )
       return;
     logger.info("A turn ended with no answer after its steps.", { agentId, turnId, provider: source.provider });
-    this.#hooks.emitError(
-      "agent_error",
-      sourceText("error.provider.noAnswerAfterSteps", {
-        provider: agentProviderDescriptor(source.provider).displayName,
-      }),
-      agentId,
-      {
-        causeCode: "empty_answer",
-        provider: source.provider,
-        model: this.#hooks.turnModel(agentId, turnId),
-        turnId,
-        severity: "warning",
-      },
-    );
+    const notice = sourceText("error.provider.noAnswerAfterSteps", {
+      provider: agentProviderDescriptor(source.provider).displayName,
+    });
+    messages.push({
+      id: `${turnId}:no-answer`,
+      author: "system",
+      source: "system",
+      status: "completed",
+      createdAt: new Date().toISOString(),
+      itemType: NO_ANSWER_NOTICE_ITEM_TYPE,
+      text: notice,
+    });
+    this.#hooks.emitError("agent_error", notice, agentId, {
+      causeCode: "empty_answer",
+      provider: source.provider,
+      model: this.#hooks.turnModel(agentId, turnId),
+      turnId,
+      severity: "warning",
+    });
   }
 
   #answerWithNarration(messages: ConversationMessage[], turnId: string, narrationId: string | null): boolean {
@@ -1125,7 +1220,9 @@ export class TurnLifecycle {
   #markFailed(agentId: string, model: string | null, failover: HeldProviderError): void {
     const resetDelayMs = providerResetDelayMs(failover.message);
     const spent = failover.quiet === true && resetDelayMs === null && isBalanceDiagnostic(failover.message);
-    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, failover.context.causeCode === "authentication");
+    const { causeCode, provider } = failover.context;
+    const notOffered = causeCode === "model_not_found" && provider === "claude";
+    this.#usageLimits.failed(agentId, model, resetDelayMs, spent, causeCode === "authentication", notOffered);
   }
 
   #noteEvent(params: unknown): { threadId: string | null; agentId: string | undefined } {
@@ -1145,7 +1242,9 @@ export class TurnLifecycle {
     const turnId = getString(params, "turnId");
     const itemId = getString(params, "itemId");
     const delta = notification.method === "item/reasoning/summaryPartAdded" ? "\n\n" : getString(params, "delta");
-    if (!turnId || !itemId || delta === null) return;
+    if (!turnId || !itemId || delta === null || this.#compaction.isCompactionTurn(threadId, turnId)) return;
+    this.#capacityNotices.delete(turnId);
+    this.#retryNotices.delete(turnId);
     this.#itemTurns.set(itemId, turnId);
     const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
     const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
@@ -1255,6 +1354,8 @@ export class TurnLifecycle {
           compacted: false,
           startedBackgroundWork: false,
           narration: null,
+          narrationStepKnown: false,
+          narrationOpenTools: new Set(),
           openTools: new Set(),
           failureReports: new Set(),
           lastEventAt: Date.now(),
@@ -1328,6 +1429,15 @@ export class TurnLifecycle {
           const acted = isRepeatedWork(item);
           this.#markProduced(turnId, acted, acted, acted && isUserReactionCall(item));
         }
+        if (
+          running?.narration &&
+          !running.narrationStepKnown &&
+          !(itemId !== null && running.narrationOpenTools.has(itemId))
+        ) {
+          const step = channelNoteStep(item);
+          if (step === "result") this.#keepChannelResultNote(turnId, running.narration);
+          if (step !== null) running.narrationStepKnown = true;
+        }
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
           if (
             notification.method === "item/completed" &&
@@ -1335,9 +1445,13 @@ export class TurnLifecycle {
             isNarrationItemId(itemId, source.provider) &&
             isString(item.text) &&
             item.text.trim()
-          )
+          ) {
             running.narration = itemId;
-        } else if (running && isRepeatedWork(item)) running.narration = null;
+            running.narrationStepKnown = false;
+            running.narrationOpenTools = new Set(running.openTools);
+          }
+        } else if (running && isRepeatedWork(item) && !keepsNarration(item, notification.method === "item/completed"))
+          running.narration = null;
         if (item.type === "contextCompaction") {
           if (running) running.compacted = true;
           if (this.#conversation.openClientFor(threadId) !== source) return;
@@ -1363,6 +1477,7 @@ export class TurnLifecycle {
           }
           return;
         }
+        if (this.#compaction.isCompactionTurn(threadId, turnId)) return;
         if (notification.method === "item/completed" && itemId) {
           this.#deltas.flush(`${threadId}:${turnId}:${itemId}`);
           const loads = skillLoads(item, getArray(params, "filePaths"));
@@ -1414,18 +1529,22 @@ export class TurnLifecycle {
         const turnId = getString(turn, "id");
         if (!turnId) return;
         const reported = getString(turn, "status") ?? "completed";
-        const noAnswer = reported === "completed" && this.#holdNoAnswer(agentId, threadId, turnId, source);
+        const noAnswer =
+          reported === "completed" &&
+          turn?.handledCommand !== true &&
+          this.#holdNoAnswer(agentId, threadId, turnId, source);
         const status =
           ((reported === "failed" && this.#quietEmptyAnswers.has(turnId)) ||
             (reported === "interrupted" && this.#quietStops.has(turnId))) &&
           !this.#turnErrors.has(turnId)
             ? "completed"
             : (reported === "interrupted" &&
-                  this.#compactionFailures.get(turnId)?.stalled &&
+                  (this.#compactionFailures.get(turnId)?.stalled || this.#failoverTurns.get(turnId)?.movesToBackup) &&
                   !this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId)) ||
                 noAnswer
               ? "failed"
               : reported;
+        if (status !== "failed") this.#dropCapacityHandOff(turnId);
         if (status === "failed" && !this.#turnErrors.has(turnId)) {
           this.#hooks.emitFailure?.({
             code: "agent_error",
@@ -1447,6 +1566,8 @@ export class TurnLifecycle {
           this.#compaction.finish(agentId, threadId, status);
           return;
         }
+        this.#compaction.threadIdle(agentId, threadId, source);
+        yield* this.#requeueUnreadSteers(agentId, threadId, turnId, getArray(turn, "unreadSteers").filter(isString));
         yield* this.#completeTurn(agentId, threadId, turnId, status).pipe(
           Effect.catchCause((cause) =>
             reportOriginalFailure(cause, (failure) =>
@@ -1484,6 +1605,13 @@ export class TurnLifecycle {
           this.#noteSelfStartedOrigins(turnId, [...(this.#selfStartedOrigins.get(turnId) ?? []), origin]);
         return;
       }
+      case "openbot/unread-steers": {
+        const turnId = getString(params, "turnId");
+        if (!threadId || !agentId || !turnId) return;
+        yield* this.#requeueUnreadSteers(agentId, threadId, turnId, getArray(params, "unreadSteers").filter(isString));
+        this.#hooks.scheduleDrain(agentId);
+        return;
+      }
       case "openbot/background-work": {
         if (!threadId || !agentId) return;
         const runs = isRecord(params) && params.running === true;
@@ -1491,7 +1619,8 @@ export class TurnLifecycle {
           for (const turn of this.#runningTurns.values())
             if (turn.threadId === threadId && turn.client === source) turn.startedBackgroundWork = true;
         const waited = this.#waitingThreads.has(threadId);
-        if (!runs && isRecord(params) && params.closed === true) this.#loseBackgroundWork(threadId, agentId);
+        if (!runs && isRecord(params) && params.closed === true)
+          this.#loseBackgroundWork(threadId, agentId, params.lost === true ? source : null);
         if (runs === waited) return;
         if (runs) this.#waitingThreads.set(threadId, { agentId, client: source, since: Date.now() });
         else this.#waitingThreads.delete(threadId);
@@ -1502,6 +1631,7 @@ export class TurnLifecycle {
         if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
         if (status !== "running" && status !== "completed" && status !== "failed") return;
+        if (source.compactsOnDemand === true && this.#compaction.requested(threadId)) return;
         this.#compaction.observeCompaction(threadId, status, "none");
         return;
       }
@@ -1542,12 +1672,21 @@ export class TurnLifecycle {
           return;
         }
         if (isRecord(params) && params.willRetry === true) {
+          const retriedTurnId = getString(params, "turnId");
+          if (
+            agentId &&
+            threadId &&
+            retriedTurnId &&
+            this.#compaction.providerRetried(agentId, threadId, retriedTurnId)
+          )
+            return;
+          const details = getString(error, "additionalDetails");
           this.#providerRetried(
             agentId,
             threadId,
             getString(params, "turnId"),
             source.provider,
-            modelAtCapacity(error, getString(error, "additionalDetails")),
+            modelAtCapacity(error, details) ? (details ?? message) : null,
           );
           return;
         }
@@ -1568,8 +1707,17 @@ export class TurnLifecycle {
           });
           return;
         }
+        const accountSettingsFailure =
+          notification.method === "error" && source.provider === "codex" && isCodexAccountSettingsFailure(message);
+        if (accountSettingsFailure)
+          logger.warn("Codex could not load the settings of its ChatGPT account.", {
+            message: this.#hooks.redactMcp(message),
+          });
+        const shownMessage = accountSettingsFailure
+          ? sourceText("error.provider.codexAccountSettingsUnreadable")
+          : message;
         if (notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
-          this.#turnErrors.set(errorTurnId, message);
+          this.#turnErrors.set(errorTurnId, shownMessage);
           this.#turnCauses.set(errorTurnId, causeCode);
           if (refusedSessionFailure(source.provider, message) !== null) return;
           const errorInfo = error?.codexErrorInfo;
@@ -1712,7 +1860,7 @@ export class TurnLifecycle {
             isRefusedGeminiToken(source.provider, message) ||
             this.#mayHoldError(agentId, errorTurnId, context.causeCode))
         ) {
-          this.#failoverTurns.set(errorTurnId, { message, context, ...(link ? { link } : {}) });
+          this.#failoverTurns.set(errorTurnId, { message: shownMessage, context, ...(link ? { link } : {}) });
           return;
         }
         if (notification.method === "warning" && userErrorMessage(message, "") === "") {
@@ -1725,10 +1873,23 @@ export class TurnLifecycle {
         }
         const taskId =
           notification.method === "error" && agentId && threadId ? this.#taskForThread(agentId, threadId) : null;
+        const backupsAtLimit =
+          notification.method === "error" &&
+          context.causeCode === "usage_limit" &&
+          agentId !== undefined &&
+          this.#hooks.backupsAtLimit(agentId);
+        if (backupsAtLimit)
+          logger.warn("A usage limit stopped an agent, and no backup model can take over.", {
+            agentId,
+            provider: source.provider,
+            model: context.model,
+            message: this.#hooks.redactMcp(message),
+          });
+        const shown = backupsAtLimit ? sourceText("error.agent.backupModelsAtLimit") : shownMessage;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
-          this.#hooks.taskFailed(taskId, message);
-        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context, link);
+          this.#hooks.taskFailed(taskId, shown);
+        } else this.#hooks.emitError(`agent_${notification.method}`, shown, agentId, context, link);
       }
     }
   }).bind(this);
@@ -1738,9 +1899,11 @@ export class TurnLifecycle {
     threadId: string | null | undefined,
     turnId: string | null,
     provider: AgentClient["provider"],
-    atCapacity: boolean,
+    capacityMessage: string | null,
   ): void {
     if (!agentId || !threadId || !turnId || !this.#runningTurns.has(turnId)) return;
+    if (this.#failoverTurns.get(turnId)?.movesToBackup) return;
+    const atCapacity = capacityMessage !== null;
     const attempts = (this.#turnRetries.get(turnId) ?? 0) + 1;
     this.#turnRetries.set(turnId, attempts);
     logger.info("A provider retries a request.", {
@@ -1752,7 +1915,12 @@ export class TurnLifecycle {
     if (atCapacity) {
       if (this.#capacityNotices.has(turnId)) return;
       this.#capacityNotices.add(turnId);
-    } else if (attempts !== RETRY_NOTICE_ATTEMPTS) return;
+      if (this.#movesToBackupAtCapacity(agentId, threadId, turnId, provider, capacityMessage)) return;
+    } else {
+      if (attempts < RETRY_NOTICE_ATTEMPTS || this.#retryNotices.has(turnId)) return;
+      this.#retryNotices.add(turnId);
+    }
+    this.#deltas.flushTurn(turnId);
     const compacts = !atCapacity && this.#compaction.retrying(threadId);
     const percent = this.#compaction.usedPercent(threadId);
     this.#hooks.emitError(
@@ -1774,6 +1942,67 @@ export class TurnLifecycle {
         ...(atCapacity ? { causeCode: CAPACITY_CAUSE } : {}),
       },
     );
+  }
+
+  #movesToBackupAtCapacity(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    provider: AgentClient["provider"],
+    message: string,
+  ): boolean {
+    const running = this.#runningTurns.get(turnId);
+    const model = this.#hooks.turnModel(agentId, turnId);
+    const failedKey = this.#usageLimits.failureKey(agentId, model);
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    if (
+      running === undefined ||
+      failedKey === null ||
+      deliveries.length === 0 ||
+      this.#limitedTurns.has(turnId) ||
+      this.#failoverTurns.has(turnId) ||
+      this.#observedCompactions.get(threadId) === turnId ||
+      this.#compaction.isCompactionTurn(threadId, turnId) ||
+      this.#channelTask(this.#conversation.publicThreadId(agentId, threadId), deliveries) ||
+      deliveries.some(({ delivery }) => this.#failoverRetries.get(delivery.id)?.has(failedKey)) ||
+      this.#hooks.turnStopped(agentId, this.#taskForThread(agentId, threadId), turnId) ||
+      !this.#hooks.mayFailOver(agentId)
+    )
+      return false;
+    logger.info("A model is at capacity, so OpenBot moves the turn to a backup model.", { provider, model });
+    this.#turnErrors.set(turnId, message);
+    this.#turnCauses.set(turnId, CAPACITY_CAUSE);
+    this.#failoverTurns.set(turnId, {
+      message,
+      context: { causeCode: CAPACITY_CAUSE, provider, model, turnId, severity: "error" },
+      movesToBackup: true,
+    });
+    Effect.runFork(
+      running.client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            if (!this.#dropCapacityHandOff(turnId) || !this.#runningTurns.has(turnId)) return;
+            logger.warn("OpenBot could not stop a turn at capacity, so the provider tries again.", { provider, error });
+            this.#hooks.emitError("agent_warning", sourceText("error.backend.providerModelAtCapacity"), agentId, {
+              provider,
+              model,
+              turnId,
+              severity: "warning",
+              causeCode: CAPACITY_CAUSE,
+            });
+          }),
+        ),
+      ),
+    );
+    return true;
+  }
+
+  #dropCapacityHandOff(turnId: string): boolean {
+    if (!this.#failoverTurns.get(turnId)?.movesToBackup) return false;
+    this.#failoverTurns.delete(turnId);
+    this.#turnErrors.delete(turnId);
+    this.#turnCauses.delete(turnId);
+    return true;
   }
 
   requestNoUpdate(
@@ -1801,7 +2030,7 @@ export class TurnLifecycle {
       !deliveries.some(
         ({ delivery }) =>
           delivery.sender.kind === "routine" ||
-          quietTeammateDelivery(delivery) ||
+          quietTeammateDelivery(delivery, this.#followsUpOwnAnswer) ||
           teammateRequest(delivery) ||
           this.#continuesQuietRun(delivery),
       )
@@ -1898,6 +2127,26 @@ export class TurnLifecycle {
     return this.#quietChannelTurns.has(turnId) && !this.#reportedFailures.has(turnId);
   }
 
+  channelNote(turnId: string, messageId: string): "result" | "pending" | "running" | null {
+    if (this.#channelResultNotes.get(turnId)?.has(messageId)) return "result";
+    const running = this.#runningTurns.get(turnId);
+    if (!running) return null;
+    return running.narration === messageId && !running.narrationStepKnown ? "pending" : "running";
+  }
+
+  #keepChannelResultNote(turnId: string, messageId: string): void {
+    const notes = this.#channelResultNotes.get(turnId);
+    if (notes) {
+      notes.add(messageId);
+      return;
+    }
+    this.#channelResultNotes.set(turnId, new Set([messageId]));
+    if (this.#channelResultNotes.size > ENDED_TURN_LIMIT) {
+      const [oldest] = this.#channelResultNotes.keys();
+      if (oldest !== undefined) this.#channelResultNotes.delete(oldest);
+    }
+  }
+
   keepChannelTurnAnswers(turnId: string): void {
     this.#quietChannelTurns.delete(turnId);
   }
@@ -1938,8 +2187,14 @@ export class TurnLifecycle {
   }
 
   #quietTeammateTurnDelivery(delivery: QueueDelivery): boolean {
-    return quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id));
+    return quietTeammateTurnDelivery(
+      delivery,
+      (request) => this.#mailbox.hasOwnReplyFrom(request.id),
+      this.#followsUpOwnAnswer,
+    );
   }
+
+  readonly #followsUpOwnAnswer = (delivery: QueueDelivery): boolean => this.#mailbox.followsUpOwnAnswer(delivery);
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
     function* (this: TurnLifecycle, agentId: string, threadId: string, turnId: string, status: string) {
@@ -1975,9 +2230,14 @@ export class TurnLifecycle {
       this.#turnCauses.delete(turnId);
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
+      this.#retryNotices.delete(turnId);
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
-          ? refusedSessionFailure(running.client.provider, reportedError)
+          ? refusedSessionFailure(
+              running.client.provider,
+              reportedError,
+              running.client.contextWindow?.(threadId) ?? null,
+            )
           : null;
       const refused = running !== undefined && refusedFailure !== null;
       const safetyBlock = this.#safetyBlockedTurns.delete(turnId)
@@ -2326,12 +2586,16 @@ export class TurnLifecycle {
             ))))
           ? "no"
           : planMode;
+      const awaitsEarlierRequest =
+        continueMode !== "no" &&
+        (this.#mailbox.awaitsTeammate(agentId, laneTaskId, null) ||
+          this.#teammateWorksInBackground(agentId, laneTaskId));
       const turnPlan = snapshot.messages.find((message) => message.id === `${turnId}:plan`)?.plan ?? null;
       const toolSteps = trace?.steps.filter((step) => step.kind === "tool") ?? [];
       const finishCheck: FinishCheckMode =
         latestAssistant === undefined ||
         this.#hooks.checkFinish === undefined ||
-        (toolSteps.length === 0 && !promisesWork(latestAssistant.text))
+        (toolSteps.length === 0 && !promisesWork(latestAssistant.text) && !awaitsEarlierRequest)
           ? "no"
           : continueMode;
       const proposed =
@@ -2348,25 +2612,35 @@ export class TurnLifecycle {
                 )?.plan ?? null,
               answer: latestAssistant?.text,
               finishCheck,
+              nextStep: !awaitsEarlierRequest,
             });
-      let considered = proposed?.kind === "check" ? null : proposed;
-      if (proposed?.kind === "check" && latestAssistant) {
-        const gap = yield* this.#checkFinish(
-          agentId,
-          laneTaskId,
-          turnId,
-          snapshot,
-          deliveries,
-          toolSteps,
-          toolOutcomes,
-          turnPlan,
-          latestAssistant.text,
-          proposed.continuations,
-        );
-        considered = gap === null ? null : this.#planContinuation.afterFinishCheck(agentId, laneTaskId, gap);
-      }
-      const continuation = compactionContinuation ?? (considered && considered.kind !== "stopped" ? considered : null);
+      const gap =
+        proposed?.kind === "check" && latestAssistant
+          ? yield* this.#checkFinish(
+              agentId,
+              laneTaskId,
+              turnId,
+              snapshot,
+              deliveries,
+              toolSteps,
+              toolOutcomes,
+              turnPlan,
+              latestAssistant.text,
+              proposed.continuations,
+              awaitsEarlierRequest,
+            )
+          : null;
+      const considered =
+        proposed?.kind !== "check"
+          ? proposed
+          : gap === null
+            ? null
+            : this.#planContinuation.afterFinishCheck(agentId, laneTaskId, gap);
+      const continuation =
+        compactionContinuation ??
+        (considered && considered.kind !== "stopped" && considered.kind !== "limitReached" ? considered : null);
       const planStopped = considered?.kind === "stopped" && latestAssistant === undefined;
+      const limitReached = considered?.kind === "limitReached";
       if (!continuation)
         this.#planContinuation.cancel(
           agentId,
@@ -2407,7 +2681,12 @@ export class TurnLifecycle {
               resulted.push(delivery);
           yield* this.#relayTaskResults(agentId, turnId, deliveries, resultText ?? noResult);
         }
-        if (resulted.length > 0) keepBounded(this.#lastResults, resultsKey, { turnIds: [turnId], requests: resulted });
+        if (resulted.length > 0)
+          keepBounded(this.#lastResults, resultsKey, {
+            turnIds: [turnId],
+            requests: resulted,
+            ...(running?.startedBackgroundWork ? { interim: true as const } : {}),
+          });
         else this.#lastResults.delete(resultsKey);
         if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
           const temporary =
@@ -2441,7 +2720,11 @@ export class TurnLifecycle {
           for (const request of last.requests)
             if (yield* this.#relayLaterResult(agentId, turnId, request, answerText)) kept.push(request);
           if (kept.length > 0)
-            this.#lastResults.set(resultsKey, { turnIds: [...last.turnIds, turnId], requests: kept });
+            this.#lastResults.set(resultsKey, {
+              turnIds: [...last.turnIds, turnId],
+              requests: kept,
+              ...(running.startedBackgroundWork ? { interim: true as const } : {}),
+            });
           else this.#lastResults.delete(resultsKey);
         }
       }
@@ -2488,7 +2771,7 @@ export class TurnLifecycle {
                       },
                     ),
           });
-      } else if (planStopped) {
+      } else if (planStopped || limitReached) {
         snapshot.messages.push({
           id: `${turnId}:plan-stopped`,
           author: "system",
@@ -2496,7 +2779,7 @@ export class TurnLifecycle {
           status: "completed",
           createdAt: new Date().toISOString(),
           itemType: PLAN_CONTINUATION_ITEM_TYPE,
-          text: sourceText("status.agent.planStopped"),
+          text: sourceText(planStopped ? "status.agent.planStopped" : "status.agent.continuationLimitReached"),
         });
       }
       const provider = running?.client.provider;
@@ -2588,6 +2871,7 @@ export class TurnLifecycle {
     this.#runningTurns.delete(turnId);
     this.#turnRetries.delete(turnId);
     this.#capacityNotices.delete(turnId);
+    this.#retryNotices.delete(turnId);
     this.#reportedFailures.delete(turnId);
     this.#quietEmptyAnswers.delete(turnId);
     this.#clearQuietEnd(turnId);
@@ -2853,6 +3137,40 @@ export class TurnLifecycle {
     );
   }, Effect.uninterruptible);
 
+  readonly #requeueUnreadSteers = Effect.fn("TurnLifecycle.requeueUnreadSteers")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    reported: readonly string[],
+  ) {
+    const deliveryIds = reported.filter((deliveryId) => this.#mailbox.steeredIntoOtherWork(deliveryId));
+    if (deliveryIds.length === 0) return;
+    for (const deliveryId of deliveryIds)
+      yield* this.#mailbox
+        .restoreUnsteered(deliveryId, turnId)
+        .pipe(
+          Effect.catch((failure) =>
+            Effect.sync(() => this.#hooks.emitError("delivery_turn_association_failed", failure.cause, agentId)),
+          ),
+        );
+    yield* turnStep(() => {
+      const restored = new Set(
+        deliveryIds.filter((deliveryId) => this.#mailbox.getDelivery(deliveryId)?.delivery.status === "queued"),
+      );
+      if (restored.size === 0) return;
+      const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
+      for (let index = snapshot.messages.length - 1; index >= 0; index -= 1)
+        if (restored.has(snapshot.messages[index]?.id ?? "")) snapshot.messages.splice(index, 1);
+      this.#mailboxSync.syncMailboxMessages(snapshot);
+      this.#mailboxSync.emitQueue(agentId);
+    }).pipe(
+      Effect.catchCause((cause) =>
+        reportOriginalFailure(cause, (failure) => this.#hooks.emitError("turn_completion_failed", failure, agentId)),
+      ),
+    );
+  });
+
   #answerFailedRequest(agentId: string, deliveryId: string, temporary: boolean): Effect.Effect<void> {
     return this.#mailbox
       .answerFailedRequest(
@@ -2900,7 +3218,7 @@ export class TurnLifecycle {
       !this.#mailbox.expectsReply(messageId) ||
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
       this.#mailbox.heldByTask(agentId, messageId) ||
-      this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
+      this.#mailbox.hasAgentReplyOrRequestFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
       (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId)) ||
       this.#mailbox.steeredIntoOtherWork(delivery.id)
     );
@@ -3334,14 +3652,16 @@ export class TurnLifecycle {
   ): ConversationMessage | undefined {
     const message = traceMessage(messages, turnId);
     if (!message) return undefined;
-    let usage: { tokens: number; costUsd: number | null } | null = null;
+    let usage: { tokens: number; cachedInput: number; costUsd: number | null } | null = null;
     try {
       const since = new Date(Date.parse(trace.startedAt) - TURN_USAGE_MARGIN_MS).toISOString();
       usage = this.#store.database.usage.readTurnTotals(agentId, turnId, since);
     } catch (error) {
       logger.warn("The usage of a turn could not be read for its trace.", { error });
     }
-    message.trace = usage ? { ...trace, tokens: usage.tokens, costUsd: usage.costUsd } : trace;
+    message.trace = usage
+      ? { ...trace, tokens: usage.tokens, cachedInput: usage.cachedInput, costUsd: usage.costUsd }
+      : trace;
     return message;
   }
 
@@ -3471,6 +3791,65 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown;
   if (item.type !== "agentMessage") return true;
   if (item.failureReport === true) return false;
   return item.phase !== "commentary" && hasText(item);
+}
+
+const NO_ANSWER_CHECKED_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
+  "codex",
+  "claude",
+  "pi",
+  ...KEY_ONLY_PROVIDERS,
+]);
+
+const NARRATION_KEEPING_TOOLS = new Set([
+  "messaging_history",
+  "messaging_list_places",
+  "messaging_remember",
+  "messaging_forget_memory",
+  "remember",
+  "forget_memory",
+  "search_memories",
+  "history_read",
+  "history_search",
+  "react_to_user_message",
+]);
+
+function keepsNarration(item: DynamicRecord, completed: boolean): boolean {
+  const threadItem = toThreadItem(item);
+  if (threadItem === null) return false;
+  const tool = openBotTool(threadItem);
+  if (tool !== null) return NARRATION_KEEPING_TOOLS.has(tool);
+  if (threadItem.type !== "toolCall" || getString(threadItem, "name") !== "execute") return false;
+  if (!completed) return true;
+  const calls = getArray(getRecord(getRecord(threadItem, "result"), "metadata"), "toolCalls");
+  return calls.length > 0 && calls.every((call) => NARRATION_KEEPING_TOOLS.has(codeModeOpenBotTool(call) ?? ""));
+}
+
+const CHANNEL_RESULT_NAME = /(?:^|[._])channel_result$/u;
+const BRIDGE_TOOL = /(?:^|[._])(?:tool_call|use_tool)$/u;
+const CODE_CHANNEL_RESULT_CALL = /\bchannel_result\s*\(|["'`]openbot\.channel_result["'`]/u;
+
+function channelNoteStep(item: DynamicRecord): "result" | "other" | null {
+  const threadItem = toThreadItem(item);
+  if (threadItem === null || !isToolItem(threadItem)) return null;
+  if (openBotTool(threadItem) === "channel_result") return "result";
+  if (threadItem.type !== "toolCall") return "other";
+  const name = getString(threadItem, "name") ?? "";
+  if (name === "execute") {
+    const code = getString(getRecord(threadItem, "arguments"), "code");
+    if (!code) return null;
+    return CODE_CHANNEL_RESULT_CALL.test(code) ? "result" : "other";
+  }
+  if (!BRIDGE_TOOL.test(name)) return CHANNEL_RESULT_NAME.test(name) ? "result" : "other";
+  const args = threadItem.arguments;
+  const called = getString(args, "name") ?? getString(args, "tool") ?? getString(args, "tool_name");
+  if (called === null) return null;
+  return CHANNEL_RESULT_NAME.test(called) ? "result" : "other";
+}
+
+function codeModeOpenBotTool(call: unknown): string | null {
+  const tool = getString(call, "tool");
+  const name = tool === "openbot.tool_call" ? getString(getRecord(call, "input"), "name") : tool;
+  return name?.startsWith("openbot.") ? name.slice("openbot.".length) : null;
 }
 
 function isUserReactionCall(item: DynamicRecord): boolean {

@@ -11,6 +11,9 @@ export const messages = {
   "error.voice.transcriptionTimedOut": "תמלול הקול חרג מהזמן המותר.",
   "error.voice.prepareRequired": "תמלול קול מקומי אינו זמין. יש להריץ `bun run voice:prepare` ולהפעיל מחדש את OpenBot.",
   "error.voice.transcriptionFailed": "OpenBot לא הצליח לתמלל את ההקלטה הזו.",
+  "error.voice.videoModelMissing": "לא הוגדר מודל זיהוי דיבור להקלטות בהגדרות ← קול.",
+  "error.voice.videoModelMissingServer":
+    "לא הוגדר מודל זיהוי דיבור בשרת הזה. בעלים או מנהל יכולים להגדיר מודל בהגדרות השרת, בזיהוי דיבור.",
   "error.voice.cloud.keyRequired": "יש להוסיף מפתח API של {provider} בהגדרות ← קול.",
   "error.voice.cloud.keyRejected": "{provider} לא קיבל את מפתח ה-API. יש לבדוק את המפתח בהגדרות ← קול.",
   "error.voice.cloud.quotaExceeded": "המכסה שלך ב-{provider} נוצלה במלואה.",
@@ -28,6 +31,8 @@ export const messages = {
   "error.voice.live.timedOut": "הקול החי של Codex לא התחיל בזמן. יש לנסות שוב.",
   "error.voice.live.failed": "הקול החי נעצר: {reason}",
   "error.voice.live.disconnected": "הקול החי התנתק.",
+  "error.voice.live.startFailed":
+    "לא ניתן היה להפעיל את הקול החי. עדכנו את Codex והיכנסו עם ChatGPT במחשב שמריץ את הסוכן, ואז נסו שוב. סיבה: {reason}",
   "error.voice.live.hostFailed":
     "Codex בשרת לא הצליח להפעיל את הקול החי. בקשו מהבעלים לעדכן את Codex במחשב הזה ולהיכנס עם ChatGPT, ואז נסו שוב.",
   "error.voice.live.signIn": "יש להתחבר ל-Codex עם חשבון ChatGPT כדי להשתמש בקול חי.",
@@ -42,4 +47,6 @@ export const messages = {
   "error.voice.server.invalidAnswer": "{host} לא שלח תשובה תואמת OpenAI.",
   "error.voice.server.invalidAudio": "{host} שלח אודיו ש-OpenBot לא יכול להשמיע. יש להשתמש בשרת ששולח WAV.",
   "error.voice.server.tooLarge": "התשובה מ-{host} גדולה מדי.",
+  "error.voice.server.modelUnsupported":
+    "{host} לא יכול לתמלל עם {model}. יש לבחור מודל הכתבה אחר לשרת הקול בהגדרות ← קול.",
 } as const satisfies PartialTranslation<typeof source>;

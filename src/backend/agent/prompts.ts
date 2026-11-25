@@ -13,11 +13,13 @@ import {
   vaultExpiryText,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { decodeSharedLocationAnswer } from "@openbot/contracts/team-protocol/ui-block-location-v1";
 import {
   normalizeUiBlockSpec,
   UI_API_KEY_SCOPE_FIELD_ID,
   UI_CONFIRM_ACTION_QUESTION_ID,
   UI_CONFIRM_EDIT_ACTION_ID,
+  UI_LOCATION_FIELD_ID,
   UI_VAULT_REQUEST_FIELDS,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
@@ -544,6 +546,42 @@ export function apiKeyPromptResult(blockId: string, saved: SavedApiKey | null): 
         ...(saved.source ? { source: saved.source } : {}),
       }
     : { status: "skipped", blockId };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
+}
+
+export function locationFormSpec(reason: string): UiBlockSpec | null {
+  return normalizeUiBlockSpec({
+    type: "form",
+    title: reason,
+    fields: [
+      {
+        id: UI_LOCATION_FIELD_ID,
+        kind: "text",
+        label: sourceText("status.agent.location.field"),
+        placeholder: sourceText("status.agent.location.placeholder"),
+        secret: true,
+      },
+    ],
+    submit: sourceText("status.agent.location.submit"),
+  });
+}
+
+const LOCATION_USE =
+  "Use it only for this request. Do not repeat the coordinates unless the user asks, and do not save them to memory, files, or messages.";
+
+export function locationPromptResult(blockId: string, response: UiBlockResponse | null): DynamicToolResult {
+  const answer = response?.values?.[UI_LOCATION_FIELD_ID];
+  const text = typeof answer === "string" ? answer.trim() : "";
+  const location = text ? decodeSharedLocationAnswer(text) : null;
+  const value = location
+    ? { status: "shared", blockId, ...location, next: LOCATION_USE }
+    : text
+      ? { status: "shared", blockId, place: text, next: LOCATION_USE }
+      : {
+          status: "declined",
+          blockId,
+          next: "Do not ask again in this turn. Ask the user for a place if you still need one.",
+        };
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 

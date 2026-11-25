@@ -124,6 +124,8 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "To połączenie nie obsługuje zmian tożsamości serwera.",
   "error.team.hostUpdateUnsupported": "To połączenie nie obsługuje aktualizacji hosta.",
   "error.team.hostTimezoneUnsupported": "To połączenie nie obsługuje strefy czasowej serwera.",
+  "error.team.hostSignalHomeUnsupported": "To połączenie nie obsługuje wyboru serwera Signal.",
+  "error.team.hostVoiceModelUnsupported": "To połączenie nie obsługuje modelu rozpoznawania mowy serwera.",
   "error.team.hostRestartUnsupported": "To połączenie nie obsługuje ponownego uruchamiania serwera.",
   "error.team.ownerTransferUnsupported": "Ten serwer nie obsługuje przekazania własności.",
   "error.team.hostKeyRotationUnsupported": "To połączenie nie obsługuje zmiany klucza serwera.",
@@ -139,6 +141,10 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "To połączenie nie obsługuje czasu pamięci podręcznej promptów.",
   "error.team.claudeUserSetupUnsupported": "To połączenie nie obsługuje przełącznika konfiguracji Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "To połączenie nie obsługuje rozmiaru kompaktowania Claude.",
+  "error.team.cacheExpiryCompactionUnsupported":
+    "To połączenie nie obsługuje kompaktowania przed wygaśnięciem pamięci podręcznej.",
+  "error.team.mediaApprovalCreditsUnsupported": "To połączenie nie obsługuje progu zatwierdzania kredytów.",
+  "error.team.mediaApprovalCreditsInvalid": "Wpisz liczbę całkowitą kredytów od 0 do 100 000.",
   "error.team.providerEnvironmentUnsupported": "To połączenie nie obsługuje zmiennych dostawcy.",
   "error.team.modelVisibilityUnsupported": "To połączenie nie obsługuje listy modeli.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",
@@ -202,4 +208,7 @@ export const messages = {
   "error.team.backgroundProcessesUnsupported": "To połączenie nie obsługuje procesów w tle.",
   "error.team.providerUseUnsupported": "To połączenie nie obsługuje włączania i wyłączania dostawców.",
   "error.team.providerUseInvalid": "Ten dostawca nie ma przełącznika włączania.",
+  "error.team.mediaApprovalChoiceUnsupported":
+    "Ten serwer nie obsługuje wyboru modelu w zatwierdzeniach multimediów. Zaktualizuj OpenBot na serwerze.",
+  "error.team.mediaApprovalChoiceInvalid": "Wybór w zatwierdzeniu multimediów jest nieprawidłowy.",
 } as const satisfies PartialTranslation<typeof source>;

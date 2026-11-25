@@ -95,7 +95,8 @@ export function useChatThreadMenu(
     const onPressAction = (id: string) => {
       void haptics.selection();
       if (id === MAIN_THREAD_ID) {
-        if (inThread) router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: agent.id } });
+        if (inThread)
+          router.dismissTo({ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } });
       } else if (id === DRAFT_THREAD_ID) openThread(DRAFT_THREAD_ID);
       else if (id === "all")
         router.push({ pathname: "/server-tasks", params: { serverId: agent.serverId, agentId: agent.id } });

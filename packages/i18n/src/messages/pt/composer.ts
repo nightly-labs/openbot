@@ -66,6 +66,7 @@ export const messages = {
   "composer.voice.stop": "Parar gravação de voz",
   "composer.voice.cancel": "Cancelar gravação de voz",
   "composer.voice.preparing": "Baixando modelo de voz",
+  "composer.voice.starting": "Iniciando a gravação de voz",
   "composer.voice.requesting": "Solicitando acesso ao microfone",
   "composer.voice.transcribing": "Transcrevendo instrução por voz",
   "composer.voice.start": "Criar instrução por voz",

@@ -210,7 +210,10 @@ export class GitHubMcpProxy {
     );
     const forward = <T>(token: string, call: (client: Client) => Promise<T>) => runCauseEffect(this.#call(token, call));
     mcp.setRequestHandler(ListToolsRequestSchema, ({ params }, extra) =>
-      forward(userToken, (client) => client.listTools(params, requestOptions(extra.signal))),
+      forward(userToken, (client) => client.listTools(params, requestOptions(extra.signal))).then((result) => ({
+        ...result,
+        tools: result.tools.filter(isModelVisible),
+      })),
     );
     mcp.setRequestHandler(CallToolRequestSchema, ({ params }, extra) => {
       const args = params.arguments;
@@ -318,6 +321,12 @@ export class GitHubMcpProxy {
     const secret = Buffer.from(this.#options.secret());
     return candidate.length === secret.length && timingSafeEqual(candidate, secret);
   }
+}
+
+function isModelVisible(tool: Awaited<ReturnType<Client["listTools"]>>["tools"][number]): boolean {
+  const ui = tool._meta?.ui;
+  const visibility = isDynamicRecord(ui) ? ui.visibility : undefined;
+  return !Array.isArray(visibility) || visibility.includes("model");
 }
 
 function isRefused(error: unknown): boolean {

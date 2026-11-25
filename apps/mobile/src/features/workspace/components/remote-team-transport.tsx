@@ -1,5 +1,7 @@
+import { BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { BROWSER_SECRET_VAULT_ROUTES } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import {
   INSTANCE_TRANSFER_REMOTE_BYTES,
   INSTANCE_TRANSFER_ROUTES,
@@ -61,6 +63,7 @@ export interface RemoteTeamTransportRef {
   connect(hostId: string, hostPublicKey: string): Promise<{ kept: boolean }>;
   disconnect(): Promise<void>;
   networkChanged(): void;
+  newPage(): void;
   request<T>(
     method: string,
     path: string,
@@ -149,6 +152,12 @@ function liveVoiceErrorText(path: string, status: number, body: unknown): string
   return isDynamicRecord(body) && isString(body.error) && body.error ? body.error : null;
 }
 
+function liveVoiceHostFailure(path: string, reference: string | undefined): string | null {
+  return path === LIVE_VOICE_ROUTES.start && reference?.startsWith("host/500/")
+    ? sourceText("error.voice.live.hostFailed")
+    : null;
+}
+
 const BRIDGE_DOM: DOMProps = {
   ...expoGoDomOptions,
   containerStyle: {
@@ -164,6 +173,8 @@ const BRIDGE_DOM: DOMProps = {
   scrollEnabled: false,
   style: { flex: 0, height: 1, width: 1 },
 };
+
+const GATHERING_STALLS_BEFORE_NEW_BRIDGE = 2;
 
 export const RemoteTeamTransport = memo(
   forwardRef<RemoteTeamTransportRef, RemoteTeamTransportProps>(function RemoteTeamTransport(props, ref) {
@@ -204,6 +215,14 @@ export const RemoteTeamTransport = memo(
       if (typeof remoteDesktop !== "function") return false;
       remoteDesktop(command);
       return true;
+    }, []);
+
+    const [bridgeKey, setBridgeKey] = useState(0);
+    const gatheringStalls = useRef(0);
+    const newPage = useCallback((reason: string) => {
+      gatheringStalls.current = 0;
+      supportLog.add("warn", "connection", `${latest.current.props.hostId} new page ${reason}`);
+      setBridgeKey((key) => key + 1);
     }, []);
 
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
@@ -291,6 +310,7 @@ export const RemoteTeamTransport = memo(
           const networkChanged = bridge.current?.networkChanged;
           if (typeof networkChanged === "function") networkChanged(null);
         },
+        newPage: () => newPage("on refresh"),
         disconnect: async () => {
           const result = await enqueue({ type: "disconnect" });
           if (!result.ok)
@@ -332,7 +352,12 @@ export const RemoteTeamTransport = memo(
               `${request} -> ${result.status ?? "no status"} ${time}`,
             );
           if (!result.ok)
-            throw referencedError(result.error ?? sourceText("error.remote.serverRequestFailed"), result.reference);
+            throw referencedError(
+              liveVoiceHostFailure(path, result.reference) ??
+                result.error ??
+                sourceText("error.remote.serverRequestFailed"),
+              result.reference,
+            );
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           if (
@@ -345,6 +370,12 @@ export const RemoteTeamTransport = memo(
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
+          if (
+            result.status === 409 &&
+            method === "POST" &&
+            (path === BROWSER_SECRET_RESPONSE_PATH || path === BROWSER_SECRET_VAULT_ROUTES.respond)
+          )
+            throw new InactiveRequestError(currentText().t("mobile.chat.browserSecret.ended"));
           if (result.status !== undefined && result.status >= 400)
             throw referencedError(
               liveVoiceErrorText(path, result.status, result.body) ?? sourceText("error.remote.serverRequestFailed"),
@@ -397,7 +428,7 @@ export const RemoteTeamTransport = memo(
           };
         },
       }),
-      [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane],
+      [enqueue, sendViewCommand, sendDesktopCommand, backgroundLane, newPage],
     );
 
     const pageLoads = useRef(0);
@@ -494,12 +525,21 @@ export const RemoteTeamTransport = memo(
       onConnectionUpdate: async (update: RemoteTeamConnectionUpdate) => latest.current.props.onConnectionUpdate(update),
       onDiagnostic: async ({ hostId, step, detail }: RemoteTeamDiagnostic) => {
         supportLog.add(
-          step === "failed" || step === "stalled" || step === "signal-error" || step === "ice-candidate-error"
+          step === "failed" ||
+            step === "stalled" ||
+            step === "signal-error" ||
+            step === "ice-candidate-error" ||
+            step === "ice-gathering-stalled"
             ? "warn"
             : "info",
           "connection",
           `${hostId} peer ${step}${detail ? `: ${detail}` : ""}`,
         );
+        if (step === "authenticated") gatheringStalls.current = 0;
+        if (step === "ice-gathering-stalled") {
+          gatheringStalls.current += 1;
+          if (gatheringStalls.current >= GATHERING_STALLS_BEFORE_NEW_BRIDGE) newPage("after ICE gathering stalls");
+        }
         latest.current.props.onDiagnostic?.(step, detail);
       },
       onNetworkRestored: async () => latest.current.props.onNetworkRestored?.(),
@@ -519,6 +559,7 @@ export const RemoteTeamTransport = memo(
 
     return (
       <RemoteTeamBridge
+        key={bridgeKey}
         ref={bridge}
         active={props.active}
         dom={BRIDGE_DOM}

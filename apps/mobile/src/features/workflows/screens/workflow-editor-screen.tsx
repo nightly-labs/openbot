@@ -1,12 +1,12 @@
 import { WORKFLOW_PORTS, type WorkflowDetail, type WorkflowNode } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, Stack, useLocalSearchParams } from "expo-router";
+import { router, Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import Plus from "lucide-react-native/icons/plus";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Keyboard, Pressable, View } from "react-native";
 import { useCSSVariable, useUniwind } from "uniwind";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
@@ -135,6 +135,7 @@ function EditorStepRow({
             <WorkflowKindTile
               kind={node.kind}
               trigger={node.kind === "trigger" ? triggerType(node) : undefined}
+              fields={node.fields}
               size={32}
             />
           }
@@ -229,6 +230,7 @@ export function WorkflowEditorScreen() {
   const problems = draft ? draftProblems(draft, serverAgents, t) : null;
   const firstProblem = problems?.first ?? null;
   useDiscardGuard(!savedId && changed, { warn: true });
+  useFocusEffect(useCallback(() => () => Keyboard.dismiss(), []));
 
   const finish = (id: string) => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.serverWorkflows(queryScope, serverId) });
@@ -441,14 +443,13 @@ export function WorkflowEditorScreen() {
         </>
       ) : view === "flow" ? (
         <WorkflowFlowView
+          serverId={serverId}
           graph={draftGraph(draft)}
           agents={serverAgents}
           problems={problems.steps}
           onOpenStep={openStep}
           onAdd={draft.mode === "fields" ? openAddStepAt : undefined}
-          canOpenStep={(node) =>
-            node.kind === "trigger" || (draft.mode === "fields" && node.kind !== "image" && node.kind !== "asset")
-          }
+          canOpenStep={(node) => node.kind === "trigger" || draft.mode === "fields"}
         />
       ) : (
         <SettingsSection title={t("mobile.workflow.detail.stepsTitle")}>
@@ -457,7 +458,7 @@ export function WorkflowEditorScreen() {
               return <FlowRowNote key={item.type === "loose" ? "loose" : item.key} row={item} labelOf={labelOf} />;
             const node = byId.get(item.id);
             if (!node || node.kind === "trigger") return null;
-            return stepRow(node, draft.mode === "fields" && node.kind !== "image" && node.kind !== "asset", item.depth);
+            return stepRow(node, draft.mode === "fields", item.depth);
           })}
         </SettingsSection>
       )}

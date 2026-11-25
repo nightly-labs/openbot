@@ -221,7 +221,7 @@ export class WorkflowRunStore {
 
   run(runId: string): StoredWorkflowRun | null {
     const row = databaseRow(this.#database.connection.prepare(`${RUN_SELECT} WHERE run_id = ?`).get(runId));
-    return row ? toRun(row) : null;
+    return row ? strictRun(row) : null;
   }
 
   handoffSource(runId: string): WorkflowRunSource | null {
@@ -237,7 +237,17 @@ export class WorkflowRunStore {
       this.#database.connection
         .prepare(`${RUN_SELECT} WHERE status IN (${placeholders(OPEN_RUN_STATUSES)}) ORDER BY started_at, run_id`)
         .all(...OPEN_RUN_STATUSES),
-    ).map(toRun);
+    ).flatMap((row) => readableRun(row) ?? []);
+  }
+
+  unreadableOpenRunIds(): Set<string> {
+    return new Set(
+      databaseRows(
+        this.#database.connection
+          .prepare(`SELECT run_id, graph_json FROM workflow_runs WHERE status IN (${placeholders(OPEN_RUN_STATUSES)})`)
+          .all(...OPEN_RUN_STATUSES),
+      ).flatMap((row) => (runGraph(row) ? [] : [requiredStringColumn(row, "run_id")])),
+    );
   }
 
   setRunStatus(runId: string, status: WorkflowRunStatus, error: string | null, now = new Date()): boolean {
@@ -277,6 +287,39 @@ export class WorkflowRunStore {
     return row ? toStep(row) : null;
   }
 
+  earlierAttempts(step: StoredWorkflowStep, limit: number): StoredWorkflowStep[] {
+    const rows =
+      step.runId === null
+        ? this.#database.connection
+            .prepare(
+              `${STEP_SELECT} WHERE run_id IS NULL AND workflow_id = ? AND node_id = ? AND rowid < ? ORDER BY rowid DESC LIMIT ?`,
+            )
+            .all(step.workflowId, step.nodeId, step.sequence, limit)
+        : this.#database.connection
+            .prepare(`${STEP_SELECT} WHERE run_id = ? AND node_id = ? AND attempt < ? ORDER BY attempt DESC LIMIT ?`)
+            .all(step.runId, step.nodeId, step.attempt, limit);
+    return databaseRows(rows).map(toStep);
+  }
+
+  runningAgentStep(deliveryId: string): StoredWorkflowStep | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare(`${STEP_SELECT} WHERE delivery_id = ? AND status = 'running' AND kind = 'agent'`)
+        .get(deliveryId),
+    );
+    return row ? toStep(row) : null;
+  }
+
+  keepAgentAnswer(stepId: string, deliveryId: string, output: string, now = new Date()): boolean {
+    return (
+      this.#database.connection
+        .prepare(
+          "UPDATE workflow_steps SET output = ?, updated_at = ? WHERE step_id = ? AND delivery_id = ? AND status = 'running'",
+        )
+        .run(output, now.toISOString(), stepId, deliveryId).changes > 0
+    );
+  }
+
   openSteps(): StoredWorkflowStep[] {
     return databaseRows(
       this.#database.connection
@@ -290,6 +333,19 @@ export class WorkflowRunStore {
       this.#database.connection
         .prepare(
           `${STEP_SELECT} WHERE workflow_id = ? AND status = 'done'
+             AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
+           ORDER BY created_at, attempt, step_id`,
+        )
+        .all(workflowId),
+    ).map(toStep);
+    return new Map(rows.map((step) => [step.nodeId, step]));
+  }
+
+  latestSettled(workflowId: string): Map<string, StoredWorkflowStep> {
+    const rows = databaseRows(
+      this.#database.connection
+        .prepare(
+          `${STEP_SELECT} WHERE workflow_id = ? AND status IN ('done', 'failed', 'stopped')
              AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
            ORDER BY created_at, attempt, step_id`,
         )
@@ -475,7 +531,12 @@ export class WorkflowRunStore {
       .run(status, reason, status === "sent" ? at : null, at, stepId);
   }
 
-  page(workflowId: string, before: string | undefined, limit: number): WorkflowRunPage {
+  page(
+    workflowId: string,
+    before: string | undefined,
+    limit: number,
+    shown: (step: StoredWorkflowStep) => WorkflowStep,
+  ): WorkflowRunPage {
     const db = this.#database.connection;
     const cursor = before === undefined ? null : runCursor(before);
     const rows = databaseRows(
@@ -489,7 +550,7 @@ export class WorkflowRunStore {
                ORDER BY started_at DESC, run_id DESC LIMIT ?`,
             )
             .all(workflowId, cursor.startedAt, cursor.startedAt, cursor.runId, limit + 1),
-    ).map(toRun);
+    ).map((row) => toRun(row, runGraph(row) ?? { nodes: [], edges: [], strokes: [] }));
     const runs = rows.slice(0, limit);
     const last = runs.at(-1);
     const soloSteps =
@@ -503,8 +564,8 @@ export class WorkflowRunStore {
           ).map(toStep)
         : [];
     return {
-      runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(publicStep) })),
-      soloSteps: soloSteps.map(publicStep),
+      runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(shown) })),
+      soloSteps: soloSteps.map(shown),
       nextBefore: rows.length > limit && last ? `${last.startedAt}|${last.id}` : null,
     };
   }
@@ -560,9 +621,29 @@ const STEP_SELECT = `
     settings_json, sources_json, output, branch, error, started_at, ended_at, created_at, rowid AS sequence
   FROM workflow_steps`;
 
-function toRun(row: DynamicRecord): StoredWorkflowRun {
-  const graph = JSON.parse(requiredStringColumn(row, "graph_json"));
-  if (!isWorkflowGraph(graph)) throw new Error("Invalid SQLite column: workflow_runs.graph_json");
+function runGraph(row: DynamicRecord): WorkflowGraph | null {
+  const text = row.graph_json;
+  if (typeof text !== "string") return null;
+  try {
+    const graph = JSON.parse(text);
+    return isWorkflowGraph(graph) ? graph : null;
+  } catch {
+    return null;
+  }
+}
+
+function readableRun(row: DynamicRecord): StoredWorkflowRun | null {
+  const graph = runGraph(row);
+  return graph ? toRun(row, graph) : null;
+}
+
+function strictRun(row: DynamicRecord): StoredWorkflowRun {
+  const run = readableRun(row);
+  if (!run) throw new Error("Invalid SQLite column: workflow_runs.graph_json");
+  return run;
+}
+
+function toRun(row: DynamicRecord, graph: WorkflowGraph): StoredWorkflowRun {
   return {
     id: requiredStringColumn(row, "run_id"),
     workflowId: requiredStringColumn(row, "workflow_id"),

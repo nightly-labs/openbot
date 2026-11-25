@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { isCauseCode } from "@openbot/telemetry";
 import { visibleDynamicTools } from "../src/backend/agent/tool-catalog";
 import { FAILOVER_CAUSES } from "../src/backend/agent/turn-lifecycle";
@@ -274,6 +275,20 @@ try {
   report.turns.ownRefusedTool = ownRefused;
   assert.equal(ownRefused.status, "failed", "The turn fails.");
   assert.equal(refusedDrops.length, 1, "No server of OpenBot is left out.");
+  const stopped = sourceText("error.provider.antigravityTurnStopped");
+  assert.equal(ownRefused.error, stopped, "The turn shows the plain message, not the CLI's text.");
+
+  const failures: Record<string, TurnResult> = {};
+  for (const word of ["FAIL_KEY", "FAIL_OTHER", "FAIL_QUIET"]) {
+    const turn = await runTurn(refusedClient, refusedThread, { text: word, timeoutMs: 30_000 });
+    failures[word] = turn;
+    report.turns[word] = turn;
+    assert.equal(turn.status, "failed", `The ${word} turn fails.`);
+  }
+  assert.equal(failures.FAIL_KEY?.error, sourceText("error.provider.geminiKeyRefused"), "A refused key is named.");
+  assert.equal(failures.FAIL_OTHER?.error, stopped, "An unknown cause gives the plain message.");
+  assert.equal(failures.FAIL_QUIET?.error, stopped, "A log with no cause gives the plain message.");
+  assert.equal(refusedDrops.length, 1, "No server is left out for these failures.");
 
   const dropsBefore = refusedDrops.length;
   const answerThread = await startThread(refusedClient, { cwd: refusedWorkspace });

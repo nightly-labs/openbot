@@ -4,6 +4,7 @@ import type { ImageFitResult } from "../backend/agent/image-reader";
 const MAX_EDGE = 2048;
 const MAX_KEPT_BYTES = 3 * 1024 * 1024;
 const MAX_PIXELS = 120_000_000;
+const SCREENSHOT_JPEG_QUALITY = 85;
 export const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 const STORED_PIXEL: Record<number, (x: number, y: number, width: number, height: number) => [number, number]> = {
@@ -15,6 +16,15 @@ const STORED_PIXEL: Record<number, (x: number, y: number, width: number, height:
   7: (x, y, width, height) => [width - 1 - y, height - 1 - x],
   8: (x, y, width) => [width - 1 - y, x],
 };
+
+export function compactScreenshot(png: Buffer): Buffer | null {
+  if (png.length < 24 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) return null;
+  if (png.readUInt32BE(16) * png.readUInt32BE(20) > MAX_PIXELS) return null;
+  const image = nativeImage.createFromBuffer(png);
+  if (image.isEmpty()) return null;
+  const jpeg = image.toJPEG(SCREENSHOT_JPEG_QUALITY);
+  return jpeg.length > 0 && jpeg.length < png.length ? jpeg : null;
+}
 
 export function fitImageForAgent(bytes: Uint8Array): ImageFitResult {
   const file = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);

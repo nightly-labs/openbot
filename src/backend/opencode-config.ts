@@ -1,4 +1,9 @@
-import type { CustomProviderHarness, CustomProviderHeader, CustomProviderModel } from "@openbot/contracts/ipc";
+import {
+  type CustomProviderHarness,
+  type CustomProviderHeader,
+  type CustomProviderModel,
+  customModelKey,
+} from "@openbot/contracts/ipc";
 
 export interface CustomProviderConfig {
   readonly id: string;
@@ -28,6 +33,7 @@ interface OpenCodeProviderOptions {
 }
 
 interface OpenCodeModelEntry {
+  readonly id?: string;
   readonly name: string;
   readonly limit?: { readonly context: number; readonly output: number };
   readonly variants?: Readonly<Record<string, { readonly reasoningEffort: string }>>;
@@ -42,6 +48,7 @@ interface OpenCodeProviderEntry {
 }
 
 interface OpenCodeNativeModelEntry {
+  readonly modelID?: string;
   readonly name: string;
   readonly limit?: { readonly context: number; readonly output: number };
   readonly capabilities?: { readonly input: readonly string[]; readonly output: readonly string[] };
@@ -77,12 +84,17 @@ const OPENCODE_TITLE_OFF = { title: { disable: true } } as const;
 export const OPENCODE_PROFILE_CONFIG: OpenCodeConfigBase = { permission: { "*": "deny", bash: "ask", read: "ask" } };
 
 export const OPENCODE_AGENT_CONFIG: OpenCodeConfigBase = {
-  permission: { "opencode_session_*": "deny", "opencode_worktree_*": "deny" },
+  permission: {
+    "opencode_session_*": "deny",
+    "opencode_worktree_*": "deny",
+    automation_create: "deny",
+    automation_resume: "deny",
+  },
 };
 
 const OPENCODE_CONFIG_ENV = "OPENCODE_CONFIG_CONTENT";
 
-const OPENCODE_GO_PROVIDER = "opencode-go";
+export const OPENCODE_GO_PROVIDER = "opencode-go";
 
 const OPENCODE_GO_ADVICE = "OpenCode listed no model. Add an OpenCode Go key to continue.";
 
@@ -126,10 +138,11 @@ function providerEntry(provider: CustomProviderConfig): OpenCodeProviderEntry {
         : {}),
     },
     models: Object.fromEntries(
-      provider.models.map((model) => [
-        model.id,
-        modelEntry(model, provider.withoutReasoning?.includes(model.id) === true),
-      ]),
+      provider.models.map((model) => {
+        const key = customModelKey(provider.id, model.id);
+        const entry = modelEntry(model, provider.withoutReasoning?.includes(model.id) === true);
+        return [key, key === model.id ? entry : { id: model.id, ...entry }];
+      }),
     ),
   };
 }
@@ -192,8 +205,9 @@ function nativeProviderEntry(
   };
 }
 
-function nativeModelEntry({ name, limit, modalities, variants }: OpenCodeModelEntry): OpenCodeNativeModelEntry {
+function nativeModelEntry({ id, name, limit, modalities, variants }: OpenCodeModelEntry): OpenCodeNativeModelEntry {
   return {
+    ...(id ? { modelID: id } : {}),
     name,
     ...(limit ? { limit } : {}),
     ...(modalities ? { capabilities: modalities } : {}),
@@ -229,6 +243,10 @@ function mergeOpenCodeConfig(
     ...(Object.keys(entries).length > 0 ? { provider: entries } : {}),
     ...(native ? { providers: native } : {}),
   };
+}
+
+export function clearedInheritedOpenCodeKeyEnv(apiKey: string | null): Record<string, string> {
+  return apiKey && process.env.OPENCODE_API_KEY?.trim() ? { OPENCODE_API_KEY: "" } : {};
 }
 
 export function openCodeConfigEnv(

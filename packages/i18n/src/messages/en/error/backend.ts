@@ -3,6 +3,8 @@ import { defineMessages } from "../../../message";
 export const messages = defineMessages("error.backend", {
   "error.backend.eventsUnavailable": "Events are not available on this host.",
   "error.backend.databaseIntegrity": "OpenBot database failed its integrity check.",
+  "error.backend.creditsHoldAdminOnly": "Only an owner or admin of this server can let agents use credits.",
+  "error.backend.creditsHoldShort": "There are not enough credits yet.",
   "error.backend.webhookRouteLimit": "A host can have at most {limit} webhook routines.",
   "error.backend.webhookSettingsInvalid": "Check the webhook settings and try again.",
   "error.backend.webhookSenderSecretInvalid":
@@ -52,6 +54,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserUserControlUnsupported": "This remote host does not support taking control of a browser tab.",
   "error.backend.browserSignInUnsupported": "This remote host cannot take a sign-in from this computer.",
   "error.backend.browserSignInOpenFailed": "OpenBot could not open the sign-in window.",
+  "error.backend.browserSignInLoadFailed":
+    "OpenBot could not load the page in the sign-in window. Check the internet connection, then open the sign-in window again.",
   "error.backend.browserSignInReadFailed": "OpenBot could not read the sign-in from the window.",
   "error.backend.browserStopUnsupported": "This remote host cannot stop a page load.",
   "error.backend.sharedDataLocalOnly": "Shared data is managed on the computer that runs these agents.",
@@ -63,6 +67,12 @@ export const messages = defineMessages("error.backend", {
     "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
   "error.backend.contextCompactionStopped":
     "Two compactions of this chat failed in a row, so OpenBot stops compacting it automatically. Each try sends the whole chat to the model and uses your plan limit. Select Compact now to try again, or start a new chat.",
+  "error.backend.contextCompactionRetrying":
+    "The provider could not compact this chat and tries again. New messages in this chat wait until the compaction ends. If it does not end soon, OpenBot stops it and sends your messages.",
+  "error.backend.contextCompactionFailed":
+    "Compacting this chat failed. The chat did not change. Messages that wait go to the agent now.",
+  "error.backend.contextCompactionTimedOut":
+    "Compacting this chat timed out, so OpenBot stopped it. The chat did not change. Messages that wait go to the agent now.",
   "error.backend.providerModelAtCapacity":
     "The model is at capacity. The provider tries again in a few minutes. To continue now, stop the turn and choose a different model.",
   "error.backend.providerRetrying":
@@ -87,6 +97,8 @@ export const messages = defineMessages("error.backend", {
     "The members of this channel have no conversation to compact yet. Compact it after a member answers in the channel.",
   "error.backend.channelCompactNotSupported":
     "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
+  "error.backend.channelCompactProviderUnavailable":
+    "The provider of the channel members does not work now. Refresh the providers, then compact the channel again.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelArchiveRunning": "Stop the running work in this channel, then delete it.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
@@ -103,6 +115,13 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelRoutingFailed": "Routing failed. Choose a member or try again.",
   "error.backend.channelLeadTimedOut": "The channel lead did not answer in time. Choose a member or try again.",
   "error.backend.channelLeadFailed": "The channel lead could not route this message. Choose a member or try again.",
+  "error.backend.channelLeadBusy": "The lead's model is busy now. Try again in a few minutes, or choose a member.",
+  "error.backend.channelLeadOffline": "The lead's model lost its connection. Try again, or choose a member.",
+  "error.backend.channelLeadSignIn": "The lead's provider sign-in expired. Sign in again, or choose a member.",
+  "error.backend.channelLeadModelGone":
+    "The lead's model is not available. Choose another model for the lead, or choose a member.",
+  "error.backend.channelLeadRefused":
+    "The lead's model refused this request. Choose a member, or choose another model for the lead.",
   "error.backend.channelRequestMemberRequired": "Choose a member for this request.",
   "error.backend.channelDeliveryNotCreated": "Channel delivery was not created.",
   "error.backend.channelAssignmentStopped": "This channel assignment has been stopped or replaced.",
@@ -123,6 +142,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.routineRunFailedNoReason":
     "The run stopped with an error, but no reason came with it. Open the run to see what the agent did.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
+  "error.backend.turnStartUnconfirmed":
+    "{provider} did not confirm in time that it started this message. OpenBot does not send it again, so the work does not run twice. OpenBot waits up to 5 minutes for the agent to start.",
+  "error.backend.turnStartAbandoned": "The agent did not start this message in 5 minutes. Send the message again.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",
   "error.backend.channelMemoryLimit": "A channel can have up to {limit} memories.",
@@ -240,8 +262,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
   "error.backend.mcpServerInvalid": "OpenBot cannot save this MCP server configuration.",
+  "error.backend.mcpHeaderNameInvalid":
+    "Header names cannot contain spaces or symbols such as : ( ) /. Use a name such as Authorization, and put the key or token in Value.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",
   "error.backend.mcpSignInNotAccepted": "The server did not accept that sign-in.",
+  "error.backend.mcpSignInGrantRefused":
+    "The server did not accept the sign-in. Sign in again. If the problem continues, make sure that your account is on the same site or region as this app.",
   "error.backend.mcpSignInAccountRefused":
     "The server refused the account that you signed in with. Check that this account can use the service. To use another account, sign out, then sign in again.",
   "error.backend.mcpSignInClientRefused":
@@ -264,6 +290,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpSignInOnHost": "This server asks for a sign-in. Sign in to it in OpenBot on the host computer.",
   "error.backend.mcpSignInNeedsHttps":
     "This server asks for a sign-in, and OpenBot signs in only over https. Change the URL to {url}.",
+  "error.backend.mcpSignInOtherAddress":
+    "This server signs in only at {url}. Change the URL to this address, then sign in again.",
   "error.backend.mcpSignInCancelled": "The sign-in was cancelled.",
   "error.backend.mcpSignInTimedOut": "The sign-in was not finished in the browser.",
   "error.backend.mcpSignInRefused": "The sign-in page refused access. Sign in again.",
@@ -275,7 +303,11 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerExitedWithOutput": "The server stopped before it answered. It wrote: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "The server did not start, because its download failed. Check the internet connection, then try again.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpServerProgramMissing":
+    "OpenBot could not start the MCP server {name}, because its program is not installed on the computer that runs OpenBot. Install the app that gives {name} on that computer, or turn {name} off in Marketplace, Apps.",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopped waiting before the server started, so its agents do not get the tools of this server.",
   "error.backend.mcpServerStoppedDuringCall": "The MCP server stopped before it answered this call.",
@@ -283,6 +315,8 @@ export const messages = defineMessages("error.backend", {
     "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open {name} in Marketplace, Apps, and choose Sign in.",
+  "error.backend.mcpServerKeyForProvider":
+    "{provider} could not use the MCP server {name}, because the server asks for a key. Open {name} in Marketplace, Apps, choose Edit, and enter the correct key under Headers.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} could not start the MCP server {name}. Open {name} in Marketplace, Apps, and choose Test connection to see the cause.",
   "error.backend.mcpServerFailedInProvider":
@@ -405,6 +439,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
   "error.backend.browserSystemProxyFailed":
     "The proxy in the settings of the computer that runs OpenBot does not answer or refused the connection, so the page did not open. Check the proxy settings of that computer.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "The site or the proxy in the settings of the computer that runs OpenBot closed the connection with no answer, so the page did not open. If no site opens, check the proxy settings of that computer.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "The site or the proxy of this browser profile closed the connection with no answer, so the page did not open. If no site opens, check the proxy of the profile.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -413,6 +451,8 @@ export const messages = defineMessages("error.backend", {
     "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":
     "This server is low on memory, so the browser cannot open another tab. Close a tab, or wait for other agents to finish.",
+  "error.backend.browserNoMemory":
+    "This server is almost out of memory, so the browser cannot open a tab now. Wait for other agents to finish, then try again.",
   "error.backend.browserOpenFailed": "Unable to open {url}: {reason}",
   "error.backend.popupSecureInput":
     "Popups are blocked during secure input. Finish or cancel secure input, then retry from the page.",

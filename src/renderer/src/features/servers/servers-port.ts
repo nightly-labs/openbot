@@ -69,6 +69,7 @@ export interface ServersPort {
     | "reorder"
     | "retryConnection"
     | "select"
+    | "setHidden"
     | "setMuted"
     | "setNotificationLevel"
   >;

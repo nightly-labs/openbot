@@ -34,6 +34,8 @@ export const messages = {
     "A conexão com o computador anfitrião está lenta demais para a imagem. Tente novamente: a próxima conexão usará uma qualidade mais baixa.",
   "error.remote.streamTooSlow":
     "A conexão com o computador anfitrião está lenta demais para a imagem. Use uma rede mais rápida e tente novamente.",
+  "error.remote.noPictureSwitchEncoder":
+    "O computador anfitrião não enviou nenhuma imagem. Tente novamente: a próxima conexão usa uma configuração de vídeo que funciona em mais computadores.",
   "error.remote.teamSessionExpired": "A sessão da equipe expirou.",
   "error.remote.finishTestBeforeSwitch": "Conclua o teste de área de trabalho remota antes de trocar de tela.",
   "error.remote.displayNotFound": "Tela remota não encontrada.",
@@ -98,7 +100,11 @@ export const messages = {
     "O OpenBot não pode verificar este servidor porque a chave de segurança dele está ausente ou mudou. Peça ao proprietário do servidor para verificá-lo.",
   "error.remote.connectionNotStarted":
     "O OpenBot não conseguiu iniciar a conexão com este servidor. Se isso continuar, feche o OpenBot e abra-o novamente.",
-  "error.remote.hostDidNotConnect": "O computador anfitrião WebRTC não se conectou.",
+  "error.remote.connectionServiceUnreachable":
+    "Este computador não consegue acessar o serviço de conexão do OpenBot. Verifique a conexão com a internet. O OpenBot se reconecta automaticamente.",
+  "error.remote.serverAnswerTimeout": "O servidor não respondeu a tempo. O OpenBot se reconecta automaticamente.",
+  "error.remote.signInConnectionClosed":
+    "A conexão com o servidor foi fechada durante o início da sessão. Se isso continuar, verifique se a data e a hora estão corretas no servidor e neste dispositivo.",
   "error.remote.connectionCancelled": "A conexão remota foi cancelada.",
   "error.remote.hostDisconnected":
     "A conexão com o servidor foi perdida. Verifique se a ação foi concluída e tente novamente.",

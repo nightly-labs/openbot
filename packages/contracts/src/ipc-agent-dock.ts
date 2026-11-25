@@ -95,6 +95,7 @@ export interface AgentDockMessage {
   kind: "text" | "error";
   body: string;
   attachments: AttachmentSummary[];
+  visual?: boolean;
 }
 
 export interface AgentDockApproval {
@@ -232,6 +233,7 @@ export type AgentDockAction =
   | { type: "move"; serverId: string; seat: AgentDockSeatRef; before: AgentDockSeatRef | null }
   | { type: "send"; serverId: string; seat: AgentDockSeatRef; text: string; clientMessageId: string }
   | { type: "open-agent"; serverId: string; agentId: string }
+  | { type: "open-browser-takeover"; serverId: string; agentId: string; tabId: string }
   | { type: "open-channel"; serverId: string; channelId: string }
   | { type: "open-window"; serverId: string; agentId: string }
   | {
@@ -263,7 +265,7 @@ export type AgentDockAction =
   | { type: "open-settings" }
   | { type: "hide" };
 
-export type AboveAppsSupport = "restart" | "unsupported";
+export type AboveAppsSupport = "restart" | "unsupported" | "no-compositor";
 
 export interface SetAgentDockXWaylandInput {
   enabled: boolean;
@@ -322,6 +324,8 @@ export function isAgentDockAction(value: unknown): value is AgentDockAction {
     case "open-agent":
     case "open-window":
       return isIdentifier(value.agentId);
+    case "open-browser-takeover":
+      return isIdentifier(value.agentId) && isIdentifier(value.tabId);
     case "open-channel":
       return isIdentifier(value.channelId);
     case "respond-approval":
@@ -605,7 +609,8 @@ function isMessage(value: unknown): value is AgentDockMessage {
     (value.senderMember === null || isConversationMessageSender(value.senderMember)) &&
     isOneOf(["text", "error"] as const, value.kind) &&
     isBoundedString(value.body, INPUT_LIMITS.messageText) &&
-    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary)
+    isList(value.attachments, INPUT_LIMITS.attachments, isAttachmentSummary) &&
+    (value.visual === undefined || isBoolean(value.visual))
   );
 }
 

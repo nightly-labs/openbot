@@ -112,6 +112,8 @@ type Story = StoryObj<typeof meta>;
 
 export const Starting: Story = { args: { phase: "starting" } };
 
+export const DownloadingVoiceModel: Story = { args: { phase: "starting", downloadProgress: 42 } };
+
 export const PushToTalk: Story = { args: { muted: true } };
 
 export const Talking: Story = { args: { talking: true, levels: SPEECH } };

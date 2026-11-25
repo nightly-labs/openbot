@@ -29,6 +29,7 @@ import {
   validateMobileSession,
 } from "@/features/auth/api/mobile-auth";
 import { deleteComposerDrafts } from "@/features/chat/model/composer-drafts";
+import { deleteLocationAlwaysAllowed } from "@/features/chat/model/location-always-allowed";
 import { deleteSideQuestions } from "@/features/chat/model/side-questions";
 import { deleteAgentBackdrops } from "@/features/settings/model/chat-backdrop";
 import { deleteAgentAvatars } from "@/features/workspace/model/agent-avatar-cache";
@@ -58,6 +59,7 @@ function deletePhoneCopy() {
   void deleteWorkspaceCaches();
   deleteAgentBackdrops();
   deleteAgentAvatars();
+  deleteLocationAlwaysAllowed();
 }
 
 export function MobileSessionProvider({ children }: PropsWithChildren) {
@@ -77,6 +79,8 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       queryClient.removeQueries({ queryKey: queryKeys.accountSessions() });
       queryClient.removeQueries({ queryKey: queryKeys.hostedServerPlans() });
       queryClient.removeQueries({ queryKey: queryKeys.billing() });
+      queryClient.removeQueries({ queryKey: queryKeys.credits() });
+      queryClient.removeQueries({ queryKey: queryKeys.creditActivity() });
       queryClient.removeQueries({ queryKey: queryKeys.referrals() });
       deleteComposerDrafts();
       deleteSideQuestions();

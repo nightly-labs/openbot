@@ -30,7 +30,7 @@ import {
   channelRoutingConversationEvent,
   isAgentAnswer,
   isContextResetMarker,
-  isMessagingUndeliveredMarker,
+  isNoAnswerNotice,
   marketplaceSuggestionEvent,
   mcpSignInEvent,
   parseConversationPlanText,
@@ -69,7 +69,7 @@ export type ChatMessage =
       standalone: boolean;
     }
   | { id: string; kind: "context-reset" }
-  | { id: string; kind: "notice"; text: string }
+  | { id: string; kind: "no-answer"; text: string }
   | { id: string; kind: "app-suggestion"; appId: string }
   | { id: string; kind: "mcp-sign-in"; mcpServerId: string }
   | {
@@ -205,7 +205,7 @@ const projectedQuestions = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedMemoryChanges = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedRoutines = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedResets = new WeakMap<ConversationMessage, ChatMessage>();
-const projectedNotices = new WeakMap<ConversationMessage, ChatMessage>();
+const projectedNoAnswers = new WeakMap<ConversationMessage, ChatMessage>();
 const projectedUpdates = new WeakMap<ConversationMessage, ChatMessage>();
 
 export interface ProgressUpdates {
@@ -457,9 +457,9 @@ export function projectChatMessages(
       );
       continue;
     }
-    if (isMessagingUndeliveredMarker(message)) {
+    if (isNoAnswerNotice(message)) {
       result.push(
-        projectedMarker(projectedNotices, message, () => ({ id: message.id, kind: "notice", text: message.text })),
+        projectedMarker(projectedNoAnswers, message, () => ({ id: message.id, kind: "no-answer", text: message.text })),
       );
       continue;
     }

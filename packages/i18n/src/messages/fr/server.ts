@@ -22,6 +22,8 @@ export const messages = {
   "server.connection.loadingHint": "Vous pouvez sélectionner un autre serveur pendant le chargement de celui-ci.",
   "server.connection.cachedHint":
     "Le contenu chargé et les brouillons sont conservés. Les actions du serveur reprendront après la reconnexion.",
+  "server.connection.computerOffline":
+    "{name} est hors ligne. Vérifiez que son ordinateur est allumé, qu'OpenBot est ouvert et que Publier ce serveur est activé dans Réglages du serveur > Membres.",
   "server.connection.conversationFailed": "Impossible de charger la conversation. Réessayez.",
   "server.connection.panelsFailed": "Certains panneaux de l’espace de travail n’ont pas pu se charger. Réessayez.",
   "server.connection.retry": "Réessayer",
@@ -228,6 +230,9 @@ export const messages = {
   "server.rail.delete": "Supprimer le serveur",
   "server.rail.hide": "Masquer le serveur",
   "server.rail.showLocal": "Afficher {name}",
+  "server.rail.hiddenServers": "Serveurs masqués",
+  "server.rail.hideFailed": "Impossible de masquer {name}",
+  "server.rail.showFailed": "Impossible d’afficher {name}",
   "server.plan.daysLeft": {
     one: "{count} jour",
     other: "{count} jours",
@@ -355,6 +360,7 @@ export const messages = {
     "Affiche la page CRM aux propriétaires et administrateurs, permet aux agents de lire le CRM et synchronise Stripe. Si vous le désactivez, les données restent.",
   "server.settings.agentDefaultsTitle": "Valeurs par défaut des agents",
   "server.settings.threadsCard": "Fils et fuseau horaire",
+  "server.settings.creditsCard": "Crédits",
   "server.settings.memoryTitle": "Mémoire",
   "server.settings.memoryDescription": "Choisir ce que les agents de ce serveur retiennent et apprennent.",
   "server.settings.memoriesCard": "Souvenirs",
@@ -394,6 +400,30 @@ export const messages = {
     "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
+  "server.settings.connectionTitle": "Connexion",
+  "server.settings.signalHome": "Serveur Signal",
+  "server.settings.signalHomeDescription":
+    "Les membres se connectent à ce serveur via ce serveur Signal. Un serveur Signal avec une latence plus faible donne des connexions plus rapides.",
+  "server.settings.signalHomeFallback":
+    "{chosen} ne répond pas. Le serveur utilise {name} jusqu'à ce que {chosen} réponde à nouveau.",
+  "server.settings.signalHomeMoving": "Le serveur passe à {name}. Les membres se reconnectent dans quelques secondes.",
+  "server.settings.signalHomeLoadFailed": "Impossible de charger les serveurs Signal.",
+  "server.settings.signalHomeAutomatic": "Automatique (le plus proche)",
+  "server.settings.signalHomeAutomaticUsing": "Automatique ({name})",
+  "server.settings.signalHomeOption": "{name} · {latency}",
+  "server.settings.signalHomeLatency": "{latency} ms",
+  "server.settings.signalHomeNoAnswer": "Pas de réponse",
+  "server.settings.signalHomePlaceHelsinki1": "Helsinki 1",
+  "server.settings.signalHomePlaceHelsinki2": "Helsinki 2",
+  "server.settings.signalHomePlaceSanJose": "San José",
+  "server.settings.signalHomePlaceSydney": "Sydney",
+  "server.settings.signalHomePlaceSingapore": "Singapour",
+  "server.settings.voiceModel.section": "Reconnaissance vocale",
+  "server.settings.voiceModel.description":
+    "Les agents de ce serveur utilisent ce modèle pour transcrire le son des vidéos sans sous-titres.",
+  "server.settings.voiceModel.loadFailed": "Impossible de charger le modèle de reconnaissance vocale du serveur.",
+  "server.settings.voiceModel.group": "Sur ce serveur",
+  "server.settings.voiceModel.removeLabel": "Supprimer {name} de ce serveur",
   "server.settings.turnLimit": "Fils en même temps",
   "server.settings.turnLimitDescription":
     "Le nombre de fils d’agents qui peuvent s’exécuter en même temps sur ce serveur. Plus de fils utilisent plus de mémoire.",
@@ -405,6 +435,12 @@ export const messages = {
   "server.settings.agentTaskLimitDescription":
     "Le nombre de fils que chaque agent sans limite propre peut exécuter en même temps.",
   "server.settings.agentTaskLimitDefault": "Par défaut ({count})",
+  "server.settings.mediaApprovalCredits": "Demander avant de dépenser plus de",
+  "server.settings.mediaApprovalCreditsUnit": "crédits",
+  "server.settings.mediaApprovalCreditsLoadFailed":
+    "Impossible de charger le seuil d’approbation des crédits de ce serveur.",
+  "server.settings.mediaApprovalAgents": "Les agents peuvent utiliser des crédits",
+  "server.settings.mediaApprovalAsk": "Demander quand des crédits sont nécessaires",
   "server.settings.memoryLimit": "Souvenirs par agent",
   "server.settings.memoryLimitDescription": "Nombre de souvenirs que chaque agent de ce serveur peut conserver.",
   "server.settings.memoryLimitLoadFailed": "Impossible de charger la limite de souvenirs de ce serveur.",
@@ -551,6 +587,7 @@ export const messages = {
     "Il n’y a pas de mot de passe distinct pour le bureau à distance. Les réglages ci-dessous choisissent qui peut contrôler cet ordinateur.",
   "server.desktop.componentInstalled": "Composant hôte installé",
   "server.desktop.componentNotInstalled": "Composant hôte non installé",
+  "server.desktop.needsX11Session": "Session X11 requise",
   "server.desktop.sessions": "Sans surveillance : {unattended} · Sessions actives : {active}/{max}",
   "server.desktop.unattendedEnabled": "activé",
   "server.desktop.unattendedUnavailable": "non disponible",
@@ -634,7 +671,7 @@ export const messages = {
   "server.update.waitingFor": "En attente : {reasons}.",
   "server.update.disabledTitle": "Les mises à jour à distance sont désactivées",
   "server.update.disabledDescription":
-    "L’utilisateur de {name} a désactivé les mises à jour par les membres du serveur. Demandez-lui de mettre à jour OpenBot ou d’activer ce réglage.",
+    "L’utilisateur de {name} a désactivé les mises à jour par les membres du serveur. Demandez-lui de mettre à jour OpenBot, ou d’ouvrir Réglages > Mises à jour sur son ordinateur et d’activer « Autoriser les mises à jour par les membres du serveur ».",
   "server.update.managedTitle": "Un Host Manager contrôle les mises à jour",
   "server.update.managedDescription": "OpenBot Host Manager met à jour {name}. Contactez l’administrateur de l’hôte.",
   "server.update.unsupportedTitle": "{name} ne peut pas se mettre à jour",

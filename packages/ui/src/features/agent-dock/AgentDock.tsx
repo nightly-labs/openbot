@@ -303,6 +303,10 @@ export function AgentDock(props: AgentDockProps) {
     return next;
   });
   const seatFor = (id: string) => seatProps().get(id);
+  const firstTemporaryAfterSaved = createMemo(() => {
+    const index = state.seats.findIndex((id) => seatFor(id)?.temporary === true);
+    return index > 0 ? state.seats[index] : undefined;
+  });
   const seatAgent = (agentId: string) => {
     const seat = seatFor(agentDockSeatKey({ kind: "agent", id: agentId }));
     return seat?.kind === "agent" ? seat.agent : undefined;
@@ -925,7 +929,8 @@ export function AgentDock(props: AgentDockProps) {
     if (!props.onMove || event.button !== 0 || endSeatDrag || leaving.has(id) || !state.seats.includes(id)) return;
     const element = event.currentTarget;
     const pointerId = event.pointerId;
-    const startY = event.clientY;
+    const stageTop = () => stage.getBoundingClientRect().top;
+    const startY = event.clientY - stageTop();
     const springs = seatSprings(id);
     const initial = [...state.seats];
     let order = initial;
@@ -951,8 +956,9 @@ export function AgentDock(props: AgentDockProps) {
     };
     const scroll = () => {
       const view = seatScroll.getBoundingClientRect();
-      const above = view.top + SEAT_FADE - pointerY;
-      const below = pointerY - (view.bottom - SEAT_FADE);
+      const top = stageTop();
+      const above = view.top - top + SEAT_FADE - pointerY;
+      const below = pointerY - (view.bottom - top - SEAT_FADE);
       const step = above > 0 ? -above : below > 0 ? below : 0;
       const before = seatScroll.scrollTop;
       if (step !== 0) seatScroll.scrollTop = before + step * SEAT_DRAG_SCROLL;
@@ -970,7 +976,7 @@ export function AgentDock(props: AgentDockProps) {
     };
     const move = (moved: PointerEvent) => {
       if (moved.pointerId !== pointerId) return;
-      pointerY = moved.clientY;
+      pointerY = moved.clientY - stageTop();
       if (!started && Math.abs(pointerY - startY) < SEAT_DRAG_START) return;
       if (!started) start();
       follow();
@@ -1255,6 +1261,7 @@ export function AgentDock(props: AgentDockProps) {
                     }}
                     style={{ left: `${DOCK_PAD}px` }}
                     data-dragging={draggedSeat() === id ? "" : undefined}
+                    data-temporary-start={firstTemporaryAfterSaved() === id ? "" : undefined}
                   >
                     <Show when={seatFor(id)}>
                       {(seat) => (
@@ -1504,6 +1511,12 @@ export function AgentDock(props: AgentDockProps) {
                     onOpenInMain={() => {
                       closeChat(false);
                       props.onOpenInMain(refOfKey(id));
+                    }}
+                    onOpenTakeover={(takeover) => {
+                      closeChat(false);
+                      const openTakeover = props.answers?.openTakeover;
+                      if (openTakeover) openTakeover(takeover);
+                      else props.onOpenInMain(refOfKey(id));
                     }}
                     onOpenWindow={openWindowFor(id)}
                     voice={chatVoice(id)}

@@ -80,6 +80,7 @@ export function TelegramTriggerRows(props: { id: string; locked: boolean }) {
         name={t("workflow.telegram.chat")}
         value={connectionId()}
         choices={[{ value: "", label: t("workflow.telegram.anyChat"), icon: () => <TelegramIcon /> }, ...chats()]}
+        placeholder={t("workflow.telegram.chooseChat")}
         disabled={props.locked}
         onChange={setConnectionId}
       />

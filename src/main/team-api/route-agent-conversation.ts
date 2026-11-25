@@ -109,6 +109,7 @@ export async function routeAgentConversation(
           },
           memberSender(member),
           isString(body.timezone) ? body.timezone : undefined,
+          context.fromChrome,
         ),
       ),
     );

@@ -306,6 +306,14 @@ export function isWithdrawalConsumer(
   return isEuVatCountry(details.country) || OTHER_WITHDRAWAL_COUNTRIES.has(details.country);
 }
 
+export function chargesVat(country: string, vatId: string | null): boolean {
+  return isEuVatCountry(country) && (country === VAT_SELLER_COUNTRY || !vatId);
+}
+
+export function vatAmount(net: number): number {
+  return Math.round((net * VAT_TAX_RATE.percentage) / 100);
+}
+
 export function vatIdPrefix(country: string): string {
   return VAT_ID_PREFIX[country] ?? country;
 }

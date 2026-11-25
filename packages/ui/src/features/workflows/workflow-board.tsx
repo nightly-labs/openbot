@@ -2,9 +2,13 @@ import {
   type AgentStepActivity,
   type RoutineSchedule,
   type StoredFileRow,
+  WORKFLOW_TRIGGER_FIELDS_FORMAT,
   type WorkflowAnswerProblem,
+  type WorkflowAnswerScope,
+  type WorkflowAnswerSource,
   type WorkflowGraph,
   workflowAnswerProblems,
+  workflowAnswerSources,
   workflowInputAnswerFields,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
@@ -200,10 +204,12 @@ export interface WfnBoard {
   setFields: (id: string, values: WfnFields) => void;
   githubTriggers: (id: string) => string[];
   answerNames: (id: string) => readonly string[];
+  answerSources: (id: string) => readonly WorkflowAnswerSource[];
   answerProblems: (id: string) => readonly WorkflowAnswerProblem[];
   inputs: (id: string, type: WfnPortType) => string[];
   duplicate?: ((id: string) => void) | undefined;
   status: (id: string) => WfnRunStatus | undefined;
+  waiting: (id: string) => boolean;
   progress: (id: string) => WorkflowAgentProgress | undefined;
   error: (id: string) => string | undefined;
   retry?: ((id: string) => void) | undefined;
@@ -231,8 +237,11 @@ export interface WfnBoard {
   resetSize?: ((id: string) => void) | undefined;
   results: (id: string) => readonly WfnResult[];
   pending: (id: string) => readonly WfnPending[];
+  creditsShort: (id: string) => boolean;
+  markCreditsShort: (id: string, short: boolean) => void;
   shown: (id: string) => WfnResult | undefined;
   newest: (id: string) => WfnResult | undefined;
+  picked: (id: string) => string | undefined;
   pick: (id: string, result: string) => void;
   record: (id: string, value: string, run?: number) => void;
   recordFailure: (id: string, message: string, run?: number) => void;
@@ -275,6 +284,7 @@ export interface BoardOptions {
   hides?: (edge: WfnEdge) => boolean;
   dropFiles?: (id: string, files: readonly File[]) => void;
   status?: (id: string) => WfnRunStatus | undefined;
+  waiting?: (id: string) => boolean;
   progress?: (id: string) => WorkflowAgentProgress | undefined;
   error?: (id: string) => string | undefined;
   retry?: (id: string) => void;
@@ -405,7 +415,10 @@ function copyFields(fields: Record<string, WfnFields>): Record<string, WfnFields
 
 export function isEditable(element: Element | null): boolean {
   return (
-    element instanceof HTMLElement && (element.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName))
+    element instanceof HTMLElement &&
+    (element.isContentEditable ||
+      element.classList.contains("wfn-name-field") ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName))
   );
 }
 
@@ -438,9 +451,29 @@ const NO_PENDING: readonly WfnPending[] = [];
 
 export const showsStrip = (board: WfnBoard, id: string) => board.results(id).length + board.pending(id).length > 1;
 
+export const makingTake = (board: WfnBoard, id: string): WfnPending | undefined => {
+  const takes = board.pending(id);
+  const [first] = takes;
+  if (first === undefined) return undefined;
+  const picked = board.picked(id);
+  if (picked !== undefined) return takes.find((take) => take.id === picked);
+  const shown = board.shown(id);
+  return shown === undefined || (shown.id === board.newest(id)?.id && shown.at < first.at) ? first : undefined;
+};
+
 export function createBoard(options: BoardOptions) {
   const { t } = useText();
   const nameOf = (element: Element | null | undefined) => nodeName(element, t("workflow.board.stepFallback"));
+  const [creditsShort, setCreditsShort] = createSignal<ReadonlySet<string>>(new Set());
+  const markCreditsShort = (id: string, short: boolean) => {
+    setCreditsShort((current) => {
+      if (current.has(id) === short) return current;
+      const next = new Set(current);
+      if (short) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
   const [state, setState] = createStore<BoardState>({
     selection: untrack(() => (options.selected ? [options.selected] : [])),
     removed: [],
@@ -640,11 +673,14 @@ export function createBoard(options: BoardOptions) {
     });
   };
 
+  const answerScope = (): WorkflowAnswerScope => ({
+    triggerFields: (options.features?.()?.format ?? 1) >= WORKFLOW_TRIGGER_FIELDS_FORMAT,
+  });
   const answerProblemsByNode = createMemo(
     () => {
       const graph = options.graph?.();
       const byNode = new Map<string, WorkflowAnswerProblem[]>();
-      for (const problem of graph ? workflowAnswerProblems(graph) : [])
+      for (const problem of graph ? workflowAnswerProblems(graph, answerScope()) : [])
         byNode.set(problem.nodeId, [...(byNode.get(problem.nodeId) ?? []), problem]);
       return byNode;
     },
@@ -853,7 +889,11 @@ export function createBoard(options: BoardOptions) {
     },
     answerNames: (id) => {
       const graph = options.graph?.();
-      return graph ? [...workflowInputAnswerFields(graph, id).keys()] : [];
+      return graph ? [...workflowInputAnswerFields(graph, id, answerScope()).keys()] : [];
+    },
+    answerSources: (id) => {
+      const graph = options.graph?.();
+      return graph ? workflowAnswerSources(graph, id, graph.edges, answerScope()) : [];
     },
     answerProblems: (id) => answerProblemsByNode().get(id) ?? NO_ANSWER_PROBLEMS,
     inputs: (id, type) =>
@@ -883,6 +923,7 @@ export function createBoard(options: BoardOptions) {
     features: () => options.features?.(),
     github: () => options.github?.(),
     status: (id) => options.status?.(id),
+    waiting: (id) => options.waiting?.(id) ?? false,
     progress: (id) => options.progress?.(id),
     error: (id) => options.error?.(id),
     retry: options.retry,
@@ -910,6 +951,8 @@ export function createBoard(options: BoardOptions) {
     resetSize: options.resetSize,
     results: (id) => resultsOf(id),
     pending: (id) => options.pendingOf?.(id) ?? NO_PENDING,
+    creditsShort: (id) => creditsShort().has(id),
+    markCreditsShort,
     shown: (id) => {
       const latest = latestOf(id);
       const picked = state.picked[id];
@@ -918,6 +961,10 @@ export function createBoard(options: BoardOptions) {
       return resultsOf(id).find((result) => result.id === picked.result) ?? latest;
     },
     newest: latestOf,
+    picked: (id) => {
+      const picked = state.picked[id];
+      return picked !== undefined && latestOf(id)?.id === picked.newest ? picked.result : undefined;
+    },
     pick: (id, result) => {
       const newest = latestOf(id)?.id;
       setState((draft) => {
@@ -968,8 +1015,10 @@ export function createBoard(options: BoardOptions) {
       ports.set(key, entry);
       const nodeElement = entry.element.closest("[data-node-id]");
       if (nodeElement) resize.observe(nodeElement);
+      resize.observe(entry.element);
       schedule();
       return () => {
+        resize.unobserve(entry.element);
         if (ports.get(key) === entry) ports.delete(key);
         if (nodeElement && ![...ports.values()].some((other) => other.node === entry.node))
           resize.unobserve(nodeElement);

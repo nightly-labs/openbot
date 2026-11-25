@@ -10,6 +10,7 @@ import { Button, Spinner, Typography } from "heroui-native";
 import CircleX from "lucide-react-native/icons/circle-x";
 import CornerUpRight from "lucide-react-native/icons/corner-up-right";
 import GitFork from "lucide-react-native/icons/git-fork";
+import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import {
   type ComponentProps,
   createContext,
@@ -37,6 +38,7 @@ import { GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import Animated, {
   Easing,
   Extrapolation,
+  FadeIn,
   FadeInDown,
   interpolate,
   Keyframe,
@@ -179,6 +181,9 @@ const FOLLOW_END = { animated: false, on: { dataChange: true, itemLayout: true, 
 const USER_MESSAGE_ENTRANCE = FadeInDown.duration(240)
   .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .withInitialValues({ opacity: 0, transform: [{ translateY: 12 }] })
+  .reduceMotion(ReduceMotion.System);
+const PROGRESS_UPDATE_ENTRANCE = FadeIn.duration(220)
+  .easing(Easing.bezier(0.23, 1, 0.32, 1))
   .reduceMotion(ReduceMotion.System);
 const REPLY_SIZE = { duration: 180, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.System };
 const REPLY_APPEAR = { duration: 220, easing: Easing.bezier(0.23, 1, 0.32, 1), reduceMotion: ReduceMotion.Never };
@@ -388,12 +393,13 @@ interface MessageRowShared {
   };
 }
 
-function MarkerRow({ muted, label }: { muted: ViewStyle["backgroundColor"]; label: string }) {
+function ContextResetMarkerRow({ muted }: { muted: ViewStyle["backgroundColor"] }) {
+  const { t } = useText();
   return (
     <View accessible className="flex-row items-center gap-3 py-2">
       <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
-      <Typography.Paragraph type="body-sm" style={{ color: muted, flexShrink: 1, textAlign: "center" }}>
-        {label}
+      <Typography.Paragraph type="body-sm" style={{ color: muted }}>
+        {t("mobile.chat.contextReset")}
       </Typography.Paragraph>
       <View className="h-px flex-1" style={{ backgroundColor: muted, opacity: 0.35 }} />
     </View>
@@ -555,7 +561,7 @@ const MessageRow = memo(function MessageRow({
   selecting?: boolean;
   shared: MessageRowShared;
 }) {
-  const { t, sourceText } = useText();
+  const { t } = useText();
   const [selectionHeight, setSelectionHeight] = useState(0);
   const waiting = awaitingFirstWord(message, shared, arriving, revealed);
   const bubble = message.kind === "message" && !outbox && !message.streaming && !waiting ? message : null;
@@ -704,6 +710,7 @@ const MessageRow = memo(function MessageRow({
     playback,
     animationEnabled: shared.animationActive && arriving,
     align: message.kind === "message" && message.author === "user" ? ("end" as const) : ("start" as const),
+    literalWordStars: message.kind === "message" && message.author === "user",
   };
   const bubbleFor = useCallback(
     (children: ReactNode, key?: string) =>
@@ -771,9 +778,9 @@ const MessageRow = memo(function MessageRow({
     ) : message.kind === "routine-run-group" ? (
       <RoutineRunGroupRow key={message.id} group={message} />
     ) : message.kind === "context-reset" ? (
-      <MarkerRow key={message.id} muted={muted} label={t("mobile.chat.contextReset")} />
-    ) : message.kind === "notice" ? (
-      <MarkerRow key={message.id} muted={muted} label={sourceText(message.text)} />
+      <ContextResetMarkerRow key={message.id} muted={muted} />
+    ) : message.kind === "no-answer" ? (
+      <NoAnswerNotice key={message.id} text={message.text} />
     ) : message.kind === "app-suggestion" ? (
       <ChatAppSuggestion key={message.id} serverId={serverId} messageId={message.id} appId={message.appId} />
     ) : message.kind === "mcp-sign-in" ? (
@@ -802,7 +809,13 @@ const MessageRow = memo(function MessageRow({
       <Animated.View
         key={message.id}
         entering={
-          arriving && !isFirstUser ? (message.author === "user" ? USER_MESSAGE_ENTRANCE : undefined) : undefined
+          arriving && !isFirstUser
+            ? message.author === "user"
+              ? USER_MESSAGE_ENTRANCE
+              : message.progress && shared.playbackActive
+                ? PROGRESS_UPDATE_ENTRANCE
+                : undefined
+            : undefined
         }
         className={
           message.author === "user" ? "max-w-full items-end self-end gap-2" : "max-w-full items-start self-start gap-2"
@@ -1304,6 +1317,20 @@ function TurnFailure({ reason }: { reason: string | undefined }) {
       <CircleX size={14} color={String(danger)} strokeWidth={2} style={{ marginTop: 2 }} />
       <Typography.Paragraph type="body-xs" numberOfLines={6} className="shrink text-danger-text">
         {text}
+      </Typography.Paragraph>
+    </View>
+  );
+}
+
+function NoAnswerNotice({ text }: { text: string }) {
+  const { sourceText } = useText();
+  const [warning] = useCSSVariable(["--openbot-warning-text"]);
+  const notice = sourceText(text);
+  return (
+    <View accessible accessibilityLabel={notice} className="flex-row items-start gap-1.5 self-start px-1">
+      <TriangleAlert size={14} color={String(warning)} strokeWidth={2} style={{ marginTop: 2 }} />
+      <Typography.Paragraph type="body-xs" numberOfLines={6} className="shrink text-warning-text">
+        {notice}
       </Typography.Paragraph>
     </View>
   );

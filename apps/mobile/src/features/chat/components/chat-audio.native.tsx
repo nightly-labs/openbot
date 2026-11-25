@@ -18,7 +18,7 @@ import type { AttachmentTint } from "./chat-attachment";
 import { shareMediaFile } from "./chat-video.native";
 import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
-import { useMediaFile } from "./use-media-file";
+import { mediaFileErrorText, useMediaFile } from "./use-media-file";
 
 const TIME_STEP = 0.1;
 const TABULAR = { fontVariant: ["tabular-nums" as const] };
@@ -118,7 +118,7 @@ function AudioCard({
   player,
 }: AudioAttachmentProps & { query: MediaFileQuery; uri: string | null; player: VideoPlayer | null }) {
   const text = useText();
-  const { t, format, sourceText } = text;
+  const { t, format } = text;
   const [muted, foreground] = useThemeColor(["muted", "foreground"]);
   const accentForeground = tint ? tint.foreground : String(foreground);
   const { width } = useWindowDimensions();
@@ -260,7 +260,7 @@ function AudioCard({
           <View className="flex-row items-center gap-2" style={{ height: WAVE_HEIGHT + 4 }}>
             {failed ? (
               <Typography.Paragraph type="body-xs" numberOfLines={1} className="min-w-0 flex-1 text-muted">
-                {query.error ? sourceText(query.error.message) : t("mobile.chat.audio.unplayable")}
+                {query.error ? mediaFileErrorText(query.error, text) : t("mobile.chat.audio.unplayable")}
               </Typography.Paragraph>
             ) : (
               <AudioWaveform

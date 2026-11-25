@@ -44,25 +44,42 @@ export function ChannelRecordsScreen({ section }: { section: "memories" | "memor
     available && !memorySection,
     [...queryKeys.channelInfo(queryScope, serverId, channelId, "routines"), "events"],
   );
+  const onceRoutinesEnabled = available && section === "routine" && Boolean(recordId);
+  const onceRoutines = useQuery({
+    ...options,
+    enabled: onceRoutinesEnabled,
+    queryKey: [...queryKeys.channelInfo(queryScope, serverId, channelId, "routines"), "once"],
+    queryFn: () => store.onceRoutines(serverId, channelId),
+  });
   const query = memorySection ? memories : routines;
-  const recordsPending = query.isPending || (eventsEnabled && eventRoutines.isPending);
-  const recordsError = query.isError || (eventsEnabled && eventRoutines.isError);
   const target = { id: channelId, serverId };
   const memory = memories.data?.find((item) => item.id === recordId);
-  const routine = routines.data?.find((item) => item.id === recordId);
+  const releasedRoutine = routines.data?.find((item) => item.id === recordId);
   const eventRoutine = eventRoutines.data?.find((item) => item.id === recordId);
+  const onceNeeded = onceRoutinesEnabled && !releasedRoutine && !eventRoutine;
+  const routine =
+    releasedRoutine ?? (onceRoutinesEnabled ? onceRoutines.data?.find((item) => item.id === recordId) : undefined);
+  const recordsPending =
+    query.isPending || (eventsEnabled && eventRoutines.isPending) || (onceNeeded && onceRoutines.isPending);
+  const recordsError = query.isError || (eventsEnabled && eventRoutines.isError);
+  const onceFailed = onceNeeded && onceRoutines.isError && !routine;
   const allRoutines = [...(routines.data ?? []), ...webhookRoutines];
   return (
     <SettingsContent>
       {!available ? <Typography.Paragraph>{t("mobile.channel.records.connect")}</Typography.Paragraph> : null}
       {recordsPending && (Boolean(recordId) || section === "memories" || section === "routines") ? (
         <Typography.Paragraph>{t("common.loading")}</Typography.Paragraph>
-      ) : recordsError && !query.data && !eventRoutines.data ? (
+      ) : (recordsError && !query.data && !eventRoutines.data) || onceFailed ? (
         <>
           <Typography.Paragraph accessibilityRole="alert">
             {t("mobile.channel.records.loadFailed")}
           </Typography.Paragraph>
-          <Button onPress={() => void query.refetch()}>
+          <Button
+            onPress={() => {
+              void query.refetch();
+              if (onceFailed) void onceRoutines.refetch();
+            }}
+          >
             <Button.Label>{t("common.tryAgain")}</Button.Label>
           </Button>
         </>

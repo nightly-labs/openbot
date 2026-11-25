@@ -321,7 +321,7 @@ try {
       const long = Array.from({ length: 60 }, (_, index) => `Line ${index} ${"x".repeat(60)}`).join("\n");
       const sent = await post(threads, connection, {
         text: long,
-        embeds: [{ title: "Report", url: `https://openbot.run/${SECRET}` }],
+        embeds: [{ title: "Report", url: `https://${SECRET}/report` }],
       });
       assert.equal(sent.success, false, "A post with a broken link was accepted.");
       assert.equal(sent.requests.length, 1);

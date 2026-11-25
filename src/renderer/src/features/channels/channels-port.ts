@@ -23,6 +23,12 @@ export interface ChannelsPort {
     Partial<Pick<OpenBotDesktopApi["agent"], "discardDraftAttachment" | "downloadAttachments">> &
     Partial<Pick<OpenBotDesktopApi["agent"], "deleteChannelMessage">> &
     Partial<Pick<OpenBotDesktopApi["agent"], "setChannelImage">> &
+    Partial<
+      Pick<
+        OpenBotDesktopApi["agent"],
+        "readMediaApproval" | "respondToMediaApproval" | "respondToCreditsHold" | "setCreditsAskMuted"
+      >
+    > &
     Partial<ChannelFoldersApi & Pick<OpenBotDesktopApi["agent"], "chooseChannelFolder">> &
     Partial<Pick<OpenBotDesktopApi["agent"], "clearChannelContext" | "compactChannelContext" | "deleteChannelHistory">>;
   eventRoutines?: EventRoutinesApi | undefined;

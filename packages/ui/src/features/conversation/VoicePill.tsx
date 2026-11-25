@@ -72,6 +72,7 @@ export interface VoicePillProps {
   muted: boolean;
   levels: readonly number[];
   error: string | null;
+  downloadProgress?: number | null | undefined;
   onToggleMute: () => void;
   talkMode: VoiceTalkMode;
   onTalkModeChange: (mode: VoiceTalkMode) => void;
@@ -92,6 +93,8 @@ export function VoicePill(props: VoicePillProps) {
   const { t, format } = useText();
   const speed = () => format.number(props.speed ?? 1);
   const push = () => props.talkMode === "push";
+  const downloadProgress = () => (props.phase === "starting" ? (props.downloadProgress ?? null) : null);
+  const downloading = () => downloadProgress() !== null;
   const hearing = () => props.phase === "listening" && !props.muted;
   const micOff = () => props.muted && !push();
   const live = () =>
@@ -102,6 +105,7 @@ export function VoicePill(props: VoicePillProps) {
     return props.muted ? "conversation.voice.phase.muted" : PHASE_LABELS.listening;
   };
   const filterId = `voice-pill-goo-${createUniqueId()}`;
+  const downloadLabelId = `voice-pill-download-${createUniqueId()}`;
   let dock!: HTMLDivElement;
   let body!: HTMLDivElement;
   let neck!: HTMLDivElement;
@@ -202,10 +206,13 @@ export function VoicePill(props: VoicePillProps) {
     },
   );
 
-  createEffect(push, (pushed) => {
-    talk.to(pushed ? 1 : 0);
-    if (ready) motion.kick();
-  });
+  createEffect(
+    () => push() || downloading(),
+    (wide) => {
+      talk.to(wide ? 1 : 0);
+      if (ready) motion.kick();
+    },
+  );
 
   onSettled(() => {
     measureTalk();
@@ -319,7 +326,7 @@ export function VoicePill(props: VoicePillProps) {
         <span class="voice-pill-phase sr-only" aria-live="polite">
           {t(phaseLabel())}
         </span>
-        <div class="voice-pill-talk-slot" ref={slot}>
+        <div class="voice-pill-talk-slot" data-downloading={downloading() ? "" : undefined} ref={slot}>
           <div class="voice-pill-wave" inert={push() ? true : undefined} ref={wave}>
             <VoiceWaveform
               levels={!push() && (hearing() || props.phase === "speaking") ? props.levels.slice(-PILL_LEVELS) : []}
@@ -341,6 +348,22 @@ export function VoicePill(props: VoicePillProps) {
             onStart={() => props.onTalkStart()}
             onEnd={() => props.onTalkEnd()}
           />
+          <Show when={downloading()}>
+            <div
+              class="voice-pill-download"
+              role="progressbar"
+              aria-labelledby={downloadLabelId}
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow={downloadProgress() ?? 0}
+              style={{ "--voice-pill-download": String((downloadProgress() ?? 0) / 100) }}
+            >
+              <span class="voice-pill-download-fill" aria-hidden="true" />
+              <span class="voice-pill-download-label" id={downloadLabelId}>
+                {t("conversation.voice.downloading", { progress: downloadProgress() ?? 0 })}
+              </span>
+            </div>
+          </Show>
         </div>
         <SlidingTabs.Root
           value={props.talkMode}

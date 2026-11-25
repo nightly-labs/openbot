@@ -67,9 +67,9 @@ export async function routeWorkflowFolders(
   const known = listed();
   const graphs = new Map<string, WorkflowGraph>();
   const shown = new Set<string>();
-  for (const { summary, graph } of await runWorkflowEffect(workflows.listWithGraphs())) {
+  for (const { summary, graph, needsNewerApp } of await runWorkflowEffect(workflows.listWithGraphs())) {
     graphs.set(summary.id, graph);
-    if (visibleGraph(graph, known)) shown.add(summary.id);
+    if (!needsNewerApp && visibleGraph(graph, known)) shown.add(summary.id);
   }
   const visible = (snapshot: WorkflowFoldersSnapshot) => json(200, shownFolders(snapshot, shown));
 

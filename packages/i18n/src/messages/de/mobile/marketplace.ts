@@ -107,6 +107,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Öffne die Anmeldeseite von {name}.",
   "mobile.marketplace.app.stepAllow": "Melde dich an und erlaube den Zugriff.",
   "mobile.marketplace.app.stepReturn": "Komm hierher zurück. {name} wird auf deinem Server verbunden.",
+  "mobile.marketplace.app.stepBlank": "Die letzte Seite lädt nicht. Das ist richtig.",
+  "mobile.marketplace.app.stepCopy": "Tippe auf die Adressleiste und kopiere die ganze Adresse.",
+  "mobile.marketplace.app.stepPaste": "Komm zurück zu OpenBot und füge die Adresse unten ein.",
   "mobile.marketplace.app.openSignIn": "Anmeldeseite öffnen",
   "mobile.marketplace.app.keySecure": "Der Schlüssel geht nur verschlüsselt an deinen Server.",
   "mobile.marketplace.app.connecting": "Verbindet",
@@ -123,8 +126,6 @@ export const messages = {
     "Diese App verlangt eine Anmeldung im Browser. Aktualisiere OpenBot auf dem Server oder verbinde die App auf dem Computer.",
   "mobile.marketplace.app.waiting": "Warten auf die Anmeldeseite…",
   "mobile.marketplace.app.openAgain": "Anmeldeseite erneut öffnen",
-  "mobile.marketplace.app.pasteHint":
-    "Am Ende öffnet die Seite eine Adresse, die nicht lädt. Kopiere diese Adresse und füge sie unten ein.",
   "mobile.marketplace.app.pasteLabel": "Adresse nach der Anmeldung",
   "mobile.marketplace.app.pasteInvalid": "Diese Adresse ist nicht das Ende dieser Anmeldung.",
   "mobile.marketplace.app.finishSignIn": "Anmeldung abschließen",
