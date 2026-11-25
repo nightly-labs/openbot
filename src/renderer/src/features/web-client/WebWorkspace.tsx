@@ -295,6 +295,7 @@ import {
   createAgentMessageDeleteAccess,
   readerCanDeleteMessage,
 } from "../conversation/message-delete-access";
+import { openChatFile } from "../conversation/open-chat-file";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { trackUsageLimitShown, usageLimitAskFrom } from "../conversation/usage-limit-ask";
 import { createCrmEnabled } from "../crm/crm-enabled";
@@ -3876,6 +3877,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         void runtime.agent
                           .openAttachment({ attachmentId: attachment.id, action: "download" })
                           .catch((error) => actionToast.error(text.errorMessage(error, t("attachment.error.download"))))
+                      }
+                      onOpenFile={(kind, agentId, path, asWritten) =>
+                        void openChatFile(runtime.agent, kind, agentId, path, asWritten).then((error) => {
+                          if (error) actionToast.error(error);
+                        })
                       }
                       approvals={workspace.state.approvals}
                       onRespondApproval={async (approval, decision) => {

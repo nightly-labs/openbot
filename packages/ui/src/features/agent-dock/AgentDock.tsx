@@ -54,6 +54,7 @@ import {
   type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockChatVoice,
+  type AgentDockFileOpener,
   type AgentDockPendingMessage,
   pendingMessageDelivered,
 } from "./AgentDockChat";
@@ -195,6 +196,7 @@ export interface AgentDockProps {
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  onOpenFile?: ((...file: Parameters<AgentDockFileOpener>) => Promise<string | null>) | undefined;
   answers?: AgentDockChatAnswers | undefined;
   onOpenSettings?: (() => void) | undefined;
   onHide?: (() => void) | undefined;
@@ -1057,6 +1059,21 @@ export function AgentDock(props: AgentDockProps) {
       }),
   );
 
+  const fileErrors = new Map<string, string>();
+
+  async function openFile(id: string, ...file: Parameters<AgentDockFileOpener>) {
+    const open = props.onOpenFile;
+    if (!open) return;
+    const error = await open(...file);
+    const shownFileError = fileErrors.get(id);
+    if (error) fileErrors.set(id, error);
+    else fileErrors.delete(id);
+    setState((draft) => {
+      if (error) draft.errors[id] = error;
+      else if (shownFileError !== undefined && draft.errors[id] === shownFileError) draft.errors[id] = null;
+    });
+  }
+
   async function send(id = state.open, draft?: string) {
     if (!id || state.sending[id]) return;
     const text = (draft ?? state.drafts[id] ?? "").trim();
@@ -1533,6 +1550,7 @@ export function AgentDock(props: AgentDockProps) {
                       props.onSelectAgent?.(agentId);
                     }}
                     onOpenLink={(url) => props.onOpenLink?.(url)}
+                    onOpenFile={props.onOpenFile ? (...file) => void openFile(id, ...file) : undefined}
                     answers={props.answers}
                   />
                 )}

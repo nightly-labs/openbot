@@ -80,6 +80,7 @@ import { latestVisibleAgentMessageId } from "../conversation/conversation-read-s
 import { useDesktopMediaApproval } from "../conversation/desktop-media-approval";
 import { createAgentMessageDeleteAccess, desktopAgentMessageDeleteAccess } from "../conversation/message-delete-access";
 import { narrationRows, placeTurnRowsByTime } from "../conversation/narration-rows";
+import { openChatFile, serverChatFileOpener } from "../conversation/open-chat-file";
 import { usageLimitAskFrom } from "../conversation/usage-limit-ask";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
@@ -889,6 +890,9 @@ function WindowAgentDock(props: { serverId: string }) {
       agents={dock.agents()}
       onSelectAgent={(agentId) => selectAgent(agentId)}
       onOpenLink={(url) => void appPort().openUrl(withOpenBotSource(url))}
+      onOpenFile={(kind, agentId, path, asWritten) =>
+        openChatFile(serverChatFileOpener(agentDockPort().agent, props.serverId), kind, agentId, path, asWritten)
+      }
       onOpenSettings={() => openAppSettings(null, "agent-dock")}
       onHide={() => setAgentDockPreference({ shown: false })}
       results={dock.results()}

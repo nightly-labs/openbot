@@ -27,6 +27,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { windowExtent, windowShape } from "../../window-shape";
+import { openChatFile, serverChatFileOpener } from "../conversation/open-chat-file";
 import {
   AGENT_DOCK_STRIP_FEEL,
   AGENT_DOCK_STRIP_REST,
@@ -574,6 +575,9 @@ export function AgentDockSurface() {
               void perform({ type: "open-agent", serverId: server, agentId }).catch(() => undefined)
             }
             onOpenLink={(url) => void perform({ type: "open-link", url }).catch(() => undefined)}
+            onOpenFile={(kind, agentId, path, asWritten) =>
+              openChatFile(serverChatFileOpener(agentDockPort().agent, server), kind, agentId, path, asWritten)
+            }
             onOpenSettings={() => void perform({ type: "open-settings" }).catch(() => undefined)}
             onHide={() => void perform({ type: "hide" }).catch(() => undefined)}
             results={results()}

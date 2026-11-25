@@ -50,6 +50,7 @@ import { readAgentSelection, writeAgentSelection } from "../agents/agent-selecti
 import { insertAtSelection, insertPastedText, rowAttachments } from "../conversation/composer-draft";
 import { latestVisibleAgentMessageId } from "../conversation/conversation-read-state";
 import { naturalThreadRows } from "../conversation/narration-rows";
+import type { ChatFileKind } from "../conversation/open-chat-file";
 import { importPastedFiles, type PastePreview, pastePreviewTracker } from "../conversation/stores/composer-actions";
 import { createTurnSteps } from "../conversation/turn-steps";
 import { createTurnStreamHold } from "../conversation/turn-stream-hold";
@@ -96,6 +97,9 @@ interface TasksViewProps {
   voice?: ((controls: TasksVoiceControls) => TasksVoiceAdapter) | undefined;
   onOpenLink: (url: string) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
+  onOpenFile?:
+    | ((kind: ChatFileKind, agentId: string | undefined, path: string, asWritten?: string) => void)
+    | undefined;
   files?: TaskFiles | undefined;
   mediaSource?: AttachmentMediaSource | undefined;
   downloads?: AttachmentDownloads | undefined;
@@ -823,6 +827,7 @@ export function TasksView(props: TasksViewProps) {
                   void runAction(() => props.source.stop(target, props.serverId), "conversation.tasks.error.stop");
               }}
               onOpenLink={props.onOpenLink}
+              onOpenFile={props.onOpenFile}
               onPreview={(attachment) => props.onAttachmentAction(attachment, "open")}
               onAttachmentAction={props.onAttachmentAction}
               mediaSource={props.mediaSource}
