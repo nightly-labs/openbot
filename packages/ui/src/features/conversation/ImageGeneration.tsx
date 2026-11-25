@@ -59,9 +59,10 @@ export function ImageGeneration(props: ImageGenerationProps) {
     const { naturalHeight, naturalWidth } = element;
     if (naturalWidth <= 0 || naturalHeight <= 0) return;
     const size = { width: naturalWidth, height: naturalHeight };
+    const fromCopy = element.src === untrack(copy);
     setImageSize(size);
     const id = props.attachment?.id;
-    if (id) rememberMediaSize(element.src === untrack(copy) ? copySizeKey(id) : id, size);
+    if (id) rememberMediaSize(fromCopy ? copySizeKey(id) : id, size);
   };
   createEffect(
     () => imageUrl(),
