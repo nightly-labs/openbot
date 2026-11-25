@@ -34,13 +34,18 @@ export function quietRoutineRun(run: Pick<RoutineRun, "kind" | "source">): boole
   return run.kind === "scheduled" || run.source === "script" || run.source === "webhook";
 }
 
-export function quietTeammateDelivery(delivery: QueueDelivery): boolean {
+export type FollowsUpOwnMessage = (delivery: QueueDelivery) => boolean;
+
+function newTeammateMessage(delivery: QueueDelivery, followsUpOwnMessage: FollowsUpOwnMessage): boolean {
   return (
     delivery.sender.kind === "agent" &&
     delivery.sender.agentId !== delivery.recipientAgentId &&
-    delivery.expectsReply === false &&
-    !delivery.replyToMessageId
+    (!delivery.replyToMessageId || followsUpOwnMessage(delivery))
   );
+}
+
+export function quietTeammateDelivery(delivery: QueueDelivery, followsUpOwnMessage: FollowsUpOwnMessage): boolean {
+  return delivery.expectsReply === false && newTeammateMessage(delivery, followsUpOwnMessage);
 }
 
 export function answeredRequestId(delivery: QueueDelivery): string | null {
@@ -52,20 +57,19 @@ export function answeredRequestId(delivery: QueueDelivery): string | null {
     : null;
 }
 
-export function teammateRequest(delivery: QueueDelivery): boolean {
-  return (
-    delivery.sender.kind === "agent" &&
-    delivery.sender.agentId !== delivery.recipientAgentId &&
-    delivery.expectsReply !== false &&
-    !delivery.replyToMessageId
-  );
+export function teammateRequest(delivery: QueueDelivery, followsUpOwnMessage: FollowsUpOwnMessage): boolean {
+  return delivery.expectsReply !== false && newTeammateMessage(delivery, followsUpOwnMessage);
 }
 
 export function quietTeammateTurnDelivery(
   delivery: QueueDelivery,
   answered: (delivery: QueueDelivery) => boolean,
+  followsUpOwnMessage: FollowsUpOwnMessage,
 ): boolean {
-  return quietTeammateDelivery(delivery) || (teammateRequest(delivery) && answered(delivery));
+  return (
+    quietTeammateDelivery(delivery, followsUpOwnMessage) ||
+    (teammateRequest(delivery, followsUpOwnMessage) && answered(delivery))
+  );
 }
 
 export function isNoUpdateAnswer(text: string): boolean {

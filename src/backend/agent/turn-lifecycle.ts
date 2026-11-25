@@ -95,6 +95,7 @@ import {
 import type { ProviderRuntime } from "./provider-runtime";
 import {
   answeredRequestId,
+  type FollowsUpOwnMessage,
   isNoUpdateAnswer,
   isNoUpdateToolCall,
   quietRunStepsMessage,
@@ -1980,8 +1981,8 @@ export class TurnLifecycle {
       !deliveries.some(
         ({ delivery }) =>
           delivery.sender.kind === "routine" ||
-          quietTeammateDelivery(delivery) ||
-          teammateRequest(delivery) ||
+          quietTeammateDelivery(delivery, this.#followsUpOwnMessage) ||
+          teammateRequest(delivery, this.#followsUpOwnMessage) ||
           this.#continuesQuietRun(delivery),
       )
     )
@@ -2122,7 +2123,7 @@ export class TurnLifecycle {
         (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) =>
-          (teammateRequest(delivery) && answered(delivery)) ||
+          (teammateRequest(delivery, this.#followsUpOwnMessage) && answered(delivery)) ||
           this.#quietTeammateTurnDelivery(delivery) ||
           (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)) ||
           (noUpdateCalled && this.#continuesQuietRun(delivery)),
@@ -2137,8 +2138,14 @@ export class TurnLifecycle {
   }
 
   #quietTeammateTurnDelivery(delivery: QueueDelivery): boolean {
-    return quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id));
+    return quietTeammateTurnDelivery(
+      delivery,
+      (request) => this.#mailbox.hasOwnReplyFrom(request.id),
+      this.#followsUpOwnMessage,
+    );
   }
+
+  readonly #followsUpOwnMessage = (delivery: QueueDelivery): boolean => this.#mailbox.followsUpOwnMessage(delivery);
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
     function* (this: TurnLifecycle, agentId: string, threadId: string, turnId: string, status: string) {
@@ -2484,7 +2491,7 @@ export class TurnLifecycle {
           ? settleQuietRoutineTurn(
               snapshot,
               turnId,
-              noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId),
+              noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId, this.#followsUpOwnMessage),
               running?.client.provider ?? this.#store.get(agentId)?.provider,
             )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
@@ -3625,10 +3632,11 @@ function answeredRequestTurn(
   deliveries: readonly DeliveryContext[],
   snapshot: ConversationSnapshot,
   turnId: string,
+  followsUpOwnMessage: FollowsUpOwnMessage,
 ): boolean {
   return (
     deliveries.length > 0 &&
-    deliveries.every(({ delivery }) => teammateRequest(delivery)) &&
+    deliveries.every(({ delivery }) => teammateRequest(delivery, followsUpOwnMessage)) &&
     writesNoAnswer(snapshot, turnId)
   );
 }

@@ -2406,6 +2406,16 @@ export class MailboxStore {
     return reply !== undefined && isAnswer(reply) && this.#answeredRequestOf(agentId, reply) !== undefined;
   }
 
+  followsUpOwnMessage(delivery: QueueDelivery): boolean {
+    if (delivery.sender.kind !== "agent" || !delivery.replyToMessageId) return false;
+    const replied = this.#state.messages.find((message) => message.id === delivery.replyToMessageId);
+    return (
+      replied?.sender.kind === "agent" &&
+      replied.sender.agentId === delivery.recipientAgentId &&
+      replied.expectsReply === false
+    );
+  }
+
   expectsReply(messageId: string): boolean {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
   }

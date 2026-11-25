@@ -298,7 +298,11 @@ export class QueueControls {
     const steersQuietTurn =
       turnDeliveries.length > 0 &&
       turnDeliveries.every(({ delivery }) =>
-        quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id)),
+        quietTeammateTurnDelivery(
+          delivery,
+          (request) => this.#mailbox.hasOwnReplyFrom(request.id),
+          (follow) => this.#mailbox.followsUpOwnMessage(follow),
+        ),
       );
     yield* client
       .request(
@@ -327,6 +331,7 @@ export class QueueControls {
                   ? this.#routines.timezoneForDelivery(input.deliveryId)
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
+              followsUpOwnMessage: this.#mailbox.followsUpOwnMessage(context.delivery),
               taskReport: this.#drain.taskReport(context),
               taskReportWaiting: this.#drain.taskReportWaiting(context),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),

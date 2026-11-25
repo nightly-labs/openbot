@@ -80,8 +80,10 @@ marker and the run history stay. A marker inside a longer answer is a report and
 is never quiet.
 
 A teammate update ends quiet in the same way. It is a teammate's message with `expectsReply` false
-that does not reply to a message of the agent (`quietTeammateDelivery`), so nobody waits for the
-turn. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
+that does not reply to a request of the agent (`quietTeammateDelivery`), so nobody waits for the
+turn. A reply to a message of the agent that wanted no answer, such as its result, is a new message
+and not a result for the agent (`MailboxStore.followsUpOwnMessage`, #16136). Its prompt does not tell
+the agent to give a result to the user. Its prompt names `routine_no_update`, because a provider such as Claude Code makes the model
 write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
 of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
 path and in the history import. The desktop chat shows its quiet answers under the marker of the
@@ -92,7 +94,7 @@ for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only af
 `routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
 request always shows.
 
-A teammate's request that does not reply to a message of the agent ends quiet in the same way after
+A teammate's request that does not reply to a request of the agent ends quiet in the same way after
 the agent sent its result to that teammate with `send_message` (`quietTeammateTurnDelivery`, #7465).
 The turn does not need `routine_no_update`, and the prompt does not name it: Claude often does not
 load the tool, which waits behind its tool search. When only answered requests started the turn and
@@ -109,7 +111,7 @@ changes it to a quiet answer. The history import runs after the relay. It counts
 from the turn that ran the request (`MailboxStore.hasOwnReplyFrom`) or the stored idempotency key of
 the relayed result (`MailboxStore.hasSentResultFor`), so both decide the same. The note for a failed
 request and a reply from a later turn do not count. The import also reads the stored file and question
-messages of the turn, because the provider history does not hold them. A reply to a message of the
+messages of the turn, because the provider history does not hold them. A reply to a request of the
 agent can hold the result that the user asked for, so it is never quiet.
 
 A quiet turn can start background work, such as a background command or subagent. When it ends while
