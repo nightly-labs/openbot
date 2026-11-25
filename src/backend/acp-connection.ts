@@ -160,7 +160,7 @@ export class AcpConnection {
         ended,
         Effect.succeed({
           ending: signal ? `signal ${signal}` : `exit code ${code ?? "unknown"}`,
-          detail: causeDiagnostic ?? crashDiagnostic ?? lastDiagnostic,
+          detail: crashDiagnostic ?? causeDiagnostic ?? lastDiagnostic,
         }),
       );
     });
