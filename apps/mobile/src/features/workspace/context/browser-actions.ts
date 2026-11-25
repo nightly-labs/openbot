@@ -1,5 +1,10 @@
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
   BROWSER_PERMISSIONS_CAPABILITY,
   BROWSER_PERMISSIONS_ROUTES,
   decodeBrowserPermissionsSnapshot,
@@ -17,6 +22,7 @@ import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-prot
 import {
   decodeMobileBrowserTab,
   decodeMobileBrowserTabs,
+  mobileHttpSignIns,
   withBrowserTab,
   withoutBrowserTab,
 } from "@/features/browser/model/browser-tabs";
@@ -40,7 +46,7 @@ export function createBrowserActions({
   capabilities: ServerCapabilities;
 }): Pick<
   MobileWorkspaceContextValue,
-  "browserViewSupport" | "openBrowserView" | "controlBrowserTab" | "answerBrowserPermission"
+  "browserViewSupport" | "openBrowserView" | "controlBrowserTab" | "answerBrowserPermission" | "answerBrowserHttpSignIn"
 > {
   return {
     browserViewSupport: (serverId) => {
@@ -53,7 +59,21 @@ export function createBrowserActions({
         viewport: view && advertised.includes(TEAM_BROWSER_VIEW_VIEWPORT_CAPABILITY),
         navigation: view && advertised.includes(TEAM_BROWSER_NAVIGATION_CAPABILITY),
         permissions: view && advertised.includes(BROWSER_PERMISSIONS_CAPABILITY),
+        httpSignIn: view && advertised.includes(BROWSER_HTTP_SIGN_IN_CAPABILITY),
       };
+    },
+    answerBrowserHttpSignIn: async (serverId, input) => {
+      const snapshot = await request(
+        "POST",
+        BROWSER_HTTP_SIGN_IN_ROUTES.answer,
+        decodeBrowserHttpSignInSnapshot,
+        { ...input },
+        serverId,
+      );
+      liveState.update("browserHttpSignIns", (current) => ({
+        ...current,
+        [serverId]: mobileHttpSignIns(snapshot.tabs),
+      }));
     },
     openBrowserView: (serverId, tabId, listener) => {
       const peer = client(serverId);

@@ -682,6 +682,12 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   }
 
+  async function answerBrowserHttpSignIn(tabId: string, answer: { username: string; password: string } | null) {
+    await conversationRuntime(deps.props).browser.answerHttpSignIn(
+      answer ? { tabId, username: answer.username, password: answer.password } : { tabId, cancel: true },
+    );
+  }
+
   async function navigateBrowserTab(tabId: string, direction: "back" | "forward") {
     if (
       !browserInteractionAvailable() ||
@@ -909,6 +915,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     stopBrowserTab,
     answerBrowserPermission,
     permissionAnswerPending,
+    answerBrowserHttpSignIn,
     navigateBrowserTab,
     takeBrowserControl,
     releaseBrowserControl,

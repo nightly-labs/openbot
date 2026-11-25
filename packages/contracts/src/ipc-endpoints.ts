@@ -231,6 +231,7 @@ import type {
   BrowserBounds,
   BrowserControlState,
   BrowserDisplayState,
+  BrowserHttpSignInInput,
   BrowserLiveViewEvent,
   BrowserLocalSignInEnd,
   BrowserLocalSignInFinish,
@@ -1843,6 +1844,7 @@ export const IPC_ENDPOINTS = {
     finishLocalSignIn: request<BrowserLocalSignInFinish, BrowserLocalSignInResult | null>()(
       "browser:local-sign-in-finish",
     ),
+    answerHttpSignIn: request<BrowserHttpSignInInput, void>()("browser:http-sign-in-answer"),
   },
   browserInput: {
     sendLiveViewInput: untypedRequest("browser:send-live-view-input"),

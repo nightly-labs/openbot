@@ -355,6 +355,7 @@ try {
       copyViewSelection: unused,
       answerViewDialog: unused,
       importSignIn: unused,
+      answerHttpSignIn: unused,
     },
     sidebarLayout: sidebar,
     agentAccess: access,

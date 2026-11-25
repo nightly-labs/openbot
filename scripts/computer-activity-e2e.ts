@@ -187,6 +187,7 @@ const teamBrowser: TeamApiBrowser = {
   copyViewSelection: unused,
   answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 
 const database = new OpenBotDatabase(userData);

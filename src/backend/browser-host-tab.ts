@@ -71,6 +71,18 @@ export interface BrowserHostTab {
   viewContextMenu: { deliver: (menu: BrowserViewContextMenu) => void; until: number } | null;
   visitedHost?: string | undefined;
   secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean } | undefined;
+  httpSignIn?: BrowserHttpSignInPrompt | undefined;
+  mainFrameRequestUrl?: string | undefined;
+  httpSignInAnswer?: (BrowserHttpSignInRealm & { username: string; password: string }) | undefined;
+}
+
+interface BrowserHttpSignInRealm {
+  origin: string;
+  realm: string;
+}
+
+interface BrowserHttpSignInPrompt extends BrowserHttpSignInRealm {
+  refused: boolean;
 }
 
 export type KeepQueueBlocked = (work: Effect.Effect<unknown, BrowserOperationError>) => void;
@@ -119,6 +131,9 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
     ...(tab.openerTabId ? { openerTabId: tab.openerTabId } : {}),
     ...(tab.popupFailure ? { popupFailure: tab.popupFailure } : {}),
     ...(tab.permissionRequest ? { permissionRequest: tab.permissionRequest } : {}),
+    ...(tab.httpSignIn && !tab.secret
+      ? { httpSignIn: { origin: tab.httpSignIn.origin, ...(tab.httpSignIn.refused ? { refused: true as const } : {}) } }
+      : {}),
   };
 }
 

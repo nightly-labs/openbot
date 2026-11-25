@@ -90,4 +90,11 @@ export const messages = defineMessages("mobile.browser", {
   "mobile.browser.location.allowAlways": "Allow always",
   "mobile.browser.location.unavailable": "Could not get the location of this device.",
   "mobile.browser.location.answerFailed": "Could not answer the location request.",
+  "mobile.browser.httpSignIn.title": "Sign in to {site}",
+  "mobile.browser.httpSignIn.description": "This site asks for its own username and password.",
+  "mobile.browser.httpSignIn.refused": "The site did not accept this username or password.",
+  "mobile.browser.httpSignIn.username": "Username",
+  "mobile.browser.httpSignIn.password": "Password",
+  "mobile.browser.httpSignIn.submit": "Sign in",
+  "mobile.browser.httpSignIn.failed": "OpenBot could not send the sign-in.",
 });

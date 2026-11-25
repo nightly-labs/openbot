@@ -93,4 +93,11 @@ export const messages = {
   "mobile.browser.location.allowAlways": "Consenti sempre",
   "mobile.browser.location.unavailable": "Impossibile ottenere la posizione di questo dispositivo.",
   "mobile.browser.location.answerFailed": "Impossibile rispondere alla richiesta di posizione.",
+  "mobile.browser.httpSignIn.title": "Accedi a {site}",
+  "mobile.browser.httpSignIn.description": "Questo sito chiede un proprio nome utente e una propria password.",
+  "mobile.browser.httpSignIn.refused": "Il sito non ha accettato questo nome utente o questa password.",
+  "mobile.browser.httpSignIn.username": "Nome utente",
+  "mobile.browser.httpSignIn.password": "Password",
+  "mobile.browser.httpSignIn.submit": "Accedi",
+  "mobile.browser.httpSignIn.failed": "OpenBot non è riuscito a inviare l’accesso.",
 } as const satisfies PartialTranslation<typeof source>;

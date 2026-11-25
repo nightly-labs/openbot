@@ -64,6 +64,8 @@ export const messages = {
   "error.backend.browserLocationFailed": "Impossibile impostare la posizione per la pagina.",
   "error.backend.browserPermissionsUnsupported": "Questo host remoto non può rispondere alle richieste di posizione.",
   "error.backend.browserLocationRequired": "Invia la posizione del dispositivo per consentire la richiesta.",
+  "error.backend.browserHttpSignInInactive": "Questo sito non chiede più l’accesso. Ricarica la pagina per riprovare.",
+  "error.backend.browserHttpSignInUnsupported": "Questo host remoto non può ricevere un accesso a un sito.",
   "error.backend.sharedDataLocalOnly": "I dati condivisi sono gestiti sul computer su cui girano questi agenti.",
   "error.backend.browserUrlProtocol": "Sono consentiti solo URL del browser HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine non è diventato pronto.",

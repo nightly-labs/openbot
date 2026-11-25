@@ -5,6 +5,7 @@ export interface BrowserPort {
     OpenBotDesktopApi["browser"],
     | "activate"
     | "answerPermission"
+    | "answerHttpSignIn"
     | "close"
     | "dockPictureInPicture"
     | "dockWindow"

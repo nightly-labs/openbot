@@ -66,6 +66,10 @@ export const messages = {
   "error.backend.browserLocationFailed": "Der Standort für die Seite konnte nicht festgelegt werden.",
   "error.backend.browserPermissionsUnsupported": "Dieser entfernte Host kann Standortanfragen nicht beantworten.",
   "error.backend.browserLocationRequired": "Sende den Gerätestandort, um die Anfrage zu erlauben.",
+  "error.backend.browserHttpSignInInactive":
+    "Diese Website fragt nicht mehr nach einer Anmeldung. Lade die Seite neu, um es noch einmal zu versuchen.",
+  "error.backend.browserHttpSignInUnsupported":
+    "Dieser entfernte Host kann keine Anmeldung bei einer Website übernehmen.",
   "error.backend.sharedDataLocalOnly":
     "Geteilte Daten werden auf dem Computer verwaltet, auf dem diese Agenten laufen.",
   "error.backend.browserUrlProtocol": "Im Browser sind nur HTTP(S)-URLs erlaubt.",

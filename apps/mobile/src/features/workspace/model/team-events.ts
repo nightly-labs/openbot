@@ -2,7 +2,7 @@ import type { AgentEvent, TeamRealtimeEvent } from "@openbot/contracts/ipc";
 import { type PlanLimits, withUsageEvent } from "@openbot/team-client/plan-limits";
 import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import { type QueryClient, replaceEqualDeep } from "@tanstack/react-query";
-import { decodeMobileBrowserTabs } from "@/features/browser/model/browser-tabs";
+import { decodeMobileBrowserTabs, mobileHttpSignIns } from "@/features/browser/model/browser-tabs";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
 import { AGENT_SETTINGS_PARTS, type QueryScope, queryKeys } from "./query-keys";
 import { applyMobileQueueEvent } from "./queue-cache";
@@ -44,6 +44,8 @@ export function applyBrowserEvent(liveState: LiveWorkspaceStore, serverId: strin
     }));
   } else if (event.type === "browser-permissions-changed") {
     liveState.update("browserPermissions", (current) => ({ ...current, [serverId]: event.requests }));
+  } else if (event.type === "browser-http-sign-in-changed") {
+    liveState.update("browserHttpSignIns", (current) => ({ ...current, [serverId]: mobileHttpSignIns(event.tabs) }));
   }
 }
 

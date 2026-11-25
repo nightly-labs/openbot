@@ -60,6 +60,8 @@ export const messages = {
   "error.backend.browserLocationFailed": "לא ניתן להגדיר את המיקום עבור הדף.",
   "error.backend.browserPermissionsUnsupported": "המארח המרוחק הזה לא יכול להשיב לבקשות מיקום.",
   "error.backend.browserLocationRequired": "שלח את מיקום המכשיר כדי לאשר את הבקשה.",
+  "error.backend.browserHttpSignInInactive": "האתר הזה כבר לא מבקש התחברות. יש לטעון מחדש את הדף כדי לנסות שוב.",
+  "error.backend.browserHttpSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות לאתר.",
   "error.backend.sharedDataLocalOnly": "נתונים משותפים מנוהלים במחשב שמריץ את הסוכנים האלה.",
   "error.backend.browserUrlProtocol": "מותר להשתמש רק בכתובות דפדפן של HTTP(S).",
   "error.backend.sunshineNotReady": "Sunshine לא הפך למוכן.",

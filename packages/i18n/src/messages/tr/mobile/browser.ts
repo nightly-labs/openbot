@@ -93,4 +93,11 @@ export const messages = {
   "mobile.browser.location.allowAlways": "Her zaman izin ver",
   "mobile.browser.location.unavailable": "Bu cihazın konumu alınamadı.",
   "mobile.browser.location.answerFailed": "Konum isteği yanıtlanamadı.",
+  "mobile.browser.httpSignIn.title": "{site} sitesinde oturum aç",
+  "mobile.browser.httpSignIn.description": "Bu site kendi kullanıcı adını ve şifresini istiyor.",
+  "mobile.browser.httpSignIn.refused": "Site bu kullanıcı adını veya şifreyi kabul etmedi.",
+  "mobile.browser.httpSignIn.username": "Kullanıcı adı",
+  "mobile.browser.httpSignIn.password": "Şifre",
+  "mobile.browser.httpSignIn.submit": "Oturum aç",
+  "mobile.browser.httpSignIn.failed": "OpenBot oturumu gönderemedi.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -6,6 +6,11 @@ import {
 } from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  BROWSER_HTTP_SIGN_IN_CAPABILITY,
+  BROWSER_HTTP_SIGN_IN_ROUTES,
+  decodeBrowserHttpSignInSnapshot,
+} from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
+import {
   BROWSER_PAGE_STATE_CAPABILITY,
   BROWSER_PAGE_STATE_ROUTES,
   decodeBrowserPageStateSnapshot,
@@ -67,6 +72,7 @@ import {
   parseBrowserTeachStop,
   parseBrowserWindowAction,
   parseBrowserWindowModel,
+  parseHttpSignInAnswer,
   parseLocalSignIn,
   parseLocalSignInFinish,
   parseVisibility,
@@ -115,6 +121,7 @@ export interface BrowserIpcDependencies {
     | "getControlState"
     | "capturePreview"
     | "setVisible"
+    | "answerHttpSignIn"
   >;
   remoteServers: Pick<RemoteServerManager, "activeServerId" | "supportsCapability" | "request">;
   browserView: Pick<BrowserViewClient, "start" | "stop" | "sendInput">;
@@ -180,11 +187,28 @@ export function browserIpcHandlers({
         : tab;
     };
   };
+  const httpSignInUpdate = async (serverId: string): Promise<TabUpdate> => {
+    if (!remoteServers.supportsCapability(serverId, BROWSER_HTTP_SIGN_IN_CAPABILITY)) return keepTab;
+    const snapshot = await runCauseEffect(
+      remoteServers.request(serverId, BROWSER_HTTP_SIGN_IN_ROUTES.state, decodeBrowserHttpSignInSnapshot, {
+        method: "POST",
+        body: {},
+      }),
+    );
+    const prompts = new Map(snapshot.tabs.map((prompt) => [prompt.tabId, prompt]));
+    return (tab) => {
+      const prompt = prompts.get(tab.id);
+      return prompt
+        ? { ...tab, httpSignIn: { origin: prompt.origin, ...(prompt.refused ? { refused: true } : {}) } }
+        : tab;
+    };
+  };
   const withTabState = async (serverId: string, tabs: BrowserTab[]): Promise<BrowserTab[]> => {
     const updates = await Promise.all([
       userControlUpdate(serverId),
       pageStateUpdate(serverId),
       permissionsUpdate(serverId),
+      httpSignInUpdate(serverId),
     ]);
     return tabs.map((tab) => updates.reduce((updated, update) => update(updated), tab));
   };
@@ -308,6 +332,21 @@ export function browserIpcHandlers({
               throw new Error(sourceText("error.backend.browserPermissionsUnsupported"));
             await runCauseEffect(
               remoteServers.request(serverId, BROWSER_PERMISSIONS_ROUTES.answer, decodeBrowserPermissionsSnapshot, {
+                method: "POST",
+                body: answer,
+              }),
+            );
+          },
+        }),
+      ),
+      answerHttpSignIn: payloadHandler(parseHttpSignInAnswer, (answer) =>
+        routeToServer(remoteServers.activeServerId, {
+          local: () => runCauseEffect(browser.answerHttpSignIn(answer)),
+          remote: async (serverId) => {
+            if (!remoteServers.supportsCapability(serverId, BROWSER_HTTP_SIGN_IN_CAPABILITY))
+              throw new Error(sourceText("error.backend.browserHttpSignInUnsupported"));
+            await runCauseEffect(
+              remoteServers.request(serverId, BROWSER_HTTP_SIGN_IN_ROUTES.answer, decodeBrowserHttpSignInSnapshot, {
                 method: "POST",
                 body: answer,
               }),

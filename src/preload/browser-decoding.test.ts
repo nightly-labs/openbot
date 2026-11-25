@@ -46,6 +46,7 @@ const fullTab = {
   userControl: true,
   canGoBack: true,
   canGoForward: false,
+  httpSignIn: { origin: "https://files.example.com", refused: true },
 } satisfies BrowserTab;
 
 const bounds = { x: 10, y: 20, width: 480, height: 270 } satisfies BrowserBounds;
@@ -199,6 +200,21 @@ describe("browser decoders", () => {
       "browser tab with a permission request without an origin",
       decodeBrowserTab,
       { ...tab, permissionRequest: { id: "request-1", permission: "geolocation" } },
+    ],
+    [
+      "browser tab with a site sign-in over HTTP",
+      decodeBrowserTab,
+      { ...tab, httpSignIn: { origin: "http://files.example.com" } },
+    ],
+    [
+      "browser tab with a site sign-in path",
+      decodeBrowserTab,
+      { ...tab, httpSignIn: { origin: "https://files.example.com/login" } },
+    ],
+    [
+      "browser tab with a false site sign-in refusal",
+      decodeBrowserTab,
+      { ...tab, httpSignIn: { origin: "https://files.example.com", refused: false } },
     ],
     ["browser tab list that is not an array", decodeBrowserTabs, tab],
     ["browser display state without tabs", decodeBrowserDisplayState, { activeTabId: null }],
