@@ -62,6 +62,7 @@ const logger = createOpenBotLogger("voice-transcription-service");
 const TRANSCRIPTION_TIMEOUT_MS = 180_000;
 const TRANSCRIPTION_TIMEOUT_PER_AUDIO_SECOND_MS = 1_500;
 const SPEECH_CHECK_TIMEOUT_MS = 30_000;
+const SPEECH_CHECK_TIMEOUT_PER_AUDIO_SECOND_MS = 100;
 const GROQ_API_ADDRESS = "https://api.groq.com/openai/v1";
 const GROQ_MODELS: Record<GroqVoiceModelId, string> = {
   "groq-whisper-large-v3-turbo": "whisper-large-v3-turbo",
@@ -249,10 +250,8 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
               Effect.gen({ self: this }, function* () {
                 const settings = this.#preferences.get();
                 const { modelId } = settings;
-                if (isGroqVoiceModelId(modelId)) {
-                  if (!(yield* this.#hasSpeech(audio.slice(WAV_HEADER_BYTES)))) return { text: "" };
+                if (isGroqVoiceModelId(modelId))
                   return yield* this.#transcribeAtGroq(audio, modelId, settings.language);
-                }
                 if (!isLocalVoiceModelId(modelId))
                   return yield* new VoiceOperationError({
                     cause: new Error(sourceText("error.voice.transcriptionFailed")),
@@ -411,7 +410,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
       );
     const startedAt = Date.now();
     const audioSeconds = (Math.max(0, audio.byteLength - WAV_HEADER_BYTES) / BYTES_PER_SECOND).toFixed(1);
-    return transcribeRecording(
+    const upload = transcribeRecording(
       this.#fetch,
       { address: GROQ_API_ADDRESS, apiKey },
       GROQ_MODELS[modelId],
@@ -429,6 +428,9 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
           logger.info(`Groq transcription of ${audioSeconds}s completed in ${Date.now() - startedAt}ms.`),
         ),
       ),
+    );
+    return this.#hasSpeech(audio.slice(WAV_HEADER_BYTES)).pipe(
+      Effect.flatMap((speech) => (speech ? upload : Effect.succeed({ text: "" }))),
     );
   }
 
@@ -488,9 +490,14 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     return this.#ask(
       { addonPath: this.#addonPath, speechDetector: this.#speechDetector, pcm },
       null,
-      SPEECH_CHECK_TIMEOUT_MS,
+      Math.max(SPEECH_CHECK_TIMEOUT_MS, (pcm.byteLength / BYTES_PER_SECOND) * SPEECH_CHECK_TIMEOUT_PER_AUDIO_SECOND_MS),
     ).pipe(
       Effect.map((answer) => !("speech" in answer) || answer.speech),
+      Effect.tapError((error) =>
+        Effect.sync(() =>
+          logger.warn("The speech check failed, so the recording is transcribed.", errorCategory(error.cause)),
+        ),
+      ),
       Effect.orElseSucceed(() => true),
     );
   }

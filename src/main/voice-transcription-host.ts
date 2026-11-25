@@ -327,11 +327,11 @@ function toSamples(pcm: Uint8Array, leadingSilence: number): Float32Array {
 }
 
 async function transcribe(request: VoiceTranscriptionRequest): Promise<string> {
+  const recording = toSamples(request.pcm, request.leadingSilenceSamples);
+  if (request.engine === "whisper" && !hasSpeech(request.addonPath, request.speechDetector, recording)) return "";
   const loaded = await recognizerFor(request);
   useLanguage(loaded, request.language);
   if (request.pcm.byteLength < 2) return "";
-  const recording = toSamples(request.pcm, request.leadingSilenceSamples);
-  if (loaded.engine === "whisper" && !hasSpeech(request.addonPath, request.speechDetector, recording)) return "";
   const speech = loaded.engine === "whisper" ? speechOnly(recording) : undefined;
   const samples = speech ?? recording;
   const parts = splitIntoParts(samples, loaded.engine === "nemo-transducer" ? TRANSDUCER_PARTS : WINDOWED_PARTS);
@@ -477,7 +477,7 @@ function isSpeechCheck(value: unknown): value is VoiceSpeechCheckRequest {
 
 function accept(value: unknown, respond: (response: VoiceTranscriptionResponse) => void): void {
   if (!isRequest(value)) {
-    if (isSpeechCheck(value))
+    if (isSpeechCheck(value) && !("engine" in value))
       queue = queue.then(() =>
         respond({ id: value.id, speech: hasSpeech(value.addonPath, value.speechDetector, toSamples(value.pcm, 0)) }),
       );
