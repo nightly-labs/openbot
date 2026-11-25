@@ -17,6 +17,7 @@ async function checkRestart(): Promise<void> {
   if (restartedFor !== null) {
     record({
       role: "child",
+      pid: process.pid,
       reason: restartedFor,
       platform: app.commandLine.getSwitchValue("ozone-platform"),
       argv: process.argv.slice(2),

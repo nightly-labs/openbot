@@ -1,7 +1,7 @@
 import { createConnection } from "node:net";
 import { join } from "node:path";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Schema, Semaphore } from "effect";
 import type { BrowserWindow } from "electron";
 
 const logger = createOpenBotLogger("linux-hyprland-overlay");
@@ -99,6 +99,7 @@ export function keepOverlayOnAllHyprlandWorkspaces(window: BrowserWindow, enviro
   const directory = hyprlandDirectory(environment);
   if (process.platform !== "linux" || !directory) return;
   let pending = "";
+  const oneAtATime = Semaphore.makeUnsafe(1);
   const events = createConnection(join(directory, ".socket2.sock"));
   events.on("error", (error) => logger.warn("Could not read the Hyprland window events:", toLogValue(error)));
   events.on("data", (chunk: Buffer) => {
@@ -109,6 +110,7 @@ export function keepOverlayOnAllHyprlandWorkspaces(window: BrowserWindow, enviro
       const address = `0x${line.slice(OPEN_WINDOW_EVENT.length).split(",", 1)[0]}`;
       Effect.runFork(
         keepOverlayClient(directory, address, window).pipe(
+          oneAtATime.withPermits(1),
           Effect.catch((error) =>
             Effect.sync(() =>
               logger.warn("Could not keep the window on all Hyprland workspaces:", toLogValue(error.cause)),

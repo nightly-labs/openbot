@@ -25,6 +25,7 @@ const decodeRecord = Schema.decodeUnknownSync(
   Schema.fromJsonString(
     Schema.Struct({
       role: Schema.Literals(["parent", "child"]),
+      pid: Schema.optional(Schema.Number),
       restarted: Schema.optional(Schema.Boolean),
       reason: Schema.optional(Schema.String),
       platform: Schema.String,
@@ -87,7 +88,23 @@ async function restartScenario(
   await once(parent);
   const parentRecord = await until(() => readRecords(report)[0], `the ${name} start`);
   if (parentRecord.restarted) await until(() => readRecords(report).length >= 2 && true, `the ${name} restart`);
-  return readRecords(report);
+  const records = readRecords(report);
+  for (const record of records) if (record.pid !== undefined) await stopDetached(record.pid);
+  return records;
+}
+
+async function stopDetached(pid: number): Promise<void> {
+  const alive = () => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!alive()) return;
+  process.kill(pid, "SIGTERM");
+  await until(() => !alive(), `the restarted process ${pid} to stop`);
 }
 
 interface FakeHyprland {
@@ -187,12 +204,11 @@ async function main(): Promise<void> {
     });
     const output = harness.stdout;
     assert.ok(output, "the harness has a stdout pipe");
-    const shownLine = new Promise<string>((done) =>
-      createInterface({ input: output }).on("line", (line) => {
-        if (line.startsWith("@@shown ")) done(line.slice(8));
-      }),
-    );
-    const shown = decodeShown(await shownLine);
+    let shownLine: string | undefined;
+    createInterface({ input: output }).on("line", (line) => {
+      if (line.startsWith("@@shown ")) shownLine = line.slice(8);
+    });
+    const shown = decodeShown(await until(() => shownLine, "the overlay window to show"));
     const events = await until(() => fake?.events[0], "the Hyprland event connection");
     const overlaySize = [shown.width, shown.height] as const;
     fake.clients = [
