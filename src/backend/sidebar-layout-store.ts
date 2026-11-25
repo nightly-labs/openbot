@@ -19,7 +19,7 @@ import {
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { isUuidV4, legacyAgentId } from "@openbot/contracts/validation";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Exit, Semaphore } from "effect";
+import { Clock, Effect, Exit, Semaphore } from "effect";
 import { writeFileAtomically } from "./atomic-json-file";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
 import { readVersionedJsonFile, type VersionedJsonFormat } from "./versioned-json-store";
@@ -75,7 +75,11 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
       yield* storedIO(() => mkdir(dirname(this.#path), { recursive: true, mode: 0o700 }));
       const loaded = yield* readVersionedJsonFile(this.#path, SIDEBAR_LAYOUT_FORMAT);
       this.#writePath = loaded.writePath;
-      this.#layout = loaded.value ?? structuredClone(DEFAULT_LAYOUT);
+      const layout = loaded.value ?? structuredClone(DEFAULT_LAYOUT);
+      this.#layout =
+        loaded.state === "loaded"
+          ? layout
+          : { ...layout, revision: Math.max(layout.revision, yield* Clock.currentTimeMillis) };
     });
   }
 
