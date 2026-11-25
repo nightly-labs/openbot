@@ -1160,9 +1160,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ...(options.fitImage ? { fitImage: options.fitImage } : {}),
         ...(credentials.serverEnvironment
           ? {
-              agentEnvironment: (inherited) => ({
+              agentEnvironment: (inherited, gitConfig) => ({
                 ...credentials.serverEnvironment,
-                ...credentials.agentEnvironment?.(inherited),
+                ...credentials.agentEnvironment?.(inherited, gitConfig),
               }),
             }
           : {}),
