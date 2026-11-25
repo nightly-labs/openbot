@@ -398,6 +398,8 @@ export const messages = {
     "图片太大，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageCountLimit":
     "此聊天中的图片太多，模型未接受此聊天。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.imageCountLimitRepeated":
+    "此聊天中的图片太多，模型再次未接受此聊天。一个任务打开的图片超过此模型接受的数量，因此新会话也无法解决。请选择“新对话”，并让智能体在每一步打开更少的图片，或者选择一个可以接受更多图片的模型。",
   "error.provider.imageUnreadable":
     "模型无法读取此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。如果你发送了图片，请换一张图片。",
   "error.provider.requestTooLarge":

@@ -468,6 +468,8 @@ export const messages = {
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop grande. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageCountLimit":
     "Le modèle n'a pas accepté ce chat, car il contient trop d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.imageCountLimitRepeated":
+    "Le modèle n’a de nouveau pas accepté ce chat : il contient trop d’images. Une tâche ouvre plus d’images que ce modèle n’en accepte, donc une nouvelle session n’aide pas. Choisissez Nouvelle discussion et demandez à l’agent d’ouvrir moins d’images par étape, ou un modèle qui accepte plus d’images.",
   "error.provider.imageUnreadable":
     "Le modèle n'a pas pu lire une image de ce chat. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez. Si vous avez envoyé une image, envoyez-en une autre.",
   "error.provider.requestTooLarge":

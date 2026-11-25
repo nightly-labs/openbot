@@ -89,6 +89,7 @@ import {
   GEMINI_INVALID_CREDENTIALS,
   isBalanceDiagnostic,
   isCodexAccountSettingsFailure,
+  isImageCountDiagnostic,
   isPlanLimitDiagnostic,
   isUsageLimitDiagnostic,
   providerResetDelayMs,
@@ -423,6 +424,7 @@ export class TurnLifecycle {
   readonly #refusedRetries = new Set<string>();
   readonly #safetyBlockedTurns = new Set<string>();
   readonly #sessionFailures = new Map<string, number>();
+  readonly #imageLimitedChats = new Set<string>();
   readonly #noUpdateTurns = new Set<string>();
   readonly #taskStartTurns = new Set<string>();
   readonly #noUpdateSteps = new Map<string, Set<string>>();
@@ -599,6 +601,7 @@ export class TurnLifecycle {
     this.#refusedRetries.clear();
     this.#safetyBlockedTurns.clear();
     this.#sessionFailures.clear();
+    this.#imageLimitedChats.clear();
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
     this.#codexChildTurns.clear();
@@ -2231,12 +2234,14 @@ export class TurnLifecycle {
       this.#turnRetries.delete(turnId);
       this.#capacityNotices.delete(turnId);
       this.#retryNotices.delete(turnId);
+      const imageLimitRepeated = this.#noteImageLimit(agentId, threadId, status, reportedError);
       const refusedFailure =
         running !== undefined && status === "failed" && reportedError !== undefined
           ? refusedSessionFailure(
               running.client.provider,
               reportedError,
               running.client.contextWindow?.(threadId) ?? null,
+              imageLimitRepeated,
             )
           : null;
       const refused = running !== undefined && refusedFailure !== null;
@@ -2967,6 +2972,19 @@ export class TurnLifecycle {
       if (oldest !== undefined) this.#sessionFailures.delete(oldest);
     }
     return false;
+  }
+
+  #noteImageLimit(agentId: string, threadId: string, status: string, reportedError: string | undefined): boolean {
+    const chat = `${agentId}:${this.#conversation.publicThreadId(agentId, threadId)}`;
+    const repeated = this.#imageLimitedChats.has(chat);
+    if (status === "completed") this.#imageLimitedChats.delete(chat);
+    if (status !== "failed" || reportedError === undefined || !isImageCountDiagnostic(reportedError)) return repeated;
+    this.#imageLimitedChats.add(chat);
+    if (this.#imageLimitedChats.size > ENDED_TURN_LIMIT) {
+      const [oldest] = this.#imageLimitedChats;
+      if (oldest !== undefined) this.#imageLimitedChats.delete(oldest);
+    }
+    return repeated;
   }
 
   readonly #dropFailingSession = Effect.fn("TurnLifecycle.dropFailingSession")(function* (
