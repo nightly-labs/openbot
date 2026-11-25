@@ -1,7 +1,14 @@
-import { createFluidGlass, type FluidGlassSettings, type GlassInteraction, type GlassShape } from "./fluid-glass";
+import {
+  createFluidGlass,
+  type FluidGlassSettings,
+  type GlassInteraction,
+  type GlassPoint,
+  type GlassShape,
+  type GlassView,
+} from "./fluid-glass";
+import { fitSize, paintCentered, paintElement, paintRobot } from "./glass-scene";
 
 const AMOUNT = "$0";
-const ROBOT = "🤖";
 const WORD = "openbot";
 const KONAMI = [
   "arrowup",
@@ -27,6 +34,11 @@ const STILL_MS = 2600;
 const SMALL_PRINT_MS = 7000;
 const SMALL_PRINT_PX = 13;
 const ROBOT_MS = 4500;
+const ROBOT_SCALE = 1.05;
+const FOREVER_SCALE = 1.56;
+const FOREVER_FIT = 0.96;
+const AMOUNT_SPACING = -0.055;
+const INTERACTIVE = "a, button, input, select, textarea, [role='button']";
 
 export interface PricingGlassText {
   readonly smallPrint: string;
@@ -34,7 +46,8 @@ export interface PricingGlassText {
 }
 
 export interface PricingGlassParts {
-  readonly stage: HTMLElement;
+  readonly section: HTMLElement;
+  readonly copy: readonly HTMLElement[];
   readonly amount: HTMLElement;
   readonly layer: HTMLElement;
   readonly canvas: HTMLCanvasElement;
@@ -57,13 +70,17 @@ interface EggState {
   interaction: GlassInteraction;
 }
 
+type SceneMode = "amount" | "robot" | "print" | "forever";
+
+const isInteractive = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest(INTERACTIVE));
+
 const isEditable = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName));
 
 export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingGlassText): () => void {
-  const { stage, amount, layer } = parts;
+  const { section, amount, layer } = parts;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const styles = getComputedStyle(stage);
+  const styles = getComputedStyle(section);
   const palette = PALETTE_TOKENS.map((token) => styles.getPropertyValue(token).trim()).filter(Boolean);
   const state: EggState = {
     party: false,
@@ -81,29 +98,51 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
   let typed = "";
   let visible = false;
   let amountSize = Number.parseFloat(getComputedStyle(amount).fontSize) || 230;
+  let home: GlassPoint = { x: 0, y: 0 };
+  let layout = 0;
+
+  const mode = (): SceneMode => {
+    if (state.forever) return "forever";
+    if (state.robot) return "robot";
+    if (state.smallPrint) return "print";
+    return "amount";
+  };
+
+  const paint = (ctx: CanvasRenderingContext2D, view: GlassView) => {
+    const words = text();
+    const origin = section.getBoundingClientRect();
+    for (const element of parts.copy) paintElement(ctx, element, origin);
+    const box = amount.getBoundingClientRect();
+    const style = getComputedStyle(amount);
+    const color = getComputedStyle(layer).color;
+    amountSize = Number.parseFloat(style.fontSize) || amountSize;
+    home = { x: box.left - origin.left + box.width / 2, y: box.top - origin.top + box.height / 2 };
+    const scene = mode();
+    if (scene === "amount") {
+      paintElement(ctx, amount, origin, color);
+      return;
+    }
+    if (scene === "robot") {
+      paintRobot(ctx, home, amountSize * ROBOT_SCALE, color);
+      return;
+    }
+    const font = { family: style.fontFamily, weight: style.fontWeight, letterSpacing: AMOUNT_SPACING };
+    const lines = scene === "print" ? [words.smallPrint] : [AMOUNT, words.forever];
+    const size =
+      scene === "print"
+        ? SMALL_PRINT_PX
+        : fitSize(ctx, { ...font, lines }, view.width * 0.84, amountSize * FOREVER_FIT);
+    paintCentered(ctx, { ...font, lines, center: home, size, color });
+  };
 
   const settings = (): FluidGlassSettings => {
     const words = text();
-    const content = state.forever
-      ? `${AMOUNT}\n${words.forever}`
-      : state.robot
-        ? ROBOT
-        : state.smallPrint
-          ? words.smallPrint
-          : AMOUNT;
-    const fontSize = state.forever
-      ? null
-      : state.robot
-        ? amountSize * 1.09
-        : state.smallPrint
-          ? SMALL_PRINT_PX
-          : amountSize;
     return {
-      text: content,
-      fontSize,
+      scene: [mode(), layout, words.smallPrint, words.forever].join("|"),
+      home,
       shape: state.forever ? "diamond" : "lens",
       cycle: CYCLE,
-      size: amountSize * (state.forever ? 1.56 : 1),
+      size: amountSize * (state.forever ? FOREVER_SCALE : 1),
       refraction: state.forever ? 2 : 1.2,
       dispersion: state.party || state.forever ? 1 : 0.6,
       color: state.party ? (palette[state.hue % Math.max(1, palette.length)] ?? WHITE) : WHITE,
@@ -113,7 +152,7 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     };
   };
 
-  const glass = createFluidGlass({ container: layer, canvas: parts.canvas, handle: parts.handle }, settings);
+  const glass = createFluidGlass({ container: layer, canvas: parts.canvas, handle: parts.handle, paint }, settings);
   if (!glass) return () => {};
 
   const later = (ms: number, run: () => void) => {
@@ -182,7 +221,8 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     shake = { lastX: Number.NaN, dir: 0, travel: 0, flips: [] };
   };
 
-  const onDoubleClick = () => {
+  const onDoubleClick = (event: MouseEvent) => {
+    if (isInteractive(event.target)) return;
     const interaction: GlassInteraction = state.interaction === "drag" ? "follow" : "drag";
     layer.dataset.interaction = interaction;
     update({ interaction });
@@ -200,23 +240,26 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     later(ROBOT_MS, () => update({ robot: false }));
   };
 
-  const onResize = () => {
-    amountSize = Number.parseFloat(getComputedStyle(amount).fontSize) || amountSize;
+  const relayout = () => {
+    layout += 1;
     glass.refresh();
   };
 
-  const sizeObserver = new ResizeObserver(onResize);
+  const sizeObserver = new ResizeObserver(relayout);
   const visibility = new IntersectionObserver((entries) => {
     visible = entries.some((entry) => entry.isIntersecting);
   });
+  sizeObserver.observe(section);
   sizeObserver.observe(amount);
-  visibility.observe(stage);
-  stage.addEventListener("pointermove", onMove, { passive: true });
-  stage.addEventListener("pointerleave", onLeave);
-  stage.addEventListener("dblclick", onDoubleClick);
+  visibility.observe(section);
+  section.addEventListener("pointermove", onMove, { passive: true });
+  section.addEventListener("pointerleave", onLeave);
+  section.addEventListener("dblclick", onDoubleClick);
+  section.addEventListener("animationend", relayout);
   document.addEventListener("keydown", onKey);
+  void document.fonts?.ready.then(relayout);
   layer.dataset.interaction = state.interaction;
-  stage.dataset.glass = "on";
+  section.dataset.glass = "on";
 
   return () => {
     for (const id of timers) clearTimeout(id);
@@ -225,11 +268,12 @@ export function mountPricingGlass(parts: PricingGlassParts, text: () => PricingG
     clearTimeout(stillTimer);
     sizeObserver.disconnect();
     visibility.disconnect();
-    stage.removeEventListener("pointermove", onMove);
-    stage.removeEventListener("pointerleave", onLeave);
-    stage.removeEventListener("dblclick", onDoubleClick);
+    section.removeEventListener("pointermove", onMove);
+    section.removeEventListener("pointerleave", onLeave);
+    section.removeEventListener("dblclick", onDoubleClick);
+    section.removeEventListener("animationend", relayout);
     document.removeEventListener("keydown", onKey);
-    delete stage.dataset.glass;
+    delete section.dataset.glass;
     delete layer.dataset.interaction;
     glass.dispose();
   };

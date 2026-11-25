@@ -1,9 +1,19 @@
 export type GlassShape = "lens" | "blob" | "cube" | "pill" | "torus" | "prism" | "diamond";
 export type GlassInteraction = "follow" | "drag";
 
+export interface GlassPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+export interface GlassView {
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface FluidGlassSettings {
-  readonly text: string;
-  readonly fontSize: number | null;
+  readonly scene: string;
+  readonly home: GlassPoint;
   readonly shape: GlassShape;
   readonly cycle: readonly GlassShape[];
   readonly size: number;
@@ -19,6 +29,7 @@ export interface FluidGlassParts {
   readonly container: HTMLElement;
   readonly canvas: HTMLCanvasElement;
   readonly handle: HTMLElement | undefined;
+  readonly paint: (context: CanvasRenderingContext2D, view: GlassView) => void;
 }
 
 export interface FluidGlass {
@@ -38,10 +49,9 @@ interface ProgramEntry {
 }
 
 const PIXEL_BUDGET = 5e6;
-const SHADOW_SIZE = 160;
+const SHADOW_SIZE = 320;
 const MAX_RATIO = 2;
-const FONT_WEIGHT = 800;
-const LETTER_SPACING = -0.055;
+const INTERACTIVE = "a, button, input, select, textarea, [role='button']";
 const REFLECTION = 1;
 const SHADOW = 0.5;
 const ELEVATION = 0.4;
@@ -613,7 +623,7 @@ function startEngine(
   intro: boolean,
   onRestored: () => void,
 ): FluidGlass | null {
-  const { container, canvas, handle } = parts;
+  const { container, canvas, handle, paint } = parts;
   const gl = canvas.getContext("webgl2", {
     alpha: true,
     premultipliedAlpha: true,
@@ -731,56 +741,29 @@ function startEngine(
 
   const radius = () => Math.min(read().size / 2, Math.min(view.width, view.height) * 0.36);
 
-  const drawText = () => {
-    const s = read();
-    const computed = getComputedStyle(container);
-    const family = computed.fontFamily || "sans-serif";
-    const fill = computed.color || "#ffffff";
+  const drawScene = () => {
     const width = canvas.width;
     const height = canvas.height;
-    const key = [s.text, family, fill, s.fontSize, width, height].join("|");
+    const key = [read().scene, width, height].join("|");
     if (key === textState.key) return;
     textState.key = key;
     textCanvas.width = width;
     textCanvas.height = height;
     const ctx = textCanvas.getContext("2d");
     if (!ctx) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, width, height);
-    const lines = s.text.split("\n");
-    if (s.text.trim()) {
-      const font = (px: number) => `${FONT_WEIGHT} ${px}px ${family}`;
-      let px = s.fontSize ? s.fontSize * view.ratio : height * 0.36;
-      if (!s.fontSize) {
-        ctx.font = font(100);
-        const widest = Math.max(...lines.map((line) => ctx.measureText(line).width), 1);
-        px = Math.min((width * 0.84 * 100) / widest, (height * 0.64) / (lines.length * 1.02));
-      }
-      ctx.font = font(px);
-      ctx.fillStyle = fill;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      ctx.letterSpacing = `${LETTER_SPACING * px}px`;
-      const metrics = ctx.measureText(s.text);
-      const ascent = metrics.actualBoundingBoxAscent || px * 0.72;
-      const descent = metrics.actualBoundingBoxDescent || px * 0.2;
-      const lineHeight = px * 1.02;
-      const total = lineHeight * (lines.length - 1) + ascent + descent;
-      let y = (height - total) / 2 + ascent;
-      for (const line of lines) {
-        ctx.fillText(line, width / 2, y);
-        y += lineHeight;
-      }
-    }
+    ctx.setTransform(view.ratio, 0, 0, view.ratio, 0, 0);
+    paint(ctx, { width: view.width, height: view.height });
     gl.bindTexture(gl.TEXTURE_2D, textTexture);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textCanvas);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.generateMipmap(gl.TEXTURE_2D);
-    textState.ready = Boolean(s.text.trim());
+    textState.ready = true;
   };
 
   const applyResize = () => {
-    const s = read();
     const rect = container.getBoundingClientRect();
     const cssWidth = Math.max(1, rect.width);
     const cssHeight = Math.max(1, rect.height);
@@ -794,9 +777,11 @@ function startEngine(
     view.width = cssWidth;
     view.height = cssHeight;
     view.ratio = width / cssWidth;
+    drawScene();
+    const s = read();
     if (!placed) {
-      body.x = cssWidth / 2;
-      body.y = cssHeight / 2;
+      body.x = s.home.x;
+      body.y = s.home.y;
       body.anchorX = body.x;
       body.anchorY = body.y;
       placed = true;
@@ -805,7 +790,6 @@ function startEngine(
       body.anchorX = clamp(body.anchorX, edge, Math.max(edge, cssWidth - edge));
       body.anchorY = clamp(body.anchorY, edge, Math.max(edge, cssHeight - edge));
     }
-    drawText();
   };
 
   const bindContent = (entry: ProgramEntry) => {
@@ -878,8 +862,8 @@ function startEngine(
   const advanceBody = (s: FluidGlassSettings, dt: number, size: number) => {
     let busy = false;
     if (!pointer.grabbed && s.interaction !== "drag") {
-      body.anchorX = view.width / 2;
-      body.anchorY = view.height / 2;
+      body.anchorX = s.home.x;
+      body.anchorY = s.home.y;
     }
     if (!reduced && !pointer.grabbed) {
       idleClock += dt;
@@ -900,8 +884,10 @@ function startEngine(
       goalY = pointer.y - pointer.offsetY;
       flying = false;
     }
+    const edge = size * 1.08;
+    goalX = clamp(goalX, edge, Math.max(edge, view.width - edge));
+    goalY = clamp(goalY, edge, Math.max(edge, view.height - edge));
     if (flying) {
-      const edge = size * 1.08;
       for (let index = 0; index < substeps; index++) {
         body.x += body.vx * h;
         body.y += body.vy * h;
@@ -1150,6 +1136,7 @@ function startEngine(
   };
 
   const onPointerDown = (event: PointerEvent) => {
+    if (event.target instanceof Element && event.target.closest(INTERACTIVE)) return;
     const spot = locate(event);
     if (!spot.inside) return;
     pointer.x = spot.x;
@@ -1236,7 +1223,7 @@ function startEngine(
   void document.fonts?.ready.then(() => {
     if (disposed) return;
     textState.key = "";
-    drawText();
+    drawScene();
     wake();
   });
 

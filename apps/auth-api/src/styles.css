@@ -1949,6 +1949,7 @@ svg[data-icon="arrow-right"]:dir(rtl) {
 }
 
 .landing-pricing {
+  position: relative;
   color: var(--openbot-text-primary);
 }
 
@@ -1973,10 +1974,23 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   margin: clamp(8px, 1.5vw, 20px) 0 clamp(28px, 4vw, 48px);
 }
 
-.landing-pricing-stage[data-glass="on"] {
+.landing-pricing[data-glass="on"] .landing-pricing-stage {
   cursor: pointer;
+}
+
+.landing-pricing[data-glass="on"] :is(.landing-pricing-eyebrow, .landing-pricing-stage, .landing-pricing-facts) {
   user-select: none;
   -webkit-user-select: none;
+}
+
+.landing-pricing[data-glass="on"] :is(.landing-pricing-eyebrow, .landing-pricing-facts) {
+  opacity: 0;
+  animation: none;
+}
+
+.landing-pricing[data-glass="on"] .landing-pricing-actions {
+  position: relative;
+  z-index: 1;
 }
 
 .landing-pricing-amount {
@@ -2030,16 +2044,15 @@ svg[data-icon="arrow-right"]:dir(rtl) {
   filter: blur(clamp(24px, 4vw, 56px));
 }
 
-.landing-pricing-stage[data-glass="on"] .landing-pricing-amount {
+.landing-pricing[data-glass="on"] .landing-pricing-amount {
   background-image: none;
   filter: none;
 }
 
 .landing-pricing-glass {
   position: absolute;
-  inset: -0.3em calc(-1 * clamp(20px, 4vw, 48px));
+  inset: 0;
   color: var(--openbot-text-primary);
-  font-size: clamp(8rem, 30vw, 22rem);
   pointer-events: none;
 }
 

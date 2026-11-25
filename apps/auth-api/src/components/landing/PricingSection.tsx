@@ -8,7 +8,8 @@ import { useSitePath } from "./SiteText";
 
 export function PricingSection() {
   let sectionRef: HTMLElement | undefined;
-  let stageRef: HTMLDivElement | undefined;
+  let eyebrowRef: HTMLHeadingElement | undefined;
+  let factsRef: HTMLUListElement | undefined;
   let amountRef: HTMLParagraphElement | undefined;
   let layerRef: HTMLDivElement | undefined;
   let canvasRef: HTMLCanvasElement | undefined;
@@ -20,9 +21,16 @@ export function PricingSection() {
   const text = () => landing().pricing;
 
   createEffect(revealed, (shown) => {
-    if (!shown || !stageRef || !amountRef || !layerRef || !canvasRef) return;
+    if (!shown || !sectionRef || !eyebrowRef || !factsRef || !amountRef || !layerRef || !canvasRef) return;
     return mountPricingGlass(
-      { stage: stageRef, amount: amountRef, layer: layerRef, canvas: canvasRef, handle: handleRef },
+      {
+        section: sectionRef,
+        copy: [eyebrowRef, factsRef],
+        amount: amountRef,
+        layer: layerRef,
+        canvas: canvasRef,
+        handle: handleRef,
+      },
       () => text().eggs,
     );
   });
@@ -30,19 +38,15 @@ export function PricingSection() {
   return (
     <section ref={sectionRef} class="landing-pricing" aria-labelledby="pricing-title">
       <div class="landing-pricing-inner">
-        <h2 id="pricing-title" class="landing-pricing-eyebrow" data-revealed={revealState()}>
+        <h2 ref={eyebrowRef} id="pricing-title" class="landing-pricing-eyebrow" data-revealed={revealState()}>
           {text().title}
         </h2>
-        <div ref={stageRef} class="landing-pricing-stage">
+        <div class="landing-pricing-stage">
           <p ref={amountRef} class="landing-pricing-amount" data-amount="$0" data-revealed={revealState()}>
             $0
           </p>
-          <div ref={layerRef} class="landing-pricing-glass" aria-hidden="true" data-revealed={revealState()}>
-            <canvas ref={canvasRef} class="landing-pricing-glass-canvas" />
-            <div ref={handleRef} class="landing-pricing-glass-handle" />
-          </div>
         </div>
-        <ul class="landing-pricing-facts" data-revealed={revealState()}>
+        <ul ref={factsRef} class="landing-pricing-facts" data-revealed={revealState()}>
           <For each={text().facts}>
             {(fact) => (
               <li>
@@ -60,6 +64,10 @@ export function PricingSection() {
             {text().license}
           </ButtonLink>
         </div>
+      </div>
+      <div ref={layerRef} class="landing-pricing-glass" aria-hidden="true" data-revealed={revealState()}>
+        <canvas ref={canvasRef} class="landing-pricing-glass-canvas" />
+        <div ref={handleRef} class="landing-pricing-glass-handle" />
       </div>
     </section>
   );
