@@ -436,6 +436,7 @@ interface ThreadRuntime {
   answered: boolean;
   promptIds: Set<string>;
   nextTurnId: string | null;
+  unreadSteers: Map<string, { deliveryId: string; turnId: string }>;
   streamMessage: { id: string | null; thinkingBlocks: Map<number, string> };
   mcpConfigFile: string | null;
   settingsFile: string | null;
@@ -978,10 +979,38 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           runtime,
           "failed",
           sourceText("error.agent.turnStalled", { provider: agentProviderName("claude") }),
+          true,
         );
-      else yield* this.#completeTurn(runtime, "interrupted", null);
+      else yield* this.#completeTurn(runtime, "interrupted", null, true);
     }
+    this.#requeueUnreadSteers(runtime, turn?.stopRequested === true);
   });
+
+  #unreadSteersOf(runtime: ThreadRuntime, turn: ActiveTurn, processEnds: boolean): { unreadSteers?: string[] } {
+    if (!processEnds || turn.stopRequested) return {};
+    const unreadSteers: string[] = [];
+    for (const [messageId, steer] of runtime.unreadSteers)
+      if (steer.turnId === turn.id) {
+        unreadSteers.push(steer.deliveryId);
+        runtime.unreadSteers.delete(messageId);
+      }
+    return unreadSteers.length > 0 ? { unreadSteers } : {};
+  }
+
+  #requeueUnreadSteers(runtime: ThreadRuntime, stopped: boolean): void {
+    const unread = [...runtime.unreadSteers.values()];
+    runtime.unreadSteers.clear();
+    if (stopped) return;
+    for (const turnId of new Set(unread.map((steer) => steer.turnId)))
+      this.emit("notification", {
+        method: "openbot/unread-steers",
+        params: {
+          threadId: runtime.id,
+          turnId,
+          unreadSteers: unread.filter((steer) => steer.turnId === turnId).map((steer) => steer.deliveryId),
+        },
+      });
+  }
 
   readonly #watchStall = Effect.fn("ClaudeAgentClient.watchStall")(function* (
     this: ClaudeAgentClient,
@@ -1727,6 +1756,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       answered: false,
       promptIds: (resume && this.#takenPrompts.get(threadId)) || new Set<string>(),
       nextTurnId: null,
+      unreadSteers: new Map(),
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
       mcpConfigFile,
       settingsFile,
@@ -1964,6 +1994,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const messageId = promptUuid(runtime, clientId);
     takePrompt(runtime, messageId);
     runtime.activeTurn.messageIds.add(messageId);
+    if (clientId) runtime.unreadSteers.set(messageId, { deliveryId: clientId, turnId: runtime.activeTurn.id });
     const waitsForRunningTools = isRecord(params) && params.waitsForRunningTools === true;
     const stopsRunningTools =
       !waitsForRunningTools && runtime.activeTurn.toolCalls.size > 0 && runtime.activeTurn.personRequests === 0;
@@ -2067,7 +2098,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (!turn) return;
     for (const [toolCallId, { name }] of turn.toolCalls) this.#emitToolCall(runtime, toolCallId, name, true);
     turn.toolCalls.clear();
-    yield* this.#completeTurn(runtime, "failed", error);
+    yield* this.#completeTurn(runtime, "failed", error, true);
   });
 
   #emitTurnProgress(runtime: ThreadRuntime, turn: ActiveTurn, detail: string): void {
@@ -2091,7 +2122,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     runtime.lastOutputAt = Date.now();
     if (runtime.activeTurn) runtime.activeTurn.lastActivityAt = runtime.lastOutputAt;
     runtime.answered = true;
+    if (!message.parent_tool_use_id) for (const uuid of takenMessageIds(message)) runtime.unreadSteers.delete(uuid);
     if (message.type === "command_lifecycle") {
+      if (message.state === "started" && isString(message.command_uuid))
+        runtime.unreadSteers.delete(message.command_uuid);
       yield* this.#promptLifecycle(runtime, message.command_uuid, message.state);
       return;
     }
@@ -2447,6 +2481,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       queryLogger.info("Claude stopped its running tools to take a steered message.", { threadId: runtime.id });
       return;
     }
+    if (turn?.stopRequested || (!turn?.unprompted && takenMessageIds(message).length === 0))
+      runtime.unreadSteers.clear();
     const apiError = message.subtype === "success" && message.is_error === true;
     if (turn) {
       for (const [toolCallId, { name }] of turn.toolCalls) {
@@ -2770,6 +2806,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     runtime: ThreadRuntime,
     status: string,
     error: unknown,
+    processEnds = false,
   ) {
     const turn = runtime.activeTurn;
     if (!turn) return;
@@ -2837,10 +2874,14 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#emitSubagents(runtime, endSubagentTurn(runtime.subagents, turn.id, new Date().toISOString()));
     this.emit("notification", {
       method: "turn/completed",
-      params: { threadId: runtime.id, turn: { id: turn.id, status } },
+      params: {
+        threadId: runtime.id,
+        turn: { id: turn.id, status, ...this.#unreadSteersOf(runtime, turn, processEnds) },
+      },
     });
     runtime.activeTurn = null;
-    yield* this.#threads.markIdle(runtime);
+    if (runtime.unreadSteers.size > 0) this.#threads.awaitOwnTurn(runtime);
+    else yield* this.#threads.markIdle(runtime);
   });
 
   readonly #readThreadEffect = Effect.fn("ClaudeAgentClient.readThread")(function* (
