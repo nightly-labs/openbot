@@ -4755,6 +4755,7 @@ export class BrowserHost {
   });
 
   readonly #pageStopped = Effect.fn("BrowserHost.pageStopped")(function* (this: BrowserHost, tab: BrowserHostTab) {
+    if (tab.secret) return false;
     if (tab.endingSilentPage || (!tab.contents.isDestroyed() && tab.contents.isCrashed())) return true;
     return yield* this.#leaveSilentPage(tab.id);
   });
