@@ -20,7 +20,7 @@ export interface VoiceSpeechCheckRequest {
   pcm: Uint8Array;
 }
 
-export type VoiceHostRequest = VoiceTranscriptionRequest | VoiceSpeechCheckRequest;
+type VoiceHostRequest = VoiceTranscriptionRequest | VoiceSpeechCheckRequest;
 
 export type VoiceTranscriptionFailure = "runtime-unavailable" | "model-load-failed" | "inference-failed";
 
