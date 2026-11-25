@@ -109,7 +109,8 @@ export const messages = {
   "settings.quitGuard.always": "תמיד",
   "settings.quitGuard.never": "אף פעם",
   "settings.externalLinks.title": "פתיחת קישורים חיצוניים ב",
-  "settings.externalLinks.description": "קישורים בצ'אטים, בעמודי התחברות ובעמודי חיוב נפתחים כאן.",
+  "settings.externalLinks.description":
+    "קישורים בצ'אטים, בעמודי התחברות ובעמודי חיוב נפתחים כאן. עם OpenBot, רק קישורים בצ'אטים של החלון הראשי עם סוכנים במחשב הזה נפתחים ב-OpenBot. קישורים אחרים נפתחים בדפדפן ברירת המחדל.",
   "settings.externalLinks.defaultBrowser": "דפדפן ברירת המחדל",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "דפדפן ברירת המחדל ({name})",

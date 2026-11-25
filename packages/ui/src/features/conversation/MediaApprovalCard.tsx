@@ -119,7 +119,7 @@ function ModelPicker(props: {
     const settings = settingsFor(model, props.settings);
     const credits = costFor(model, settings);
     return {
-      credits: credits === null ? "" : format.number(credits),
+      credits,
       unit:
         settings.duration === null
           ? t("prompt.mediaApproval.perImage")
@@ -256,7 +256,7 @@ function ModelPicker(props: {
                     </span>
                   </span>
                   <span class="media-approval-row-price">
-                    <CreditAmount value={priceOf(item.rawValue).credits} />
+                    <CreditAmount credits={priceOf(item.rawValue).credits} />
                     <span class="media-approval-row-unit">{priceOf(item.rawValue).unit}</span>
                   </span>
                 </Listbox.Item>
@@ -444,7 +444,7 @@ export function MediaApprovalCard(props: {
   onAllow: (choice: MediaApprovalChoice) => void;
   onSetDefault?: ((model: string | null) => Promise<void>) | undefined;
 }) {
-  const { t, format } = useText();
+  const { t } = useText();
   const initial = untrack(
     (): CardState => ({
       model: props.offer.choice.model,
@@ -463,10 +463,6 @@ export function MediaApprovalCard(props: {
   const cost = () => {
     const model = picked();
     return model ? costFor(model, state.settings) : null;
-  };
-  const credits = () => {
-    const value = cost();
-    return value === null ? "" : format.number(value);
   };
   const isDefault = () => state.defaultModel === state.model;
   const title = () =>
@@ -539,7 +535,7 @@ export function MediaApprovalCard(props: {
           </Show>
           <Button size="sm" type="button" class="media-approval-allow" disabled={allowDisabled()} onClick={allow}>
             {t("prompt.approval.allow")}
-            <CreditAmount value={credits()} class="media-approval-price" />
+            <CreditAmount credits={cost()} class="media-approval-price" />
           </Button>
         </>
       }

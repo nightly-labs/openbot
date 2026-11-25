@@ -67,7 +67,10 @@ adding a module or moving ownership between workspaces.
   service binding `MEDIA_GATEWAY`) to the media generation processor, and the result file comes back
   the same way. Both pass them through in transit only: they do not store or log them, and the
   account service keeps only the credit hold record. The processor adapters, routes, upstream model
-  IDs and keys are in the private gateway repository and its secrets, never in this repository.
+  IDs and keys are in the private repository
+  [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway) and
+  its Worker secrets, never in this repository. To change a processor, a route, a welcome route or
+  the active upstream, work in that repository and deploy its Worker as its README says.
 - The user's SQLite database is the source of truth, not a remote cache.
 - Agents keep their workspace, thread, and identity across provider switches and restarts.
   Do not reset an agent to simplify state.

@@ -575,7 +575,10 @@ export const messages = {
   "error.provider.sessionSettingsTimedOut": "Ajanın oturumu zamanında yanıt vermedi. Tekrar deneyin.",
   "error.provider.piOutdated": "Pi {version} çok eski. Yerel RPC ve MCP desteği için Pi 1.1.0 veya sonrasını yükleyin.",
   "error.provider.nativeMissing": "{provider} CLI yüklü değil. Ayarlar'dan indirin.",
-  "error.provider.nativeNotStarted": "{provider} CLI başlatılamadı.",
+  "error.provider.nativeNotStarted":
+    "OpenBot yüklediğiniz {provider} uygulamasını buldu, ancak başlamadı. {provider} uygulamasını güncelleyin veya yeniden yükleyin, sonra tekrar deneyin.",
+  "error.provider.nativeManagedNotStarted":
+    "{provider} bu sunucuyu çalıştıran bilgisayarda başlamadı. OpenBot'u o bilgisayarda yeniden başlatın. Yine başlamazsa Yardım > Sorun bildir'i seçin.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
   "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",

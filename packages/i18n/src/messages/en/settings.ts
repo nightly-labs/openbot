@@ -109,7 +109,8 @@ export const messages = defineMessages("settings", {
   "settings.quitGuard.always": "Always",
   "settings.quitGuard.never": "Never",
   "settings.externalLinks.title": "Open external links in",
-  "settings.externalLinks.description": "Links in chats, sign-in pages and billing pages open here.",
+  "settings.externalLinks.description":
+    "Links in chats, sign-in pages and billing pages open here. With OpenBot, only links in the main window's chats with agents on this computer open in OpenBot. Other links open in the default browser.",
   "settings.externalLinks.defaultBrowser": "Default browser",
   "settings.externalLinks.openbot": "OpenBot",
   "settings.externalLinks.defaultBrowserNamed": "Default browser ({name})",

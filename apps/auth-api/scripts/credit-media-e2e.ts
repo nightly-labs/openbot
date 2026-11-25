@@ -1182,6 +1182,100 @@ async function welcomeRouteFlow() {
       hold(paidJob.request.jobId)?.funding === "paid",
     paidSubmit,
   );
+
+  database.exec(
+    "UPDATE credit_holds SET status = 'released', outcome = 'canceled', settled_at = 2 WHERE status = 'held'",
+  );
+  database.prepare("UPDATE credit_grants SET remaining_tenths = 100 WHERE grant_id = ?").run(`welcome:${OWNER}`);
+  const serverLedger = database
+    .prepare("SELECT SUM(amount_tenths) AS tenths FROM credit_ledger WHERE server_id = ?")
+    .get(SERVER_ID);
+  database
+    .prepare(
+      "INSERT INTO credit_ledger(entry_id, user_id, server_id, amount_tenths, kind, actor_user_id, reference, created_at) VALUES ('move:studio', NULL, ?, ?, 'transfer', ?, 'move', 2)",
+    )
+    .run(SERVER_ID, 10 - Number(serverLedger?.tenths ?? 0), OWNER);
+  const emptyServer = await run(service.balance(studio));
+  const ownerBefore = await run(service.balance(owner));
+  const viaJob = submission("image-one", { count: 2 });
+  const viaFirst = await run(service.submit(studio, null, viaJob));
+  const viaSubmit = gateway.submits.at(-1)?.request;
+  const viaRetry = await run(service.submit(studio, null, viaJob));
+  const viaHold = database
+    .prepare("SELECT user_id, server_id, actor_user_id, via_server_id, funding FROM credit_holds WHERE job_id = ?")
+    .get(viaJob.request.jobId);
+  const viaPoll = await run(service.job(studio, viaJob.request.jobId));
+  const viaOwnerPoll = await failure(service.job(owner, viaJob.request.jobId));
+  const viaProvider = database
+    .prepare("SELECT provider_job_id FROM credit_holds WHERE job_id = ?")
+    .get(viaJob.request.jobId);
+  gateway.complete(String(viaProvider?.provider_job_id ?? ""), 1);
+  const viaDone = await run(service.job(studio, viaJob.request.jobId));
+  const ownerAfter = await run(service.balance(owner));
+  const serverAfter = await run(service.balance(studio));
+  check(
+    "a server with too few credits makes a free model job on the free credits of its owner, polls it, and the owner sees the spend",
+    emptyServer.available === 11 &&
+      emptyServer.welcome === 10 &&
+      ownerBefore.welcome === 10 &&
+      viaSubmit?.funding === "welcome" &&
+      viaSubmit.upstream === "tasks" &&
+      viaFirst.jobId === viaRetry.jobId &&
+      gateway.submits.filter((entry) => entry.request.jobId === viaJob.request.jobId).length === 1 &&
+      JSON.stringify(viaHold) ===
+        JSON.stringify({
+          user_id: OWNER,
+          server_id: null,
+          actor_user_id: null,
+          via_server_id: SERVER_ID,
+          funding: "welcome",
+        }) &&
+      viaPoll.jobId === viaJob.request.jobId &&
+      viaOwnerPoll.code === "media_job_not_found" &&
+      viaDone.status === "completed" &&
+      ownerAfter.welcome === 7 &&
+      serverAfter.available === 8 &&
+      serverAfter.welcome === 7,
+    { emptyServer, ownerBefore, viaSubmit, viaHold, viaOwnerPoll, viaDone, ownerAfter, serverAfter },
+  );
+
+  const paidOnServer = await failure(service.submit(studio, null, submission("video-one", { duration: 5 })));
+  database.prepare("UPDATE credit_grants SET remaining_tenths = 30 WHERE grant_id = ?").run(`welcome:${OWNER}`);
+  const tooBig = await failure(service.submit(studio, null, submission("image-one", { count: 4 })));
+  check(
+    "the owner's free credits never pay for a model with no free use or a job they cannot cover",
+    paidOnServer.code === "credits_spend_not_enough" &&
+      tooBig.code === "credits_spend_not_enough" &&
+      (await run(service.balance(owner))).welcome === 3,
+    { paidOnServer, tooBig },
+  );
+
+  database.exec(`
+    INSERT INTO users(id, identity_key, email, created_at, updated_at)
+    VALUES ('member', 'email:member@example.test', 'member@example.test', 1, 1);
+    INSERT INTO remote_memberships(membership_id, host_id, user_id, role, status, created_at, updated_at)
+    VALUES ('m-member', '${SERVER_ID}', 'member', 'member', 'active', 1, 1);
+  `);
+  const outsiderJob = await failure(service.submit(studio, OUTSIDER, submission("image-one")));
+  const memberSubmission = submission("image-one");
+  await run(service.submit(studio, "member", memberSubmission));
+  const memberHold = database
+    .prepare("SELECT user_id, server_id, actor_user_id, via_server_id, funding FROM credit_holds WHERE job_id = ?")
+    .get(memberSubmission.request.jobId);
+  check(
+    "a job of a server member also uses the owner's free credits; a job of a user who is not a member does not",
+    outsiderJob.code === "credits_spend_member" &&
+      JSON.stringify(memberHold) ===
+        JSON.stringify({
+          user_id: OWNER,
+          server_id: null,
+          actor_user_id: "member",
+          via_server_id: SERVER_ID,
+          funding: "welcome",
+        }) &&
+      (await run(service.balance(owner))).welcome === 1.5,
+    { outsiderJob, memberHold },
+  );
 }
 
 let passed = false;

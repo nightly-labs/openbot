@@ -279,8 +279,14 @@ export const messages = defineMessages("billing", {
   "billing.credits.rate": "{price} = {credits}",
   "billing.credits.save": "−{percent}",
   "billing.credits.regularPrice": "Regular price",
-  "billing.credits.images": { one: "{amount} image {model}", other: "{amount} images {model}" },
-  "billing.credits.videos": { one: "{amount} video {model}", other: "{amount} videos {model}" },
+  "billing.credits.images": {
+    one: "{amount} image {model} ({resolution})",
+    other: "{amount} images {model} ({resolution})",
+  },
+  "billing.credits.videos": {
+    one: "{amount} video {model} ({seconds} s, {resolution})",
+    other: "{amount} videos {model} ({seconds} s, {resolution})",
+  },
   "billing.credits.pay": "Pay {amount}",
   "billing.credits.confirmPay": "Confirm and pay {amount}",
   "billing.credits.discount": "Discount",

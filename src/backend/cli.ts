@@ -8,6 +8,7 @@ import { olderVersion } from "@openbot/contracts/cli-version";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Fiber, Option, Result, type Scope } from "effect";
 import { providerCheckTimeoutMs } from "./disk-restore";
 import type { SignInRegion } from "./kimi-region";
@@ -16,6 +17,8 @@ import { type ProviderClientOperationError, providerCall, providerFailure } from
 export { compareReleases, isVersion, olderVersion } from "@openbot/contracts/cli-version";
 
 const execFileAsync = promisify(execFile);
+const logger = createOpenBotLogger("provider-runtime");
+const loggedStartFailures = new Set<string>();
 const MINIMUM_CODEX_VERSION = [0, 156, 0] as const;
 const MINIMUM_CLAUDE_VERSION = [2, 1, 232] as const;
 const MINIMUM_GROK_VERSION = [1, 0, 5] as const;
@@ -715,6 +718,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
   const candidates = yield* cliCandidates(provider, input.systemCandidates, input.bundledExecutable ?? null);
   let found = false;
   let outdated: CodexCliError | undefined;
+  let failedSource: "system" | "managed" | undefined;
   for (const candidate of candidates) {
     if (provider === "muse" && isWindowsLauncherScript(candidate.executable)) continue;
     if (!(yield* isExecutable(candidate.executable))) continue;
@@ -729,22 +733,38 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
       }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
     );
     if (Result.isSuccess(attempt)) return attempt.success;
-    if (attempt.failure.cause instanceof CodexCliError && attempt.failure.cause.code === "outdated")
-      outdated = attempt.failure.cause;
-    if (isCliTimeout(attempt.failure.cause)) return yield* Effect.fail(attempt.failure);
+    const cause = attempt.failure.cause;
+    if (cause instanceof CodexCliError && cause.code === "outdated") outdated = cause;
+    else if (isCliTimeout(cause)) return yield* Effect.fail(attempt.failure);
+    else {
+      failedSource ??= candidate.source;
+      const failure = startFailure(cause);
+      const logged = `${candidate.executable}\0${failure.code}\0${failure.signal ?? ""}`;
+      if (!loggedStartFailures.has(logged)) {
+        loggedStartFailures.add(logged);
+        logger.warn("Provider CLI did not start.", { provider, source: candidate.source, ...failure });
+      }
+    }
   }
   if (outdated) return yield* Effect.fail(providerFailure(outdated));
+  const key = !found
+    ? "error.provider.nativeMissing"
+    : failedSource === "managed"
+      ? "error.provider.nativeManagedNotStarted"
+      : "error.provider.nativeNotStarted";
   return yield* Effect.fail(
     providerFailure(
-      new CodexCliError(
-        sourceText(found ? "error.provider.nativeNotStarted" : "error.provider.nativeMissing", {
-          provider: agentProviderName(provider),
-        }),
-        found ? "invalid" : "missing",
-      ),
+      new CodexCliError(sourceText(key, { provider: agentProviderName(provider) }), found ? "invalid" : "missing"),
     ),
   );
 });
+
+function startFailure(cause: unknown): { code: string | number | null; signal?: string } {
+  if (cause instanceof CodexCliError) return { code: cause.code };
+  if (!isDynamicRecord(cause)) return { code: null };
+  const code = typeof cause.code === "string" || typeof cause.code === "number" ? cause.code : null;
+  return typeof cause.signal === "string" ? { code, signal: cause.signal } : { code };
+}
 
 export const resolvePiCli = (input?: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined }) =>
   resolveNativeCli("pi", input);
