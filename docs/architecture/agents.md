@@ -1117,6 +1117,19 @@ the limit, the message waits in the queue. Before, it failed at once and the mes
 of the whole turn. `scripts/antigravity-steer-e2e.ts` and
 `scripts/devin-steer-e2e.ts` check these paths.
 
+Antigravity ends its prompt while a command that it moved to the background still runs
+(`AcpFlavor.wakesAfterPromptEnds`), and OpenBot keeps the turn open. When the command ends, a current
+CLI reports it and replies by itself, with no prompt open. That reply is the rest of the turn: it ends
+`ACP_OWN_REPLY_SETTLE_MS` (3 s) after its `usage_update`, or after `ACP_OWN_REPLY_QUIET_MS` (2 minutes)
+with no update. Only a command step can stay open: when the reply starts a new background command,
+the turn waits for that command in the same way.
+OpenBot sends the background wake prompt only when the session changed and no update came within
+`ACP_OWN_REPLY_WAIT_MS` (30 s), as an older CLI needs, or when the CLI reported the command end but did
+not reply within `ACP_OWN_REPLY_QUIET_MS`. Before, it always sent the prompt, and the CLI answered it
+again, so the chat showed the same answer twice in one message (#16149).
+`scripts/antigravity-steer-e2e.ts` checks a CLI that replies, a silent CLI, and a reply that starts a
+new command.
+
 A message that comes while a turn starts, before the provider gave the turn id, cannot steer yet and
 stays in the queue. When the mode is "steer" and a delivery of the same lane is starting,
 `AgentService` keeps its delivery id (`#steersAfterTurnStart`) and steers it at `turn-started` of the
