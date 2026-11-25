@@ -16,7 +16,7 @@ export interface NearWalletIpcDependencies {
   nearWallet: Pick<
     NearWalletService,
     | "status"
-    | "retryReads"
+    | "refresh"
     | "create"
     | "setBudget"
     | "setAgents"
@@ -46,7 +46,7 @@ export function nearWalletIpcHandlers({ nearWallet }: NearWalletIpcDependencies)
   return {
     nearWallet: {
       status: handler(() => {
-        Effect.runFork(nearWallet.retryReads());
+        Effect.runFork(nearWallet.refresh());
         return nearWallet.status();
       }),
       create: payloadHandler(required(parseNearWalletCreateInput, "setup"), (input) =>

@@ -1888,7 +1888,7 @@ export async function createApplicationServices({
   });
   await Effect.runPromise(nearWallet.load());
   centralAuth.on("changed", (state) => {
-    if (state.status === "signed_in") void Effect.runPromise(nearWallet.retryReads());
+    if (state.status === "signed_in") void Effect.runPromise(nearWallet.refresh());
   });
   teardown.push(TEARDOWN_ORDER.nearWallet, "the NEAR wallet", () => Effect.runPromise(nearWallet.dispose()));
   const bitwardenCliTarget = runtimeTarget(process.platform, process.arch);

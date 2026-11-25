@@ -1561,7 +1561,7 @@ Network traffic can also occur when:
   through in transit only. It does not store or log them. It keeps only the wallet ID, the OpenBot
   account or server that owns it, and the time it was made, so that only that owner can use the
   wallet. The owner signs on the OpenBot page
-  `api.openbot.run/near/sign` in the system browser; the request is in the address fragment, which the
+  `nearintents.openbot.run/near/sign` in the system browser; the request is in the address fragment, which the
   browser does not send to the server, and the page sends the signature back to OpenBot only. The
   agent's reason and the domain of a payment stay on this computer. The chat card and the Crypto tab
   load the icon of the payment's domain from that domain (`/favicon.ico`), with no referrer. Nothing

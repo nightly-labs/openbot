@@ -34,4 +34,5 @@
   waits in the queue.
 - When the network fails during a payment, OpenBot keeps the payment and does not send it a second time.
 - After you renew the payment grant, OpenBot does not send a payment that you approved under the old grant.
-- On a joined server, the wallet page shows the agents of that server.
+- While a joined server is open, the wallet page lists the agents of this computer, not the agents of
+  the joined server.

@@ -34,7 +34,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
-import { Duration, Effect, Exit, Result, Scope, Semaphore } from "effect";
+import { Duration, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
 import {
   type NearPaymentRequest,
   type NearPaymentResult,
@@ -116,7 +116,7 @@ export class NearWalletService implements NearWallet {
   #signingState: NearSigning | null = null;
   #error: string | null = null;
   #readFailed = false;
-  #retrying = false;
+  #reading = false;
   #started = false;
   #balances: { at: number; list: NearBalance[]; raw: BalanceRow[] } | null = null;
   #tokens: { at: number; list: TokenView[] } | null = null;
@@ -185,24 +185,22 @@ export class NearWalletService implements NearWallet {
   }
 
   readonly refresh = Effect.fn("NearWallet.refresh")(function* (this: NearWalletService) {
-    yield* this.#background(this.#refresh(true));
-    return this.status();
-  }).bind(this);
-
-  readonly retryReads = Effect.fn("NearWallet.retryReads")(function* (this: NearWalletService) {
-    if (this.#disposed || this.#retrying || !this.#readFailed || !this.#gatewayOwner(this.#store.read())) return;
-    this.#retrying = true;
-    const reads = this.#started ? this.#refresh(true) : this.#startup();
-    yield* Effect.forkIn(
+    if (this.#disposed || this.#reading || !this.#gatewayOwner(this.#store.read())) return this.status();
+    if (!this.#readFailed && !this.#started) return this.status();
+    this.#reading = true;
+    const reads = this.#started ? this.#refresh(this.#readFailed) : this.#startup();
+    const fiber = yield* Effect.forkIn(
       this.#background(reads).pipe(
         Effect.ensuring(
           Effect.sync(() => {
-            this.#retrying = false;
+            this.#reading = false;
           }),
         ),
       ),
       this.#scope,
     );
+    yield* Fiber.await(fiber);
+    return this.status();
   }).bind(this);
 
   readonly create = Effect.fn("NearWallet.create")(function* (this: NearWalletService, input: NearWalletCreateInput) {
