@@ -451,6 +451,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Yükleniyor",
   "mobile.chat.outbox.sendsWhenOnline": "Sunucu çevrim içi olunca gönderilecek",
   "mobile.chat.outbox.waiting": "Gönderilmeyi bekliyor",
+  "mobile.chat.outbox.waitingForFailed": "Gönderilemeyen mesajı bekliyor",
   "mobile.chat.outbox.failed": "Gönderilmedi",
   "mobile.chat.outbox.failedHold": "Gönderilmedi. Tekrar denemek için mesaja basılı tutun.",
   "mobile.chat.outbox.cancelSend": "Gönderme",

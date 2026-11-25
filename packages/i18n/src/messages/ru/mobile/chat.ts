@@ -532,6 +532,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Загрузка",
   "mobile.chat.outbox.sendsWhenOnline": "Отправится, когда сервер будет в сети",
   "mobile.chat.outbox.waiting": "Ожидает отправки",
+  "mobile.chat.outbox.waitingForFailed": "Ожидает неотправленное сообщение",
   "mobile.chat.outbox.failed": "Не отправлено",
   "mobile.chat.outbox.failedHold": "Не отправлено. Нажмите и удерживайте сообщение, чтобы повторить.",
   "mobile.chat.outbox.cancelSend": "Не отправлять",

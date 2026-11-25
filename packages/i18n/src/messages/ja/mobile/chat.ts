@@ -449,6 +449,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "アップロード中",
   "mobile.chat.outbox.sendsWhenOnline": "サーバーがオンラインになると送信されます",
   "mobile.chat.outbox.waiting": "送信を待っています",
+  "mobile.chat.outbox.waitingForFailed": "送信されなかったメッセージを待っています",
   "mobile.chat.outbox.failed": "未送信",
   "mobile.chat.outbox.failedHold": "未送信です。メッセージを長押しして再試行してください。",
   "mobile.chat.outbox.cancelSend": "送信しない",

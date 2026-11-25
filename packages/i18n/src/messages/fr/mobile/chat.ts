@@ -463,6 +463,7 @@ export const messages = {
   "mobile.chat.upload.uploadingLabel": "Envoi en cours",
   "mobile.chat.outbox.sendsWhenOnline": "Sera envoyé quand le serveur sera en ligne",
   "mobile.chat.outbox.waiting": "En attente d’envoi",
+  "mobile.chat.outbox.waitingForFailed": "En attente du message non envoyé",
   "mobile.chat.outbox.failed": "Non envoyé",
   "mobile.chat.outbox.failedHold": "Non envoyé. Maintenez le message appuyé pour réessayer.",
   "mobile.chat.outbox.cancelSend": "Ne pas envoyer",

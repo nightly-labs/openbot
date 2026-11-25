@@ -13,6 +13,7 @@ import { reportMobileNotification } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { ChannelHistoryRefreshError } from "@/features/channels/model/channel-store";
 import { donateShareTarget } from "@/features/share/model/share-extension";
+import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import {
   useMobileWorkspaceReader,
   useMobileWorkspaceSelector,
@@ -53,7 +54,11 @@ function createAccountOutbox(scope: string | null): AccountOutbox {
       const { t, errorMessage } = currentText();
       return errorMessage(error, t("mobile.chat.outbox.failed"));
     },
-    reportFailure: (error) => reportMobileNotification({ code: classifyFailure(error) }, "turn", "banner"),
+    reportFailure: (error) => {
+      const code = classifyFailure(error);
+      supportLog.add("warn", "app", `Chat message not sent (${code}): ${supportLogValue(error)}`);
+      reportMobileNotification({ code }, "turn", "banner");
+    },
     randomId: Crypto.randomUUID,
   });
   return { store, workspace };
