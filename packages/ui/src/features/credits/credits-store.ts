@@ -69,7 +69,14 @@ export function creditsRailWallet(
   const movable = wallet?.role === "owner" ? wallet : null;
   if (!wallet)
     return { balance: credits.balance, welcome: credits.welcome ?? null, serverId: null, name: null, movable };
-  return { balance: wallet.balance, welcome: null, serverId: wallet.serverId, name: wallet.name, movable };
+  const welcome = movable ? (credits.welcome ?? null) : null;
+  return {
+    balance: wallet.balance + (welcome ?? 0),
+    welcome,
+    serverId: wallet.serverId,
+    name: wallet.name,
+    movable,
+  };
 }
 
 export function createCreditsStore(

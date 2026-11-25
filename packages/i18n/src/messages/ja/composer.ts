@@ -109,6 +109,9 @@ export const messages = {
   "composer.voice.recording": "音声の録音",
   "composer.voice.limitSoon": "あと {seconds} 秒で録音が止まります。",
   "composer.voice.limitReached": "10 分の上限に達したため録音を停止しました。話した内容はメッセージに入っています。",
+  "composer.voice.languageNotice":
+    "音声入力が認識できるのは英語など 25 のヨーロッパ言語です。ほかの言語には大きなモデル（{size}）が必要で、テキストは停止後に表示されます。",
+  "composer.voice.languageNotice.action": "別の言語を話す",
   "composer.send.saveQueued": "キューのメッセージを保存",
   "composer.send.voice": "音声メッセージを送信",
   "composer.send.message": "メッセージを送信",

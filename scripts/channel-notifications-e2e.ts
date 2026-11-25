@@ -264,7 +264,9 @@ const teamBrowser: TeamApiBrowser = {
   startView: unused,
   dispatchViewInput: unused,
   copyViewSelection: unused,
+  answerViewDialog: unused,
   importSignIn: unused,
+  answerHttpSignIn: unused,
 };
 const cipher = {
   encrypt: (value: string) => Buffer.from(value, "utf8"),

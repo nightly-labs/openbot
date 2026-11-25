@@ -69,6 +69,8 @@ export const messages = {
   "error.backend.browserLocationFailed": "Não foi possível definir a localização da página.",
   "error.backend.browserPermissionsUnsupported": "Este host remoto não pode responder a pedidos de localização.",
   "error.backend.browserLocationRequired": "Envie a localização do dispositivo para permitir o pedido.",
+  "error.backend.browserHttpSignInInactive": "Este site não pede mais login. Recarregue a página para tentar de novo.",
+  "error.backend.browserHttpSignInUnsupported": "Este host remoto não pode receber um login de site.",
   "error.backend.sharedDataLocalOnly":
     "Os dados compartilhados são gerenciados no computador que executa estes agentes.",
   "error.backend.browserUrlProtocol": "Somente URLs HTTP(S) são permitidas no navegador.",
@@ -354,6 +356,8 @@ export const messages = {
     "{provider} não conseguiu obter as ferramentas do GitHub, porque o GitHub não respondeu. Abra o GitHub na Loja, Apps, e conecte-o de novo se ele pedir. Depois inicie um novo chat para tentar de novo.",
   "error.backend.mcpAppReconnect":
     "{name} no ChatGPT pede que você entre de novo. Reconecte {name} no ChatGPT e peça de novo ao agente.",
+  "error.backend.mcpAppAutoReview":
+    "Este app do ChatGPT não funciona quando o agente tem Perguntar antes ou Acesso completo. O app precisa da revisão automática de aprovações do Codex, que o OpenBot ainda não suporta. Você pode tentar Espaço de trabalho em Acesso, nas configurações do agente, e pedir de novo ao agente.",
   "error.backend.mcpServerSignInPage":
     "O servidor MCP {name} pediu que você entre em uma página da web. O OpenBot não abre essa página para um servidor, então recusou o pedido. Abra {name} na Loja, Apps, entre e peça de novo ao agente.",
   "error.backend.mcpServerRequestDeclined":

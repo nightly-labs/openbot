@@ -71,6 +71,10 @@ export const messages = {
   "browser.liveView.copyTooLarge": "La selezione è troppo lunga da copiare. Seleziona meno testo.",
   "browser.liveView.copyFailed": "Impossibile copiare il testo. Fai clic sulla pagina e riprova.",
   "browser.liveView.pageCopied": "La pagina ha copiato del testo. Scegli Copia per metterlo negli appunti.",
+  "browser.liveView.dialog.site": "{site} dice",
+  "browser.liveView.dialog.page": "Questa pagina dice",
+  "browser.liveView.dialog.waiting": "La pagina attende la tua risposta.",
+  "browser.liveView.dialog.ok": "OK",
   "browser.previews.label": "Anteprime del browser",
   "browser.previews.resize": "Ridimensiona il pannello destro",
   "browser.previews.empty": "Nessuna scheda del browser",
@@ -179,6 +183,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} mostra ancora una pagina di accesso di {site}. Completa l’accesso nella finestra.",
   "browser.signIn.failed": "OpenBot non è riuscito a inviare l’accesso.",
+  "browser.httpSignIn.title": "Accedi a {site}",
+  "browser.httpSignIn.description": "Questo sito chiede un proprio nome utente e una propria password.",
+  "browser.httpSignIn.refused": "Il sito non ha accettato questo nome utente o questa password.",
+  "browser.httpSignIn.username": "Nome utente",
+  "browser.httpSignIn.password": "Password",
+  "browser.httpSignIn.submit": "Accedi",
   "browser.profiles.title": "Profili del browser",
   "browser.profiles.subtitle":
     "Ogni profilo mantiene accessi, cookie e dati dei siti propri sul computer su cui gira OpenBot.",

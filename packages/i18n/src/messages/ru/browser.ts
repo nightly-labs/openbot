@@ -74,6 +74,10 @@ export const messages = {
   "browser.liveView.copyFailed": "Не удалось скопировать текст. Нажмите на страницу и повторите попытку.",
   "browser.liveView.pageCopied":
     "Страница скопировала текст. Выберите «Копировать», чтобы поместить его в буфер обмена.",
+  "browser.liveView.dialog.site": "Сообщение от {site}",
+  "browser.liveView.dialog.page": "Сообщение от страницы",
+  "browser.liveView.dialog.waiting": "Страница ждёт вашего ответа.",
+  "browser.liveView.dialog.ok": "ОК",
   "browser.previews.label": "Превью браузера",
   "browser.previews.resize": "Изменить размер правой панели",
   "browser.previews.empty": "Нет вкладок браузера",
@@ -184,6 +188,12 @@ export const messages = {
   "browser.signIn.notFound": "OpenBot не нашёл вход в {site}. Войдите в окне, затем выберите «Готово».",
   "browser.signIn.stillSignedOut": "{server} всё ещё показывает страницу входа в {site}. Завершите вход в окне.",
   "browser.signIn.failed": "OpenBot не удалось отправить вход.",
+  "browser.httpSignIn.title": "Вход в {site}",
+  "browser.httpSignIn.description": "Этот сайт запрашивает собственное имя пользователя и пароль.",
+  "browser.httpSignIn.refused": "Сайт не принял это имя пользователя или пароль.",
+  "browser.httpSignIn.username": "Имя пользователя",
+  "browser.httpSignIn.password": "Пароль",
+  "browser.httpSignIn.submit": "Войти",
   "browser.profiles.title": "Профили браузера",
   "browser.profiles.subtitle":
     "Каждый профиль хранит свои входы в аккаунты, cookie и данные сайтов на компьютере, где работает OpenBot.",

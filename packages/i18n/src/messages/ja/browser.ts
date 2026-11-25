@@ -70,6 +70,10 @@ export const messages = {
   "browser.liveView.copyTooLarge": "選択範囲が長すぎてコピーできません。選択するテキストを減らしてください。",
   "browser.liveView.copyFailed": "テキストをコピーできませんでした。ページをクリックしてもう一度お試しください。",
   "browser.liveView.pageCopied": "ページがテキストをコピーしました。［コピー］を選ぶとクリップボードに入ります。",
+  "browser.liveView.dialog.site": "{site} からのメッセージ",
+  "browser.liveView.dialog.page": "このページからのメッセージ",
+  "browser.liveView.dialog.waiting": "ページはあなたの回答を待っています。",
+  "browser.liveView.dialog.ok": "OK",
   "browser.previews.label": "ブラウザーのプレビュー",
   "browser.previews.resize": "右のパネルのサイズを変更",
   "browser.previews.empty": "ブラウザーのタブはありません",
@@ -176,6 +180,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} にはまだ {site} のサインインページが表示されています。ウィンドウでサインインを完了してください。",
   "browser.signIn.failed": "OpenBot はサインインを送信できませんでした。",
+  "browser.httpSignIn.title": "{site} にサインイン",
+  "browser.httpSignIn.description": "このサイトは独自のユーザー名とパスワードを求めています。",
+  "browser.httpSignIn.refused": "サイトはこのユーザー名またはパスワードを受け付けませんでした。",
+  "browser.httpSignIn.username": "ユーザー名",
+  "browser.httpSignIn.password": "パスワード",
+  "browser.httpSignIn.submit": "サインイン",
   "browser.profiles.title": "ブラウザープロファイル",
   "browser.profiles.subtitle":
     "各プロファイルは、専用のサインイン、Cookie、サイトデータを OpenBot を実行しているコンピューターに保持します。",

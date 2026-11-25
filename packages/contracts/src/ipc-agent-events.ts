@@ -166,6 +166,7 @@ export type AgentEvent =
       type: "browser-page-state-changed";
       tabs: { tabId: string; canGoBack: boolean; canGoForward: boolean }[];
     }
+  | { type: "browser-http-sign-in-changed"; tabs: { tabId: string; origin: string; refused: boolean }[] }
   | {
       type: "browser-permissions-changed";
       requests: { tabId: string; id: string; origin: string; permission: "geolocation" }[];
@@ -388,6 +389,13 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
             isString(request.id) &&
             isString(request.origin) &&
             request.permission === "geolocation",
+        )
+      );
+    case "browser-http-sign-in-changed":
+      return (
+        Array.isArray(value.tabs) &&
+        value.tabs.every(
+          (tab) => isDynamicRecord(tab) && isString(tab.tabId) && isString(tab.origin) && isBoolean(tab.refused),
         )
       );
     case "error":

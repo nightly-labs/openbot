@@ -61,6 +61,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserLocationFailed": "Could not set the location for the page.",
   "error.backend.browserPermissionsUnsupported": "This remote host cannot answer location requests.",
   "error.backend.browserLocationRequired": "Send the location of the device to allow the request.",
+  "error.backend.browserHttpSignInInactive": "This site no longer asks for a sign-in. Reload the page to try again.",
+  "error.backend.browserHttpSignInUnsupported": "This remote host cannot take a site sign-in.",
   "error.backend.sharedDataLocalOnly": "Shared data is managed on the computer that runs these agents.",
   "error.backend.browserUrlProtocol": "Only HTTP(S) browser URLs are allowed.",
   "error.backend.sunshineNotReady": "Sunshine did not become ready.",
@@ -336,6 +338,8 @@ export const messages = defineMessages("error.backend", {
     "{provider} could not get the GitHub tools, because GitHub did not answer. Open GitHub in Marketplace, Apps, and connect it again if it asks you to. Then start a new chat to try again.",
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
+  "error.backend.mcpAppAutoReview":
+    "This ChatGPT app does not run when the agent has Ask first or Full access. The app needs the automatic approval review of Codex, which OpenBot does not support yet. You can try Workspace only for Access in the agent settings, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
     "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open {name} in Marketplace, Apps, and sign in, then ask the agent again.",
   "error.backend.mcpServerRequestDeclined":

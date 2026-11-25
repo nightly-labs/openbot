@@ -112,6 +112,9 @@ export const messages = {
   "composer.voice.recording": "تسجيل صوتي",
   "composer.voice.limitSoon": "يتوقف التسجيل خلال {seconds} ثانية.",
   "composer.voice.limitReached": "توقف التسجيل عند حد 10 دقائق. ما قلته موجود في الرسالة.",
+  "composer.voice.languageNotice":
+    "يعرف الإملاء الصوتي 25 لغة أوروبية، مثل الإنجليزية. تحتاج اللغات الأخرى إلى نموذج أكبر ({size})، ويظهر النص بعد أن تتوقف.",
+  "composer.voice.languageNotice.action": "أتحدث لغة أخرى",
   "composer.send.saveQueued": "حفظ الرسالة في قائمة الانتظار",
   "composer.send.voice": "إرسال رسالة صوتية",
   "composer.send.message": "إرسال الرسالة",

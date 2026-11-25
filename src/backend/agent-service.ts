@@ -150,6 +150,7 @@ import {
   agentNewChatAllowed,
   agentTaskLimit,
   type BusyMessageMode,
+  browserHttpSignInPrompts,
   COMPUTER_USE_MCP_SERVER_NAME,
   CONTEXT_RESET_ITEM_TYPE,
   type CreditsHold,
@@ -197,7 +198,7 @@ import { ContextCompactRefusedError } from "@openbot/contracts/team-protocol/con
 import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-reset-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger } from "@openbot/logging";
+import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { workflowMediaCreditsOf, workflowMediaProvidersOf } from "@openbot/team-client/workflow-decoding";
 import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
@@ -334,7 +335,7 @@ import {
 } from "./agent/workflow-generation-error";
 import { confinedWritesAllowed, effectiveAgentFolders } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
-import type { AgentProvider } from "./agent-client";
+import { type AgentProvider, fixedContextCompaction } from "./agent-client";
 import type { AgentTables } from "./agent-data/agent-tables";
 import {
   AgentHistoryTransfer,
@@ -1161,9 +1162,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ...(options.fitImage ? { fitImage: options.fitImage } : {}),
         ...(credentials.serverEnvironment
           ? {
-              agentEnvironment: (inherited) => ({
+              agentEnvironment: (inherited, gitConfig) => ({
                 ...credentials.serverEnvironment,
-                ...credentials.agentEnvironment?.(inherited),
+                ...credentials.agentEnvironment?.(inherited, gitConfig),
               }),
             }
           : {}),
@@ -1319,6 +1320,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     let userControlTabIds = "";
     let browserPageStates = "";
     let browserPermissions = "[]";
+    let browserHttpSignIns = "";
     this.#browser.onChanged((tabs, activeTabId) => {
       this.#attention.cancelTakeoversForMissingTabs(tabs);
       Effect.runFork(this.#browserUploads.retainTabs(tabs).pipe(Effect.forkIn(this.#scope)));
@@ -1338,6 +1340,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       if (permissionKey !== browserPermissions) {
         browserPermissions = permissionKey;
         this.#emit({ type: "browser-permissions-changed", requests: permissionRequests });
+      }
+      const httpSignIns = browserHttpSignInPrompts(tabs);
+      const httpSignInKey = JSON.stringify(httpSignIns);
+      if (httpSignInKey !== browserHttpSignIns) {
+        browserHttpSignIns = httpSignInKey;
+        this.#emit({ type: "browser-http-sign-in-changed", tabs: httpSignIns });
       }
       const held = tabs.filter((tab) => tab.userControl).map((tab) => tab.id);
       if (held.join("\n") === userControlTabIds) return;
@@ -1754,6 +1762,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
       ownChat: (threadId) => this.#store.ownsThread(threadId),
+      appendSystemMessage: (agentId, sideThreadId, message) =>
+        sideThreadId
+          ? this.#appendSideThreadSystemMessage(agentId, sideThreadId, message, "messaging.undelivered")
+          : this.#appendSystemMessage(agentId, message, "messaging.undelivered"),
       contextSession: (agentId, threadId) => {
         const agent = this.#store.get(agentId);
         if (!agent || !this.#reportsCompactions(agentId)) return null;
@@ -3156,7 +3168,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             failed(
               failure instanceof GenerationUsageLimitError
                 ? sourceText("error.provider.usageLimitReached")
-                : workflowGenerationError(failure.cause, provider),
+                : workflowGenerationError(failure.cause, provider, (text) => redactText(this.#mcp.redact(text))),
             ),
           ),
         );
@@ -5211,8 +5223,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  channelCompactAvailable(channelId: string): boolean {
+    const members = new Set(this.channels.store.get(channelId).members.map((member) => member.agentId));
+    return this.#store.list().some((agent) => members.has(agent.id) && this.#mayCompactOnRequest(agent));
+  }
+
   #mayCompactOnRequest(agent: AgentSummary): boolean {
-    const mode = this.#providers.lastCompactionMode(agent);
+    const mode = this.#providers.lastCompactionMode(agent) ?? fixedContextCompaction(agent.provider);
     return mode === undefined || compactsOnRequest(mode);
   }
 

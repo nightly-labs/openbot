@@ -3613,6 +3613,43 @@ fieldset.wfn-picker-group {
   -webkit-line-clamp: 3;
 }
 
+.wfn-alert-clamp {
+  display: grid;
+  flex: 1;
+  gap: var(--openbot-space-0-5);
+  min-width: 0;
+}
+
+.wfn-alert:has(> .wfn-alert-clamp) {
+  align-items: flex-start;
+}
+
+.wfn-alert-icon-first-line {
+  margin-top: calc((var(--openbot-leading-sm) - var(--openbot-icon-sm)) / 2);
+}
+
+.wfn-alert .wfn-alert-clamp .wfn-step-text-body {
+  max-height: calc(var(--openbot-leading-sm) * 3);
+  color: inherit;
+}
+
+.wfn-alert .wfn-alert-clamp .wfn-step-text-body[data-open] {
+  max-height: none;
+}
+
+.wfn-alert .wfn-alert-clamp[data-clamped] .wfn-step-text-body {
+  mask-image: linear-gradient(
+    to bottom,
+    var(--openbot-danger-text) calc(100% - var(--openbot-leading-sm)),
+    transparent
+  );
+}
+
+.wfn-alert .wfn-alert-clamp .wfn-step-text-toggle,
+.wfn-alert .wfn-alert-clamp .wfn-step-text-toggle:hover {
+  color: inherit;
+}
+
 .wfn-answer-input {
   min-height: 96px;
   font-family: var(--openbot-font-mono);

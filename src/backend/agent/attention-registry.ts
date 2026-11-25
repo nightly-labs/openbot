@@ -165,6 +165,24 @@ function outlivesTurn(pending: PendingPrompt): boolean {
   return pending.detached !== undefined || pending.subagent === true;
 }
 
+function plainBlock(
+  block: SurfacedUiBlock,
+  auto: UiBlockAutoAnswer | undefined,
+  questions: AgentPromptQuestion[],
+): boolean {
+  return (
+    !block.vault &&
+    !block.apiKey &&
+    !block.location &&
+    auto === undefined &&
+    !questions.some((question) => question.isSecret)
+  );
+}
+
+function providerStopsCall(request: AppServerRequest): boolean {
+  return request.detachAfterMs !== undefined || request.answerBeforeMs !== undefined;
+}
+
 export type AgentPersonWait = "approval" | "answer" | "browser";
 
 export interface LateAnswerTarget {
@@ -2239,7 +2257,8 @@ export class AttentionRegistry {
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
       ...(request.subagent ? { subagent: true as const } : {}),
     };
-    if (block.vault) this.#scheduleDetach(request, pending);
+    if (block.vault || (plainBlock(block, auto, questions) && providerStopsCall(request)))
+      this.#scheduleDetach(request, pending);
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({

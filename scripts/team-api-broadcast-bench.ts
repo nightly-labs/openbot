@@ -394,6 +394,7 @@ const fakeAgents: TeamApiAgents = {
   deleteAgentHistory: unused("deleteAgentHistory"),
   clearChannelContext: unused("clearChannelContext"),
   compactChannelContext: unused("compactChannelContext"),
+  channelCompactAvailable: unused("channelCompactAvailable"),
   deleteChannelHistory: unused("deleteChannelHistory"),
   compactAgentContext: unused("compactAgentContext"),
   compactTaskContext: unused("compactTaskContext"),
@@ -434,7 +435,9 @@ const browser: TeamApiBrowser = {
   startView: unused("startView"),
   dispatchViewInput: unused("dispatchViewInput"),
   copyViewSelection: unused("copyViewSelection"),
+  answerViewDialog: unused("answerViewDialog"),
   importSignIn: unused("importSignIn"),
+  answerHttpSignIn: unused("answerHttpSignIn"),
 };
 
 const mailbox: TeamApiMailbox = { resolveAttachment: () => Effect.succeed(null) };

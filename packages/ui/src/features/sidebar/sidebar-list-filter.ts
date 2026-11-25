@@ -37,10 +37,6 @@ export function sidebarListFilterIsSet(filter: SidebarListFilter): boolean {
   return filter.show !== "all" || filter.unread || filter.working || filter.folders.length > 0;
 }
 
-export function sidebarListFilterParts(filter: SidebarListFilter): number {
-  return Number(filter.show !== "all") + Number(filter.unread || filter.working) + Number(filter.folders.length > 0);
-}
-
 export function sidebarChatMatchesFilter(chat: SidebarChatFacts, filter: SidebarListFilter): boolean {
   if (filter.show === "agents" && chat.kind !== "agent") return false;
   if (filter.show === "channels" && chat.kind !== "channel") return false;

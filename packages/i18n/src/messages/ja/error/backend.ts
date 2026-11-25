@@ -65,6 +65,9 @@ export const messages = {
   "error.backend.browserLocationFailed": "ページの位置情報を設定できませんでした。",
   "error.backend.browserPermissionsUnsupported": "このリモートホストは位置情報のリクエストに応答できません。",
   "error.backend.browserLocationRequired": "リクエストを許可するには、デバイスの位置情報を送信してください。",
+  "error.backend.browserHttpSignInInactive":
+    "このサイトはもうサインインを求めていません。ページを再読み込みして、もう一度お試しください。",
+  "error.backend.browserHttpSignInUnsupported": "このリモートホストはサイトへのサインインを受け取れません。",
   "error.backend.sharedDataLocalOnly": "共有データは、これらのエージェントを実行しているコンピューターで管理されます。",
   "error.backend.browserUrlProtocol": "HTTP(S) のブラウザー URL のみ使用できます。",
   "error.backend.sunshineNotReady": "Sunshine の準備ができませんでした。",

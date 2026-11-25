@@ -67,6 +67,9 @@ export const messages = {
   "error.backend.browserLocationFailed": "Kan de locatie voor de pagina niet instellen.",
   "error.backend.browserPermissionsUnsupported": "Deze externe host kan geen locatieverzoeken beantwoorden.",
   "error.backend.browserLocationRequired": "Stuur de locatie van het apparaat om het verzoek toe te staan.",
+  "error.backend.browserHttpSignInInactive":
+    "Deze site vraagt niet meer om in te loggen. Laad de pagina opnieuw om het nog eens te proberen.",
+  "error.backend.browserHttpSignInUnsupported": "Deze externe host kan geen login voor een site overnemen.",
   "error.backend.sharedDataLocalOnly": "Gedeelde gegevens worden beheerd op de computer waarop deze agents draaien.",
   "error.backend.browserUrlProtocol": "Alleen HTTP(S)-URL’s zijn toegestaan in de browser.",
   "error.backend.sunshineNotReady": "Sunshine is niet klaar geworden.",

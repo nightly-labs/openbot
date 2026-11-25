@@ -67,7 +67,10 @@ adding a module or moving ownership between workspaces.
   service binding `MEDIA_GATEWAY`) to the media generation processor, and the result file comes back
   the same way. Both pass them through in transit only: they do not store or log them, and the
   account service keeps only the credit hold record. The processor adapters, routes, upstream model
-  IDs and keys are in the private gateway repository and its secrets, never in this repository.
+  IDs and keys are in the private repository
+  [`nightly-labs/openbot-media-gateway`](https://github.com/nightly-labs/openbot-media-gateway) and
+  its Worker secrets, never in this repository. To change a processor, a route, a welcome route or
+  the active upstream, work in that repository and deploy its Worker as its README says.
   Exception: the crypto wallet sends its NEAR Intents Agent API calls through the account service
   (`/v1/near/*`), which adds the partner key (`NEAR_INTENTS_PARTNER_KEY`, a secret). It passes them
   through in transit only, and keeps only the wallet ID, its owner and its creation time in D1.

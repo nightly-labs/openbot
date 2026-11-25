@@ -53,6 +53,8 @@ export const messages = {
   "agent.dock.add": "ドックに追加",
   "agent.dock.allAdded": "すべてのエージェントとチャンネルがドックにあります",
   "agent.dock.more": "その他",
+  "agent.dock.mainChat": "メインチャット",
+  "agent.dock.changeChat": "チャットを切り替え",
   "agent.dock.keepOpen": "開いたままにする",
   "agent.dock.closeOnLeave": "外をクリックしたら閉じる",
   "agent.dock.openInMain": "メインウィンドウで開く",

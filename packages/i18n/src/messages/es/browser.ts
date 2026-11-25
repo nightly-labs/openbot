@@ -71,6 +71,10 @@ export const messages = {
   "browser.liveView.copyTooLarge": "La selección es demasiado larga para copiarla. Selecciona menos texto.",
   "browser.liveView.copyFailed": "No se pudo copiar el texto. Haz clic en la página e inténtalo de nuevo.",
   "browser.liveView.pageCopied": "La página copió texto. Elige Copiar para ponerlo en tu portapapeles.",
+  "browser.liveView.dialog.site": "{site} dice",
+  "browser.liveView.dialog.page": "Esta página dice",
+  "browser.liveView.dialog.waiting": "La página espera tu respuesta.",
+  "browser.liveView.dialog.ok": "Aceptar",
   "browser.previews.label": "Vistas previas del navegador",
   "browser.previews.resize": "Cambiar tamaño del panel derecho",
   "browser.previews.empty": "No hay pestañas del navegador",
@@ -180,6 +184,12 @@ export const messages = {
   "browser.signIn.stillSignedOut":
     "{server} todavía muestra una página de inicio de sesión de {site}. Termina el inicio de sesión en la ventana.",
   "browser.signIn.failed": "OpenBot no pudo enviar el inicio de sesión.",
+  "browser.httpSignIn.title": "Iniciar sesión en {site}",
+  "browser.httpSignIn.description": "Este sitio pide su propio nombre de usuario y contraseña.",
+  "browser.httpSignIn.refused": "El sitio no aceptó este nombre de usuario o esta contraseña.",
+  "browser.httpSignIn.username": "Nombre de usuario",
+  "browser.httpSignIn.password": "Contraseña",
+  "browser.httpSignIn.submit": "Iniciar sesión",
   "browser.profiles.title": "Perfiles del navegador",
   "browser.profiles.subtitle":
     "Cada perfil guarda sus propios inicios de sesión, cookies y datos de sitios en el equipo que ejecuta OpenBot.",

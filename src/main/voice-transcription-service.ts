@@ -22,6 +22,7 @@ import {
   type VoiceModelId,
   type VoiceModelStatus,
   type VoiceSettings,
+  type VoiceSettingsState,
   type VoiceStream,
   type VoiceStreamAudio,
   type VoiceStreamTranscript,
@@ -215,7 +216,7 @@ export class VoiceTranscriptionService extends EventEmitter<VoiceTranscriptionEv
     );
   }).bind(this);
 
-  getSettings(): VoiceSettings {
+  getSettings(): VoiceSettingsState {
     return this.#preferences.get();
   }
 

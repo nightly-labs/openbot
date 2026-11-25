@@ -392,6 +392,36 @@
   white-space: nowrap;
 }
 
+.agent-dock-thread-switcher {
+  position: relative;
+  max-width: 100%;
+  align-self: flex-start;
+  justify-content: flex-start;
+  height: auto;
+  gap: var(--openbot-space-1);
+  margin-block: calc(var(--openbot-space-0-5) * -1);
+  margin-inline-start: calc(var(--openbot-space-1-5) * -1);
+  padding: var(--openbot-space-0-5) var(--openbot-space-1-5);
+  border-width: 0;
+  border-radius: var(--openbot-radius-sm);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-regular);
+  line-height: var(--openbot-leading-sm);
+}
+
+.agent-dock-thread-switcher > svg {
+  width: var(--openbot-icon-xs);
+  height: var(--openbot-icon-xs);
+}
+
+.agent-dock-thread-switcher-label {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .agent-dock-icon {
   display: grid;
   width: 30px;

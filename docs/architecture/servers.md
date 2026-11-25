@@ -201,6 +201,12 @@ starts a new conversation or compacts it; only an owner or admin deletes the cha
 desktop hides that row from a member. A host without the capability does not show the rows. Protocol
 9 only.
 
+`channel-compact-availability-v1` adds `POST /v1/channels/context/compact-availability` with
+`{ channelId }`. The host answers `{ available }`: false when no member of the channel can compact on
+request, for example when all members use Claude Code or a custom ACP agent, which compact by
+themselves. The desktop, the web client and mobile then hide "Compact context" in the channel
+settings. A client of a host without the capability shows the row as before. Protocol 10 only.
+
 ### Workspace folders
 
 `workspace-directory-v1` adds `POST /v1/workspace-directory` with `{ agentId, path }`. Any member who
@@ -1020,6 +1026,22 @@ the cookies as `browser-sign-in` does. It writes the pairs only when the tab sho
 keeps the other pairs of that origin, and loads the tab again when it set a cookie or a pair. A
 desktop uses this route when the server advertises the capability, and `browser-sign-in` with
 cookies only for an older server. The host never sends the values back or records them.
+
+`browser-http-sign-in` (protocol 10) is for a site that asks for its sign-in in its own prompt (HTTP
+Basic or Digest), not in a page field (#8462). Before it, Electron cancelled such a prompt, and the
+tab and the takeover showed only the empty 401 page. The host records a prompt only for a page load
+over HTTPS that is not for a proxy (`#siteSignIn` in `src/backend/browser-host.ts`). Electron still
+cancels it, so the page load and the agent do not wait. The tab shows the prompt as
+`httpSignIn: { origin, refused? }`, and a snapshot gives the agent a `needs-user` challenge that tells
+it to call `request_takeover`. `POST /v1/browser/http-sign-in` (empty body) and
+`POST /v1/browser/http-sign-in/answer` (`{ tabId, username, password }` or `{ tabId, cancel: true }`)
+both answer with `{ tabs: [{ tabId, origin, refused }] }`, and each change sends
+`browser-http-sign-in-changed` with the same list, filtered like the page state. The host keeps an
+answer in memory for one try at the same origin and realm, loads the tab again, and forgets it at the
+next commit. A second prompt after that try shows `refused: true`. A navigation to another page
+closes the prompt, and a cancel keeps the page. The desktop and the web client show the sign-in in a
+popover under the address bar of the browser view and of the browser window, and mobile shows it above the live view, only
+when the host has the capability. The host never sends the answer back or records it.
 
 `browser-vault-skip-v1` (protocol 9 only) adds `vaultSkip` beside the frozen takeover projection, in
 the `browser-takeover-requested` event and in `pendingBrowserTakeovers`. The host sets it on a password

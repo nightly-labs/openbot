@@ -10,6 +10,7 @@ import type {
   BrowserWindowModel,
   OpenBotDesktopApi,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import browserTakeoverPreviewUrl from "../../stories/assets/browser-takeover-preview.svg";
 import { STORY_BROWSER_CONTROL, STORY_BROWSER_TABS } from "./fixtures";
 import { clone, type Listener, type MockRuntime } from "./mock-support";
@@ -154,6 +155,17 @@ export function createMockBrowser(
     closePictureInPicture: async () => undefined,
     openLocalSignIn: async () => ({ signedIn: false }),
     finishLocalSignIn: async ({ send }) => (send ? { cookies: 12, signedIn: true } : null),
+    answerHttpSignIn: async ({ tabId }) => {
+      if (!browserTabs.some((tab) => tab.id === tabId && tab.httpSignIn))
+        throw new Error(sourceText("error.backend.browserHttpSignInInactive"));
+      browserTabs = browserTabs.map((tab) => {
+        if (tab.id !== tabId) return tab;
+        const { httpSignIn: _signIn, ...rest } = tab;
+        return rest;
+      });
+      emit(browserDisplayListeners, { tabs: browserTabs, activeTabId: activeBrowserTabId });
+      emitAgentEvent({ type: "browser-changed", tabs: browserTabs, activeTabId: activeBrowserTabId });
+    },
     dockPictureInPicture: async () => {
       emit(browserPictureInPictureListeners, { type: "dock" });
     },

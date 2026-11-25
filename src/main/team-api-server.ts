@@ -10,6 +10,7 @@ import {
   type AgentSummary,
   AnalyticsInputError,
   agentAccessRank,
+  browserHttpSignInPrompts,
   type ChatColors,
   canAdministerServer,
   type DirectConversationPage,
@@ -65,6 +66,7 @@ import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent
 import { ANTIGRAVITY_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/antigravity-code-sign-in-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
+import { BROWSER_HTTP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/browser-http-sign-in-v1";
 import { BROWSER_PAGE_STATE_CAPABILITY } from "@openbot/contracts/team-protocol/browser-page-state-v1";
 import {
   BROWSER_PERMISSIONS_CAPABILITY,
@@ -75,6 +77,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { CACHE_EXPIRY_COMPACTION_CAPABILITY } from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
+import { CHANNEL_COMPACT_AVAILABILITY_CAPABILITY } from "@openbot/contracts/team-protocol/channel-compact-availability-v1";
 import { CHANNEL_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/channel-folders-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
 import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/claude-api-key-v1";
@@ -432,7 +435,7 @@ import { routeCacheExpiryCompaction } from "./team-api/route-cache-expiry-compac
 import { routeChannelFolders } from "./team-api/route-channel-folders";
 import { routeChannels } from "./team-api/route-channels";
 import { chatColorsOf, routeChatColors, visibleChatColors } from "./team-api/route-chat-colors";
-import { routeChatHistory } from "./team-api/route-chat-history";
+import { routeChannelCompactAvailability, routeChatHistory } from "./team-api/route-chat-history";
 import { routeClaudeCompactWindow } from "./team-api/route-claude-compact-window";
 import { routeClaudeUserSetup } from "./team-api/route-claude-user-setup";
 import { routeClientBrowser } from "./team-api/route-client-browser";
@@ -1420,6 +1423,11 @@ export class TeamApiServer {
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
         return;
       if ((await routeChatHistory(context, this.#options.agents, this.#options.channels, hidden)) === "handled") return;
+      if (
+        (await routeChannelCompactAvailability(context, this.#options.agents, this.#options.channels, hidden)) ===
+        "handled"
+      )
+        return;
       if ((await routeConversationUnreadFrom(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentMemoryPage(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeWorkspaceDirectory(context, this.#options.agents, hidden)) === "handled") return;
@@ -2082,6 +2090,12 @@ export class TeamApiServer {
     client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-permissions-changed", requests })));
   }
 
+  #sendBrowserHttpSignIn(client: Ws.WebSocket, connection: EventClientState): void {
+    const tabs = browserHttpSignInPrompts(this.#options.browser.listTabs());
+    if (client.readyState !== webSockets.WebSocket.OPEN) return;
+    client.send(JSON.stringify(this.#eventFor(connection, { type: "browser-http-sign-in-changed", tabs })));
+  }
+
   #eventFor(connection: EventClientState, event: AgentEvent, access?: () => EventAccess): AgentEvent {
     if (event.type === "usage-changed" && event.usage.limits.some((limit) => limit.accountId !== undefined))
       return {
@@ -2110,6 +2124,15 @@ export class TeamApiServer {
       );
       if (!hidden) return event;
       return { ...event, requests: event.requests.filter((request) => !hidden(request.tabId)) };
+    }
+    if (event.type === "browser-http-sign-in-changed") {
+      const hidden = this.#hiddenTab(
+        connection,
+        event.tabs.map((tab) => tab.tabId),
+        access,
+      );
+      if (!hidden) return event;
+      return { ...event, tabs: event.tabs.filter((tab) => !hidden(tab.tabId)) };
     }
     if (event.type === "browser-control-changed") {
       const tabIds = event.state.sessions.flatMap((session) => (session.tabId === null ? [] : [session.tabId]));
@@ -2211,6 +2234,7 @@ export class TeamApiServer {
             const userControlWasSent = connection.capabilities.has(BROWSER_USER_CONTROL_CAPABILITY);
             const pageStateWasSent = connection.capabilities.has(BROWSER_PAGE_STATE_CAPABILITY);
             const permissionsWereSent = connection.capabilities.has(BROWSER_PERMISSIONS_CAPABILITY);
+            const httpSignInWasSent = connection.capabilities.has(BROWSER_HTTP_SIGN_IN_CAPABILITY);
             const machineAlertsWereSent = connection.capabilities.has(MACHINE_RESOURCES_CAPABILITY);
             const colorsWereSent = connection.capabilities.has(AGENT_COLORS_CAPABILITY);
             const chatColorsWereSent = connection.capabilities.has(CHAT_COLORS_CAPABILITY);
@@ -2226,6 +2250,8 @@ export class TeamApiServer {
               this.#sendBrowserPageState(client, connection);
             if (!permissionsWereSent && connection.capabilities.has(BROWSER_PERMISSIONS_CAPABILITY))
               this.#sendBrowserPermissions(client, connection);
+            if (!httpSignInWasSent && connection.capabilities.has(BROWSER_HTTP_SIGN_IN_CAPABILITY))
+              this.#sendBrowserHttpSignIn(client, connection);
             if (!colorsWereSent && connection.capabilities.has(AGENT_COLORS_CAPABILITY))
               this.#sendAgentColors(client, connection);
             if (!chatColorsWereSent && connection.capabilities.has(CHAT_COLORS_CAPABILITY))
@@ -2763,7 +2789,8 @@ export class TeamApiServer {
           capability === CHANNEL_TASK_CANCEL_CAPABILITY ||
           capability === CHANNEL_ISOLATION_CAPABILITY ||
           capability === CHANNEL_PICTURE_CAPABILITY ||
-          capability === CHANNEL_BROWSER_CAPABILITY
+          capability === CHANNEL_BROWSER_CAPABILITY ||
+          capability === CHANNEL_COMPACT_AVAILABILITY_CAPABILITY
         )
           return this.#options.channels !== undefined;
         if (capability === "remote-desktop-setup")
@@ -3196,6 +3223,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "browser-user-control-changed") return BROWSER_USER_CONTROL_CAPABILITY;
   if (event.type === "browser-page-state-changed") return BROWSER_PAGE_STATE_CAPABILITY;
   if (event.type === "browser-permissions-changed") return BROWSER_PERMISSIONS_CAPABILITY;
+  if (event.type === "browser-http-sign-in-changed") return BROWSER_HTTP_SIGN_IN_CAPABILITY;
   if (
     event.type === "agent-tasks-changed" ||
     event.type === "agent-task-conversation" ||
