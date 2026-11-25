@@ -545,11 +545,30 @@ export function creditModelCharge(model: CreditModelCost): number {
   return creditCharge(creditModelRate(model) * units);
 }
 
-export const CREDIT_ESTIMATE_MODEL_IDS: readonly string[] = ["nano-banana-pro", "seedance-2.5"];
-
-export function creditEstimateModels(): CreditModelCost[] {
-  return CREDIT_MODEL_COSTS.filter((model) => CREDIT_ESTIMATE_MODEL_IDS.includes(model.modelId));
+export interface CreditEstimate {
+  model: CreditModelCost;
+  resolution: string;
+  charge: number;
 }
+
+interface CreditEstimateSpec {
+  resolution: string;
+  credits: number;
+}
+
+const CREDIT_ESTIMATE_SPECS: Readonly<Record<string, CreditEstimateSpec>> = {
+  "nano-banana-pro": { resolution: "1K", credits: 4.5 },
+  "seedance-2.5": { resolution: "480p", credits: 17.5 },
+};
+
+export function creditEstimates(): CreditEstimate[] {
+  return CREDIT_MODEL_COSTS.flatMap((model) => {
+    const spec = CREDIT_ESTIMATE_SPECS[model.modelId];
+    if (spec === undefined) return [];
+    return [{ model, resolution: spec.resolution, charge: creditModelCharge({ ...model, credits: spec.credits }) }];
+  });
+}
+
 export const CREDIT_PRODUCT_ID = "openbot_credits";
 export const CREDIT_METADATA_KIND = "credits";
 export const CREDIT_METADATA = {
