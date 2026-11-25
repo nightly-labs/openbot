@@ -64,6 +64,9 @@ export const messages = {
     "OpenBot kon de pagina in het inlogvenster niet laden. Controleer de internetverbinding en open het inlogvenster daarna opnieuw.",
   "error.backend.browserSignInReadFailed": "OpenBot kon de inlog niet uit het venster lezen.",
   "error.backend.browserStopUnsupported": "Deze externe host kan het laden van een pagina niet stoppen.",
+  "error.backend.browserLocationFailed": "Kan de locatie voor de pagina niet instellen.",
+  "error.backend.browserPermissionsUnsupported": "Deze externe host kan geen locatieverzoeken beantwoorden.",
+  "error.backend.browserLocationRequired": "Stuur de locatie van het apparaat om het verzoek toe te staan.",
   "error.backend.sharedDataLocalOnly": "Gedeelde gegevens worden beheerd op de computer waarop deze agents draaien.",
   "error.backend.browserUrlProtocol": "Alleen HTTP(S)-URL’s zijn toegestaan in de browser.",
   "error.backend.sunshineNotReady": "Sunshine is niet klaar geworden.",
@@ -299,6 +302,8 @@ export const messages = {
     "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",
   "error.backend.mcpRegistrationUnavailable":
     "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Sla deze server op in Marktplaats, Apps, en voeg er daarna een inlog-app aan toe om te verbinden.",
+  "error.backend.mcpSignInAppNeeded":
+    "De inlogserver kan OpenBot niet als app registreren. Dit ligt niet aan je account. Open deze server in Marktplaats, Apps, klik op Verbinding testen en voeg daarna een inlog-app toe om te verbinden.",
   "error.backend.mcpSignInAbandonedGeneric": "Het inloggen is afgebroken.",
   "error.backend.mcpSignInForgotten": "De MCP-inlog is vergeten terwijl deze bezig was.",
   "error.backend.mcpSignInAbandoned": "Het inloggen bij MCP is afgebroken.",
@@ -322,6 +327,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerExitedWithOutput": "De server is gestopt voordat hij antwoordde. Hij schreef: {detail}",
+  "error.backend.mcpServerDownloadFailed":
+    "De server is niet gestart, omdat de download is mislukt. Controleer de internetverbinding en probeer het opnieuw.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot kon de MCP-server {name} niet starten, omdat het programma ervan niet is geïnstalleerd op de computer waarop OpenBot draait. Installeer de app die {name} levert op die computer, of zet {name} uit in Marktplaats, Apps.",
@@ -448,6 +455,10 @@ export const messages = {
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
   "error.backend.browserSystemProxyFailed":
     "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "De site of de proxy in de instellingen van de computer waarop OpenBot draait heeft de verbinding zonder antwoord gesloten, dus de pagina is niet geopend. Als geen enkele site opent, controleer dan de proxy-instellingen van die computer.",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "De site of de proxy van dit browserprofiel heeft de verbinding zonder antwoord gesloten, dus de pagina is niet geopend. Als geen enkele site opent, controleer dan de proxy van het profiel.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxyComputerLocalAddress":

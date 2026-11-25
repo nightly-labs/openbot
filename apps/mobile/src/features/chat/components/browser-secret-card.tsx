@@ -1,10 +1,15 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  BrowserPermissionAnswer,
   BrowserTakeoverRequest,
   BrowserVaultSkipReason,
   RespondToBrowserSecretInput,
 } from "@openbot/contracts/ipc";
 import { markdownInlinePlainText } from "@openbot/contracts/markdown-preview-text";
+import {
+  type BrowserPermissionRequestState,
+  browserPermissionSite,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { GlassView } from "expo-glass-effect";
 import { Button, Spinner, Typography } from "heroui-native";
@@ -12,10 +17,12 @@ import { useThemeColor } from "heroui-native/hooks";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import Globe from "lucide-react-native/icons/globe";
 import KeyRound from "lucide-react-native/icons/key-round";
+import MapPin from "lucide-react-native/icons/map-pin";
 import X from "lucide-react-native/icons/x";
 import { type ReactNode, useState } from "react";
 import { Pressable, TextInput, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { answerBrowserLocation } from "@/features/browser/components/use-browser-location-request";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
 import { InactiveRequestError } from "@/features/workspace/model/pending-approvals";
 import { haptics } from "@/shared/lib/haptics";
@@ -162,6 +169,66 @@ export function BrowserTakeoverCard({
       {error ? (
         <Typography.Paragraph type="body-xs" className="text-danger-text" accessibilityRole="alert">
           {t("mobile.chat.browserSecret.takeoverFailed")}
+        </Typography.Paragraph>
+      ) : null}
+    </BrowserRequestCard>
+  );
+}
+
+export function BrowserLocationCard({
+  request,
+  answer,
+}: {
+  request: BrowserPermissionRequestState;
+  answer: (answer: BrowserPermissionAnswer) => Promise<void>;
+}) {
+  const { t } = useText();
+  const muted = useThemeColor("muted");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<MobileTextKey | null>(null);
+  const finish = async (allow: boolean, always = false) => {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const result = await answerBrowserLocation(answer, request, allow, always);
+      if (result === "unavailable") setError("mobile.browser.location.unavailable");
+      void haptics.notification(result === "answered" ? "success" : "warning");
+    } catch {
+      void haptics.notification("error");
+      setError("mobile.browser.location.answerFailed");
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <BrowserRequestCard
+      icon={<MapPin color={String(muted)} size={14} strokeWidth={2.2} />}
+      title={t("mobile.browser.location.title", { site: browserPermissionSite(request.origin) })}
+      body={t("mobile.browser.location.description")}
+      busy={pending}
+      onCancel={() => void finish(false)}
+    >
+      <View className="flex-row gap-2">
+        <Button size="sm" variant="ghost" className="flex-1" isDisabled={pending} onPress={() => void finish(false)}>
+          <Button.Label>{t("mobile.browser.location.block")}</Button.Label>
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="flex-1"
+          isDisabled={pending}
+          onPress={() => void finish(true, true)}
+        >
+          <Button.Label>{t("mobile.browser.location.allowAlways")}</Button.Label>
+        </Button>
+        <Button size="sm" className="flex-1 bg-action" isDisabled={pending} onPress={() => void finish(true)}>
+          <Button.Label className="text-action-foreground">{t("mobile.browser.location.allow")}</Button.Label>
+        </Button>
+      </View>
+      {error ? (
+        <Typography.Paragraph type="body-xs" className="text-danger-text" accessibilityRole="alert">
+          {t(error)}
         </Typography.Paragraph>
       ) : null}
     </BrowserRequestCard>

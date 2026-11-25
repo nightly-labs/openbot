@@ -631,6 +631,8 @@ function describeMcpErrorText(error: unknown, config: McpServerConfig): string {
   if (error instanceof McpTimeout)
     return sourceText("error.backend.mcpServerNoAnswer", { seconds: Math.round(error.timeoutMs / 1000) });
   if (error instanceof UnauthorizedError) return sourceText("error.backend.mcpSignInNotAccepted");
+  if (error instanceof McpServerExit && isPackageDownloadFailure(error.output))
+    return sourceText("error.backend.mcpServerDownloadFailed");
   if (error instanceof McpServerExit)
     return sourceText("error.backend.mcpServerExitedWithOutput", { detail: serverOutput(error, config) });
   if (config.transport === "stdio" && isConnectionClosed(error)) return sourceText("error.backend.mcpServerExited");
@@ -657,6 +659,14 @@ function mcpRemoteBridgeUrl(config: McpServerConfig): string | null {
     if (url.protocol === "http:" || url.protocol === "https:") return `${url.origin}${url.pathname}`;
   }
   return null;
+}
+
+const BUN_DOWNLOAD_FAILURE = /error: \w+ downloading (?:package manifest|tarball) /u;
+const NPM_DOWNLOAD_FAILURE =
+  /npm (?:ERR!|error) (?:code|errno) (?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ENETUNREACH|EHOSTUNREACH)\b/u;
+
+function isPackageDownloadFailure(output: string): boolean {
+  return BUN_DOWNLOAD_FAILURE.test(output) || NPM_DOWNLOAD_FAILURE.test(output);
 }
 
 function isConnectionClosed(error: unknown): boolean {
@@ -712,7 +722,7 @@ function isProtocolMismatch(error: Error, code: string | null): boolean {
 
 const REGISTRATION_REFUSED = sourceText("error.backend.mcpRegistrationRefused");
 
-const REGISTRATION_UNAVAILABLE = sourceText("error.backend.mcpRegistrationUnavailable");
+const REGISTRATION_UNAVAILABLE = sourceText("error.backend.mcpSignInAppNeeded");
 
 function isAccessRefusal(status: number | null): boolean {
   return status === 401 || status === 403;

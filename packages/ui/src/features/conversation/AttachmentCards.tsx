@@ -31,7 +31,7 @@ export type AttachmentDownloadState = { phase: "downloading"; received: number; 
 
 export interface AttachmentDownloads {
   state(attachmentId: string): AttachmentDownloadState | undefined;
-  stop(attachment: AttachmentSummary): void;
+  stop?: ((attachment: AttachmentSummary) => void) | undefined;
   retry(attachment: AttachmentSummary): void;
 }
 
@@ -246,6 +246,17 @@ export function AttachmentCards(props: {
                     </Button>
                   }
                 >
+                  <Match when={!props.downloads?.stop && downloading(attachment)}>
+                    {(state) => (
+                      <span class="attachment-download-progress">
+                        <RadialProgress
+                          class="attachment-download-ring"
+                          value={percent(state())}
+                          aria-label={t("attachment.download", { name: attachment.name })}
+                        />
+                      </span>
+                    )}
+                  </Match>
                   <Match when={downloading(attachment)}>
                     {(state) => (
                       <Button
@@ -256,7 +267,7 @@ export function AttachmentCards(props: {
                           name: attachment.name,
                           percent: String(percent(state())),
                         })}
-                        onClick={() => props.downloads?.stop(attachment)}
+                        onClick={() => props.downloads?.stop?.(attachment)}
                       >
                         <RadialProgress class="attachment-download-ring" value={percent(state())} aria-hidden="true">
                           <Square />

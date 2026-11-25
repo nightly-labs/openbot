@@ -358,6 +358,11 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
   default) with no activity. That unload ends the thread's unified exec processes and its MCP servers.
   An agent delete sends `thread/archive` after the unsubscribe: Codex ends the thread before it answers,
   so Windows can remove the workspace (#6266).
+- The Codex app server keeps the tool list of each MCP server in memory for 30 minutes. With a valid
+  list, a resumed thread does not wait for its MCP servers to start; without one, the first turn waits
+  up to `mcp_optional_startup_grace_ms` (10 s) for each slow server. So `ProviderRuntime` stops an
+  idle Codex app server 30 minutes after its last use, not after the 10 minutes of the other
+  provider CLIs (#16388). A Workspace only Codex process still stops after 10 minutes.
 - When the memory of a server is critical, `MemoryHold` releases every idle session of each kind at once.
 - A routine session is ephemeral and is not released.
 - Outside Windows, the Claude, Codex and Pi CLIs start as the leaders of their own process groups
@@ -461,6 +466,20 @@ Claude sessions, sign-in and sign-out) start with the resolved `launchPath`: the
 folders, then OpenBot's own, then the CLI's folder for a system copy. An app that Finder starts can
 then run a `#!/usr/bin/env node` CLI. A CLI that exists but does not start reports whether the
 managed copy or the user's copy failed.
+
+A native system Codex with no `codex-code-mode-host` beside it, or in `codex-resources`, is
+`incomplete`: GPT-6 and other code-mode models cannot run tools with it. It runs only when no
+complete Codex starts, and Settings > Providers offers the managed copy. A desktop window waits for
+the user to click Download. A server (hosted, server mode, or a local server child) runs agents in
+the background, often for routines that nobody watches, so `createSystemCliTracker` in `src/main/system-cli-tracker.ts`
+downloads the managed copy once per process when an agent uses ChatGPT, the provider is on, the
+managed copy is not downloaded, and the user did not choose "Use installed version". It checks
+again at each provider status and each change to the agent list, so a server's first ChatGPT agent
+starts the download without a restart. An explicit
+`OPENBOT_CODEX_PATH` is never `incomplete`. The download replaces the CLI as Download in Settings
+does. `bun run test:server-incomplete-codex` (CI runs it in `test:provider-update-busy`) checks
+these decisions with the real runtime manager and resolver. It calls the tracker directly, so it
+does not cover the agent-list event or the server kinds.
 
 Installed runtimes live in one store per computer, `appData/OpenBot/provider-runtimes`, which is the
 path the packaged app always used: its `userData` is `appData/OpenBot`. Development profiles differ

@@ -74,12 +74,17 @@ export function useProviderAccounts(agent: MobileAgent, enabled: boolean) {
 
 export function useProviderAccountName() {
   const { t } = useText();
-  return (account: ProviderAccountStatus, index: number) =>
+  return (account: ProviderAccountStatus, index: number, accounts: readonly ProviderAccountStatus[]) =>
     account.label ||
-    account.email ||
+    (accounts.some((other) => other !== account && sameEmail(other, account)) ? null : account.email) ||
     (account.id === CLAUDE_API_KEY_ACCOUNT_ID
       ? t("mobile.agent.runtime.accountApiKey")
       : t("mobile.agent.runtime.accountNumbered", { number: index + 1 }));
+}
+
+function sameEmail(first: ProviderAccountStatus, second: ProviderAccountStatus): boolean {
+  const email = first.email?.trim().toLowerCase();
+  return Boolean(email) && email === second.email?.trim().toLowerCase();
 }
 
 export function AgentRuntimeFields({
@@ -207,7 +212,7 @@ export function AgentRuntimeFields({
                     : []),
                   ...accounts.map((account, index) => ({
                     value: account.id,
-                    label: pickerLabel(accountName(account, index), account.id === accountId),
+                    label: pickerLabel(accountName(account, index, accounts), account.id === accountId),
                   })),
                 ]}
                 enabled={available && !saving}

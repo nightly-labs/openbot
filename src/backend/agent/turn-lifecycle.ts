@@ -1605,6 +1605,13 @@ export class TurnLifecycle {
           this.#noteSelfStartedOrigins(turnId, [...(this.#selfStartedOrigins.get(turnId) ?? []), origin]);
         return;
       }
+      case "openbot/unread-steers": {
+        const turnId = getString(params, "turnId");
+        if (!threadId || !agentId || !turnId) return;
+        yield* this.#requeueUnreadSteers(agentId, threadId, turnId, getArray(params, "unreadSteers").filter(isString));
+        this.#hooks.scheduleDrain(agentId);
+        return;
+      }
       case "openbot/background-work": {
         if (!threadId || !agentId) return;
         const runs = isRecord(params) && params.running === true;

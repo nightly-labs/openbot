@@ -81,4 +81,11 @@ export const messages = {
   "mobile.browser.help.handingBack": "החזרת השליטה",
   "mobile.browser.help.handBack.title": "החזרת השליטה",
   "mobile.browser.help.handBack.body": "כשסוכן מבקש להשתלט, יש לבחור ב״סיימתי״ בתפריט ···. הסוכן ימשיך אז בלשונית הזו.",
+  "mobile.browser.location.title": "{site} רוצה לדעת את המיקום שלך",
+  "mobile.browser.location.description": "אפשר רק לאתרים שאתה סומך עליהם.",
+  "mobile.browser.location.block": "חסימה",
+  "mobile.browser.location.allow": "אישור",
+  "mobile.browser.location.allowAlways": "לאפשר תמיד",
+  "mobile.browser.location.unavailable": "לא ניתן לקבל את המיקום של המכשיר הזה.",
+  "mobile.browser.location.answerFailed": "לא ניתן להשיב לבקשת המיקום.",
 } as const satisfies PartialTranslation<typeof source>;

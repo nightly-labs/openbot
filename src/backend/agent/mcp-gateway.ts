@@ -322,7 +322,7 @@ export class McpGateway {
     yield* this.#refreshForTestedTools(config, outcome);
     const refused = outcome.error === null && (yield* this.signInOffer(config)) === "refused";
     const error = refused
-      ? sourceText("error.backend.mcpRegistrationUnavailable")
+      ? sourceText("error.backend.mcpSignInAppNeeded")
       : outcome.error === null && this.#awaitsSignIn(config)
         ? sourceText(
             options.signInPlace === "host" ? "error.backend.mcpSignInOnHost" : "error.backend.mcpSignInRequired",

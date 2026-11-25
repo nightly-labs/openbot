@@ -11,6 +11,7 @@ import {
   type BrowserLiveViewEvent,
   type BrowserLocalSignInEnd,
   type BrowserLocalSignInResult,
+  type BrowserPermissionRequest,
   type BrowserPictureInPictureEvent,
   type BrowserPreview,
   type BrowserTab,
@@ -261,6 +262,7 @@ function browserTab(tab: DynamicRecord): BrowserTab {
     diagnosticErrorCount,
     openerTabId,
     popupFailure,
+    permissionRequest,
     userControl,
     canGoBack,
     canGoForward,
@@ -284,6 +286,7 @@ function browserTab(tab: DynamicRecord): BrowserTab {
     ...(diagnosticErrorCount === undefined ? {} : { diagnosticErrorCount }),
     ...(openerTabId === undefined ? {} : { openerTabId }),
     ...(popupFailure === undefined ? {} : { popupFailure: popupFailureOf(popupFailure) }),
+    ...(permissionRequest === undefined ? {} : { permissionRequest: permissionRequestOf(permissionRequest) }),
     ...(userControl === true ? { userControl } : {}),
     ...(canGoBack === undefined ? {} : { canGoBack }),
     ...(canGoForward === undefined ? {} : { canGoForward }),
@@ -317,6 +320,16 @@ function browserViewport(value: unknown): BrowserViewport {
 function popupFailureOf(value: unknown): { id: string; message: string } {
   const failure = decodeRecord(value, "browser popup failure");
   return { id: requiredString(failure, "id"), message: requiredString(failure, "message") };
+}
+
+function permissionRequestOf(value: unknown): BrowserPermissionRequest {
+  const request = decodeRecord(value, "browser permission request");
+  if (request.permission !== "geolocation") throw new Error("Invalid permission.");
+  return {
+    id: requiredString(request, "id"),
+    origin: requiredString(request, "origin"),
+    permission: request.permission,
+  };
 }
 
 function controlSession(session: DynamicRecord): BrowserControlSession {

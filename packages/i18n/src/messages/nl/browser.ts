@@ -254,4 +254,11 @@ export const messages = {
   },
   "browser.proxies.changeTitle": "Proxy van {name} wijzigen?",
   "browser.proxies.change": "Proxy wijzigen",
+  "browser.location.title": "{site} wil je locatie weten",
+  "browser.location.description": "Sta dit alleen toe voor sites die je vertrouwt.",
+  "browser.location.block": "Blokkeren",
+  "browser.location.allow": "Toestaan",
+  "browser.location.allowAlways": "Altijd toestaan",
+  "browser.location.unavailable": "Kan de locatie van dit apparaat niet ophalen.",
+  "browser.location.answerFailed": "Kan het locatieverzoek niet beantwoorden.",
 } as const satisfies PartialTranslation<typeof source>;

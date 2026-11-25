@@ -201,6 +201,10 @@ import {
   BITWARDEN_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/bitwarden-connector-v1";
 import {
+  BROWSER_PERMISSIONS_CAPABILITY,
+  BROWSER_PERMISSIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/browser-permissions-v1";
+import {
   BROWSER_PROFILES_CAPABILITY,
   BROWSER_PROFILES_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-profiles-v1";
@@ -2249,6 +2253,10 @@ const browser: TeamApiBrowser = {
   navigate: unused("navigate"),
   reload: unused("reload"),
   stop: unused("stop"),
+  answerPermission: (answer) => {
+    record("answerPermission", answer);
+    return Effect.void;
+  },
   takeUserControl: unused("takeUserControl"),
   releaseUserControl: unused("releaseUserControl"),
   startTeach: (tabId, holder) => {
@@ -7991,6 +7999,114 @@ try {
         callsOf("startTeach").length === teachesBefore &&
         isDeepStrictEqual(ids(reopened), ["tab-ada", "tab-oc"]),
       [summary(memberTabs), summary(adminTabs), summary(teach), summary(open), summary(reopened)],
+    );
+  }
+
+  {
+    const v10 = { capabilities: [BROWSER_PERMISSIONS_CAPABILITY], protocol: TEAM_PROTOCOL_V10 };
+    const asking = (id: string) => ({
+      id,
+      title: id,
+      url: "https://maps.example/",
+      loading: false,
+      ownerThreadId: null,
+      ownerAgentId: "agent-oc",
+      permissionRequest: { id: `request-${id}`, origin: "https://maps.example", permission: "geolocation" as const },
+    });
+    browserTabs = [asking("tab-1"), asking("tab-private")];
+    const answersBefore = callsOf("answerPermission").length;
+    const location = { latitude: 52.2297, longitude: 21.0122, accuracyMeters: 35 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V10 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const unsupported = await call("POST", BROWSER_PERMISSIONS_ROUTES.state, {
+      token: bobToken,
+      json: {},
+      capabilities: [],
+      protocol: TEAM_PROTOCOL_V10,
+    });
+    const state = await call("POST", BROWSER_PERMISSIONS_ROUTES.state, { token: bobToken, json: {}, ...v10 });
+    check(
+      "the host advertises browser-permissions on protocol 10 only; a member reads the open location requests without the private tab, and a client without the capability gets 400",
+      list(field(compatibility.body, "capabilities")).includes(BROWSER_PERMISSIONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSER_PERMISSIONS_CAPABILITY) &&
+        errorIs(unsupported, 400, sourceText("error.backend.browserPermissionsUnsupported")) &&
+        state.status === 200 &&
+        isDeepStrictEqual(state.body, {
+          requests: [
+            { tabId: "tab-1", id: "request-tab-1", origin: "https://maps.example", permission: "geolocation" },
+          ],
+        }),
+      [summary(unsupported), summary(state)],
+    );
+    const allowWithoutLocation = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: true },
+      ...v10,
+    });
+    const blockWithLocation = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: false, location },
+      ...v10,
+    });
+    const farLocation = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: true, location: { ...location, latitude: 91 } },
+      ...v10,
+    });
+    const blockAlways = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: false, always: true },
+      ...v10,
+    });
+    const privateAnswer = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-private", requestId: "request-tab-private", allow: false },
+      ...v10,
+    });
+    check(
+      "the host refuses an allow without a location, a block with a location, a location out of range, a block for always and an answer for a private tab",
+      errorIs(allowWithoutLocation, 400, sourceText("error.backend.browserLocationRequired")) &&
+        blockWithLocation.status === 400 &&
+        farLocation.status === 400 &&
+        blockAlways.status === 400 &&
+        errorIs(privateAnswer, 404, sourceText("error.backend.browserTabNotFound")) &&
+        callsOf("answerPermission").length === answersBefore,
+      [
+        summary(allowWithoutLocation),
+        summary(blockWithLocation),
+        summary(farLocation),
+        summary(blockAlways),
+        summary(privateAnswer),
+      ],
+    );
+    const allowed = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: true, location },
+      ...v10,
+    });
+    const blocked = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: false },
+      ...v10,
+    });
+    const allowedAlways = await call("POST", BROWSER_PERMISSIONS_ROUTES.answer, {
+      token: bobToken,
+      json: { tabId: "tab-1", requestId: "request-tab-1", allow: true, always: true, location },
+      ...v10,
+    });
+    browserTabs = [];
+    check(
+      "a member allows once or always with the location of the device, or blocks; the host gets the answer and sends back the open requests",
+      allowed.status === 200 &&
+        blocked.status === 200 &&
+        allowedAlways.status === 200 &&
+        list(field(allowed.body, "requests")).length === 1 &&
+        isDeepStrictEqual(callsOf("answerPermission").slice(answersBefore), [
+          [{ tabId: "tab-1", requestId: "request-tab-1", allow: true, location }],
+          [{ tabId: "tab-1", requestId: "request-tab-1", allow: false }],
+          [{ tabId: "tab-1", requestId: "request-tab-1", allow: true, always: true, location }],
+        ]),
+      [summary(allowed), summary(blocked), summary(allowedAlways), callsOf("answerPermission").slice(answersBefore)],
     );
   }
 

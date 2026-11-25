@@ -54,6 +54,9 @@ export const messages = {
   "error.backend.browserSignInLoadFailed": "OpenBot 无法在登录窗口中加载页面。请检查网络连接，然后再次打开登录窗口。",
   "error.backend.browserSignInReadFailed": "OpenBot 无法从窗口读取登录信息。",
   "error.backend.browserStopUnsupported": "该远程主机无法停止页面加载。",
+  "error.backend.browserLocationFailed": "无法为页面设置位置。",
+  "error.backend.browserPermissionsUnsupported": "此远程主机无法回应位置请求。",
+  "error.backend.browserLocationRequired": "发送设备位置以允许此请求。",
   "error.backend.sharedDataLocalOnly": "共享数据在运行这些助手的电脑上管理。",
   "error.backend.browserUrlProtocol": "只允许使用 HTTP(S) 浏览器地址。",
   "error.backend.sunshineNotReady": "Sunshine 未能就绪。",
@@ -254,6 +257,8 @@ export const messages = {
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",
   "error.backend.mcpRegistrationUnavailable":
     "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中保存此服务器，然后为它添加登录应用。",
+  "error.backend.mcpSignInAppNeeded":
+    "登录服务器无法将 OpenBot 注册为应用，这与你的账号无关。要连接，请在 市场、应用 中打开此服务器，点击 测试连接，然后添加登录应用。",
   "error.backend.mcpSignInAbandonedGeneric": "登录已放弃。",
   "error.backend.mcpSignInForgotten": "MCP 登录在运行过程中被遗忘。",
   "error.backend.mcpSignInAbandoned": "MCP 登录已放弃。",
@@ -272,6 +277,7 @@ export const messages = {
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
   "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
+  "error.backend.mcpServerDownloadFailed": "服务器没有启动，因为下载失败。请检查网络连接，然后重试。",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
   "error.backend.mcpServerProgramMissing":
     "OpenBot 无法启动 MCP 服务器 {name}，因为运行 OpenBot 的电脑上没有安装它的程序。请在那台电脑上安装提供 {name} 的应用，或在 市场、应用 中关闭 {name}。",
@@ -388,6 +394,10 @@ export const messages = {
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
   "error.backend.browserSystemProxyFailed":
     "运行 OpenBot 的计算机设置中的代理没有响应或拒绝了连接，因此页面没有打开。请检查该计算机的代理设置。",
+  "error.backend.browserSystemProxyOrSiteClosed":
+    "网站或运行 OpenBot 的计算机设置中的代理没有应答就关闭了连接，因此页面没有打开。如果所有网站都打不开，请检查该计算机的代理设置。",
+  "error.backend.browserProfileProxyOrSiteClosed":
+    "网站或此浏览器配置文件的代理没有应答就关闭了连接，因此页面没有打开。如果所有网站都打不开，请检查该配置文件的代理。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
   "error.backend.browserProxyComputerLocalAddress":
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",

@@ -2,6 +2,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentEvent,
   type AskSideQuestionInput,
+  type AttachmentDownloadProgress,
   type AttachmentImportEvent,
   type AttachmentSummary,
   decodeSaveSkillSuggestionResult,
@@ -184,6 +185,7 @@ export function createWebConversationRuntime(
   const routineRunChangesEnabled = () => hasCapability?.(ROUTINE_RUN_CHANGES_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
+  const downloadListeners = new Set<(progress: AttachmentDownloadProgress) => void>();
   const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
@@ -380,7 +382,26 @@ export function createWebConversationRuntime(
       discardAttachmentImport(requestId) {
         failedImports.delete(requestId);
       },
-      openAttachment: ({ attachmentId }) => files.download(attachmentId),
+      openAttachment: ({ attachmentId, size }) => {
+        const serverId = hostId();
+        return files.download(
+          attachmentId,
+          size === undefined
+            ? undefined
+            : {
+                size,
+                onProgress: (received, total) => {
+                  for (const listener of downloadListeners) listener({ serverId, attachmentId, received, total });
+                },
+              },
+        );
+      },
+      onAttachmentDownload(listener) {
+        downloadListeners.add(listener);
+        return () => {
+          downloadListeners.delete(listener);
+        };
+      },
       openSharedFile: ({ path }) => files.saveShared(path),
       openWorkspaceFile: ({ agentId, path }) => files.saveWorkspace(agentId, path),
       previewSharedFile: ({ path }) => files.previewShared(path),
@@ -405,6 +426,9 @@ export function createWebConversationRuntime(
       publishWindowModel: async () => {},
       reload: (tabId) => remote.reloadBrowserTab(tabId),
       stop: (tabId) => remote.stopBrowserTab(tabId),
+      answerPermission: async () => {
+        throw new Error(currentText().t("error.backend.browserPermissionsUnsupported"));
+      },
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
       releaseControl: (tabId) => remote.releaseBrowserControl(tabId),
       startTeach: (tabId) => remote.startBrowserTeach(tabId),

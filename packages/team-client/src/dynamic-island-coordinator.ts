@@ -467,9 +467,13 @@ export class DynamicIslandCoordinator {
     for (const request of snapshot.pendingBrowserTakeovers) {
       pendingPrompts[request.agentId] = { type: "browser-takeover-requested", request };
     }
+    const knownColors = new Map(runtime.agents.map((agent) => [agent.id, agent.avatarColor] as const));
     this.replaceServer({
       serverId,
-      agents: snapshot.agents,
+      agents: snapshot.agents.map((agent) => {
+        const avatarColor = knownColors.get(agent.id);
+        return avatarColor ? { ...agent, avatarColor } : agent;
+      }),
       activeTurns: Object.fromEntries(snapshot.activeTurns.map((turn) => [turn.agentId, turn.turnId])),
       queues: queueSnapshotsFromRuntimeWork(snapshot.work),
       unreadReplies: { ...runtime.unreadReplies },
