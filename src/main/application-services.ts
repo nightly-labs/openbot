@@ -3351,7 +3351,7 @@ export async function createApplicationServices({
           }
         : {}),
       turnLimits: hostTurnLimits,
-      ...(serverModeEnvironment
+      ...(serverModeEnvironment || hostedServer
         ? {
             restart: {
               request: (memberId) => {
