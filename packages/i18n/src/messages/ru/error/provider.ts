@@ -349,6 +349,8 @@ export const messages = {
     "Gemini не смог прочитать сохранённую историю этого чата. OpenBot начал новый сеанс Gemini с историей чата. Отправьте сообщение ещё раз.",
   "error.provider.acpTurnStuck":
     "{provider} не завершил предыдущий ход, поэтому не принял это сообщение. OpenBot начал новый сеанс {provider} с историей чата. Отправьте сообщение ещё раз.",
+  "error.provider.antigravityLicenseRefused":
+    "Google сообщает, что у вашего аккаунта нет лицензии на эту модель. Выберите другую модель и отправьте сообщение снова.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google не разрешает Gemini работать из сетевого местоположения компьютера, на котором работает этот агент. Используйте Gemini на другом компьютере или выберите другого провайдера для этого агента.\n{detail}",
   "error.provider.antigravityTurnStopped":

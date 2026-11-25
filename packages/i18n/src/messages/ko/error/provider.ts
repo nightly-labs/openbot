@@ -353,6 +353,8 @@ export const messages = {
     "Gemini가 이 채팅의 저장된 기록을 읽지 못했습니다. OpenBot이 채팅 기록으로 새 Gemini 세션을 시작했습니다. 메시지를 다시 보내세요.",
   "error.provider.acpTurnStuck":
     "{provider}이(가) 이전 턴을 끝내지 않아 이 메시지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 메시지를 다시 보내세요.",
+  "error.provider.antigravityLicenseRefused":
+    "Google에 따르면 이 계정에는 이 모델을 사용할 라이선스가 없어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
   "error.provider.antigravityTurnStopped":

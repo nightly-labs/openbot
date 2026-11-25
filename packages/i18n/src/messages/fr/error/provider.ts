@@ -373,6 +373,8 @@ export const messages = {
     "Gemini n’a pas pu lire l’historique enregistré de cette conversation. OpenBot a démarré une nouvelle session Gemini avec l’historique de la conversation. Renvoyez votre message.",
   "error.provider.acpTurnStuck":
     "{provider} n’a pas terminé son tour précédent et n’a donc pas accepté ce message. OpenBot a démarré une nouvelle session {provider} avec l’historique de la conversation. Renvoyez votre message.",
+  "error.provider.antigravityLicenseRefused":
+    "Google indique que votre compte n’a pas de licence pour utiliser ce modèle. Choisissez un autre modèle, puis renvoyez votre message.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google n’autorise pas Gemini depuis l’emplacement réseau de l’ordinateur qui exécute cet agent. Utilisez Gemini sur un autre ordinateur, ou choisissez un autre fournisseur pour cet agent.\n{detail}",
   "error.provider.antigravityTurnStopped":

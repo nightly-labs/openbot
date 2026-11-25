@@ -351,6 +351,8 @@ export const messages = {
     "Gemini nie mógł odczytać zapisanej historii tego czatu. OpenBot uruchomił nową sesję Gemini z historią czatu. Wyślij wiadomość ponownie.",
   "error.provider.acpTurnStuck":
     "{provider} nie zakończył poprzedniej tury, więc nie przyjął tej wiadomości. OpenBot rozpoczął nową sesję {provider} z historią czatu. Wyślij wiadomość ponownie.",
+  "error.provider.antigravityLicenseRefused":
+    "Google informuje, że Twoje konto nie ma licencji na ten model. Wybierz inny model i wyślij wiadomość ponownie.\n{detail}",
   "error.provider.antigravityLocationUnsupported":
     "Google nie pozwala Gemini działać z lokalizacji sieciowej komputera, na którym działa ten agent. Użyj Gemini na innym komputerze albo wybierz innego dostawcę dla tego agenta.\n{detail}",
   "error.provider.antigravityTurnStopped":
