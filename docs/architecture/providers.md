@@ -1648,6 +1648,9 @@ The settings page, the admin route `agent-backup-models-v1`, and the `update_pro
 When the list is automatic, `UsageLimitGate` and `AgentService.#usageLimitMove` move the agent to the
 first ready model in the order that no hold covers. `usageLimitReturn` keeps the model the agent
 left, and the agent goes back to it when its hold ends. A model the user picks drops the return.
+An effort that the user or an agent picks on the backup model is also the effort that the agent goes
+back with, when its own model takes that effort (#16007). Otherwise the agent goes back with the effort
+that it had before the move.
 
 Two holds move an agent:
 
