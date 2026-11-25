@@ -419,6 +419,7 @@
     "./features/sidebar/SidebarTopbar": "./src/features/sidebar/SidebarTopbar.tsx",
     "./features/sidebar/sidebar-working-badge.css": "./src/features/sidebar/sidebar-working-badge.css",
     "./features/sidebar/sidebar-filter.css": "./src/features/sidebar/sidebar-filter.css",
+    "./features/sidebar/sidebar-tabs.css": "./src/features/sidebar/sidebar-tabs.css",
     "./features/sidebar/sidebar-felt-badges.css": "./src/features/sidebar/sidebar-felt-badges.css",
     "./features/sidebar/sidebar-tooltips.css": "./src/features/sidebar/sidebar-tooltips.css",
     "./features/sidebar/sidebar-threads.css": "./src/features/sidebar/sidebar-threads.css",

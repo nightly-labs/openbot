@@ -9,7 +9,6 @@ import {
   type SidebarListFilter,
   sidebarFolderMark,
   sidebarFolderTreeIds,
-  sidebarListFilterParts,
   sidebarSelectedFolders,
   sidebarToggleFolder,
 } from "./sidebar-list-filter";
@@ -87,10 +86,11 @@ function FolderEntries(props: { nodes: readonly SidebarFolderNode[] }) {
 }
 
 export function SidebarFilterMenu() {
-  const { filterFolders, listFilter, listFilterCount, listFiltered, props, setListFilter } = useSidebarScope();
+  const { filterFolders, listFilter, listFilterCount, listFiltered, props, setListFilter, sidebarTabs } =
+    useSidebarScope();
   const { t } = useText();
   const set = (patch: Partial<SidebarListFilter>) => setListFilter({ ...listFilter(), ...patch });
-  const parts = () => sidebarListFilterParts(listFilter());
+  const parts = () => sidebarTabs.listFilterPartsBeyondTab();
   const picked = () => sidebarSelectedFolders(filterFolders(), listFilter().folders).length;
   return (
     <DropdownMenu.Root placement="bottom-end" gutter={4}>
