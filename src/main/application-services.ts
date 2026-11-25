@@ -7,16 +7,11 @@ import { homedir, hostname, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import type { Readable } from "node:stream";
-import {
-  isKeyOnlyProvider,
-  isManagedRuntimeProvider,
-  type ManagedProviderId,
-} from "@openbot/contracts/agent-providers";
+import { isKeyOnlyProvider, isManagedRuntimeProvider } from "@openbot/contracts/agent-providers";
 import { leadingAddress } from "@openbot/contracts/chat-tag-references";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { selfHostedApiOrigin } from "@openbot/contracts/invite-links";
 import type {
-  AgentProviderStatus,
   AgentStatus,
   AppVariant,
   BrowserDisplayState,
@@ -94,7 +89,6 @@ import { AgentThreadStore } from "../backend/agent-threads/agent-thread-store";
 import { type BrowserAgentChat, BrowserHost } from "../backend/browser-host";
 import { BrowserProfileStore } from "../backend/browser-profiles/browser-profile-store";
 import { BrowserProxyStore } from "../backend/browser-profiles/browser-proxy-store";
-import { CodexCliError, resolveClaudeCli, resolveCodexCli } from "../backend/cli";
 import { type CrmHandle, createCrm } from "../backend/crm/crm";
 import { CrmError } from "../backend/crm/crm-handle";
 import { stripeSource } from "../backend/crm/crm-stripe";
@@ -470,6 +464,7 @@ import { SLACK_DEV_CALLBACK_PATH, startSlackDevCallbackServer } from "./slack-de
 import { SpeechPreferenceStore } from "./speech-preference-store";
 import { StartupTiming } from "./startup-timing";
 import { AGENT_CERTIFICATES_FILE, agentCertificateEnvironment } from "./system-certificates";
+import { createSystemCliTracker } from "./system-cli-tracker";
 import { mcpSignInSharedWithOthers } from "./team-api/mcp-member-access";
 import { LEGACY_TEAM_STORE_FILE, TEAM_STORE_FILE, TeamStore } from "./team-store";
 import { TeamWebRtcBridge } from "./team-webrtc-bridge";
@@ -2676,52 +2671,23 @@ export async function createApplicationServices({
     libraryFolders.reconcileFiles(new Set(mailbox.listStoredFiles().map((stored) => stored.attachment.id))),
   );
 
-  const hostedCliDownloads = new Set<ManagedProviderId>();
-  const resolvesAsMissing = (provider: "claude" | "codex") =>
-    (provider === "claude" ? resolveClaudeCli : resolveCodexCli)({
-      bundledExecutable: providerRuntimes.executablePath(provider),
-    }).pipe(
-      Effect.as(false),
-      Effect.catch((failure) =>
-        Effect.succeed(failure.cause instanceof CodexCliError && failure.cause.code === "missing"),
-      ),
-    );
-  const hostedCliDownload = (provider: AgentProviderStatus, agentProviders: ReadonlySet<string>) => {
-    if (provider.state === "outdated") return Effect.succeed(true);
-    if (!agentProviders.has(provider.id) || provider.cliSource !== undefined || provider.version !== null) return null;
-    if (provider.state === "not-installed") return Effect.succeed(true);
-    if (provider.state === "error" && (provider.id === "claude" || provider.id === "codex"))
-      return resolvesAsMissing(provider.id);
-    return null;
-  };
+  const runsAsServer = Boolean(hostedServer || serverModeEnvironment || localServerChild);
+  const trackSystemCliVersionsOnly = createSystemCliTracker({
+    runtimes: providerRuntimes,
+    providerUse,
+    agentProviders: () =>
+      new Set(service.listAgents().map((agent) => (isKeyOnlyProvider(agent.provider) ? "pi" : agent.provider))),
+    hosted: hostedServer !== null,
+    server: runsAsServer,
+  });
   const trackSystemCliVersions = (status: AgentStatus): void => {
-    let copyInUse = false;
-    const agentProviders =
-      hostedServer === null
-        ? null
-        : new Set(service.listAgents().map((agent) => (isKeyOnlyProvider(agent.provider) ? "pi" : agent.provider)));
-    for (const provider of status.providers ?? []) {
-      if (!isManagedRuntimeProvider(provider.id)) continue;
-      const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      if (providerRuntimes.setSystemVersion(provider.id, version, provider.cliIncomplete === true)) copyInUse = true;
-      const needsDownload = agentProviders === null ? null : hostedCliDownload(provider, agentProviders);
-      if (needsDownload !== null && !hostedCliDownloads.has(provider.id) && !providerUse.off().includes(provider.id)) {
-        hostedCliDownloads.add(provider.id);
-        const runtime = provider.id;
-        Effect.runFork(
-          needsDownload.pipe(
-            Effect.flatMap((download) => (download ? providerRuntimes.download(runtime) : Effect.void)),
-            Effect.ignore,
-          ),
-        );
-      }
-    }
-    if (copyInUse) Effect.runFork(providerRuntimes.providerUseChanged());
+    trackSystemCliVersionsOnly(status);
     hermesInstaller.setProvider(status.providers?.find((provider) => provider.id === "hermes"));
   };
   trackSystemCliVersions(service.getStatus());
   service.on("event", (event) => {
     if (event.type === "status") trackSystemCliVersions(event.status);
+    else if (event.type === "agents-changed" && runsAsServer) trackSystemCliVersionsOnly(service.getStatus());
   });
   providerRuntimes.on("status", forwardProviderRuntimeStatus);
   if (diskRestoring()) {
