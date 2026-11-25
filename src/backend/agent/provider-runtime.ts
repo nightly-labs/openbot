@@ -116,7 +116,6 @@ import { defaultUsageModel, ownApiKeyNotice, ProviderAccountFailed, ProviderAcco
 import {
   createAcpRequestEchoReader,
   isAcpHandlerDiagnostic,
-  isGitSpawnDiagnostic,
   isGlogBelowErrorDiagnostic,
   isIgnoredConfigDiagnostic,
   isMcpSessionClosingDiagnostic,
@@ -3985,10 +3984,6 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("A provider reported a failed usage reading.", { provider: client.provider, message });
         return;
       }
-      if (client.provider === "grok" && isGitSpawnDiagnostic(message)) {
-        stderrLogger.warn("A provider could not start git.", { provider: client.provider, message });
-        return;
-      }
       if (isAcpHandlerDiagnostic(message)) {
         stderrLogger.warn("A provider logged a request that it answered with an error.", {
           provider: client.provider,
@@ -4008,6 +4003,10 @@ export class ProviderRuntime implements ProviderPort {
       }
       if (client.provider === "codex") {
         stderrLogger.warn("Codex logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
+      if (client.provider === "grok") {
+        stderrLogger.warn("Grok logged a diagnostic.", { provider: client.provider, message });
         return;
       }
       if (client.provider === "hermes") {
