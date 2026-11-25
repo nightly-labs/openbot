@@ -522,6 +522,7 @@ export interface AgentServiceOptions {
   agentCursorDrawn?: boolean;
   computerUseOnWayland?: boolean;
   computerUseInputRefused?: () => boolean;
+  computerUseForegroundInput?: boolean;
   computerUseMissingPermissions?: () => readonly MacPermissionId[];
   codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
   creditMedia?: CreditMediaGateway | null;
@@ -641,6 +642,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #steersAfterTurnStart = new Map<string, { agentId: string; taskId: string | null; threadId: string }>();
 
   readonly #requestedNewChats = new Set<string>();
+  readonly #settlingStaleTaskTurns = new Set<string>();
   readonly signInWaits = new ProviderSignInWaits((agentId) => this.#store.get(agentId) !== undefined);
   #signInProviders: ReadonlySet<AgentProvider> = new Set();
   readonly #planContinuation = new PlanContinuation({ limit: 8 });
@@ -1413,6 +1415,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.agentCursorDrawn ? { agentCursorDrawn: true } : {}),
       ...(options.computerUseOnWayland ? { computerUseOnWayland: true } : {}),
       ...(options.computerUseInputRefused ? { computerUseInputRefused: options.computerUseInputRefused } : {}),
+      ...(options.computerUseForegroundInput ? { computerUseForegroundInput: true } : {}),
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
       memoryReview: () => this.#memoryReview.running(),
       skillRevision: () => options.skillLearning?.() === "automatic",
@@ -1860,6 +1863,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             logger.info(`Agent ${agentId} dropped its new chat request: a turn in its chat started first.`);
         },
         followPendingRuntime: (agentId) => this.#startPendingRuntime(agentId),
+        pendingRuntimeWaits: (agentId) =>
+          Boolean(this.#store.get(agentId)?.pendingRuntime) && this.#runtimeHandoverBusy(agentId),
+        settleStaleTaskTurns: (agentId) => this.#settleStaleTaskTurnsOnce(agentId),
         signInWait: (agentId, provider) => this.signInWaits.note(agentId, provider),
         followUsageLimit: (agentId) => {
           if (this.#startPendingRuntime(agentId)) return true;
@@ -3940,6 +3946,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     }
   });
 
+  #settleStaleTaskTurnsOnce(agentId: string): void {
+    if (this.#settlingStaleTaskTurns.has(agentId)) return;
+    this.#settlingStaleTaskTurns.add(agentId);
+    Effect.runFork(
+      this.#settleStaleTaskTurns(agentId).pipe(
+        Effect.catch((failure) => Effect.sync(() => this.#emitError("stale_task_settlement_failed", failure, agentId))),
+        Effect.ensuring(Effect.sync(() => this.#settlingStaleTaskTurns.delete(agentId))),
+        Effect.forkIn(this.#scope, { startImmediately: true }),
+      ),
+    );
+  }
+
   #turnRunsNowhere(agentId: string, turnId: string): boolean {
     return (
       !this.#stopping &&
@@ -4271,6 +4289,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         agent.reasoningEffort,
       );
     }
+    if (previous?.pendingRuntime && !agent.pendingRuntime) this.#drain.scheduleDrain(agent.id);
     if (profileChanged) this.#conversation.unloadAgentThreads(agent.id);
     if (previous && workspaceAccessEnforced(previous) && !workspaceAccessEnforced(agent))
       this.#attention.answerGrantedRequests();

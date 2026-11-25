@@ -44,6 +44,7 @@ export const messages = defineMessages("update", {
   "update.idleRestart.description": "New routine runs wait until the restart.",
   "update.idleRestart.waitingFor": "Waiting for {reasons}.",
   "update.idleRestart.cancel": "Cancel restart",
+  "update.idleRestart.openSettings": "Open update settings",
   "update.idleRestart.restartNow": "Restart now",
   "update.idleRestart.restartNowTitle": "Restart OpenBot now?",
   "update.idleRestart.restartNowDescription": "Agent turns and routine runs that did not finish stop now.",
