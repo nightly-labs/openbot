@@ -373,6 +373,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} 삭제",
   "mobile.agent.backupModels.unavailable": "지금 사용할 수 없음 · 건너뜀",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "작업을 시작한 뒤 사용 한도로 {name}이(가) 멈추면, 순서에서 처음으로 사용 가능한 모델로 같은 작업을 이어가요. 한도가 끝나거나 제공자 오류 후 10분이 지나면 {model}(으)로 돌아가요.",
   "mobile.agent.busyMessage.label": "작업 중일 때",

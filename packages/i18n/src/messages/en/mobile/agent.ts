@@ -370,6 +370,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.backupModels.remove": "Remove {model}",
   "mobile.agent.backupModels.unavailable": "Not available now · skipped",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "When a usage limit stops {name} after it starts to work, {name} continues the same work on the first available model in the order. It goes back to {model} when the limit ends, or 10 minutes after a provider error.",
   "mobile.agent.busyMessage.label": "While working",

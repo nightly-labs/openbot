@@ -96,6 +96,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Gebruikslimiet bereikt · overgeslagen",
   "agentSettings.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "agentSettings.groups.brain": "Brein",

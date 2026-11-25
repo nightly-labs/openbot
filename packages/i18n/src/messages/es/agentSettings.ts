@@ -95,6 +95,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "Límite de uso alcanzado · omitido",
   "agentSettings.backupModels.unavailable": "No disponible ahora · omitido",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "Si un límite de uso detiene a {name} después de empezar a trabajar, {name} continúa el mismo trabajo con el primer modelo disponible del orden. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
   "agentSettings.groups.brain": "Cerebro",

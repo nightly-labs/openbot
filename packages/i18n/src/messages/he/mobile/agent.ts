@@ -373,6 +373,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "הסרת {model}",
   "mobile.agent.backupModels.unavailable": "לא זמין כעת · מדולג",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "כשמגבלת שימוש עוצרת את {name} אחרי שהתחיל לעבוד, {name} ממשיך את אותה עבודה במודל הזמין הראשון לפי הסדר. הוא חוזר ל-{model} כשהמגבלה מסתיימת, או 10 דקות אחרי שגיאת ספק.",
   "mobile.agent.busyMessage.label": "בזמן עבודה",

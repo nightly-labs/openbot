@@ -378,6 +378,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Quitar {model}",
   "mobile.agent.backupModels.unavailable": "No disponible ahora · omitido",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Si un límite de uso detiene a {name} después de empezar a trabajar, {name} continúa el mismo trabajo con el primer modelo disponible del orden. Vuelve a {model} cuando termina el límite, o 10 minutos después de un error del proveedor.",
   "mobile.agent.busyMessage.label": "Mientras trabaja",
