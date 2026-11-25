@@ -59,6 +59,9 @@ const githubRepositoriesSchema = z.object({
   total_count: z.number(),
   repositories: z.array(z.object({ full_name: z.string().min(1), private: z.boolean() })),
 });
+const publicRepositoriesSchema = z.object({
+  repositories: z.array(z.object({ installationId: z.number(), fullName: z.string().min(1) })),
+});
 
 export interface GitHubConnectorServiceOptions {
   app: GitHubAppConfig | null;
@@ -83,6 +86,7 @@ export class GitHubConnectorService {
   readonly #scope = Scope.makeUnsafe();
   readonly #operations = new Set<Deferred.Deferred<void>>();
   readonly #fetch: GitHubFetch;
+  readonly #apiUrl: string;
   readonly #now: () => number;
   readonly #statusListeners = new Set<(status: GitHubConnectorStatus) => void>();
   readonly #accessListeners = new Set<() => void>();
@@ -110,6 +114,7 @@ export class GitHubConnectorService {
     this.#fetch = options.fetch ?? ((url, init) => fetch(url, init));
     this.#platform = GitHubPlatform.layer(this.#fetch, options.openExternal);
     this.#now = options.now ?? Date.now;
+    this.#apiUrl = options.apiUrl;
     this.#botTokens = new GitHubBotTokens({ apiUrl: options.apiUrl, fetch: this.#fetch, now: this.#now });
     registerSecretValue(this.#mcpProxySecret);
   }
@@ -539,16 +544,24 @@ export class GitHubConnectorService {
     this: GitHubConnectorService,
     token: string,
   ): Effect.fn.Return<{ repositories: InstallationRepository[]; total: number }, GitHubOperationError, GitHubPlatform> {
-    const { installations } = yield* this.#getGitHubEffect(
-      `https://api.github.com/user/installations?per_page=${GITHUB_PAGE_SIZE}`,
-      token,
-      githubInstallationsSchema,
+    const [{ installations }, publicRepositories] = yield* Effect.all(
+      [
+        this.#getGitHubEffect(
+          `https://api.github.com/user/installations?per_page=${GITHUB_PAGE_SIZE}`,
+          token,
+          githubInstallationsSchema,
+        ),
+        this.#publicRepositories(token).pipe(Effect.orElseSucceed(() => [])),
+      ],
+      { concurrency: "unbounded" },
     );
     const repositories: InstallationRepository[] = [];
+    const eventsByInstallation = new Map<number, boolean>();
     let total = 0;
     for (const installation of installations) {
       const subscribed = installation.events ?? [];
       const events = GITHUB_ROUTE_EVENTS.every((event) => subscribed.includes(event));
+      eventsByInstallation.set(installation.id, events);
       for (let page = 1; ; page += 1) {
         const answer = yield* this.#getGitHubEffect(
           `https://api.github.com/user/installations/${installation.id}/repositories?per_page=${GITHUB_PAGE_SIZE}&page=${page}`,
@@ -564,11 +577,39 @@ export class GitHubConnectorService {
       }
       if (repositories.length >= MAX_LISTED_REPOSITORIES) break;
     }
+    const listed = new Set(repositories.map((repository) => repository.fullName.toLowerCase()));
+    for (const repository of publicRepositories) {
+      if (repositories.length >= MAX_LISTED_REPOSITORIES) break;
+      const events = eventsByInstallation.get(repository.installationId);
+      if (events === undefined || listed.has(repository.fullName.toLowerCase())) continue;
+      listed.add(repository.fullName.toLowerCase());
+      repositories.push({ fullName: repository.fullName, private: false, events });
+      total += 1;
+    }
     repositories.sort((left, right) => left.fullName.localeCompare(right.fullName, "en", { sensitivity: "base" }));
     return {
       repositories: repositories.slice(0, MAX_LISTED_REPOSITORIES),
       total: Math.max(total, repositories.length),
     };
+  });
+
+  readonly #publicRepositories = Effect.fn("GitHubConnector.publicRepositories")(function* (
+    this: GitHubConnectorService,
+    token: string,
+  ): Effect.fn.Return<z.infer<typeof publicRepositoriesSchema>["repositories"], GitHubOperationError, GitHubPlatform> {
+    const response = yield* GitHubPlatform.use((platform) =>
+      platform.fetch(new URL("/v1/github/public-repositories", this.#apiUrl).toString(), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        signal: AbortSignal.timeout(GITHUB_REQUEST_TIMEOUT_MS),
+      }),
+    );
+    if (!response.ok) {
+      void response.body?.cancel();
+      return [];
+    }
+    const answer = publicRepositoriesSchema.safeParse(yield* githubCall(() => response.json().catch(() => null)));
+    return answer.success ? answer.data.repositories : [];
   });
 
   readonly #canRead = Effect.fn("GitHubConnector.canRead")(

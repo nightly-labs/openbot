@@ -16,6 +16,11 @@ export interface GitHubInstallationToken {
   repositories: string[];
 }
 
+export interface GitHubPublicRepository {
+  installationId: number;
+  fullName: string;
+}
+
 export interface GitHubRepositoryRoute extends GitHubRouteRepository {
   fullName: string;
   events: boolean;
@@ -44,6 +49,8 @@ const MAX_INSTALLATIONS = 20;
 const MAX_REPOSITORY_PAGES = 10;
 const MAX_REPOSITORIES_PER_TOKEN = 500;
 const USER_ONLY_PERMISSIONS: ReadonlySet<string> = new Set(["administration"]);
+const LISTING_TOKEN_MARGIN_MS = 5 * 60_000;
+const LISTING_PERMISSIONS = { metadata: "read" } as const;
 
 const appSchema = Schema.Struct({ id: Schema.Number });
 const installationsSchema = Schema.Struct({
@@ -72,6 +79,10 @@ const repositoriesSchema = Schema.Struct({
       ),
     }),
   ),
+});
+const installationRepositoriesSchema = Schema.Struct({
+  total_count: Schema.Number,
+  repositories: Schema.Array(Schema.Struct({ id: Schema.Number, full_name: Schema.String, private: Schema.Boolean })),
 });
 const accessTokenSchema = Schema.Struct({ token: Schema.NonEmptyString, expires_at: Schema.String });
 const repositoryInstallationSchema = Schema.Struct({ id: Schema.Number });
@@ -164,6 +175,7 @@ export class GitHubInstallationTokens {
   #key: CryptoKey | null = null;
   #appId: number | null = null;
   readonly #repositoryInstallations = new Map<string, number>();
+  readonly #listingTokens = new Map<number, { token: string; expiresAt: number }>();
 
   constructor(options: GitHubInstallationTokensOptions) {
     this.#options = options;
@@ -216,8 +228,34 @@ export class GitHubInstallationTokens {
         }),
       );
       if (Result.isFailure(result) && result.failure.code !== "github_failed") return yield* result.failure;
+      if (wanted.size === 0) break;
+      const listed = yield* this.#publicInstallationRepositories(installation.id).pipe(Effect.orElseSucceed(() => []));
+      for (const repository of listed) {
+        if (!wanted.delete(repository.full_name.toLowerCase())) continue;
+        routes.push({ id: repository.id, installationId: installation.id, fullName: repository.full_name, events });
+      }
     }
     return routes;
+  }).bind(this);
+
+  readonly publicRepositories = Effect.fn("GitHubInstallationTokens.publicRepositories")(function* (
+    this: GitHubInstallationTokens,
+    userToken: string,
+  ): Effect.fn.Return<GitHubPublicRepository[], GitHubInstallationTokensError> {
+    const appId = yield* this.#readAppId();
+    const user: Credential = { kind: "user", token: userToken };
+    const { installations } = yield* this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
+    const repositories: GitHubPublicRepository[] = [];
+    for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
+      const listed = yield* Effect.result(this.#publicInstallationRepositories(installation.id));
+      if (Result.isFailure(listed)) {
+        if (listed.failure.code !== "github_failed") return yield* listed.failure;
+        continue;
+      }
+      for (const repository of listed.success)
+        repositories.push({ installationId: installation.id, fullName: repository.full_name });
+    }
+    return repositories;
   }).bind(this);
 
   readonly openIssue = Effect.fn("GitHubInstallationTokens.openIssue")(function* (
@@ -412,6 +450,44 @@ export class GitHubInstallationTokens {
       return true;
     });
     return writable;
+  });
+
+  readonly #publicInstallationRepositories = Effect.fn("GitHubInstallationTokens.publicInstallationRepositories")(
+    function* (
+      this: GitHubInstallationTokens,
+      installationId: number,
+    ): Effect.fn.Return<{ id: number; full_name: string }[], GitHubInstallationTokensError> {
+      const credential = yield* this.#listingToken(installationId);
+      const repositories: { id: number; full_name: string }[] = [];
+      for (let page = 1; page <= MAX_REPOSITORY_PAGES; page += 1) {
+        const answer = yield* this.#get(
+          `/installation/repositories?per_page=${PAGE_SIZE}&page=${page}`,
+          credential,
+          installationRepositoriesSchema,
+        ).pipe(Effect.tapError(() => Effect.sync(() => this.#listingTokens.delete(installationId))));
+        for (const repository of answer.repositories)
+          if (!repository.private) repositories.push({ id: repository.id, full_name: repository.full_name });
+        if (answer.repositories.length < PAGE_SIZE || page * PAGE_SIZE >= answer.total_count) break;
+      }
+      return repositories;
+    },
+  );
+
+  readonly #listingToken = Effect.fn("GitHubInstallationTokens.listingToken")(function* (
+    this: GitHubInstallationTokens,
+    installationId: number,
+  ): Effect.fn.Return<Credential, GitHubInstallationTokensError> {
+    const cached = this.#listingTokens.get(installationId);
+    if (cached && cached.expiresAt - this.#now() > LISTING_TOKEN_MARGIN_MS)
+      return { kind: "installation", token: cached.token };
+    const minted = yield* this.#post(
+      `/app/installations/${installationId}/access_tokens`,
+      APP,
+      { permissions: LISTING_PERMISSIONS },
+      accessTokenSchema,
+    );
+    this.#listingTokens.set(installationId, { token: minted.token, expiresAt: Date.parse(minted.expires_at) });
+    return { kind: "installation", token: minted.token };
   });
 
   readonly #eachRepository = Effect.fn("GitHubInstallationTokens.eachRepository")(function* (
