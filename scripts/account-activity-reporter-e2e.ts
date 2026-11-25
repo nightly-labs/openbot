@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { Effect } from "effect";
-import { AccountActivityReporter } from "../src/main/account-activity-reporter";
+import { AccountActivityReporter, HostAccountActivity } from "../src/main/account-activity-reporter";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const OUT = join(ROOT, ".openbot-build", "account-activity-reporter-e2e");
@@ -118,6 +118,61 @@ async function main() {
     "an account active on the new day is sent once for that day",
     JSON.stringify(midnight.sent) === JSON.stringify([["bob"], ["ada"]]),
     midnight.sent,
+  );
+
+  const hostSent = harness(NOON_23RD);
+  let owner: { id: string } | null = { id: "owner" };
+  const host = new HostAccountActivity({
+    analyticsOn: false,
+    now: () => NOON_23RD,
+    retryAfterMs: 10,
+    send: hostSent.send,
+    resolveOwner: () => owner,
+    memberAccountId: (memberId) => (memberId === "member-1" ? "member-account" : null),
+  });
+  host.turnStarted();
+  host.memberUsed("member-1");
+  await host.idle();
+  const sentWhileOff = hostSent.sent.length;
+  host.setAnalyticsOn(true);
+  owner = null;
+  host.turnStarted();
+  host.memberUsed("member-without-account");
+  await host.idle();
+  const sentWithoutAccounts = hostSent.sent.length;
+  owner = { id: "owner" };
+  host.turnStarted();
+  await host.idle();
+  check(
+    "a host with analytics off sends no owner or member, and with analytics on sends its signed-in owner",
+    sentWhileOff === 0 && sentWithoutAccounts === 0 && JSON.stringify(hostSent.sent) === JSON.stringify([["owner"]]),
+    { sentWhileOff, sentWithoutAccounts, sent: hostSent.sent },
+  );
+
+  const optOut = harness(NOON_23RD);
+  const optOutHost = new HostAccountActivity({
+    analyticsOn: true,
+    now: () => NOON_23RD,
+    retryAfterMs: 10,
+    send: optOut.send,
+    resolveOwner: () => ({ id: "owner" }),
+    memberAccountId: () => "member-account",
+  });
+  optOut.failNextSends(1);
+  const failedOwnerSend = optOut.nextSend();
+  optOutHost.turnStarted();
+  await failedOwnerSend;
+  await optOutHost.idle();
+  optOutHost.setAnalyticsOn(false);
+  optOutHost.setAnalyticsOn(true);
+  const nextAfterOptOut = optOut.nextSend();
+  optOutHost.memberUsed("member-1");
+  const sentAfterOptOut = await nextAfterOptOut;
+  await optOutHost.idle();
+  check(
+    "turning analytics off drops the accounts that wait for a retry",
+    sentAfterOptOut && JSON.stringify(optOut.sent) === JSON.stringify([["member-account"]]),
+    optOut.sent,
   );
 
   await mkdir(OUT, { recursive: true });

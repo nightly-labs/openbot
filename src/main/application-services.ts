@@ -142,7 +142,7 @@ import {
   type WorkflowsHandle,
   workflowNoticeEvent,
 } from "../backend/workflows/workflows";
-import { ACCOUNT_ACTIVITY_PATH, AccountActivityReporter } from "./account-activity-reporter";
+import { ACCOUNT_ACTIVITY_PATH, HostAccountActivity } from "./account-activity-reporter";
 import { centralAuthApiUrl, createCentralAuthManager, safeStorageCipher } from "./account-service-access";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { AGENT_ACCESS_FILE, AgentAccessStore } from "./agent-access-store";
@@ -3229,27 +3229,22 @@ export async function createApplicationServices({
       ? state.user
       : null;
   };
-  let ownerAnalyticsOn = analyticsPreference.enabled;
-  const accountActivity = new AccountActivityReporter({
+  const accountActivity = new HostAccountActivity({
+    analyticsOn: analyticsPreference.enabled,
+    resolveOwner: resolveHostOwner,
+    memberAccountId: (memberId) => teamStore.getMemberAccountId(memberId),
     send: (accounts) =>
-      !ownerAnalyticsOn
-        ? Effect.void
-        : centralAuth.requestAuthorized(
-            ACCOUNT_ACTIVITY_PATH,
-            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accounts }) },
-            (value) => value,
-          ),
+      centralAuth.requestAuthorized(
+        ACCOUNT_ACTIVITY_PATH,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accounts }) },
+        (value) => value,
+      ),
   });
   service.on("event", (event) => {
-    if (event.type !== "turn-started" || !ownerAnalyticsOn) return;
-    const owner = resolveHostOwner();
-    if (owner) accountActivity.record(owner.id);
+    if (event.type === "turn-started") accountActivity.turnStarted();
   });
   const host = new HostService({
-    onMemberUse: (memberId) => {
-      const accountId = ownerAnalyticsOn ? teamStore.getMemberAccountId(memberId) : null;
-      if (accountId) accountActivity.record(accountId);
-    },
+    onMemberUse: (memberId) => accountActivity.memberUsed(memberId),
     appVersion: app.getVersion(),
     store: teamStore,
     agents: service,
@@ -3710,7 +3705,7 @@ export async function createApplicationServices({
     path: analyticsPreferenceFile,
     account: centralAuth,
     setTrackingEnabled: (enabled) => {
-      ownerAnalyticsOn = enabled;
+      accountActivity.setAnalyticsOn(enabled);
       analytics.setTrackingEnabled(enabled);
     },
     followed: (enabled) => {
