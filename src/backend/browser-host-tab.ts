@@ -71,6 +71,7 @@ export interface BrowserHostTab {
   visitedHost?: string | undefined;
   secret?: { origin: string; submitted: boolean; replaced: boolean; running: boolean } | undefined;
   httpSignIn?: BrowserHttpSignInPrompt | undefined;
+  mainFrameRequestUrl?: string | undefined;
   httpSignInAnswer?: (BrowserHttpSignInRealm & { username: string; password: string }) | undefined;
 }
 

@@ -45,10 +45,22 @@ function site(request: IncomingMessage, response: ServerResponse): void {
   const sent = authorization(request);
   requests.push({ path: url.pathname, authorization: sent });
   if (url.pathname === "/open") {
-    page(response, 200, "open", url.searchParams.has("image") ? '<img src="/image">' : "");
+    const embed = url.searchParams.has("image")
+      ? '<img src="/image">'
+      : url.searchParams.has("frame")
+        ? '<iframe src="/frame"></iframe>'
+        : "";
+    page(response, 200, "open", embed);
     return;
   }
-  const realm = url.pathname === "/other" ? "Other" : url.pathname === "/image" ? "Image" : "Files";
+  const realm =
+    url.pathname === "/other"
+      ? "Other"
+      : url.pathname === "/image"
+        ? "Image"
+        : url.pathname === "/frame"
+          ? "Frame"
+          : "Files";
   if (sent === "right" && url.pathname === "/files") {
     page(response, 200, "files-open");
     return;
@@ -185,6 +197,12 @@ async function main(): Promise<void> {
     await settled(imageTab.id, (current) => current.title === "open");
     assert.equal(tabOf(imageTab.id)?.httpSignIn, undefined);
     recordCases("subresource-prompt-not-shown");
+
+    const frameTab = await runCauseEffect(host.open(`${secureOrigin}/open?frame`, "fixture-thread", "fixture-agent"));
+    await changed(() => requests.some((entry) => entry.path === "/frame"));
+    await settled(frameTab.id, (current) => current.title === "open");
+    assert.equal(tabOf(frameTab.id)?.httpSignIn, undefined);
+    recordCases("frame-prompt-not-shown");
 
     const report = {
       status: "passed",

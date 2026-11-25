@@ -3717,6 +3717,7 @@ export class BrowserHost {
       !details.isRequestForNavigation ||
       (scheme !== "basic" && scheme !== "digest") ||
       url?.protocol !== "https:" ||
+      details.url !== tab.mainFrameRequestUrl ||
       tab.secret
     )
       return;
@@ -3767,9 +3768,14 @@ export class BrowserHost {
       delete tab.httpSignInAnswer;
     });
     contents.on("did-start-navigation", (details) => {
-      if (!details.isMainFrame || details.isSameDocument || !tab.httpSignIn) return;
+      if (!details.isMainFrame || details.isSameDocument) return;
+      tab.mainFrameRequestUrl = withoutFragment(details.url);
+      if (!tab.httpSignIn) return;
       delete tab.httpSignIn;
       changed();
+    });
+    contents.on("did-redirect-navigation", (details) => {
+      if (details.isMainFrame) tab.mainFrameRequestUrl = withoutFragment(details.url);
     });
     contents.on("close", () => {
       if (tab.contents !== contents) return;
@@ -4978,4 +4984,9 @@ function uniqueDownloadPath(root: string, name: string, reserved: Set<string>): 
     const candidate = join(root, suffix === 1 ? name : `${stem} (${suffix})${extension}`);
     if (!reserved.has(candidate) && !existsSync(candidate)) return candidate;
   }
+}
+
+function withoutFragment(url: string): string {
+  const fragment = url.indexOf("#");
+  return fragment === -1 ? url : url.slice(0, fragment);
 }

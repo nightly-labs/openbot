@@ -58,15 +58,17 @@ function httpsOrigin(value: string): boolean {
 function signInPrompts(input: unknown): BrowserHttpSignInPrompt[] {
   const decoded = prompts(input);
   if (!Array.isArray(decoded)) throw new Error("Invalid browser HTTP sign-in list.");
-  return decoded.flatMap((entry) =>
-    isDynamicRecord(entry) &&
-    isString(entry.tabId) &&
-    isString(entry.origin) &&
-    httpsOrigin(entry.origin) &&
-    isBoolean(entry.refused)
-      ? [{ tabId: entry.tabId, origin: entry.origin, refused: entry.refused }]
-      : [],
-  );
+  return decoded.map((entry) => {
+    if (
+      !isDynamicRecord(entry) ||
+      !isString(entry.tabId) ||
+      !isString(entry.origin) ||
+      !httpsOrigin(entry.origin) ||
+      !isBoolean(entry.refused)
+    )
+      throw new Error("Invalid browser HTTP sign-in prompt.");
+    return { tabId: entry.tabId, origin: entry.origin, refused: entry.refused };
+  });
 }
 
 export function decodeBrowserHttpSignInSnapshot(input: unknown): BrowserHttpSignInSnapshot {
