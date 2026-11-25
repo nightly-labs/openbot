@@ -523,11 +523,14 @@ export class McpGateway {
     return this.#servers
       .list()
       .filter((config) => config.transport === "http")
-      .map((config) => ({
-        mcpServerId: config.id,
-        signedIn: oauth?.signedIn(config.url) ?? false,
-        needsSignIn: this.#awaitsSignIn(config),
-      }));
+      .map((config) => {
+        const needsSignIn = this.#awaitsSignIn(config);
+        return {
+          mcpServerId: config.id,
+          signedIn: !needsSignIn && (oauth?.signedIn(config.url) ?? false),
+          needsSignIn,
+        };
+      });
   }
 
   serviceSignIns(host: string): McpServiceSignIn[] {
