@@ -467,7 +467,7 @@ const SERVER_PLACES: readonly ServerPlaceEntry[] = [
     about:
       "Only the owner or an admin. The saved logins, cards, contact info and API keys that agents use, also the keys that an agent saved with save_api_key. A Marketplace app does not read the Vault: to use a saved key in an app, copy it here, then open Marketplace, open the app, and paste it where the app asks for its key (Change key when the app is connected). A member asks the owner.",
     words: "vault api key keys token tokens secret secrets password passwords credential credentials",
-    foundWithoutServerWord: ["vault", "api", "token", "secret", "credential", "password"],
+    foundWithoutServerWord: ["vault", "api", "key", "keys", "token", "secret", "credential", "password"],
   },
 ];
 
