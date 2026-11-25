@@ -124,8 +124,10 @@ import {
   TEAM_PROTOCOL_V10_ABSENT_LIMIT,
 } from "@openbot/contracts/team-protocol/v10";
 import { sourceText } from "@openbot/i18n/source";
-import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
+import { createOpenBotLogger } from "@openbot/logging";
+import { Cause, Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
 import type * as Ws from "ws";
+import { reportOriginalFailure } from "../backend/effect-boundary";
 import type { VerifiedRemoteSessionTicket } from "./central-auth-manager";
 import { contentDispositionFileName } from "./content-disposition";
 import {
@@ -142,6 +144,7 @@ import { rawDataBytes, sendableCloseCode } from "./ws-raw-data";
 
 const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
+const logger = createOpenBotLogger("team-webrtc-host-peer");
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
 const MAXIMUM_BUFFERED_EVENT_CHARACTERS = 32 * 1024 * 1024;
 const MAXIMUM_KEPT_RESPONSES = 1_000;
@@ -399,13 +402,17 @@ export class TeamWebRtcHostPeer {
     const authFrame = channel === "rpc" && isString(data) ? authenticationFrame(data) : null;
     if (authFrame?.type === "auth-init") {
       this.#dispatch(
-        this.#handleAuthentication(peerId, authFrame).pipe(Effect.catchCause(() => this.#failProtocol(peerId))),
+        this.#handleAuthentication(peerId, authFrame).pipe(
+          Effect.catchCause((cause) => this.#rejectAuthentication(peerId, authFrame.type, cause)),
+        ),
       );
       return;
     }
     if (authFrame?.type === "auth-complete") {
       this.#dispatch(
-        this.#completeAuthentication(peerId, authFrame).pipe(Effect.catchCause(() => this.#failProtocol(peerId))),
+        this.#completeAuthentication(peerId, authFrame).pipe(
+          Effect.catchCause((cause) => this.#rejectAuthentication(peerId, authFrame.type, cause)),
+        ),
       );
       return;
     }
@@ -1052,6 +1059,22 @@ export class TeamWebRtcHostPeer {
     if (this.#eventSender === sessionId) this.#eventSender = null;
   });
 
+  readonly #rejectAuthentication = Effect.fn("TeamHostPeer.rejectAuthentication")(function* (
+    this: TeamWebRtcHostPeer,
+    peerId: string,
+    step: TeamProtocolV2AuthFrame["type"],
+    cause: Cause.Cause<RemoteWorkflowError>,
+  ) {
+    if (peerId !== this.#peerId) return;
+    if (!Cause.hasInterruptsOnly(cause))
+      yield* reportOriginalFailure(cause, (failure) =>
+        logger.warn(
+          `A remote client did not pass the ${step} sign-in step (${authenticationFailureReason(failure)}). The server closed the connection.`,
+        ),
+      );
+    yield* this.#failProtocol(peerId);
+  });
+
   readonly #failProtocol = Effect.fn("TeamHostPeer.failProtocol")(function* (this: TeamWebRtcHostPeer, peerId: string) {
     if (peerId !== this.#peerId) return;
     this.#setPeerAuthenticated(peerId, false);
@@ -1290,6 +1313,16 @@ function encodeRpcResponse(response: TeamProtocolV2RpcFrame): string {
       },
     });
   }
+}
+
+function authenticationFailureReason(failure: unknown): string {
+  let error = failure;
+  for (let depth = 0; depth < 4 && isDynamicRecord(error); depth += 1) {
+    if (isString(error.code) && /^[A-Z][A-Z0-9_]{2,}$/u.test(error.code))
+      return isString(error.claim) ? `${error.code} ${error.claim}` : error.code;
+    error = error.cause;
+  }
+  return failure instanceof Error ? failure.message : "unknown";
 }
 
 function authenticationFrame(data: string): TeamProtocolV2AuthFrame | null {
