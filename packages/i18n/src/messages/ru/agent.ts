@@ -53,6 +53,8 @@ export const messages = {
   "agent.dock.add": "Добавить в док",
   "agent.dock.allAdded": "Все ваши агенты и каналы уже в доке",
   "agent.dock.more": "Ещё",
+  "agent.dock.mainChat": "Основной чат",
+  "agent.dock.changeChat": "Сменить чат",
   "agent.dock.keepOpen": "Не закрывать",
   "agent.dock.closeOnLeave": "Закрывать при щелчке вне чата",
   "agent.dock.openInMain": "Открыть в главном окне",

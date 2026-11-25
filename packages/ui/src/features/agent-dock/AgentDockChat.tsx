@@ -37,11 +37,13 @@ import { ComposerEditor } from "../conversation/ComposerEditor";
 import { ApprovalCard, BrowserTakeoverCard } from "../conversation/ConversationPrompts";
 import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
+import { DRAFT_THREAD_ID } from "../conversation/threads/thread-types";
 import { ComposerVoiceControls, type VoicePhase } from "../conversation/VoiceRecordingMorph";
 import { SidebarWaitIcon } from "../sidebar/SidebarAgentIndicator";
 import { SIDEBAR_WAIT_ACTION, SIDEBAR_WAIT_TITLE } from "../sidebar/sidebar-filtering";
 import type { SidebarWaitReason } from "../sidebar/sidebar-types";
 import type { AgentDockSeat } from "./AgentDock";
+import { type AgentDockThreadChoices, AgentDockThreadMenu } from "./AgentDockThreadMenu";
 
 const VISIBLE_MESSAGES = 60;
 const STICK_TO_END_PX = 80;
@@ -52,6 +54,7 @@ const SCROLL_INPUT_MS = 1000;
 
 export interface AgentDockChatModel {
   thread?: { taskId: string; title: string } | null | undefined;
+  threads?: AgentDockThreadChoices | null | undefined;
   messages: readonly AgentMessage[];
   working: boolean;
   wait: SidebarWaitReason | null;
@@ -123,6 +126,8 @@ export function AgentDockChat(props: {
   onAdd: () => void;
   onOpenInMain: () => void;
   onOpenWindow?: (() => void) | undefined;
+  onOpenThread?: ((id: string) => void) | undefined;
+  onNewThread?: (() => void) | undefined;
   voice?: AgentDockChatVoice | undefined;
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
@@ -145,6 +150,18 @@ export function AgentDockChat(props: {
     if (props.chat.working) return t("agent.dock.working");
     if (props.chat.thread) return t("conversation.threads.current", { title: props.chat.thread.title });
     return props.seat.kind === "agent" ? props.seat.agent.title : props.seat.channel.title;
+  };
+  const threadSwitcher = () => {
+    const choices = props.chat.threads;
+    const onOpen = props.onOpenThread;
+    const onNew = props.onNewThread;
+    return choices && onOpen && onNew ? { choices, onOpen, onNew } : undefined;
+  };
+  const composerPlaceholder = () => {
+    if (props.chat.threads?.activeId === DRAFT_THREAD_ID)
+      return t("conversation.threads.view.newPlaceholder", { name: name() });
+    if (props.chat.thread) return t("conversation.threads.view.placeholder", { name: name() });
+    return t("composer.placeholder.message", { name: name() });
   };
   const author = (message: AgentMessage): string | undefined => {
     if (!channel() || isOwn(message)) return undefined;
@@ -326,7 +343,11 @@ export function AgentDockChat(props: {
         </Show>
         <div class="agent-dock-chat-title">
           <strong>{name()}</strong>
-          <span>{subtitle()}</span>
+          <Show when={threadSwitcher()} fallback={<span>{subtitle()}</span>}>
+            {(switcher) => (
+              <AgentDockThreadMenu choices={switcher().choices} onOpen={switcher().onOpen} onNew={switcher().onNew} />
+            )}
+          </Show>
         </div>
         <Show when={props.onPinChange}>
           {(change) => (
@@ -573,8 +594,8 @@ export function AgentDockChat(props: {
               agentId={undefined}
               agents={props.agents}
               value={props.draft}
-              placeholder={t("composer.placeholder.message", { name: name() })}
-              ariaLabel={t("composer.placeholder.message", { name: name() })}
+              placeholder={composerPlaceholder()}
+              ariaLabel={composerPlaceholder()}
               disabled={transcribing()}
               focusRequest={props.focusRequest}
               dictation={{ text: props.voice?.liveText ?? "", final: transcribing() }}

@@ -19,6 +19,7 @@ import {
   agentDockBody,
   agentDockSeatKey,
 } from "@openbot/ui/features/agent-dock/AgentDock";
+import { DRAFT_THREAD_ID } from "@openbot/ui/features/conversation/threads/thread-types";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, Show } from "solid-js";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
@@ -229,6 +230,12 @@ export function AgentDockSurface() {
       );
       bySeat.set(agentDockSeatKey(chat.seat), {
         thread: chat.thread ?? null,
+        threads: chat.threads
+          ? {
+              activeId: chat.threads.activeId,
+              threads: chat.threads.threads.map((thread) => ({ ...thread, kind: "side" as const })),
+            }
+          : null,
         messages,
         working: chat.working,
         wait: chat.wait,
@@ -361,8 +368,17 @@ export function AgentDockSurface() {
             }}
             onSend={async (seat, text) => {
               const seatKey = agentDockSeatKey(seat);
-              const taskId = presentation()?.chats.find((chat) => agentDockSeatKey(chat.seat) === seatKey)?.thread
-                ?.taskId;
+              const shown = presentation()?.chats.find((chat) => agentDockSeatKey(chat.seat) === seatKey);
+              const taskId = shown?.thread?.taskId;
+              if (seat.kind === "agent" && shown?.threads?.activeId === DRAFT_THREAD_ID) {
+                const clientMessageId = crypto.randomUUID();
+                try {
+                  await perform({ type: "start-thread", serverId: server, agentId: seat.id, text, clientMessageId });
+                  return { messageId: clientMessageId };
+                } catch (error) {
+                  return { error: errorMessage(error, t("conversation.threads.error.start")) };
+                }
+              }
               const clientMessageId =
                 failed && failed.seatKey === seatKey && failed.taskId === taskId && failed.text === text
                   ? failed.clientMessageId
@@ -392,6 +408,12 @@ export function AgentDockSurface() {
             }
             onOpenWindow={(agentId) =>
               void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
+            }
+            onOpenThread={(seat, threadId) =>
+              void perform({ type: "open-thread", serverId: server, agentId: seat.id, threadId }).catch(() => undefined)
+            }
+            onNewThread={(seat) =>
+              void perform({ type: "new-thread", serverId: server, agentId: seat.id }).catch(() => undefined)
             }
             answers={answersFor(server)}
             agents={agents()}

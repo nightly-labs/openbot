@@ -55,6 +55,8 @@ export const messages = {
   "agent.dock.add": "Ajouter au dock",
   "agent.dock.allAdded": "Tous vos agents et canaux sont dans le dock",
   "agent.dock.more": "Plus",
+  "agent.dock.mainChat": "Chat principal",
+  "agent.dock.changeChat": "Changer de chat",
   "agent.dock.keepOpen": "Garder ouvert",
   "agent.dock.closeOnLeave": "Fermer en cliquant ailleurs",
   "agent.dock.openInMain": "Ouvrir dans la fenêtre principale",

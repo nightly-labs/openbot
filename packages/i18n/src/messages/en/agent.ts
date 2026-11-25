@@ -52,6 +52,8 @@ export const messages = defineMessages("agent", {
   "agent.dock.add": "Add to the dock",
   "agent.dock.allAdded": "All your agents and channels are on the dock",
   "agent.dock.more": "More",
+  "agent.dock.mainChat": "Main chat",
+  "agent.dock.changeChat": "Change chat",
   "agent.dock.keepOpen": "Keep open",
   "agent.dock.closeOnLeave": "Close when you click away",
   "agent.dock.openInMain": "Open in the main window",
