@@ -585,6 +585,7 @@
     "@anthropic-ai/sdk": "0.137.0",
     "@cacheable/node-cache": "catalog:",
     "@hapi/boom": "catalog:",
+    "@indutny/simple-windows-notifications": "2.0.21",
     "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/sdk": "1.32.1",
