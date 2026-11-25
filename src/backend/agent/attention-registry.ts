@@ -76,13 +76,14 @@ import {
   isRecord,
   type RequestId,
 } from "../protocol";
-import type {
-  VaultAgent,
-  VaultAgentChange,
-  VaultAgentResult,
-  VaultEnteredItem,
-  VaultItems,
-  VaultTypedLogin,
+import {
+  type VaultAgent,
+  type VaultAgentChange,
+  type VaultAgentResult,
+  type VaultEnteredItem,
+  type VaultItems,
+  type VaultTypedLogin,
+  vaultClosedText,
 } from "../vault-items";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION, shouldAutoApprove } from "./approval-automation";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -1416,7 +1417,7 @@ export class AttentionRegistry {
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault list request.") });
     const agentId = params.ownerAgentId;
     if (this.#vaultItems && !this.#vaultItems.ready())
-      return browserTakeoverError("The Vault could not be read. Ask the user, or use request_takeover.");
+      return browserTakeoverError(`${vaultClosedText(this.#vaultItems.status())} Or use request_takeover.`);
     const listed = yield* Effect.result(
       attentionStep(() => (agentId ? (this.#vaultItems?.listForAgent(agentId) ?? null) : null)),
     );
@@ -1597,6 +1598,7 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const change = vaultChange(call.args);
     if (typeof change === "string") return browserTakeoverError(change);
     const agent = this.#vaultAgent(agentId);
@@ -1634,7 +1636,7 @@ export class AttentionRegistry {
     const call = yield* attentionStep(() => parseBrowserToolCall("request_vault_item", params.arguments));
     if (call.tool !== "request_vault_item")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault request.") });
-    if (!this.#vaultItems?.ready()) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!this.#vaultItems?.ready()) return browserTakeoverError(vaultClosedText(this.#vaultItems?.status()));
     if (this.#messagingThread(params.threadId))
       return browserTakeoverError(
         "request_vault_item does not work in a Slack, Discord or Telegram chat. Ask the user to add the item in Server settings > Vault.",
@@ -1655,6 +1657,7 @@ export class AttentionRegistry {
     const vault = this.#vaultItems;
     const agentId = params.ownerAgentId;
     if (!vault || !agentId) return browserTakeoverError(VAULT_UNAVAILABLE);
+    if (!vault.ready()) return browserTakeoverError(vaultClosedText(vault.status()));
     const deleted = yield* Effect.result(vault.delete(call.args.id, agentId));
     if (Result.isFailure(deleted)) return vaultFailure("delete", deleted.failure);
     if (deleted.success === null) return browserTakeoverError("No Vault item has this id. Call list_vault_items.");
