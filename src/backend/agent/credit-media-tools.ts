@@ -216,7 +216,7 @@ interface PlannedJob {
   job: Omit<CreditMediaJobRequest, "jobId">;
   inputs: Inputs;
   cost: number;
-  freeInsteadOf: string | null;
+  freeNote: string | null;
 }
 
 const failure = (message: string) => openBotToolFailure(message);
@@ -365,7 +365,7 @@ function plannedJob(
   if (requestProblem) return requestProblemText(model, requestProblem);
   const cost = creditMediaCost(model, job);
   if (cost === null) return `${model.id} has no price for this request. Choose another resolution or model.`;
-  return { model, job, inputs, cost, freeInsteadOf: null };
+  return { model, job, inputs, cost, freeNote: null };
 }
 
 function settingChoices(model: CreditMediaModel, args: JobArguments): JobArguments[] {
@@ -411,12 +411,27 @@ function freeOfferText(tool: string, short: PlannedJob, spendable: number, free:
   return `Nothing was spent. ${short.model.id} costs ${short.cost} credits, and the paid balance is ${spendable}. ${listedModel(free.model).name} takes free credits: call ${tool} again with ${settings} (${free.cost} credits). When the user named ${short.model.id}, ask the user first; they add paid credits in Settings > Credits.`;
 }
 
+function settingsText(planned: PlannedJob): string {
+  return [
+    ...(planned.job.resolution === null ? [] : [planned.job.resolution]),
+    ...(planned.job.duration === null ? [] : [`${planned.job.duration} s`]),
+  ].join(", ");
+}
+
+function freeNoteText(asked: PlannedJob, free: PlannedJob): string {
+  const askedName = listedModel(asked.model).name;
+  const freeName = listedModel(free.model).name;
+  const settings = settingsText(free);
+  const used = settings === "" ? freeName : `${freeName} at ${settings}`;
+  if (asked.model.welcome !== true)
+    return `The paid balance was too low for ${askedName}, so OpenBot used ${used}, which takes free credits.`;
+  if (free.model.id === asked.model.id)
+    return `The free credits were too few for ${askedName} at the asked settings, so OpenBot used ${used}.`;
+  return `The free credits were too few for ${askedName}, so OpenBot used ${used}, which also takes free credits.`;
+}
+
 function freeNote(planned: PlannedJob): { note?: string } {
-  return planned.freeInsteadOf === null
-    ? {}
-    : {
-        note: `The paid balance was too low for ${planned.freeInsteadOf}, so OpenBot used ${listedModel(planned.model).name}, which takes free credits.`,
-      };
+  return planned.freeNote === null ? {} : { note: planned.freeNote };
 }
 
 function choiceOf(planned: PlannedJob): MediaApprovalChoice {
@@ -623,7 +638,7 @@ export class CreditMediaTools {
       run.facts.outcome = "short";
       return failure(freeOfferText(call.tool, asked, free.spendable, free.planned));
     }
-    const first = free ? { ...free.planned, freeInsteadOf: listedModel(asked.model).name } : asked;
+    const first = free ? { ...free.planned, freeNote: freeNoteText(asked, free.planned) } : asked;
     if (free) notePlan(run, first);
     const held = yield* this.#holdUntilFunded(media, call, run, first.model, first.cost);
     if (held) return failure(held);

@@ -844,6 +844,19 @@ async function freeFlow() {
     { data: video.data, request: video.submitted?.request, reports: video.reports },
   );
 
+  defaultModels = { image: null, video: "video-free" };
+  const lowered = await call("generate_video", { prompt: "A slow river" });
+  defaultModels = { image: null, video: null };
+  check(
+    "a default free model above the free credits keeps the model at lower settings and the note names the settings, not the paid balance",
+    lowered.result.success &&
+      lowered.submitted?.request.model === "video-free" &&
+      lowered.submitted.request.resolution === "360p" &&
+      lowered.data?.note?.includes("360p, 8 s") === true &&
+      lowered.data.note.includes("paid balance") === false,
+    { data: lowered.data, request: lowered.submitted?.request },
+  );
+
   const named = await call("generate_image", { prompt: "A green kite", model: "image-text" });
   check(
     "a named paid model above the paid balance names the free model and its settings, asks nothing and spends nothing",
