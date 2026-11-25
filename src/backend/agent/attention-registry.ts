@@ -1154,7 +1154,10 @@ export class AttentionRegistry {
         )
         .pipe(toAttentionOperationFailed);
     } else {
-      if (input.decision === "accept") yield* this.#beforeAccept(pending.approval, pending.params);
+      if (input.decision === "accept") {
+        this.#approvals.delete(input.requestId);
+        yield* this.#beforeAccept(pending.approval, pending.params);
+      }
       pending.client.respond(
         pending.id,
         approvalReply(pending.method, pending.params, input.decision, "The user declined this action."),

@@ -80,7 +80,7 @@ import {
 import { readCapturedSteps } from "./handoff-tool-steps";
 import type { ImageGenRuntime } from "./image-gen-runtime";
 import { markIncompleteMediaGeneration } from "./image-generation";
-import { type InstructionsChanges, instructionsChangeMessage } from "./instructions-changes";
+import { type InstructionsChanges, instructionsChangeMessage, mentionsInstructionFile } from "./instructions-changes";
 import type { MailboxSync } from "./mailbox-sync";
 import { memoryChangesMessage } from "./memory-changes-message";
 import { type FinishCheckMode, type PlanContinuation, promisesWork, waitsForUser } from "./plan-continuation";
@@ -1429,10 +1429,12 @@ export class TurnLifecycle {
         const turnId = getString(params, "turnId");
         const item = getRecord(params, "item");
         if (!turnId || !item) return;
-        if (notification.method === "item/completed" && writesFiles(item)) {
-          const workspace = this.#store.get(agentId)?.workspacePath;
-          const written = getArray(params, "filePaths").filter(isString);
-          if (workspace && written.length > 0) yield* this.#instructions.agentWrote(agentId, workspace, written);
+        const workspace = this.#store.get(agentId)?.workspacePath;
+        if (notification.method === "item/completed" && workspace) {
+          const written = writesFiles(item) ? getArray(params, "filePaths").filter(isString) : [];
+          if (written.length > 0) yield* this.#instructions.agentWrote(agentId, workspace, written);
+          else if (runsCommand(item) && mentionsInstructionFile(JSON.stringify([item.command, item.arguments])))
+            yield* this.#instructions.agentRanCommand(agentId, workspace);
         }
         this.fileHistory.record(
           agentId,
@@ -3887,6 +3889,10 @@ const FILE_WRITE_TOOL_KINDS: readonly unknown[] = ["edit", "delete", "move"];
 
 function writesFiles(item: DynamicRecord): boolean {
   return item.type === "fileChange" || (item.type === "toolCall" && FILE_WRITE_TOOL_KINDS.includes(item.toolKind));
+}
+
+function runsCommand(item: DynamicRecord): boolean {
+  return item.type === "commandExecution" || (item.type === "toolCall" && item.toolKind === "execute");
 }
 
 function isEmptyAnswer(item: { type?: unknown; phase?: unknown; text?: unknown }): boolean {

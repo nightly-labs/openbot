@@ -13,10 +13,10 @@ import { agentInstructionsRevealPath, readAgentInstructionsFile } from "./worksp
 
 interface Baseline {
   text: string | null;
-  known: string | null;
-  agentWrites: number;
   turns: Set<string>;
   saves: number;
+  beforeWrites: string[];
+  agentTexts: Set<string>;
 }
 
 const currentText = (workspace: string) =>
@@ -35,6 +35,9 @@ const realPath = (path: string) =>
 
 const namesInstructionFile = (path: string) =>
   AGENT_INSTRUCTION_FILE_NAMES.some((name) => name.toLowerCase() === basename(path).toLowerCase());
+
+export const mentionsInstructionFile = (text: string) =>
+  AGENT_INSTRUCTION_FILE_NAMES.some((name) => text.toLowerCase().includes(name.toLowerCase()));
 
 const targetsInstructionFile = Effect.fn("InstructionsChanges.targetsFile")(function* (
   workspace: string,
@@ -64,11 +67,16 @@ export class InstructionsChanges {
       known.turns.add(turnId);
       return;
     }
-    const baseline: Baseline = { text: null, known: null, agentWrites: 0, turns: new Set([turnId]), saves: 0 };
+    const baseline: Baseline = {
+      text: null,
+      turns: new Set([turnId]),
+      saves: 0,
+      beforeWrites: [],
+      agentTexts: new Set(),
+    };
     this.#agents.set(agentId, baseline);
     const text = yield* currentText(workspace);
     baseline.text ??= text;
-    baseline.known ??= text;
   });
 
   readonly beforeAgentWrite = Effect.fn("InstructionsChanges.beforeAgentWrite")(function* (
@@ -79,11 +87,8 @@ export class InstructionsChanges {
   ) {
     const baseline = this.#agents.get(agentId);
     if (!baseline || !(yield* targetsInstructionFile(workspace, paths))) return;
-    const text = baseline.agentWrites === 0 ? yield* currentText(workspace) : null;
-    baseline.agentWrites += 1;
-    if (text === null || text === baseline.known) return;
-    baseline.text = text;
-    baseline.known = text;
+    const text = yield* currentText(workspace);
+    if (text !== null) baseline.beforeWrites.push(text);
   });
 
   readonly agentWrote = Effect.fn("InstructionsChanges.agentWrote")(function* (
@@ -95,8 +100,18 @@ export class InstructionsChanges {
     const baseline = this.#agents.get(agentId);
     if (!baseline || !(yield* targetsInstructionFile(workspace, paths))) return;
     const text = yield* currentText(workspace);
-    if (text !== null) baseline.known = text;
-    baseline.agentWrites = Math.max(0, baseline.agentWrites - 1);
+    if (text !== null) baseline.agentTexts.add(text);
+  });
+
+  readonly agentRanCommand = Effect.fn("InstructionsChanges.agentRanCommand")(function* (
+    this: InstructionsChanges,
+    agentId: string,
+    workspace: string,
+  ) {
+    const baseline = this.#agents.get(agentId);
+    if (!baseline) return;
+    const text = yield* currentText(workspace);
+    if (text !== null) baseline.agentTexts.add(text);
   });
 
   readonly finishTurn = Effect.fn("InstructionsChanges.finishTurn")(function* (
@@ -115,17 +130,16 @@ export class InstructionsChanges {
     const after = yield* currentText(workspace);
     baseline.turns.delete(turnId);
     if (baseline.turns.size === 0) this.#agents.delete(agentId);
+    const outsideEdit = baseline.beforeWrites.findLast((text) => !baseline.agentTexts.has(text));
+    baseline.beforeWrites = [];
+    baseline.agentTexts.clear();
     if (baseline.saves !== saves) return null;
     if (after !== null && after === this.#saving.get(agentId)) {
       baseline.text = after;
-      baseline.known = after;
       return null;
     }
-    const before = baseline.text;
-    if (after !== null) {
-      baseline.text = after;
-      baseline.known = after;
-    }
+    const before = outsideEdit ?? baseline.text;
+    if (after !== null) baseline.text = after;
     return before === null || after === null || before === after
       ? null
       : ({ before, after } satisfies AgentInstructionsChange);
@@ -144,7 +158,7 @@ export class InstructionsChanges {
       const baseline = this.#agents.get(agentId);
       if (!written || !baseline) return;
       baseline.text = text;
-      baseline.known = text;
+      baseline.beforeWrites = [];
       baseline.saves += 1;
     };
   }

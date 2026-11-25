@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
@@ -9,11 +9,23 @@ const MODELS = {
 };
 const plan = JSON.parse(readFileSync(process.env.FAKE_PLAN ?? "", "utf8"));
 const outsideEdit = isDynamicRecord(plan) && typeof plan.outsideEdit === "string" ? plan.outsideEdit : null;
+const shellWrite = isDynamicRecord(plan) && typeof plan.shellWrite === "string" ? plan.shellWrite : null;
 const writes =
   isDynamicRecord(plan) && Array.isArray(plan.writes)
     ? plan.writes.filter((value): value is string => typeof value === "string")
     : [];
+const goFile = isDynamicRecord(plan) && typeof plan.goFile === "string" ? plan.goFile : "";
 const workspaces = new Map<string, string>();
+
+function waitForGo(): Promise<void> {
+  return new Promise((ready) => {
+    const timer = setInterval(() => {
+      if (!existsSync(goFile)) return;
+      clearInterval(timer);
+      ready();
+    }, 10);
+  });
+}
 let count = 0;
 
 function promptText(blocks: AcpRequest["params"]["prompt"]): string {
@@ -59,6 +71,21 @@ async function writeInstructions(peer: AcpPeer, sessionId: string, file: string,
   });
 }
 
+function writeWithShell(peer: AcpPeer, sessionId: string, file: string, content: string) {
+  const toolCallId = "shell-1";
+  const rawInput = { command: `sed -i 's/old-place/shell-place/' ${file}` };
+  peer.update(sessionId, {
+    sessionUpdate: "tool_call",
+    toolCallId,
+    title: "bash",
+    kind: "execute",
+    status: "in_progress",
+    rawInput,
+  });
+  writeFileSync(file, content);
+  peer.update(sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "completed" });
+}
+
 serveFakeAcpAgent({
   initialize: (request, peer) =>
     peer.reply(request, {
@@ -83,7 +110,9 @@ serveFakeAcpAgent({
       return;
     }
     const file = join(workspaces.get(sessionId) ?? process.cwd(), "AGENTS.md");
+    await waitForGo();
     if (outsideEdit !== null) writeFileSync(file, outsideEdit);
+    if (shellWrite !== null) writeWithShell(peer, sessionId, file, shellWrite);
     for (const [index, content] of writes.entries()) await writeInstructions(peer, sessionId, file, content, index + 1);
     peer.say(sessionId, "done");
     peer.reply(request, { stopReason: "end_turn" });

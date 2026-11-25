@@ -13,6 +13,7 @@ const START_TEXT = "# Rules\n- Docs: see docs/old-place.md\n";
 const OUTSIDE_EDIT = "# Rules\n- Docs: see docs/new-place.md\n- Routines: the user's sentence\n";
 const AGENT_FIRST = "# Rules\n- Docs: see docs/old-place.md\n- Agent rule\n";
 const AGENT_SECOND = "# Rules\n- Docs: see docs/old-place.md\n- Agent rule\n- Second agent rule\n";
+const SHELL_WRITE = "# Rules\n- Docs: see docs/shell-place.md\n";
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-instructions-undo-"));
 const home = join(root, "home");
 
@@ -35,6 +36,7 @@ interface Scenario {
   name: string;
   approvals: Approvals;
   outsideEdit: string | null;
+  shellWrite?: string;
   expectedBefore: string;
 }
 
@@ -53,6 +55,13 @@ const SCENARIOS: Scenario[] = [
   { name: "outside edit, ask first", approvals: "ask-first", outsideEdit: OUTSIDE_EDIT, expectedBefore: OUTSIDE_EDIT },
   { name: "outside edit, automatic", approvals: "automatic", outsideEdit: OUTSIDE_EDIT, expectedBefore: OUTSIDE_EDIT },
   { name: "no outside edit", approvals: "automatic", outsideEdit: null, expectedBefore: START_TEXT },
+  {
+    name: "agent shell edit first",
+    approvals: "automatic",
+    outsideEdit: null,
+    shellWrite: SHELL_WRITE,
+    expectedBefore: START_TEXT,
+  },
 ];
 
 const report: { passed: boolean; scenarios: ScenarioResult[]; error?: string } = { passed: false, scenarios: [] };
@@ -96,7 +105,15 @@ async function run(scenario: Scenario, index: number): Promise<ScenarioResult> {
   const fakeAgent = resolve(import.meta.dirname, "provider-fakes/agents/opencode-instructions-write.ts");
   const plan = join(folder, "plan.json");
   mkdirSync(join(folder, "bin"), { recursive: true });
-  await writeFile(plan, JSON.stringify({ outsideEdit: scenario.outsideEdit, writes: [AGENT_FIRST, AGENT_SECOND] }));
+  await writeFile(
+    plan,
+    JSON.stringify({
+      outsideEdit: scenario.outsideEdit,
+      shellWrite: scenario.shellWrite ?? null,
+      goFile: join(folder, "go"),
+      writes: [AGENT_FIRST, AGENT_SECOND],
+    }),
+  );
   await writeFile(
     executable,
     [
@@ -127,7 +144,9 @@ async function run(scenario: Scenario, index: number): Promise<ScenarioResult> {
     },
   });
   let approvalCards = 0;
+  let turnStarted = false;
   agents.on("event", (event) => {
+    if (event.type === "turn-started") turnStarted = true;
     if (event.type !== "approval") return;
     approvalCards += 1;
     void runCauseEffect(agents.respondToApproval({ requestId: event.approval.requestId, decision: "accept" }));
@@ -150,7 +169,10 @@ async function run(scenario: Scenario, index: number): Promise<ScenarioResult> {
     await waitFor("the first turn to end", async () => idle(agent.id));
     const file = join(agent.workspacePath, "AGENTS.md");
     await writeFile(file, START_TEXT);
+    turnStarted = false;
     await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "rewrite" }));
+    await waitFor("the turn to start", async () => turnStarted);
+    await writeFile(join(folder, "go"), "");
     const change = await waitFor("the instructions change marker", async () => {
       if (!idle(agent.id)) return null;
       const snapshot = await runCauseEffect(agents.readConversation(agent.id));
