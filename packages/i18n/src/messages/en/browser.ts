@@ -39,6 +39,7 @@ export const messages = defineMessages("browser", {
   "browser.tab.closeUnnamed": "Close browser tab",
   "browser.newTab": "New browser tab",
   "browser.backToChat": "Back to chat",
+  "browser.fullView.open": "Open in full view",
   "browser.goBack": "Go back",
   "browser.goForward": "Go forward",
   "browser.reload": "Reload page",
@@ -57,6 +58,8 @@ export const messages = defineMessages("browser", {
   "browser.pip.close": "Close browser popup",
   "browser.pip.reattachFailed": "OpenBot could not reattach the browser.",
   "browser.pip.closeFailed": "OpenBot could not close the browser popup.",
+  "browser.window.open": "Open browser in new window",
+  "browser.window.openFailed": "OpenBot could not open the browser window.",
   "browser.popupBlocked.title": "Popup blocked",
   "browser.popupBlocked.dismiss": "Dismiss popup message",
   "browser.liveView.label": "Live view of the page on the server",
@@ -97,6 +100,7 @@ export const messages = defineMessages("browser", {
   "browser.secret.submitting": "Submitting…",
   "browser.secret.takeOver": "Take over",
   "browser.secret.failed": "The request could not be completed. Check the connection and try again.",
+  "browser.secret.ended": "This sign-in request has ended. Ask the agent to try again.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot did not use your saved login because the agent ran a script on this page. To use it, ask the agent to reload the page and try again.",
   "browser.secret.vaultSkip.fieldKind":

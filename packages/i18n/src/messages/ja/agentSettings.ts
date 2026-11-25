@@ -47,6 +47,7 @@ export const messages = {
   "agentSettings.folders.missing": "{folder} はこのコンピューター上のフォルダーではありません",
   "agentSettings.folders.limit": { other: "追加できるフォルダーは最大 {count} 個です" },
   "agentSettings.folders.browse.places": "移動",
+  "agentSettings.folders.browse.path": "フォルダのパス",
   "agentSettings.folders.browse.home": "ホームフォルダ",
   "agentSettings.folders.browse.parent": "上へ: {folder}",
   "agentSettings.folders.browse.failed": "このフォルダを開けませんでした。",
@@ -90,6 +91,7 @@ export const messages = {
   "agentSettings.backupModels.limited": "使用量の上限に達しました · スキップ",
   "agentSettings.backupModels.unavailable": "現在使用できません · スキップ",
   "agentSettings.backupModels.withAccount": "{model} · {account}",
+  "agentSettings.backupModels.withProvider": "{model} · {provider}",
   "agentSettings.backupModels.note":
     "作業の開始後に利用上限で {name} が止まると、{name} は順序の中で最初に使えるモデルで同じ作業を続けます。上限が解除されると、またはプロバイダーのエラーから 10 分後に {model} に戻ります。",
   "agentSettings.groups.brain": "頭脳",
@@ -180,6 +182,8 @@ export const messages = {
     "エージェントは新しく始めますが、必要なときはこのチャットを検索できます。メッセージは区切り線の上に表示されたままです。指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.newChat.confirm": "新しいチャットを開始",
   "agentSettings.newChat.failed": "新しいチャットを始められませんでした。",
+  "agentSettings.newChat.busy":
+    "エージェントが作業中です。新しいチャットを始めるには、終わるまで待つか、停止してください。",
   "agentSettings.deleteHistory.title": "履歴を削除",
   "agentSettings.deleteHistory.description":
     "このチャットのメッセージを削除し、エージェントも忘れます。設定は残ります。",
@@ -189,6 +193,10 @@ export const messages = {
     "このチャットのすべてのメッセージとファイルをOpenBotから削除し、エージェントも忘れます。元に戻せません。サイドスレッド、指示、モデル、ツール、メモリー、ワークスペース、ブラウザーは変わりません。",
   "agentSettings.deleteHistory.confirm": "履歴を削除",
   "agentSettings.deleteHistory.failed": "履歴を削除できませんでした。",
+  "agentSettings.deleteAgent.title": "エージェントを削除",
+  "agentSettings.deleteAgent.description":
+    "エージェントとそのチャット、メモリー、ルーティン、ワークスペースが OpenBot から削除されます。",
+  "agentSettings.deleteAgent.button": "削除",
 
   "agentSettings.fullAccess.title": "このエージェントにフルアクセスを許可しますか？",
   "agentSettings.fullAccess.askTitle": "このエージェントにワークスペースの外での作業を許可しますか？",
@@ -228,6 +236,9 @@ export const messages = {
     "チャットが長くなったときに、エージェントが新しいチャットを開始できます。開始前にメモを保存します。",
   "agentSettings.quickAcknowledgement.title": "長いタスクの前に計画を表示",
   "agentSettings.quickAcknowledgement.description": "長いタスクの前に、エージェントが計画を表示します。",
+  "agentSettings.builtinMemory.title": "OpenBot のメモリー",
+  "agentSettings.builtinMemory.description":
+    "エージェントが自分のメモリーを保存して読み込みます。Mem0 などのメモリーアプリだけを使うにはオフにします。保存済みのメモリーは残ります。",
   "agentSettings.browserProfile.label": "ブラウザープロファイル",
   "agentSettings.browserProfile.shared": "共有",
   "agentSettings.browserProfile.agent": "このエージェントのみ",

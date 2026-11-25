@@ -377,6 +377,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Rimuovi {model}",
   "mobile.agent.backupModels.unavailable": "Non disponibile ora · saltato",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Se un limite di utilizzo ferma {name} dopo l'inizio del lavoro, {name} continua lo stesso lavoro con il primo modello disponibile nell'ordine. Torna a {model} quando il limite termina, o 10 minuti dopo un errore del provider.",
   "mobile.agent.busyMessage.label": "Durante il lavoro",
@@ -407,6 +408,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Mostra il piano prima delle attività lunghe",
   "mobile.agent.planCard.footer":
     "Prima di un'attività lunga, l'agente mostra il suo piano. Inizia dopo 10 s o quando premi Avvia.",
+  "mobile.agent.builtinMemory.label": "Memoria di OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "L'agente salva e legge le proprie memorie. Disattiva per usare solo un'app di memoria, come Mem0. Le memorie salvate restano.",
   "mobile.agent.workspace.title": "Cartella del workspace",
   "mobile.agent.workspace.footer": "La cartella di questo agente sul computer host.",
   "mobile.agent.advanced.behavior": "Comportamento",
@@ -525,6 +529,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Raccolta iniziata {started}. Aggiornata {updated}.",
   "mobile.agent.usage.never": "mai",
   "mobile.agent.record.time": "Ora",
+  "mobile.agent.record.date": "Data",
   "mobile.agent.section.changeFailed": "Impossibile modificare la cartella",
   "mobile.agent.section.tryAgain": "Riprova.",
   "mobile.agent.section.moveUp": "Sposta su",
@@ -612,7 +617,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Impossibile caricare i tuoi server",
   "mobile.agent.home.serversFailedBody": "Controlla che l'app desktop sia in esecuzione e riprova.",
   "mobile.agent.home.noServers": "Nessun server disponibile",
-  "mobile.agent.home.noServersBody": "Collega di nuovo l'app desktop o unisciti a un server remoto.",
+  "mobile.agent.home.noServersBody":
+    "Apri OpenBot sul tuo computer con questo account e attiva Pubblica questo server in Impostazioni server → Membri. Oppure unisciti a un server remoto.",
   "mobile.agent.home.chooseServer": "Scegli un server",
   "mobile.agent.home.openServers": "Apri i server",
   "mobile.agent.home.noChatOpen": "Nessuna chat aperta",
@@ -689,6 +695,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Non escludere",
   "mobile.agent.folders.browseTitle": "Scegli cartella",
   "mobile.agent.folders.places": "Vai a",
+  "mobile.agent.folders.path": "Percorso della cartella",
   "mobile.agent.folders.home": "Cartella Inizio",
   "mobile.agent.folders.parent": "Su a {folder}",
   "mobile.agent.folders.browseFailed": "Impossibile aprire questa cartella.",

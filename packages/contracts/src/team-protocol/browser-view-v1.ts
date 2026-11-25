@@ -47,6 +47,20 @@ export function browserViewClientViewport(url: URL): BrowserViewViewport | null 
   return { width, height };
 }
 
+export const TEAM_BROWSER_VIEW_FRAME_SIZE_CAPABILITY = "browser-view-frame-size";
+export const BROWSER_VIEW_FRAME_SIZE_QUERY = "frame";
+
+export function browserViewFrameSizeQuery(size: BrowserViewViewport): string {
+  const bound = (value: number) => (Number.isFinite(value) ? Math.min(9_999, Math.max(1, Math.round(value))) : 1);
+  return `${bound(size.width)}x${bound(size.height)}`;
+}
+
+export function browserViewClientFrameSize(url: URL): BrowserViewViewport | null {
+  const match = /^([1-9]\d{0,3})x([1-9]\d{0,3})$/u.exec(url.searchParams.get(BROWSER_VIEW_FRAME_SIZE_QUERY) ?? "");
+  if (!match) return null;
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
 export const TEAM_BROWSER_VIEW_CONTEXT_MENU_CAPABILITY = "browser-view-context-menu";
 export const BROWSER_VIEW_CONTEXT_MENU_QUERY = "menu";
 
@@ -164,6 +178,10 @@ export const BROWSER_VIEW_MAX_FRAME_BYTES = 2 * 1024 * 1024;
 export const BROWSER_VIEW_MAX_CLIPBOARD_TEXT = 100_000;
 const FRAME_MAGIC = new Uint8Array([0x4f, 0x42, 0x56, 0x31]);
 const FRAME_HEADER_BYTES = FRAME_MAGIC.byteLength + 8;
+
+export function browserViewFrameBytes(frame: { image: Uint8Array }): number {
+  return FRAME_HEADER_BYTES + frame.image.byteLength;
+}
 
 export interface BrowserViewFrame {
   sequence: number;

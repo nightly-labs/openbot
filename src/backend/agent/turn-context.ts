@@ -3,6 +3,7 @@ import { isDynamicRecord, isNumber, isOneOf, isString } from "@openbot/contracts
 import {
   type InstructionsFileText,
   instructionsFileUpdate,
+  MEMORY_OFF_UPDATE,
   type MemoryContext,
   memoryContextUpdate,
   NATURAL_TURN_REMINDER,
@@ -23,6 +24,7 @@ export class TurnContext {
   >();
   readonly #savedLogins = new Map<string, { current: boolean; delivered: boolean | undefined }>();
   readonly #styleReminders = new Set<string>();
+  readonly #memoryOff = new Set<string>();
 
   set(threadId: string, params: unknown, resume: boolean): void {
     if (isDynamicRecord(params) && params.turnStyleReminder === true) this.#styleReminders.add(threadId);
@@ -32,6 +34,11 @@ export class TurnContext {
       const memory = this.#memories.get(threadId);
       if (memory) memory.current = current;
       else this.#memories.set(threadId, { current, delivered: null });
+      this.#memoryOff.delete(threadId);
+    } else {
+      if (this.#memories.get(threadId)?.delivered || (resume && carriesTurnContext(params)))
+        this.#memoryOff.add(threadId);
+      this.#memories.delete(threadId);
     }
     if (isDynamicRecord(params) && typeof params.savedLogins === "boolean") {
       const logins = this.#savedLogins.get(threadId);
@@ -60,12 +67,14 @@ export class TurnContext {
       ? []
       : [
           memory ? memoryContextUpdate(memory.delivered, memory.current) : null,
+          this.#memoryOff.has(threadId) ? MEMORY_OFF_UPDATE : null,
           teammates ? sectionTeammatesUpdate(teammates.delivered, teammates.current) : null,
           file ? instructionsFileUpdate(file.delivered, file.current) : null,
           logins ? savedLoginsUpdate(logins.delivered, logins.current) : null,
           this.#styleReminders.has(threadId) ? NATURAL_TURN_REMINDER : null,
         ].filter((block): block is string => block !== null);
     if (memory) memory.delivered = command ? null : memory.current;
+    if (!command) this.#memoryOff.delete(threadId);
     if (teammates) teammates.delivered = command ? undefined : teammates.current;
     if (file) file.delivered = command ? undefined : file.current;
     if (logins) logins.delivered = command ? undefined : logins.current;
@@ -89,7 +98,12 @@ export class TurnContext {
     this.#instructionsFiles.delete(threadId);
     this.#savedLogins.delete(threadId);
     this.#styleReminders.delete(threadId);
+    this.#memoryOff.delete(threadId);
   }
+}
+
+function carriesTurnContext(params: unknown): boolean {
+  return isDynamicRecord(params) && "sectionTeammates" in params;
 }
 
 function readMemoryContext(params: unknown): MemoryContext | null {

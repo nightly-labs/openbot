@@ -45,6 +45,7 @@ import {
 import { AgentDeleteSection } from "@/features/agents/components/agent-delete-section";
 import { AgentFolderBrowser, AgentFolders, AgentFoldersRow } from "@/features/agents/components/agent-folders";
 import {
+  AgentBuiltinMemoryField,
   AgentBusyMessageField,
   AgentHostPermissionFields,
   AgentNewChatAllowedField,
@@ -159,6 +160,7 @@ function AgentForm({
     canManageAgentTaskLimit,
     canManageAgentNewChat,
     canManageAgentPlanCard,
+    canManageAgentBuiltinMemory,
     canManageBrowserProfiles,
     canManageAgentFolders,
     canSetAgentNotificationLevel,
@@ -179,7 +181,8 @@ function AgentForm({
     canManageAgentHostSettings(agent.serverId) ||
     canManageAgentTaskLimit(agent.serverId) ||
     canManageAgentNewChat(agent.serverId) ||
-    canManageAgentPlanCard(agent.serverId);
+    canManageAgentPlanCard(agent.serverId) ||
+    canManageAgentBuiltinMemory(agent.serverId);
   const showWorkspace = Boolean(agent.workspacePath) || canManageBrowserProfiles(agent.serverId);
   const showNewChat = canStartNewChat(agent.serverId) && accessLevel !== "view";
   const showChatActions = showNewChat || showDeleteHistory;
@@ -271,6 +274,10 @@ function AgentForm({
     pending.current = true;
     setSaving(true);
     setError(null);
+    const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
+    const accountWithRuntime =
+      accountChanged &&
+      (edits.provider !== undefined || edits.model !== undefined || edits.reasoningEffort !== undefined);
     try {
       if (Object.keys(edits).length > 0)
         await updateAgent(
@@ -285,13 +292,14 @@ function AgentForm({
             ...(edits.provider === undefined ? {} : { provider: edits.provider }),
             ...(edits.model === undefined ? {} : { model: edits.model }),
             ...(edits.reasoningEffort === undefined ? {} : { reasoningEffort: edits.reasoningEffort }),
+            ...(accountWithRuntime ? { providerAccountId: accountId } : {}),
           },
           agent.serverId,
         );
       setEdits({});
       if (accountChanged || (edits.provider !== undefined && edits.provider !== agent.provider)) {
-        const accountId = account === undefined || account === DEFAULT_PROVIDER_ACCOUNT_ID ? null : account;
-        if (accountChanged) await setAgentProviderAccount({ agentId: agent.id, accountId }, agent.serverId);
+        if (accountChanged && !accountWithRuntime)
+          await setAgentProviderAccount({ agentId: agent.id, accountId }, agent.serverId);
         setAccount(undefined);
         queryClient.setQueryData<HostProviderAccounts | null>(accountsKey, (current) =>
           current
@@ -456,6 +464,7 @@ function AgentForm({
               <AgentTaskLimitField agent={agent} server={host} available={available} />
               <AgentNewChatAllowedField agent={agent} server={host} available={available} />
               <AgentPlanCardField agent={agent} server={host} available={available} />
+              <AgentBuiltinMemoryField agent={agent} server={host} available={available} />
             </SettingsSection>
           ) : null}
           {showWorkspace ? (

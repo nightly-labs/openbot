@@ -8,14 +8,15 @@ import type {
 } from "./voice-transcription-protocol";
 
 const SAMPLE_RATE = 16_000;
-const PART_MAXIMUM_SAMPLES = 28 * SAMPLE_RATE;
-const PART_SPLIT_SEARCH_SAMPLES = 4 * SAMPLE_RATE;
+const WINDOWED_PARTS = { maximumSamples: 28 * SAMPLE_RATE, splitSearchSamples: 4 * SAMPLE_RATE };
+const TRANSDUCER_PARTS = { maximumSamples: 90 * SAMPLE_RATE, splitSearchSamples: 20 * SAMPLE_RATE };
 const SPLIT_WINDOW_SAMPLES = SAMPLE_RATE / 50;
 const SPEECH_ABOVE_FLOOR_DB = 10;
 const SPEECH_BELOW_PEAK_DB = 40;
 const SPEECH_MARGIN_SAMPLES = (450 * SAMPLE_RATE) / 1_000;
 const SPEECH_END_SILENCE_SAMPLES = SAMPLE_RATE;
 const DIGITAL_SILENCE_DB = -90;
+const WHISPER_TOKENS_PER_SECOND = "15";
 const MAXIMUM_LEADING_SILENCE_SAMPLES = SAMPLE_RATE;
 const MAXIMUM_THREADS = 64;
 const SESSION_CONFIG_PATTERN = /^(?:[a-z0-9-]+\.cfg)?$/u;
@@ -252,7 +253,7 @@ async function transcribe(request: VoiceTranscriptionRequest): Promise<string> {
   const recording = toSamples(request.pcm, request.leadingSilenceSamples);
   const speech = loaded.engine === "whisper" ? speechOnly(recording) : undefined;
   const samples = speech ?? recording;
-  const parts = loaded.engine === "nemo-transducer" ? [samples] : splitIntoParts(samples);
+  const parts = splitIntoParts(samples, loaded.engine === "nemo-transducer" ? TRANSDUCER_PARTS : WINDOWED_PARTS);
   let text = "";
   for (const part of parts) text = joinText(text, await decode(loaded, speech ? withEndSilence(part) : part));
   return text;
@@ -265,6 +266,7 @@ async function decode(
   try {
     const stream = addon.createOfflineStream(recognizer);
     if (engine === "cohere-transcribe") addon.offlineStreamSetOption(stream, "language", language || "en");
+    if (engine === "whisper") addon.offlineStreamSetOption(stream, "max_tokens_per_second", WHISPER_TOKENS_PER_SECOND);
     addon.acceptWaveformOffline(stream, { samples, sampleRate: SAMPLE_RATE });
     await addon.decodeOfflineStreamAsync(recognizer, stream);
     return resultText(JSON.parse(addon.getOfflineStreamResultAsJson(stream))).trim();
@@ -308,16 +310,19 @@ function withEndSilence(part: Float32Array): Float32Array {
   return padded;
 }
 
-function splitIntoParts(samples: Float32Array): Float32Array[] {
+function splitIntoParts(
+  samples: Float32Array,
+  { maximumSamples, splitSearchSamples }: typeof WINDOWED_PARTS,
+): Float32Array[] {
   const parts: Float32Array[] = [];
   let start = 0;
-  while (samples.length - start > PART_MAXIMUM_SAMPLES) {
-    const limit = start + PART_MAXIMUM_SAMPLES;
+  while (samples.length - start > maximumSamples) {
+    const limit = start + maximumSamples;
     let end = limit;
     let quietest = Number.POSITIVE_INFINITY;
     for (
       let windowStart = limit - SPLIT_WINDOW_SAMPLES;
-      windowStart >= limit - PART_SPLIT_SEARCH_SAMPLES;
+      windowStart >= limit - splitSearchSamples;
       windowStart -= SPLIT_WINDOW_SAMPLES
     ) {
       const energy = windowEnergy(samples, windowStart);

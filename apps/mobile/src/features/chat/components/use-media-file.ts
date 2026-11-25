@@ -1,12 +1,14 @@
 import { attachmentFileExtension } from "@openbot/contracts/attachment-files";
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { useQuery } from "@tanstack/react-query";
+import { hashKey, type QueryClient, type QueryKey, useQuery } from "@tanstack/react-query";
 import { Directory, File, Paths } from "expo-file-system";
 import { useMemo } from "react";
 import { create } from "zustand";
 import { supportLog } from "@/features/support/model/support-log";
 import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import { isConnectionStop } from "@/features/workspace/model/connection-waits";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import type { MobileText } from "@/shared/lib/text";
 import { largeDownloadOf } from "../model/large-files";
 
 const MIME_EXTENSIONS: Record<string, string> = {
@@ -49,6 +51,10 @@ export function messageFileCopy(serverId: string, key: string, name: string) {
   return new File(mediaFolder(), segment(serverId), folder, fileName(name));
 }
 
+export function mediaFileErrorText(error: Error, text: MobileText): string {
+  return isConnectionStop(error) ? text.t("mobile.chat.attachment.downloadStopped") : text.sourceText(error.message);
+}
+
 const mediaWrites = new Map<string, Promise<void>>();
 
 export function writeMediaFile(file: File, base64: string): Promise<void> {
@@ -57,6 +63,31 @@ export function writeMediaFile(file: File, base64: string): Promise<void> {
   const write = file.write(base64, { encoding: "base64" }).finally(() => mediaWrites.delete(file.uri));
   mediaWrites.set(file.uri, write);
   return write;
+}
+
+const requestedFiles = new Map<string, number>();
+
+export async function requestFile<T>(queryKey: QueryKey, fetch: () => Promise<T>): Promise<T> {
+  const key = hashKey(queryKey);
+  requestedFiles.set(key, (requestedFiles.get(key) ?? 0) + 1);
+  try {
+    return await fetch();
+  } finally {
+    const left = (requestedFiles.get(key) ?? 1) - 1;
+    if (left > 0) requestedFiles.set(key, left);
+    else requestedFiles.delete(key);
+  }
+}
+
+export function fileWantedOrDropped(client: QueryClient, queryKey: QueryKey): () => boolean {
+  const cache = client.getQueryCache();
+  const query = cache.find({ queryKey, exact: true });
+  return () => {
+    if (!query || cache.find({ queryKey, exact: true }) !== query) return false;
+    if (requestedFiles.has(hashKey(queryKey)) || query.getObserversCount() > 0) return true;
+    cache.remove(query);
+    return false;
+  };
 }
 
 const useDownloadedBytes = create<{ bytes: ReadonlyMap<string, number> }>(() => ({ bytes: new Map() }));
@@ -91,7 +122,7 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
   return useQuery({
     enabled,
     queryKey: queryKeys.chatMediaFile(serverId, attachment.id),
-    queryFn: async () => {
+    queryFn: async ({ client, queryKey }) => {
       const file = mediaFile(serverId, attachment);
       if (file.exists && file.size === attachment.size) return file.uri;
       const key = downloadKey(serverId, attachment.id);
@@ -108,10 +139,17 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
                 },
               }
             : undefined;
-        const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment), progress);
-        const handedOver = Date.now();
         file.parentDirectory.create({ intermediates: true, idempotent: true });
-        await writeMediaFile(file, data.base64);
+        const data = await downloadAttachment(
+          serverId,
+          attachment.id,
+          largeDownloadOf(attachment, file.uri),
+          progress,
+          !enabled,
+          fileWantedOrDropped(client, queryKey),
+        );
+        const handedOver = Date.now();
+        if (!data.file) await writeMediaFile(file, data.base64);
         const bytesMs = (arrived ?? handedOver) - started;
         supportLog.add(
           "info",

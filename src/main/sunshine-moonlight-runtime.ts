@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn as nodeSpawn, type SpawnOptions } from "node:child_process";
 import { createHash, randomBytes, timingSafeEqual, X509Certificate } from "node:crypto";
 import { createSocket } from "node:dgram";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, request as httpRequest, type IncomingMessage, type Server } from "node:http";
 import https from "node:https";
 import { createServer as createTcpServer } from "node:net";
@@ -46,6 +46,7 @@ export class RemoteRuntimeStartError extends Error {
   }
 }
 
+const SOFTWARE_ENCODER_MS = 7 * 24 * 60 * 60 * 1000;
 const MOONLIGHT_STREAMER_SLOTS = 4;
 const SUNSHINE_DEFAULT_BASE_PORT = 47_989;
 const SUNSHINE_PORT_FAMILY_OFFSETS = [-5, 0, 1, 9, 10, 11, 21];
@@ -60,15 +61,15 @@ const SUNSHINE_START_ATTEMPTS = 3;
 const MOONLIGHT_WEBRTC_RANGE_SIZE = 32;
 const MOONLIGHT_WEBRTC_RANGE_START = 40_000;
 const SUNSHINE_SCREEN_CAPTURE_DENIED = "No screen capture permission";
-const SUNSHINE_DIAGNOSTIC_OVERLAP = SUNSHINE_SCREEN_CAPTURE_DENIED.length;
+const SUNSHINE_WINDOWS_CAPTURE_DENIED = "DuplicateOutput() test failed [0x80070005]";
 
-function createScreenCaptureDenialWatcher(): (message: string) => boolean {
+function createOutputPhraseWatcher(phrase: string): (message: string) => boolean {
   let printed = "";
   return (message) => {
     printed = `${printed}${message}`;
-    const denied = printed.includes(SUNSHINE_SCREEN_CAPTURE_DENIED);
-    printed = printed.slice(-SUNSHINE_DIAGNOSTIC_OVERLAP);
-    return denied;
+    const said = printed.includes(phrase);
+    printed = printed.slice(-phrase.length);
+    return said;
   };
 }
 
@@ -339,8 +340,10 @@ export class SunshineMoonlightRuntime {
   readonly #pairingName = `openbot-remote-${randomBytes(16).toString("hex")}`;
   #state: SunshineMoonlightRuntimeState | null = null;
   #screenCaptureDenied = false;
+  #windowsCaptureDenied = false;
   readonly #moonlightHeader = `X-OpenBot-Remote-${randomBytes(32).toString("hex")}`;
   #selectedDisplayId: string | null = null;
+  #softwareEncoder = false;
   readonly #lifecycle = new LifecycleGate<SunshineMoonlightRuntimeState, RemoteDesktopOperationError>();
   #stopRequested = false;
   #sunshineBasePort: number | null = null;
@@ -380,6 +383,10 @@ export class SunshineMoonlightRuntime {
 
   screenCaptureDenied(): boolean {
     return this.#screenCaptureDenied;
+  }
+
+  windowsCaptureDenied(): boolean {
+    return this.#windowsCaptureDenied;
   }
 
   readonly start = Effect.fn("SunshineMoonlightRuntime.start")(() =>
@@ -444,6 +451,36 @@ export class SunshineMoonlightRuntime {
     yield* this.#startSunshineOnceEffect();
     if (this.#state) this.#state = { ...this.#state, selectedDisplayId: displayId };
   }).bind(this);
+
+  canSwitchToSoftwareEncoder(): boolean {
+    return this.#options.platform === "win32" && !this.#softwareEncoder;
+  }
+
+  readonly noPictureReceived = Effect.fn("SunshineMoonlightRuntime.noPictureReceived")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<void, RemoteDesktopOperationError> {
+    if (!this.canSwitchToSoftwareEncoder()) return;
+    const until = String(Date.now() + SOFTWARE_ENCODER_MS);
+    yield* desktopCall(() => writeFile(this.#softwareEncoderMarker(), until, { mode: 0o600 }));
+    this.#options.onDiagnostic?.(
+      "sunshine",
+      "OpenBot: no picture reached the viewer with the hardware encoder. Sunshine uses the software encoder for 7 days from its next start.\n",
+    );
+  }).bind(this);
+
+  readonly #softwareEncoderActiveEffect = Effect.fn("SunshineMoonlightRuntime.softwareEncoderActive")(function* (
+    this: SunshineMoonlightRuntime,
+  ): Effect.fn.Return<boolean, RemoteDesktopOperationError> {
+    const marker = this.#softwareEncoderMarker();
+    const until = Number(yield* desktopCall(() => readFile(marker, "utf8").catch(() => "")));
+    if (until > Date.now()) return true;
+    if (until) yield* desktopCall(() => rm(marker, { force: true }));
+    return false;
+  });
+
+  #softwareEncoderMarker(): string {
+    return join(this.#options.stateDirectory, "sunshine-software-encoder");
+  }
 
   readonly stop = Effect.fn("SunshineMoonlightRuntime.stop")(() =>
     this.#lifecycle.stop(
@@ -612,6 +649,7 @@ export class SunshineMoonlightRuntime {
     const basePort = this.#sunshineBasePort;
     if (basePort === null) return yield* desktopFailure(new Error("Sunshine ports have not been allocated yet."));
     const directory = windowsShortPath(this.#options.stateDirectory);
+    this.#softwareEncoder = this.#options.platform === "win32" && (yield* this.#softwareEncoderActiveEffect());
     const values = [
       "sunshine_name = OpenBot Remote Desktop",
       `port = ${basePort}`,
@@ -629,6 +667,7 @@ export class SunshineMoonlightRuntime {
       ...(this.#selectedDisplayId ? [`output_name = ${this.#selectedDisplayId}`] : []),
       ...(this.#options.platform === "linux" ? ["capture = x11", "encoder = software"] : []),
       ...(this.#options.platform === "darwin" ? ["system_tray = disabled"] : []),
+      ...(this.#softwareEncoder ? ["encoder = software"] : []),
     ];
     yield* desktopCall(() =>
       Promise.all([
@@ -737,7 +776,7 @@ export class SunshineMoonlightRuntime {
         yield* stopRemoteProcess(sunshine).pipe(Effect.catch(() => Effect.void));
         this.#sunshine = null;
       }
-      if (attempt + 1 >= SUNSHINE_START_ATTEMPTS) break;
+      if (attempt + 1 >= SUNSHINE_START_ATTEMPTS || this.#windowsCaptureDenied) break;
       if (this.#ownsSunshineAllocation && this.#sunshineBasePort !== null) {
         releaseSunshineBasePort(this.#sunshineBasePort);
         this.#sunshineBasePort = yield* allocateSunshineBasePort();
@@ -751,6 +790,7 @@ export class SunshineMoonlightRuntime {
     this: SunshineMoonlightRuntime,
   ): Effect.fn.Return<void, RemoteDesktopOperationError> {
     this.#screenCaptureDenied = false;
+    this.#windowsCaptureDenied = false;
     const executable = windowsShortPath(this.#options.paths.sunshine);
     this.#sunshine = yield* desktopSync(() =>
       this.#spawn(executable, [join(windowsShortPath(this.#options.stateDirectory), "sunshine.conf")], {
@@ -766,6 +806,7 @@ export class SunshineMoonlightRuntime {
       yield* desktopSync(() => this.#requireSunshineHttpsPort()),
       join(this.#options.stateDirectory, "sunshine-cert.pem"),
       this.#sunshine,
+      () => this.#windowsCaptureDenied,
     );
   });
 
@@ -1087,9 +1128,13 @@ export class SunshineMoonlightRuntime {
 
   #pipeDiagnostics(process: ChildProcess, source: "sunshine" | "moonlight"): void {
     for (const stream of [process.stdout, process.stderr]) {
-      const saidCaptureDenied = createScreenCaptureDenialWatcher();
+      const saidCaptureDenied = createOutputPhraseWatcher(SUNSHINE_SCREEN_CAPTURE_DENIED);
+      const saidWindowsCaptureDenied = createOutputPhraseWatcher(SUNSHINE_WINDOWS_CAPTURE_DENIED);
       stream?.on("data", (chunk) => {
-        if (source === "sunshine" && saidCaptureDenied(chunk.toString("utf8"))) this.#screenCaptureDenied = true;
+        if (source !== "sunshine") return;
+        const text = chunk.toString("utf8");
+        if (saidCaptureDenied(text)) this.#screenCaptureDenied = true;
+        if (saidWindowsCaptureDenied(text)) this.#windowsCaptureDenied = true;
       });
       forwardDiagnosticLines(stream, (text) =>
         this.#options.onDiagnostic?.(source, text.replaceAll(this.#moonlightHeader, "[REDACTED]")),
@@ -1289,10 +1334,12 @@ const waitForHttpsEffect = Effect.fn("RemoteDesktop.waitForHttps")(function* (
   port: number,
   certificatePath: string,
   child?: WatchedChild | null,
+  captureDenied: () => boolean = () => false,
 ) {
   const deadline = Date.now() + 20_000;
   let lastError: unknown;
   while (Date.now() < deadline) {
+    if (captureDenied()) return yield* desktopFailure(new Error(sourceText("error.remote.windowsCaptureDenied")));
     if (childEnded(child))
       return yield* desktopFailure(
         new Error(sourceText("error.backend.sunshineExited", { port }), { cause: lastError }),

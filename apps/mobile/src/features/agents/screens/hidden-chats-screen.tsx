@@ -40,7 +40,7 @@ export function HiddenChatsScreen() {
     hiddenAgents.map((agent) => ({
       id: agent.id,
       name: agent.name,
-      href: { pathname: "/chat/[agentId]" as const, params: { agentId: agent.id } },
+      href: { pathname: "/chat/[agentId]" as const, params: { agentId: agent.id, serverId: agent.serverId } },
       avatar: (
         <BloubAvatar
           agentId={agent.id}

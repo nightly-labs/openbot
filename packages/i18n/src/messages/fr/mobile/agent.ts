@@ -388,6 +388,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Retirer {model}",
   "mobile.agent.backupModels.unavailable": "Indisponible pour le moment · ignoré",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Si une limite d’utilisation arrête {name} après le début du travail, {name} poursuit le même travail avec le premier modèle disponible dans l’ordre. Il revient à {model} quand la limite prend fin, ou 10 minutes après une erreur du fournisseur.",
   "mobile.agent.busyMessage.label": "Pendant le travail",
@@ -418,6 +419,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Montrer le plan avant les longues tâches",
   "mobile.agent.planCard.footer":
     "Avant une longue tâche, l’agent montre son plan. Il commence après 10 s ou quand vous appuyez sur Démarrer.",
+  "mobile.agent.builtinMemory.label": "Mémoire OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "L’agent enregistre et lit ses propres souvenirs. Désactivez-la pour utiliser seulement une app de mémoire, comme Mem0. Les souvenirs enregistrés restent.",
   "mobile.agent.workspace.title": "Dossier de l’espace de travail",
   "mobile.agent.workspace.footer": "Le dossier de cet agent sur l’ordinateur hôte.",
   "mobile.agent.advanced.behavior": "Comportement",
@@ -538,6 +542,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Collecte commencée {started}. Mise à jour {updated}.",
   "mobile.agent.usage.never": "jamais",
   "mobile.agent.record.time": "Heure",
+  "mobile.agent.record.date": "Date",
   "mobile.agent.section.changeFailed": "Impossible de modifier le dossier",
   "mobile.agent.section.tryAgain": "Veuillez réessayer.",
   "mobile.agent.section.moveUp": "Monter",
@@ -625,7 +630,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Impossible de charger vos serveurs",
   "mobile.agent.home.serversFailedBody": "Vérifiez que l’application de bureau fonctionne, puis réessayez.",
   "mobile.agent.home.noServers": "Aucun serveur disponible",
-  "mobile.agent.home.noServersBody": "Reconnectez l’application de bureau ou rejoignez un serveur distant.",
+  "mobile.agent.home.noServersBody":
+    "Ouvrez OpenBot sur votre ordinateur avec ce compte et activez Publier ce serveur dans Réglages du serveur → Membres. Ou rejoignez un serveur distant.",
   "mobile.agent.home.chooseServer": "Choisir un serveur",
   "mobile.agent.home.openServers": "Ouvrir les serveurs",
   "mobile.agent.home.noChatOpen": "Aucune discussion ouverte",
@@ -703,6 +709,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Ne plus exclure",
   "mobile.agent.folders.browseTitle": "Choisir un dossier",
   "mobile.agent.folders.places": "Aller à",
+  "mobile.agent.folders.path": "Chemin du dossier",
   "mobile.agent.folders.home": "Dossier personnel",
   "mobile.agent.folders.parent": "Remonter à {folder}",
   "mobile.agent.folders.browseFailed": "Impossible d’ouvrir ce dossier.",

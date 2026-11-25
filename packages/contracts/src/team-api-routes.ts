@@ -4,6 +4,8 @@ function segment(value: string): string {
 
 const REMOTE_SCREEN = "/v1/remote-screen";
 
+export const WORKSPACE_FILE_EXACT_PATH_QUERY = "exact";
+
 export const TEAM_API_ROUTES = {
   analytics: "/v1/analytics",
   compatibility: "/v1/compatibility",

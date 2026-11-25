@@ -188,7 +188,7 @@ function AgentLine({
       />
     );
   return (
-    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id } }} asChild>
+    <Link href={{ pathname: "/chat/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }} asChild>
       <ChatLinkPressable
         accessibilityRole="link"
         accessibilityLabel={accessibilityLabel}

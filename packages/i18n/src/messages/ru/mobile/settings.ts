@@ -308,6 +308,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "Отправлять фото в полном качестве",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Когда это выключено, приложение отправляет уменьшенную копию каждого фото, до 2048 пикселей по длинной стороне. Она быстрее доходит при медленном соединении. Включите, чтобы отправлять исходное фото.",
+  "mobile.settings.conversations.fullScreenCamera": "Полноэкранная камера",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "Если включено, «Камера» открывает системную камеру с зумом и всеми объективами. Если выключено, в чате открывается маленькая камера.",
   "mobile.settings.profile.nameUnsafe": "Уберите из имени переносы строк и управляющие символы.",
   "mobile.settings.profile.nameLength": "Имя должно содержать от 3 до 20 символов.",
   "mobile.settings.profile.saveFailed": "Не удалось сохранить изменения. Повторите попытку.",
@@ -482,6 +485,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "Серверы",
   "mobile.settings.voice.gptLive.serversFooter":
     "Нажмите на сервер, которому нужен вход, чтобы подключить Codex к аккаунту ChatGPT. Вход сервера видят только владелец и администратор.",
+  "mobile.settings.voice.gptLive.account": "Аккаунт для живого голоса GPT",
   "mobile.settings.voice.gptLive.status.ready": "Готово",
   "mobile.settings.voice.gptLive.status.supported": "Поддерживается",
   "mobile.settings.voice.gptLive.status.offline": "Не в сети",

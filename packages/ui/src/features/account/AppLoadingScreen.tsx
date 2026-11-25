@@ -43,6 +43,7 @@ interface PileSeat {
   alone: () => boolean;
   handOver: () => void;
   playThrough: () => boolean;
+  playToEnd: () => void;
   hopOut: () => void;
   leave: () => void;
 }
@@ -64,7 +65,7 @@ function newRun(seed: number, reduced: boolean, now: number): PileRun {
   };
 }
 
-function takeSeat(seed: number | undefined, reduced: boolean, playThrough: boolean): PileSeat {
+function takeSeat(seed: number | undefined, reduced: boolean): PileSeat {
   const now = performance.now();
   let run: PileRun;
   if (seed !== undefined) {
@@ -78,7 +79,6 @@ function takeSeat(seed: number | undefined, reduced: boolean, playThrough: boole
   }
   const token = {};
   run.screens.push(token);
-  if (playThrough) run.playThrough = true;
   const waiting = () => run.screens.filter((screen) => !run.handedOver.has(screen));
   return {
     pile: run.pile,
@@ -89,6 +89,9 @@ function takeSeat(seed: number | undefined, reduced: boolean, playThrough: boole
       run.handedOver.add(token);
     },
     playThrough: () => run.playThrough,
+    playToEnd: () => {
+      run.playThrough = true;
+    },
     hopOut: () => {
       run.leaving = true;
     },
@@ -106,23 +109,23 @@ export interface AppLoadingScreenProps {
   ready?: boolean | undefined;
   onExited?: (() => void) | undefined;
   onMountViews?: (() => void) | undefined;
-  scene?: "pile" | "thinking";
+  scene?: "pile" | "thinking" | "quiet";
   seed?: number;
   label?: string;
   title?: string;
-  quickExit?: boolean;
+  exit?: "playToEnd" | "fade" | undefined;
   immediate?: boolean;
 }
 
 export function AppLoadingScreen(props: AppLoadingScreenProps) {
   const { t } = useText();
   const reducedMotion = prefersReducedMotion() || documentStillFaces();
-  const pileScene = untrack(() => props.scene !== "thinking");
+  const scene = untrack(() => props.scene ?? "pile");
+  const pileScene = scene === "pile";
   const seat = pileScene
     ? takeSeat(
         untrack(() => props.seed),
         reducedMotion,
-        untrack(() => props.quickExit === false),
       )
     : undefined;
   onCleanup(() => seat?.leave());
@@ -164,11 +167,12 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
   });
 
   createEffect(
-    () => props.ready,
-    (ready) => {
+    () => [props.ready, untrack(() => props.exit)] as const,
+    ([ready, exit]) => {
       if (!ready || untrack(phase) !== "loading" || hopWanted) return;
       clearTimeout(statusTimer);
-      const quick = !seat?.playThrough() && age() < QUICK_EXIT_S;
+      if (exit === "playToEnd") seat?.playToEnd();
+      const quick = exit === "fade" || (!seat?.playThrough() && age() < QUICK_EXIT_S);
       const hopOut = seat && !reducedMotion && seat.owns() && seat.alone() && !quick;
       const rainLeft = hopOut ? Math.max(0, MIN_RAIN_S - age()) * 1000 : 0;
       exitTimer ??= setTimeout(finishExit, rainLeft + EXIT_LIMIT_MS);
@@ -224,7 +228,7 @@ export function AppLoadingScreen(props: AppLoadingScreenProps) {
       }}
       class="app-loading"
       style={{ "--app-loading-at": `${enterAt}s`, "--app-loading-exit-delay": `${fadeDelay()}ms` }}
-      data-scene={pileScene ? "pile" : "thinking"}
+      data-scene={scene}
       data-phase={phase()}
       role="status"
       aria-live="polite"

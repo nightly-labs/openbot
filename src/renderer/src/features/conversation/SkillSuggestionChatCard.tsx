@@ -1,4 +1,5 @@
 import type { SkillSuggestionEvent } from "@openbot/contracts/ipc";
+import { toast } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
   MarketplaceSuggestionCard,
@@ -60,7 +61,13 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
     const result = await props.onSave?.(reply);
     if (result === "saved") setPress("saved");
-    else if (!result) setPress(null);
+    else if (!result) {
+      setPress(null);
+      toast.error(t("chat.suggestion.saveFailed"), {
+        id: `skill-suggestion-save:${props.messageId}`,
+        report: { operation: "memory", source: "action", cause_code: "unknown" },
+      });
+    }
   };
   const skillAction = (): MarketplaceSuggestionSkillAction =>
     props.suggestion.action === "create" ? "save" : "update";

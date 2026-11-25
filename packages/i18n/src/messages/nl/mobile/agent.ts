@@ -379,6 +379,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "{model} verwijderen",
   "mobile.agent.backupModels.unavailable": "Nu niet beschikbaar · overgeslagen",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Als een gebruikslimiet {name} stopt nadat het werk is begonnen, gaat {name} met hetzelfde werk verder op het eerste beschikbare model in de volgorde. Het gaat terug naar {model} als de limiet afloopt, of 10 minuten na een fout van de aanbieder.",
   "mobile.agent.busyMessage.label": "Tijdens werk",
@@ -409,6 +410,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Plan tonen vóór lange taken",
   "mobile.agent.planCard.footer":
     "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
+  "mobile.agent.builtinMemory.label": "OpenBot-geheugen",
+  "mobile.agent.builtinMemory.footer":
+    "De agent bewaart en leest zijn eigen herinneringen. Zet dit uit om alleen een geheugen-app zoals Mem0 te gebruiken. Bewaarde herinneringen blijven.",
   "mobile.agent.workspace.title": "Werkruimtemap",
   "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.advanced.behavior": "Gedrag",
@@ -527,6 +531,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Verzamelen gestart {started}. Bijgewerkt {updated}.",
   "mobile.agent.usage.never": "nooit",
   "mobile.agent.record.time": "Tijd",
+  "mobile.agent.record.date": "Datum",
   "mobile.agent.section.changeFailed": "Kan map niet wijzigen",
   "mobile.agent.section.tryAgain": "Probeer het opnieuw.",
   "mobile.agent.section.moveUp": "Omhoog",
@@ -612,7 +617,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Kan je servers niet laden",
   "mobile.agent.home.serversFailedBody": "Controleer of de desktop-app draait en probeer het opnieuw.",
   "mobile.agent.home.noServers": "Geen servers beschikbaar",
-  "mobile.agent.home.noServersBody": "Verbind de desktop-app opnieuw of word lid van een externe server.",
+  "mobile.agent.home.noServersBody":
+    "Open OpenBot op je computer met dit account en zet Publiceer deze server aan in Serverinstellingen → Leden. Of word lid van een externe server.",
   "mobile.agent.home.chooseServer": "Kies een server",
   "mobile.agent.home.openServers": "Servers openen",
   "mobile.agent.home.noChatOpen": "Geen chat geopend",
@@ -690,6 +696,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Niet uitsluiten",
   "mobile.agent.folders.browseTitle": "Map kiezen",
   "mobile.agent.folders.places": "Ga naar",
+  "mobile.agent.folders.path": "Mappad",
   "mobile.agent.folders.home": "Thuismap",
   "mobile.agent.folders.parent": "Omhoog naar {folder}",
   "mobile.agent.folders.browseFailed": "Kan deze map niet openen.",

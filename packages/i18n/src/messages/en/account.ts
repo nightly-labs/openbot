@@ -19,6 +19,7 @@ export const messages = defineMessages("account", {
   "account.usage.notReported": "No limit reported",
   "account.usage.value.notReported": "Not reported",
   "account.usage.providerNotReported": "No usage reading",
+  "account.usage.readFailed": "Could not read usage",
   "account.usage.row.unavailable": "{name}, unavailable",
   "account.usage.row.notReported": "{name}, usage not reported",
   "account.usage.row.loading": "{name}, loading",

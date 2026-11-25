@@ -24,11 +24,13 @@ export function PageHeader(props: {
 }) {
   const { t } = useText();
   let heading: HTMLHeadingElement | undefined;
+  let header: HTMLElement | undefined;
   onSettled(() => {
     if (untrack(() => props.onBack)) heading?.focus();
   });
   const inWindow = () => props.frame === "window";
   const back = () => (inWindow() ? undefined : props.onBack);
+  const close = () => (inWindow() ? props.onBack : undefined);
   const hostName = () => (inWindow() ? undefined : props.hostName);
   const hasPath = () => (props.path?.length ? "" : undefined);
   const identity = () => (
@@ -85,7 +87,7 @@ export function PageHeader(props: {
     </>
   );
   return (
-    <header class={props.class ? `page-header ${props.class}` : "page-header"}>
+    <header ref={header} class={props.class ? `page-header ${props.class}` : "page-header"}>
       <Show
         when={props.pathLabel}
         fallback={
@@ -101,6 +103,25 @@ export function PageHeader(props: {
         )}
       </Show>
       {props.children}
+      <Show when={close()}>{(closePage) => <CloseOnEscape within={() => header} onClose={() => closePage()()} />}</Show>
     </header>
   );
+}
+
+function CloseOnEscape(props: { within: () => HTMLElement | undefined; onClose: () => void }) {
+  onSettled(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      const within = props.within();
+      if (!within?.isConnected || within.closest("[inert]")) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("[role=dialog], [role=alertdialog], [role=menu], [role=listbox]")) return;
+      if (target?.closest("input, textarea, select, [contenteditable]")) return;
+      event.preventDefault();
+      props.onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  });
+  return null;
 }

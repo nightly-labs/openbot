@@ -240,8 +240,8 @@ async function run() {
     found.serverList === storageGb && found.hostingList === storageGb && found.billing === storageGb;
   const starterStorage = { moved: await storage("moved"), boat: await storage("control-stopped") };
   check(
-    "a moved Starter server has 25 GB and a boat Starter server has 12 GB, in each list",
-    sameStorage(starterStorage.moved, 25) && sameStorage(starterStorage.boat, 12),
+    "a moved Starter server and a boat Starter server both have 25 GB, in each list",
+    sameStorage(starterStorage.moved, 25) && sameStorage(starterStorage.boat, 25),
     starterStorage,
   );
   const ownComputer = await storage("own-computer");
@@ -437,8 +437,8 @@ async function run() {
   );
   const proStorage = { moved: await storage("moved"), boat: await storage("control-stopped") };
   check(
-    "after a change to Pro, a moved server has 150 GB and a boat server has 100 GB, in each list",
-    sameStorage(proStorage.moved, 150) && sameStorage(proStorage.boat, 100),
+    "after a change to Pro, a moved server and a boat server both have 150 GB, in each list",
+    sameStorage(proStorage.moved, 150) && sameStorage(proStorage.boat, 150),
     proStorage,
   );
 

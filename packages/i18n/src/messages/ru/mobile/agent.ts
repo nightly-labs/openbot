@@ -407,6 +407,7 @@ export const messages = {
   "mobile.agent.backupModels.remove": "Убрать {model}",
   "mobile.agent.backupModels.unavailable": "Сейчас недоступна · пропущена",
   "mobile.agent.backupModels.withAccount": "{model} · {account}",
+  "mobile.agent.backupModels.withProvider": "{model} · {provider}",
   "mobile.agent.backupModels.note":
     "Если лимит использования остановит {name} после начала работы, {name} продолжит ту же работу на первой доступной модели из списка. Когда лимит закончится или через 10 минут после ошибки провайдера, {name} вернётся к {model}.",
   "mobile.agent.busyMessage.label": "Во время работы",
@@ -436,6 +437,9 @@ export const messages = {
   "mobile.agent.planCard.label": "Показывать план перед долгими задачами",
   "mobile.agent.planCard.footer":
     "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
+  "mobile.agent.builtinMemory.label": "Память OpenBot",
+  "mobile.agent.builtinMemory.footer":
+    "Агент сохраняет и читает свою память. Выключите, чтобы использовать только приложение памяти, например Mem0. Сохранённая память остаётся.",
   "mobile.agent.workspace.title": "Папка рабочего пространства",
   "mobile.agent.workspace.footer": "Папка этого агента на компьютере-хосте.",
   "mobile.agent.advanced.behavior": "Поведение",
@@ -563,6 +567,7 @@ export const messages = {
   "mobile.agent.usage.collection": "Сбор данных начат: {started}. Обновлено: {updated}.",
   "mobile.agent.usage.never": "никогда",
   "mobile.agent.record.time": "Время",
+  "mobile.agent.record.date": "Дата",
   "mobile.agent.section.changeFailed": "Не удалось изменить папку",
   "mobile.agent.section.tryAgain": "Повторите попытку.",
   "mobile.agent.section.moveUp": "Выше",
@@ -664,7 +669,8 @@ export const messages = {
   "mobile.agent.home.serversFailed": "Не удалось загрузить серверы",
   "mobile.agent.home.serversFailedBody": "Убедитесь, что настольное приложение запущено, и повторите попытку.",
   "mobile.agent.home.noServers": "Нет доступных серверов",
-  "mobile.agent.home.noServersBody": "Подключите настольное приложение снова или присоединитесь к удалённому серверу.",
+  "mobile.agent.home.noServersBody":
+    "Откройте OpenBot на компьютере с этим аккаунтом и включите «Опубликовать этот сервер» в «Настройки сервера» → «Участники». Или присоединитесь к удалённому серверу.",
   "mobile.agent.home.chooseServer": "Выберите сервер",
   "mobile.agent.home.openServers": "Открыть серверы",
   "mobile.agent.home.noChatOpen": "Чат не открыт",
@@ -756,6 +762,7 @@ export const messages = {
   "mobile.agent.folders.includeConfirm": "Не исключать",
   "mobile.agent.folders.browseTitle": "Выбор папки",
   "mobile.agent.folders.places": "Перейти",
+  "mobile.agent.folders.path": "Путь к папке",
   "mobile.agent.folders.home": "Домашняя папка",
   "mobile.agent.folders.parent": "Вверх: {folder}",
   "mobile.agent.folders.browseFailed": "Не удалось открыть эту папку.",

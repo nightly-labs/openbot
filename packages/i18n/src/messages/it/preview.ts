@@ -24,5 +24,10 @@ export const messages = {
   "preview.tooLarge.description":
     "L'anteprima arriva fino a 100 MB. Puoi aprire questo file con la sua app predefinita.",
   "preview.spreadsheet.readFailed": "Impossibile leggere questo foglio di calcolo.",
+  "preview.spreadsheet.tooLarge":
+    "Questo foglio di calcolo è troppo grande per l’anteprima. Apri o scarica il file per vederlo tutto.",
   "preview.spreadsheet.truncated": "Anteprima limitata alle prime {rows} righe e {columns} colonne.",
+  "preview.document.readFailed": "Impossibile leggere questo documento.",
+  "preview.document.empty": "Questo documento non contiene testo da mostrare.",
+  "preview.document.truncated": "Anteprima limitata alla prima parte del documento.",
 } as const satisfies PartialTranslation<typeof source>;

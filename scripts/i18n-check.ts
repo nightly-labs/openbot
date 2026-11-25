@@ -10,7 +10,15 @@ const ROOT = resolve(import.meta.dirname, "..");
 const MESSAGES = resolve(ROOT, "packages/i18n/src/messages");
 const GAPS = resolve(ROOT, "packages/i18n/untranslated.json");
 const AGGREGATORS = new Set(["index", "mobile", "source", "shared"]);
-const CODE_ROOTS = ["src", "packages", "apps/mobile/src", "apps/auth-api/src", "scripts"];
+const CODE_ROOTS = [
+  "src",
+  "packages",
+  "apps/mobile/src",
+  "apps/auth-api/src",
+  "apps/browser-extension/src",
+  "remote/api/src",
+  "scripts",
+];
 const CODE_EXTENSIONS = /\.(?:ts|tsx)$/;
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", "out", ".expo"]);
 const RELEASED_SOURCE_KEYS = new Set([
@@ -29,6 +37,8 @@ const RELEASED_SOURCE_KEYS = new Set([
   "error.backend.channelHistoryArriving",
   "error.backend.channelHistoryLeadRequired",
   "error.backend.channelRoutingUnreadable",
+  "error.backend.channelLeadTimedOut",
+  "error.backend.channelRequestMemberRequired",
   "error.backend.recipientHidden",
   "error.provider.customEndpointKeyRefused",
   "error.connector.protonPassPlan",

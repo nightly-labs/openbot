@@ -7,10 +7,12 @@ import {
   decodeHostBrowsingMemory,
   decodeHostMemoryReview,
   decodeHostPersonality,
+  decodeHostSignalHomeSettings,
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostTurnLimits,
   decodeHostUpdateStatus,
+  decodeHostVoiceModel,
   decodeMachineAlertSettings,
   decodePromptCacheTtlSetting,
   decodeProviderModelVisibility,
@@ -19,6 +21,7 @@ import {
   type HostTurnLimitsInput,
   type HostUpdateSettingsChange,
   type HostUpdateStatus,
+  type HostVoiceModelChange,
   hostAgentMemoryLimit,
   hostBrowsingMemory,
   hostMemoryReview,
@@ -30,6 +33,7 @@ import {
   LEGACY_RESPONSE_STYLE,
   LOCAL_SERVER_ID,
   type MachineAlertSettings,
+  type MediaApprovalCreditsUpdate,
   PROVIDER_ENVIRONMENT_LIMITS,
   type PromptCacheTtl,
   type ProviderEnvironmentProvider,
@@ -38,8 +42,11 @@ import {
   type ProviderModelVisibilityChange,
   parseAgentAccessChange,
   parseHostTurnLimitsInput,
+  parseHostVoiceModelChange,
+  parseMediaApprovalCreditsUpdate,
   parseProviderModelVisibilityChange,
   parseProviderModelVisibilityProvider,
+  parseSignalHomeChoice,
   type ServerAuditLog,
   type ServerAuditName,
   type ServerSummary,
@@ -57,6 +64,11 @@ import {
   BROWSING_MEMORY_CAPABILITY,
   BROWSING_MEMORY_ROUTES,
 } from "@openbot/contracts/team-protocol/browsing-memory-v1";
+import {
+  CACHE_EXPIRY_COMPACTION_CAPABILITY,
+  CACHE_EXPIRY_COMPACTION_ROUTES,
+  decodeCacheExpiryCompactionResponse,
+} from "@openbot/contracts/team-protocol/cache-expiry-compaction-v1";
 import {
   CLAUDE_COMPACT_WINDOW_CAPABILITY,
   CLAUDE_COMPACT_WINDOW_ROUTES,
@@ -88,6 +100,10 @@ import {
 } from "@openbot/contracts/team-protocol/host-personality-v1";
 import { HOST_RELEASE_CAPABILITY, HOST_RELEASE_ROUTES } from "@openbot/contracts/team-protocol/host-release-v1";
 import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
+import {
+  HOST_SIGNAL_HOME_CAPABILITY,
+  HOST_SIGNAL_HOME_ROUTES,
+} from "@openbot/contracts/team-protocol/host-signal-home-v1";
 import { HOST_TIMEZONE_CAPABILITY, HOST_TIMEZONE_ROUTES } from "@openbot/contracts/team-protocol/host-timezone-v1";
 import {
   HOST_TURN_LIMITS_CAPABILITY,
@@ -95,9 +111,18 @@ import {
 } from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import { HOST_UPDATE_CAPABILITY, HOST_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-update-v1";
 import {
+  HOST_VOICE_MODEL_CAPABILITY,
+  HOST_VOICE_MODEL_ROUTES,
+} from "@openbot/contracts/team-protocol/host-voice-model-v1";
+import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
 } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import {
+  decodeMediaApprovalCreditsResponse,
+  MEDIA_APPROVAL_CREDITS_CAPABILITY,
+  MEDIA_APPROVAL_CREDITS_ROUTES,
+} from "@openbot/contracts/team-protocol/media-approval-credits-v1";
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
@@ -120,11 +145,15 @@ import { runCauseEffect } from "../../backend/effect-boundary";
 import { type AgentAccessStore, agentAccessSnapshot } from "../agent-access-store";
 import type { AgentMemoryLimitSetting } from "../agent-memory-limit-preference-store";
 import type { BrowsingMemoryPreferenceStore } from "../browsing-memory-preference-store";
+import type { CacheExpiryCompactionControl } from "../cache-expiry-compaction-preference-store";
 import type { ClaudeCompactWindowControl } from "../claude-compact-window-preference-store";
 import type { ClaudeUserSetupControl } from "../claude-user-setup-preference-store";
 import type { HostService } from "../host-service";
+import type { HostSignalHomeService } from "../host-signal-home";
 import type { HostTurnLimitsPreferenceStore } from "../host-turn-limits-preference-store";
+import type { HostVoiceModelService } from "../host-voice-model";
 import type { MachineAlertMonitor } from "../machine-alerts";
+import type { MediaApprovalCreditsControl } from "../media-approval-credits-preference-store";
 import type { MemoryReviewPreferenceStore } from "../memory-review-preference-store";
 import type { ModelVisibility } from "../model-visibility";
 import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preference-store";
@@ -163,6 +192,8 @@ interface HostAdminIpcDependencies {
   host: Pick<HostService, "updateIdentity" | "rotateIdentityKey">;
   remoteServers: HostAdminRemoteServers;
   serverTimezone: Pick<ServerTimezonePreferenceStore, "get" | "set">;
+  voiceModel: Pick<HostVoiceModelService, "snapshot" | "change">;
+  signalHome: Pick<HostSignalHomeService, "snapshot" | "set">;
   hostTurnLimits: Pick<HostTurnLimitsPreferenceStore, "get" | "set">;
   serverPersonality: Pick<ServerPersonalityPreferenceStore, "get" | "set">;
   agentMemoryLimit: AgentMemoryLimitSetting;
@@ -172,6 +203,8 @@ interface HostAdminIpcDependencies {
   machineAlerts: Pick<MachineAlertMonitor, "alerts" | "setAlerts" | "canBeResponsible">;
   promptCacheTtl: Pick<PromptCacheTtlPreferenceStore, "get" | "set">;
   claudeUserSetup: ClaudeUserSetupControl;
+  cacheExpiryCompaction: CacheExpiryCompactionControl;
+  mediaApprovalCredits: MediaApprovalCreditsControl;
   claudeCompactWindow: ClaudeCompactWindowControl;
   providerEnvironment: Pick<ProviderEnvironmentControl, "get" | "set">;
   modelVisibility: Pick<ModelVisibility, "settings" | "set">;
@@ -190,6 +223,8 @@ export function hostAdminIpcHandlers({
   host,
   remoteServers,
   serverTimezone,
+  voiceModel,
+  signalHome,
   hostTurnLimits,
   serverPersonality,
   agentMemoryLimit,
@@ -199,6 +234,8 @@ export function hostAdminIpcHandlers({
   machineAlerts,
   promptCacheTtl,
   claudeUserSetup,
+  cacheExpiryCompaction,
+  mediaApprovalCredits,
   claudeCompactWindow,
   providerEnvironment,
   modelVisibility,
@@ -224,6 +261,18 @@ export function hostAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, HOST_TIMEZONE_CAPABILITY))
       throw new Error(sourceText("error.team.hostTimezoneUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, route, decodeHostTimezoneSettings, { method: "POST", body }));
+  }
+  function remoteSignalHome(serverId: string, route: string, body: { home?: string | null }) {
+    if (!remoteServers.supportsCapability(serverId, HOST_SIGNAL_HOME_CAPABILITY))
+      throw new Error(sourceText("error.team.hostSignalHomeUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeHostSignalHomeSettings, { method: "POST", body }),
+    );
+  }
+  function remoteVoiceModel(serverId: string, route: string, body: Record<string, never> | HostVoiceModelChange) {
+    if (!remoteServers.supportsCapability(serverId, HOST_VOICE_MODEL_CAPABILITY))
+      throw new Error(sourceText("error.team.hostVoiceModelUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, route, decodeHostVoiceModel, { method: "POST", body }));
   }
   function remoteTurnLimits(serverId: string, route: string, body: Record<string, never> | HostTurnLimitsInput) {
     if (!remoteServers.supportsCapability(serverId, HOST_TURN_LIMITS_CAPABILITY))
@@ -270,6 +319,20 @@ export function hostAdminIpcHandlers({
       throw new Error(sourceText("error.team.claudeUserSetupUnsupported"));
     return runCauseEffect(
       remoteServers.request(serverId, route, decodeClaudeUserSetupResponse, { method: "POST", body }),
+    );
+  }
+  function remoteCacheExpiryCompaction(serverId: string, route: string, body: { enabled?: boolean }) {
+    if (!remoteServers.supportsCapability(serverId, CACHE_EXPIRY_COMPACTION_CAPABILITY))
+      throw new Error(sourceText("error.team.cacheExpiryCompactionUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeCacheExpiryCompactionResponse, { method: "POST", body }),
+    );
+  }
+  function remoteMediaApprovalCredits(serverId: string, route: string, body: MediaApprovalCreditsUpdate) {
+    if (!remoteServers.supportsCapability(serverId, MEDIA_APPROVAL_CREDITS_CAPABILITY))
+      throw new Error(sourceText("error.team.mediaApprovalCreditsUnsupported"));
+    return runCauseEffect(
+      remoteServers.request(serverId, route, decodeMediaApprovalCreditsResponse, { method: "POST", body }),
     );
   }
   function remoteClaudeCompactWindow(serverId: string, route: string, body: { tokens?: number | null }) {
@@ -437,6 +500,22 @@ export function hostAdminIpcHandlers({
         local: (timezone) => runCauseEffect(serverTimezone.set(timezone)),
         remote: (timezone, serverId) => remoteTimezone(serverId, HOST_TIMEZONE_ROUTES.update, { timezone }),
       }),
+      getVoiceModel: scopedQueryHandler({
+        local: () => runCauseEffect(voiceModel.snapshot()),
+        remote: (serverId) => remoteVoiceModel(serverId, HOST_VOICE_MODEL_ROUTES.settings, {}),
+      }),
+      changeVoiceModel: scopedHandler(parseHostVoiceModelChange, {
+        local: (change) => runCauseEffect(voiceModel.change(change)),
+        remote: (change, serverId) => remoteVoiceModel(serverId, HOST_VOICE_MODEL_ROUTES.change, change),
+      }),
+      getSignalHome: scopedQueryHandler({
+        local: () => runCauseEffect(signalHome.snapshot()),
+        remote: (serverId) => remoteSignalHome(serverId, HOST_SIGNAL_HOME_ROUTES.settings, {}),
+      }),
+      setSignalHome: scopedHandler(parseSignalHomeChoice, {
+        local: (home) => runCauseEffect(signalHome.set(home)),
+        remote: (home, serverId) => remoteSignalHome(serverId, HOST_SIGNAL_HOME_ROUTES.update, { home }),
+      }),
       getTurnLimits: scopedQueryHandler({
         local: () => hostTurnLimits.get(),
         remote: (serverId) => remoteTurnLimits(serverId, HOST_TURN_LIMITS_ROUTES.settings, {}),
@@ -525,6 +604,24 @@ export function hostAdminIpcHandlers({
         local: (enabled) => runCauseEffect(claudeUserSetup.set(enabled)),
         remote: (enabled, serverId) => remoteClaudeUserSetup(serverId, CLAUDE_USER_SETUP_ROUTES.update, { enabled }),
       }),
+      getCacheExpiryCompaction: scopedQueryHandler({
+        local: () => cacheExpiryCompaction.get(),
+        remote: (serverId) => remoteCacheExpiryCompaction(serverId, CACHE_EXPIRY_COMPACTION_ROUTES.settings, {}),
+      }),
+      setCacheExpiryCompaction: scopedHandler(parseCacheExpiryCompaction, {
+        local: (enabled) => runCauseEffect(cacheExpiryCompaction.set(enabled)),
+        remote: (enabled, serverId) =>
+          remoteCacheExpiryCompaction(serverId, CACHE_EXPIRY_COMPACTION_ROUTES.update, { enabled }),
+      }),
+      getMediaApprovalCredits: scopedQueryHandler({
+        local: () => mediaApprovalCredits.get(),
+        remote: (serverId) => remoteMediaApprovalCredits(serverId, MEDIA_APPROVAL_CREDITS_ROUTES.settings, {}),
+      }),
+      setMediaApprovalCredits: scopedHandler(parseMediaApprovalCredits, {
+        local: (update) => runCauseEffect(mediaApprovalCredits.set(update)),
+        remote: (update, serverId) =>
+          remoteMediaApprovalCredits(serverId, MEDIA_APPROVAL_CREDITS_ROUTES.update, update),
+      }),
       getClaudeCompactWindow: scopedQueryHandler({
         local: () => claudeCompactWindow.get(),
         remote: (serverId) => remoteClaudeCompactWindow(serverId, CLAUDE_COMPACT_WINDOW_ROUTES.settings, {}),
@@ -609,6 +706,17 @@ function wireIdentity(input: UpdateHostIdentityInput) {
 function parseClaudeUserSetup(value: unknown): boolean {
   if (typeof value !== "boolean") throw new Error("Invalid Claude setup setting.");
   return value;
+}
+
+function parseCacheExpiryCompaction(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("Invalid cache expiry compaction setting.");
+  return value;
+}
+
+function parseMediaApprovalCredits(value: unknown): MediaApprovalCreditsUpdate {
+  const update = parseMediaApprovalCreditsUpdate(value);
+  if (!update) throw new Error("Invalid media approval credits.");
+  return update;
 }
 
 function parseClaudeCompactWindow(value: unknown): number | null {

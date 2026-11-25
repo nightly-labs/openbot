@@ -308,6 +308,9 @@ export const messages = {
   "mobile.settings.conversations.fullQualityPhotos": "إرسال الصور بالجودة الكاملة",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "عند إيقاف هذا الخيار، يرسل التطبيق نسخة أصغر من كل صورة، حتى 2048 بكسل في الضلع الأطول. تصل أسرع على اتصال بطيء. فعّل هذا الخيار لإرسال الصورة الأصلية.",
+  "mobile.settings.conversations.fullScreenCamera": "استخدام الكاميرا بملء الشاشة",
+  "mobile.settings.conversations.fullScreenCameraFooter":
+    "عند التشغيل، يفتح زر الكاميرا كاميرا النظام مع التكبير وجميع العدسات. عند الإيقاف، تفتح كاميرا صغيرة داخل المحادثة.",
   "mobile.settings.profile.nameUnsafe": "أزل فواصل الأسطر وأحرف التحكم من اسمك.",
   "mobile.settings.profile.nameLength": "استخدم من 3 إلى 20 حرفًا لاسم العرض.",
   "mobile.settings.profile.saveFailed": "تعذّر حفظ التغييرات. أعد المحاولة.",
@@ -484,6 +487,7 @@ export const messages = {
   "mobile.settings.voice.gptLive.serversTitle": "الخوادم",
   "mobile.settings.voice.gptLive.serversFooter":
     "اضغط على خادم يحتاج إلى تسجيل الدخول لربط Codex بحساب ChatGPT. لا يرى تسجيل دخول الخادم إلا المالك أو المسؤول.",
+  "mobile.settings.voice.gptLive.account": "حساب الصوت المباشر في GPT",
   "mobile.settings.voice.gptLive.status.ready": "جاهز",
   "mobile.settings.voice.gptLive.status.supported": "مدعوم",
   "mobile.settings.voice.gptLive.status.offline": "غير متصل",

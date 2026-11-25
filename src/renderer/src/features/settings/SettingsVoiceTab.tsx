@@ -55,8 +55,10 @@ import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, Show } from "solid-js";
 import { setVoiceTalkKey, useVoiceTalkKey } from "../conversation/voice-talk-key";
 import type { CodexLiveAccess } from "../speech/codex-live-access";
+import { type LiveVoiceAccountChoice, LiveVoiceAccountRow } from "./LiveVoiceAccountRow";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import {
+  MODEL_DESCRIPTION,
   type ModelChoice,
   type ModelDownload,
   ModelDownloadToasts,
@@ -65,17 +67,6 @@ import {
   VoiceModelRow,
 } from "./VoiceModelRow";
 import { VoiceServerDialog } from "./VoiceServerDialog";
-
-const MODEL_DESCRIPTION = {
-  "parakeet-tdt-0.6b-v3": "settings.voice.model.parakeet.description",
-  "parakeet-unified-en-0.6b": "settings.voice.model.parakeetUnified.description",
-  "bark-3.0-plus": "settings.voice.model.bark.description",
-  "whisper-turbo": "settings.voice.model.whisper.description",
-  "cohere-transcribe-03-2026": "settings.voice.model.cohere.description",
-  [ELEVENLABS_VOICE_MODEL_ID]: "settings.voice.model.elevenlabs.description",
-  "groq-whisper-large-v3-turbo": "settings.voice.model.groqTurbo.description",
-  "groq-whisper-large-v3": "settings.voice.model.groqLarge.description",
-} as const satisfies Record<VoiceModelInfo["id"], AppTextKey>;
 
 const SPEECH_MODEL_DESCRIPTION = {
   [SPEECH_MODEL_ID]: "settings.voice.speech.model.description",
@@ -198,6 +189,7 @@ interface SettingsVoiceTabProps {
   selectMount: HTMLElement | undefined;
   codexLiveAccess?: CodexLiveAccess | undefined;
   onConnectCodex?: (() => void) | undefined;
+  liveVoiceAccount?: LiveVoiceAccountChoice | undefined;
   platform?: "darwin" | "win32" | "linux" | undefined;
 }
 
@@ -666,6 +658,15 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
                 </Select>
               </ItemActions>
             </Item>
+            <Show when={props.liveVoiceAccount}>
+              {(choice) => (
+                <LiveVoiceAccountRow
+                  choice={choice()}
+                  disabled={!speech().settings?.codexLive}
+                  selectMount={props.selectMount}
+                />
+              )}
+            </Show>
           </Show>
         </ItemGroup>
       </SettingsSection>

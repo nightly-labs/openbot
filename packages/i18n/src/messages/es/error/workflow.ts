@@ -6,11 +6,15 @@ export const messages = {
   "error.workflow.versionMissing": "Esta versión del flujo de trabajo ya no existe.",
   "error.workflow.annotation": "Los textos, las notas y las formas no pueden tener conexiones.",
   "error.workflow.port": "Un paso no puede recibir este tipo de entrada.",
+  "error.workflow.unknownValue":
+    "Este OpenBot no conoce un ajuste de un paso. Actualiza OpenBot y vuelve a intentarlo.",
   "error.workflow.branch": "Solo una condición puede tener conexiones de sí y no.",
   "error.workflow.conditionBranch": "Cada conexión de una condición debe ser sí o no.",
   "error.workflow.duplicateEdge": "Estos dos pasos ya tienen esta conexión.",
   "error.workflow.serverTooOld":
     "Este servidor no admite flujos de trabajo. Actualiza OpenBot en el ordenador que lo ejecuta.",
+  "error.workflow.newerSteps":
+    "Este flujo de trabajo tiene pasos de una versión más reciente de OpenBot. Actualiza OpenBot para cambiarlo.",
   "error.workflow.nodeUnsupported":
     "Esta versión de OpenBot aún no puede ejecutar pasos de imagen, archivo ni mensaje.",
   "error.workflow.interrupted": "OpenBot se detuvo mientras se ejecutaba este paso. Ejecútalo de nuevo.",
@@ -19,6 +23,17 @@ export const messages = {
   "error.workflow.agentStepEnded": "El mensaje al agente se eliminó antes de que respondiera.",
   "error.workflow.agentStepStopped": "El agente se detuvo antes de responder a este paso. Ejecuta el paso de nuevo.",
   "error.workflow.conditionUnclear": "El modelo no respondió sí o no.",
+  "error.workflow.answerInvalid":
+    "La respuesta no tenía los campos que pide este paso: {fields}. Ejecuta el paso de nuevo.",
+  "error.workflow.answerSetup":
+    "Los campos de respuesta de este flujo de trabajo tienen un problema aquí: {fields}. Corrige el flujo de trabajo y vuelve a ejecutar el paso.",
+  "error.workflow.answerSourceEnded":
+    "Estos campos no tienen valor porque el paso que los da no terminó: {fields}. Primero vuelve a ejecutar ese paso.",
+  "error.workflow.runInputInvalid":
+    "La entrada de la ejecución no coincide con los campos de respuesta del disparador: {fields}. Envía un objeto JSON con estos campos.",
+  "error.workflow.sourceNotDone":
+    "Un paso anterior falló o se detuvo la última vez que se ejecutó. Primero vuelve a ejecutar ese paso.",
+  "error.workflow.checkInvalid": "La comprobación de este paso no es válida. Corrígela y ejecuta el paso de nuevo.",
   "error.workflow.modelFailed": "El modelo no pudo responder. Ejecuta el paso de nuevo.",
   "error.workflow.modelTimedOut":
     "El modelo no respondió a tiempo. Elige un esfuerzo menor o un modelo más rápido para este paso y ejecútalo de nuevo.",
@@ -49,6 +64,7 @@ export const messages = {
     'El proveedor rechazó este paso: "{reason}". Elige otro modelo para este paso o ejecuta el paso de nuevo.',
   "error.workflow.modelBusy": "Hay otra solicitud al modelo en curso. Ejecuta el paso de nuevo en breve.",
   "error.workflow.mediaFailed": "El modelo no pudo crear la imagen o el vídeo. Ejecuta el paso de nuevo.",
+  "error.workflow.mediaNotMade": "El modelo no creó la imagen ni el vídeo. Respondió: {answer}",
   "error.workflow.pictureMissing": "La imagen ya no está en el servidor. Envíala de nuevo.",
   "error.workflow.pictureType": "Usa una imagen PNG, JPEG o WebP.",
   "error.workflow.mediaInputMissing": "Una imagen de un paso anterior no está disponible. Ejecuta ese paso de nuevo.",

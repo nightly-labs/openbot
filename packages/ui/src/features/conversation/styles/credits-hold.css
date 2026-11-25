@@ -1,0 +1,54 @@
+.credits-hold-card > .ui-block-content {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--openbot-space-3);
+  row-gap: var(--openbot-space-3);
+  padding: var(--openbot-space-4);
+}
+
+.credits-hold-card > .ui-block-content > .ui-block-header {
+  display: contents;
+}
+
+.credits-hold-avatar {
+  grid-row: 1;
+  grid-column: 1;
+  width: 40px;
+  height: 40px;
+  translate: 1px -6px;
+}
+
+.credits-hold-card .ui-block-heading {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.credits-hold-card > .ui-block-content > :is(.ui-block-card-footer, .ui-block-outcome) {
+  grid-row: 2;
+  grid-column: 2;
+}
+
+.credits-hold-card .ui-block-actions {
+  flex: 1 1 auto;
+}
+
+.credits-hold-card .ui-block-actions > .ui-button {
+  flex-grow: 0;
+}
+
+.credits-hold-dont-ask {
+  margin-inline: calc(var(--openbot-space-4) * -1) auto;
+}
+
+.credits-hold-amount {
+  display: inline;
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.credits-hold-amount > .credit-icon {
+  display: inline-block;
+  margin-inline-end: 0.2em;
+  vertical-align: -0.125em;
+}

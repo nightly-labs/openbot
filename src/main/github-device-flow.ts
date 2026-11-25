@@ -189,14 +189,7 @@ const postFormEffect = Effect.fn("GitHub.postForm")(function* (
     Effect.mapError(
       ({ cause }) =>
         new GitHubOperationError({
-          cause: signal?.aborted
-            ? signal.reason
-            : new GitHubDeviceFlowError(
-                "unreachable",
-                sourceText("error.connector.githubUnreachable", {
-                  detail: cause instanceof Error ? cause.message : String(cause),
-                }),
-              ),
+          cause: signal?.aborted ? signal.reason : githubUnreachable(cause),
         }),
     ),
   );
@@ -223,6 +216,38 @@ function flowError(code: string, body: OAuthAnswer | null): GitHubDeviceFlowErro
     default:
       return unexpected([code, body?.error_description].filter(Boolean).join(": "));
   }
+}
+
+/** Codes that say the request never got to GitHub: no name lookup, no route, or no connection. */
+const NETWORK_CODES = new Set([
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ENETUNREACH",
+  "ENETDOWN",
+  "EHOSTUNREACH",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+
+/**
+ * A request that got no answer. Node rejects it with a bare "fetch failed", and the reason (DNS, a
+ * refused connection) is only on its `cause`, sometimes in an `AggregateError`. A network reason
+ * gets a sentence that says what to check; any other failure names its innermost reason.
+ */
+export function githubUnreachable(error: unknown): GitHubDeviceFlowError {
+  let detail = error instanceof Error ? error.message : String(error);
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth++) {
+    const code = "code" in current ? current.code : undefined;
+    if (typeof code === "string" && NETWORK_CODES.has(code)) {
+      return new GitHubDeviceFlowError("unreachable", sourceText("error.connector.githubOffline"));
+    }
+    if (current.message) detail = current.message;
+    current = current.cause ?? (current instanceof AggregateError ? current.errors[0] : undefined);
+  }
+  return new GitHubDeviceFlowError("unreachable", sourceText("error.connector.githubUnreachable", { detail }));
 }
 
 function unexpected(detail: string): GitHubDeviceFlowError {

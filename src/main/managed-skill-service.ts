@@ -1,6 +1,6 @@
 import { lstat, mkdir, readdir, readFile, realpath, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
+import { agentProviderDescriptor, MANAGED_SKILL_FOLDERS } from "@openbot/contracts/agent-providers";
 import type { AgentSummary, InstalledSkill } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -20,7 +20,6 @@ export const MANAGED_SKILL_SLUGS: ReadonlySet<string> = new Set([
   DATA_SKILL_SLUG,
 ]);
 export const OWNERSHIP_MARKER = SKILL_OWNERSHIP_MARKER;
-export const MANAGED_SKILL_FOLDERS = [".agents/skills", ".claude/skills"] as const;
 
 const logger = createOpenBotLogger("managed-skill-service");
 

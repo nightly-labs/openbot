@@ -41,25 +41,31 @@ export class McpHostSignIns {
   }
 
   start(input: TestMcpServerInput) {
-    return this.#pages.start(
-      signInKey(input.config.url),
-      (openPage) => this.#dependencies.service.signInMcpServer(input, openPage),
-      resultOf,
-    );
+    const key = signInKey(input.config.url);
+    return this.#pages
+      .interrupt(key)
+      .pipe(
+        Effect.andThen(
+          this.#pages.start(key, (openPage) => this.#dependencies.service.signInMcpServer(input, openPage), resultOf),
+        ),
+        Effect.asVoid,
+      );
   }
 
   startRelay(input: TestMcpServerInput, deepLinkRedirectUrl?: string) {
-    return this.#pages.start(
-      signInKey(input.config.url),
-      (openPage) => this.#dependencies.service.signInMcpServer(input, openPage, deepLinkRedirectUrl),
-      resultOf,
-      "relay",
-    );
-  }
-
-  relayStatus(url: string): { pageUrl: string | null; result: McpTestResult | null } {
-    const key = signInKey(url);
-    return { pageUrl: this.#pages.pageUrl(key), result: this.status(url).result };
+    return this.#pages
+      .start(
+        signInKey(input.config.url),
+        (openPage) => this.#dependencies.service.signInMcpServer(input, openPage, deepLinkRedirectUrl),
+        resultOf,
+        "relay",
+      )
+      .pipe(
+        Effect.map((run) => ({
+          status: () => ({ pageUrl: run.pageUrl(), result: run.result() }),
+          cancel: run.interrupt,
+        })),
+      );
   }
 
   status(url: string): McpSignInStatus {

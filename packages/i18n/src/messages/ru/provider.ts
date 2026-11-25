@@ -113,6 +113,9 @@ export const messages = {
   "provider.codeLogin.relayStarting": "Запуск входа в {name} на {host}…",
   "provider.codeLogin.pageOpening": "Открываем страницу входа {name} на {host}…",
   "provider.codeLogin.linkStep": "Войдите в {name}. OpenBot продолжит сам.",
+  "provider.codeLogin.thisComputerDescription":
+    "Откройте эту ссылку в браузере на этом компьютере. OpenBot ждёт здесь.",
+  "provider.codeLogin.copyLink": "Копировать ссылку",
   "provider.codeLogin.chatgptDeviceSetting":
     "В ChatGPT на компьютере откройте настройки безопасности и включите вход по коду устройства для Codex. Для рабочего аккаунта его включает администратор рабочего пространства.",
   "provider.useApp.title": "Подключите {name} в приложении OpenBot",
@@ -140,7 +143,8 @@ export const messages = {
     "Эти модели не работают с режимом «Рабочее пространство» в Windows и Linux. Чтобы использовать их, измените «Доступ» в настройках агента.",
   "provider.picker.olderModels": "Старые модели",
   "provider.picker.olderModelsList": "Старые модели {name}",
-  "provider.picker.noModels": "У {name} нет доступных моделей.",
+  "provider.picker.noModels":
+    "Здесь нет моделей {name}. Если они выключены, администратор может включить их в разделе «Настройки сервера» > «Провайдеры» > «{name}» > «Модели».",
   "provider.picker.endpointModelsInCustom": "{name} запускает ваши эндпоинты. Их модели — на вкладке «Свой».",
   "provider.picker.showCustomModels": "Показать модели",
   "provider.picker.museNoModels":
@@ -160,6 +164,7 @@ export const messages = {
   "provider.picker.effort": "Усилие",
   "provider.picker.effortLabel": "Уровень усилий агента",
   "provider.picker.effortFixed": "{effort}, задаёт {provider}",
+  "provider.picker.effortLimited": "Настройки Claude или ваша организация ограничивают уровень до «{effort}».",
   "provider.picker.fast": "Быстро",
   "provider.picker.fastText": "Более быстрые ответы, больший расход",
   "provider.picker.speed": "Скорость",
@@ -247,6 +252,7 @@ export const messages = {
   "provider.account.apiKey": "API-ключ",
   "provider.account.listLabel": "Аккаунты {name}",
   "provider.account.usedBy": "Используют: {agents}",
+  "provider.account.sameEmail": "Тот же адрес эл. почты, что у {name}",
   "provider.account.failed": "Ошибка входа",
   "provider.account.moreActions": "Другие действия для {name}",
   "provider.account.renameLabel": "Имя: {name}",
@@ -289,6 +295,7 @@ export const messages = {
   "provider.settings.disconnectHost": "OpenBot выйдет из {provider} на сервере.",
   "provider.settings.geminiKeyReplacesAccount":
     "Вместо входа через Google используется сохранённый ключ Gemini API. Чтобы использовать тариф Google и его модели, удалите ключ.",
+  "provider.settings.museKeyInUse": "Muse использует этот ключ, а не ваш вход. Чтобы использовать вход, удалите ключ.",
   "provider.settings.versionInstalledByUser": "{version} · установлена вами",
   "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
   "provider.settings.otherVersionInstalledByUser": "Не используется: {version} · установлена вами",
@@ -299,10 +306,14 @@ export const messages = {
   "provider.settings.useDownloadedVersion": "Использовать от OpenBot",
   "provider.settings.cache": "Кэш",
   "provider.settings.promptCache": "Кэш промптов",
-  "provider.settings.promptCacheDescription": "Как долго Claude хранит контекст агента в кэше между ходами.",
+  "provider.settings.promptCacheDescription": "Как долго Claude и Pi хранят контекст агента в кэше между ходами.",
   "provider.settings.promptCacheHour": "1 час",
-  "provider.settings.promptCacheDefault": "По умолчанию Claude Code",
+  "provider.settings.promptCacheDefault": "По умолчанию у провайдера",
   "provider.settings.promptCacheLoadFailed": "Не удалось загрузить время кэша промптов этого сервера.",
+  "provider.settings.cacheExpiryCompaction": "Сжимать до истечения кэша",
+  "provider.settings.cacheExpiryCompactionDescription":
+    "Когда чат с контекстом от 200K токенов простаивает с кэшем на 1 час, агент сжимает контекст до истечения кэша. Тогда следующее сообщение не читает весь контекст заново без кэша.",
+  "provider.settings.cacheExpiryCompactionLoadFailed": "Не удалось загрузить настройку сжатия этого сервера.",
   "provider.settings.claudeSetup": "Claude Code",
   "provider.settings.claudeUserSetup": "Использовать мою настройку Claude Code",
   "provider.settings.claudeUserSetupDescription":

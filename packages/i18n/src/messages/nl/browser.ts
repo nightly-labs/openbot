@@ -40,6 +40,7 @@ export const messages = {
   "browser.tab.closeUnnamed": "Browsertabblad sluiten",
   "browser.newTab": "Nieuw browsertabblad",
   "browser.backToChat": "Terug naar chat",
+  "browser.fullView.open": "Openen in volledige weergave",
   "browser.goBack": "Terug",
   "browser.goForward": "Vooruit",
   "browser.reload": "Pagina opnieuw laden",
@@ -58,6 +59,8 @@ export const messages = {
   "browser.pip.close": "Browserpop-up sluiten",
   "browser.pip.reattachFailed": "OpenBot kon de browser niet terugzetten.",
   "browser.pip.closeFailed": "OpenBot kon de browserpop-up niet sluiten.",
+  "browser.window.open": "Browser openen in nieuw venster",
+  "browser.window.openFailed": "OpenBot kon het browservenster niet openen.",
   "browser.popupBlocked.title": "Pop-up geblokkeerd",
   "browser.popupBlocked.dismiss": "Pop-upmelding sluiten",
   "browser.liveView.label": "Live weergave van de pagina op de server",
@@ -99,6 +102,7 @@ export const messages = {
   "browser.secret.submitting": "Versturen…",
   "browser.secret.takeOver": "Overnemen",
   "browser.secret.failed": "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer het opnieuw.",
+  "browser.secret.ended": "Dit aanmeldverzoek is beëindigd. Vraag de agent het nog eens te proberen.",
   "browser.secret.vaultSkip.agentScript":
     "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent een script op deze pagina heeft uitgevoerd. Vraag de agent de pagina opnieuw te laden en het nog eens te proberen.",
   "browser.secret.vaultSkip.fieldKind":

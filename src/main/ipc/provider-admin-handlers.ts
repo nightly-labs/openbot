@@ -39,6 +39,11 @@ import {
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import {
+  decodeLiveVoiceAccount,
+  LIVE_VOICE_ACCOUNT_CAPABILITY,
+  LIVE_VOICE_ACCOUNT_ROUTES,
+} from "@openbot/contracts/team-protocol/live-voice-account-v1";
+import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-code-v1";
@@ -125,6 +130,7 @@ import {
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  parseSetLiveVoiceAccountInput,
   parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
@@ -341,7 +347,7 @@ export function providerAdminIpcHandlers({
   return {
     providerAdmin: {
       startCodeLogin: scopedHandler(parseProviderId, {
-        local: (provider) => runCauseEffect(service.startProviderCodeLogin(provider)),
+        local: (provider) => runCauseEffect(service.startProviderCodeLogin(provider, true)),
         remote: (provider, serverId) =>
           remote(serverId, signInRoutes(serverId, provider).codeLoginStart, { provider }, decodeProviderCodeLoginStart),
       }),
@@ -400,11 +406,23 @@ export function providerAdminIpcHandlers({
                 })
                 .pipe(Effect.orElseSucceed(() => null))
             : Effect.succeed(null);
+          const liveVoice = remoteServers.supportsCapability(serverId, LIVE_VOICE_ACCOUNT_CAPABILITY)
+            ? remoteServers
+                .request(serverId, LIVE_VOICE_ACCOUNT_ROUTES.settings, decodeLiveVoiceAccount, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(
+                  Effect.map((accountId) => ({ accountId })),
+                  Effect.orElseSucceed(() => null),
+                )
+            : Effect.succeed(null);
           return runCauseEffect(
-            Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
-              Effect.map(([accounts, extra, pooled]) => {
+            Effect.all([list, models, pools, liveVoice], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled, voice]) => {
                 const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
-                return pooled ? { ...withModels, pools: pooled } : withModels;
+                const withPools = pooled ? { ...withModels, pools: pooled } : withModels;
+                return voice ? { ...withPools, liveVoiceAccount: voice.accountId } : withPools;
               }),
             ),
           );
@@ -473,6 +491,19 @@ export function providerAdminIpcHandlers({
             throw new Error(sourceText("error.team.providersUnsupported"));
           return runCauseEffect(
             remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.update, acceptEmpty, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
+      setLiveVoiceAccount: scopedHandler(parseSetLiveVoiceAccountInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, LIVE_VOICE_ACCOUNT_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, LIVE_VOICE_ACCOUNT_ROUTES.update, acceptEmpty, {
               method: "POST",
               body: input,
             }),

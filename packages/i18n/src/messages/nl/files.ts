@@ -72,6 +72,8 @@ export const messages = {
   "files.library.agents": "Agents",
   "files.library.allAgents": { one: "{count} agent", other: "Alle {count} agents" },
   "files.library.folders": "Mappen",
+  "files.library.workflows": "Workflows",
+  "files.library.workflowsOf": "Workflows in {name}",
   "files.library.favorite": "{name} als favoriet",
   "files.folder.new": "Nieuwe map",
   "files.folder.name": "Mapnaam",
@@ -202,6 +204,8 @@ export const messages = {
   "files.conversation.title": "Bestanden",
   "files.conversation.summary": "{files} · chat {size}",
   "files.conversation.close": "Bestanden sluiten",
+  "files.conversation.workspace": "Werkruimtemap",
+  "files.conversation.workspaces": "Werkruimtemappen",
   "files.conversation.emptyTitle": "Geen bestanden in deze chat",
   "files.conversation.emptyDescription": "Bestanden die je bijvoegt en bestanden die de agent maakt, verschijnen hier.",
 } as const satisfies PartialTranslation<typeof source>;

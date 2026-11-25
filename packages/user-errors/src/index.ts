@@ -21,6 +21,7 @@ export type UserErrorKind =
   | "read-only"
   | "conflict"
   | "service"
+  | "clock"
   | "interrupted"
   | "unknown";
 
@@ -36,6 +37,7 @@ const USER_ERROR_COPY = {
   permission: "error.kind.permission",
   "rate-limit": "error.kind.rateLimit",
   service: "error.kind.service",
+  clock: "error.kind.clock",
   interrupted: "error.kind.interrupted",
 } as const satisfies Record<Exclude<UserErrorKind, "unknown">, keyof SourceMessages>;
 
@@ -53,6 +55,8 @@ const AUTH_SIGNALS =
 
 const RATE_LIMIT_SIGNALS = /\b429\s+too many requests\b|\blast status:\s*429\b|"status"\s*:\s*429\b/iu;
 
+const CLOCK_SIGNALS = /\bCERT_NOT_YET_VALID\b|\bcertificate is not yet valid\b/iu;
+
 const INTERRUPTED_ANSWER = /\bstream disconnected before completion\b/iu;
 const CONTENT_FILTER_STOP = /\bcontent_filter\b/u;
 
@@ -67,7 +71,8 @@ export function classifyUserError(error: unknown): UserErrorKind {
   if (
     code === "ETIMEDOUT" ||
     code === "ERR_CONNECTION_TIMED_OUT" ||
-    (error instanceof Error && error.name === "TimeoutError")
+    (error instanceof Error && error.name === "TimeoutError") ||
+    errorReference(error) === "error/TimeoutError"
   ) {
     return "timeout";
   }
@@ -81,6 +86,7 @@ export function classifyUserError(error: unknown): UserErrorKind {
   if (/^(?:HTTP )?429(?:\b|:)/u.test(message)) return "rate-limit";
   if (/^(?:HTTP )?5\d\d(?:\b|:)/u.test(message)) return "service";
   if (RATE_LIMIT_SIGNALS.test(message)) return "rate-limit";
+  if (CLOCK_SIGNALS.test(message)) return "clock";
   if (AUTH_SIGNALS.test(message)) return "auth";
   if (INTERRUPTED_ANSWER.test(message) && !CONTENT_FILTER_STOP.test(message)) return "interrupted";
   return "unknown";

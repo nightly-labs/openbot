@@ -107,6 +107,9 @@ export const messages = {
   "mobile.marketplace.app.stepOpen": "Abre la página de inicio de sesión de {name}.",
   "mobile.marketplace.app.stepAllow": "Inicia sesión y permite el acceso.",
   "mobile.marketplace.app.stepReturn": "Vuelve aquí. {name} se conecta en tu servidor.",
+  "mobile.marketplace.app.stepBlank": "La última página no carga. Es lo correcto.",
+  "mobile.marketplace.app.stepCopy": "Toca la barra de direcciones y copia la dirección completa.",
+  "mobile.marketplace.app.stepPaste": "Vuelve a OpenBot y pega la dirección abajo.",
   "mobile.marketplace.app.openSignIn": "Abrir inicio de sesión",
   "mobile.marketplace.app.keySecure": "La clave solo va a tu servidor, por una conexión cifrada.",
   "mobile.marketplace.app.connecting": "Conectando",
@@ -123,8 +126,6 @@ export const messages = {
     "Esta app pide iniciar sesión en el navegador. Actualiza OpenBot en el servidor o conecta la app en el ordenador.",
   "mobile.marketplace.app.waiting": "Esperando la página de inicio de sesión…",
   "mobile.marketplace.app.openAgain": "Abrir de nuevo la página de inicio de sesión",
-  "mobile.marketplace.app.pasteHint":
-    "Al final, la página abre una dirección que no carga. Copia esa dirección y pégala abajo.",
   "mobile.marketplace.app.pasteLabel": "Dirección tras iniciar sesión",
   "mobile.marketplace.app.pasteInvalid": "Esta dirección no es el final de este inicio de sesión.",
   "mobile.marketplace.app.finishSignIn": "Terminar",
